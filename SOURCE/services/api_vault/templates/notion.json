@@ -1,0 +1,11 @@
+{
+  "service_name": "notion",
+  "description": "Notion workspace — read/write pages, databases, and blocks",
+  "base_url": "https://api.notion.com/v1",
+  "docs_url": "https://developers.notion.com",
+  "capabilities": ["read_pages", "search", "create_page", "update_page", "query_database"],
+  "auth_type": "bearer_token",
+  "rate_limits": {"requests_per_second": 3},
+  "header_name": "Authorization",
+  "header_prefix": "Bearer"
+}

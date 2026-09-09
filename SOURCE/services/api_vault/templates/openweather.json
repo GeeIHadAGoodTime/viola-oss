@@ -1,0 +1,11 @@
+{
+  "service_name": "openweather",
+  "description": "OpenWeatherMap — current weather, forecasts, and historical data worldwide",
+  "base_url": "https://api.openweathermap.org/data/2.5",
+  "docs_url": "https://openweathermap.org/api",
+  "capabilities": ["current_weather", "forecast", "air_quality", "geocoding"],
+  "auth_type": "api_key",
+  "rate_limits": {"requests_per_minute": 60},
+  "header_name": "appid",
+  "header_prefix": ""
+}

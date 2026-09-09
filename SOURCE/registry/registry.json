@@ -1,0 +1,52 @@
+[
+  {
+    "name": "weather",
+    "description": "Current weather conditions and forecasts via wttr.in",
+    "author": "NOVVIOLA",
+    "repo_url": "builtin:weather",
+    "version": "1.0.0",
+    "min_viola_version": "1.0",
+    "tags": ["weather", "forecast", "utility"],
+    "intent_keywords": ["weather", "temperature", "forecast", "rain", "sunny", "cold", "hot", "umbrella"]
+  },
+  {
+    "name": "timer",
+    "description": "Set, cancel, and check countdown timers",
+    "author": "NOVVIOLA",
+    "repo_url": "builtin:timer",
+    "version": "1.0.0",
+    "min_viola_version": "1.0",
+    "tags": ["timer", "alarm", "utility"],
+    "intent_keywords": ["timer", "alarm", "countdown", "minutes", "seconds", "remind", "remind me"]
+  },
+  {
+    "name": "system-info",
+    "description": "System resource monitoring (CPU, memory, disk, uptime)",
+    "author": "NOVVIOLA",
+    "repo_url": "builtin:system-info",
+    "version": "1.0.0",
+    "min_viola_version": "1.0",
+    "tags": ["system", "monitoring", "utility"],
+    "intent_keywords": ["system", "cpu", "memory", "disk", "uptime", "battery", "status"]
+  },
+  {
+    "name": "calendar",
+    "description": "Query and manage calendar events (Google Calendar, local fallback)",
+    "author": "NOVVIOLA",
+    "repo_url": "builtin:calendar",
+    "version": "1.0.0",
+    "min_viola_version": "1.0",
+    "tags": ["calendar", "schedule", "utility"],
+    "intent_keywords": ["calendar", "schedule", "meeting", "event", "appointment", "agenda", "free"]
+  },
+  {
+    "name": "smart-home",
+    "description": "Control smart home devices (lights, thermostat, switches)",
+    "author": "Community",
+    "repo_url": "https://github.com/example/viola-smart-home",
+    "version": "0.1.0",
+    "min_viola_version": "1.0",
+    "tags": ["smart-home", "iot", "lights"],
+    "intent_keywords": ["lights", "turn on", "turn off", "brightness", "thermostat", "temperature", "home"]
+  }
+]

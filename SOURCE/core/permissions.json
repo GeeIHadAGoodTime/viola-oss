@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "viola-permissions-v1",
+  "description": "Legacy feature availability reference. Viola pricing is spending caps, not ability blocks; plan tiers must not restrict feature access.",
+  "features": {
+    "multi_node": {
+      "tiers": ["free", "pro"],
+      "description": "Multiple Hub/Spoke nodes in the mesh"
+    },
+    "cloud_intelligence": {
+      "tiers": ["free", "pro"],
+      "requires_api_key": false,
+      "description": "Bundled cloud LLM/STT access, capped by managed spend"
+    },
+    "custom_api_key": {
+      "tiers": ["free", "pro"],
+      "description": "Bring-your-own API key for cloud providers"
+    },
+    "local_intelligence": {
+      "tiers": ["free", "pro"],
+      "description": "Local LLM/STT via Ollama, LM Studio, llama.cpp, etc."
+    },
+    "automations": {
+      "tiers": ["free", "pro"],
+      "description": "Time-based and event-based automation routines"
+    },
+    "multi_provider": {
+      "tiers": ["free", "pro"],
+      "description": "Multiple music providers linked simultaneously"
+    },
+    "wake_word": {
+      "tiers": ["free", "pro"],
+      "description": "Always-on wake word detection (OpenWakeWord)"
+    },
+    "multi_room_sync": {
+      "tiers": ["free", "pro"],
+      "description": "Synchronized multi-room audio playback"
+    },
+    "contextual_memory": {
+      "tiers": ["free", "pro"],
+      "description": "Cross-session conversation memory and preferences"
+    },
+    "voice_first": {
+      "tiers": ["free", "pro"],
+      "description": "Full voice-first experience with TTS responses"
+    },
+    "single_provider": {
+      "tiers": ["free", "pro"],
+      "description": "Single music provider (YouTube Music, Spotify, etc.)"
+    },
+    "manual_controls": {
+      "tiers": ["free", "pro"],
+      "description": "Manual UI controls for music playback"
+    },
+    "push_to_talk": {
+      "tiers": ["free", "pro"],
+      "description": "Push-to-talk voice input"
+    }
+  },
+  "tiers": {
+    "free": {
+      "display_name": "Free",
+      "description": "Full product surface with starter spending and usage caps"
+    },
+    "pro": {
+      "display_name": "Pro",
+      "description": "Full product surface with higher spending and usage caps"
+    }
+  },
+  "defaults": {
+    "tier": "free",
+    "upgrade_prompt": "Usage cap reached. Upgrade or add credit for more allowance."
+  }
+}

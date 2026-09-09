@@ -1,0 +1,10 @@
+{
+  "name": "timers",
+  "version": "1.0.0",
+  "api_version": "1.0",
+  "description": "Set timers and alarms",
+  "author": "Viola Team",
+  "permissions": [],
+  "entry_point": "plugin.py",
+  "dependencies": []
+}

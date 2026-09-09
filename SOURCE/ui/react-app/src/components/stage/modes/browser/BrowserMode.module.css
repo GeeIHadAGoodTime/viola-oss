@@ -1,0 +1,252 @@
+@import '../../../../styles/variables.css';
+
+.container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 360px;
+  display: grid;
+  grid-template-rows: 48px minmax(0, 1fr) auto;
+  background: #090b0f;
+  color: var(--text-primary);
+  overflow: hidden;
+}
+
+.topBar {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: rgba(9, 11, 15, 0.94);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  z-index: 4;
+}
+
+.urlPill,
+.activityPill,
+.controlButton,
+.takeoverBar {
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(14px);
+}
+
+.urlPill {
+  min-width: 0;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid;
+  border-radius: 8px;
+  padding: 0 10px;
+}
+
+.lockIcon {
+  width: 14px;
+  height: 14px;
+  display: inline-flex;
+  color: var(--status-green);
+  flex-shrink: 0;
+}
+
+.urlText {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 13px;
+  line-height: 1;
+}
+
+.activityPill {
+  height: 32px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 0 10px;
+  color: rgba(255, 255, 255, 0.76);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.activityPill[data-active='true'] {
+  color: #ffffff;
+  border-color: rgba(60, 220, 130, 0.34);
+}
+
+.pulseDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--status-green);
+  animation: browserPulse 1.5s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+.spinner {
+  width: 13px;
+  height: 13px;
+  border: 2px solid rgba(255, 255, 255, 0.18);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: browserSpin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.controlButton {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.16s ease, color 0.16s ease, border-color 0.16s ease;
+}
+
+.controlButton:hover,
+.controlButton[aria-pressed='true'] {
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.24);
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.surface {
+  position: relative;
+  min-height: 0;
+  background: #000000;
+  overflow: hidden;
+}
+
+.streamSurface {
+  cursor: crosshair;
+}
+
+.frame {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000000;
+  pointer-events: none;
+}
+
+.frameFade {
+  opacity: 0;
+  transition: opacity 150ms ease-out;
+  z-index: 1;
+}
+
+.frameCurrent {
+  opacity: 1;
+  transition: opacity 150ms ease-in;
+  z-index: 2;
+}
+
+.waitingState {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 13px;
+}
+
+.takeoverBar {
+  position: relative;
+  margin: 0 12px 12px;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid rgba(234, 179, 8, 0.34);
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: #f8d36b;
+  font-size: 13px;
+  z-index: 5;
+}
+
+.takeoverBar span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.takeoverBar button {
+  height: 28px;
+  border: 1px solid rgba(234, 179, 8, 0.42);
+  border-radius: 8px;
+  background: rgba(234, 179, 8, 0.1);
+  color: #f8d36b;
+  padding: 0 10px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.takeoverBar button:hover {
+  background: rgba(234, 179, 8, 0.18);
+}
+
+@media (max-width: 767px) {
+  .container {
+    min-height: 320px;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+  }
+
+  .topBar {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+  }
+
+  .activityPill {
+    display: none;
+  }
+
+  .controls {
+    gap: 6px;
+  }
+
+  .takeoverBar {
+    flex-wrap: wrap;
+    margin: 0 8px 8px;
+  }
+
+  .takeoverBar button {
+    width: 100%;
+  }
+}
+
+@keyframes browserPulse {
+  0%,
+  100% {
+    opacity: 0.52;
+    transform: scale(0.92);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes browserSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}

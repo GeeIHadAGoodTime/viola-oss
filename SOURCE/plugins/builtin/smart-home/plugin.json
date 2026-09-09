@@ -1,0 +1,9 @@
+{
+  "name": "smart-home",
+  "version": "0.1.0",
+  "api_version": "1.0",
+  "description": "Control smart home devices (lights, thermostat, switches)",
+  "author": "Community",
+  "permissions": ["network"],
+  "entry_point": "__init__.py"
+}

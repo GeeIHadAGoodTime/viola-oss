@@ -1,0 +1,11 @@
+{
+  "service_name": "slack",
+  "description": "Slack — send messages, list channels, search message history",
+  "base_url": "https://slack.com/api",
+  "docs_url": "https://api.slack.com/methods",
+  "capabilities": ["send_message", "list_channels", "search_messages", "list_users"],
+  "auth_type": "bearer_token",
+  "rate_limits": {"requests_per_minute": 50},
+  "header_name": "Authorization",
+  "header_prefix": "Bearer"
+}

@@ -1,0 +1,11 @@
+# Install only into a dedicated Python 3.11 environment.
+# See optional/deepfilter-runtime/README.md. No torchaudio is required.
+./optional/deepfilter-runtime
+deepfilterlib==0.5.6
+numpy==1.26.4
+packaging==23.2
+torch==2.14.0
+scipy==1.16.3
+soundfile==0.13.1
+setuptools==84.0.0
+pip==26.2.1

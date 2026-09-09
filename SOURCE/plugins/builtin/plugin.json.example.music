@@ -1,0 +1,10 @@
+{
+  "name": "music",
+  "version": "1.0.0",
+  "api_version": "1.0",
+  "description": "Music player control and playlist management",
+  "author": "Viola Team",
+  "permissions": [],
+  "entry_point": "music_plugin.py",
+  "dependencies": []
+}

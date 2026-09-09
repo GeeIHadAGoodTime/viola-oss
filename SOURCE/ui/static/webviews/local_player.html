@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Viola Local Audio Player</title>
+	<style>
+		html,
+		body {
+			margin: 0;
+			padding: 0;
+			width: 100%;
+			height: 100%;
+			overflow: hidden;
+			background: #000;
+			color: #fff;
+			font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+		}
+
+		#status {
+			position: absolute;
+			top: 50%;
+			left: 50%;
+			transform: translate(-50%, -50%);
+			text-align: center;
+			font-size: 14px;
+			opacity: 0.6;
+		}
+	</style>
+	<!-- QWebChannel for Qt <-> JS communication -->
+	<script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+	<script>
+		// QWebChannel bridge (set up when available)
+		var qt_bridge = null;
+		if (typeof QWebChannel !== 'undefined' && window.qt && window.qt.webChannelTransport) {
+			new QWebChannel(window.qt.webChannelTransport, function (channel) {
+				qt_bridge = channel.objects.qt_bridge;
+				console.log('[Viola Local Player] QWebChannel connected');
+			});
+		}
+	</script>
+</head>
+
+<body>
+	<audio id="player" preload="auto"></audio>
+	<div id="status">Loading...</div>
+
+	<script>
+		(function () {
+			'use strict';
+
+			var audio = document.getElementById('player');
+			var statusEl = document.getElementById('status');
+
+			// YouTube IFrame API state codes (for compatibility)
+			var YT_UNSTARTED = -1;
+			var YT_ENDED = 0;
+			var YT_PLAYING = 1;
+			var YT_PAUSED = 2;
+
+			var currentState = YT_UNSTARTED;
+			var positionInterval = null;
+
+			function isAllowedSource(src) {
+				try {
+					var url = new URL(src, window.location.origin);
+					return url.origin === window.location.origin &&
+						url.pathname.indexOf('/api/v1/media/stream/') === 0;
+				} catch (e) {
+					return false;
+				}
+			}
+
+			// ----------------------------------------------------------
+			// URL param parsing
+			// ----------------------------------------------------------
+			var params = new URLSearchParams(window.location.search);
+			var srcUrl = params.get('src');
+			var autoplay = params.get('autoplay') === '1';
+
+			// ----------------------------------------------------------
+			// State broadcast (matches YouTube embed format)
+			// ----------------------------------------------------------
+			function broadcastState(state) {
+				currentState = state;
+				var msg = {
+					type: 'yt_iframe_state',
+					payload: {
+						state: state,
+						currentTime: audio.currentTime || 0,
+						duration: audio.duration || 0,
+						videoId: null
+					}
+				};
+
+				// postMessage to parent (React SmartDisplay reads this)
+				try {
+					if (window.parent && window.parent !== window) {
+						window.parent.postMessage(msg, window.location.origin);
+					}
+				} catch (e) { /* cross-origin */ }
+
+				// QWebChannel bridge for Qt native
+				if (qt_bridge && typeof qt_bridge.onYouTubeStateChange === 'function') {
+					qt_bridge.onYouTubeStateChange(JSON.stringify(msg));
+				}
+			}
+
+			// Position updates every 250ms while playing
+			function startPositionUpdates() {
+				stopPositionUpdates();
+				positionInterval = setInterval(function () {
+					if (!audio.paused && !audio.ended) {
+						broadcastState(YT_PLAYING);
+					}
+				}, 250);
+			}
+
+			function stopPositionUpdates() {
+				if (positionInterval !== null) {
+					clearInterval(positionInterval);
+					positionInterval = null;
+				}
+			}
+
+			// ----------------------------------------------------------
+			// Audio element events
+			// ----------------------------------------------------------
+			audio.addEventListener('play', function () {
+				statusEl.style.display = 'none';
+				broadcastState(YT_PLAYING);
+				startPositionUpdates();
+			});
+
+			audio.addEventListener('pause', function () {
+				broadcastState(YT_PAUSED);
+				stopPositionUpdates();
+			});
+
+			audio.addEventListener('ended', function () {
+				broadcastState(YT_ENDED);
+				stopPositionUpdates();
+			});
+
+			audio.addEventListener('error', function (e) {
+				console.error('[Viola Local Player] Audio error:', e);
+				statusEl.textContent = 'Playback error';
+				statusEl.style.display = 'block';
+				broadcastState(YT_ENDED);
+				stopPositionUpdates();
+			});
+
+			audio.addEventListener('loadedmetadata', function () {
+				console.log('[Viola Local Player] Metadata loaded: duration=' + audio.duration);
+			});
+
+			// ----------------------------------------------------------
+			// Incoming commands (postMessage from parent)
+			// ----------------------------------------------------------
+			window.addEventListener('message', function (event) {
+				if (event.origin !== window.location.origin) return;
+				var data = event.data;
+				if (!data || typeof data !== 'object') return;
+
+				switch (data.type || data.command) {
+					case 'viola_play':
+						if (data.src && isAllowedSource(data.src)) {
+							audio.src = data.src;
+						}
+						audio.play().catch(function (e) {
+							console.warn('[Viola Local Player] Play failed:', e);
+						});
+						break;
+					case 'viola_pause':
+						audio.pause();
+						break;
+					case 'viola_resume':
+						audio.play().catch(function () { });
+						break;
+					case 'viola_seek':
+						if (typeof data.time === 'number') {
+							audio.currentTime = data.time;
+						}
+						break;
+					case 'viola_stop':
+						audio.pause();
+						audio.currentTime = 0;
+						broadcastState(YT_ENDED);
+						stopPositionUpdates();
+						break;
+					case 'viola_volume':
+						if (typeof data.volume === 'number') {
+							audio.volume = Math.max(0, Math.min(1, data.volume));
+						}
+						break;
+				}
+			});
+
+			// ----------------------------------------------------------
+			// Direct API for QWebChannel / scripting
+			// (matches window.violaYoutube pattern)
+			// ----------------------------------------------------------
+			window.violaLocal = {
+				play: function (src) {
+					if (src && isAllowedSource(src)) audio.src = src;
+					audio.play().catch(function () { });
+				},
+				pause: function () {
+					audio.pause();
+				},
+				resume: function () {
+					audio.play().catch(function () { });
+				},
+				stop: function () {
+					audio.pause();
+					audio.currentTime = 0;
+					broadcastState(YT_ENDED);
+					stopPositionUpdates();
+				},
+				seekTo: function (sec) {
+					audio.currentTime = sec;
+				},
+				setVolume: function (v) {
+					audio.volume = Math.max(0, Math.min(1, v));
+				},
+				getState: function () {
+					return {
+						state: currentState,
+						currentTime: audio.currentTime || 0,
+						duration: audio.duration || 0
+					};
+				},
+				isPlaying: function () {
+					return !audio.paused && !audio.ended;
+				}
+			};
+
+			// ----------------------------------------------------------
+			// Auto-load and optionally auto-play
+			// ----------------------------------------------------------
+			if (srcUrl) {
+				if (!isAllowedSource(srcUrl)) {
+					statusEl.textContent = 'Invalid audio source';
+					return;
+				}
+				audio.src = srcUrl;
+				if (autoplay) {
+					audio.play().catch(function (e) {
+						console.warn('[Viola Local Player] Autoplay blocked:', e);
+						statusEl.textContent = 'Click to play';
+						statusEl.style.display = 'block';
+						document.body.addEventListener('click', function onclick() {
+							audio.play().catch(function () { });
+							document.body.removeEventListener('click', onclick);
+						}, { once: true });
+					});
+				}
+			} else {
+				statusEl.textContent = 'No audio source';
+			}
+		})();
+	</script>
+</body>
+
+</html>

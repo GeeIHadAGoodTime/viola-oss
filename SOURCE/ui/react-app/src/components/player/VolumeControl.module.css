@@ -1,0 +1,84 @@
+@import '../../styles/variables.css';
+
+.container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.slider {
+  width: 80px;
+  height: 4px;
+  appearance: none;
+  -webkit-appearance: none;
+  border-radius: 2px;
+  cursor: pointer;
+  outline: none;
+  /* Fill/track drawn from CSS (was an inline style) so mobile can grow the tap
+   * area without repainting the whole 44px box as a thick bar. --vol-fill is
+   * the volume percentage, set inline by VolumeControl.jsx. */
+  background: linear-gradient(
+    to right,
+    white var(--vol-fill, 0%),
+    var(--text-faint) var(--vol-fill, 0%)
+  );
+}
+
+.slider::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: white;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.container:hover .slider::-webkit-slider-thumb {
+  opacity: 1;
+}
+
+.slider::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: white;
+  cursor: pointer;
+  border: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.container:hover .slider::-moz-range-thumb {
+  opacity: 1;
+}
+
+.slider:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Touch devices: expand the slider's vertical tap area to 44px while keeping
+ * the visible track a thin 4px band centered in that area. */
+@media (max-width: 1023px) {
+  .slider {
+    height: 44px;
+    border-radius: 0;
+    background:
+      linear-gradient(
+        to right,
+        white var(--vol-fill, 0%),
+        var(--text-faint) var(--vol-fill, 0%)
+      )
+      center / 100% 4px no-repeat;
+  }
+}
+
+@media (max-width: 480px) {
+  .slider {
+    width: 72px;
+  }
+}

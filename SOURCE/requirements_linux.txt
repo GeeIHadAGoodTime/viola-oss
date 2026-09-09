@@ -1,0 +1,196 @@
+# Viola Linux Desktop Requirements
+#
+# Runtime dependencies for the Linux desktop build (AppImage + source install).
+# Goal: parity with requirements_desktop.txt so a Linux user gets the SAME
+# capability surface as Windows (login, voice/wake, agent, music, playback,
+# phone, settings). The ONLY things dropped from the desktop set are packages
+# that are genuinely Windows-only (WASAPI/COM/Win32) — every cross-platform
+# runtime dep is kept. See the "Windows-only — intentionally excluded" block
+# at the bottom for what was dropped and why.
+#
+# Pinned for reproducible builds. Keep in lockstep with requirements_desktop.txt
+# when a cross-platform dependency is added or bumped there.
+
+# Core dependencies
+PySide6==6.8.1.1
+PySide6-Addons==6.8.1.1
+shiboken6==6.8.1.1
+
+# WebEngine for YouTube embedded playback
+# QtWebEngineCore + QtWebEngineWidgets ship inside PySide6-Addons.
+# IMPORTANT: the PyInstaller build still needs the Qt WebEngine helper binaries
+# (QtWebEngineProcess, ICU/locale data, the bundled Chromium). PyInstaller's
+# PySide6 hook collects these automatically; the AppImage recipe additionally
+# verifies QtWebEngineProcess landed in the bundle (build_appimage.sh).
+
+# Async support
+qasync>=0.27.0,<1.0.0
+
+# Environment variables
+python-dotenv==1.2.2  # SECURITY: 1.2.2 fixes CVE-2026-28684 (symlink file overwrite in set_key/unset_key)
+
+# Process management for graceful shutdown
+psutil==7.1.3
+
+# Existing Viola dependencies / AI
+anthropic>=0.40.0,<1.0.0
+openai>=2.26.0,<3.0.0  # >=2.26.0 required by openai-agents SDK
+openai-agents>=0.13.0,<1.0.0  # OpenAI Agents SDK — used by OpenAIAgentsProvider + Codex path
+codex-auth>=0.1.1,<0.2.0  # Codex subscription OAuth — ChatGPT Plus/Pro as LLM source
+mcp>=1.27.0,<2.0.0  # MCP SDK for built-in tool servers, including computer-use
+asyncpg==0.29.0  # Required whenever VIOLA_DATABASE_URL points at Postgres
+sqlalchemy>=2.0.0,<3.0.0  # Required by websocket auth/session DB context helpers (auth.models chain)
+ytmusicapi==1.11.4  # YouTube Music API for autoplay radio
+loguru>=0.7.0,<1.0.0
+tenacity>=8.2.0,<9.0.0  # Retry logic for API calls
+tiktoken==0.11.0  # Accurate token counting for GPT models (95%+ accuracy vs heuristic)
+fastapi==0.133.1  # SEC #3335: 0.133 is the first fastapi whose dependency floor resolves starlette>=1.3.1 (pre-0.137, no router-tree change)
+starlette==1.3.1  # SEC #3335: pin the transitive ASGI core; starlette 0.50.0 carried CVE-2026-54283 (unauth form-limit-bypass DoS 7.5), CVE-2026-48818 (7.5), CVE-2026-48710 (BadHost host-header bypass), CVE-2026-48817, CVE-2026-54282 — all fixed in 1.3.1
+uvicorn==0.40.0
+python-multipart>=0.0.22,<0.1.0  # SECURITY: 0.0.22+ required (CVE fix)
+websockets==15.0.1
+websocket-client>=1.9.0,<2.0.0  # Synchronous client used by beta spoke websocket protocol tests
+pydantic==2.12.5
+email-validator>=2.1.0,<3.0.0  # Required by auth.models and Pydantic EmailStr
+jsonschema==4.25.1
+slowapi==0.1.9  # Rate limiting for API endpoints
+limits==3.14.1  # Direct dependency for shared IP/auth rate-limit storage strategies
+requests==2.34.2  # SECURITY: 2.34.2 fixes CVE-2026-25645 (insecure temp-file reuse in extract_zipped_paths)
+aiohttp>=3.13.3,<4.0.0  # SECURITY: 3.13.3+ required (CVE fix)
+httpx==0.28.1  # For Ollama/local LLM support and Google Gemini REST calls
+packaging>=24.0,<26.0  # Version parsing for runtime dependency validation
+sentry-sdk[fastapi]==2.60.0  # Opt-in error reporting
+beautifulsoup4>=4.12.0,<5.0.0  # HTML parsing for web_read content extraction
+lxml>=6.1.0,<7.0.0  # Faster/cleaner HTML parsing when available; >=6.1.0 patches CVE-2026-41066 XXE (#3332)
+aiofiles==25.1.0  # Required by Pipecat phone runtime
+python-vlc==3.0.21203  # VLC bindings with HTTPS header fixes (needs system libvlc — see install.sh)
+sounddevice==0.5.3  # PortAudio bindings for streaming backend playback (needs libportaudio2)
+
+# Phone calling (Telnyx + Pipecat)
+./third_party/pipecat  # Maintained 0.0.108+viola.1 fork; corpus-free sentence segmentation
+telnyx[webhooks]==4.86.0
+PyNaCl==1.6.2  # Required by Telnyx Ed25519 webhook signature verification
+phonenumbers==9.0.33
+
+# Speech-to-Text (default backend: faster-whisper)
+# CPU-only on Linux desktop by default; GPU users install CUDA/cuDNN separately.
+faster-whisper>=1.0.0,<2.0.0
+
+# TTS (optional Kokoro: install requirements_kokoro.txt)
+pyttsx3==2.99  # System TTS fallback — needs espeak-ng installed (see install.sh)
+babel>=2.17.0,<3.0.0        # Required by Pipecat Kokoro TTS service
+soundfile>=0.13.0,<0.14.0   # WAV/audio file I/O for TTS output (needs libsndfile)
+scipy==1.16.3       # Resampling for TTS (24kHz->16kHz) — fallback for soxr
+soxr>=1.0.0,<2.0.0  # High-quality resampling (preferred over scipy); >=1.0.0 required by pipecat-ai 0.0.107
+
+# Wake word detection
+# #4786: openwakeword IS required. Ground-truthed against the actual shipped
+# violawake_data/trained_models/temporal_cnn.onnx via onnxruntime: its ONNX
+# graph declares input "embeddings" shape (batch, 9, 96) -- the OpenWakeWord
+# embedding shape, not a raw mel-spectrogram -- so violawake/engine.py's
+# ViolaWake._load_model() always routes it through _load_onnx_mlp(), which
+# constructs openwakeword.utils.AudioFeatures to turn raw audio into those
+# embeddings before the classifier runs. Without openwakeword installed this
+# raises ImportError the moment the wake engine loads, which is what happens
+# on every Linux install (this entry was previously excluded on a stale
+# comment claiming the production model was "mel/CNN" and openwakeword-free
+# -- that premise predates whatever retrained/replaced temporal_cnn.onnx with
+# this embedding-based architecture, and nobody updated this file to match).
+# pyaudio IS required: voice/wake_detector/violawake_listener.py imports it at
+# module top, so the wake path fails to import without it. Needs system
+# portaudio19-dev / libportaudio2 (installed by install.sh).
+numpy==2.2.6
+onnxruntime>=1.17.0,<2.0.0
+pyaudio==0.2.14
+openwakeword==0.6.0  # matches requirements_desktop.txt's pin
+
+# Browser automation (spoke sessions, stream bridge, Spotify CDP)
+playwright==1.59.0  # Pin exact version — Chromium bundle must match QtWebEngine.
+# NOTE: `playwright install chromium` (or the system browser) is required once on
+# the target machine; the pip package ships only the driver, not the browser.
+
+# Commerce (Stripe checkout links for order flow)
+stripe>=7.0.0,<8.0.0
+
+# Messaging integrations
+python-telegram-bot==22.6  # Telegram bot adapter for messaging subsystem
+
+# Computer-use / desktop automation (cross-platform parts only)
+pyautogui>=0.9.50,<0.10.0  # Cross-platform mouse/keyboard control (needs X11/scrot on Linux)
+mss>=9.0,<10.0.0           # Fast multi-monitor screenshot capture
+Pillow>=12.2.0,<13.0.0     # Resize/encode captures; >=12.2.0 required (GHSA-r73j-pqj5-w3x7 / GHSA-wjx4-4jcj-g98j); also satisfies pipecat-ai 0.0.107's >=11.1.0 floor
+
+# Calendar integration
+caldav>=3.1.0,<4.0.0
+google-api-python-client>=2.100.0,<3.0.0
+google-auth-httplib2>=0.1.1,<0.2.0
+google-auth-oauthlib>=1.1.0,<2.0.0
+pyicloud>=1.0.0,<2.0.0
+dateparser>=1.2.0,<2.0.0
+croniter>=6.0.0,<7.0.0       # Cron expression parsing for scheduled automation
+
+# Contacts integration (#3282, read-only CardDAV/iCloud Contacts)
+defusedxml>=0.7.1,<1.0.0     # Hardened XML parsing for untrusted CardDAV server responses (bandit B314)
+vobject>=0.9.6,<1.0.0        # vCard parsing for CardDAV contacts. caldav 2.0 dropped it
+                             # as a runtime dep (test extra only), so #3282's "already
+                             # transitive via caldav" assumption left contacts raising
+                             # CardDAVDependencyError on every install.
+
+# High ROI Enhancements (Production-grade)
+cryptography>=50.0.0,<51.0.0  # SECURITY: 50.0.0 fixes CVE-2026-69247/69248/69249; supersedes the 48.0.1 OpenSSL bundle fix (GHSA-537c-gmf6-5ccf). Parity with desktop/macos.
+PyJWT==2.13.0  # JWT verification for auth secret rotation and Apple Sign-In.
+zstandard>=0.25.0,<1.0.0  # Trace v2 zstd compression; writer falls back to gzip if unavailable
+keyring>=24.0.0,<25.0.0  # OS keyring for master key storage. On Linux this is the
+                         # Secret Service (libsecret/gnome-keyring) backend — see L5.
+# Secret Service backend for `keyring` on Linux. WITHOUT these two, keyring's
+# backend auto-selection finds no usable backend and falls back to the inert
+# `keyring.backends.fail.Keyring`, whose get/set raise NoKeyringError. That
+# silently kills BOTH the credential store (utils/secure_credentials.py) and the
+# payment vault (services/payments/) on a stock Linux box — no amount of correct
+# code above keyring helps. `secretstorage` is the D-Bus Secret Service client;
+# `jeepney` is its pure-Python D-Bus transport. Both are Linux-only and are NOT
+# auto-collected by PyInstaller (keyring imports its backends dynamically), so
+# build_appimage.sh verifies they landed in the frozen bundle. They must ALSO be
+# added to viola.spec hiddenimports (L3-owned) for PyInstaller to collect them;
+# until then the build_appimage.sh require_find will fail closed rather than ship
+# a keyring-dead bundle.
+secretstorage>=3.3.0,<4.0.0 ; sys_platform == "linux"  # Secret Service (libsecret) keyring backend
+jeepney>=0.8.0,<1.0.0 ; sys_platform == "linux"         # Pure-Python D-Bus transport for secretstorage
+backports.tarfile>=1.2.0,<2.0.0  # Required by keyring/jaraco.context backport plugin loading
+
+# Velopack runtime bridge — Windows auto-update only. Kept on Linux so the
+# import in the shared updater module does not error; the Linux update path
+# (L4 / decision D2) does NOT use Velopack.
+velopack==0.0.1589.dev41669
+
+# Local music provider - fuzzy search for local file library
+rapidfuzz==3.14.3
+# Audio metadata extraction for local library scanner
+tinytag==2.2.1  # SECURITY: 2.2.1 fixes CVE-2026-32889 (DoS via unterminated SYLT frame)
+
+# Multi-room device discovery (mDNS/Bonjour)
+zeroconf==0.149.16     # LAN device discovery for multi-room sync
+
+# ---------------------------------------------------------------------------
+# Windows-only — intentionally excluded from the Linux build
+# ---------------------------------------------------------------------------
+# pyaec               — AEC pre-built wheel is Windows-only; no Linux wheel.
+#                       This does NOT disable AEC on Linux. The default `auto`
+#                       backend resolves to ViolaAEC (voice/wake_detector/
+#                       aec_viola.py — pure numpy+scipy FDAF with double-talk
+#                       detection), which is selected FIRST in
+#                       create_aec_processor() and works on Linux. pyaec is only
+#                       the optional SpeexDSP-MDF *fallback*; its absence drops
+#                       that one fallback, not Acoustic Echo Cancellation itself.
+#                       AEC degrades to noop only if ViolaAEC is also
+#                       unavailable (numpy/scipy missing) — both are required
+#                       deps above, so on a normal Linux build AEC is active.
+# pyaudiowpatch       — WASAPI loopback capture (Windows-only).
+# pycaw               — Windows Core Audio system-volume control.
+# comtypes            — COM bridge used by pycaw.
+# pywinauto           — Win32 UI automation via accessibility APIs.
+#
+# (openwakeword is NOT excluded here -- see the "Wake word detection" pin
+# above. #4786: it was previously excluded on a stale premise; see that pin's
+# comment for the ground-truthed reason it must stay.)
+-r requirements_bootstrap.txt

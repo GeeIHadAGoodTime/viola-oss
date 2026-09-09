@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Viola - Diagnostic Tool</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1a1a1a;
+            color: #fff;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            border-bottom: 2px solid #6366f1;
+            padding-bottom: 10px;
+        }
+        .section {
+            background: #2a2a2a;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .status {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .status.ok { background: #22c55e; }
+        .status.error { background: #f44336; }
+        .status.warning { background: #ff9800; }
+        button {
+            background: #6366f1;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #5558e3;
+        }
+        pre {
+            background: #1a1a1a;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .field {
+            margin: 10px 0;
+            padding: 10px;
+            background: #333;
+            border-radius: 4px;
+        }
+        .field-name {
+            font-weight: bold;
+            color: #6366f1;
+        }
+        .field-value {
+            color: #fff;
+            margin-left: 20px;
+        }
+        #ws-messages {
+            max-height: 300px;
+            overflow-y: auto;
+            background: #1a1a1a;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .ws-message {
+            padding: 5px;
+            margin: 2px 0;
+            background: #2a2a2a;
+            border-left: 3px solid #6366f1;
+            font-family: monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔧 Viola Diagnostic Tool</h1>
+
+    <!-- API Connection Test -->
+    <div class="section">
+        <h2>1. API Connection</h2>
+        <div id="api-status">Testing...</div>
+        <button onclick="testAPI()">Retest API</button>
+    </div>
+
+    <!-- Player State -->
+    <div class="section">
+        <h2>2. Player State (GET /v1/state)</h2>
+        <button onclick="fetchState()">Refresh State</button>
+        <div id="state-output"></div>
+    </div>
+
+    <!-- Queue Data -->
+    <div class="section">
+        <h2>3. Queue Data (GET /v1/queue)</h2>
+        <button onclick="fetchQueue()">Fetch Queue</button>
+        <div id="queue-output"></div>
+    </div>
+
+    <!-- WebSocket Monitor -->
+    <div class="section">
+        <h2>4. WebSocket Messages</h2>
+        <div id="ws-status">Disconnected</div>
+        <button onclick="connectWS()">Connect WebSocket</button>
+        <button onclick="clearMessages()">Clear Messages</button>
+        <div id="ws-messages"></div>
+    </div>
+
+    <!-- Browser Info -->
+    <div class="section">
+        <h2>5. Browser Information</h2>
+        <div id="browser-info"></div>
+    </div>
+
+    <!-- Test Queue Button -->
+    <div class="section">
+        <h2>6. Test Queue Button Function</h2>
+        <button onclick="testQueueButton()">Test openQueue()</button>
+        <div id="queue-test-output"></div>
+    </div>
+    <script type="module" src="/static/api.js"></script>
+    <script>
+        const apiFetch = (...args) => (window.apiFetch || window.fetch.bind(window))(...args);
+
+        let ws = null;
+        let messageCount = 0;
+
+        // Test API connection
+        async function testAPI() {
+            const statusEl = document.getElementById('api-status');
+            try {
+                const response = await apiFetch('/health');
+                const data = await response.json();
+                if (data.status === 'ok') {
+                    statusEl.innerHTML = `<span class="status ok">✓ Connected</span> Backend: ${data.backend}`;
+                } else {
+                    statusEl.innerHTML = `<span class="status error">✗ Error</span> ${JSON.stringify(data)}`;
+                }
+            } catch (error) {
+                statusEl.innerHTML = `<span class="status error">✗ Connection Failed</span> ${error.message}`;
+            }
+        }
+
+        // Fetch player state
+        async function fetchState() {
+            const output = document.getElementById('state-output');
+            try {
+                const response = await apiFetch('/v1/state');
+                const data = await response.json();
+
+                let html = '<div class="field"><span class="field-name">Raw JSON:</span><pre>' + JSON.stringify(data, null, 2) + '</pre></div>';
+
+                // Check critical fields
+                html += '<h3>Critical Fields Check:</h3>';
+                const checks = [
+                    {field: 'position', value: data.position, expected: 'number'},
+                    {field: 'duration', value: data.duration, expected: 'number'},
+                    {field: 'position_percentage', value: data.position_percentage, expected: 'number'},
+                    {field: 'now_playing', value: data.now_playing, expected: 'object or null'},
+                    {field: 'now_playing.title', value: data.now_playing?.title, expected: 'string'},
+                    {field: 'now_playing.artist', value: data.now_playing?.artist, expected: 'string'},
+                    {field: 'now_playing.video_id', value: data.now_playing?.video_id, expected: 'string'},
+                    {field: 'queue', value: data.queue, expected: 'array'},
+                ];
+
+                checks.forEach(check => {
+                    const exists = check.value !== undefined;
+                    const status = exists ? 'ok' : 'error';
+                    html += `<div class="field">
+                        <span class="status ${status}">${exists ? '✓' : '✗'}</span>
+                        <span class="field-name">${check.field}:</span>
+                        <span class="field-value">${JSON.stringify(check.value)}</span>
+                    </div>`;
+                });
+
+                output.innerHTML = html;
+            } catch (error) {
+                output.innerHTML = `<span class="status error">Error:</span> ${error.message}`;
+            }
+        }
+
+        // Fetch queue
+        async function fetchQueue() {
+            const output = document.getElementById('queue-output');
+            try {
+                const response = await apiFetch('/v1/queue');
+                const data = await response.json();
+                output.innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+            } catch (error) {
+                output.innerHTML = `<span class="status error">Error:</span> ${error.message}`;
+            }
+        }
+
+        // WebSocket connection
+        function connectWS() {
+            const statusEl = document.getElementById('ws-status');
+            const messagesEl = document.getElementById('ws-messages');
+
+            const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${wsProtocol}//${window.location.host}/ws/events`;
+
+            statusEl.innerHTML = `Connecting to ${wsUrl}...`;
+
+            try {
+                ws = new WebSocket(wsUrl);
+
+                ws.onopen = () => {
+                    statusEl.innerHTML = '<span class="status ok">✓ Connected</span>';
+                };
+
+                ws.onmessage = (event) => {
+                    messageCount++;
+                    const msg = document.createElement('div');
+                    msg.className = 'ws-message';
+                    msg.textContent = `[${messageCount}] ${new Date().toLocaleTimeString()}: ${event.data}`;
+                    messagesEl.appendChild(msg);
+                    messagesEl.scrollTop = messagesEl.scrollHeight;
+
+                    // Parse and highlight important fields
+                    try {
+                        const data = JSON.parse(event.data);
+                        if (data.type === 'state' && data.payload) {
+                            const payload = data.payload;
+                            if (payload.position !== undefined || payload.duration !== undefined) {
+                                msg.style.borderLeftColor = '#ff9800'; // Orange for state updates
+                            }
+                        }
+                    } catch (e) {}
+                };
+
+                ws.onerror = (error) => {
+                    statusEl.innerHTML = `<span class="status error">✗ Error</span> ${error}`;
+                };
+
+                ws.onclose = () => {
+                    statusEl.innerHTML = '<span class="status warning">Disconnected</span>';
+                };
+            } catch (error) {
+                statusEl.innerHTML = `<span class="status error">✗ Failed</span> ${error.message}`;
+            }
+        }
+
+        function clearMessages() {
+            document.getElementById('ws-messages').innerHTML = '';
+            messageCount = 0;
+        }
+
+        // Browser info
+        function showBrowserInfo() {
+            const info = document.getElementById('browser-info');
+            info.innerHTML = `
+                <div class="field"><span class="field-name">User Agent:</span><span class="field-value">${navigator.userAgent}</span></div>
+                <div class="field"><span class="field-name">Screen:</span><span class="field-value">${screen.width}x${screen.height}</span></div>
+                <div class="field"><span class="field-name">Window:</span><span class="field-value">${window.innerWidth}x${window.innerHeight}</span></div>
+                <div class="field"><span class="field-name">Cache Available:</span><span class="field-value">${'caches' in window}</span></div>
+            `;
+        }
+
+        // Test queue button
+        function testQueueButton() {
+            const output = document.getElementById('queue-test-output');
+            try {
+                // Check if function exists
+                if (typeof openQueue === 'function') {
+                    output.innerHTML = '<span class="status ok">✓ Function exists</span> Attempting to call...<br>';
+                    openQueue();
+                    setTimeout(() => {
+                        const modal = document.getElementById('queue-modal');
+                        if (modal) {
+                            const isVisible = window.getComputedStyle(modal).display !== 'none';
+                            if (isVisible) {
+                                output.innerHTML += '<span class="status ok">✓ Modal opened successfully!</span>';
+                            } else {
+                                output.innerHTML += '<span class="status error">✗ Modal exists but not visible</span>';
+                            }
+                        } else {
+                            output.innerHTML += '<span class="status error">✗ Modal element not found in DOM</span>';
+                        }
+                    }, 100);
+                } else {
+                    output.innerHTML = '<span class="status error">✗ Function openQueue() not found!</span><br>' +
+                                     'This means the main app.js is not loaded. Go to main page first.';
+                }
+            } catch (error) {
+                output.innerHTML = `<span class="status error">✗ Error:</span> ${error.message}<br>` +
+                                 `<pre>${error.stack}</pre>`;
+            }
+        }
+
+        // Auto-run tests on load
+        window.addEventListener('DOMContentLoaded', () => {
+            testAPI();
+            fetchState();
+            showBrowserInfo();
+        });
+    </script>
+</body>
+</html>

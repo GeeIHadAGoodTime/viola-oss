@@ -1,0 +1,171 @@
+/*
+ * Shared CSS custom properties for Viola Smart Display.
+ *
+ * These variables mirror THEME.colors from config.js but are used
+ * in CSS Modules. The actual values are updated at runtime via
+ * applyTheme() — these are the dark-mode defaults.
+ */
+
+/*
+ * App-wide display serif — the same Cormorant Garamond the marketing website
+ * and the first-run onboarding use, self-hosted so the Qt WebView CSP (which
+ * blocks external origins) can load it same-origin. Vite fingerprints the
+ * woff2 into /static/react/assets/ and rewrites this url(). Only the 600
+ * weight, latin subset, is shipped — it is used for display headings, so the
+ * payload stays tiny.
+ *
+ * This is the CANONICAL app-wide load. onboarding.css declares its own
+ * scoped @font-face for the same family/weight/file; that is harmless
+ * (identical src, deduped by the browser) and can be dropped once this lands.
+ * The woff2 itself is an identical-bytes add/add with the onboarding branch,
+ * so the merge is clean.
+ */
+@font-face {
+  font-family: 'Cormorant Garamond';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('./cormorant-garamond-600-latin.woff2') format('woff2');
+}
+
+:root {
+  /* Backgrounds */
+  --bg-void: #000000;
+  --bg-card: #0d0d0d;
+  --bg-elevated: #1a1a1a;
+  --bg-surface: #141414;
+
+  /* Text */
+  --text-bright: #fafafa;
+  --text-primary: rgba(255, 255, 255, 0.85);
+  --text-secondary: rgba(255, 255, 255, 0.65);
+  --text-tertiary: rgba(255, 255, 255, 0.55);
+  --text-muted: rgba(255, 255, 255, 0.45);
+  --text-disabled: rgba(255, 255, 255, 0.35);
+  --text-faint: rgba(255, 255, 255, 0.2);
+
+  /* Status */
+  --status-green: #22c55e;
+  --status-yellow: #eab308;
+  --status-red: #ef4444;
+
+  /* Borders */
+  --border-subtle: rgba(255, 255, 255, 0.04);
+  --border-light: rgba(255, 255, 255, 0.06);
+  --border-hover: rgba(255, 255, 255, 0.12);
+  --divider: rgba(255, 255, 255, 0.08);
+
+  /* Glass */
+  --glass-base: rgba(255, 255, 255, 0.07);
+  --glass-hover: rgba(255, 255, 255, 0.10);
+  --glass-active: rgba(255, 255, 255, 0.14);
+
+  /* Accent */
+  --accent: #6B2E1B;
+  --accent-rgb: 107, 46, 27;
+  --accent-glow: rgba(107, 46, 27, 0.3);
+  --accent-hover: rgba(107, 46, 27, 0.07);
+  --accent-subtle: rgba(107, 46, 27, 0.10);
+  --accent-active: rgba(107, 46, 27, 0.16);
+  --accent-ring: rgba(107, 46, 27, 0.14);
+  --accent-border: rgba(107, 46, 27, 0.40);
+  --focus-ring: #fbbf24;
+  --focus-ring-glow: rgba(251, 191, 36, 0.35);
+
+  /* Bronze warmth — the lamplight-on-wood embers shared with onboarding
+     (OnboardingOverlay's BRONZE / BRONZE_DEEP / EMBER_GLOW constants). The
+     mahogany --accent is the brand color; these lighter bronzes give warm
+     hairlines and glows on the dark surfaces. */
+  --bronze: #c98a68;
+  --bronze-deep: #7d3a22;
+  --bronze-hairline: rgba(201, 138, 104, 0.26);
+  --ember-glow: rgba(201, 138, 104, 0.55);
+
+  /* Shadows */
+  --shadow-light: rgba(0, 0, 0, 0.3);
+  --shadow-medium: rgba(0, 0, 0, 0.5);
+  --shadow-heavy: rgba(0, 0, 0, 0.65);
+  --shadow-deep: rgba(0, 0, 0, 0.8);
+  --overlay: rgba(0, 0, 0, 0.85);
+
+  /* Typography — one shared type system with the website + onboarding.
+     --font-display is the Cormorant Garamond serif, used for large display
+     headings (clock, now-playing title, modal titles). --font-sans is the UI
+     workhorse for body text, labels, and dense controls (the serif is NOT for
+     small/dense copy). --font-family is kept as a back-compat alias of the
+     sans stack. */
+  --font-display: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
+  --font-sans: system-ui, -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif;
+  --font-family: var(--font-sans);
+  --radius-sm: 8px;
+  --radius-md: 16px;
+  --radius-lg: 32px;
+
+  /* Scrollbars — match Settings tab style (canonical across the app) */
+  --scrollbar-size: 6px;
+  --scrollbar-thumb: var(--glass-active);
+  --scrollbar-thumb-hover: var(--text-faint);
+  --scrollbar-track: transparent;
+}
+
+/* Base UI font for the whole app. Individual display surfaces opt into the
+   serif via var(--font-display); everything else inherits this clean sans. */
+html,
+body {
+  font-family: var(--font-sans);
+}
+
+html,
+body,
+* {
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+  scrollbar-width: thin;
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar,
+*::-webkit-scrollbar {
+  width: var(--scrollbar-size);
+  height: var(--scrollbar-size);
+}
+
+html::-webkit-scrollbar-track,
+body::-webkit-scrollbar-track,
+*::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+  border-radius: 999px;
+}
+
+html::-webkit-scrollbar-thumb,
+body::-webkit-scrollbar-thumb,
+*::-webkit-scrollbar-thumb {
+  border-radius: 3px;
+  background: var(--scrollbar-thumb);
+}
+
+html::-webkit-scrollbar-thumb:hover,
+body::-webkit-scrollbar-thumb:hover,
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+}
+
+html::-webkit-scrollbar-corner,
+body::-webkit-scrollbar-corner,
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+:where(
+  a[href],
+  button,
+  input,
+  select,
+  textarea,
+  [role='button'],
+  [role='switch'],
+  [tabindex]:not([tabindex='-1'])
+):focus-visible {
+  outline: 2px solid var(--focus-ring) !important;
+  outline-offset: 3px !important;
+  box-shadow: 0 0 0 4px var(--focus-ring-glow) !important;
+}

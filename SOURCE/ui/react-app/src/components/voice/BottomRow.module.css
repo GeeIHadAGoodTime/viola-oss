@@ -1,0 +1,222 @@
+@import '../../styles/variables.css';
+
+.container {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 24px;
+  align-items: center;
+  padding-top: clamp(20px, 3vh, 36px);
+  min-width: 0;
+}
+
+/* AI Response area */
+.responseArea {
+  font-size: clamp(16px, 2.2vw, 22px);
+  line-height: 1.6;
+  min-height: 1.6em;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  margin-left: 2px;
+  vertical-align: middle;
+  animation: blink 1s infinite;
+}
+
+.loadingIndicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  animation: thinking-pulse 1.5s ease-in-out infinite;
+}
+
+.loadingSpinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  animation: cmd-loading-spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+.thinkingText {
+  animation: thinking-pulse 1.5s ease-in-out infinite;
+}
+
+/* PTT container */
+.pttContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.pttLabel {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  transition: color 0.15s ease;
+}
+
+/* Spoke chat */
+.spokeChatWrap {
+  position: relative;
+  margin-left: 12px;
+}
+
+.spokeChatButton {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.spokeChatButton:hover {
+  opacity: 0.85;
+}
+
+.spokeChatButton:focus-visible,
+.spokeSendBtn:focus-visible,
+.spokeCancelBtn:focus-visible,
+.spokeChatInput:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 4px var(--accent-glow);
+}
+
+.spokeChatPanel {
+  position: fixed;
+  bottom: calc(80px + env(safe-area-inset-bottom));
+  left: 16px;
+  right: 16px;
+  display: flex;
+  gap: 8px;
+  z-index: 10000;
+}
+
+.spokeChatInput {
+  flex: 1;
+  padding: 12px 16px;
+  font-size: 16px;
+  border-radius: 12px;
+  outline: none;
+}
+
+.spokeSendBtn {
+  padding: 12px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  border: none;
+  border-radius: 12px;
+  color: #fff;
+  cursor: pointer;
+}
+
+.spokeSendBtn:hover {
+  filter: brightness(1.1);
+}
+
+.spokeCancelBtn {
+  padding: 12px;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.spokeCancelBtn:hover {
+  filter: brightness(1.2);
+}
+
+/* Connection status */
+.connectionStatus {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+.statusDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.statusLabel {
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 1023px) {
+  .container {
+    gap: 18px;
+    padding-top: 22px;
+  }
+
+  .responseArea {
+    font-size: 18px;
+  }
+}
+
+@media (max-width: 767px) {
+  .container {
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      "response response"
+      "ptt status";
+    gap: 12px 16px;
+    padding-top: 14px;
+  }
+
+  .responseArea {
+    grid-area: response;
+    font-size: 16px;
+    line-height: 1.45;
+    max-height: 4.5em;
+    overflow-y: auto;
+  }
+
+  .pttContainer {
+    grid-area: ptt;
+    justify-self: start;
+  }
+
+  .connectionStatus {
+    grid-area: status;
+    justify-self: end;
+  }
+}
+
+@media (max-width: 480px) {
+  .container {
+    gap: 10px 12px;
+    padding-top: 12px;
+  }
+
+  .responseArea {
+    font-size: 15px;
+  }
+
+  .pttLabel {
+    font-size: 10px;
+    letter-spacing: 0;
+  }
+
+  .statusLabel {
+    max-width: 112px;
+  }
+}

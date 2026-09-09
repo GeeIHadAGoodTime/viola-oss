@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "source_manifest": "source-manifest.json",
+  "source_manifest_sha256": "6ccc943f59fc324fb719fb0d55d70b2272b2a22145cdb374c644e3e3239d3396",
+  "source_tree_sha256": "0bba93fe67af4a06c48a01477512b744d257dc681d68128fa4d4858a411e6646",
+  "source_file_count": 2457,
+  "retained_sboms": [
+    {
+      "path": "frontend.sbom.json",
+      "sha256": "a9926b948cad9e72004ade4d4fef7486a6e0ba22b62787614147626aabeeadc0",
+      "retained_metadata_timestamp": "2026-09-09T00:51:21.732Z",
+      "components": 431,
+      "dependency_edges_including_source_root": 903,
+      "package_dependency_edges": 880
+    },
+    {
+      "path": "windows-all-optional.sbom.json",
+      "sha256": "4667b8525ef9802cdb57df29e9b3cd84100895a2eee341ae3a34844bee577d14",
+      "retained_metadata_timestamp": "2026-09-09T01:23:03.209916+00:00",
+      "components": 229,
+      "dependency_edges_including_source_root": 442,
+      "package_dependency_edges": 353
+    },
+    {
+      "path": "windows-deepfilter.sbom.json",
+      "sha256": "cc2dec54893a6ebda23738b1f4252a5615bb6cd581d057602dae4f09b55fb582",
+      "retained_metadata_timestamp": "2026-09-09T01:23:07.366224+00:00",
+      "components": 28,
+      "dependency_edges_including_source_root": 36,
+      "package_dependency_edges": 27
+    },
+    {
+      "path": "windows-desktop.sbom.json",
+      "sha256": "14f45d7e77cce7630320d8cd74f4b31d66a7821cf370fa23889b061f036a73b7",
+      "retained_metadata_timestamp": "2026-09-09T01:22:19.453681+00:00",
+      "components": 210,
+      "dependency_edges_including_source_root": 399,
+      "package_dependency_edges": 313
+    },
+    {
+      "path": "windows-kokoro.sbom.json",
+      "sha256": "8dd650083e0a5f91e023922f4b697a1c3e51823ec2941d50a2b55c6d778be9ee",
+      "retained_metadata_timestamp": "2026-09-09T01:22:24.016352+00:00",
+      "components": 221,
+      "dependency_edges_including_source_root": 422,
+      "package_dependency_edges": 335
+    },
+    {
+      "path": "windows-other-optional.sbom.json",
+      "sha256": "595a9a9bd881ef1ecbfd952e98aad8b848d6e6b0a5213f8ad7e5212ab16239a2",
+      "retained_metadata_timestamp": "2026-09-09T01:22:47.523868+00:00",
+      "components": 218,
+      "dependency_edges_including_source_root": 419,
+      "package_dependency_edges": 331
+    }
+  ],
+  "input_equivalence": {
+    "basis": "Exact byte identity against the source snapshot accompanying the retained inventories",
+    "requirements": [
+      "requirements_bootstrap.txt",
+      "requirements_deepfilter.txt",
+      "requirements_desktop.txt",
+      "requirements_kokoro.txt",
+      "requirements_linux.txt",
+      "requirements_macos.txt",
+      "requirements_optional.txt"
+    ],
+    "local_source_files": 535,
+    "frontend_files": 442,
+    "prior_frontend_binding_inputs_verified": 442
+  },
+  "new_resolution_performed": false,
+  "new_advisory_scan_performed": false,
+  "new_runtime_qualification_performed": false
+}

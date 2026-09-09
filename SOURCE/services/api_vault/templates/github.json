@@ -1,0 +1,11 @@
+{
+  "service_name": "github",
+  "description": "GitHub — repositories, issues, pull requests, and actions",
+  "base_url": "https://api.github.com",
+  "docs_url": "https://docs.github.com/en/rest",
+  "capabilities": ["list_repos", "search_code", "create_issue", "list_pulls", "get_user"],
+  "auth_type": "bearer_token",
+  "rate_limits": {"requests_per_hour": 5000},
+  "header_name": "Authorization",
+  "header_prefix": "Bearer"
+}

@@ -1,0 +1,354 @@
+schema_version = 1
+scope = "Included first-party artwork, fonts, icons and model assets. Vendored dependency assets are covered by their own origin inventories."
+
+[[assets]]
+path = "assets/images/viola_icon.ico"
+sha256 = "081fc9acae305849039d2c45918489b05cd9e344d0a97ca98fb7ae5049a1714f" # pragma: allowlist secret - public artifact checksum verified against shipped bytes
+bytes = 46388
+origin = "Original commissioned Viola artwork; founder confirmed ownership/publication rights"
+license = "Apache-2.0"
+license_file = "LICENSE"
+
+[[assets]]
+path = "assets/images/viola_logo.png"
+sha256 = "ee5236c7ef9cbca70919e50ccadea8a4bf3bf722ab590a2b9f409471db815df7" # pragma: allowlist secret - public artifact checksum verified against shipped bytes
+bytes = 288214
+origin = "Original commissioned Viola artwork; founder confirmed ownership/publication rights"
+license = "Apache-2.0"
+license_file = "LICENSE"
+
+[[assets]]
+path = "assets/images/viola_logo_small.png"
+sha256 = "f6b48332241098db8f642ff09519d719be98186dbec1856bfd32d1ba9e74c1e4" # pragma: allowlist secret - public artifact checksum verified against shipped bytes
+bytes = 911
+origin = "Original commissioned Viola artwork; founder confirmed ownership/publication rights"
+license = "Apache-2.0"
+license_file = "LICENSE"
+
+[[assets]]
+path = "models/vad/silero_vad.onnx"
+sha256 = "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3" # pragma: allowlist secret - public artifact checksum verified against shipped bytes
+bytes = 2327524
+origin = "https://github.com/snakers4/silero-vad/tree/v6.2.1"
+license = "MIT"
+license_file = "LICENSES/Silero-MIT.txt"
+
+[[assets]]
+path = "models/wake/embedding_model.onnx"
+sha256 = "70d164290c1d095d1d4ee149bc5e00543250a7316b59f31d056cff7bd3075c1f" # pragma: allowlist secret - public artifact checksum verified against shipped bytes
+bytes = 1326578
+origin = "https://github.com/dscripka/openWakeWord/releases/tag/v0.5.1"
+license = "Apache-2.0"
+license_file = "ui/react-app/public/licenses/ViolaWake-LICENSE.txt"
+
+[[assets]]
+path = "models/wake/melspectrogram.onnx"
+sha256 = "ba2b0e0f8b7b875369a2c89cb13360ff53bac436f2895cced9f479fa65eb176f" # pragma: allowlist secret - public artifact checksum verified against shipped bytes
+bytes = 1087958
+origin = "https://github.com/dscripka/openWakeWord/releases/tag/v0.5.1"
+license = "Apache-2.0"
+license_file = "ui/react-app/public/licenses/ViolaWake-LICENSE.txt"
+
+[[assets]]
+path = "ui/react-app/public/favicon.ico"
+sha256 = "081fc9acae305849039d2c45918489b05cd9e344d0a97ca98fb7ae5049a1714f" # pragma: allowlist secret - public artifact checksum verified against shipped bytes
+bytes = 46388
+origin = "Original commissioned Viola artwork; founder confirmed ownership/publication rights"
+license = "Apache-2.0"
+license_file = "LICENSE"
+
+[[assets]]
+path = "ui/react-app/public/icons/icon-192.svg"
+sha256 = "4ce1fb95abb0b135f6616bd6135d95cac4e25dcdc972e82d29ea00b8612c78ce" # pragma: allowlist secret - public artifact checksum verified against shipped bytes
+bytes = 306
+origin = "Original commissioned Viola artwork; founder confirmed ownership/publication rights"
+license = "Apache-2.0"
+license_file = "LICENSE"
+
+[[assets]]
+path = "ui/react-app/public/icons/icon-512.svg"
+sha256 = "74ae1d3bb22e1b9e6687be4d8894705d2f31c8c1394c0ba96813bbb48569636a" # pragma: allowlist secret - public artifact checksum verified against shipped bytes
+bytes = 307
+origin = "Original commissioned Viola artwork; founder confirmed ownership/publication rights"
+license = "Apache-2.0"
+license_file = "LICENSE"
+
+[[assets]]
+path = "ui/react-app/public/viola_icon.png"
+sha256 = "ee5236c7ef9cbca70919e50ccadea8a4bf3bf722ab590a2b9f409471db815df7" # pragma: allowlist secret - public artifact checksum verified against shipped bytes
+bytes = 288214
+origin = "Original commissioned Viola artwork; founder confirmed ownership/publication rights"
+license = "Apache-2.0"
+license_file = "LICENSE"
+
+[[assets]]
+path = "ui/react-app/public/viola_logo.png"
+sha256 = "ee5236c7ef9cbca70919e50ccadea8a4bf3bf722ab590a2b9f409471db815df7" # pragma: allowlist secret - public artifact checksum verified against shipped bytes
+bytes = 288214
+origin = "Original commissioned Viola artwork; founder confirmed ownership/publication rights"
+license = "Apache-2.0"
+license_file = "LICENSE"
+
+[[assets]]
+path = "ui/react-app/src/assets/meteocons/animated/clear-day.svg"
+sha256 = "2d1713bef60336b15bd063a69e85ef1b6780f575038475915b20e383b2dd8e1e" # pragma: allowlist secret - public artifact checksum verified against shipped bytes
+bytes = 954
+origin = "https://github.com/basmilius/weather-icons; upstream production assets compared 2026-09-07"
+license = "MIT"
+license_file = "LICENSES/meteocons.txt"
+
+[[assets]]
+path = "ui/react-app/src/assets/meteocons/animated/clear-night.svg"
+sha256 = "3bece8ecaa09f5ba594a61ca3b07060f3c2cf1ea2a96cb2f23b9769606c8dc79" # pragma: allowlist secret - public artifact checksum verified against shipped bytes
+bytes = 924
+origin = "https://github.com/basmilius/weather-icons; upstream production assets compared 2026-09-07"
+license = "MIT"
+license_file = "LICENSES/meteocons.txt"
+
+[[assets]]
+path = "ui/react-app/src/assets/meteocons/animated/cloudy.svg"
+sha256 = "943e9ed908be347746f482704c1b43e6a1545b4f848d46289ee4a15f2e6afe17" # pragma: allowlist secret - public artifact checksum verified against shipped bytes
+bytes = 825
+origin = "https://github.com/basmilius/weather-icons; upstream production assets compared 2026-09-07"
+license = "MIT"
+license_file = "LICENSES/meteocons.txt"
+
+[[assets]]
+path = "ui/react-app/src/assets/meteocons/animated/drizzle.svg"
+sha256 = "e08708597ec1562feaad7a233e662ea037a97830042cdbaff55a513bb28fc283" # pragma: allowlist secret - public artifact checksum verified against shipped bytes
+bytes = 2406
+origin = "https://github.com/basmilius/weather-icons; upstream production assets compared 2026-09-07"
+license = "MIT"
+license_file = "LICENSES/meteocons.txt"
+
+[[assets]]
+path = "ui/react-app/src/assets/meteocons/animated/fog-day.svg"
+sha256 = "f873197ee0a14939bb5f0408b817125ec6550cffe6a919f15bc97737fdf48633" # pragma: allowlist secret - public artifact checksum verified against shipped bytes
+bytes = 2006
+origin = "https://github.com/basmilius/weather-icons; upstream production assets compared 2026-09-07"
+license = "MIT"
+license_file = "LICENSES/meteocons.txt"
+
+[[assets]]
+path = "ui/react-app/src/assets/meteocons/animated/fog-night.svg"
+sha256 = "e235eafe4ac0afac27c50dafe74358ebbd148086c9a64dc033e928c9135af90a" # pragma: allowlist secret - public artifact checksum verified against shipped bytes
+bytes = 1956
+origin = "https://github.com/basmilius/weather-icons; upstream production assets compared 2026-09-07"
+license = "MIT"
+license_file = "LICENSES/meteocons.txt"
+
+[[assets]]
+path = "ui/react-app/src/assets/meteocons/animated/haze-day.svg"
+sha256 = "6f68fc7431c755a0cc8df3c47b2f68af3b673dffd4d97f175d8daa487d9e9e84" # pragma: allowlist secret - public artifact checksum verified against shipped bytes
+bytes = 2852
+origin = "https://github.com/basmilius/weather-icons; upstream production assets compared 2026-09-07"
+license = "MIT"
+license_file = "LICENSES/meteocons.txt"
+
+[[assets]]
+path = "ui/react-app/src/assets/meteocons/animated/haze-night.svg"
+sha256 = "b7f94466cb85ecb62b15752e4ed2eca18274fe4ecc1f44a5887c039dc2090453" # pragma: allowlist secret - public artifact checksum verified against shipped bytes
+bytes = 2802
+origin = "https://github.com/basmilius/weather-icons; upstream production assets compared 2026-09-07"
+license = "MIT"
+license_file = "LICENSES/meteocons.txt"
+
+[[assets]]
+path = "ui/react-app/src/assets/meteocons/animated/mist.svg"
+sha256 = "0683b508357292fefa9a62ec5b53fac80afab0da8e399fb76071338a3e62b696" # pragma: allowlist secret - public artifact checksum verified against shipped bytes
+bytes = 1277
+origin = "https://github.com/basmilius/weather-icons; upstream production assets compared 2026-09-07"
+license = "MIT"
+license_file = "LICENSES/meteocons.txt"
+
+[[assets]]
+path = "ui/react-app/src/assets/meteocons/animated/partly-cloudy-day.svg"
+sha256 = "5a11de2f6f684a9c17804021c227f9f981ee8cab3cb2cb8e5d8b4454919e5d79" # pragma: allowlist secret - public artifact checksum verified against shipped bytes
+bytes = 1580
+origin = "https://github.com/basmilius/weather-icons; upstream production assets compared 2026-09-07"
+license = "MIT"
+license_file = "LICENSES/meteocons.txt"
+
+[[assets]]
+path = "ui/react-app/src/assets/meteocons/animated/partly-cloudy-night.svg"
+sha256 = "60c8481f1a8e053956c2e493bfbf7df700b0f890393d53197a8198129a3eb886" # pragma: allowlist secret - public artifact checksum verified against shipped bytes
+bytes = 1527
+origin = "https://github.com/basmilius/weather-icons; upstream production assets compared 2026-09-07"
+license = "MIT"
+license_file = "LICENSES/meteocons.txt"
+
+[[assets]]
+path = "ui/react-app/src/assets/meteocons/animated/rain.svg"
+sha256 = "7671cc8ff1230c5dd9f26afe835b14e608026d0b8f1ee80fe966550cbdbe7c0a" # pragma: allowlist secret - public artifact checksum verified against shipped bytes
+bytes = 2594
+origin = "https://github.com/basmilius/weather-icons; upstream production assets compared 2026-09-07"
+license = "MIT"
+license_file = "LICENSES/meteocons.txt"
+
+[[assets]]
+path = "ui/react-app/src/assets/meteocons/animated/sleet.svg"
+sha256 = "9075cfe28284a9a0a726973c31ccbcfe5b111d9a0d5be46a9a6308dce0ada2f3" # pragma: allowlist secret - public artifact checksum verified against shipped bytes
+bytes = 6140
+origin = "https://github.com/basmilius/weather-icons; upstream production assets compared 2026-09-07"
+license = "MIT"
+license_file = "LICENSES/meteocons.txt"
+
+[[assets]]
+path = "ui/react-app/src/assets/meteocons/animated/snow.svg"
+sha256 = "5751824ec15fc1913fc6cd97b0c12aea50d128e8e313fa1da32c6de468b390e9" # pragma: allowlist secret - public artifact checksum verified against shipped bytes
+bytes = 4291
+origin = "https://github.com/basmilius/weather-icons; upstream production assets compared 2026-09-07"
+license = "MIT"
+license_file = "LICENSES/meteocons.txt"
+
+[[assets]]
+path = "ui/react-app/src/assets/meteocons/animated/thunderstorms-rain.svg"
+sha256 = "de546b2f012d87c235d5ff145da0908261fcaa553a1c7d9844a1deb762a4a465" # pragma: allowlist secret - public artifact checksum verified against shipped bytes
+bytes = 3248
+origin = "https://github.com/basmilius/weather-icons; upstream production assets compared 2026-09-07"
+license = "MIT"
+license_file = "LICENSES/meteocons.txt"
+
+[[assets]]
+path = "ui/react-app/src/assets/meteocons/static/clear-day.svg"
+sha256 = "6b8e16033f0cbb838f26a63eefa30aed943e898c75036d78b397b2c2b8571da6" # pragma: allowlist secret - public artifact checksum verified against shipped bytes
+bytes = 809
+origin = "https://github.com/basmilius/weather-icons; upstream production assets compared 2026-09-07"
+license = "MIT"
+license_file = "LICENSES/meteocons.txt"
+
+[[assets]]
+path = "ui/react-app/src/assets/meteocons/static/clear-night.svg"
+sha256 = "5909dc6f15384e654826ed38367eb8d6e4cb15dc50c402a9d40d6291d4283531" # pragma: allowlist secret - public artifact checksum verified against shipped bytes
+bytes = 746
+origin = "https://github.com/basmilius/weather-icons; upstream production assets compared 2026-09-07"
+license = "MIT"
+license_file = "LICENSES/meteocons.txt"
+
+[[assets]]
+path = "ui/react-app/src/assets/meteocons/static/cloudy.svg"
+sha256 = "ad6f68e313828ebb21857843810c54b587c3498e4e7430f3ea1d1523731e37b9" # pragma: allowlist secret - public artifact checksum verified against shipped bytes
+bytes = 681
+origin = "https://github.com/basmilius/weather-icons; upstream production assets compared 2026-09-07"
+license = "MIT"
+license_file = "LICENSES/meteocons.txt"
+
+[[assets]]
+path = "ui/react-app/src/assets/meteocons/static/drizzle.svg"
+sha256 = "a062e55c1e1f9de965bef6afae080697601dadabcd64fc61fd49573c50f75ec8" # pragma: allowlist secret - public artifact checksum verified against shipped bytes
+bytes = 1649
+origin = "https://github.com/basmilius/weather-icons; upstream production assets compared 2026-09-07"
+license = "MIT"
+license_file = "LICENSES/meteocons.txt"
+
+[[assets]]
+path = "ui/react-app/src/assets/meteocons/static/fog-day.svg"
+sha256 = "a0c6a8af44235cfa16487070f0e6d982f9b6d6774ad810f000bdc4b13828779d" # pragma: allowlist secret - public artifact checksum verified against shipped bytes
+bytes = 1553
+origin = "https://github.com/basmilius/weather-icons; upstream production assets compared 2026-09-07"
+license = "MIT"
+license_file = "LICENSES/meteocons.txt"
+
+[[assets]]
+path = "ui/react-app/src/assets/meteocons/static/fog-night.svg"
+sha256 = "62715f7ac958002c27b7f92e0580eb73a062aa91616ea997d9e44d49fc5671a3" # pragma: allowlist secret - public artifact checksum verified against shipped bytes
+bytes = 1489
+origin = "https://github.com/basmilius/weather-icons; upstream production assets compared 2026-09-07"
+license = "MIT"
+license_file = "LICENSES/meteocons.txt"
+
+[[assets]]
+path = "ui/react-app/src/assets/meteocons/static/haze-day.svg"
+sha256 = "a2658fe0be31e6b652ad5cd4ec573b40e601c4a3f735f3e960f862cefa0291ed" # pragma: allowlist secret - public artifact checksum verified against shipped bytes
+bytes = 2397
+origin = "https://github.com/basmilius/weather-icons; upstream production assets compared 2026-09-07"
+license = "MIT"
+license_file = "LICENSES/meteocons.txt"
+
+[[assets]]
+path = "ui/react-app/src/assets/meteocons/static/haze-night.svg"
+sha256 = "2bdc81074a51c7c1eaa3917ff480c2787289eb510a855a4f98533d164e830dfe" # pragma: allowlist secret - public artifact checksum verified against shipped bytes
+bytes = 2333
+origin = "https://github.com/basmilius/weather-icons; upstream production assets compared 2026-09-07"
+license = "MIT"
+license_file = "LICENSES/meteocons.txt"
+
+[[assets]]
+path = "ui/react-app/src/assets/meteocons/static/mist.svg"
+sha256 = "a00ce64be3aed34241bc94e8b16deb3d72be448ec28955f3618eb913beec8a5b" # pragma: allowlist secret - public artifact checksum verified against shipped bytes
+bytes = 829
+origin = "https://github.com/basmilius/weather-icons; upstream production assets compared 2026-09-07"
+license = "MIT"
+license_file = "LICENSES/meteocons.txt"
+
+[[assets]]
+path = "ui/react-app/src/assets/meteocons/static/partly-cloudy-day.svg"
+sha256 = "36d9e4bba723a871b538455cb59c7510b0ea1ad4f3f48a4e56d86aebc8fc95d6" # pragma: allowlist secret - public artifact checksum verified against shipped bytes
+bytes = 1439
+origin = "https://github.com/basmilius/weather-icons; upstream production assets compared 2026-09-07"
+license = "MIT"
+license_file = "LICENSES/meteocons.txt"
+
+[[assets]]
+path = "ui/react-app/src/assets/meteocons/static/partly-cloudy-night.svg"
+sha256 = "855bc3ff3de621fdc6e70c1e69abecbd45a32abf92de913590b07a9acda4fd62" # pragma: allowlist secret - public artifact checksum verified against shipped bytes
+bytes = 1374
+origin = "https://github.com/basmilius/weather-icons; upstream production assets compared 2026-09-07"
+license = "MIT"
+license_file = "LICENSES/meteocons.txt"
+
+[[assets]]
+path = "ui/react-app/src/assets/meteocons/static/rain.svg"
+sha256 = "af35aba84621b7a23bb00e5a64c376946ca859c16128db6028494c321791ef20" # pragma: allowlist secret - public artifact checksum verified against shipped bytes
+bytes = 1748
+origin = "https://github.com/basmilius/weather-icons; upstream production assets compared 2026-09-07"
+license = "MIT"
+license_file = "LICENSES/meteocons.txt"
+
+[[assets]]
+path = "ui/react-app/src/assets/meteocons/static/sleet.svg"
+sha256 = "2cb511ef201d2a0c283af5e9a1e466e23473d36d89b6a8f29657065de915fe1e" # pragma: allowlist secret - public artifact checksum verified against shipped bytes
+bytes = 3954
+origin = "https://github.com/basmilius/weather-icons; upstream production assets compared 2026-09-07"
+license = "MIT"
+license_file = "LICENSES/meteocons.txt"
+
+[[assets]]
+path = "ui/react-app/src/assets/meteocons/static/snow.svg"
+sha256 = "2b3b0fd00bb3c23be114ef0df5c14aa533236053c9ec28adffb5c838cffe63c0" # pragma: allowlist secret - public artifact checksum verified against shipped bytes
+bytes = 3018
+origin = "https://github.com/basmilius/weather-icons; upstream production assets compared 2026-09-07"
+license = "MIT"
+license_file = "LICENSES/meteocons.txt"
+
+[[assets]]
+path = "ui/react-app/src/assets/meteocons/static/thunderstorms-rain.svg"
+sha256 = "d55ac97aaabf469ca6d94a413ea3e7e42b863cf5333a4f34d4676a3351445e92" # pragma: allowlist secret - public artifact checksum verified against shipped bytes
+bytes = 2241
+origin = "https://github.com/basmilius/weather-icons; upstream production assets compared 2026-09-07"
+license = "MIT"
+license_file = "LICENSES/meteocons.txt"
+
+[[assets]]
+path = "ui/react-app/src/styles/cormorant-garamond-600-latin.woff2"
+sha256 = "ae062b6d5ae308e7edf61b28b07b9984bbb6e961b1f34d9b2c2f4389c33f21ea" # pragma: allowlist secret - public artifact checksum verified against shipped bytes
+bytes = 23396
+origin = "Cormorant Project Authors; verified embedded copyright and version 4.001"
+license = "OFL-1.1"
+license_file = "ui/react-app/public/licenses/CormorantGaramond-OFL.txt"
+
+[[assets]]
+path = "viola_icon.ico"
+sha256 = "081fc9acae305849039d2c45918489b05cd9e344d0a97ca98fb7ae5049a1714f" # pragma: allowlist secret - public artifact checksum verified against shipped bytes
+bytes = 46388
+origin = "Original commissioned Viola artwork; founder confirmed ownership/publication rights"
+license = "Apache-2.0"
+license_file = "LICENSE"
+
+[[assets]]
+path = "violawake_data/trained_models/temporal_cnn.onnx"
+sha256 = "9c0b12c68593cfdb3d320a3b34667913b18d63e89eb01247d6332d7839ac9efe" # pragma: allowlist secret - public artifact checksum verified against shipped bytes
+bytes = 102378
+origin = "https://github.com/GeeIHadAGoodTime/ViolaWake/releases/tag/v0.1.0"
+license = "Apache-2.0"
+license_file = "violawake_data/trained_models/ViolaWake-LICENSE.txt"

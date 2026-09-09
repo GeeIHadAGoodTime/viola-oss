@@ -1,0 +1,164 @@
+{
+  "app": {
+    "startup": {
+      "initializing": "Initializing...",
+      "title": "Starting Viola",
+      "failed_title": "Startup Failed",
+      "starting": "Viola is starting...",
+      "timeout": "Viola is still starting. Keep this window open. If this lasts over a minute, restart Viola."
+    }
+  },
+  "common": {
+    "actions": {
+      "try_again": "Try again",
+      "check_again": "Check again",
+      "saving": "Saving...",
+      "send": "Send",
+      "cancel": "Cancel"
+    }
+  },
+  "onboarding": {
+    "a11y": {
+      "dialog_label": "Viola onboarding",
+      "phase_title": "Onboarding step",
+      "progress_label": "Onboarding progress",
+      "progress_text": "Step {{current}} of {{total}}",
+      "suggestion_label": "Try command: {{label}}"
+    },
+    "skip": {
+      "label": "Skip intro",
+      "aria_label": "Skip introduction"
+    },
+    "phases": {
+      "welcome": {
+        "title": "Thank you for trying Viola",
+        "speech": "Thank you so much for trying Viola. We are still in beta, so a few things may be rough around the edges. If anything breaks, please tell us. It genuinely helps. Let me walk you through a short setup, and then you are on your way."
+      },
+      "account_pair": {
+        "title": "Connect account",
+        "speech": "First, connect this app to your Viola account. Open account settings to sign in or create your account. I will continue automatically once you are signed in."
+      },
+      "cloud_consent": {
+        "title": "Choose AI processing",
+        "speech": "To answer with Viola-managed AI, I need your permission to send request text and conversation context to cloud AI."
+      },
+      "autonomy_tier": {
+        "title": "How much can Viola do?",
+        "speech": "Choose how much Viola is allowed to do on this computer. You can change this any time in Settings."
+      },
+      "mic_try": {
+        "title": "Say hello to Viola",
+        "speech": "Last step: hold the microphone button and ask Viola something, like what is two plus two. That checks your mic and runs your first command.",
+        "suggestions": {
+          "two_plus_two": {
+            "text": "what is two plus two",
+            "label": "What is two plus two"
+          }
+        }
+      },
+      "hear_about": {
+        "title": "How did you hear about Viola?",
+        "speech": "One quick, optional question: how did you hear about Viola? Pick an answer, or choose prefer not to say."
+      }
+    },
+    "welcome": {
+      "eyebrow": "Welcome",
+      "beta_badge": "Beta",
+      "beta_note": "You are one of Viola's first users. Thank you for being here.",
+      "begin": "Begin setup",
+      "report_bug": "Report a bug",
+      "report_hint": "Found something broken? You can report a bug any time from the top bar."
+    },
+    "account_pair": {
+      "preparing": "Checking your account...",
+      "instructions": "Open Account settings to sign in or create your Viola account. Setup continues automatically once you are signed in.",
+      "open_settings": "Open account settings",
+      "signed_in": "Signed in. Continuing setup...",
+      "signed_in_tts": "Signed in. Let us finish setting up.",
+      "no_account": "Continue without an account",
+      "no_account_hint": "An account is only needed for Viola-managed AI. Without one, you can still run Viola on your own AI key or a local model.",
+      "no_account_tts": "No problem. You can run Viola on your own AI key or a local model instead. Let us finish setting up."
+    },
+    "mic": {
+      "checking": "Checking microphone access...",
+      "unknown": "Microphone access could not be confirmed.",
+      "success_tts": "Got it. I heard: {{heardText}}. Push-to-talk works.",
+      "retry_tts": "I did not catch that. Hold the microphone button, say one short phrase, then release.",
+      "continue_without": "Continue without the microphone"
+    },
+    "cloud": {
+      "settings_needed": "Viola is set to use your own AI key. Add a provider key in AI settings, then return here.",
+      "managed_notice": "Enable this only if you want Viola-managed AI to process your request text and conversation context.",
+      "open_settings": "Open AI settings",
+      "added_key": "I added my key",
+      "enable": "Enable cloud AI",
+      "use_own_key": "Use my own AI key",
+      "enabled_tts": "Cloud AI is enabled. Now try your first command.",
+      "declined_tts": "Okay. Viola is set to use your own AI key. Open AI settings, add your provider key, then return here.",
+      "byok_ready_tts": "Got it. Try your first command with your own AI key.",
+      "save_error": "Couldn't save that AI setting. Try again.",
+      "no_account_notice": "You are continuing without a Viola account, so Viola-managed AI is not available. Run Viola on your own provider key or a local model instead.",
+      "sign_in_instead": "Sign in after all"
+    },
+    "mic_try": {
+      "running": "Running...",
+      "error_tts": "That command did not finish. Check your AI setup and try again."
+    },
+    "attribution": {
+      "optional_note": "Totally optional, and it is the only marketing question Viola will ever ask. Your answer is stored as a single word on this computer.",
+      "group_label": "How did you hear about Viola?",
+      "prefer_not": "Prefer not to say",
+      "options": {
+        "reddit": "Reddit",
+        "x": "X (Twitter)",
+        "youtube": "YouTube",
+        "tiktok": "TikTok",
+        "hn": "Hacker News",
+        "search": "Search engine",
+        "friend": "A friend",
+        "blog": "A blog or article",
+        "other": "Somewhere else"
+      }
+    },
+    "autonomy": {
+      "note": "This sets how much Viola may do on your behalf. Every option still asks before anything that changes your data.",
+      "group_label": "Choose an autonomy level",
+      "recommended": "Recommended",
+      "change_later": "You can change this any time in Settings, under AI & Agents.",
+      "save_error": "Couldn't save that choice. Try again.",
+      "tiers": {
+        "solo": {
+          "label": "Solo",
+          "subtitle": "Private & safe",
+          "description": "Answers questions, plays music, and searches the web. No file access, email, browsing, or desktop control."
+        },
+        "ensemble": {
+          "label": "Ensemble",
+          "subtitle": "Capable & sandboxed",
+          "description": "Can read your files, browse the web in a sandbox, read email, and manage your calendar. Anything that changes data asks you first."
+        },
+        "symphony": {
+          "label": "Symphony",
+          "subtitle": "Full autonomy",
+          "description": "Full access: write files, send email, control your desktop, and browse with saved passwords. Dangerous actions still ask first."
+        }
+      }
+    }
+  },
+  "voice": {
+    "spoke_chat": {
+      "open": "Type a command for this room",
+      "input_label": "Command for this room",
+      "placeholder": "Type a command...",
+      "cancel": "Close command input",
+      "error": "I could not send that command from this room. Check that the hub is online, then try again."
+    },
+    "status": {
+      "connected": "Connected",
+      "disconnected": "Disconnected",
+      "processing": "Processing...",
+      "thinking": "Thinking...",
+      "taking_longer": "Taking longer than usual..."
+    }
+  }
+}

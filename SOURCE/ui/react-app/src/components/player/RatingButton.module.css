@@ -1,0 +1,31 @@
+@import '../../styles/variables.css';
+
+.button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.button:hover:not(.disabled):not(.active) {
+  color: var(--text-secondary) !important;
+  transform: scale(1.1) !important;
+}
+
+.button.disabled {
+  cursor: default;
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+/* Touch devices: meet the 44px minimum tap target. */
+@media (max-width: 1023px) {
+  .button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}

@@ -1,0 +1,272 @@
+@import '../../styles/variables.css';
+
+.topbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: clamp(18px, 3vw, 42px);
+  margin-bottom: clamp(4px, 1vh, 10px);
+}
+
+.topbarLeft {
+  display: flex;
+  align-items: center;
+  gap: clamp(32px, 5vw, 56px);
+  min-width: 0;
+}
+
+.clock {
+  font-family: var(--font-sans);
+  font-size: clamp(76px, 12.5vw, 116px);
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: 0.5px;
+}
+
+/* Weather */
+.weatherSetup {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  opacity: 0.6;
+}
+
+.weatherSetup:hover {
+  opacity: 0.8;
+}
+
+.weatherSetupText {
+  font-size: clamp(14px, 2vw, 18px);
+  font-weight: 400;
+}
+
+.weatherDisplay {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.weatherIconWrap {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+
+.weatherInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.weatherTemp {
+  font-family: var(--font-sans);
+  font-size: clamp(38px, 6.2vw, 56px);
+  font-weight: 500;
+  line-height: 1;
+}
+
+.weatherDesc {
+  font-size: clamp(14px, 2vw, 18px);
+  font-weight: 400;
+}
+
+/* Right side */
+.topbarRight {
+  display: flex;
+  flex: 1 1 0;
+  align-items: flex-start;
+  justify-content: flex-end;
+  gap: clamp(10px, 1.5vw, 16px);
+  min-width: 0;
+}
+
+.calendarWrap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: flex-end;
+  gap: clamp(10px, 1.6vw, 20px);
+  min-width: 0;
+}
+
+.dateText {
+  flex: 0 1 clamp(132px, 16vw, 232px);
+  max-width: clamp(132px, 16vw, 232px);
+  padding-top: 6px;
+  font-family: var(--font-display);
+  font-size: clamp(19px, 2.3vw, 27px);
+  font-weight: 500;
+  line-height: 1.1;
+  text-align: right;
+}
+
+.calendarPanel {
+  flex: 0 1 clamp(220px, 24vw, 340px);
+  width: clamp(220px, 24vw, 340px);
+  max-width: 100%;
+}
+
+.topbarActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.agentCountButton {
+  min-width: 26px;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border-hover);
+  background-color: var(--bg-elevated);
+  color: var(--text-secondary);
+  box-shadow: 0 8px 22px var(--shadow-light);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.bugReportButton {
+  /* 44px is the mobile touch-target floor (was 34px; see issue #367). */
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 44px;
+  border: 1px solid var(--border-hover);
+  border-radius: 8px;
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  box-shadow: 0 8px 22px var(--shadow-light);
+  cursor: pointer;
+  padding: 0;
+}
+
+.bugReportButton:hover {
+  background: var(--glass-hover);
+  color: var(--text-bright);
+}
+
+/* Menu container */
+.menuContainer {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+@media (max-width: 1023px) {
+  .topbar {
+    align-items: center;
+    gap: 14px;
+  }
+
+  .topbarLeft {
+    gap: 22px;
+  }
+
+  .clock {
+    font-size: 64px;
+  }
+
+  .weatherTemp {
+    font-size: 38px;
+  }
+
+  .weatherDesc,
+  .weatherSetupText {
+    font-size: 14px;
+  }
+
+  .dateText {
+    font-size: 17px;
+  }
+
+  .calendarWrap {
+    max-width: 240px;
+  }
+}
+
+@media (max-width: 767px) {
+  .topbar {
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+
+  .topbarLeft,
+  .topbarRight {
+    width: 100%;
+  }
+
+  .topbarLeft {
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .topbarRight {
+    align-items: stretch;
+  }
+
+  /* #771 made .calendarWrap reflow (width: 100%) instead of vanishing, which
+     made .topbarRight tall at this width and activated the .topbarRight
+     align-items: stretch above -- .topbarActions (the agent-count/bug-report/
+     menu button row) stretched to match that height and its own
+     align-items: center then vertically centred the 44px buttons in the
+     middle of the tall box, dropping them onto the TODAY agenda row (#4788,
+     twice-recurred regression of #771). Keep .topbarActions pinned to its own
+     natural height instead of stretching. */
+  .topbarActions {
+    align-self: flex-start;
+  }
+
+  .dateRow {
+    justify-content: space-between;
+  }
+
+  /* Reflow instead of vanishing (#771): full-width row lets date + calendar
+     strip wrap onto their own lines rather than disappearing. */
+  .calendarWrap {
+    width: 100%;
+    max-width: 100%;
+    justify-content: flex-start;
+  }
+
+  .dateText {
+    flex: 0 1 auto;
+    max-width: 100%;
+    text-align: left;
+  }
+
+  .calendarPanel {
+    flex: 1 1 220px;
+    width: auto;
+  }
+}
+
+@media (max-width: 480px) {
+  .clock {
+    font-size: 50px;
+  }
+
+  .weatherDisplay {
+    gap: 8px;
+  }
+
+  .weatherTemp {
+    font-size: 28px;
+  }
+
+  .weatherDesc,
+  .weatherSetupText {
+    display: none;
+  }
+
+  .dateText {
+    max-width: calc(100vw - 86px);
+    font-size: 14px;
+  }
+}

@@ -1,0 +1,215 @@
+# Viola macOS Desktop Requirements
+#
+# Runtime dependencies for the macOS desktop build (installer/macos/build_macos_app.sh
+# -> PyInstaller .app bundle). Goal: parity with requirements_desktop.txt (Windows) /
+# requirements_linux.txt so a Mac user gets the SAME capability surface (login,
+# voice/wake, agent, music, playback, phone, settings). The ONLY things dropped
+# from the desktop set are packages that are genuinely Windows-only (WASAPI/COM/
+# Win32) or Linux-only (Secret Service D-Bus); every cross-platform dependency is
+# kept, plus the macOS-only pyobjc framework bindings the darwin code paths
+# already import at runtime (services/computer_use/input.py,
+# services/computer_use/window_manager.py, intent/tools/vision_tools.py,
+# audio_core/capture/coreaudio_capture.py, services/notifications/macos_notification.py).
+#
+# This manifest did not exist before #2594: `build_macos_app.sh` ran PyInstaller
+# directly with no pip-install step, so a bundle only worked when the box
+# happened to have these hand-installed (which is exactly why the gap stayed
+# invisible on the Mac dev box). See #2594 acceptance oracle.
+#
+# Pinned for reproducible builds. Keep in lockstep with requirements_desktop.txt /
+# requirements_linux.txt when a cross-platform dependency is added or bumped there.
+
+# Core dependencies
+PySide6==6.8.1.1
+PySide6-Addons==6.8.1.1
+shiboken6==6.8.1.1
+
+# WebEngine for YouTube embedded playback
+# QtWebEngineCore + QtWebEngineWidgets ship inside PySide6-Addons.
+# build_macos_app.sh normalizes/signs the QtWebEngine framework layout
+# post-build (normalize_qtwebengine_framework.sh / sign_qt_frameworks.sh).
+
+# Async support
+qasync>=0.27.0,<1.0.0
+
+# Environment variables
+python-dotenv==1.2.2  # SECURITY: 1.2.2 fixes CVE-2026-28684 (symlink file overwrite in set_key/unset_key)
+
+# Process management for graceful shutdown
+psutil==7.1.3
+
+# Existing Viola dependencies / AI
+anthropic>=0.40.0,<1.0.0
+openai>=2.26.0,<3.0.0  # >=2.26.0 required by openai-agents SDK
+openai-agents>=0.13.0,<1.0.0  # OpenAI Agents SDK — used by OpenAIAgentsProvider + Codex path
+codex-auth>=0.1.1,<0.2.0  # Codex subscription OAuth — ChatGPT Plus/Pro as LLM source
+mcp>=1.27.0,<2.0.0  # MCP SDK for built-in tool servers, including computer-use
+asyncpg==0.29.0  # Required whenever VIOLA_DATABASE_URL points at Postgres
+sqlalchemy>=2.0.0,<3.0.0  # Required by websocket auth/session DB context helpers (auth.models chain)
+ytmusicapi==1.11.4  # YouTube Music API for autoplay radio
+loguru>=0.7.0,<1.0.0
+tenacity>=8.2.0,<9.0.0  # Retry logic for API calls
+tiktoken==0.11.0  # Accurate token counting for GPT models (95%+ accuracy vs heuristic)
+fastapi==0.133.1  # SEC #3335: 0.133 is the first fastapi whose dependency floor resolves starlette>=1.3.1 (pre-0.137, no router-tree change)
+starlette==1.3.1  # SEC #3335: pin the transitive ASGI core; starlette 0.50.0 carried CVE-2026-54283 (unauth form-limit-bypass DoS 7.5), CVE-2026-48818 (7.5), CVE-2026-48710 (BadHost host-header bypass), CVE-2026-48817, CVE-2026-54282 — all fixed in 1.3.1
+uvicorn==0.40.0
+python-multipart>=0.0.22,<0.1.0  # SECURITY: 0.0.22+ required (CVE fix)
+websockets==15.0.1
+websocket-client>=1.9.0,<2.0.0  # Synchronous client used by beta spoke websocket protocol tests
+pydantic==2.12.5
+email-validator>=2.1.0,<3.0.0  # Required by auth.models and Pydantic EmailStr
+bcrypt>=4.1.0,<5.0.0  # Primary password-hash backend for auth.utils.hash_password/verify_password (desktop auth)
+jsonschema==4.25.1
+slowapi==0.1.9  # Rate limiting for API endpoints
+limits==3.14.1  # Direct dependency for shared IP/auth rate-limit storage strategies
+requests==2.34.2  # SECURITY: 2.34.2 fixes CVE-2026-25645 (insecure temp-file reuse in extract_zipped_paths)
+aiohttp>=3.13.3,<4.0.0  # SECURITY: 3.13.3+ required (CVE fix)
+httpx==0.28.1  # For Ollama/local LLM support and Google Gemini REST calls
+packaging>=24.0,<26.0  # Version parsing for runtime dependency validation
+sentry-sdk[fastapi]==2.60.0  # Opt-in error reporting
+beautifulsoup4>=4.12.0,<5.0.0  # HTML parsing for web_read content extraction
+lxml>=6.1.0,<7.0.0  # Faster/cleaner HTML parsing when available; >=6.1.0 patches CVE-2026-41066 XXE (#3332)
+aiofiles==25.1.0  # Required by Pipecat phone runtime
+# python-vlc decision (#2594): included for cross-platform parity with the
+# Windows/Linux backends (music/backends/vlc.py). Needs the system libvlc
+# dylib, which pip's python-vlc wheel does NOT ship on macOS — install it via
+# `brew install --cask vlc` (or `brew install libvlc`) on the build/runtime
+# host, same shape as requirements_linux.txt's "needs system libvlc" note.
+# music/backends/simple_av.py's in-process `av` decode path below covers
+# playback if libvlc is absent, so this is a capability floor, not a hard dep.
+python-vlc==3.0.21203  # VLC bindings with HTTPS header fixes (needs system libvlc — brew install --cask vlc)
+sounddevice==0.5.3  # PortAudio bindings for streaming backend playback (needs portaudio, via Homebrew)
+
+# Phone calling (Telnyx + Pipecat)
+./third_party/pipecat  # Maintained 0.0.108+viola.1 fork; corpus-free sentence segmentation
+telnyx[webhooks]==4.86.0
+PyNaCl==1.6.2  # Required by Telnyx Ed25519 webhook signature verification
+phonenumbers==9.0.33
+
+# Speech-to-Text (default backend: faster-whisper)
+# CPU-only on macOS by default (no CUDA on Apple Silicon/Intel Macs).
+faster-whisper>=1.0.0,<2.0.0
+
+# TTS (optional Kokoro: install requirements_kokoro.txt)
+pyttsx3==2.99  # System TTS fallback — uses NSSpeechSynthesizer via pyobjc on macOS
+babel>=2.17.0,<3.0.0        # Required by Pipecat Kokoro TTS service
+soundfile>=0.13.0,<0.14.0   # WAV/audio file I/O for TTS output (needs libsndfile, via Homebrew)
+scipy==1.16.3       # Resampling for TTS (24kHz->16kHz) — fallback for soxr
+soxr>=1.0.0,<2.0.0  # High-quality resampling (preferred over scipy); >=1.0.0 required by pipecat-ai 0.0.107
+
+# Wake word detection
+# #4786: openwakeword IS required. Ground-truthed against the actual shipped
+# violawake_data/trained_models/temporal_cnn.onnx via onnxruntime: its ONNX
+# graph declares input "embeddings" shape (batch, 9, 96) -- the OpenWakeWord
+# embedding shape, not a raw mel-spectrogram -- so violawake/engine.py's
+# ViolaWake._load_model() always routes it through _load_onnx_mlp(), which
+# constructs openwakeword.utils.AudioFeatures to turn raw audio into those
+# embeddings before the classifier runs. Without openwakeword installed this
+# raises ImportError the moment the wake engine loads (this entry was
+# previously excluded on a stale "mel/CNN" premise that predates whatever
+# retrained/replaced temporal_cnn.onnx with this embedding-based
+# architecture -- see requirements_linux.txt's identical fix for detail).
+numpy==2.2.6
+onnxruntime>=1.17.0,<2.0.0
+pyaudio==0.2.14  # Needs portaudio (brew install portaudio)
+openwakeword==0.6.0  # matches requirements_desktop.txt's pin
+
+# Browser automation (spoke sessions, stream bridge, Spotify CDP)
+playwright==1.59.0  # Pin exact version — Chromium bundle must match QtWebEngine.
+# NOTE: `playwright install chromium` (or a system Chrome/Edge/Brave/Chromium
+# under /Applications, see music/spotify/cdp_controller.py's
+# _CHROME_PATHS_DARWIN) is required once on the target machine.
+
+# Commerce (Stripe checkout links for order flow)
+stripe>=7.0.0,<8.0.0
+
+# Messaging integrations
+python-telegram-bot==22.6  # Telegram bot adapter for messaging subsystem
+
+# Computer-use / desktop automation
+# macOS has NO Win32/pywinauto equivalent — window enumeration/focus/input use
+# the native pyobjc frameworks below (Quartz CGEvent + CGWindowList, AppKit
+# NSWorkspace/NSRunningApplication) rather than a UI-automation library.
+pyautogui>=0.9.50,<0.10.0  # Cross-platform mouse/keyboard control (screenshot fallback)
+mss>=9.0,<10.0.0           # Fast multi-monitor screenshot capture
+Pillow>=12.2.0,<13.0.0     # Resize/encode captures; >=12.2.0 required (GHSA-r73j-pqj5-w3x7 / GHSA-wjx4-4jcj-g98j)
+pynput>=1.7.6,<2.0.0       # Cross-platform text-injection fallback (voice/dictation/text_injector.py)
+
+# pyobjc — macOS native framework bindings (#2594: declared for the first time;
+# was previously hand-installed on the Mac dev box, which is why the gap in
+# this manifest stayed invisible there). Split per-framework rather than the
+# `pyobjc` umbrella metapackage to keep the bundle smaller (PyInstaller only
+# needs to collect the frameworks actually imported). Range-pinned rather than
+# exact-pinned (unlike the rest of this file): this cloud session has no PyPI
+# access to confirm an exact current patch version exists, and all five
+# pyobjc packages must stay in lockstep with each other (they share one
+# release train), so a floor of the oldest release with Sonoma/Sequoia
+# (macOS 14+) Python 3.11 wheels is safer than guessing a specific patch that
+# might not exist. Tighten to an exact pin once a Mac session can confirm the
+# resolved version (rides under #2596).
+pyobjc-core>=10.0,<12.0  # `objc` module: services/computer_use/input.py, audio_core/capture/coreaudio_capture.py
+pyobjc-framework-Cocoa>=10.0,<12.0        # AppKit (NSWorkspace/NSRunningApplication) + Foundation: window_manager.py, coreaudio_capture.py
+pyobjc-framework-Quartz>=10.0,<12.0       # CGEvent/CGWindowList: services/computer_use/input.py, window_manager.py, intent/tools/vision_tools.py
+pyobjc-framework-ApplicationServices>=10.0,<12.0  # ApplicationServices/HIServices (AXIsProcessTrusted): services/computer_use/input.py
+pyobjc-framework-UserNotifications>=10.0,<12.0    # UNUserNotificationCenter: services/notifications/macos_notification.py
+
+# Calendar integration
+caldav>=3.1.0,<4.0.0
+google-api-python-client>=2.100.0,<3.0.0
+google-auth-httplib2>=0.1.1,<0.2.0
+google-auth-oauthlib>=1.1.0,<2.0.0
+pyicloud>=1.0.0,<2.0.0
+dateparser>=1.2.0,<2.0.0
+croniter>=6.0.0,<7.0.0       # Cron expression parsing for scheduled automation
+
+# Contacts integration (#3282, read-only CardDAV/iCloud Contacts)
+defusedxml>=0.7.1,<1.0.0     # Hardened XML parsing for untrusted CardDAV server responses (bandit B314)
+vobject>=0.9.6,<1.0.0        # vCard parsing for CardDAV contacts. caldav 2.0 dropped it
+                             # as a runtime dep (test extra only), so #3282's "already
+                             # transitive via caldav" assumption left contacts raising
+                             # CardDAVDependencyError on every install.
+
+# High ROI Enhancements (Production-grade)
+cryptography>=50.0.0,<51.0.0  # SECURITY: 50.0.0 fixes CVE-2026-69247/69248/69249; supersedes the 48.0.1 OpenSSL bundle fix (GHSA-537c-gmf6-5ccf)
+PyJWT==2.13.0  # JWT verification for auth secret rotation and Apple Sign-In. SECURITY: 2.13.0 fixes CVE-2026-48522/48523/48524/48525/48526
+zstandard>=0.25.0,<1.0.0  # Trace v2 zstd compression; writer falls back to gzip if unavailable
+keyring>=24.0.0,<25.0.0  # OS keyring for master key storage. On macOS this is the
+                         # `keyring.backends.macOS` backend (ctypes -> Security.framework
+                         # Keychain Services, no pyobjc required) — build_macos_app.sh
+                         # already carries the PyInstaller --hidden-import for it.
+backports.tarfile>=1.2.0,<2.0.0  # Required by keyring/jaraco.context backport plugin loading
+
+# In-process audio decode backend (rides ffmpeg's shared libs via faster-whisper;
+# imported directly by music/backends/simple_av.py). Declared explicitly because
+# it is imported directly, same as requirements_desktop.txt.
+av>=11.0.0,<18.0.0
+
+# Local music provider - fuzzy search for local file library
+rapidfuzz==3.14.3
+# Audio metadata extraction for local library scanner
+tinytag==2.2.1  # SECURITY: 2.2.1 fixes CVE-2026-32889 (DoS via unterminated SYLT frame)
+
+# Multi-room device discovery (mDNS/Bonjour)
+zeroconf==0.149.16     # LAN device discovery for multi-room sync
+
+# Velopack runtime bridge — Windows auto-update only. Kept here (as on Linux)
+# so the import in the shared updater module does not error; the macOS update
+# path (utils/macos_updater.py) does NOT use Velopack.
+velopack==0.0.1589.dev41669
+
+# ---------------------------------------------------------------------------
+# Windows-only / Linux-only — intentionally excluded from the macOS build
+# ---------------------------------------------------------------------------
+# pyaec, pyaudiowpatch, pycaw, comtypes  — WASAPI/COM, Windows-only. macOS AEC
+#                       uses ViolaAEC (voice/wake_detector/aec_viola.py, pure
+#                       numpy+scipy), selected first in create_aec_processor().
+# pywinauto             — Win32 UI automation via accessibility APIs
+#                       (Windows-only); macOS equivalent is the pyobjc/Quartz
+#                       block above.
+# secretstorage, jeepney — Linux Secret Service (D-Bus) keyring backend; macOS
+#                       uses the Keychain backend instead (see keyring above).
+#
+# (openwakeword is NOT excluded here -- see the "Wake word detection" pin
+# above. #4786: it was previously excluded on a stale premise; see that pin's
+# comment for the ground-truthed reason it must stay.)
+-r requirements_bootstrap.txt

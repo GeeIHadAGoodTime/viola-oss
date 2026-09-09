@@ -1,0 +1,4 @@
+# Canonical text hashes must survive clones on every platform.
+* text eol=lf
+*.onnx binary
+*.wav binary

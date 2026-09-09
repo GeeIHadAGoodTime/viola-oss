@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Onboarding Guest-Path Harness (test-only, #4225)</title>
+    <!--
+      Test-only entry point, NOT part of the shipped app. It is not listed in
+      vite.config.js's build input (which stays the default single index.html
+      entry), so `npm run build` never bundles it -- only
+      vite.onboarding-harness.config.js builds it, for the hermetic Playwright
+      proof in tests/e2e/web/onboarding_guest/verify_guest_first_run.py. It
+      mounts the REAL OnboardingOverlay.jsx + useVoiceOnboarding.js production
+      modules (src/testHarness/onboardingGuestHarness.jsx), wired the same way
+      SmartDisplay.jsx wires them, against a hermetic backend
+      (tests/e2e/web/onboarding_guest/backend_harness.py) instead of the
+      desktop app this sandbox cannot run.
+    -->
+    <script>
+      // First-run onboarding is a DESKTOP-app flow: utils/featureSurface keys
+      // off the Qt shell's injected `window.viola` bridge, and without it the
+      // hook correctly suppresses itself as the cloud SPA. Establish the
+      // desktop surface before the bundle loads so the guided flow runs, the
+      // same way the vitest suite does in its beforeEach.
+      window.viola = {};
+      // The Qt shell also injects the desktop-local API key here; without it
+      // useViolaApi's resolveApiKey() goes looking for one it will not find.
+      window.__VIOLA_API_KEY__ = 'onboarding-guest-harness-key'; // pragma: allowlist secret
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/testHarness/onboardingGuestHarness.jsx"></script>
+  </body>
+</html>

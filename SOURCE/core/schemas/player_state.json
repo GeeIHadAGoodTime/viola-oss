@@ -1,0 +1,354 @@
+{
+  "$defs": {
+    "JsonValue": {},
+    "QueueItem": {
+      "additionalProperties": true,
+      "description": "Represents a single item in the playback queue.\n\nAttributes:\n    id: Unique identifier for this queue item\n    title: Song/video title\n    url: Direct playback URL (resolved stream URL)\n    source: Source type (ytsearch1, url, local)\n    video_id: YouTube video ID (for thumbnails, metadata)\n    artist: Artist/channel name\n    resolved_at: Timestamp when URL was resolved (for freshness tracking)",
+      "properties": {
+        "artist": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Artist"
+        },
+        "artwork_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Resolved artwork URL suitable for UI display",
+          "title": "Artwork Url"
+        },
+        "capabilities": {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "description": "Provider capability overrides for this item (gapless, lyrics, bitrate, offline flags)",
+          "title": "Capabilities",
+          "type": "object"
+        },
+        "duration": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Track duration in seconds",
+          "title": "Duration"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "media_type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Media type: 'audio' or 'video'. Determined by file extension for local files.",
+          "title": "Media Type"
+        },
+        "playback_mode": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Playback mode: 'qt_media' (local files), 'vlc_stream' (direct streams), 'external_browser', 'embedded_webview'. Determines which playback mechanism to use.",
+          "title": "Playback Mode"
+        },
+        "provider": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Normalized provider identifier (spotify, youtube_music, youtube_iframe, local, browser).",
+          "title": "Provider"
+        },
+        "resolved_at": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Unix timestamp when URL was resolved",
+          "title": "Resolved At"
+        },
+        "source": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source"
+        },
+        "stream_token": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Provider-issued token or track identifier required for official SDK playback",
+          "title": "Stream Token"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Title"
+        },
+        "unavailable": {
+          "default": false,
+          "description": "Whether this track is unavailable (e.g., provider not linked, disabled in build)",
+          "title": "Unavailable",
+          "type": "boolean"
+        },
+        "unavailable_reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Human-readable reason why track is unavailable",
+          "title": "Unavailable Reason"
+        },
+        "url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Url"
+        },
+        "video_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Video Id"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "QueueItem",
+      "type": "object"
+    }
+  },
+  "description": "Complete player state representation.\n\nThis is the single source of truth for all player state.\nUsed by:\n- MusicPlayer (internal state)\n- WebSocket broadcasts\n- UI updates\n- API responses\n\nAttributes:\n    is_playing: Whether audio is currently playing\n    now_playing: Currently playing track (None if idle)\n    queue: Upcoming tracks in order\n    volume: Current volume (0-100)\n    position: Current playback position in seconds\n    duration: Total track duration in seconds\n    position_percentage: Position as percentage (0.0 to 1.0)",
+  "properties": {
+    "backend": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Identifier for the active playback backend (e.g. 'vlc', 'simple', 'embedded', 'youtube_web').",
+      "title": "Backend"
+    },
+    "backend_capabilities": {
+      "additionalProperties": {
+        "$ref": "#/$defs/JsonValue"
+      },
+      "description": "Backend-level capability flags (pause, seek, volume, etc.).",
+      "title": "Backend Capabilities",
+      "type": "object"
+    },
+    "backend_display_name": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Human friendly backend name suitable for UI display.",
+      "title": "Backend Display Name"
+    },
+    "duration": {
+      "default": 0,
+      "title": "Duration",
+      "type": "integer"
+    },
+    "is_playing": {
+      "default": false,
+      "title": "Is Playing",
+      "type": "boolean"
+    },
+    "metadata": {
+      "additionalProperties": {
+        "$ref": "#/$defs/JsonValue"
+      },
+      "description": "Additional state metadata for UI hints (playlist summary, context).",
+      "title": "Metadata",
+      "type": "object"
+    },
+    "now_playing": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/QueueItem"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "playback_capabilities": {
+      "additionalProperties": {
+        "$ref": "#/$defs/JsonValue"
+      },
+      "description": "Normalized capability flags after combining backend + track overrides.",
+      "title": "Playback Capabilities",
+      "type": "object"
+    },
+    "playback_errors": {
+      "description": "Recent playback warnings/errors surfaced to the UI.",
+      "items": {
+        "additionalProperties": {
+          "$ref": "#/$defs/JsonValue"
+        },
+        "type": "object"
+      },
+      "title": "Playback Errors",
+      "type": "array"
+    },
+    "playback_mode": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Current playback mode: 'vlc_stream' (for local files/direct streams), 'external_browser', 'embedded_webview'.",
+      "title": "Playback Mode"
+    },
+    "position": {
+      "default": 0,
+      "title": "Position",
+      "type": "integer"
+    },
+    "position_ms": {
+      "default": 0,
+      "description": "Playback position in milliseconds (sub-second precision).",
+      "title": "Position Ms",
+      "type": "integer"
+    },
+    "position_percentage": {
+      "default": 0.0,
+      "title": "Position Percentage",
+      "type": "number"
+    },
+    "queue": {
+      "items": {
+        "$ref": "#/$defs/QueueItem"
+      },
+      "title": "Queue",
+      "type": "array"
+    },
+    "repeat_mode": {
+      "default": "off",
+      "description": "Repeat mode: 'off', 'all', or 'one'.",
+      "title": "Repeat Mode",
+      "type": "string"
+    },
+    "resolver_info": {
+      "additionalProperties": {
+        "$ref": "#/$defs/JsonValue"
+      },
+      "description": "Resolver metadata describing how the current track was resolved.",
+      "title": "Resolver Info",
+      "type": "object"
+    },
+    "shuffle": {
+      "default": false,
+      "description": "Whether shuffle is enabled.",
+      "title": "Shuffle",
+      "type": "boolean"
+    },
+    "state_version": {
+      "default": 0,
+      "description": "Monotonically increasing version number for state changes. Incremented on each state update per PRD \u00a74.2.",
+      "title": "State Version",
+      "type": "integer"
+    },
+    "volume": {
+      "default": 80,
+      "maximum": 100,
+      "minimum": 0,
+      "title": "Volume",
+      "type": "integer"
+    }
+  },
+  "title": "PlayerState",
+  "type": "object"
+}

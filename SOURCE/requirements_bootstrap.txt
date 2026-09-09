@@ -1,0 +1,5 @@
+# Upgrade the installer before installing platform dependencies:
+# python -m pip install -r requirements_bootstrap.txt
+# Included in platform recipes so the resolved inventory covers venv tooling.
+pip==26.2.1
+setuptools==84.0.0

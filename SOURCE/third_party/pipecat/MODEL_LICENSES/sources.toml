@@ -1,0 +1,10 @@
+[[sources]]
+"path" = "MODEL_LICENSES/smart-turn-LICENSE"
+"url" = "https://raw.githubusercontent.com/pipecat-ai/smart-turn/4786657e242dfe77dd138699ac564ee074a2a543/LICENSE"
+"sha256" = "0d66364067f678c08586ebb60a16a2aed4fa081ec11057df35585759ce0e774f" # pragma: allowlist secret (public artifact checksum)
+
+[[sources]]
+"path" = "MODEL_LICENSES/silero-vad-LICENSE"
+"url" = "https://raw.githubusercontent.com/snakers4/silero-vad/fba061dc5559f696e62171e9a0741782b0fdc23c/LICENSE"
+"sha256" = "2e63e9a38b6e8fc0c7bc37ce174caca1862870856c6daf5697cfb785e925520b" # pragma: allowlist secret (public artifact checksum)
+

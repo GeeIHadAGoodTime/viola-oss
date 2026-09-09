@@ -1,0 +1,24 @@
+ViolaWake — browser wake-word detection (client-side, in-tab)
+=============================================================
+
+This directory ships redistributable third-party model + code artifacts used
+by Viola's browser hands-free wake word. All components are Apache-2.0 or MIT;
+redistribution in a shipped web bundle is permitted with the attributions below.
+
+1. ViolaWake SDK + temporal_cnn.onnx classifier head
+   Source: https://github.com/GeeIHadAGoodTime/ViolaWake
+   Licensed under the Apache License, Version 2.0.
+   The browser detector code under ui/react-app/src/lib/wake/ is vendored from
+   the ViolaWake WASM port (npm package `violawake` v0.1.0). The temporal CNN
+   classification head and streaming pipeline are original ViolaWake work.
+
+2. OpenWakeWord audio backbone — melspectrogram.onnx, embedding_model.onnx
+   Source: https://github.com/dscripka/openWakeWord
+   Copyright (c) openWakeWord Contributors. Apache License, Version 2.0.
+   ViolaWake uses OpenWakeWord's audio embedding backbone as a frozen feature
+   extractor (redistributed here as ONNX model binaries). These derive from
+   Google's TensorFlow-Hub speech_embedding model, released Apache-2.0.
+
+3. ONNX Runtime Web (onnxruntime-web) — the in-tab WASM inference runtime
+   Source: https://github.com/microsoft/onnxruntime
+   Copyright (c) Microsoft Corporation. MIT License.

@@ -1,0 +1,9 @@
+{
+  "name": "calendar",
+  "version": "1.0.0",
+  "api_version": "1.0",
+  "description": "Query and manage the local primary calendar and optional sync targets",
+  "author": "NOVVIOLA",
+  "permissions": [],
+  "entry_point": "__init__.py"
+}

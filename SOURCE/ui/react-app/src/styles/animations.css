@@ -1,0 +1,174 @@
+/*
+ * Shared keyframe animations for Viola Smart Display.
+ * Imported once in SmartDisplay.jsx — replaces inline <style> tags.
+ */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.001ms !important;
+  }
+
+  /* Functional indicators stay animating because they communicate progress.
+     Decorative motion remains reduced by the global rule above. */
+  [class*='loadingSpinner'],
+  [class*='LoadingSpinner'],
+  [class*='loading-spinner'],
+  [class*='loadingIndicator'],
+  [class*='thinkingText'],
+  [class*='searchDot'],
+  [class*='logoRing'],
+  [data-essential-motion] {
+    animation-iteration-count: infinite !important;
+  }
+
+  [class*='loadingSpinner'],
+  [class*='LoadingSpinner'],
+  [class*='loading-spinner'],
+  [data-essential-motion='spin-command'] {
+    animation-duration: 0.7s !important;
+  }
+
+  [data-essential-motion='spin-fast'] {
+    animation-duration: 0.8s !important;
+  }
+
+  [data-essential-motion='spin'] {
+    animation-duration: 1s !important;
+  }
+
+  [class*='loadingIndicator'],
+  [class*='thinkingText'],
+  [class*='searchDot'],
+  [data-essential-motion='pulse'] {
+    animation-duration: 1.5s !important;
+  }
+
+  [class*='logoRing'],
+  [data-essential-motion='pulse-slow'] {
+    animation-duration: 2s !important;
+  }
+}
+
+@keyframes blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+@keyframes searchPulse {
+  0%, 100% { opacity: 0.3; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.3); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.85); }
+}
+
+@keyframes recordingBadgePulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.72; transform: scale(1.18); }
+}
+
+@keyframes agentPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+@keyframes agentSpin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes agentPillFadeIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes agentPillFadeOut {
+  from { opacity: 1; transform: translateY(0); }
+  to   { opacity: 0; transform: translateY(-8px); }
+}
+
+@keyframes modal-loading-spinner-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes cmd-loading-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes thinking-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+@keyframes agentDrawerSlideUp {
+  from { opacity: 0; transform: translateX(-50%) translateY(12px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+@keyframes agentThinkingFadeIn {
+  from { opacity: 0.25; }
+  to { opacity: 1; }
+}
+
+/* Now-playing motion for static album-art tiles (#1530) -- Spotify/browser
+   playback has no built-in video motion the way YouTube/provider embeds do,
+   so the media tile otherwise sits as a still frame the whole time audio
+   plays. auraBreath is the same slow "candlelight" breathing cadence the
+   marketing site's hero uses (ViolaWebsite/index.html .hero::after), reused
+   here so the product surface and the site share one motion language.
+   artBreathe is a barely-there Ken-Burns-style breathe on the art itself.
+   Both are decorative (no data-essential-motion opt-out) so the global
+   prefers-reduced-motion rule above collapses them to near-static like every
+   other decorative animation on this stylesheet. */
+@keyframes auraBreath {
+  0%, 100% { opacity: 0.2; }
+  50%      { opacity: 0.5; }
+}
+
+@keyframes artBreathe {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.035); }
+}
+
+/* Display mode overlay transitions */
+.display-mode-overlay {
+  transition: opacity 0.8s ease-in-out;
+}
+
+.display-mode-overlay.entering {
+  opacity: 1;
+}
+
+.display-mode-overlay.exiting {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.browser-url-bar {
+  transition: background-color 0.3s ease;
+}
+
+.browser-url-bar:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.agent-status-bar {
+  transition: background-color 0.3s ease;
+}
+
+.agent-takeover-container {
+  transition: all 400ms ease-out;
+}
+
+/* Mobile viewport breakpoints removed — spoke CSS-scale renders SmartDisplay
+   at 1400px design width, so viewport-based @media overrides cause visual
+   divergence between hub and spoke.  The spoke must look identical to the hub.
+   If mobile-specific layout is ever needed, use CSS container queries scoped
+   to SmartDisplay's container width, not the viewport. */

@@ -1,0 +1,9 @@
+{
+  "name": "timer",
+  "version": "1.0.0",
+  "api_version": "1.0",
+  "description": "Set, cancel, and check countdown timers",
+  "author": "NOVVIOLA",
+  "permissions": ["audio"],
+  "entry_point": "__init__.py"
+}

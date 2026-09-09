@@ -1,0 +1,47 @@
+@import '../../styles/variables.css';
+
+.placeholder {
+  width: 100%;
+  min-height: clamp(260px, 42vh, 420px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  text-align: center;
+  padding: 32px;
+  box-sizing: border-box;
+}
+
+.badge {
+  min-width: 42px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  background: var(--accent-glow);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.title {
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.detail {
+  max-width: 420px;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}

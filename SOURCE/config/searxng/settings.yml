@@ -1,0 +1,12 @@
+use_default_settings: true
+
+search:
+  formats:
+    - html
+    - json
+
+server:
+  # Rendered inside the container from the operator-provided SEARXNG_SECRET_KEY.
+  secret_key: "${SEARXNG_SECRET_KEY}"
+  limiter: false
+  public_instance: false

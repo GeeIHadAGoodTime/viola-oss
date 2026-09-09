@@ -1,0 +1,32 @@
+# Audio device configuration for the audio core sinks.
+#
+# This file is consumed by `audio_core.sinks.device_manager.DeviceManager`.
+# Update the `defaults` block to pin a preferred device or latency profile.
+# Add/edit `latency_profiles` to tune sink behaviour across hardware targets.
+
+defaults:
+  # Set to a stable device id (see logs from DeviceManager) or leave null to
+  # follow the operating system default output device.
+  preferred_device_id: null
+
+  # Latency profile used when building sink configurations unless overridden.
+  latency_profile: standard
+
+latency_profiles:
+  standard:
+    latency_target_ms: 120
+    shared_mode: true
+    exclusive_mode: false
+    buffer_frames: null
+
+  low_latency:
+    latency_target_ms: 80
+    shared_mode: true
+    exclusive_mode: false
+    buffer_frames: 4096
+
+  exclusive_monitoring:
+    latency_target_ms: 40
+    shared_mode: false
+    exclusive_mode: true
+    buffer_frames: 2048

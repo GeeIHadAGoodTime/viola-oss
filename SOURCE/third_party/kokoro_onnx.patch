@@ -1,0 +1,39 @@
+--- a/kokoro_onnx/pyproject.toml
++++ b/kokoro_onnx/pyproject.toml
+@@ -3 +3 @@
+-version = "0.4.9"
++version = "0.4.9+viola.1"
+@@ -4,0 +5,2 @@
++license = "MIT"
++license-files = ["LICENSE"]
+@@ -13 +14,0 @@
+-    "espeakng-loader>=0.2.4",
+@@ -33 +34 @@
+-requires = ["hatchling"]
++requires = ["hatchling==1.29.0"]
+--- a/kokoro_onnx/src/kokoro_onnx/tokenizer.py
++++ b/kokoro_onnx/src/kokoro_onnx/tokenizer.py
+@@ -1,0 +2 @@
++import ctypes.util
+@@ -6 +6,0 @@
+-import espeakng_loader
+@@ -21 +21 @@
+-            espeak_config.data_path = espeakng_loader.get_data_path()
++            espeak_config.data_path = os.getenv("PHONEMIZER_ESPEAK_DATA_PATH")
+@@ -23 +23,10 @@
+-            espeak_config.lib_path = espeakng_loader.get_library_path()
++            espeak_config.lib_path = (
++                os.getenv("PHONEMIZER_ESPEAK_LIBRARY")
++                or ctypes.util.find_library("espeak-ng")
++                or ctypes.util.find_library("espeak")
++            )
++        if not espeak_config.lib_path:
++            raise RuntimeError(
++                "Kokoro requires a separately installed system eSpeak-NG library. "
++                "Set PHONEMIZER_ESPEAK_LIBRARY to its shared library path."
++            )
+@@ -53 +62,3 @@
+-        EspeakWrapper.set_data_path(espeak_config.data_path)
++        # Use the system library data directory unless explicitly overridden.
++        if espeak_config.data_path:
++            EspeakWrapper.set_data_path(espeak_config.data_path)

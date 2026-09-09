@@ -1,0 +1,14 @@
+[project]
+name = "viola"
+version = "1.0.4"
+description = "Voice assistant with user-owned AI providers and local models"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "Apache-2.0"
+
+[project.urls]
+Homepage = "https://github.com/GeeIHadAGoodTime/Viola"
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"

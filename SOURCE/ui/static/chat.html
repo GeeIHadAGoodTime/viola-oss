@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Viola — Chat</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#000;--bg-card:#0d0d0d;--bg-input:#141414;
+  --accent:#C89B3C;--accent-dim:rgba(200,155,60,0.15);--accent-chip:rgba(200,155,60,0.1);
+  --text:rgba(255,255,255,0.85);--text2:rgba(255,255,255,0.65);--text3:rgba(255,255,255,0.4);
+  --border:rgba(255,255,255,0.06);--shadow:0 24px 80px rgba(0,0,0,0.8);
+  --radius:12px;--radius-lg:20px;
+  --font:'Segoe UI','SF Pro Display',-apple-system,BlinkMacSystemFont,sans-serif;
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--font);overflow:hidden}
+body{display:flex;justify-content:center;align-items:stretch}
+
+/* ---------- layout ---------- */
+.chat-root{
+  display:flex;flex-direction:column;width:100%;max-width:600px;height:100dvh;
+  background:var(--bg-card);border-left:1px solid var(--border);border-right:1px solid var(--border);
+}
+header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:16px 20px;border-bottom:1px solid var(--border);flex-shrink:0;
+}
+header .logo{display:flex;align-items:center;gap:10px;font-size:18px;font-weight:600;letter-spacing:.3px}
+header .logo .dot{width:10px;height:10px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px var(--accent)}
+header .help-btn{
+  background:none;border:1px solid var(--border);color:var(--text2);border-radius:50%;
+  width:32px;height:32px;cursor:pointer;font-size:14px;transition:border-color .2s;
+}
+header .help-btn:hover{border-color:var(--accent);color:var(--text)}
+
+/* ---------- messages ---------- */
+.messages{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:12px}
+.messages::-webkit-scrollbar{width:4px}
+.messages::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.1);border-radius:2px}
+
+.msg{max-width:85%;padding:12px 16px;border-radius:var(--radius-lg);font-size:14px;line-height:1.55;word-wrap:break-word;white-space:pre-wrap;position:relative}
+.msg.assistant{align-self:flex-start;background:#1a1a1a;border:1px solid var(--border)}
+.msg.user{align-self:flex-end;background:var(--accent-dim);border:1px solid rgba(200,155,60,0.2);color:var(--text)}
+
+/* channel badge for messages from Telegram history */
+.msg .channel-badge{
+  display:inline-block;font-size:10px;color:var(--text3);margin-left:6px;
+  vertical-align:middle;font-weight:400;letter-spacing:.3px;
+}
+
+.typing{align-self:flex-start;display:none;padding:12px 16px;background:#1a1a1a;border:1px solid var(--border);border-radius:var(--radius-lg)}
+.typing.visible{display:flex;gap:5px;align-items:center}
+.typing span{width:6px;height:6px;border-radius:50%;background:var(--accent);animation:pulse 1.2s infinite}
+.typing span:nth-child(2){animation-delay:.2s}
+.typing span:nth-child(3){animation-delay:.4s}
+@keyframes pulse{0%,80%,100%{opacity:.3;transform:scale(.8)}40%{opacity:1;transform:scale(1)}}
+
+/* ---------- suggestions ---------- */
+.suggestions{display:flex;flex-wrap:wrap;gap:8px;padding:8px 20px;flex-shrink:0}
+.chip{
+  padding:7px 14px;border-radius:20px;font-size:13px;cursor:pointer;
+  background:var(--accent-chip);color:var(--accent);border:1px solid rgba(200,155,60,0.15);
+  transition:background .2s,border-color .2s;white-space:nowrap;
+}
+.chip:hover{background:rgba(200,155,60,0.2);border-color:rgba(200,155,60,0.3)}
+
+/* ---------- input bar ---------- */
+.input-bar{
+  display:flex;gap:10px;padding:12px 16px;border-top:1px solid var(--border);flex-shrink:0;
+  padding-bottom:max(12px,env(safe-area-inset-bottom));
+}
+.input-bar input{
+  flex:1;padding:12px 16px;background:var(--bg-input);border:1px solid var(--border);
+  border-radius:var(--radius);color:var(--text);font-size:14px;font-family:var(--font);outline:none;
+  transition:border-color .2s;
+}
+.input-bar input::placeholder{color:var(--text3)}
+.input-bar input:focus{border-color:rgba(200,155,60,0.3)}
+.input-bar button{
+  width:44px;height:44px;border-radius:var(--radius);border:none;
+  background:var(--accent);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;transition:opacity .2s;
+}
+.input-bar button:disabled{opacity:.4;cursor:default}
+.input-bar button svg{width:20px;height:20px}
+
+/* ---------- login overlay ---------- */
+.login-overlay{
+  position:absolute;inset:0;background:var(--bg);display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:24px;z-index:10;padding:32px;
+}
+.login-overlay.hidden{display:none}
+.login-overlay h2{font-size:22px;font-weight:600;color:var(--text)}
+.login-overlay p{color:var(--text2);font-size:14px;text-align:center;max-width:320px;line-height:1.5}
+.login-overlay a{
+  display:inline-block;padding:12px 28px;background:var(--accent);color:#000;font-weight:600;
+  border-radius:var(--radius);text-decoration:none;font-size:14px;transition:opacity .2s;
+}
+.login-overlay a:hover{opacity:.85}
+</style>
+</head>
+<body>
+<div class="chat-root" id="app">
+
+  <!-- login overlay (shown when unauthenticated) -->
+  <div class="login-overlay" id="loginOverlay">
+    <div class="logo" style="font-size:24px"><span class="dot"></span> Viola</div>
+    <h2>Chat with Viola</h2>
+    <p>Your personal AI assistant — weather, timers, math, jokes, and more. Sign in to start chatting.</p>
+    <a id="loginLink" href="/auth/login?redirect=/chat">Sign In</a>
+  </div>
+
+  <!-- chat UI (shown when authenticated) -->
+  <header>
+    <div class="logo"><span class="dot"></span> Viola</div>
+    <button class="help-btn" title="Help" onclick="sendText('help')">?</button>
+  </header>
+
+  <div class="messages" id="messages">
+    <div class="msg assistant">Hey! What can I help you with?</div>
+    <div class="typing" id="typing"><span></span><span></span><span></span></div>
+  </div>
+
+  <div class="suggestions" id="suggestions">
+    <div class="chip" onclick="sendText('What\'s the weather?')">What's the weather?</div>
+    <div class="chip" onclick="sendText('Tell me a joke')">Tell me a joke</div>
+    <div class="chip" onclick="sendText('Set a timer for 5 minutes')">Set a timer</div>
+    <div class="chip" onclick="sendText('What time is it in Tokyo?')">Time in Tokyo</div>
+  </div>
+
+  <div class="input-bar">
+    <input id="input" type="text" placeholder="Type a message..." autocomplete="off"
+           onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();send()}">
+    <button id="sendBtn" onclick="send()" title="Send">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+    </button>
+  </div>
+</div>
+
+<script>
+(function(){
+  var msgBox  = document.getElementById('messages');
+  var typing  = document.getElementById('typing');
+  var input   = document.getElementById('input');
+  var sendBtn = document.getElementById('sendBtn');
+  var overlay = document.getElementById('loginOverlay');
+  var sugBox  = document.getElementById('suggestions');
+  var busy    = false;
+  var pendingDraft = '';  // preserved across session-expiry re-auth
+  var lastTimestamp = ''; // newest message timestamp — for incremental polling
+  var seenIds = {};       // message IDs already rendered — prevents duplicates
+  var pollTimer = null;
+  var authenticated = false;
+
+  /* ---- CSRF helper ----
+     Cloud cookie-auth state-changing requests must echo the readable
+     ``viola_csrf`` cookie in ``X-CSRF-Token`` or the CSRFMiddleware rejects
+     them with 403 — see auth/csrf.py. Without this, every POST /chat/message
+     from this page was a guaranteed 403 in cloud mode (the cloud chat page
+     was effectively dead on arrival before this was wired). */
+  function readCsrfToken(){
+    var match = document.cookie.match(/(?:^|; )viola_csrf=([^;]+)/);
+    return match ? decodeURIComponent(match[1]) : '';
+  }
+
+  /* ---- auth check ---- */
+  async function checkAuth(){
+    try{
+      var r = await fetch('/auth/me',{credentials:'include'});
+      if(r.ok){
+        overlay.classList.add('hidden');
+        authenticated = true;
+        loadHistory();
+        startPolling();
+        // Restore draft that was in-flight when session expired
+        if(pendingDraft){
+          input.value = pendingDraft;
+          pendingDraft = '';
+        }
+        input.focus();
+      }
+    }catch(e){/* stay on login overlay */}
+  }
+  checkAuth();
+
+  /* Re-check auth when page regains focus (handles login in another tab) */
+  document.addEventListener('visibilitychange', function(){
+    if(document.hidden){
+      stopPolling();
+    }else if(authenticated){
+      pollNow();  // immediate check on tab focus
+      startPolling();
+    }else if(!overlay.classList.contains('hidden')){
+      checkAuth();
+    }
+  });
+
+  /* ---- history (cross-channel: shows Telegram + Web merged) ---- */
+  async function loadHistory(){
+    try{
+      var r = await fetch('/chat/history?limit=50&all_channels=true',{credentials:'include'});
+      if(!r.ok) return;
+      var json = await r.json();
+      var msgs = (json.data && json.data.messages) || [];
+      if(msgs.length === 0) return;
+      // clear default greeting
+      var first = msgBox.querySelector('.msg.assistant');
+      if(first) first.remove();
+      msgs.forEach(function(m){
+        seenIds[m.id] = true;
+        if(m.timestamp && m.timestamp > lastTimestamp) lastTimestamp = m.timestamp;
+        appendMsg(m.role, m.content, m.channel);
+      });
+      scrollBottom();
+    }catch(e){/* ignore */}
+  }
+
+  /* ---- polling: pick up messages from other tabs / devices / Telegram ---- */
+  function startPolling(){
+    if(pollTimer) return;
+    pollTimer = setInterval(pollNow, 8000);  // every 8 seconds
+  }
+  function stopPolling(){
+    if(pollTimer){ clearInterval(pollTimer); pollTimer = null; }
+  }
+  async function pollNow(){
+    if(!lastTimestamp || busy) return;
+    try{
+      var url = '/chat/history?limit=20&all_channels=true&after=' + encodeURIComponent(lastTimestamp);
+      var r = await fetch(url, {credentials:'include'});
+      if(r.status === 401){ authenticated = false; stopPolling(); overlay.classList.remove('hidden'); return; }
+      if(!r.ok) return;
+      var json = await r.json();
+      var msgs = (json.data && json.data.messages) || [];
+      var added = 0;
+      msgs.forEach(function(m){
+        if(seenIds[m.id]) return;  // already rendered
+        seenIds[m.id] = true;
+        if(m.timestamp && m.timestamp > lastTimestamp) lastTimestamp = m.timestamp;
+        appendMsg(m.role, m.content, m.channel);
+        added++;
+      });
+      if(added > 0) scrollBottom();
+    }catch(e){/* ignore poll errors */}
+  }
+
+  /* ---- send ---- */
+  window.sendText = function(text){ input.value = text; send(); };
+
+  window.send = async function(){
+    var text = input.value.trim();
+    if(!text || busy) return;
+    busy = true;
+    sendBtn.disabled = true;
+    input.value = '';
+    sugBox.innerHTML = '';
+
+    appendMsg('user', text, 'web');
+    typing.classList.add('visible');
+    scrollBottom();
+
+    try{
+      var headers = {'Content-Type':'application/json'};
+      var csrf = readCsrfToken();
+      if(csrf) headers['X-CSRF-Token'] = csrf;
+      var r = await fetch('/chat/message',{
+        method:'POST',
+        credentials:'include',
+        headers: headers,
+        body: JSON.stringify({text: text})
+      });
+      typing.classList.remove('visible');
+
+      if(r.status === 401){
+        // Session expired — preserve the message so user doesn't lose it
+        pendingDraft = text;
+        overlay.classList.remove('hidden');
+        return;
+      }
+
+      if(r.status === 429){
+        var errJson = await r.json().catch(function(){ return {}; });
+        appendMsg('assistant', (errJson.error && errJson.error.message) || 'Rate limit reached. Try again later.', 'web');
+        return;
+      }
+
+      var json = await r.json();
+      if(json.ok && json.data){
+        // Track the exchange ID so the poller won't duplicate it
+        if(json.data.id){
+          seenIds[json.data.id] = true;
+          seenIds[json.data.id + '-a'] = true;
+        }
+        appendMsg('assistant', json.data.response, 'web');
+        // Update lastTimestamp so poller starts after this message
+        var now = new Date().toISOString();
+        if(now > lastTimestamp) lastTimestamp = now;
+        showSuggestions(json.data.source);
+      }else{
+        appendMsg('assistant', (json.error && json.error.message) || 'Something went wrong.', 'web');
+      }
+    }catch(e){
+      typing.classList.remove('visible');
+      appendMsg('assistant', 'Network error \u2014 please try again.', 'web');
+    }finally{
+      busy = false;
+      sendBtn.disabled = false;
+      input.focus();
+      scrollBottom();
+    }
+  };
+
+  function appendMsg(role, text, channel){
+    var div = document.createElement('div');
+    div.className = 'msg ' + role;
+    div.textContent = text;
+    // Show a subtle badge when message came from a different channel
+    if(channel && channel !== 'web'){
+      var badge = document.createElement('span');
+      badge.className = 'channel-badge';
+      badge.textContent = 'via ' + channel;
+      div.appendChild(badge);
+    }
+    msgBox.insertBefore(div, typing);
+  }
+
+  function scrollBottom(){
+    requestAnimationFrame(function(){ msgBox.scrollTop = msgBox.scrollHeight; });
+  }
+
+  function showSuggestions(source){
+    var chips = [
+      ["What's the weather?","What's the weather?"],
+      ["Tell me a joke","Tell me a joke"],
+      ["Flip a coin","Flip a coin"],
+      ["What time is it?","What time is it?"],
+    ];
+    sugBox.innerHTML = '';
+    chips.forEach(function(c){
+      var el = document.createElement('div');
+      el.className = 'chip';
+      el.textContent = c[0];
+      el.onclick = function(){ sendText(c[1]); };
+      sugBox.appendChild(el);
+    });
+  }
+})();
+</script>
+</body>
+</html>

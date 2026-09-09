@@ -1,0 +1,33 @@
+# NOVVIOLA / Viola — Security Disclosure Policy
+# https://api.useviola.com/.well-known/security.txt
+#
+# This file follows RFC 9116. If you found a vulnerability in any
+# Viola surface (api.useviola.com, useviola.com, the desktop client,
+# the iframe browser provider, or any cloud route), please report it
+# via the channels below. We accept reports in plain English and we
+# acknowledge every reasonable report within 24 hours and provide a
+# substantive response within 72 hours.
+
+Contact: mailto:security@useviola.com
+Contact: https://useviola.com/security
+Expires: 2027-05-22T00:00:00Z
+Preferred-Languages: en
+Canonical: https://api.useviola.com/.well-known/security.txt
+Policy: https://useviola.com/security
+Hiring: https://useviola.com/about
+
+# Reports we want most:
+#   - Authentication bypass on any /auth/v1/* or /api/v1/account/* route
+#   - Per-user data leak (cross-tenant) on any /v1/* surface
+#   - Stripe / BTCPay / billing surface manipulation
+#   - GDPR delete/export bypass
+#   - Anything in the desktop client that reaches a network it shouldn't
+#
+# Safe-harbor:
+#   We will not pursue legal action against good-faith researchers who:
+#     * avoid denial-of-service, spam, high-volume, or rate-limit
+#       bypass testing;
+#     * test only against accounts they themselves own, or against
+#       accounts prefixed `security-research-*@` that we provision on
+#       request;
+#     * report privately before public disclosure.

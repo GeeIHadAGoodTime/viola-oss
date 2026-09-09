@@ -1,0 +1,76 @@
+/*
+ * First-run onboarding styling.
+ *
+ * The marketing serif (Cormorant Garamond) is self-hosted here so the Qt
+ * WebView CSP (which blocks external origins) can load it same-origin. Vite
+ * fingerprints the woff2 into /static/react/assets/ and rewrites this url().
+ * Only the 600 weight, latin subset, is shipped — it is used solely for the
+ * onboarding titles, so the payload stays tiny.
+ */
+@font-face {
+  font-family: 'Cormorant Garamond';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('./cormorant-garamond-600-latin.woff2') format('woff2');
+}
+
+/* The backdrop dissolves the running app: deep dim + heavy blur + a warm
+   mahogany glow rising from below, like lamplight on wood. */
+@keyframes violaOnboardBackdropIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* The card arrives gently: a soft fade and a small upward settle. */
+@keyframes violaOnboardCardIn {
+  from { opacity: 0; transform: translateY(18px) scale(0.985); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* A slow breathing glow on the brand mark — barely-there warmth. */
+@keyframes violaOnboardEmberPulse {
+  0%, 100% { opacity: 0.55; }
+  50%      { opacity: 1; }
+}
+
+.viola-onboard-backdrop {
+  animation: violaOnboardBackdropIn 0.5s ease-out both;
+}
+
+.viola-onboard-card {
+  animation: violaOnboardCardIn 0.55s cubic-bezier(0.16, 0.84, 0.44, 1) both;
+}
+
+.viola-onboard-ember {
+  animation: violaOnboardEmberPulse 3.2s ease-in-out infinite;
+}
+
+.viola-onboard-serif {
+  font-family: 'Cormorant Garamond', 'Georgia', serif;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+
+/* Action affordances lift gently on hover — bronze warmth. */
+.viola-onboard-btn {
+  transition: transform 0.15s ease, box-shadow 0.2s ease, background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.viola-onboard-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+.viola-onboard-btn:focus-visible {
+  outline: 2px solid rgba(168, 92, 64, 0.9);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .viola-onboard-backdrop,
+  .viola-onboard-card,
+  .viola-onboard-ember {
+    animation: none !important;
+  }
+  .viola-onboard-btn:hover:not(:disabled) {
+    transform: none;
+  }
+}

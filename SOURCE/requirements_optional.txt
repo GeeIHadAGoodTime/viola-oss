@@ -1,0 +1,38 @@
+# Viola Optional Heavy Dependencies
+# Install only if you need karaoke timing or push-to-talk features
+
+# Karaoke timing engine (beat tracking and audio analysis)
+librosa>=0.10.0,<0.11.0
+scipy==1.16.3
+
+# Push-to-talk mode (for testing without wake word)
+pynput>=1.7.6,<2.0.0
+
+# VP-2: DeepFilterNet runs in a separate interpreter because its NumPy 1.x
+# extension is incompatible with the desktop NumPy 2.x stack. Install
+# requirements_deepfilter.txt in that venv and set VIOLA_DEEPFILTER_PYTHON;
+# see docs/INSTALLATION.md. The backend remains available through that worker.
+
+# VP-6: High-quality audio resampling (preferred over scipy.signal.resample)
+soxr>=1.0.0,<2.0.0
+
+# VP-7: RNNoise lightweight noise suppression (ARM/Pi deployment) — NOT pinned here.
+# `rnnoise-python` does not exist on PyPI (#3495); the only real PyPI candidate,
+# `pyrnnoise`, has an incompatible API (`RNNoise(sample_rate=...)` + `denoise_frame()`
+# returning a tuple, vs. the code's `RNNoise()` + `process_frame()`) and pulls in heavy
+# deps (audiolab/ffmpeg, matplotlib, tqdm) that defeat the lightweight-ARM intent.
+# audio_core/rnnoise_suppressor.py already degrades gracefully if a compatible `rnnoise`
+# binding is installed manually — install one yourself if you want this backend.
+
+# CardDAV contacts (services/contacts/providers/carddav.py parses vCards with it).
+# The provider is registered in services/outbound_provider_registry.py and reachable
+# from intent/tools/contacts_tools.py, and it imports vobject lazily behind a
+# graceful "install 'vobject' to enable CardDAV contacts" error -- so the feature
+# ships, degrades cleanly without the package, and belongs here rather than in the
+# base install.
+vobject>=0.9.6,<1.0.0
+
+# Codex subscription (ChatGPT Plus/Pro zero-cost LLM via OAuth)
+# Requires: codex login  (sign in with your ChatGPT account)
+codex-auth>=0.1.1,<0.2.0
+openai-agents>=0.13.0,<1.0.0

@@ -1,0 +1,9 @@
+{
+  "name": "system-info",
+  "version": "1.0.0",
+  "api_version": "1.0",
+  "description": "System resource monitoring (CPU, memory, disk, uptime)",
+  "author": "NOVVIOLA",
+  "permissions": ["system"],
+  "entry_point": "__init__.py"
+}

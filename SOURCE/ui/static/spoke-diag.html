@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html><head><title>Spoke Diagnostics</title>
+<style>
+  body { background: #111; color: #eee; font-family: monospace; padding: 20px; }
+  button { margin: 4px; padding: 10px 16px; font-size: 14px; cursor: pointer; background: #333; color: #eee; border: 1px solid #555; border-radius: 6px; }
+  button:hover { background: #444; }
+  pre { background: #1a1a1a; padding: 12px; border-radius: 8px; overflow-x: auto; white-space: pre-wrap; word-break: break-all; max-height: 60vh; overflow-y: auto; }
+  h2 { color: #6366f1; }
+  .section { margin: 16px 0; padding: 12px; border: 1px solid #333; border-radius: 8px; }
+</style>
+</head>
+<body>
+<h2>Spoke Button Diagnostics</h2>
+<p>Run tests in order. Open browser DevTools Console for extra details.</p>
+<pre id="log"></pre>
+
+<div class="section">
+  <h3>Step 1: Current Auth Surface</h3>
+  <button onclick="checkInjectedAuth()">1a. Inspect injected auth globals</button>
+  <button onclick="requestPairing()">1b. POST /bootstrap/request</button>
+  <button onclick="confirmPairing()">1c. POST /bootstrap/confirm</button>
+</div>
+
+<div class="section">
+  <h3>Step 2: API Calls (desktop API-key path)</h3>
+  <p>Requires a desktop-injected API key. Paired spoke credentials do not replace full REST auth.</p>
+  <button onclick="testPause()">2a. POST /v1/pause (with Content-Type)</button>
+  <button onclick="testPauseNoContentType()">2b. POST /v1/pause (no Content-Type)</button>
+  <button onclick="testResume()">2c. POST /v1/resume</button>
+  <button onclick="testSkip()">2d. POST /v1/skip</button>
+  <button onclick="testVolume()">2e. POST /v1/volume {level:50}</button>
+  <button onclick="testState()">2f. GET /v1/state</button>
+</div>
+
+<div class="section">
+  <h3>Step 3: WebSocket</h3>
+  <button onclick="testWS()">3. Test /ws/events WebSocket</button>
+</div>
+
+<div class="section">
+  <h3>Step 4: Full Button Simulation</h3>
+  <button onclick="simulateButtonClick()">4. Simulate exact handlePlayPause() path</button>
+</div>
+
+<div class="section">
+  <h3>Step 5: Network & Environment</h3>
+  <button onclick="checkEnv()">5. Check window globals & env</button>
+</div>
+
+<script>
+const logEl = document.getElementById('log');
+const log = (msg) => {
+  const ts = new Date().toISOString().substr(11, 12);
+  const line = `[${ts}] ${msg}`;
+  logEl.textContent += line + '\n';
+  logEl.scrollTop = logEl.scrollHeight;
+  console.log(line);
+};
+
+const BASE = window.location.origin;
+log('Page origin: ' + BASE);
+log('Page URL: ' + window.location.href);
+log('User-Agent: ' + navigator.userAgent.substring(0, 120));
+log('---');
+
+async function checkInjectedAuth() {
+  log('=== Injected Auth ===');
+  log('window.__VIOLA_API_KEY__: ' + JSON.stringify(window.__VIOLA_API_KEY__ || '(not set)'));
+  log('window.__VIOLA_WS_AUTH_TOKEN__: ' + JSON.stringify(window.__VIOLA_WS_AUTH_TOKEN__ || '(not set)'));
+  if (window.__VIOLA_API_KEY__) {
+    log('Desktop shell already injected an API key. No /bootstrap/auth fetch should be needed.');
+  } else {
+    log('No injected API key detected. Pairing bootstrap only yields a scoped spoke credential/cookie for spoke access; it does not mint a desktop API key.');
+  }
+}
+
+async function requestPairing() {
+  log('=== Pairing Bootstrap Request ===');
+  try {
+    const r = await fetch(BASE + '/bootstrap/request', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+    });
+    log('Status: ' + r.status + ' ' + r.statusText);
+    log('Headers: ' + JSON.stringify(Object.fromEntries(r.headers.entries())));
+    const envelope = await r.json();
+    log('Body: ' + JSON.stringify(envelope));
+    // Bootstrap responses now follow the canonical envelope: { ok, error, data }.
+    const data = envelope && envelope.data ? envelope.data : envelope;
+    window._pairingSessionId = data.pairing_session_id || '';
+    log('pairing_session_id: ' + (window._pairingSessionId || '(missing)'));
+    log('expires_in: ' + (data.expires_in ?? '(missing)'));
+    log('message: ' + JSON.stringify(data.message || '(missing)'));
+  } catch(e) {
+    log('ERROR: ' + e.message);
+    log('Stack: ' + e.stack);
+  }
+}
+
+async function confirmPairing() {
+  log('=== Pairing Bootstrap Confirm ===');
+  const sessionId = window._pairingSessionId || prompt('Enter pairing_session_id from step 1b');
+  if (!sessionId) {
+    log('No pairing_session_id available. Run step 1b first.');
+    return;
+  }
+  const code = prompt('Enter the pairing code currently displayed on the Viola hub');
+  if (!code) {
+    log('No pairing code entered.');
+    return;
+  }
+  try {
+    const r = await fetch(BASE + '/bootstrap/confirm', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pairing_session_id: sessionId, code: code.trim() }),
+      credentials: 'same-origin',
+    });
+    log('Status: ' + r.status + ' ' + r.statusText);
+    log('Headers: ' + JSON.stringify(Object.fromEntries(r.headers.entries())));
+    const envelope = await r.json();
+    log('Body: ' + JSON.stringify(envelope));
+    // Bootstrap responses now follow the canonical envelope: { ok, error, data }.
+    const data = envelope && envelope.data ? envelope.data : envelope;
+    if (data.spoke_token) {
+      window._pairedSpokeToken = data.spoke_token;
+      log('Stored returned spoke_token into window._pairedSpokeToken for non-browser diagnostics only.');
+      log('Same-origin browser/WebSocket tests should rely on the HttpOnly viola_spoke cookie set by /bootstrap/confirm.');
+    }
+    log('auth_required: ' + data.auth_required);
+    log('credential_type: ' + JSON.stringify(data.credential_type || '(missing)'));
+    log('device_id: ' + JSON.stringify(data.device_id || '(missing)'));
+    log('spoke_token present: ' + !!data.spoke_token);
+  } catch(e) {
+    log('ERROR: ' + e.message);
+    log('Stack: ' + e.stack);
+  }
+}
+
+async function doFetch(path, opts = {}) {
+  log(`--- ${opts.method || 'GET'} ${path} ---`);
+  try {
+    const url = BASE + path;
+    log('Fetching: ' + url);
+    const startMs = performance.now();
+    const r = await fetch(url, opts);
+    const elapsed = (performance.now() - startMs).toFixed(0);
+    log(`Status: ${r.status} ${r.statusText} (${elapsed}ms)`);
+    const text = await r.text();
+    log('Response: ' + text.substring(0, 500));
+    return { status: r.status, text };
+  } catch(e) {
+    log('FETCH ERROR: ' + e.message);
+    log('Error type: ' + e.constructor.name);
+    log('Stack: ' + (e.stack || '').substring(0, 300));
+    return null;
+  }
+}
+
+async function testPause() {
+  await doFetch('/v1/pause', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'same-origin',
+  });
+}
+
+async function testPauseNoContentType() {
+  await doFetch('/v1/pause', {
+    method: 'POST',
+    credentials: 'same-origin',
+  });
+}
+
+async function testResume() {
+  await doFetch('/v1/resume', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'same-origin',
+  });
+}
+
+async function testSkip() {
+  await doFetch('/v1/skip', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'same-origin',
+  });
+}
+
+async function testVolume() {
+  await doFetch('/v1/volume', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ level: 50 }),
+    credentials: 'same-origin',
+  });
+}
+
+async function testState() {
+  await doFetch('/v1/state');
+}
+
+async function testWS() {
+  log('=== WebSocket Test ===');
+  if (window._pairedSpokeToken) {
+    log('Scoped spoke credential cached locally. Browser WebSocket auth should come from the HttpOnly viola_spoke cookie.');
+  }
+  const room = new URLSearchParams(window.location.search).get('room') || 'diag-test';
+  const wsUrl = BASE.replace('http', 'ws') + '/ws/events?room=' + room;
+  log('Connecting to: ' + wsUrl);
+  try {
+    const ws = new WebSocket(wsUrl);
+    ws.onopen = () => { log('WS OPEN'); setTimeout(() => { log('WS closing after 3s'); ws.close(); }, 3000); };
+    ws.onmessage = (e) => {
+      const data = e.data.substring(0, 300);
+      log('WS MSG: ' + data);
+    };
+    ws.onerror = (e) => log('WS ERROR (see DevTools Network tab for details)');
+    ws.onclose = (e) => log('WS CLOSE: code=' + e.code + ' reason=' + e.reason + ' wasClean=' + e.wasClean);
+  } catch(e) {
+    log('WS EXCEPTION: ' + e.message);
+  }
+}
+
+async function simulateButtonClick() {
+  log('=== Simulating handlePlayPause() exactly as SmartDisplay does ===');
+
+  // Step 1: Reproduce apiFetch behavior
+  const apiKey = window.__VIOLA_API_KEY__ || '';
+  log('window.__VIOLA_API_KEY__: ' + JSON.stringify(apiKey || '(not set)'));
+
+  // Step 2: Build headers exactly as useViolaApi does
+  const headers = { 'Content-Type': 'application/json' };
+  if (apiKey) {
+    headers['X-API-Key'] = apiKey;
+    log('Added X-API-Key header');
+  } else {
+    log('No API key — X-API-Key header NOT added');
+  }
+
+  // Step 3: Make the exact same fetch call
+  const url = '/v1/pause';
+  log('Calling fetch("' + url + '", { method: "POST", headers: ' + JSON.stringify(headers) + ', credentials: "same-origin" })');
+
+  try {
+    const startMs = performance.now();
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      credentials: 'same-origin',
+    });
+    const elapsed = (performance.now() - startMs).toFixed(0);
+    log('response.ok: ' + response.ok);
+    log('response.status: ' + response.status + ' (' + elapsed + 'ms)');
+
+    if (!response.ok) {
+      const error = await response.text();
+      log('NOT OK — error text: ' + error);
+      log('apiFetch would throw: "API /v1/pause failed: ' + response.status + ' ' + error + '"');
+      log('But handlePlayPause has NO .catch() — this error would be SILENTLY SWALLOWED as an unhandled promise rejection');
+      return;
+    }
+
+    const text = await response.text();
+    log('Raw response text: ' + text);
+
+    try {
+      const json = JSON.parse(text);
+      log('Parsed JSON: ' + JSON.stringify(json));
+      if (json.data !== undefined && json.ok !== false) {
+        log('apiFetch would return json.data: ' + JSON.stringify(json.data));
+      } else {
+        log('apiFetch would return full json');
+      }
+    } catch (parseErr) {
+      log('JSON PARSE FAILED: ' + parseErr.message);
+      log('apiFetch would throw: "API /v1/pause returned invalid JSON"');
+    }
+  } catch(e) {
+    log('FETCH FAILED: ' + e.message);
+    log('This means the network request itself failed (DNS, connection refused, CORS, etc.)');
+    log('Stack: ' + (e.stack || '').substring(0, 300));
+  }
+}
+
+function checkEnv() {
+  log('=== Environment Check ===');
+  log('window.__VIOLA_BASE_URL__: ' + JSON.stringify(window.__VIOLA_BASE_URL__ || '(not set)'));
+  log('window.__VIOLA_API_KEY__: ' + JSON.stringify(window.__VIOLA_API_KEY__ || '(not set)'));
+  log('window._pairedSpokeToken present: ' + !!window._pairedSpokeToken);
+  log('window.location.origin: ' + window.location.origin);
+  log('window.location.href: ' + window.location.href);
+  log('window.location.search: ' + window.location.search);
+
+  // Check if React app is loaded
+  log('React root element: ' + !!document.getElementById('root'));
+
+  // Check computed BASE in useViolaApi context
+  const computedBase = window.__VIOLA_BASE_URL__ || '';
+  log('Computed BASE (what useViolaApi uses): "' + computedBase + '"');
+  log('Effective pause URL: "' + computedBase + '/v1/pause"');
+
+  // Check if same-origin
+  const isSameOrigin = computedBase === '' || computedBase === window.location.origin;
+  log('Same-origin request: ' + isSameOrigin);
+}
+</script>
+</body></html>

@@ -1,0 +1,142 @@
+{
+  "$defs": {
+    "QueueItem": {
+      "additionalProperties": true,
+      "description": "Represents a single item in the playback queue.\n\nAttributes:\n    id: Unique identifier for this queue item\n    title: Song/video title\n    url: Direct playback URL (resolved stream URL)\n    source: Source type (ytsearch1, url, local)\n    video_id: YouTube video ID (for thumbnails, metadata)\n    artist: Artist/channel name\n    resolved_at: Timestamp when URL was resolved (for freshness tracking)",
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Title"
+        },
+        "url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Url"
+        },
+        "source": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source"
+        },
+        "video_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Video Id"
+        },
+        "artist": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Artist"
+        },
+        "resolved_at": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Unix timestamp when URL was resolved",
+          "title": "Resolved At"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "QueueItem",
+      "type": "object"
+    }
+  },
+  "description": "Complete player state representation.\n\nThis is the single source of truth for all player state.\nUsed by:\n- MusicPlayer (internal state)\n- WebSocket broadcasts\n- UI updates\n- API responses\n\nAttributes:\n    is_playing: Whether audio is currently playing\n    now_playing: Currently playing track (None if idle)\n    queue: Upcoming tracks in order\n    volume: Current volume (0-100)\n    position: Current playback position in seconds\n    duration: Total track duration in seconds\n    position_percentage: Position as percentage (0.0 to 1.0)",
+  "properties": {
+    "is_playing": {
+      "default": false,
+      "title": "Is Playing",
+      "type": "boolean"
+    },
+    "now_playing": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/QueueItem"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "queue": {
+      "items": {
+        "$ref": "#/$defs/QueueItem"
+      },
+      "title": "Queue",
+      "type": "array"
+    },
+    "volume": {
+      "default": 80,
+      "maximum": 100,
+      "minimum": 0,
+      "title": "Volume",
+      "type": "integer"
+    },
+    "position": {
+      "default": 0,
+      "title": "Position",
+      "type": "integer"
+    },
+    "duration": {
+      "default": 0,
+      "title": "Duration",
+      "type": "integer"
+    },
+    "position_percentage": {
+      "default": 0.0,
+      "title": "Position Percentage",
+      "type": "number"
+    }
+  },
+  "title": "PlayerState",
+  "type": "object"
+}

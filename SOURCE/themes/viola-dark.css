@@ -1,0 +1,85 @@
+/* Viola Dark Theme - CSS Custom Properties */
+
+:root {
+  /* Backgrounds */
+  --viola-bg-void: #000000;
+  --viola-bg-card: #0d0d0d;
+  --viola-bg-elevated: #1a1a1a;
+
+  /* Text Hierarchy */
+  --viola-text-primary: rgba(255,255,255,0.85);
+  --viola-text-secondary: rgba(255,255,255,0.65);
+  --viola-text-tertiary: rgba(255,255,255,0.55);
+  --viola-text-muted: rgba(255,255,255,0.45);
+  --viola-text-disabled: rgba(255,255,255,0.35);
+  --viola-text-faint: rgba(255,255,255,0.2);
+
+  /* Status Colors */
+  --viola-status-green: #22c55e;
+  --viola-status-green-glow: rgba(34, 197, 94, 0.4);
+  --viola-status-yellow: #eab308;
+  --viola-status-yellow-glow: rgba(234, 179, 8, 0.4);
+  --viola-status-red: #ef4444;
+  --viola-status-red-glow: rgba(239, 68, 68, 0.4);
+
+  /* Borders */
+  --viola-border-subtle: rgba(255,255,255,0.04);
+  --viola-border-light: rgba(255,255,255,0.06);
+  --viola-border-hover: rgba(255,255,255,0.12);
+  --viola-divider: rgba(255,255,255,0.08);
+
+  /* Glass */
+  --viola-glass-base: rgba(255,255,255,0.07);
+  --viola-glass-hover: rgba(255,255,255,0.10);
+  --viola-glass-active: rgba(255,255,255,0.14);
+
+  /* Gradients */
+  --viola-gradient-glass: linear-gradient(145deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.02) 100%);
+  --viola-gradient-glass-hover: linear-gradient(145deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.04) 100%);
+  --viola-gradient-divider: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.08) 15%, rgba(255,255,255,0.08) 85%, transparent 100%);
+
+  /* Typography */
+  --viola-font-family: 'Segoe UI', 'SF Pro Display', -apple-system, sans-serif;
+  --viola-font-ultralight: 200;
+  --viola-font-light: 300;
+  --viola-font-regular: 400;
+  --viola-font-medium: 500;
+
+  /* Type Scale */
+  --viola-text-display-xl: clamp(72px, 12vw, 108px);
+  --viola-text-display-lg: clamp(36px, 6vw, 54px);
+  --viola-text-h1: clamp(32px, 5vw, 52px);
+  --viola-text-h2: clamp(18px, 2.8vw, 28px);
+  --viola-text-h3: clamp(18px, 2.5vw, 24px);
+  --viola-text-body-lg: clamp(17px, 2.2vw, 22px);
+  --viola-text-body: clamp(15px, 2vw, 19px);
+  --viola-text-body-sm: clamp(14px, 2vw, 18px);
+  --viola-text-caption: 9px;
+
+  /* Spacing */
+  --viola-container-padding: clamp(32px, 4.5vw, 56px) clamp(36px, 5.5vw, 72px);
+  --viola-section-gap: clamp(20px, 3vh, 32px);
+  --viola-element-gap: clamp(16px, 2.5vh, 28px);
+
+  /* Radii */
+  --viola-radius-card: 32px;
+  --viola-radius-button-lg: 50%;
+  --viola-radius-button-sm: 16px;
+  --viola-radius-album: 16px;
+  --viola-radius-menu: 16px;
+  --viola-radius-progress: 2px;
+
+  /* Shadows */
+  --viola-shadow-card-inset: inset 0 0 0 1px rgba(255,255,255,0.04);
+  --viola-shadow-album: 0 12px 48px rgba(0,0,0,0.5);
+  --viola-shadow-menu: 0 16px 48px rgba(0,0,0,0.65), inset 0 0 0 1px rgba(255,255,255,0.07);
+  --viola-shadow-status-active: 0 0 28px rgba(255,255,255,0.35);
+
+  /* Transitions */
+  --viola-transition-default: all 0.2s ease;
+  --viola-transition-fast: all 0.15s ease;
+  --viola-transition-progress: width 0.3s linear;
+
+  /* Backdrop */
+  --viola-backdrop-blur: blur(24px);
+}

@@ -1,0 +1,164 @@
+@import '../../styles/variables.css';
+
+.section {
+  display: flex;
+  align-items: stretch;
+  gap: clamp(28px, 4vw, 48px);
+  padding-top: clamp(20px, 3vh, 32px);
+  padding-bottom: clamp(16px, 2.5vh, 24px);
+  flex: 1;
+  min-height: 0;
+  /* Structural backstop for #1171: Stage/.modePanel never clip their own
+     overflow, so when this section's content (media + track panel, most
+     acutely once they stack in the <=767px tier below) needs more height
+     than Stage's flex-allotted box, it used to paint straight past this
+     box onto the next sibling, BottomRow -- visually overlapping the voice
+     hint text and the PTT button. Scrolling inside the section instead
+     keeps that overflow contained to the player itself at any width or
+     height, not just the specific ~700px repro band. */
+  overflow-y: auto;
+}
+
+.trackPanel {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  justify-content: center;
+  gap: clamp(16px, 2.5vh, 28px);
+  min-width: 0;
+}
+
+.trackInfoRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  min-width: 0;
+}
+
+.trackTextCol {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.trackTitle {
+  font-family: var(--font-display);
+  font-size: clamp(34px, 5.2vw, 56px);
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  line-height: 1.08;
+  overflow-wrap: anywhere;
+}
+
+.trackArtist {
+  font-size: clamp(18px, 2.8vw, 28px);
+  font-weight: 400;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ratingRow {
+  display: flex;
+  align-items: center;
+  gap: clamp(20px, 3vw, 40px);
+  flex: 0 0 auto;
+}
+
+.transportRow {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+}
+
+.spacer {
+  width: 20px;
+}
+
+@media (max-width: 1023px) {
+  .section {
+    gap: 26px;
+  }
+
+  .trackTitle {
+    font-size: 34px;
+  }
+
+  .trackArtist {
+    font-size: 20px;
+  }
+
+  .transportRow {
+    flex-wrap: wrap;
+    gap: 10px 12px;
+  }
+
+  .spacer {
+    display: none;
+  }
+}
+
+@media (max-width: 767px) {
+  .section {
+    flex-direction: column;
+    align-items: stretch;
+    /* Tightened from 16px (#1171): every px here competes with the
+       stacked media square for the same short Stage box at ~700-767px. */
+    gap: 10px;
+    padding-top: 10px;
+    padding-bottom: 8px;
+  }
+
+  .trackPanel {
+    justify-content: flex-start;
+    gap: 8px;
+  }
+
+  .trackTitle {
+    font-size: 28px;
+  }
+
+  .trackArtist {
+    font-size: 17px;
+  }
+
+  .ratingRow {
+    gap: 12px;
+  }
+
+  .transportRow {
+    justify-content: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .section {
+    gap: 12px;
+    padding-top: 12px;
+    padding-bottom: 10px;
+  }
+
+  .trackInfoRow {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .trackTextCol {
+    flex: 1 1 100%;
+  }
+
+  .trackTitle {
+    font-size: 24px;
+  }
+
+  .trackArtist {
+    font-size: 15px;
+  }
+
+  .ratingRow {
+    margin-left: auto;
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "name": "weather",
+  "version": "1.0.0",
+  "api_version": "1.0",
+  "description": "Current weather conditions and forecasts via wttr.in",
+  "author": "NOVVIOLA",
+  "permissions": ["network"],
+  "entry_point": "__init__.py"
+}

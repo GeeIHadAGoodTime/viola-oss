@@ -1,0 +1,10 @@
+{
+  "name": "home_automation",
+  "version": "1.0.0",
+  "api_version": "1.0",
+  "description": "Home automation and smart device control",
+  "author": "Viola Team",
+  "permissions": ["network"],
+  "entry_point": "home_automation_plugin.py",
+  "dependencies": []
+}

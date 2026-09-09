@@ -1,0 +1,182 @@
+--- a/pipecat/pyproject.toml
++++ b/pipecat/pyproject.toml
+@@ -2 +2 @@
+-requires = ["setuptools>=64", "setuptools_scm>=8"]
++requires = ["setuptools==84.0.0"]
+@@ -7 +7 @@
+-dynamic = ["version"]
++version = "0.0.108+viola.1"
+@@ -10 +10 @@
+-license-files = ["LICENSE"]
++license-files = ["LICENSE", "MODEL_LICENSES/*LICENSE", "MODEL_LICENSES/models.toml"]
+@@ -29 +29 @@
+-    "nltk>=3.9.4,<4",
++    "pysbd==0.3.4",
+@@ -163,16 +163,4 @@
+-"pipecat.audio.dtmf" = [
+-    "src/pipecat/audio/dtmf/dtmf-0.wav",
+-    "src/pipecat/audio/dtmf/dtmf-1.wav",
+-    "src/pipecat/audio/dtmf/dtmf-2.wav",
+-    "src/pipecat/audio/dtmf/dtmf-3.wav",
+-    "src/pipecat/audio/dtmf/dtmf-4.wav",
+-    "src/pipecat/audio/dtmf/dtmf-5.wav",
+-    "src/pipecat/audio/dtmf/dtmf-6.wav",
+-    "src/pipecat/audio/dtmf/dtmf-7.wav",
+-    "src/pipecat/audio/dtmf/dtmf-8.wav",
+-    "src/pipecat/audio/dtmf/dtmf-9.wav",
+-    "src/pipecat/audio/dtmf/dtmf-pound.wav",
+-    "src/pipecat/audio/dtmf/dtmf-star.wav",
+-]
+-"pipecat.services.aws_nova_sonic" = ["src/pipecat/services/aws_nova_sonic/ready.wav"]
+-"pipecat.audio.turn.smart_turn.data" = ["src/pipecat/audio/turn/smart_turn/data/smart-turn-v3.2-cpu.onnx"]
++"pipecat.audio.dtmf" = ["*.wav"]
++"pipecat.services.aws_nova_sonic" = ["*.wav"]
++"pipecat.audio.turn.smart_turn.data" = ["*.onnx"]
++"pipecat.audio.vad.data" = ["*.onnx"]
+--- a/pipecat/src/pipecat/services/camb/tts.py
++++ b/pipecat/src/pipecat/services/camb/tts.py
+@@ -165 +165 @@
+# pragma: allowlist nextline secret (known upstream placeholder)
+-            api_key="your-api-key",
++            api_key="your-api-key",  # pragma: allowlist secret (upstream placeholder, not a credential)
+@@ -173 +173 @@
+# pragma: allowlist nextline secret (known upstream placeholder)
+-            api_key="your-api-key",
++            api_key="your-api-key",  # pragma: allowlist secret (upstream placeholder, not a credential)
+--- a/pipecat/src/pipecat/services/deepgram/flux/stt.py
++++ b/pipecat/src/pipecat/services/deepgram/flux/stt.py
+@@ -146 +146 @@
+# pragma: allowlist nextline secret (known upstream placeholder)
+-                stt = DeepgramFluxSTTService(api_key="your-api-key")
++                stt = DeepgramFluxSTTService(api_key="your-api-key")  # pragma: allowlist secret (upstream placeholder, not a credential)
+@@ -151 +151 @@
+# pragma: allowlist nextline secret (known upstream placeholder)
+-                    api_key="your-api-key",
++                    api_key="your-api-key",  # pragma: allowlist secret (upstream placeholder, not a credential)
+--- a/pipecat/src/pipecat/services/google/gemini_live/vertex/llm.py
++++ b/pipecat/src/pipecat/services/google/gemini_live/vertex/llm.py
+@@ -203 +203 @@
+# pragma: allowlist nextline secret (known upstream placeholder)
+-            api_key="dummy",
++            api_key="dummy",  # pragma: allowlist secret (upstream placeholder, not a credential)
+--- a/pipecat/src/pipecat/services/google/vertex/llm.py
++++ b/pipecat/src/pipecat/services/google/vertex/llm.py
+@@ -242 +242 @@
+# pragma: allowlist nextline secret (known upstream placeholder)
+-            api_key="dummy",
++            api_key="dummy",  # pragma: allowlist secret (upstream placeholder, not a credential)
+--- a/pipecat/src/pipecat/services/ollama/llm.py
++++ b/pipecat/src/pipecat/services/ollama/llm.py
+@@ -76 +76 @@
+# pragma: allowlist nextline secret (known upstream placeholder)
+-        super().__init__(base_url=base_url, api_key="ollama", settings=default_settings, **kwargs)
++        super().__init__(base_url=base_url, api_key="ollama", settings=default_settings, **kwargs)  # pragma: allowlist secret (upstream placeholder, not a credential)
+--- a/pipecat/src/pipecat/services/openai/stt.py
++++ b/pipecat/src/pipecat/services/openai/stt.py
+@@ -227 +227 @@
+# pragma: allowlist nextline secret (known upstream placeholder)
+-            api_key="sk-...",
++            api_key="sk-...",  # pragma: allowlist secret (upstream placeholder, not a credential)
+--- a/pipecat/src/pipecat/services/sarvam/tts.py
++++ b/pipecat/src/pipecat/services/sarvam/tts.py
+@@ -328 +328 @@
+# pragma: allowlist nextline secret (known upstream placeholder)
+-            api_key="your-api-key",
++            api_key="your-api-key",  # pragma: allowlist secret (upstream placeholder, not a credential)
+@@ -342 +342 @@
+# pragma: allowlist nextline secret (known upstream placeholder)
+-            api_key="your-api-key",
++            api_key="your-api-key",  # pragma: allowlist secret (upstream placeholder, not a credential)
+@@ -689 +689 @@
+# pragma: allowlist nextline secret (known upstream placeholder)
+-            api_key="your-api-key",
++            api_key="your-api-key",  # pragma: allowlist secret (upstream placeholder, not a credential)
+@@ -702 +702 @@
+# pragma: allowlist nextline secret (known upstream placeholder)
+-            api_key="your-api-key",
++            api_key="your-api-key",  # pragma: allowlist secret (upstream placeholder, not a credential)
+--- a/pipecat/src/pipecat/services/smallest/tts.py
++++ b/pipecat/src/pipecat/services/smallest/tts.py
+@@ -110 +110 @@
+# pragma: allowlist nextline secret (known upstream placeholder)
+-            api_key="your-api-key",
++            api_key="your-api-key",  # pragma: allowlist secret (upstream placeholder, not a credential)
+--- a/pipecat/src/pipecat/utils/string.py
++++ b/pipecat/src/pipecat/utils/string.py
+@@ -14,4 +14,2 @@
+-    This module uses NLTK (Natural Language Toolkit) for robust sentence
+-    tokenization. NLTK is licensed under the Apache License 2.0.
+-    See: https://www.nltk.org/
+-    Source: https://www.nltk.org/api/nltk.tokenize.punkt.html
++    Viola's maintained fork uses pySBD (MIT) for sentence segmentation.
++    The rules ship with the package; importing telephony never downloads a corpus.
+@@ -24,19 +22,7 @@
+-import nltk
+-from loguru import logger
+-from nltk.tokenize import sent_tokenize
+-
+-# Ensure punkt_tab tokenizer data is available
+-try:
+-    nltk.data.find("tokenizers/punkt_tab")
+-except LookupError:
+-    try:
+-        nltk.download("punkt_tab", quiet=True)
+-    except (OSError, PermissionError) as e:
+-        logger.error(
+-            f"Failed to download NLTK 'punkt_tab' tokenizer data: {e}. "
+-            "This data is required for sentence tokenization features. "
+-            "The download failed due to filesystem permissions. "
+-            "To resolve: pre-install the data in a location with appropriate read permissions, "
+-            "or set the NLTK_DATA environment variable to point to a writable directory. "
+-            "See https://www.nltk.org/data.html for more information."
+-        )
++import pysbd
++
++
++def sent_tokenize(text: str) -> List[str]:
++    """Split without changing input offsets or sharing mutable parser state."""
++    return [sentence.rstrip() for sentence in pysbd.Segmenter(language="en", clean=False).segment(text)]
++
+@@ -92 +78 @@
+-# Latin punctuation that NLTK handles well — these need NLTK's disambiguation
++# Latin punctuation that pySBD handles well — these need pySBD's disambiguation
+@@ -97 +83 @@
+-# NLTK's disambiguation logic. Used as a fallback when NLTK doesn't support the
++# pySBD's disambiguation logic. Used as a fallback when pySBD doesn't support the
+@@ -128 +114 @@
+-    This function uses NLTK's sentence tokenizer to detect sentence boundaries
++    This function uses pySBD's sentence tokenizer to detect sentence boundaries
+@@ -143 +129 @@
+-    # Use NLTK's sentence tokenizer to find sentence boundaries
++    # Use pySBD's sentence tokenizer to find sentence boundaries
+@@ -153 +139 @@
+-    # This is required as NLTK may return a single sentence for
++    # This is required as pySBD may return a single sentence for
+@@ -160,2 +146,2 @@
+-        # Fallback for languages not supported by NLTK (e.g., Japanese, Chinese,
+-        # Korean, Hindi, Arabic). NLTK returned the entire text as a single
++        # Fallback for languages not supported by pySBD (e.g., Japanese, Chinese,
++        # Korean, Hindi, Arabic). pySBD returned the entire text as a single
+@@ -164 +150 @@
+-        # ending punctuation that doesn't need NLTK's disambiguation.
++        # ending punctuation that doesn't need pySBD's disambiguation.
+@@ -171 +157 @@
+-    # (NLTK found a boundary, so there must be proper punctuation)
++    # (pySBD found a boundary, so there must be proper punctuation)
+--- a/pipecat/src/pipecat/utils/text/simple_text_aggregator.py
++++ b/pipecat/src/pipecat/utils/text/simple_text_aggregator.py
+@@ -54 +54 @@
+-        lookahead before calling NLTK.
++        lookahead before calling pySBD.
+@@ -83 +83 @@
+-        non-whitespace character before calling NLTK. This disambiguates cases
++        non-whitespace character before calling pySBD. This disambiguates cases
+@@ -102 +102 @@
+-                # We have meaningful lookahead, call NLTK
++                # We have meaningful lookahead, call pySBD
+@@ -107 +107 @@
+-                    # NLTK confirmed a sentence - return it
++                    # pySBD confirmed a sentence - return it
+@@ -118 +118 @@
+-            # Mark that we need lookahead (don't call NLTK yet)
++            # Mark that we need lookahead (don't call pySBD yet)

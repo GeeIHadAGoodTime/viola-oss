@@ -1,0 +1,10 @@
+{
+  "name": "scripts",
+  "version": "1.0.0",
+  "api_version": "1.0",
+  "description": "Run custom scripts and automation tasks",
+  "author": "Viola Team",
+  "permissions": ["files", "system"],
+  "entry_point": "scripts_plugin.py",
+  "dependencies": []
+}

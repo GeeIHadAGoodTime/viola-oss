@@ -1,0 +1,225 @@
+@import '../../styles/variables.css';
+
+.shell {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+
+.shell::-webkit-scrollbar {
+  display: none;
+}
+
+.group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 0 0 auto;
+}
+
+.contextualGroup {
+  padding-left: 10px;
+  border-left: 1px solid var(--border-light);
+}
+
+.pill {
+  position: relative;
+  /* 44px is the Apple HIG / WCAG mobile touch-target floor (see
+     check_app_display_integrity.py's small-touch-target class). Was 38px --
+     the founder's iPhone-viewport mobile burn-down (issue #367). */
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  max-width: 220px;
+  padding: 0 13px;
+  border: 1px solid var(--border-hover);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  box-shadow: 0 8px 24px var(--shadow-light);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 750;
+  line-height: 1;
+  transition: background 160ms ease, border-color 160ms ease, color 160ms ease, transform 160ms ease;
+}
+
+.pill:hover {
+  color: var(--text-primary);
+  border-color: var(--accent);
+  background: var(--accent-glow);
+}
+
+.pill:active {
+  transform: translateY(1px);
+}
+
+/* Active state: tinted background + accent border + accent text/icon. Reads as
+   "selected" on both dark and light without becoming a heavy slab on light mode. */
+.active {
+  background: var(--accent-active);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.active:hover {
+  background: var(--accent-active);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.contextual {
+  max-width: 260px;
+}
+
+.iconOnly {
+  width: 44px;
+  padding: 0;
+  justify-content: center;
+}
+
+.workbenchPlus {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: 999px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid var(--border-hover);
+  background: transparent;
+  color: var(--text-secondary);
+  box-shadow: 0 8px 24px var(--shadow-light);
+  cursor: pointer;
+  margin-left: 4px;
+  transition: background 160ms ease, border-color 160ms ease, color 160ms ease, transform 160ms ease;
+}
+
+.workbenchPlus:hover {
+  color: var(--text-primary);
+  border-color: var(--accent);
+  background: var(--accent-glow);
+}
+
+.workbenchPlus:active {
+  transform: translateY(1px);
+}
+
+.workbenchPlus svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.iconWrap {
+  position: relative;
+  width: 18px;
+  height: 18px;
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+}
+
+.iconWrap svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.label,
+.meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.meta {
+  max-width: 120px;
+  color: currentColor;
+  opacity: 0.72;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.statusDot {
+  position: absolute;
+  top: -1px;
+  right: -2px;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--status-green);
+  box-shadow: 0 0 0 2px var(--bg-card);
+}
+
+.active .statusDot {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.pulse {
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.liveRegion {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (max-width: 720px) {
+  .shell {
+    gap: 8px;
+  }
+
+  .pill {
+    max-width: 168px;
+    padding: 0 10px;
+  }
+
+  .contextual {
+    max-width: 190px;
+  }
+
+  .meta {
+    max-width: 72px;
+  }
+}
+
+@media (max-width: 520px) {
+  .pill:not(.contextual) {
+    width: 44px;
+    padding: 0;
+    justify-content: center;
+  }
+
+  .pill:not(.contextual) .label,
+  .pill:not(.contextual) .meta {
+    display: none;
+  }
+
+  .contextual {
+    max-width: 160px;
+  }
+}

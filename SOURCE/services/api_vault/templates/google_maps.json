@@ -1,0 +1,11 @@
+{
+  "service_name": "google_maps",
+  "description": "Google Maps Platform — geocoding, directions, places, and distance matrix",
+  "base_url": "https://maps.googleapis.com/maps/api",
+  "docs_url": "https://developers.google.com/maps/documentation",
+  "capabilities": ["geocoding", "directions", "places_search", "distance_matrix"],
+  "auth_type": "api_key",
+  "rate_limits": {"requests_per_second": 50},
+  "header_name": "key",
+  "header_prefix": ""
+}

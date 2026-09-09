@@ -1,0 +1,46 @@
+@media (max-width: 1023px) {
+  .smart-display {
+    height: 100dvh !important;
+    min-height: 100dvh !important;
+    align-items: stretch !important;
+    padding: 8px !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+  }
+
+  .viola-inner-card {
+    max-width: 100% !important;
+    max-height: none !important;
+    min-height: calc(100dvh - 16px) !important;
+    height: auto !important;
+    border-radius: 24px !important;
+    padding: 24px 28px !important;
+    overflow: hidden;
+  }
+
+  .stage-workbench-plus {
+    flex: 0 0 44px;
+    width: 44px !important;
+    height: 44px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .smart-display {
+    padding: 0 !important;
+  }
+
+  .viola-inner-card {
+    min-height: 100dvh !important;
+    border-radius: 0 !important;
+    padding:
+      calc(env(safe-area-inset-top, 0px) + 14px)
+      14px
+      calc(env(safe-area-inset-bottom, 0px) + 14px) !important;
+  }
+
+  .stage-workbench-plus {
+    width: 44px !important;
+    height: 44px !important;
+  }
+}

@@ -1,0 +1,39 @@
+@import '../../styles/variables.css';
+
+.stage {
+  position: relative;
+  display: flex;
+  flex: 1 1 0;
+  min-height: 0;
+  isolation: isolate;
+}
+
+.stage > *,
+.modePanel {
+  min-width: 0;
+}
+
+.modePanel {
+  width: 100%;
+  min-height: 0;
+  flex: 1;
+}
+
+.activePanel {
+  display: flex;
+  position: relative;
+  z-index: 1;
+  visibility: visible;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.inactivePanel {
+  display: flex;
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+}

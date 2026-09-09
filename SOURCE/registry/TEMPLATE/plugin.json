@@ -1,0 +1,9 @@
+{
+  "name": "my-plugin",
+  "version": "0.1.0",
+  "api_version": "1.0",
+  "description": "A custom Viola plugin",
+  "author": "Your Name",
+  "permissions": [],
+  "entry_point": "__init__.py"
+}

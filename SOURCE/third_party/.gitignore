@@ -1,0 +1,7 @@
+# Local build outputs are never part of the maintained source fork.
+**/build/
+**/dist/
+**/*.egg-info/
+**/__pycache__/
+**/*.pyc
+**/.ruff_cache/

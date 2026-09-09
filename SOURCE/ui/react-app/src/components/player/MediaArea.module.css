@@ -1,0 +1,220 @@
+@import '../../styles/variables.css';
+
+.container {
+  max-height: 100%;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  flex-shrink: 0;
+  align-self: center;
+  transition: all 0.3s ease;
+  position: relative;
+  max-width: 100%;
+}
+
+.wide {
+  width: clamp(280px, 40vw, 480px);
+  aspect-ratio: 16 / 9;
+}
+
+.square {
+  width: clamp(200px, 28vw, 320px);
+  aspect-ratio: 1;
+}
+
+/* Browser overlay placeholder */
+.overlayPlaceholder {
+  width: 100%;
+  height: 100%;
+  background-color: #000;
+  position: relative;
+}
+
+.overlayCloseBtn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background-color: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  transition: background-color 0.15s ease;
+}
+
+.overlayCloseBtn:hover {
+  background-color: rgba(255, 255, 255, 0.15);
+}
+
+/* Loading state */
+.loadingState {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.searchDot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background-color: #FF0000;
+  animation: searchPulse 1.5s ease-in-out infinite;
+}
+
+.searchText {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* Album art */
+.albumArtContainer {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+.albumArt {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: opacity 0.4s ease;
+}
+
+.albumArtFull {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.albumArtOverlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 24px 16px 12px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.8));
+  z-index: 2;
+}
+
+/* Now-playing motion (#1530) — see the shared-keyframes comment in
+   styles/animations.css for the full rationale. artMotion adds a breathing
+   bronze glow layered above the art (below the title/artist overlay and
+   provider badges, which sit at z-index 2); albumArtAnimated adds the
+   matching slow zoom on the art itself. MediaArea.jsx only ever applies
+   these together, and only while isPlaying is true with a real artUrl. */
+.artMotion {
+  position: relative;
+}
+
+.artMotion::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: radial-gradient(60% 50% at 50% 32%, var(--ember-glow), transparent 72%);
+  mix-blend-mode: screen;
+  animation: auraBreath 16s ease-in-out infinite;
+}
+
+.albumArtAnimated {
+  animation: artBreathe 22s ease-in-out infinite;
+  transform-origin: center;
+}
+
+.albumArtTitle {
+  font-size: 14px;
+  font-weight: 500;
+  color: #fff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.albumArtArtist {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Spotify badge */
+.spotifyBadge {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  height: 24px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 8px;
+  z-index: 2;
+}
+
+.spotifyLabel {
+  font-size: 10px;
+  color: #1DB954;
+  font-weight: 600;
+}
+
+@media (max-width: 1023px) {
+  .wide {
+    width: clamp(280px, 38vw, 420px);
+  }
+
+  .square {
+    width: clamp(200px, 26vw, 280px);
+  }
+}
+
+@media (max-width: 767px) {
+  .container {
+    align-self: center;
+  }
+
+  .wide {
+    width: 100%;
+  }
+
+  /* Smaller on phones so the column layout (media + track panel + the typed
+     music request) fits above the persistent BottomRow voice bar. Capped at
+     96px (not 190px): at the top of this tier (~700-767px) the Stage's own
+     flex-allotted height is often shorter than the combined stacked media +
+     track-panel content needs, and nothing here clips that overflow -- a
+     190px square left ~150-200px of PlayerSection bleeding onto BottomRow's
+     voice hint text and PTT button (#1171). PlayerSection.module.css's
+     `.section` also gets `overflow-y: auto` as a structural backstop so any
+     residual overflow scrolls inside the player instead of bleeding onto the
+     next sibling, but shrinking the art here is what keeps that backstop
+     from having to engage on the common case.
+  */
+  .square {
+    width: min(24vw, 96px);
+  }
+}
+
+@media (max-width: 480px) {
+  .wide {
+    width: 100%;
+  }
+
+  .square {
+    width: min(44vw, 160px);
+  }
+
+  .albumArtOverlay {
+    padding: 22px 12px 10px;
+  }
+}

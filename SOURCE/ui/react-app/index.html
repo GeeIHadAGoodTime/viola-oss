@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="/favicon.ico" />
+    <title>Viola</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body, #root {
+        width: 100%;
+        height: 100%;
+        background: #000;
+        overflow: hidden;
+      }
+    </style>
+    <!--
+      Early theme init lives in /theme-init.js (public/theme-init.js), NOT
+      inline here. #1063: the cloud /app CSP ships without 'unsafe-inline' in
+      script-src (payment-touching surface), so an inline script block would
+      be silently blocked by the browser. A same-origin external script src
+      needs no CSP relaxation -- keep it that way, do not re-inline this.
+    -->
+    <script src="/theme-init.js"></script>
+  </head>
+  <body>
+    <div id="root">
+      <!-- Loading screen: replaced by React on mount -->
+      <div style="display:flex;align-items:center;justify-content:center;width:100%;height:100dvh;background:#000">
+        <img src="/static/react/viola_icon.png" alt="" width="96" height="96"
+             style="animation:viola-breathe 2s ease-in-out infinite" />
+      </div>
+      <style>
+        @keyframes viola-breathe {
+          0%, 100% { opacity: 0.3; }
+          50% { opacity: 1; }
+        }
+      </style>
+    </div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

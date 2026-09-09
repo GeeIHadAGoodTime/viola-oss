@@ -1,0 +1,1195 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<!-- CRITICAL: Referrer policy required for YouTube embedding after July 2025 API update -->
+	<meta name="referrer" content="strict-origin-when-cross-origin">
+	<title>Viola YouTube IFrame Player</title>
+	<style>
+		html,
+		body {
+			margin: 0;
+			padding: 0;
+			width: 100%;
+			height: 100%;
+			overflow: hidden;
+			background: #000;
+			color: #fff;
+			font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+		}
+
+		#player {
+			width: 100%;
+			height: 100%;
+			min-width: 320px;
+			min-height: 180px;
+		}
+
+		#error-message {
+			display: none;
+			position: absolute;
+			top: 50%;
+			left: 50%;
+			transform: translate(-50%, -50%);
+			text-align: center;
+			color: #ef4444;
+			font-size: 14px;
+			padding: 20px;
+		}
+
+		#loading-message {
+			position: absolute;
+			top: 50%;
+			left: 50%;
+			transform: translate(-50%, -50%);
+			text-align: center;
+			color: #fff;
+			font-size: 14px;
+		}
+
+		#debug-overlay {
+			display: none;
+			position: fixed;
+			top: 0;
+			left: 0;
+			right: 0;
+			background: rgba(0,0,0,0.88);
+			color: #0f0;
+			font-family: monospace;
+			font-size: 11px;
+			line-height: 1.5;
+			padding: 8px 12px;
+			z-index: 99999;
+			max-height: 50vh;
+			overflow: auto;
+			pointer-events: none;
+		}
+		#debug-overlay .dbg-title { color: #ff0; font-weight: bold; margin-bottom: 4px; }
+		#debug-overlay .dbg-err { color: #f44; }
+		#debug-overlay .dbg-ok { color: #0f0; }
+		#debug-overlay .dbg-warn { color: #fa0; }
+	</style>
+	<!-- QWebChannel for Qt ↔ JS communication -->
+	<script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+	<script>
+		// QWebChannel bridge (set up when available)
+		var qt_bridge = null;
+
+		// Initialize QWebChannel if available
+		if (typeof QWebChannel !== 'undefined' && window.qt && window.qt.webChannelTransport) {
+			new QWebChannel(window.qt.webChannelTransport, function (channel) {
+				qt_bridge = channel.objects.qt_bridge;
+				console.log('[Viola YouTube Player] QWebChannel connected, bridge available');
+			});
+		}
+
+		// Lightweight query parser
+		function getQueryParam(name) {
+			const params = new URLSearchParams(window.location.search);
+			const v = params.get(name);
+			return v && v.trim().length > 0 ? v.trim() : null;
+		}
+
+		// =========================================================================
+		// EVENT LOG - Tracks all significant events for debugging
+		// =========================================================================
+		window.violaEventLog = [];
+		window.violaEventLogStart = Date.now();
+
+		function logEvent(event, data) {
+			var entry = {
+				time: Date.now(),
+				elapsed: Date.now() - window.violaEventLogStart,
+				event: event,
+				data: data ? JSON.parse(JSON.stringify(data)) : {}
+			};
+			window.violaEventLog.push(entry);
+			// Keep last 50 events
+			if (window.violaEventLog.length > 50) {
+				window.violaEventLog.shift();
+			}
+			console.log('[VIOLA-EVENT]', entry.elapsed + 'ms:', event, entry.data);
+		}
+
+		// Spoke mode: mute=1 means audio comes from PCM, video is visual-only
+		var muteParam = getQueryParam('mute') === '1';
+
+		// Log initial load with FULL context for debugging origin issues
+		logEvent('page_load', {
+			videoId: getQueryParam('video'),
+			autoplay: getQueryParam('autoplay'),
+			mute: muteParam,
+			// CRITICAL: Log all context to debug Error 150
+			origin: window.location.origin,
+			href: window.location.href,
+			protocol: window.location.protocol,
+			host: window.location.host,
+			referrer: document.referrer,
+			userAgent: navigator.userAgent.substring(0, 100)
+		});
+		console.error('[VIOLA-CONTEXT] =========== ENVIRONMENT ===========');
+		console.error('[VIOLA-CONTEXT] window.location.origin:', window.location.origin);
+		console.error('[VIOLA-CONTEXT] window.location.href:', window.location.href);
+		console.error('[VIOLA-CONTEXT] document.referrer:', document.referrer);
+
+		// =========================================================================
+		// VIDEO ELEMENT STATE - Gets the real state of YouTube's internal video element
+		// =========================================================================
+		function getVideoElementState() {
+			// YouTube embeds a video element inside the iframe - find it
+			var video = document.querySelector('video');
+			if (!video) {
+				return { exists: false };
+			}
+
+			var bufferedEnd = 0;
+			try {
+				if (video.buffered && video.buffered.length > 0) {
+					bufferedEnd = video.buffered.end(video.buffered.length - 1);
+				}
+			} catch (e) { /* ignore */ }
+
+			return {
+				exists: true,
+				readyState: video.readyState,
+				networkState: video.networkState,
+				paused: video.paused,
+				muted: video.muted,
+				volume: video.volume,
+				currentTime: video.currentTime,
+				duration: video.duration || 0,
+				error: video.error ? video.error.code : null,
+				bufferedEnd: bufferedEnd,
+				videoWidth: video.videoWidth,
+				videoHeight: video.videoHeight,
+				srcPresent: !!(video.src || video.currentSrc)
+			};
+		}
+
+		// =========================================================================
+		// DIAGNOSTIC FUNCTION - Collects comprehensive state for debugging
+		// =========================================================================
+		function collectDiagnostics() {
+			var diag = {
+				yt_api_loaded: !!(window.YT && window.YT.Player),
+				player_exists: !!(window.violaYoutube && window.violaYoutube._player),
+				player_state: -1,
+				player_state_name: 'UNKNOWN',
+				player_error: null,
+				player_error_message: null,
+				iframe_in_dom: false,
+				iframe_visible: false,
+				iframe_src: null,
+				current_time: 0,
+				duration: 0,
+				video_id: getQueryParam('video'),
+				video_url: window.location.href,
+				collected_at: Date.now() / 1000,
+				// DEBUG fields
+				onReady_called: window.violaYoutube ? window.violaYoutube._onReadyCalled : false,
+				initial_state_at_ready: window.violaYoutube ? window.violaYoutube._initialStateAtReady : null,
+				initial_duration_at_ready: window.violaYoutube ? window.violaYoutube._initialDurationAtReady : null,
+				state_history: window.violaYoutube ? window.violaYoutube._stateHistory : [],
+				wants_to_play: window.violaYoutube ? window.violaYoutube._wantsToPlay : false,
+				retry_count: window.violaYoutube ? window.violaYoutube._playRetryCount : 0,
+				tried_muted_start: window.violaYoutube ? window.violaYoutube._triedMutedStart : false,
+				// DEBUG: autoplay check conditions
+				autoplay_param: window.violaYoutube ? window.violaYoutube._autoplayParam : null,
+				has_playVideo_func: window.violaYoutube ? window.violaYoutube._hasPlayVideoFunc : null,
+				autoplay_check_log: window.violaYoutube ? window.violaYoutube._autoplayCheckLog : null,
+				last_error: window.violaYoutube ? window.violaYoutube._lastError : null,
+				last_error_time: window.violaYoutube ? window.violaYoutube._lastErrorTime : null,
+				// Enhanced diagnostics - event log and video element
+				debug_line527_reached: window.violaYoutube ? window.violaYoutube._debugLine527Reached : null,
+				video_element: getVideoElementState(),
+				event_log: window.violaEventLog || [],
+			};
+
+			// Check player state
+			if (diag.player_exists && window.violaYoutube._player) {
+				var player = window.violaYoutube._player;
+
+				// Get player state
+				if (typeof player.getPlayerState === 'function') {
+					try {
+						diag.player_state = player.getPlayerState();
+						var stateMap = {
+							'-1': 'UNSTARTED',
+							'0': 'ENDED',
+							'1': 'PLAYING',
+							'2': 'PAUSED',
+							'3': 'BUFFERING',
+							'5': 'CUED'
+						};
+						diag.player_state_name = stateMap[String(diag.player_state)] || 'UNKNOWN';
+					} catch (e) {
+						diag.player_error_message = 'Failed to get player state: ' + e.message;
+					}
+				}
+
+				// Get current time and duration
+				if (typeof player.getCurrentTime === 'function') {
+					try {
+						diag.current_time = player.getCurrentTime() || 0;
+					} catch (e) { /* no-op */ }
+				}
+
+				if (typeof player.getDuration === 'function') {
+					try {
+						diag.duration = player.getDuration() || 0;
+					} catch (e) { /* no-op */ }
+				}
+
+				// Get video URL from player
+				if (typeof player.getVideoUrl === 'function') {
+					try {
+						diag.video_url = player.getVideoUrl();
+					} catch (e) { /* no-op */ }
+				}
+			}
+
+			// Check iframe in DOM
+			var playerEl = document.getElementById('player');
+			if (playerEl) {
+				diag.iframe_in_dom = true;
+				// Check if it's actually an iframe (after YT API transforms it)
+				var iframe = playerEl.tagName === 'IFRAME' ? playerEl : playerEl.querySelector('iframe');
+				if (iframe) {
+					diag.iframe_src = iframe.src || null;
+					// Check visibility
+					var rect = iframe.getBoundingClientRect();
+					diag.iframe_visible = rect.width > 0 && rect.height > 0;
+				} else {
+					// Player container exists but no iframe yet (still loading)
+					diag.iframe_visible = false;
+				}
+			}
+
+			return diag;
+		}
+
+		// Expose diagnostic function globally
+		window.violaDiagnostics = {
+			collect: collectDiagnostics,
+			sendToParent: function() {
+				var diag = collectDiagnostics();
+				try {
+					window.parent.postMessage({ type: 'yt_diagnostics', payload: diag }, '*');
+				} catch (e) {
+					console.warn('[Viola YouTube Player] Failed to send diagnostics to parent:', e);
+				}
+				return diag;
+			}
+		};
+
+		// Bridge for backend/native side
+		window.violaYoutube = {
+			_ready: false,
+			_player: null,
+			_wantsToPlay: false,  // Track if we want to be playing (for retry logic)
+			_playRetryCount: 0,   // Track retry attempts
+			_maxPlayRetries: 10,  // Max retries before giving up
+			_triedMutedStart: false,  // Track if we tried muted start workaround
+			_onReadyCalled: false,  // DEBUG: Was onReady called?
+			_initialStateAtReady: null,  // DEBUG: Player state when onReady fired
+			_initialDurationAtReady: null,  // DEBUG: Duration when onReady fired
+			_stateHistory: [],  // DEBUG: Track all state changes
+			_playerCreateCount: 0,  // DEBUG: How many times YT.Player was created
+			_loadVideoByIdCount: 0,  // DEBUG: How many times loadVideoById was called
+			_playCallCount: 0,  // DEBUG: How many times play() was called
+			_sessionStartTime: Date.now(),  // DEBUG: Session start timestamp
+			loadVideo: function (videoId) {
+				window.violaYoutube._loadVideoByIdCount++;
+				var elapsed = Date.now() - window.violaYoutube._sessionStartTime;
+				console.log('[VIOLA-YT] loadVideoById called #' + window.violaYoutube._loadVideoByIdCount +
+					' videoId=' + videoId + ' elapsed=' + elapsed + 'ms timestamp=' + Date.now());
+				var currentState = window.violaYoutube._player ? window.violaYoutube._player.getPlayerState() : 'no_player';
+				console.log('[VIOLA-YT] Current player state before loadVideoById:', currentState);
+				try {
+					if (window.violaYoutube._player && typeof window.violaYoutube._player.loadVideoById === 'function') {
+						window.violaYoutube._player.loadVideoById(videoId);
+					}
+				} catch (e) {
+					console.error('[VIOLA-YT] loadVideoById error:', e);
+				}
+			},
+			play: function () {
+				window.violaYoutube._playCallCount++;
+				var elapsed = Date.now() - window.violaYoutube._sessionStartTime;
+				var currentState = window.violaYoutube._player ? window.violaYoutube._player.getPlayerState() : 'no_player';
+				var duration = window.violaYoutube._player && window.violaYoutube._player.getDuration ? window.violaYoutube._player.getDuration() : 0;
+				console.log('[VIOLA-YT] play() called #' + window.violaYoutube._playCallCount +
+					' elapsed=' + elapsed + 'ms timestamp=' + Date.now());
+				console.log('[VIOLA-YT] Current state before play:', currentState, 'duration:', duration);
+				window.violaYoutube._wantsToPlay = true;
+				window.violaYoutube._playRetryCount = 0;
+				window.violaYoutube._triedMutedStart = false;
+				try {
+					if (window.violaYoutube._player && typeof window.violaYoutube._player.playVideo === 'function') {
+						console.log('[VIOLA-YT] Calling playVideo() at', Date.now());
+						window.violaYoutube._player.playVideo();
+					} else {
+						console.warn('[VIOLA-YT] Player not ready for playVideo()');
+					}
+				} catch (e) {
+					console.error('[VIOLA-YT] playVideo() error:', e);
+				}
+			},
+			pause: function () {
+				console.log('[Viola YouTube Player] pause() called');
+				window.violaYoutube._wantsToPlay = false;
+				try {
+					if (window.violaYoutube._player && typeof window.violaYoutube._player.pauseVideo === 'function') {
+						window.violaYoutube._player.pauseVideo();
+					}
+				} catch (e) { /* no-op */ }
+			},
+			stop: function () {
+				console.log('[Viola YouTube Player] stop() called');
+				window.violaYoutube._wantsToPlay = false;
+				try {
+					if (window.violaYoutube._player && typeof window.violaYoutube._player.stopVideo === 'function') {
+						window.violaYoutube._player.stopVideo();
+					}
+				} catch (e) { /* no-op */ }
+			},
+			seekTo: function (seconds) {
+				try {
+					if (window.violaYoutube._player && typeof window.violaYoutube._player.seekTo === 'function') {
+						window.violaYoutube._player.seekTo(Number(seconds) || 0, true);
+					}
+				} catch (e) { /* no-op */ }
+			},
+			setVolume: function (level) {
+				try {
+					// Spoke mode: YouTube audio must stay muted (audio via PCM)
+					if (muteParam) return;
+					// YouTube volume is 0-100
+					var vol = Math.max(0, Math.min(100, Number(level) || 0));
+					if (window.violaYoutube._player && typeof window.violaYoutube._player.setVolume === 'function') {
+						window.violaYoutube._player.setVolume(vol);
+						console.log('[Viola YouTube Player] Volume set to:', vol);
+					}
+				} catch (e) {
+					console.warn('[Viola YouTube Player] setVolume error:', e);
+				}
+			},
+			getVolume: function () {
+				try {
+					if (window.violaYoutube._player && typeof window.violaYoutube._player.getVolume === 'function') {
+						return window.violaYoutube._player.getVolume();
+					}
+				} catch (e) { /* no-op */ }
+				return 100;
+			},
+			mute: function () {
+				try {
+					// Spoke mode: never call player.mute() - it kills the WASAPI stream.
+					// Use setVolume(0) instead (keeps WASAPI alive for ProcTap capture).
+					if (muteParam) {
+						if (window.violaYoutube._player && typeof window.violaYoutube._player.setVolume === "function") {
+							window.violaYoutube._player.setVolume(0);
+						}
+						return;
+					}
+					if (window.violaYoutube._player && typeof window.violaYoutube._player.mute === "function") {
+						window.violaYoutube._player.mute();
+					}
+				} catch (e) { /* no-op */ }
+			},
+			unMute: function () {
+				try {
+					// Spoke mode: never unmute (audio via PCM)
+					if (muteParam) return;
+					if (window.violaYoutube._player && typeof window.violaYoutube._player.unMute === 'function') {
+						window.violaYoutube._player.unMute();
+					}
+				} catch (e) { /* no-op */ }
+			}
+		};
+
+		// Helper function to retry playVideo() with exponential backoff
+		function retryPlayVideo(reason) {
+			if (!window.violaYoutube._wantsToPlay) {
+				console.log('[Viola YouTube Player] retryPlayVideo skipped - _wantsToPlay is false');
+				return;
+			}
+			if (window.violaYoutube._playRetryCount >= window.violaYoutube._maxPlayRetries) {
+				console.error('[Viola YouTube Player] Max play retries reached (' + window.violaYoutube._maxPlayRetries + ')');
+				postState('yt_iframe_autoplay_blocked', { reason: 'max_retries', retries: window.violaYoutube._playRetryCount });
+				return;
+			}
+			window.violaYoutube._playRetryCount++;
+			var stateBeforeRetry = window.violaYoutube._player ? window.violaYoutube._player.getPlayerState() : 'no_player';
+			var durationBeforeRetry = window.violaYoutube._player && window.violaYoutube._player.getDuration ? window.violaYoutube._player.getDuration() : 0;
+			debugLog('retryPlayVideo', {attempt: window.violaYoutube._playRetryCount, reason: reason, stateBefore: stateBeforeRetry, duration: durationBeforeRetry});
+			console.warn('[Viola YouTube Player] Retry playVideo() attempt ' + window.violaYoutube._playRetryCount + ' - reason: ' + reason);
+
+			try {
+				if (window.violaYoutube._player && typeof window.violaYoutube._player.playVideo === 'function') {
+					// After 3 failed attempts, try mute-then-unmute approach
+					// This bypasses stricter autoplay policies on some videos
+					if (window.violaYoutube._playRetryCount >= 3 && !window.violaYoutube._triedMutedStart) {
+						console.warn('[Viola YouTube Player] Trying muted start workaround');
+						window.violaYoutube._triedMutedStart = true;
+						if (!muteParam) {
+							// Hub mode: use mute() for autoplay policy bypass
+							window.violaYoutube._player.mute();
+						}
+						// Spoke mode: volume already 0 from onReady, skip mute() (kills WASAPI)
+						window.violaYoutube._player.playVideo();
+						// Unmute after a short delay once playing — but NOT in spoke mode
+						// (spoke audio comes from PCM, YouTube audio must stay muted)
+						setTimeout(function() {
+							if (window.violaYoutube._player && window.violaYoutube._player.getPlayerState() === 1 && !muteParam) {
+								console.log('[Viola YouTube Player] Muted start worked, unmuting...');
+								window.violaYoutube._player.unMute();
+							}
+						}, 500);
+					} else {
+						window.violaYoutube._player.playVideo();
+					}
+				}
+			} catch (e) {
+				console.error('[Viola YouTube Player] retryPlayVideo error:', e);
+			}
+		}
+
+		function getDebugAuthToken() {
+			try {
+				return window.__VIOLA_DEBUG_AUTH_TOKEN__ ||
+					(window.parent && window.parent.__VIOLA_DEBUG_AUTH_TOKEN__) ||
+					'';
+			} catch (e) {
+				return '';
+			}
+		}
+
+		function postDebugEvent(payload) {
+			try {
+				const token = getDebugAuthToken();
+				if (!token) {
+					return;
+				}
+				fetch('/v1/debug/yt-iframe-event', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json', 'X-Debug-Auth-Token': token },
+					body: JSON.stringify(payload)
+				}).catch(function() {});
+			} catch (e) { /* no-op */ }
+		}
+
+		// DIAGNOSTIC: Send events to backend for server-side logging
+		function sendDiagnostic(event, data) {
+			postDebugEvent({ event: event, ...data, timestamp: Date.now() });
+		}
+
+		// DEBUG: Send debug logs to backend for capture
+		function debugLog(message, data) {
+			console.log('[YT DEBUG]', message, data || '');
+			postDebugEvent({ event: 'DEBUG_LOG', message: message, data: data, timestamp: Date.now() });
+		}
+
+		// Notify native side AND React parent when state changes
+		function postState(eventName, payload) {
+			try {
+				// Use QWebChannel bridge if available (Qt native)
+				if (qt_bridge) {
+					if (eventName === 'yt_iframe_state' && payload) {
+						// Map numeric state to string for Python bridge
+						var stateMap = {
+							'-1': 'UNSTARTED',
+							'0': 'ENDED',
+							'1': 'PLAYING',
+							'2': 'PAUSED',
+							'3': 'BUFFERING',
+							'5': 'CUED'
+						};
+						var stateStr = stateMap[String(payload.state)] || 'UNKNOWN';
+						var currentTime = payload.currentTime || 0;
+						qt_bridge.on_state(stateStr, currentTime);
+						console.log('[Viola YouTube Player] State sent via QWebChannel:', stateStr, currentTime);
+					} else if (eventName === 'yt_iframe_error' && payload) {
+						qt_bridge.on_error(payload.error || 0);
+					}
+				}
+				// Fallback: legacy qtBridge or chrome webview
+				else if (window.qtBridge && typeof window.qtBridge.postMessage === 'function') {
+					window.qtBridge.postMessage(JSON.stringify({ type: eventName, payload: payload || {} }));
+				} else if (window.chrome && window.chrome.webview && typeof window.chrome.webview.postMessage === 'function') {
+					window.chrome.webview.postMessage({ type: eventName, payload: payload || {} });
+				}
+
+				// ALWAYS send to parent window for React UI (runs in iframe context)
+				try {
+					window.parent.postMessage({ type: eventName, payload: payload || {} }, '*');
+				} catch (e) { /* ignore if no parent */ }
+			} catch (e) {
+				console.warn('[Viola YouTube Player] postState error:', e);
+			}
+		}
+
+		// DOM element references (will be set when DOM is ready)
+		var loadingEl = null;
+		var errorEl = null;
+
+		// Initialize DOM references when ready
+		function initDOMRefs() {
+			loadingEl = document.getElementById('loading-message');
+			errorEl = document.getElementById('error-message');
+		}
+
+		// Run on DOM ready
+		if (document.readyState === 'loading') {
+			document.addEventListener('DOMContentLoaded', initDOMRefs);
+		} else {
+			initDOMRefs();
+		}
+
+		// Listen for control commands from React parent
+		window.addEventListener('message', function(event) {
+			var data = event.data || {};
+
+			// Handle diagnostic requests
+			if (data.type === 'diagnostic_request') {
+				console.log('[Viola YouTube Player] Diagnostic request received');
+				window.violaDiagnostics.sendToParent();
+				return;
+			}
+
+			if (data.type !== 'control') return;
+
+			var command = data.command;
+			console.log('[Viola YouTube Player] Received control command:', command, data);
+
+			try {
+				if (command === 'setVolume' && data.level !== undefined) {
+					window.violaYoutube.setVolume(data.level);
+					sendDiagnostic('CONTROL_VOLUME', { level: data.level });
+				} else if (command === 'seekTo' && data.seconds !== undefined) {
+					window.violaYoutube.seekTo(data.seconds);
+					sendDiagnostic('CONTROL_SEEK', { seconds: data.seconds });
+				} else if (command === 'play') {
+					window.violaYoutube.play();
+					sendDiagnostic('CONTROL_PLAY', {});
+				} else if (command === 'pause') {
+					window.violaYoutube.pause();
+					sendDiagnostic('CONTROL_PAUSE', {});
+				} else if (command === 'stop') {
+					window.violaYoutube.stop();
+					sendDiagnostic('CONTROL_STOP', {});
+				} else if (command === 'pause_for_ms' && data.duration_ms !== undefined) {
+					// Micro-pause correction for multi-room sync (spoke is ahead)
+					window.violaYoutube.pause();
+					setTimeout(function() {
+						window.violaYoutube.play();
+					}, data.duration_ms);
+					sendDiagnostic('CONTROL_PAUSE_FOR_MS', { duration_ms: data.duration_ms });
+				} else if (command === 'setPlaybackRate' && data.rate !== undefined) {
+					// YouTube only supports: 0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2
+					var validRates = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
+					if (validRates.indexOf(data.rate) === -1) {
+						console.warn('[Viola YouTube Player] Non-standard playback rate ignored:', data.rate,
+							'(YouTube only supports:', validRates.join(', '), ')');
+						sendDiagnostic('CONTROL_PLAYBACK_RATE_REJECTED', { rate: data.rate });
+					} else {
+						var yt = window.violaYoutube && window.violaYoutube._player;
+						if (yt && typeof yt.setPlaybackRate === 'function') {
+							yt.setPlaybackRate(data.rate);
+						}
+						sendDiagnostic('CONTROL_PLAYBACK_RATE', { rate: data.rate });
+					}
+				} else if (command === 'getDiagnostics') {
+					// Explicit diagnostic request via control command
+					window.violaDiagnostics.sendToParent();
+				}
+			} catch (e) {
+				console.warn('[Viola YouTube Player] Control command error:', e);
+			}
+		});
+
+		// YouTube IFrame API loader callback
+		function onYouTubeIframeAPIReady() {
+			// Ensure DOM refs are set
+			if (!loadingEl) loadingEl = document.getElementById('loading-message');
+			if (!errorEl) errorEl = document.getElementById('error-message');
+			logEvent('yt_api_ready', { hasYT: !!window.YT, hasYTPlayer: !!(window.YT && window.YT.Player) });
+			console.warn('[Viola YouTube Player] YouTube IFrame API ready');
+			var initialVideo = getQueryParam('video');
+			var autoplay = getQueryParam('autoplay') === '1' ? 1 : 0;
+
+			if (!initialVideo) {
+				console.error('[Viola YouTube Player] No video ID provided');
+				if (errorEl) {
+					errorEl.textContent = 'Error: No video ID provided';
+					errorEl.style.display = 'block';
+				}
+				if (loadingEl) loadingEl.style.display = 'none';
+				postState('yt_iframe_error', { error: 'no_video_id' });
+				return;
+			}
+
+			window.violaYoutube._playerCreateCount++;
+			var elapsed = Date.now() - window.violaYoutube._sessionStartTime;
+			logEvent('yt_player_create', { videoId: initialVideo, autoplay: autoplay, createCount: window.violaYoutube._playerCreateCount });
+			console.log('[VIOLA-YT] ========== CREATING YT.Player #' + window.violaYoutube._playerCreateCount + ' ==========');
+			console.log('[VIOLA-YT] videoId=' + initialVideo + ' elapsed=' + elapsed + 'ms timestamp=' + Date.now());
+			console.log('[VIOLA-YT] autoplay param=' + autoplay);
+
+			// Set timeout to detect if onReady never fires
+			var onReadyTimeout = setTimeout(function() {
+				if (!window.violaYoutube._onReadyCalled) {
+					logEvent('onReady_timeout', {
+						videoId: initialVideo,
+						playerExists: !!window.violaYoutube._player,
+						playerState: window.violaYoutube._player ?
+							(typeof window.violaYoutube._player.getPlayerState === 'function' ?
+								window.violaYoutube._player.getPlayerState() : 'no_getPlayerState') : 'no_player'
+					});
+					console.error('[VIOLA-YT] TIMEOUT: onReady never fired after 10 seconds!');
+
+					// Try to get any available info from the player
+					if (window.violaYoutube._player) {
+						try {
+							var videoData = window.violaYoutube._player.getVideoData ?
+								window.violaYoutube._player.getVideoData() : null;
+							if (videoData) {
+								logEvent('timeout_videoData', videoData);
+								console.error('[VIOLA-YT] VideoData at timeout:', videoData);
+							}
+						} catch (e) {
+							logEvent('timeout_error', { error: e.message });
+						}
+					}
+
+					postState('yt_iframe_error', { error: 'onReady_timeout', videoId: initialVideo, fatal: true });
+				}
+			}, 10000);
+
+			try {
+				// The YouTube IFrame Player API requires `origin` to be THIS page's
+				// own origin (developers.google.com/youtube/player_parameters:
+				// "you should always specify your domain as the origin parameter
+				// value"). Spokes load this asset from the hub over the LAN, so
+				// their real origin (http://<lan-ip>:8756) is the correct value.
+				//
+				// Do NOT override this to https://www.youtube.com. That regression
+				// (905f1d7a, 2026-02-15) made origin/widget_referrer lie about the
+				// embedding page for every non-localhost surface, breaking the
+				// postMessage handshake so the player reported "Video unavailable"
+				// on every spoke. WO-002 (2025-12-01) shipped the correct
+				// real-origin behavior; keep it. See docs/EMBEDDED_PLAYBACK_ARCHITECTURE.md.
+				var actualOrigin = window.location.origin || 'http://127.0.0.1:8756';
+				console.error('[VIOLA-PLAYER-CREATE] =========== CREATING PLAYER ===========');
+				console.error('[VIOLA-PLAYER-CREATE] videoId:', initialVideo);
+				console.error('[VIOLA-PLAYER-CREATE] window.location.origin:', window.location.origin);
+				console.error('[VIOLA-PLAYER-CREATE] actual origin sent:', actualOrigin);
+				logEvent('yt_player_create_debug', {
+					videoId: initialVideo,
+					windowOrigin: window.location.origin,
+					actualOriginSent: actualOrigin,
+					autoplay: autoplay
+				});
+
+				window.violaYoutube._player = new YT.Player('player', {
+					videoId: initialVideo,
+					width: '100%',
+					height: '100%',
+					playerVars: {
+						autoplay: autoplay,
+						controls: 1,
+						enablejsapi: 1,
+						modestbranding: 1,
+						rel: 0,
+						playsinline: 1,
+						hl: 'en',  // Set language to help with region detection
+						// Set origin to current window origin for proper YouTube auth
+						// Without this, some videos return errorCode:"auth" and error 150
+						origin: actualOrigin,
+						// CRITICAL: widget_referrer required for major label content after July 2025 YouTube API update
+						// Without this, videos from Sony, Universal, etc. return error 150
+						widget_referrer: actualOrigin,
+					},
+					events: {
+						onReady: function (e) {
+							// Clear the timeout since onReady fired
+							if (onReadyTimeout) {
+								clearTimeout(onReadyTimeout);
+								onReadyTimeout = null;
+							}
+							var elapsed = Date.now() - window.violaYoutube._sessionStartTime;
+							var initialState = e.target.getPlayerState ? e.target.getPlayerState() : 'unknown';
+							var initialDuration = e.target.getDuration ? e.target.getDuration() : 0;
+							var videoData = e.target.getVideoData ? e.target.getVideoData() : {};
+							logEvent('onReady', { videoId: initialVideo, state: initialState, duration: initialDuration, videoData: videoData });
+							console.log('[VIOLA-YT] ========== onReady FIRED ==========');
+							console.log('[VIOLA-YT] timestamp=' + Date.now() + ' elapsed=' + elapsed + 'ms');
+							console.log('[VIOLA-YT] videoId=' + initialVideo);
+							console.log('[VIOLA-YT] initialState=' + initialState + ' (' +
+								({'-1':'UNSTARTED','0':'ENDED','1':'PLAYING','2':'PAUSED','3':'BUFFERING','5':'CUED'}[String(initialState)] || 'UNKNOWN') + ')');
+							console.log('[VIOLA-YT] initialDuration=' + initialDuration);
+							console.log('[VIOLA-YT] videoData=', videoData);
+							console.log('[VIOLA-YT] playerCreateCount=' + window.violaYoutube._playerCreateCount);
+							console.log('[VIOLA-YT] loadVideoByIdCount=' + window.violaYoutube._loadVideoByIdCount);
+							console.log('[VIOLA-YT] playCallCount=' + window.violaYoutube._playCallCount);
+							debugLog('videoId', initialVideo);
+							debugLog('initialState', initialState);
+							debugLog('initialDuration', initialDuration);
+							debugLog('videoData', videoData);
+							debugLog('autoplay param', autoplay);
+							console.warn('[Viola YouTube Player] Player ready');
+							// Store debug info for diagnostics
+							window.violaYoutube._onReadyCalled = true;
+							window.violaYoutube._initialStateAtReady = initialState;
+							window.violaYoutube._initialDurationAtReady = initialDuration;
+							window.violaYoutube._ready = true;
+
+							// Spoke mode: mute audio — video is visual decoration only,
+							// real audio comes from hub via PCM WebSocket
+							if (muteParam) {
+								e.target.setVolume(0);
+								console.log('[Viola YouTube Player] Spoke mode: volume=0 (WASAPI stays alive for ProcTap capture)');
+							}
+
+							// DEBUG: Track execution reached this point
+							window.violaYoutube._debugLine527Reached = Date.now();
+
+							// DEBUG: Track autoplay check conditions
+							window.violaYoutube._autoplayParam = autoplay;
+							window.violaYoutube._hasPlayVideoFunc = typeof e.target.playVideo === 'function';
+							console.log('[VIOLA-YT] DEBUG autoplay=' + autoplay + ' hasPlayVideoFunc=' + (typeof e.target.playVideo === 'function'));
+							if (loadingEl) loadingEl.style.display = 'none';
+
+							// Get initial duration
+							var duration = e.target.getDuration ? e.target.getDuration() : 0;
+							postState('yt_iframe_ready', {
+								ready: true,
+								videoId: initialVideo,
+								duration: duration
+							});
+
+							// Start periodic time updates
+							window.violaYoutube._timeUpdateInterval = setInterval(function () {
+								if (window.violaYoutube._player) {
+									var currentTime = window.violaYoutube._player.getCurrentTime ? window.violaYoutube._player.getCurrentTime() : 0;
+									var duration = window.violaYoutube._player.getDuration ? window.violaYoutube._player.getDuration() : 0;
+									var state = window.violaYoutube._player.getPlayerState ? window.violaYoutube._player.getPlayerState() : -1;
+									postState('yt_iframe_time', {
+										currentTime: currentTime,
+										duration: duration,
+										state: state,
+										videoId: initialVideo
+									});
+
+									// CRITICAL: If we want to play but state is UNSTARTED/CUED, retry
+									if (window.violaYoutube._wantsToPlay && (state === -1 || state === 5)) {
+										retryPlayVideo('periodic_check_unstarted');
+									}
+								}
+							}, 1000); // Update every second
+
+							// DEBUG: Log autoplay check conditions BEFORE the if block
+							console.log('[VIOLA-YT] AUTOPLAY CHECK: autoplay=' + autoplay + ' typeof playVideo=' + typeof e.target.playVideo);
+							window.violaYoutube._autoplayCheckLog = 'autoplay=' + autoplay + ' typeof_playVideo=' + typeof e.target.playVideo;
+
+							// CRITICAL FIX: Always set _wantsToPlay if autoplay is requested
+							// This ensures retry logic works even if initial playVideo() check fails
+							if (autoplay) {
+								logEvent('autoplay_requested', { videoId: initialVideo, hasPlayVideoFunc: typeof e.target.playVideo === 'function' });
+								console.warn('[Viola YouTube Player] Autoplay requested - setting _wantsToPlay=true');
+								window.violaYoutube._wantsToPlay = true;
+								window.violaYoutube._playRetryCount = 0;
+								window.violaYoutube._triedMutedStart = false;
+
+								// Try autoplay immediately if playVideo is available
+								if (typeof e.target.playVideo === 'function') {
+									try {
+										logEvent('playVideo_called', { source: 'onReady_autoplay' });
+										console.log('[Viola YouTube Player] Calling playVideo() in onReady');
+										e.target.playVideo();
+									} catch (playErr) {
+										console.warn('[Viola YouTube Player] Initial playVideo() failed:', playErr);
+									}
+								} else {
+									console.warn('[Viola YouTube Player] playVideo not available yet, will retry');
+								}
+
+								// Schedule multiple retries with increasing delays
+								// Use longer delays to give YouTube more time to initialize
+								var retryDelays = [200, 400, 800, 1200, 2000, 3000, 5000];
+								retryDelays.forEach(function(delay) {
+									setTimeout(function() {
+										if (window.violaYoutube._player && window.violaYoutube._wantsToPlay) {
+											var state = window.violaYoutube._player.getPlayerState();
+											if (state === -1 || state === 5) { // UNSTARTED or CUED
+												retryPlayVideo('scheduled_retry_' + delay + 'ms');
+											} else if (state === 1) {
+												console.log('[Viola YouTube Player] Already playing, no retry needed');
+											}
+										}
+									}, delay);
+								});
+							}
+						},
+						onStateChange: function (e) {
+							var elapsed = Date.now() - window.violaYoutube._sessionStartTime;
+							var currentTime = window.violaYoutube._player && window.violaYoutube._player.getCurrentTime ? window.violaYoutube._player.getCurrentTime() : 0;
+							var duration = window.violaYoutube._player && window.violaYoutube._player.getDuration ? window.violaYoutube._player.getDuration() : 0;
+							var stateNames = { '-1': 'UNSTARTED', '0': 'ENDED', '1': 'PLAYING', '2': 'PAUSED', '3': 'BUFFERING', '5': 'CUED' };
+							var stateName = stateNames[String(e.data)] || 'UNKNOWN';
+							logEvent('onStateChange', { state: e.data, stateName: stateName, currentTime: currentTime, duration: duration, wantsToPlay: window.violaYoutube._wantsToPlay });
+							console.log('[VIOLA-YT] ========== onStateChange ==========');
+							console.log('[VIOLA-YT] timestamp=' + Date.now() + ' elapsed=' + elapsed + 'ms');
+							console.log('[VIOLA-YT] state=' + e.data + ' (' + stateName + ')');
+							console.log('[VIOLA-YT] currentTime=' + currentTime.toFixed(2) + ' duration=' + duration);
+							console.log('[VIOLA-YT] wantsToPlay=' + window.violaYoutube._wantsToPlay + ' retryCount=' + window.violaYoutube._playRetryCount);
+							console.log('[VIOLA-YT] playerCreateCount=' + window.violaYoutube._playerCreateCount + ' loadVideoByIdCount=' + window.violaYoutube._loadVideoByIdCount);
+							debugLog('========== onStateChange ==========');
+							debugLog('stateChange', {state: e.data, time: currentTime.toFixed(2), duration: duration, wantsToPlay: window.violaYoutube._wantsToPlay, retryCount: window.violaYoutube._playRetryCount});
+							// Track state history for diagnostics
+							if (window.violaYoutube._stateHistory.length < 50) {
+								window.violaYoutube._stateHistory.push({state: e.data, time: currentTime, duration: duration, ts: Date.now()});
+							}
+							console.warn('[Viola YouTube Player] State changed:', e.data, '_wantsToPlay:', window.violaYoutube._wantsToPlay);
+							// State mapping mirroring YT.PlayerState
+							// -1 (unstarted), 0 (ended), 1 (playing), 2 (paused), 3 (buffering), 5 (cued)
+							var stateNames = { '-1': 'UNSTARTED', '0': 'ENDED', '1': 'PLAYING', '2': 'PAUSED', '3': 'BUFFERING', '5': 'CUED' };
+							var stateName = stateNames[String(e.data)] || 'UNKNOWN';
+							var currentTime = window.violaYoutube._player && window.violaYoutube._player.getCurrentTime ? window.violaYoutube._player.getCurrentTime() : 0;
+							var duration = window.violaYoutube._player && window.violaYoutube._player.getDuration ? window.violaYoutube._player.getDuration() : 0;
+
+							// Send diagnostic for state change
+							sendDiagnostic('YT_STATE_CHANGE', { state: stateName, stateCode: e.data, currentTime: currentTime, duration: duration, videoId: initialVideo });
+
+							// Special diagnostic for ENDED - track completion
+							if (e.data === 0) {
+								// CRITICAL: Stop player IMMEDIATELY to prevent YouTube auto-advance
+								// YouTube's iframe will play "recommended" videos if we don't stop it
+								// This MUST happen before notifying backend to prevent race conditions
+								try {
+									if (window.violaYoutube._player && typeof window.violaYoutube._player.stopVideo === 'function') {
+										console.warn('[Viola YouTube Player] ENDED - stopping player to prevent YouTube auto-advance');
+										window.violaYoutube._player.stopVideo();
+									}
+								} catch (stopErr) {
+									console.error('[Viola YouTube Player] Failed to stop player on ENDED:', stopErr);
+								}
+
+								// Clear wantsToPlay to prevent retry logic from restarting
+								window.violaYoutube._wantsToPlay = false;
+
+								sendDiagnostic('YT_TRACK_ENDED', { videoId: initialVideo, currentTime: currentTime, duration: duration });
+							}
+
+							// CRITICAL: Handle UNSTARTED/CUED when we want to be playing
+							// This catches cases where playVideo() was called but the player got stuck
+							if (window.violaYoutube._wantsToPlay && (e.data === -1 || e.data === 5)) {
+								console.warn('[Viola YouTube Player] State is ' + stateName + ' but _wantsToPlay=true, scheduling retry');
+								// Use a small delay to avoid tight retry loop
+								setTimeout(function() {
+									if (window.violaYoutube._wantsToPlay) {
+										var currentState = window.violaYoutube._player ? window.violaYoutube._player.getPlayerState() : -1;
+										if (currentState === -1 || currentState === 5) {
+											retryPlayVideo('stateChange_' + stateName);
+										}
+									}
+								}, 200);
+							}
+
+							// When we successfully start playing, reset retry count
+							if (e.data === 1) { // PLAYING
+								console.log('[Viola YouTube Player] Playback started successfully!');
+								window.violaYoutube._playRetryCount = 0;
+							}
+
+							postState('yt_iframe_state', {
+								state: e.data,
+								currentTime: currentTime,
+								duration: duration,
+								videoId: initialVideo  // Include videoId to prevent stale state messages from wrong iframe
+							});
+						},
+						onError: function (e) {
+							var errorCode = e && e.data;
+							var errorNames = { 2: 'INVALID_ID', 5: 'HTML5_ERROR', 100: 'NOT_FOUND', 101: 'NOT_EMBEDDABLE', 150: 'NOT_EMBEDDABLE' };
+							var errorName = errorNames[errorCode] || 'UNKNOWN_' + errorCode;
+
+							// DEEP DIAGNOSTICS: Capture everything we can about the error
+							var videoData = null;
+							var playerState = null;
+							try {
+								if (window.violaYoutube._player) {
+									videoData = window.violaYoutube._player.getVideoData ? window.violaYoutube._player.getVideoData() : null;
+									playerState = window.violaYoutube._player.getPlayerState ? window.violaYoutube._player.getPlayerState() : null;
+								}
+							} catch (diagErr) {
+								console.error('[VIOLA-DIAG] Failed to get player data:', diagErr);
+							}
+
+							console.error('╔══════════════════════════════════════════════════════════════╗');
+							console.error('║            YOUTUBE ERROR 150 DEEP DIAGNOSTICS                ║');
+							console.error('╠══════════════════════════════════════════════════════════════╣');
+							console.error('║ Error Code:', errorCode, '(' + errorName + ')');
+							console.error('║ Video ID:', initialVideo);
+							console.error('║ Player State:', playerState);
+							console.error('║ VideoData:', JSON.stringify(videoData, null, 2));
+							console.error('║ window.location.origin:', window.location.origin);
+							console.error('║ window.location.href:', window.location.href);
+							console.error('║ document.referrer:', document.referrer);
+							console.error('║ document.domain:', document.domain);
+							console.error('║ Origin sent to YT:', actualOrigin);
+							console.error('╚══════════════════════════════════════════════════════════════╝');
+
+							logEvent('onError', {
+								errorCode: errorCode,
+								errorName: errorName,
+								videoId: initialVideo,
+								videoData: videoData,
+								playerState: playerState,
+								origin: window.location.origin,
+								referrer: document.referrer,
+								actualOriginSent: actualOrigin
+							});
+							console.error('[Viola YouTube Player] Player error:', e.data);
+
+							// DEBUG: Track error in diagnostics
+							window.violaYoutube._lastError = errorCode;
+							window.violaYoutube._lastErrorTime = Date.now();
+							window.violaYoutube._lastErrorVideoData = videoData;
+
+							// Send diagnostic for error with full context
+							sendDiagnostic('YT_ERROR', {
+								errorCode: errorCode,
+								videoId: initialVideo,
+								videoData: videoData,
+								origin: window.location.origin,
+								referrer: document.referrer,
+								actualOriginSent: actualOrigin
+							});
+
+							if (errorEl) {
+								// For error 101/150, YouTube shows its own "Video unavailable" overlay
+								// Don't show our error message on top of it (causes overlapping text)
+								var youtubeShowsOwnError = (errorCode === 101 || errorCode === 150);
+
+								if (!youtubeShowsOwnError) {
+									var errorMsg = 'Error loading video';
+									if (errorCode) {
+										// YouTube error codes: 2=invalid ID, 5=HTML5 error, 100=not found, 101/150=not allowed, 153=configuration error
+										var errorCodes = {
+											2: 'Invalid video ID',
+											5: 'HTML5 player error',
+											100: 'Video not found',
+											153: 'Video player configuration error (referrer policy or embed settings)'
+										};
+										errorMsg = errorCodes[errorCode] || 'Error code: ' + errorCode;
+									}
+									errorEl.textContent = errorMsg;
+									errorEl.style.display = 'block';
+								} else {
+									// Hide our error element - YouTube is showing its own
+									errorEl.style.display = 'none';
+									console.log('[Viola YouTube Player] Error 101/150 - letting YouTube show its native error overlay');
+								}
+							}
+							if (loadingEl) loadingEl.style.display = 'none';
+
+							// Notify parent of fatal errors - these should trigger auto-skip
+							var fatalErrors = [100, 101, 150];
+							var isFatal = fatalErrors.indexOf(errorCode) !== -1;
+
+							// CRITICAL FIX: Stop retry mechanism on fatal errors
+							// Without this, retries keep firing errors which can cause skip loops
+							if (isFatal) {
+								console.warn('[Viola YouTube Player] Fatal error - stopping retry mechanism');
+								window.violaYoutube._wantsToPlay = false;
+							}
+
+							postState('yt_iframe_error', { error: errorCode, fatal: isFatal, videoId: initialVideo });
+						}
+					}
+				});
+			} catch (err) {
+				console.error('[Viola YouTube Player] Initialization error:', err);
+				if (errorEl) {
+					errorEl.textContent = 'Failed to initialize player: ' + (err.message || String(err));
+					errorEl.style.display = 'block';
+				}
+				if (loadingEl) loadingEl.style.display = 'none';
+				postState('yt_iframe_error', { error: String(err || 'init_failed') });
+			}
+		}
+
+		// Set callback before API loads
+		window.onYouTubeIframeAPIReady = onYouTubeIframeAPIReady;
+
+		// Fallback: if API doesn't load within 30 seconds, show error (increased for slow networks)
+		setTimeout(function () {
+			if (!window.violaYoutube._ready && !window.YT) {
+				console.error('[Viola YouTube Player] YouTube IFrame API failed to load after 30 seconds');
+				if (errorEl) {
+					errorEl.textContent = 'Failed to load YouTube player. Please check your internet connection and try again.';
+					errorEl.style.display = 'block';
+				}
+				if (loadingEl) loadingEl.style.display = 'none';
+				postState('yt_iframe_error', { error: 'api_load_timeout' });
+			}
+		}, 30000);
+	</script>
+	<!-- Load YouTube IFrame API with error handling and diagnostics -->
+	<script>
+		// Pre-create error handler in case script fails to load
+		var apiLoadStartTime = Date.now();
+		var apiLoadTimeout = 30000; // 30 seconds
+
+		// Diagnostic: Log when script tag is added
+		console.log('[Viola YouTube Player] Preparing to load YouTube IFrame API...');
+
+		// Monitor for script load errors
+		window.addEventListener('error', function (e) {
+			if (e.target && e.target.src && e.target.src.includes('youtube.com/iframe_api')) {
+				console.error('[Viola YouTube Player] Failed to load YouTube IFrame API script:', e);
+				var elapsed = Date.now() - apiLoadStartTime;
+				if (elapsed > apiLoadTimeout) {
+					console.error('[Viola YouTube Player] YouTube IFrame API script load timeout after ' + elapsed + 'ms');
+					if (errorEl) {
+						errorEl.textContent = 'Failed to load YouTube player API. Please check your internet connection.';
+						errorEl.style.display = 'block';
+					}
+					if (loadingEl) loadingEl.style.display = 'none';
+					postState('yt_iframe_error', { error: 'api_script_load_failed' });
+				}
+			}
+		}, true);
+
+		// Monitor for successful script load
+		var scriptCheckInterval = setInterval(function () {
+			if (window.YT && window.YT.Player) {
+				console.log('[Viola YouTube Player] YouTube IFrame API loaded successfully!');
+				clearInterval(scriptCheckInterval);
+			}
+		}, 500);
+
+		// Clear interval after timeout
+		setTimeout(function () {
+			clearInterval(scriptCheckInterval);
+		}, apiLoadTimeout);
+	</script>
+	<!-- Load YouTube IFrame API - script tags bypass CORS, do NOT use crossOrigin -->
+	<script>
+		// Load via script tag (no crossOrigin to avoid triggering CORS)
+		var script = document.createElement('script');
+		script.src = 'https://www.youtube.com/iframe_api';
+		script.async = true;
+		// NOTE: crossOrigin attribute removed - it triggers CORS checks which fail
+
+		// Add error handler
+		script.onerror = function () {
+			console.error('[Viola YouTube Player] Script tag method failed');
+			if (errorEl) {
+				errorEl.textContent = 'Failed to load YouTube API. Check network connection.';
+				errorEl.style.display = 'block';
+			}
+			if (loadingEl) loadingEl.style.display = 'none';
+			postState('yt_iframe_error', { error: 'api_script_failed' });
+		};
+
+		// Add success handler
+		script.onload = function () {
+			console.log('[Viola YouTube Player] YouTube IFrame API script loaded!');
+		};
+
+		// Append to head
+		document.head.appendChild(script);
+	</script>
+</head>
+
+<body>
+	<div id="debug-overlay"></div>
+	<div id="loading-message">Loading YouTube player...</div>
+	<div id="error-message"></div>
+	<div id="player"></div>
+	<script>
+		// =========================================================================
+		// DEBUG OVERLAY — visible when URL contains &debug=1
+		// Shows diagnostic info inside the iframe itself (visible on phone)
+		// =========================================================================
+		(function() {
+			var debugMode = getQueryParam('debug') === '1';
+			if (!debugMode) return;
+
+			var overlay = document.getElementById('debug-overlay');
+			if (!overlay) return;
+			overlay.style.display = 'block';
+
+			var state = {
+				pageLoaded: true,
+				origin: window.location.origin,
+				videoParam: getQueryParam('video') || '(none)',
+				ytApiLoaded: false,
+				playerCreated: false,
+				playerState: 'not yet',
+				errorCode: '(none)',
+				iframeSrc: '(not yet)',
+				referrer: document.referrer || '(empty)',
+				protocol: window.location.protocol,
+				host: window.location.host,
+			};
+
+			function cls(ok) { return ok ? 'dbg-ok' : 'dbg-err'; }
+
+			function render() {
+				overlay.innerHTML =
+					'<div class="dbg-title">YouTube Player Diagnostics</div>' +
+					'<div>Page loaded: <b class="' + cls(state.pageLoaded) + '">' + (state.pageLoaded ? 'YES' : 'NO') + '</b></div>' +
+					'<div>Origin: <b>' + state.origin + '</b></div>' +
+					'<div>Protocol: <b>' + state.protocol + '</b></div>' +
+					'<div>Host: <b>' + state.host + '</b></div>' +
+					'<div>Referrer: <b>' + state.referrer + '</b></div>' +
+					'<div>Video ID: <b class="' + cls(state.videoParam !== '(none)') + '">' + state.videoParam + '</b></div>' +
+					'<div>YouTube API loaded: <b class="' + cls(state.ytApiLoaded) + '">' + (state.ytApiLoaded ? 'YES' : 'NO') + '</b></div>' +
+					'<div>Player created: <b class="' + cls(state.playerCreated) + '">' + (state.playerCreated ? 'YES' : 'NO') + '</b></div>' +
+					'<div>Player state: <b class="' + (state.playerState === 'PLAYING' ? 'dbg-ok' : state.playerState === 'ERROR' ? 'dbg-err' : 'dbg-warn') + '">' + state.playerState + '</b></div>' +
+					'<div>Error code: <b class="' + (state.errorCode === '(none)' ? 'dbg-ok' : 'dbg-err') + '">' + state.errorCode + '</b></div>' +
+					'<div style="word-break:break-all">Player frame source: <b>' + state.iframeSrc + '</b></div>';
+			}
+
+			render();
+
+			// Poll for state changes every 500ms
+			setInterval(function() {
+				state.ytApiLoaded = !!(window.YT && window.YT.Player);
+				state.playerCreated = !!(window.violaYoutube && window.violaYoutube._player);
+
+				if (state.playerCreated && window.violaYoutube._player) {
+					try {
+						var ps = window.violaYoutube._player.getPlayerState();
+						var names = { '-1': 'UNSTARTED', '0': 'ENDED', '1': 'PLAYING', '2': 'PAUSED', '3': 'BUFFERING', '5': 'CUED' };
+						state.playerState = names[String(ps)] || 'UNKNOWN(' + ps + ')';
+					} catch(e) { state.playerState = 'ERROR: ' + e.message; }
+				}
+
+				if (window.violaYoutube && window.violaYoutube._lastError) {
+					var ec = window.violaYoutube._lastError;
+					var errorNames = { 2: 'INVALID_PARAM', 5: 'HTML5_ERROR', 100: 'NOT_FOUND', 101: 'EMBED_RESTRICTED', 150: 'EMBED_RESTRICTED' };
+					state.errorCode = ec + ' (' + (errorNames[ec] || 'unknown') + ')';
+				}
+
+				// Find YouTube's inner iframe
+				var playerEl = document.getElementById('player');
+				if (playerEl) {
+					var inner = playerEl.tagName === 'IFRAME' ? playerEl : playerEl.querySelector('iframe');
+					if (inner && inner.src) {
+						state.iframeSrc = inner.src;
+					}
+				}
+
+				render();
+			}, 500);
+		})();
+	</script>
+</body>
+
+</html>

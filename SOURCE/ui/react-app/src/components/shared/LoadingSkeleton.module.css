@@ -1,0 +1,55 @@
+@import '../../styles/variables.css';
+
+.container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  z-index: 100;
+}
+
+.logoRing {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.3) 0%, rgba(59, 130, 246, 0.2) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.logo {
+  width: 64px;
+  height: 64px;
+}
+
+.textBlock {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.title {
+  font-size: 18px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.subtitle {
+  font-size: 14px;
+}
+
+.detail {
+  max-width: 320px;
+  text-align: center;
+  font-size: 12px;
+  line-height: 1.4;
+}

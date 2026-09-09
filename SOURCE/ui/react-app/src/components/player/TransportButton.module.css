@@ -1,0 +1,43 @@
+@import '../../styles/variables.css';
+
+.button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s ease;
+}
+
+.button:hover {
+  color: var(--text-secondary) !important;
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.button.active:hover {
+  color: var(--text-primary) !important;
+}
+
+.button.disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.button.disabled:hover {
+  color: var(--text-disabled) !important;
+}
+
+/* Touch devices: meet the 44px minimum tap target. */
+@media (max-width: 1023px) {
+  .button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
