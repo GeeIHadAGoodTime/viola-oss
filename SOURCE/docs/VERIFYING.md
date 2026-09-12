@@ -5,7 +5,7 @@ file, its hash, and the source revision. Before installing or building into the
 folder, verify that its bytes match:
 
 ```sh
-python tools/release/verify_source.py --manifest ../SOURCE.manifest.json --source .
+python tools/release/verify_source.py --manifest ../PUBLIC_METADATA/source-manifest.json --source .
 ```
 
 Use the actual supplied manifest filename. The verifier checks for missing,
