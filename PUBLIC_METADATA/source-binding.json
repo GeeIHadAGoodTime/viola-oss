@@ -148,7 +148,7 @@
     },
     "advisory_assessment": {
       "path": "advisory-assessment.md",
-      "sha256": "46656aff5ebb1c65c2319d9f2b8d7cab4587e1ec4f7b1e1d25939e1ec0a1e111"
+      "sha256": "1d97bea28a96678d59c6dd2a9ccc3ab474cb9bbe6ced5e9b31595f6b04f84515"
     },
     "pipecat_wheel_sha256": "fb0895009eaa6cb49f771e8952347b43dbcd0603d5470d97976e740d2a64f68e",
     "new_dependency_resolution_performed": false,
