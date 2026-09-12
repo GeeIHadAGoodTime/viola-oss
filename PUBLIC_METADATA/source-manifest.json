@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "60c043a22f43b72f599ecbd2112e296f49423d01",
-  "sha256": "89d49901bcfde5c27142aa0dc16c4b9aa519de56b3ba9e7f44c229fa3729de85",
+  "revision": "b3926264e2e946cce32a9485d0d6d939a2b8edc6",
+  "sha256": "3095046a52b86b8cbb5ec1c4e0bae922d137a8509a91b10ff81cab1a0b655253",
   "files": [
     {
       "path": ".env.example",
@@ -85,8 +85,8 @@
     },
     {
       "path": "SECURITY.md",
-      "sha256": "e6b9eb9013f375e0335a30c2d6839fe092665dd0ece34eea50dd2ac6b7259a5d",
-      "bytes": 1665
+      "sha256": "0cdbe5e6311a7e6612165233528e2ae084825bc8a25b9636df5cdde85f6b548e",
+      "bytes": 1844
     },
     {
       "path": "START_WEB_INTERFACE.py",
@@ -850,8 +850,8 @@
     },
     {
       "path": "config/schema.py",
-      "sha256": "4775bf763ee9f8d55be2f0e8da669d731d130b4ce83e03e8631f37a127d339c9",
-      "bytes": 20545
+      "sha256": "97ce7d254ba39defdbe02e17745772200cf53964b2776c0737a2247bebad3514",
+      "bytes": 20547
     },
     {
       "path": "config/searxng/render-settings.sh",
@@ -865,8 +865,8 @@
     },
     {
       "path": "config/settings.py",
-      "sha256": "227abfa73de1e66c5a75ef34325dd7791b66a181bbfcd595f19ea4a3ec2857d3",
-      "bytes": 71612
+      "sha256": "7cca342474b6820c6db567436c133d879d98328b73b38e66af0fdb3c51ca2da2",
+      "bytes": 71614
     },
     {
       "path": "config/settings_validation.py",
@@ -1065,8 +1065,8 @@
     },
     {
       "path": "core/privacy_consent.py",
-      "sha256": "dc6c7ee2825ffdc3bb86d0a381cb09121339c517a4ea47339d28bd10db6920db",
-      "bytes": 6934
+      "sha256": "ddbb9604217e55a4568e51059e2ad0468eb40c78efad4bb4c2bddd093396c852",
+      "bytes": 8208
     },
     {
       "path": "core/product.py",
@@ -1132,6 +1132,11 @@
       "path": "core/state_selectors.py",
       "sha256": "01798f06563e6e12d19451e5eada4cc82e2bf21fa9633e3813cde6c718a7b850",
       "bytes": 16306
+    },
+    {
+      "path": "core/subprocess_env.py",
+      "sha256": "b93f1ef739fbdba66d55fff6806d75adf286187cad23955bf48d20f3a43b0737",
+      "bytes": 1076
     },
     {
       "path": "core/subprocess_utils.py",
@@ -1470,8 +1475,8 @@
     },
     {
       "path": "docs/PRIVACY.md",
-      "sha256": "c820ceb72570c1a1366c08b543844e56074b222a23182bc65842efbfbc4c0d50",
-      "bytes": 5145
+      "sha256": "7a199e18cef6d9b4d0532fbc5ed4d8fc4eb2ef2691066d59e0883923989f4259",
+      "bytes": 5573
     },
     {
       "path": "docs/TELEPHONY.md",
@@ -1525,13 +1530,13 @@
     },
     {
       "path": "intent/agent_executor.py",
-      "sha256": "98115e866a2172000278221457ceb09f0faa0f056209b50ea549f92123e3a5f0",
-      "bytes": 561894
+      "sha256": "e97e615f3db59f5bc63562a658fb9895f79c6ef8efb6be72ce6d3309de07fae8",
+      "bytes": 563888
     },
     {
       "path": "intent/agent_loop.py",
-      "sha256": "7b77d47b162e06e5ce7716c25801377e6015ffaa724620a85ea9a908a6a3fff8",
-      "bytes": 244539
+      "sha256": "278a2d53b603cdf9d8efa7cea8887ebb4b469243f6df9fce07fa2ca90b50c9d1",
+      "bytes": 243975
     },
     {
       "path": "intent/agent_message_manager.py",
@@ -1555,8 +1560,8 @@
     },
     {
       "path": "intent/ai_controller.py",
-      "sha256": "91fabbd740afc88e1bfc757f2bcb7ef8867b1a489b7b7611fcd369901515f16c",
-      "bytes": 163180
+      "sha256": "343fff506c94ec37c19b26d287d7b298e270a79987a32c94f99cc979cc5d72f9",
+      "bytes": 163417
     },
     {
       "path": "intent/ai_interpreter.py",
@@ -1800,8 +1805,8 @@
     },
     {
       "path": "intent/irreversible_actions.py",
-      "sha256": "b9520f676444426180f7d01f09c3c916adc5094027d6dbe34debe86ba1769283",
-      "bytes": 12220
+      "sha256": "74970de6bd429f29552ffe546e1158400c60c9f12e750751c0921249876778da",
+      "bytes": 12383
     },
     {
       "path": "intent/json_utils.py",
@@ -1917,6 +1922,11 @@
       "path": "intent/token_budget.py",
       "sha256": "fc40db45b34e8373cefe8fac58dac7d7890c1d25b109c880db74cca32d579bd0",
       "bytes": 18105
+    },
+    {
+      "path": "intent/tool_allowlist.py",
+      "sha256": "bcdb404feb6d628596878b5aa716385359365ee82fcb1ab8ffea8e01b88c85a7",
+      "bytes": 1210
     },
     {
       "path": "intent/tool_concurrency.py",
@@ -2090,8 +2100,8 @@
     },
     {
       "path": "intent/tools/shell.py",
-      "sha256": "659661efc895875f3a058c52ecda2815249a560a27fdcb6d0b29e6e738d8b268",
-      "bytes": 16179
+      "sha256": "b89f4acb1c20916846b507f3cfe994e4bbe73ba7925de1a327da16e50b712bf1",
+      "bytes": 16379
     },
     {
       "path": "intent/tools/system_state.py",
@@ -2205,8 +2215,8 @@
     },
     {
       "path": "mcp_hub/launcher.py",
-      "sha256": "8f8d84a5545e5aa5c31e8122686e3f422311f70c06f22dc3d8ca02ce24fc38ee",
-      "bytes": 16760
+      "sha256": "697a2952be3cbc3812963f88edcb4568491af9ddf5602620419351cc60defe9d",
+      "bytes": 16154
     },
     {
       "path": "mcp_hub/manifest_validator.py",
@@ -2220,8 +2230,8 @@
     },
     {
       "path": "mcp_hub/runtime_config.py",
-      "sha256": "52c94d35995d4ebd9cd3392f7b004e0d35e84f529a40b9c3cf1ff19132246481",
-      "bytes": 8472
+      "sha256": "4076f3e002f749b85343f35fc921d4fffdb34974a682183dc917ecfbd4b2eef5",
+      "bytes": 9272
     },
     {
       "path": "mcp_hub/tool_surface.py",
@@ -2270,8 +2280,8 @@
     },
     {
       "path": "mcp_servers/browser/server.py",
-      "sha256": "a8694d7267226ba2082e8b8fa89f2d6640bac898ea6a0a3b3bc50851b47e16b1",
-      "bytes": 244391
+      "sha256": "d51903eefb601b70406fb016588d42d5324b1083cf0d6b4daac15a46bbbe2a11",
+      "bytes": 245584
     },
     {
       "path": "mcp_servers/browser_cdp/__init__.py",
@@ -2655,8 +2665,8 @@
     },
     {
       "path": "music/consent/service.py",
-      "sha256": "ccb8904b6c608966068e7010b59924c8e7ca6a0def2f2e5b95668020d269f123",
-      "bytes": 29514
+      "sha256": "901b31b3ba53b88d232e9d37a28eaf956a5710aa8631cf46f9f47c45ad67bbf0",
+      "bytes": 29521
     },
     {
       "path": "music/consent/session_manager.py",
@@ -4265,8 +4275,8 @@
     },
     {
       "path": "services/llm/openai_consent.py",
-      "sha256": "cb65d7e8a34e16a0d2826b24055bae46ae2bacf28d64df7757c1a990c875654c",
-      "bytes": 2404
+      "sha256": "c119536f68eb270ca0afb9dfe311eddfb81adeab8064a78d6cb9f0da6c9186e6",
+      "bytes": 2449
     },
     {
       "path": "services/llm/openai_direct.py",
@@ -4685,13 +4695,13 @@
     },
     {
       "path": "services/oauth/workspace_bridge.py",
-      "sha256": "6413288dbb317c5be5ce9fcaa8b18e77e07e66e1630917a55b69e77b3ca1bbea",
-      "bytes": 8863
+      "sha256": "d68bc0967e91965705f19dff300c626dad54dba716e2baab0eb1b85d04871eb0",
+      "bytes": 12606
     },
     {
       "path": "services/openai_background.py",
-      "sha256": "13675723571ea1ecef4ccd0880b7cbb0cbe0f115f0d794b0df6c6e1ce3e52ba4",
-      "bytes": 11612
+      "sha256": "824626b848678ff52db8ec606bc189489b1583fe411d8ef14780bf4f6fcd1a34",
+      "bytes": 11629
     },
     {
       "path": "services/operator_controls.py",
@@ -5095,8 +5105,8 @@
     },
     {
       "path": "services/user_profile.py",
-      "sha256": "63d84a2b59732895f6aceac16e57e3a652e8e5f00a75bc94335c4d8f884468e6",
-      "bytes": 20529
+      "sha256": "cb4d0908f83518af904191eaeb1bd1ed0cf1cba3890f51524c4bf8bf8939db77",
+      "bytes": 20537
     },
     {
       "path": "services/user_timezone.py",
@@ -5390,13 +5400,13 @@
     },
     {
       "path": "telephony/call_history.py",
-      "sha256": "06d06d13126c1c0de23416b574232d7d2c3c83de073cfa4d66b05b15f38f1319",
-      "bytes": 13326
+      "sha256": "b16d50ede5d4c523d68df188a65dc6c2692a82c32a59d10ac8964906cbfb0b7c",
+      "bytes": 17760
     },
     {
       "path": "telephony/call_manager.py",
-      "sha256": "7f80ca7f01566bbc758551a202e88da0f5ba5a7933d912d8921b9c5217257870",
-      "bytes": 359601
+      "sha256": "32c645b405058a95ad0747adc64ec5a90c1f03381fac3448aa0e49598f407f71",
+      "bytes": 371956
     },
     {
       "path": "telephony/call_queue.py",
@@ -5495,8 +5505,8 @@
     },
     {
       "path": "telephony/loopback_phone_call_session.py",
-      "sha256": "64ed8460530f8b045bc92fe27b3a4e2a7d5547ca155bf0d602a84e95ac080437",
-      "bytes": 122442
+      "sha256": "d426e858cc3139f39494c36e253686064c9511ce8f278ce2be15fcf177ce356e",
+      "bytes": 122444
     },
     {
       "path": "telephony/loopback_transport.py",
@@ -5699,9 +5709,19 @@
       "bytes": 27604
     },
     {
+      "path": "tests/public/test_call_history_order_contract.py",
+      "sha256": "0cc8b760badad62729d74d5a40f9963540cb9821afc8ea951582b7161538d32e",
+      "bytes": 5503
+    },
+    {
+      "path": "tests/public/test_carrier_event_adapter_contract.py",
+      "sha256": "0e6b2c96b6b89887680fcbedb672609b63eefc4c9c7a86e7161b61dcd96e57c4",
+      "bytes": 11905
+    },
+    {
       "path": "tests/public/test_execution_safety_contract.py",
-      "sha256": "4224236306a3bfb73e256832c17fd0aad4eecb879e0644af1b628d88f5555c10",
-      "bytes": 15901
+      "sha256": "537983a50cde45564cc6b80f77d42955d56502a065f2eef2e16ab54cd8d85a41",
+      "bytes": 30670
     },
     {
       "path": "tests/public/test_phone_call_plan_confirmation.py",
@@ -5709,9 +5729,19 @@
       "bytes": 8358
     },
     {
+      "path": "tests/public/test_privacy_boundary_contract.py",
+      "sha256": "d369a2a43d2797aeca6bd2e6fe1bfb25af4e8f6abfd3c661c423ba3bd85d715a",
+      "bytes": 15289
+    },
+    {
       "path": "tests/public/test_source_contract.py",
       "sha256": "10ffad0a662f6413bfb5b1e52295c82eeba591df47730c3f5c6c86e8435f43a0",
       "bytes": 3666
+    },
+    {
+      "path": "tests/public/test_tool_allowlist_contract.py",
+      "sha256": "99c31df2c76291be3ce3672d5f75011d423ad9f25721b9134c99049d06436600",
+      "bytes": 650
     },
     {
       "path": "themes/viola-dark.css",
