@@ -30,11 +30,11 @@ logger = get_logger(__name__)
 _store_override_warning_logged = False
 
 
-def enforce_storage_consent(api_kwargs: dict[str, Any]) -> dict[str, Any]:
+def enforce_storage_consent(api_kwargs: dict[str, Any], *, user_id: str | None = None) -> dict[str, Any]:
     """Mutate ``api_kwargs`` so ``store`` respects the user's consent flag.
 
     Behaviour:
-      * If ``is_openai_storage_consented()`` returns True, the caller's
+      * If ``is_openai_storage_consented(user_id)`` returns True, the caller's
         ``store`` value (if any) is left untouched.
       * Otherwise ``api_kwargs["store"] = False`` is set, overriding any
         caller-provided ``True`` with a WARNING log.
@@ -47,7 +47,7 @@ def enforce_storage_consent(api_kwargs: dict[str, Any]) -> dict[str, Any]:
     try:
         from core.privacy_consent import is_openai_storage_consented
 
-        consented = bool(is_openai_storage_consented())
+        consented = bool(is_openai_storage_consented(user_id))
     except Exception:
         logger.exception("SEC-08: consent read failed; forcing store=False")
         consented = False

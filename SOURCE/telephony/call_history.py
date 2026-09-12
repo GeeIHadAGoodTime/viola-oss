@@ -11,10 +11,13 @@ from __future__ import annotations
 
 import json
 import shutil
+import uuid
 from collections.abc import Iterable
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+
+from filelock import FileLock
 
 from core.logging_config import get_logger
 from core.platform import get_data_dir
@@ -164,6 +167,25 @@ def get_call_dir(call_id: str) -> Path:
     return _HISTORY_DIR / call_id
 
 
+def _carrier_revision(data: dict) -> int:
+    cost_breakdown = data.get("cost_breakdown")
+    if not isinstance(cost_breakdown, dict):
+        return -1
+    try:
+        return int(cost_breakdown.get("carrier_revision", -1))
+    except (TypeError, ValueError):
+        return -1
+
+
+def _write_history_metadata_atomically(meta_path: Path, data: dict) -> None:
+    temp_path = meta_path.with_name(".%s.%s.tmp" % (meta_path.name, uuid.uuid4().hex))
+    try:
+        temp_path.write_text(json.dumps(data, indent=2, default=str), encoding="utf-8")
+        temp_path.replace(meta_path)
+    finally:
+        temp_path.unlink(missing_ok=True)
+
+
 def save_call_history(entry: CallHistoryEntry) -> Path:
     """Save call metadata as JSON alongside audio files.
 
@@ -178,10 +200,92 @@ def save_call_history(entry: CallHistoryEntry) -> Path:
     meta_path = call_dir / "metadata.json"
 
     data = _encrypt_sensitive(asdict(entry))
-    meta_path.write_text(json.dumps(data, indent=2, default=str), encoding="utf-8")
+    lock_path = meta_path.with_suffix(meta_path.suffix + ".lock")
+    with FileLock(str(lock_path)):
+        if meta_path.exists():
+            existing = json.loads(meta_path.read_text(encoding="utf-8"))
+            stored_user_id = str(existing.get("user_id") or "")
+            if stored_user_id and entry.user_id and stored_user_id != entry.user_id:
+                raise PermissionError("call-history owner does not match saved entry")
+
+            merged = dict(existing)
+            merged.update(data)
+            for field_name in _SENSITIVE_FIELDS:
+                stored_value = existing.get(field_name)
+                incoming_value = data.get(field_name)
+                if (
+                    isinstance(stored_value, str)
+                    and stored_value.startswith("ENC:")
+                    and not (isinstance(incoming_value, str) and incoming_value.startswith("ENC:"))
+                ):
+                    merged[field_name] = stored_value
+
+            if _carrier_revision(existing) > _carrier_revision(data):
+                merged["status"] = existing.get("status", merged.get("status", ""))
+                merged["duration_seconds"] = existing.get("duration_seconds", merged.get("duration_seconds", 0.0))
+                merged_cost = dict(data.get("cost_breakdown") or {})
+                existing_cost = existing.get("cost_breakdown")
+                if isinstance(existing_cost, dict):
+                    for key in ("estimated_cost_usd", "duration_seconds", "carrier_revision"):
+                        if key in existing_cost:
+                            merged_cost[key] = existing_cost[key]
+                merged["cost_breakdown"] = merged_cost
+            data = merged
+        _write_history_metadata_atomically(meta_path, data)
 
     logger.info("Saved call history: %s", meta_path)
     return meta_path
+
+
+def update_call_history_billing_fields(
+    call_id: str,
+    user_id: str,
+    *,
+    status: str,
+    duration_seconds: float,
+    estimated_cost_usd: float,
+    carrier_revision: int,
+) -> bool:
+    """Atomically update carrier-controlled fields without rewriting metadata.
+
+    A manager reconstructed from a carrier projection knows the final status
+    and CDR but not the original task, caller, transcript, or future metadata
+    fields. Updating the raw JSON preserves encrypted values byte-for-byte
+    when an encryption key is unavailable during callback handling.
+    """
+    call_dir = get_call_dir(call_id)
+    call_dir.mkdir(parents=True, exist_ok=True)
+    meta_path = call_dir / "metadata.json"
+
+    lock_path = meta_path.with_suffix(meta_path.suffix + ".lock")
+    with FileLock(str(lock_path)):
+        data = (
+            json.loads(meta_path.read_text(encoding="utf-8"))
+            if meta_path.exists()
+            else {"call_id": call_id, "user_id": user_id}
+        )
+        stored_user_id = str(data.get("user_id") or "")
+        if stored_user_id and user_id and stored_user_id != user_id:
+            raise PermissionError("call-history owner does not match carrier projection")
+
+        cost_breakdown = data.get("cost_breakdown")
+        if not isinstance(cost_breakdown, dict):
+            cost_breakdown = {}
+        else:
+            cost_breakdown = dict(cost_breakdown)
+        stored_revision = _carrier_revision(data)
+        if stored_revision >= int(carrier_revision):
+            return False
+        cost_breakdown["estimated_cost_usd"] = float(estimated_cost_usd or 0.0)
+        cost_breakdown["duration_seconds"] = float(duration_seconds or 0.0)
+        cost_breakdown["carrier_revision"] = int(carrier_revision)
+        data["status"] = status
+        data["duration_seconds"] = float(duration_seconds or 0.0)
+        data["cost_breakdown"] = cost_breakdown
+
+        _write_history_metadata_atomically(meta_path, data)
+    logger.info("Updated carrier billing fields in call history: %s", meta_path)
+    return True
 
 
 def _load_call_history_entry(call_dir: Path) -> CallHistoryEntry | None:

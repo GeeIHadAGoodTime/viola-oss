@@ -246,7 +246,7 @@ async def run_background_openai_response(
     else:
         payload["temperature"] = 0.0
     payload.setdefault("store", True)
-    enforce_storage_consent(payload)
+    enforce_storage_consent(payload, user_id=user_id)
     client = _create_background_client(ai_source=ai_source, timeout_s=timeout_s, user_id=user_id)
 
     from services.llm.spend_accounting import (

@@ -93,6 +93,15 @@ def _append_google_workspace_config(
 ) -> None:
     from services.oauth.google import is_google_restricted_features_enabled
 
+    # The external Workspace server owns one fixed credential cache below its
+    # project root.  It has no tenant-aware token store, so do not launch it in
+    # a shared cloud process where a cached credential could serve another user.
+    from services.computer_use.cloud_guard import is_cloud_surface
+
+    if is_cloud_surface(settings_obj):
+        logger.warning("Google Workspace MCP server is unavailable on the shared cloud surface")
+        return
+
     if not is_google_restricted_features_enabled(settings_obj):
         logger.debug("Google Workspace MCP server disabled by restricted Google launch gate")
         return
@@ -161,19 +170,25 @@ def _append_configured_external_servers(configs: list[ServerConfig], settings_ob
         return
     try:
         from services.oauth.google import is_google_restricted_features_enabled
+        from services.computer_use.cloud_guard import is_cloud_surface
 
         google_restricted_enabled = is_google_restricted_features_enabled(settings_obj)
+        cloud_surface = is_cloud_surface(settings_obj)
         ext_list = json.loads(raw_ext)
         if not isinstance(ext_list, list):
             return
         for entry in ext_list:
             if not isinstance(entry, dict) or "name" not in entry:
                 continue
-            if str(entry.get("name", "")).strip() == "google-workspace" and not google_restricted_enabled:
-                logger.debug(
-                    "Skipping configured google-workspace MCP server because restricted Google features are disabled"
-                )
-                continue
+            if str(entry.get("name", "")).strip() == "google-workspace":
+                if not google_restricted_enabled:
+                    logger.debug(
+                        "Skipping configured google-workspace MCP server because restricted Google features are disabled"
+                    )
+                    continue
+                if cloud_surface:
+                    logger.warning("Configured Google Workspace MCP server is unavailable on the shared cloud surface")
+                    continue
             ext_cfg = ServerConfig(
                 name=entry["name"],
                 transport="stdio",

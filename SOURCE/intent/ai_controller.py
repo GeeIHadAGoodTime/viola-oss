@@ -895,19 +895,22 @@ class AIController:
             bridge = ApprovalBridge(approval_mgr, hook_registry=self.hook_registry)
             hub = MCPClientHub(approval_bridge=bridge)
 
-            await hub.initialize(runtime_configs.fast_configs)
-
             if any(_cfg.name == "google-workspace" for _cfg in runtime_configs.fast_configs):
+                workspace_ready = False
                 try:
-                    from services.oauth.workspace_bridge import (
-                        export_tokens_for_workspace,
-                    )
+                    from services.oauth.workspace_bridge import export_tokens_for_workspace
 
                     workspace_user_id = _ctx_user_id.get()
                     if workspace_user_id:
-                        asyncio.ensure_future(export_tokens_for_workspace(workspace_user_id))
+                        workspace_ready = await export_tokens_for_workspace(workspace_user_id)
                 except Exception:
-                    logger.debug("Workspace token seeding deferred to login")
+                    logger.exception("Workspace token preparation failed; not starting Workspace MCP")
+                if not workspace_ready:
+                    runtime_configs.fast_configs = [
+                        _cfg for _cfg in runtime_configs.fast_configs if _cfg.name != "google-workspace"
+                    ]
+
+            await hub.initialize(runtime_configs.fast_configs)
 
             # Connect browser server in background â€” tools become available
             # once the subprocess is ready (~20-30s).  Until then, browser

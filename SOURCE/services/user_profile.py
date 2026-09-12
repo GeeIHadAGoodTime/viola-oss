@@ -381,7 +381,7 @@ class UserProfile:
         founder's desktop" defaults). For NAMED AUTH USERS, never fall back to
         those defaults — that would let one user's data answer for another.
 
-        Origin incident (2026-05-20): every test user_id ('user-1', 'jay',
+        Origin incident (2026-05-20): every test user_id ('user-1', 'sample-user',
         'test-user', etc.) was resolving to the founder's email and profile
         because legacy JSON + env vars applied unconditionally. In dev that
         spammed the founder; in production multi-tenant SaaS, any cache miss

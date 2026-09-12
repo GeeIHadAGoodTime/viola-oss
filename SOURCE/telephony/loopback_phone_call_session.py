@@ -2601,7 +2601,7 @@ def _tool_call_arguments(raw: dict[str, Any]) -> dict[str, Any]:
 
 
 def _scripted_opening_text(scenario: PhoneScenario) -> str:
-    caller = str(scenario.caller_name or "Jay").strip() or "Jay"
+    caller = str(scenario.caller_name or "Alex").strip() or "Alex"
     disclosure = str(scenario.recording_disclosure or "").strip()
     purpose = str(scenario.task or "complete this call").strip()
     parts = [
@@ -2629,9 +2629,9 @@ def _scripted_assistant_text(event: PhoneEvent, index: int, tool_calls: list[dic
     if "end_call" in names:
         return "Thank you. Goodbye."
     if index == 1:
-        return "Hi, I am calling for Jay to schedule a dental appointment."
+        return "Hi, I am calling for Alex to schedule a dental appointment."
     if "who am I speaking with" in event.text.lower():
-        return "This is Viola calling for Jay Shkoukani."
+        return "This is Viola calling for Alex Example."
     return "Thanks, I understand."
 
 
