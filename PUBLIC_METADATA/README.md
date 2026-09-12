@@ -1,5 +1,13 @@
 # Source snapshot dependency inventories
 
+The current source manifest includes the September 12 runtime-safety, test and
+documentation corrections. Its binding records the compared public revision and
+the changed source paths. The six dependency inventories retain their original
+bytes: dependency recipes, maintained dependency source, frontend inputs and
+inventoried assets are unchanged. Synthetic regression checks do not establish
+new live-runtime, carrier, hardware or other-platform qualification. No new
+dependency resolution or advisory scan is claimed for these corrections.
+
 These software bills of materials (SBOMs) list the dependencies selected for the
 accompanying Viola source snapshot. Keep this directory alongside the `SOURCE`
 directory when distributing the snapshot. `source-manifest.json` identifies the

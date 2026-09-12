@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "6ccc943f59fc324fb719fb0d55d70b2272b2a22145cdb374c644e3e3239d3396",
-  "source_tree_sha256": "0bba93fe67af4a06c48a01477512b744d257dc681d68128fa4d4858a411e6646",
-  "source_file_count": 2457,
+  "source_manifest_sha256": "79336fccb0be349025faef261334fa306089cfb313ed3e2b0958ad0f327a9bf0",
+  "source_tree_sha256": "89d49901bcfde5c27142aa0dc16c4b9aa519de56b3ba9e7f44c229fa3729de85",
+  "source_file_count": 2460,
   "retained_sboms": [
     {
       "path": "frontend.sbom.json",
@@ -55,7 +55,7 @@
     }
   ],
   "input_equivalence": {
-    "basis": "Exact byte identity against the source snapshot accompanying the retained inventories",
+    "basis": "All previously shipped source paths outside changed_source_paths retain exact Git blob identity against comparison_public_revision. Changes comprise runtime safety, synthetic tests and docs. pyproject.toml differs only in project.urls. Requirements, maintained dependency source, frontend inputs and all inventoried assets remain byte-identical.",
     "requirements": [
       "requirements_bootstrap.txt",
       "requirements_deepfilter.txt",
@@ -71,5 +71,20 @@
   },
   "new_resolution_performed": false,
   "new_advisory_scan_performed": false,
-  "new_runtime_qualification_performed": false
+  "new_runtime_qualification_performed": false,
+  "source_revision": "60c043a22f43b72f599ecbd2112e296f49423d01",
+  "comparison_public_revision": "8673530938c6bdccf55b86e0a846016ae982467e",
+  "changed_source_paths": [
+    "SOURCE/README.md",
+    "SOURCE/SECURITY.md",
+    "SOURCE/docs/CONFIGURATION.md",
+    "SOURCE/docs/PRIVACY.md",
+    "SOURCE/docs/VERIFYING.md",
+    "SOURCE/intent/agent_executor.py",
+    "SOURCE/mcp_hub/launcher.py",
+    "SOURCE/pyproject.toml",
+    "SOURCE/telephony/call_tools.py",
+    "SOURCE/tests/public/test_execution_safety_contract.py",
+    "SOURCE/tests/public/test_phone_call_plan_confirmation.py"
+  ]
 }

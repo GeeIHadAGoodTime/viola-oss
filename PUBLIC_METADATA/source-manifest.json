@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "99afb33219fb5d4e896dbae213a6b7a42f73364f",
-  "sha256": "0bba93fe67af4a06c48a01477512b744d257dc681d68128fa4d4858a411e6646",
+  "revision": "60c043a22f43b72f599ecbd2112e296f49423d01",
+  "sha256": "89d49901bcfde5c27142aa0dc16c4b9aa519de56b3ba9e7f44c229fa3729de85",
   "files": [
     {
       "path": ".env.example",
@@ -80,13 +80,13 @@
     },
     {
       "path": "README.md",
-      "sha256": "134fec3ca83af1928bf58c452078826888c4a44760a0189e4f41bac76f85f184",
-      "bytes": 2653
+      "sha256": "9e3add6250fcab9d028c597bad7a1e750e8af831636ce657787c2090a96d16b1",
+      "bytes": 2826
     },
     {
       "path": "SECURITY.md",
-      "sha256": "35b5fc0094d2aa42d67a28f2d9bc797e40c2ba4b00a911402367617fbe84e38e",
-      "bytes": 1020
+      "sha256": "e6b9eb9013f375e0335a30c2d6839fe092665dd0ece34eea50dd2ac6b7259a5d",
+      "bytes": 1665
     },
     {
       "path": "START_WEB_INTERFACE.py",
@@ -1460,13 +1460,18 @@
     },
     {
       "path": "docs/CONFIGURATION.md",
-      "sha256": "6529e7649dfdffc6de9276241fc864fc0fe9701e59f94488115969695072f3da",
-      "bytes": 4275
+      "sha256": "a11cfaa39bfc047dd5a5b9f9db2eaeef2643715eb8d68db7c0451acebea9ff8e",
+      "bytes": 4416
     },
     {
       "path": "docs/INSTALLATION.md",
       "sha256": "5652862e03253c03908284c9d74a2f691d8990cbe7df5742e33f94074f7716a5",
       "bytes": 4324
+    },
+    {
+      "path": "docs/PRIVACY.md",
+      "sha256": "c820ceb72570c1a1366c08b543844e56074b222a23182bc65842efbfbc4c0d50",
+      "bytes": 5145
     },
     {
       "path": "docs/TELEPHONY.md",
@@ -1475,8 +1480,8 @@
     },
     {
       "path": "docs/VERIFYING.md",
-      "sha256": "ecef373619c230d04765539b77db91157622e9b29fa8c26cd3a6b5836fc1327b",
-      "bytes": 1670
+      "sha256": "a1c2c1914b174c86ba6c5041573e8bb50753a731a39701475188e8c265e79f19",
+      "bytes": 2572
     },
     {
       "path": "docs/YOUTUBE_EMBED_HELPER.md",
@@ -1520,8 +1525,8 @@
     },
     {
       "path": "intent/agent_executor.py",
-      "sha256": "681dcb94ebf09172fb552bd11f23a7447999b365fbd9e65f39e34782459ce20c",
-      "bytes": 560813
+      "sha256": "98115e866a2172000278221457ceb09f0faa0f056209b50ea549f92123e3a5f0",
+      "bytes": 561894
     },
     {
       "path": "intent/agent_loop.py",
@@ -2200,8 +2205,8 @@
     },
     {
       "path": "mcp_hub/launcher.py",
-      "sha256": "033a4001d2283428d20e5f7549d84b7306b6d3cd4be776ebf0ceb527e6f51a26",
-      "bytes": 16669
+      "sha256": "8f8d84a5545e5aa5c31e8122686e3f422311f70c06f22dc3d8ca02ce24fc38ee",
+      "bytes": 16760
     },
     {
       "path": "mcp_hub/manifest_validator.py",
@@ -3490,8 +3495,8 @@
     },
     {
       "path": "pyproject.toml",
-      "sha256": "0e09ad1972c7a5e7ef3374596c2198da682e294e9d6b19060837b1b92d47502f",
-      "bytes": 319
+      "sha256": "a52a4ab5968580d99d1f15bfd0a6a3555d33d606c403873f0cf97e03dbbcbf1b",
+      "bytes": 323
     },
     {
       "path": "registry/TEMPLATE/__init__.py",
@@ -5405,8 +5410,8 @@
     },
     {
       "path": "telephony/call_tools.py",
-      "sha256": "e3179e9d759064e95965a7531af217f8ec487ac0120e7c47ade572852c2ce11b",
-      "bytes": 61779
+      "sha256": "1a246b714a98054aefd974f56dc4e2bff450333d605341772632b78b82f25b15",
+      "bytes": 61515
     },
     {
       "path": "telephony/caller_validation.py",
@@ -5692,6 +5697,16 @@
       "path": "telephony/voicemail_detection.py",
       "sha256": "9d3f82b250ad4431ad4d7e5de62ac3346baa3cb2c1fe5d64fb50d9be02f4bc91",
       "bytes": 27604
+    },
+    {
+      "path": "tests/public/test_execution_safety_contract.py",
+      "sha256": "4224236306a3bfb73e256832c17fd0aad4eecb879e0644af1b628d88f5555c10",
+      "bytes": 15901
+    },
+    {
+      "path": "tests/public/test_phone_call_plan_confirmation.py",
+      "sha256": "d623e2d4c1b81de9020133e5bdb6a7cf0262473b69afc8e0990f59a63c65ea7b",
+      "bytes": 8358
     },
     {
       "path": "tests/public/test_source_contract.py",
