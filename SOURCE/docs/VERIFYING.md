@@ -12,7 +12,7 @@ For a distributed candidate, also verify the manifest and all six retained
 dependency inventories as one binding:
 
 ```sh
-python tools/release/verify_source_binding.py --source . --metadata ../PUBLIC_METADATA
+python -B tools/release/verify_source_binding.py --source . --metadata ../PUBLIC_METADATA
 ```
 
 Release maintainers can regenerate the source manifest after an intentional
@@ -20,7 +20,7 @@ source edit with the shipped helper, then review the resulting diff and update
 the binding in the same release change:
 
 ```sh
-python tools/release/create_source_manifest.py --source . --output ../PUBLIC_METADATA/source-manifest.json
+python -B tools/release/create_source_manifest.py --source . --output ../PUBLIC_METADATA/source-manifest.json
 ```
 
 The helper records the current Git revision when available, hashes every source
