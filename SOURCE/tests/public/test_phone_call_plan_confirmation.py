@@ -2,17 +2,40 @@
 
 from __future__ import annotations
 
+import importlib.util
 import sys
 from types import ModuleType, SimpleNamespace
 from typing import Any
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 from intent.approval import ApprovalManager
 from intent.tool_types import RiskLevel
-from mcp_hub.approval_bridge import ApprovalBridge
 from telephony import call_tools
 from telephony.call_tools import present_call_plan_handler
+
+
+SOURCE_ROOT = Path(__file__).resolve().parents[2]
+
+
+def _load_approval_bridge_without_package_side_effects():
+    """Load the real bridge without importing the eager MCP package initializer."""
+
+    package_name = "_phone_test_mcp_hub"
+    package = ModuleType(package_name)
+    package.__path__ = [str(SOURCE_ROOT / "mcp_hub")]  # type: ignore[attr-defined]
+    sys.modules[package_name] = package
+
+    module_name = f"{package_name}.approval_bridge"
+    path = SOURCE_ROOT / "mcp_hub" / "approval_bridge.py"
+    spec = importlib.util.spec_from_file_location(module_name, path)
+    if spec is None or spec.loader is None:  # pragma: no cover - import machinery guard
+        raise RuntimeError(f"Unable to load {path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
+    spec.loader.exec_module(module)
+    return module
 
 
 class _Params:
@@ -76,6 +99,8 @@ class PreCallPlanConfirmationTests(unittest.IsolatedAsyncioTestCase):
     async def test_phone_call_remains_dangerous_and_central_denial_blocks_dispatch(self) -> None:
         """The actual compound phone call path must retain its independent gate."""
 
+        approval_bridge = _load_approval_bridge_without_package_side_effects()
+
         class DenialChannel:
             supports_buttons = False
 
@@ -94,14 +119,20 @@ class PreCallPlanConfirmationTests(unittest.IsolatedAsyncioTestCase):
         ) -> str:
             return "deny"
 
-        bridge = ApprovalBridge(ApprovalManager(channel=DenialChannel()))
+        bridge = approval_bridge.ApprovalBridge(ApprovalManager(channel=DenialChannel()))
         args = {
             "action": "call",
             "phone_number": "+12025550123",
             "task": "Synthetic only; no phone tool is invoked",
         }
 
-        with patch.object(ApprovalManager, "_classify_response", classify):
+        # ApprovalManager imports this module again for its immutable-risk-map
+        # invariant. Bind the already-loaded real module at that precise boundary
+        # so Python does not execute mcp_hub/__init__.py and import GUI backends.
+        with (
+            patch.dict(sys.modules, {"mcp_hub.approval_bridge": approval_bridge}),
+            patch.object(ApprovalManager, "_classify_response", classify),
+        ):
             self.assertEqual(bridge.get_call_risk("phone", args), RiskLevel.DANGEROUS)
             self.assertFalse(await bridge.check_approval("phone", args))
 
@@ -142,7 +173,13 @@ class ConferenceUserResolutionTests(unittest.TestCase):
         settings_module.get_settings_manager = lambda: SettingsManager()  # type: ignore[attr-defined]
 
         self.assertFalse(call_tools._can_use_global_conference_settings("authenticated-user"))
-        with patch.dict(sys.modules, {"ui.settings_manager": settings_module}):
+        # Number normalization is a separate unit. Patch that boundary so this
+        # identity/settings regression does not import the eager intent.tools
+        # package and its optional Windows GUI backend.
+        with (
+            patch.dict(sys.modules, {"ui.settings_manager": settings_module}),
+            patch.object(call_tools, "_normalize_us_e164", side_effect=lambda value: value),
+        ):
             self.assertEqual(
                 call_tools._resolve_conference_user_phone("authenticated-user", "me"),
                 "+12025550123",
