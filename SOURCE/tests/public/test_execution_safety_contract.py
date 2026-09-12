@@ -9,7 +9,9 @@ from __future__ import annotations
 import os
 import contextvars
 import importlib.util
+import logging
 import sys
+import tempfile
 import types
 import unittest
 from pathlib import Path
@@ -17,6 +19,114 @@ from unittest.mock import patch
 
 
 SOURCE_ROOT = Path(__file__).resolve().parents[2]
+
+_TEST_PROFILE = None
+_TEST_PROFILE_ROOT = None
+_FAKE_HOME = None
+_FAKE_DATA = None
+_PROFILE_ENV = None
+_HOME_LOOKUP = None
+_ORIGINAL_ROOT_HANDLERS = None
+_ORIGINAL_ROOT_LEVEL = None
+_ORIGINAL_LOGGING_READY = False
+_ORIGINAL_OBSERVABILITY_CONFIGURED = False
+_ORIGINAL_OBSERVABILITY_CONFIG = None
+
+
+def setUpModule():
+    """Put every test-time persistence boundary in a disposable profile."""
+
+    global _FAKE_DATA
+    global _FAKE_HOME
+    global _HOME_LOOKUP
+    global _ORIGINAL_LOGGING_READY
+    global _ORIGINAL_OBSERVABILITY_CONFIG
+    global _ORIGINAL_OBSERVABILITY_CONFIGURED
+    global _ORIGINAL_ROOT_HANDLERS
+    global _ORIGINAL_ROOT_LEVEL
+    global _PROFILE_ENV
+    global _TEST_PROFILE
+    global _TEST_PROFILE_ROOT
+
+    root_logger = logging.getLogger()
+    _ORIGINAL_ROOT_HANDLERS = list(root_logger.handlers)
+    _ORIGINAL_ROOT_LEVEL = root_logger.level
+    prior_logging_module = sys.modules.get("core.logging_config")
+    prior_observability_module = sys.modules.get("diagnostics.observability_logging")
+    _ORIGINAL_LOGGING_READY = getattr(prior_logging_module, "_LOGGING_READY", False)
+    _ORIGINAL_OBSERVABILITY_CONFIGURED = getattr(prior_observability_module, "_CONFIGURED", False)
+    _ORIGINAL_OBSERVABILITY_CONFIG = getattr(prior_observability_module, "_CONFIG", None)
+
+    base_dir = Path(
+        os.environ.get("VIOLA_EXECUTION_SAFETY_TEST_ROOT")
+        or os.environ.get("VIOLA_DATA_DIR")
+        or tempfile.gettempdir()
+    )
+    base_dir.mkdir(parents=True, exist_ok=True)
+    _TEST_PROFILE = tempfile.TemporaryDirectory(prefix="viola-execution-safety-", dir=base_dir)
+    _TEST_PROFILE_ROOT = Path(_TEST_PROFILE.name)
+    _FAKE_HOME = _TEST_PROFILE_ROOT / "home"
+    _FAKE_DATA = _TEST_PROFILE_ROOT / "data"
+    fake_cache = _TEST_PROFILE_ROOT / "cache"
+    fake_logs = _TEST_PROFILE_ROOT / "logs"
+    for directory in (_FAKE_HOME, _FAKE_DATA, fake_cache, fake_logs):
+        directory.mkdir(parents=True, exist_ok=True)
+
+    _PROFILE_ENV = patch.dict(
+        os.environ,
+        {
+            "HOME": str(_FAKE_HOME),
+            "USERPROFILE": str(_FAKE_HOME),
+            "VIOLA_DATA_DIR": str(_FAKE_DATA),
+            "VIOLA_CACHE_DIR": str(fake_cache),
+            "VIOLA_LOG_DIR": str(fake_logs),
+        },
+        clear=False,
+    )
+    _HOME_LOOKUP = patch.object(Path, "home", return_value=_FAKE_HOME)
+    _PROFILE_ENV.start()
+    _HOME_LOOKUP.start()
+
+
+def tearDownModule():
+    """Close test-owned log files before removing the disposable profile."""
+
+    profile_root = _TEST_PROFILE_ROOT.resolve()
+    loggers = [logging.getLogger()]
+    loggers.extend(
+        candidate
+        for candidate in logging.Logger.manager.loggerDict.values()
+        if isinstance(candidate, logging.Logger)
+    )
+    for active_logger in loggers:
+        for handler in list(active_logger.handlers):
+            filename = getattr(handler, "baseFilename", None)
+            if not filename:
+                continue
+            try:
+                Path(filename).resolve().relative_to(profile_root)
+            except ValueError:
+                continue
+            active_logger.removeHandler(handler)
+            handler.close()
+
+    root_logger = logging.getLogger()
+    root_logger.handlers.clear()
+    for handler in _ORIGINAL_ROOT_HANDLERS:
+        root_logger.addHandler(handler)
+    root_logger.setLevel(_ORIGINAL_ROOT_LEVEL)
+
+    logging_module = sys.modules.get("core.logging_config")
+    if logging_module is not None:
+        logging_module._LOGGING_READY = _ORIGINAL_LOGGING_READY
+    observability_module = sys.modules.get("diagnostics.observability_logging")
+    if observability_module is not None:
+        observability_module._CONFIGURED = _ORIGINAL_OBSERVABILITY_CONFIGURED
+        observability_module._CONFIG = _ORIGINAL_OBSERVABILITY_CONFIG
+
+    _HOME_LOOKUP.stop()
+    _PROFILE_ENV.stop()
+    _TEST_PROFILE.cleanup()
 
 
 def _load_launcher_without_package_side_effects():
@@ -123,6 +233,16 @@ class ExternalMCPEnvironmentContract(unittest.IsolatedAsyncioTestCase):
 
 
 class BrowserGateBindingContract(unittest.IsolatedAsyncioTestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        # AgentExecutor imports checkpoint persistence, whose compatibility
+        # migration reads Path.home()/.viola/tasks at module import. Module
+        # setup activates the disposable home before this first import.
+        from intent import task_checkpoint
+
+        cls._task_checkpoint = task_checkpoint
+
     @staticmethod
     def _make_executor(AgentExecutor):
         class FakeHub:
@@ -249,6 +369,12 @@ class BrowserGateBindingContract(unittest.IsolatedAsyncioTestCase):
     async def test_binding_scope_preserves_ordinary_tool_dispatch(self):
         from intent.agent_executor import AgentExecutor
         executor = self._make_executor(AgentExecutor)
+
+        self.assertEqual(
+            self._task_checkpoint._LEGACY_CHECKPOINT_DIR,
+            _FAKE_HOME / ".viola" / "tasks",
+        )
+        self.assertEqual(self._task_checkpoint.CHECKPOINT_DIR, _FAKE_DATA / "tasks")
 
         gate_module = types.ModuleType("mcp_servers.browser.server")
         gate_module.set_payment_session = lambda _session_id: self.fail("ordinary tool must not bind browser context")
