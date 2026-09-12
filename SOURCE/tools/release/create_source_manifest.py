@@ -49,7 +49,7 @@ def main() -> None:
     args = parser.parse_args()
     manifest = create(args.source.resolve(), args.revision or git_revision(args.source.resolve()))
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    args.output.write_bytes((json.dumps(manifest, indent=2) + "\n").encode("utf-8"))
     print(json.dumps({"revision": manifest["revision"], "files": len(manifest["files"]), "sha256": manifest["sha256"]}, indent=2))
 
 
