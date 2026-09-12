@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "b3926264e2e946cce32a9485d0d6d939a2b8edc6",
-  "sha256": "3095046a52b86b8cbb5ec1c4e0bae922d137a8509a91b10ff81cab1a0b655253",
+  "revision": "e4fa14dd870825bcc7eca1401d09f1b4375f8449",
+  "sha256": "015d048d69642fe6a303704b49807569e692ab2530ec14d7bc6c5db467022a45",
   "files": [
     {
       "path": ".env.example",
@@ -1485,8 +1485,8 @@
     },
     {
       "path": "docs/VERIFYING.md",
-      "sha256": "a1c2c1914b174c86ba6c5041573e8bb50753a731a39701475188e8c265e79f19",
-      "bytes": 2572
+      "sha256": "d372898762d3d6e7d768c60caff418f0a1eb60d224b2b28572cb45d50bad52b4",
+      "bytes": 3909
     },
     {
       "path": "docs/YOUTUBE_EMBED_HELPER.md",
@@ -3535,8 +3535,8 @@
     },
     {
       "path": "requirements_desktop.txt",
-      "sha256": "8db7f716c778980dbfd647efdf9bcb8f7ba0d8567b591f88901c355a42bcbd62",
-      "bytes": 8569
+      "sha256": "9ae6309b577dd10ac23cf697c79bbd2329fdc23e8c2e2ccaaad8c9e6c27c9ad8",
+      "bytes": 8575
     },
     {
       "path": "requirements_kokoro.txt",
@@ -3545,13 +3545,13 @@
     },
     {
       "path": "requirements_linux.txt",
-      "sha256": "6afe7efce9adacfa074701b2455b2af813c6051150b5accfd6830d90870789b9",
-      "bytes": 11582
+      "sha256": "b5058d5ff60814bf600f5ec2db85fadc7563bd7b7bc05cdd0255cee2a27924da",
+      "bytes": 11588
     },
     {
       "path": "requirements_macos.txt",
-      "sha256": "341ad45e834d1bc49769418009b34e1f4ceb24ce462272b92b1df41df84e6894",
-      "bytes": 13119
+      "sha256": "2740b49cd04afafc947aa3e2b7ae72c6b76ce51c136c966a836a212ea90a8243",
+      "bytes": 13125
     },
     {
       "path": "requirements_optional.txt",
@@ -5720,8 +5720,8 @@
     },
     {
       "path": "tests/public/test_execution_safety_contract.py",
-      "sha256": "537983a50cde45564cc6b80f77d42955d56502a065f2eef2e16ab54cd8d85a41",
-      "bytes": 30670
+      "sha256": "331d3b27a9e4388931d60cbcfeebb318c8268e5b7924ba3570407569115baedd",
+      "bytes": 30885
     },
     {
       "path": "tests/public/test_phone_call_plan_confirmation.py",
@@ -5729,9 +5729,14 @@
       "bytes": 8358
     },
     {
+      "path": "tests/public/test_pipecat_runner_security.py",
+      "sha256": "63b22cb3ae7702a45d800d5a9b2f46fe546a29ecdc41a85960222d3148862373",
+      "bytes": 7273
+    },
+    {
       "path": "tests/public/test_privacy_boundary_contract.py",
-      "sha256": "d369a2a43d2797aeca6bd2e6fe1bfb25af4e8f6abfd3c661c423ba3bd85d715a",
-      "bytes": 15289
+      "sha256": "60430b35b0fd62f68801d269e3c01e0208596744b2fc17d36035064fefbcfee9",
+      "bytes": 17545
     },
     {
       "path": "tests/public/test_source_contract.py",
@@ -5825,8 +5830,8 @@
     },
     {
       "path": "third_party/pipecat.patch",
-      "sha256": "d50c7a39144540f8a331d08ee28cbb185051752d45c62db56b18b4214bf4f07f",
-      "bytes": 9139
+      "sha256": "6b8300d37e40f493e076b5d0a1579c1ba3f37dfc8f47f8b2dfa03d7d70038985",
+      "bytes": 18468
     },
     {
       "path": "third_party/pipecat/LICENSE",
@@ -5860,7 +5865,7 @@
     },
     {
       "path": "third_party/pipecat/pyproject.toml",
-      "sha256": "5b7a5be07c327c80b6894b67c2b5eae11d94af648b972f0f52854004d9ab7145",
+      "sha256": "0fde019a97ecfc4c6d6a38e5ed175812f0b60afd7e665dedac74575b04d40c1f",
       "bytes": 8077
     },
     {
@@ -6685,8 +6690,8 @@
     },
     {
       "path": "third_party/pipecat/src/pipecat/runner/run.py",
-      "sha256": "affdc25c9e0e5ea604327b7719214a6688169c9602c0edc8ff97da164ba01fc5",
-      "bytes": 37205
+      "sha256": "34c0f2ed2ed9de5970bf0e5fc75d187539387e65f029b0c9db554fa5a49b9685",
+      "bytes": 41946
     },
     {
       "path": "third_party/pipecat/src/pipecat/runner/types.py",
@@ -8395,13 +8400,23 @@
     },
     {
       "path": "third_party/sources.toml",
-      "sha256": "bbcb7bd61294751d67a9283430418694ad9a5e0ce0acd1126ffcc0f5bcb30b45",
-      "bytes": 202906
+      "sha256": "120fb4787988a64375c65fab296c53dcac4795126b36995d8eb43a41979ca219",
+      "bytes": 203193
+    },
+    {
+      "path": "tools/release/create_source_manifest.py",
+      "sha256": "ba10fad32da41ffe5679a33ec0f329a257d907e439e3addc255f78045a201736",
+      "bytes": 2241
     },
     {
       "path": "tools/release/verify_source.py",
       "sha256": "3043054a222b8eb015c2bb8602e5aacf5b9e96b87c8770dcf92964112e22fc89",
       "bytes": 2493
+    },
+    {
+      "path": "tools/release/verify_source_binding.py",
+      "sha256": "8ec136142264085018efec59694de6f8bfebe53c47d6e9fbe0a175ae22c353ce",
+      "bytes": 3226
     },
     {
       "path": "typings/datasets/__init__.pyi",
