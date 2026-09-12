@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Literal
 
 from core.logging_config import get_logger
+from core.subprocess_env import is_code_injection_env_key
 from intent.log_redaction import redact_diagnostic_payload
 from intent.permissions.shell_safety import (
     ShellName,
@@ -207,7 +208,13 @@ def sanitized_env() -> dict[str, str]:
 
     env = os.environ.copy()
     keys_to_remove = [
-        k for k in env if k in _SENSITIVE_ENV_EXACT or any(fnmatch.fnmatch(k, pat) for pat in _SENSITIVE_ENV_PATTERNS)
+        k
+        for k in env
+        if (
+            (normalized_key := str(k).upper()) in _SENSITIVE_ENV_EXACT
+            or any(fnmatch.fnmatch(normalized_key, pat) for pat in _SENSITIVE_ENV_PATTERNS)
+            or is_code_injection_env_key(k)
+        )
     ]
     for key in keys_to_remove:
         del env[key]

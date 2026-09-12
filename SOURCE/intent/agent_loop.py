@@ -37,6 +37,7 @@ from intent.agent_middleware import (
     URLTrackerMiddleware,
     run_middleware_pipeline,
 )
+from intent.tool_allowlist import tool_name_allowed_by_allowlist
 from intent.context_compaction import (
     compact_native_messages,
     is_token_limit_error,
@@ -1463,23 +1464,7 @@ _TOOL_PROGRESS_PHRASES: dict[str, str] = {
 def _tool_allowed_by_executor(executor: AgentExecutor, tool_name: str) -> bool:
     """Return whether the current request-scoped allowlist permits a tool."""
 
-    allowed = getattr(executor, "_allowed_tools", None)
-    if not allowed:
-        return True
-    normalized_allowed = {_normalize_tool_permission_name(name) for name in allowed if str(name).strip()}
-    if "*" in normalized_allowed:
-        return True
-    normalized_tool = _normalize_tool_permission_name(tool_name)
-    candidates = {
-        normalized_tool,
-        _normalize_tool_permission_name(normalized_tool.split("__")[-1]),
-        _normalize_tool_permission_name(normalized_tool.rsplit(".", 1)[-1]),
-    }
-    return bool(normalized_allowed.intersection(candidates))
-
-
-def _normalize_tool_permission_name(value: str) -> str:
-    return re.sub(r"[^a-z0-9_]+", "_", str(value or "").strip().lower()).strip("_")
+    return tool_name_allowed_by_allowlist(getattr(executor, "_allowed_tools", None), tool_name)
 
 
 # _summarize and _summarize_args moved to intent.agent_middleware.

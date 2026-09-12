@@ -26,6 +26,7 @@ from typing import Any
 import anyio
 
 from core.logging_config import get_logger
+from core.subprocess_env import is_code_injection_env_key
 
 from .types import ServerConfig
 
@@ -69,30 +70,6 @@ _INLINE_CODE_ARG_FLAGS: dict[str, set[str]] = {
     "node": {"-e", "--eval", "-p", "--print", "--require", "-r"},
     "npx": {"-e", "--eval", "-c", "--call", "-p", "--package=-"},
 }
-
-# Environment keys that can inject code into an otherwise-clean command
-# (SEC-033 rider / SEC-036): `NODE_OPTIONS=--require=evil.js`,
-# `PYTHONSTARTUP`, `PYTHONPATH`, `LD_PRELOAD`, etc. Rejected on the
-# externally-supplied env overlay.
-_DANGEROUS_ENV_KEYS: frozenset[str] = frozenset(
-    {
-        "NODE_OPTIONS",
-        "PYTHONSTARTUP",
-        "PYTHONPATH",
-        "PYTHONHOME",
-        "PYTHONEXECUTABLE",
-        "PYTHONWARNINGS",
-        "BASH_ENV",
-        "ENV",
-        "LD_PRELOAD",
-        "LD_LIBRARY_PATH",
-        "LD_AUDIT",
-        "DYLD_INSERT_LIBRARIES",
-        "DYLD_LIBRARY_PATH",
-        "DYLD_FRAMEWORK_PATH",
-    }
-)
-
 
 def _base_exe_name(command: str) -> str:
     """Extract the base executable name (no path, no .exe/.cmd/.bat suffix)."""
@@ -149,7 +126,7 @@ def _validate_server_command(config: ServerConfig) -> str | None:
 
     # Reject code-injecting environment overrides on the externally-supplied env.
     for env_key in config.env or {}:
-        if str(env_key).strip().upper() in _DANGEROUS_ENV_KEYS:
+        if is_code_injection_env_key(env_key):
             return (
                 "Rejected MCP server '%s': environment variable '%s' can inject code "
                 "into the subprocess and is not allowed." % (config.name, env_key)

@@ -13,8 +13,10 @@ Use your own provider/carrier credentials and protect your local state directory
 
 The `run_command` tool validates command syntax and requires explicit approval, but
 the approved process still runs with the current operating-system user's authority.
-It is not an operating-system sandbox. Use an OS account, container, or virtual
-machine boundary when untrusted code needs stronger isolation.
+It can read or change files, access the network, and start child processes wherever
+that user can. It is not an operating-system sandbox. Treat an approved shell command
+as local code execution. Use a dedicated low-privilege OS account, container, or
+virtual machine boundary when untrusted code needs stronger isolation.
 
 External MCP subprocesses receive only the MCP SDK's small set of process essentials
 (such as `PATH`, the user profile or home directory, and the temporary directory)

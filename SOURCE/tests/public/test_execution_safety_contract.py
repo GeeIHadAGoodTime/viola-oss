@@ -6,6 +6,8 @@ process, execute a shell command, or open a browser/payment page.
 
 from __future__ import annotations
 
+import asyncio
+import json
 import os
 import contextvars
 import importlib.util
@@ -15,13 +17,15 @@ import tempfile
 import types
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, patch
 
 
 SOURCE_ROOT = Path(__file__).resolve().parents[2]
 
 _TEST_PROFILE = None
 _TEST_PROFILE_ROOT = None
+_TEST_BOUNDARY_ROOT = None
 _FAKE_HOME = None
 _FAKE_DATA = None
 _PROFILE_ENV = None
@@ -46,6 +50,7 @@ def setUpModule():
     global _ORIGINAL_ROOT_LEVEL
     global _PROFILE_ENV
     global _TEST_PROFILE
+    global _TEST_BOUNDARY_ROOT
     global _TEST_PROFILE_ROOT
 
     root_logger = logging.getLogger()
@@ -63,6 +68,7 @@ def setUpModule():
         or tempfile.gettempdir()
     )
     base_dir.mkdir(parents=True, exist_ok=True)
+    _TEST_BOUNDARY_ROOT = base_dir.resolve()
     _TEST_PROFILE = tempfile.TemporaryDirectory(prefix="viola-execution-safety-", dir=base_dir)
     _TEST_PROFILE_ROOT = Path(_TEST_PROFILE.name)
     _FAKE_HOME = _TEST_PROFILE_ROOT / "home"
@@ -232,6 +238,338 @@ class ExternalMCPEnvironmentContract(unittest.IsolatedAsyncioTestCase):
             await launcher.launch(config)
 
 
+class PermissionAndIrreversibilityContract(unittest.TestCase):
+    @staticmethod
+    def _permission_context(*, risk="dangerous", hook=None):
+        from intent.permissions.policy import PermissionContext
+
+        return PermissionContext(
+            user_id="synthetic-user",
+            session_id="synthetic-session",
+            tool_name="synthetic_tool",
+            tool_input={},
+            risk_level=risk,
+            hook_provenance=(() if hook is None else (hook,)),
+        )
+
+    def test_configured_deny_and_ask_rules_survive_hook_allow(self):
+        from intent.permissions.policy import PermissionHookProvenance, PermissionPolicy, PermissionRule
+
+        hook_allow = PermissionHookProvenance(event="PreToolUse", decision="allow")
+        deny = PermissionPolicy(rules=(PermissionRule("synthetic_tool", "deny", "settings"),))
+        ask = PermissionPolicy(rules=(PermissionRule("synthetic_tool", "ask", "settings"),))
+
+        self.assertEqual(deny.check(self._permission_context(hook=hook_allow)).behavior, "deny")
+        self.assertEqual(ask.check(self._permission_context(hook=hook_allow)).behavior, "ask")
+
+    def test_hook_deny_wins_and_confirm_tier_is_automatic_audit_tier(self):
+        from intent.permissions.policy import PermissionHookProvenance, PermissionPolicy, PermissionRule
+
+        hook_deny = PermissionHookProvenance(event="PreToolUse", decision="deny")
+        ask = PermissionPolicy(rules=(PermissionRule("synthetic_tool", "ask", "settings"),))
+
+        self.assertEqual(ask.check(self._permission_context(hook=hook_deny)).behavior, "deny")
+        confirm_decision = PermissionPolicy().check(self._permission_context(risk="confirm"))
+        self.assertEqual(confirm_decision.behavior, "allow")
+        self.assertEqual(confirm_decision.source, "risk_metadata")
+
+    def test_irreversible_classifier_fails_closed_for_unknown_payment_actions(self):
+        from intent.irreversible_actions import irreversible_action_class
+
+        expected = {
+            ("run_command", ""): "shell_command",
+            ("mcp_servers", "register"): "mcp_register",
+            ("calendar", "create"): "calendar_write",
+            ("calendar", "delete"): "calendar_delete",
+            ("payment", "provider_extension_charge"): "payment",
+            ("fill_payment_details", ""): "payment",
+        }
+        for (tool_name, action), action_class in expected.items():
+            with self.subTest(tool_name=tool_name, action=action):
+                self.assertEqual(irreversible_action_class(tool_name, {"action": action}), action_class)
+
+        for safe_action in ("", "list", "request_review", "open_secure_card_entry"):
+            with self.subTest(safe_action=safe_action):
+                self.assertIsNone(irreversible_action_class("payment", {"action": safe_action}))
+
+
+class ShellSubprocessContract(unittest.IsolatedAsyncioTestCase):
+    def test_sanitized_environment_strips_secrets_and_code_injection_case_insensitively(self):
+        from intent.tools.shell import sanitized_env
+
+        synthetic = {
+            "PATH": "synthetic-path",
+            "SAFE_SETTING": "preserved",
+            "openai_api_key": "must-not-cross",
+            "Node_Options": "--require=synthetic-payload.js",
+            "pythonpath": "synthetic-module-path",
+            "LD_PRELOAD": "synthetic-library",
+        }
+        with patch.dict(os.environ, synthetic, clear=True):
+            child_env = sanitized_env()
+
+        self.assertEqual(child_env["SAFE_SETTING"], "preserved")
+        for forbidden in ("openai_api_key", "Node_Options", "pythonpath", "LD_PRELOAD"):
+            self.assertNotIn(forbidden, child_env)
+
+    async def test_allowed_shell_launch_uses_sanitized_environment_at_spawn_boundary(self):
+        from intent.permissions.shell_safety import ShellSafetyDecision
+        from intent.tools import shell as shell_module
+
+        captured: dict[str, object] = {}
+
+        class SyntheticProcess:
+            returncode = 0
+
+            async def communicate(self):
+                return b"synthetic output", b""
+
+        async def capture_exec(*args, **kwargs):
+            captured["args"] = args
+            captured["env"] = dict(kwargs["env"])
+            return SyntheticProcess()
+
+        decision = ShellSafetyDecision(
+            behavior="allow",
+            normalized_command="synthetic-tool --version",
+            shell="cmd",
+            cwd=str(_TEST_PROFILE_ROOT),
+            read_only=True,
+            reason="synthetic read-only command",
+        )
+        parent_env = {
+            "PATH": "synthetic-path",
+            "SAFE_SETTING": "preserved",
+            "OPENAI_API_KEY": "must-not-cross",
+            "NODE_OPTIONS": "--require=synthetic-payload.js",
+        }
+        with (
+            patch.dict(os.environ, parent_env, clear=True),
+            patch.object(shell_module, "validate_shell_command", return_value=decision),
+            patch.object(shell_module, "_audit_log", return_value=True),
+            patch.object(asyncio, "create_subprocess_exec", side_effect=capture_exec),
+            patch.object(asyncio, "create_subprocess_shell", side_effect=AssertionError("shell path must not run")),
+        ):
+            result = await shell_module.run_command(
+                "synthetic-tool --version",
+                working_directory=str(_TEST_PROFILE_ROOT),
+            )
+
+        self.assertTrue(result.ok)
+        self.assertEqual(captured["args"], ("synthetic-tool", "--version"))
+        child_env = captured["env"]
+        self.assertEqual(child_env["SAFE_SETTING"], "preserved")
+        self.assertNotIn("OPENAI_API_KEY", child_env)
+        self.assertNotIn("NODE_OPTIONS", child_env)
+
+
+class PaymentToolContract(unittest.IsolatedAsyncioTestCase):
+    async def test_public_payment_fill_is_explicitly_unavailable_before_browser_access(self):
+        from mcp_servers.browser import server as browser_module
+
+        with (
+            patch.object(browser_module, "_payment_fill_handler", None),
+            patch.object(
+                browser_module.manager,
+                "get_page",
+                new=AsyncMock(side_effect=AssertionError("unavailable tool must not access browser")),
+            ),
+        ):
+            payload = json.loads(await browser_module.fill_payment_details("synthetic-card"))
+
+        self.assertFalse(payload["ok"])
+        self.assertEqual(payload["code"], "payment_fill_unavailable")
+
+    async def test_generic_browser_type_rejects_card_shaped_value_before_browser_access(self):
+        from mcp_servers.browser import server as browser_module
+
+        with patch.object(
+            browser_module.manager,
+            "get_page",
+            new=AsyncMock(side_effect=AssertionError("payment violation must not access browser")),
+        ):
+            payload = json.loads(await browser_module._do_type("#card", "4242 4242 4242 4242"))
+
+        self.assertFalse(payload["ok"])
+        self.assertIn("PAYMENT SAFETY VIOLATION", payload["error"])
+
+    async def test_registered_payment_handler_is_invoked_and_cannot_be_replaced(self):
+        from mcp_servers.browser import server as browser_module
+
+        observed: dict[str, object] = {}
+        synthetic_page = object()
+
+        async def first_handler(args, *, page):
+            observed["args"] = dict(args)
+            observed["page"] = page
+            return json.dumps({"ok": True, "synthetic": True})
+
+        async def replacement_handler(_args, *, page):
+            return str(page)
+
+        with (
+            patch.object(browser_module, "_payment_fill_handler", None),
+            patch.object(
+                browser_module,
+                "_get_call_payment_confirmation",
+                return_value={"confirmation_token": "synthetic-token"},
+            ),
+            patch.object(browser_module, "_require_call_user_id", return_value="synthetic-user"),
+            patch.object(browser_module.manager, "get_page", new=AsyncMock(return_value=synthetic_page)),
+        ):
+            browser_module.register_payment_fill_handler(first_handler)
+            browser_module.register_payment_fill_handler(first_handler)
+            self.assertIs(browser_module._payment_fill_handler, first_handler)
+            with self.assertRaisesRegex(RuntimeError, "already registered"):
+                browser_module.register_payment_fill_handler(replacement_handler)
+            payload = json.loads(await browser_module.fill_payment_details("synthetic-card"))
+
+        self.assertTrue(payload["ok"])
+        self.assertEqual(observed["args"]["card_label"], "synthetic-card")
+        self.assertEqual(observed["args"]["confirmation_token"], "synthetic-token")
+        self.assertIs(observed["page"], synthetic_page)
+
+
+class TimeoutAndChildAuthorityContract(unittest.IsolatedAsyncioTestCase):
+    @staticmethod
+    def _cancel_executor(AgentExecutor, *, cancelled: bool):
+        executor = object.__new__(AgentExecutor)
+        executor._cancel_event = asyncio.Event()
+        if cancelled:
+            executor._cancel_event.set()
+        executor._takeover_interrupt_event = asyncio.Event()
+        executor._takeover_active = False
+        executor._cancelled = False
+        return executor
+
+    async def test_interrupt_cancels_read_only_action_but_completes_mutation(self):
+        from intent import agent_executor as agent_module
+        from intent.agent_executor import AgentExecutor
+
+        executor = self._cancel_executor(AgentExecutor, cancelled=True)
+
+        async def complete():
+            return {"success": True}
+
+        with self.assertRaises(agent_module._ToolExecutionCancelled):
+            await AgentExecutor._run_tool_with_cancel(
+                executor,
+                complete(),
+                tool_name="calendar",
+                tool_args={"action": "list"},
+                timeout_seconds=1.0,
+            )
+
+        result = await AgentExecutor._run_tool_with_cancel(
+            executor,
+            complete(),
+            tool_name="calendar",
+            tool_args={"action": "create"},
+            timeout_seconds=1.0,
+        )
+        self.assertTrue(result["success"])
+
+    async def test_timeout_signals_abort_and_cleans_up_inflight_tool(self):
+        from intent import agent_executor as agent_module
+        from intent.agent_executor import AgentExecutor
+
+        executor = self._cancel_executor(AgentExecutor, cancelled=False)
+        abort_signal = asyncio.Event()
+        cancelled = asyncio.Event()
+
+        async def never_finishes():
+            try:
+                await asyncio.Event().wait()
+            finally:
+                cancelled.set()
+
+        with self.assertRaises(agent_module._ToolExecutionTimedOut):
+            await AgentExecutor._run_tool_with_cancel(
+                executor,
+                never_finishes(),
+                tool_name="web_search",
+                tool_args={"query": "synthetic"},
+                timeout_seconds=0.01,
+                abort_signal=abort_signal,
+            )
+
+        self.assertTrue(abort_signal.is_set())
+        self.assertTrue(cancelled.is_set())
+
+    def test_parallel_child_dispatch_allowlist_excludes_all_shared_state_families(self):
+        from intent.agent_executor import _restricted_child_allowed_tools, _without_shared_state_tools
+        from intent.agent_loop import _tool_allowed_by_executor
+
+        parent_tools = [
+            {"name": "mcp__search__web_search"},
+            {"name": "search.web_read"},
+            {"name": "memory"},
+            {"name": "browser.browser_click"},
+            {"name": "mcp__desktop__desktop_snapshot"},
+            {"name": "mcp__host__computer_control"},
+            {"name": "vault__fill_payment_details"},
+            {"name": "host.signature"},
+        ]
+        safe_tools = _without_shared_state_tools(parent_tools)
+        child = SimpleNamespace(_allowed_tools=_restricted_child_allowed_tools(safe_tools, None))
+
+        self.assertEqual(child._allowed_tools, {"mcp__search__web_search", "search.web_read", "memory"})
+        self.assertTrue(_tool_allowed_by_executor(child, "mcp__search__web_search"))
+        self.assertTrue(_tool_allowed_by_executor(child, "search.web_read"))
+        self.assertTrue(_tool_allowed_by_executor(child, "memory"))
+        for forbidden in (
+            "browser.browser_click",
+            "mcp__desktop__desktop_snapshot",
+            "mcp__host__computer_control",
+            "vault__fill_payment_details",
+            "host.signature",
+        ):
+            with self.subTest(forbidden=forbidden):
+                self.assertFalse(_tool_allowed_by_executor(child, forbidden))
+
+        alias_restricted = SimpleNamespace(
+            _allowed_tools=_restricted_child_allowed_tools(safe_tools, {"web_search", "web_read"})
+        )
+        self.assertEqual(
+            alias_restricted._allowed_tools,
+            {"mcp__search__web_search", "search.web_read"},
+        )
+        self.assertTrue(_tool_allowed_by_executor(alias_restricted, "mcp__search__web_search"))
+        self.assertTrue(_tool_allowed_by_executor(alias_restricted, "search.web_read"))
+        self.assertFalse(_tool_allowed_by_executor(alias_restricted, "memory"))
+
+    async def test_semantic_parallel_task_gets_restricted_child_authority(self):
+        from intent.agent_executor import AgentExecutor
+        from intent.tool_types import ToolResult
+
+        executor = object.__new__(AgentExecutor)
+        executor._depth = 0
+        executor._current_checkpoint = object()
+        observed: list[dict[str, object]] = []
+
+        async def run_child(**kwargs):
+            observed.append(kwargs)
+            return ToolResult(ok=True, data="synthetic summary")
+
+        executor._run_child_agent = run_child
+        result = await AgentExecutor._handle_spawn_parallel_subtasks(
+            executor,
+            {"tasks": [{"task": "Compare the two choices and report the result."}]},
+        )
+
+        self.assertTrue(result.ok)
+        self.assertEqual(len(observed), 1)
+        self.assertTrue(observed[0]["exclude_shared_state_tools"])
+
+        executor._depth = 1
+        recursive = await AgentExecutor._handle_spawn_parallel_subtasks(
+            executor,
+            {"tasks": [{"task": "Repeat the comparison."}]},
+        )
+        self.assertFalse(recursive.ok)
+        self.assertEqual(len(observed), 1)
+
+
 class BrowserGateBindingContract(unittest.IsolatedAsyncioTestCase):
     @classmethod
     def setUpClass(cls):
@@ -370,11 +708,12 @@ class BrowserGateBindingContract(unittest.IsolatedAsyncioTestCase):
         from intent.agent_executor import AgentExecutor
         executor = self._make_executor(AgentExecutor)
 
-        self.assertEqual(
-            self._task_checkpoint._LEGACY_CHECKPOINT_DIR,
-            _FAKE_HOME / ".viola" / "tasks",
-        )
-        self.assertEqual(self._task_checkpoint.CHECKPOINT_DIR, _FAKE_DATA / "tasks")
+        # Another public test module may import task_checkpoint before this
+        # module's setUpModule runs.  In an aggregate process, both the
+        # process-level fake profile and this module's nested profile are valid
+        # as long as they remain inside the caller-provided test boundary.
+        self._task_checkpoint._LEGACY_CHECKPOINT_DIR.resolve().relative_to(_TEST_BOUNDARY_ROOT)
+        self._task_checkpoint.CHECKPOINT_DIR.resolve().relative_to(_TEST_BOUNDARY_ROOT)
 
         gate_module = types.ModuleType("mcp_servers.browser.server")
         gate_module.set_payment_session = lambda _session_id: self.fail("ordinary tool must not bind browser context")
