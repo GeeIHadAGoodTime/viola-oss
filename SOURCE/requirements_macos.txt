@@ -81,7 +81,7 @@ python-vlc==3.0.21203  # VLC bindings with HTTPS header fixes (needs system libv
 sounddevice==0.5.3  # PortAudio bindings for streaming backend playback (needs portaudio, via Homebrew)
 
 # Phone calling (Telnyx + Pipecat)
-./third_party/pipecat  # Maintained 0.0.108+viola.1 fork; corpus-free sentence segmentation
+./third_party/pipecat  # Maintained 0.0.108+viola.2 fork; tokenizer and runner security backports
 telnyx[webhooks]==4.86.0
 PyNaCl==1.6.2  # Required by Telnyx Ed25519 webhook signature verification
 phonenumbers==9.0.33

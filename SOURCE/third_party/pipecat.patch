@@ -5,7 +5,7 @@
 +requires = ["setuptools==84.0.0"]
 @@ -7 +7 @@
 -dynamic = ["version"]
-+version = "0.0.108+viola.1"
++version = "0.0.108+viola.2"
 @@ -10 +10 @@
 -license-files = ["LICENSE"]
 +license-files = ["LICENSE", "MODEL_LICENSES/*LICENSE", "MODEL_LICENSES/models.toml"]
@@ -180,3 +180,200 @@
 @@ -118 +118 @@
 -            # Mark that we need lookahead (don't call NLTK yet)
 +            # Mark that we need lookahead (don't call pySBD yet)
++
+diff --git a/pipecat/src/pipecat/runner/run.py b/pipecat/src/pipecat/runner/run.py
+index 76c8704..582bbfc 100644
+--- a/pipecat/src/pipecat/runner/run.py
++++ b/pipecat/src/pipecat/runner/run.py
+@@ -69,0 +70,4 @@ import asyncio
++import base64
++import hashlib
++import hmac
++import json
+@@ -71,0 +76 @@ import os
++import secrets
+@@ -72,0 +78 @@ import sys
++import time
+@@ -112,0 +119,6 @@ RUNNER_PORT: int = 7860
++# Tokens are scoped to one runner process, so restarting the development runner
++# also invalidates every token it issued.
++_WS_AUTH_SECRET: bytes = secrets.token_bytes(32)
++_WS_AUTH_BOOTSTRAP_CONFIGURED = bool(os.getenv("PIPECAT_WEBSOCKET_AUTH_BOOTSTRAP"))
++_WS_AUTH_BOOTSTRAP_SECRET = os.getenv("PIPECAT_WEBSOCKET_AUTH_BOOTSTRAP") or secrets.token_urlsafe(32)
++
+@@ -187 +199 @@ def _create_server_app(args: argparse.Namespace):
+-        _setup_telephony_routes(app, args)
++        _setup_telephony_routes(app, args, set())
+@@ -193,0 +206,68 @@ def _create_server_app(args: argparse.Namespace):
++def _generate_ws_token(ttl: int = 300) -> str:
++    """Return a signed, self-expiring, one-time WebSocket session token."""
++    payload = (
++        base64.urlsafe_b64encode(
++            json.dumps({"exp": int(time.time()) + ttl, "jti": secrets.token_hex(8)}).encode()
++        )
++        .decode()
++        .rstrip("=")
++    )
++    signature = hmac.new(_WS_AUTH_SECRET, payload.encode(), hashlib.sha256).hexdigest()
++    return f"{payload}.{signature}"
++
++
++def _verify_and_consume_ws_token(used: set[str], token: str) -> bool:
++    """Validate a WebSocket token and consume it to prevent replay."""
++    try:
++        payload, signature = token.rsplit(".", 1)
++    except ValueError:
++        return False
++
++    expected = hmac.new(_WS_AUTH_SECRET, payload.encode(), hashlib.sha256).hexdigest()
++    if not hmac.compare_digest(expected, signature):
++        return False
++
++    padded = payload + "=" * (-len(payload) % 4)
++    try:
++        data = json.loads(base64.urlsafe_b64decode(padded))
++        expires_at = data["exp"]
++    except (KeyError, TypeError, ValueError):
++        return False
++    if not isinstance(expires_at, (int, float)) or time.time() > expires_at:
++        return False
++    if token in used:
++        return False
++
++    used.add(token)
++    return True
++
++
++def _extract_ws_token(websocket: WebSocket) -> Optional[str]:
++    """Extract a token from a bearer header or query parameter."""
++    authorization = websocket.headers.get("authorization", "")
++    if authorization.lower().startswith("bearer "):
++        return authorization[7:].strip()
++    return websocket.query_params.get("token")
++
++
++def _authorize_token_issuance(request: Request) -> None:
++    """Require the operator bootstrap secret before minting a public-runner token."""
++    authorization = request.headers.get("authorization", "")
++    supplied = authorization[7:].strip() if authorization.lower().startswith("bearer ") else ""
++    supplied = supplied or request.query_params.get("auth", "")
++    if supplied and hmac.compare_digest(supplied, _WS_AUTH_BOOTSTRAP_SECRET):
++        return
++    raise HTTPException(status_code=403, detail="Token issuance requires operator authorization")
++
++
++def _resolve_download_path(folder: str, filename: str) -> Path:
++    """Resolve a download path and ensure it stays within the downloads folder."""
++    allowed_base = Path(folder).resolve()
++    file_path = (allowed_base / filename).resolve()
++
++    if not file_path.is_relative_to(allowed_base):
++        raise HTTPException(status_code=403, detail="Access denied")
++
++    return file_path
++
++
+@@ -236 +316 @@ def _setup_webrtc_routes(app: FastAPI, args: argparse.Namespace):
+-            return
++            raise HTTPException(404)
+@@ -238,2 +318,2 @@ def _setup_webrtc_routes(app: FastAPI, args: argparse.Namespace):
+-        file_path = Path(args.folder) / filename
+-        if not os.path.exists(file_path):
++        file_path = _resolve_download_path(args.folder, filename)
++        if not file_path.exists():
+@@ -244 +324 @@ def _setup_webrtc_routes(app: FastAPI, args: argparse.Namespace):
+-        return FileResponse(path=file_path, media_type=media_type, filename=filename)
++        return FileResponse(path=file_path, media_type=media_type, filename=file_path.name)
+@@ -746,5 +826,18 @@ def _setup_daily_routes(app: FastAPI, args: argparse.Namespace):
+-def _setup_telephony_routes(app: FastAPI, args: argparse.Namespace):
+-    """Set up telephony-specific routes."""
+-    # XML response templates (Exotel doesn't use XML webhooks)
+-    XML_TEMPLATES = {
+-        "twilio": f"""<?xml version="1.0" encoding="UTF-8"?>
++def _setup_telephony_routes(
++    app: FastAPI, args: argparse.Namespace, ws_used_tokens: set[str]
++):
++    """Set up telephony routes with optional upstream HMAC token authentication."""
++
++    def websocket_url(*, issue_token: bool = False) -> str:
++        path = "/ws"
++        if issue_token:
++            path += f"/{_generate_ws_token()}"
++        if args.proxy:
++            return f"wss://{args.proxy}{path}"
++        scheme = "wss" if args.host != "localhost" else "ws"
++        return f"{scheme}://{args.host}:{args.port}{path}"
++
++    def xml_template(url: str) -> str:
++        # Exotel doesn't use XML webhooks.
++        templates = {
++            "twilio": f"""<?xml version="1.0" encoding="UTF-8"?>
+@@ -753 +846 @@ def _setup_telephony_routes(app: FastAPI, args: argparse.Namespace):
+-    <Stream url="wss://{args.proxy}/ws"></Stream>
++    <Stream url="{url}"></Stream>
+@@ -757 +850 @@ def _setup_telephony_routes(app: FastAPI, args: argparse.Namespace):
+-        "telnyx": f"""<?xml version="1.0" encoding="UTF-8"?>
++            "telnyx": f"""<?xml version="1.0" encoding="UTF-8"?>
+@@ -760 +853 @@ def _setup_telephony_routes(app: FastAPI, args: argparse.Namespace):
+-    <Stream url="wss://{args.proxy}/ws" bidirectionalMode="rtp"></Stream>
++    <Stream url="{url}" bidirectionalMode="rtp"></Stream>
+@@ -764 +857 @@ def _setup_telephony_routes(app: FastAPI, args: argparse.Namespace):
+-        "plivo": f"""<?xml version="1.0" encoding="UTF-8"?>
++            "plivo": f"""<?xml version="1.0" encoding="UTF-8"?>
+@@ -766 +859 @@ def _setup_telephony_routes(app: FastAPI, args: argparse.Namespace):
+-  <Stream bidirectional="true" keepCallAlive="true" contentType="audio/x-mulaw;rate=8000">wss://{args.proxy}/ws</Stream>
++  <Stream bidirectional="true" keepCallAlive="true" contentType="audio/x-mulaw;rate=8000">{url}</Stream>
+@@ -768 +861,2 @@ def _setup_telephony_routes(app: FastAPI, args: argparse.Namespace):
+-    }
++        }
++        return templates.get(args.transport, "<Response></Response>")
+@@ -771 +865 @@ def _setup_telephony_routes(app: FastAPI, args: argparse.Namespace):
+-    async def start_call():
++    async def start_call(request: Request):
+@@ -772,0 +867 @@ def _setup_telephony_routes(app: FastAPI, args: argparse.Namespace):
++        _authorize_token_issuance(request)
+@@ -778 +873 @@ def _setup_telephony_routes(app: FastAPI, args: argparse.Namespace):
+-                "websocket_url": f"wss://{args.proxy}/ws",
++                "websocket_url": websocket_url(issue_token=True),
+@@ -783 +878 @@ def _setup_telephony_routes(app: FastAPI, args: argparse.Namespace):
+-            xml_content = XML_TEMPLATES.get(args.transport, "<Response></Response>")
++            xml_content = xml_template(websocket_url(issue_token=True))
+@@ -786,3 +881,14 @@ def _setup_telephony_routes(app: FastAPI, args: argparse.Namespace):
+-    @app.websocket("/ws")
+-    async def websocket_endpoint(websocket: WebSocket):
+-        """Handle WebSocket connections for telephony."""
++    @app.post("/start")
++    async def start_agent(request: Request):
++        """Issue a short-lived token for clients that configure their own WebSocket URL."""
++        _authorize_token_issuance(request)
++        result = {"wsUrl": websocket_url()}
++        result["token"] = _generate_ws_token()
++        return result
++
++    async def handle_websocket(websocket: WebSocket, path_token: Optional[str] = None):
++        token = path_token or _extract_ws_token(websocket)
++        if not token or not _verify_and_consume_ws_token(ws_used_tokens, token):
++            logger.warning("WebSocket connection rejected: invalid or missing token")
++            await websocket.close(code=4003)
++            return
+@@ -792,0 +899,10 @@ def _setup_telephony_routes(app: FastAPI, args: argparse.Namespace):
++    @app.websocket("/ws")
++    async def websocket_endpoint(websocket: WebSocket):
++        """Handle WebSocket connections for telephony."""
++        await handle_websocket(websocket)
++
++    @app.websocket("/ws/{token}")
++    async def websocket_endpoint_with_token(websocket: WebSocket, token: str):
++        """Handle authenticated WebSocket connections for telephony."""
++        await handle_websocket(websocket, token)
++
+@@ -794 +910 @@ def _setup_telephony_routes(app: FastAPI, args: argparse.Namespace):
+-    async def start_agent():
++    async def status():
+@@ -941,0 +1058,6 @@ def main(parser: Optional[argparse.ArgumentParser] = None):
++    if args.transport in TELEPHONY_TRANSPORTS and not _WS_AUTH_BOOTSTRAP_CONFIGURED:
++        parser.error(
++            "telephony runner requires PIPECAT_WEBSOCKET_AUTH_BOOTSTRAP "
++            "for authorized token issuance"
++        )
++

@@ -5,9 +5,13 @@
 "source_url" = "https://files.pythonhosted.org/packages/29/c6/121d4a6088051695eb382457a09fd8515cc6c37de23c359f9b16be18124f/pipecat_ai-0.0.108.tar.gz"
 "source_sha256" = "d6707333c9e1f909d654b329d2d85288b693a36a4e31e820e522df94e3308bb8" # pragma: allowlist secret (public artifact checksum)
 "source_filename" = "pipecat_ai-0.0.108.tar.gz"
-"fork_version" = "0.0.108+viola.1"
+"fork_version" = "0.0.108+viola.2"
 "patch" = "pipecat.patch"
 "normalization" = "UTF-8 text CRCRLF and CRLF to LF; binary unchanged"
+"security_backports" = [
+  { advisory = "GHSA-3363-2ph6-35wh", upstream_commit = "e780f759d05529c68f7fdfdf50491b1ffca6c984", fixed_release = "1.2.0" },
+  { advisory = "GHSA-j8cv-x86q-rj85", upstream_merge_commit = "3032da53434c5ef01d368654b3551cf21c50dec9", fixed_release = "1.4.0" },
+]
 
 ["pipecat"."upstream_files"]
 
@@ -2050,7 +2054,7 @@
 ["pipecat"."files"]
 "LICENSE" = "e31a733ecb79cbffafd5474e964e5eca15e0a0876a42b1d7253b51b198eb61aa" # pragma: allowlist secret (public artifact checksum)
 "README.md" = "2ff9ce448a80381edd352e2e3aeb3021b57f541e97ec1c7a76d7f867589eac94" # pragma: allowlist secret (public artifact checksum)
-"pyproject.toml" = "5b7a5be07c327c80b6894b67c2b5eae11d94af648b972f0f52854004d9ab7145" # pragma: allowlist secret (public artifact checksum)
+"pyproject.toml" = "0fde019a97ecfc4c6d6a38e5ed175812f0b60afd7e665dedac74575b04d40c1f" # pragma: allowlist secret (public artifact checksum)
 "src/pipecat/__init__.py" = "228823520a5bffa30e54079d769ceb041c0ad3b40e85f676f30faa9c2642df91" # pragma: allowlist secret (public artifact checksum)
 "src/pipecat/adapters/__init__.py" = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" # pragma: allowlist secret (public artifact checksum)
 "src/pipecat/adapters/base_llm_adapter.py" = "b0796eb0f54a69bfc44627f7f1e8f555c6eaff8fa22ea27e1e555562d633d482" # pragma: allowlist secret (public artifact checksum)
@@ -2215,7 +2219,7 @@
 "src/pipecat/runner/__init__.py" = "889878bc5306350622fc04d5197243538ace27023ed58e9f9a4c95d7cf9d7401" # pragma: allowlist secret (public artifact checksum)
 "src/pipecat/runner/daily.py" = "a6e5a791117c5070745576e2b1a173b0fac5d64ccaf0a99016439f0ab7fa2445" # pragma: allowlist secret (public artifact checksum)
 "src/pipecat/runner/livekit.py" = "8e1c932ffbabae2d05bc3ce9eeb4998494f245b6974e76b3bc6dcc5f71e833ca" # pragma: allowlist secret (public artifact checksum)
-"src/pipecat/runner/run.py" = "affdc25c9e0e5ea604327b7719214a6688169c9602c0edc8ff97da164ba01fc5" # pragma: allowlist secret (public artifact checksum)
+"src/pipecat/runner/run.py" = "34c0f2ed2ed9de5970bf0e5fc75d187539387e65f029b0c9db554fa5a49b9685" # pragma: allowlist secret (public artifact checksum)
 "src/pipecat/runner/types.py" = "391848e922d932add64568672e97cbe0491e62d0a8b249277173a8b3607d8687" # pragma: allowlist secret (public artifact checksum)
 "src/pipecat/runner/utils.py" = "e02042e5547a3980f7426fe2f8a3b2c9aeb9aff09a2931e7ade71ab26ecc338c" # pragma: allowlist secret (public artifact checksum)
 "src/pipecat/serializers/__init__.py" = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" # pragma: allowlist secret (public artifact checksum)
