@@ -35,6 +35,7 @@ _ORIGINAL_ROOT_LEVEL = None
 _ORIGINAL_LOGGING_READY = False
 _ORIGINAL_OBSERVABILITY_CONFIGURED = False
 _ORIGINAL_OBSERVABILITY_CONFIG = None
+_ORIGINAL_TEMPDIR = None
 
 
 def setUpModule():
@@ -48,6 +49,7 @@ def setUpModule():
     global _ORIGINAL_OBSERVABILITY_CONFIGURED
     global _ORIGINAL_ROOT_HANDLERS
     global _ORIGINAL_ROOT_LEVEL
+    global _ORIGINAL_TEMPDIR
     global _PROFILE_ENV
     global _TEST_PROFILE
     global _TEST_BOUNDARY_ROOT
@@ -56,6 +58,7 @@ def setUpModule():
     root_logger = logging.getLogger()
     _ORIGINAL_ROOT_HANDLERS = list(root_logger.handlers)
     _ORIGINAL_ROOT_LEVEL = root_logger.level
+    _ORIGINAL_TEMPDIR = tempfile.tempdir
     prior_logging_module = sys.modules.get("core.logging_config")
     prior_observability_module = sys.modules.get("diagnostics.observability_logging")
     _ORIGINAL_LOGGING_READY = getattr(prior_logging_module, "_LOGGING_READY", False)
@@ -132,6 +135,8 @@ def tearDownModule():
 
     _HOME_LOOKUP.stop()
     _PROFILE_ENV.stop()
+    # Runtime startup may change this process-wide cache independently of env.
+    tempfile.tempdir = _ORIGINAL_TEMPDIR
     _TEST_PROFILE.cleanup()
 
 

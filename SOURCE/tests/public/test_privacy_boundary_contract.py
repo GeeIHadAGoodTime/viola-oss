@@ -175,8 +175,31 @@ class OpenAIStorageConsentBoundaryContract(unittest.TestCase):
 
         fake_settings_module = types.ModuleType("ui.settings_manager")
         fake_settings_module.get_settings_manager = lambda: FakeSettingsManager()
+        config_settings_module = types.ModuleType("config.settings")
+        config_settings_module.settings = SimpleNamespace(app_surface="desktop")
+        config_package = types.ModuleType("config")
+        config_package.__path__ = []  # type: ignore[attr-defined]
+        services_package = types.ModuleType("services")
+        services_package.__path__ = []  # type: ignore[attr-defined]
+        computer_use_package = types.ModuleType("services.computer_use")
+        computer_use_package.__path__ = []  # type: ignore[attr-defined]
+        cloud_guard_module = types.ModuleType("services.computer_use.cloud_guard")
+
+        def fail_surface_detection(_settings: object) -> bool:
+            raise RuntimeError("synthetic surface lookup failure")
+
+        cloud_guard_module.is_cloud_surface = fail_surface_detection
         modules = _fake_core_logging_modules()
-        modules["ui.settings_manager"] = fake_settings_module
+        modules.update(
+            {
+                "ui.settings_manager": fake_settings_module,
+                "config": config_package,
+                "config.settings": config_settings_module,
+                "services": services_package,
+                "services.computer_use": computer_use_package,
+                "services.computer_use.cloud_guard": cloud_guard_module,
+            }
+        )
         with patch.dict(os.environ, {}, clear=True), patch.dict(sys.modules, modules):
             privacy_consent = _load_module("core.privacy_consent", "core/privacy_consent.py")
             openai_consent = _load_module("privacy_contract_openai_consent", "services/llm/openai_consent.py")
@@ -220,8 +243,27 @@ class OpenAIStorageConsentBoundaryContract(unittest.TestCase):
 
         fake_settings_module = types.ModuleType("ui.settings_manager")
         fake_settings_module.get_settings_manager = lambda: FakeSettingsManager()
+        config_package = types.ModuleType("config")
+        config_package.__path__ = []  # type: ignore[attr-defined]
+        config_settings_module = types.ModuleType("config.settings")
+        config_settings_module.settings = SimpleNamespace(app_surface="desktop")
+        services_package = types.ModuleType("services")
+        services_package.__path__ = []  # type: ignore[attr-defined]
+        computer_use_package = types.ModuleType("services.computer_use")
+        computer_use_package.__path__ = []  # type: ignore[attr-defined]
+        cloud_guard_module = types.ModuleType("services.computer_use.cloud_guard")
+        cloud_guard_module.is_cloud_surface = lambda _settings: (_ for _ in ()).throw(RuntimeError("synthetic failure"))
         modules = _fake_core_logging_modules()
-        modules["ui.settings_manager"] = fake_settings_module
+        modules.update(
+            {
+                "ui.settings_manager": fake_settings_module,
+                "config": config_package,
+                "config.settings": config_settings_module,
+                "services": services_package,
+                "services.computer_use": computer_use_package,
+                "services.computer_use.cloud_guard": cloud_guard_module,
+            }
+        )
         with patch.dict(os.environ, {"VIOLA_CONSENT_OPENAI_STORAGE": "true"}, clear=True), patch.dict(
             sys.modules, modules
         ):
