@@ -21,7 +21,6 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-import os
 from typing import Any
 
 import anyio
@@ -213,17 +212,17 @@ class MCPServerLauncher:
             logger.warning("Rejected MCP server command: %s", config.command)
             raise ValueError(rejection)
 
-        # Always pass the full parent environment so subprocess inherits
-        # VIOLA_* vars (e.g. VIOLA_BROWSER_ALLOW_LOCALHOST).  The MCP
-        # library's get_default_environment() strips most vars when env=None.
-        merged_env = dict(os.environ)
-        if config.env:
-            merged_env.update(config.env)
+        # The MCP SDK adds its small cross-platform allowlist of process
+        # essentials (PATH, system root/home, temp, user profile) at the final
+        # spawn boundary.  Pass only this server's explicit overlay here so an
+        # unrelated credential or code-injection variable from Viola's parent
+        # process cannot silently cross into every external MCP server.
+        server_env = dict(config.env or {})
 
         params = StdioServerParameters(
             command=config.command,
             args=config.args or [],
-            env=merged_env,
+            env=server_env,
         )
 
         logger.info(

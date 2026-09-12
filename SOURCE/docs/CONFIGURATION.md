@@ -1,5 +1,8 @@
 # Configure your own providers
 
+For a feature-by-feature account of local data, provider requests, defaults, and
+consent controls, see [Privacy and data flow](PRIVACY.md).
+
 Copy `.env.example` to `.env` once. Environment variables configure secrets and
 infrastructure; Settings in the application stores user preferences. Never put
 provider secrets in version control or in bug reports.

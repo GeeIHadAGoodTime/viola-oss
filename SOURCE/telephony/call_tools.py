@@ -846,22 +846,15 @@ async def present_call_plan_handler(params) -> None:
         result = await ask_user_handler(plan_text, context="pre-call briefing")
         if result.ok:
             user_feedback = result.data["answer"]
-            answer_lower = user_feedback.lower()
-            approved = any(
-                word in answer_lower
-                for word in [
-                    "yes",
-                    "yeah",
-                    "go",
-                    "sure",
-                    "do it",
-                    "dial",
-                    "ok",
-                    "yep",
-                    "go ahead",
-                    "approve",
-                ]
+            from intent.approval import ApprovalManager
+            from intent.tool_types import RiskLevel
+
+            decision = await ApprovalManager()._classify_response(
+                user_feedback,
+                "place the planned phone call to %s" % label,
+                RiskLevel.CONFIRM,
             )
+            approved = decision in ("strong_affirm", "affirm")
     except Exception as exc:
         logger.warning("present_call_plan ask_user failed: %s", exc)
 
@@ -920,12 +913,6 @@ _CONFERENCE_USER_ALIASES = frozenset(
         "the caller",
         "founder",
         "the founder",
-        "jay",
-        "j",
-        "j n",
-        "jn",
-        "jihad",
-        "jihad shkoukani",
     }
 )
 
@@ -1037,7 +1024,6 @@ def make_conference_user_handler(
     async def conference_user_handler(params) -> None:
         reason = params.arguments.get("reason", "")
         target = params.arguments.get("target", "")
-        caller_name = (getattr(call_record, "caller_name", "") or "the user").strip()
         call_id = getattr(call_record, "call_id", "unknown")
         logger.info("conference_in_user: call=%s reason=%s", call_id, reason[:120])
 

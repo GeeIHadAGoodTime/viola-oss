@@ -13,6 +13,12 @@ modified and extra files and compiles Python sources in memory without generatin
 bytecode. Installation and frontend builds add files, so keep the original source
 snapshot for this check and use a separate working copy for development.
 
+This repository marks `SOURCE/**` and `PUBLIC_METADATA/**` as byte-preserved
+paths. Keep that `.gitattributes` file active: with Git's global
+`core.autocrlf=true`, text conversion can change already-committed mixed
+line-endings and make asset hashes fail even when the working tree was not
+intentionally edited.
+
 After installing the selected requirements and building the frontend:
 
 ```sh
@@ -21,6 +27,15 @@ cd ui/react-app
 npm run test:run
 cd ../..
 ```
+
+The `tests/public` command contains two kinds of evidence: source-boundary
+contracts for the shipped packet and synthetic Python behavior checks (including
+safety and phone behavior). Both are useful checks, but neither is provider,
+carrier, startup, UI, or live runtime acceptance. The frontend Vitest suite is
+separate evidence; report its exact command and receipt when it is run. The
+frontend command requires the dependencies installed by `npm ci` in
+`ui/react-app`. Do not infer a test count or passing result from file counts,
+source presence, or an unrun command.
 
 Dependency verification must use the selected installation, not another machine's
 global packages. A release's software bill of materials (SBOM) describes exact

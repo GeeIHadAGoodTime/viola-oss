@@ -8246,26 +8246,52 @@ class AgentExecutor:
         if memory_exhaustion is not None:
             return memory_exhaustion
 
-        # Set payment/signature session context so the browser server's gate
-        # overrides know which session is making this tool call.
+        # Bind browser gate overrides to exactly this tool call.  The two
+        # ContextVars form one safety context: if either setter fails, restore
+        # any partial binding and do not dispatch a browser-capable tool.
         task_id = self._ensure_task_id()
         _gate_session_id = self._session_id or task_id
-        try:
-            from mcp_servers.browser.server import (
-                set_payment_session,
-                set_signature_session,
-            )
+        _ps_token = None
+        _sg_token = None
+        if self._is_browser_takeover_tool(tool_name):
+            try:
+                from mcp_servers.browser.server import (
+                    set_payment_session,
+                    set_signature_session,
+                )
 
-            _ps_token = set_payment_session(_gate_session_id)
-            _sg_token = set_signature_session(_gate_session_id)
-        except Exception:
-            # ratchet: critical-path-visibility — payment/signature gate overrides
-            # silently lose their session binding otherwise (safety-critical).
-            logger.exception(
-                "Payment/signature session token setup failed; browser gate overrides will not bind this tool call"
-            )
-            _ps_token = None  # type: ignore[assignment] # PAY-25: failed token setup leaves no active payment context.
-            _sg_token = None  # type: ignore[assignment] # SIGNATURE-01: failed token setup leaves no active signature context.
+                _ps_token = set_payment_session(_gate_session_id)
+                _sg_token = set_signature_session(_gate_session_id)
+            except Exception:
+                # Roll back the first setter if the second one fails.  Leaving
+                # that ContextVar live could bind a later call to this session.
+                if _ps_token is not None:
+                    try:
+                        from mcp_servers.browser.server import reset_payment_session
+
+                        reset_payment_session(_ps_token)
+                    except Exception:
+                        logger.exception("Payment session rollback failed after gate binding error")
+                    finally:
+                        _ps_token = None
+                if _sg_token is not None:
+                    try:
+                        from mcp_servers.browser.server import reset_signature_session
+
+                        reset_signature_session(_sg_token)
+                    except Exception:
+                        logger.exception("Signature session rollback failed after gate binding error")
+                    finally:
+                        _sg_token = None
+                logger.exception(
+                    "Payment/signature session binding failed; browser-capable tool dispatch blocked"
+                )
+                return ToolResult(
+                    ok=False,
+                    error="Browser safety context could not be bound to this tool call",
+                    error_category="GATE_SESSION_BINDING_FAILED",
+                    retryable=False,
+                )
 
         # Mid-tool cancellation: wrap the hub call in a task so that
         # _cancel_event can abort it mid-execution rather than waiting
