@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "be3d70b12dd340657531278d7bd4a2e7144ccfd181181e4c85f53192583c628f",
-  "source_tree_sha256": "015d048d69642fe6a303704b49807569e692ab2530ec14d7bc6c5db467022a45",
+  "source_manifest_sha256": "a85ee64e19f8422b67a777bd6ec30d81f4978af4254cf5d70354c2381ba85f23",
+  "source_tree_sha256": "b650f1efba9d54682cb49b6bdc77817797b727df56335a51d9a45e41d9fbd2f4",
   "source_file_count": 2469,
   "retained_sboms": [
     {
@@ -59,7 +59,7 @@
     }
   ],
   "input_equivalence": {
-    "basis": "All previously shipped source paths outside changed_source_paths retain exact Git blob identity against comparison_public_revision. Changes comprise runtime safety, synthetic tests, docs and a Pipecat security backport. The root pyproject differs only in project.urls. Requirement specifications are unchanged apart from comments; Pipecat package metadata differs only in fork version, and all 107 Requires-Dist declarations are unchanged. Four inventories were regenerated from the built fork metadata while retaining every other resolved package. Frontend inputs, other maintained dependencies and inventoried assets remain byte-identical.",
+    "basis": "All previously shipped source paths outside changed_source_paths retain exact Git blob identity against comparison_public_revision. Changes comprise runtime safety, synthetic tests, docs, a Pipecat security backport, and the cross-platform aiohttp security floor correction. The root pyproject differs only in project.urls. The desktop, Linux, and macOS recipes now require aiohttp>=3.14.3,<4.0.0 to exclude CVE-2026-69244; every retained Windows SBOM already resolves aiohttp 3.14.3. Pipecat package metadata differs only in fork version, and all 107 Requires-Dist declarations are unchanged. Four inventories were regenerated from the built fork metadata while retaining every other resolved package. Frontend inputs, other maintained dependencies and inventoried assets remain byte-identical.",
     "requirements": [
       "requirements_bootstrap.txt",
       "requirements_deepfilter.txt",
@@ -74,9 +74,9 @@
     "prior_frontend_binding_inputs_verified": 442
   },
   "new_resolution_performed": false,
-  "new_advisory_scan_performed": true,
+  "new_advisory_scan_performed": false,
   "new_runtime_qualification_performed": false,
-  "source_revision": "e4fa14dd870825bcc7eca1401d09f1b4375f8449",
+  "source_revision": "2d180e2141358433e26ec2c902dd274e050a3ecc",
   "comparison_public_revision": "8673530938c6bdccf55b86e0a846016ae982467e",
   "changed_source_paths": [
     "SOURCE/README.md",
@@ -116,6 +116,7 @@
     "SOURCE/tests/public/test_phone_call_plan_confirmation.py",
     "SOURCE/tests/public/test_pipecat_runner_security.py",
     "SOURCE/tests/public/test_privacy_boundary_contract.py",
+    "SOURCE/tests/public/test_source_contract.py",
     "SOURCE/tests/public/test_tool_allowlist_contract.py",
     "SOURCE/third_party/pipecat.patch",
     "SOURCE/third_party/pipecat/pyproject.toml",
@@ -126,9 +127,16 @@
   ],
   "qualification": {
     "public_contracts": {
-      "source_revision": "e4fa14dd870825bcc7eca1401d09f1b4375f8449",
-      "passed_test_methods": 55,
-      "environment": "Windows CPython 3.11.9; Pipecat 0.0.108+viola.2 and retained desktop dependencies"
+      "source_revision": "2d180e2141358433e26ec2c902dd274e050a3ecc",
+      "passed_test_methods": 7,
+      "command": "python -B tests/public/test_source_contract.py",
+      "environment": "Windows CPython 3.11.9; source-only contract, no dependency installation",
+      "scope": "Verifies the aiohttp>=3.14.3 floor in all three desktop recipes plus the existing shipped-source contracts.",
+      "prior_runtime_contracts": {
+        "source_revision": "e4fa14dd870825bcc7eca1401d09f1b4375f8449",
+        "passed_test_methods": 55,
+        "applicability": "The CVE correction changes dependency recipe floors and this source contract only; prior runtime-contract evidence remains applicable to unchanged runtime paths."
+      }
     },
     "frontend": {
       "test_files_passed": 135,
@@ -139,19 +147,28 @@
       "source_inputs_unchanged": true
     },
     "advisory_scan": {
-      "scanned_at": "2026-09-12T18:33:14.470607+00:00",
+      "prior_scanned_at": "2026-09-12T18:33:14.470607+00:00",
       "service": "OSV batch API",
       "unique_exact_queries": 238,
       "python_sbom_component_occurrences": 906,
       "upstream_pipecat_advisories": 2,
-      "fork_resolution": "source security backports; no scan ignore"
+      "status": "historical evidence retained for the listed public inventory; no new broad scan was performed or implied for this candidate"
     },
     "advisory_assessment": {
       "path": "advisory-assessment.md",
-      "sha256": "1d97bea28a96678d59c6dd2a9ccc3ab474cb9bbe6ced5e9b31595f6b04f84515"
+      "sha256": "0ca8563097fae08f22b670a98964dc6091fa0084c8668726140299cf9c8ec178"
     },
     "pipecat_wheel_sha256": "fb0895009eaa6cb49f771e8952347b43dbcd0603d5470d97976e740d2a64f68e",
     "new_dependency_resolution_performed": false,
-    "live_provider_carrier_hardware_acceptance_performed": false
+    "live_provider_carrier_hardware_acceptance_performed": false,
+    "direct_primary_advisory": {
+      "id": "GHSA-cq5v-8q36-5273",
+      "cve": "CVE-2026-69244",
+      "package": "aiohttp",
+      "affected_through": "3.14.2",
+      "fixed_in": "3.14.3",
+      "source": "https://github.com/aio-libs/aiohttp/security/advisories/GHSA-cq5v-8q36-5273",
+      "disposition": "all cross-platform desktop recipes require >=3.14.3; retained Windows SBOMs resolve 3.14.3"
+    }
   }
 }

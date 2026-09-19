@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "e4fa14dd870825bcc7eca1401d09f1b4375f8449",
-  "sha256": "015d048d69642fe6a303704b49807569e692ab2530ec14d7bc6c5db467022a45",
+  "revision": "2d180e2141358433e26ec2c902dd274e050a3ecc",
+  "sha256": "b650f1efba9d54682cb49b6bdc77817797b727df56335a51d9a45e41d9fbd2f4",
   "files": [
     {
       "path": ".env.example",
@@ -3535,8 +3535,8 @@
     },
     {
       "path": "requirements_desktop.txt",
-      "sha256": "9ae6309b577dd10ac23cf697c79bbd2329fdc23e8c2e2ccaaad8c9e6c27c9ad8",
-      "bytes": 8575
+      "sha256": "78c52d0dfae5b0923290a18f1a0426e374a977d7274a993d8b470c645554b225",
+      "bytes": 8598
     },
     {
       "path": "requirements_kokoro.txt",
@@ -3545,13 +3545,13 @@
     },
     {
       "path": "requirements_linux.txt",
-      "sha256": "b5058d5ff60814bf600f5ec2db85fadc7563bd7b7bc05cdd0255cee2a27924da",
-      "bytes": 11588
+      "sha256": "354d713833fddb94cdc9d12606a1fc701e43ddba08238b5b4edae13a66a7ce15",
+      "bytes": 11611
     },
     {
       "path": "requirements_macos.txt",
-      "sha256": "2740b49cd04afafc947aa3e2b7ae72c6b76ce51c136c966a836a212ea90a8243",
-      "bytes": 13125
+      "sha256": "4cca717cee329ada7589079fea322af80ace77d135ac9626252d47ff802753cb",
+      "bytes": 13148
     },
     {
       "path": "requirements_optional.txt",
@@ -5740,8 +5740,8 @@
     },
     {
       "path": "tests/public/test_source_contract.py",
-      "sha256": "10ffad0a662f6413bfb5b1e52295c82eeba591df47730c3f5c6c86e8435f43a0",
-      "bytes": 3666
+      "sha256": "914cb4ef3d20810aa9f8b70dcad7f5207783797a84dff9776514d70bed21d31a",
+      "bytes": 5062
     },
     {
       "path": "tests/public/test_tool_allowlist_contract.py",

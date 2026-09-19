@@ -1,11 +1,19 @@
-# Patched Pipecat advisory assessment
+# Public dependency advisory assessment
 
-Source revision: `e4fa14dd870825bcc7eca1401d09f1b4375f8449`
-Source tree SHA-256: `015d048d69642fe6a303704b49807569e692ab2530ec14d7bc6c5db467022a45`
-Canonical candidate manifest SHA-256: `be3d70b12dd340657531278d7bd4a2e7144ccfd181181e4c85f53192583c628f`
+Source revision: `2d180e2141358433e26ec2c902dd274e050a3ecc`
+Source tree SHA-256: `b650f1efba9d54682cb49b6bdc77817797b727df56335a51d9a45e41d9fbd2f4`
+Canonical candidate manifest SHA-256: `a85ee64e19f8422b67a777bd6ec30d81f4978af4254cf5d70354c2381ba85f23`
 Wheel qualification revision: `4d513b599af5ac7dafc8a1c1ee1d6856344d378f`
 Wheel: `pipecat-ai 0.0.108+viola.2`
 Wheel SHA-256: `fb0895009eaa6cb49f771e8952347b43dbcd0603d5470d97976e740d2a64f68e`
+
+## aiohttp CVE-2026-69244 floor correction
+
+The upstream [GHSA-cq5v-8q36-5273](https://github.com/aio-libs/aiohttp/security/advisories/GHSA-cq5v-8q36-5273) identifies `CVE-2026-69244`: aiohttp releases through `3.14.2` are affected and `3.14.3` is the fixed release. The three cross-platform desktop requirement recipes now require `aiohttp>=3.14.3,<4.0.0`, and `tests/public/test_source_contract.py` enforces a patched minimum across Windows, Linux, and macOS.
+
+The retained Windows desktop, Kokoro, other-optional, and all-optional SBOMs each already record the exact resolved component `aiohttp 3.14.3`. Their package identities, hashes, dependencies, and counts therefore remain applicable to this stricter floor and are retained byte-for-byte. No dependency resolution was run for this correction.
+
+The retained OSV scan, dated `2026-09-12T18:33:14.470607+00:00`, covers only the inventories listed in `source-binding.json`. This assessment verifies the patched version already resolved in those inventories and the stricter declared minimum against the primary upstream advisory. No new dependency resolution or broad advisory scan was performed. Other dependency sets require assessment against their own resolved versions. The focused source contract was rerun against this source revision.
 
 ## Inventory refresh
 
