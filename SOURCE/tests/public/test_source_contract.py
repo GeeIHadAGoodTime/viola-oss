@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ast
 import hashlib
+import re
 import tomllib
 import unittest
 from pathlib import Path
@@ -22,6 +23,32 @@ class SourceContract(unittest.TestCase):
                         assert (
                             module.with_suffix(".py").is_file() or (module / "__init__.py").is_file()
                         ), f"{file.relative_to(ROOT)} requires {node.module}"
+
+    @staticmethod
+    def _aiohttp_minimum(requirements_text: str) -> tuple[int, int, int]:
+        entries = [line.split("#", 1)[0].strip() for line in requirements_text.splitlines()]
+        aiohttp = [line for line in entries if line.lower().startswith("aiohttp")]
+        if len(aiohttp) != 1:
+            raise ValueError("expected exactly one aiohttp requirement")
+        match = re.match(r"^aiohttp\s*>=\s*(\d+)\.(\d+)\.(\d+)", aiohttp[0], re.IGNORECASE)
+        if match is None:
+            raise ValueError("aiohttp requirement must declare a minimum version")
+        return tuple(int(part) for part in match.groups())
+
+    @classmethod
+    def _aiohttp_floor_is_fixed(cls, requirements_text: str) -> bool:
+        return cls._aiohttp_minimum(requirements_text) >= (3, 14, 3)
+
+    def test_aiohttp_security_floor_excludes_cve_2026_69244(self):
+        self.assertFalse(self._aiohttp_floor_is_fixed("aiohttp >= 3.14.2, <4.0.0  # affected"))
+        self.assertTrue(self._aiohttp_floor_is_fixed("aiohttp>=3.15.0,<4.0.0 # a future patched floor"))
+        for requirements in (
+            "requirements_desktop.txt",
+            "requirements_linux.txt",
+            "requirements_macos.txt",
+        ):
+            with self.subTest(requirements=requirements):
+                self.assertTrue(self._aiohttp_floor_is_fixed((ROOT / requirements).read_text(encoding="utf-8")))
 
     def test_maintained_dependency_source_inventory(self):
         import sys
