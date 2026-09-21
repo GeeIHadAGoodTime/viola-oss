@@ -15,6 +15,19 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class SourceContract(unittest.TestCase):
+    def test_music_state_startup_uses_desktop_device_partition(self):
+        import sys
+        from unittest.mock import patch
+
+        sys.path.insert(0, str(ROOT))
+        from music.runtime.state_service import PlayerStateService
+
+        with (
+            patch("core.user_context.get_current_user_id", side_effect=LookupError),
+            patch("core.user_context.get_device_user_id", return_value="device-public-source"),
+        ):
+            self.assertEqual(PlayerStateService._resolve_user_id(), "device-public-source")
+
     def test_cloud_phone_history_fails_cleanly_without_private_proxy(self):
         import sys
         from unittest.mock import patch
