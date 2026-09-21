@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import ast
+import asyncio
 import hashlib
+import json
 import re
 import tomllib
 import unittest
@@ -13,6 +15,20 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class SourceContract(unittest.TestCase):
+    def test_cloud_phone_history_fails_cleanly_without_private_proxy(self):
+        import sys
+        from unittest.mock import patch
+
+        sys.path.insert(0, str(ROOT))
+        from telephony.routes import _maybe_proxy_phone_to_cloud
+
+        with patch("telephony.phone_mode.phone_mode_is_cloud", return_value=True):
+            response = asyncio.run(_maybe_proxy_phone_to_cloud("GET", "/api/phone/history"))
+
+        self.assertEqual(response.status_code, 503)
+        payload = json.loads(response.body)
+        self.assertEqual(payload["error"]["code"], "cloud_phone_unavailable")
+
     def test_account_gate_is_shipped_and_keeps_user_owned_ai_account_free(self):
         import os
         import sys

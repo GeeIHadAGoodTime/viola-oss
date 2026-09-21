@@ -77,7 +77,23 @@ async def _maybe_proxy_phone_to_cloud(
     if not phone_mode_is_cloud():
         return None
 
-    from telephony.desktop_cloud_proxy import CloudProxyUnavailable, proxy_phone_request
+    try:
+        from telephony.desktop_cloud_proxy import CloudProxyUnavailable, proxy_phone_request
+    except ModuleNotFoundError as exc:
+        if exc.name != "telephony.desktop_cloud_proxy":
+            raise
+        # The public-source distribution intentionally excludes the hosted
+        # desktop-to-cloud proxy.  Cloud phone mode must fail clearly instead
+        # of turning a normal history request into an internal-server error.
+        logger.info("Cloud phone proxy is not included in this distribution")
+        return JSONResponse(
+            failure_response(
+                "cloud_phone_unavailable",
+                "Cloud phone data is unavailable in this installation. "
+                "Configure local phone calling or install the private service components.",
+            ),
+            status_code=503,
+        )
 
     try:
         status_code, body = await proxy_phone_request(method, cloud_path, params=params, json_body=json_body)
