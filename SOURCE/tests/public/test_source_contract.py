@@ -27,6 +27,21 @@ class SourceContract(unittest.TestCase):
             self.assertFalse(requires_account_for_command("device-public-source", "codex"))
             self.assertFalse(requires_account_for_command("device-public-source", "local"))
 
+    def test_managed_budget_honors_global_source_override_before_private_billing(self):
+        import sys
+        from unittest.mock import patch
+
+        sys.path.insert(0, str(ROOT))
+        from config.settings import settings as app_settings
+        from services.llm.managed_budget import user_uses_managed_llm
+
+        with patch.object(app_settings, "ai_source_override", "local"):
+            self.assertFalse(user_uses_managed_llm("device-public-source"))
+        with patch.object(app_settings, "ai_source_override", "byok"):
+            self.assertFalse(user_uses_managed_llm("device-public-source"))
+        with patch.object(app_settings, "ai_source_override", "managed"):
+            self.assertTrue(user_uses_managed_llm("device-public-source"))
+
     def test_desktop_security_guard_imports_are_shipped(self):
         for folder in ("mcp_hub", "mcp_servers", "services/computer_use"):
             for file in (ROOT / folder).rglob("*.py"):

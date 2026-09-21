@@ -139,11 +139,13 @@ def user_uses_managed_llm(user_id: str | None) -> bool:
     """
     try:
         from config.defaults import DEFAULT_AI_SOURCE
+        from config.settings import settings as app_settings
         from core.product import ai_source_uses_viola_managed_llm
         from ui.settings_manager import get_settings_manager
 
-        ai_source: object = DEFAULT_AI_SOURCE
-        if user_id:
+        ai_source_override = (getattr(app_settings, "ai_source_override", "") or "").strip()
+        ai_source: object = ai_source_override or DEFAULT_AI_SOURCE
+        if user_id and not ai_source_override:
             ai_source = get_settings_manager().get("ai_source", DEFAULT_AI_SOURCE, user_id=user_id)
         return ai_source_uses_viola_managed_llm(ai_source)
     except (AttributeError, ImportError, KeyError, RuntimeError, ValueError) as exc:
