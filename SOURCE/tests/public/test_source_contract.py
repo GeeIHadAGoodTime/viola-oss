@@ -15,6 +15,32 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class SourceContract(unittest.TestCase):
+    def test_music_player_legacy_volume_matches_restored_state(self):
+        import logging
+        import sys
+
+        sys.path.insert(0, str(ROOT))
+        from music.player.initializer import MusicPlayerInitializer
+
+        class Store:
+            @staticmethod
+            def load_music_state(_user_id):
+                return {"queue": [], "now_playing": None, "volume": 5, "is_playing": False}
+
+            @staticmethod
+            def clear_stale_queue(_user_id):
+                return 0
+
+        class Player:
+            _logger = logging.getLogger("test.music.restore")
+            _test_mode = False
+            _volume = 80
+
+        player = Player()
+        MusicPlayerInitializer(player)._setup_core_services(None, Store())
+        self.assertEqual(player._state.volume, 5)
+        self.assertEqual(player._volume, 5)
+
     def test_lazy_music_placeholder_cannot_seed_hub_defaults(self):
         import sys
 

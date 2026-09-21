@@ -346,6 +346,11 @@ class MusicPlayerInitializer:
                     self.player._logger.debug("clear_stale_queue failed (non-critical): %s", e)
 
         self.player._state = self.player._state_service.state
+        # MusicPlayerStateManager still exposes the legacy ``_volume`` field,
+        # while persistence is owned by PlayerStateService.  Keep both views
+        # aligned after restore so the first provider snapshot does not report
+        # the configured default over the saved runtime volume.
+        self.player._volume = self.player._state.volume
 
     def _setup_playlist_and_queue(self) -> None:
         """Setup playlist and queue infrastructure."""
