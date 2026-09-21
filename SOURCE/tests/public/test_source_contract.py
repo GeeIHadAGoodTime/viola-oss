@@ -13,6 +13,20 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class SourceContract(unittest.TestCase):
+    def test_account_gate_is_shipped_and_keeps_user_owned_ai_account_free(self):
+        import os
+        import sys
+        from unittest.mock import patch
+
+        sys.path.insert(0, str(ROOT))
+        from core.account_gate import requires_account_for_command
+
+        with patch.dict(os.environ, {"VIOLA_REQUIRE_ACCOUNT_FOR_PAID_ACTIONS_OVERRIDE": "true"}):
+            self.assertTrue(requires_account_for_command("device-public-source", "managed"))
+            self.assertFalse(requires_account_for_command("device-public-source", "byok"))
+            self.assertFalse(requires_account_for_command("device-public-source", "codex"))
+            self.assertFalse(requires_account_for_command("device-public-source", "local"))
+
     def test_desktop_security_guard_imports_are_shipped(self):
         for folder in ("mcp_hub", "mcp_servers", "services/computer_use"):
             for file in (ROOT / folder).rglob("*.py"):
