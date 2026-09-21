@@ -15,6 +15,33 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class SourceContract(unittest.TestCase):
+    def test_lazy_music_placeholder_cannot_seed_hub_defaults(self):
+        import sys
+
+        sys.path.insert(0, str(ROOT))
+        from ui.core.player_state import to_player_state
+
+        class LazyMusic:
+            @staticmethod
+            def state():
+                return {}
+
+            @staticmethod
+            def is_materialized():
+                return False
+
+        class RecordingHub:
+            calls = 0
+
+            def reconcile_provider_state(self, **_kwargs):
+                self.calls += 1
+                raise AssertionError("lazy placeholder must not reach hub reconciliation")
+
+        hub = RecordingHub()
+        state = to_player_state(LazyMusic(), object(), hub_authority=hub)
+        self.assertEqual(hub.calls, 0)
+        self.assertFalse(state.is_playing)
+
     def test_music_state_startup_uses_desktop_device_partition(self):
         import sys
         from unittest.mock import patch

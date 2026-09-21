@@ -469,6 +469,7 @@ class PlayerStateService(StateService):
         self._state.now_playing = None
         self._state.is_playing = False
         self._state.queue = []
+        self._logger.info("Restored persisted music volume: %d", volume_int)
         self.invalidate_snapshot()
 
     def persist(self, snapshot: PlayerState | None = None) -> None:

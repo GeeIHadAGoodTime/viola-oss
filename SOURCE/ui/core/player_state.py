@@ -27,6 +27,15 @@ def to_player_state(music: Any, state: Any, hub_authority: Any | None = None) ->
     try:
         provider_state = music.state()
 
+        # The lazy desktop music adapter deliberately reports an empty dict
+        # before its real player is materialized.  Do not reconcile that
+        # placeholder into the hub: validating ``{}`` produces a PlayerState
+        # full of defaults (notably volume=80), which would become canonical
+        # and overwrite the persisted volume restored moments later.
+        is_materialized = getattr(music, "is_materialized", None)
+        if provider_state == {} and callable(is_materialized) and not is_materialized():
+            return sanitize_player_state(PlayerState())
+
         # Extract playback_mode from provider before hub reconciliation
         # (reconciliation may create a new PlayerState that drops it).
         _provider_pm = (
