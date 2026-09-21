@@ -15,6 +15,35 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class SourceContract(unittest.TestCase):
+    def test_audio_ducking_never_amplifies_quiet_playback(self):
+        import sys
+
+        sys.path.insert(0, str(ROOT))
+        from utils.audio_ducking import AudioDucker
+
+        class State:
+            volume = 5
+            is_playing = True
+
+        class Player:
+            volume = 5
+
+            @staticmethod
+            def state():
+                return State()
+
+            def set_volume(self, level):
+                self.volume = level
+
+        player = Player()
+        ducker = AudioDucker(player, duck_level=20, fade_duration=0.1)
+        ducker.duck()
+        ducker._fade_thread.join(timeout=1)
+        self.assertEqual(player.volume, 5)
+        ducker.unduck()
+        ducker._fade_thread.join(timeout=1)
+        self.assertEqual(player.volume, 5)
+
     def test_music_player_legacy_volume_matches_restored_state(self):
         import logging
         import sys
