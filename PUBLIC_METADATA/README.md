@@ -1,58 +1,49 @@
 # Source snapshot dependency inventories
 
-The current source manifest includes the September 12 runtime-safety, test and
-documentation corrections. Its binding records the compared public revision and
-the changed source paths. The six dependency inventories retain their original
-bytes: dependency recipes, maintained dependency source, frontend inputs and
-inventoried assets are unchanged. Synthetic regression checks do not establish
-new live-runtime, carrier, hardware or other-platform qualification. No new
-dependency resolution or advisory scan is claimed for these corrections.
+This metadata accompanies public source revision
+`86ece45338d93f4bb1693a220f37188f805663ba`. The canonical manifest contains
+2,470 source files and binds the exact `SOURCE/` tree used by the clean Windows
+reference installation and public contract qualification.
 
-These software bills of materials (SBOMs) list the dependencies selected for the
-accompanying Viola source snapshot. Keep this directory alongside the `SOURCE`
-directory when distributing the snapshot. `source-manifest.json` identifies the
-source files by relative path, size and SHA-256 checksum. `source-binding.json`
-ties that manifest and its source tree checksum to these six unchanged SBOMs.
+`windows-desktop.sbom.json` was regenerated from that clean Windows CPython
+3.11 environment and its exact pip resolution. The other five inventories are
+retained from the preceding qualified source snapshot because their package
+inputs were not changed or re-resolved in this qualification. The binding makes
+that distinction explicit; it does not claim a fresh optional-package, Linux,
+macOS, or frontend dependency resolution.
 
-From the `SOURCE` directory, verify the distributed source files with:
+Keep this directory alongside `SOURCE`. From the `SOURCE` directory, verify the
+distributed files and metadata with:
 
 ```sh
-python -B tools/release/verify_source.py --manifest ../PUBLIC_METADATA/source-manifest.json --source .
+python -B tools/release/verify_source_binding.py --source . --metadata ../PUBLIC_METADATA
 ```
 
-| Inventory | Scope | Packages |
-|---|---|---:|
-| `windows-desktop.sbom.json` | Default Windows desktop dependencies | 210 |
-| `windows-kokoro.sbom.json` | Desktop plus optional Kokoro speech | 221 |
-| `windows-other-optional.sbom.json` | Desktop plus other optional dependencies | 218 |
-| `windows-all-optional.sbom.json` | Desktop plus all combined optional dependencies | 229 |
-| `windows-deepfilter.sbom.json` | Separate DeepFilter worker environment | 28 |
-| `frontend.sbom.json` | Browser application and development/build dependencies | 431 |
+| Inventory | Scope | Packages | Status |
+|---|---|---:|---|
+| `windows-desktop.sbom.json` | Default Windows desktop dependencies | 210 | Refreshed from exact clean install |
+| `windows-kokoro.sbom.json` | Desktop plus optional Kokoro speech | 221 | Retained |
+| `windows-other-optional.sbom.json` | Desktop plus other optional dependencies | 218 | Retained |
+| `windows-all-optional.sbom.json` | Desktop plus all combined optional dependencies | 229 | Retained |
+| `windows-deepfilter.sbom.json` | Separate DeepFilter worker environment | 28 | Retained |
+| `frontend.sbom.json` | Browser application and development/build dependencies | 431 | Retained; unchanged inputs retested |
 
-The inventories preserve dependency versions, artifact checksums, dependency
-relationships, upstream license declarations, and relative paths for maintained
-source packages. Python resolution targets Windows CPython 3.11.9 AMD64. These
-reports do not establish installation results for Linux or macOS.
+The refreshed desktop inventory records the resolved versions, dependency
+relationships, publisher license declarations, and the download SHA-256 for
+209 remote artifacts. The maintained Pipecat fork was installed from
+`SOURCE/third_party/pipecat`, so its component records that relative source path
+instead of inventing a wheel hash for the directory install. The pip report and
+the installed environment matched on all 210 package names and versions.
 
-The retained Python resolution reports had been audited by 2026-09-09 UTC
-(2026-09-08 in America/Chicago), as recorded in the original audit receipts.
-The Python resolution reports do not embed a resolution timestamp. The npm build
-inventory records `2026-09-09T00:51:21.732Z` in its metadata. The Python SBOM
-metadata timestamp records later assembly of the retained results, not a new
-dependency resolution.
-Each SBOM retains its original timestamp and identity. The source revision and
-checksum inside the Python SBOMs identify the preceding source snapshot; the
-separate binding records their applicability to the corrected snapshot after
-verifying unchanged dependency recipes, maintained source packages and frontend
-inputs. No new dependency resolution, advisory scan or runtime qualification was
-performed in preparing these sidecars.
+The retained inventories preserve their original identities and timestamps.
+Their embedded source revision identifies the snapshot where they were
+generated; `source-binding.json` records why they remain applicable here.
+Python package resolution targets Windows CPython 3.11 AMD64. These reports do
+not establish installation results for Linux or macOS.
 
-License declarations in an inventory are publisher metadata, not a complete
-license review. Missing license fields do not grant permission, and the
-application's Apache-2.0 license does not relicense dependencies. Preserve the
-licenses supplied by installed distributions and built assets. Read `LICENSE`,
-`NOTICES.md`, the notices in `LICENSES/`, and the maintained packages' provenance
-and license files in the source snapshot. Custom `FSL-1.1-MIT` labels in the two
-Sentry build-tool entries are preserved as license names rather than represented
-as SPDX identifiers. Third-party author names and public upstream links remain
-part of the inventories.
+License declarations are publisher metadata, not a complete license review.
+Missing license fields do not grant permission, and the application's
+Apache-2.0 license does not relicense dependencies. Preserve the licenses
+supplied by installed distributions and built assets. Read `LICENSE`,
+`NOTICES.md`, the notices in `LICENSES/`, and the maintained packages'
+provenance and license files in the source snapshot.

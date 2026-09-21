@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "2d180e2141358433e26ec2c902dd274e050a3ecc",
-  "sha256": "b650f1efba9d54682cb49b6bdc77817797b727df56335a51d9a45e41d9fbd2f4",
+  "revision": "86ece45338d93f4bb1693a220f37188f805663ba",
+  "sha256": "3acfed6aff702de9b16eb1706ebfa000d6a9be7d5cfdead45954172a260edcce",
   "files": [
     {
       "path": ".env.example",
@@ -912,6 +912,11 @@
       "path": "core/__init__.py",
       "sha256": "a63b26eacf6baa352db51f78d7f03779c4f8914cdf9ba113a35b8c7f4060894c",
       "bytes": 1185
+    },
+    {
+      "path": "core/account_gate.py",
+      "sha256": "cc91f4a9f919f7a419e91fb479289217f72f39b603cdd8fde08a9d4bd64b4f2b",
+      "bytes": 5317
     },
     {
       "path": "core/activity_tracker.py",
@@ -2795,8 +2800,8 @@
     },
     {
       "path": "music/player/initializer.py",
-      "sha256": "3a40fa992506ec53289c428e4ad08a5c01b5d299bc980724a13e4b0233614f10",
-      "bytes": 32671
+      "sha256": "c4f107597df5c8ddd6ff662dc622af5a35c37abb621ca4e930e571a6c59b2598",
+      "bytes": 33025
     },
     {
       "path": "music/player/playback.py",
@@ -3185,8 +3190,8 @@
     },
     {
       "path": "music/runtime/state_service.py",
-      "sha256": "6a5ea2bafa02241dfecf851329e441e33526afd6d8b36c859f2cecd9766840c7",
-      "bytes": 22063
+      "sha256": "3afe7552f70729f0eacd4d10b7f6e15ea1e775994c98d3b69b1d21494a338c0f",
+      "bytes": 22404
     },
     {
       "path": "music/runtime/telemetry_service.py",
@@ -4260,8 +4265,8 @@
     },
     {
       "path": "services/llm/managed_budget.py",
-      "sha256": "64b35f819e5a3fc1f55535f5246e4bd2083ba64e3742ee9a0338a95663cccea1",
-      "bytes": 8567
+      "sha256": "481b747591624740eb0967e1007be50c3191386447a18255711d3e22bebfc635",
+      "bytes": 8770
     },
     {
       "path": "services/llm/model_fallback.py",
@@ -5630,8 +5635,8 @@
     },
     {
       "path": "telephony/routes.py",
-      "sha256": "c94025ef73e7a96432fbaf549d9c77b25d2df4fd3820a38323feddac7c5079ba",
-      "bytes": 45878
+      "sha256": "b6ae1e034669b646c30151ded1b840fcc1ab5d9b7fe68e826f46275330c0fd2c",
+      "bytes": 46633
     },
     {
       "path": "telephony/streaming_stt_model.py",
@@ -5740,8 +5745,8 @@
     },
     {
       "path": "tests/public/test_source_contract.py",
-      "sha256": "914cb4ef3d20810aa9f8b70dcad7f5207783797a84dff9776514d70bed21d31a",
-      "bytes": 5062
+      "sha256": "e72574c056dd65944d4073499045ff5bcafe5fe2ce518396d1f0525d7fdfa89e",
+      "bytes": 10124
     },
     {
       "path": "tests/public/test_tool_allowlist_contract.py",
@@ -8895,8 +8900,8 @@
     },
     {
       "path": "ui/core/player_state.py",
-      "sha256": "f1a36afc343c6a07cf4ca862e57a3c4027a9624e20cda12ac7546dcb04c1859e",
-      "bytes": 7768
+      "sha256": "44c39dfc8f30acb4333e8956e819a78f12c9319339ddaa59c8079793dc3c2352",
+      "bytes": 8352
     },
     {
       "path": "ui/core/security.py",
@@ -11535,8 +11540,8 @@
     },
     {
       "path": "utils/audio_ducking.py",
-      "sha256": "dfaead9ad1185e495a9b146a35d24088f0254a7dc44d578dfe8246622510d566",
-      "bytes": 13269
+      "sha256": "bf10b401fdeeda39e6f29c795716cf142322b114682239601974e3a7b72e8a2b",
+      "bytes": 13728
     },
     {
       "path": "utils/audio_preprocessing.py",
