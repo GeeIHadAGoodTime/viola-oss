@@ -221,8 +221,12 @@ class ExternalMCPEnvironmentContract(unittest.IsolatedAsyncioTestCase):
         child_env = captured["child_env"]
         self.assertIsInstance(child_env, dict)
         self.assertIn("PATH", child_env)
-        self.assertIn("SYSTEMROOT", child_env)
-        self.assertIn("TEMP", child_env)
+        if sys.platform == "win32":
+            self.assertIn("SYSTEMROOT", child_env)
+            self.assertIn("TEMP", child_env)
+        else:
+            self.assertNotIn("SYSTEMROOT", child_env)
+            self.assertNotIn("TEMP", child_env)
         self.assertEqual(child_env["SYNTHETIC_CONFIG_CREDENTIAL"], "explicit-value")
         self.assertNotIn("SYNTHETIC_PARENT_SECRET", child_env)
         self.assertNotIn("NODE_OPTIONS", child_env)
