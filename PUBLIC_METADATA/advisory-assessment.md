@@ -1,8 +1,8 @@
 # Public dependency advisory assessment
 
-- Source revision: `86ece45338d93f4bb1693a220f37188f805663ba`
-- Source tree SHA-256: `3acfed6aff702de9b16eb1706ebfa000d6a9be7d5cfdead45954172a260edcce`
-- Canonical candidate manifest SHA-256: `c13ac89abfc04af774f8e9d95e35db825c147e9f9c1db877b26c354f132c0c1b`
+- Source revision: `c7de239c61985273527d297adeef265d82269cb9`
+- Source tree SHA-256: `0508733930df331f1a2c38dc299c1ce1d0312356b5a1c58fc7e981eec4b3f3f8`
+- Canonical candidate manifest SHA-256: `032d83a5a8ceddaa6bcfa982b51511fdc57efebcca2544e731dd4c6bd80406b9`
 - Maintained package: `pipecat-ai 0.0.108+viola.2`
 
 ## Exact clean-install scope
@@ -11,7 +11,8 @@ The Windows desktop reference environment was resolved and installed afresh on
 Windows CPython 3.11. The pip report and installed environment agree on all 210
 package names and versions, `pip check` passed, and the refreshed
 `windows-desktop.sbom.json` records that exact set. Its SHA-256 is
-`75787b8bd8b1c153fb597023482fcd607d50d27f75143274dee6174b34adce91`.
+recorded in `source-binding.json`. The follow-up changes only a platform-specific
+test assertion; the installed package inputs and runtime source are unchanged.
 
 The Kokoro, other-optional, all-optional, DeepFilter, and frontend inventories
 were not re-resolved. Their input surfaces were unchanged, so their prior

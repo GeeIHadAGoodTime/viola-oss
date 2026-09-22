@@ -10507,7 +10507,7 @@
         "zeroconf==0.149.16",
         "zstandard==0.25.0"
       ],
-      "ref": "viola:86ece45338d93f4bb1693a220f37188f805663ba"
+      "ref": "viola:c7de239c61985273527d297adeef265d82269cb9"
     },
     {
       "dependsOn": [
@@ -10584,7 +10584,7 @@
   ],
   "metadata": {
     "component": {
-      "bom-ref": "viola:86ece45338d93f4bb1693a220f37188f805663ba",
+      "bom-ref": "viola:c7de239c61985273527d297adeef265d82269cb9",
       "description": "Voice assistant with user-owned AI providers and local models",
       "externalReferences": [
         {
@@ -10596,7 +10596,7 @@
       "hashes": [
         {
           "alg": "SHA-256",
-          "content": "3acfed6aff702de9b16eb1706ebfa000d6a9be7d5cfdead45954172a260edcce"
+          "content": "0508733930df331f1a2c38dc299c1ce1d0312356b5a1c58fc7e981eec4b3f3f8"
         }
       ],
       "licenses": [
@@ -10609,12 +10609,12 @@
       ],
       "name": "Viola",
       "type": "application",
-      "version": "86ece45338d93f4bb1693a220f37188f805663ba"
+      "version": "c7de239c61985273527d297adeef265d82269cb9"
     },
     "properties": [
       {
         "name": "viola:source-revision",
-        "value": "86ece45338d93f4bb1693a220f37188f805663ba"
+        "value": "c7de239c61985273527d297adeef265d82269cb9"
       },
       {
         "name": "viola:installation-scope",
@@ -10622,7 +10622,7 @@
       },
       {
         "name": "viola:candidate-manifest-sha256",
-        "value": "c13ac89abfc04af774f8e9d95e35db825c147e9f9c1db877b26c354f132c0c1b"
+        "value": "032d83a5a8ceddaa6bcfa982b51511fdc57efebcca2544e731dd4c6bd80406b9"
       },
       {
         "name": "viola:pip-report-sha256",

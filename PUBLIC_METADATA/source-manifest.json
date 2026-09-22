@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "86ece45338d93f4bb1693a220f37188f805663ba",
-  "sha256": "3acfed6aff702de9b16eb1706ebfa000d6a9be7d5cfdead45954172a260edcce",
+  "revision": "c7de239c61985273527d297adeef265d82269cb9",
+  "sha256": "0508733930df331f1a2c38dc299c1ce1d0312356b5a1c58fc7e981eec4b3f3f8",
   "files": [
     {
       "path": ".env.example",
@@ -5725,8 +5725,8 @@
     },
     {
       "path": "tests/public/test_execution_safety_contract.py",
-      "sha256": "331d3b27a9e4388931d60cbcfeebb318c8268e5b7924ba3570407569115baedd",
-      "bytes": 30885
+      "sha256": "20f275b479b0dd85ac6a1dc932c9b41fcf0ee3dce1789e29c9db951c0e7869c1",
+      "bytes": 31045
     },
     {
       "path": "tests/public/test_phone_call_plan_confirmation.py",
