@@ -1,9 +1,11 @@
 # Source snapshot dependency inventories
 
 This metadata accompanies public source revision
-`86ece45338d93f4bb1693a220f37188f805663ba`. The canonical manifest contains
+`c7de239c61985273527d297adeef265d82269cb9`. The canonical manifest contains
 2,470 source files and binds the exact `SOURCE/` tree used by the clean Windows
-reference installation and public contract qualification.
+reference installation and public contract qualification. This follow-up changes only
+one platform-specific contract assertion; runtime and dependency inputs are unchanged
+from the clean-installed candidate.
 
 `windows-desktop.sbom.json` was regenerated from that clean Windows CPython
 3.11 environment and its exact pip resolution. The other five inventories are

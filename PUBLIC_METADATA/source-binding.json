@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "c13ac89abfc04af774f8e9d95e35db825c147e9f9c1db877b26c354f132c0c1b",
-  "source_tree_sha256": "3acfed6aff702de9b16eb1706ebfa000d6a9be7d5cfdead45954172a260edcce",
+  "source_manifest_sha256": "032d83a5a8ceddaa6bcfa982b51511fdc57efebcca2544e731dd4c6bd80406b9",
+  "source_tree_sha256": "0508733930df331f1a2c38dc299c1ce1d0312356b5a1c58fc7e981eec4b3f3f8",
   "source_file_count": 2470,
   "retained_sboms": [
     {
@@ -34,7 +34,7 @@
     },
     {
       "path": "windows-desktop.sbom.json",
-      "sha256": "75787b8bd8b1c153fb597023482fcd607d50d27f75143274dee6174b34adce91",
+      "sha256": "4d20617200a4d099a1087da11f2dade7385f2ad798584ad3f8f4d9a7589dda74",
       "components": 210,
       "dependency_edges_including_source_root": 597,
       "package_dependency_edges": 511,
@@ -76,7 +76,7 @@
   "new_resolution_performed": true,
   "new_advisory_scan_performed": false,
   "new_runtime_qualification_performed": true,
-  "source_revision": "86ece45338d93f4bb1693a220f37188f805663ba",
+  "source_revision": "c7de239c61985273527d297adeef265d82269cb9",
   "comparison_public_revision": "8673530938c6bdccf55b86e0a846016ae982467e",
   "changed_source_paths": [
     "SOURCE/README.md",
@@ -134,7 +134,7 @@
   ],
   "qualification": {
     "public_contracts": {
-      "source_revision": "86ece45338d93f4bb1693a220f37188f805663ba",
+      "source_revision": "c7de239c61985273527d297adeef265d82269cb9",
       "passed_test_methods": 63,
       "command": "python -m unittest discover -s tests/public -v",
       "environment": "Clean Windows CPython 3.11 virtual environment",
@@ -161,7 +161,7 @@
     },
     "advisory_assessment": {
       "path": "advisory-assessment.md",
-      "sha256": "81159657f84251ff904856e031d2bb319d9375ca2c37e67f33458f23a1137945"
+      "sha256": "e194d040e49782643a3df58ec2dfd33457674dc25d6697c79fe5689dad5c5c5c"
     },
     "pipecat_wheel_sha256": "fb0895009eaa6cb49f771e8952347b43dbcd0603d5470d97976e740d2a64f68e",
     "new_dependency_resolution_performed": true,
