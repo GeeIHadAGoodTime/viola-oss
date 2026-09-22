@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import ast
+import asyncio
 import hashlib
+import json
+import re
 import tomllib
 import unittest
 from pathlib import Path
@@ -12,6 +15,144 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class SourceContract(unittest.TestCase):
+    def test_audio_ducking_never_amplifies_quiet_playback(self):
+        import sys
+
+        sys.path.insert(0, str(ROOT))
+        from utils.audio_ducking import AudioDucker
+
+        class State:
+            volume = 5
+            is_playing = True
+
+        class Player:
+            volume = 5
+
+            @staticmethod
+            def state():
+                return State()
+
+            def set_volume(self, level):
+                self.volume = level
+
+        player = Player()
+        ducker = AudioDucker(player, duck_level=20, fade_duration=0.1)
+        ducker.duck()
+        ducker._fade_thread.join(timeout=1)
+        self.assertEqual(player.volume, 5)
+        ducker.unduck()
+        ducker._fade_thread.join(timeout=1)
+        self.assertEqual(player.volume, 5)
+
+    def test_music_player_legacy_volume_matches_restored_state(self):
+        import logging
+        import sys
+
+        sys.path.insert(0, str(ROOT))
+        from music.player.initializer import MusicPlayerInitializer
+
+        class Store:
+            @staticmethod
+            def load_music_state(_user_id):
+                return {"queue": [], "now_playing": None, "volume": 5, "is_playing": False}
+
+            @staticmethod
+            def clear_stale_queue(_user_id):
+                return 0
+
+        class Player:
+            _logger = logging.getLogger("test.music.restore")
+            _test_mode = False
+            _volume = 80
+
+        player = Player()
+        MusicPlayerInitializer(player)._setup_core_services(None, Store())
+        self.assertEqual(player._state.volume, 5)
+        self.assertEqual(player._volume, 5)
+
+    def test_lazy_music_placeholder_cannot_seed_hub_defaults(self):
+        import sys
+
+        sys.path.insert(0, str(ROOT))
+        from ui.core.player_state import to_player_state
+
+        class LazyMusic:
+            @staticmethod
+            def state():
+                return {}
+
+            @staticmethod
+            def is_materialized():
+                return False
+
+        class RecordingHub:
+            calls = 0
+
+            def reconcile_provider_state(self, **_kwargs):
+                self.calls += 1
+                raise AssertionError("lazy placeholder must not reach hub reconciliation")
+
+        hub = RecordingHub()
+        state = to_player_state(LazyMusic(), object(), hub_authority=hub)
+        self.assertEqual(hub.calls, 0)
+        self.assertFalse(state.is_playing)
+
+    def test_music_state_startup_uses_desktop_device_partition(self):
+        import sys
+        from unittest.mock import patch
+
+        sys.path.insert(0, str(ROOT))
+        from music.runtime.state_service import PlayerStateService
+
+        with (
+            patch("core.user_context.get_current_user_id", side_effect=LookupError),
+            patch("core.user_context.get_device_user_id", return_value="device-public-source"),
+        ):
+            self.assertEqual(PlayerStateService._resolve_user_id(), "device-public-source")
+
+    def test_cloud_phone_history_fails_cleanly_without_private_proxy(self):
+        import sys
+        from unittest.mock import patch
+
+        sys.path.insert(0, str(ROOT))
+        from telephony.routes import _maybe_proxy_phone_to_cloud
+
+        with patch("telephony.phone_mode.phone_mode_is_cloud", return_value=True):
+            response = asyncio.run(_maybe_proxy_phone_to_cloud("GET", "/api/phone/history"))
+
+        self.assertEqual(response.status_code, 503)
+        payload = json.loads(response.body)
+        self.assertEqual(payload["error"]["code"], "cloud_phone_unavailable")
+
+    def test_account_gate_is_shipped_and_keeps_user_owned_ai_account_free(self):
+        import os
+        import sys
+        from unittest.mock import patch
+
+        sys.path.insert(0, str(ROOT))
+        from core.account_gate import requires_account_for_command
+
+        with patch.dict(os.environ, {"VIOLA_REQUIRE_ACCOUNT_FOR_PAID_ACTIONS_OVERRIDE": "true"}):
+            self.assertTrue(requires_account_for_command("device-public-source", "managed"))
+            self.assertFalse(requires_account_for_command("device-public-source", "byok"))
+            self.assertFalse(requires_account_for_command("device-public-source", "codex"))
+            self.assertFalse(requires_account_for_command("device-public-source", "local"))
+
+    def test_managed_budget_honors_global_source_override_before_private_billing(self):
+        import sys
+        from unittest.mock import patch
+
+        sys.path.insert(0, str(ROOT))
+        from config.settings import settings as app_settings
+        from services.llm.managed_budget import user_uses_managed_llm
+
+        with patch.object(app_settings, "ai_source_override", "local"):
+            self.assertFalse(user_uses_managed_llm("device-public-source"))
+        with patch.object(app_settings, "ai_source_override", "byok"):
+            self.assertFalse(user_uses_managed_llm("device-public-source"))
+        with patch.object(app_settings, "ai_source_override", "managed"):
+            self.assertTrue(user_uses_managed_llm("device-public-source"))
+
     def test_desktop_security_guard_imports_are_shipped(self):
         for folder in ("mcp_hub", "mcp_servers", "services/computer_use"):
             for file in (ROOT / folder).rglob("*.py"):
@@ -22,6 +163,32 @@ class SourceContract(unittest.TestCase):
                         assert (
                             module.with_suffix(".py").is_file() or (module / "__init__.py").is_file()
                         ), f"{file.relative_to(ROOT)} requires {node.module}"
+
+    @staticmethod
+    def _aiohttp_minimum(requirements_text: str) -> tuple[int, int, int]:
+        entries = [line.split("#", 1)[0].strip() for line in requirements_text.splitlines()]
+        aiohttp = [line for line in entries if line.lower().startswith("aiohttp")]
+        if len(aiohttp) != 1:
+            raise ValueError("expected exactly one aiohttp requirement")
+        match = re.match(r"^aiohttp\s*>=\s*(\d+)\.(\d+)\.(\d+)", aiohttp[0], re.IGNORECASE)
+        if match is None:
+            raise ValueError("aiohttp requirement must declare a minimum version")
+        return tuple(int(part) for part in match.groups())
+
+    @classmethod
+    def _aiohttp_floor_is_fixed(cls, requirements_text: str) -> bool:
+        return cls._aiohttp_minimum(requirements_text) >= (3, 14, 3)
+
+    def test_aiohttp_security_floor_excludes_cve_2026_69244(self):
+        self.assertFalse(self._aiohttp_floor_is_fixed("aiohttp >= 3.14.2, <4.0.0  # affected"))
+        self.assertTrue(self._aiohttp_floor_is_fixed("aiohttp>=3.15.0,<4.0.0 # a future patched floor"))
+        for requirements in (
+            "requirements_desktop.txt",
+            "requirements_linux.txt",
+            "requirements_macos.txt",
+        ):
+            with self.subTest(requirements=requirements):
+                self.assertTrue(self._aiohttp_floor_is_fixed((ROOT / requirements).read_text(encoding="utf-8")))
 
     def test_maintained_dependency_source_inventory(self):
         import sys

@@ -67,9 +67,15 @@ To run locally:
 
 import argparse
 import asyncio
+import base64
+import hashlib
+import hmac
+import json
 import mimetypes
 import os
+import secrets
 import sys
+import time
 import uuid
 from contextlib import asynccontextmanager
 from http import HTTPMethod
@@ -109,6 +115,12 @@ TELEPHONY_TRANSPORTS = ["twilio", "telnyx", "plivo", "exotel"]
 RUNNER_DOWNLOADS_FOLDER: Optional[str] = None
 RUNNER_HOST: str = "localhost"
 RUNNER_PORT: int = 7860
+
+# Tokens are scoped to one runner process, so restarting the development runner
+# also invalidates every token it issued.
+_WS_AUTH_SECRET: bytes = secrets.token_bytes(32)
+_WS_AUTH_BOOTSTRAP_CONFIGURED = bool(os.getenv("PIPECAT_WEBSOCKET_AUTH_BOOTSTRAP"))
+_WS_AUTH_BOOTSTRAP_SECRET = os.getenv("PIPECAT_WEBSOCKET_AUTH_BOOTSTRAP") or secrets.token_urlsafe(32)
 
 
 def _get_bot_module():
@@ -184,11 +196,79 @@ def _create_server_app(args: argparse.Namespace):
     elif args.transport == "daily":
         _setup_daily_routes(app, args)
     elif args.transport in TELEPHONY_TRANSPORTS:
-        _setup_telephony_routes(app, args)
+        _setup_telephony_routes(app, args, set())
     else:
         logger.warning(f"Unknown transport type: {args.transport}")
 
     return app
+
+
+def _generate_ws_token(ttl: int = 300) -> str:
+    """Return a signed, self-expiring, one-time WebSocket session token."""
+    payload = (
+        base64.urlsafe_b64encode(
+            json.dumps({"exp": int(time.time()) + ttl, "jti": secrets.token_hex(8)}).encode()
+        )
+        .decode()
+        .rstrip("=")
+    )
+    signature = hmac.new(_WS_AUTH_SECRET, payload.encode(), hashlib.sha256).hexdigest()
+    return f"{payload}.{signature}"
+
+
+def _verify_and_consume_ws_token(used: set[str], token: str) -> bool:
+    """Validate a WebSocket token and consume it to prevent replay."""
+    try:
+        payload, signature = token.rsplit(".", 1)
+    except ValueError:
+        return False
+
+    expected = hmac.new(_WS_AUTH_SECRET, payload.encode(), hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(expected, signature):
+        return False
+
+    padded = payload + "=" * (-len(payload) % 4)
+    try:
+        data = json.loads(base64.urlsafe_b64decode(padded))
+        expires_at = data["exp"]
+    except (KeyError, TypeError, ValueError):
+        return False
+    if not isinstance(expires_at, (int, float)) or time.time() > expires_at:
+        return False
+    if token in used:
+        return False
+
+    used.add(token)
+    return True
+
+
+def _extract_ws_token(websocket: WebSocket) -> Optional[str]:
+    """Extract a token from a bearer header or query parameter."""
+    authorization = websocket.headers.get("authorization", "")
+    if authorization.lower().startswith("bearer "):
+        return authorization[7:].strip()
+    return websocket.query_params.get("token")
+
+
+def _authorize_token_issuance(request: Request) -> None:
+    """Require the operator bootstrap secret before minting a public-runner token."""
+    authorization = request.headers.get("authorization", "")
+    supplied = authorization[7:].strip() if authorization.lower().startswith("bearer ") else ""
+    supplied = supplied or request.query_params.get("auth", "")
+    if supplied and hmac.compare_digest(supplied, _WS_AUTH_BOOTSTRAP_SECRET):
+        return
+    raise HTTPException(status_code=403, detail="Token issuance requires operator authorization")
+
+
+def _resolve_download_path(folder: str, filename: str) -> Path:
+    """Resolve a download path and ensure it stays within the downloads folder."""
+    allowed_base = Path(folder).resolve()
+    file_path = (allowed_base / filename).resolve()
+
+    if not file_path.is_relative_to(allowed_base):
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    return file_path
 
 
 def _setup_webrtc_routes(app: FastAPI, args: argparse.Namespace):
@@ -233,15 +313,15 @@ def _setup_webrtc_routes(app: FastAPI, args: argparse.Namespace):
         """Handle file downloads."""
         if not args.folder:
             logger.warning(f"Attempting to dowload {filename}, but downloads folder not setup.")
-            return
+            raise HTTPException(404)
 
-        file_path = Path(args.folder) / filename
-        if not os.path.exists(file_path):
+        file_path = _resolve_download_path(args.folder, filename)
+        if not file_path.exists():
             raise HTTPException(404)
 
         media_type, _ = mimetypes.guess_type(file_path)
 
-        return FileResponse(path=file_path, media_type=media_type, filename=filename)
+        return FileResponse(path=file_path, media_type=media_type, filename=file_path.name)
 
     # Initialize the SmallWebRTC request handler
     small_webrtc_handler: SmallWebRTCRequestHandler = SmallWebRTCRequestHandler(
@@ -743,55 +823,91 @@ def _setup_daily_routes(app: FastAPI, args: argparse.Namespace):
             }
 
 
-def _setup_telephony_routes(app: FastAPI, args: argparse.Namespace):
-    """Set up telephony-specific routes."""
-    # XML response templates (Exotel doesn't use XML webhooks)
-    XML_TEMPLATES = {
-        "twilio": f"""<?xml version="1.0" encoding="UTF-8"?>
+def _setup_telephony_routes(
+    app: FastAPI, args: argparse.Namespace, ws_used_tokens: set[str]
+):
+    """Set up telephony routes with optional upstream HMAC token authentication."""
+
+    def websocket_url(*, issue_token: bool = False) -> str:
+        path = "/ws"
+        if issue_token:
+            path += f"/{_generate_ws_token()}"
+        if args.proxy:
+            return f"wss://{args.proxy}{path}"
+        scheme = "wss" if args.host != "localhost" else "ws"
+        return f"{scheme}://{args.host}:{args.port}{path}"
+
+    def xml_template(url: str) -> str:
+        # Exotel doesn't use XML webhooks.
+        templates = {
+            "twilio": f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Connect>
-    <Stream url="wss://{args.proxy}/ws"></Stream>
+    <Stream url="{url}"></Stream>
   </Connect>
   <Pause length="40"/>
 </Response>""",
-        "telnyx": f"""<?xml version="1.0" encoding="UTF-8"?>
+            "telnyx": f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Connect>
-    <Stream url="wss://{args.proxy}/ws" bidirectionalMode="rtp"></Stream>
+    <Stream url="{url}" bidirectionalMode="rtp"></Stream>
   </Connect>
   <Pause length="40"/>
 </Response>""",
-        "plivo": f"""<?xml version="1.0" encoding="UTF-8"?>
+            "plivo": f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Stream bidirectional="true" keepCallAlive="true" contentType="audio/x-mulaw;rate=8000">wss://{args.proxy}/ws</Stream>
+  <Stream bidirectional="true" keepCallAlive="true" contentType="audio/x-mulaw;rate=8000">{url}</Stream>
 </Response>""",
-    }
+        }
+        return templates.get(args.transport, "<Response></Response>")
 
     @app.post("/")
-    async def start_call():
+    async def start_call(request: Request):
         """Handle telephony webhook and return XML response."""
+        _authorize_token_issuance(request)
         if args.transport == "exotel":
             # Exotel doesn't use POST webhooks - redirect to proper documentation
             logger.debug("POST Exotel endpoint - not used")
             return {
                 "error": "Exotel doesn't use POST webhooks",
-                "websocket_url": f"wss://{args.proxy}/ws",
+                "websocket_url": websocket_url(issue_token=True),
                 "note": "Configure the WebSocket URL above in your Exotel App Bazaar Voicebot Applet",
             }
         else:
             logger.debug(f"POST {args.transport.upper()} XML")
-            xml_content = XML_TEMPLATES.get(args.transport, "<Response></Response>")
+            xml_content = xml_template(websocket_url(issue_token=True))
             return HTMLResponse(content=xml_content, media_type="application/xml")
 
-    @app.websocket("/ws")
-    async def websocket_endpoint(websocket: WebSocket):
-        """Handle WebSocket connections for telephony."""
+    @app.post("/start")
+    async def start_agent(request: Request):
+        """Issue a short-lived token for clients that configure their own WebSocket URL."""
+        _authorize_token_issuance(request)
+        result = {"wsUrl": websocket_url()}
+        result["token"] = _generate_ws_token()
+        return result
+
+    async def handle_websocket(websocket: WebSocket, path_token: Optional[str] = None):
+        token = path_token or _extract_ws_token(websocket)
+        if not token or not _verify_and_consume_ws_token(ws_used_tokens, token):
+            logger.warning("WebSocket connection rejected: invalid or missing token")
+            await websocket.close(code=4003)
+            return
         await websocket.accept()
         logger.debug("WebSocket connection accepted")
         await _run_telephony_bot(websocket, args)
 
+    @app.websocket("/ws")
+    async def websocket_endpoint(websocket: WebSocket):
+        """Handle WebSocket connections for telephony."""
+        await handle_websocket(websocket)
+
+    @app.websocket("/ws/{token}")
+    async def websocket_endpoint_with_token(websocket: WebSocket, token: str):
+        """Handle authenticated WebSocket connections for telephony."""
+        await handle_websocket(websocket, token)
+
     @app.get("/")
-    async def start_agent():
+    async def status():
         """Simple status endpoint for telephony transports."""
         return {"status": f"Bot started with {args.transport}"}
 
@@ -938,6 +1054,12 @@ def main(parser: Optional[argparse.ArgumentParser] = None):
     # Validate and clean proxy hostname
     if args.proxy:
         args.proxy = _validate_and_clean_proxy(args.proxy)
+
+    if args.transport in TELEPHONY_TRANSPORTS and not _WS_AUTH_BOOTSTRAP_CONFIGURED:
+        parser.error(
+            "telephony runner requires PIPECAT_WEBSOCKET_AUTH_BOOTSTRAP "
+            "for authorized token issuance"
+        )
 
     # Auto-set transport to daily if --direct is used without explicit transport
     if args.direct and args.transport == "webrtc":  # webrtc is the default

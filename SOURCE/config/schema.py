@@ -153,7 +153,7 @@ class SettingsSchema:
     """TTS volume (0-100). Applied as amplitude scaling on output PCM."""
 
     tts_pronunciation_overrides: dict[str, str] = field(default_factory=dict)
-    """Case-insensitive whole-word text respellings before phonemization, e.g. {"Jihad": "Jee hahd"}."""
+    """Case-insensitive whole-word text respellings before phonemization, e.g. {"Amina": "Ah mee nah"}."""
 
     tts_acronym_dict_enabled: bool = True
     """Enable built-in acronym pronunciations such as AI -> A I and JPEG -> jay peg."""

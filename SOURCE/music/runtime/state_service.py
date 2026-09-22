@@ -81,14 +81,18 @@ class PlayerStateService(StateService):
     @staticmethod
     def _resolve_user_id() -> str:
         try:
-            from core.user_context import get_current_user_id
+            from core.user_context import get_current_user_id, get_device_user_id
         except ImportError as exc:
             raise LookupError("user_id is required for music state persistence") from exc
 
         try:
             user_id = get_current_user_id()
-        except LookupError as exc:
-            raise LookupError("user_id is required for music state persistence") from exc
+        except LookupError:
+            # Music is materialized during desktop startup, before a request
+            # establishes authenticated user context.  The desktop is a
+            # single-listener boundary at that point, so restore the same
+            # device partition that unauthenticated loopback requests use.
+            user_id = get_device_user_id()
         if not user_id:
             raise LookupError("user_id is required for music state persistence")
         return user_id
@@ -465,6 +469,7 @@ class PlayerStateService(StateService):
         self._state.now_playing = None
         self._state.is_playing = False
         self._state.queue = []
+        self._logger.info("Restored persisted music volume: %d", volume_int)
         self.invalidate_snapshot()
 
     def persist(self, snapshot: PlayerState | None = None) -> None:

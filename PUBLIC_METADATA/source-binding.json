@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "6ccc943f59fc324fb719fb0d55d70b2272b2a22145cdb374c644e3e3239d3396",
-  "source_tree_sha256": "0bba93fe67af4a06c48a01477512b744d257dc681d68128fa4d4858a411e6646",
-  "source_file_count": 2457,
+  "source_manifest_sha256": "c13ac89abfc04af774f8e9d95e35db825c147e9f9c1db877b26c354f132c0c1b",
+  "source_tree_sha256": "3acfed6aff702de9b16eb1706ebfa000d6a9be7d5cfdead45954172a260edcce",
+  "source_file_count": 2470,
   "retained_sboms": [
     {
       "path": "frontend.sbom.json",
@@ -11,15 +11,17 @@
       "retained_metadata_timestamp": "2026-09-09T00:51:21.732Z",
       "components": 431,
       "dependency_edges_including_source_root": 903,
-      "package_dependency_edges": 880
+      "package_dependency_edges": 880,
+      "inventory_status": "retained_unchanged_inputs"
     },
     {
       "path": "windows-all-optional.sbom.json",
-      "sha256": "4667b8525ef9802cdb57df29e9b3cd84100895a2eee341ae3a34844bee577d14",
-      "retained_metadata_timestamp": "2026-09-09T01:23:03.209916+00:00",
+      "sha256": "e268f67db05e11e7d6421eca3f528d8728176010904c1d46eed46a11b104dfdf",
       "components": 229,
       "dependency_edges_including_source_root": 442,
-      "package_dependency_edges": 353
+      "package_dependency_edges": 353,
+      "metadata_timestamp": "2026-09-12T19:05:06.292297+00:00",
+      "inventory_status": "retained_unchanged_inputs"
     },
     {
       "path": "windows-deepfilter.sbom.json",
@@ -27,35 +29,39 @@
       "retained_metadata_timestamp": "2026-09-09T01:23:07.366224+00:00",
       "components": 28,
       "dependency_edges_including_source_root": 36,
-      "package_dependency_edges": 27
+      "package_dependency_edges": 27,
+      "inventory_status": "retained_unchanged_inputs"
     },
     {
       "path": "windows-desktop.sbom.json",
-      "sha256": "14f45d7e77cce7630320d8cd74f4b31d66a7821cf370fa23889b061f036a73b7",
-      "retained_metadata_timestamp": "2026-09-09T01:22:19.453681+00:00",
+      "sha256": "75787b8bd8b1c153fb597023482fcd607d50d27f75143274dee6174b34adce91",
       "components": 210,
-      "dependency_edges_including_source_root": 399,
-      "package_dependency_edges": 313
+      "dependency_edges_including_source_root": 597,
+      "package_dependency_edges": 511,
+      "metadata_timestamp": "2026-09-21T05:20:47.253196+00:00",
+      "inventory_status": "refreshed_from_exact_clean_windows_install"
     },
     {
       "path": "windows-kokoro.sbom.json",
-      "sha256": "8dd650083e0a5f91e023922f4b697a1c3e51823ec2941d50a2b55c6d778be9ee",
-      "retained_metadata_timestamp": "2026-09-09T01:22:24.016352+00:00",
+      "sha256": "bc37e0a43edd62ecf95d50f17a13222dde1739557cef15de6d0d718f5a69e75a",
       "components": 221,
       "dependency_edges_including_source_root": 422,
-      "package_dependency_edges": 335
+      "package_dependency_edges": 335,
+      "metadata_timestamp": "2026-09-12T19:05:00.618392+00:00",
+      "inventory_status": "retained_unchanged_inputs"
     },
     {
       "path": "windows-other-optional.sbom.json",
-      "sha256": "595a9a9bd881ef1ecbfd952e98aad8b848d6e6b0a5213f8ad7e5212ab16239a2",
-      "retained_metadata_timestamp": "2026-09-09T01:22:47.523868+00:00",
+      "sha256": "ca3de3770642cbbe8147f733e1a59f920463eab0f0e58c07dcfa24e47bd39aa1",
       "components": 218,
       "dependency_edges_including_source_root": 419,
-      "package_dependency_edges": 331
+      "package_dependency_edges": 331,
+      "metadata_timestamp": "2026-09-12T19:05:03.425261+00:00",
+      "inventory_status": "retained_unchanged_inputs"
     }
   ],
   "input_equivalence": {
-    "basis": "Exact byte identity against the source snapshot accompanying the retained inventories",
+    "basis": "The Windows desktop dependency set was freshly resolved and installed for this exact source candidate. The other optional Python inventories and frontend lockfile inputs are unchanged from their identified retained inventories; the unchanged frontend was rebuilt and retested.",
     "requirements": [
       "requirements_bootstrap.txt",
       "requirements_deepfilter.txt",
@@ -65,11 +71,109 @@
       "requirements_macos.txt",
       "requirements_optional.txt"
     ],
-    "local_source_files": 535,
-    "frontend_files": 442,
     "prior_frontend_binding_inputs_verified": 442
   },
-  "new_resolution_performed": false,
+  "new_resolution_performed": true,
   "new_advisory_scan_performed": false,
-  "new_runtime_qualification_performed": false
+  "new_runtime_qualification_performed": true,
+  "source_revision": "86ece45338d93f4bb1693a220f37188f805663ba",
+  "comparison_public_revision": "8673530938c6bdccf55b86e0a846016ae982467e",
+  "changed_source_paths": [
+    "SOURCE/README.md",
+    "SOURCE/SECURITY.md",
+    "SOURCE/config/schema.py",
+    "SOURCE/config/settings.py",
+    "SOURCE/core/account_gate.py",
+    "SOURCE/core/privacy_consent.py",
+    "SOURCE/core/subprocess_env.py",
+    "SOURCE/docs/CONFIGURATION.md",
+    "SOURCE/docs/PRIVACY.md",
+    "SOURCE/docs/VERIFYING.md",
+    "SOURCE/intent/agent_executor.py",
+    "SOURCE/intent/agent_loop.py",
+    "SOURCE/intent/ai_controller.py",
+    "SOURCE/intent/irreversible_actions.py",
+    "SOURCE/intent/tool_allowlist.py",
+    "SOURCE/intent/tools/shell.py",
+    "SOURCE/mcp_hub/launcher.py",
+    "SOURCE/mcp_hub/runtime_config.py",
+    "SOURCE/mcp_servers/browser/server.py",
+    "SOURCE/music/consent/service.py",
+    "SOURCE/music/player/initializer.py",
+    "SOURCE/music/runtime/state_service.py",
+    "SOURCE/pyproject.toml",
+    "SOURCE/requirements_desktop.txt",
+    "SOURCE/requirements_linux.txt",
+    "SOURCE/requirements_macos.txt",
+    "SOURCE/services/llm/managed_budget.py",
+    "SOURCE/services/llm/openai_consent.py",
+    "SOURCE/services/oauth/workspace_bridge.py",
+    "SOURCE/services/openai_background.py",
+    "SOURCE/services/user_profile.py",
+    "SOURCE/telephony/call_history.py",
+    "SOURCE/telephony/call_manager.py",
+    "SOURCE/telephony/call_tools.py",
+    "SOURCE/telephony/loopback_phone_call_session.py",
+    "SOURCE/telephony/routes.py",
+    "SOURCE/tests/public/test_call_history_order_contract.py",
+    "SOURCE/tests/public/test_carrier_event_adapter_contract.py",
+    "SOURCE/tests/public/test_execution_safety_contract.py",
+    "SOURCE/tests/public/test_phone_call_plan_confirmation.py",
+    "SOURCE/tests/public/test_pipecat_runner_security.py",
+    "SOURCE/tests/public/test_privacy_boundary_contract.py",
+    "SOURCE/tests/public/test_source_contract.py",
+    "SOURCE/tests/public/test_tool_allowlist_contract.py",
+    "SOURCE/third_party/pipecat.patch",
+    "SOURCE/third_party/pipecat/pyproject.toml",
+    "SOURCE/third_party/pipecat/src/pipecat/runner/run.py",
+    "SOURCE/third_party/sources.toml",
+    "SOURCE/tools/release/create_source_manifest.py",
+    "SOURCE/tools/release/verify_source_binding.py",
+    "SOURCE/ui/core/player_state.py",
+    "SOURCE/utils/audio_ducking.py"
+  ],
+  "qualification": {
+    "public_contracts": {
+      "source_revision": "86ece45338d93f4bb1693a220f37188f805663ba",
+      "passed_test_methods": 63,
+      "command": "python -m unittest discover -s tests/public -v",
+      "environment": "Clean Windows CPython 3.11 virtual environment",
+      "scope": "Public source, privacy, action-confirmation, phone, Pipecat backport, local-account separation, music persistence, and ducking contracts.",
+      "clean_install": {
+        "resolved_packages": 210,
+        "pip_check": "passed",
+        "pip_report_matches_installed_environment": true
+      }
+    },
+    "frontend": {
+      "test_files_passed": 135,
+      "tests_passed": 954,
+      "npm_advisories": 0,
+      "node_version": "24.15.0",
+      "npm_version": "11.12.1",
+      "source_inputs_unchanged": true
+    },
+    "advisory_scan": {
+      "prior_scanned_at": "2026-09-12T18:33:14.470607+00:00",
+      "service": "OSV batch API",
+      "unique_exact_queries": 238,
+      "status": "historical broad-scan evidence retained; current primary aiohttp and Pipecat advisories assessed against the exact candidate"
+    },
+    "advisory_assessment": {
+      "path": "advisory-assessment.md",
+      "sha256": "81159657f84251ff904856e031d2bb319d9375ca2c37e67f33458f23a1137945"
+    },
+    "pipecat_wheel_sha256": "fb0895009eaa6cb49f771e8952347b43dbcd0603d5470d97976e740d2a64f68e",
+    "new_dependency_resolution_performed": true,
+    "live_provider_carrier_hardware_acceptance_performed": false,
+    "direct_primary_advisory": {
+      "id": "GHSA-cq5v-8q36-5273",
+      "cve": "CVE-2026-69244",
+      "package": "aiohttp",
+      "affected_through": "3.14.2",
+      "fixed_in": "3.14.3",
+      "source": "https://github.com/aio-libs/aiohttp/security/advisories/GHSA-cq5v-8q36-5273",
+      "disposition": "clean Windows install resolves 3.14.3; all desktop recipes require >=3.14.3"
+    }
+  }
 }

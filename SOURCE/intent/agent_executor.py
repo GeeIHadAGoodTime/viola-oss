@@ -458,12 +458,31 @@ def _shared_state_tool_names(tools: list[dict[str, Any]] | None) -> list[str]:
         name = _schema_tool_name(tool)
         if not name:
             continue
-        lower_name = name.lower()
-        if lower_name in _BACKGROUND_SHARED_STATE_TOOL_NAMES or lower_name.startswith(
+        policy_name = canonicalize_tool_name_for_safety(name).lower()
+        if policy_name in _BACKGROUND_SHARED_STATE_TOOL_NAMES or policy_name.startswith(
             _BACKGROUND_SHARED_STATE_TOOL_PREFIXES
         ):
             names.append(name)
     return sorted(set(names))
+
+
+def _without_shared_state_tools(tools: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Return tool schemas that cannot mutate parent-owned UI/payment state."""
+
+    shared_names = {name.lower() for name in _shared_state_tool_names(tools)}
+    return [tool for tool in tools if _schema_tool_name(tool).lower() not in shared_names]
+
+
+def _restricted_child_allowed_tools(
+    tools: list[dict[str, Any]],
+    parent_allowed_tools: set[str] | None,
+) -> set[str]:
+    """Build the dispatch allowlist matching a restricted child tool surface."""
+
+    names = {_schema_tool_name(tool) for tool in tools if _schema_tool_name(tool)}
+    if not parent_allowed_tools or "*" in parent_allowed_tools:
+        return names
+    return {name for name in names if tool_name_allowed_by_allowlist(parent_allowed_tools, name)}
 
 
 def _background_shared_state_error(shared_names: list[str]) -> str:
@@ -778,6 +797,7 @@ from intent.content_sanitizer import (
     BROWSER_PAGE_CONTENT_TOOLS as _BROWSER_PAGE_CONTENT_TOOLS,
     canonicalize_tool_name_for_safety,
 )
+from intent.tool_allowlist import tool_name_allowed_by_allowlist
 
 _CALENDAR_ADD_FAILURE_MESSAGE = (
     "I couldn't add the event because the start time format wasn't recognized. "
@@ -7414,6 +7434,7 @@ class AgentExecutor:
         resume_messages: list[dict[str, Any]] | None = None,
         model_override: str | None = None,
         allow_shared_state_tools: bool = True,
+        exclude_shared_state_tools: bool = False,
     ) -> ToolResult:
         """Spawn a child AgentExecutor for an independent subtask.
 
@@ -7430,7 +7451,9 @@ class AgentExecutor:
           because the parent is blocked and gets a browser-state footer after
           completion. Background ``start_agent`` callers must pass
           ``allow_shared_state_tools=False`` so browser/payment/desktop tools
-          fail closed before the parent is unblocked.
+          fail closed before the parent is unblocked. Parallel foreground
+          children pass ``exclude_shared_state_tools=True``; their provider
+          schema and execution allowlist both omit those tools.
         - ``approval_manager``: Approval / pre-approved state is shared so
           user approval decisions are consistent across parent and child.
           However, ``_rejected_tools`` is per-instance and fully isolated.
@@ -7468,6 +7491,24 @@ class AgentExecutor:
             subagent_mode=child_mode,
             subagent_type=subagent_type,
         )
+        child_allowed_tools = self._allowed_tools
+        if exclude_shared_state_tools:
+            if child_native_tools is None:
+                return ToolResult(
+                    ok=False,
+                    error="Parallel child tool authority could not be determined safely.",
+                    error_category="SUBAGENT_SHARED_STATE_TOOLS",
+                    retryable=False,
+                )
+            child_native_tools = _without_shared_state_tools(child_native_tools)
+            child_allowed_tools = _restricted_child_allowed_tools(child_native_tools, self._allowed_tools)
+            if not child_allowed_tools:
+                return ToolResult(
+                    ok=False,
+                    error="Parallel child has no tools after shared-state restrictions were applied.",
+                    error_category="SUBAGENT_SHARED_STATE_TOOLS",
+                    retryable=False,
+                )
         if not allow_shared_state_tools:
             shared_names = _shared_state_tool_names(child_native_tools)
             if shared_names:
@@ -7526,7 +7567,7 @@ class AgentExecutor:
             subagent_type=subagent_type,
             hook_registry=self._hook_registry,
             hook_settings_runner=self._hook_settings_runner,
-            allowed_tools=self._allowed_tools,
+            allowed_tools=child_allowed_tools,
         )
         child.task_id = child_agent_id
 
@@ -7758,14 +7799,18 @@ class AgentExecutor:
         return str(tool_name or "").strip().lower() in _LOCAL_SIDE_EFFECT_TOOLS
 
     @staticmethod
-    def get_tool_interrupt_behavior(tool_name: str) -> str:
+    def get_tool_interrupt_behavior(tool_name: str, tool_args: dict[str, Any] | None = None) -> str:
         lower_name = str(tool_name or "").strip().lower()
         if not lower_name:
             return "block"
         if lower_name in _BLOCK_ON_INTERRUPT_TOOLS or lower_name.startswith(_BLOCK_ON_INTERRUPT_PREFIXES):
             return "block"
-        if lower_name in _PARALLEL_READ_ONLY_TOOLS or lower_name in _PARALLEL_READ_ONLY_ACTIONS:
+        if lower_name in _PARALLEL_READ_ONLY_TOOLS:
             return "cancel"
+        read_only_actions = _PARALLEL_READ_ONLY_ACTIONS.get(lower_name)
+        if read_only_actions is not None:
+            action = str((tool_args or {}).get("action") or "").strip().lower()
+            return "cancel" if action in read_only_actions else "block"
         return "block"
 
     @staticmethod
@@ -7794,6 +7839,7 @@ class AgentExecutor:
         coro: Awaitable[dict[str, Any]],
         *,
         tool_name: str,
+        tool_args: dict[str, Any] | None = None,
         timeout_seconds: float,
         abort_signal: Any | None = None,
     ) -> dict[str, Any]:
@@ -7810,7 +7856,7 @@ class AgentExecutor:
             if callable(cancel):
                 cancel()
 
-        interrupt_behavior = self.get_tool_interrupt_behavior(tool_name)
+        interrupt_behavior = self.get_tool_interrupt_behavior(tool_name, tool_args)
         if self._cancel_event.is_set() and interrupt_behavior == "cancel":
             close = getattr(coro, "close", None)
             if callable(close):
@@ -8246,26 +8292,52 @@ class AgentExecutor:
         if memory_exhaustion is not None:
             return memory_exhaustion
 
-        # Set payment/signature session context so the browser server's gate
-        # overrides know which session is making this tool call.
+        # Bind browser gate overrides to exactly this tool call.  The two
+        # ContextVars form one safety context: if either setter fails, restore
+        # any partial binding and do not dispatch a browser-capable tool.
         task_id = self._ensure_task_id()
         _gate_session_id = self._session_id or task_id
-        try:
-            from mcp_servers.browser.server import (
-                set_payment_session,
-                set_signature_session,
-            )
+        _ps_token = None
+        _sg_token = None
+        if self._is_browser_takeover_tool(tool_name):
+            try:
+                from mcp_servers.browser.server import (
+                    set_payment_session,
+                    set_signature_session,
+                )
 
-            _ps_token = set_payment_session(_gate_session_id)
-            _sg_token = set_signature_session(_gate_session_id)
-        except Exception:
-            # ratchet: critical-path-visibility — payment/signature gate overrides
-            # silently lose their session binding otherwise (safety-critical).
-            logger.exception(
-                "Payment/signature session token setup failed; browser gate overrides will not bind this tool call"
-            )
-            _ps_token = None  # type: ignore[assignment] # PAY-25: failed token setup leaves no active payment context.
-            _sg_token = None  # type: ignore[assignment] # SIGNATURE-01: failed token setup leaves no active signature context.
+                _ps_token = set_payment_session(_gate_session_id)
+                _sg_token = set_signature_session(_gate_session_id)
+            except Exception:
+                # Roll back the first setter if the second one fails.  Leaving
+                # that ContextVar live could bind a later call to this session.
+                if _ps_token is not None:
+                    try:
+                        from mcp_servers.browser.server import reset_payment_session
+
+                        reset_payment_session(_ps_token)
+                    except Exception:
+                        logger.exception("Payment session rollback failed after gate binding error")
+                    finally:
+                        _ps_token = None
+                if _sg_token is not None:
+                    try:
+                        from mcp_servers.browser.server import reset_signature_session
+
+                        reset_signature_session(_sg_token)
+                    except Exception:
+                        logger.exception("Signature session rollback failed after gate binding error")
+                    finally:
+                        _sg_token = None
+                logger.exception(
+                    "Payment/signature session binding failed; browser-capable tool dispatch blocked"
+                )
+                return ToolResult(
+                    ok=False,
+                    error="Browser safety context could not be bound to this tool call",
+                    error_category="GATE_SESSION_BINDING_FAILED",
+                    retryable=False,
+                )
 
         # Mid-tool cancellation: wrap the hub call in a task so that
         # _cancel_event can abort it mid-execution rather than waiting
@@ -8349,6 +8421,7 @@ class AgentExecutor:
                         **hub_call_kwargs,
                     ),
                     tool_name=tool_name,
+                    tool_args=tool_args,
                     timeout_seconds=tool_timeout_secs,
                     abort_signal=tool_abort_signal,
                 )
@@ -9047,7 +9120,7 @@ class AgentExecutor:
         return_format = tool_args.get("return_format", "summary")
 
         # Check depth limit
-        if self._depth >= MAX_DELEGATION_DEPTH - 1:
+        if self._depth >= MAX_DELEGATION_DEPTH:
             return ToolResult(
                 ok=False,
                 error="Maximum delegation depth (%d) reached. "
@@ -9080,35 +9153,23 @@ class AgentExecutor:
             return ToolResult(ok=False, error="No tasks provided")
         if len(tasks_list) > 2:
             return ToolResult(ok=False, error="Maximum 2 parallel subtasks allowed")
-
-        # Safety: reject browser tasks (shared state)
-        _browser_tools = frozenset(
-            {
-                "browser_navigate",
-                "browser_snapshot",
-                "browser_click",
-                "browser_interact",
-                "browser_fill_form",
-                "browser_type",
-                "browser_evaluate",
-                "browser_run_script",
-                "browser_wait",
-            }
-        )
-        for i, t in enumerate(tasks_list):
-            hint = str(t.get("task", "")).lower()
-            tools_hint = t.get("tools", [])
-            if any(bt in hint for bt in _browser_tools) or any(bt in tools_hint for bt in _browser_tools):
-                return ToolResult(
-                    ok=False,
-                    error="Task %d references browser tools which cannot run in parallel because browser state is shared."
-                    % i,
-                )
+        if self._depth >= MAX_DELEGATION_DEPTH:
+            return ToolResult(
+                ok=False,
+                error="Maximum delegation depth (%d) reached. "
+                "Handle these tasks directly instead of delegating." % MAX_DELEGATION_DEPTH,
+            )
 
         async def _run_one(task_spec: dict) -> dict:
             task_text = task_spec.get("task", "")
             try:
-                result = await self._handle_spawn_subtask({"task": task_text})
+                result = await self._run_child_agent(
+                    task=task_text,
+                    max_steps=0,
+                    return_format="summary",
+                    parent_checkpoint=self._current_checkpoint,
+                    exclude_shared_state_tools=True,
+                )
                 return {
                     "task": task_text[:80],
                     "ok": result.ok,

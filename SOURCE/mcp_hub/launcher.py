@@ -21,12 +21,12 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-import os
 from typing import Any
 
 import anyio
 
 from core.logging_config import get_logger
+from core.subprocess_env import is_code_injection_env_key
 
 from .types import ServerConfig
 
@@ -70,30 +70,6 @@ _INLINE_CODE_ARG_FLAGS: dict[str, set[str]] = {
     "node": {"-e", "--eval", "-p", "--print", "--require", "-r"},
     "npx": {"-e", "--eval", "-c", "--call", "-p", "--package=-"},
 }
-
-# Environment keys that can inject code into an otherwise-clean command
-# (SEC-033 rider / SEC-036): `NODE_OPTIONS=--require=evil.js`,
-# `PYTHONSTARTUP`, `PYTHONPATH`, `LD_PRELOAD`, etc. Rejected on the
-# externally-supplied env overlay.
-_DANGEROUS_ENV_KEYS: frozenset[str] = frozenset(
-    {
-        "NODE_OPTIONS",
-        "PYTHONSTARTUP",
-        "PYTHONPATH",
-        "PYTHONHOME",
-        "PYTHONEXECUTABLE",
-        "PYTHONWARNINGS",
-        "BASH_ENV",
-        "ENV",
-        "LD_PRELOAD",
-        "LD_LIBRARY_PATH",
-        "LD_AUDIT",
-        "DYLD_INSERT_LIBRARIES",
-        "DYLD_LIBRARY_PATH",
-        "DYLD_FRAMEWORK_PATH",
-    }
-)
-
 
 def _base_exe_name(command: str) -> str:
     """Extract the base executable name (no path, no .exe/.cmd/.bat suffix)."""
@@ -150,7 +126,7 @@ def _validate_server_command(config: ServerConfig) -> str | None:
 
     # Reject code-injecting environment overrides on the externally-supplied env.
     for env_key in config.env or {}:
-        if str(env_key).strip().upper() in _DANGEROUS_ENV_KEYS:
+        if is_code_injection_env_key(env_key):
             return (
                 "Rejected MCP server '%s': environment variable '%s' can inject code "
                 "into the subprocess and is not allowed." % (config.name, env_key)
@@ -213,17 +189,17 @@ class MCPServerLauncher:
             logger.warning("Rejected MCP server command: %s", config.command)
             raise ValueError(rejection)
 
-        # Always pass the full parent environment so subprocess inherits
-        # VIOLA_* vars (e.g. VIOLA_BROWSER_ALLOW_LOCALHOST).  The MCP
-        # library's get_default_environment() strips most vars when env=None.
-        merged_env = dict(os.environ)
-        if config.env:
-            merged_env.update(config.env)
+        # The MCP SDK adds its small cross-platform allowlist of process
+        # essentials (PATH, system root/home, temp, user profile) at the final
+        # spawn boundary.  Pass only this server's explicit overlay here so an
+        # unrelated credential or code-injection variable from Viola's parent
+        # process cannot silently cross into every external MCP server.
+        server_env = dict(config.env or {})
 
         params = StdioServerParameters(
             command=config.command,
             args=config.args or [],
-            env=merged_env,
+            env=server_env,
         )
 
         logger.info(

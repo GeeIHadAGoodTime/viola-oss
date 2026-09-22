@@ -11,6 +11,18 @@ Keep local APIs on loopback unless you have configured authentication and networ
 access deliberately. Never expose an unauthenticated development listener publicly.
 Use your own provider/carrier credentials and protect your local state directory.
 
+The `run_command` tool validates command syntax and requires explicit approval, but
+the approved process still runs with the current operating-system user's authority.
+It can read or change files, access the network, and start child processes wherever
+that user can. It is not an operating-system sandbox. Treat an approved shell command
+as local code execution. Use a dedicated low-privilege OS account, container, or
+virtual machine boundary when untrusted code needs stronger isolation.
+
+External MCP subprocesses receive only the MCP SDK's small set of process essentials
+(such as `PATH`, the user profile or home directory, and the temporary directory)
+plus environment values explicitly configured for that server. Configure a needed
+credential on that server rather than relying on an ambient parent-process secret.
+
 Verify the exact source and dependency inventory distributed with a release.
 Update dependencies through tested changes; a successful installation does not
 prove that the selected versions are free of advisories. Third-party components

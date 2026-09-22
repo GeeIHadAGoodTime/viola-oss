@@ -107,7 +107,7 @@ def _cloud_llm_consent_service_value() -> bool | None:
         return None
 
 
-def _get_consent(key: str) -> bool:
+def _get_consent(key: str, *, user_id: str | None = None, allow_environment: bool = True) -> bool:
     """Read a consent flag from environment or SettingsManager.
 
     Checks the environment variable first (e.g. VIOLA_CONSENT_CLOUD_STT),
@@ -117,7 +117,7 @@ def _get_consent(key: str) -> bool:
     """
     # Check env var override first (set via .env or system environment)
     env_var = _CONSENT_ENV_VARS.get(key)
-    if env_var:
+    if allow_environment and env_var:
         env_val = os.environ.get(env_var)
         if env_val is not None:
             return str(env_val).strip().lower() in ("1", "true", "yes", "on", "y")
@@ -126,7 +126,7 @@ def _get_consent(key: str) -> bool:
         from ui.settings_manager import get_settings_manager
 
         mgr = get_settings_manager()
-        value = mgr.get(key, _MISSING)
+        value = mgr.get(key, _MISSING, user_id=user_id)
         if value is _MISSING:
             return False
         return bool(value)
@@ -182,9 +182,34 @@ def is_cloud_sync_consented() -> bool:
     return _get_consent("consent_cloud_sync")
 
 
-def is_openai_storage_consented() -> bool:
-    """Check if user consented to OpenAI server-side response storage."""
-    return _get_consent("consent_openai_storage")
+def is_openai_storage_consented(user_id: str | None = None) -> bool:
+    """Check whether the selected user consented to OpenAI response storage.
+
+    ``user_id`` keeps delayed and background work bound to the user that
+    initiated it.  Calls without an explicit id retain the request-context or
+    desktop behavior used by existing interactive paths.
+    """
+    # A deployment-wide environment flag is an intentional desktop-owner
+    # convenience. It cannot stand in for a named cloud user's consent record:
+    # delayed work already has that initiating user id and must not inherit a
+    # process-wide value or another request's ambient principal.
+    resolved_user_id = user_id
+    try:
+        from services.computer_use.cloud_guard import is_cloud_surface
+        from config.settings import settings as app_settings
+
+        cloud_surface = bool(is_cloud_surface(app_settings))
+    except Exception:
+        # A global value can only authorize local-owner storage after a local
+        # surface is positively established. Unknown is treated as shared.
+        cloud_surface = True
+    if cloud_surface and not resolved_user_id:
+        resolved_user_id = _cloud_runtime_user_id()
+    return _get_consent(
+        "consent_openai_storage",
+        user_id=resolved_user_id,
+        allow_environment=not cloud_surface,
+    )
 
 
 def is_error_reporting_consented() -> bool:

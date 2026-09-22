@@ -31,6 +31,10 @@ key in Settings, or select a [local model](docs/CONFIGURATION.md). Do not sign i
 a company account to use the source core. Only provider features you configure
 need provider credentials.
 
+Read the [privacy and data-flow guide](docs/PRIVACY.md) for the actual default
+boundary, optional provider requests, background memory calls, and local debug
+log handling.
+
 The model download is explicit and verifies checksums. Python/npm installation,
 speech-model preparation, browser installation and optional local-model download
 need Internet access. Once prepared, local inference and local speech run on your

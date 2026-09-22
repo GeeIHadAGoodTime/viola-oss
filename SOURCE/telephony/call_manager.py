@@ -51,7 +51,7 @@ from datetime import UTC, datetime
 from enum import Enum
 from functools import partial
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal, Protocol
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 from config import defaults
@@ -1582,6 +1582,9 @@ def _billed_duration_seconds(record: CallRecord) -> float:
     raw ``ended_at - started_at`` into ``record.duration_seconds``, the number
     that reaches the money ledger still cannot exceed the carrier-proven window.
     """
+    carrier_duration = record.carrier_billed_duration_seconds
+    if carrier_duration is not None:
+        return max(0.0, float(carrier_duration))
     if record.started_at is not None:
         return _billable_window_seconds(record)
     return max(0.0, float(record.duration_seconds or 0.0))
@@ -1594,6 +1597,9 @@ def _billed_cost_usd(record: CallRecord) -> float:
     in-system ledger lines up with what Telnyx actually charges us.
     See PHONE-06/PHONE-11.
     """
+    carrier_cost = record.carrier_total_cost_usd
+    if carrier_cost is not None:
+        return max(0.0, float(carrier_cost))
     cost = float(record.estimated_cost_usd or 0.0)
     if record.status.value in _BILLABLE_FAILURE_STATES:
         cost = max(cost, _MIN_BILLED_COST_USD)
@@ -1757,6 +1763,7 @@ def _persist_call_history_entry(record: CallRecord) -> Path:
         "duration_seconds": float(record.duration_seconds or 0.0),
         "llm_prompt_tokens": int(record.llm_prompt_tokens or 0),
         "llm_completion_tokens": int(record.llm_completion_tokens or 0),
+        "carrier_revision": int(record.carrier_revision or 0),
     }
     persisted_transcript = _persisted_transcript_entries(record)
     entry = CallHistoryEntry(
@@ -3395,6 +3402,13 @@ class CallRecord:
     # ``_billable_window_seconds``; never used for terminal-status decisions,
     # which stay exactly where they were.
     carrier_hangup_at: datetime | None = None
+    # Optional durable carrier-CDR facts. A deployment may provide these through
+    # ``CarrierEventAdapter``; standalone desktop calls continue to use the
+    # locally observed values above.
+    carrier_billed_duration_seconds: float | None = None
+    carrier_total_cost_usd: float | None = None
+    carrier_cost_at: datetime | None = None
+    carrier_revision: int = 0
     # The moment the Telnyx media stream ended AND failed to recover, recorded by
     # ``_watch_telnyx_ws_disconnect``. Second honest end anchor for the same
     # window, covering the case where the media socket dies but the ``call.hangup``
@@ -3477,6 +3491,71 @@ class CallRecord:
     queue_position: int = 0
     queued_at: float = 0.0
     duplicate_request_suppressed: bool = False
+
+
+@dataclass(frozen=True)
+class CarrierCallIdentity:
+    """Owner-bound identity for one carrier control leg.
+
+    Extension adapters must keep all three values together. A control id on
+    its own is not an authorization to load or mutate another user's call.
+    """
+
+    user_id: str
+    call_id: str
+    call_control_id: str
+
+    def is_complete(self) -> bool:
+        return bool(self.user_id.strip() and self.call_id.strip() and self.call_control_id.strip())
+
+
+@dataclass(frozen=True)
+class CarrierEvent:
+    """One verified carrier callback passed to an optional durable adapter."""
+
+    call_control_id: str
+    kind: Literal["answered", "hangup", "cost"]
+    occurred_at: datetime | None = None
+    hangup_cause: str = ""
+    billed_duration_seconds: float | None = None
+    total_cost_usd: float | None = None
+
+
+@dataclass(frozen=True)
+class CarrierEventProjection:
+    """Dependency-free durable result returned by a carrier event adapter."""
+
+    identity: CarrierCallIdentity
+    status: str
+    duration_seconds: float = 0.0
+    estimated_cost_usd: float = 0.0
+    carrier_answered_at: datetime | None = None
+    carrier_hangup_at: datetime | None = None
+    carrier_hangup_cause: str = ""
+    carrier_billed_duration_seconds: float | None = None
+    carrier_total_cost_usd: float | None = None
+    carrier_cost_at: datetime | None = None
+    carrier_revision: int = 0
+
+
+class CarrierEventAdapter(Protocol):
+    """Optional durable carrier projection adapter for hosted integrations.
+
+    The public manager owns identity validation and in-memory/history mutation.
+    An adapter owns its database, carrier CDR parsing, and accounting details.
+    Returning ``None`` means the event was not durably accepted; callers must
+    leave their webhook retryable.
+    """
+
+    async def bind_call_control_id(self, identity: CarrierCallIdentity) -> None: ...
+
+    async def resolve_call(self, call_control_id: str) -> CarrierEventProjection | None: ...
+
+    async def apply_event(
+        self,
+        event: CarrierEvent,
+        expected_identity: CarrierCallIdentity,
+    ) -> CarrierEventProjection | None: ...
 
 
 def _enable_recording_after_disclosure(record: CallRecord) -> None:
@@ -3903,7 +3982,13 @@ class CallManager:
         print(record.transcript)
     """
 
-    def __init__(self, config: TelnyxConfig, *, queue_store: PhoneCallQueue | None = None) -> None:
+    def __init__(
+        self,
+        config: TelnyxConfig,
+        *,
+        queue_store: PhoneCallQueue | None = None,
+        carrier_event_adapter: CarrierEventAdapter | None = None,
+    ) -> None:
         if not config.is_configured:
             raise ValueError("TelnyxConfig is incomplete. Need api_key, phone_number, sip_connection_id.")
         self.config = config
@@ -3912,6 +3997,9 @@ class CallManager:
         self._call_tasks: dict[str, asyncio.Task[None]] = {}
         self._billing_heartbeat_tasks: dict[str, asyncio.Task[None]] = {}
         self._call_queue = queue_store or PhoneCallQueue()
+        # Hosted deployments can opt into a durable carrier projection without
+        # making its database, CDR schema, or ledger a public-source dependency.
+        self._carrier_event_adapter = carrier_event_adapter
         self._queued_issuer_channels: dict[str, Any] = {}
         self._queue_pump_lock = asyncio.Lock()
         self._queue_pump_task: asyncio.Task[None] | None = None
@@ -4322,15 +4410,20 @@ class CallManager:
         hub = MCPClientHub(approval_bridge=ApprovalBridge(approval_manager))
         runtime_configs = build_runtime_mcp_server_configs(browser_surface=_PHONE_BACKGROUND_BROWSER_SURFACE)
 
-        await hub.initialize(runtime_configs.fast_configs)
-
-        if any(config.name == "google-workspace" for config in runtime_configs.fast_configs) and user_id:
+        if any(config.name == "google-workspace" for config in runtime_configs.fast_configs):
+            workspace_ready = False
             try:
                 from services.oauth.workspace_bridge import export_tokens_for_workspace
 
-                asyncio.ensure_future(export_tokens_for_workspace(user_id))
+                workspace_ready = await export_tokens_for_workspace(user_id)
             except Exception:
-                logger.debug("Phone Workspace token seeding deferred to login")
+                logger.exception("Phone Workspace token preparation failed; not starting Workspace MCP")
+            if not workspace_ready:
+                runtime_configs.fast_configs = [
+                    config for config in runtime_configs.fast_configs if config.name != "google-workspace"
+                ]
+
+        await hub.initialize(runtime_configs.fast_configs)
 
         if runtime_configs.browser_config is not None:
             try:
@@ -5067,6 +5160,150 @@ class CallManager:
         """
         return self._active_calls.get(call_id) or self._call_records.get(call_id)
 
+    @staticmethod
+    def _carrier_identity_for_record(record: CallRecord) -> CarrierCallIdentity | None:
+        identity = CarrierCallIdentity(
+            user_id=str(record.user_id or "").strip(),
+            call_id=str(record.call_id or "").strip(),
+            call_control_id=str(record.telnyx_call_control_id or "").strip(),
+        )
+        return identity if identity.is_complete() else None
+
+    @staticmethod
+    def _projection_matches_identity(
+        projection: CarrierEventProjection,
+        expected_identity: CarrierCallIdentity,
+    ) -> bool:
+        return projection.identity == expected_identity and expected_identity.is_complete()
+
+    @staticmethod
+    def _apply_carrier_projection(record: CallRecord, projection: CarrierEventProjection) -> bool:
+        """Apply only public record fields from a validated durable projection."""
+        try:
+            status = CallStatus(str(projection.status))
+            duration_seconds = max(0.0, float(projection.duration_seconds))
+            estimated_cost_usd = max(0.0, float(projection.estimated_cost_usd))
+            revision = int(projection.carrier_revision)
+            carrier_duration = (
+                None
+                if projection.carrier_billed_duration_seconds is None
+                else max(0.0, float(projection.carrier_billed_duration_seconds))
+            )
+            carrier_cost = (
+                None
+                if projection.carrier_total_cost_usd is None
+                else max(0.0, float(projection.carrier_total_cost_usd))
+            )
+        except (TypeError, ValueError):
+            return False
+        if any(
+            value is not None and not isinstance(value, datetime)
+            for value in (projection.carrier_answered_at, projection.carrier_hangup_at, projection.carrier_cost_at)
+        ):
+            return False
+        if revision < int(record.carrier_revision or 0):
+            return False
+        record.status = status
+        record.duration_seconds = duration_seconds
+        record.estimated_cost_usd = estimated_cost_usd
+        record.carrier_answered = projection.carrier_answered_at is not None
+        record.carrier_answered_at = projection.carrier_answered_at
+        record.carrier_hangup_at = projection.carrier_hangup_at
+        record.carrier_hangup_cause = str(projection.carrier_hangup_cause or "")
+        record.carrier_billed_duration_seconds = carrier_duration
+        record.carrier_total_cost_usd = carrier_cost
+        record.carrier_cost_at = projection.carrier_cost_at
+        record.carrier_revision = revision
+        return True
+
+    async def _bind_carrier_call_control_id(self, record: CallRecord) -> None:
+        adapter = self._carrier_event_adapter
+        identity = self._carrier_identity_for_record(record)
+        if adapter is None or identity is None:
+            return
+        await adapter.bind_call_control_id(identity)
+
+    def _schedule_carrier_call_control_bind(self, record: CallRecord) -> None:
+        """Schedule an idempotent bind for a control id learned from media."""
+        if self._carrier_event_adapter is None or self._carrier_identity_for_record(record) is None:
+            return
+
+        async def _bind() -> None:
+            try:
+                await self._bind_carrier_call_control_id(record)
+            except Exception:
+                # A later signed callback will resolve through the adapter and
+                # remain retryable until its durable identity exists.
+                logger.exception("Failed to bind carrier control id for call %s", record.call_id)
+
+        asyncio.create_task(_bind(), name="carrier-control-bind-%s" % record.call_id)
+
+    async def _resolve_carrier_event_record(self, call_control_id: str) -> CallRecord | None:
+        record = self.get_record_by_call_control_id(call_control_id)
+        if record is not None:
+            return record
+        adapter = self._carrier_event_adapter
+        if adapter is None:
+            return None
+        projection = await adapter.resolve_call(call_control_id)
+        if projection is None:
+            return None
+        identity = projection.identity
+        if not identity.is_complete() or identity.call_control_id != call_control_id:
+            logger.warning("Carrier adapter returned a mismatched control-id projection")
+            return None
+        existing_by_call_id = self.get_record(identity.call_id)
+        if existing_by_call_id is not None:
+            existing_identity = self._carrier_identity_for_record(existing_by_call_id)
+            if existing_identity != identity:
+                logger.warning("Carrier adapter attempted to reuse a differently bound call id")
+                return None
+            return existing_by_call_id
+        try:
+            record = CallRecord(
+                call_id=identity.call_id,
+                phone_number="",
+                task="",
+                caller_name="",
+                user_id=identity.user_id,
+                status=CallStatus(str(projection.status)),
+                telnyx_call_control_id=identity.call_control_id,
+            )
+        except ValueError:
+            logger.warning("Carrier adapter returned an unsupported call status")
+            return None
+        if not self._apply_carrier_projection(record, projection):
+            logger.warning("Carrier adapter returned an invalid durable projection")
+            return None
+        self._call_records[record.call_id] = record
+        return record
+
+    async def _apply_durable_carrier_event(self, record: CallRecord, event: CarrierEvent) -> bool:
+        """Persist an adapter event before mutating the public record/history."""
+        adapter = self._carrier_event_adapter
+        identity = self._carrier_identity_for_record(record)
+        if adapter is None or identity is None or event.call_control_id != identity.call_control_id:
+            return False
+        projection = await adapter.apply_event(event, identity)
+        if projection is None or not self._projection_matches_identity(projection, identity):
+            logger.warning("Carrier adapter did not accept an owner-bound event")
+            return False
+        if not self._apply_carrier_projection(record, projection):
+            logger.warning("Carrier adapter returned an invalid event projection")
+            return False
+
+        from telephony.call_history import update_call_history_billing_fields
+
+        update_call_history_billing_fields(
+            identity.call_id,
+            identity.user_id,
+            status=record.status.value,
+            duration_seconds=record.duration_seconds,
+            estimated_cost_usd=record.estimated_cost_usd,
+            carrier_revision=record.carrier_revision,
+        )
+        return True
+
     def get_active_call_for_user(self, user_id: str) -> CallRecord | None:
         """Return the user's currently-live call, or None.
 
@@ -5160,7 +5397,12 @@ class CallManager:
             return True
         return False
 
-    async def handle_call_answered(self, call_control_id: str) -> bool:
+    async def handle_call_answered(
+        self,
+        call_control_id: str,
+        *,
+        occurred_at: datetime | None = None,
+    ) -> bool:
         """Record the authoritative Telnyx ``call.answered`` signal (issue #2796).
 
         ACTIVE is set when the media stream connects, which can precede the
@@ -5169,20 +5411,31 @@ class CallManager:
         answered call is honestly reported COMPLETED and an unanswered one is
         not.
         """
-        record = self.get_record_by_call_control_id(call_control_id)
+        record = await self._resolve_carrier_event_record(call_control_id)
         if record is None:
             logger.info(
                 "call.answered for unknown call_control_id=%s",
                 call_control_id[:16],
             )
             return False
+        if self._carrier_event_adapter is not None:
+            return await self._apply_durable_carrier_event(
+                record,
+                CarrierEvent(call_control_id=call_control_id, kind="answered", occurred_at=occurred_at),
+            )
         if not record.carrier_answered:
             record.carrier_answered = True
-            record.carrier_answered_at = datetime.now(tz=UTC)
+            record.carrier_answered_at = occurred_at or datetime.now(tz=UTC)
             logger.info("Call %s: carrier confirmed answer", record.call_id)
         return True
 
-    async def handle_call_hangup(self, call_control_id: str, hangup_cause: str = "") -> bool:
+    async def handle_call_hangup(
+        self,
+        call_control_id: str,
+        hangup_cause: str = "",
+        *,
+        occurred_at: datetime | None = None,
+    ) -> bool:
         """Record the authoritative Telnyx ``call.hangup`` cause (issue #2796).
 
         Stores ``hangup_cause`` so terminal-status derivation can tell a real
@@ -5195,7 +5448,7 @@ class CallManager:
         optimistic COMPLETED is corrected -- an already-honest terminal status
         (FAILED/TIMEOUT/CANCELLED/NO_ANSWER/VOICEMAIL) is left untouched.
         """
-        record = self.get_record_by_call_control_id(call_control_id)
+        record = await self._resolve_carrier_event_record(call_control_id)
         if record is None:
             logger.info(
                 "call.hangup for unknown call_control_id=%s (cause=%s)",
@@ -5204,12 +5457,23 @@ class CallManager:
             )
             return False
 
+        if self._carrier_event_adapter is not None:
+            return await self._apply_durable_carrier_event(
+                record,
+                CarrierEvent(
+                    call_control_id=call_control_id,
+                    kind="hangup",
+                    occurred_at=occurred_at,
+                    hangup_cause=hangup_cause,
+                ),
+            )
+
         cause = (hangup_cause or "").strip().lower()
         record.carrier_hangup_cause = cause
         # #2589: keep the TIME, not just the cause. This is the authoritative
         # end of the billable leg. Earliest-wins so a Telnyx redelivery of the
         # same event cannot push the billed end later.
-        now = datetime.now(tz=UTC)
+        now = occurred_at or datetime.now(tz=UTC)
         if record.carrier_hangup_at is None or now < record.carrier_hangup_at:
             record.carrier_hangup_at = now
 
@@ -5228,9 +5492,42 @@ class CallManager:
                 await self._correct_settled_ledger_status(record, CallStatus.NO_ANSWER)
         return True
 
-    async def handle_local_carrier_hangup(self, call_control_id: str, hangup_cause: str = "") -> bool:
+    async def handle_call_cost(
+        self,
+        call_control_id: str,
+        *,
+        billed_duration_seconds: float | None,
+        total_cost_usd: float | None,
+        occurred_at: datetime | None = None,
+    ) -> bool:
+        """Apply an ordered carrier CDR only through a durable adapter.
+
+        Standalone source installations do not retain a carrier CDR projection,
+        so an unowned cost callback remains unhandled and retryable.
+        """
+        record = await self._resolve_carrier_event_record(call_control_id)
+        if record is None or self._carrier_event_adapter is None:
+            return False
+        return await self._apply_durable_carrier_event(
+            record,
+            CarrierEvent(
+                call_control_id=call_control_id,
+                kind="cost",
+                occurred_at=occurred_at,
+                billed_duration_seconds=billed_duration_seconds,
+                total_cost_usd=total_cost_usd,
+            ),
+        )
+
+    async def handle_local_carrier_hangup(
+        self,
+        call_control_id: str,
+        hangup_cause: str = "",
+        *,
+        occurred_at: datetime | None = None,
+    ) -> bool:
         """End local media after a signed carrier event, even if its socket stays open."""
-        if not await self.handle_call_hangup(call_control_id, hangup_cause):
+        if not await self.handle_call_hangup(call_control_id, hangup_cause, occurred_at=occurred_at):
             return False
         record = self.get_record_by_call_control_id(call_control_id)
         # The carrier already ended the leg; cleanup must not issue a new hangup.
@@ -5690,6 +5987,7 @@ class CallManager:
 
             def _capture_telnyx_call_control_id(call_control_id: str) -> None:
                 record.telnyx_call_control_id = call_control_id
+                self._schedule_carrier_call_control_bind(record)
                 logger.info(
                     "Call %s: captured Telnyx call_control_id from media stream: %s",
                     record.call_id,
@@ -6719,6 +7017,7 @@ class CallManager:
             call_control_id = telnyx_dial_call_control_id(dial_response)
             if call_control_id:
                 record.telnyx_call_control_id = call_control_id
+                await self._bind_carrier_call_control_id(record)
 
             logger.info(
                 "Telnyx call initiated: control_id=%s",
@@ -6764,6 +7063,7 @@ class CallManager:
 
             if not record.telnyx_call_control_id and transport.call_control_id:
                 record.telnyx_call_control_id = transport.call_control_id
+                await self._bind_carrier_call_control_id(record)
 
             record.status = CallStatus.ACTIVE
             record.started_at = datetime.now(tz=UTC)

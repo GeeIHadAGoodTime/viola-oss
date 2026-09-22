@@ -263,7 +263,7 @@ class ConsentService:
             raise ConsentError("Failed to clear exported Google Workspace credentials") from exc
 
         try:
-            cleared = clear_exported_workspace_tokens()
+            cleared = clear_exported_workspace_tokens(user_id)
         except Exception as exc:
             logger.warning(
                 "Failed to clear Workspace MCP credential cache for user %s: %s",

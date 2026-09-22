@@ -19,7 +19,7 @@ import threading
 import time
 from dataclasses import dataclass
 from difflib import SequenceMatcher
-from typing import Annotated, Any
+from typing import Annotated, Any, Awaitable, Callable
 from urllib.parse import urljoin, urlparse
 
 from mcp.server.fastmcp import FastMCP
@@ -66,6 +66,8 @@ from .safety_helpers import (
 )
 
 logger = get_logger(__name__)
+PaymentFillHandler = Callable[..., Awaitable[str]]
+_payment_fill_handler: PaymentFillHandler | None = None
 _BROWSER_OPERATION_ERRORS = (
     PlaywrightError,
     RuntimeError,
@@ -75,6 +77,23 @@ _BROWSER_OPERATION_ERRORS = (
 )
 _BROWSER_METADATA_PROBE_ERRORS = _BROWSER_OPERATION_ERRORS + (AttributeError,)
 _BROWSER_SNAPSHOT_MAX_LLM_CHARS = 12_000
+
+
+def register_payment_fill_handler(handler: PaymentFillHandler) -> None:
+    """Register the host-provided secure payment-fill implementation.
+
+    The public browser server deliberately has no card vault.  A composed host
+    may register its vault-backed handler during trusted startup. Registration
+    is idempotent for the same handler and rejects replacement so runtime code
+    cannot silently swap the payment authority.
+    """
+
+    if not callable(handler):
+        raise TypeError("Payment fill handler must be callable")
+    global _payment_fill_handler
+    if _payment_fill_handler is not None and _payment_fill_handler is not handler:
+        raise RuntimeError("Payment fill handler is already registered")
+    _payment_fill_handler = handler
 
 
 def _browser_disabled() -> str | None:
@@ -5961,7 +5980,8 @@ async def browser_close() -> str:
 
 @server.tool(
     description=(
-        "Fill confirmed payment card details into the final payment page securely; card numbers and CVC are never exposed to the agent."
+        "Fill confirmed payment card details into the final payment page through a host-provided secure vault extension. "
+        "Returns payment_fill_unavailable when this build has no extension; card numbers and CVC are never exposed to the agent."
     ),
     annotations=_CONFIRM,
     meta={"risk": "confirm", "irreversible": True, "irreversible_class": "payment"},
@@ -5976,9 +5996,17 @@ async def fill_payment_details(card_label: str = "") -> str:
     Args:
         card_label: Label of the saved card to use. If empty, uses default.
     """
-    try:
-        from intent.tools.payment_fill import handle_fill_payment_details
+    handler = _payment_fill_handler
+    if handler is None:
+        return _json(
+            {
+                "ok": False,
+                "code": "payment_fill_unavailable",
+                "error": "Secure payment filling is not available in this build.",
+            }
+        )
 
+    try:
         confirmation_meta = _get_call_payment_confirmation()
         fill_args: dict[str, Any] = {
             "card_label": card_label or confirmation_meta.get("card_label") or None,
@@ -6018,7 +6046,7 @@ async def fill_payment_details(card_label: str = "") -> str:
         from core.user_context import user_scope
 
         with user_scope(user_id):
-            return await handle_fill_payment_details(
+            return await handler(
                 fill_args,
                 page=page,
             )

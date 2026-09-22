@@ -380,7 +380,7 @@ class AppConfig:
     tts_rate: int = 150  # WPM
     tts_volume: int = 80  # 0-100
     # Case-insensitive whole-word text respellings before phonemization,
-    # e.g. {"Jihad": "Jee hahd"}. User overrides win over built-in dictionaries.
+    # e.g. {"Amina": "Ah mee nah"}. User overrides win over built-in dictionaries.
     tts_pronunciation_overrides: dict[str, str] = field(default_factory=dict)
     tts_acronym_dict_enabled: bool = True
     tts_brand_dict_enabled: bool = True

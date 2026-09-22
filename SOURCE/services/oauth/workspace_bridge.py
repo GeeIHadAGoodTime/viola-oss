@@ -12,6 +12,7 @@ calls when its access token expires (replacing the default cloud function).
 from __future__ import annotations
 
 import json
+import hashlib
 from pathlib import Path
 
 from core.logging_config import get_logger
@@ -23,6 +24,83 @@ WORKSPACE_CREDENTIAL_FILES = (
     "gemini-cli-workspace-token.json",
     ".gemini-cli-workspace-master-key",
 )
+_WORKSPACE_CACHE_OWNER_FILE = ".viola-workspace-cache-owner"
+
+
+def _workspace_cache_is_local_to_user(user_id: str) -> bool:
+    """Whether the fixed Workspace cache belongs to this desktop user.
+
+    The external Workspace MCP implementation stores credentials in one fixed
+    file under its project root.  It has no per-user storage-root or transport
+    binding, so it is safe only for the one active user of a desktop install.
+    ``get_desktop_local_principals`` includes both its signed-in account id and
+    device id and raises on the multi-tenant cloud surface.
+    """
+    try:
+        from core.user_context import get_desktop_local_principals
+
+        return user_id in get_desktop_local_principals()
+    except (ImportError, LookupError, OSError, RuntimeError, ValueError):
+        return False
+
+
+def _principal_fingerprint(user_id: str) -> str:
+    return hashlib.sha256(user_id.encode("utf-8")).hexdigest()
+
+
+def _active_desktop_principal_fingerprints() -> set[str]:
+    try:
+        from core.user_context import get_desktop_local_principals
+
+        return {_principal_fingerprint(principal) for principal in get_desktop_local_principals() if principal}
+    except (ImportError, LookupError, OSError, RuntimeError, ValueError):
+        return set()
+
+
+def _cache_owner_path(root: Path) -> Path:
+    return root / _WORKSPACE_CACHE_OWNER_FILE
+
+
+def _read_cache_owner(root: Path) -> str | None:
+    try:
+        value = _cache_owner_path(root).read_text(encoding="ascii").strip()
+        return value or None
+    except OSError:
+        return None
+
+
+def _write_cache_owner(root: Path, user_id: str) -> None:
+    _cache_owner_path(root).write_text(_principal_fingerprint(user_id), encoding="ascii")
+
+
+def _cache_has_credentials(root: Path) -> bool:
+    return any((root / filename).exists() for filename in WORKSPACE_CREDENTIAL_FILES)
+
+
+def _remove_workspace_cache(root: Path, *, include_owner_marker: bool = True) -> bool:
+    filenames = (*WORKSPACE_CREDENTIAL_FILES, _WORKSPACE_CACHE_OWNER_FILE) if include_owner_marker else WORKSPACE_CREDENTIAL_FILES
+    for filename in filenames:
+        path = root / filename
+        if not path.exists():
+            continue
+        try:
+            path.unlink()
+        except OSError as exc:
+            logger.warning("Failed to clear Workspace MCP credential cache file %s: %s", path, exc)
+            return False
+    return True
+
+
+def _retire_cache_for_new_desktop_owner(root: Path) -> bool:
+    """Remove an old or legacy cache before another desktop account can use it."""
+    if not _cache_has_credentials(root):
+        return True
+    owner = _read_cache_owner(root)
+    if owner is not None and owner in _active_desktop_principal_fingerprints():
+        return True
+    # This is an account-handoff cleanup, not user-initiated revocation. The
+    # former owner is no longer an active principal on this one-user desktop.
+    return _remove_workspace_cache(root)
 
 
 def _get_workspace_mcp_root() -> Path | None:
@@ -41,7 +119,7 @@ def _get_workspace_mcp_root() -> Path | None:
     return None
 
 
-def clear_exported_workspace_tokens() -> bool:
+def clear_exported_workspace_tokens(user_id: str) -> bool:
     """Delete exported Google credentials from the Workspace MCP cache.
 
     Returns True when there is no configured cache or every cache file was
@@ -51,22 +129,23 @@ def clear_exported_workspace_tokens() -> bool:
     root = _get_workspace_mcp_root()
     if not root:
         return True
+    if not _workspace_cache_is_local_to_user(user_id):
+        logger.warning("Refusing to clear a shared Workspace credential cache outside its desktop owner")
+        return False
 
-    removed_any = False
-    for filename in WORKSPACE_CREDENTIAL_FILES:
-        credential_path = root / filename
-        if not credential_path.exists():
-            continue
-        try:
-            credential_path.unlink()
-            removed_any = True
-        except OSError as exc:
-            logger.warning("Failed to clear Workspace MCP credential cache file %s: %s", filename, exc)
+    if _cache_has_credentials(root):
+        owner = _read_cache_owner(root)
+        if owner is not None and owner != _principal_fingerprint(user_id):
+            logger.warning("Refusing to clear Workspace credentials owned by another desktop account")
+            return False
+        if owner is None:
+            logger.warning("Refusing to clear an unbound legacy Workspace credential cache")
             return False
 
-    if removed_any:
+    removed = _remove_workspace_cache(root)
+    if removed:
         logger.info("Cleared exported Google tokens from Workspace MCP credential cache")
-    return True
+    return removed
 
 
 async def export_tokens_for_workspace(user_id: str) -> bool:
@@ -77,6 +156,10 @@ async def export_tokens_for_workspace(user_id: str) -> bool:
 
     Returns True on success, False if tokens are unavailable.
     """
+    if not _workspace_cache_is_local_to_user(user_id):
+        logger.warning("Workspace credential export is unavailable outside the active desktop user")
+        return False
+
     try:
         from services.oauth.credentials import get_google_credentials
         from services.oauth.google import get_enabled_workspace_scopes
@@ -86,8 +169,15 @@ async def export_tokens_for_workspace(user_id: str) -> bool:
             logger.debug("Google Workspace bridge skipped because restricted Google features are disabled")
             return False
 
+        root = _get_workspace_mcp_root()
+        if not root:
+            logger.debug("Workspace MCP server not configured — bridge skipped")
+            return False
+
         creds = await get_google_credentials(user_id, required_scopes=workspace_scopes)
         if not creds or not creds.token:
+            if not _retire_cache_for_new_desktop_owner(root):
+                logger.warning("Workspace bridge could not retire stale credential cache")
             logger.info("No Google credentials for user %s — workspace bridge skipped", user_id)
             return False
 
@@ -100,9 +190,8 @@ async def export_tokens_for_workspace(user_id: str) -> bool:
             )
             return False
 
-        root = _get_workspace_mcp_root()
-        if not root:
-            logger.debug("Workspace MCP server not configured — bridge skipped")
+        if not _retire_cache_for_new_desktop_owner(root):
+            logger.warning("Workspace bridge refused to replace an unretired credential cache")
             return False
 
         scope_str = " ".join(sorted(scope_set))
@@ -126,6 +215,7 @@ async def export_tokens_for_workspace(user_id: str) -> bool:
         # Rather than reimplementing that in Python, we call a tiny Node script that
         # uses the MCP server's own encryption to write the file.
         _write_via_node(root, token_data)
+        _write_cache_owner(root, user_id)
         logger.info("Exported Google tokens to Workspace MCP for user %s", user_id)
         return True
 

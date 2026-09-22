@@ -72,7 +72,6 @@ _CALENDAR_WRITE_ACTIONS = {
 }
 _MEMORY_DELETE_ACTIONS = {"delete", "forget", "delete_all", "clear"}
 _PAYMENT_SAFE_ACTIONS = {"", "list", "request_review", "open_secure_card_entry"}
-_PAYMENT_ACTIONS = {"pay", "submit", "confirm", "purchase", "place_order"}
 _SMART_HOME_UNLOCK_ACTIONS = {"unlock"}
 _SMART_HOME_DISARM_ACTIONS = {"disarm"}
 _OAUTH_DISCONNECT_ACTIONS = {"disconnect", "clear", "revoke", "logout", "unlink"}
@@ -157,8 +156,11 @@ def irreversible_action_class(
     if name == "payment":
         if action in _PAYMENT_SAFE_ACTIONS:
             return None
-        if not action or action in _PAYMENT_ACTIONS:
-            return "payment"
+        # Payment extensions may add action names independently of the public
+        # core.  Only the small read/review allowlist above is reversible; an
+        # unknown non-empty payment action must fail into confirmation rather
+        # than silently bypass the irreversible-action gate.
+        return "payment"
     if name.startswith("payment_"):
         return "payment"
     if name == "smart_home":

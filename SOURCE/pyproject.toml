@@ -7,7 +7,7 @@ requires-python = ">=3.11"
 license = "Apache-2.0"
 
 [project.urls]
-Homepage = "https://github.com/GeeIHadAGoodTime/Viola"
+Homepage = "https://github.com/GeeIHadAGoodTime/viola-oss"
 
 [tool.ruff]
 line-length = 120
