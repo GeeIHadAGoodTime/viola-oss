@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "032d83a5a8ceddaa6bcfa982b51511fdc57efebcca2544e731dd4c6bd80406b9",
-  "source_tree_sha256": "0508733930df331f1a2c38dc299c1ce1d0312356b5a1c58fc7e981eec4b3f3f8",
+  "source_manifest_sha256": "af695a7fac4f1e873dd9f6ce8f993c95c37c36aa1ff76b91369a5ae56b394a95",
+  "source_tree_sha256": "2c266d09c8663d9a032a91a83623bc7c0cb7b62b614d16dad8112b804ec3147f",
   "source_file_count": 2470,
   "retained_sboms": [
     {
@@ -21,7 +21,7 @@
       "dependency_edges_including_source_root": 442,
       "package_dependency_edges": 353,
       "metadata_timestamp": "2026-09-12T19:05:06.292297+00:00",
-      "inventory_status": "retained_unchanged_inputs"
+      "inventory_status": "stale_pyjwt_2_13_requires_clean_2_15_1_refresh"
     },
     {
       "path": "windows-deepfilter.sbom.json",
@@ -39,7 +39,7 @@
       "dependency_edges_including_source_root": 597,
       "package_dependency_edges": 511,
       "metadata_timestamp": "2026-09-21T05:20:47.253196+00:00",
-      "inventory_status": "refreshed_from_exact_clean_windows_install"
+      "inventory_status": "stale_pyjwt_2_13_requires_clean_2_15_1_refresh"
     },
     {
       "path": "windows-kokoro.sbom.json",
@@ -48,7 +48,7 @@
       "dependency_edges_including_source_root": 422,
       "package_dependency_edges": 335,
       "metadata_timestamp": "2026-09-12T19:05:00.618392+00:00",
-      "inventory_status": "retained_unchanged_inputs"
+      "inventory_status": "stale_pyjwt_2_13_requires_clean_2_15_1_refresh"
     },
     {
       "path": "windows-other-optional.sbom.json",
@@ -57,82 +57,27 @@
       "dependency_edges_including_source_root": 419,
       "package_dependency_edges": 331,
       "metadata_timestamp": "2026-09-12T19:05:03.425261+00:00",
-      "inventory_status": "retained_unchanged_inputs"
+      "inventory_status": "stale_pyjwt_2_13_requires_clean_2_15_1_refresh"
     }
   ],
   "input_equivalence": {
-    "basis": "The Windows desktop dependency set was freshly resolved and installed for this exact source candidate. The other optional Python inventories and frontend lockfile inputs are unchanged from their identified retained inventories; the unchanged frontend was rebuilt and retested.",
+    "basis": "Only the separate DeepFilter and frontend dependency inputs remain unchanged. Four Windows desktop and optional inventories contain PyJWT 2.13.0 and are stale for this local 2.15.1 candidate; no Linux/macOS resolution is claimed.",
     "requirements": [
-      "requirements_bootstrap.txt",
-      "requirements_deepfilter.txt",
-      "requirements_desktop.txt",
-      "requirements_kokoro.txt",
-      "requirements_linux.txt",
-      "requirements_macos.txt",
-      "requirements_optional.txt"
+      "requirements_deepfilter.txt"
     ],
     "prior_frontend_binding_inputs_verified": 442
   },
-  "new_resolution_performed": true,
+  "new_resolution_performed": false,
   "new_advisory_scan_performed": false,
-  "new_runtime_qualification_performed": true,
-  "source_revision": "c7de239c61985273527d297adeef265d82269cb9",
-  "comparison_public_revision": "8673530938c6bdccf55b86e0a846016ae982467e",
+  "new_runtime_qualification_performed": false,
+  "source_revision": "f8d5457278380af4c31d5e1573eb0c00432dcdd3",
+  "comparison_public_revision": "f4d39d1dbb532420e0983051c72f64fb03950278",
   "changed_source_paths": [
-    "SOURCE/README.md",
-    "SOURCE/SECURITY.md",
-    "SOURCE/config/schema.py",
-    "SOURCE/config/settings.py",
-    "SOURCE/core/account_gate.py",
-    "SOURCE/core/privacy_consent.py",
-    "SOURCE/core/subprocess_env.py",
-    "SOURCE/docs/CONFIGURATION.md",
-    "SOURCE/docs/PRIVACY.md",
-    "SOURCE/docs/VERIFYING.md",
-    "SOURCE/intent/agent_executor.py",
-    "SOURCE/intent/agent_loop.py",
-    "SOURCE/intent/ai_controller.py",
-    "SOURCE/intent/irreversible_actions.py",
-    "SOURCE/intent/tool_allowlist.py",
-    "SOURCE/intent/tools/shell.py",
-    "SOURCE/mcp_hub/launcher.py",
-    "SOURCE/mcp_hub/runtime_config.py",
-    "SOURCE/mcp_servers/browser/server.py",
-    "SOURCE/music/consent/service.py",
-    "SOURCE/music/player/initializer.py",
-    "SOURCE/music/runtime/state_service.py",
-    "SOURCE/pyproject.toml",
     "SOURCE/requirements_desktop.txt",
     "SOURCE/requirements_linux.txt",
-    "SOURCE/requirements_macos.txt",
-    "SOURCE/services/llm/managed_budget.py",
-    "SOURCE/services/llm/openai_consent.py",
-    "SOURCE/services/oauth/workspace_bridge.py",
-    "SOURCE/services/openai_background.py",
-    "SOURCE/services/user_profile.py",
-    "SOURCE/telephony/call_history.py",
-    "SOURCE/telephony/call_manager.py",
-    "SOURCE/telephony/call_tools.py",
-    "SOURCE/telephony/loopback_phone_call_session.py",
-    "SOURCE/telephony/routes.py",
-    "SOURCE/tests/public/test_call_history_order_contract.py",
-    "SOURCE/tests/public/test_carrier_event_adapter_contract.py",
-    "SOURCE/tests/public/test_execution_safety_contract.py",
-    "SOURCE/tests/public/test_phone_call_plan_confirmation.py",
-    "SOURCE/tests/public/test_pipecat_runner_security.py",
-    "SOURCE/tests/public/test_privacy_boundary_contract.py",
-    "SOURCE/tests/public/test_source_contract.py",
-    "SOURCE/tests/public/test_tool_allowlist_contract.py",
-    "SOURCE/third_party/pipecat.patch",
-    "SOURCE/third_party/pipecat/pyproject.toml",
-    "SOURCE/third_party/pipecat/src/pipecat/runner/run.py",
-    "SOURCE/third_party/sources.toml",
-    "SOURCE/tools/release/create_source_manifest.py",
-    "SOURCE/tools/release/verify_source_binding.py",
-    "SOURCE/ui/core/player_state.py",
-    "SOURCE/utils/audio_ducking.py"
+    "SOURCE/requirements_macos.txt"
   ],
-  "qualification": {
+  "prior_qualification": {
     "public_contracts": {
       "source_revision": "c7de239c61985273527d297adeef265d82269cb9",
       "passed_test_methods": 63,
@@ -157,11 +102,11 @@
       "prior_scanned_at": "2026-09-12T18:33:14.470607+00:00",
       "service": "OSV batch API",
       "unique_exact_queries": 238,
-      "status": "historical broad-scan evidence retained; current primary aiohttp and Pipecat advisories assessed against the exact candidate"
+      "status": "At the prior c7de239 source qualification, dated broad-scan evidence was retained and aiohttp/Pipecat advisories were assessed against that prior candidate"
     },
     "advisory_assessment": {
       "path": "advisory-assessment.md",
-      "sha256": "e194d040e49782643a3df58ec2dfd33457674dc25d6697c79fe5689dad5c5c5c"
+      "sha256": "b61cfa2ff678aa12c3f8896d2fb02733f223d4274b6d755aed479ece2deaaf57"
     },
     "pipecat_wheel_sha256": "fb0895009eaa6cb49f771e8952347b43dbcd0603d5470d97976e740d2a64f68e",
     "new_dependency_resolution_performed": true,
@@ -174,6 +119,17 @@
       "fixed_in": "3.14.3",
       "source": "https://github.com/aio-libs/aiohttp/security/advisories/GHSA-cq5v-8q36-5273",
       "disposition": "clean Windows install resolves 3.14.3; all desktop recipes require >=3.14.3"
-    }
+    },
+    "source_revision": "c7de239c61985273527d297adeef265d82269cb9",
+    "scope_note": "Historical clean-install, advisory and public-contract evidence for c7de239 only; it does not qualify the current PyJWT 2.15.1 source candidate."
+  },
+  "qualification": {
+    "source_revision": "f8d5457278380af4c31d5e1573eb0c00432dcdd3",
+    "clean_windows_dependency_resolution": "pending",
+    "pyjwt_bearing_windows_sbom_refresh": "pending_four_inventories",
+    "public_contracts": "pending_exact_source",
+    "advisory_scan": "pending_exact_composed_dependency_set",
+    "linux_macos_install": "not_performed",
+    "public_merge_and_release": "not_authorized"
   }
 }

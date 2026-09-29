@@ -1,18 +1,17 @@
 # Source snapshot dependency inventories
 
-This metadata accompanies public source revision
-`c7de239c61985273527d297adeef265d82269cb9`. The canonical manifest contains
-2,470 source files and binds the exact `SOURCE/` tree used by the clean Windows
-reference installation and public contract qualification. This follow-up changes only
-one platform-specific contract assertion; runtime and dependency inputs are unchanged
-from the clean-installed candidate.
+This metadata accompanies a local, unpublished PyJWT security update with source
+commit `f8d5457278380af4c31d5e1573eb0c00432dcdd3` based on public
+`f4d39d1dbb532420e0983051c72f64fb03950278`. The canonical manifest binds
+the exact local `SOURCE/` tree. Its requirement pins change to PyJWT 2.15.1.
+The prior clean Windows installation and public contract qualification apply to
+the earlier source revision recorded in `source-binding.json`, not this candidate.
 
-`windows-desktop.sbom.json` was regenerated from that clean Windows CPython
-3.11 environment and its exact pip resolution. The other five inventories are
-retained from the preceding qualified source snapshot because their package
-inputs were not changed or re-resolved in this qualification. The binding makes
-that distinction explicit; it does not claim a fresh optional-package, Linux,
-macOS, or frontend dependency resolution.
+Four retained Windows inventories still list PyJWT 2.13.0, so they are stale for
+this candidate and must be regenerated from clean installations before public
+merge or distribution. The separate DeepFilter and frontend inventories have
+unchanged dependency inputs. No clean dependency resolution or broad runtime
+qualification of this candidate is claimed.
 
 Keep this directory alongside `SOURCE`. From the `SOURCE` directory, verify the
 distributed files and metadata with:
@@ -23,14 +22,14 @@ python -B tools/release/verify_source_binding.py --source . --metadata ../PUBLIC
 
 | Inventory | Scope | Packages | Status |
 |---|---|---:|---|
-| `windows-desktop.sbom.json` | Default Windows desktop dependencies | 210 | Refreshed from exact clean install |
-| `windows-kokoro.sbom.json` | Desktop plus optional Kokoro speech | 221 | Retained |
-| `windows-other-optional.sbom.json` | Desktop plus other optional dependencies | 218 | Retained |
-| `windows-all-optional.sbom.json` | Desktop plus all combined optional dependencies | 229 | Retained |
-| `windows-deepfilter.sbom.json` | Separate DeepFilter worker environment | 28 | Retained |
-| `frontend.sbom.json` | Browser application and development/build dependencies | 431 | Retained; unchanged inputs retested |
+| `windows-desktop.sbom.json` | Default Windows desktop dependencies | 210 | Stale: PyJWT 2.13.0 |
+| `windows-kokoro.sbom.json` | Desktop plus optional Kokoro speech | 221 | Stale: PyJWT 2.13.0 |
+| `windows-other-optional.sbom.json` | Desktop plus other optional dependencies | 218 | Stale: PyJWT 2.13.0 |
+| `windows-all-optional.sbom.json` | Desktop plus all combined optional dependencies | 229 | Stale: PyJWT 2.13.0 |
+| `windows-deepfilter.sbom.json` | Separate DeepFilter worker environment | 28 | Retained; unchanged inputs |
+| `frontend.sbom.json` | Browser application and development/build dependencies | 431 | Retained; unchanged inputs |
 
-The refreshed desktop inventory records the resolved versions, dependency
+The historical desktop inventory records the resolved versions, dependency
 relationships, publisher license declarations, and the download SHA-256 for
 209 remote artifacts. The maintained Pipecat fork was installed from
 `SOURCE/third_party/pipecat`, so its component records that relative source path
@@ -39,7 +38,8 @@ the installed environment matched on all 210 package names and versions.
 
 The retained inventories preserve their original identities and timestamps.
 Their embedded source revision identifies the snapshot where they were
-generated; `source-binding.json` records why they remain applicable here.
+generated; `source-binding.json` marks the four PyJWT-bearing inventories
+as stale until regenerated against this candidate.
 Python package resolution targets Windows CPython 3.11 AMD64. These reports do
 not establish installation results for Linux or macOS.
 

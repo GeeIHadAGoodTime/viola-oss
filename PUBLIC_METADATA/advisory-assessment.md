@@ -1,5 +1,12 @@
 # Public dependency advisory assessment
 
+**Historical scope:** This assessment covers the `c7de239...` source snapshot
+listed below. The current local PyJWT 2.15.1 candidate changes dependency
+inputs; its four PyJWT-bearing Windows SBOMs are stale and no new clean install
+or broad advisory scan has been completed. See `README.md` and
+`source-binding.json` for the candidate status. Statements below about
+unchanged inputs refer only to the earlier follow-up, not this candidate.
+
 - Source revision: `c7de239c61985273527d297adeef265d82269cb9`
 - Source tree SHA-256: `0508733930df331f1a2c38dc299c1ce1d0312356b5a1c58fc7e981eec4b3f3f8`
 - Canonical candidate manifest SHA-256: `032d83a5a8ceddaa6bcfa982b51511fdc57efebcca2544e731dd4c6bd80406b9`
