@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "af695a7fac4f1e873dd9f6ce8f993c95c37c36aa1ff76b91369a5ae56b394a95",
-  "source_tree_sha256": "2c266d09c8663d9a032a91a83623bc7c0cb7b62b614d16dad8112b804ec3147f",
+  "source_manifest_sha256": "0d5a51d102a628c29d470d64311b61f65b3d5d6213924d00d47e3a53f4854cd3",
+  "source_tree_sha256": "176c5d0774ae0521a60bb684a7b34938f796e89f4bba79ccfbe17ef8bddaddf3",
   "source_file_count": 2470,
   "retained_sboms": [
     {
@@ -12,7 +12,7 @@
       "components": 431,
       "dependency_edges_including_source_root": 903,
       "package_dependency_edges": 880,
-      "inventory_status": "retained_unchanged_inputs"
+      "inventory_status": "stale_brace_expansion_5_0_9_requires_5_0_12_refresh"
     },
     {
       "path": "windows-all-optional.sbom.json",
@@ -61,21 +61,22 @@
     }
   ],
   "input_equivalence": {
-    "basis": "Only the separate DeepFilter and frontend dependency inputs remain unchanged. Four Windows desktop and optional inventories contain PyJWT 2.13.0 and are stale for this local 2.15.1 candidate; no Linux/macOS resolution is claimed.",
+    "basis": "Only the separate DeepFilter dependency inputs remain unchanged. Four Windows inventories retain PyJWT 2.13.0 and the frontend inventory retains brace-expansion 5.0.9; all five are stale for this candidate. No Windows Python, Linux Python, or macOS dependency resolution is claimed.",
     "requirements": [
       "requirements_deepfilter.txt"
-    ],
-    "prior_frontend_binding_inputs_verified": 442
+    ]
   },
   "new_resolution_performed": false,
   "new_advisory_scan_performed": false,
   "new_runtime_qualification_performed": false,
-  "source_revision": "f8d5457278380af4c31d5e1573eb0c00432dcdd3",
+  "source_revision": "4501ee07a9e4ecbaa12ffd6b518d58c45d459ed8",
   "comparison_public_revision": "f4d39d1dbb532420e0983051c72f64fb03950278",
   "changed_source_paths": [
     "SOURCE/requirements_desktop.txt",
     "SOURCE/requirements_linux.txt",
-    "SOURCE/requirements_macos.txt"
+    "SOURCE/requirements_macos.txt",
+    "SOURCE/ui/react-app/package.json",
+    "SOURCE/ui/react-app/package-lock.json"
   ],
   "prior_qualification": {
     "public_contracts": {
@@ -124,12 +125,22 @@
     "scope_note": "Historical clean-install, advisory and public-contract evidence for c7de239 only; it does not qualify the current PyJWT 2.15.1 source candidate."
   },
   "qualification": {
-    "source_revision": "f8d5457278380af4c31d5e1573eb0c00432dcdd3",
+    "source_revision": "4501ee07a9e4ecbaa12ffd6b518d58c45d459ed8",
     "clean_windows_dependency_resolution": "pending",
     "pyjwt_bearing_windows_sbom_refresh": "pending_four_inventories",
     "public_contracts": "pending_exact_source",
     "advisory_scan": "pending_exact_composed_dependency_set",
     "linux_macos_install": "not_performed",
-    "public_merge_and_release": "not_authorized"
+    "public_merge_and_release": "not_authorized",
+    "frontend_sbom_refresh": "pending_exact_5_0_12_inventory",
+    "frontend_cloud_validation": {
+      "environment": "Linux; Node 24.19.0; npm 11.9.0",
+      "clean_npm_ci": "passed; 435 packages; minimatch 3.1.5 patch applied",
+      "npm_audit": "passed; zero vulnerabilities on 2026-10-01",
+      "eslint": "passed; 0 errors, 170 pre-existing warnings",
+      "build": "passed; 7.88 seconds; credentials absent; not release qualification",
+      "vitest": "passed; 135 files, 954 tests; 49.58 seconds",
+      "brace_expansion_stress": "four advisory-shaped input cases completed without exception; ordinary expansion passed"
+    }
   }
 }
