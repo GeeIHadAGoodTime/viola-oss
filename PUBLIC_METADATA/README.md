@@ -1,51 +1,67 @@
 # Source snapshot dependency inventories
 
-This metadata accompanies public source revision
-`c7de239c61985273527d297adeef265d82269cb9`. The canonical manifest contains
-2,470 source files and binds the exact `SOURCE/` tree used by the clean Windows
-reference installation and public contract qualification. This follow-up changes only
-one platform-specific contract assertion; runtime and dependency inputs are unchanged
-from the clean-installed candidate.
+This metadata binds the exact public source tree at source revision
+`4501ee07a9e4ecbaa12ffd6b518d58c45d459ed8`, including PyJWT 2.15.1 and the
+brace-expansion 5.0.12 frontend override. It contains 2,470 source files.
 
-`windows-desktop.sbom.json` was regenerated from that clean Windows CPython
-3.11 environment and its exact pip resolution. The other five inventories are
-retained from the preceding qualified source snapshot because their package
-inputs were not changed or re-resolved in this qualification. The binding makes
-that distinction explicit; it does not claim a fresh optional-package, Linux,
-macOS, or frontend dependency resolution.
+## Current qualification
 
-Keep this directory alongside `SOURCE`. From the `SOURCE` directory, verify the
-distributed files and metadata with:
+The October 1 hosted Windows qualification installed five isolated Python
+feature scopes and the exact frontend graph. All installation checks succeeded;
+Python package inventories agree with the pip reports and installed versions,
+and `pip check` passed. Python report markers record Windows CPython 3.11.9 AMD64.
+
+The public source checks passed 63 Python contract tests. Frontend build and
+135 files / 954 tests passed, and npm audit reported zero vulnerabilities.
+These are source/synthetic behavior results, not actual provider, carrier,
+device, or other-platform runtime acceptance.
+
+| Inventory | Packages | Current status |
+|---|---:|---|
+| windows-desktop.sbom.json | 210 | Refreshed from clean Windows installation |
+| windows-kokoro.sbom.json | 221 | Refreshed from clean Windows installation |
+| windows-other-optional.sbom.json | 218 | Refreshed from clean Windows installation |
+| windows-all-optional.sbom.json | 229 | Refreshed from clean Windows installation |
+| frontend.sbom.json | 431 | Refreshed from exact clean Windows npm installation |
+| windows-deepfilter.sbom.json | 28 | Refreshed isolated worker; NumPy 1.26.4, urllib3 2.8.0 |
+
+The first fresh advisory scan caught three urllib3 findings in the old DeepFilter
+inventory. Its separate clean Windows refresh now resolves fixed urllib3 2.8.0.
+The final scan covers all five freshly installed Python scopes; only the two
+upstream Pipecat issues with tested maintained-fork backports remain as raw
+version matches. See `advisory-assessment.md` for disposition and scope limits.
+
+## Reproducible evidence
+
+From SOURCE, verify source and inventory binding before installing/building:
 
 ```sh
 python -B tools/release/verify_source_binding.py --source . --metadata ../PUBLIC_METADATA
 ```
 
-| Inventory | Scope | Packages | Status |
-|---|---|---:|---|
-| `windows-desktop.sbom.json` | Default Windows desktop dependencies | 210 | Refreshed from exact clean install |
-| `windows-kokoro.sbom.json` | Desktop plus optional Kokoro speech | 221 | Retained |
-| `windows-other-optional.sbom.json` | Desktop plus other optional dependencies | 218 | Retained |
-| `windows-all-optional.sbom.json` | Desktop plus all combined optional dependencies | 229 | Retained |
-| `windows-deepfilter.sbom.json` | Separate DeepFilter worker environment | 28 | Retained |
-| `frontend.sbom.json` | Browser application and development/build dependencies | 431 | Retained; unchanged inputs retested |
+The checksummed receipts under `qualification-20261001/` retain exact source
+hashes, platform markers, installed versions, sanitized package artifact
+URLs/hashes, requested extras, dependency declarations, and GitHub run/job
+provenance. Local maintained packages use relative source paths instead of
+invented download hashes. Package licenses come from publisher metadata; no
+permissive license is guessed for an undeclared or ambiguous package.
 
-The refreshed desktop inventory records the resolved versions, dependency
-relationships, publisher license declarations, and the download SHA-256 for
-209 remote artifacts. The maintained Pipecat fork was installed from
-`SOURCE/third_party/pipecat`, so its component records that relative source path
-instead of inventing a wheel hash for the directory install. The pip report and
-the installed environment matched on all 210 package names and versions.
+The generated Python graph evaluates the recorded Windows marker environment
+and active requested/transitive extras. Root edges identify requested packages,
+including the explicitly installed bootstrap tooling. This differs from a
+raw exporter graph that includes inactive extras or an empty pyproject root.
 
-The retained inventories preserve their original identities and timestamps.
-Their embedded source revision identifies the snapshot where they were
-generated; `source-binding.json` records why they remain applicable here.
-Python package resolution targets Windows CPython 3.11 AMD64. These reports do
-not establish installation results for Linux or macOS.
+[Source checks](https://github.com/GeeIHadAGoodTime/viola-oss/actions/runs/36895224651)
+and [inventory generation](https://github.com/GeeIHadAGoodTime/viola-oss/actions/runs/36895224710)
+ran at head `d13c95d87a8d632f5a873ab4dab28736f075455d`, whose runtime SOURCE is
+byte-identical to the bound source revision. Metadata refreshes preserve that
+source identity. The separate DeepFilter refresh passed in
+[run 36897971442](https://github.com/GeeIHadAGoodTime/viola-oss/actions/runs/36897971442).
+Seven npm SCP-style VCS references are normalized to equivalent SSH URIs for
+CycloneDX schema compliance; the receipt preserves each original URL.
+The previous Windows and advisory qualification is retained
+as historical evidence in `source-binding.json`.
 
-License declarations are publisher metadata, not a complete license review.
-Missing license fields do not grant permission, and the application's
-Apache-2.0 license does not relicense dependencies. Preserve the licenses
-supplied by installed distributions and built assets. Read `LICENSE`,
-`NOTICES.md`, the notices in `LICENSES/`, and the maintained packages'
-provenance and license files in the source snapshot.
+Public merge/distribution and private composed-consumer qualification remain
+separate decisions and checks. This metadata does not change the private source
+lock, build or distribute an installer, or establish production readiness.

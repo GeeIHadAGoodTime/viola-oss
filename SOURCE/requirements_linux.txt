@@ -138,7 +138,7 @@ vobject>=0.9.6,<1.0.0        # vCard parsing for CardDAV contacts. caldav 2.0 dr
 
 # High ROI Enhancements (Production-grade)
 cryptography>=50.0.0,<51.0.0  # SECURITY: 50.0.0 fixes CVE-2026-69247/69248/69249; supersedes the 48.0.1 OpenSSL bundle fix (GHSA-537c-gmf6-5ccf). Parity with desktop/macos.
-PyJWT==2.13.0  # JWT verification for auth secret rotation and Apple Sign-In.
+PyJWT==2.15.1  # JWT verification for auth secret rotation and Apple Sign-In; fixes GHSA-w6j9-cwv2-h6wq and GHSA-x33g-cr3x-6449.
 zstandard>=0.25.0,<1.0.0  # Trace v2 zstd compression; writer falls back to gzip if unavailable
 keyring>=24.0.0,<25.0.0  # OS keyring for master key storage. On Linux this is the
                          # Secret Service (libsecret/gnome-keyring) backend — see L5.

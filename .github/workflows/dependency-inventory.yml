@@ -1,0 +1,75 @@
+name: Public dependency inventories
+
+on:
+  pull_request:
+    paths:
+      - 'PUBLIC_METADATA/source-manifest.json'
+      - 'PUBLIC_METADATA/source-binding.json'
+      - 'SOURCE/requirements*.txt'
+      - 'SOURCE/third_party/**'
+      - 'SOURCE/optional/deepfilter-runtime/**'
+      - 'SOURCE/pyproject.toml'
+      - 'SOURCE/ui/react-app/package*.json'
+      - '.github/scripts/*inventory*.py'
+      - '.github/workflows/dependency-inventory.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: public-inventory-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  python-inventory:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        scope: [windows-desktop, windows-kokoro, windows-other-optional, windows-all-optional, windows-deepfilter]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Validate inventory evidence contracts
+        run: python -m unittest discover -s .github/scripts -p 'test_inventory*.py' -v
+      - name: Resolve clean Windows scope and emit source-bound evidence
+        run: python .github/scripts/run_windows_inventory.py ${{ matrix.scope }}
+
+  frontend-inventory:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    env:
+      CI: '1'
+      SENTRY_AUTH_TOKEN: ''
+      SENTRY_ORG: ''
+      SENTRY_PROJECT: ''
+      VITE_SENTRY_DSN: ''
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify exact public source binding
+        run: python -B SOURCE/tools/release/verify_source_binding.py --source SOURCE --metadata PUBLIC_METADATA
+      - name: Install exact frontend graph
+        working-directory: SOURCE/ui/react-app
+        run: npm ci --no-fund
+      - name: Verify dependency advisory scan
+        working-directory: SOURCE/ui/react-app
+        run: npm audit
+      - name: Generate installed frontend inventory
+        working-directory: SOURCE/ui/react-app
+        run: npm sbom --sbom-format cyclonedx | Out-File -Encoding utf8 "$env:RUNNER_TEMP/frontend.sbom.json"
+      - name: Emit source-bound frontend evidence
+        run: python .github/scripts/inventory_evidence.py --source SOURCE --scope frontend --sbom "$env:RUNNER_TEMP/frontend.sbom.json"

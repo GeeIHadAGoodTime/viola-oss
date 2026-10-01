@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "c7de239c61985273527d297adeef265d82269cb9",
-  "sha256": "0508733930df331f1a2c38dc299c1ce1d0312356b5a1c58fc7e981eec4b3f3f8",
+  "revision": "4501ee07a9e4ecbaa12ffd6b518d58c45d459ed8",
+  "sha256": "176c5d0774ae0521a60bb684a7b34938f796e89f4bba79ccfbe17ef8bddaddf3",
   "files": [
     {
       "path": ".env.example",
@@ -3540,8 +3540,8 @@
     },
     {
       "path": "requirements_desktop.txt",
-      "sha256": "78c52d0dfae5b0923290a18f1a0426e374a977d7274a993d8b470c645554b225",
-      "bytes": 8598
+      "sha256": "aea34e38815c39bdf90ead61e2d301278a6a3687950d2e14e2ede9d6c0cb9973",
+      "bytes": 8587
     },
     {
       "path": "requirements_kokoro.txt",
@@ -3550,13 +3550,13 @@
     },
     {
       "path": "requirements_linux.txt",
-      "sha256": "354d713833fddb94cdc9d12606a1fc701e43ddba08238b5b4edae13a66a7ce15",
-      "bytes": 11611
+      "sha256": "7d4463c0c7dc3b9cab8c47fae7ca10a7f6e2f6c0322e92f48314902b841b65cc",
+      "bytes": 11662
     },
     {
       "path": "requirements_macos.txt",
-      "sha256": "4cca717cee329ada7589079fea322af80ace77d135ac9626252d47ff802753cb",
-      "bytes": 13148
+      "sha256": "c452d005091998bf6a5706b03a0865f3d4c463a99bbfa83c8d66ac89fa86a18f",
+      "bytes": 13137
     },
     {
       "path": "requirements_optional.txt",
@@ -9090,13 +9090,13 @@
     },
     {
       "path": "ui/react-app/package-lock.json",
-      "sha256": "d1bda1bac3341818c77baaf914a8af1f3a650714c1ff49e00abd1582c18d3afd",
-      "bytes": 247907
+      "sha256": "fbb04c205d10db7ff29e067d1413a94af6baa931b6e1e8038a5cc11f305fc78c",
+      "bytes": 247909
     },
     {
       "path": "ui/react-app/package.json",
-      "sha256": "38e433a316359d8d8aaea9606eee0e41c70e28e9a22ff308db50beac40547664",
-      "bytes": 1252
+      "sha256": "874d3c7063d7616b992025e95737d838ad0c0abb92a3fb60f20170b42d61711a",
+      "bytes": 1253
     },
     {
       "path": "ui/react-app/patches/minimatch+3.1.5.patch",
