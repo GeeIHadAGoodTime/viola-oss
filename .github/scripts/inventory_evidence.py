@@ -15,8 +15,10 @@ from urllib.request import url2pathname
 
 try:
     from packaging.requirements import Requirement
+    from packaging.version import Version
 except ImportError:
     from pip._vendor.packaging.requirements import Requirement
+    from pip._vendor.packaging.version import Version
 
 
 def digest(data: bytes) -> str:
@@ -120,7 +122,14 @@ def bind_python(source: Path, scope: str, report: dict, installed: list, bom: di
     ):
         raise ValueError("SBOM does not cover exact installed dependency graph")
     validate_graph(bom)
-    if expected.get("pyjwt") != "2.15.1":
+    if scope == "windows-deepfilter":
+        if (
+            "pyjwt" in expected
+            or expected.get("numpy") != "1.26.4"
+            or Version(expected.get("urllib3", "0")) < Version("2.8.0")
+        ):
+            raise ValueError("DeepFilter must stay isolated on NumPy 1.26.4 with fixed urllib3")
+    elif expected.get("pyjwt") != "2.15.1":
         raise ValueError("security candidate must install PyJWT 2.15.1")
     for item in report["install"]:
         c = components[canonical(item["metadata"]["name"])]
@@ -132,7 +141,11 @@ def bind_python(source: Path, scope: str, report: dict, installed: list, bom: di
                 raise ValueError("local dependency URL has unexpected authority or suffix")
             local = Path(url2pathname(parsed.path)).resolve(strict=True)
             relative = local.relative_to(source.resolve(strict=True)).as_posix()
-            local_sources = {"pipecat-ai": "third_party/pipecat", "kokoro-onnx": "third_party/kokoro_onnx"}
+            local_sources = {
+                "pipecat-ai": "third_party/pipecat",
+                "kokoro-onnx": "third_party/kokoro_onnx",
+                "deepfilternet": "optional/deepfilter-runtime",
+            }
             if local_sources.get(canonical(c["name"])) != relative or not local.is_dir():
                 raise ValueError("unexpected local dependency source")
             c.setdefault("properties", []).append({"name": "viola:local-source", "value": relative})

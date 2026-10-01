@@ -152,6 +152,37 @@ class InventoryEvidenceTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.bind()
 
+    def test_deepfilter_rejects_stale_urllib3_or_mixed_desktop(self):
+        with self.assertRaises(ValueError):
+            bind_python(Path.cwd(), "windows-deepfilter", self.report, self.installed, self.bom)
+
+    def test_deepfilter_accepts_isolated_fixed_graph_and_local_source(self):
+        with tempfile.TemporaryDirectory() as temp:
+            source = Path(temp)
+            local = source / "optional/deepfilter-runtime"
+            local.mkdir(parents=True)
+            rows = []
+            for name, version in [("DeepFilterNet", "0.5.6+viola.1"), ("numpy", "1.26.4"), ("urllib3", "2.8.0")]:
+                info = {
+                    "url": "https://files.pythonhosted.org/" + name + ".whl",
+                    "archive_info": {"hashes": {"sha256": "a" * 64}},
+                }
+                if name == "DeepFilterNet":
+                    info = {"url": local.as_uri(), "dir_info": {}}
+                rows.append({"metadata": {"name": name, "version": version}, "download_info": info, "requested": True})
+            report = {**self.report, "install": rows}
+            installed = [{"name": x["metadata"]["name"], "version": x["metadata"]["version"]} for x in rows]
+            bom = {
+                "metadata": {"component": {"bom-ref": "viola"}},
+                "components": [{**x, "bom-ref": x["name"]} for x in installed],
+                "dependencies": [{"ref": x["name"], "dependsOn": []} for x in installed],
+            }
+            result = bind_python(source, "windows-deepfilter", report, installed, bom)
+            self.assertEqual(
+                result["components"][0]["properties"],
+                [{"name": "viola:local-source", "value": "optional/deepfilter-runtime"}],
+            )
+
     def test_bounded_payload_round_trip(self):
         out = io.StringIO()
         value = {"sbom": self.bom, "receipt": {"scope": "test"}}

@@ -12,6 +12,7 @@ import tempfile
 
 SCOPES = {
     "windows-desktop": [],
+    "windows-deepfilter": ["requirements_deepfilter.txt"],
     "windows-kokoro": ["requirements_kokoro.txt"],
     "windows-other-optional": ["requirements_optional.txt"],
     "windows-all-optional": ["requirements_kokoro.txt", "requirements_optional.txt"],
@@ -63,7 +64,9 @@ def main() -> None:
             check=True,
         )
         report = work / "pip-report.json"
-        command = [str(py), "-m", "pip", "install", "--report", str(report), "-r", "requirements_desktop.txt"]
+        command = [str(py), "-m", "pip", "install", "--report", str(report)]
+        if args.scope != "windows-deepfilter":
+            command.extend(["-r", "requirements_desktop.txt"])
         for requirement in SCOPES[args.scope]:
             command.extend(["-r", requirement])
         subprocess.run(command, cwd=source, check=True)
