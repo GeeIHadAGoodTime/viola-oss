@@ -181,6 +181,19 @@ def bind_python(source: Path, scope: str, report: dict, installed: list, bom: di
     return bom
 
 
+def normalize_vcs_references(bom: dict) -> list[dict]:
+    changes = []
+    for component in bom["components"]:
+        for reference in component.get("externalReferences", []):
+            original = reference.get("url", "")
+            match = re.fullmatch(r"git@([A-Za-z0-9.-]+):([^\s]+)", original)
+            if reference.get("type") == "vcs" and match:
+                normalized = f"ssh://git@{match[1]}/{match[2]}"
+                reference["url"] = normalized
+                changes.append({"component": component["bom-ref"], "original": original, "normalized": normalized})
+    return changes
+
+
 def emit(scope: str, files: dict[str, dict]) -> None:
     raw = json.dumps(files, sort_keys=True, separators=(",", ":")).encode()
     if len(raw) > 10_000_000:
@@ -235,6 +248,9 @@ def main() -> None:
         if not any(c.get("name") == "brace-expansion" and c.get("version") == "5.0.12" for c in bom["components"]):
             raise ValueError("SBOM is missing fixed frontend dependency")
         receipt["package_lock_sha256"] = digest((args.source / "ui/react-app/package-lock.json").read_bytes())
+    normalized = normalize_vcs_references(bom)
+    if normalized:
+        receipt["vcs_url_normalizations"] = normalized
     props = bom.setdefault("metadata", {}).setdefault("properties", [])
     props.extend(
         {
@@ -242,7 +258,7 @@ def main() -> None:
             "value": json.dumps(value, sort_keys=True) if not isinstance(value, str) else value,
         }
         for key, value in receipt.items()
-        if key != "installed"
+        if key not in {"installed", "vcs_url_normalizations"}
     )
     if args.report:
         receipt["resolved_packages"] = [

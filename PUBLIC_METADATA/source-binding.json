@@ -7,67 +7,71 @@
   "retained_sboms": [
     {
       "path": "frontend.sbom.json",
-      "sha256": "a9926b948cad9e72004ade4d4fef7486a6e0ba22b62787614147626aabeeadc0",
-      "retained_metadata_timestamp": "2026-09-09T00:51:21.732Z",
+      "sha256": "e28d3b8ed9062fa94566f1923bbf091fb4b0544774763775dbaff347777b2f98",
       "components": 431,
       "dependency_edges_including_source_root": 903,
       "package_dependency_edges": 880,
-      "inventory_status": "stale_brace_expansion_5_0_9_requires_5_0_12_refresh"
+      "inventory_status": "refreshed_exact_clean_windows_install",
+      "metadata_timestamp": "2026-10-01T16:53:14.566Z",
+      "receipt": "qualification-20261001/frontend.receipt.json"
     },
     {
       "path": "windows-all-optional.sbom.json",
-      "sha256": "e268f67db05e11e7d6421eca3f528d8728176010904c1d46eed46a11b104dfdf",
+      "sha256": "7293a8bfa357fc9104e0a6c67d3e4d6d37ac6bd0919f991ad870a9e9d0b8e307",
       "components": 229,
-      "dependency_edges_including_source_root": 442,
-      "package_dependency_edges": 353,
-      "metadata_timestamp": "2026-09-12T19:05:06.292297+00:00",
-      "inventory_status": "stale_pyjwt_2_13_requires_clean_2_15_1_refresh"
+      "dependency_edges_including_source_root": 441,
+      "package_dependency_edges": 352,
+      "metadata_timestamp": "2026-10-01T17:05:04.590293+00:00",
+      "inventory_status": "refreshed_exact_clean_windows_install",
+      "receipt": "qualification-20261001/windows-all-optional.receipt.json"
     },
     {
       "path": "windows-deepfilter.sbom.json",
-      "sha256": "cc2dec54893a6ebda23738b1f4252a5615bb6cd581d057602dae4f09b55fb582",
-      "retained_metadata_timestamp": "2026-09-09T01:23:07.366224+00:00",
+      "sha256": "c9de385226d1e7530a5bbb5c5993a04d39e7a8e5ede5ef25dcf7c270ad4fc383",
       "components": 28,
       "dependency_edges_including_source_root": 36,
       "package_dependency_edges": 27,
-      "inventory_status": "retained_unchanged_inputs"
+      "inventory_status": "refreshed_exact_clean_windows_install",
+      "metadata_timestamp": "2026-10-01T17:27:50.142720+00:00",
+      "receipt": "qualification-20261001/windows-deepfilter.receipt.json"
     },
     {
       "path": "windows-desktop.sbom.json",
-      "sha256": "4d20617200a4d099a1087da11f2dade7385f2ad798584ad3f8f4d9a7589dda74",
+      "sha256": "8089cc0874ff51ca223a9e3c656d7932e8b8bd2c84f4f29e1ce358f5431ec31e",
       "components": 210,
-      "dependency_edges_including_source_root": 597,
-      "package_dependency_edges": 511,
-      "metadata_timestamp": "2026-09-21T05:20:47.253196+00:00",
-      "inventory_status": "stale_pyjwt_2_13_requires_clean_2_15_1_refresh"
+      "dependency_edges_including_source_root": 398,
+      "package_dependency_edges": 312,
+      "metadata_timestamp": "2026-10-01T16:59:30.598070+00:00",
+      "inventory_status": "refreshed_exact_clean_windows_install",
+      "receipt": "qualification-20261001/windows-desktop.receipt.json"
     },
     {
       "path": "windows-kokoro.sbom.json",
-      "sha256": "bc37e0a43edd62ecf95d50f17a13222dde1739557cef15de6d0d718f5a69e75a",
+      "sha256": "c011672693ab941a80381a31179148533080bf83faddad081b79a755bb460894",
       "components": 221,
-      "dependency_edges_including_source_root": 422,
-      "package_dependency_edges": 335,
-      "metadata_timestamp": "2026-09-12T19:05:00.618392+00:00",
-      "inventory_status": "stale_pyjwt_2_13_requires_clean_2_15_1_refresh"
+      "dependency_edges_including_source_root": 421,
+      "package_dependency_edges": 334,
+      "metadata_timestamp": "2026-10-01T16:57:13.271348+00:00",
+      "inventory_status": "refreshed_exact_clean_windows_install",
+      "receipt": "qualification-20261001/windows-kokoro.receipt.json"
     },
     {
       "path": "windows-other-optional.sbom.json",
-      "sha256": "ca3de3770642cbbe8147f733e1a59f920463eab0f0e58c07dcfa24e47bd39aa1",
+      "sha256": "194830a9b3726d5589e91bff03e8a9264094085619d59ec3d739b30bcf04711e",
       "components": 218,
-      "dependency_edges_including_source_root": 419,
-      "package_dependency_edges": 331,
-      "metadata_timestamp": "2026-09-12T19:05:03.425261+00:00",
-      "inventory_status": "stale_pyjwt_2_13_requires_clean_2_15_1_refresh"
+      "dependency_edges_including_source_root": 418,
+      "package_dependency_edges": 330,
+      "metadata_timestamp": "2026-10-01T17:02:42.111667+00:00",
+      "inventory_status": "refreshed_exact_clean_windows_install",
+      "receipt": "qualification-20261001/windows-other-optional.receipt.json"
     }
   ],
   "input_equivalence": {
-    "basis": "Only the separate DeepFilter dependency inputs remain unchanged. Four Windows inventories retain PyJWT 2.13.0 and the frontend inventory retains brace-expansion 5.0.9; all five are stale for this candidate. No Windows Python, Linux Python, or macOS dependency resolution is claimed.",
-    "requirements": [
-      "requirements_deepfilter.txt"
-    ]
+    "basis": "All six inventories were regenerated from exact clean Windows installations. The five Python scopes are isolated environments; frontend uses its exact lockfile. No historical inventory is reused as current installed evidence. Linux/macOS installation is not claimed.",
+    "requirements": []
   },
-  "new_resolution_performed": false,
-  "new_advisory_scan_performed": false,
+  "new_resolution_performed": true,
+  "new_advisory_scan_performed": true,
   "new_runtime_qualification_performed": false,
   "source_revision": "4501ee07a9e4ecbaa12ffd6b518d58c45d459ed8",
   "comparison_public_revision": "f4d39d1dbb532420e0983051c72f64fb03950278",
@@ -106,7 +110,7 @@
       "status": "At the prior c7de239 source qualification, dated broad-scan evidence was retained and aiohttp/Pipecat advisories were assessed against that prior candidate"
     },
     "advisory_assessment": {
-      "path": "advisory-assessment.md",
+      "path": "history/20260929-advisory-assessment.md",
       "sha256": "b61cfa2ff678aa12c3f8896d2fb02733f223d4274b6d755aed479ece2deaaf57"
     },
     "pipecat_wheel_sha256": "fb0895009eaa6cb49f771e8952347b43dbcd0603d5470d97976e740d2a64f68e",
@@ -126,13 +130,30 @@
   },
   "qualification": {
     "source_revision": "4501ee07a9e4ecbaa12ffd6b518d58c45d459ed8",
-    "clean_windows_dependency_resolution": "pending",
-    "pyjwt_bearing_windows_sbom_refresh": "pending_four_inventories",
-    "public_contracts": "pending_exact_source",
-    "advisory_scan": "pending_exact_composed_dependency_set",
+    "clean_windows_dependency_resolution": "passed_five_isolated_scopes",
+    "pyjwt_bearing_windows_sbom_refresh": "passed_four_inventories",
+    "public_contracts": {
+      "passed": 63,
+      "environment": "Windows CPython 3.11",
+      "source_ci_head": "d13c95d87a8d632f5a873ab4dab28736f075455d",
+      "run_url": "https://github.com/GeeIHadAGoodTime/viola-oss/actions/runs/36895224651"
+    },
+    "advisory_scan": {
+      "path": "qualification-20261001/osv-python-scan.json",
+      "sha256": "f96a6a380ccbc6f8ad70471505a6ebc0d12dcdfc3d1749ae6c9c3584598d6e6b",
+      "unique_exact_pypi_queries": 238,
+      "scanned_at": "2026-10-01T17:30:09.129682+00:00",
+      "raw_hits": [
+        "GHSA-3363-2ph6-35wh",
+        "GHSA-j8cv-x86q-rj85",
+        "PYSEC-2026-2877",
+        "PYSEC-2026-2878"
+      ],
+      "status": "Only maintained Pipecat fork version matches remain; exact retained backport contracts passed. No unreviewed finding remains in the scanned package graph. This is not a vulnerability-free or release-ready claim."
+    },
     "linux_macos_install": "not_performed",
     "public_merge_and_release": "not_authorized",
-    "frontend_sbom_refresh": "pending_exact_5_0_12_inventory",
+    "frontend_sbom_refresh": "passed_exact_clean_windows_install",
     "frontend_cloud_validation": {
       "environment": "Linux; Node 24.19.0; npm 11.9.0",
       "clean_npm_ci": "passed; 435 packages; minimatch 3.1.5 patch applied",
@@ -141,6 +162,44 @@
       "build": "passed; 7.88 seconds; credentials absent; not release qualification",
       "vitest": "passed; 135 files, 954 tests; 49.58 seconds",
       "brace_expansion_stress": "four advisory-shaped input cases completed without exception; ordinary expansion passed"
-    }
+    },
+    "inventory_receipts": [
+      {
+        "path": "qualification-20261001/windows-desktop.receipt.json",
+        "sha256": "70e07a264b285ec3d8cd7c2e3e43f7b4706d894d67b9c7825380d0e2f9c03ddc"
+      },
+      {
+        "path": "qualification-20261001/windows-kokoro.receipt.json",
+        "sha256": "68a9a1865284ff578117ef7c2eca9892288379513393fd4451f8372b17782397"
+      },
+      {
+        "path": "qualification-20261001/windows-other-optional.receipt.json",
+        "sha256": "6855d2d87f42c302223fb82266a47306e5f330cba45757b7b3b74c255631eb27"
+      },
+      {
+        "path": "qualification-20261001/windows-all-optional.receipt.json",
+        "sha256": "2eda2520b5aaf20e910309fc7820e27b316ad5bf04545792ce9fec257551e175"
+      },
+      {
+        "path": "qualification-20261001/frontend.receipt.json",
+        "sha256": "ba1d3f81bd550a6e1dc245210e2d20f831c29d740474f9125ec80023438557ba"
+      },
+      {
+        "path": "qualification-20261001/windows-deepfilter.receipt.json",
+        "sha256": "a903522df3c3983aa20c19eb3a9efe3ff96f3e9114ed37a8b7fb48d24e74441f"
+      }
+    ],
+    "inventory_workflow_url": "https://github.com/GeeIHadAGoodTime/viola-oss/actions/runs/36895224710",
+    "frontend_windows": {
+      "test_files": 135,
+      "tests": 954,
+      "npm_audit_vulnerabilities": 0,
+      "run_url": "https://github.com/GeeIHadAGoodTime/viola-oss/actions/runs/36895224651"
+    },
+    "private_composed_consumer": "pending",
+    "actual_runtime_acceptance": "pending",
+    "deepfilter_inventory_refresh": "passed_isolated_numpy_1_26_4_urllib3_2_8_0",
+    "all_windows_sbom_refresh": "passed_five_inventories",
+    "deepfilter_workflow_url": "https://github.com/GeeIHadAGoodTime/viola-oss/actions/runs/36897971442"
   }
 }

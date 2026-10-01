@@ -1,58 +1,11 @@
 # Public dependency advisory assessment
 
-## October 1, 2026 candidate
-
-Source revision: `4501ee07a9e4ecbaa12ffd6b518d58c45d459ed8`
-Source tree SHA-256: `176c5d0774ae0521a60bb684a7b34938f796e89f4bba79ccfbe17ef8bddaddf3`
-
-Five clean Windows Python scope inventories and the Windows frontend inventory
-were regenerated in [run 36895224710](https://github.com/GeeIHadAGoodTime/viola-oss/actions/runs/36895224710).
-The source and current security backport contracts passed in
-[run 36895224651](https://github.com/GeeIHadAGoodTime/viola-oss/actions/runs/36895224651).
-Receipts and the full OSV response are retained under `qualification-20261001/`.
-
-The final OSV batch scan queried 238 unique exact PyPI coordinates across
-all five freshly installed Windows scopes. Only the maintained Pipecat fork
-returned raw advisory version matches. The frontend exact-lock npm audit
-returned zero findings. The initial scan is retained separately as historical
-evidence of the DeepFilter finding and its subsequent resolution.
-A zero advisory result is a dated scanner result, not proof of absence of defects.
-
-### Resolved DeepFilter urllib3 finding
-
-All four fresh desktop/optional resolutions select urllib3 2.8.0. The initial retained
-DeepFilter inventory contained 2.7.0, matching:
-
-- [GHSA-8988-9cw3-xx77](https://github.com/advisories/GHSA-8988-9cw3-xx77): HTTPS proxy TLS isolation
-- [GHSA-gh4c-6fx4-qh6g](https://github.com/advisories/GHSA-gh4c-6fx4-qh6g): chunked Deflate streaming loop
-- [GHSA-vxq7-64xx-v4gw](https://github.com/advisories/GHSA-vxq7-64xx-v4gw): unbounded chunk-size line buffering
-
-Upstream fixes these in 2.8.0. A clean isolated Windows refresh in
-[run 36897971442](https://github.com/GeeIHadAGoodTime/viola-oss/actions/runs/36897971442)
-installed urllib3 2.8.0 with NumPy 1.26.4, passed pip check and exact installed
-report/SBOM reconciliation, and replaced the historical inventory. The final
-scan includes those actual installed versions.
-
-### Maintained Pipecat backports
-
-OSV matches `pipecat-ai 0.0.108+viola.2` to GHSA-3363-2ph6-35wh,
-GHSA-j8cv-x86q-rj85 and their PYSEC-2026-2877/2878 aliases. These are two upstream
-issues, not four distinct defects. The maintained source contains the recorded
-path-containment and WebSocket-authentication backports; current Windows
-contracts exercise path traversal, unauthenticated access, expiry and replay.
-`SOURCE/third_party/sources.toml` records upstream provenance. This is a reviewed
-fork disposition based on exact source and tests, not a scanner-wide exclusion.
-
-### Remaining limits
-
-Private composed-consumer checks, actual device/provider/carrier acceptance,
-Linux/macOS installation and production-release authorization remain pending.
-The inventory workflow does not merge, distribute or deploy anything.
-
-## Historical qualification (superseded for current scope)
-
-The remainder records the earlier source snapshot. Its dates, inventory hashes
-and assertions about unchanged inputs describe that earlier qualification only.
+**Historical scope:** This assessment covers the `c7de239...` source snapshot
+listed below. The current local PyJWT 2.15.1 candidate changes dependency
+inputs; its four PyJWT-bearing Windows SBOMs are stale and no new clean install
+or broad advisory scan has been completed. See `README.md` and
+`source-binding.json` for the candidate status. Statements below about
+unchanged inputs refer only to the earlier follow-up, not this candidate.
 
 - Source revision: `c7de239c61985273527d297adeef265d82269cb9`
 - Source tree SHA-256: `0508733930df331f1a2c38dc299c1ce1d0312356b5a1c58fc7e981eec4b3f3f8`

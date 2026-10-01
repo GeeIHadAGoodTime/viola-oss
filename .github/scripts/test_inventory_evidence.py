@@ -9,7 +9,14 @@ import tempfile
 from pathlib import Path
 import unittest
 
-from inventory_evidence import active_dependencies, bind_python, digest, emit, verify_expected_source
+from inventory_evidence import (
+    active_dependencies,
+    bind_python,
+    digest,
+    emit,
+    normalize_vcs_references,
+    verify_expected_source,
+)
 
 
 class InventoryEvidenceTests(unittest.TestCase):
@@ -182,6 +189,22 @@ class InventoryEvidenceTests(unittest.TestCase):
                 result["components"][0]["properties"],
                 [{"name": "viola:local-source", "value": "optional/deepfilter-runtime"}],
             )
+
+    def test_npm_scp_vcs_url_normalized_without_changing_package_identity(self):
+        bom = {
+            "components": [
+                {
+                    "name": "example",
+                    "version": "1",
+                    "bom-ref": "example@1",
+                    "externalReferences": [{"type": "vcs", "url": "git@github.com:owner/example.git"}],
+                }
+            ]
+        }
+        changes = normalize_vcs_references(bom)
+        self.assertEqual(bom["components"][0]["externalReferences"][0]["url"], "ssh://git@github.com/owner/example.git")
+        self.assertEqual(changes[0]["original"], "git@github.com:owner/example.git")
+        self.assertEqual(bom["components"][0]["version"], "1")
 
     def test_bounded_payload_round_trip(self):
         out = io.StringIO()

@@ -1,0 +1,54 @@
+{
+  "manifest_sha256": "0d5a51d102a628c29d470d64311b61f65b3d5d6213924d00d47e3a53f4854cd3",
+  "package_lock_sha256": "fbb04c205d10db7ff29e067d1413a94af6baa931b6e1e8038a5cc11f305fc78c",
+  "platform_system": "Windows",
+  "scope": "frontend",
+  "source_revision": "4501ee07a9e4ecbaa12ffd6b518d58c45d459ed8",
+  "source_tree_sha256": "176c5d0774ae0521a60bb684a7b34938f796e89f4bba79ccfbe17ef8bddaddf3",
+  "github_provenance": {
+    "head_sha": "d13c95d87a8d632f5a873ab4dab28736f075455d",
+    "run_id": 36895224710,
+    "job_id": 110480408413,
+    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/actions/runs/36895224710/job/110480408413",
+    "conclusion": "success",
+    "raw_envelope_sha256": "4610f0a916a8f6ab0d0c774c4172cc536ff5f29f594ff531995d970bfea48d7a",
+    "raw_envelope_bytes": 382402
+  },
+  "vcs_url_normalizations": [
+    {
+      "component": "assertion-error@2.0.1",
+      "original": "git@github.com:chaijs/assertion-error.git",
+      "normalized": "ssh://git@github.com/chaijs/assertion-error.git"
+    },
+    {
+      "component": "color-name@1.1.4",
+      "original": "git@github.com:colorjs/color-name.git",
+      "normalized": "ssh://git@github.com/colorjs/color-name.git"
+    },
+    {
+      "component": "cross-spawn@7.0.6",
+      "original": "git@github.com:moxystudio/node-cross-spawn.git",
+      "normalized": "ssh://git@github.com/moxystudio/node-cross-spawn.git"
+    },
+    {
+      "component": "glob@13.0.6",
+      "original": "git@github.com:isaacs/node-glob.git",
+      "normalized": "ssh://git@github.com/isaacs/node-glob.git"
+    },
+    {
+      "component": "minimatch@10.2.6",
+      "original": "git@github.com:isaacs/minimatch",
+      "normalized": "ssh://git@github.com/isaacs/minimatch"
+    },
+    {
+      "component": "ignore@5.3.2",
+      "original": "git@github.com:kaelzhang/node-ignore.git",
+      "normalized": "ssh://git@github.com/kaelzhang/node-ignore.git"
+    },
+    {
+      "component": "jsonfile@6.2.1",
+      "original": "git@github.com:jprichardson/node-jsonfile.git",
+      "normalized": "ssh://git@github.com/jprichardson/node-jsonfile.git"
+    }
+  ]
+}
