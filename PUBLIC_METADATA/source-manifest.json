@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "3f2822bcc2928ba3f62f12b384d986c78f5c90a0",
-  "sha256": "c525f5f830da9052f61ef997bb88754f22372e23c324a7db38de18117c1b41ef",
+  "revision": "862f0d1b53d114a7269d8f46b8755296f593151a",
+  "sha256": "f35fee86a6999dafc7c9f2a1664a21fe79a7471366ebbcd8f53f43d53269c53b",
   "files": [
     {
       "path": ".env.example",
@@ -5410,8 +5410,8 @@
     },
     {
       "path": "telephony/call_manager.py",
-      "sha256": "32c645b405058a95ad0747adc64ec5a90c1f03381fac3448aa0e49598f407f71",
-      "bytes": 371956
+      "sha256": "960bf67c5aac88ec9544f520ec511c3fa8e1568eb3b59cc8415097a2c0eb6a93",
+      "bytes": 371465
     },
     {
       "path": "telephony/call_queue.py",
@@ -5745,8 +5745,8 @@
     },
     {
       "path": "tests/public/test_source_contract.py",
-      "sha256": "e72574c056dd65944d4073499045ff5bcafe5fe2ce518396d1f0525d7fdfa89e",
-      "bytes": 10124
+      "sha256": "e1774f976630ce9c78ef04cfd183408907b92ed8d554b89a563260980a5806f4",
+      "bytes": 12309
     },
     {
       "path": "tests/public/test_tool_allowlist_contract.py",

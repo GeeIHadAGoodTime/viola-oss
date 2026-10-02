@@ -1,19 +1,20 @@
 # Source snapshot binding
 
-Current Phone Calling Terms repair source: `3f2822bcc2928ba3f62f12b384d986c78f5c90a0`.
-The source manifest binds 2,470 files; exactly seven Phone Terms/CSRF paths changed.
-Dependency inputs and all six October 1 clean Windows inventories remain unchanged.
+Current cost-handling source revision: `862f0d1b53d114a7269d8f46b8755296f593151a`.
+The manifest binds 2,470 source files; exactly the two listed source/test paths changed
+from `1aa40ad76f8176624820ba36f9578d9bc0bb79c8`.
 
-The concise `source-binding.json` records current source hashes, the retained inventory
-hashes and an immutable reference to the prior binding. Existing October 1 receipts
-and advisory assessment remain dated evidence for their recorded source/environment.
-They are not a new dependency resolution, advisory scan or Phone Terms runtime result.
+The focused public source contract passes 150 combinations and rejects the prior
+outcome-based cost floor. Authoritative carrier facts remain unchanged; existing
+measured estimates can still include provider costs. This is not a promise that
+every unanswered call is free. Full composed accounting and runtime proof is pending.
 
-Scoped repair regressions passed 79 backend and 42 frontend cases. Full integrated
-runtime, frontend build and installed Windows/customer acceptance are separate gates.
-No release or deployment is established by this source binding.
+Dependency inputs, all six October 1 Windows inventories, and their dated receipts
+and advisory files are unchanged. The prior binding is referenced immutably rather
+than copied. No new dependency resolution, advisory scan, release or deployment is
+claimed here.
 
-Verify the unchanged canonical binding from SOURCE:
+From SOURCE, verify with the unchanged canonical tool:
 
 ```sh
 python -B tools/release/verify_source_binding.py --source . --metadata ../PUBLIC_METADATA
