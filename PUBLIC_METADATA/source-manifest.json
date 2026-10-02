@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "949a6cef1f8dedba8ed15bf3be6304446eb327b5",
-  "sha256": "cd0dccbe5dd5936e0e24138f46a6e765b094c01e367eed49ce57627c6a1184a8",
+  "revision": "a34de7bee7869a3440b97066b85e1f2cdbd89e04",
+  "sha256": "53467d99ae3349de223b49ca856ac7bb639eb66e7907b2fc6af95eafdd5f5444",
   "files": [
     {
       "path": ".env.example",
@@ -3550,13 +3550,13 @@
     },
     {
       "path": "requirements_linux.txt",
-      "sha256": "7d4463c0c7dc3b9cab8c47fae7ca10a7f6e2f6c0322e92f48314902b841b65cc",
-      "bytes": 11662
+      "sha256": "f791e52d4968fb5fe7fbcbf966a48c038b2652dc144df6f43b65314f05f56226",
+      "bytes": 11740
     },
     {
       "path": "requirements_macos.txt",
-      "sha256": "c452d005091998bf6a5706b03a0865f3d4c463a99bbfa83c8d66ac89fa86a18f",
-      "bytes": 13137
+      "sha256": "2024e864bba2bc67f8434bd2c568f00ce25755ea965675bd0074a6ac162a8584",
+      "bytes": 13215
     },
     {
       "path": "requirements_optional.txt",
@@ -5752,6 +5752,16 @@
       "path": "tests/public/test_tool_allowlist_contract.py",
       "sha256": "99c31df2c76291be3ce3672d5f75011d423ad9f25721b9134c99049d06436600",
       "bytes": 650
+    },
+    {
+      "path": "tests/public/test_tts_profile_dependencies.py",
+      "sha256": "51ee6af8a08fde8c0d2af4bb716108b83c8abfe4a1576307878a751257d4a274",
+      "bytes": 554
+    },
+    {
+      "path": "tests/public/test_windows_native_startup_order.py",
+      "sha256": "090641a41a087b50675b9ed2b59e6b40f01db239db66e147a1f6d9b92bfa08f5",
+      "bytes": 3202
     },
     {
       "path": "themes/viola-dark.css",
@@ -9480,8 +9490,13 @@
     },
     {
       "path": "ui/react-app/src/components/AccentPicker.jsx",
-      "sha256": "e4c639eab4df9cc6437e049e36beb5808ff657a6e028becd1011548ec14fc40d",
-      "bytes": 8918
+      "sha256": "7c4ee33870ca8a310045a35e470aa8b7e968decd76e56dbfe950d95177313a66",
+      "bytes": 8975
+    },
+    {
+      "path": "ui/react-app/src/components/AccentPicker.test.jsx",
+      "sha256": "42a16071b94878abad820bbeddcca6d3d646a4db3751e616731f974869fb0076",
+      "bytes": 1389
     },
     {
       "path": "ui/react-app/src/components/AccountTab.authSync.test.jsx",
@@ -10740,8 +10755,13 @@
     },
     {
       "path": "ui/react-app/src/hooks/useDeviceDiscovery.js",
-      "sha256": "39d484b7a9a5b5a158c8d4af1e4e8cea9d983fd402251354407f5cac9d347eab",
-      "bytes": 5092
+      "sha256": "cc6e7270cb18f20427f3fbb27c3044d5c71691eaaaacb7b68e4deb96abbd0f73",
+      "bytes": 5300
+    },
+    {
+      "path": "ui/react-app/src/hooks/useDeviceDiscovery.test.jsx",
+      "sha256": "b17c35159a79d70a5d733c26d6ad2f7716912f1e2961a5417b3361913ef7231b",
+      "bytes": 4815
     },
     {
       "path": "ui/react-app/src/hooks/useEventBus.js",
@@ -11825,8 +11845,8 @@
     },
     {
       "path": "viola_qt.py",
-      "sha256": "b722e5d0a8bd561f8929b24a6d747909954ab7adbaa99bb8f0e9f91c80d163dc",
-      "bytes": 79085
+      "sha256": "661b7996febe34e2a6ff69fe4eb30f2f3dca1f99670598493179e996b91e3f14",
+      "bytes": 80295
     },
     {
       "path": "viola_spoke.py",
