@@ -1,19 +1,14 @@
 {
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "81f439e8ffaf44fa9d5e1d1841c888942f8807639f5b18ce6972c518b074d6a9",
-  "source_tree_sha256": "c525f5f830da9052f61ef997bb88754f22372e23c324a7db38de18117c1b41ef",
+  "source_manifest_sha256": "4f9c1df4161125ffe4a1a65fd7306c6928cf01d82a24ec087c1e9fad8d220d8f",
+  "source_tree_sha256": "f35fee86a6999dafc7c9f2a1664a21fe79a7471366ebbcd8f53f43d53269c53b",
   "source_file_count": 2470,
-  "source_revision": "3f2822bcc2928ba3f62f12b384d986c78f5c90a0",
-  "comparison_public_revision": "876e0febfa1cd5125c573ded1c927b2cc34ea5c5",
+  "source_revision": "862f0d1b53d114a7269d8f46b8755296f593151a",
+  "comparison_public_revision": "1aa40ad76f8176624820ba36f9578d9bc0bb79c8",
   "changed_source_paths": [
-    "SOURCE/auth/csrf.py",
-    "SOURCE/backend/fastapi_app.py",
-    "SOURCE/telephony/routes.py",
-    "SOURCE/ui/react-app/src/components/PhoneToSModal.jsx",
-    "SOURCE/ui/react-app/src/components/PhoneToSModal.test.jsx",
-    "SOURCE/ui/react-app/src/hooks/useViolaApi.js",
-    "SOURCE/ui/react-app/src/hooks/useViolaApi.test.js"
+    "SOURCE/telephony/call_manager.py",
+    "SOURCE/tests/public/test_source_contract.py"
   ],
   "retained_sboms": [
     {
@@ -55,38 +50,29 @@
   ],
   "input_equivalence": {
     "unchanged_dependency_input_count": 545,
-    "method": "Compared dependency path, byte count and SHA-256 entries between the baseline and current source manifests; only the seven listed Phone Terms paths changed.",
-    "inventory_scope": "Exact October 1 Windows inventories retained unchanged; dated qualification remains in the immutable prior binding. No new dependency resolution or advisory scan is claimed."
+    "comparison_source_manifest_sha256": "81f439e8ffaf44fa9d5e1d1841c888942f8807639f5b18ce6972c518b074d6a9",
+    "basis": "Compared dependency path, byte count and SHA-256 entries; only the two listed cost-handling source/test files changed. Exact October 1 Windows inventories and dated receipts remain unchanged."
+  },
+  "prior_binding": {
+    "public_revision": "1aa40ad76f8176624820ba36f9578d9bc0bb79c8",
+    "path": "PUBLIC_METADATA/source-binding.json",
+    "git_blob": "2e2d4cec6ee7be4ff2f2d0f73b00ccc19bf6e20e",
+    "sha256": "e533abc4cdfec2b4a4be025b9b125b224f9df3a18844efe3fd9d3634176f2396",
+    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/1aa40ad76f8176624820ba36f9578d9bc0bb79c8/PUBLIC_METADATA/source-binding.json"
   },
   "new_resolution_performed": false,
   "new_advisory_scan_performed": false,
   "new_runtime_qualification_performed": false,
-  "prior_binding": {
-    "public_revision": "876e0febfa1cd5125c573ded1c927b2cc34ea5c5",
-    "path": "PUBLIC_METADATA/source-binding.json",
-    "git_blob": "c6918dce8941675812defa6d2b853d0723d46d74",
-    "sha256": "8d86f26433782cf822a4e72dc5c8557130c2921cd6331e6b438142369c07bb1a",
-    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/876e0febfa1cd5125c573ded1c927b2cc34ea5c5/PUBLIC_METADATA/source-binding.json"
-  },
   "qualification": {
-    "source_revision": "3f2822bcc2928ba3f62f12b384d986c78f5c90a0",
-    "scope": "Scoped source regression evidence only; full canonical-runtime and installer qualification are separate pending gates",
-    "scoped_backend": {
-      "passed": 79,
-      "failed": 0,
-      "skipped": 0,
-      "errors": 0,
+    "scope": "Source-only cost-function contract; not full module, accounting or runtime acceptance",
+    "source_contract": {
+      "passed_test_methods": 1,
+      "matrix_combinations": 150,
+      "original_source_negative_control": "failed as expected",
       "independently_reproduced": true
     },
-    "scoped_frontend": {
-      "passed": 42,
-      "failed": 0,
-      "independently_reproduced": true
-    },
-    "format_and_lint": "scoped Ruff, Black and ESLint passed",
-    "canonical_composed_runtime": "pending",
-    "clean_frontend_build": "pending",
-    "installed_windows_or_customer_acceptance": "not_performed",
-    "live_production_mutation": "not_performed"
+    "composed_ledger_history_spend": "pending",
+    "installed_runtime_or_live_billing": "not_performed",
+    "release_or_deployment": "not_established"
   }
 }
