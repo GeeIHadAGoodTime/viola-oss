@@ -341,12 +341,6 @@ _WSS_DEFAULT_PORT = 443
 _LOCAL_STREAM_HOSTS = frozenset({BIND_ALL_INTERFACES, LOCALHOST, LOCALHOST_NAME, "::1"})
 _STREAM_URL_SECRET_QUERY_TOKENS = frozenset({"secret", "signature", "token"})
 
-# -- Unified billing policy (PHONE-05/06/11) ---------------------------------
-# Failed calls can still cost Telnyx money (call setup, carrier fees), so
-# apply a tiny cost floor without inflating the user's actual duration ledger.
-_MIN_BILLED_COST_USD = 0.01
-_BILLABLE_FAILURE_STATES: frozenset[str] = frozenset({"failed", "timeout", "no_answer", "cancelled"})
-
 # Module-level loguru bridge (installed once per process)
 _loguru_bridge_installed = False
 _loguru_bridge_handler_id: int | None = None
@@ -1573,9 +1567,9 @@ def _billable_window_seconds(record: CallRecord) -> float:
 def _billed_duration_seconds(record: CallRecord) -> float:
     """Return the billable duration for a CallRecord.
 
-    Phone duration is metered by the actual connected seconds. Carrier setup
-    fees for failed attempts are represented by ``_billed_cost_usd`` instead
-    of inflating the user's minute ledger.
+    Phone duration is metered by the actual connected seconds. Delivered
+    carrier cost facts are represented by ``_billed_cost_usd`` independently
+    of the user's minute ledger.
 
     This is the single choke point every settle path funnels through, so the
     carrier anchoring lives here (#2589): even if some future path re-inlines a
@@ -1593,17 +1587,14 @@ def _billed_duration_seconds(record: CallRecord) -> float:
 def _billed_cost_usd(record: CallRecord) -> float:
     """Return the billable cost USD for a CallRecord.
 
-    Enforces a minimum cost on failure/no-answer/timeout/cancel so the
-    in-system ledger lines up with what Telnyx actually charges us.
-    See PHONE-06/PHONE-11.
+    A delivered carrier CDR is authoritative, including a legitimate zero.
+    Until that record arrives, retain the nonnegative measured estimate;
+    an unsuccessful outcome alone does not establish a carrier setup fee.
     """
     carrier_cost = record.carrier_total_cost_usd
     if carrier_cost is not None:
         return max(0.0, float(carrier_cost))
-    cost = float(record.estimated_cost_usd or 0.0)
-    if record.status.value in _BILLABLE_FAILURE_STATES:
-        cost = max(cost, _MIN_BILLED_COST_USD)
-    return cost
+    return max(0.0, float(record.estimated_cost_usd or 0.0))
 
 
 def _recipient_state(record: Any) -> str:
@@ -7312,9 +7303,8 @@ class CallManager:
                     )
 
             # Record call end for billing (must use same user_id as record_call_start).
-            # PHONE-05/06/11: ceil duration to >=1 minute for billed minutes and
-            # apply a minimum cost on failed/no-answer/timeout so users can't
-            # cancel out of an attempted call for free.
+            # Preserve measured duration and cost until authoritative carrier
+            # facts arrive; outcome alone must not manufacture a setup fee.
             billed_duration_seconds = _billed_duration_seconds(record)
             billed_cost_usd = _billed_cost_usd(record)
 

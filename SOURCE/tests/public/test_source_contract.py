@@ -15,6 +15,44 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class SourceContract(unittest.TestCase):
+    def test_phone_cost_uses_carrier_facts_or_measured_estimate_without_outcome_floor(self):
+        """Exercise the actual source function without importing optional phone runtimes."""
+        from types import SimpleNamespace
+
+        source = ROOT / "telephony" / "call_manager.py"
+        tree = ast.parse(source.read_text(encoding="utf-8"))
+        nodes = [ast.ImportFrom(module="__future__", names=[ast.alias(name="annotations")], level=0)]
+        constants = {"_MIN_BILLED_COST_USD", "_BILLABLE_FAILURE_STATES"}
+        for node in tree.body:
+            if isinstance(node, ast.FunctionDef) and node.name == "_billed_cost_usd":
+                nodes.append(node)
+            elif isinstance(node, ast.Assign) and any(
+                isinstance(target, ast.Name) and target.id in constants for target in node.targets
+            ):
+                nodes.append(node)
+            elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name) and node.target.id in constants:
+                nodes.append(node)
+        namespace = {}
+        module = ast.fix_missing_locations(ast.Module(body=nodes, type_ignores=[]))
+        exec(compile(module, str(source), "exec"), namespace)
+        billed_cost = namespace["_billed_cost_usd"]
+
+        def record(status, estimate, carrier):
+            return SimpleNamespace(
+                status=SimpleNamespace(value=status),
+                estimated_cost_usd=estimate,
+                carrier_total_cost_usd=carrier,
+            )
+
+        # Existing shared source turned this measured estimate into an unsupported cent.
+        self.assertEqual(billed_cost(record("no_answer", 0.004, None)), 0.004)
+        for status in ("failed", "timeout", "no_answer", "cancelled", "completed", "voicemail"):
+            for estimate in (-0.004, 0.0, 0.004, 0.25, None):
+                for carrier in (None, -0.004, 0.0, 0.004, 0.42):
+                    with self.subTest(status=status, estimate=estimate, carrier=carrier):
+                        expected = max(0.0, float(carrier if carrier is not None else estimate or 0.0))
+                        self.assertEqual(billed_cost(record(status, estimate, carrier)), expected)
+
     def test_audio_ducking_never_amplifies_quiet_playback(self):
         import sys
 
