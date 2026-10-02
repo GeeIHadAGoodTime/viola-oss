@@ -495,4 +495,35 @@ describe('ChatMode command registry', () => {
 
     consoleErrorSpy.mockRestore();
   });
+  it('keeps a stream transport failure visible while the server has only the user message', async () => {
+    let source;
+    window.EventSource = class {
+      constructor() { source = this; }
+      close = vi.fn();
+    };
+    const userMessage = { id: 'user-message', role: 'user', content: '2+2', status: 'complete', metadata: {} };
+    chatHarness.apiFetch.mockImplementation((url, options = {}) => {
+      if (url === '/v1/chat/models') return Promise.resolve({ current_model: 'gpt-test', provider: 'test', providers: [] });
+      if (url === '/v1/chat/threads/thread-1/send' && options.method === 'POST') {
+        return Promise.resolve({ thread, messages: [userMessage], stream_id: 'stream-1' });
+      }
+      if (url === '/v1/chat/threads/thread-1') return Promise.resolve({ thread, messages: [userMessage] });
+      if (url === '/v1/chat/threads' || url.startsWith('/v1/chat/threads?')) return Promise.resolve({ threads: [thread] });
+      return Promise.resolve({});
+    });
+    render(<ChatMode profileName="Test user" />);
+    const input = await screen.findByPlaceholderText('Message Viola');
+    await screen.findByText('2+2');
+    fireEvent.change(input, { target: { value: '2+2' } });
+    fireEvent.click(screen.getByLabelText('Send message'));
+    await waitFor(() => expect(source?.onerror).toBeTypeOf('function'));
+    await act(async () => { source.onerror(); });
+    await waitFor(() => expect(screen.getByText('The live response connection dropped.')).toBeInTheDocument());
+    // Flush the immediate async refresh that previously erased the transient failure.
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    expect(screen.getByText('The live response connection dropped.')).toBeInTheDocument();
+    expect(source.close).toHaveBeenCalled();
+    expect(screen.queryByLabelText('Stop response')).not.toBeInTheDocument();
+  });
+
 });
