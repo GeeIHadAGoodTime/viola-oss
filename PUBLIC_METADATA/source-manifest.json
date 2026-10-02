@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "ed8446207b9a86cb01198472830fdc67c9c57bf1",
-  "sha256": "532e9958e64021d0a2e0439e757c08d2ffd01e9635a73a1019db9dc962f5d59e",
+  "revision": "a6165b06babf017cb50897a85839abf783958058",
+  "sha256": "93228efb8378790e714a68364ef769bbd1ef032834420fcb2a04b6b5d58261c0",
   "files": [
     {
       "path": ".env.example",
@@ -5755,8 +5755,8 @@
     },
     {
       "path": "tests/public/test_tts_profile_dependencies.py",
-      "sha256": "233be62845aec775210805c0bb847a902b33f2482832489408d14ebdaaec04b4",
-      "bytes": 570
+      "sha256": "028ad001dc2d0e3643e09b6a2f1d893840bac97add50af152d9cfd3bd3aea26f",
+      "bytes": 2491
     },
     {
       "path": "tests/public/test_windows_native_startup_order.py",
@@ -9595,13 +9595,13 @@
     },
     {
       "path": "ui/react-app/src/components/CallHistoryList.jsx",
-      "sha256": "0a7a73c31dcaa88dc4355239d03695d01298c4a53f7c48175bc2523b9dc7f4f6",
-      "bytes": 6707
+      "sha256": "9b6200070dd4fd27b9d56756fb86c770a693adcdfebf3e46b22019a61032b1f7",
+      "bytes": 7180
     },
     {
       "path": "ui/react-app/src/components/CallHistoryList.test.jsx",
-      "sha256": "ab1f96c3249b30bdb5a977ff4f370cc209d2a9f37c70458d1cf3dcea1abf4119",
-      "bytes": 5243
+      "sha256": "baeac3ae5dd22048b53bff14afb091ec15fe985289f8cdaa06be29ce0c1679ad",
+      "bytes": 6520
     },
     {
       "path": "ui/react-app/src/components/CallHistoryRow.jsx",
@@ -12115,8 +12115,8 @@
     },
     {
       "path": "voice/synthesis/kokoro_engine.py",
-      "sha256": "adddb0aeaf092046fd2c80126b42483d9a2e1139126f679372eff66c1bc51f6c",
-      "bytes": 58095
+      "sha256": "50748c7ad935f6cab2be690c26c41aa0aab52db620b9e607294f8dd404f2749e",
+      "bytes": 58223
     },
     {
       "path": "voice/synthesis/lazy_engine.py",
