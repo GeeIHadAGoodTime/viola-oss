@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "4501ee07a9e4ecbaa12ffd6b518d58c45d459ed8",
-  "sha256": "176c5d0774ae0521a60bb684a7b34938f796e89f4bba79ccfbe17ef8bddaddf3",
+  "revision": "3f2822bcc2928ba3f62f12b384d986c78f5c90a0",
+  "sha256": "c525f5f830da9052f61ef997bb88754f22372e23c324a7db38de18117c1b41ef",
   "files": [
     {
       "path": ".env.example",
@@ -500,8 +500,8 @@
     },
     {
       "path": "auth/csrf.py",
-      "sha256": "351ed1f011f108e1f3662f65bf8b21ef2aeb73748af449b8275a1c1a757bf9db",
-      "bytes": 14627
+      "sha256": "ede46ae8f9b05ea3536586242f91a4078161801d470a6cff3fd636671e37b2b2",
+      "bytes": 16110
     },
     {
       "path": "auth/database.py",
@@ -625,8 +625,8 @@
     },
     {
       "path": "backend/fastapi_app.py",
-      "sha256": "b54775ede0bbef8a0545c8a8da94b5389f683929427eafbf34a9a975cfad6a04",
-      "bytes": 66381
+      "sha256": "dea901f80ff168f92e5afe5948b056c4cfd4f8bc57109aa58d64ceb1794cbd56",
+      "bytes": 66858
     },
     {
       "path": "backend/instrumentation.py",
@@ -5635,8 +5635,8 @@
     },
     {
       "path": "telephony/routes.py",
-      "sha256": "b6ae1e034669b646c30151ded1b840fcc1ab5d9b7fe68e826f46275330c0fd2c",
-      "bytes": 46633
+      "sha256": "bcebc8727661ec59beaf7e306674c5b3d24e94421512afc9c17df87dd997841a",
+      "bytes": 47850
     },
     {
       "path": "telephony/streaming_stt_model.py",
@@ -9780,13 +9780,13 @@
     },
     {
       "path": "ui/react-app/src/components/PhoneToSModal.jsx",
-      "sha256": "8e16c2f89c07f8d5e448477efbb37ba7ec4f95e9f2cc31cd98da6b7d0dacd268",
-      "bytes": 5881
+      "sha256": "f7d18e6fe89ec3d746ca44f49a601d75b93619d26478d6e6a4ee1dab884494bd",
+      "bytes": 6143
     },
     {
       "path": "ui/react-app/src/components/PhoneToSModal.test.jsx",
-      "sha256": "606e4eeee96fb353e77eee7a33a5a329408761897473592a871d63ca43ae5ba5",
-      "bytes": 1866
+      "sha256": "42967c3e093d70a8b1c1989b7471e0cfe27312dabccadae60dc4a3f67a4450f7",
+      "bytes": 9418
     },
     {
       "path": "ui/react-app/src/components/QueueModal.jsx",
@@ -10820,8 +10820,8 @@
     },
     {
       "path": "ui/react-app/src/hooks/useViolaApi.js",
-      "sha256": "98e87a37147a518f372eb48bc67ee5eb8ca7a20aa205c94ab9ea4e1bde3ceabf",
-      "bytes": 13148
+      "sha256": "5fb083020d2dde1d486e3cdd687848475c7ae5721a6c7e3ecf92d9ac81c34a55",
+      "bytes": 13224
     },
     {
       "path": "ui/react-app/src/hooks/useViolaApi.shuffleFailure.test.js",
@@ -10830,8 +10830,8 @@
     },
     {
       "path": "ui/react-app/src/hooks/useViolaApi.test.js",
-      "sha256": "e7650a8dbd87c24cbf05e8562d7d11bb138b67c08635f56ad44f1ca198e8fdc4",
-      "bytes": 5208
+      "sha256": "b4a8308b0d645c8d9966e5df57895e16463ee298f137bc9c48365251bb60eebe",
+      "bytes": 8772
     },
     {
       "path": "ui/react-app/src/hooks/useVoice.cancelRecording.test.js",

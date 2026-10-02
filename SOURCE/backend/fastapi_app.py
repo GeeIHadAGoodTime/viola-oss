@@ -1288,6 +1288,15 @@ def _register_synchronous_route_definitions(app: FastAPI, *, state: Any, music: 
     if getattr(app.state, "_synchronous_route_definitions_registered", False):
         return
 
+    # Desktop routes with explicit csrf_required checks need the readable
+    # double-submit cookie too, including sessions created by older builds.
+    # This middleware only bootstraps cookies on desktop; cloud enforcement
+    # and the desktop routes' existing per-route enforcement stay unchanged.
+    from auth.csrf import CSRFMiddleware
+
+    if not any(middleware.cls is CSRFMiddleware for middleware in app.user_middleware):
+        app.add_middleware(CSRFMiddleware)
+
     _include_consent_router(app)
     _include_desktop_gotrue_auth_proxy(app)
     _include_desktop_oauth_callback(app)

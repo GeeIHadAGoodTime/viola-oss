@@ -1,8 +1,9 @@
 """
-CSRF protection for cookie-authenticated cloud requests.
+CSRF protection for cookie-authenticated cloud and desktop requests.
 
 This middleware implements the double-submit-cookie pattern for the hosted
-browser surface:
+browser surface and bootstraps the same cookie on the loopback desktop surface.
+Desktop enforcement remains on explicit csrf_required route dependencies:
 
 - The server issues a readable ``viola_csrf`` cookie on GET requests and
   whenever a session cookie is issued (login / magic-link / oauth complete).
@@ -92,15 +93,17 @@ def _normalize_origin(value: str | None) -> str | None:
     except ValueError:
         return None
     scheme = parsed.scheme.lower()
-    if scheme not in {"http", "https"} or not parsed.hostname:
+    if scheme not in {"http", "https"} or not parsed.hostname or parsed.username is not None:
         return None
     host = parsed.hostname.lower()
+    if ":" in host:
+        host = "[%s]" % host
     try:
         port = parsed.port
     except ValueError:
         return None
     default_port = (scheme == "http" and port == 80) or (scheme == "https" and port == 443)
-    if port and not default_port:
+    if port is not None and not default_port:
         host = "%s:%s" % (host, port)
     return "%s://%s" % (scheme, host)
 
@@ -129,16 +132,45 @@ def _configured_allowed_origins() -> frozenset[str]:
     return frozenset(origins)
 
 
+def _is_desktop_loopback_request(request: Request) -> bool:
+    """Match the local desktop listener, never forwarded headers or any local port."""
+    if _get_app_surface() != "desktop":
+        return False
+    loopback_hosts = {"localhost", "127.0.0.1", "::1"}
+    if request.url.hostname not in loopback_hosts:
+        return False
+    if request.client is None or request.client.host not in loopback_hosts:
+        return False
+    server = request.scope.get("server")
+    if not server or server[0] not in loopback_hosts:
+        return False
+    request_port = request.url.port
+    if request_port is None:
+        request_port = 443 if request.url.scheme == "https" else 80
+    return request.url.scheme in {"http", "https"} and request_port == server[1]
+
+
 def _request_origin_allowed(request: Request) -> bool:
     origin = request.headers.get("origin")
-    if origin:
-        normalized = _normalize_origin(origin)
-        return bool(normalized and normalized in _configured_allowed_origins())
+    if origin is not None:
+        # Origin is a serialized origin, not a URL with a path or credentials.
+        try:
+            parsed = urlsplit(origin)
+        except ValueError:
+            return False
+        if parsed.path or parsed.query or parsed.fragment:
+            return False
+        source = origin
+    else:
+        source = request.headers.get("referer")
 
-    referer = request.headers.get("referer")
-    if referer:
-        normalized = _normalize_origin(referer)
-        return bool(normalized and normalized in _configured_allowed_origins())
+    if source is not None:
+        normalized = _normalize_origin(source)
+        if not normalized:
+            return False
+        if normalized in _configured_allowed_origins():
+            return True
+        return _is_desktop_loopback_request(request) and normalized == _normalize_origin(str(request.url))
 
     # Non-browser clients and same-origin form submissions may omit both.
     # They still need the double-submit token below when using cookies.
@@ -233,7 +265,7 @@ def _csrf_set_cookie_header(token: str, request: Request) -> bytes:
 
 
 class CSRFMiddleware:
-    """Enforce CSRF protection for cookie-authenticated cloud requests.
+    """Enforce cloud CSRF and bootstrap cookies for trusted loopback desktop requests.
 
     Pure-ASGI (not BaseHTTPMiddleware) — see ``auth/middleware.py`` for the
     asyncpg cross-loop reasoning.
@@ -266,15 +298,16 @@ class CSRFMiddleware:
             await self.app(scope, receive, send)
             return
 
-        if _get_app_surface() != "cloud":
+        request = Request(scope, receive)
+        cloud_surface = _get_app_surface() == "cloud"
+        if not cloud_surface and not _is_desktop_loopback_request(request):
             await self.app(scope, receive, send)
             return
 
-        request = Request(scope, receive)
         path = scope.get("path", "") or ""
         method = (scope.get("method", "") or "").upper()
 
-        if method in STATE_CHANGING_METHODS and not self._is_exempt_path(path):
+        if cloud_surface and method in STATE_CHANGING_METHODS and not self._is_exempt_path(path):
             if request.cookies.get(SESSION_COOKIE_NAME) and not _has_bearer_authorization(request):
                 if not _request_origin_allowed(request):
                     response = JSONResponse(
