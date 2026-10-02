@@ -1,20 +1,19 @@
 # Source snapshot binding
 
-Chat response recovery source revision: `949a6cef1f8dedba8ed15bf3be6304446eb327b5`.
+Source revision: `ed8446207b9a86cb01198472830fdc67c9c57bf1`.
 
-Only ChatMode and its existing regression test changed from `2a01c2cb3d0158459b76f527d8dd03232b56e44f`.
-The correction keeps the visible transport error while a pending assistant result
-is not yet in the server snapshot. It does not change authentication or claim
-to repair the separate stream-token rejection. Fourteen focused frontend tests
-and ESLint pass; the new regression rejects the original behavior. Installed
-candidate verification and public delivery remain pending.
+This snapshot contains source corrections for the observed Windows native-import
+lock inversion, room response parsing, light-theme accent contrast, and missing
+Linux/macOS number-normalization dependencies. The Windows access-violation crash
+has not been established as the same cause as the native-import deadlock.
 
-Dependency inputs, all six existing Windows inventories and their dated receipts
-remain unchanged. No fresh inventory resolution, advisory scan, native runtime
-qualification, release or deployment is claimed.
+The frontend suite passes 981 tests across 137 files and builds. Five focused
+unittest methods cover startup ordering and all three desktop dependency profiles.
+These are source checks. This revision has not passed installed acceptance and
+is not a released product.
 
-Verify from SOURCE with the unchanged canonical verifier:
+Only Linux and macOS requirements add num2words==0.5.14, already pinned on Windows.
+The six existing Windows/frontend inventories and dated receipts remain unchanged.
+They do not establish Linux/macOS inventory coverage or a fresh advisory scan.
 
-```sh
-python -B tools/release/verify_source_binding.py --source . --metadata ../PUBLIC_METADATA
-```
+Verify using the unchanged canonical source-binding verifier.

@@ -1,14 +1,21 @@
 {
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "27f47a9c64ddeeb1982f845b5dc7aec6d1ba8709c7fa999387007ccf25bc1edf",
-  "source_tree_sha256": "cd0dccbe5dd5936e0e24138f46a6e765b094c01e367eed49ce57627c6a1184a8",
-  "source_file_count": 2470,
-  "source_revision": "949a6cef1f8dedba8ed15bf3be6304446eb327b5",
-  "comparison_public_revision": "2a01c2cb3d0158459b76f527d8dd03232b56e44f",
+  "source_manifest_sha256": "4d511c280263a1b01975002eaaab3e293ca4f25d31b843d74214015cd784d88e",
+  "source_tree_sha256": "532e9958e64021d0a2e0439e757c08d2ffd01e9635a73a1019db9dc962f5d59e",
+  "source_file_count": 2474,
+  "source_revision": "ed8446207b9a86cb01198472830fdc67c9c57bf1",
+  "comparison_public_revision": "65b928ce9f7821c5c857d6b6c7e8c76de53773b4",
   "changed_source_paths": [
-    "SOURCE/ui/react-app/src/components/stage/modes/chat/ChatMode.jsx",
-    "SOURCE/ui/react-app/src/components/stage/modes/chat/ChatMode.test.jsx"
+    "SOURCE/requirements_linux.txt",
+    "SOURCE/requirements_macos.txt",
+    "SOURCE/tests/public/test_tts_profile_dependencies.py",
+    "SOURCE/tests/public/test_windows_native_startup_order.py",
+    "SOURCE/ui/react-app/src/components/AccentPicker.jsx",
+    "SOURCE/ui/react-app/src/components/AccentPicker.test.jsx",
+    "SOURCE/ui/react-app/src/hooks/useDeviceDiscovery.js",
+    "SOURCE/ui/react-app/src/hooks/useDeviceDiscovery.test.jsx",
+    "SOURCE/viola_qt.py"
   ],
   "retained_sboms": [
     {
@@ -49,26 +56,31 @@
     }
   ],
   "input_equivalence": {
-    "unchanged_dependency_input_count": 545,
-    "comparison_source_manifest_sha256": "4f9c1df4161125ffe4a1a65fd7306c6928cf01d82a24ec087c1e9fad8d220d8f",
-    "basis": "Only the two listed ChatMode source/test files changed. Dependency inputs, existing inventories and their dated receipts are unchanged."
+    "unchanged_dependency_input_count": 543,
+    "changed_dependency_inputs": [
+      "requirements_linux.txt",
+      "requirements_macos.txt"
+    ],
+    "basis": "Linux and macOS profiles add num2words==0.5.14, already pinned in the unchanged Windows desktop profile. Existing six Windows/frontend inventories and dated receipts are retained unchanged; they are not Linux or macOS inventories. No new platform dependency resolution or vulnerability scan is claimed."
   },
   "prior_binding": {
-    "public_revision": "2a01c2cb3d0158459b76f527d8dd03232b56e44f",
+    "public_revision": "65b928ce9f7821c5c857d6b6c7e8c76de53773b4",
     "path": "PUBLIC_METADATA/source-binding.json",
-    "git_blob": "a0660d5f9fd2179d5013e73c380ef4a3c5320062",
-    "sha256": "57e1cd6f8defd60b5477e4aebc2ffd4cacf0a902d7230571508d8782d4a9b68d",
-    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/2a01c2cb3d0158459b76f527d8dd03232b56e44f/PUBLIC_METADATA/source-binding.json"
+    "git_blob": "f280eb6c2ce2e18ac2465a1063018fe73e255693",
+    "sha256": "61c14badbdfbc187f2082afaf7f7de583fe76d9d964fc232ddaf82bc87c54f97",
+    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/65b928ce9f7821c5c857d6b6c7e8c76de53773b4/PUBLIC_METADATA/source-binding.json"
   },
   "new_resolution_performed": false,
   "new_advisory_scan_performed": false,
   "new_runtime_qualification_performed": false,
   "qualification": {
-    "scope": "Chat transport-error recovery source correction; installed candidate and public delivery not established",
-    "focused_frontend_tests": 14,
-    "original_source_negative_control": "new regression fails as expected",
-    "eslint": "passed",
-    "installed_candidate": "pending",
+    "scope": "Focused source corrections following installed-product failures; this source revision is not installed-qualified",
+    "frontend_tests": 981,
+    "frontend_files": 137,
+    "frontend_build": "passed",
+    "focused_unittest_methods": 5,
+    "negative_controls": "original room response parsing and accent styles fail added regressions; original entrypoint lacks preload contract",
+    "installed_candidate": "pending for this revision",
     "release_or_deployment": "not_established"
   }
 }

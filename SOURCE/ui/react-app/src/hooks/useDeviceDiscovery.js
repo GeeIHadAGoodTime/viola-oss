@@ -31,11 +31,11 @@ export function useDeviceDiscovery(enabled = false) {
     }
     try {
       const data = await apiFetch('/api/v1/devices/discovered');
-      if (data.ok) {
-        setDevices(data.data?.devices || []);
+      if (data?.ok !== false && Array.isArray(data?.devices)) {
+        setDevices(data.devices);
         setError(null);
       } else {
-        setError(errorMessage(data.error, "Couldn't load rooms. Check your connection and try again."));
+        setError(errorMessage(data?.error, "Couldn't load rooms. Check your connection and try again."));
       }
     } catch {
       setError("Couldn't load rooms. Check your connection and try again.");
@@ -52,14 +52,14 @@ export function useDeviceDiscovery(enabled = false) {
         method: 'POST',
         body: JSON.stringify({ room_name: roomName }),
       });
-      if (data.ok) {
+      if (data?.ok !== false && data?.device_id === deviceId) {
         // Optimistic update: mark device as connected with new name
         setDevices(prev => prev.map(d =>
           d.device_id === deviceId ? { ...d, is_connected: true, name: roomName || d.name } : d
         ));
-        return { ok: true, data: data.data };
+        return { ok: true, data };
       } else {
-        const message = errorMessage(data.error, "Couldn't add this room. Make sure it is on the same network and try again.");
+        const message = errorMessage(data?.error, "Couldn't add this room. Make sure it is on the same network and try again.");
         setError(message);
         return { ok: false, error: message };
       }
@@ -77,14 +77,14 @@ export function useDeviceDiscovery(enabled = false) {
       const data = await apiFetch(`/api/v1/devices/${deviceId}/disconnect`, {
         method: 'POST',
       });
-      if (data.ok) {
+      if (data?.ok !== false && data?.device_id === deviceId && data?.disconnected === true) {
         // Optimistic update: mark device as disconnected
         setDevices(prev => prev.map(d =>
           d.device_id === deviceId ? { ...d, is_connected: false } : d
         ));
         return { ok: true };
       } else {
-        const message = errorMessage(data.error, "Couldn't remove this room. Try again.");
+        const message = errorMessage(data?.error, "Couldn't remove this room. Try again.");
         setError(message);
         return { ok: false, error: message };
       }
@@ -103,14 +103,14 @@ export function useDeviceDiscovery(enabled = false) {
         method: 'PATCH',
         body: JSON.stringify({ name: newName }),
       });
-      if (data.ok) {
+      if (data?.ok !== false && data?.room_id === deviceId && data?.name === newName) {
         // Optimistic update: update device name
         setDevices(prev => prev.map(d =>
           d.device_id === deviceId ? { ...d, name: newName } : d
         ));
         return { ok: true };
       } else {
-        const message = errorMessage(data.error, "Couldn't rename this room. Try again.");
+        const message = errorMessage(data?.error, "Couldn't rename this room. Try again.");
         setError(message);
         return { ok: false, error: message };
       }

@@ -168,7 +168,7 @@ export default function AccentPicker({ onChange }) {
         aspectRatio: '1',
         borderRadius: 7,
         background: hex,
-        border: isActive(hex) ? '2px solid #fff' : '1px solid rgba(255, 255, 255, 0.12)',
+        border: isActive(hex) ? '2px solid var(--text-primary)' : '1px solid var(--border-hover)',
         cursor: 'pointer',
         padding: 0,
         transition: 'transform 0.12s ease',
@@ -186,7 +186,7 @@ export default function AccentPicker({ onChange }) {
     <div
       style={{
         fontFamily: "'Segoe UI', 'SF Pro Display', -apple-system, sans-serif",
-        color: 'rgba(255, 255, 255, 0.88)',
+        color: 'var(--text-primary)',
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
@@ -219,10 +219,10 @@ export default function AccentPicker({ onChange }) {
             flex: 1,
             minHeight: 44,
             boxSizing: 'border-box',
-            background: 'rgba(255, 255, 255, 0.05)',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
+            background: 'var(--bg-surface)',
+            border: '1px solid var(--border-hover)',
             borderRadius: 8,
-            color: '#fff',
+            color: 'var(--text-primary)',
             padding: '8px 12px',
             fontSize: 13,
             fontFamily: '"SF Mono", "Consolas", monospace',
@@ -230,7 +230,7 @@ export default function AccentPicker({ onChange }) {
           }}
         />
       </div>
-      <div style={{ fontSize: 10, opacity: 0.5, marginBottom: 14 }}>
+      <div style={{ fontSize: 10, color: 'var(--text-secondary)', marginBottom: 14 }}>
         Auto-applies on paste · accepts #ABC or #AABBCC · saves to your account
       </div>
 
@@ -240,7 +240,7 @@ export default function AccentPicker({ onChange }) {
             style={{
               fontSize: 10,
               fontWeight: 700,
-              opacity: 0.55,
+              color: 'var(--text-secondary)',
               letterSpacing: 0.8,
               marginBottom: 6,
             }}
@@ -266,7 +266,7 @@ export default function AccentPicker({ onChange }) {
             style={{
               fontSize: 10,
               fontWeight: 700,
-              opacity: 0.55,
+              color: 'var(--text-secondary)',
               letterSpacing: 0.8,
               marginBottom: 6,
             }}
