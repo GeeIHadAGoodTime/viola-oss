@@ -8,7 +8,7 @@ ENTRY = Path(__file__).resolve().parents[2] / "viola_qt.py"
 
 
 def load(platform="win32", name="__main__", argv=None, hook=False, missing=False):
-    tree = ast.parse(ENTRY.read_text())
+    tree = ast.parse(ENTRY.read_text(encoding="utf-8"))
     node = next(
         (n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "_preload_windows_ui_runtime"),
         None,
@@ -63,7 +63,7 @@ class WindowsNativeStartupOrderTests(unittest.TestCase):
         self.assertEqual(checkpoints, ["03a-win32ui-preload-start", "03b-win32ui-preload-unavailable"])
 
     def test_call_precedes_telemetry_and_follows_velopack(self):
-        tree = ast.parse(ENTRY.read_text())
+        tree = ast.parse(ENTRY.read_text(encoding="utf-8"))
         calls = {
             n.value.func.id: n.lineno
             for n in tree.body
@@ -76,7 +76,7 @@ class WindowsNativeStartupOrderTests(unittest.TestCase):
         ]
         self.assertIn("_preload_windows_ui_runtime", calls)
         self.assertLess(
-            ENTRY.read_text().index("_VELOPACK_STARTUP_HOOK_RAN ="),
-            ENTRY.read_text().index("\n_preload_windows_ui_runtime()"),
+            ENTRY.read_text(encoding="utf-8").index("_VELOPACK_STARTUP_HOOK_RAN ="),
+            ENTRY.read_text(encoding="utf-8").index("\n_preload_windows_ui_runtime()"),
         )
         self.assertLess(calls["_preload_windows_ui_runtime"], min(imports))
