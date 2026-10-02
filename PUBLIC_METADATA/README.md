@@ -1,20 +1,19 @@
 # Source snapshot binding
 
-Current cost-handling source revision: `862f0d1b53d114a7269d8f46b8755296f593151a`.
-The manifest binds 2,470 source files; exactly the two listed source/test paths changed
-from `1aa40ad76f8176624820ba36f9578d9bc0bb79c8`.
+Chat response recovery source revision: `949a6cef1f8dedba8ed15bf3be6304446eb327b5`.
 
-The focused public source contract passes 150 combinations and rejects the prior
-outcome-based cost floor. Authoritative carrier facts remain unchanged; existing
-measured estimates can still include provider costs. This is not a promise that
-every unanswered call is free. Full composed accounting and runtime proof is pending.
+Only ChatMode and its existing regression test changed from `2a01c2cb3d0158459b76f527d8dd03232b56e44f`.
+The correction keeps the visible transport error while a pending assistant result
+is not yet in the server snapshot. It does not change authentication or claim
+to repair the separate stream-token rejection. Fourteen focused frontend tests
+and ESLint pass; the new regression rejects the original behavior. Installed
+candidate verification and public delivery remain pending.
 
-Dependency inputs, all six October 1 Windows inventories, and their dated receipts
-and advisory files are unchanged. The prior binding is referenced immutably rather
-than copied. No new dependency resolution, advisory scan, release or deployment is
-claimed here.
+Dependency inputs, all six existing Windows inventories and their dated receipts
+remain unchanged. No fresh inventory resolution, advisory scan, native runtime
+qualification, release or deployment is claimed.
 
-From SOURCE, verify with the unchanged canonical tool:
+Verify from SOURCE with the unchanged canonical verifier:
 
 ```sh
 python -B tools/release/verify_source_binding.py --source . --metadata ../PUBLIC_METADATA

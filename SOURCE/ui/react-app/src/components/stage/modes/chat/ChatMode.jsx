@@ -491,9 +491,13 @@ function ChatModeInner({
           }
           : message
       )));
-      refreshActiveThread().catch(() => {});
+      // A transport failure can precede persistence of the assistant result.
+      // Reloading messages here replaces the visible error with the server's
+      // user-only snapshot. Keep that recovery feedback until the user opens
+      // another thread or retries; the sidebar may still refresh safely.
+      loadThreads(search).catch(() => {});
     };
-  }, [refreshActiveThread]);
+  }, [refreshActiveThread, loadThreads, search]);
 
   const sendText = useCallback(async (text) => {
     const clean = text.trim();
