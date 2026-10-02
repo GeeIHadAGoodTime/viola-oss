@@ -79,6 +79,7 @@ faster-whisper>=1.0.0,<2.0.0
 # TTS (optional Kokoro: install requirements_kokoro.txt)
 pyttsx3==2.99  # System TTS fallback — needs espeak-ng installed (see install.sh)
 babel>=2.17.0,<3.0.0        # Required by Pipecat Kokoro TTS service
+num2words==0.5.14           # Shared TTS text normalization, matching Windows
 soundfile>=0.13.0,<0.14.0   # WAV/audio file I/O for TTS output (needs libsndfile)
 scipy==1.16.3       # Resampling for TTS (24kHz->16kHz) — fallback for soxr
 soxr>=1.0.0,<2.0.0  # High-quality resampling (preferred over scipy); >=1.0.0 required by pipecat-ai 0.0.107

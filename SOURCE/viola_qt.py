@@ -223,6 +223,38 @@ _VELOPACK_STARTUP_HOOK_RAN = _run_velopack_startup_hook_first()
 _boot_checkpoint("03-velopack-hook-returned")
 
 
+def _preload_windows_ui_runtime() -> None:
+    """Initialize win32ui before concurrent native imports can invert locks.
+
+    Published Windows startup dumps show win32ui's CRT initializer waiting
+    for Python's GIL while the GIL holder waits in CFFI LoadLibraryExW.
+    DLL initialization holds Windows' loader lock. Loading win32ui here,
+    before telemetry or backend workers start, removes that first-import
+    race without disabling desktop automation, audio, or health checks.
+    """
+    import sys as _startup_sys
+
+    if (
+        _startup_sys.platform != "win32"
+        or __name__ != "__main__"
+        or "--multiprocessing-fork" in _startup_sys.argv
+        or _is_velopack_hook_invocation()
+    ):
+        return
+    _boot_checkpoint("03a-win32ui-preload-start")
+    try:
+        import win32ui  # noqa: F401 - required native initialization ordering
+    except ImportError:
+        # Source environments may omit optional Windows automation. Preserve
+        # existing feature-level handling while making that condition visible.
+        _boot_checkpoint("03b-win32ui-preload-unavailable")
+    else:
+        _boot_checkpoint("03b-win32ui-preload-complete")
+
+
+_preload_windows_ui_runtime()
+
+
 def _mark_release_health_clean_exit(exit_code: int = 0) -> None:
     return None
 
