@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "862f0d1b53d114a7269d8f46b8755296f593151a",
-  "sha256": "f35fee86a6999dafc7c9f2a1664a21fe79a7471366ebbcd8f53f43d53269c53b",
+  "revision": "949a6cef1f8dedba8ed15bf3be6304446eb327b5",
+  "sha256": "cd0dccbe5dd5936e0e24138f46a6e765b094c01e367eed49ce57627c6a1184a8",
   "files": [
     {
       "path": ".env.example",
@@ -10495,13 +10495,13 @@
     },
     {
       "path": "ui/react-app/src/components/stage/modes/chat/ChatMode.jsx",
-      "sha256": "bc68fe794f686ec4821e665ff0a8a07a85b12cc099cfd3ec09468cee585f63e8",
-      "bytes": 37299
+      "sha256": "265e5d0e9ba03add042668ab5a670fa3b6af8f7b71884c61ba6d913b394f6506",
+      "bytes": 37626
     },
     {
       "path": "ui/react-app/src/components/stage/modes/chat/ChatMode.test.jsx",
-      "sha256": "c0213b4867aff09f82a88c85b207eae66b85aa2a3c5d0572ebfe25cb524ae6a7",
-      "bytes": 20690
+      "sha256": "c2a9936e0c85d55fad70e4033f22a037ce5804dce657c1b68c2172e6ede55644",
+      "bytes": 22578
     },
     {
       "path": "ui/react-app/src/components/stage/modes/chat/ChatSidebar.jsx",
