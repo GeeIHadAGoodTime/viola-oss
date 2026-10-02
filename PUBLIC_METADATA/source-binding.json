@@ -1,205 +1,92 @@
 {
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "0d5a51d102a628c29d470d64311b61f65b3d5d6213924d00d47e3a53f4854cd3",
-  "source_tree_sha256": "176c5d0774ae0521a60bb684a7b34938f796e89f4bba79ccfbe17ef8bddaddf3",
+  "source_manifest_sha256": "81f439e8ffaf44fa9d5e1d1841c888942f8807639f5b18ce6972c518b074d6a9",
+  "source_tree_sha256": "c525f5f830da9052f61ef997bb88754f22372e23c324a7db38de18117c1b41ef",
   "source_file_count": 2470,
+  "source_revision": "3f2822bcc2928ba3f62f12b384d986c78f5c90a0",
+  "comparison_public_revision": "876e0febfa1cd5125c573ded1c927b2cc34ea5c5",
+  "changed_source_paths": [
+    "SOURCE/auth/csrf.py",
+    "SOURCE/backend/fastapi_app.py",
+    "SOURCE/telephony/routes.py",
+    "SOURCE/ui/react-app/src/components/PhoneToSModal.jsx",
+    "SOURCE/ui/react-app/src/components/PhoneToSModal.test.jsx",
+    "SOURCE/ui/react-app/src/hooks/useViolaApi.js",
+    "SOURCE/ui/react-app/src/hooks/useViolaApi.test.js"
+  ],
   "retained_sboms": [
     {
       "path": "frontend.sbom.json",
       "sha256": "e28d3b8ed9062fa94566f1923bbf091fb4b0544774763775dbaff347777b2f98",
       "components": 431,
-      "dependency_edges_including_source_root": 903,
-      "package_dependency_edges": 880,
-      "inventory_status": "refreshed_exact_clean_windows_install",
-      "metadata_timestamp": "2026-10-01T16:53:14.566Z",
-      "receipt": "qualification-20261001/frontend.receipt.json"
+      "inventory_status": "retained_exact_october_1_clean_windows_inventory"
     },
     {
       "path": "windows-all-optional.sbom.json",
       "sha256": "7293a8bfa357fc9104e0a6c67d3e4d6d37ac6bd0919f991ad870a9e9d0b8e307",
       "components": 229,
-      "dependency_edges_including_source_root": 441,
-      "package_dependency_edges": 352,
-      "metadata_timestamp": "2026-10-01T17:05:04.590293+00:00",
-      "inventory_status": "refreshed_exact_clean_windows_install",
-      "receipt": "qualification-20261001/windows-all-optional.receipt.json"
+      "inventory_status": "retained_exact_october_1_clean_windows_inventory"
     },
     {
       "path": "windows-deepfilter.sbom.json",
       "sha256": "c9de385226d1e7530a5bbb5c5993a04d39e7a8e5ede5ef25dcf7c270ad4fc383",
       "components": 28,
-      "dependency_edges_including_source_root": 36,
-      "package_dependency_edges": 27,
-      "inventory_status": "refreshed_exact_clean_windows_install",
-      "metadata_timestamp": "2026-10-01T17:27:50.142720+00:00",
-      "receipt": "qualification-20261001/windows-deepfilter.receipt.json"
+      "inventory_status": "retained_exact_october_1_clean_windows_inventory"
     },
     {
       "path": "windows-desktop.sbom.json",
       "sha256": "8089cc0874ff51ca223a9e3c656d7932e8b8bd2c84f4f29e1ce358f5431ec31e",
       "components": 210,
-      "dependency_edges_including_source_root": 398,
-      "package_dependency_edges": 312,
-      "metadata_timestamp": "2026-10-01T16:59:30.598070+00:00",
-      "inventory_status": "refreshed_exact_clean_windows_install",
-      "receipt": "qualification-20261001/windows-desktop.receipt.json"
+      "inventory_status": "retained_exact_october_1_clean_windows_inventory"
     },
     {
       "path": "windows-kokoro.sbom.json",
       "sha256": "c011672693ab941a80381a31179148533080bf83faddad081b79a755bb460894",
       "components": 221,
-      "dependency_edges_including_source_root": 421,
-      "package_dependency_edges": 334,
-      "metadata_timestamp": "2026-10-01T16:57:13.271348+00:00",
-      "inventory_status": "refreshed_exact_clean_windows_install",
-      "receipt": "qualification-20261001/windows-kokoro.receipt.json"
+      "inventory_status": "retained_exact_october_1_clean_windows_inventory"
     },
     {
       "path": "windows-other-optional.sbom.json",
       "sha256": "194830a9b3726d5589e91bff03e8a9264094085619d59ec3d739b30bcf04711e",
       "components": 218,
-      "dependency_edges_including_source_root": 418,
-      "package_dependency_edges": 330,
-      "metadata_timestamp": "2026-10-01T17:02:42.111667+00:00",
-      "inventory_status": "refreshed_exact_clean_windows_install",
-      "receipt": "qualification-20261001/windows-other-optional.receipt.json"
+      "inventory_status": "retained_exact_october_1_clean_windows_inventory"
     }
   ],
   "input_equivalence": {
-    "basis": "All six inventories were regenerated from exact clean Windows installations. The five Python scopes are isolated environments; frontend uses its exact lockfile. No historical inventory is reused as current installed evidence. Linux/macOS installation is not claimed.",
-    "requirements": []
+    "unchanged_dependency_input_count": 545,
+    "method": "Compared dependency path, byte count and SHA-256 entries between the baseline and current source manifests; only the seven listed Phone Terms paths changed.",
+    "inventory_scope": "Exact October 1 Windows inventories retained unchanged; dated qualification remains in the immutable prior binding. No new dependency resolution or advisory scan is claimed."
   },
-  "new_resolution_performed": true,
-  "new_advisory_scan_performed": true,
+  "new_resolution_performed": false,
+  "new_advisory_scan_performed": false,
   "new_runtime_qualification_performed": false,
-  "source_revision": "4501ee07a9e4ecbaa12ffd6b518d58c45d459ed8",
-  "comparison_public_revision": "f4d39d1dbb532420e0983051c72f64fb03950278",
-  "changed_source_paths": [
-    "SOURCE/requirements_desktop.txt",
-    "SOURCE/requirements_linux.txt",
-    "SOURCE/requirements_macos.txt",
-    "SOURCE/ui/react-app/package.json",
-    "SOURCE/ui/react-app/package-lock.json"
-  ],
-  "prior_qualification": {
-    "public_contracts": {
-      "source_revision": "c7de239c61985273527d297adeef265d82269cb9",
-      "passed_test_methods": 63,
-      "command": "python -m unittest discover -s tests/public -v",
-      "environment": "Clean Windows CPython 3.11 virtual environment",
-      "scope": "Public source, privacy, action-confirmation, phone, Pipecat backport, local-account separation, music persistence, and ducking contracts.",
-      "clean_install": {
-        "resolved_packages": 210,
-        "pip_check": "passed",
-        "pip_report_matches_installed_environment": true
-      }
-    },
-    "frontend": {
-      "test_files_passed": 135,
-      "tests_passed": 954,
-      "npm_advisories": 0,
-      "node_version": "24.15.0",
-      "npm_version": "11.12.1",
-      "source_inputs_unchanged": true
-    },
-    "advisory_scan": {
-      "prior_scanned_at": "2026-09-12T18:33:14.470607+00:00",
-      "service": "OSV batch API",
-      "unique_exact_queries": 238,
-      "status": "At the prior c7de239 source qualification, dated broad-scan evidence was retained and aiohttp/Pipecat advisories were assessed against that prior candidate"
-    },
-    "advisory_assessment": {
-      "path": "history/20260929-advisory-assessment.md",
-      "sha256": "b61cfa2ff678aa12c3f8896d2fb02733f223d4274b6d755aed479ece2deaaf57"
-    },
-    "pipecat_wheel_sha256": "fb0895009eaa6cb49f771e8952347b43dbcd0603d5470d97976e740d2a64f68e",
-    "new_dependency_resolution_performed": true,
-    "live_provider_carrier_hardware_acceptance_performed": false,
-    "direct_primary_advisory": {
-      "id": "GHSA-cq5v-8q36-5273",
-      "cve": "CVE-2026-69244",
-      "package": "aiohttp",
-      "affected_through": "3.14.2",
-      "fixed_in": "3.14.3",
-      "source": "https://github.com/aio-libs/aiohttp/security/advisories/GHSA-cq5v-8q36-5273",
-      "disposition": "clean Windows install resolves 3.14.3; all desktop recipes require >=3.14.3"
-    },
-    "source_revision": "c7de239c61985273527d297adeef265d82269cb9",
-    "scope_note": "Historical clean-install, advisory and public-contract evidence for c7de239 only; it does not qualify the current PyJWT 2.15.1 source candidate."
+  "prior_binding": {
+    "public_revision": "876e0febfa1cd5125c573ded1c927b2cc34ea5c5",
+    "path": "PUBLIC_METADATA/source-binding.json",
+    "git_blob": "c6918dce8941675812defa6d2b853d0723d46d74",
+    "sha256": "8d86f26433782cf822a4e72dc5c8557130c2921cd6331e6b438142369c07bb1a",
+    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/876e0febfa1cd5125c573ded1c927b2cc34ea5c5/PUBLIC_METADATA/source-binding.json"
   },
   "qualification": {
-    "source_revision": "4501ee07a9e4ecbaa12ffd6b518d58c45d459ed8",
-    "clean_windows_dependency_resolution": "passed_five_isolated_scopes",
-    "pyjwt_bearing_windows_sbom_refresh": "passed_four_inventories",
-    "public_contracts": {
-      "passed": 63,
-      "environment": "Windows CPython 3.11",
-      "source_ci_head": "d13c95d87a8d632f5a873ab4dab28736f075455d",
-      "run_url": "https://github.com/GeeIHadAGoodTime/viola-oss/actions/runs/36895224651"
+    "source_revision": "3f2822bcc2928ba3f62f12b384d986c78f5c90a0",
+    "scope": "Scoped source regression evidence only; full canonical-runtime and installer qualification are separate pending gates",
+    "scoped_backend": {
+      "passed": 79,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0,
+      "independently_reproduced": true
     },
-    "advisory_scan": {
-      "path": "qualification-20261001/osv-python-scan.json",
-      "sha256": "f96a6a380ccbc6f8ad70471505a6ebc0d12dcdfc3d1749ae6c9c3584598d6e6b",
-      "unique_exact_pypi_queries": 238,
-      "scanned_at": "2026-10-01T17:30:09.129682+00:00",
-      "raw_hits": [
-        "GHSA-3363-2ph6-35wh",
-        "GHSA-j8cv-x86q-rj85",
-        "PYSEC-2026-2877",
-        "PYSEC-2026-2878"
-      ],
-      "status": "Only maintained Pipecat fork version matches remain; exact retained backport contracts passed. No unreviewed finding remains in the scanned package graph. This is not a vulnerability-free or release-ready claim."
+    "scoped_frontend": {
+      "passed": 42,
+      "failed": 0,
+      "independently_reproduced": true
     },
-    "linux_macos_install": "not_performed",
-    "public_merge_and_release": "not_authorized",
-    "frontend_sbom_refresh": "passed_exact_clean_windows_install",
-    "frontend_cloud_validation": {
-      "environment": "Linux; Node 24.19.0; npm 11.9.0",
-      "clean_npm_ci": "passed; 435 packages; minimatch 3.1.5 patch applied",
-      "npm_audit": "passed; zero vulnerabilities on 2026-10-01",
-      "eslint": "passed; 0 errors, 170 pre-existing warnings",
-      "build": "passed; 7.88 seconds; credentials absent; not release qualification",
-      "vitest": "passed; 135 files, 954 tests; 49.58 seconds",
-      "brace_expansion_stress": "four advisory-shaped input cases completed without exception; ordinary expansion passed"
-    },
-    "inventory_receipts": [
-      {
-        "path": "qualification-20261001/windows-desktop.receipt.json",
-        "sha256": "70e07a264b285ec3d8cd7c2e3e43f7b4706d894d67b9c7825380d0e2f9c03ddc"
-      },
-      {
-        "path": "qualification-20261001/windows-kokoro.receipt.json",
-        "sha256": "68a9a1865284ff578117ef7c2eca9892288379513393fd4451f8372b17782397"
-      },
-      {
-        "path": "qualification-20261001/windows-other-optional.receipt.json",
-        "sha256": "6855d2d87f42c302223fb82266a47306e5f330cba45757b7b3b74c255631eb27"
-      },
-      {
-        "path": "qualification-20261001/windows-all-optional.receipt.json",
-        "sha256": "2eda2520b5aaf20e910309fc7820e27b316ad5bf04545792ce9fec257551e175"
-      },
-      {
-        "path": "qualification-20261001/frontend.receipt.json",
-        "sha256": "ba1d3f81bd550a6e1dc245210e2d20f831c29d740474f9125ec80023438557ba"
-      },
-      {
-        "path": "qualification-20261001/windows-deepfilter.receipt.json",
-        "sha256": "a903522df3c3983aa20c19eb3a9efe3ff96f3e9114ed37a8b7fb48d24e74441f"
-      }
-    ],
-    "inventory_workflow_url": "https://github.com/GeeIHadAGoodTime/viola-oss/actions/runs/36895224710",
-    "frontend_windows": {
-      "test_files": 135,
-      "tests": 954,
-      "npm_audit_vulnerabilities": 0,
-      "run_url": "https://github.com/GeeIHadAGoodTime/viola-oss/actions/runs/36895224651"
-    },
-    "private_composed_consumer": "pending",
-    "actual_runtime_acceptance": "pending",
-    "deepfilter_inventory_refresh": "passed_isolated_numpy_1_26_4_urllib3_2_8_0",
-    "all_windows_sbom_refresh": "passed_five_inventories",
-    "deepfilter_workflow_url": "https://github.com/GeeIHadAGoodTime/viola-oss/actions/runs/36897971442"
+    "format_and_lint": "scoped Ruff, Black and ESLint passed",
+    "canonical_composed_runtime": "pending",
+    "clean_frontend_build": "pending",
+    "installed_windows_or_customer_acceptance": "not_performed",
+    "live_production_mutation": "not_performed"
   }
 }
