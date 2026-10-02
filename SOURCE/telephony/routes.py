@@ -60,6 +60,7 @@ async def _maybe_proxy_phone_to_cloud(
     *,
     params: dict[str, object] | None = None,
     json_body: dict[str, object] | None = None,
+    bearer_token: str | None = None,
 ) -> JSONResponse | None:
     """Proxy a phone-data request to the cloud, or return None to read locally.
 
@@ -96,7 +97,12 @@ async def _maybe_proxy_phone_to_cloud(
         )
 
     try:
-        status_code, body = await proxy_phone_request(method, cloud_path, params=params, json_body=json_body)
+        if bearer_token is None:
+            status_code, body = await proxy_phone_request(method, cloud_path, params=params, json_body=json_body)
+        else:
+            status_code, body = await proxy_phone_request(
+                method, cloud_path, params=params, json_body=json_body, bearer_token=bearer_token
+            )
     except CloudProxyUnavailable as exc:
         logger.warning("Cloud phone proxy unavailable for %s %s: %s", method, cloud_path, exc)
         return JSONResponse(
@@ -218,6 +224,21 @@ async def _resolve_user_plan_family(user: User | None) -> str:
 # ---------------------------------------------------------------------------
 
 
+async def _maybe_proxy_phone_tos(request: Request, method: str, path: str) -> JSONResponse | None:
+    """Keep hosted-call consent with the cloud account whose session was validated."""
+    from config.settings import get_settings
+
+    if str(getattr(get_settings(), "app_surface", "desktop")).strip().lower() != "desktop":
+        # Cloud browser aliases use these same handlers; never proxy them back
+        # to themselves. The cloud gate below owns the Postgres consent row.
+        return None
+    return await _maybe_proxy_phone_to_cloud(
+        method,
+        path,
+        bearer_token=str(getattr(request.state, "gotrue_access_token", "") or ""),
+    )
+
+
 @tos_router.post("/accept-tos")
 async def accept_phone_tos(
     request: Request,
@@ -237,6 +258,9 @@ async def accept_phone_tos(
         )
     user_id = user.id
     await csrf_required(request)
+    proxied = await _maybe_proxy_phone_tos(request, "POST", "/v1/phone/accept-tos")
+    if proxied is not None:
+        return proxied
     # Capture request provenance for the consent audit. The cloud phone_tos
     # table has ip_address_hash / user_agent_hash columns explicitly for
     # this — matches the shape used by auth_events. Resolved through the
@@ -257,6 +281,7 @@ async def accept_phone_tos(
 
 @tos_router.get("/tos-status")
 async def get_tos_status(
+    request: Request,
     user: User | None = Depends(get_current_user_optional),
 ) -> JSONResponse:
     """Get the Phone Calling ToS acceptance status for the current user."""
@@ -271,6 +296,9 @@ async def get_tos_status(
             status_code=401,
         )
     user_id = user.id
+    proxied = await _maybe_proxy_phone_tos(request, "GET", "/v1/phone/tos-status")
+    if proxied is not None:
+        return proxied
     tos = get_phone_tos()
     return JSONResponse(success_response(await tos.get_status(user_id)))
 

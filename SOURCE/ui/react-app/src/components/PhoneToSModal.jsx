@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import Modal, { primaryButtonStyle, secondaryButtonStyle } from './Modal';
 import { THEME } from '../config';
@@ -8,10 +8,17 @@ export const PHONE_TOS_AUDIT_NOTICE = 'Phone calls placed through Viola are reco
 
 export default function PhoneToSModal({ isOpen, onClose, onAccepted = null, payload = null }) {
   const [submitting, setSubmitting] = useState(false);
+  const submissionInFlight = useRef(false);
   const [error, setError] = useState('');
   const message = payload?.message || 'Accept the Phone Calling Terms of Service before making calls.';
 
+  const handleClose = () => {
+    if (!submissionInFlight.current) onClose();
+  };
+
   const handleAccept = async () => {
+    if (submissionInFlight.current) return;
+    submissionInFlight.current = true;
     setSubmitting(true);
     setError('');
     try {
@@ -26,6 +33,7 @@ export default function PhoneToSModal({ isOpen, onClose, onAccepted = null, payl
     } catch (err) {
       setError(err?.message || 'Could not save acceptance. Try again.');
     } finally {
+      submissionInFlight.current = false;
       setSubmitting(false);
     }
   };
@@ -33,13 +41,13 @@ export default function PhoneToSModal({ isOpen, onClose, onAccepted = null, payl
   return (
     <Modal
       isOpen={isOpen}
-      onClose={onClose}
+      onClose={handleClose}
       title="Phone Calling Terms"
       footer={(
         <>
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleClose}
             style={secondaryButtonStyle}
             disabled={submitting}
           >

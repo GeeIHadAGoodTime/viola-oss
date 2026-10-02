@@ -5,6 +5,7 @@ import {
   getCloudAccessToken,
 } from '../config';
 import { getGoTrueAccessToken } from '../lib/gotrue_client';
+import { withCsrfHeader } from '../lib/csrf';
 
 const BASE = window.__VIOLA_BASE_URL__ || '';
 const API_KEY = () => window.__VIOLA_API_KEY__ || '';
@@ -160,7 +161,7 @@ export async function authFetch(path, options = {}) {
   }
   const response = await fetch(url, {
     ...options,
-    headers,
+    headers: withCsrfHeader(headers, url),
     credentials: options.credentials || 'same-origin',
   });
 

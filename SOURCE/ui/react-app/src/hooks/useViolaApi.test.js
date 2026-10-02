@@ -93,6 +93,93 @@ describe('authFetch — desktop calls never carry the cloud Bearer (issue #340)'
   });
 });
 
+describe('authFetch — desktop Phone Terms double-submit CSRF', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.stubGlobal('__VIOLA_API_KEY__', 'desktop-api-key');
+    getCloudAccessToken.mockReturnValue('raw-cloud-jwt');
+    getGoTrueAccessToken.mockResolvedValue('fallback-cloud-jwt');
+    document.cookie = 'viola_csrf=; Max-Age=0; Path=/';
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ status: 200, ok: true }));
+  });
+
+  afterEach(() => {
+    document.cookie = 'viola_csrf=; Max-Age=0; Path=/';
+    vi.unstubAllGlobals();
+  });
+
+  it('echoes the readable cookie while retaining desktop auth and same-origin credentials', async () => {
+    document.cookie = 'viola_csrf=desktop-csrf-token; Path=/';
+
+    await authFetch('/v1/phone/accept-tos', { method: 'POST' });
+
+    expect(global.fetch).toHaveBeenCalledExactlyOnceWith(
+      '/v1/phone/accept-tos',
+      expect.objectContaining({
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: expect.objectContaining({
+          'X-API-Key': 'desktop-api-key',
+          'X-CSRF-Token': 'desktop-csrf-token',
+        }),
+      }),
+    );
+    const [, { headers }] = global.fetch.mock.calls[0];
+    expect(Object.keys(headers).some((name) => name.toLowerCase() === 'authorization')).toBe(false);
+    expect(getCloudAccessToken).not.toHaveBeenCalled();
+    expect(getGoTrueAccessToken).not.toHaveBeenCalled();
+  });
+
+  it('reads the latest token on every request after the cookie rotates', async () => {
+    document.cookie = 'viola_csrf=first-token; Path=/';
+    await authFetch('/v1/phone/accept-tos', { method: 'POST' });
+
+    document.cookie = 'viola_csrf=rotated-token; Path=/';
+    await authFetch('/v1/phone/accept-tos', { method: 'POST' });
+
+    expect(global.fetch.mock.calls.map(([, options]) => options.headers['X-CSRF-Token']))
+      .toEqual(['first-token', 'rotated-token']);
+  });
+
+  it.each(['X-CSRF-Token', 'x-csrf-token', 'X-CsRf-ToKeN'])(
+    'preserves an explicit %s header without adding another or mutating the caller',
+    async (headerName) => {
+      document.cookie = 'viola_csrf=cookie-token; Path=/';
+      const headers = { [headerName]: 'caller-token', 'Content-Type': 'application/json' };
+
+      await authFetch('/v1/phone/accept-tos', { method: 'POST', headers });
+
+      const [, options] = global.fetch.mock.calls[0];
+      const csrfHeaders = Object.entries(options.headers)
+        .filter(([name]) => name.toLowerCase() === 'x-csrf-token');
+      expect(csrfHeaders).toEqual([[headerName, 'caller-token']]);
+      expect(headers).toEqual({ [headerName]: 'caller-token', 'Content-Type': 'application/json' });
+    },
+  );
+
+  it.each(['https://other.example/v1/phone/accept-tos', '//other.example/v1/phone/accept-tos'])(
+    'does not leak the CSRF cookie to cross-origin URL %s',
+    async (url) => {
+      document.cookie = 'viola_csrf=local-only-token; Path=/';
+
+      await authFetch(url, { method: 'POST' });
+
+      const [requestUrl, options] = global.fetch.mock.calls[0];
+      expect(requestUrl).toBe(url);
+      expect(Object.keys(options.headers).some((name) => name.toLowerCase() === 'x-csrf-token')).toBe(false);
+    },
+  );
+
+  it('does not invent an empty CSRF header when the cookie is missing', async () => {
+    await authFetch('/v1/phone/accept-tos', { method: 'POST' });
+
+    const [, options] = global.fetch.mock.calls[0];
+    expect(options.headers['X-CSRF-Token']).toBeUndefined();
+    expect(options.headers['X-API-Key']).toBe('desktop-api-key');
+    expect(options.credentials).toBe('same-origin');
+  });
+});
+
 describe('sendCommandStreaming', () => {
   beforeEach(() => {
     vi.clearAllMocks();
