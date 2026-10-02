@@ -1,6 +1,6 @@
 # Source snapshot binding
 
-Source revision: `a34de7bee7869a3440b97066b85e1f2cdbd89e04`.
+Source revision: `ed8446207b9a86cb01198472830fdc67c9c57bf1`.
 
 This snapshot contains source corrections for the observed Windows native-import
 lock inversion, room response parsing, light-theme accent contrast, and missing
