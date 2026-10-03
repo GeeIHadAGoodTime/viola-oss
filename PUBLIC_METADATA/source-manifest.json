@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "a6165b06babf017cb50897a85839abf783958058",
-  "sha256": "93228efb8378790e714a68364ef769bbd1ef032834420fcb2a04b6b5d58261c0",
+  "revision": "31e6a87388c224b127f7de68f91fa53437c82555",
+  "sha256": "c6dba0dd4985b4ae152b214fa247796f0300043e0f91228c39965d96c41c07af",
   "files": [
     {
       "path": ".env.example",
@@ -10500,8 +10500,8 @@
     },
     {
       "path": "ui/react-app/src/components/stage/modes/chat/ChatMode.consentGate.test.jsx",
-      "sha256": "0b729e26ea2484c7b647df863e75e61115567362d0d1b9deb524a46a326cd8c8",
-      "bytes": 3917
+      "sha256": "d1b88325296de91d9c8ddebd52bc3a96a602caa34ce3837c9959c382bf59a86b",
+      "bytes": 3947
     },
     {
       "path": "ui/react-app/src/components/stage/modes/chat/ChatMode.css",
@@ -10510,13 +10510,13 @@
     },
     {
       "path": "ui/react-app/src/components/stage/modes/chat/ChatMode.jsx",
-      "sha256": "265e5d0e9ba03add042668ab5a670fa3b6af8f7b71884c61ba6d913b394f6506",
-      "bytes": 37626
+      "sha256": "1ba6f747fe750cf99551b114a8adc9d46b197323b477c0138a8864d747f6425a",
+      "bytes": 37970
     },
     {
       "path": "ui/react-app/src/components/stage/modes/chat/ChatMode.test.jsx",
-      "sha256": "c2a9936e0c85d55fad70e4033f22a037ce5804dce657c1b68c2172e6ede55644",
-      "bytes": 22578
+      "sha256": "f68f96b374b5deda446a864fb922afdfe6e199c648f3badf2b384f4671ef95fe",
+      "bytes": 24375
     },
     {
       "path": "ui/react-app/src/components/stage/modes/chat/ChatSidebar.jsx",

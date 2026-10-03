@@ -1,17 +1,14 @@
 # Source snapshot binding
 
-Source revision: `a6165b06babf017cb50897a85839abf783958058`.
+Source revision: `31e6a87388c224b127f7de68f91fa53437c82555`.
 
-This source adds a retry control for failed call-history loading and checks the
-optional Kokoro tokenizer runtime before reporting the backend available.
-It does not install or redistribute a system speech library, change the configured
-backend, or claim that a fallback voice has passed installed acceptance.
+This source preserves the optimistic first chat turn when a new conversation is
+created, including send refusal and streaming-transport failure feedback.
+The missing-first-message behavior was reproduced in the preceding installed
+Linux candidate. This correction does not resolve the separate stream-token
+authorization failure and has not yet been verified in an installed candidate.
 
-Frontend: 983 tests in 137 files, build passed, lint has zero errors and 169 warnings.
-Three focused Python unittest methods pass, including two new red-to-green
-readiness tests. Full Python qualification remains pending canonical Windows CI;
-the local minimal environment lacks unrelated desktop test dependencies.
-
-All dependency inputs and retained inventories remain unchanged. No fresh
-advisory scan, installed-candidate acceptance, release, or deployment is claimed.
-Use the existing canonical source-binding verifier.
+Frontend: 985 tests in 137 files, build passed, lint has zero errors. Sixteen
+focused chat/consent tests pass, including two new red-to-green first-turn cases.
+All dependency inputs and retained inventories remain unchanged. No new advisory
+scan, release, deployment, or whole-product acceptance is claimed.

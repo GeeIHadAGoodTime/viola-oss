@@ -1,16 +1,15 @@
 {
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "2862efa64bb2a58adbaf5f91ea4fca6d9b674fdccf87a3881bb710bd67b33ff0",
-  "source_tree_sha256": "93228efb8378790e714a68364ef769bbd1ef032834420fcb2a04b6b5d58261c0",
+  "source_manifest_sha256": "a7251950ba75620e2cd31e4dcd68da7caefc025a8839b018690d612b3b7ee877",
+  "source_tree_sha256": "c6dba0dd4985b4ae152b214fa247796f0300043e0f91228c39965d96c41c07af",
   "source_file_count": 2474,
-  "source_revision": "a6165b06babf017cb50897a85839abf783958058",
-  "comparison_public_revision": "a7710dd9a78dadd68322c788bd3e0478ba762bed",
+  "source_revision": "31e6a87388c224b127f7de68f91fa53437c82555",
+  "comparison_public_revision": "14a9569c8d2464924fd62e561f483c1df9bebca0",
   "changed_source_paths": [
-    "SOURCE/tests/public/test_tts_profile_dependencies.py",
-    "SOURCE/ui/react-app/src/components/CallHistoryList.jsx",
-    "SOURCE/ui/react-app/src/components/CallHistoryList.test.jsx",
-    "SOURCE/voice/synthesis/kokoro_engine.py"
+    "SOURCE/ui/react-app/src/components/stage/modes/chat/ChatMode.consentGate.test.jsx",
+    "SOURCE/ui/react-app/src/components/stage/modes/chat/ChatMode.jsx",
+    "SOURCE/ui/react-app/src/components/stage/modes/chat/ChatMode.test.jsx"
   ],
   "retained_sboms": [
     {
@@ -56,25 +55,24 @@
     "basis": "All dependency inputs unchanged from the preceding public source revision. Retained inventories and dated receipts are not fresh platform qualification or advisory scans."
   },
   "prior_binding": {
-    "public_revision": "a7710dd9a78dadd68322c788bd3e0478ba762bed",
+    "public_revision": "14a9569c8d2464924fd62e561f483c1df9bebca0",
     "path": "PUBLIC_METADATA/source-binding.json",
-    "git_blob": "9481dced1c7a395309cd693df0e5f52baf199156",
-    "sha256": "a6f2656ab01fa42b65d39ef10f7670bcf24d71b4d4bf2384f9054bc91ea69795",
-    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/a7710dd9a78dadd68322c788bd3e0478ba762bed/PUBLIC_METADATA/source-binding.json"
+    "git_blob": "27d0e6841726ca6b6673e1ff6613ca78f76921c5",
+    "sha256": "5b0b2f2bc1730ab71488690704a84f87c1c1284b8697c136abfc1fce639750dd",
+    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/14a9569c8d2464924fd62e561f483c1df9bebca0/PUBLIC_METADATA/source-binding.json"
   },
   "new_resolution_performed": false,
   "new_advisory_scan_performed": false,
   "new_runtime_qualification_performed": false,
   "qualification": {
-    "scope": "Call-history retry and accurate optional native speech readiness; source checks only",
-    "frontend_tests": 983,
+    "scope": "First-turn optimistic message preservation through new-thread creation and send/stream failures; source checks only",
+    "frontend_tests": 985,
     "frontend_files": 137,
     "frontend_build": "passed",
-    "frontend_lint": "zero errors; 169 warnings",
-    "focused_unittest_methods": 3,
-    "negative_controls": "Both new native-readiness tests fail the prior probe; call-history retry tests fail without the new control",
-    "full_python_contracts": "pending canonical Windows CI; local minimal environment lacks required dependencies",
-    "installed_candidate": "pending for this source revision",
+    "frontend_lint": "zero errors; existing warnings retained",
+    "focused_frontend_tests": 16,
+    "negative_controls": "Two fresh-conversation failure tests fail before and pass after; consent gate still requires ensureThread inside try",
+    "installed_candidate": "pending for this revision",
     "release_or_deployment": "not_established"
   }
 }

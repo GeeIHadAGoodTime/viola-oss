@@ -304,7 +304,7 @@ function ChatModeInner({
     }));
   }, [streamingMessageId]));
 
-  const ensureThread = useCallback(async () => {
+  const ensureThread = useCallback(async (pendingMessages = []) => {
     if (activeThreadIdRef.current) return activeThreadIdRef.current;
     const data = await apiFetch('/v1/chat/threads', {
       method: 'POST',
@@ -315,7 +315,10 @@ function ChatModeInner({
     setActiveThreadId(data.thread.id);
     activeThreadIdRef.current = data.thread.id;
     setTitleDraft(data.thread.title);
-    setMessages([]);
+    // A first send already has optimistic messages. Keep them when thread
+    // creation completes; clearing here made the first turn and its errors vanish.
+    // On stale-thread recovery this also drops messages from the old thread.
+    setMessages(pendingMessages);
     return data.thread.id;
   }, [selectedModel]);
 
@@ -512,11 +515,7 @@ function ChatModeInner({
       return;
     }
     const temporaryAssistant = makeTemporaryAssistant();
-    setDraft('');
-    setStreaming(true);
-    setStreamingMessageId(temporaryAssistant.id);
-    setMessages((current) => [
-      ...current,
+    const pendingMessages = [
       {
         id: `local-user-${Date.now()}`,
         role: 'user',
@@ -525,7 +524,11 @@ function ChatModeInner({
         metadata: { optimistic: true },
       },
       temporaryAssistant,
-    ]);
+    ];
+    setDraft('');
+    setStreaming(true);
+    setStreamingMessageId(temporaryAssistant.id);
+    setMessages((current) => [...current, ...pendingMessages]);
     const postSend = (id) => apiFetch(`/v1/chat/threads/${encodeURIComponent(id)}/send`, {
       method: 'POST',
       body: JSON.stringify({ text: clean, model: selectedModel || null }),
@@ -536,7 +539,7 @@ function ChatModeInner({
       // who has not enabled cloud sync) escaped as an unhandled promise
       // rejection: the typed message vanished with no reply, no error, and no
       // prompt. Inside the try it becomes a message the user can act on.
-      const threadId = await ensureThread();
+      const threadId = await ensureThread(pendingMessages);
       let sendResult;
       try {
         sendResult = await postSend(threadId);
@@ -552,7 +555,7 @@ function ChatModeInner({
           activeThreadIdRef.current = null;
           setActiveThreadId(null);
           setActiveThread(null);
-          const freshThreadId = await ensureThread();
+          const freshThreadId = await ensureThread(pendingMessages);
           sendResult = await postSend(freshThreadId);
         } else {
           throw err;
