@@ -30,6 +30,14 @@ logger = get_logger(__name__)
 # Cents per 1M tokens (input/output/cached/cache_write) and cents per
 # request (web_search). Unset numeric components default to ``0`` at lookup.
 LLM_PRICING_CENTS: dict[str, dict[str, float]] = {
+    # OpenAI GPT-6 Luna published Standard rates, checked 2026-10-03.
+    "gpt-6-luna": {
+        "input": 10,
+        "output": 50,
+        "cached": 1,
+        "cache_write": 12.5,
+        "web_search": 1.0,
+    },
     "gpt-4o-mini": {
         "input": 15,
         "output": 60,
@@ -166,6 +174,13 @@ def calculate_cost_cents(
     web-search server tool.
     """
     pricing = _pricing_for_spend_tracking(model)
+    if model == "gpt-6-luna" and int(input_tokens) > 272000:
+        # The long-context premium applies to the whole request, not just
+        # tokens above the threshold. Tool request prices are unchanged.
+        pricing = dict(pricing)
+        for component in ("input", "cached", "cache_write"):
+            pricing[component] *= 2
+        pricing["output"] *= 1.5
     uncached_input = max(0, int(input_tokens) - int(cached_tokens))
     cents = (
         uncached_input * pricing["input"] / 1_000_000

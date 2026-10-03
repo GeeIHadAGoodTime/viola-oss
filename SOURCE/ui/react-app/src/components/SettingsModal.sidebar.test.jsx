@@ -458,4 +458,26 @@ describe('SettingsModal sidebar shell', () => {
     expect(await screen.findByRole('button',{name:/Accuracy Level:.*English/})).toBeInTheDocument();
   });
 
+  it('saves captured PTT keyboard metadata together', async () => {
+    settingsHarness.settings = {...settingsHarness.settings, ptt_hotkey:'Space', ptt_hotkey_type:'mouse', ptt_hotkey_display:'Space'};
+    render(<SettingsModal isOpen onClose={vi.fn()} initialTab="voice" />);
+    const input = await screen.findByDisplayValue('Space');
+    fireEvent.keyDown(input, {key:'k', code:'KeyK', ctrlKey:true});
+    fireEvent.click(screen.getByRole('button',{name:'Save Changes'}));
+    await waitFor(() => expect(settingsHarness.updateSettings).toHaveBeenCalledWith(expect.objectContaining({
+      ptt_hotkey:'Ctrl+KeyK', ptt_hotkey_type:'keyboard', ptt_hotkey_display:'Ctrl+KeyK',
+    })));
+  });
+
+  it('resets PTT shortcut metadata to the keyboard default', async () => {
+    settingsHarness.settings = {...settingsHarness.settings, ptt_hotkey:'Ctrl+KeyK', ptt_hotkey_type:'mouse', ptt_hotkey_display:'Old shortcut'};
+    render(<SettingsModal isOpen onClose={vi.fn()} initialTab="voice" />);
+    fireEvent.click(await screen.findByRole('button',{name:'Reset hotkey to default', exact:true}));
+    expect(screen.getByRole('textbox',{name:'Push-to-Talk Shortcut'})).toHaveValue('Space');
+    fireEvent.click(screen.getByRole('button',{name:'Save Changes'}));
+    await waitFor(() => expect(settingsHarness.updateSettings).toHaveBeenCalledWith(expect.objectContaining({
+      ptt_hotkey:'Space', ptt_hotkey_type:'keyboard', ptt_hotkey_display:'Space',
+    })));
+  });
+
 });

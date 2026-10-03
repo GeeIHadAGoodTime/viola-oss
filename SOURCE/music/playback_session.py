@@ -18,6 +18,7 @@ Design:
 from __future__ import annotations
 
 import random
+import threading
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
@@ -178,6 +179,7 @@ class PlaybackSessionController:
         self._autoplay = autoplay_controller
         self._playlist_mgr = playlist_manager
         self._state_mgr = state_manager
+        self._repeat_lock = threading.RLock()
         self._playlist_session: PlaylistSession | None = None
         self._logger = get_logger(__name__ + ".session")
 
@@ -288,36 +290,42 @@ class PlaybackSessionController:
     # ------------------------------------------------------------------ #
 
     def get_repeat_mode(self) -> RepeatMode:
-        """Get current repeat mode."""
-        if self._state_mgr is not None:
-            return self._state_mgr.get_repeat_mode()
-        return RepeatMode.OFF
+        """Read the runtime mode used by end-of-track handling."""
+        with self._repeat_lock:
+            if self._state_mgr is not None:
+                return self._state_mgr.get_repeat_mode()
+            return RepeatMode.OFF
 
-    def set_repeat_mode(self, mode: RepeatMode) -> RepeatMode:
-        """Set repeat mode."""
-        if self._state_mgr is not None:
-            return self._state_mgr.set_repeat_mode(mode)
-        return mode
+    def set_repeat_mode(self, mode: RepeatMode, *, user_id: str | None = None) -> RepeatMode:
+        """Apply the playback mode and its user-scoped display preference together."""
+        from core.compat import StateCompat
+
+        mode = RepeatMode(mode)
+        with self._repeat_lock:
+            if self._state_mgr is None:
+                raise RuntimeError("Playback session is not ready")
+            previous = self._state_mgr.get_repeat_mode()
+            self._state_mgr.set_repeat_mode(mode)
+            try:
+                StateCompat(user_id=user_id).set_repeat_mode(mode.value)
+            except Exception:
+                self._state_mgr.set_repeat_mode(previous)
+                raise
+            return mode
 
     def cycle_repeat_mode(self) -> RepeatMode:
-        """Cycle through repeat modes: OFF → ALL → ONE → OFF."""
-        if self._state_mgr is not None:
-            new_mode = self._state_mgr.cycle_repeat_mode()
+        """Cycle OFF → ALL → ONE → OFF through the same apply path."""
+        with self._repeat_lock:
+            cycle = {RepeatMode.OFF: RepeatMode.ALL, RepeatMode.ALL: RepeatMode.ONE, RepeatMode.ONE: RepeatMode.OFF}
+            new_mode = self.set_repeat_mode(cycle[self.get_repeat_mode()])
             self._logger.info("Cycled repeat mode to: %s", new_mode.value)
             return new_mode
-        return RepeatMode.OFF
 
     def should_repeat_current(self) -> bool:
-        """Check if current track should repeat (Repeat One mode)."""
-        if self._state_mgr is not None:
-            return self._state_mgr.should_repeat_current()
-        return False
+        return self.get_repeat_mode() == RepeatMode.ONE
 
     def should_loop_queue(self) -> bool:
-        """Check if queue should loop (Repeat All mode)."""
-        if self._state_mgr is not None:
-            return self._state_mgr.should_loop_queue()
-        return False
+        return self.get_repeat_mode() == RepeatMode.ALL
 
     # ------------------------------------------------------------------ #
     # Queue Fill Logic

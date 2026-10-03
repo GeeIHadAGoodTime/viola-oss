@@ -131,3 +131,40 @@ class NativeTitlebarNames(unittest.TestCase):
             target = SimpleNamespace(btn_maximize=button, _create_icon_from_svg=lambda svg: svg)
             namespace['_set_maximize_icon'](target, maximized)
             self.assertEqual(labels, [expected])
+
+
+class NativeDownloadContract(unittest.TestCase):
+    def _load(self, choice):
+        from unittest.mock import Mock
+        source = ENTRY.parent / 'ui/qt_native/webview_window.py'
+        tree = ast.parse(source.read_text())
+        node = next((n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == '_handle_download_request'), None)
+        self.assertIsNotNone(node, 'Qt profile has no download handler')
+        ns = {'Path': Path, 'QFileDialog': SimpleNamespace(getSaveFileName=Mock(return_value=(choice, ''))),
+              'QApplication': SimpleNamespace(activeWindow=lambda: None),
+              'QStandardPaths': SimpleNamespace(StandardLocation=SimpleNamespace(DownloadLocation=1), writableLocation=lambda _: '/synthetic-downloads'),
+              'QMessageBox': SimpleNamespace(warning=Mock()), 'logger': Mock()}
+        exec(compile(ast.fix_missing_locations(ast.Module(body=[node], type_ignores=[])), str(source), 'exec'), ns)
+        return ns
+
+    def test_profile_wires_downloads_once(self):
+        tree = ast.parse((ENTRY.parent / 'ui/qt_native/webview_window.py').read_text())
+        profile = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == '_get_viola_profile')
+        self.assertIn('profile.downloadRequested.connect(_handle_download_request)', ast.unparse(profile))
+
+    def test_cancel_never_accepts_or_selects_a_path(self):
+        from unittest.mock import Mock
+        ns = self._load(''); request = Mock(); request.downloadFileName.return_value = 'chat.md'
+        ns['_handle_download_request'](request)
+        request.cancel.assert_called_once(); request.accept.assert_not_called(); request.setDownloadDirectory.assert_not_called()
+
+    def test_selected_path_is_applied_before_accepting(self):
+        from unittest.mock import Mock, call
+        ns = self._load('/synthetic-downloads/renamed.md'); request = Mock()
+        request.downloadFileName.return_value = '../../chat.md'
+        ns['_handle_download_request'](request)
+        self.assertEqual(ns['QFileDialog'].getSaveFileName.call_args.args[2], '/synthetic-downloads/chat.md')
+        calls = request.mock_calls
+        self.assertLess(calls.index(call.setDownloadDirectory('/synthetic-downloads')), calls.index(call.accept()))
+        self.assertLess(calls.index(call.setDownloadFileName('renamed.md')), calls.index(call.accept()))
+        request.cancel.assert_not_called()

@@ -144,6 +144,8 @@ function ChatModeInner({
   const [uploadingFileCount, setUploadingFileCount] = useState(0);
   const [uploadError, setUploadError] = useState('');
   const [threadActionError, setThreadActionError] = useState('');
+  const [exporting, setExporting] = useState(false);
+  const exportRequestRef = useRef(null);
   // Tier-2 cloud-sync consent gate (services/sync/consent.py) blocks
   // /v1/chat/threads with 403 consent_required until the user opts in
   // (Settings > Privacy & Data > Cloud Sync). Surface this as an explicit,
@@ -244,6 +246,8 @@ function ChatModeInner({
     // loadThread/loadModels) is now stale and will no-op instead of
     // applying its response when it eventually resolves (#2395/C-071).
     const generation = ++requestGenerationRef.current;
+    exportRequestRef.current = null;
+    setExporting(false);
     setThreadActionError('');
     async function boot() {
       try {
@@ -284,6 +288,7 @@ function ChatModeInner({
     void boot();
     return () => {
       cancelled = true;
+      exportRequestRef.current = null;
       if (eventSourceRef.current) eventSourceRef.current.close();
     };
   }, [principalKey, loadModels, loadThread, loadThreads]);
@@ -707,9 +712,27 @@ function ChatModeInner({
   }, [loadThread, threads]);
 
   const exportThread = useCallback(async (thread = activeThread) => {
-    if (!thread) return;
-    const data = await apiFetch(`/v1/chat/threads/${encodeURIComponent(thread.id)}/export`);
-    downloadMarkdown(data.filename, data.markdown);
+    if (!thread || exportRequestRef.current) return;
+    const request = {};
+    const generation = requestGenerationRef.current;
+    exportRequestRef.current = request;
+    setExporting(true);
+    setThreadActionError('');
+    try {
+      const data = await apiFetch(`/v1/chat/threads/${encodeURIComponent(thread.id)}/export`);
+      if (requestGenerationRef.current !== generation || exportRequestRef.current !== request) return;
+      if (typeof data?.markdown !== 'string') throw new Error('Invalid export response');
+      downloadMarkdown(data.filename, data.markdown);
+    } catch {
+      if (requestGenerationRef.current === generation && exportRequestRef.current === request) {
+        setThreadActionError('Could not export this chat. Please try again.');
+      }
+    } finally {
+      if (exportRequestRef.current === request) {
+        exportRequestRef.current = null;
+        setExporting(false);
+      }
+    }
   }, [activeThread]);
 
   const submitTitle = useCallback(async () => {
@@ -950,7 +973,7 @@ function ChatModeInner({
                 <option key={item.id} value={item.id}>{item.label}</option>
               ))}
             </select>
-            <button type="button" onClick={() => exportThread()} disabled={!activeThread}>Export</button>
+            <button type="button" onClick={() => exportThread()} disabled={!activeThread || exporting}>{exporting ? 'Exporting…' : 'Export'}</button>
           </div>
         </header>
         <ChatThread

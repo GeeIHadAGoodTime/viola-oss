@@ -3292,12 +3292,14 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                   <input
                     type="text"
+                    aria-label="Push-to-Talk Shortcut"
                     value={localSettings.ptt_hotkey || DEFAULT_PTT_HOTKEY}
                     readOnly
                     placeholder="Press a key..."
                     onKeyDown={(e) => {
                       e.preventDefault();
-                      updateLocal('ptt_hotkey', hotkeyFromKeyboardEvent(e));
+                      const hotkey = hotkeyFromKeyboardEvent(e);
+                      updateLocalSettings({ptt_hotkey: hotkey, ptt_hotkey_type: 'keyboard', ptt_hotkey_display: hotkey});
                     }}
                     style={{
                       flex: 1,
@@ -3313,7 +3315,7 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
                     }}
                   />
                   <button
-                    onClick={() => updateLocal('ptt_hotkey', DEFAULT_PTT_HOTKEY)}
+                    onClick={() => updateLocalSettings({ptt_hotkey: DEFAULT_PTT_HOTKEY, ptt_hotkey_type: 'keyboard', ptt_hotkey_display: DEFAULT_PTT_HOTKEY})}
                     aria-label="Reset hotkey to default"
                     style={{
                       padding: '12px 16px',
@@ -3352,6 +3354,7 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                   <input
                     type="text"
+                    aria-label="Mute Shortcut"
                     value={localSettings.mute_hotkey || DEFAULT_MUTE_HOTKEY}
                     readOnly
                     placeholder="Press a key..."

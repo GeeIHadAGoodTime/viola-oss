@@ -149,16 +149,16 @@ VOICE_MUTED_DEFAULT = False
 # =============================================================================
 
 # Canonical managed model for first-party Viola execution.
-# Keep the base/default, agent, and phone paths aligned to one value so
-# settings migrations and provider fallbacks cannot silently drift apart.
-DEFAULT_MANAGED_MODEL = "gpt-5.4-mini"
+# Source-aware managed resolution uses this value. General provider and
+# self-hosted phone defaults remain separate so BYOK/local choices do not change.
+DEFAULT_MANAGED_MODEL = "gpt-6-luna"
 
 # Low-cost internal background model for summarization / extraction /
 # compaction. This is not the user-facing route or agent default.
 DEFAULT_BACKGROUND_TASK_MODEL = "gpt-5-nano"
 
-# Base/default model for managed OpenAI execution.
-DEFAULT_GPT_MODEL = DEFAULT_MANAGED_MODEL
+# General OpenAI/BYOK fallback. Managed subscriptions use DEFAULT_MANAGED_MODEL.
+DEFAULT_GPT_MODEL = "gpt-5.4-mini"
 
 # Default model for the Codex (ChatGPT subscription) source. Must be a model
 # available to ALL Codex users — gpt-5.3-codex-spark is a ChatGPT *max-plan*-only
@@ -180,10 +180,10 @@ DEFAULT_LOCAL_LLM_ENABLED = False
 DEFAULT_LOCAL_LLM_MODEL = "qwen3.5-9b-q4_k_m"
 
 # Agent model — the user-facing model for voice commands and agent tasks.
-DEFAULT_AGENT_MODEL = DEFAULT_MANAGED_MODEL
+DEFAULT_AGENT_MODEL = "gpt-5.4-mini"
 
 # Phone model — used in Pipecat telephony pipeline.
-DEFAULT_PHONE_MODEL = DEFAULT_MANAGED_MODEL
+DEFAULT_PHONE_MODEL = "gpt-5.4-mini"
 CALL_HISTORY_RETENTION_DAYS_DEFAULT = 30
 REQUIRE_ACCOUNT_FOR_PAID_ACTIONS_DEFAULT = True
 PHONE_RECORD_CALLS_DEFAULT = True
@@ -196,7 +196,7 @@ PHONE_AI_IDENTITY_ENFORCEMENT_DEFAULT = False
 # OpenAI-compatible backends deliberately stay blank because Viola cannot infer
 # a safe universal model name.
 DEFAULT_MODEL_BY_PROVIDER: dict[str, str] = {
-    "openai": DEFAULT_GPT_MODEL,
+    "openai": "gpt-5.4-mini",
     "anthropic": "claude-haiku-4-5-20251001",
     "google": "gemini-2.5-flash",
     "ollama": "llama2",
@@ -205,7 +205,7 @@ DEFAULT_MODEL_BY_PROVIDER: dict[str, str] = {
 }
 
 DEFAULT_AGENT_MODEL_BY_PROVIDER: dict[str, str] = {
-    "openai": DEFAULT_AGENT_MODEL,
+    "openai": "gpt-5.4-mini",
     "anthropic": "claude-sonnet-4-5-20250929",
     "google": "gemini-2.5-flash",
     "ollama": "llama2",
@@ -232,7 +232,7 @@ def get_default_model_for_source(ai_source: str, provider: str, *, agent: bool =
     if normalized_source == "codex":
         return DEFAULT_CODEX_MODEL
     if normalized_source in {"managed", "subscription"}:
-        return DEFAULT_AGENT_MODEL if agent else DEFAULT_GPT_MODEL
+        return DEFAULT_MANAGED_MODEL
     if agent:
         return get_provider_default_agent_model(provider)
     return get_provider_default_model(provider)
@@ -258,6 +258,10 @@ def resolve_effective_model(
         if isinstance(candidate, str):
             normalized = candidate.strip()
             if normalized:
+                # Upgrade the historical managed default without rewriting
+                # BYOK, local, Codex, or explicitly selected other models.
+                if (ai_source or DEFAULT_AI_SOURCE).strip().lower() in {"managed", "subscription"} and normalized == "gpt-5.4-mini":
+                    return DEFAULT_MANAGED_MODEL
                 return normalized
 
     default_model = get_default_model_for_source(ai_source, provider, agent=agent)
@@ -342,7 +346,7 @@ def resolve_reasoning_effort(effort: str, model: str) -> str:
         return effort
     m = (model or "").lower()
     is_codex_spark = "gpt-5.3-codex-spark" in m
-    is_5_4 = "gpt-5.4" in m
+    is_5_4 = "gpt-5.4" in m or m.startswith("gpt-6")
     if effort in {"none", "minimal"} and is_codex_spark:
         return "low"
     if effort == "none" and not is_5_4:
@@ -357,7 +361,7 @@ def _is_reasoning_family(model: str | None) -> bool:
     if not model:
         return False
     lower = model.lower()
-    return any(tag in lower for tag in ("gpt-5", "o1", "o3", "o4"))
+    return any(tag in lower for tag in ("gpt-5", "gpt-6", "o1", "o3", "o4"))
 
 
 def get_configured_reasoning_effort(
@@ -431,7 +435,7 @@ def pipecat_model_extra(model: str, effort: str | None = None) -> dict:
     leaking thinking tokens into TTS output.  Returns an empty dict for
     non-reasoning models.
     """
-    if any(tag in model.lower() for tag in ("gpt-5", "o3", "o4-")):
+    if any(tag in model.lower() for tag in ("gpt-5", "gpt-6", "o3", "o4-")):
         selected = (
             resolve_reasoning_effort(effort, model) if effort else get_configured_reasoning_effort("phone", model)
         )
@@ -453,8 +457,10 @@ def pipecat_phone_model_extra(
     gpt-5.4-mini Chat Completions, so tool-bearing phone calls must omit it.
     """
     if tools_present:
+        if model.lower().startswith("gpt-6"):
+            return {"reasoning_effort": "none"}
         return {}
-    if any(tag in model.lower() for tag in ("gpt-5", "o3", "o4-")):
+    if any(tag in model.lower() for tag in ("gpt-5", "gpt-6", "o3", "o4-")):
         selected = (
             resolve_reasoning_effort(effort, model) if effort else get_configured_reasoning_effort("phone", model)
         )

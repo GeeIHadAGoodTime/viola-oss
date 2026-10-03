@@ -1173,10 +1173,9 @@ def register_control_routes(context: ApiContext, toolbox: RouteToolbox) -> None:
             mode = body.get("mode")
             if mode is None:
                 try:
-                    from core.compat import StateCompat
+                    from music.playback_session import get_playback_session_controller
 
-                    compat = StateCompat(user_id=user_id)
-                    current = compat.get_repeat_mode()
+                    current = get_playback_session_controller().get_repeat_mode().value
                     cycle = {"off": "all", "all": "one", "one": "off"}
                     mode = cycle.get(current, "off")
                 except Exception:
@@ -1188,10 +1187,10 @@ def register_control_routes(context: ApiContext, toolbox: RouteToolbox) -> None:
                     "Repeat mode must be off, all, or one.",
                 )
             try:
-                from core.compat import StateCompat
+                from models.state_manager import RepeatMode
+                from music.playback_session import get_playback_session_controller
 
-                compat = StateCompat(user_id=user_id)
-                compat.set_repeat_mode(mode)
+                get_playback_session_controller().set_repeat_mode(RepeatMode(mode), user_id=user_id)
             except Exception:
                 log.exception("Failed to set repeat mode")
                 return _control_error_response(

@@ -17,10 +17,12 @@ const TOOL_STATUS_LABELS = {
   failed: 'failed',
   cancelled: 'cancelled',
   denied: 'not allowed',
+  unknown: 'Status unavailable',
 };
 
 function formatValue(value) {
-  if (value === undefined || value === null || value === '') return '(empty)';
+  if (value === undefined) return 'Details unavailable';
+  if (value === null || value === '') return '(empty)';
   if (typeof value === 'string') return value;
   try {
     return JSON.stringify(value, null, 2);
@@ -31,12 +33,12 @@ function formatValue(value) {
 
 export default function ToolUseCard({ tool }) {
   const [open, setOpen] = useState(false);
-  const status = tool.status || 'ok';
+  const status = tool.status || 'unknown';
   const title = humanizeIdentifier(tool.tool_name || tool.name) || 'Tool';
   const statusLabel = tool.progress || TOOL_STATUS_LABELS[status] || '';
   return (
     <div className={`chat-tool-card ${open ? 'is-open' : ''}`}>
-      <button type="button" className="chat-tool-summary" onClick={() => setOpen((value) => !value)}>
+      <button type="button" className="chat-tool-summary" onClick={() => setOpen((value) => !value)} aria-expanded={open}>
         <span className={`chat-tool-dot status-${status}`} />
         <span className="chat-tool-name">{title}</span>
         <span className="chat-tool-status">{statusLabel}</span>
@@ -50,7 +52,7 @@ export default function ToolUseCard({ tool }) {
           </div>
           <div>
             <span>Output</span>
-            <pre>{formatValue(tool.tool_output || tool.output)}</pre>
+            <pre>{formatValue(tool.tool_output ?? tool.output)}</pre>
           </div>
         </div>
       )}

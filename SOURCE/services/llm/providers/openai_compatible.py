@@ -684,10 +684,10 @@ _OPENAI_TOOL_NAME_MAX_LEN = 64
 # ``max_tokens`` parameter (must use ``max_completion_tokens``) and do not
 # accept ``temperature != 1`` or ``top_p != 1``.  Pattern matches any model
 # name that starts with ``o1``/``o3``/``o4`` (optionally followed by ``-``
-# or digits) OR starts with ``gpt-5`` (covers gpt-5, gpt-5-mini, gpt-5.4,
+# or digits) OR starts with ``gpt-5`` / ``gpt-6`` (covers gpt-5, gpt-5-mini, gpt-5.4,
 # gpt-5.4-mini, gpt-5-codex, etc.).  Use a family regex, not a hardcoded
 # list — OpenAI ships new variants frequently.
-_REASONING_MODEL_RE = re.compile(r"^(?:o[134](?:[-\d]|$)|gpt-5)", re.IGNORECASE)
+_REASONING_MODEL_RE = re.compile(r"^(?:o[134](?:[-\d]|$)|gpt-[56])", re.IGNORECASE)
 
 
 def _is_reasoning_model(model: str | None) -> bool:
@@ -752,6 +752,9 @@ def _drop_unsupported_chat_tool_reasoning(
     non-Responses branch used by third-party OpenAI-compatible endpoints.
     """
     if not has_tools or not _is_reasoning_model(model):
+        return
+    if model.lower().startswith("gpt-6"):
+        api_kwargs["reasoning_effort"] = "none"
         return
     if "reasoning_effort" in api_kwargs:
         api_kwargs.pop("reasoning_effort", None)

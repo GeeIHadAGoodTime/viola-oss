@@ -496,14 +496,27 @@ def _validate_llm_cross_field_requirements(
 
 
 def _normalize_hotkey_for_compare(value: str) -> str:
-    """Normalize a hotkey string for equality comparison.
-
-    Lowercases each '+'-joined token and sorts them so 'Ctrl+Shift+M' and
-    'Shift+Ctrl+M' compare equal, matching how ``hotkeys.js`` parses/matches
-    a combo order-independently.
-    """
-    tokens = [t.strip().lower() for t in str(value or "").split("+") if t.strip()]
-    return "+".join(sorted(tokens))
+    """Compare the physical combo understood by the frontend hotkey parser."""
+    modifiers = {"ctrl": "ctrl", "control": "ctrl", "alt": "alt", "option": "alt",
+                 "shift": "shift", "meta": "meta", "cmd": "meta", "command": "meta",
+                 "win": "meta", "windows": "meta", "super": "meta"}
+    aliases = {"spacebar": "space", "esc": "escape", "return": "enter", "del": "delete",
+               "up": "arrowup", "down": "arrowdown", "left": "arrowleft", "right": "arrowright"}
+    active = set()
+    code = "space"
+    for raw in str(value or "space").split("+"):
+        token = raw.strip().lower()
+        if not token:
+            continue
+        if token in modifiers:
+            active.add(modifiers[token])
+        elif len(token) == 1 and "a" <= token <= "z":
+            code = "key" + token
+        elif len(token) == 1 and token.isascii() and token.isdigit():
+            code = "digit" + token
+        else:
+            code = aliases.get(token, token)
+    return "+".join([*sorted(active), code])
 
 
 def _validate_hotkey_cross_field_requirements(
