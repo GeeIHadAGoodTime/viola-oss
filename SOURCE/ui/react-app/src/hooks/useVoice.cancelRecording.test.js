@@ -88,6 +88,43 @@ describe('voice capture enablement', () => {
     expect(result.current.isRecording).toBe(false);
   });
 
+  it('does not revive an old permission request when voice is re-enabled', async () => {
+    let release;
+    navigator.mediaDevices.getUserMedia.mockImplementation(() => new Promise(resolve => { release = resolve; }));
+    const { useVoice } = await import('./useVoice');
+    const hook = renderHook(({ enabled }) => useVoice(undefined, { enabled }), { initialProps: { enabled: true } });
+    let pending;
+    act(() => { pending = hook.result.current.startRecording(); });
+    hook.rerender({ enabled: false });
+    hook.rerender({ enabled: true });
+    await act(async () => { release(stream); await pending; });
+    expect(track.stop).toHaveBeenCalled();
+    expect(recorderInstances).toHaveLength(0);
+    expect(hook.result.current.isRecording).toBe(false);
+  });
+
+  it('does not execute a late transcript after voice is disabled', async () => {
+    const { useVoice } = await import('./useVoice');
+    const { authFetch } = await import('./useViolaApi');
+    let releaseTranscript;
+    authFetch.mockImplementation(url => url === '/v1/transcribe'
+      ? new Promise(resolve => { releaseTranscript = resolve; })
+      : Promise.resolve({ json: async () => ({ ok: true }) }));
+    const onResult = vi.fn();
+    const hook = renderHook(({ enabled }) => useVoice(onResult, { enabled }), { initialProps: { enabled: true } });
+    await act(async () => { await hook.result.current.startRecording(); });
+    recorderInstances[0].ondataavailable({ data: new Blob(['x'.repeat(200)]) });
+    let stopping;
+    act(() => { stopping = hook.result.current.stopRecording(); });
+    hook.rerender({ enabled: false });
+    await act(async () => {
+      releaseTranscript({ json: async () => ({ ok: true, data: { text: 'synthetic command' } }) });
+      await stopping;
+    });
+    expect(authFetch.mock.calls.some(([url]) => url === '/v1/command')).toBe(false);
+    expect(onResult).not.toHaveBeenCalled();
+  });
+
   it('cancels active recording without transcription and can resume only after re-enabled', async () => {
     const { useVoice } = await import('./useVoice');
     const { authFetch } = await import('./useViolaApi');
