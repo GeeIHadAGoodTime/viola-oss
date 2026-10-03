@@ -52,6 +52,7 @@ const sentryHarness = vi.hoisted(() => ({
 const onboardingHarness = vi.hoisted(() => ({
   useVoiceOnboarding: vi.fn(),
 }));
+const voiceHarness = vi.hoisted(() => ({ options: null, startRecording: vi.fn(), stopRecording: vi.fn(), cancelRecording: vi.fn() }));
 const settingsHarness = vi.hoisted(() => ({
   useSettings: vi.fn(),
   updateSetting: vi.fn(),
@@ -188,12 +189,16 @@ vi.mock('../hooks/useAgentBrowserStream', () => ({
 }));
 
 vi.mock('../hooks/useVoice', () => ({
-  useVoice: () => ({
-    isListening: false,
-    transcript: '',
-    startListening: vi.fn(),
-    stopListening: vi.fn(),
-  }),
+  useVoice: (_callback, options) => {
+    voiceHarness.options = options;
+    return {
+      isListening: false, isRecording: false, isProcessing: false,
+      transcript: '', startListening: vi.fn(), stopListening: vi.fn(),
+      startRecording: voiceHarness.startRecording,
+      stopRecording: voiceHarness.stopRecording,
+      cancelRecording: voiceHarness.cancelRecording,
+    };
+  },
 }));
 
 vi.mock('../hooks/useCallAudio', () => ({
@@ -553,6 +558,27 @@ describe('SmartDisplay', () => {
     expect(context.steps).toBe('');
     expect(context.expected).toBe('');
     expect(context.actual).toBe('');
+  });
+
+  it('blocks chat PTT when Voice is Disabled even if unmuted, and allows a deliberate re-enable', async () => {
+    window.viola = { isDesktop: true };
+    voiceHarness.startRecording.mockClear();
+    let voiceMode = 'disabled';
+    settingsHarness.useSettings.mockImplementation(() => ({ ...mockSettingsState(), settings: { voice_mode: voiceMode, mic_muted: false } }));
+    try {
+      const { user, rerender } = render(<SmartDisplay />);
+      await user.click(screen.getByTestId('stage-pill-chat'));
+      const ptt = within(await screen.findByTestId('chat-mode')).getByRole('button', { name: 'Push to talk' });
+      fireEvent.mouseDown(ptt);
+      expect(voiceHarness.startRecording).not.toHaveBeenCalled();
+      expect(voiceHarness.options.enabled).toBe(false);
+      expect(screen.getByText(/Voice input is disabled/)).toBeInTheDocument();
+      voiceMode = 'push_to_talk';
+      rerender(<SmartDisplay />);
+      fireEvent.mouseDown(ptt);
+      expect(voiceHarness.options.enabled).toBe(true);
+      expect(voiceHarness.startRecording).toHaveBeenCalledTimes(1);
+    } finally { delete window.viola; }
   });
 
   it('opens settings from a ui_action event', async () => {

@@ -1220,11 +1220,14 @@ export default function SmartDisplay({ isSpoke = false, micStream = null, room =
   // here so the persistent wake mic stream can be reused by the voice turn.
   const [handsFreeWake] = useHandsFreeWake();
   const [wakeStream, setWakeStream] = useState(null);
+  const voiceCaptureEnabled = userSettings?.voice_mode !== 'disabled' && !userSettings?.mic_muted;
   const httpVoice = useVoice(handleCommandResult, {
+    enabled: voiceCaptureEnabled,
     existingStream: micStream,
     executeCommand: executeCommandFlag,
   });
   const wsVoice = useVoiceWs(handleCommandResult, {
+    enabled: voiceCaptureEnabled,
     room: room || 'speaker',
     // Reuse the already-hot wake mic (if any) so a wake turn does not trigger a
     // second getUserMedia; falls back to the caller-provided micStream / own.
@@ -2120,12 +2123,23 @@ export default function SmartDisplay({ isSpoke = false, micStream = null, room =
   const TAP_THRESHOLD_MS = 250;
 
   const beginVoiceTurn = useCallback(() => {
+    // Shared by PTT, hotkeys, browser wake and resumed consent actions.
+    if (!voiceCaptureEnabled) {
+      addToast({ message: userSettings?.voice_mode === 'disabled'
+        ? 'Voice input is disabled. Enable it in Voice settings to use the microphone.'
+        : 'Your microphone is muted. Unmute it to talk to Viola.', level: 'warning' });
+      return;
+    }
     pttPressStartRef.current = (typeof performance !== 'undefined' ? performance.now() : Date.now());
     voice.startRecording();
     setChatHistory(prev => [...prev, { role: 'user', content: '(listening...)', timestamp: new Date().toISOString(), pending: true }]);
-  }, [voice]);
+  }, [voice, voiceCaptureEnabled, userSettings?.voice_mode, addToast]);
 
   const handlePTTStart = useCallback(() => {
+    if (userSettings?.voice_mode === 'disabled') {
+      addToast({ message: 'Voice input is disabled. Enable it in Voice settings to use the microphone.', level: 'warning' });
+      return;
+    }
     // Muted mic hard-gates PTT too: a hotkey/tray mute is meant to stop the
     // mic entirely, so a stray push-to-talk press while muted must not
     // start a recording.
@@ -2158,7 +2172,7 @@ export default function SmartDisplay({ isSpoke = false, micStream = null, room =
       return;
     }
     beginVoiceTurn();
-  }, [voice, beginVoiceTurn, interceptCloudConsent, userSettings?.mic_muted, addToast]);
+  }, [voice, beginVoiceTurn, interceptCloudConsent, userSettings?.mic_muted, userSettings?.voice_mode, addToast]);
 
   const handlePTTEnd = useCallback(() => {
     const pressedAt = pttPressStartRef.current;

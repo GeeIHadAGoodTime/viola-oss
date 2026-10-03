@@ -19,7 +19,7 @@ function getSupportedMimeType() {
  * Custom hook for voice/PTT functionality
  * Handles audio recording, transcription, and command execution
  */
-export function useVoice(onCommandResult, { existingStream, executeCommand = true } = {}) {
+export function useVoice(onCommandResult, { existingStream, executeCommand = true, enabled = true } = {}) {
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [transcript, setTranscript] = useState('');
@@ -37,6 +37,9 @@ export function useVoice(onCommandResult, { existingStream, executeCommand = tru
   const stopRecordingRef = useRef(null);
   const mimeTypeRef = useRef('');
   const executeCommandRef = useRef(executeCommand);
+  const enabledRef = useRef(enabled);
+  enabledRef.current = enabled;
+  const captureGenerationRef = useRef(0);
 
   // Keep existingStreamRef current without retriggering effects
   useEffect(() => {
@@ -138,6 +141,8 @@ export function useVoice(onCommandResult, { existingStream, executeCommand = tru
 
   // Start recording
   const startRecording = useCallback(async () => {
+    if (!enabledRef.current) return;
+    const generation = ++captureGenerationRef.current;
     try {
       setError(null);
       setTranscript('');
@@ -152,15 +157,16 @@ export function useVoice(onCommandResult, { existingStream, executeCommand = tru
       // Reuse pre-acquired stream if available and has active tracks
       // (iOS AudioSession fix: calling getUserMedia again fails when the session is already held)
       let stream;
+      let borrowedStream = false;
       if (existingStreamRef.current && existingStreamRef.current.active
           && existingStreamRef.current.getAudioTracks().some(t => t.readyState === 'live')) {
         stream = existingStreamRef.current;
-        usingSharedStreamRef.current = true;
+        borrowedStream = true;
         if (import.meta.env.DEV) {
           console.log('[PTT_DEBUG] Reusing existing mic stream (shared)');
         }
       } else {
-        usingSharedStreamRef.current = false;
+        borrowedStream = false;
         if (import.meta.env.DEV) {
           console.log('[PTT_DEBUG] window.location.origin:', window.location.origin);
           console.log('[PTT_DEBUG] navigator.mediaDevices exists:', !!navigator.mediaDevices);
@@ -201,6 +207,12 @@ export function useVoice(onCommandResult, { existingStream, executeCommand = tru
       if (import.meta.env.DEV) {
         console.log('[PTT_DEBUG] Got stream, active:', stream.active);
       }
+      // A permission prompt can resolve after the user disabled voice.
+      if (!enabledRef.current || generation !== captureGenerationRef.current) {
+        if (!borrowedStream) stream.getTracks().forEach(track => track.stop());
+        return;
+      }
+      usingSharedStreamRef.current = borrowedStream;
       streamRef.current = stream;
 
       // Create MediaRecorder
@@ -230,6 +242,7 @@ export function useVoice(onCommandResult, { existingStream, executeCommand = tru
       }
 
     } catch (err) {
+      if (!enabledRef.current || generation !== captureGenerationRef.current) return;
       // Log the actual error for debugging
       if (import.meta.env.DEV) {
         console.error('[useVoice] getUserMedia failed:', err.name, err.message, err);
@@ -247,8 +260,10 @@ export function useVoice(onCommandResult, { existingStream, executeCommand = tru
 
     return new Promise((resolve) => {
       const mediaRecorder = mediaRecorderRef.current;
+      const generation = captureGenerationRef.current;
 
       mediaRecorder.onstop = async () => {
+        if (!enabledRef.current || generation !== captureGenerationRef.current) { resolve(null); return; }
         _stopVAD();
         setIsRecording(false);
         setIsProcessing(true);
@@ -290,6 +305,7 @@ export function useVoice(onCommandResult, { existingStream, executeCommand = tru
           });
 
           const result = await response.json();
+          if (!enabledRef.current || generation !== captureGenerationRef.current) { resolve(null); return; }
 
           // Unduck audio
           try {
@@ -298,6 +314,7 @@ export function useVoice(onCommandResult, { existingStream, executeCommand = tru
             // Continue anyway
           }
 
+          if (!enabledRef.current || generation !== captureGenerationRef.current) { resolve(null); return; }
           if (result.ok && result.data?.text) {
             const text = result.data.text;
             setTranscript(text);
@@ -315,6 +332,7 @@ export function useVoice(onCommandResult, { existingStream, executeCommand = tru
               body: JSON.stringify({ text }),
             });
             const cmdResult = await cmdResponse.json();
+            if (!enabledRef.current || generation !== captureGenerationRef.current) { resolve(null); return; }
 
             if (onCommandResult) {
               onCommandResult(cmdResult);
@@ -323,7 +341,7 @@ export function useVoice(onCommandResult, { existingStream, executeCommand = tru
             if (cmdResult.data?.continue_listening === true) {
               await new Promise((delayResolve) => window.setTimeout(delayResolve, 300));
 
-              if (mediaRecorderRef.current?.state !== 'recording') {
+              if (enabledRef.current && generation === captureGenerationRef.current && mediaRecorderRef.current?.state !== 'recording') {
                 try {
                   await startRecording();
                 } catch (startError) {
@@ -371,11 +389,17 @@ export function useVoice(onCommandResult, { existingStream, executeCommand = tru
 
   // Cancel recording without processing
   const cancelRecording = useCallback(() => {
-    if (mediaRecorderRef.current && isRecording) {
-      _stopVAD();
-      mediaRecorderRef.current.stop();
-      setIsRecording(false);
+    captureGenerationRef.current += 1;
+    _stopVAD();
+    const recorder = mediaRecorderRef.current;
+    mediaRecorderRef.current = null;
+    if (recorder) {
+      recorder.onstop = null;
+      recorder.ondataavailable = null;
+      if (recorder.state !== 'inactive') recorder.stop();
     }
+    setIsRecording(false);
+    setIsProcessing(false);
     if (streamRef.current && !usingSharedStreamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
     }
@@ -391,7 +415,11 @@ export function useVoice(onCommandResult, { existingStream, executeCommand = tru
     authFetch('/v1/audio/unduck', { method: 'POST' }).catch((err) => {
       console.error('[useVoice] Unduck request failed; audio may stay ducked (quiet):', err);
     });
-  }, [_stopVAD, isRecording]);
+  }, [_stopVAD]);
+
+  useEffect(() => {
+    if (!enabled && captureGenerationRef.current > 0) cancelRecording();
+  }, [enabled, cancelRecording]);
 
   return {
     isRecording,
