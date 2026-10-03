@@ -1196,7 +1196,7 @@ export default function SmartDisplay({ isSpoke = false, micStream = null, room =
         ]);
       }
       if (onboarding.isOnboarding) {
-        onboarding.onCommandExecuted();
+        onboarding.onCommandExecuted(result);
       }
     }
   }, [handlePaidActionGatePayload, onboarding]);

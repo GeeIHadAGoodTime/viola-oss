@@ -1,10 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '../../test/test-utils';
+import { fireEvent, render, screen, waitFor } from '../../test/test-utils';
 import AdvancedSettingsWindow from './AdvancedSettingsWindow';
 
 vi.mock('../extensions/ExtensionsSection', () => ({
   default: () => <div>Extensions body</div>,
 }));
+
+const diagnosticsApi = vi.hoisted(() => vi.fn());
+vi.mock('../../hooks/useViolaApi', () => ({apiFetch: diagnosticsApi}));
 
 const baseSettings = {
   ai_source: 'byok',
@@ -21,6 +24,7 @@ describe('AdvancedSettingsWindow', () => {
     // its whole body collapses to one DesktopUpsell card. These cases are
     // about the desktop sections, so declare the desktop surface.
     window.viola = {};
+    diagnosticsApi.mockReset().mockResolvedValue({status: 'ok'});
   });
 
   afterEach(() => {
@@ -68,4 +72,15 @@ describe('AdvancedSettingsWindow', () => {
     fireEvent.change(screen.getByLabelText(/api port/i), { target: { value: '8765' } });
     expect(onSettingChange).toHaveBeenCalledWith('api_port', 8765);
   });
+  it.each([['Open Diagnostics','/v1/diagnostics'],['YouTube','/v1/diagnostics/youtube']])(
+    'uses the existing read-only endpoint for %s', async (name,path) => {
+      render(<AdvancedSettingsWindow isOpen onClose={vi.fn()} settings={baseSettings} onSettingChange={vi.fn()} onSettingsChange={vi.fn()} />);
+      fireEvent.click(screen.getByRole('button',{name,exact:true}));
+      await waitFor(() => expect(diagnosticsApi).toHaveBeenCalled());
+      const [calledPath,options] = diagnosticsApi.mock.calls[0];
+      expect(calledPath).toBe(path);
+      expect(options?.method || 'GET').toBe('GET');
+    },
+  );
+
 });

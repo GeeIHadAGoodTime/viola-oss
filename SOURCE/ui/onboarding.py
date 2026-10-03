@@ -54,6 +54,7 @@ class OnboardingStep(Enum):
     VOICE_MODE = "voice_mode"
     MICROPHONE_TEST = "microphone_test"
     AI_SETUP = "ai_setup"
+    AUTONOMY_TIER = "autonomy_tier"
     QUICK_TUTORIAL = "quick_tutorial"
     COMPLETE = "complete"
 

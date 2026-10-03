@@ -6,6 +6,7 @@
  * live in __tests__/integration/.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+const { default: QueueModal } = await vi.importActual('../components/QueueModal');
 import { act, fireEvent, render, screen, waitFor, within } from '../test/test-utils';
 
 const wsHarness = vi.hoisted(() => ({
@@ -28,6 +29,8 @@ const playerHarness = vi.hoisted(() => ({
 const agentBrowserStreamHarness = vi.hoisted(() => ({ calls: [] }));
 const apiHarness = vi.hoisted(() => ({
   submitBugReport: null,
+  getQueue: vi.fn(() => Promise.resolve({ok: true, queue: []})),
+  playQueueItem: vi.fn(() => Promise.resolve({ok: true})),
   setShuffle: vi.fn(() => Promise.resolve({})),
   // Transport calls a test needs to fail on demand. Every one of these is
   // `apiFetch` in production, which ALWAYS returns a promise -- so the mocks
@@ -143,7 +146,8 @@ vi.mock('../hooks/useViolaApi', () => ({
     setVolume: apiHarness.setVolume,
     setRating: apiHarness.setRating,
     setRepeat: vi.fn(() => Promise.resolve({})),
-    getQueue: vi.fn(() => Promise.resolve([])),
+    getQueue: apiHarness.getQueue,
+    playQueueItem: apiHarness.playQueueItem,
     clearQueue: vi.fn(),
     sendCommand: vi.fn(() => Promise.resolve({ message: 'ok' })),
     getWeather: vi.fn(() => Promise.resolve({})),
@@ -351,6 +355,8 @@ beforeEach(async () => {
   agentBrowserStreamHarness.calls = [];
   apiHarness.submitBugReport?.mockClear?.();
   apiHarness.submitBugReport?.mockResolvedValue?.({ bug_ticket_id: 42 });
+  apiHarness.getQueue.mockReset().mockResolvedValue({ok: true, queue: []});
+  apiHarness.playQueueItem.mockReset().mockResolvedValue({ok: true});
   apiHarness.setShuffle.mockReset();
   apiHarness.setShuffle.mockResolvedValue({});
   for (const name of ['skip', 'previous', 'setVolume', 'seek', 'setRating']) {
@@ -1534,5 +1540,27 @@ describe('cloud browser playback needs the user gesture (#3552)', () => {
     const iframe = screen.getByTitle('YouTube video player');
     expect(iframe.tagName).toBe('IFRAME');
     expect(iframe.getAttribute('src')).toContain('/static/webviews/youtube_iframe_v3.html');
+  });
+});
+
+
+describe('upcoming queue controls', () => {
+  it('offers Play for the first and only future track', async () => {
+    const item = { id: 'next-1', title: 'Future track' };
+    render(<QueueModal isOpen onClose={vi.fn()} wsQueue={[item]} />);
+    const row = await screen.findByRole('listitem', {name: 'Queue position 1: Future track'});
+    expect(within(row).getByText('1')).toBeInTheDocument();
+    fireEvent.click(within(row).getByRole('button', {name: 'Play Future track now'}));
+    await waitFor(() => expect(apiHarness.playQueueItem).toHaveBeenCalledWith('next-1'));
+  });
+
+  it('keeps each new first upcoming item playable after queue changes', async () => {
+    const next = {id: 'next-2', title: 'Second future track'};
+    const {rerender} = render(<QueueModal isOpen onClose={vi.fn()} wsQueue={[{id:'next-1', title:'First future track'}, next]} />);
+    await screen.findByRole('listitem', {name: 'Queue position 1: First future track'});
+    rerender(<QueueModal isOpen onClose={vi.fn()} wsQueue={[next]} />);
+    const row = await screen.findByRole('listitem', {name: 'Queue position 1: Second future track'});
+    fireEvent.click(within(row).getByRole('button', {name: 'Play Second future track now'}));
+    await waitFor(() => expect(apiHarness.playQueueItem).toHaveBeenCalledWith('next-2'));
   });
 });

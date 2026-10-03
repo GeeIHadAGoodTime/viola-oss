@@ -35,6 +35,18 @@ const Slider = React.memo(({ value, onChange, min = 0, max = 100, label, step = 
     onChange(newValue);
   }, [min, max, step, onChange]);
 
+  const handleKeyDown = (event) => {
+    const deltas = { ArrowRight: step, ArrowUp: step, ArrowLeft: -step, ArrowDown: -step, PageUp: step * 10, PageDown: -step * 10 };
+    let next;
+    if (event.key === 'Home') next = min;
+    else if (event.key === 'End') next = max;
+    else if (Object.hasOwn(deltas, event.key)) next = Number((value + deltas[event.key]).toFixed(10));
+    else return;
+    event.preventDefault();
+    event.stopPropagation();
+    onChange(Math.max(min, Math.min(max, next)));
+  };
+
   const handleMouseDown = (e) => {
     setIsDragging(true);
     updateValue(e.clientX);
@@ -84,6 +96,13 @@ const Slider = React.memo(({ value, onChange, min = 0, max = 100, label, step = 
       </div>
       <div
         ref={trackRef}
+        role="slider"
+        tabIndex={0}
+        aria-label={label || 'Value'}
+        aria-valuemin={min}
+        aria-valuemax={max}
+        aria-valuenow={value}
+        onKeyDown={handleKeyDown}
         data-hold-interactive
         onMouseDown={handleMouseDown}
         onTouchStart={handleTouchStart}

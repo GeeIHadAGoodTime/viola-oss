@@ -143,6 +143,7 @@ function ChatModeInner({
   const [dragActive, setDragActive] = useState(false);
   const [uploadingFileCount, setUploadingFileCount] = useState(0);
   const [uploadError, setUploadError] = useState('');
+  const [threadActionError, setThreadActionError] = useState('');
   // Tier-2 cloud-sync consent gate (services/sync/consent.py) blocks
   // /v1/chat/threads with 403 consent_required until the user opts in
   // (Settings > Privacy & Data > Cloud Sync). Surface this as an explicit,
@@ -243,6 +244,7 @@ function ChatModeInner({
     // loadThread/loadModels) is now stale and will no-op instead of
     // applying its response when it eventually resolves (#2395/C-071).
     const generation = ++requestGenerationRef.current;
+    setThreadActionError('');
     async function boot() {
       try {
         setLoading(true);
@@ -662,14 +664,28 @@ function ChatModeInner({
   const renameThread = useCallback(async (thread, nextTitle) => {
     const title = nextTitle ?? window.prompt('Rename chat', thread.title || 'New chat');
     if (!title || !title.trim()) return;
-    const data = await apiFetch(`/v1/chat/threads/${encodeURIComponent(thread.id)}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ title: title.trim() }),
-    });
-    setThreads((current) => current.map((item) => (item.id === thread.id ? data.thread : item)));
-    if (activeThreadIdRef.current === thread.id) {
-      setActiveThread(data.thread);
-      setTitleDraft(data.thread.title);
+    const trimmed = title.trim();
+    if (Array.from(trimmed).length > 200) {
+      setThreadActionError('Use 200 characters or fewer for the chat title.');
+      return;
+    }
+    const generation = requestGenerationRef.current;
+    setThreadActionError('');
+    try {
+      const data = await apiFetch(`/v1/chat/threads/${encodeURIComponent(thread.id)}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ title: trimmed }),
+      });
+      if (requestGenerationRef.current !== generation) return;
+      setThreads((current) => current.map((item) => (item.id === thread.id ? data.thread : item)));
+      if (activeThreadIdRef.current === thread.id) {
+        setActiveThread(data.thread);
+        setTitleDraft(data.thread.title);
+      }
+    } catch {
+      if (requestGenerationRef.current === generation) {
+        setThreadActionError('Could not confirm the new chat title. Please try again.');
+      }
     }
   }, []);
 
@@ -897,6 +913,7 @@ function ChatModeInner({
         profileName={profileName}
       />
       <main className="chat-main">
+        {threadActionError && <div className="chat-upload-status is-error" role="alert">{threadActionError}</div>}
         {consentRequired && (
           <div className="chat-consent-banner" data-testid="chat-consent-required">
             <span>

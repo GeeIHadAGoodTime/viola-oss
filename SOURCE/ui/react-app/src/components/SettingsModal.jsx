@@ -315,6 +315,12 @@ function validationSummary(profile) {
 }
 
 // Main Settings Component
+function assistantVolumePercent(value) {
+  const raw = Number(value ?? 1);
+  const normalized = Number.isFinite(raw) ? (raw > 1 ? raw / 100 : raw) : 1;
+  return Math.round(Math.max(0, Math.min(1, normalized)) * 100);
+}
+
 const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initialTab, initialSection }) {
   const [activeTab, setActiveTab] = useState(() => normalizeTabId(initialTab));
   const [searchTerm, setSearchTerm] = useState('');
@@ -3443,8 +3449,8 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
                     <Slider
                       label="Assistant Volume"
                       tooltip="Controls how loud spoken responses are."
-                      value={localSettings.tts_volume ?? 80}
-                      onChange={(v) => updateLocal('tts_volume', v)}
+                      value={assistantVolumePercent(localSettings.tts_volume)}
+                      onChange={(v) => updateLocal('tts_volume', v / 100)}
                     />
                   </div>
                   <SectionDivider />
@@ -3556,13 +3562,19 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
                     <Select
                       label="Accuracy Level"
                       tooltip="Choose the balance between faster responses and more accurate transcription."
-                      value={localSettings.whisper_model || 'base'}
+                      value={localSettings.whisper_model || 'tiny.en'}
                       onChange={(v) => updateLocal('whisper_model', v)}
                       options={[
-                        { value: 'tiny', label: 'Fast (Lower accuracy)' },
-                        { value: 'base', label: 'Balanced' },
-                        { value: 'small', label: 'Accurate' },
-                        { value: 'medium', label: 'Most accurate (Slower)' },
+                        { value: 'tiny.en', label: 'Fast — English (Default)' },
+                        { value: 'tiny', label: 'Fast — Multilingual' },
+                        { value: 'base.en', label: 'Balanced — English' },
+                        { value: 'base', label: 'Balanced — Multilingual' },
+                        { value: 'small.en', label: 'Accurate — English' },
+                        { value: 'small', label: 'Accurate — Multilingual' },
+                        { value: 'medium.en', label: 'More accurate — English (Slower)' },
+                        { value: 'medium', label: 'More accurate — Multilingual (Slower)' },
+                        { value: 'large', label: 'Large — Multilingual (Slowest)' },
+                        { value: 'large-v2', label: 'Large v2 — Multilingual (Slowest)' },
                       ]}
                     />
                   </div>
