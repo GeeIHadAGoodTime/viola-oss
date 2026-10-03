@@ -655,11 +655,20 @@ def register_chat_mode_routes(context: ApiContext, toolbox: RouteToolbox) -> Non
             thread = await chat_store.get_thread(user_id, thread_id)
             if thread is None:
                 raise _not_found("chat_thread")
-            messages = await chat_store.list_messages(user_id, thread_id)
+            # Capture liveness before reading persisted messages. If a task
+            # finishes during the read, reporting it active for one more poll
+            # is safe; the reverse could falsely report a missing final result.
+            active_stream_ids = [
+                stream_id
+                for stream_id, active in _ACTIVE_CHAT_TASKS.items()
+                if active.user_id == user_id and active.thread_id == thread_id and not active.task.done()
+            ]
+            messages = await chat_store.list_messages(user_id, thread_id, newest=True)
             return success_response(
                 {
                     "thread": _thread_payload(thread),
                     "messages": [_message_payload(message) for message in messages],
+                    "active_stream_ids": active_stream_ids,
                 }
             )
 
@@ -786,13 +795,16 @@ def register_chat_mode_routes(context: ApiContext, toolbox: RouteToolbox) -> Non
             if active.task.done():
                 _ACTIVE_CHAT_TASKS.pop(stream_id, None)
                 return success_response({"cancelled": False})
+            if active.task.cancelling():
+                # Repeated Stop must not interrupt the first cancellation's
+                # awaited persistence/cleanup with another CancelledError.
+                return success_response({"cancelled": True})
             cancel_requested = active.task.cancel()
             if cancel_requested is False:
                 _ACTIVE_CHAT_TASKS.pop(stream_id, None)
                 return success_response({"cancelled": False})
-            from services.llm.stream_bus import finalize_stream
-
-            finalize_stream(stream_id, error=True, message="Stopped.")
+            # Cancellation is requested, not yet completed. The task's
+            # CancelledError handler persists the outcome and finalizes SSE.
             return success_response({"cancelled": True})
 
         return await toolbox.record_and_call(_inner, route="/v1/chat/streams/{stream_id}/cancel", method="POST")

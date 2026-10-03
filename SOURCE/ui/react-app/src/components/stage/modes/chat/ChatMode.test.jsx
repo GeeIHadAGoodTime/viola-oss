@@ -43,6 +43,7 @@ function findRegisteredCommand(registerCommands, label) {
 
 describe('ChatMode command registry', () => {
   afterEach(() => {
+    vi.useRealTimers();
     delete window.EventSource;
     // #1064: Workbench uploads are desktop-only (featureSurface.js
     // isFeatureHidden('workbench')); restore the no-bridge default so other
@@ -91,6 +92,247 @@ describe('ChatMode command registry', () => {
       }
       return Promise.resolve({});
     });
+  });
+
+  it('REVIEW rejects a late new-chat POST from a retired principal', async () => {
+    const fallback = chatHarness.apiFetch.getMockImplementation();
+    let accept;
+    chatHarness.apiFetch.mockImplementation((url, options = {}) => {
+      if (url === '/v1/chat/threads' && options.method === 'POST') return new Promise((resolve) => { accept = resolve; });
+      return fallback(url, options);
+    });
+    const view = render(<ChatMode principalKey="owner-a" />);
+    await screen.findByText('Initial response');
+    fireEvent.click(screen.getByRole('button', { name: 'New chat', exact: true }));
+    view.rerender(<ChatMode principalKey="owner-b" />);
+    await screen.findByText('Initial response');
+    await act(async () => { accept({ thread: { id: 'private-old', title: 'PRIVATE OLD TITLE' } }); });
+    expect(screen.queryByDisplayValue('PRIVATE OLD TITLE')).not.toBeInTheDocument();
+    expect(screen.queryByText('PRIVATE OLD TITLE')).not.toBeInTheDocument();
+  });
+
+  it('REVIEW retires prior-principal model options while replacement is unresolved', async () => {
+    const fallback = chatHarness.apiFetch.getMockImplementation();
+    let defer = false;
+    chatHarness.apiFetch.mockImplementation((url, options) => {
+      if (url === '/v1/chat/models' && defer) return new Promise(() => {});
+      return fallback(url, options);
+    });
+    const view = render(<ChatMode principalKey="owner-a" />);
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Model' })).toHaveValue('gpt-test'));
+    defer = true;
+    view.rerender(<ChatMode principalKey="owner-b" />);
+    await act(async () => {});
+    expect(screen.getByRole('combobox', { name: 'Model' })).not.toHaveTextContent('gpt-test');
+  });
+
+  it('REVIEW does not send a retired principal model after replacement catalog fails', async () => {
+    const fallback = chatHarness.apiFetch.getMockImplementation();
+    let failModels = false;
+    chatHarness.apiFetch.mockImplementation((url, options) => {
+      if (url === '/v1/chat/models' && failModels) return Promise.reject(Object.assign(new Error('outage'), { status: 503 }));
+      if (url.endsWith('/send')) return new Promise(() => {});
+      return fallback(url, options);
+    });
+    const view = render(<ChatMode principalKey="owner-a" />);
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Model' })).toHaveValue('gpt-test'));
+    failModels = true;
+    view.rerender(<ChatMode principalKey="owner-b" />);
+    await screen.findByText("Couldn't load the model list. Please try again.");
+    await screen.findByText('Initial response');
+    fireEvent.change(screen.getByPlaceholderText('Message Viola'), { target: { value: 'New owner prompt' } });
+    fireEvent.click(screen.getByLabelText('Send message'));
+    await waitFor(() => expect(chatHarness.apiFetch.mock.calls.some(([url]) => url.endsWith('/send'))).toBe(true));
+    const [, options] = chatHarness.apiFetch.mock.calls.find(([url]) => url.endsWith('/send'));
+    expect(JSON.parse(options.body).model).toBeNull();
+  });
+
+  it('REVIEW rejects a late delete snapshot from a retired principal', async () => {
+    const fallback = chatHarness.apiFetch.getMockImplementation();
+    const oldOther = { ...thread, id: 'private-other', title: 'PRIVATE OTHER THREAD' };
+    let nextOwner = false;
+    let accept;
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    chatHarness.apiFetch.mockImplementation((url, options = {}) => {
+      if (options.method === 'DELETE') return new Promise((resolve) => { accept = resolve; });
+      if (url === '/v1/chat/threads') return Promise.resolve({ threads: nextOwner ? [thread] : [thread, oldOther] });
+      return fallback(url, options);
+    });
+    const view = render(<ChatMode principalKey="owner-a" />);
+    await screen.findByText('PRIVATE OTHER THREAD');
+    fireEvent.click(screen.getAllByRole('button', { name: 'Conversation menu' })[0]);
+    fireEvent.click(screen.getByRole('button', { name: 'Delete', exact: true }));
+    nextOwner = true;
+    view.rerender(<ChatMode principalKey="owner-b" />);
+    await screen.findByText('Initial response');
+    await act(async () => { accept({ deleted: true }); });
+    expect(screen.queryByText('PRIVATE OTHER THREAD')).not.toBeInTheDocument();
+    confirm.mockRestore();
+  });
+
+  it('REVIEW retires prior-principal title and unsent draft for an empty next workspace', async () => {
+    const fallback = chatHarness.apiFetch.getMockImplementation();
+    let nextOwner = false;
+    chatHarness.apiFetch.mockImplementation((url, options = {}) => {
+      if (url === '/v1/chat/threads' && nextOwner) return Promise.resolve({ threads: [] });
+      return fallback(url, options);
+    });
+    const view = render(<ChatMode principalKey="owner-a" />);
+    await screen.findByText('Initial response');
+    fireEvent.change(screen.getByPlaceholderText('Message Viola'), { target: { value: 'PRIVATE UNSENT DRAFT' } });
+    fireEvent.change(screen.getByLabelText('Search chats'), { target: { value: 'PRIVATE SEARCH' } });
+    nextOwner = true;
+    view.rerender(<ChatMode principalKey="owner-b" />);
+    await waitFor(() => expect(screen.queryByText('Loading chats...')).not.toBeInTheDocument());
+    expect(screen.getByLabelText('Conversation title')).not.toHaveValue('Existing thread');
+    expect(screen.getByPlaceholderText('Message Viola')).toHaveValue('');
+    expect(screen.getByLabelText('Search chats')).toHaveValue('');
+  });
+
+  it('REVIEW rejects a retired-principal upload result and does not dispatch the remaining files', async () => {
+    const fallback = chatHarness.apiFetch.getMockImplementation();
+    let accept;
+    chatHarness.apiFetch.mockImplementation((url, options = {}) => url === '/api/workbench/files'
+      ? new Promise((resolve) => { accept = resolve; }) : fallback(url, options));
+    const view = render(<ChatMode principalKey="owner-a" />);
+    await screen.findByText('Initial response');
+    const files = [new File(['one'], 'private-one.txt'), new File(['two'], 'private-two.txt')];
+    fireEvent.drop(document.querySelector('.chat-mode'), { dataTransfer: { files, types: ['Files'] } });
+    expect(chatHarness.apiFetch.mock.calls.filter(([url]) => url === '/api/workbench/files')).toHaveLength(1);
+    view.rerender(<ChatMode principalKey="owner-b" />);
+    await screen.findByText('Initial response');
+    await act(async () => { accept({ name: 'PRIVATE-UPLOAD.txt' }); });
+    expect(chatHarness.apiFetch.mock.calls.filter(([url]) => url === '/api/workbench/files')).toHaveLength(1);
+    expect(screen.getByPlaceholderText('Message Viola')).not.toHaveValue(expect.stringContaining('PRIVATE-UPLOAD'));
+    expect(screen.queryByText(/Uploaded PRIVATE-UPLOAD/)).not.toBeInTheDocument();
+  });
+
+  it('REVIEW rejects a retired-principal model update response', async () => {
+    const fallback = chatHarness.apiFetch.getMockImplementation();
+    let accept;
+    chatHarness.apiFetch.mockImplementation((url, options = {}) => options.method === 'PATCH'
+      ? new Promise((resolve) => { accept = resolve; }) : fallback(url, options));
+    const view = render(<ChatMode principalKey="owner-a" />);
+    await screen.findByText('Initial response');
+    fireEvent.change(screen.getByRole('combobox', { name: 'Model' }), { target: { value: '' } });
+    view.rerender(<ChatMode principalKey="owner-b" />);
+    await screen.findByText('Initial response');
+    await act(async () => { accept({ thread: { ...thread, title: 'PRIVATE MODEL RESPONSE' } }); });
+    expect(screen.queryByText('PRIVATE MODEL RESPONSE')).not.toBeInTheDocument();
+  });
+
+  it('REVIEW ignores old feedback content after a principal switch', async () => {
+    const fallback = chatHarness.apiFetch.getMockImplementation();
+    let accept;
+    chatHarness.apiFetch.mockImplementation((url, options = {}) => url.endsWith('/feedback')
+      ? new Promise((resolve) => { accept = resolve; }) : fallback(url, options));
+    const view = render(<ChatMode principalKey="owner-a" />);
+    await screen.findByText('Initial response');
+    fireEvent.click(screen.getByLabelText('Thumbs up'));
+    view.rerender(<ChatMode principalKey="owner-b" />);
+    await screen.findByText('Initial response');
+    await act(async () => { accept({ message: { ...assistantMessage, content: 'PRIVATE OLD FEEDBACK' } }); });
+    expect(screen.queryByText('PRIVATE OLD FEEDBACK')).not.toBeInTheDocument();
+  });
+
+  it('REVIEW preserves an intentional same-principal model choice through a catalog outage and retry', async () => {
+    const fallback = chatHarness.apiFetch.getMockImplementation();
+    let fail = false;
+    chatHarness.apiFetch.mockImplementation((url, options = {}) => {
+      if (url === '/v1/chat/models') return fail ? Promise.reject(new Error('503 outage'))
+        : Promise.resolve({ current_model: 'gpt-test', provider: 'test', models: ['gpt-test', 'chosen-model'] });
+      if (options.method === 'PATCH') return Promise.resolve({ thread: { ...thread, model: JSON.parse(options.body).model } });
+      return fallback(url, options);
+    });
+    render(<ChatMode principalKey="owner-a" />);
+    await screen.findByText('Initial response');
+    const selector = screen.getByRole('combobox', { name: 'Model' });
+    await act(async () => { fireEvent.change(selector, { target: { value: 'chosen-model' } }); });
+    fail = true;
+    fireEvent.focus(selector);
+    await screen.findByText("Couldn't load the model list. Please try again.");
+    fail = false;
+    fireEvent.click(screen.getByRole('button', { name: 'Retry model list' }));
+    await waitFor(() => expect(selector).toHaveValue('chosen-model'));
+    expect(chatHarness.apiFetch.mock.calls.filter(([, options]) => options?.method === 'PATCH')).toHaveLength(1);
+  });
+
+  it('REVIEW keeps same-principal new-chat creation functional without extra requests', async () => {
+    const fallback = chatHarness.apiFetch.getMockImplementation();
+    chatHarness.apiFetch.mockImplementation((url, options = {}) => url === '/v1/chat/threads' && options.method === 'POST'
+      ? Promise.resolve({ thread: { id: 'new-current', title: 'New current chat' } }) : fallback(url, options));
+    render(<ChatMode principalKey="owner-a" />);
+    await screen.findByText('Initial response');
+    fireEvent.click(screen.getByRole('button', { name: 'New chat', exact: true }));
+    await screen.findByDisplayValue('New current chat');
+    expect(chatHarness.apiFetch.mock.calls.filter(([url, options]) => url === '/v1/chat/threads' && options?.method === 'POST')).toHaveLength(1);
+  });
+
+  it('shows a model-catalog outage and recovers through an explicit retry', async () => {
+    const fallback = chatHarness.apiFetch.getMockImplementation();
+    let available = false;
+    chatHarness.apiFetch.mockImplementation((url, options) => {
+      if (url === '/v1/chat/models' && !available) return Promise.reject(new Error('503 unavailable'));
+      return fallback(url, options);
+    });
+    render(<ChatMode />);
+    await screen.findByText("Couldn't load the model list. Please try again.");
+    const selector = screen.getByRole('combobox', { name: 'Model' });
+    expect(selector).toBeDisabled();
+    expect(selector).toHaveTextContent('Model list unavailable');
+    expect(selector).not.toHaveTextContent('Default model');
+    available = true;
+    fireEvent.click(screen.getByRole('button', { name: 'Retry model list' }));
+    await waitFor(() => expect(selector).toBeEnabled());
+    expect(selector).toHaveValue('gpt-test');
+    expect(screen.queryByText("Couldn't load the model list. Please try again.")).not.toBeInTheDocument();
+  });
+
+  it('hides an obsolete model catalog after a refresh failure until the real catalog returns', async () => {
+    const fallback = chatHarness.apiFetch.getMockImplementation();
+    let unavailable = false;
+    chatHarness.apiFetch.mockImplementation((url, options) => {
+      if (url === '/v1/chat/models' && unavailable) return Promise.reject(new Error('503 unavailable'));
+      return fallback(url, options);
+    });
+    render(<ChatMode />);
+    const selector = screen.getByRole('combobox', { name: 'Model' });
+    await waitFor(() => expect(selector).toHaveValue('gpt-test'));
+    unavailable = true;
+    fireEvent.focus(selector);
+    await screen.findByText("Couldn't load the model list. Please try again.");
+    expect(selector).toBeDisabled();
+    expect(selector).not.toHaveTextContent('gpt-test');
+    chatHarness.apiFetch.mockImplementation((url, options) => url === '/v1/chat/models'
+      ? Promise.resolve({ current_model: 'local-fixture', provider: 'ollama', models: ['local-fixture'] })
+      : fallback(url, options));
+    fireEvent.click(screen.getByRole('button', { name: 'Retry model list' }));
+    await waitFor(() => expect(selector).toHaveValue('local-fixture'));
+    expect(selector).toHaveTextContent('ollama - local-fixture');
+    expect(selector).not.toHaveTextContent('gpt-test');
+  });
+
+  it('does not let an older model refresh failure replace a newer successful catalog', async () => {
+    const fallback = chatHarness.apiFetch.getMockImplementation();
+    const pending = [];
+    let deferModels = false;
+    chatHarness.apiFetch.mockImplementation((url, options) => {
+      if (url === '/v1/chat/models' && deferModels) return new Promise((resolve, reject) => pending.push({ resolve, reject }));
+      return fallback(url, options);
+    });
+    render(<ChatMode />);
+    const selector = screen.getByRole('combobox', { name: 'Model' });
+    await waitFor(() => expect(selector).toHaveValue('gpt-test'));
+    deferModels = true;
+    fireEvent.focus(selector);
+    fireEvent.focus(selector);
+    expect(pending).toHaveLength(2);
+    await act(async () => { pending[1].resolve({ current_model: 'new-model', provider: 'local', models: ['new-model'] }); });
+    await waitFor(() => expect(selector).toHaveValue('new-model'));
+    await act(async () => { pending[0].reject(new Error('older failure')); });
+    expect(selector).toBeEnabled();
+    expect(selector).toHaveValue('new-model');
+    expect(screen.queryByText("Couldn't load the model list. Please try again.")).not.toBeInTheDocument();
   });
 
   it('shows export failure and allows retry without duplicate pending requests', async () => {
@@ -584,12 +826,12 @@ describe('ChatMode command registry', () => {
     fireEvent.click(screen.getByLabelText('Send message'));
     await waitFor(() => expect(source?.onerror).toBeTypeOf('function'));
     await act(async () => { source.onerror(); });
-    await waitFor(() => expect(screen.getByText('The live response connection dropped.')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/The live response connection dropped\./g)).toBeInTheDocument());
     // Flush the immediate async refresh that previously erased the transient failure.
     await act(async () => { await Promise.resolve(); await Promise.resolve(); });
-    expect(screen.getByText('The live response connection dropped.')).toBeInTheDocument();
+    expect(screen.getByText(/The live response connection dropped\./g)).toBeInTheDocument();
     expect(source.close).toHaveBeenCalled();
-    expect(screen.queryByLabelText('Stop response')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Stop response')).toBeInTheDocument();
   });
 
   it.each(['transport', 'send'])('preserves the first turn in a newly created thread when %s fails', async (failureKind) => {
@@ -605,7 +847,7 @@ describe('ChatMode command registry', () => {
       if (url === '/v1/chat/threads' || url.startsWith('/v1/chat/threads?')) return Promise.resolve({ threads: [] });
       if (url === '/v1/chat/threads/fresh-thread/send') {
         return failureKind === 'send'
-          ? Promise.reject(new Error('send unavailable'))
+          ? Promise.reject(Object.assign(new Error('send refused'), { status: 400 }))
           : Promise.resolve({ stream_id: 'fresh-stream' });
       }
       return Promise.resolve({});
@@ -620,10 +862,391 @@ describe('ChatMode command registry', () => {
       await act(async () => { source.onerror(); });
     }
     await screen.findByText(failureKind === 'transport'
-      ? 'The live response connection dropped.'
+      ? /The live response connection dropped\./
       : 'Something went wrong while sending that message.');
     expect(screen.getByText('first message')).toBeInTheDocument();
+    if (failureKind === 'transport') expect(screen.getByLabelText('Stop response')).toBeInTheDocument();
+    else expect(screen.queryByLabelText('Stop response')).not.toBeInTheDocument();
+  });
+
+  function recoveryHarness() {
+    const sources = [];
+    window.EventSource = class {
+      constructor() { sources.push(this); }
+      close = vi.fn();
+    };
+    const state = {
+      active: [],
+      messages: [assistantMessage],
+      unavailable: false,
+      cancel: async () => ({ cancelled: true }),
+      probe: null,
+    };
+    const fallback = chatHarness.apiFetch.getMockImplementation();
+    chatHarness.apiFetch.mockImplementation((url, options = {}) => {
+      if (url === '/v1/chat/streams/stream-1/cancel') return state.cancel(options);
+      if (url.includes('/regenerate/')) state.active = ['stream-1'];
+      if (url === '/v1/chat/threads/thread-1') {
+        if (options.signal && state.probe) return state.probe(options);
+        if (options.signal && state.unavailable) return Promise.reject(new Error('offline'));
+        return Promise.resolve({ thread, messages: state.messages, active_stream_ids: [...state.active] });
+      }
+      return fallback(url, options);
+    });
+    return { state, sources };
+  }
+
+  async function startRecoveryTurn() {
+    await screen.findByText('Initial response');
+    fireEvent.click(screen.getByRole('button', { name: 'Regenerate', exact: true }));
+    await waitFor(() => expect(chatHarness.buildStreamUrl).toHaveBeenCalled());
+    await act(async () => {});
+  }
+
+  it('retains Stop through a simulated 45-second producer delay after SSE loss and recovers the persisted result', async () => {
+    const { state, sources } = recoveryHarness();
+    render(<ChatMode />);
+    await startRecoveryTurn();
+    vi.useFakeTimers();
+    await act(async () => { sources[0].onerror(); });
+    expect(screen.getByLabelText('Stop response')).toBeInTheDocument();
+    expect(screen.getByText(/response is still running/)).toBeInTheDocument();
+    await act(async () => { await vi.advanceTimersByTimeAsync(45000); });
+    expect(screen.getByLabelText('Stop response')).toBeInTheDocument();
+    expect(sources).toHaveLength(1); // Polling never resubmits generation or duplicates replayed tokens.
+    state.active = [];
+    state.messages = [{ ...assistantMessage, content: 'Recovered result', metadata: { stream_id: 'stream-1' } }];
+    await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
+    expect(screen.getByText('Recovered result')).toBeInTheDocument();
     expect(screen.queryByLabelText('Stop response')).not.toBeInTheDocument();
+    expect(screen.queryByText(/response is still running/)).not.toBeInTheDocument();
+  });
+
+  it('bounds failed status checks, shows unknown without a cursor, and retries without resending generation', async () => {
+    const { state, sources } = recoveryHarness();
+    render(<ChatMode />);
+    await startRecoveryTurn();
+    state.unavailable = true;
+    vi.useFakeTimers();
+    await act(async () => { sources[0].onerror(); await vi.advanceTimersByTimeAsync(4000); });
+    expect(screen.getByText(/Cannot confirm the response status/)).toBeInTheDocument();
+    expect(screen.getByLabelText('Stop response')).toBeInTheDocument();
+    expect(document.querySelector('.chat-cursor')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Regenerate', exact: true })).toBeDisabled();
+    const probes = () => chatHarness.apiFetch.mock.calls.filter(([url, options]) => url === '/v1/chat/threads/thread-1' && options?.signal);
+    expect(probes()).toHaveLength(3);
+    await act(async () => { await vi.advanceTimersByTimeAsync(60000); });
+    expect(probes()).toHaveLength(3);
+    state.unavailable = false;
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Retry response status' })); });
+    expect(screen.getByText(/response is still running/)).toBeInTheDocument();
+    expect(chatHarness.apiFetch.mock.calls.filter(([url]) => url.includes('/regenerate/'))).toHaveLength(1);
+  });
+
+  it('bounds hanging status requests and aborts them instead of waiting forever', async () => {
+    const { state, sources } = recoveryHarness();
+    render(<ChatMode />);
+    await startRecoveryTurn();
+    const signals = [];
+    state.probe = ({ signal }) => { signals.push(signal); return new Promise(() => {}); };
+    vi.useFakeTimers();
+    await act(async () => { sources[0].onerror(); await vi.advanceTimersByTimeAsync(19000); });
+    expect(signals).toHaveLength(3);
+    expect(signals.every((signal) => signal.aborted)).toBe(true);
+    expect(screen.getByText(/Cannot confirm the response status/)).toBeInTheDocument();
+  });
+
+  it('keeps Stop until cancellation is actually terminal and allows retry after a failed cancel', async () => {
+    const { state, sources } = recoveryHarness();
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    render(<ChatMode />);
+    await startRecoveryTurn();
+    vi.useFakeTimers();
+    await act(async () => { sources[0].onerror(); });
+    state.cancel = async () => { throw new Error('offline'); };
+    await act(async () => { fireEvent.click(screen.getByLabelText('Stop response')); });
+    expect(screen.getByText(/Could not confirm Stop/)).toBeInTheDocument();
+    expect(screen.queryByText('Stopped.')).not.toBeInTheDocument();
+    state.cancel = async () => ({ cancelled: true });
+    await act(async () => { fireEvent.click(screen.getByLabelText('Stop response')); });
+    expect(screen.getByText(/Waiting for the response to finish stopping/)).toBeInTheDocument();
+    expect(screen.getByLabelText('Stop response')).toBeInTheDocument();
+    state.active = [];
+    state.messages = [{ ...assistantMessage, content: 'Stopped.', status: 'stopped', metadata: { stream_id: 'stream-1' } }];
+    await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
+    expect(screen.getByText('Stopped.')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Stop response')).not.toBeInTheDocument();
+    log.mockRestore();
+  });
+
+  it('can Stop while a recovery probe is unresolved and rejects its late snapshot', async () => {
+    const { state, sources } = recoveryHarness();
+    render(<ChatMode />);
+    await startRecoveryTurn();
+    let resolveProbe;
+    state.probe = () => new Promise((resolve) => { resolveProbe = resolve; });
+    await act(async () => { sources[0].onerror(); });
+    state.probe = null;
+    state.cancel = async () => {
+      state.active = [];
+      state.messages = [{ ...assistantMessage, content: 'Stopped.', status: 'stopped', metadata: { stream_id: 'stream-1' } }];
+      return { cancelled: true };
+    };
+    await act(async () => { fireEvent.click(screen.getByLabelText('Stop response')); });
+    expect(screen.getByText('Stopped.')).toBeInTheDocument();
+    await act(async () => { resolveProbe({ thread, active_stream_ids: ['stream-1'], messages: [] }); });
+    expect(screen.queryByLabelText('Stop response')).not.toBeInTheDocument();
+  });
+
+  it('queues Stop before the generation POST returns and cancels the returned stream without opening SSE', async () => {
+    const { state, sources } = recoveryHarness();
+    let accept;
+    const fallback = chatHarness.apiFetch.getMockImplementation();
+    chatHarness.apiFetch.mockImplementation((url, options) => url.includes('/regenerate/')
+      ? new Promise((resolve) => { accept = resolve; }) : fallback(url, options));
+    render(<ChatMode />);
+    await screen.findByText('Initial response');
+    fireEvent.click(screen.getByRole('button', { name: 'Regenerate', exact: true }));
+    fireEvent.click(screen.getByLabelText('Stop response'));
+    state.cancel = async () => {
+      state.active = [];
+      state.messages = [{ ...assistantMessage, status: 'stopped', content: 'Stopped.', metadata: { stream_id: 'stream-1' } }];
+      return { cancelled: true };
+    };
+    await act(async () => { accept({ thread, messages: [{ ...assistantMessage, content: '' }], stream_id: 'stream-1' }); });
+    expect(screen.getByText('Stopped.')).toBeInTheDocument();
+    expect(sources).toHaveLength(0);
+    expect(chatHarness.apiFetch).toHaveBeenCalledWith('/v1/chat/streams/stream-1/cancel', expect.objectContaining({ method: 'POST' }));
+  });
+
+  it.each(['switch', 'unmount'])('disposes recovery on principal %s and ignores old callbacks', async (kind) => {
+    const { state, sources } = recoveryHarness();
+    const view = render(<ChatMode principalKey="owner-a" />);
+    await startRecoveryTurn();
+    let resolveProbe;
+    let signal;
+    state.probe = (options) => { signal = options.signal; return new Promise((resolve) => { resolveProbe = resolve; }); };
+    await act(async () => { sources[0].onerror(); });
+    if (kind === 'switch') { state.active = []; view.rerender(<ChatMode principalKey="owner-b" />); }
+    else view.unmount();
+    expect(signal.aborted).toBe(true);
+    await act(async () => {
+      resolveProbe({ thread, active_stream_ids: [], messages: [{ ...assistantMessage, content: 'PRIVATE OLD RESULT', metadata: { stream_id: 'stream-1' } }] });
+      sources[0].onmessage({ data: JSON.stringify({ done: true, content: 'PRIVATE OLD EVENT' }) });
+    });
+    expect(screen.queryByText('PRIVATE OLD RESULT')).not.toBeInTheDocument();
+    expect(screen.queryByText('PRIVATE OLD EVENT')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Stop response')).not.toBeInTheDocument();
+  });
+
+  it('does not attach a stream returned by a prior principal after the generation POST was delayed', async () => {
+    const { sources } = recoveryHarness();
+    let accept;
+    const fallback = chatHarness.apiFetch.getMockImplementation();
+    chatHarness.apiFetch.mockImplementation((url, options) => url.includes('/regenerate/')
+      ? new Promise((resolve) => { accept = resolve; }) : fallback(url, options));
+    const view = render(<ChatMode principalKey="owner-a" />);
+    await screen.findByText('Initial response');
+    fireEvent.click(screen.getByRole('button', { name: 'Regenerate', exact: true }));
+    view.rerender(<ChatMode principalKey="owner-b" />);
+    await act(async () => { accept({ thread, messages: [{ ...assistantMessage, content: 'PRIVATE OLD POST' }], stream_id: 'stream-1' }); });
+    expect(sources).toHaveLength(0);
+    expect(screen.queryByText('PRIVATE OLD POST')).not.toBeInTheDocument();
+  });
+
+  it('treats an SSE connection timeout as transport loss rather than server completion', async () => {
+    const { sources } = recoveryHarness();
+    render(<ChatMode />);
+    await startRecoveryTurn();
+    await act(async () => { sources[0].onmessage({ data: JSON.stringify({ error: true, message: 'Stream timeout' }) }); });
+    expect(screen.getByLabelText('Stop response')).toBeInTheDocument();
+    expect(screen.getByText(/response is still running/)).toBeInTheDocument();
+  });
+
+  it('recovers when stream authentication fails after the server accepted generation', async () => {
+    recoveryHarness();
+    chatHarness.buildStreamUrl.mockRejectedValueOnce(new Error('auth transport offline'));
+    render(<ChatMode />);
+    await startRecoveryTurn();
+    expect(screen.getByLabelText('Stop response')).toBeInTheDocument();
+    expect(screen.getByText(/response is still running/)).toBeInTheDocument();
+  });
+
+  it('clears pending on a genuine terminal event and leaves no recovery polling', async () => {
+    const { sources } = recoveryHarness();
+    render(<ChatMode />);
+    await startRecoveryTurn();
+    await act(async () => { sources[0].onmessage({ data: JSON.stringify({ done: true, content: 'Terminal result' }) }); });
+    expect(screen.getByText('Terminal result')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Stop response')).not.toBeInTheDocument();
+    expect(sources[0].close).toHaveBeenCalled();
+    expect(chatHarness.apiFetch.mock.calls.filter(([, options]) => options?.signal)).toHaveLength(0);
+  });
+
+  it('restores Stop after a same-principal remount and replays into a clean buffer', async () => {
+    const { state, sources } = recoveryHarness();
+    const first = render(<ChatMode principalKey="owner-a" />);
+    await startRecoveryTurn();
+    await act(async () => { sources[0].onmessage({ data: JSON.stringify({ token: 'partial' }) }); });
+    expect(screen.getByText('partial')).toBeInTheDocument();
+    first.unmount();
+    state.messages = [{ ...assistantMessage, content: '', status: 'streaming', metadata: { stream_id: 'stream-1' } }];
+    render(<ChatMode principalKey="owner-a" />);
+    await waitFor(() => expect(sources).toHaveLength(2));
+    expect(screen.getByLabelText('Stop response')).toBeInTheDocument();
+    await act(async () => { sources[1].onmessage({ data: JSON.stringify({ token: 'partial' }) }); });
+    expect(screen.getByText('partial')).toBeInTheDocument();
+    expect(screen.queryByText('partialpartial')).not.toBeInTheDocument();
+    expect(chatHarness.apiFetch.mock.calls.filter(([url]) => url.includes('/regenerate/'))).toHaveLength(1);
+  });
+
+  it('releases pending honestly when the server no longer has the task or a persisted result', async () => {
+    const { state, sources } = recoveryHarness();
+    render(<ChatMode />);
+    await startRecoveryTurn();
+    state.active = [];
+    state.messages = [];
+    await act(async () => { sources[0].onerror(); });
+    expect(screen.getByText(/no longer running, but its result could not be recovered/)).toBeInTheDocument();
+    expect(screen.queryByLabelText('Stop response')).not.toBeInTheDocument();
+    expect(screen.queryByText('Stopped.')).not.toBeInTheDocument();
+  });
+
+  it('times out a hanging cancellation without claiming that Stop succeeded', async () => {
+    const { state } = recoveryHarness();
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    render(<ChatMode />);
+    await startRecoveryTurn();
+    state.cancel = () => new Promise(() => {});
+    vi.useFakeTimers();
+    await act(async () => {
+      fireEvent.click(screen.getByLabelText('Stop response'));
+      fireEvent.click(screen.getByLabelText('Stop response'));
+      await vi.advanceTimersByTimeAsync(5000);
+    });
+    expect(screen.getByText(/Could not confirm Stop/)).toBeInTheDocument();
+    expect(screen.getByLabelText('Stop response')).toBeInTheDocument();
+    expect(chatHarness.apiFetch.mock.calls.filter(([url]) => url.endsWith('/cancel'))).toHaveLength(1);
+    log.mockRestore();
+  });
+
+  it('ignores a stream URL that resolves after unmount', async () => {
+    const { sources } = recoveryHarness();
+    let resolveUrl;
+    chatHarness.buildStreamUrl.mockImplementationOnce(() => new Promise((resolve) => { resolveUrl = resolve; }));
+    const view = render(<ChatMode />);
+    await startRecoveryTurn();
+    view.unmount();
+    await act(async () => { resolveUrl('/synthetic-old-stream'); });
+    expect(sources).toHaveLength(0);
+  });
+
+  it('ignores a late thread GET after newer navigation without attaching the wrong stream', async () => {
+    const { sources } = recoveryHarness();
+    const a = { ...thread, id: 'thread-a', title: 'Thread A' };
+    const b = { ...thread, id: 'thread-b', title: 'Thread B' };
+    let resolveA;
+    const fallback = chatHarness.apiFetch.getMockImplementation();
+    chatHarness.apiFetch.mockImplementation((url, options) => {
+      if (url === '/v1/chat/threads') return Promise.resolve({ threads: [thread, a, b] });
+      if (url === '/v1/chat/threads/thread-a') return new Promise((resolve) => { resolveA = resolve; });
+      if (url === '/v1/chat/threads/thread-b') return Promise.resolve({ thread: b, messages: [{ ...assistantMessage, content: 'B content' }], active_stream_ids: [] });
+      return fallback(url, options);
+    });
+    render(<ChatMode />);
+    await screen.findByText('Initial response');
+    fireEvent.click(screen.getByRole('button', { name: 'Thread A', exact: true }));
+    fireEvent.click(screen.getByRole('button', { name: 'Thread B', exact: true }));
+    await screen.findByText('B content');
+    await act(async () => { resolveA({ thread: a, messages: [{ ...assistantMessage, content: 'Late A content' }], active_stream_ids: ['old-a-stream'] }); });
+    expect(screen.getByDisplayValue('Thread B')).toBeInTheDocument();
+    expect(screen.queryByText('Late A content')).not.toBeInTheDocument();
+    expect(sources).toHaveLength(0);
+  });
+
+  it('does not let a delayed terminal refresh erase the next response', async () => {
+    const { state, sources } = recoveryHarness();
+    render(<ChatMode />);
+    await startRecoveryTurn();
+    state.active = [];
+    vi.useFakeTimers();
+    let resolveRefresh;
+    const fallback = chatHarness.apiFetch.getMockImplementation();
+    chatHarness.apiFetch.mockImplementation((url, options) => url === '/v1/chat/threads/thread-1' && !options?.signal
+      ? new Promise((resolve) => { resolveRefresh = resolve; }) : fallback(url, options));
+    await act(async () => {
+      sources[0].onmessage({ data: JSON.stringify({ done: true, content: 'First complete' }) });
+      await vi.advanceTimersByTimeAsync(120);
+    });
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Regenerate', exact: true })); });
+    await act(async () => {
+      sources[1].onmessage({ data: JSON.stringify({ token: 'New partial' }) });
+      resolveRefresh({ thread, messages: [{ ...assistantMessage, content: 'Old snapshot' }], active_stream_ids: [] });
+    });
+    expect(screen.getByText('New partial')).toBeInTheDocument();
+    expect(screen.queryByText('Old snapshot')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Stop response')).toBeInTheDocument();
+  });
+
+  it.each(['hang', 'network failure'])('marks initial POST %s as unconfirmed without resending or claiming Stop', async (kind) => {
+    const { sources } = recoveryHarness();
+    let accept;
+    const fallback = chatHarness.apiFetch.getMockImplementation();
+    chatHarness.apiFetch.mockImplementation((url, options) => url.includes('/regenerate/')
+      ? (kind === 'hang' ? new Promise((resolve) => { accept = resolve; }) : Promise.reject(new Error('lost acceptance response')))
+      : fallback(url, options));
+    render(<ChatMode />);
+    await screen.findByText('Initial response');
+    vi.useFakeTimers();
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Regenerate', exact: true })); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(15000); });
+    expect(screen.getByText(/request has not been confirmed|Could not confirm whether the response request/)).toBeInTheDocument();
+    expect(document.querySelector('.chat-cursor')).not.toBeInTheDocument();
+    await act(async () => { fireEvent.click(screen.getByLabelText('Stop response')); });
+    expect(screen.getByText(/cancellation is not confirmed/)).toBeInTheDocument();
+    expect(chatHarness.apiFetch.mock.calls.filter(([url]) => url.includes('/regenerate/'))).toHaveLength(1);
+    expect(chatHarness.apiFetch.mock.calls.filter(([url]) => url.endsWith('/cancel'))).toHaveLength(0);
+    expect(sources).toHaveLength(0);
+    // Keep the deliberately unresolved acceptance fixture local to this test.
+    expect(kind === 'hang' ? typeof accept : 'unused').toBe(kind === 'hang' ? 'function' : 'unused');
+  });
+
+  it.each([false, true])('REVIEW treats a missing accepted stream ID as unknown with queued Stop=%s', async (queuedStop) => {
+    const { sources } = recoveryHarness();
+    let accept;
+    const fallback = chatHarness.apiFetch.getMockImplementation();
+    chatHarness.apiFetch.mockImplementation((url, options) => url.includes('/regenerate/')
+      ? new Promise((resolve) => { accept = resolve; }) : fallback(url, options));
+    render(<ChatMode />);
+    await screen.findByText('Initial response');
+    fireEvent.click(screen.getByRole('button', { name: 'Regenerate', exact: true }));
+    if (queuedStop) fireEvent.click(screen.getByLabelText('Stop response'));
+    await act(async () => { accept({ thread, messages: [{ ...assistantMessage, content: '' }] }); });
+    if (!queuedStop && sources[0]) await act(async () => { sources[0].onerror(); });
+    expect(screen.getByLabelText('Stop response')).toBeInTheDocument();
+    expect(chatHarness.apiFetch.mock.calls.filter(([url]) => url.endsWith('/cancel'))).toHaveLength(0);
+    expect(sources).toHaveLength(0);
+    expect(screen.queryByText(/no longer running/)).not.toBeInTheDocument();
+  });
+
+  it('locks generation ownership while a fork POST is pending', async () => {
+    const { state, sources } = recoveryHarness();
+    state.messages = [{ id: 'user-1', role: 'user', content: 'Prompt', status: 'complete', metadata: {} }, assistantMessage];
+    const prompt = vi.spyOn(window, 'prompt').mockReturnValue('Edited prompt');
+    let accept;
+    const fallback = chatHarness.apiFetch.getMockImplementation();
+    chatHarness.apiFetch.mockImplementation((url, options) => url.endsWith('/fork')
+      ? new Promise((resolve) => { accept = resolve; }) : fallback(url, options));
+    render(<ChatMode />);
+    await screen.findByText('Initial response');
+    fireEvent.click(screen.getAllByRole('button', { name: 'Edit', exact: true })[1]);
+    expect(screen.getByLabelText('Stop response')).toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole('button', { name: 'Regenerate', exact: true })[0]);
+    expect(chatHarness.apiFetch.mock.calls.filter(([url]) => url.includes('/regenerate/'))).toHaveLength(0);
+    await act(async () => { accept({ thread: { ...thread, id: 'branch' }, messages: state.messages, stream_id: 'fork-stream' }); });
+    expect(sources).toHaveLength(1);
+    expect(screen.getByLabelText('Stop response')).toBeInTheDocument();
+    prompt.mockRestore();
   });
 
 });

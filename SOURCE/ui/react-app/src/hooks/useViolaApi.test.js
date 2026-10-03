@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { getClientApiKey, getClientApiKeySync, getCloudAccessToken } from '../config';
 import { getGoTrueAccessToken } from '../lib/gotrue_client';
-import { renderHook } from '@testing-library/react';
+import { act, cleanup, renderHook, waitFor } from '@testing-library/react';
+import { useRoomGroups } from './useRoomGroups';
 import { useViolaApi, authFetch, buildStreamUrl, sendCommandStreaming } from './useViolaApi';
 
 vi.mock('../config', () => ({
@@ -264,4 +265,162 @@ describe('playback seek units', () => {
       }));
     },
   );
+});
+
+
+describe('room groups through the real API envelope boundary', () => {
+  const group = { group_id: 'g1', group_name: 'Studio', master_volume: 60,
+    members: [{ room_id: 'local', volume_offset: 0, is_muted: false }] };
+  const response = (data) => ({ ok: true, status: 200, json: async () => ({ ok: true, data }) });
+  let stored;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    window.viola = {};
+    window.__VIOLA_API_KEY__ = '';
+    getClientApiKey.mockResolvedValue('');
+    getClientApiKeySync.mockReturnValue('');
+    getCloudAccessToken.mockReturnValue('');
+    getGoTrueAccessToken.mockResolvedValue('');
+    stored = [];
+    global.fetch = vi.fn(async (_url, options = {}) => {
+      if (options.method === 'POST') {
+        stored.push(group);
+        return response({ group });
+      }
+      return response({ groups: [...stored], count: stored.length });
+    });
+  });
+
+  afterEach(() => { cleanup(); delete window.viola; });
+
+  async function mountGroups() {
+    const hook = renderHook(() => useRoomGroups());
+    await waitFor(() => expect(hook.result.current.loading).toBe(false));
+    return hook;
+  }
+
+  it('loads an empty or populated durable list without a false error', async () => {
+    stored = [group];
+    const { result } = await mountGroups();
+    expect(result.current.error).toBeNull();
+    expect(result.current.groups).toEqual([group]);
+  });
+
+  it('reports one successful create, keeps it after refresh, and needs no duplicate retry', async () => {
+    const { result } = await mountGroups();
+    let answer;
+    await act(async () => { answer = await result.current.createGroup('Studio', ['local']); });
+    expect(answer).toEqual({ ok: true, group });
+    expect(result.current.error).toBeNull();
+    expect(result.current.groups).toEqual([group]);
+    await act(async () => { await result.current.refreshGroups(); });
+    expect(result.current.groups).toEqual([group]);
+    expect(stored).toEqual([group]);
+    expect(global.fetch.mock.calls.filter(([, options]) => options.method === 'POST')).toHaveLength(1);
+  });
+
+  it('updates and deletes the actual group instead of reporting durable mutations as failures', async () => {
+    stored = [group];
+    const { result } = await mountGroups();
+    const renamed = { ...group, group_name: 'Office' };
+    global.fetch.mockResolvedValueOnce(response({ group: renamed }));
+    let answer;
+    await act(async () => { answer = await result.current.updateGroup('g1', { group_name: 'Office' }); });
+    expect(answer).toEqual({ ok: true, group: renamed });
+    expect(result.current.groups).toEqual([renamed]);
+    global.fetch.mockResolvedValueOnce(response({ deleted: true, group_id: 'g1' }));
+    await act(async () => { answer = await result.current.deleteGroup('g1'); });
+    expect(answer).toEqual({ ok: true });
+    expect(result.current.groups).toEqual([]);
+  });
+
+  it('accepts master volume, room offset and mute acknowledgments including zero and false', async () => {
+    stored = [group];
+    const { result } = await mountGroups();
+    let answer;
+    global.fetch.mockResolvedValueOnce(response({ group: { ...group, master_volume: 0 }, master_volume: 0 }));
+    await act(async () => { answer = await result.current.setMasterVolume('g1', 0); });
+    expect(answer).toEqual({ ok: true });
+    expect(result.current.groups[0].master_volume).toBe(0);
+    global.fetch.mockResolvedValueOnce(response({ room_id: 'local', offset: 0, effective_volume: 0 }));
+    await act(async () => { answer = await result.current.setRoomVolume('g1', 'local', 0); });
+    expect(answer).toEqual({ ok: true });
+    for (const muted of [true, false]) {
+      global.fetch.mockResolvedValueOnce(response({ room_id: 'local', is_muted: muted, effective_volume: 0 }));
+      await act(async () => { answer = await result.current.setRoomMute('g1', 'local', muted); });
+      expect(answer).toEqual({ ok: true });
+      expect(result.current.groups[0].members[0].is_muted).toBe(muted);
+    }
+  });
+
+  it('uses acknowledged control values rather than repeating the request as durable state', async () => {
+    stored = [group];
+    const { result } = await mountGroups();
+    global.fetch.mockResolvedValueOnce(response({ group: { ...group, master_volume: 80 }, master_volume: 80 }));
+    await act(async () => { await result.current.setMasterVolume('g1', 84); });
+    expect(result.current.groups[0].master_volume).toBe(80);
+    global.fetch.mockResolvedValueOnce(response({ room_id: 'local', offset: 8, effective_volume: 88 }));
+    await act(async () => { await result.current.setRoomVolume('g1', 'local', 10); });
+    expect(result.current.groups[0].members[0].volume_offset).toBe(8);
+    global.fetch.mockResolvedValueOnce(response({ room_id: 'local', is_muted: false, effective_volume: 88 }));
+    await act(async () => { await result.current.setRoomMute('g1', 'local', true); });
+    expect(result.current.groups[0].members[0].is_muted).toBe(false);
+  });
+
+  it('rejects update and delete acknowledgments belonging to another group', async () => {
+    stored = [group];
+    const { result } = await mountGroups();
+    let answer;
+    global.fetch.mockResolvedValueOnce(response({ group: { ...group, group_id: 'other' } }));
+    await act(async () => { answer = await result.current.updateGroup('g1', { group_name: 'Office' }); });
+    expect(answer.ok).toBe(false);
+    expect(result.current.groups).toEqual([group]);
+    global.fetch.mockResolvedValueOnce(response({ deleted: true, group_id: 'other' }));
+    await act(async () => { answer = await result.current.deleteGroup('g1'); });
+    expect(answer.ok).toBe(false);
+    expect(result.current.groups).toEqual([group]);
+  });
+
+  it.each(['master', 'volume', 'mute'])('REVIEW rejects %s controls acknowledged for another target', async (kind) => {
+    stored = [group];
+    const { result } = await mountGroups();
+    let answer;
+    const payloads = {
+      master: { group: { ...group, group_id: 'other-group', master_volume: 23 }, master_volume: 23 },
+      volume: { room_id: 'other-room', offset: 8, effective_volume: 68 },
+      mute: { room_id: 'other-room', is_muted: true, effective_volume: 0 },
+    };
+    global.fetch.mockResolvedValueOnce(response(payloads[kind]));
+    await act(async () => {
+      answer = kind === 'master' ? await result.current.setMasterVolume('g1', 23)
+        : kind === 'volume' ? await result.current.setRoomVolume('g1', 'local', 8)
+          : await result.current.setRoomMute('g1', 'local', true);
+    });
+    expect(answer.ok).toBe(false);
+    expect(result.current.groups).toEqual([group]);
+  });
+
+  it('clears a real list failure after a successful explicit retry', async () => {
+    global.fetch.mockRejectedValueOnce(new Error('offline'));
+    const { result } = await mountGroups();
+    expect(result.current.error).toMatch(/load groups/);
+    await act(async () => { await result.current.refreshGroups(); });
+    expect(result.current.error).toBeNull();
+    expect(result.current.groups).toEqual([]);
+  });
+
+  it.each(['http', 'envelope', 'malformed'])('does not mutate or claim create success for %s failures', async (kind) => {
+    const { result } = await mountGroups();
+    const failure = { ok: false, error: { code: 'create_failed', message: 'Create failed' } };
+    global.fetch.mockResolvedValueOnce(kind === 'http'
+      ? { ok: false, status: 500, text: async () => JSON.stringify(failure) }
+      : { ok: true, status: 200, json: async () => kind === 'envelope' ? failure : { ok: true, data: {} } });
+    let answer;
+    await act(async () => { answer = await result.current.createGroup('Studio', ['local']); });
+    expect(answer.ok).toBe(false);
+    expect(result.current.error).toBeTruthy();
+    expect(result.current.groups).toEqual([]);
+    expect(result.current.saving).toBe(false);
+  });
 });

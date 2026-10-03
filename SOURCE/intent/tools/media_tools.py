@@ -389,11 +389,12 @@ async def _handle_play_mode(track_uri: str, provider: str, target_room: str, use
             error_category=result.error_category,
             retryable=result.retryable,
             required_tier=result.required_tier,
+            unverified=result.unverified,
         )
     return result
 
 
-def _playback_started_evidence(play_ok: bool, play_data: object) -> bool:
+def _playback_started_evidence(play_ok: bool, play_data: object, *, unverified: bool = False) -> bool:
     """Derive playback_started from structured play evidence, not a bare 200.
 
     The lane-3 MF-A chain minted ``playback_started: true`` from a coerced
@@ -401,7 +402,7 @@ def _playback_started_evidence(play_ok: bool, play_data: object) -> bool:
     ``play_result.ok``, respect explicit structured not-played markers from
     the play pipeline. Structured result fields only — no prose parsing.
     """
-    if not play_ok:
+    if not play_ok or unverified:
         return False
     if isinstance(play_data, dict):
         if play_data.get("ok") is False:
@@ -410,7 +411,10 @@ def _playback_started_evidence(play_ok: bool, play_data: object) -> bool:
             return False
         if play_data.get("playback_status") == "candidate_not_played":
             return False
-    return True
+        if play_data.get("playback_verified") is False:
+            return False
+        return play_data.get("playback_verified") is True or play_data.get("playback_status") == "started"
+    return False
 
 
 # --- No-confident-match honesty (issue #1403) --------------------------------
@@ -601,7 +605,7 @@ async def _handle_search_play_mode(
             "selected_provider": selected_provider,
             "tracks": [selected],
             "count": 1,
-            "playback_started": _playback_started_evidence(play_result.ok, play_data),
+            "playback_started": _playback_started_evidence(play_result.ok, play_data, unverified=play_result.unverified),
             "play_result": play_data,
         }
     )
@@ -619,7 +623,11 @@ async def _handle_search_play_mode(
             if _field in play_data and _field not in data:
                 data[_field] = play_data[_field]
     if play_result.ok:
-        fallback_message = "Playing some music." if generic_request else "Playing %s." % query
+        fallback_message = (
+            ("Playing some music." if generic_request else "Playing %s." % query)
+            if data["playback_started"]
+            else "Playback was requested, but has not been confirmed."
+        )
         data.setdefault("message", fallback_message)
         data.setdefault("voice_summary", data["message"])
         # R3-P1-F (2026-05-30): retired ``terminal_response`` field. The
@@ -628,7 +636,12 @@ async def _handle_search_play_mode(
         # string. The model now sees ``message`` + ``voice_summary`` as
         # structured data and produces the one-line acknowledgement itself
         # (matching Claude Code TS, which issues one more assistant turn).
-        return ToolResult(ok=True, data=data, truncated=play_result.truncated)
+        return ToolResult(
+            ok=True,
+            data=data,
+            truncated=play_result.truncated,
+            unverified=play_result.unverified or not data["playback_started"],
+        )
 
     # R3-P1-E: retired next_step prose hint. The play_result.error
     # already carries the failure signal; "Pick another candidate or

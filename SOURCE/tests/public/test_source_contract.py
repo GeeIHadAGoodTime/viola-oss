@@ -556,3 +556,316 @@ class HotkeyCollisionContract(unittest.TestCase):
             with self.subTest(ptt=ptt, mute=mute):
                 settings = SimpleNamespace(get=lambda key, fallback: {'ptt_hotkey': ptt, 'mute_hotkey': mute}.get(key, fallback))
                 self.assertEqual(validate({'ptt_hotkey': ptt}, settings), [])
+
+
+class MediaPlaybackEvidenceContract(unittest.IsolatedAsyncioTestCase):
+    async def test_media_play_preserves_unverified_result_from_real_music_verdict(self):
+        from unittest.mock import AsyncMock, patch
+        from intent.tools import media_tools, music_tools
+
+        result = music_tools._play_tool_result(
+            {"title": "Synthetic", "verification": music_tools.VERIFY_NOT_PLAYING, "playback_verified": False}
+        )
+        self.assertTrue(result.unverified)
+        with patch.object(media_tools, "_play_music_handler", AsyncMock(return_value=result)):
+            actual = await media_tools._handle_play_mode("/synthetic/track.wav", "local", "", "fixture-user")
+        self.assertTrue(actual.ok)  # Accepted is real, even though playback is unconfirmed.
+        self.assertTrue(actual.unverified)
+        self.assertFalse(actual.data["playback_verified"])
+        self.assertEqual(actual.data["message"], result.data["message"])
+
+    async def test_search_play_cannot_promote_accepted_or_failed_verification_to_started(self):
+        from unittest.mock import AsyncMock, patch
+        from intent.tool_types import ToolResult
+        from intent.tools import media_tools, music_tools
+
+        track = {"title": "Synthetic", "track_uri": "/synthetic/track.wav", "provider": "local"}
+        for verification in (
+            music_tools.VERIFY_NOT_PLAYING,
+            music_tools.VERIFY_UNAVAILABLE,
+            music_tools.VERIFY_PLAYING,
+        ):
+            with self.subTest(verification=verification):
+                verified = verification == music_tools.VERIFY_PLAYING
+                underlying = music_tools._play_tool_result(
+                    {"title": "Synthetic", "verification": verification, "playback_verified": verified}
+                )
+                with patch.object(
+                    media_tools,
+                    "_handle_search_mode",
+                    AsyncMock(return_value=ToolResult(ok=True, data={"tracks": [track]})),
+                ), patch.object(media_tools, "_play_music_handler", AsyncMock(return_value=underlying)):
+                    actual = await media_tools._handle_search_play_mode("Synthetic", "local", 5, "", "fixture-user")
+                self.assertTrue(actual.ok)
+                self.assertEqual(actual.unverified, not verified)
+                self.assertEqual(actual.data["playback_started"], verified)
+                self.assertEqual(actual.data["play_result"]["playback_verified"], verified)
+                if not verified:
+                    self.assertNotIn("Playing Synthetic", actual.data["voice_summary"])
+
+    def test_started_requires_positive_evidence_and_honors_explicit_failure(self):
+        from intent.tools.media_tools import _playback_started_evidence
+
+        for payload in (
+            None,
+            {},
+            {"enqueued": {}},
+            {"playback_verified": False},
+            {"room_route": {}},
+            {"state": "not_played", "playback_verified": True},
+            {"playback_status": "candidate_not_played", "playback_verified": True},
+        ):
+            with self.subTest(payload=payload):
+                self.assertFalse(_playback_started_evidence(True, payload))
+        self.assertTrue(_playback_started_evidence(True, {"playback_verified": True}))
+        self.assertTrue(_playback_started_evidence(True, {"playback_status": "started"}))
+        self.assertFalse(_playback_started_evidence(False, {"playback_verified": True}))
+        self.assertFalse(_playback_started_evidence(True, {"playback_verified": True}, unverified=True))
+
+
+class ProviderValidationEvidenceContract(unittest.IsolatedAsyncioTestCase):
+    async def test_malformed_native_probe_cannot_pass_profile_validation_and_valid_retry_recovers(self):
+        import json
+        from types import SimpleNamespace
+        from unittest.mock import AsyncMock, Mock, patch
+
+        from services.connectors.profiles import validate_llm_profile
+        from services.llm.factory import LLMProviderFactory
+
+        profile = SimpleNamespace(
+            category="llm",
+            profile_id="fixture-profile",
+            connector_id="llm.ollama",
+            adapter="ollama",
+            model="fixture-model",
+            base_url="http://127.0.0.1:11434",
+        )
+        store = SimpleNamespace(
+            get_profile=Mock(return_value=profile),
+            get_profile_secret=Mock(return_value=""),
+            update_validation=Mock(),
+        )
+        provider = SimpleNamespace(
+            SUPPORTS_NATIVE_TOOLS=True,
+            test_connection=AsyncMock(
+                return_value=SimpleNamespace(success=True, message="connected", latency_ms=1, error_code=None)
+            ),
+            route_command_native=AsyncMock(),
+            get_available_models=lambda: ["fixture-model"],
+        )
+        cases = [
+            (json.JSONDecodeError("Malformed HTTP200 JSON", "not json", 0), False),
+            ("not a protocol object", False),
+            ({"type": "tool_call", "tool": "echo_probe", "args": {"value": "wrong"}}, False),
+            ({"type": "tool_call", "tool": "echo_probe", "args": {"value": "ok"}}, True),
+        ]
+        with patch.object(LLMProviderFactory, "create_provider", return_value=provider), patch(
+            "socket.socket.connect", side_effect=AssertionError("external network prohibited")
+        ):
+            for reply, valid in cases:
+                with self.subTest(reply=repr(reply)):
+                    provider.route_command_native.side_effect = reply if isinstance(reply, Exception) else None
+                    provider.route_command_native.return_value = reply
+                    result = await validate_llm_profile(store, "fixture-user", "fixture-profile", probe_tools=True)
+                    self.assertEqual(result["valid"], valid)
+                    self.assertEqual(result["tool_contract"]["live_tool_probe"]["success"], valid)
+                    self.assertEqual(result["tool_contract"]["native_tools_supported"], valid)
+                    self.assertEqual(result["error_code"], None if valid else "native_tool_contract_failed")
+                    store.update_validation.assert_called_with("fixture-user", "fixture-profile", result)
+                    store.get_profile.assert_called_with("fixture-user", "fixture-profile")
+
+class ChatStreamRecoveryContract(unittest.IsolatedAsyncioTestCase):
+    """Run the actual existing route handlers against synthetic tasks and store.
+
+    Only optional application startup imports/decorators are omitted. No live
+    principal, provider, GUI, microphone, network request, or account is used.
+    """
+
+    async def asyncSetUp(self):
+        from types import SimpleNamespace
+        from unittest.mock import AsyncMock
+        from http import HTTPStatus
+        from fastapi import HTTPException
+
+        self.namespace_type = SimpleNamespace
+        self.store = SimpleNamespace(
+            get_thread=AsyncMock(return_value={"id": "thread-a"}),
+            list_messages=AsyncMock(return_value=[]),
+        )
+        self.active = {}
+        self.request = SimpleNamespace(user_id="owner-a")
+        source = ROOT / "ui/api/routes/chat_mode.py"
+        tree = ast.parse(source.read_text())
+        register = next(node for node in tree.body if isinstance(node, ast.FunctionDef)
+                        and node.name == "register_chat_mode_routes")
+        handlers = [node for node in register.body if isinstance(node, ast.AsyncFunctionDef)
+                    and node.name in {"get_thread", "cancel_stream"}]
+        for handler in handlers:
+            handler.decorator_list = []
+
+        async def record_and_call(function, **_):
+            return await function()
+
+        self.namespace = {
+            "_store": AsyncMock(return_value=self.store),
+            "_require_request_user_id": lambda request: request.user_id,
+            "_thread_payload": lambda record: record,
+            "_message_payload": lambda record: record,
+            "_ACTIVE_CHAT_TASKS": self.active,
+            "_not_found": lambda _: HTTPException(status_code=404),
+            "success_response": lambda data: data,
+            "failure_response": lambda code, message: {"code": code, "message": message},
+            "HTTPException": HTTPException,
+            "HTTPStatus": HTTPStatus,
+            "toolbox": SimpleNamespace(record_and_call=record_and_call),
+        }
+        nodes = [ast.ImportFrom(module="__future__", names=[ast.alias(name="annotations")], level=0), *handlers]
+        exec(compile(ast.fix_missing_locations(ast.Module(body=nodes, type_ignores=[])), str(source), "exec"), self.namespace)
+        self.tasks = []
+
+    async def asyncTearDown(self):
+        for task in self.tasks:
+            task.cancel()
+        await asyncio.gather(*self.tasks, return_exceptions=True)
+
+    def add_task(self, stream_id="stream-a", user="owner-a", thread="thread-a", coroutine=None):
+        async def waiting():
+            await asyncio.Event().wait()
+        task = asyncio.create_task(coroutine or waiting())
+        self.tasks.append(task)
+        self.active[stream_id] = self.namespace_type(user_id=user, thread_id=thread, task=task)
+        return task
+
+    async def get_thread(self):
+        return await self.namespace["get_thread"](self.request, "thread-a")
+
+    async def test_liveness_is_owner_and_thread_scoped_and_excludes_finished_tasks(self):
+        own = self.add_task()
+        self.add_task("foreign", user="owner-b")
+        self.add_task("other-thread", thread="thread-b")
+        finished = self.add_task("finished")
+        finished.cancel()
+        await asyncio.gather(finished, return_exceptions=True)
+        self.assertEqual((await self.get_thread())["active_stream_ids"], ["stream-a"])
+        self.assertFalse(own.done())
+        self.store.get_thread.assert_awaited_with("owner-a", "thread-a")
+        self.store.list_messages.assert_awaited_with("owner-a", "thread-a", newest=True)
+
+    async def test_task_finishing_during_message_read_cannot_report_false_terminal_snapshot(self):
+        task = self.add_task()
+        async def stale_read(*_, **__):
+            task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
+            return []
+        self.store.list_messages.side_effect = stale_read
+        first = await self.get_thread()
+        self.assertEqual(first["active_stream_ids"], ["stream-a"])
+        self.assertEqual((await self.get_thread())["active_stream_ids"], [])
+
+    async def test_cancel_acceptance_is_not_a_terminal_event_until_task_cleanup_finishes(self):
+        import sys
+        import types
+        from unittest.mock import Mock, patch
+
+        cleanup_started = asyncio.Event()
+        allow_cleanup = asyncio.Event()
+        async def producer():
+            try:
+                await asyncio.Event().wait()
+            except asyncio.CancelledError:
+                cleanup_started.set()
+                await allow_cleanup.wait()
+                self.store.list_messages.return_value = [{
+                    "id": "result", "role": "assistant", "status": "stopped",
+                    "content": "Stopped.", "metadata": {"stream_id": "stream-a"},
+                }]
+                raise
+        task = self.add_task(coroutine=producer())
+        await asyncio.sleep(0)
+        bus = types.ModuleType("services.llm.stream_bus")
+        bus.finalize_stream = Mock()
+        with patch.dict(sys.modules, {"services.llm.stream_bus": bus}):
+            result = await self.namespace["cancel_stream"](self.request, "stream-a")
+        self.assertEqual(result, {"cancelled": True})
+        bus.finalize_stream.assert_not_called()
+        await asyncio.wait_for(cleanup_started.wait(), timeout=1)
+        self.assertEqual((await self.get_thread())["active_stream_ids"], ["stream-a"])
+        # Repeated Stop cannot inject another cancellation into the pending
+        # store write, otherwise both durable status and terminal SSE are lost.
+        self.assertEqual(await self.namespace["cancel_stream"](self.request, "stream-a"), {"cancelled": True})
+        self.assertEqual(task.cancelling(), 1)
+        allow_cleanup.set()
+        await asyncio.gather(task, return_exceptions=True)
+        terminal = await self.get_thread()
+        self.assertEqual(terminal["active_stream_ids"], [])
+        self.assertEqual(terminal["messages"][0]["status"], "stopped")
+
+    async def test_cancel_denies_another_owner_and_reports_no_task_without_fabricating_success(self):
+        from fastapi import HTTPException
+        task = self.add_task(user="owner-b")
+        with self.assertRaises(HTTPException) as raised:
+            await self.namespace["cancel_stream"](self.request, "stream-a")
+        self.assertEqual(raised.exception.status_code, 403)
+        self.assertEqual(task.cancelling(), 0)
+        self.assertEqual(await self.namespace["cancel_stream"](self.request, "absent"), {"cancelled": False})
+
+    async def test_missing_thread_is_rejected_before_liveness_or_messages_are_exposed(self):
+        from fastapi import HTTPException
+        self.add_task()
+        self.store.get_thread.return_value = None
+        with self.assertRaises(HTTPException) as raised:
+            await self.get_thread()
+        self.assertEqual(raised.exception.status_code, 404)
+        self.store.list_messages.assert_not_awaited()
+
+    async def test_sqlite_recent_window_recovers_result_after_200_without_losing_history(self):
+        import tempfile
+        from services.persistence.chat_store import SqliteChatBackend
+        from unittest.mock import patch
+
+        with tempfile.TemporaryDirectory() as directory:
+            backend = SqliteChatBackend(Path(directory) / "chat.sqlite3")
+            await backend.initialize()
+            await backend.create_thread("owner-a", thread_id="thread-a", title="Synthetic")
+            await backend.create_thread("owner-b", thread_id="thread-a", title="Foreign")
+            for index in range(205):
+                with patch("services.persistence.chat_store._now", return_value=float(index + 1)):
+                    await backend.append_message(
+                        "owner-a", "thread-a", role="assistant", content=str(index),
+                        metadata={"stream_id": "stream-a"} if index == 204 else {},
+                    )
+            await backend.append_message("owner-b", "thread-a", role="assistant", content="PRIVATE FOREIGN")
+            earliest = await backend.list_messages("owner-a", "thread-a")
+            latest = await backend.list_messages("owner-a", "thread-a", newest=True)
+            self.assertEqual([message.content for message in earliest], [str(index) for index in range(200)])
+            self.assertEqual([message.content for message in latest], [str(index) for index in range(5, 205)])
+            self.assertEqual(latest[-1].metadata["stream_id"], "stream-a")
+            self.assertEqual(len(await backend.list_messages("owner-a", "thread-a", limit=500)), 205)
+            # Exercise the actual GET handler with that same persisted boundary.
+            self.namespace["_store"].return_value = backend
+            self.namespace["_thread_payload"] = lambda record: record.to_payload()
+            self.namespace["_message_payload"] = lambda record: record.to_payload()
+            response = await self.get_thread()
+            self.assertEqual(response["active_stream_ids"], [])
+            self.assertEqual(response["messages"][-1]["metadata"]["stream_id"], "stream-a")
+            self.assertNotIn("PRIVATE FOREIGN", str(response))
+
+    async def test_postgres_recent_window_preserves_parameter_scoping_and_chronology(self):
+        from unittest.mock import AsyncMock, patch
+        from services.persistence.chat_store import PostgresChatBackend
+
+        class ConnectionContext:
+            async def __aenter__(self):
+                return connection
+            async def __aexit__(self, *_):
+                return False
+
+        connection = self.namespace_type(fetch=AsyncMock(return_value=[{"content": "new"}, {"content": "old"}]))
+        pool = self.namespace_type(acquire=lambda: ConnectionContext())
+        backend = PostgresChatBackend("postgresql://synthetic-unused")
+        with patch.object(backend, "initialize", new=AsyncMock()), patch.object(backend, "_pg_pool", new=AsyncMock(return_value=pool)), patch("services.persistence.chat_store._message_from_row", side_effect=lambda row: row):
+            result = await backend.list_messages("owner-a", "thread-a", newest=True)
+        self.assertEqual([record["content"] for record in result], ["old", "new"])
+        query, *parameters = connection.fetch.await_args.args
+        self.assertIn("ORDER BY created_at DESC", query)
+        self.assertEqual(parameters, ["owner-a", "thread-a", 200])

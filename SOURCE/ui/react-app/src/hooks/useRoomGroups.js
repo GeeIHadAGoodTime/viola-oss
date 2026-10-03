@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { apiFetch } from './useViolaApi';
 import { isFeatureAvailable } from '../utils/featureSurface';
 
+// apiFetch unwraps successful ResponseEnvelope.data; only failure envelopes retain ok/error.
 const errorMessage = (error, fallback) => error?.message || (typeof error === 'string' ? error : fallback);
 
 /**
@@ -30,10 +31,11 @@ export function useRoomGroups() {
     try {
       setLoading(true);
       const data = await apiFetch('/v1/rooms/groups');
-      if (data.ok) {
-        setGroups(data.data?.groups || []);
+      if (data?.ok !== false && Array.isArray(data?.groups)) {
+        setGroups(data.groups);
+        setError(null);
       } else {
-        setError(errorMessage(data.error, "Couldn't load groups. Check your connection and try again."));
+        setError(errorMessage(data?.error, "Couldn't load groups. Check your connection and try again."));
       }
     } catch {
       setError("Couldn't load groups. Check your connection and try again.");
@@ -51,11 +53,11 @@ export function useRoomGroups() {
         method: 'POST',
         body: JSON.stringify({ name: name, room_ids: roomIds }),
       });
-      if (data.ok) {
-        setGroups(prev => [...prev, data.data.group]);
-        return { ok: true, group: data.data.group };
+      if (data?.ok !== false && data?.group?.group_id) {
+        setGroups(prev => [...prev, data.group]);
+        return { ok: true, group: data.group };
       } else {
-        const message = errorMessage(data.error, "Couldn't create this group. Check your connection and try again.");
+        const message = errorMessage(data?.error, "Couldn't create this group. Check your connection and try again.");
         setError(message);
         return { ok: false, error: message };
       }
@@ -77,11 +79,11 @@ export function useRoomGroups() {
         method: 'PUT',
         body: JSON.stringify(updates),
       });
-      if (data.ok) {
-        setGroups(prev => prev.map(g => g.group_id === groupId ? data.data.group : g));
-        return { ok: true, group: data.data.group };
+      if (data?.ok !== false && data?.group?.group_id === groupId) {
+        setGroups(prev => prev.map(g => g.group_id === groupId ? data.group : g));
+        return { ok: true, group: data.group };
       } else {
-        const message = errorMessage(data.error, "Couldn't update this group. Check your connection and try again.");
+        const message = errorMessage(data?.error, "Couldn't update this group. Check your connection and try again.");
         setError(message);
         return { ok: false, error: message };
       }
@@ -102,11 +104,11 @@ export function useRoomGroups() {
       const data = await apiFetch(`/v1/rooms/groups/${groupId}`, {
         method: 'DELETE',
       });
-      if (data.ok) {
+      if (data?.ok !== false && data?.deleted === true && data?.group_id === groupId) {
         setGroups(prev => prev.filter(g => g.group_id !== groupId));
         return { ok: true };
       } else {
-        const message = errorMessage(data.error, "Couldn't delete this group. Check your connection and try again.");
+        const message = errorMessage(data?.error, "Couldn't delete this group. Check your connection and try again.");
         setError(message);
         return { ok: false, error: message };
       }
@@ -126,13 +128,13 @@ export function useRoomGroups() {
         method: 'POST',
         body: JSON.stringify({ volume }),
       });
-      if (data.ok) {
+      if (data?.ok !== false && data?.group?.group_id === groupId && Number.isFinite(data?.master_volume)) {
         setGroups(prev => prev.map(g =>
-          g.group_id === groupId ? { ...g, master_volume: volume } : g
+          g.group_id === groupId ? { ...g, master_volume: data.master_volume } : g
         ));
         return { ok: true };
       }
-      return { ok: false, error: data.error };
+      return { ok: false, error: data?.error };
     } catch (err) {
       return { ok: false, error: "Couldn't set room volume. Check your connection and try again." };
     }
@@ -145,19 +147,19 @@ export function useRoomGroups() {
         method: 'POST',
         body: JSON.stringify({ offset: offset }),
       });
-      if (data.ok) {
+      if (data?.ok !== false && data?.room_id === roomId && Number.isFinite(data?.offset)) {
         setGroups(prev => prev.map(g => {
           if (g.group_id !== groupId) return g;
           return {
             ...g,
             members: g.members.map(m =>
-              m.room_id === roomId ? { ...m, volume_offset: offset } : m
+              m.room_id === roomId ? { ...m, volume_offset: data.offset } : m
             ),
           };
         }));
         return { ok: true };
       }
-      return { ok: false, error: data.error };
+      return { ok: false, error: data?.error };
     } catch (err) {
       return { ok: false, error: "Couldn't adjust room volume. Check your connection and try again." };
     }
@@ -170,19 +172,19 @@ export function useRoomGroups() {
         method: 'POST',
         body: JSON.stringify({ muted }),
       });
-      if (data.ok) {
+      if (data?.ok !== false && data?.room_id === roomId && typeof data?.is_muted === 'boolean') {
         setGroups(prev => prev.map(g => {
           if (g.group_id !== groupId) return g;
           return {
             ...g,
             members: g.members.map(m =>
-              m.room_id === roomId ? { ...m, is_muted: muted } : m
+              m.room_id === roomId ? { ...m, is_muted: data.is_muted } : m
             ),
           };
         }));
         return { ok: true };
       }
-      return { ok: false, error: data.error };
+      return { ok: false, error: data?.error };
     } catch (err) {
       return { ok: false, error: "Couldn't mute room. Check your connection and try again." };
     }
