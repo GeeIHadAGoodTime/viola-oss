@@ -242,14 +242,30 @@ def _preload_windows_ui_runtime() -> None:
     ):
         return
     _boot_checkpoint("03a-win32ui-preload-start")
+    # pywin32 issue #691 documents GC visiting not-yet-constructed native
+    # types during win32ui's static initialization. Keep its documented
+    # workaround confined to this early import, before background workers.
+    # Do not change thresholds or leave collection disabled for app runtime.
+    import gc as _startup_gc
+
+    _gc_was_enabled = _startup_gc.isenabled()
     try:
-        import win32ui  # noqa: F401 - required native initialization ordering
-    except ImportError:
-        # Source environments may omit optional Windows automation. Preserve
-        # existing feature-level handling while making that condition visible.
-        _boot_checkpoint("03b-win32ui-preload-unavailable")
-    else:
-        _boot_checkpoint("03b-win32ui-preload-complete")
+        if _gc_was_enabled:
+            _startup_gc.disable()
+        try:
+            import win32ui  # noqa: F401 - required native initialization ordering
+        except ImportError:
+            # Preserve existing optional-module handling in source environments.
+            _runtime_available = False
+        else:
+            _runtime_available = True
+    finally:
+        if _gc_was_enabled:
+            _startup_gc.enable()
+    # Logging stays outside the narrowly scoped GC pause.
+    _boot_checkpoint(
+        "03b-win32ui-preload-complete" if _runtime_available else "03b-win32ui-preload-unavailable"
+    )
 
 
 _preload_windows_ui_runtime()
