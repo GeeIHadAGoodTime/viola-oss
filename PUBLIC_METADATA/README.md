@@ -1,16 +1,19 @@
 # Source snapshot binding
 
-Source revision: `2b07f2cb80cb7ceabc789670d7aad97afa438ecf`.
+Source revision: `c2a76353e29c362b489df1efc9f24a0e58c86b3d`.
 
-Initial native window size, minimum dimensions and position now respect Qt
-available logical screen geometry, including taskbar space and negative monitor
-origins. This addresses controls opening outside smaller displays.
+EventSource now presents its signed, stream-bound token to both HTTP authentication
+layers. Acceptance is limited to the exact GET stream endpoint, while account
+cookies and bearer credentials remain authoritative. Loopback desktop tokens
+resolve the active desktop principal, matching the existing stream-owner check.
+No endpoint authentication exemption or general API-key query fallback is added.
 
-Five existing/new unittest methods pass. Five screen cases fail before and pass
-after. A real bundled-PySide6 offscreen geometry probe also confirms the original
-1400x800 window exceeds its800x800 work area while the corrected window fits.
-That probe is not a normal installed GUI acceptance run; that remains pending.
+The26-test execution contract module passes, including eight stream-auth tests.
+The original source fails the valid-token and actual-route reproduction. The
+corrected in-process route returns synthetic data only to its owner and rejects
+the wrong account. A full local contract attempt has one environment import
+error for missing pipecat-ai package metadata. Canonical CI and installed-product
+acceptance remain required. No published customer fix is claimed.
 
-Frontend and dependency inputs are unchanged. Existing inventories and prior
-qualification receipts are retained without claiming a fresh advisory scan,
-new product release or deployment.
+Frontend and dependency inputs, six retained inventories and prior receipts are
+unchanged. No fresh dependency resolution or vulnerability scan is claimed.

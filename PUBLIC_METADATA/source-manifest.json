@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "2b07f2cb80cb7ceabc789670d7aad97afa438ecf",
-  "sha256": "0fd7221ad76ddeba0f3ccba9e4d8e02417c4005fdd78d5636fe39f189e4fcd93",
+  "revision": "c2a76353e29c362b489df1efc9f24a0e58c86b3d",
+  "sha256": "cb806d8a5c6ae1dac31715aff6e92ed6d52a4256ab7774065d25839ebf0a9536",
   "files": [
     {
       "path": ".env.example",
@@ -5725,8 +5725,8 @@
     },
     {
       "path": "tests/public/test_execution_safety_contract.py",
-      "sha256": "20f275b479b0dd85ac6a1dc932c9b41fcf0ee3dce1789e29c9db951c0e7869c1",
-      "bytes": 31045
+      "sha256": "b3e7b4223bd315d842fef1ef5e4dad3b1504d24efddf0663855cbbde66c195b0",
+      "bytes": 36289
     },
     {
       "path": "tests/public/test_phone_call_plan_confirmation.py",
@@ -8680,8 +8680,8 @@
     },
     {
       "path": "ui/api/routes/llm_stream.py",
-      "sha256": "b2faf306f5132144f620a8cbc7ad7c13ec4221b98e176de54696da473ab31f73",
-      "bytes": 14461
+      "sha256": "9f511f162fc44509751486b4ed2ef94309a03c6b25dd8d09f371cbdacb9585ca",
+      "bytes": 14496
     },
     {
       "path": "ui/api/routes/local_library.py",
@@ -11310,8 +11310,8 @@
     },
     {
       "path": "ui/security/auth.py",
-      "sha256": "80dcd6bffcb7981d3b0f7a891edd8bf34d1486dbbccac8780a6bf79afe9a0156",
-      "bytes": 46528
+      "sha256": "1ed792822a2116fb58ce9a12db35530b39ee2474ee76131b9ca8fe7a5cb7d8fc",
+      "bytes": 47954
     },
     {
       "path": "ui/security/auth_failure_store.py",

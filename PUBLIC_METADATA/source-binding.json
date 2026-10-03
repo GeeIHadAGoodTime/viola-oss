@@ -1,14 +1,15 @@
 {
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "fba5edc088c731d600cbe9c4ecbff5c349b9d3a25efc8a4c999acb8e1a77f87a",
-  "source_tree_sha256": "0fd7221ad76ddeba0f3ccba9e4d8e02417c4005fdd78d5636fe39f189e4fcd93",
+  "source_manifest_sha256": "9d04f6472566695628cae5942cacaf49c7a5dbf9ba9a3bf34877926784a2516b",
+  "source_tree_sha256": "cb806d8a5c6ae1dac31715aff6e92ed6d52a4256ab7774065d25839ebf0a9536",
   "source_file_count": 2474,
-  "source_revision": "2b07f2cb80cb7ceabc789670d7aad97afa438ecf",
-  "comparison_public_revision": "e0ddd53018e7f4533ca1edee59cf0671616919bc",
+  "source_revision": "c2a76353e29c362b489df1efc9f24a0e58c86b3d",
+  "comparison_public_revision": "f8adf3f33cce142f3751f7a5350b781ac4171b91",
   "changed_source_paths": [
-    "SOURCE/tests/public/test_windows_native_startup_order.py",
-    "SOURCE/ui/qt_native/webview_window.py"
+    "SOURCE/tests/public/test_execution_safety_contract.py",
+    "SOURCE/ui/api/routes/llm_stream.py",
+    "SOURCE/ui/security/auth.py"
   ],
   "retained_sboms": [
     {
@@ -54,22 +55,22 @@
     "basis": "All dependency inputs unchanged from the preceding public source revision. Retained inventories and dated receipts are not fresh platform qualification or advisory scans."
   },
   "prior_binding": {
-    "public_revision": "e0ddd53018e7f4533ca1edee59cf0671616919bc",
+    "public_revision": "f8adf3f33cce142f3751f7a5350b781ac4171b91",
     "path": "PUBLIC_METADATA/source-binding.json",
-    "git_blob": "5c8aa798461f4479b9cdd80b53cf1507144e3cc2",
-    "sha256": "b327c4765f32c09645421cf783774c792bf70fd8c23448ada353c4126245374f",
-    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/e0ddd53018e7f4533ca1edee59cf0671616919bc/PUBLIC_METADATA/source-binding.json"
+    "git_blob": "ea592d24713c74bb9790769a68bad6583a6833aa",
+    "sha256": "f329c5c2087c7d55e5966d7d403a85109d8dc8d6696c60c45254b9296b9fabab",
+    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/f8adf3f33cce142f3751f7a5350b781ac4171b91/PUBLIC_METADATA/source-binding.json"
   },
   "new_resolution_performed": false,
   "new_advisory_scan_performed": false,
   "new_runtime_qualification_performed": false,
   "qualification": {
-    "scope": "Initial native-window geometry fits available logical work area; focused source and real Qt geometry checks",
-    "focused_unittest_methods": 5,
-    "new_geometry_screen_cases": 5,
-    "negative_controls": "Original geometry fails all five screen cases; original real Qt offscreen window1400x800 exceeds800x800 available area, corrected window fits",
-    "native_qt_probe": "Passed using bundled PySide6 in offscreen QApplication; not installed product GUI acceptance",
-    "frontend": "unchanged from preceding qualified source revision",
+    "scope": "Scoped EventSource middleware and route authentication correction following installed SSE401",
+    "execution_contract_tests": 26,
+    "stream_auth_tests": 8,
+    "negative_controls": "Original middleware rejects valid SSE credentials with401; original loopback principal differs from owning desktop. Corrected in-process route delivers synthetic terminal data to its owner and denies another account with403. Wrong scope/method/signature, expired token, invalid account credentials, remote legacy token and general WS token are rejected.",
+    "local_full_suite": "Attempted:73 collected, one import error because minimal local environment lacks pipecat-ai package metadata; no skipped or weakened assertions",
+    "frontend": "unchanged",
     "installed_candidate": "pending for this revision",
     "release_or_deployment": "not_established"
   }
