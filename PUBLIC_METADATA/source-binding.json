@@ -1,32 +1,28 @@
 {
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "453dc9145bc06d23d00a08b9d10febc9929b938c614f8c7f3a26d7f9db634fd1",
-  "source_tree_sha256": "a55ca2de2e788eccd45d34c7fe3f108bcb64e34485a60ef7afc219adfaf3b6ab",
+  "source_manifest_sha256": "30a3bcb8b538d00b8ba8edc4ffa130a6144261af2f6340ce91a4662d6f4e15f9",
+  "source_tree_sha256": "46cd90191e411ad2fae8f8f115a78e8018fead61e330059ab25fbf47eb4a31b7",
   "source_file_count": 2476,
-  "source_revision": "e267b8d8a92a097128abbbee64a26da2218f2080",
-  "comparison_public_revision": "55c180d2060d18312b8239eb027d80ec9baa3f9f",
+  "source_revision": "d01942c2edf89cc8beccf3efc8ef0a8982ceb578",
+  "comparison_public_revision": "9bf530c1cb498e57f3c01c7ecee3e465fc3d998d",
   "changed_source_paths": [
+    "SOURCE/config/defaults.py",
+    "SOURCE/music/playback_session.py",
+    "SOURCE/services/llm/pricing.py",
+    "SOURCE/services/llm/providers/openai_compatible.py",
+    "SOURCE/skills/builtin/music_control.py",
     "SOURCE/tests/public/test_source_contract.py",
     "SOURCE/tests/public/test_windows_native_startup_order.py",
-    "SOURCE/ui/api/routes/rating.py",
-    "SOURCE/ui/onboarding.py",
+    "SOURCE/ui/api/routes/chat_mode.py",
+    "SOURCE/ui/api/routes/control.py",
     "SOURCE/ui/qt_native/webview_window.py",
-    "SOURCE/ui/react-app/src/SmartDisplay.jsx",
-    "SOURCE/ui/react-app/src/__tests__/SmartDisplay.test.jsx",
-    "SOURCE/ui/react-app/src/__tests__/hooks/useVoiceOnboarding.micCaptureProbe.test.jsx",
-    "SOURCE/ui/react-app/src/components/OnboardingOverlay.jsx",
-    "SOURCE/ui/react-app/src/components/QueueModal.jsx",
     "SOURCE/ui/react-app/src/components/SettingsModal.jsx",
     "SOURCE/ui/react-app/src/components/SettingsModal.sidebar.test.jsx",
-    "SOURCE/ui/react-app/src/components/advanced/AdvancedSettingsWindow.jsx",
-    "SOURCE/ui/react-app/src/components/advanced/AdvancedSettingsWindow.test.jsx",
-    "SOURCE/ui/react-app/src/components/settings/Slider.jsx",
-    "SOURCE/ui/react-app/src/components/settings/Slider.test.jsx",
     "SOURCE/ui/react-app/src/components/stage/modes/chat/ChatMode.jsx",
     "SOURCE/ui/react-app/src/components/stage/modes/chat/ChatMode.test.jsx",
-    "SOURCE/ui/react-app/src/hooks/useVoiceOnboarding.js",
-    "SOURCE/ui/react-app/src/i18n/en.json"
+    "SOURCE/ui/react-app/src/components/stage/modes/chat/ToolUseCard.jsx",
+    "SOURCE/ui/settings_api.py"
   ],
   "retained_sboms": [
     {
@@ -68,24 +64,24 @@
   ],
   "input_equivalence": {
     "changed_dependency_inputs": [],
-    "basis": "Twenty existing Python/frontend source and test files changed. Dependency manifests, locks and retained SBOM bytes are unchanged."
+    "basis": "Sixteen existing public source and test paths changed; dependency manifests, locks, source ownership and all six retained SBOM bytes are unchanged."
   },
   "prior_binding": {
-    "public_revision": "55c180d2060d18312b8239eb027d80ec9baa3f9f",
+    "public_revision": "9bf530c1cb498e57f3c01c7ecee3e465fc3d998d",
     "path": "PUBLIC_METADATA/source-binding.json",
-    "git_blob": "b5981640141b202c15eba04b1b1c6814a3732284",
-    "sha256": "f2ce2ab674fdeba3f26d8c0eee176faaedeaee71d91eb1deab8806671e72c7c6",
-    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/55c180d2060d18312b8239eb027d80ec9baa3f9f/PUBLIC_METADATA/source-binding.json"
+    "git_blob": "275d3e1a156e94c430a1df67cb6b03f175248428",
+    "sha256": "9271bbf74e86e81f90d5e31c0ecbd537024b89a528cdc4c83932909b1d738a00",
+    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/9bf530c1cb498e57f3c01c7ecee3e465fc3d998d/PUBLIC_METADATA/source-binding.json"
   },
   "new_resolution_performed": false,
   "new_advisory_scan_performed": false,
   "new_runtime_qualification_performed": false,
   "qualification": {
-    "scope": "Onboarding readiness/completion and save failure; queue playback controls; local-track ratings; settings volume/model choices; diagnostics routes; keyboard sliders; native control names; visible chat rename validation and retry",
-    "negative_controls": "Retained original-source failures for queue, rating, onboarding, settings, diagnostics, native titlebar, keyboard slider and chat rename. Synthetic behavior and source-contract evidence only.",
-    "python_checks": "89 public Python contracts passed on Linux; no native Windows GUI or physical audio claim.",
-    "frontend_checks": "Final source: 138 frontend test files and 1039 tests passed on Linux; production frontend build passed in 4.82 seconds. Protected Windows CI and installed acceptance remain pending.",
-    "installed_candidate": "pending; Surface held at owner instruction until consolidated repair batch",
+    "scope": "Repeat runtime/display consistency; native download handling and visible export failure; hotkey collision normalization and metadata; truthful redacted tool detail/status; managed GPT-6 Luna source defaults and price accounting without changing BYOK/local/Codex selection. Private managed forwarding and phone integration are separate pending work.",
+    "negative_controls": "Original-source failures retained for repeat, native export handler, export duplicate requests, hotkey normalization/metadata, tool-card rendering and managed Luna defaults. Synthetic behavior/source tests only.",
+    "python_checks": "101 public Python contracts passed on Linux. First Windows run found one POSIX-only path assertion in the native download test; fixture now checks both PureWindowsPath and PurePosixPath with unchanged path-selection/order/cancellation assertions. Corrected Windows CI pending.",
+    "frontend_checks": "138 test files / 1046 tests passed on Linux; production frontend build passed in 4.81 seconds. Windows CI pending.",
+    "installed_candidate": "pending; Surface remains held for consolidated batch",
     "release_or_deployment": "not_established"
   }
 }

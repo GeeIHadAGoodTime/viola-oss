@@ -26,6 +26,7 @@ from PySide6.QtCore import (
     QObject,
     QPoint,
     QPropertyAnimation,
+    QStandardPaths,
     QRect,
     QSize,
     Qt,
@@ -53,6 +54,8 @@ from PySide6.QtWebEngineCore import (
 )
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWidgets import (
+    QApplication,
+    QFileDialog,
     QCheckBox,
     QDialog,
     QDialogButtonBox,
@@ -828,6 +831,35 @@ def is_profile_persistent() -> bool | None:
     return _viola_profile_persistent
 
 
+def _handle_download_request(download):
+    """Use the normal native Save dialog; never silently discard or auto-open exports."""
+    try:
+        filename = str(download.downloadFileName() or "download").replace("\\", "/").rsplit("/", 1)[-1]
+        if filename in {"", ".", ".."}:
+            filename = "download"
+        directory = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.DownloadLocation) or str(Path.home())
+        chosen, _ = QFileDialog.getSaveFileName(
+            QApplication.activeWindow(), "Save file", str(Path(directory) / filename), "All files (*)"
+        )
+        if not chosen:
+            download.cancel()
+            return
+        target = Path(chosen)
+        download.setDownloadDirectory(str(target.parent))
+        download.setDownloadFileName(target.name)
+
+        def report_failure(state):
+            if state == download.DownloadState.DownloadInterrupted:
+                QMessageBox.warning(QApplication.activeWindow(), "Download failed", "The file could not be saved. Please try again.")
+
+        download.stateChanged.connect(report_failure)
+        download.accept()
+    except Exception:
+        download.cancel()
+        logger.exception("Native download save failed")
+        QMessageBox.warning(QApplication.activeWindow(), "Download failed", "The file could not be saved. Please try again.")
+
+
 def _get_viola_profile():
     """Get or create the singleton Viola QWebEngineProfile with persistent cookies.
 
@@ -863,6 +895,7 @@ def _get_viola_profile():
 
     # ---- 2. Named profile (parent=None so it outlives any single page) ----
     profile = QWebEngineProfile("viola")
+    profile.downloadRequested.connect(_handle_download_request)
     profile.setPersistentStoragePath(str(storage_path))
     profile.setCachePath(str(cache_path))
 

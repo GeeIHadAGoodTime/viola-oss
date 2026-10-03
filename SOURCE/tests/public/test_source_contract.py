@@ -15,6 +15,78 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class SourceContract(unittest.TestCase):
+    def test_chat_catalog_migrates_only_managed_model_labels(self):
+        import sys
+        import types
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        sys.path.insert(0, str(ROOT))
+        source = ROOT / 'ui/api/routes/chat_mode.py'
+        tree = ast.parse(source.read_text())
+        names = {'_unique_models', '_provider_prefix_valid', '_chat_model_catalog', '_validate_chat_model'}
+        nodes = [ast.ImportFrom(module='__future__', names=[ast.alias(name='annotations')], level=0)]
+        nodes += [n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name in names]
+        namespace = {}
+        exec(compile(ast.fix_missing_locations(ast.Module(body=nodes, type_ignores=[])), str(source), 'exec'), namespace)
+        base = types.ModuleType('services.llm.providers.base')
+        base.PROVIDER_INFO = {'openai': SimpleNamespace(name='OpenAI', popular_models=['gpt-5.4-mini'], default_models=['gpt-5.4-mini'])}
+        settings = types.ModuleType('ui.settings_manager')
+        for ai_source, expected in [('managed', 'gpt-6-luna'), ('subscription', 'gpt-6-luna'), ('byok', 'gpt-5.4-mini')]:
+            def get(key, default=None, *, user_id):
+                self.assertEqual(user_id, 'synthetic-user')
+                return {'ai_source': ai_source, 'llm_provider': 'openai', 'llm_model': 'gpt-5.4-mini'}.get(key, default)
+            settings.get_settings_manager = lambda: SimpleNamespace(get=get)
+            with patch.dict(sys.modules, {'services.llm.providers.base': base, 'ui.settings_manager': settings}):
+                catalog = namespace['_chat_model_catalog']('synthetic-user')
+                self.assertEqual(catalog['current_model'], expected)
+                self.assertEqual(namespace['_validate_chat_model']('synthetic-user', 'gpt-5.4-mini', explicit=True), expected)
+                if ai_source != 'byok': self.assertNotIn('gpt-5.4-mini', catalog['models'])
+
+
+    def test_managed_luna_default_preserves_other_sources(self):
+        import sys
+        sys.path.insert(0, str(ROOT))
+        from config import defaults
+        for source in ('managed', 'subscription'):
+            for agent in (False, True):
+                for candidates in ((), ('',), ('gpt-5.4-mini',), ('  gpt-5.4-mini  ',)):
+                    with self.subTest(source=source, agent=agent, candidates=candidates):
+                        self.assertEqual(defaults.resolve_effective_model(ai_source=source, agent=agent, candidates=candidates), 'gpt-6-luna')
+        self.assertEqual((defaults.DEFAULT_GPT_MODEL, defaults.DEFAULT_AGENT_MODEL, defaults.DEFAULT_PHONE_MODEL), ('gpt-5.4-mini',) * 3)
+        self.assertEqual(defaults.get_provider_default_model('openai'), 'gpt-5.4-mini')
+        self.assertEqual(defaults.get_provider_default_agent_model('openai'), 'gpt-5.4-mini')
+        self.assertEqual(defaults.resolve_effective_model(ai_source='byok', candidates=('gpt-5.4-mini',)), 'gpt-5.4-mini')
+        self.assertEqual(defaults.resolve_effective_model(ai_source='local', provider='ollama', candidates=('fixture:latest',)), 'fixture:latest')
+        self.assertEqual(defaults.resolve_effective_model(ai_source='codex'), 'gpt-5.4-mini')
+        self.assertEqual(defaults.resolve_effective_model(ai_source='managed', candidates=('gpt-4o-mini',)), 'gpt-4o-mini')
+
+
+    def test_luna_reasoning_parameters_preserve_phone_tier(self):
+        import sys
+        sys.path.insert(0, str(ROOT))
+        from config import defaults
+        self.assertEqual(defaults.resolve_reasoning_effort('none', 'gpt-6-luna'), 'none')
+        self.assertEqual(defaults.resolve_reasoning_effort('minimal', 'gpt-6-luna'), 'none')
+        self.assertTrue(defaults._is_reasoning_family('gpt-6-luna'))
+        self.assertEqual(defaults.pipecat_model_extra('gpt-6-luna', 'low'), {'reasoning': {'effort': 'low', 'summary': 'auto'}})
+        self.assertEqual(defaults.pipecat_phone_model_extra('gpt-6-luna', 'low', tools_present=False), {'reasoning_effort': 'low'})
+        # Legacy Chat Completions only accepts Luna tool calls with none;
+        # production Responses phone turns retain their low effort above.
+        self.assertEqual(defaults.pipecat_phone_model_extra('gpt-6-luna', 'low', tools_present=True), {'reasoning_effort': 'none'})
+
+
+    def test_luna_pricing_includes_long_context_threshold(self):
+        import sys
+        sys.path.insert(0, str(ROOT))
+        from services.llm import pricing
+        pricing.reset_unknown_model_cost_state()
+        self.assertEqual(pricing.get_llm_pricing_usd('gpt-6-luna')['input'], 0.10)
+        self.assertAlmostEqual(pricing.calculate_cost_cents('gpt-6-luna', 200000, 100000, 100000, cache_write_tokens=10000), 6.225)
+        self.assertAlmostEqual(pricing.calculate_cost_cents('gpt-6-luna', 272000, 100000), 7.72)
+        self.assertAlmostEqual(pricing.calculate_cost_cents('gpt-6-luna', 272001, 100000), 12.94002)
+        self.assertFalse(pricing.has_unknown_model_cost())
+
+
     def test_phone_cost_uses_carrier_facts_or_measured_estimate_without_outcome_floor(self):
         """Exercise the actual source function without importing optional phone runtimes."""
         from types import SimpleNamespace
@@ -374,3 +446,113 @@ class OnboardingSavedStepContract(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class RepeatPlaybackContract(unittest.IsolatedAsyncioTestCase):
+    async def _exercise(self, mode, *, reject_preference=False):
+        import logging
+        import sys
+        import types
+        from types import SimpleNamespace
+        from unittest.mock import AsyncMock, patch
+        sys.path.insert(0, str(ROOT))
+        from models.state_manager import ConsolidatedState, RepeatMode
+        from music.playback_session import PlaybackSessionController
+        controller = PlaybackSessionController(state_manager=ConsolidatedState())
+        preferences = {'mode': 'off', 'user_id': None}
+        class Compat:
+            def __init__(self, *, user_id=None): preferences['user_id'] = user_id
+            def get_repeat_mode(self): return preferences['mode']
+            def set_repeat_mode(self, value):
+                if reject_preference: raise RuntimeError('synthetic preference rejection')
+                preferences['mode'] = value
+        compat = types.ModuleType('core.compat'); compat.StateCompat = Compat
+        playback = types.ModuleType('music.playback_session')
+        playback.get_playback_session_controller = lambda: controller
+        helpers = types.ModuleType('utils.api_helpers'); helpers.inject_preferences = lambda value: None
+        source = ROOT / 'ui/api/routes/control.py'
+        tree = ast.parse(source.read_text())
+        endpoint = next(n for n in ast.walk(tree) if isinstance(n, ast.AsyncFunctionDef) and n.name == 'post_repeat')
+        endpoint.decorator_list = []
+        endpoint.args.defaults = [ast.Constant(None)]
+        async def record(callback, **kwargs): return await callback()
+        async def snapshot(*args): return SimpleNamespace(model_dump=lambda: {})
+        namespace = {'log': logging.getLogger('repeat-contract'), 'toolbox': SimpleNamespace(record_and_call=record),
+                     'music': object(), 'state': {}, 'hub': SimpleNamespace(broadcast=AsyncMock()),
+                     '_safe_state_adapter': snapshot,
+                     '_control_error_response': lambda status, code, message: {'ok': False, 'status': status, 'error': code}}
+        isolated = ast.Module(body=[ast.ImportFrom(module='__future__', names=[ast.alias(name='annotations')], level=0), endpoint], type_ignores=[])
+        exec(compile(ast.fix_missing_locations(isolated), str(source), 'exec'), namespace)
+        with patch.dict(sys.modules, {'core.compat': compat, 'music.playback_session': playback, 'utils.api_helpers': helpers}):
+            result = await namespace['post_repeat'](SimpleNamespace(json=AsyncMock(return_value={'mode': mode})), user_id='synthetic-listener')
+        return result, controller, preferences
+
+    async def test_repeat_endpoint_changes_real_playback_and_display_preference(self):
+        from models.state_manager import RepeatMode
+        for mode in ('off', 'all', 'one'):
+            with self.subTest(mode=mode):
+                result, controller, preferences = await self._exercise(mode)
+                self.assertTrue(result['ok'])
+                self.assertEqual(controller.get_repeat_mode(), RepeatMode(mode))
+                self.assertEqual(controller.should_repeat_current(), mode == 'one')
+                self.assertEqual(controller.should_loop_queue(), mode == 'all')
+                self.assertEqual(preferences, {'mode': mode, 'user_id': 'synthetic-listener'})
+
+    async def test_failed_preference_write_does_not_leave_runtime_changed(self):
+        from models.state_manager import RepeatMode
+        result, controller, preferences = await self._exercise('one', reject_preference=True)
+        self.assertFalse(result['ok'])
+        self.assertEqual(controller.get_repeat_mode(), RepeatMode.OFF)
+        self.assertEqual(preferences['mode'], 'off')
+
+    async def test_invalid_repeat_does_not_change_runtime_or_preference(self):
+        from models.state_manager import RepeatMode
+        result, controller, preferences = await self._exercise('invalid')
+        self.assertEqual(result['status'], 400)
+        self.assertEqual(controller.get_repeat_mode(), RepeatMode.OFF)
+        self.assertEqual(preferences['mode'], 'off')
+
+    async def test_controller_voice_cycle_keeps_display_preference_in_sync(self):
+        import sys
+        import types
+        from unittest.mock import patch
+        from models.state_manager import ConsolidatedState, RepeatMode
+        from music.playback_session import PlaybackSessionController
+        writes = []
+        class Compat:
+            def __init__(self, *, user_id=None): self.user_id = user_id
+            def set_repeat_mode(self, mode): writes.append((self.user_id, mode))
+        compat = types.ModuleType('core.compat'); compat.StateCompat = Compat
+        controller = PlaybackSessionController(state_manager=ConsolidatedState())
+        with patch.dict(sys.modules, {'core.compat': compat}):
+            for expected in (RepeatMode.ALL, RepeatMode.ONE, RepeatMode.OFF):
+                self.assertEqual(controller.cycle_repeat_mode(), expected)
+                self.assertEqual(writes[-1], (None, expected.value))
+            controller.set_repeat_mode(RepeatMode.ONE, user_id='explicit-synthetic-listener')
+            self.assertEqual(writes[-1], ('explicit-synthetic-listener', 'one'))
+            with self.assertRaises(RuntimeError):
+                PlaybackSessionController().set_repeat_mode(RepeatMode.ONE)
+            self.assertEqual(len(writes), 4)
+
+
+class HotkeyCollisionContract(unittest.TestCase):
+    def test_keyboard_code_and_display_alias_collisions_are_rejected(self):
+        from types import SimpleNamespace
+        source = ROOT / 'ui/settings_api.py'
+        tree = ast.parse(source.read_text())
+        names = {'_normalize_hotkey_for_compare', '_validate_hotkey_cross_field_requirements'}
+        nodes = [ast.ImportFrom(module='__future__', names=[ast.alias(name='annotations')], level=0)]
+        nodes += [n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name in names]
+        namespace = {}
+        exec(compile(ast.fix_missing_locations(ast.Module(body=nodes, type_ignores=[])), str(source), 'exec'), namespace)
+        validate = namespace['_validate_hotkey_cross_field_requirements']
+        same = [('Ctrl+KeyM', 'ctrl+m'), ('Control+M', 'ctrl+m'), ('Shift+Ctrl+KeyM', 'control+shift+m'),
+                ('Alt+Digit1', 'option+1'), ('Super+Spacebar', 'Win+Space'), ('Escape', 'Esc'), ('Return', 'Enter')]
+        for ptt, mute in same:
+            with self.subTest(ptt=ptt, mute=mute):
+                settings = SimpleNamespace(get=lambda key, fallback: {'ptt_hotkey': ptt, 'mute_hotkey': mute}.get(key, fallback))
+                self.assertTrue(validate({'ptt_hotkey': ptt}, settings))
+        for ptt, mute in [('ctrl+m','m'), ('Digit1','Numpad1'), ('ctrl+m','ctrl+shift+m'), ('Space','ctrl+m')]:
+            with self.subTest(ptt=ptt, mute=mute):
+                settings = SimpleNamespace(get=lambda key, fallback: {'ptt_hotkey': ptt, 'mute_hotkey': mute}.get(key, fallback))
+                self.assertEqual(validate({'ptt_hotkey': ptt}, settings), [])

@@ -1112,10 +1112,6 @@ class MusicControlSkill(Skill):
             }
             controller = get_playback_session_controller()
             controller.set_repeat_mode(mode_map[mode])
-            # Update the StateHub so API endpoints reflect the new value
-            from core.state_hub import SetRepeatMode, get_state_hub
-
-            get_state_hub().dispatch(SetRepeatMode(mode=mode))
 
             messages = {
                 "off": "Repeat is now off",

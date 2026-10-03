@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor } from '../../../../test/test-utils';
 import ChatMode from './ChatMode';
+import ToolUseCard from './ToolUseCard';
 
 const chatHarness = vi.hoisted(() => ({
   apiFetch: vi.fn(),
@@ -90,6 +91,24 @@ describe('ChatMode command registry', () => {
       }
       return Promise.resolve({});
     });
+  });
+
+  it('shows export failure and allows retry without duplicate pending requests', async () => {
+    const fallback = chatHarness.apiFetch.getMockImplementation();
+    let rejectExport;
+    chatHarness.apiFetch.mockImplementation((url, options) => {
+      if (url.endsWith('/export')) return new Promise((resolve, reject) => { rejectExport = reject; });
+      return fallback(url, options);
+    });
+    render(<ChatMode />);
+    await screen.findByDisplayValue('Existing thread');
+    const button = screen.getByRole('button', {name:'Export',exact:true});
+    fireEvent.click(button);
+    fireEvent.click(button);
+    expect(chatHarness.apiFetch.mock.calls.filter(([url]) => url.endsWith('/export'))).toHaveLength(1);
+    await act(async () => rejectExport(new Error('synthetic offline')));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not export this chat');
+    expect(screen.getByRole('button',{name:'Export',exact:true})).toBeEnabled();
   });
 
   it('rejects an overlong rename with visible feedback and no request', async () => {
@@ -607,4 +626,27 @@ describe('ChatMode command registry', () => {
     expect(screen.queryByLabelText('Stop response')).not.toBeInTheDocument();
   });
 
+});
+
+
+describe('ToolUseCard truthful missing detail and false results', () => {
+  it('distinguishes omitted details from an empty tool value', () => {
+    render(<ToolUseCard tool={{ tool_name: 'memory', status: 'ok' }} />);
+    fireEvent.click(screen.getByRole('button', { name: /memory/i }));
+    expect(screen.getAllByText('Details unavailable')).toHaveLength(2);
+    expect(screen.queryByText('(empty)')).not.toBeInTheDocument();
+  });
+  it.each([false, 0])('retains a legitimate false-like tool result: %s', (value) => {
+    render(<ToolUseCard tool={{ tool_name: 'synthetic', status: 'ok', tool_input: {}, tool_output: value }} />);
+    fireEvent.click(screen.getByRole('button', { name: /synthetic/i }));
+    expect(screen.getByText(String(value))).toBeInTheDocument();
+  });
+  it('does not report completion when the status is absent', () => {
+    render(<ToolUseCard tool={{ tool_name: 'synthetic' }} />);
+    const control = screen.getByRole('button', { name: /synthetic/i });
+    expect(control).toHaveTextContent('Status unavailable');
+    expect(control).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(control);
+    expect(control).toHaveAttribute('aria-expanded', 'true');
+  });
 });

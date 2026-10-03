@@ -206,7 +206,7 @@ def _chat_model_catalog(user_id: str) -> dict[str, Any]:
     from config.defaults import (
         DEFAULT_AI_SOURCE,
         DEFAULT_CODEX_MODEL,
-        DEFAULT_GPT_MODEL,
+        DEFAULT_MANAGED_MODEL,
         DEFAULT_LOCAL_LLM_MODEL,
         resolve_effective_model,
     )
@@ -238,7 +238,7 @@ def _chat_model_catalog(user_id: str) -> dict[str, Any]:
     elif ai_source in {"managed", "subscription"}:
         provider_id = "managed"
         provider_name = "Viola Managed AI"
-        default_model = DEFAULT_GPT_MODEL
+        default_model = DEFAULT_MANAGED_MODEL
         provider_info = PROVIDER_INFO.get("openai")
         if provider_info is not None:
             models = list(provider_info.popular_models or provider_info.default_models)
@@ -259,6 +259,9 @@ def _chat_model_catalog(user_id: str) -> dict[str, Any]:
             models = list(provider_info.popular_models or provider_info.default_models)
         default_model = resolve_effective_model(ai_source=ai_source, provider=provider, agent=False)
 
+    if ai_source in {"managed", "subscription"}:
+        configured_model = resolve_effective_model(ai_source=ai_source, candidates=(configured_model,))
+        models = [resolve_effective_model(ai_source=ai_source, candidates=(model,)) for model in models]
     models = _unique_models([configured_model, default_model, *models])
     valid_models = [model for model in models if _provider_prefix_valid(provider_id, model)]
     current_model = configured_model if configured_model in valid_models else ""
@@ -291,6 +294,10 @@ def _validate_chat_model(user_id: str, model: str | None, *, explicit: bool) -> 
     catalog = _chat_model_catalog(user_id)
     valid_models = set(catalog.get("models") or [])
     provider = str(catalog.get("provider") or "")
+    if catalog.get("ai_source") in {"managed", "subscription"}:
+        from config.defaults import resolve_effective_model
+
+        requested = resolve_effective_model(ai_source="managed", candidates=(requested,))
     if requested in valid_models or _provider_prefix_valid(provider, requested):
         return requested
     if explicit:
