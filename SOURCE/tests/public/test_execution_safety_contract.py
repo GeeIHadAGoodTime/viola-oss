@@ -736,5 +736,93 @@ class BrowserGateBindingContract(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(executor._mcp_hub.calls, 1)
 
 
+class StreamTransportContract(unittest.TestCase):
+    def setUp(self):
+        from fastapi import FastAPI
+        from ui.security.auth import AuthenticationPlugin
+        from ui.security.config import SecurityConfig
+
+        self.plugin = AuthenticationPlugin(SecurityConfig(
+            auth_enabled=True, auth_api_key="synthetic-desktop-key",
+            auth_token_secret="synthetic-stream-test-secret-32-characters",
+        ))
+        self.app = FastAPI()
+        self.app.state.auth_plugin = self.plugin
+
+    def request(self, token, path="/api/stream/test-stream", method="GET", host="127.0.0.1", headers=()):
+        from urllib.parse import urlencode
+        from fastapi import Request
+
+        return Request({"type": "http", "method": method, "path": path,
+            "raw_path": path.encode(), "query_string": urlencode({"stream_token": token}).encode(),
+            "headers": list(headers), "client": (host, 1234), "server": ("127.0.0.1", 8756),
+            "scheme": "http", "app": self.app})
+
+    def token(self):
+        return self.plugin.generate_stream_auth_token(stream_id="test-stream", user_id="synthetic-user", session_id="synthetic-session")
+
+    def check_both(self, request, expected):
+        with patch.object(self.plugin, "_spoke_credential_valid", return_value=False):
+            self.assertEqual(asyncio.run(self.plugin._check_auth(request)), expected)
+            self.assertEqual(asyncio.run(self.plugin.verify_request(request)), expected)
+
+    def test_valid_identity_stream_token_crosses_both_auth_layers(self):
+        self.check_both(self.request(self.token()), True)
+
+    def test_token_cannot_authenticate_other_paths_methods_or_streams(self):
+        for path, method in [("/api/stream/other", "GET"), ("/v1/state", "GET"),
+                             ("/api/stream/test-stream/extra", "GET"), ("/api/stream/test-stream", "POST")]:
+            with self.subTest(path=path, method=method):
+                self.check_both(self.request(self.token(), path=path, method=method), False)
+
+    def test_bad_signature_and_expired_token_fail(self):
+        token = self.token()
+        self.check_both(self.request(token[:-1] + ("0" if token[-1] != "0" else "1")), False)
+        with patch("ui.security.auth.time.time", return_value=1):
+            expired = self.token()
+        self.check_both(self.request(expired), False)
+
+    def test_invalid_account_credentials_do_not_fall_through(self):
+        for header in [(b"cookie", b"viola_session=expired-session"), (b"authorization", b"Bearer invalid-session")]:
+            with self.subTest(header=header[0]), patch.object(self.plugin, "_verify_session_token", new=AsyncMock(return_value=False)):
+                self.check_both(self.request(self.token(), headers=[header]), False)
+
+    def test_general_websocket_token_is_not_stream_auth(self):
+        self.check_both(self.request(self.plugin.generate_ws_auth_token()), False)
+
+    def test_legacy_stream_token_is_not_accepted_remotely(self):
+        token = self.plugin.generate_stream_auth_token(stream_id="test-stream")
+        self.check_both(self.request(token, host="192.0.2.10"), False)
+
+    def test_loopback_token_resolves_the_actual_desktop_principal(self):
+        token = self.plugin.generate_stream_auth_token(stream_id="test-stream")
+        request = self.request(token)
+        with patch("core.user_context.get_current_or_desktop_active_user_id", return_value="synthetic-device"), patch("ui.core.security.is_desktop_surface", return_value=True):
+            self.check_both(request, True)
+        self.assertEqual(request.state.stream_token_claims.user_id, "synthetic-device")
+
+    def test_actual_middleware_and_route_keep_owner_and_account_boundaries(self):
+        from fastapi.testclient import TestClient
+        from ui.api.routes.llm_stream import router
+        from services.llm.stream_bus import register_stream, publish_stream_event, remove_stream
+        self.app.include_router(router)
+        self.plugin.initialize(self.app)
+        for caller, expected in [("synthetic-device", 200), ("other-account", 403)]:
+            with self.subTest(caller=caller):
+                register_stream("test-stream", owner_id="synthetic-device")
+                publish_stream_event("test-stream", {"done": True, "content": "synthetic-result"})
+                token = self.plugin.generate_stream_auth_token(stream_id="test-stream")
+                try:
+                    with patch("core.user_context.get_current_or_desktop_active_user_id", return_value=caller), patch("core.user_context.get_current_user_id", side_effect=LookupError), patch("ui.core.security.is_desktop_surface", return_value=True), patch("ui.core.security.is_loopback_request", return_value=True), TestClient(self.app) as client:
+                        response = client.get("/api/stream/test-stream", params={"stream_token": token})
+                    self.assertEqual(response.status_code, expected, response.text)
+                    if expected == 200:
+                        self.assertIn("synthetic-result", response.text)
+                    else:
+                        self.assertNotIn("synthetic-result", response.text)
+                finally:
+                    remove_stream("test-stream")
+
+
 if __name__ == "__main__":
     unittest.main()
