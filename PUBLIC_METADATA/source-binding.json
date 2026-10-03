@@ -1,16 +1,13 @@
 {
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "fb125c1691edc1a2d3e0f6e03ecb2a186c8ebd87e6a12ef334288c96032cccdb",
-  "source_tree_sha256": "e680f093c10be66ce6f7f8a76510f740b0b1f1312287e0ebcab3d8139ce92689",
-  "source_file_count": 2475,
-  "source_revision": "bf964ed8dc21eaa558aa8dd31119516eb17c5422",
-  "comparison_public_revision": "f0a3f33074df76269dca76293aa413ed8e1bfb46",
+  "source_manifest_sha256": "de8e01c48f7b52c6d2ff82d781cc73a4478674dd06255133818a68ff718284e4",
+  "source_tree_sha256": "b5e1e2dd6e0e5db5583b5c325dd72f4ae0939df652d07924f6545527070691e7",
+  "source_file_count": 2476,
+  "source_revision": "f389fb7d98e0166382f0ceb1029334715d105e64",
+  "comparison_public_revision": "cb6f55f25c602ea7b67cfbc362b50959462fe23f",
   "changed_source_paths": [
-    "SOURCE/ui/react-app/src/SmartDisplay.jsx",
-    "SOURCE/ui/react-app/src/__tests__/SmartDisplay.test.jsx",
-    "SOURCE/ui/react-app/src/components/SettingsModal.jsx",
-    "SOURCE/ui/react-app/src/components/SettingsModal.sidebar.test.jsx"
+    "SOURCE/ui/react-app/patches/minimatch+3.1.5.patch"
   ],
   "retained_sboms": [
     {
@@ -51,24 +48,27 @@
     }
   ],
   "input_equivalence": {
-    "changed_dependency_inputs": [],
-    "basis": "All package, lockfile, postinstall and Python dependency inputs unchanged from f0a3f33074df76269dca76293aa413ed8e1bfb46. Frontend inventory now retains the successful Windows installation from job111110266035; five Python inventories remain unchanged."
+    "changed_dependency_inputs": [
+      "SOURCE/ui/react-app/patches/minimatch+3.1.5.patch"
+    ],
+    "basis": "Restore the original compatibility patch as a reference for the existing immutable private/public ownership mapping. It is not consumed: postinstall remains the bounded native script and patch-package remains absent. package.json, lockfile, executable postinstall script and all Python dependency inputs are unchanged from the qualified preceding revision."
   },
   "prior_binding": {
-    "public_revision": "f0a3f33074df76269dca76293aa413ed8e1bfb46",
+    "public_revision": "cb6f55f25c602ea7b67cfbc362b50959462fe23f",
     "path": "PUBLIC_METADATA/source-binding.json",
-    "git_blob": "3837a12d0431d3cc257d341510794998c181a2ef",
-    "sha256": "d6cd06c4e2dd578344977630540cd90bb0de18157ca43a766a8aedf5ed4e28c5",
-    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/f0a3f33074df76269dca76293aa413ed8e1bfb46/PUBLIC_METADATA/source-binding.json"
+    "git_blob": "fc78b071a4d2b7220e596d9a6f4ef0162997fd51",
+    "sha256": "2443b40e7bbb82c1d83297ef2788536bc6bd8aafa1337ad0191f849fc9abea99",
+    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/cb6f55f25c602ea7b67cfbc362b50959462fe23f/PUBLIC_METADATA/source-binding.json"
   },
   "new_resolution_performed": false,
   "new_advisory_scan_performed": false,
   "new_runtime_qualification_performed": false,
   "qualification": {
-    "scope": "Calendar nested-modal interactivity and canceled appearance preview restoration",
-    "negative_controls": "Original calendar makes its own ancestor inert. Original Cancel and Escape leave preview theme active. Both reproductions fail before changes and pass afterward. Successful Save retains new theme. Sibling settings dialog still makes background inert.",
-    "frontend": "Combined final frontend:138 files/992 tests passed and production build passed on Linux. Uses exact preceding repaired npm lockfile.",
-    "installed_candidate": "pending for these UI repairs",
+    "scope": "Compatibility reference retention for canonical source composition",
+    "runtime_changes": "none; the original reference patch is not invoked by npm postinstall",
+    "negative_control": "Windows candidate run37092507505 stopped before packaging because new scripts/test mappings were absent and the old immutable patch mapping lacked its source. Paired private change adds only the two new explicit mappings; no existing ownership mapping or guard is removed.",
+    "previous_ui_checks": "Public PR12 passed all eight Windows checks before merge; this change does not alter its executable files.",
+    "installed_candidate": "pending",
     "release_or_deployment": "not_established"
   }
 }
