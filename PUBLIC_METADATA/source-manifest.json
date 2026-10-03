@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "dc38779bb0eee16f2821675fcada4d026d3f2a76",
-  "sha256": "953cff851d5db30f9df19d8f9cac5409023e80e0e3bded9d9a0202aec759eeb9",
+  "revision": "d01942c2edf89cc8beccf3efc8ef0a8982ceb578",
+  "sha256": "46cd90191e411ad2fae8f8f115a78e8018fead61e330059ab25fbf47eb4a31b7",
   "files": [
     {
       "path": ".env.example",
@@ -5760,8 +5760,8 @@
     },
     {
       "path": "tests/public/test_windows_native_startup_order.py",
-      "sha256": "4db306345744b80f7fce84d00236c2185a946f276572c86b86f0c66347c9984d",
-      "bytes": 9309
+      "sha256": "65ca4f3a750b752c5557089e638870eec5ea99b686ba61ed7218708948731212",
+      "bytes": 9656
     },
     {
       "path": "themes/viola-dark.css",

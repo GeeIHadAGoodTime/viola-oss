@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "4609390c1dd214d87599f9181e5577d29725179005707a226a0e851fd9f354de",
-  "source_tree_sha256": "953cff851d5db30f9df19d8f9cac5409023e80e0e3bded9d9a0202aec759eeb9",
+  "source_manifest_sha256": "30a3bcb8b538d00b8ba8edc4ffa130a6144261af2f6340ce91a4662d6f4e15f9",
+  "source_tree_sha256": "46cd90191e411ad2fae8f8f115a78e8018fead61e330059ab25fbf47eb4a31b7",
   "source_file_count": 2476,
-  "source_revision": "dc38779bb0eee16f2821675fcada4d026d3f2a76",
+  "source_revision": "d01942c2edf89cc8beccf3efc8ef0a8982ceb578",
   "comparison_public_revision": "9bf530c1cb498e57f3c01c7ecee3e465fc3d998d",
   "changed_source_paths": [
     "SOURCE/config/defaults.py",
@@ -79,7 +79,7 @@
   "qualification": {
     "scope": "Repeat runtime/display consistency; native download handling and visible export failure; hotkey collision normalization and metadata; truthful redacted tool detail/status; managed GPT-6 Luna source defaults and price accounting without changing BYOK/local/Codex selection. Private managed forwarding and phone integration are separate pending work.",
     "negative_controls": "Original-source failures retained for repeat, native export handler, export duplicate requests, hotkey normalization/metadata, tool-card rendering and managed Luna defaults. Synthetic behavior/source tests only.",
-    "python_checks": "101 public Python contracts passed on Linux.",
+    "python_checks": "101 public Python contracts passed on Linux. First Windows run found one POSIX-only path assertion in the native download test; fixture now checks both PureWindowsPath and PurePosixPath with unchanged path-selection/order/cancellation assertions. Corrected Windows CI pending.",
     "frontend_checks": "138 test files / 1046 tests passed on Linux; production frontend build passed in 4.81 seconds. Windows CI pending.",
     "installed_candidate": "pending; Surface remains held for consolidated batch",
     "release_or_deployment": "not_established"
