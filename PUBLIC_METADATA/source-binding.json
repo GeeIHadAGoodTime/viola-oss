@@ -1,22 +1,27 @@
 {
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "9d04f6472566695628cae5942cacaf49c7a5dbf9ba9a3bf34877926784a2516b",
-  "source_tree_sha256": "cb806d8a5c6ae1dac31715aff6e92ed6d52a4256ab7774065d25839ebf0a9536",
-  "source_file_count": 2474,
-  "source_revision": "c2a76353e29c362b489df1efc9f24a0e58c86b3d",
+  "source_manifest_sha256": "93d79dd4a1959511706c531caf0a6711bcb70c22c555458e7bc0ec143a6dd1f2",
+  "source_tree_sha256": "b24158387517354ff773d800dc73f4c3a281b4409e60d8b909ec6ad37e19a6e4",
+  "source_file_count": 2475,
+  "source_revision": "5ff3e237c745cdfdd21cdbad03639bdb1f49714b",
   "comparison_public_revision": "f8adf3f33cce142f3751f7a5350b781ac4171b91",
   "changed_source_paths": [
     "SOURCE/tests/public/test_execution_safety_contract.py",
     "SOURCE/ui/api/routes/llm_stream.py",
+    "SOURCE/ui/react-app/package-lock.json",
+    "SOURCE/ui/react-app/package.json",
+    "SOURCE/ui/react-app/patches/minimatch+3.1.5.patch",
+    "SOURCE/ui/react-app/scripts/patch-minimatch-interop.mjs",
+    "SOURCE/ui/react-app/tests/minimatch_interop.test.js",
     "SOURCE/ui/security/auth.py"
   ],
   "retained_sboms": [
     {
       "path": "frontend.sbom.json",
-      "sha256": "e28d3b8ed9062fa94566f1923bbf091fb4b0544774763775dbaff347777b2f98",
-      "components": 431,
-      "inventory_status": "retained_exact_october_1_clean_windows_inventory"
+      "sha256": "1218872299ce488f3e92164e6d5b6c3825aade310999a072cc03345c7b2bf88a",
+      "components": 406,
+      "inventory_status": "fresh_linux_npm_ci_inventory_20261003_windows_confirmation_pending"
     },
     {
       "path": "windows-all-optional.sbom.json",
@@ -50,9 +55,13 @@
     }
   ],
   "input_equivalence": {
-    "unchanged_dependency_input_count": 545,
-    "changed_dependency_inputs": [],
-    "basis": "All dependency inputs unchanged from the preceding public source revision. Retained inventories and dated receipts are not fresh platform qualification or advisory scans."
+    "changed_dependency_inputs": [
+      "SOURCE/ui/react-app/package.json",
+      "SOURCE/ui/react-app/package-lock.json",
+      "SOURCE/ui/react-app/patches/minimatch+3.1.5.patch",
+      "SOURCE/ui/react-app/scripts/patch-minimatch-interop.mjs"
+    ],
+    "basis": "Python dependency inputs and five Windows inventories unchanged. Frontend npm graph re-resolved after removal of patch-package; fresh Linux inventory recorded honestly. Existing Windows CI must independently install, audit and inventory this exact lockfile before integration."
   },
   "prior_binding": {
     "public_revision": "f8adf3f33cce142f3751f7a5350b781ac4171b91",
@@ -61,8 +70,8 @@
     "sha256": "f329c5c2087c7d55e5966d7d403a85109d8dc8d6696c60c45254b9296b9fabab",
     "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/f8adf3f33cce142f3751f7a5350b781ac4171b91/PUBLIC_METADATA/source-binding.json"
   },
-  "new_resolution_performed": false,
-  "new_advisory_scan_performed": false,
+  "new_resolution_performed": true,
+  "new_advisory_scan_performed": true,
   "new_runtime_qualification_performed": false,
   "qualification": {
     "scope": "Scoped EventSource middleware and route authentication correction following installed SSE401",
@@ -70,8 +79,9 @@
     "stream_auth_tests": 8,
     "negative_controls": "Original middleware rejects valid SSE credentials with401; original loopback principal differs from owning desktop. Corrected in-process route delivers synthetic terminal data to its owner and denies another account with403. Wrong scope/method/signature, expired token, invalid account credentials, remote legacy token and general WS token are rejected.",
     "local_full_suite": "Attempted:73 collected, one import error because minimal local environment lacks pipecat-ai package metadata; no skipped or weakened assertions",
-    "frontend": "unchanged",
+    "frontend": "Fresh npm ci, full 988-test suite and production build passed on Linux Node24.19.0/npm11.9.0. npm audit reports zero vulnerabilities. Windows checks pending.",
     "installed_candidate": "pending for this revision",
-    "release_or_deployment": "not_established"
+    "release_or_deployment": "not_established",
+    "dependency_repair": "Remove patch-package and its vulnerable braces transitive graph. Preserve the exact existing minimatch3.1.5/brace-expansion5.0.12 interoperability correction with a bounded, idempotent postinstall script that rejects unexpected source/version. No audit exceptions, assertion weakening or dependency downgrades."
   }
 }
