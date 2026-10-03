@@ -1,8 +1,8 @@
 import ast
 import builtins
+import unittest
 from pathlib import Path
 from types import SimpleNamespace
-import unittest
 
 ENTRY = Path(__file__).resolve().parents[2] / "viola_qt.py"
 
@@ -80,3 +80,25 @@ class WindowsNativeStartupOrderTests(unittest.TestCase):
             ENTRY.read_text(encoding="utf-8").index("\n_preload_windows_ui_runtime()"),
         )
         self.assertLess(calls["_preload_windows_ui_runtime"], min(imports))
+
+
+class InitialWindowGeometryTests(unittest.TestCase):
+    def test_initial_window_fits_available_logical_screen(self):
+        path = ENTRY.parent / "ui/qt_native/webview_window.py"
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        setup = next(n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == "_setup_window")
+        qt = SimpleNamespace(WindowType=SimpleNamespace(FramelessWindowHint=1), WidgetAttribute=SimpleNamespace(WA_TranslucentBackground=2))
+        namespace = {"Qt": qt}
+        exec(compile(ast.Module(body=[setup], type_ignores=[]), str(path), "exec"), namespace)
+        for left, top, width, height in [(0, 0, 1024, 728), (0, 0, 800, 560), (0, 0, 1364, 900), (0, 40, 1920, 1040), (-1280, 20, 1280, 720)]:
+            with self.subTest(screen=(left, top, width, height)):
+                calls = {}
+                geometry = SimpleNamespace(width=lambda: width, height=lambda: height, left=lambda: left, top=lambda: top)
+                window = SimpleNamespace(screen=lambda: SimpleNamespace(availableGeometry=lambda: geometry))
+                for name in ["setWindowTitle", "setWindowFlags", "setAttribute", "setStyleSheet", "setMouseTracking", "setMinimumSize", "resize", "move"]:
+                    setattr(window, name, lambda *args, key=name: calls.__setitem__(key, args))
+                namespace["_setup_window"](window)
+                expected_size = (min(1400, width), min(800, height))
+                self.assertEqual(calls["resize"], expected_size)
+                self.assertEqual(calls["setMinimumSize"], (min(1024, width), min(600, height)))
+                self.assertEqual(calls.get("move"), (left + (width - expected_size[0]) // 2, top + (height - expected_size[1]) // 2))
