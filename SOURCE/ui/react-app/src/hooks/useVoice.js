@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useLayoutEffect } from 'react';
 import { describeError, describeMicError, ERROR_CODE_MESSAGES } from '../utils/describeError';
 import { authFetch } from './useViolaApi';
 
@@ -420,6 +420,13 @@ export function useVoice(onCommandResult, { existingStream, executeCommand = tru
   useEffect(() => {
     if (!enabled && captureGenerationRef.current > 0) cancelRecording();
   }, [enabled, cancelRecording]);
+
+  // Pending permission/transcription promises belong to this hook's mounted
+  // owner. Retire their generation before a different account can mount a
+  // new voice hook; late owned microphone grants then release themselves.
+  useLayoutEffect(() => () => {
+    if (captureGenerationRef.current > 0) cancelRecording();
+  }, [cancelRecording]);
 
   return {
     isRecording,

@@ -95,6 +95,17 @@ describe('MemoryPanel -- cloud SPA Memory tab reads/writes /v1/memories (#1182)'
     delete window.viola;
   });
 
+  it('closes on Escape only while open', async () => {
+    const onClose = vi.fn();
+    const {rerender} = render(<MemoryPanel isOpen onClose={onClose} />);
+    await screen.findByText('Loves jazz on weekends');
+    fireEvent.keyDown(document,{key:'Escape'});
+    expect(onClose).toHaveBeenCalledTimes(1);
+    rerender(<MemoryPanel isOpen={false} onClose={onClose} />);
+    fireEvent.keyDown(document,{key:'Escape'});
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
   it('renders a real cloud memory via /v1/memories instead of a DesktopUpsell', async () => {
     render(<MemoryPanel isOpen onClose={() => {}} />);
 

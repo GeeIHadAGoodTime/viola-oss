@@ -14,12 +14,13 @@ function getWakeColors(status) {
     off: { ring: THEME.colors.textMuted, glow: 'transparent' },
     degraded: { ring: THEME.colors.statusYellow, glow: `${THEME.colors.statusYellow}66` },
     listening: { ring: THEME.colors.statusGreen, glow: `${THEME.colors.statusGreen}66` },
+    unavailable: { ring: THEME.colors.statusYellow, glow: `${THEME.colors.statusYellow}66` },
     starting: { ring: THEME.colors.statusYellow, glow: `${THEME.colors.statusYellow}66` },
   };
   return map[status] || map.off;
 }
 
-const PTTButton = ({ active, disabled, wakeStatus, onMouseDown, onMouseUp, onIntent }) => {
+const PTTButton = ({ active, disabled, wakeStatus, statusDescriptionId, onMouseDown, onMouseUp, onIntent }) => {
   const [isPressed, setIsPressed] = useState(false);
   const colors = getWakeColors(wakeStatus);
 
@@ -55,6 +56,7 @@ const PTTButton = ({ active, disabled, wakeStatus, onMouseDown, onMouseUp, onInt
       onMouseEnter={onIntent}
       onFocus={onIntent}
       aria-label="Push to talk"
+      aria-describedby={statusDescriptionId}
       disabled={disabled}
       className={`${styles.button} ${isActive ? styles.active : ''} ${disabled ? styles.disabled : ''}`}
       style={{
@@ -90,6 +92,7 @@ PTTButton.propTypes = {
   active: PropTypes.bool,
   disabled: PropTypes.bool,
   wakeStatus: PropTypes.string.isRequired,
+  statusDescriptionId: PropTypes.string,
   onMouseDown: PropTypes.func,
   onMouseUp: PropTypes.func,
   onIntent: PropTypes.func,

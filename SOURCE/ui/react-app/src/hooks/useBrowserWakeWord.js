@@ -80,6 +80,8 @@ export function useBrowserWakeWord({
 
     const runId = ++runIdRef.current;
     let cancelled = false;
+    wasPausedRef.current = false;
+    pauseObservedRef.current = false;
     setError(null);
     setStatus('loading');
 
@@ -114,10 +116,10 @@ export function useBrowserWakeWord({
     };
 
     const pump = async () => {
-      if (pumpingRef.current) return;
+      if (cancelled || runId !== runIdRef.current || pumpingRef.current) return;
       pumpingRef.current = true;
       try {
-        while (queueRef.current.length > 0) {
+        while (!cancelled && runId === runIdRef.current && queueRef.current.length > 0) {
           const frame = queueRef.current.shift();
           const detector = detectorRef.current;
           if (!detector) break;
@@ -160,7 +162,9 @@ export function useBrowserWakeWord({
           }
         }
       } finally {
-        pumpingRef.current = false;
+        // A completed inference from the previous run must not unlock the new
+        // run and allow two detect() calls to race on the same model state.
+        if (!cancelled && runId === runIdRef.current) pumpingRef.current = false;
       }
     };
 
@@ -190,8 +194,16 @@ export function useBrowserWakeWord({
           classifierModelUrl: `${base}${MODELS.classifier}`,
           ortOptions: { executionProviders: ['wasm'] },
         });
-        await detector.load();
-        if (cancelled || runId !== runIdRef.current) return;
+        try {
+          await detector.load();
+        } catch (err) {
+          try { detector.dispose(); } catch { /* noop */ }
+          throw err;
+        }
+        if (cancelled || runId !== runIdRef.current) {
+          try { detector.dispose(); } catch { /* noop */ }
+          return;
+        }
         detectorRef.current = detector;
 
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -229,6 +241,7 @@ export function useBrowserWakeWord({
         const worklet = new AudioWorkletNode(audioCtx, 'wake-capture-worklet');
         workletRef.current = worklet;
         worklet.port.onmessage = (event) => {
+          if (cancelled || runId !== runIdRef.current) return;
           const frame = event.data;
           if (!(frame instanceof Float32Array)) return;
           // Bounded queue: if we ever fall behind realtime, drop oldest so we

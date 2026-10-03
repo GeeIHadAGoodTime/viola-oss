@@ -1,5 +1,5 @@
 /* eslint react/jsx-uses-vars: "error" */
-import React, { Suspense, lazy, useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { Suspense, lazy, useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef } from 'react';
 import PropTypes from 'prop-types';
 import { usePlayerState } from './hooks/usePlayerState';
 import { useWebSocket } from './hooks/useWebSocket';
@@ -497,7 +497,20 @@ ProviderEmbed.propTypes = {
 // END OF MODULE-SCOPE COMPONENTS
 // =========================================================================
 
-export default function SmartDisplay({ isSpoke = false, micStream = null, room = null }) {
+export default function SmartDisplay(props) {
+  const { user } = useAuth();
+  // A principal owns every pending turn and its UI state. Replacing that
+  // owner runs existing listener/stream cleanup and makes old state setters
+  // inert, instead of letting a reset-only fix accept an old completion.
+  return <PrincipalSmartDisplay key={user?.id || 'device'} {...props} />;
+}
+
+function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null }) {
+  const mountedRef = useRef(true);
+  useLayoutEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
 
   // Real state from backend (includes send for WebSocket commands, setLocalIsPlaying for optimistic updates)
   const playerState = usePlayerState();
@@ -960,6 +973,7 @@ export default function SmartDisplay({ isSpoke = false, micStream = null, room =
   const dismissCard = useCallback(() => setActiveCard(null), []);
   const [agentDrawerExpanded, setAgentDrawerExpanded] = useState(true);
   const handleAgentResult = useCallback(({ content }) => {
+    if (!mountedRef.current) return;
     setLastResponse(content);
     setMainThinking('');
     setChatHistory(prev => [
@@ -1154,6 +1168,7 @@ export default function SmartDisplay({ isSpoke = false, micStream = null, room =
   }, [openSettingsPanel]);
 
   const handleCommandResult = useCallback((result) => {
+    if (!mountedRef.current) return;
     if (result) {
       // Turn-complete backstop (#1407): the arrival of a command result IS the
       // authoritative "this turn is done" signal for every command path (voice
@@ -1378,16 +1393,16 @@ export default function SmartDisplay({ isSpoke = false, micStream = null, room =
     Number.isFinite(wakeSensitivity) && wakeSensitivity > 0 && wakeSensitivity <= 1
       ? wakeSensitivity
       : 0.9;
+  const browserWakePaused = voice.isRecording || voice.isProcessing || cloudLlmConsentOpen || cloudWelcomeOpen;
   const browserWake = useBrowserWakeWord({
-    enabled: handsFreeWake && (isSpoke || cloudSurfaceActive),
+    enabled: !settingsLoading && voiceCaptureEnabled && handsFreeWake && (isSpoke || cloudSurfaceActive),
     // Pause the wake loop while a turn is being captured/processed or the
     // consent modal is up, so the detector can't re-trigger mid-turn.
-    paused: voice.isRecording || voice.isProcessing || cloudLlmConsentOpen || cloudWelcomeOpen,
+    paused: browserWakePaused,
     onWake: browserWakeOnWake,
     onStreamReady: setWakeStream,
     threshold: browserWakeThreshold,
   });
-  const browserWakeListening = browserWake.status === 'listening';
 
   // Voice processing timeout
   const [processingTooLong, setProcessingTooLong] = useState(false);
@@ -1634,22 +1649,40 @@ export default function SmartDisplay({ isSpoke = false, micStream = null, room =
   // Track rating
   const [rating, setRating] = useState(null);
 
-  // Wake detector status
-  const [wakeDetectorRunning, setWakeDetectorRunning] = useState(false);
+  // Reuse the existing health poll. Configuration and a previous successful
+  // response are not proof that the detector is still listening.
+  const [wakeDetectorHealth, setWakeDetectorHealth] = useState(null);
   useEffect(() => {
+    let cancelled = false;
+    let pendingRequest = null;
     const checkWakeStatus = async () => {
+      if (pendingRequest) {
+        // A request that outlives the next poll cannot keep an old green claim.
+        pendingRequest.abort();
+        setWakeDetectorHealth(null);
+      }
+      const request = new AbortController();
+      pendingRequest = request;
       try {
         const base = window.__VIOLA_BASE_URL__ || window.location.origin;
-        const response = await fetch(`${base}/health`);
-        if (response.ok) {
-          const data = await response.json();
-          setWakeDetectorRunning(data?.dependencies?.wake_detector?.is_running ?? false);
+        const response = await fetch(`${base}/health`, { signal: request.signal });
+        const data = response.ok ? await response.json() : null;
+        if (!cancelled && pendingRequest === request) {
+          setWakeDetectorHealth(data?.dependencies?.wake_detector ?? null);
         }
-      } catch (e) { /* silently ignore */ }
+      } catch {
+        if (!cancelled && pendingRequest === request) setWakeDetectorHealth(null);
+      } finally {
+        if (pendingRequest === request) pendingRequest = null;
+      }
     };
     checkWakeStatus();
     const interval = setInterval(checkWakeStatus, 3000);
-    return () => clearInterval(interval);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+      pendingRequest?.abort();
+    };
   }, []);
 
   // =========================================================================
@@ -1679,6 +1712,7 @@ export default function SmartDisplay({ isSpoke = false, micStream = null, room =
   useEffect(() => {
     if (!setChatResponseCallback) return;
     const handleChatResponse = (payload) => {
+      if (!mountedRef.current) return;
       dispatchUiActions(payload);
       const text = payload.text || '';
       if (!text) return;
@@ -1746,20 +1780,29 @@ export default function SmartDisplay({ isSpoke = false, micStream = null, room =
   // so the report has to be deduped per video or it becomes a 1 Hz broadcast.
   const notStartedReportedRef = useRef(null);
 
-  // Wake word status.
-  //
-  // `userSettings` is empty until the settings fetch resolves. Comparing the
-  // loaded value alone would silently mean "not wake_word" during that window,
-  // so a wake-enabled install reports wake as OFF for the first paint. An absent
-  // value falls back to the shipped default (config/defaults.py
-  // DEFAULT_VOICE_MODE) instead, which is what the install will actually be.
-  const wakeWordEnabled = (userSettings?.voice_mode ?? 'wake_word') === 'wake_word';
+  // Wake selection is only configuration. Report detection from this
+  // surface's live signal, with Disabled/mute taking precedence over stale
+  // native health while settings changes are being applied.
   const wakeStatus = (() => {
     if (voice.isRecording) return 'recording';
     if (voice.isProcessing) return 'processing';
+    if (userSettings?.voice_mode === 'disabled') return 'off';
+    if (userSettings?.mic_muted) return 'muted';
+    if (isSpoke || cloudSurfaceActive) {
+      if (!handsFreeWake) return 'off';
+      if (browserWake.status === 'error') return 'unavailable';
+      if (browserWake.status === 'loading') return 'starting';
+      if (browserWake.status === 'listening') return browserWakePaused ? 'paused' : 'wake_listening';
+      return 'unknown';
+    }
+    if ((userSettings?.voice_mode ?? 'wake_word') !== 'wake_word') return 'off';
+    if (settingsLoading) return 'unknown';
+    if (wakeDetectorHealth?.reason === 'not_initialized') return 'starting';
+    if (wakeDetectorHealth?.status === 'error' || wakeDetectorHealth?.status === 'degraded') return 'unavailable';
     if (voiceStatus?.degraded) return 'degraded';
-    if (wakeDetectorRunning || browserWakeListening) return 'wake_listening';
-    return wakeWordEnabled ? 'enabled' : 'off';
+    if (wakeDetectorHealth?.status === 'ok' && wakeDetectorHealth.is_running === true) return 'wake_listening';
+    if (wakeDetectorHealth?.status === 'ok' && wakeDetectorHealth.is_running === false) return 'stopped';
+    return 'unknown';
   })();
 
   // =========================================================================
@@ -3310,7 +3353,7 @@ export default function SmartDisplay({ isSpoke = false, micStream = null, room =
             the chat-stage toggle) — while the wake mic is active the hot-mic
             state must be visible on every stage, never hidden by layout
             state. Renders nothing when hands-free is off. */}
-        <HandsFreeMicIndicator status={browserWake.status} error={browserWake.error} />
+        <HandsFreeMicIndicator status={browserWake.status} error={browserWake.error} paused={browserWakePaused} />
 
         {!isChatStageActive && (
           <>
@@ -3461,7 +3504,7 @@ export default function SmartDisplay({ isSpoke = false, micStream = null, room =
       {historyOpen && (
         <ChunkLoadErrorBoundary name="History">
           <Suspense fallback={<ModalLoadingSpinner />}>
-            <HistoryModal isOpen={historyOpen} onClose={() => setHistoryOpen(false)} history={chatHistory} onClearHistory={() => setChatHistory([])} timeFormat={userSettings.time_display_format || 'auto'} />
+            <HistoryModal principalKey={accountUser?.id || 'device'} isOpen={historyOpen} onClose={() => setHistoryOpen(false)} history={chatHistory} onClearHistory={() => setChatHistory([])} timeFormat={userSettings.time_display_format || 'auto'} />
           </Suspense>
         </ChunkLoadErrorBoundary>
       )}
@@ -3598,3 +3641,5 @@ SmartDisplay.propTypes = {
   micStream: PropTypes.object,
   room: PropTypes.string,
 };
+
+PrincipalSmartDisplay.propTypes = SmartDisplay.propTypes;

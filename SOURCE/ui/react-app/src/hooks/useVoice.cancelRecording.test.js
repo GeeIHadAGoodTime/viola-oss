@@ -142,4 +142,51 @@ describe('voice capture enablement', () => {
     expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledTimes(2);
     act(() => result.current.cancelRecording());
   });
+  it('review: does not execute a transcript delivered after unmount', async () => {
+    const { useVoice } = await import('./useVoice');
+    const { authFetch } = await import('./useViolaApi');
+    let releaseTranscript;
+    authFetch.mockImplementation(url => url === '/v1/transcribe'
+      ? new Promise(resolve => { releaseTranscript = resolve; })
+      : Promise.resolve({ json: async () => ({ ok: true }) }));
+    const onResult = vi.fn();
+    const hook = renderHook(() => useVoice(onResult));
+    await act(async () => { await hook.result.current.startRecording(); });
+    recorderInstances[0].ondataavailable({ data: new Blob(['x'.repeat(200)]) });
+    let stopping;
+    act(() => { stopping = hook.result.current.stopRecording(); });
+    hook.unmount();
+    await act(async () => {
+      releaseTranscript({ json: async () => ({ ok: true, data: { text: 'synthetic old-account command' } }) });
+      await stopping;
+    });
+    expect(authFetch.mock.calls.some(([url]) => url === '/v1/command')).toBe(false);
+    expect(onResult).not.toHaveBeenCalled();
+  });
+
+  it('review: releases an owned late microphone grant after unmount', async () => {
+    let release;
+    navigator.mediaDevices.getUserMedia.mockImplementation(() => new Promise(resolve => { release = resolve; }));
+    const { useVoice } = await import('./useVoice');
+    const hook = renderHook(() => useVoice());
+    let pending;
+    act(() => { pending = hook.result.current.startRecording(); });
+    hook.unmount();
+    await act(async () => { release(stream); await pending; });
+    expect(track.stop).toHaveBeenCalled();
+    expect(recorderInstances).toHaveLength(0);
+  });
+
+  it.each([false, true])('review: cancels capture on unmount without stopping borrowed tracks (shared=%s)', async shared => {
+    const { useVoice } = await import('./useVoice');
+    const { authFetch } = await import('./useViolaApi');
+    const hook = renderHook(() => useVoice(undefined, shared ? { existingStream: stream } : {}));
+    await act(async () => { await hook.result.current.startRecording(); });
+    expect(recorderInstances[0].state).toBe('recording');
+    hook.unmount();
+    expect(recorderInstances[0].state).toBe('inactive');
+    expect(track.stop).toHaveBeenCalledTimes(shared ? 0 : 1);
+    expect(authFetch.mock.calls.some(([url]) => url === '/v1/transcribe')).toBe(false);
+  });
+
 });

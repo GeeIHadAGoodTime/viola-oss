@@ -9473,7 +9473,9 @@ class AgentExecutor:
         # provider globals are only a compatibility fallback.
         known_names: list[str] | None = None
         _provider_tools = self._get_request_native_tools()
-        if isinstance(_provider_tools, (list, tuple)) and _provider_tools:
+        # An explicitly empty request surface authorizes no tools. Only an
+        # unspecified surface may fall back to the hub's discovered catalog.
+        if isinstance(_provider_tools, (list, tuple)):
             known_names = sorted(t.get("name", "") for t in _provider_tools if isinstance(t, dict) and t.get("name"))
         elif self._mcp_hub is not None:
             raw = self._mcp_hub.list_tools()

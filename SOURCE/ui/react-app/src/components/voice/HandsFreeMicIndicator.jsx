@@ -11,7 +11,7 @@
 import PropTypes from 'prop-types';
 import { THEME } from '../../config';
 
-export default function HandsFreeMicIndicator({ status, error, theme = THEME }) {
+export default function HandsFreeMicIndicator({ status, error, paused = false, theme = THEME }) {
   if (status === 'off') return null;
 
   const listening = status === 'listening';
@@ -23,9 +23,11 @@ export default function HandsFreeMicIndicator({ status, error, theme = THEME }) 
       : theme.colors.statusYellow;
   const label = failed
     ? `Hands-free unavailable: ${error || 'wake word failed to start'}`
-    : listening
-      ? 'Hands-free on — mic is listening for "Viola"'
-      : 'Hands-free: starting…';
+    : listening && paused
+      ? 'Hands-free on — mic active; wake detection paused'
+      : listening
+        ? 'Hands-free on — mic is listening for "Viola"'
+        : 'Hands-free: starting…';
 
   return (
     <div
@@ -72,5 +74,6 @@ export default function HandsFreeMicIndicator({ status, error, theme = THEME }) 
 HandsFreeMicIndicator.propTypes = {
   status: PropTypes.oneOf(['off', 'loading', 'listening', 'error']).isRequired,
   error: PropTypes.string,
+  paused: PropTypes.bool,
   theme: PropTypes.object,
 };

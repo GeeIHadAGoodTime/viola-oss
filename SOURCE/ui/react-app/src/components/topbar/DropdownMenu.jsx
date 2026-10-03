@@ -1,13 +1,32 @@
 /**
  * DropdownMenu — Navigation menu with ARIA roles and keyboard support.
  */
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
 import { THEME } from '../../config';
 import styles from './DropdownMenu.module.css';
 
 const DropdownMenu = ({ isOpen, onClose, onOpenHistory, onOpenQueue, onOpenSettings, onOpenRooms, onOpenHelp }) => {
   const itemRefs = useRef([]);
+  const openerRef = useRef(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    openerRef.current = document.activeElement;
+    itemRefs.current[0]?.focus();
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const handleEscape = (event) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      onClose?.();
+      openerRef.current?.focus();
+    };
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -28,10 +47,7 @@ const DropdownMenu = ({ isOpen, onClose, onOpenHistory, onOpenQueue, onOpenSetti
   };
 
   const handleKeyDown = (e, idx) => {
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      onClose?.();
-    } else if (e.key === 'ArrowDown') {
+    if (e.key === 'ArrowDown') {
       e.preventDefault();
       const next = (idx + 1) % menuItems.length;
       itemRefs.current[next]?.focus();
@@ -59,7 +75,12 @@ const DropdownMenu = ({ isOpen, onClose, onOpenHistory, onOpenQueue, onOpenSetti
           key={item.icon}
           ref={el => { itemRefs.current[idx] = el; }}
           role="menuitem"
-          onClick={item.onClick}
+          onClick={() => {
+            // A dialog opened by this item must remember the persistent
+            // trigger, rather than the menu item that is about to unmount.
+            openerRef.current?.focus();
+            item.onClick?.();
+          }}
           aria-label={item.label}
           onKeyDown={(e) => handleKeyDown(e, idx)}
           className={styles.menuItem}
