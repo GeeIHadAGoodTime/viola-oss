@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "1608c78c1b4464b96232c22174c73cac4025ba6b",
-  "sha256": "9d600709dd79f4b5b1390a501771a127a7ad7f89665cedeccfae7edaff0fbbb5",
+  "revision": "cc9cde01ebbea40d9ebf8cacad792ff0de996a29",
+  "sha256": "e1e39723d14c3c2397fe460e9fb2bd2975e1147972be052d5790771a5895ffa0",
   "files": [
     {
       "path": ".env.example",
@@ -965,7 +965,7 @@
     },
     {
       "path": "core/constants.py",
-      "sha256": "fa71a52aec1d6c05c7107ae869217f86ad522d3b73738ecaa617552827fb4d94",
+      "sha256": "d0a0c45ba3fe638ff8d1cb95f12fd8c6ba5a05ed39a9998faa3669a146054edc",
       "bytes": 11919
     },
     {
