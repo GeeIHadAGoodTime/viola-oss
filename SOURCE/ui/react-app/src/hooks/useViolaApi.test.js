@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { getClientApiKey, getClientApiKeySync, getCloudAccessToken } from '../config';
 import { getGoTrueAccessToken } from '../lib/gotrue_client';
-import { authFetch, buildStreamUrl, sendCommandStreaming } from './useViolaApi';
+import { renderHook } from '@testing-library/react';
+import { useViolaApi, authFetch, buildStreamUrl, sendCommandStreaming } from './useViolaApi';
 
 vi.mock('../config', () => ({
   getClientApiKey: vi.fn(),
@@ -241,4 +242,26 @@ describe('sendCommandStreaming', () => {
       expect.objectContaining({ method: 'POST' }),
     );
   });
+});
+
+
+describe('playback seek units', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getClientApiKey.mockResolvedValue('');
+    getClientApiKeySync.mockReturnValue('');
+    getCloudAccessToken.mockReturnValue('');
+    getGoTrueAccessToken.mockResolvedValue('');
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ data: {} }) });
+  });
+
+  it.each([[0, 0], [3, 3000], [3.125, 3125], [119.9996, 120000]])(
+    'converts UI %s seconds to backend %s milliseconds', async (seconds, milliseconds) => {
+      const { result } = renderHook(() => useViolaApi());
+      await result.current.seek(seconds);
+      expect(global.fetch).toHaveBeenCalledWith('/v1/seek', expect.objectContaining({
+        method: 'POST', body: JSON.stringify({ position: milliseconds }),
+      }));
+    },
+  );
 });

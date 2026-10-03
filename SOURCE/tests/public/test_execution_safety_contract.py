@@ -824,5 +824,88 @@ class StreamTransportContract(unittest.TestCase):
                     remove_stream("test-stream")
 
 
+class SimpleAudioPauseContract(unittest.TestCase):
+    """Exercise the real playback loop with deterministic PCM and a fake sink."""
+
+    def _run_loop(self, *, action='resume', pause_during_read=False):
+        import threading
+        import numpy as np
+
+        logger_module = types.ModuleType('core.logging_config')
+        logger_module.get_logger = logging.getLogger
+        base_module = types.ModuleType('music.backends.base')
+        base_module.BackendProgress = lambda **kw: SimpleNamespace(**kw)
+        wiring = types.ModuleType('audio_core.streaming.pipeline_wiring')
+        wiring.get_active_chunk_stamper = lambda: None
+        wiring.set_direct_injection = lambda value: None
+        spec = importlib.util.spec_from_file_location(
+            '_pause_contract_audio', SOURCE_ROOT / 'music/backends/simple_audio.py'
+        )
+        module = importlib.util.module_from_spec(spec)
+        with patch.dict(sys.modules, {
+            'core.logging_config': logger_module,
+            'music.backends.base': base_module,
+            'audio_core.streaming.pipeline_wiring': wiring,
+        }):
+            spec.loader.exec_module(module)
+            backend = SimpleNamespace(
+                _sample_rate=48000, _channels=2, _config=SimpleNamespace(progress_interval_sec=0.01),
+                _stop_event=threading.Event(), _play_generation=1, _paused=False,
+                _is_playing=False, _audio_tee=None, _pos_lock=threading.Lock(),
+                _position_frames=0, _duration_frames=3840, _emit_progress=lambda value: None,
+                _stream=None,
+            )
+            chunks = [(np.ones((960, 2), dtype=np.int16) * value).tobytes() for value in (1, 2, 3, 4)]
+            reads, played, pauses = [], [], []
+            class Pipe:
+                def read(self, size):
+                    reads.append(backend._paused)
+                    if pause_during_read and len(reads) == 2:
+                        backend._paused = True
+                    return chunks.pop(0) if chunks else b''
+            class Sink:
+                def start(self): pass
+                def abort(self): pass
+                def close(self): pass
+                def write(self, data):
+                    if np.any(data):
+                        played.append(int(data[0, 0]))
+                        if len(played) == 1 and not pause_during_read:
+                            backend._paused = True
+                    else:
+                        pauses.append((len(reads), backend._position_frames))
+                        if len(pauses) == 3:
+                            if action == 'stop': backend._stop_event.set()
+                            elif action == 'supersede': backend._play_generation = 2
+                            else: backend._paused = False
+                    if len(pauses) > 6: raise AssertionError('pause loop failed to terminate')
+            module.SimpleBackendAudioOutput(
+                backend, sounddevice_module=SimpleNamespace(OutputStream=lambda **kw: Sink())
+            ).playback_loop(Pipe(), generation=1)
+        return backend, reads, played, pauses
+
+    def test_pause_preserves_remaining_pcm_until_resume(self):
+        backend, reads, played, pauses = self._run_loop()
+        self.assertEqual(played, [1, 2, 3, 4])
+        self.assertEqual(pauses, [(1, 960)] * 3)
+        self.assertFalse(any(reads), 'pause must backpressure the decoder rather than consume content')
+        self.assertEqual(backend._position_frames, 3840)
+
+    def test_pause_arriving_during_read_keeps_the_pending_chunk(self):
+        backend, reads, played, pauses = self._run_loop(pause_during_read=True)
+        self.assertEqual(played, [1, 2, 3, 4])
+        self.assertEqual(pauses, [(2, 960)] * 3)
+        self.assertEqual(backend._position_frames, 3840)
+
+    def test_stop_and_new_generation_exit_pause_without_consuming_more_pcm(self):
+        for action in ('stop', 'supersede'):
+            with self.subTest(action=action):
+                backend, reads, played, pauses = self._run_loop(action=action)
+                self.assertEqual(played, [1])
+                self.assertEqual(len(reads), 1)
+                self.assertEqual(backend._position_frames, 960)
+                self.assertEqual(len(pauses), 3)
+
+
 if __name__ == "__main__":
     unittest.main()

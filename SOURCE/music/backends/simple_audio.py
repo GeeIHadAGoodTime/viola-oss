@@ -34,11 +34,10 @@ class SimpleBackendAudioOutput:
         """
         Main playback loop that reads from FFmpeg stdout and plays via PortAudio.
 
-        During pause the loop keeps draining FFmpeg's stdout to prevent pipe
-        starvation (which would freeze FFmpeg and corrupt resume).  Drained
-        audio is discarded and silence is written to the sounddevice stream
-        so the audio session stays alive.  Position is only advanced while
-        *not* paused.
+        During pause the loop writes paced silence without reading decoded PCM.
+        The bounded pipe backpressures FFmpeg, preserving the remaining track
+        for resume while the sounddevice session stays alive. Position only
+        advances for real audio sent to the output.
 
         Args:
             stdout: FFmpeg stdout pipe
@@ -143,6 +142,23 @@ class SimpleBackendAudioOutput:
             # decode/open failure), which is an ERROR, not a clean end-of-track.
             first_read = True
 
+            def wait_while_paused() -> bool:
+                # Blocking PortAudio writes normally pace silence. Also bound
+                # the loop when a sink returns immediately, without preventing
+                # stop from waking it. Never drain/discard the decoded track.
+                while (
+                    self.backend._paused
+                    and not self.backend._stop_event.is_set()
+                    and self.backend._play_generation == generation
+                ):
+                    started = time.monotonic()
+                    write_fn = getattr(stream, "write", None)
+                    if callable(write_fn):
+                        write_fn(silence_array)
+                    silence_seconds = silence_samples / float(self.backend._sample_rate)
+                    self.backend._stop_event.wait(max(0.0, silence_seconds - (time.monotonic() - started)))
+                return not self.backend._stop_event.is_set() and self.backend._play_generation == generation
+
             # The generation check is load-bearing, not belt-and-braces:
             # _start_stream() CLEARS the shared _stop_event, so a thread that
             # was told to stop but was still parked in a blocking write on a
@@ -151,11 +167,13 @@ class SimpleBackendAudioOutput:
             # position alongside the new thread. The generation is only ever
             # incremented, so a superseded thread exits on its next iteration.
             while not self.backend._stop_event.is_set() and self.backend._play_generation == generation:
-                paused = self.backend._paused
-
-                # Always read from FFmpeg stdout to prevent pipe starvation.
-                # During pause this drains the pipe so FFmpeg never blocks.
+                if not wait_while_paused():
+                    break
                 data = stdout.read(read_chunk_size)
+                # Pause can arrive while read() is blocked. Hold this chunk
+                # until resume instead of playing it or dropping it.
+                if not wait_while_paused():
+                    break
                 if not data:
                     if first_read:
                         # Zero audio ever produced: FFmpeg could not open/decode
@@ -173,14 +191,6 @@ class SimpleBackendAudioOutput:
                     # superseded play/seek cannot resurrect _is_playing.
                     if self.backend._play_generation == generation:
                         self.backend._is_playing = True
-
-                if paused:
-                    # Discard the audio data and write silence to keep the
-                    # sounddevice stream alive (avoids stop/start fragility).
-                    write_fn = getattr(stream, "write", None)
-                    if callable(write_fn):
-                        write_fn(silence_array)
-                    continue
 
                 # Feed raw PCM into AudioTee for multi-room broadcast
                 audio_tee = self.backend._audio_tee
