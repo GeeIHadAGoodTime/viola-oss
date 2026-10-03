@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "e267b8d8a92a097128abbbee64a26da2218f2080",
-  "sha256": "a55ca2de2e788eccd45d34c7fe3f108bcb64e34485a60ef7afc219adfaf3b6ab",
+  "revision": "dc38779bb0eee16f2821675fcada4d026d3f2a76",
+  "sha256": "953cff851d5db30f9df19d8f9cac5409023e80e0e3bded9d9a0202aec759eeb9",
   "files": [
     {
       "path": ".env.example",
@@ -820,8 +820,8 @@
     },
     {
       "path": "config/defaults.py",
-      "sha256": "5549bf76d4516b8b3dd4ab128be8798ae08df03799b68b6b61cc8cc39336401e",
-      "bytes": 22873
+      "sha256": "2bf61b3872b4f5dc7cc7c18bc705a1026859a5fd181ad0aed9410c1e614e3a8a",
+      "bytes": 23328
     },
     {
       "path": "config/env.py",
@@ -2775,8 +2775,8 @@
     },
     {
       "path": "music/playback_session.py",
-      "sha256": "cdc73ce56eaa09f7dbc55fdbfa71454ffb0fb278746b23f94babf57fb9136e1b",
-      "bytes": 16790
+      "sha256": "977ecf11fe7cd532446fa7b5899b217a063bd7372d118b87916e56bdd48d3bd2",
+      "bytes": 17290
     },
     {
       "path": "music/player/__init__.py",
@@ -4300,8 +4300,8 @@
     },
     {
       "path": "services/llm/pricing.py",
-      "sha256": "9781be3ecf6125dc5451ac2c6162de8007bea0da9b7957c83357c371ffd7aa13",
-      "bytes": 9099
+      "sha256": "07e1fc1f13ba1406bd09fcad5a419a822826919e5fd78b416b02fa082ffab311",
+      "bytes": 9686
     },
     {
       "path": "services/llm/prompts/__init__.py",
@@ -4385,8 +4385,8 @@
     },
     {
       "path": "services/llm/providers/openai_compatible.py",
-      "sha256": "ce8e66a65a0635c54326969e083b60054ffef3df29be92e680b0c3a45acda266",
-      "bytes": 179066
+      "sha256": "fcf9744b71490d7734a7d797a35b71e934e3ce89829e764c7594776f97787ee0",
+      "bytes": 179186
     },
     {
       "path": "services/llm/quota_repository.py",
@@ -5270,8 +5270,8 @@
     },
     {
       "path": "skills/builtin/music_control.py",
-      "sha256": "8ec917e49c39b9b156519083bcff71447e2eea0e42e0c43498a41384fc0e6d44",
-      "bytes": 53367
+      "sha256": "d09c6c934e1c6a66c54f35a1ed8ac2bcd0b9a643107a35d8ae14f7627021fe44",
+      "bytes": 53162
     },
     {
       "path": "skills/builtin/screen_look.py",
@@ -5745,8 +5745,8 @@
     },
     {
       "path": "tests/public/test_source_contract.py",
-      "sha256": "20f069897c275468b5059b7f45494868cdda97c6e7cd164c08d92a6ee0f296be",
-      "bytes": 17058
+      "sha256": "45fdfeb0f951da29318d265d5685008e8ed05c33376cb197a05158ce527b446f",
+      "bytes": 29104
     },
     {
       "path": "tests/public/test_tool_allowlist_contract.py",
@@ -5760,8 +5760,8 @@
     },
     {
       "path": "tests/public/test_windows_native_startup_order.py",
-      "sha256": "82264582c8fb357e36194e98e62232c10105a0660b4601e3a18697d560e2050c",
-      "bytes": 6892
+      "sha256": "4db306345744b80f7fce84d00236c2185a946f276572c86b86f0c66347c9984d",
+      "bytes": 9309
     },
     {
       "path": "themes/viola-dark.css",
@@ -8580,8 +8580,8 @@
     },
     {
       "path": "ui/api/routes/chat_mode.py",
-      "sha256": "631836364f73f2a052655c7deb1e0d3526c4182b84986d82e9ddb52e6d9ec4cc",
-      "bytes": 38607
+      "sha256": "f7f00a2e9aea6f56726ae49e9dd4384de3f61d5be7e70a90a68ec314b15a5f2d",
+      "bytes": 39088
     },
     {
       "path": "ui/api/routes/clock.py",
@@ -8615,8 +8615,8 @@
     },
     {
       "path": "ui/api/routes/control.py",
-      "sha256": "dca555942a083236300abe6879fee3ade219d043392769069b1f8f3579eb129e",
-      "bytes": 66361
+      "sha256": "1a536bb6adfa10b11cd3a85e7df4188174c5ded18a018ce8787240e6bba0a64d",
+      "bytes": 66460
     },
     {
       "path": "ui/api/routes/cost.py",
@@ -9060,8 +9060,8 @@
     },
     {
       "path": "ui/qt_native/webview_window.py",
-      "sha256": "924cdc137c0b9befbfd101e44ee972c317fe0a85a2e5564731fc857cc5d47c51",
-      "bytes": 198918
+      "sha256": "abd75a28c9ed4952149ba0aa1e194485fb22c4dcf8820f280a606f9d8caf2ead",
+      "bytes": 200399
     },
     {
       "path": "ui/qt_native/widgets/connectivity_status.py",
@@ -9860,13 +9860,13 @@
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.jsx",
-      "sha256": "da64cf1e427c18ef2de06f93268658b649a06527f83ef52fe9ffc0ed2abb75ed",
-      "bytes": 197175
+      "sha256": "75e6b6a9c732623ea37c54e03bf4cdd47d8bd7fa80dd5ca760625d161ff4d21c",
+      "bytes": 197464
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.sidebar.test.jsx",
-      "sha256": "d4116c60d1b755a189de2a1a6e2ec49cf90cec8791f83fcfb3ad2649ae9b485c",
-      "bytes": 17490
+      "sha256": "ce2d02f112f7ac976f20e65c2cfc0887b9fe5d2be49ccb0df34375f5ea226386",
+      "bytes": 18954
     },
     {
       "path": "ui/react-app/src/components/SpokePairingGate.jsx",
@@ -10515,13 +10515,13 @@
     },
     {
       "path": "ui/react-app/src/components/stage/modes/chat/ChatMode.jsx",
-      "sha256": "688a11237c8c1cb54f32ff60282233d79170191eb96546e0d93d94ef8e37e096",
-      "bytes": 38701
+      "sha256": "0a3b6e973eb94f4a76163a45ed100da31f68fe61ddc53cf20dc468231452fd34",
+      "bytes": 39696
     },
     {
       "path": "ui/react-app/src/components/stage/modes/chat/ChatMode.test.jsx",
-      "sha256": "eed5199b5437a649748d38a9009e4847da32e5bd9bbed05e78722e20ef6eed4e",
-      "bytes": 26850
+      "sha256": "a86bedf8a3070204258643e23edd080b0686411642b7d4fb35cb11d7e064827f",
+      "bytes": 29071
     },
     {
       "path": "ui/react-app/src/components/stage/modes/chat/ChatSidebar.jsx",
@@ -10535,8 +10535,8 @@
     },
     {
       "path": "ui/react-app/src/components/stage/modes/chat/ToolUseCard.jsx",
-      "sha256": "170c09174432514a091b087881b9b949d6b269a34abe186e81f07e2a64f7f82d",
-      "bytes": 2408
+      "sha256": "f91304838197759d18d3e38ea21d11b596a7ffe12512c46fb2e6743ff2531652",
+      "bytes": 2501
     },
     {
       "path": "ui/react-app/src/components/stage/modes/chat/index.js",
@@ -11395,8 +11395,8 @@
     },
     {
       "path": "ui/settings_api.py",
-      "sha256": "1898ba4e1bcce3e595b48a8b68baa5d8b6261f388436d9c37f96e50067e4b808",
-      "bytes": 80431
+      "sha256": "59b2bebdad0c50239eedad8510cdc1b87580bba126264f6a16f46984b282d7e4",
+      "bytes": 81096
     },
     {
       "path": "ui/settings_effects.py",
