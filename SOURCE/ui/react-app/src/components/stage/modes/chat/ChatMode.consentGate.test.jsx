@@ -68,9 +68,9 @@ describe('chat-mode composer consent gate', () => {
       source.indexOf('const sendText = useCallback'),
       source.indexOf('const stopStreaming = useCallback'),
     );
-    expect(sendText).toContain('const threadId = await ensureThread();');
+    expect(sendText).toContain('const threadId = await ensureThread(pendingMessages);');
     const tryIndex = sendText.indexOf('try {');
-    const ensureIndex = sendText.indexOf('const threadId = await ensureThread();');
+    const ensureIndex = sendText.indexOf('const threadId = await ensureThread(pendingMessages);');
     expect(tryIndex).toBeGreaterThan(-1);
     expect(ensureIndex).toBeGreaterThan(tryIndex);
   });

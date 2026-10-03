@@ -526,4 +526,38 @@ describe('ChatMode command registry', () => {
     expect(screen.queryByLabelText('Stop response')).not.toBeInTheDocument();
   });
 
+  it.each(['transport', 'send'])('preserves the first turn in a newly created thread when %s fails', async (failureKind) => {
+    let source;
+    window.EventSource = class {
+      constructor() { source = this; }
+      close = vi.fn();
+    };
+    const newThread = { id: 'fresh-thread', title: 'New chat' };
+    chatHarness.apiFetch.mockImplementation((url, options = {}) => {
+      if (url === '/v1/chat/models') return Promise.resolve({ current_model: 'gpt-test', provider: 'test', providers: [] });
+      if (url === '/v1/chat/threads' && options.method === 'POST') return Promise.resolve({ thread: newThread });
+      if (url === '/v1/chat/threads' || url.startsWith('/v1/chat/threads?')) return Promise.resolve({ threads: [] });
+      if (url === '/v1/chat/threads/fresh-thread/send') {
+        return failureKind === 'send'
+          ? Promise.reject(new Error('send unavailable'))
+          : Promise.resolve({ stream_id: 'fresh-stream' });
+      }
+      return Promise.resolve({});
+    });
+    render(<ChatMode profileName="Test user" />);
+    const input = await screen.findByPlaceholderText('Message Viola');
+    await waitFor(() => expect(input).not.toBeDisabled());
+    fireEvent.change(input, { target: { value: 'first message' } });
+    fireEvent.click(screen.getByLabelText('Send message'));
+    if (failureKind === 'transport') {
+      await waitFor(() => expect(source?.onerror).toBeTypeOf('function'));
+      await act(async () => { source.onerror(); });
+    }
+    await screen.findByText(failureKind === 'transport'
+      ? 'The live response connection dropped.'
+      : 'Something went wrong while sending that message.');
+    expect(screen.getByText('first message')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Stop response')).not.toBeInTheDocument();
+  });
+
 });
