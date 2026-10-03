@@ -1,25 +1,18 @@
 # Source snapshot binding
 
-Source revision: `5ff3e237c745cdfdd21cdbad03639bdb1f49714b`.
+Source revision: `bf964ed8dc21eaa558aa8dd31119516eb17c5422`.
 
-EventSource now presents its signed, stream-bound token to both HTTP authentication
-layers. Acceptance is limited to the exact GET stream endpoint, while account
-cookies and bearer credentials remain authoritative. Loopback desktop tokens
-resolve the active desktop principal, matching the existing stream-owner check.
-No endpoint authentication exemption or general API-key query fallback is added.
+The expanded calendar remains outside inert ancestors while its background stage
+is hidden. Sibling dialogs still make the entire underlying card inert. Cancel
+and Escape restore the saved theme and accent after a Customize preview; Save
+preserves the selected theme.
 
-The26-test execution contract module passes, including eight stream-auth tests.
-The original source fails the valid-token and actual-route reproduction. The
-corrected in-process route returns synthetic data only to its owner and rejects
-the wrong account. A full local contract attempt has one environment import
-error for missing pipecat-ai package metadata. Canonical CI and installed-product
-acceptance remain required. No published customer fix is claimed.
+Both defects were observed in the signed Windows 1.0.4 product. Regression probes
+fail against the preceding source and pass with these changes. The combined
+frontend passes 138 test files / 992 tests and its production build on Linux.
+Installed-candidate verification and public delivery remain pending.
 
-Frontend build-tool dependencies now exclude patch-package and its vulnerable
-braces graph. The existing minimatch compatibility patch is preserved by a
-bounded postinstall script, with regression checks for idempotence, rejection
-of unexpected source, and real glob behavior. Fresh Linux npm ci, 988 frontend
-tests, production build and a zero-finding npm audit passed. The frontend
-inventory was regenerated from that exact Linux installation; Windows CI
-qualification remains required. Five Python inventories remain unchanged.
-No installed or published customer repair is claimed for this revision.
+Dependency inputs are unchanged from f0a3f33074df76269dca76293aa413ed8e1bfb46.
+The frontend inventory retains that revision's successful Windows installation
+(job 111110266035); five Python inventories are unchanged. This is not a new
+runtime or release qualification.

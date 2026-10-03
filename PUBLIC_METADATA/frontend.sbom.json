@@ -1173,12 +1173,12 @@
       "version": "3.0.4"
     },
     {
-      "bom-ref": "@esbuild/linux-x64@0.25.12",
-      "description": "The Linux 64-bit binary for esbuild, a JavaScript bundler.",
+      "bom-ref": "@esbuild/win32-x64@0.25.12",
+      "description": "The Windows 64-bit binary for esbuild, a JavaScript bundler.",
       "externalReferences": [
         {
           "type": "distribution",
-          "url": "https://registry.npmjs.org/@esbuild/linux-x64/-/linux-x64-0.25.12.tgz"
+          "url": "https://registry.npmjs.org/@esbuild/win32-x64/-/win32-x64-0.25.12.tgz"
         },
         {
           "type": "vcs",
@@ -1188,7 +1188,7 @@
       "hashes": [
         {
           "alg": "SHA-512",
-          "content": "baa64c4cbaffcd1fde7788c81a7c122e468798f8ce8c9be79ba4d5562b406b4f122d2f59d1533cc08471ee059b241e7f279e18b883089c3aae5b262f40b66483"
+          "content": "6a5242d2e099a5316b48bd020838dc8257815cf9c2ac40214c120ba5e029eccfce160a2ab407ad7c1cd7d31334d0c52c5553e956394fb8c6d112a9d90976939c"
         }
       ],
       "licenses": [
@@ -1198,14 +1198,14 @@
           }
         }
       ],
-      "name": "@esbuild/linux-x64",
+      "name": "@esbuild/win32-x64",
       "properties": [
         {
           "name": "cdx:npm:package:development",
           "value": "true"
         }
       ],
-      "purl": "pkg:npm/%40esbuild/linux-x64@0.25.12",
+      "purl": "pkg:npm/%40esbuild/win32-x64@0.25.12",
       "scope": "optional",
       "type": "library",
       "version": "0.25.12"
@@ -2472,12 +2472,12 @@
     },
     {
       "author": "Lukas Taegert-Atkinson",
-      "bom-ref": "@rollup/rollup-linux-x64-gnu@4.62.3",
+      "bom-ref": "@rollup/rollup-win32-x64-gnu@4.62.3",
       "description": "Native bindings for Rollup",
       "externalReferences": [
         {
           "type": "distribution",
-          "url": "https://registry.npmjs.org/@rollup/rollup-linux-x64-gnu/-/rollup-linux-x64-gnu-4.62.3.tgz"
+          "url": "https://registry.npmjs.org/@rollup/rollup-win32-x64-gnu/-/rollup-win32-x64-gnu-4.62.3.tgz"
         },
         {
           "type": "vcs",
@@ -2491,7 +2491,7 @@
       "hashes": [
         {
           "alg": "SHA-512",
-          "content": "5782ad5ad41f005314efef7f03f543a6cfd523c087777718cf42fcb20273cfca8aede63bc08e2bb850fcd9460862f5bd6780ed9537e141cb25e17c8f1d6e6e4a"
+          "content": "be9ecdd3ce1ec3fa1d5e7da08bf9b39bd994910bbd97a02237a76de0879433652f9bda3e71598ff9892a6cc3ad78b6e21a0a810652598c83185427ce38855b55"
         }
       ],
       "licenses": [
@@ -2501,26 +2501,26 @@
           }
         }
       ],
-      "name": "@rollup/rollup-linux-x64-gnu",
+      "name": "@rollup/rollup-win32-x64-gnu",
       "properties": [
         {
           "name": "cdx:npm:package:development",
           "value": "true"
         }
       ],
-      "purl": "pkg:npm/%40rollup/rollup-linux-x64-gnu@4.62.3",
+      "purl": "pkg:npm/%40rollup/rollup-win32-x64-gnu@4.62.3",
       "scope": "optional",
       "type": "library",
       "version": "4.62.3"
     },
     {
       "author": "Lukas Taegert-Atkinson",
-      "bom-ref": "@rollup/rollup-linux-x64-musl@4.62.3",
+      "bom-ref": "@rollup/rollup-win32-x64-msvc@4.62.3",
       "description": "Native bindings for Rollup",
       "externalReferences": [
         {
           "type": "distribution",
-          "url": "https://registry.npmjs.org/@rollup/rollup-linux-x64-musl/-/rollup-linux-x64-musl-4.62.3.tgz"
+          "url": "https://registry.npmjs.org/@rollup/rollup-win32-x64-msvc/-/rollup-win32-x64-msvc-4.62.3.tgz"
         },
         {
           "type": "vcs",
@@ -2534,7 +2534,7 @@
       "hashes": [
         {
           "alg": "SHA-512",
-          "content": "2c1c7d2d85ef8f608190c9232dd34058bc07d0c2cc8a7edda3655c568f6454f89b18b918d01410badd9fbfb355aa45ea67f0ab02ef4ba831d5575c4708ca423f"
+          "content": "30e1bfde04ce9f81707f9ef845539a63ad48e68e8ff7495e8241400e24f29f58728cdc9d4fe71ead4dab2d4c0f75990a2b227e893f8af69ed65cae0b33529aea"
         }
       ],
       "licenses": [
@@ -2544,14 +2544,14 @@
           }
         }
       ],
-      "name": "@rollup/rollup-linux-x64-musl",
+      "name": "@rollup/rollup-win32-x64-msvc",
       "properties": [
         {
           "name": "cdx:npm:package:development",
           "value": "true"
         }
       ],
-      "purl": "pkg:npm/%40rollup/rollup-linux-x64-musl@4.62.3",
+      "purl": "pkg:npm/%40rollup/rollup-win32-x64-msvc@4.62.3",
       "scope": "optional",
       "type": "library",
       "version": "4.62.3"
@@ -2703,18 +2703,18 @@
       "version": "2.58.6"
     },
     {
-      "bom-ref": "@sentry/cli-linux-x64@2.58.6",
-      "description": "The linux x64 distribution of the Sentry CLI binary.",
+      "bom-ref": "@sentry/cli-win32-x64@2.58.6",
+      "description": "The windows x64 distribution of the Sentry CLI binary.",
       "externalReferences": [
         {
           "type": "distribution",
-          "url": "https://registry.npmjs.org/@sentry/cli-linux-x64/-/cli-linux-x64-2.58.6.tgz"
+          "url": "https://registry.npmjs.org/@sentry/cli-win32-x64/-/cli-win32-x64-2.58.6.tgz"
         }
       ],
       "hashes": [
         {
           "alg": "SHA-512",
-          "content": "0d9bbde7a3218b76518d305ed5675b195e3a95d55b03c776ae0a7f7e1e751ac236e738c11da878c199cf4d2ce973e62ac54ea9269839efd07faf78eb20ae77d1"
+          "content": "477e56275ee81780f67aa2350d1dac410aabd1f8d14ede71a0fd7a5ab4eef755ccda59dd44c16c9e387efc6b6d6f16a92c204d96b8f389af7d309d0f64766980"
         }
       ],
       "licenses": [
@@ -2724,14 +2724,14 @@
           }
         }
       ],
-      "name": "@sentry/cli-linux-x64",
+      "name": "@sentry/cli-win32-x64",
       "properties": [
         {
           "name": "cdx:npm:package:development",
           "value": "true"
         }
       ],
-      "purl": "pkg:npm/%40sentry/cli-linux-x64@2.58.6",
+      "purl": "pkg:npm/%40sentry/cli-win32-x64@2.58.6",
       "scope": "optional",
       "type": "library",
       "version": "2.58.6"
@@ -17069,7 +17069,7 @@
     },
     {
       "dependsOn": [],
-      "ref": "@esbuild/linux-x64@0.25.12"
+      "ref": "@esbuild/win32-x64@0.25.12"
     },
     {
       "dependsOn": [
@@ -17238,11 +17238,11 @@
     },
     {
       "dependsOn": [],
-      "ref": "@rollup/rollup-linux-x64-gnu@4.62.3"
+      "ref": "@rollup/rollup-win32-x64-gnu@4.62.3"
     },
     {
       "dependsOn": [],
-      "ref": "@rollup/rollup-linux-x64-musl@4.62.3"
+      "ref": "@rollup/rollup-win32-x64-msvc@4.62.3"
     },
     {
       "dependsOn": [
@@ -17282,13 +17282,13 @@
         "progress@2.0.3",
         "proxy-from-env@1.1.0",
         "which@2.0.2",
-        "@sentry/cli-linux-x64@2.58.6"
+        "@sentry/cli-win32-x64@2.58.6"
       ],
       "ref": "@sentry/cli@2.58.6"
     },
     {
       "dependsOn": [],
-      "ref": "@sentry/cli-linux-x64@2.58.6"
+      "ref": "@sentry/cli-win32-x64@2.58.6"
     },
     {
       "dependsOn": [],
@@ -17993,7 +17993,7 @@
     },
     {
       "dependsOn": [
-        "@esbuild/linux-x64@0.25.12"
+        "@esbuild/win32-x64@0.25.12"
       ],
       "ref": "esbuild@0.25.12"
     },
@@ -19058,8 +19058,8 @@
     {
       "dependsOn": [
         "@types/estree@1.0.9",
-        "@rollup/rollup-linux-x64-gnu@4.62.3",
-        "@rollup/rollup-linux-x64-musl@4.62.3"
+        "@rollup/rollup-win32-x64-gnu@4.62.3",
+        "@rollup/rollup-win32-x64-msvc@4.62.3"
       ],
       "ref": "rollup@4.62.3"
     },
@@ -19616,23 +19616,23 @@
       },
       {
         "name": "viola:platform-system",
-        "value": "Linux"
+        "value": "Windows"
       },
       {
         "name": "viola:package-lock-sha256",
         "value": "e2537605cc28b2972a29f8d6e5952f3d5ab2f9539979b9246cea5645264ed8f4"
       }
     ],
-    "timestamp": "2026-10-03T02:35:41.148Z",
+    "timestamp": "2026-10-03T02:43:06.340Z",
     "tools": [
       {
         "name": "cli",
         "vendor": "npm",
-        "version": "11.9.0"
+        "version": "11.19.0"
       }
     ]
   },
-  "serialNumber": "urn:uuid:fe8ea38d-ed05-40ef-93f1-507ba4d4c7ce",
+  "serialNumber": "urn:uuid:6aabf963-8d19-4191-876e-fb1b78cc7d13",
   "specVersion": "1.5",
   "version": 1
 }

@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "5ff3e237c745cdfdd21cdbad03639bdb1f49714b",
-  "sha256": "b24158387517354ff773d800dc73f4c3a281b4409e60d8b909ec6ad37e19a6e4",
+  "revision": "bf964ed8dc21eaa558aa8dd31119516eb17c5422",
+  "sha256": "e680f093c10be66ce6f7f8a76510f740b0b1f1312287e0ebcab3d8139ce92689",
   "files": [
     {
       "path": ".env.example",
@@ -9205,8 +9205,8 @@
     },
     {
       "path": "ui/react-app/src/SmartDisplay.jsx",
-      "sha256": "360afc8596c17d8ef1ab6cefbae4241f024e902d58c5800e514070f5aaf103f4",
-      "bytes": 159857
+      "sha256": "64c22d83ec3e8e35a6fc314efb543f17553da7479e2d9461ac60f92106990f86",
+      "bytes": 160043
     },
     {
       "path": "ui/react-app/src/SmartDisplay.stageRouting.test.jsx",
@@ -9225,8 +9225,8 @@
     },
     {
       "path": "ui/react-app/src/__tests__/SmartDisplay.test.jsx",
-      "sha256": "bd48745ff49ff4809772e5f7a7f5584e99663589da796f6bef165869af4542b1",
-      "bytes": 56014
+      "sha256": "f5ce808e2a0b15536152761c3cf6ddd10cf60fe05b60fe1bed789fdc80c29992",
+      "bytes": 57245
     },
     {
       "path": "ui/react-app/src/__tests__/hooks/useEventBus.test.jsx",
@@ -9855,13 +9855,13 @@
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.jsx",
-      "sha256": "28dfcfcf2b6614ffec9208f28a0b18d0c977eb09c6ba0951ee12e6787e306471",
-      "bytes": 196083
+      "sha256": "9ee65bba24dd4298b73ef6497f25955ecbd8c4fc3cf5aa6852367b1944a59ef6",
+      "bytes": 196366
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.sidebar.test.jsx",
-      "sha256": "3e5b71ee14d30bf361e79eb64c8486306f93faaa5aa59a79e116a7cf5565f39c",
-      "bytes": 14082
+      "sha256": "b771d997bb0543ba727e9005fc75a8f2a294235c337a51d23214990578f48329",
+      "bytes": 15772
     },
     {
       "path": "ui/react-app/src/components/SpokePairingGate.jsx",

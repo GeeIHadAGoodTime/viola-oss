@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import SettingsModal from './SettingsModal';
+import { applyTheme, getCurrentThemeMode, setAccent, THEME } from '../config';
 
 const settingsHarness = vi.hoisted(() => ({
   settings: {
@@ -77,6 +78,35 @@ describe('SettingsModal sidebar shell', () => {
 
   afterEach(() => {
     delete window.viola;
+  });
+
+  it.each(['Cancel', 'Escape'])('restores saved theme and accent when dismissing a preview with %s', async (dismiss) => {
+    settingsHarness.settings = { ...settingsHarness.settings, theme: 'dark', accent_color: '#123456' };
+    applyTheme('dark');
+    setAccent('#123456');
+    const onClose = vi.fn();
+    render(<SettingsModal isOpen onClose={onClose} initialTab="customize" />);
+    fireEvent.click(await screen.findByRole('button', { name: /Color Theme:/ }));
+    fireEvent.click(await screen.findByRole('option', { name: 'Light' }));
+    expect(getCurrentThemeMode()).toBe('light');
+    if (dismiss === 'Escape') fireEvent.keyDown(document, { key: 'Escape' });
+    else fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(onClose).toHaveBeenCalled();
+    expect(getCurrentThemeMode()).toBe('dark');
+    expect(THEME.colors.accent).toBe('#123456');
+    expect(settingsHarness.updateSettings).not.toHaveBeenCalled();
+  });
+
+  it('keeps the selected theme after Save succeeds', async () => {
+    applyTheme('dark');
+    const onClose = vi.fn();
+    render(<SettingsModal isOpen onClose={onClose} initialTab="customize" />);
+    fireEvent.click(await screen.findByRole('button', { name: /Color Theme:/ }));
+    fireEvent.click(await screen.findByRole('option', { name: 'Light' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    expect(getCurrentThemeMode()).toBe('light');
+    expect(settingsHarness.updateSettings).toHaveBeenCalledWith(expect.objectContaining({ theme: 'light' }));
   });
 
   it('renders the seven settings scopes and filters them from search', async () => {

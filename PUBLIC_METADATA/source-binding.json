@@ -1,27 +1,23 @@
 {
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "93d79dd4a1959511706c531caf0a6711bcb70c22c555458e7bc0ec143a6dd1f2",
-  "source_tree_sha256": "b24158387517354ff773d800dc73f4c3a281b4409e60d8b909ec6ad37e19a6e4",
+  "source_manifest_sha256": "fb125c1691edc1a2d3e0f6e03ecb2a186c8ebd87e6a12ef334288c96032cccdb",
+  "source_tree_sha256": "e680f093c10be66ce6f7f8a76510f740b0b1f1312287e0ebcab3d8139ce92689",
   "source_file_count": 2475,
-  "source_revision": "5ff3e237c745cdfdd21cdbad03639bdb1f49714b",
-  "comparison_public_revision": "f8adf3f33cce142f3751f7a5350b781ac4171b91",
+  "source_revision": "bf964ed8dc21eaa558aa8dd31119516eb17c5422",
+  "comparison_public_revision": "f0a3f33074df76269dca76293aa413ed8e1bfb46",
   "changed_source_paths": [
-    "SOURCE/tests/public/test_execution_safety_contract.py",
-    "SOURCE/ui/api/routes/llm_stream.py",
-    "SOURCE/ui/react-app/package-lock.json",
-    "SOURCE/ui/react-app/package.json",
-    "SOURCE/ui/react-app/patches/minimatch+3.1.5.patch",
-    "SOURCE/ui/react-app/scripts/patch-minimatch-interop.mjs",
-    "SOURCE/ui/react-app/tests/minimatch_interop.test.js",
-    "SOURCE/ui/security/auth.py"
+    "SOURCE/ui/react-app/src/SmartDisplay.jsx",
+    "SOURCE/ui/react-app/src/__tests__/SmartDisplay.test.jsx",
+    "SOURCE/ui/react-app/src/components/SettingsModal.jsx",
+    "SOURCE/ui/react-app/src/components/SettingsModal.sidebar.test.jsx"
   ],
   "retained_sboms": [
     {
       "path": "frontend.sbom.json",
-      "sha256": "1218872299ce488f3e92164e6d5b6c3825aade310999a072cc03345c7b2bf88a",
+      "sha256": "937a2d0ad8aecc2c7eb7dd69eca48789c995edd6ef69af43a58cb60da819c80d",
       "components": 406,
-      "inventory_status": "fresh_linux_npm_ci_inventory_20261003_windows_confirmation_pending"
+      "inventory_status": "retained_exact_windows_inventory_20261003_job_111110266035"
     },
     {
       "path": "windows-all-optional.sbom.json",
@@ -55,33 +51,24 @@
     }
   ],
   "input_equivalence": {
-    "changed_dependency_inputs": [
-      "SOURCE/ui/react-app/package.json",
-      "SOURCE/ui/react-app/package-lock.json",
-      "SOURCE/ui/react-app/patches/minimatch+3.1.5.patch",
-      "SOURCE/ui/react-app/scripts/patch-minimatch-interop.mjs"
-    ],
-    "basis": "Python dependency inputs and five Windows inventories unchanged. Frontend npm graph re-resolved after removal of patch-package; fresh Linux inventory recorded honestly. Existing Windows CI must independently install, audit and inventory this exact lockfile before integration."
+    "changed_dependency_inputs": [],
+    "basis": "All package, lockfile, postinstall and Python dependency inputs unchanged from f0a3f33074df76269dca76293aa413ed8e1bfb46. Frontend inventory now retains the successful Windows installation from job111110266035; five Python inventories remain unchanged."
   },
   "prior_binding": {
-    "public_revision": "f8adf3f33cce142f3751f7a5350b781ac4171b91",
+    "public_revision": "f0a3f33074df76269dca76293aa413ed8e1bfb46",
     "path": "PUBLIC_METADATA/source-binding.json",
-    "git_blob": "ea592d24713c74bb9790769a68bad6583a6833aa",
-    "sha256": "f329c5c2087c7d55e5966d7d403a85109d8dc8d6696c60c45254b9296b9fabab",
-    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/f8adf3f33cce142f3751f7a5350b781ac4171b91/PUBLIC_METADATA/source-binding.json"
+    "git_blob": "3837a12d0431d3cc257d341510794998c181a2ef",
+    "sha256": "d6cd06c4e2dd578344977630540cd90bb0de18157ca43a766a8aedf5ed4e28c5",
+    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/f0a3f33074df76269dca76293aa413ed8e1bfb46/PUBLIC_METADATA/source-binding.json"
   },
-  "new_resolution_performed": true,
-  "new_advisory_scan_performed": true,
+  "new_resolution_performed": false,
+  "new_advisory_scan_performed": false,
   "new_runtime_qualification_performed": false,
   "qualification": {
-    "scope": "Scoped EventSource middleware and route authentication correction following installed SSE401",
-    "execution_contract_tests": 26,
-    "stream_auth_tests": 8,
-    "negative_controls": "Original middleware rejects valid SSE credentials with401; original loopback principal differs from owning desktop. Corrected in-process route delivers synthetic terminal data to its owner and denies another account with403. Wrong scope/method/signature, expired token, invalid account credentials, remote legacy token and general WS token are rejected.",
-    "local_full_suite": "Attempted:73 collected, one import error because minimal local environment lacks pipecat-ai package metadata; no skipped or weakened assertions",
-    "frontend": "Fresh npm ci, full 988-test suite and production build passed on Linux Node24.19.0/npm11.9.0. npm audit reports zero vulnerabilities. Windows checks pending.",
-    "installed_candidate": "pending for this revision",
-    "release_or_deployment": "not_established",
-    "dependency_repair": "Remove patch-package and its vulnerable braces transitive graph. Preserve the exact existing minimatch3.1.5/brace-expansion5.0.12 interoperability correction with a bounded, idempotent postinstall script that rejects unexpected source/version. No audit exceptions, assertion weakening or dependency downgrades."
+    "scope": "Calendar nested-modal interactivity and canceled appearance preview restoration",
+    "negative_controls": "Original calendar makes its own ancestor inert. Original Cancel and Escape leave preview theme active. Both reproductions fail before changes and pass afterward. Successful Save retains new theme. Sibling settings dialog still makes background inert.",
+    "frontend": "Combined final frontend:138 files/992 tests passed and production build passed on Linux. Uses exact preceding repaired npm lockfile.",
+    "installed_candidate": "pending for these UI repairs",
+    "release_or_deployment": "not_established"
   }
 }

@@ -5,7 +5,7 @@ import { useOptionalAuth } from '../hooks/useAuth';
 import { useHandsFreeWake } from '../hooks/useHandsFreeWake';
 import { isCloudSurface } from './auth/cloudSurface';
 import { apiFetch } from '../hooks/useViolaApi';
-import { THEME } from '../config';
+import { THEME, applyTheme, setAccent } from '../config';
 import { isFeatureHidden } from '../utils/featureSurface';
 import DesktopUpsell from './DesktopUpsell';
 import AccountTab, { CalendarSettings } from './AccountTab';
@@ -1212,6 +1212,10 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
 
   // Cancel - reset local changes and close
   const handleCancel = useCallback(() => {
+    // Customize previews update the live palette and theme cache immediately.
+    // Resetting the draft alone leaves those effects behind after dismissal.
+    applyTheme(settings.theme || 'dark');
+    setAccent(settings.accent_color || THEME.colors.accent);
     setLocalSettings(settings);
     setHasChanges(false);
     clearError();
