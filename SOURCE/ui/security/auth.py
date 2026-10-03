@@ -246,6 +246,7 @@ class AuthenticationPlugin(SecurityPlugin):
           2. X-Auth-Token header (legacy timestamp:nonce:signature scheme)
           3. Authorization: Bearer <session-token>
           4. viola_session cookie (Path-A login mints this)
+          5. Short-lived stream-bound token on the EventSource GET endpoint
 
         Sources 3 + 4 validate against GoTrue. Without (4)
         the cookie minted by /auth/login Path-A proxy can't authenticate
@@ -273,6 +274,8 @@ class AuthenticationPlugin(SecurityPlugin):
             if hmac.compare_digest(api_key, self.config.auth_api_key):
                 return True
         if self._stream_query_api_key_matches(request):
+            return True
+        if self._stream_query_token_matches(request):
             return True
 
         # Try legacy timestamp:nonce:signature token
@@ -305,6 +308,29 @@ class AuthenticationPlugin(SecurityPlugin):
             return True
 
         return False
+
+    def _stream_query_token_matches(self, request: Request) -> bool:
+        """Authenticate EventSource only on its exact GET stream route.
+
+        The browser cannot attach the desktop API-key header to EventSource.
+        It exchanges that authenticated request for a short-lived token bound
+        to one stream. Keep account credentials authoritative at the callers;
+        never turn this into an authentication exemption for a route prefix.
+        """
+        path = request.url.path
+        prefix = "/api/stream/"
+        if request.method != "GET" or not path.startswith(prefix):
+            return False
+        stream_id = path[len(prefix):]
+        if not stream_id or "/" in stream_id:
+            return False
+        token = (request.query_params.get("stream_token") or "").strip()
+        if not token.startswith(("sse:", "sseu:")):
+            return False
+        from ui.api.routes.llm_stream import _consume_stream_auth_token_from_query
+
+        claims = _consume_stream_auth_token_from_query(request, stream_id=stream_id)
+        return bool(claims is not None and getattr(claims, "user_id", None))
 
     def _spoke_credential_valid(self, request: Request) -> bool:
         """True when the request carries a valid paired-spoke credential."""
@@ -420,6 +446,7 @@ class AuthenticationPlugin(SecurityPlugin):
         - X-API-Key header (API key auth)
         - Authorization: Bearer <token> header (session auth)
         - Session cookie (browser auth)
+        - Stream-bound EventSource token on its exact GET endpoint
         """
         if not self.enabled:
             return True
@@ -441,6 +468,8 @@ class AuthenticationPlugin(SecurityPlugin):
             if hmac.compare_digest(api_key, self.config.auth_api_key):
                 return True
         if self._stream_query_api_key_matches(request):
+            return True
+        if self._stream_query_token_matches(request):
             return True
 
         # A paired multiroom spoke is a full hub window — accept its signed

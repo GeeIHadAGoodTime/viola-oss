@@ -176,12 +176,12 @@ def _consume_stream_auth_token_from_query(request: Request, stream_id: str | Non
         return None
     if not getattr(claims, "user_id", None):
         try:
-            from services.persistence.state_store import LOCAL_USER_ID
+            from core.user_context import get_current_or_desktop_active_user_id
             from ui.core.security import is_desktop_surface, is_loopback_request
 
             if is_desktop_surface() and is_loopback_request(request):
                 claims = SimpleNamespace(
-                    user_id=LOCAL_USER_ID,
+                    user_id=get_current_or_desktop_active_user_id(),
                     session_id=getattr(claims, "session_id", None),
                 )
             else:

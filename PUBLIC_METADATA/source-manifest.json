@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "2b07f2cb80cb7ceabc789670d7aad97afa438ecf",
-  "sha256": "0fd7221ad76ddeba0f3ccba9e4d8e02417c4005fdd78d5636fe39f189e4fcd93",
+  "revision": "5ff3e237c745cdfdd21cdbad03639bdb1f49714b",
+  "sha256": "b24158387517354ff773d800dc73f4c3a281b4409e60d8b909ec6ad37e19a6e4",
   "files": [
     {
       "path": ".env.example",
@@ -5725,8 +5725,8 @@
     },
     {
       "path": "tests/public/test_execution_safety_contract.py",
-      "sha256": "20f275b479b0dd85ac6a1dc932c9b41fcf0ee3dce1789e29c9db951c0e7869c1",
-      "bytes": 31045
+      "sha256": "b3e7b4223bd315d842fef1ef5e4dad3b1504d24efddf0663855cbbde66c195b0",
+      "bytes": 36289
     },
     {
       "path": "tests/public/test_phone_call_plan_confirmation.py",
@@ -8680,8 +8680,8 @@
     },
     {
       "path": "ui/api/routes/llm_stream.py",
-      "sha256": "b2faf306f5132144f620a8cbc7ad7c13ec4221b98e176de54696da473ab31f73",
-      "bytes": 14461
+      "sha256": "9f511f162fc44509751486b4ed2ef94309a03c6b25dd8d09f371cbdacb9585ca",
+      "bytes": 14496
     },
     {
       "path": "ui/api/routes/local_library.py",
@@ -9100,18 +9100,13 @@
     },
     {
       "path": "ui/react-app/package-lock.json",
-      "sha256": "fbb04c205d10db7ff29e067d1413a94af6baa931b6e1e8038a5cc11f305fc78c",
-      "bytes": 247909
+      "sha256": "e2537605cc28b2972a29f8d6e5952f3d5ab2f9539979b9246cea5645264ed8f4",
+      "bytes": 236773
     },
     {
       "path": "ui/react-app/package.json",
-      "sha256": "874d3c7063d7616b992025e95737d838ad0c0abb92a3fb60f20170b42d61711a",
-      "bytes": 1253
-    },
-    {
-      "path": "ui/react-app/patches/minimatch+3.1.5.patch",
-      "sha256": "b0e09e056b65e2d805da3011777b6f6b6490f9969bea782895c346c232526c38",
-      "bytes": 543
+      "sha256": "c6c8bfcae858d9b95169788bb1b5ff1ed1fa97a9fff21f59b3debf4862ec2064",
+      "bytes": 1249
     },
     {
       "path": "ui/react-app/public/audio-worklets/takeover-pcm-worklet.js",
@@ -9177,6 +9172,11 @@
       "path": "ui/react-app/public/wake/NOTICE-violawake.txt",
       "sha256": "03503955445e4253c2796b2167e086d353849b0bd2041e685000ae8fe04f29f2",
       "bytes": 1369
+    },
+    {
+      "path": "ui/react-app/scripts/patch-minimatch-interop.mjs",
+      "sha256": "f5c7759a4280fc172efceb23ec080abae2240a034a85f0e031a1eb2c383013db",
+      "bytes": 1515
     },
     {
       "path": "ui/react-app/src/App.jsx",
@@ -11284,6 +11284,11 @@
       "bytes": 2491
     },
     {
+      "path": "ui/react-app/tests/minimatch_interop.test.js",
+      "sha256": "13ea8afc1fedb7a0fd58733509fa56cfd7b658755c6919adcd910dd520be9254",
+      "bytes": 1582
+    },
+    {
       "path": "ui/react-app/tests/youtube_embed_bridge.test.js",
       "sha256": "f8d5870a52640a096f0e0a586f5cafb4e19b197859aec865d28ac72aee400c7c",
       "bytes": 5434
@@ -11310,8 +11315,8 @@
     },
     {
       "path": "ui/security/auth.py",
-      "sha256": "80dcd6bffcb7981d3b0f7a891edd8bf34d1486dbbccac8780a6bf79afe9a0156",
-      "bytes": 46528
+      "sha256": "1ed792822a2116fb58ce9a12db35530b39ee2474ee76131b9ca8fe7a5cb7d8fc",
+      "bytes": 47954
     },
     {
       "path": "ui/security/auth_failure_store.py",

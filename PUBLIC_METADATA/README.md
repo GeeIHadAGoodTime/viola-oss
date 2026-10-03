@@ -1,16 +1,25 @@
 # Source snapshot binding
 
-Source revision: `2b07f2cb80cb7ceabc789670d7aad97afa438ecf`.
+Source revision: `5ff3e237c745cdfdd21cdbad03639bdb1f49714b`.
 
-Initial native window size, minimum dimensions and position now respect Qt
-available logical screen geometry, including taskbar space and negative monitor
-origins. This addresses controls opening outside smaller displays.
+EventSource now presents its signed, stream-bound token to both HTTP authentication
+layers. Acceptance is limited to the exact GET stream endpoint, while account
+cookies and bearer credentials remain authoritative. Loopback desktop tokens
+resolve the active desktop principal, matching the existing stream-owner check.
+No endpoint authentication exemption or general API-key query fallback is added.
 
-Five existing/new unittest methods pass. Five screen cases fail before and pass
-after. A real bundled-PySide6 offscreen geometry probe also confirms the original
-1400x800 window exceeds its800x800 work area while the corrected window fits.
-That probe is not a normal installed GUI acceptance run; that remains pending.
+The26-test execution contract module passes, including eight stream-auth tests.
+The original source fails the valid-token and actual-route reproduction. The
+corrected in-process route returns synthetic data only to its owner and rejects
+the wrong account. A full local contract attempt has one environment import
+error for missing pipecat-ai package metadata. Canonical CI and installed-product
+acceptance remain required. No published customer fix is claimed.
 
-Frontend and dependency inputs are unchanged. Existing inventories and prior
-qualification receipts are retained without claiming a fresh advisory scan,
-new product release or deployment.
+Frontend build-tool dependencies now exclude patch-package and its vulnerable
+braces graph. The existing minimatch compatibility patch is preserved by a
+bounded postinstall script, with regression checks for idempotence, rejection
+of unexpected source, and real glob behavior. Fresh Linux npm ci, 988 frontend
+tests, production build and a zero-finding npm audit passed. The frontend
+inventory was regenerated from that exact Linux installation; Windows CI
+qualification remains required. Five Python inventories remain unchanged.
+No installed or published customer repair is claimed for this revision.

@@ -1173,12 +1173,12 @@
       "version": "3.0.4"
     },
     {
-      "bom-ref": "@esbuild/win32-x64@0.25.12",
-      "description": "The Windows 64-bit binary for esbuild, a JavaScript bundler.",
+      "bom-ref": "@esbuild/linux-x64@0.25.12",
+      "description": "The Linux 64-bit binary for esbuild, a JavaScript bundler.",
       "externalReferences": [
         {
           "type": "distribution",
-          "url": "https://registry.npmjs.org/@esbuild/win32-x64/-/win32-x64-0.25.12.tgz"
+          "url": "https://registry.npmjs.org/@esbuild/linux-x64/-/linux-x64-0.25.12.tgz"
         },
         {
           "type": "vcs",
@@ -1188,7 +1188,7 @@
       "hashes": [
         {
           "alg": "SHA-512",
-          "content": "6a5242d2e099a5316b48bd020838dc8257815cf9c2ac40214c120ba5e029eccfce160a2ab407ad7c1cd7d31334d0c52c5553e956394fb8c6d112a9d90976939c"
+          "content": "baa64c4cbaffcd1fde7788c81a7c122e468798f8ce8c9be79ba4d5562b406b4f122d2f59d1533cc08471ee059b241e7f279e18b883089c3aae5b262f40b66483"
         }
       ],
       "licenses": [
@@ -1198,14 +1198,14 @@
           }
         }
       ],
-      "name": "@esbuild/win32-x64",
+      "name": "@esbuild/linux-x64",
       "properties": [
         {
           "name": "cdx:npm:package:development",
           "value": "true"
         }
       ],
-      "purl": "pkg:npm/%40esbuild/win32-x64@0.25.12",
+      "purl": "pkg:npm/%40esbuild/linux-x64@0.25.12",
       "scope": "optional",
       "type": "library",
       "version": "0.25.12"
@@ -2472,12 +2472,12 @@
     },
     {
       "author": "Lukas Taegert-Atkinson",
-      "bom-ref": "@rollup/rollup-win32-x64-gnu@4.62.3",
+      "bom-ref": "@rollup/rollup-linux-x64-gnu@4.62.3",
       "description": "Native bindings for Rollup",
       "externalReferences": [
         {
           "type": "distribution",
-          "url": "https://registry.npmjs.org/@rollup/rollup-win32-x64-gnu/-/rollup-win32-x64-gnu-4.62.3.tgz"
+          "url": "https://registry.npmjs.org/@rollup/rollup-linux-x64-gnu/-/rollup-linux-x64-gnu-4.62.3.tgz"
         },
         {
           "type": "vcs",
@@ -2491,7 +2491,7 @@
       "hashes": [
         {
           "alg": "SHA-512",
-          "content": "be9ecdd3ce1ec3fa1d5e7da08bf9b39bd994910bbd97a02237a76de0879433652f9bda3e71598ff9892a6cc3ad78b6e21a0a810652598c83185427ce38855b55"
+          "content": "5782ad5ad41f005314efef7f03f543a6cfd523c087777718cf42fcb20273cfca8aede63bc08e2bb850fcd9460862f5bd6780ed9537e141cb25e17c8f1d6e6e4a"
         }
       ],
       "licenses": [
@@ -2501,26 +2501,26 @@
           }
         }
       ],
-      "name": "@rollup/rollup-win32-x64-gnu",
+      "name": "@rollup/rollup-linux-x64-gnu",
       "properties": [
         {
           "name": "cdx:npm:package:development",
           "value": "true"
         }
       ],
-      "purl": "pkg:npm/%40rollup/rollup-win32-x64-gnu@4.62.3",
+      "purl": "pkg:npm/%40rollup/rollup-linux-x64-gnu@4.62.3",
       "scope": "optional",
       "type": "library",
       "version": "4.62.3"
     },
     {
       "author": "Lukas Taegert-Atkinson",
-      "bom-ref": "@rollup/rollup-win32-x64-msvc@4.62.3",
+      "bom-ref": "@rollup/rollup-linux-x64-musl@4.62.3",
       "description": "Native bindings for Rollup",
       "externalReferences": [
         {
           "type": "distribution",
-          "url": "https://registry.npmjs.org/@rollup/rollup-win32-x64-msvc/-/rollup-win32-x64-msvc-4.62.3.tgz"
+          "url": "https://registry.npmjs.org/@rollup/rollup-linux-x64-musl/-/rollup-linux-x64-musl-4.62.3.tgz"
         },
         {
           "type": "vcs",
@@ -2534,7 +2534,7 @@
       "hashes": [
         {
           "alg": "SHA-512",
-          "content": "30e1bfde04ce9f81707f9ef845539a63ad48e68e8ff7495e8241400e24f29f58728cdc9d4fe71ead4dab2d4c0f75990a2b227e893f8af69ed65cae0b33529aea"
+          "content": "2c1c7d2d85ef8f608190c9232dd34058bc07d0c2cc8a7edda3655c568f6454f89b18b918d01410badd9fbfb355aa45ea67f0ab02ef4ba831d5575c4708ca423f"
         }
       ],
       "licenses": [
@@ -2544,14 +2544,14 @@
           }
         }
       ],
-      "name": "@rollup/rollup-win32-x64-msvc",
+      "name": "@rollup/rollup-linux-x64-musl",
       "properties": [
         {
           "name": "cdx:npm:package:development",
           "value": "true"
         }
       ],
-      "purl": "pkg:npm/%40rollup/rollup-win32-x64-msvc@4.62.3",
+      "purl": "pkg:npm/%40rollup/rollup-linux-x64-musl@4.62.3",
       "scope": "optional",
       "type": "library",
       "version": "4.62.3"
@@ -2703,18 +2703,18 @@
       "version": "2.58.6"
     },
     {
-      "bom-ref": "@sentry/cli-win32-x64@2.58.6",
-      "description": "The windows x64 distribution of the Sentry CLI binary.",
+      "bom-ref": "@sentry/cli-linux-x64@2.58.6",
+      "description": "The linux x64 distribution of the Sentry CLI binary.",
       "externalReferences": [
         {
           "type": "distribution",
-          "url": "https://registry.npmjs.org/@sentry/cli-win32-x64/-/cli-win32-x64-2.58.6.tgz"
+          "url": "https://registry.npmjs.org/@sentry/cli-linux-x64/-/cli-linux-x64-2.58.6.tgz"
         }
       ],
       "hashes": [
         {
           "alg": "SHA-512",
-          "content": "477e56275ee81780f67aa2350d1dac410aabd1f8d14ede71a0fd7a5ab4eef755ccda59dd44c16c9e387efc6b6d6f16a92c204d96b8f389af7d309d0f64766980"
+          "content": "0d9bbde7a3218b76518d305ed5675b195e3a95d55b03c776ae0a7f7e1e751ac236e738c11da878c199cf4d2ce973e62ac54ea9269839efd07faf78eb20ae77d1"
         }
       ],
       "licenses": [
@@ -2724,14 +2724,14 @@
           }
         }
       ],
-      "name": "@sentry/cli-win32-x64",
+      "name": "@sentry/cli-linux-x64",
       "properties": [
         {
           "name": "cdx:npm:package:development",
           "value": "true"
         }
       ],
-      "purl": "pkg:npm/%40sentry/cli-win32-x64@2.58.6",
+      "purl": "pkg:npm/%40sentry/cli-linux-x64@2.58.6",
       "scope": "optional",
       "type": "library",
       "version": "2.58.6"
@@ -4093,40 +4093,6 @@
       "version": "4.1.11"
     },
     {
-      "bom-ref": "@yarnpkg/lockfile@1.1.0",
-      "description": "The parser/stringifier for Yarn lockfiles.",
-      "externalReferences": [
-        {
-          "type": "distribution",
-          "url": "https://registry.npmjs.org/@yarnpkg/lockfile/-/lockfile-1.1.0.tgz"
-        }
-      ],
-      "hashes": [
-        {
-          "alg": "SHA-512",
-          "content": "1a94b0bf25ce70e3a557bd2f6e7ce38f87d6e715bf15d505ea7404b7510dcbb9b86427338b5fbf6ee5543c0aa619fab39ec391345cd432372d4c8a7c6bdb6e09"
-        }
-      ],
-      "licenses": [
-        {
-          "license": {
-            "id": "BSD-2-Clause"
-          }
-        }
-      ],
-      "name": "@yarnpkg/lockfile",
-      "properties": [
-        {
-          "name": "cdx:npm:package:development",
-          "value": "true"
-        }
-      ],
-      "purl": "pkg:npm/%40yarnpkg/lockfile@1.1.0",
-      "scope": "required",
-      "type": "library",
-      "version": "1.1.0"
-    },
-    {
       "bom-ref": "acorn@8.18.0",
       "description": "ECMAScript parser",
       "externalReferences": [
@@ -5051,49 +5017,6 @@
       "version": "5.0.12"
     },
     {
-      "author": "Jon Schlinkert (https://github.com/jonschlinkert)",
-      "bom-ref": "braces@3.0.3",
-      "description": "Bash-like brace expansion, implemented in JavaScript. Safer than other brace expansion libs, with complete support for the Bash 4.3 braces specification, without sacrificing speed.",
-      "externalReferences": [
-        {
-          "type": "distribution",
-          "url": "https://registry.npmjs.org/braces/-/braces-3.0.3.tgz"
-        },
-        {
-          "type": "website",
-          "url": "https://github.com/micromatch/braces"
-        },
-        {
-          "type": "issue-tracker",
-          "url": "https://github.com/micromatch/braces/issues"
-        }
-      ],
-      "hashes": [
-        {
-          "alg": "SHA-512",
-          "content": "c906d780efce499543d88b222e5ae8fbb1dfe90d7c109aca484b1da0ccca78f29772dde0bc3f282dc390748cc6ba9af9163f840def203bf9717350737cca71bc"
-        }
-      ],
-      "licenses": [
-        {
-          "license": {
-            "id": "MIT"
-          }
-        }
-      ],
-      "name": "braces",
-      "properties": [
-        {
-          "name": "cdx:npm:package:development",
-          "value": "true"
-        }
-      ],
-      "purl": "pkg:npm/braces@3.0.3",
-      "scope": "required",
-      "type": "library",
-      "version": "3.0.3"
-    },
-    {
       "author": "Andrey Sitnik <andrey@sitnik.es>",
       "bom-ref": "browserslist@4.28.7",
       "description": "Share target browsers between different front-end tools, like Autoprefixer, Stylelint and babel-env-preset",
@@ -5419,45 +5342,6 @@
       "scope": "required",
       "type": "library",
       "version": "4.1.2"
-    },
-    {
-      "author": "Thomas Watson Steen <w@tson.dk> (https://twitter.com/wa7son)",
-      "bom-ref": "ci-info@3.9.0",
-      "description": "Get details about the current Continuous Integration environment",
-      "externalReferences": [
-        {
-          "type": "distribution",
-          "url": "https://registry.npmjs.org/ci-info/-/ci-info-3.9.0.tgz"
-        },
-        {
-          "type": "website",
-          "url": "https://github.com/watson/ci-info"
-        }
-      ],
-      "hashes": [
-        {
-          "alg": "SHA-512",
-          "content": "348c45e7986fe274aa42cc2401e88e8b5afcdf1cbc26574e1434d68ae839e4a06ef499db96771dd94e958879988077f4d533d94bbecd24184130a7568fd1d031"
-        }
-      ],
-      "licenses": [
-        {
-          "license": {
-            "id": "MIT"
-          }
-        }
-      ],
-      "name": "ci-info",
-      "properties": [
-        {
-          "name": "cdx:npm:package:development",
-          "value": "true"
-        }
-      ],
-      "purl": "pkg:npm/ci-info@3.9.0",
-      "scope": "required",
-      "type": "library",
-      "version": "3.9.0"
     },
     {
       "author": "Heather Arthur <fayearthur@gmail.com>",
@@ -7759,49 +7643,6 @@
       "version": "8.0.0"
     },
     {
-      "author": "Jon Schlinkert (https://github.com/jonschlinkert)",
-      "bom-ref": "fill-range@7.1.1",
-      "description": "Fill in a range of numbers or letters, optionally passing an increment or `step` to use, or create a regex-compatible range with `options.toRegex`",
-      "externalReferences": [
-        {
-          "type": "distribution",
-          "url": "https://registry.npmjs.org/fill-range/-/fill-range-7.1.1.tgz"
-        },
-        {
-          "type": "website",
-          "url": "https://github.com/jonschlinkert/fill-range"
-        },
-        {
-          "type": "issue-tracker",
-          "url": "https://github.com/jonschlinkert/fill-range/issues"
-        }
-      ],
-      "hashes": [
-        {
-          "alg": "SHA-512",
-          "content": "62c1a97b75872caf19622e2d583836272dde6d1cf6ad7a300f19e57786e4401d3471cff5670f405a70b48bdced0c98ad8afb50bda23d29a2f22ab73e8415b4ca"
-        }
-      ],
-      "licenses": [
-        {
-          "license": {
-            "id": "MIT"
-          }
-        }
-      ],
-      "name": "fill-range",
-      "properties": [
-        {
-          "name": "cdx:npm:package:development",
-          "value": "true"
-        }
-      ],
-      "purl": "pkg:npm/fill-range@7.1.1",
-      "scope": "required",
-      "type": "library",
-      "version": "7.1.1"
-    },
-    {
       "author": "Sindre Sorhus",
       "bom-ref": "find-up@5.0.0",
       "description": "Find a file or directory by walking up parent directories",
@@ -7835,45 +7676,6 @@
       "scope": "required",
       "type": "library",
       "version": "5.0.0"
-    },
-    {
-      "author": "Square, Inc.",
-      "bom-ref": "find-yarn-workspace-root@2.0.0",
-      "description": "Algorithm for finding the root of a yarn workspace, extracted from yarnpkg.com",
-      "externalReferences": [
-        {
-          "type": "distribution",
-          "url": "https://registry.npmjs.org/find-yarn-workspace-root/-/find-yarn-workspace-root-2.0.0.tgz"
-        },
-        {
-          "type": "vcs",
-          "url": "https://github.com/square/find-yarn-workspace-root.git"
-        }
-      ],
-      "hashes": [
-        {
-          "alg": "SHA-512",
-          "content": "d483276e3b782b3b107e7867ccd77cc141205d9e3823365a6669cb631ec3e45665687b76816db40ab8bc43e13fb79b488f8f9ea5306e6fed99c6efef3482f3a9"
-        }
-      ],
-      "licenses": [
-        {
-          "license": {
-            "id": "Apache-2.0"
-          }
-        }
-      ],
-      "name": "find-yarn-workspace-root",
-      "properties": [
-        {
-          "name": "cdx:npm:package:development",
-          "value": "true"
-        }
-      ],
-      "purl": "pkg:npm/find-yarn-workspace-root@2.0.0",
-      "scope": "required",
-      "type": "library",
-      "version": "2.0.0"
     },
     {
       "author": "Jared Wray",
@@ -8084,49 +7886,6 @@
       "scope": "required",
       "type": "library",
       "version": "4.0.6"
-    },
-    {
-      "author": "JP Richardson <jprichardson@gmail.com>",
-      "bom-ref": "fs-extra@10.1.0",
-      "description": "fs-extra contains methods that aren't included in the vanilla Node.js fs package. Such as recursive mkdir, copy, and remove.",
-      "externalReferences": [
-        {
-          "type": "distribution",
-          "url": "https://registry.npmjs.org/fs-extra/-/fs-extra-10.1.0.tgz"
-        },
-        {
-          "type": "vcs",
-          "url": "https://github.com/jprichardson/node-fs-extra"
-        },
-        {
-          "type": "website",
-          "url": "https://github.com/jprichardson/node-fs-extra"
-        }
-      ],
-      "hashes": [
-        {
-          "alg": "SHA-512",
-          "content": "a115c0a6ae78113463e1e3221731a71d61b2fb3a39adab9d8eec4dd1bf07eecfd1536a16d16becc7d3b400244dfe446af44f15bbf45eb24181e68de38be1731d"
-        }
-      ],
-      "licenses": [
-        {
-          "license": {
-            "id": "MIT"
-          }
-        }
-      ],
-      "name": "fs-extra",
-      "properties": [
-        {
-          "name": "cdx:npm:package:development",
-          "value": "true"
-        }
-      ],
-      "purl": "pkg:npm/fs-extra@10.1.0",
-      "scope": "required",
-      "type": "library",
-      "version": "10.1.0"
     },
     {
       "author": "Raynos <raynos2@gmail.com>",
@@ -8725,44 +8484,6 @@
       "scope": "required",
       "type": "library",
       "version": "1.2.0"
-    },
-    {
-      "bom-ref": "graceful-fs@4.2.11",
-      "description": "A drop-in replacement for fs, making various improvements.",
-      "externalReferences": [
-        {
-          "type": "distribution",
-          "url": "https://registry.npmjs.org/graceful-fs/-/graceful-fs-4.2.11.tgz"
-        },
-        {
-          "type": "vcs",
-          "url": "https://github.com/isaacs/node-graceful-fs"
-        }
-      ],
-      "hashes": [
-        {
-          "alg": "SHA-512",
-          "content": "45b279fe398570d342703579a3d7939c12c9fc7b33595d0fef76dcf857f89d2feb263f98692e881b288e2f45680585fe9755ab97793ade1fcaac7fa7849d17bd"
-        }
-      ],
-      "licenses": [
-        {
-          "license": {
-            "id": "ISC"
-          }
-        }
-      ],
-      "name": "graceful-fs",
-      "properties": [
-        {
-          "name": "cdx:npm:package:development",
-          "value": "true"
-        }
-      ],
-      "purl": "pkg:npm/graceful-fs@4.2.11",
-      "scope": "required",
-      "type": "library",
-      "version": "4.2.11"
     },
     {
       "author": "nicolas",
@@ -9950,41 +9671,6 @@
       "version": "1.1.0"
     },
     {
-      "author": "Sindre Sorhus",
-      "bom-ref": "is-docker@2.2.1",
-      "description": "Check if the process is running inside a Docker container",
-      "externalReferences": [
-        {
-          "type": "distribution",
-          "url": "https://registry.npmjs.org/is-docker/-/is-docker-2.2.1.tgz"
-        }
-      ],
-      "hashes": [
-        {
-          "alg": "SHA-512",
-          "content": "17e8b604ab05ac7eba89a505734c280fcb0bcbc81eb64c13c2d3818efb39e82c780a024378a41ea9fcfcc0062249bf093a9ad68471f9a7becf6e6602bef52e5d"
-        }
-      ],
-      "licenses": [
-        {
-          "license": {
-            "id": "MIT"
-          }
-        }
-      ],
-      "name": "is-docker",
-      "properties": [
-        {
-          "name": "cdx:npm:package:development",
-          "value": "true"
-        }
-      ],
-      "purl": "pkg:npm/is-docker@2.2.1",
-      "scope": "required",
-      "type": "library",
-      "version": "2.2.1"
-    },
-    {
       "author": "Jordan Harband <ljharb@gmail.com>",
       "bom-ref": "is-document.all@1.0.0",
       "description": "Is this value `document.all`, i.e. an object with the [[IsHTMLDDA]] internal slot?",
@@ -10300,49 +9986,6 @@
       "scope": "required",
       "type": "library",
       "version": "2.0.3"
-    },
-    {
-      "author": "Jon Schlinkert (https://github.com/jonschlinkert)",
-      "bom-ref": "is-number@7.0.0",
-      "description": "Returns true if a number or string value is a finite number. Useful for regex matches, parsing, user input, etc.",
-      "externalReferences": [
-        {
-          "type": "distribution",
-          "url": "https://registry.npmjs.org/is-number/-/is-number-7.0.0.tgz"
-        },
-        {
-          "type": "website",
-          "url": "https://github.com/jonschlinkert/is-number"
-        },
-        {
-          "type": "issue-tracker",
-          "url": "https://github.com/jonschlinkert/is-number/issues"
-        }
-      ],
-      "hashes": [
-        {
-          "alg": "SHA-512",
-          "content": "e350a27e483a7bc4f2952a5db53a5e2d532abd20445734edb47bc4443ef8d7ea6767c00dbf4d34e0c44be3740a3c394af5c1af369e8d6566540656c65d8c719e"
-        }
-      ],
-      "licenses": [
-        {
-          "license": {
-            "id": "MIT"
-          }
-        }
-      ],
-      "name": "is-number",
-      "properties": [
-        {
-          "name": "cdx:npm:package:development",
-          "value": "true"
-        }
-      ],
-      "purl": "pkg:npm/is-number@7.0.0",
-      "scope": "required",
-      "type": "library",
-      "version": "7.0.0"
     },
     {
       "author": "Jordan Harband <ljharb@gmail.com>",
@@ -10838,41 +10481,6 @@
       "version": "2.0.4"
     },
     {
-      "author": "Sindre Sorhus",
-      "bom-ref": "is-wsl@2.2.0",
-      "description": "Check if the process is running inside Windows Subsystem for Linux (Bash on Windows)",
-      "externalReferences": [
-        {
-          "type": "distribution",
-          "url": "https://registry.npmjs.org/is-wsl/-/is-wsl-2.2.0.tgz"
-        }
-      ],
-      "hashes": [
-        {
-          "alg": "SHA-512",
-          "content": "7cacc0adad2b18951407018180d90766e4e865c9fe4ed5c7a5e0a09a430930c631d6c40361a092ca32414826b69c7d431a6eecde7d68067a21a154c168decbc3"
-        }
-      ],
-      "licenses": [
-        {
-          "license": {
-            "id": "MIT"
-          }
-        }
-      ],
-      "name": "is-wsl",
-      "properties": [
-        {
-          "name": "cdx:npm:package:development",
-          "value": "true"
-        }
-      ],
-      "purl": "pkg:npm/is-wsl@2.2.0",
-      "scope": "required",
-      "type": "library",
-      "version": "2.2.0"
-    },
-    {
       "author": "Julian Gruber",
       "bom-ref": "isarray@2.0.5",
       "description": "Array#isArray for older browsers",
@@ -11286,53 +10894,6 @@
     },
     {
       "author": "James Halliday",
-      "bom-ref": "json-stable-stringify@1.3.0",
-      "description": "deterministic JSON.stringify() with custom sorting to get deterministic hashes from stringified results",
-      "externalReferences": [
-        {
-          "type": "distribution",
-          "url": "https://registry.npmjs.org/json-stable-stringify/-/json-stable-stringify-1.3.0.tgz"
-        },
-        {
-          "type": "vcs",
-          "url": "git://github.com/ljharb/json-stable-stringify.git"
-        },
-        {
-          "type": "website",
-          "url": "https://github.com/ljharb/json-stable-stringify"
-        },
-        {
-          "type": "issue-tracker",
-          "url": "https://github.com/ljharb/json-stable-stringify/issues"
-        }
-      ],
-      "hashes": [
-        {
-          "alg": "SHA-512",
-          "content": "aad622492165c28b7d5c7b45f5b0fd73baf02a3afe45e7164fffd99cfbd29848e95799a63ce08de23f148d8e616e33643b067f8d0bf727a475fe92fb47080cb2"
-        }
-      ],
-      "licenses": [
-        {
-          "license": {
-            "id": "MIT"
-          }
-        }
-      ],
-      "name": "json-stable-stringify",
-      "properties": [
-        {
-          "name": "cdx:npm:package:development",
-          "value": "true"
-        }
-      ],
-      "purl": "pkg:npm/json-stable-stringify@1.3.0",
-      "scope": "required",
-      "type": "library",
-      "version": "1.3.0"
-    },
-    {
-      "author": "James Halliday",
       "bom-ref": "json-stable-stringify-without-jsonify@1.0.1",
       "description": "deterministic JSON.stringify() with custom sorting to get deterministic hashes from stringified results, with no public domain dependencies",
       "externalReferences": [
@@ -11422,77 +10983,6 @@
       "version": "2.2.3"
     },
     {
-      "author": "JP Richardson <jprichardson@gmail.com>",
-      "bom-ref": "jsonfile@6.2.1",
-      "description": "Easily read/write JSON files.",
-      "externalReferences": [
-        {
-          "type": "distribution",
-          "url": "https://registry.npmjs.org/jsonfile/-/jsonfile-6.2.1.tgz"
-        },
-        {
-          "type": "vcs",
-          "url": "ssh://git@github.com/jprichardson/node-jsonfile.git"
-        }
-      ],
-      "hashes": [
-        {
-          "alg": "SHA-512",
-          "content": "cf039374bdeb150fe545d0679ed295397ea4e5c289c047351dd8a54fbd41584bbb278d605c8076311a7ebf176e3d2c1924f581c44cefe321f5c182c91941d7e1"
-        }
-      ],
-      "licenses": [
-        {
-          "license": {
-            "id": "MIT"
-          }
-        }
-      ],
-      "name": "jsonfile",
-      "properties": [
-        {
-          "name": "cdx:npm:package:development",
-          "value": "true"
-        }
-      ],
-      "purl": "pkg:npm/jsonfile@6.2.1",
-      "scope": "required",
-      "type": "library",
-      "version": "6.2.1"
-    },
-    {
-      "author": "Douglas Crockford",
-      "bom-ref": "jsonify@0.0.1",
-      "description": "JSON without touching any globals",
-      "externalReferences": [
-        {
-          "type": "distribution",
-          "url": "https://registry.npmjs.org/jsonify/-/jsonify-0.0.1.tgz"
-        },
-        {
-          "type": "vcs",
-          "url": "https://github.com/ljharb/jsonify.git"
-        }
-      ],
-      "hashes": [
-        {
-          "alg": "SHA-512",
-          "content": "dbf2a2d06726baa4ab805c9e950abd334e72ecf4b4984c2e233adfddfd5f3ea9150d546f66b3d9b5548c1f1760a3c02ad2cc4039bfdcaf66aaa80dcb7961d53e"
-        }
-      ],
-      "name": "jsonify",
-      "properties": [
-        {
-          "name": "cdx:npm:package:development",
-          "value": "true"
-        }
-      ],
-      "purl": "pkg:npm/jsonify@0.0.1",
-      "scope": "required",
-      "type": "library",
-      "version": "0.0.1"
-    },
-    {
       "author": "Ethan Cohen",
       "bom-ref": "jsx-ast-utils@3.3.5",
       "description": "AST utility module for statically analyzing JSX",
@@ -11577,53 +11067,6 @@
       "scope": "required",
       "type": "library",
       "version": "4.5.4"
-    },
-    {
-      "author": "Mani Maghsoudlou",
-      "bom-ref": "klaw-sync@6.0.0",
-      "description": "Recursive, synchronous, and fast file system walker",
-      "externalReferences": [
-        {
-          "type": "distribution",
-          "url": "https://registry.npmjs.org/klaw-sync/-/klaw-sync-6.0.0.tgz"
-        },
-        {
-          "type": "vcs",
-          "url": "git+https://github.com/manidlou/node-klaw-sync.git"
-        },
-        {
-          "type": "website",
-          "url": "https://github.com/manidlou/node-klaw-sync#readme"
-        },
-        {
-          "type": "issue-tracker",
-          "url": "https://github.com/manidlou/node-klaw-sync/issues"
-        }
-      ],
-      "hashes": [
-        {
-          "alg": "SHA-512",
-          "content": "9c87ae552cdd082b3a4c33d3a88f30d58adedf8b12abb024678077b1f3816c8d82815481e03bb868b4228c5536fa5840142c2df7ee361de97a950348bfa027b5"
-        }
-      ],
-      "licenses": [
-        {
-          "license": {
-            "id": "MIT"
-          }
-        }
-      ],
-      "name": "klaw-sync",
-      "properties": [
-        {
-          "name": "cdx:npm:package:development",
-          "value": "true"
-        }
-      ],
-      "purl": "pkg:npm/klaw-sync@6.0.0",
-      "scope": "required",
-      "type": "library",
-      "version": "6.0.0"
     },
     {
       "author": "George Zahariev <z@georgezahariev.com>",
@@ -11987,49 +11430,6 @@
       "version": "1.1.0"
     },
     {
-      "author": "Jon Schlinkert (https://github.com/jonschlinkert)",
-      "bom-ref": "micromatch@4.0.8",
-      "description": "Glob matching for javascript/node.js. A replacement and faster alternative to minimatch and multimatch.",
-      "externalReferences": [
-        {
-          "type": "distribution",
-          "url": "https://registry.npmjs.org/micromatch/-/micromatch-4.0.8.tgz"
-        },
-        {
-          "type": "website",
-          "url": "https://github.com/micromatch/micromatch"
-        },
-        {
-          "type": "issue-tracker",
-          "url": "https://github.com/micromatch/micromatch/issues"
-        }
-      ],
-      "hashes": [
-        {
-          "alg": "SHA-512",
-          "content": "3d7c1f06162ed210423f0f039f413e58361beda7f77522d558a8b71c6bfce08745e13c85a02d32b3115dd06a31c3b9d2bf84ff3f3109431b18b0488508aa3604"
-        }
-      ],
-      "licenses": [
-        {
-          "license": {
-            "id": "MIT"
-          }
-        }
-      ],
-      "name": "micromatch",
-      "properties": [
-        {
-          "name": "cdx:npm:package:development",
-          "value": "true"
-        }
-      ],
-      "purl": "pkg:npm/micromatch@4.0.8",
-      "scope": "required",
-      "type": "library",
-      "version": "4.0.8"
-    },
-    {
       "bom-ref": "mime-db@1.52.0",
       "description": "Media Type Database",
       "externalReferences": [
@@ -12170,49 +11570,6 @@
       "scope": "required",
       "type": "library",
       "version": "3.1.5"
-    },
-    {
-      "author": "James Halliday",
-      "bom-ref": "minimist@1.2.8",
-      "description": "parse argument options",
-      "externalReferences": [
-        {
-          "type": "distribution",
-          "url": "https://registry.npmjs.org/minimist/-/minimist-1.2.8.tgz"
-        },
-        {
-          "type": "vcs",
-          "url": "git://github.com/minimistjs/minimist.git"
-        },
-        {
-          "type": "website",
-          "url": "https://github.com/minimistjs/minimist"
-        }
-      ],
-      "hashes": [
-        {
-          "alg": "SHA-512",
-          "content": "db2c8047ca8190ddd8ba17896a7529582e54ddb6f9a2c0f2c0d07c4730d5943c031dba1c009bdeaaa8f5bbcf92543ee39164f8cafb070a95aaa96a80c5bd3308"
-        }
-      ],
-      "licenses": [
-        {
-          "license": {
-            "id": "MIT"
-          }
-        }
-      ],
-      "name": "minimist",
-      "properties": [
-        {
-          "name": "cdx:npm:package:development",
-          "value": "true"
-        }
-      ],
-      "purl": "pkg:npm/minimist@1.2.8",
-      "scope": "required",
-      "type": "library",
-      "version": "1.2.8"
     },
     {
       "author": "Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me/)",
@@ -13038,41 +12395,6 @@
       "version": "1.27.0"
     },
     {
-      "author": "Sindre Sorhus",
-      "bom-ref": "open@7.4.2",
-      "description": "Open stuff like URLs, files, executables. Cross-platform.",
-      "externalReferences": [
-        {
-          "type": "distribution",
-          "url": "https://registry.npmjs.org/open/-/open-7.4.2.tgz"
-        }
-      ],
-      "hashes": [
-        {
-          "alg": "SHA-512",
-          "content": "3151dd743570797645ddac2d9404beea980a2e59bf260c59f74fbf341bab06841cb5538e07fcc37558dcc8fcd0fb495a0c66ec5a0ad191f948eb9b1078e813f5"
-        }
-      ],
-      "licenses": [
-        {
-          "license": {
-            "id": "MIT"
-          }
-        }
-      ],
-      "name": "open",
-      "properties": [
-        {
-          "name": "cdx:npm:package:development",
-          "value": "true"
-        }
-      ],
-      "purl": "pkg:npm/open@7.4.2",
-      "scope": "required",
-      "type": "library",
-      "version": "7.4.2"
-    },
-    {
       "author": "George Zahariev <z@georgezahariev.com>",
       "bom-ref": "optionator@0.9.4",
       "description": "option parsing and help generation",
@@ -13309,80 +12631,6 @@
       "scope": "required",
       "type": "library",
       "version": "7.3.0"
-    },
-    {
-      "author": "David Sheldrick",
-      "bom-ref": "patch-package@8.0.1",
-      "description": "Fix broken node modules with no fuss",
-      "externalReferences": [
-        {
-          "type": "distribution",
-          "url": "https://registry.npmjs.org/patch-package/-/patch-package-8.0.1.tgz"
-        }
-      ],
-      "hashes": [
-        {
-          "alg": "SHA-512",
-          "content": "56c291200f1fe6ea8743b3468702276ba071e83f6cff5897940d61b610550446e4abeb789170f41c7b7eac985ffd9f828b417f1c207686f9f4a8b74b1be43197"
-        }
-      ],
-      "licenses": [
-        {
-          "license": {
-            "id": "MIT"
-          }
-        }
-      ],
-      "name": "patch-package",
-      "properties": [
-        {
-          "name": "cdx:npm:package:development",
-          "value": "true"
-        }
-      ],
-      "purl": "pkg:npm/patch-package@8.0.1",
-      "scope": "required",
-      "type": "library",
-      "version": "8.0.1"
-    },
-    {
-      "author": "GitHub Inc.",
-      "bom-ref": "semver@7.8.5",
-      "description": "The semantic version parser used by npm.",
-      "externalReferences": [
-        {
-          "type": "distribution",
-          "url": "https://registry.npmjs.org/semver/-/semver-7.8.5.tgz"
-        },
-        {
-          "type": "vcs",
-          "url": "git+https://github.com/npm/node-semver.git"
-        }
-      ],
-      "hashes": [
-        {
-          "alg": "SHA-512",
-          "content": "63bfca0ec6fc2e3a28669c1aa86cae94ee8342592c8029dc7211c693eb19218e1206f52870c044147e54af57c8e1d57e26f974c3a723bee71a222e34a6e462a0"
-        }
-      ],
-      "licenses": [
-        {
-          "license": {
-            "id": "ISC"
-          }
-        }
-      ],
-      "name": "semver",
-      "properties": [
-        {
-          "name": "cdx:npm:package:development",
-          "value": "true"
-        }
-      ],
-      "purl": "pkg:npm/semver@7.8.5",
-      "scope": "required",
-      "type": "library",
-      "version": "7.8.5"
     },
     {
       "author": "Sindre Sorhus",
@@ -13647,49 +12895,6 @@
       "scope": "required",
       "type": "library",
       "version": "1.1.1"
-    },
-    {
-      "author": "Jon Schlinkert (https://github.com/jonschlinkert)",
-      "bom-ref": "picomatch@2.3.2",
-      "description": "Blazing fast and accurate glob matcher written in JavaScript, with no dependencies and full support for standard and extended Bash glob features, including braces, extglobs, POSIX brackets, and regular expressions.",
-      "externalReferences": [
-        {
-          "type": "distribution",
-          "url": "https://registry.npmjs.org/picomatch/-/picomatch-2.3.2.tgz"
-        },
-        {
-          "type": "website",
-          "url": "https://github.com/micromatch/picomatch"
-        },
-        {
-          "type": "issue-tracker",
-          "url": "https://github.com/micromatch/picomatch/issues"
-        }
-      ],
-      "hashes": [
-        {
-          "alg": "SHA-512",
-          "content": "57bfaf404274e99f9ce6d4b27bc4be9c751f239d71a172178c743df5c42d294910aaa3b590efca08951f657b81e3b87f60194385a8761f785d5065e7f227b4a0"
-        }
-      ],
-      "licenses": [
-        {
-          "license": {
-            "id": "MIT"
-          }
-        }
-      ],
-      "name": "picomatch",
-      "properties": [
-        {
-          "name": "cdx:npm:package:development",
-          "value": "true"
-        }
-      ],
-      "purl": "pkg:npm/picomatch@2.3.2",
-      "scope": "required",
-      "type": "library",
-      "version": "2.3.2"
     },
     {
       "author": "Benjamin Tan <demoneaux@gmail.com>",
@@ -15396,41 +14601,6 @@
       "version": "2.0.0"
     },
     {
-      "author": "Sindre Sorhus",
-      "bom-ref": "slash@2.0.0",
-      "description": "Convert Windows backslash paths to slash paths",
-      "externalReferences": [
-        {
-          "type": "distribution",
-          "url": "https://registry.npmjs.org/slash/-/slash-2.0.0.tgz"
-        }
-      ],
-      "hashes": [
-        {
-          "alg": "SHA-512",
-          "content": "6582a1dd6876cf53e91175abd0ca52059d15ea66470107d87afb6d3b5d5ce7509a5a319369a762299fb056dd4f6cc943579aa1305b25a5909e9a1c0e2bb0bcf4"
-        }
-      ],
-      "licenses": [
-        {
-          "license": {
-            "id": "MIT"
-          }
-        }
-      ],
-      "name": "slash",
-      "properties": [
-        {
-          "name": "cdx:npm:package:development",
-          "value": "true"
-        }
-      ],
-      "purl": "pkg:npm/slash@2.0.0",
-      "scope": "required",
-      "type": "library",
-      "version": "2.0.0"
-    },
-    {
       "author": "Valentin 7rulnik Semirulnik <v7rulnik@gmail.com>",
       "bom-ref": "source-map-js@1.2.1",
       "description": "Generates and consumes source maps",
@@ -16353,92 +15523,6 @@
       "version": "6.1.86"
     },
     {
-      "author": "KARASZI Istv\u00e1n <github@spam.raszi.hu>",
-      "bom-ref": "tmp@0.2.7",
-      "description": "Temporary file and directory creator",
-      "externalReferences": [
-        {
-          "type": "distribution",
-          "url": "https://registry.npmjs.org/tmp/-/tmp-0.2.7.tgz"
-        },
-        {
-          "type": "website",
-          "url": "http://github.com/raszi/node-tmp"
-        },
-        {
-          "type": "issue-tracker",
-          "url": "http://github.com/raszi/node-tmp/issues"
-        }
-      ],
-      "hashes": [
-        {
-          "alg": "SHA-512",
-          "content": "7b4be8b48a69e14a36009612cd51d5eb109c6b0ba27b3dc3cea0c06eb4dcdd8c4192994de9ef9d335dd97887199c383f4294ae536cdf677af3c18f2e9049da5f"
-        }
-      ],
-      "licenses": [
-        {
-          "license": {
-            "id": "MIT"
-          }
-        }
-      ],
-      "name": "tmp",
-      "properties": [
-        {
-          "name": "cdx:npm:package:development",
-          "value": "true"
-        }
-      ],
-      "purl": "pkg:npm/tmp@0.2.7",
-      "scope": "required",
-      "type": "library",
-      "version": "0.2.7"
-    },
-    {
-      "author": "Jon Schlinkert (https://github.com/jonschlinkert)",
-      "bom-ref": "to-regex-range@5.0.1",
-      "description": "Pass two numbers, get a regex-compatible source string for matching ranges. Validated against more than 2.78 million test assertions.",
-      "externalReferences": [
-        {
-          "type": "distribution",
-          "url": "https://registry.npmjs.org/to-regex-range/-/to-regex-range-5.0.1.tgz"
-        },
-        {
-          "type": "website",
-          "url": "https://github.com/micromatch/to-regex-range"
-        },
-        {
-          "type": "issue-tracker",
-          "url": "https://github.com/micromatch/to-regex-range/issues"
-        }
-      ],
-      "hashes": [
-        {
-          "alg": "SHA-512",
-          "content": "eb93fb8b3e97e7212bd5cc1c82f4316db230ed493780ecb974876d678ac3bde2ea86b7493fe2e2fc7c7ab722b43446fed860b29de08c2621aaac00c248d93cb1"
-        }
-      ],
-      "licenses": [
-        {
-          "license": {
-            "id": "MIT"
-          }
-        }
-      ],
-      "name": "to-regex-range",
-      "properties": [
-        {
-          "name": "cdx:npm:package:development",
-          "value": "true"
-        }
-      ],
-      "purl": "pkg:npm/to-regex-range@5.0.1",
-      "scope": "required",
-      "type": "library",
-      "version": "5.0.1"
-    },
-    {
       "author": "Jeremy Stashewsky",
       "bom-ref": "tough-cookie@5.1.2",
       "description": "RFC6265 Cookies and Cookie Jar for node.js",
@@ -16880,49 +15964,6 @@
       "scope": "required",
       "type": "library",
       "version": "8.3.0"
-    },
-    {
-      "author": "Ryan Zimmerman <opensrc@ryanzim.com>",
-      "bom-ref": "universalify@2.0.1",
-      "description": "Make a callback- or promise-based function support both promises and callbacks.",
-      "externalReferences": [
-        {
-          "type": "distribution",
-          "url": "https://registry.npmjs.org/universalify/-/universalify-2.0.1.tgz"
-        },
-        {
-          "type": "vcs",
-          "url": "git+https://github.com/RyanZim/universalify.git"
-        },
-        {
-          "type": "website",
-          "url": "https://github.com/RyanZim/universalify#readme"
-        }
-      ],
-      "hashes": [
-        {
-          "alg": "SHA-512",
-          "content": "829b4735082120d9dcfef4c6224d12385185357c3b255ae5454b42a2725196f6b0e83b97d303b925e928f6c5ab301861f8fb18019ee85c088e9dffd42a88328b"
-        }
-      ],
-      "licenses": [
-        {
-          "license": {
-            "id": "MIT"
-          }
-        }
-      ],
-      "name": "universalify",
-      "properties": [
-        {
-          "name": "cdx:npm:package:development",
-          "value": "true"
-        }
-      ],
-      "purl": "pkg:npm/universalify@2.0.1",
-      "scope": "required",
-      "type": "library",
-      "version": "2.0.1"
     },
     {
       "author": "Andrey Sitnik <andrey@sitnik.ru>",
@@ -17769,45 +16810,6 @@
       "version": "3.1.1"
     },
     {
-      "author": "Eemeli Aro <eemeli@gmail.com>",
-      "bom-ref": "yaml@2.9.0",
-      "description": "JavaScript parser and stringifier for YAML",
-      "externalReferences": [
-        {
-          "type": "distribution",
-          "url": "https://registry.npmjs.org/yaml/-/yaml-2.9.0.tgz"
-        },
-        {
-          "type": "website",
-          "url": "https://eemeli.org/yaml/"
-        }
-      ],
-      "hashes": [
-        {
-          "alg": "SHA-512",
-          "content": "d80be1357de66fccdde99cbb20d4ed4a9975175e475ba5a7aa3d2cad696428b729625fe03083098b2b86ab629e236605c543e376507edcb735d2c78c2ed2f870"
-        }
-      ],
-      "licenses": [
-        {
-          "license": {
-            "id": "ISC"
-          }
-        }
-      ],
-      "name": "yaml",
-      "properties": [
-        {
-          "name": "cdx:npm:package:development",
-          "value": "true"
-        }
-      ],
-      "purl": "pkg:npm/yaml@2.9.0",
-      "scope": "required",
-      "type": "library",
-      "version": "2.9.0"
-    },
-    {
       "author": "Sindre Sorhus",
       "bom-ref": "yocto-queue@0.1.0",
       "description": "Tiny queue data structure",
@@ -17866,7 +16868,6 @@
         "eslint-plugin-react-hooks@5.2.0",
         "globals@15.15.0",
         "jsdom@25.0.1",
-        "patch-package@8.0.1",
         "vite@6.4.3",
         "vitest@4.1.11"
       ],
@@ -18068,7 +17069,7 @@
     },
     {
       "dependsOn": [],
-      "ref": "@esbuild/win32-x64@0.25.12"
+      "ref": "@esbuild/linux-x64@0.25.12"
     },
     {
       "dependsOn": [
@@ -18237,11 +17238,11 @@
     },
     {
       "dependsOn": [],
-      "ref": "@rollup/rollup-win32-x64-gnu@4.62.3"
+      "ref": "@rollup/rollup-linux-x64-gnu@4.62.3"
     },
     {
       "dependsOn": [],
-      "ref": "@rollup/rollup-win32-x64-msvc@4.62.3"
+      "ref": "@rollup/rollup-linux-x64-musl@4.62.3"
     },
     {
       "dependsOn": [
@@ -18281,13 +17282,13 @@
         "progress@2.0.3",
         "proxy-from-env@1.1.0",
         "which@2.0.2",
-        "@sentry/cli-win32-x64@2.58.6"
+        "@sentry/cli-linux-x64@2.58.6"
       ],
       "ref": "@sentry/cli@2.58.6"
     },
     {
       "dependsOn": [],
-      "ref": "@sentry/cli-win32-x64@2.58.6"
+      "ref": "@sentry/cli-linux-x64@2.58.6"
     },
     {
       "dependsOn": [],
@@ -18513,10 +17514,6 @@
     },
     {
       "dependsOn": [],
-      "ref": "@yarnpkg/lockfile@1.1.0"
-    },
-    {
-      "dependsOn": [],
       "ref": "acorn@8.18.0"
     },
     {
@@ -18665,12 +17662,6 @@
     },
     {
       "dependsOn": [
-        "fill-range@7.1.1"
-      ],
-      "ref": "braces@3.0.3"
-    },
-    {
-      "dependsOn": [
         "baseline-browser-mapping@2.11.7",
         "caniuse-lite@1.0.30001806",
         "electron-to-chromium@1.5.398",
@@ -18720,10 +17711,6 @@
         "supports-color@7.2.0"
       ],
       "ref": "chalk@4.1.2"
-    },
-    {
-      "dependsOn": [],
-      "ref": "ci-info@3.9.0"
     },
     {
       "dependsOn": [
@@ -19006,7 +17993,7 @@
     },
     {
       "dependsOn": [
-        "@esbuild/win32-x64@0.25.12"
+        "@esbuild/linux-x64@0.25.12"
       ],
       "ref": "esbuild@0.25.12"
     },
@@ -19156,22 +18143,10 @@
     },
     {
       "dependsOn": [
-        "to-regex-range@5.0.1"
-      ],
-      "ref": "fill-range@7.1.1"
-    },
-    {
-      "dependsOn": [
         "locate-path@6.0.0",
         "path-exists@4.0.0"
       ],
       "ref": "find-up@5.0.0"
-    },
-    {
-      "dependsOn": [
-        "micromatch@4.0.8"
-      ],
-      "ref": "find-yarn-workspace-root@2.0.0"
     },
     {
       "dependsOn": [
@@ -19203,14 +18178,6 @@
         "mime-types@2.1.35"
       ],
       "ref": "form-data@4.0.6"
-    },
-    {
-      "dependsOn": [
-        "graceful-fs@4.2.11",
-        "jsonfile@6.2.1",
-        "universalify@2.0.1"
-      ],
-      "ref": "fs-extra@10.1.0"
     },
     {
       "dependsOn": [],
@@ -19306,10 +18273,6 @@
     {
       "dependsOn": [],
       "ref": "gopd@1.2.0"
-    },
-    {
-      "dependsOn": [],
-      "ref": "graceful-fs@4.2.11"
     },
     {
       "dependsOn": [],
@@ -19473,10 +18436,6 @@
       "ref": "is-date-object@1.1.0"
     },
     {
-      "dependsOn": [],
-      "ref": "is-docker@2.2.1"
-    },
-    {
       "dependsOn": [
         "call-bound@1.0.4"
       ],
@@ -19515,10 +18474,6 @@
     {
       "dependsOn": [],
       "ref": "is-negative-zero@2.0.3"
-    },
-    {
-      "dependsOn": [],
-      "ref": "is-number@7.0.0"
     },
     {
       "dependsOn": [
@@ -19587,12 +18542,6 @@
         "get-intrinsic@1.3.0"
       ],
       "ref": "is-weakset@2.0.4"
-    },
-    {
-      "dependsOn": [
-        "is-docker@2.2.1"
-      ],
-      "ref": "is-wsl@2.2.0"
     },
     {
       "dependsOn": [],
@@ -19669,33 +18618,12 @@
       "ref": "json-schema-traverse@0.4.1"
     },
     {
-      "dependsOn": [
-        "call-bind@1.0.9",
-        "call-bound@1.0.4",
-        "isarray@2.0.5",
-        "jsonify@0.0.1",
-        "object-keys@1.1.1"
-      ],
-      "ref": "json-stable-stringify@1.3.0"
-    },
-    {
       "dependsOn": [],
       "ref": "json-stable-stringify-without-jsonify@1.0.1"
     },
     {
       "dependsOn": [],
       "ref": "json5@2.2.3"
-    },
-    {
-      "dependsOn": [
-        "universalify@2.0.1",
-        "graceful-fs@4.2.11"
-      ],
-      "ref": "jsonfile@6.2.1"
-    },
-    {
-      "dependsOn": [],
-      "ref": "jsonify@0.0.1"
     },
     {
       "dependsOn": [
@@ -19711,12 +18639,6 @@
         "json-buffer@3.0.1"
       ],
       "ref": "keyv@4.5.4"
-    },
-    {
-      "dependsOn": [
-        "graceful-fs@4.2.11"
-      ],
-      "ref": "klaw-sync@6.0.0"
     },
     {
       "dependsOn": [
@@ -19766,13 +18688,6 @@
       "ref": "math-intrinsics@1.1.0"
     },
     {
-      "dependsOn": [
-        "braces@3.0.3",
-        "picomatch@2.3.2"
-      ],
-      "ref": "micromatch@4.0.8"
-    },
-    {
       "dependsOn": [],
       "ref": "mime-db@1.52.0"
     },
@@ -19791,10 +18706,6 @@
         "brace-expansion@5.0.12"
       ],
       "ref": "minimatch@3.1.5"
-    },
-    {
-      "dependsOn": [],
-      "ref": "minimist@1.2.8"
     },
     {
       "dependsOn": [],
@@ -19921,13 +18832,6 @@
     },
     {
       "dependsOn": [
-        "is-docker@2.2.1",
-        "is-wsl@2.2.0"
-      ],
-      "ref": "open@7.4.2"
-    },
-    {
-      "dependsOn": [
         "prelude-ls@1.2.1",
         "deep-is@0.1.4",
         "word-wrap@1.2.5",
@@ -19971,29 +18875,6 @@
       "ref": "parse5@7.3.0"
     },
     {
-      "dependsOn": [
-        "@yarnpkg/lockfile@1.1.0",
-        "chalk@4.1.2",
-        "ci-info@3.9.0",
-        "cross-spawn@7.0.6",
-        "find-yarn-workspace-root@2.0.0",
-        "fs-extra@10.1.0",
-        "json-stable-stringify@1.3.0",
-        "klaw-sync@6.0.0",
-        "minimist@1.2.8",
-        "open@7.4.2",
-        "semver@7.8.5",
-        "slash@2.0.0",
-        "tmp@0.2.7",
-        "yaml@2.9.0"
-      ],
-      "ref": "patch-package@8.0.1"
-    },
-    {
-      "dependsOn": [],
-      "ref": "semver@7.8.5"
-    },
-    {
       "dependsOn": [],
       "ref": "path-exists@4.0.0"
     },
@@ -20023,10 +18904,6 @@
     {
       "dependsOn": [],
       "ref": "picocolors@1.1.1"
-    },
-    {
-      "dependsOn": [],
-      "ref": "picomatch@2.3.2"
     },
     {
       "dependsOn": [],
@@ -20181,8 +19058,8 @@
     {
       "dependsOn": [
         "@types/estree@1.0.9",
-        "@rollup/rollup-win32-x64-gnu@4.62.3",
-        "@rollup/rollup-win32-x64-msvc@4.62.3"
+        "@rollup/rollup-linux-x64-gnu@4.62.3",
+        "@rollup/rollup-linux-x64-musl@4.62.3"
       ],
       "ref": "rollup@4.62.3"
     },
@@ -20312,10 +19189,6 @@
     {
       "dependsOn": [],
       "ref": "siginfo@2.0.0"
-    },
-    {
-      "dependsOn": [],
-      "ref": "slash@2.0.0"
     },
     {
       "dependsOn": [],
@@ -20455,16 +19328,6 @@
       "ref": "tldts-core@6.1.86"
     },
     {
-      "dependsOn": [],
-      "ref": "tmp@0.2.7"
-    },
-    {
-      "dependsOn": [
-        "is-number@7.0.0"
-      ],
-      "ref": "to-regex-range@5.0.1"
-    },
-    {
       "dependsOn": [
         "tldts@6.1.86"
       ],
@@ -20541,10 +19404,6 @@
       "ref": "undici-types@8.3.0"
     },
     {
-      "dependsOn": [],
-      "ref": "universalify@2.0.1"
-    },
-    {
       "dependsOn": [
         "browserslist@4.28.7",
         "escalade@3.2.0",
@@ -20567,7 +19426,6 @@
     {
       "dependsOn": [
         "@types/node@26.1.2",
-        "yaml@2.9.0",
         "esbuild@0.25.12",
         "fdir@6.5.0",
         "picomatch@4.0.5",
@@ -20715,10 +19573,6 @@
     },
     {
       "dependsOn": [],
-      "ref": "yaml@2.9.0"
-    },
-    {
-      "dependsOn": [],
       "ref": "yocto-queue@0.1.0"
     }
   ],
@@ -20750,35 +19604,35 @@
       },
       {
         "name": "viola:source-revision",
-        "value": "4501ee07a9e4ecbaa12ffd6b518d58c45d459ed8"
+        "value": "5ff3e237c745cdfdd21cdbad03639bdb1f49714b"
       },
       {
         "name": "viola:source-tree-sha256",
-        "value": "176c5d0774ae0521a60bb684a7b34938f796e89f4bba79ccfbe17ef8bddaddf3"
+        "value": "b24158387517354ff773d800dc73f4c3a281b4409e60d8b909ec6ad37e19a6e4"
       },
       {
         "name": "viola:manifest-sha256",
-        "value": "0d5a51d102a628c29d470d64311b61f65b3d5d6213924d00d47e3a53f4854cd3"
+        "value": "93d79dd4a1959511706c531caf0a6711bcb70c22c555458e7bc0ec143a6dd1f2"
       },
       {
         "name": "viola:platform-system",
-        "value": "Windows"
+        "value": "Linux"
       },
       {
         "name": "viola:package-lock-sha256",
-        "value": "fbb04c205d10db7ff29e067d1413a94af6baa931b6e1e8038a5cc11f305fc78c"
+        "value": "e2537605cc28b2972a29f8d6e5952f3d5ab2f9539979b9246cea5645264ed8f4"
       }
     ],
-    "timestamp": "2026-10-01T16:53:14.566Z",
+    "timestamp": "2026-10-03T02:35:41.148Z",
     "tools": [
       {
         "name": "cli",
         "vendor": "npm",
-        "version": "11.19.0"
+        "version": "11.9.0"
       }
     ]
   },
-  "serialNumber": "urn:uuid:fe9c710f-4251-4ef3-9fb1-498614844459",
+  "serialNumber": "urn:uuid:fe8ea38d-ed05-40ef-93f1-507ba4d4c7ce",
   "specVersion": "1.5",
   "version": 1
 }
