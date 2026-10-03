@@ -24,7 +24,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import RoomGroupsModal from './RoomGroupsModal';
 
-const apiFetchMock = vi.hoisted(() => vi.fn(() => Promise.resolve({ ok: true, data: { groups: [] } })));
+const apiFetchMock = vi.hoisted(() => vi.fn(() => Promise.resolve({ groups: [] })));
 const authFetchMock = vi.hoisted(() => vi.fn(() => Promise.resolve({
   ok: true,
   status: 200,

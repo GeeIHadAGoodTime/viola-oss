@@ -13,11 +13,19 @@ import './ChatMode.css';
 
 let pendingNewChatRequests = 0;
 const EMPTY_COMMANDS = [];
+const STREAM_STATUS_POLL_MS = 2000;
+const STREAM_STATUS_TIMEOUT_MS = 5000;
+const STREAM_STATUS_MAX_FAILURES = 3;
+const STREAM_ACCEPTANCE_WARNING_MS = 15000;
 if (typeof window !== 'undefined' && !window.__violaChatModeNewChatListener) {
   window.__violaChatModeNewChatListener = true;
   window.addEventListener('viola:chat:new', () => {
     pendingNewChatRequests += 1;
   });
+}
+
+function isUnconfirmedRequest(error) {
+  return !error?.status || error.status >= 500;
 }
 
 function makeTemporaryAssistant() {
@@ -136,8 +144,15 @@ function ChatModeInner({
   const [loading, setLoading] = useState(true);
   const [streaming, setStreaming] = useState(false);
   const [streamingMessageId, setStreamingMessageId] = useState(null);
-  const [activeStreamId, setActiveStreamId] = useState(null);
+  const [streamNotice, setStreamNotice] = useState(null);
+  const streamSessionRef = useRef(null);
+  const streamAttachRef = useRef(null);
+  const threadRequestRef = useRef(0);
+  const pendingStopRef = useRef(false);
   const [modelOptions, setModelOptions] = useState([]);
+  const [modelError, setModelError] = useState('');
+  const [modelsLoading, setModelsLoading] = useState(false);
+  const modelRequestRef = useRef(0);
   const [selectedModel, setSelectedModel] = useState('');
   const [titleDraft, setTitleDraft] = useState('');
   const [dragActive, setDragActive] = useState(false);
@@ -180,9 +195,17 @@ function ChatModeInner({
     streamingRef.current = streaming;
   }, [streaming]);
 
+
   useEffect(() => {
-    activeStreamIdRef.current = activeStreamId;
-  }, [activeStreamId]);
+    if (!streaming || !streamingMessageId) return undefined;
+    const timer = window.setTimeout(() => {
+      if (streamSessionRef.current || !streamingRef.current) return;
+      setStreamNotice({ text: 'The response request has not been confirmed. It may have started on the server. Cancellation needs a confirmed stream ID. Reload this view to check its status before retrying.', retry: false });
+      setMessages((current) => current.map((message) => message.id === streamingMessageId
+        ? { ...message, status: 'unknown' } : message));
+    }, STREAM_ACCEPTANCE_WARNING_MS);
+    return () => window.clearTimeout(timer);
+  }, [streaming, streamingMessageId]);
 
   const loadThreads = useCallback(async (query = '') => {
     const generation = requestGenerationRef.current;
@@ -211,31 +234,62 @@ function ChatModeInner({
 
   const loadThread = useCallback(async (threadId) => {
     const generation = requestGenerationRef.current;
+    const request = ++threadRequestRef.current;
+    const isCurrent = () => requestGenerationRef.current === generation
+      && threadRequestRef.current === request && activeThreadIdRef.current === threadId;
     if (!threadId) {
-      if (requestGenerationRef.current !== generation) return;
+      if (!isCurrent()) return;
       setActiveThread(null);
       setMessages([]);
       return;
     }
     const data = await apiFetch(`/v1/chat/threads/${encodeURIComponent(threadId)}`);
-    if (requestGenerationRef.current !== generation) return;
+    if (!isCurrent()) return;
     setActiveThread(data.thread);
     setTitleDraft(data.thread?.title || 'New chat');
-    setMessages(normalizeMessages(data.messages));
+    const restoredMessages = normalizeMessages(data.messages);
+    const runningId = data.active_stream_ids?.[0];
+    if (runningId && !streamingRef.current) {
+      // A same-principal remount/navigation must not orphan a task that outlived
+      // its viewer. Replay into a fresh buffer, never append history twice.
+      const existing = restoredMessages.find((message) => message.role === 'assistant'
+        && message.metadata?.stream_id === runningId);
+      const assistant = existing || makeTemporaryAssistant();
+      setMessages(existing ? restoredMessages.map((message) => message.id === assistant.id
+        ? { ...message, content: '', tools: [], status: 'streaming' } : message)
+        : [...restoredMessages, assistant]);
+      streamingRef.current = true;
+      setStreaming(true);
+      setStreamingMessageId(assistant.id);
+      void streamAttachRef.current?.(runningId, assistant.id, generation, threadId);
+    } else {
+      setMessages(restoredMessages);
+    }
   }, []);
 
   const loadModels = useCallback(async () => {
     const generation = requestGenerationRef.current;
-    const data = await apiFetch('/v1/chat/models');
-    const flattened = flattenModels(data);
-    if (requestGenerationRef.current !== generation) return flattened;
-    setModelOptions(flattened.models);
-    setSelectedModel((current) => (
-      current && flattened.models.some((item) => item.id === current)
-        ? current
-        : flattened.current
-    ));
-    return flattened;
+    const request = ++modelRequestRef.current;
+    const isCurrent = () => requestGenerationRef.current === generation && modelRequestRef.current === request;
+    setModelsLoading(true);
+    try {
+      const data = await apiFetch('/v1/chat/models');
+      const flattened = flattenModels(data);
+      if (!isCurrent()) return flattened;
+      setModelOptions(flattened.models);
+      setSelectedModel((current) => (
+        current && flattened.models.some((item) => item.id === current)
+          ? current
+          : flattened.current
+      ));
+      setModelError('');
+      return flattened;
+    } catch {
+      if (isCurrent()) setModelError("Couldn't load the model list. Please try again.");
+      return null;
+    } finally {
+      if (isCurrent()) setModelsLoading(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -246,6 +300,12 @@ function ChatModeInner({
     // loadThread/loadModels) is now stale and will no-op instead of
     // applying its response when it eventually resolves (#2395/C-071).
     const generation = ++requestGenerationRef.current;
+    const modelRequests = modelRequestRef;
+    const generations = requestGenerationRef;
+    streamSessionRef.current?.dispose();
+    streamSessionRef.current = null;
+    pendingStopRef.current = false;
+    setStreamNotice(null);
     exportRequestRef.current = null;
     setExporting(false);
     setThreadActionError('');
@@ -264,13 +324,22 @@ function ChatModeInner({
         setStreaming(false);
         streamingRef.current = false;
         setStreamingMessageId(null);
-        setActiveStreamId(null);
         activeStreamIdRef.current = null;
         setThreads([]);
         setActiveThreadId(null);
         activeThreadIdRef.current = null;
         setActiveThread(null);
         setMessages([]);
+        setDraft('');
+        setTitleDraft('');
+        setSearch('');
+        setModelOptions([]);
+        setSelectedModel('');
+        setModelError('');
+        setUploadError('');
+        setUploadingFileCount(0);
+        setDragActive(false);
+        dragDepthRef.current = 0;
         setConsentRequired(false);
         const [threadList] = await Promise.all([
           loadThreads(''),
@@ -279,6 +348,7 @@ function ChatModeInner({
         if (cancelled || requestGenerationRef.current !== generation) return;
         if (threadList.length > 0) {
           setActiveThreadId(threadList[0].id);
+          activeThreadIdRef.current = threadList[0].id;
           await loadThread(threadList[0].id);
         }
       } finally {
@@ -288,6 +358,10 @@ function ChatModeInner({
     void boot();
     return () => {
       cancelled = true;
+      ++generations.current;
+      streamSessionRef.current?.dispose();
+      streamSessionRef.current = null;
+      ++modelRequests.current;
       exportRequestRef.current = null;
       if (eventSourceRef.current) eventSourceRef.current.close();
     };
@@ -312,11 +386,13 @@ function ChatModeInner({
   }, [streamingMessageId]));
 
   const ensureThread = useCallback(async (pendingMessages = []) => {
+    const generation = requestGenerationRef.current;
     if (activeThreadIdRef.current) return activeThreadIdRef.current;
     const data = await apiFetch('/v1/chat/threads', {
       method: 'POST',
       body: JSON.stringify({ title: 'New chat', model: selectedModel || null }),
     });
+    if (requestGenerationRef.current !== generation) return null;
     setThreads((current) => [data.thread, ...current]);
     setActiveThread(data.thread);
     setActiveThreadId(data.thread.id);
@@ -330,8 +406,10 @@ function ChatModeInner({
   }, [selectedModel]);
 
   const refreshActiveThread = useCallback(async () => {
+    const generation = requestGenerationRef.current;
     if (!activeThreadIdRef.current) return;
     await loadThread(activeThreadIdRef.current);
+    if (requestGenerationRef.current !== generation) return;
     await loadThreads(search);
   }, [loadThread, loadThreads, search]);
 
@@ -347,6 +425,7 @@ function ChatModeInner({
       return;
     }
 
+    const generation = requestGenerationRef.current;
     setUploadError('');
     setUploadingFileCount(files.length);
 
@@ -359,6 +438,7 @@ function ChatModeInner({
           method: 'POST',
           body: formData,
         });
+        if (requestGenerationRef.current !== generation) return;
         uploadedNames.push(result?.name || file.name);
       }
 
@@ -383,9 +463,9 @@ function ChatModeInner({
         },
       ]);
     } catch {
-      setUploadError('File upload failed.');
+      if (requestGenerationRef.current === generation) setUploadError('File upload failed.');
     } finally {
-      setUploadingFileCount(0);
+      if (requestGenerationRef.current === generation) setUploadingFileCount(0);
     }
   }, []);
 
@@ -426,88 +506,199 @@ function ChatModeInner({
     });
   }, [uploadFilesToWorkbench]);
 
-  const attachStream = useCallback(async (streamId, assistantMessageId) => {
-    setActiveStreamId(streamId);
-    activeStreamIdRef.current = streamId;
-    const streamUrl = await buildStreamUrl(streamId);
-    const source = new EventSource(streamUrl, { withCredentials: true });
-    eventSourceRef.current = source;
-    source.onmessage = (event) => {
-      let payload = null;
-      try {
-        payload = JSON.parse(event.data);
-      } catch {
-        return;
-      }
-      if (payload.tool) {
-        setMessages((current) => current.map((message) => (
-          message.id === assistantMessageId
-            ? { ...message, tools: upsertTool(message.tools, payload.tool) }
-            : message
-        )));
-      }
-      if (payload.token) {
-        setMessages((current) => current.map((message) => (
-          message.id === assistantMessageId
-            ? { ...message, content: `${message.content}${payload.token}` }
-            : message
-        )));
-      }
-      if (payload.done || payload.error) {
-        source.close();
-        eventSourceRef.current = null;
-        setStreaming(false);
-        setStreamingMessageId(null);
-        setActiveStreamId(null);
-        activeStreamIdRef.current = null;
-        const finalContent = payload.content || payload.message || (payload.error ? 'Something went wrong while generating the response.' : '');
-        setMessages((current) => current.map((message) => {
-          if (message.id !== assistantMessageId) return message;
-          const metadata = {
-            ...(message.metadata || {}),
-            ...(payload.streaming_mode ? {
-              streaming: {
-                mode: payload.streaming_mode,
-                token_count: payload.token_count || 0,
-                native: !payload.fallback,
-              },
-            } : {}),
-          };
-          return {
-            ...message,
-            content: finalContent || message.content,
-            status: payload.error ? 'error' : 'complete',
-            metadata,
-          };
-        }));
-        window.setTimeout(() => {
-          refreshActiveThread().catch(() => {});
-        }, 120);
-      }
+  const attachStream = useCallback(async (streamId, assistantMessageId, generation = requestGenerationRef.current, threadId = activeThreadIdRef.current) => {
+    if (requestGenerationRef.current !== generation) return;
+    // A success transport response without an identity cannot establish which
+    // producer accepted the request. Leave it unknown; never cancel `undefined`.
+    if (typeof streamId !== 'string' || !streamId.trim()) throw new Error('Stream acceptance is unconfirmed');
+    streamSessionRef.current?.dispose();
+    const session = { streamId, assistantMessageId, threadId, failures: 0 };
+    streamSessionRef.current = session;
+    const isCurrent = () => streamSessionRef.current === session && requestGenerationRef.current === generation;
+    const closeSource = () => {
+      session.source?.close();
+      if (eventSourceRef.current === session.source) eventSourceRef.current = null;
+      session.source = null;
     };
-    source.onerror = () => {
-      source.close();
-      eventSourceRef.current = null;
+    session.dispose = () => {
+      closeSource();
+      window.clearTimeout(session.timer);
+      session.controller?.abort();
+    };
+    const finish = () => {
+      if (!isCurrent()) return;
+      session.dispose();
+      streamSessionRef.current = null;
+      streamingRef.current = false;
       setStreaming(false);
       setStreamingMessageId(null);
-      setActiveStreamId(null);
       activeStreamIdRef.current = null;
-      setMessages((current) => current.map((message) => (
-        message.id === assistantMessageId
-          ? {
-            ...message,
-            content: message.content || 'The live response connection dropped.',
-            status: 'error',
-          }
-          : message
-      )));
-      // A transport failure can precede persistence of the assistant result.
-      // Reloading messages here replaces the visible error with the server's
-      // user-only snapshot. Keep that recovery feedback until the user opens
-      // another thread or retries; the sidebar may still refresh safely.
-      loadThreads(search).catch(() => {});
+      pendingStopRef.current = false;
+      setStreamNotice(null);
     };
+    const boundedRequest = async (action) => {
+      const controller = new AbortController();
+      session.controller = controller;
+      const timer = window.setTimeout(() => controller.abort(), STREAM_STATUS_TIMEOUT_MS);
+      try {
+        return await Promise.race([
+          action(controller.signal),
+          new Promise((_, reject) => {
+            controller.signal.addEventListener('abort', () => reject(new Error('Request interrupted')), { once: true });
+          }),
+        ]);
+      } finally {
+        window.clearTimeout(timer);
+        if (session.controller === controller) session.controller = null;
+      }
+    };
+    const request = (path, options = {}) => boundedRequest((signal) => apiFetch(path, { ...options, signal }));
+    const markUnknown = (text) => {
+      setStreamNotice({ text, retry: true });
+      setMessages((current) => current.map((message) => message.id === assistantMessageId
+        ? { ...message, status: 'unknown' } : message));
+    };
+    // SSE loss says nothing about the producer. Reconcile against the task
+    // registry via the existing thread endpoint, keeping cancellation available.
+    // Consecutive failed checks stop automatically; no timer claims completion.
+    session.recover = async (reset = false) => {
+      if (!isCurrent() || session.checking || session.cancelling) return false;
+      window.clearTimeout(session.timer);
+      if (reset) session.failures = 0;
+      const check = {};
+      session.checking = check;
+      try {
+        const data = await request(`/v1/chat/threads/${encodeURIComponent(session.threadId)}`);
+        if (!isCurrent() || session.cancelling || session.checking !== check) return false;
+        if (!Array.isArray(data.active_stream_ids)) throw new Error('Stream status unavailable');
+        session.failures = 0;
+        if (data.active_stream_ids.includes(streamId)) {
+          setStreamNotice({ text: session.stopRequested
+            ? 'Stop requested. Waiting for the response to finish stopping.'
+            : 'The live response connection dropped. The response is still running; checking for its result.', retry: false });
+          setMessages((current) => current.map((message) => message.id === assistantMessageId
+            ? { ...message, status: 'streaming' } : message));
+          session.timer = window.setTimeout(() => { void session.recover(); }, STREAM_STATUS_POLL_MS);
+          return false;
+        }
+        const result = data.messages?.find((message) => message.role === 'assistant'
+          && message.metadata?.stream_id === streamId && ['complete', 'stopped', 'error'].includes(message.status));
+        if (result) {
+          setMessages(normalizeMessages(data.messages));
+        } else {
+          setMessages((current) => current.map((message) => message.id === assistantMessageId
+            ? { ...message, status: 'error', content: message.content || 'This response is no longer running, but its result could not be recovered. You can try again.' }
+            : message));
+        }
+        finish();
+        loadThreads(search).catch(() => {});
+        return true;
+      } catch {
+        if (!isCurrent() || session.cancelling || session.checking !== check) return false;
+        session.failures += 1;
+        if (session.failures >= STREAM_STATUS_MAX_FAILURES) {
+          markUnknown('Cannot confirm the response status. It may still be running. Retry status or use Stop.');
+        } else {
+          setStreamNotice({ text: 'The live response connection dropped. Checking whether the response is still running…', retry: false });
+          session.timer = window.setTimeout(() => { void session.recover(); }, STREAM_STATUS_POLL_MS);
+        }
+        return false;
+      } finally {
+        if (session.checking === check) session.checking = null;
+      }
+    };
+    session.cancel = async () => {
+      if (!isCurrent() || session.cancelling) return false;
+      session.cancelling = true;
+      session.checking = null;
+      closeSource();
+      window.clearTimeout(session.timer);
+      session.controller?.abort();
+      setStreamNotice({ text: 'Requesting Stop…', retry: false });
+      try {
+        const data = await request(`/v1/chat/streams/${encodeURIComponent(streamId)}/cancel`, { method: 'POST' });
+        if (!isCurrent()) return false;
+        if (typeof data.cancelled !== 'boolean') throw new Error('Cancellation status unavailable');
+        session.stopRequested = data.cancelled;
+      } catch (err) {
+        if (!isCurrent()) return false;
+        console.error('[ChatMode] Stream cancel request failed; stream may keep running server-side:', err);
+        markUnknown('Could not confirm Stop. The response may still be running. Retry status or use Stop again.');
+        return false;
+      } finally {
+        session.cancelling = false;
+      }
+      return session.recover(true);
+    };
+    activeStreamIdRef.current = streamId;
+    setMessages((current) => current.map((message) => message.id === assistantMessageId
+      ? { ...message, status: 'streaming' } : message));
+    if (pendingStopRef.current) {
+      await session.cancel();
+      return;
+    }
+    try {
+      const streamUrl = await boundedRequest(() => buildStreamUrl(streamId));
+      if (!isCurrent() || pendingStopRef.current) return;
+      const source = new EventSource(streamUrl, { withCredentials: true });
+      session.source = source;
+      eventSourceRef.current = source;
+      source.onmessage = (event) => {
+        if (!isCurrent() || session.source !== source) return;
+        let payload;
+        try { payload = JSON.parse(event.data); } catch { return; }
+        // The SSE connection's own timeout is not a producer failure.
+        if (payload.error && payload.message === 'Stream timeout') {
+          closeSource();
+          void session.recover();
+          return;
+        }
+        if (payload.tool) {
+          setMessages((current) => current.map((message) => message.id === assistantMessageId
+            ? { ...message, tools: upsertTool(message.tools, payload.tool) } : message));
+        }
+        if (payload.token) {
+          setMessages((current) => current.map((message) => message.id === assistantMessageId
+            ? { ...message, content: `${message.content}${payload.token}` } : message));
+        }
+        if (payload.done || payload.error) {
+          const finalContent = payload.content || payload.message || (payload.error ? 'Something went wrong while generating the response.' : '');
+          setMessages((current) => current.map((message) => message.id === assistantMessageId ? {
+            ...message,
+            content: finalContent || message.content,
+            status: payload.error ? (payload.message === 'Stopped.' ? 'stopped' : 'error') : 'complete',
+            metadata: {
+              ...(message.metadata || {}),
+              ...(payload.streaming_mode ? { streaming: {
+                mode: payload.streaming_mode, token_count: payload.token_count || 0, native: !payload.fallback,
+              } } : {}),
+            },
+          } : message));
+          finish();
+          window.setTimeout(() => {
+            if (requestGenerationRef.current === generation && activeThreadIdRef.current === session.threadId && !streamingRef.current) {
+              refreshActiveThread().catch(() => {});
+            }
+          }, 120);
+        }
+      };
+      source.onerror = () => {
+        if (!isCurrent() || session.source !== source) return;
+        closeSource();
+        setStreamNotice({ text: 'The live response connection dropped. Checking whether the response is still running…', retry: false });
+        void session.recover();
+      };
+    } catch {
+      if (isCurrent()) void session.recover();
+    }
   }, [refreshActiveThread, loadThreads, search]);
+  streamAttachRef.current = attachStream;
+
+  const showUnconfirmedRequest = useCallback((messageId) => {
+    setStreamNotice({ text: 'Could not confirm whether the response request was accepted. It may still be running. Reload this view to check its status before retrying.', retry: false });
+    setMessages((current) => current.map((message) => message.id === messageId
+      ? { ...message, status: 'unknown' } : message));
+  }, []);
 
   const sendText = useCallback(async (text) => {
     const clean = text.trim();
@@ -521,6 +712,11 @@ function ChatModeInner({
       setDraft('');
       return;
     }
+    const generation = requestGenerationRef.current;
+    ++threadRequestRef.current;
+    pendingStopRef.current = false;
+    setStreamNotice(null);
+    streamingRef.current = true;
     const temporaryAssistant = makeTemporaryAssistant();
     const pendingMessages = [
       {
@@ -536,10 +732,13 @@ function ChatModeInner({
     setStreaming(true);
     setStreamingMessageId(temporaryAssistant.id);
     setMessages((current) => [...current, ...pendingMessages]);
-    const postSend = (id) => apiFetch(`/v1/chat/threads/${encodeURIComponent(id)}/send`, {
-      method: 'POST',
-      body: JSON.stringify({ text: clean, model: selectedModel || null }),
-    });
+    let dispatched = false;
+    const postSend = (id) => {
+      dispatched = true;
+      return apiFetch(`/v1/chat/threads/${encodeURIComponent(id)}/send`, {
+        method: 'POST', body: JSON.stringify({ text: clean, model: selectedModel || null }),
+      });
+    };
     try {
       // ensureThread() used to be awaited ABOVE this try, and `onSend` does not
       // catch, so a thread-creation refusal (403 consent_required for a user
@@ -547,10 +746,12 @@ function ChatModeInner({
       // rejection: the typed message vanished with no reply, no error, and no
       // prompt. Inside the try it becomes a message the user can act on.
       const threadId = await ensureThread(pendingMessages);
+      if (requestGenerationRef.current !== generation) return;
       let sendResult;
       try {
         sendResult = await postSend(threadId);
       } catch (err) {
+        if (requestGenerationRef.current !== generation) return;
         // The thread we sent into doesn't exist server-side anymore -- most
         // commonly because the sidebar was still showing a thread created
         // under a previous signed-in/device principal (#2395; threads are
@@ -563,16 +764,23 @@ function ChatModeInner({
           setActiveThreadId(null);
           setActiveThread(null);
           const freshThreadId = await ensureThread(pendingMessages);
+          if (requestGenerationRef.current !== generation) return;
           sendResult = await postSend(freshThreadId);
         } else {
           throw err;
         }
       }
-      await attachStream(sendResult.stream_id, temporaryAssistant.id);
+      await attachStream(sendResult.stream_id, temporaryAssistant.id, generation);
     } catch (err) {
+      if (requestGenerationRef.current !== generation) return;
+      if (dispatched && isUnconfirmedRequest(err)) {
+        showUnconfirmedRequest(temporaryAssistant.id);
+        return;
+      }
+      streamingRef.current = false;
+      setStreamNotice(null);
       setStreaming(false);
       setStreamingMessageId(null);
-      setActiveStreamId(null);
       activeStreamIdRef.current = null;
       // Say the real reason when the server gave one. A refusal the server can
       // name ("you have not enabled cloud sync", "Viola's AI is not turned on
@@ -591,52 +799,33 @@ function ChatModeInner({
           : message
       )));
     }
-  }, [attachStream, ensureThread, selectedModel, interceptCloudConsent]);
+  }, [attachStream, ensureThread, selectedModel, interceptCloudConsent, showUnconfirmedRequest]);
 
   const stopStreaming = useCallback(async () => {
-    const stoppedMessageId = streamingMessageId;
-    if (eventSourceRef.current) {
-      eventSourceRef.current.close();
-      eventSourceRef.current = null;
-    }
-    const streamId = activeStreamId;
-    setStreaming(false);
-    setStreamingMessageId(null);
-    setActiveStreamId(null);
-    activeStreamIdRef.current = null;
-    if (stoppedMessageId) {
-      setMessages((current) => current.map((message) => (
-        message.id === stoppedMessageId
-          ? {
-            ...message,
-            content: message.content || 'Stopped.',
-            status: 'stopped',
-          }
-          : message
-      )));
-    }
-    if (streamId) {
-      await apiFetch(`/v1/chat/streams/${encodeURIComponent(streamId)}/cancel`, { method: 'POST' }).catch((err) => {
-        console.error('[ChatMode] Stream cancel request failed; stream may keep running server-side:', err);
-      });
-      window.setTimeout(() => {
-        refreshActiveThread().catch(() => {});
-      }, 120);
-    }
-  }, [activeStreamId, refreshActiveThread, streamingMessageId]);
+    pendingStopRef.current = true;
+    if (streamSessionRef.current) return streamSessionRef.current.cancel();
+    // The send/regenerate POST may still be in flight. Keep ownership until it
+    // returns a stream id, then cancel that exact task before opening SSE.
+    setStreamNotice({ text: 'Stop requested. No stream ID is confirmed yet, so cancellation is not confirmed.', retry: false });
+    return false;
+  }, []);
 
   const createNewChat = useCallback(async () => {
+    const generation = requestGenerationRef.current;
+    if (streamingRef.current && !(await stopStreaming())) return;
+    if (requestGenerationRef.current !== generation) return;
     const data = await apiFetch('/v1/chat/threads', {
       method: 'POST',
       body: JSON.stringify({ title: 'New chat', model: selectedModel || null }),
     });
+    if (requestGenerationRef.current !== generation) return;
     setThreads((current) => [data.thread, ...current]);
     setActiveThreadId(data.thread.id);
     activeThreadIdRef.current = data.thread.id;
     setActiveThread(data.thread);
     setTitleDraft(data.thread.title);
     setMessages([]);
-  }, [selectedModel]);
+  }, [selectedModel, stopStreaming]);
 
   useEffect(() => {
     let cancelled = false;
@@ -660,7 +849,7 @@ function ChatModeInner({
   }, [createNewChat]);
 
   const selectThread = useCallback(async (threadId) => {
-    if (streamingRef.current) await stopStreaming();
+    if (streamingRef.current && !(await stopStreaming())) return;
     setActiveThreadId(threadId);
     activeThreadIdRef.current = threadId;
     await loadThread(threadId);
@@ -695,10 +884,14 @@ function ChatModeInner({
   }, []);
 
   const deleteThread = useCallback(async (thread) => {
+    const generation = requestGenerationRef.current;
     if (!window.confirm(`Delete "${thread.title || 'New chat'}"?`)) return;
+    if (activeThreadIdRef.current === thread.id && streamingRef.current && !(await stopStreaming())) return;
+    if (requestGenerationRef.current !== generation) return;
     await apiFetch(`/v1/chat/threads/${encodeURIComponent(thread.id)}`, { method: 'DELETE' });
+    if (requestGenerationRef.current !== generation) return;
     const nextThreads = threads.filter((item) => item.id !== thread.id);
-    setThreads(nextThreads);
+    setThreads((current) => current.filter((item) => item.id !== thread.id));
     if (activeThreadIdRef.current === thread.id) {
       const next = nextThreads[0];
       setActiveThreadId(next?.id || null);
@@ -709,7 +902,7 @@ function ChatModeInner({
         setMessages([]);
       }
     }
-  }, [loadThread, threads]);
+  }, [loadThread, stopStreaming, threads]);
 
   const exportThread = useCallback(async (thread = activeThread) => {
     if (!thread || exportRequestRef.current) return;
@@ -741,20 +934,28 @@ function ChatModeInner({
   }, [activeThread, renameThread, titleDraft]);
 
   const handleModelChange = useCallback(async (event) => {
+    const generation = requestGenerationRef.current;
+    const threadId = activeThreadIdRef.current;
     const model = event.target.value;
     setSelectedModel(model);
-    if (activeThreadIdRef.current) {
-      const data = await apiFetch(`/v1/chat/threads/${encodeURIComponent(activeThreadIdRef.current)}`, {
+    if (threadId) {
+      const data = await apiFetch(`/v1/chat/threads/${encodeURIComponent(threadId)}`, {
         method: 'PATCH',
         body: JSON.stringify({ model }),
       });
-      setActiveThread(data.thread);
+      if (requestGenerationRef.current !== generation || data.thread?.id !== threadId) return;
+      if (activeThreadIdRef.current === threadId) setActiveThread(data.thread);
       setThreads((current) => current.map((item) => (item.id === data.thread.id ? data.thread : item)));
     }
   }, []);
 
   const handleRegenerate = useCallback(async (message) => {
     if (!activeThreadIdRef.current || streamingRef.current) return;
+    const generation = requestGenerationRef.current;
+    ++threadRequestRef.current;
+    pendingStopRef.current = false;
+    setStreamNotice(null);
+    streamingRef.current = true;
     setStreaming(true);
     setStreamingMessageId(message.id);
     setMessages((current) => current.map((item) => (
@@ -770,14 +971,21 @@ function ChatModeInner({
           body: JSON.stringify({ model: selectedModel || null }),
         }
       );
+      if (requestGenerationRef.current !== generation) return;
       setActiveThread(data.thread);
       setTitleDraft(data.thread?.title || 'New chat');
       setMessages(normalizeMessages(data.messages));
-      await attachStream(data.stream_id, message.id);
-    } catch {
+      await attachStream(data.stream_id, message.id, generation);
+    } catch (err) {
+      if (requestGenerationRef.current !== generation) return;
+      if (isUnconfirmedRequest(err)) {
+        showUnconfirmedRequest(message.id);
+        return;
+      }
+      streamingRef.current = false;
+      setStreamNotice(null);
       setStreaming(false);
       setStreamingMessageId(null);
-      setActiveStreamId(null);
       activeStreamIdRef.current = null;
       setMessages((current) => current.map((item) => (
         item.id === message.id
@@ -785,9 +993,11 @@ function ChatModeInner({
           : item
       )));
     }
-  }, [attachStream, selectedModel]);
+  }, [attachStream, selectedModel, showUnconfirmedRequest]);
 
   const handleFork = useCallback(async (message) => {
+    if (streamingRef.current) return;
+    const generation = requestGenerationRef.current;
     const startingText = message.role === 'user'
       ? message.content
       : [...messages.slice(0, messages.findIndex((item) => item.id === message.id))]
@@ -801,34 +1011,54 @@ function ChatModeInner({
         .reverse()
         .find((item) => item.role === 'user')?.id;
     if (!sourceMessageId) return;
-    const data = await apiFetch(
-      `/v1/chat/threads/${encodeURIComponent(activeThreadIdRef.current)}/messages/${encodeURIComponent(sourceMessageId)}/fork`,
-      {
-        method: 'POST',
-        body: JSON.stringify({ content, model: selectedModel || null }),
-      }
-    );
-    await loadThreads();
+    ++threadRequestRef.current;
+    pendingStopRef.current = false;
+    setStreamNotice(null);
+    streamingRef.current = true;
     const temporaryAssistant = makeTemporaryAssistant();
-    setActiveThreadId(data.thread.id);
-    activeThreadIdRef.current = data.thread.id;
-    setActiveThread(data.thread);
-    setTitleDraft(data.thread.title);
     setStreaming(true);
     setStreamingMessageId(temporaryAssistant.id);
-    setMessages([...normalizeMessages(data.messages), temporaryAssistant]);
-    await attachStream(data.stream_id, temporaryAssistant.id);
-  }, [attachStream, loadThreads, messages, selectedModel]);
+    setMessages((current) => [...current, temporaryAssistant]);
+    try {
+      const data = await apiFetch(
+        `/v1/chat/threads/${encodeURIComponent(activeThreadIdRef.current)}/messages/${encodeURIComponent(sourceMessageId)}/fork`,
+        { method: 'POST', body: JSON.stringify({ content, model: selectedModel || null }) }
+      );
+      if (requestGenerationRef.current !== generation) return;
+      setActiveThreadId(data.thread.id);
+      activeThreadIdRef.current = data.thread.id;
+      setActiveThread(data.thread);
+      setTitleDraft(data.thread.title);
+      setMessages([...normalizeMessages(data.messages), temporaryAssistant]);
+      await attachStream(data.stream_id, temporaryAssistant.id, generation);
+      if (requestGenerationRef.current === generation) loadThreads().catch(() => {});
+    } catch (err) {
+      if (requestGenerationRef.current !== generation) return;
+      if (isUnconfirmedRequest(err)) {
+        showUnconfirmedRequest(temporaryAssistant.id);
+        return;
+      }
+      streamingRef.current = false;
+      setStreaming(false);
+      setStreamingMessageId(null);
+      setStreamNotice(null);
+      setMessages((current) => current.map((item) => item.id === temporaryAssistant.id
+        ? { ...item, content: 'Something went wrong while branching this response.', status: 'error' } : item));
+    }
+  }, [attachStream, loadThreads, messages, selectedModel, showUnconfirmedRequest]);
 
   const handleFeedback = useCallback(async (message, rating) => {
-    if (!activeThreadIdRef.current) return;
+    const generation = requestGenerationRef.current;
+    const threadId = activeThreadIdRef.current;
+    if (!threadId) return;
     const data = await apiFetch(
-      `/v1/chat/threads/${encodeURIComponent(activeThreadIdRef.current)}/messages/${encodeURIComponent(message.id)}/feedback`,
+      `/v1/chat/threads/${encodeURIComponent(threadId)}/messages/${encodeURIComponent(message.id)}/feedback`,
       {
         method: 'POST',
         body: JSON.stringify({ rating }),
       }
     );
+    if (requestGenerationRef.current !== generation || activeThreadIdRef.current !== threadId) return;
     setMessages((current) => current.map((item) => (item.id === message.id ? data.message : item)));
   }, []);
 
@@ -963,19 +1193,34 @@ function ChatModeInner({
           />
           <div className="chat-topbar-actions">
             <select
-              value={selectedModel}
+              value={modelError ? '' : selectedModel}
+              disabled={Boolean(modelError)}
               onChange={handleModelChange}
               onFocus={() => { loadModels().catch(() => {}); }}
               aria-label="Model"
             >
-              <option value="">Default model</option>
-              {modelOptions.map((item) => (
+              <option value="">{modelError ? 'Model list unavailable' : 'Default model'}</option>
+              {!modelError && modelOptions.map((item) => (
                 <option key={item.id} value={item.id}>{item.label}</option>
               ))}
             </select>
             <button type="button" onClick={() => exportThread()} disabled={!activeThread || exporting}>{exporting ? 'Exporting…' : 'Export'}</button>
           </div>
         </header>
+        {modelError && (
+          <div className="chat-error" role="alert">
+            <span>{modelError}</span>
+            <button type="button" onClick={() => { void loadModels(); }} disabled={modelsLoading}>
+              {modelsLoading ? 'Loading model list…' : 'Retry model list'}
+            </button>
+          </div>
+        )}
+        {streamNotice && (
+          <div className="chat-upload-status" role="status">
+            <span>{streamNotice.text}</span>
+            {streamNotice.retry && <button type="button" onClick={() => { void streamSessionRef.current?.recover(true); }}>Retry response status</button>}
+          </div>
+        )}
         <ChatThread
           messages={messages}
           streamingMessageId={streamingMessageId}

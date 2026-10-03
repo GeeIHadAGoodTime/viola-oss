@@ -74,30 +74,14 @@ const gitSha = process.env.VITE_VIOLA_BUILD_SHA || readGitSha()
 const sentryRelease = process.env.SENTRY_RELEASE || process.env.VITE_SENTRY_RELEASE || `viola-react@${violaVersion}+${gitSha}`
 const sentryUploadEnabled = Boolean(process.env.SENTRY_AUTH_TOKEN && process.env.SENTRY_ORG && process.env.SENTRY_PROJECT)
 
-// --- Error-reporter wiring (2026-08 blind-ship incident) -------------------
+// Browser errors use the committed capture-only DSN in sentryClient.js and
+// POST to the same-origin desktop route. VITE_SENTRY_DSN is an optional
+// override, not a release prerequisite. Requiring an off-VCS value here
+// reintroduced the dependency removed by that relay architecture.
 //
-// This app's Sentry client (src/sentryClient.js) reads its DSN from
-// `import.meta.env.VITE_SENTRY_DSN`. Vite only exposes VITE_-prefixed vars
-// that it loaded from a .env file inside its OWN env directory, which
-// defaults to the vite root (ui/react-app/) — and there is no .env there.
-// Vite does NOT inherit arbitrary shell env vars into client code either.
-// So `import.meta.env.VITE_SENTRY_DSN` was always undefined in the built
-// bundle, `isSentryConfigured()` was always false, and `initSentry()`
-// returned without initializing. The 1.0.x desktop builds therefore shipped
-// a UI that could not report a single error, and did so silently, which is
-// why nobody noticed a completely broken product for 19 days.
-//
-// Viola's .env lives at the REPO root (config/settings.py::_load_env_file
-// reads it from there), so point Vite's env loader at the repo root and pass
-// the result through `define` explicitly. `define` is deliberate rather than
-// just setting `envDir`: it makes the value a greppable literal in the built
-// asset, which is what the release-qualification gate
-// (scripts/check_release_reporting_alive.py) inspects.
-//
-// `loadEnv(mode, dir, 'VITE_')` reads .env, .env.local, .env.[mode] and
-// .env.[mode].local from `dir`, and also folds in matching VITE_-prefixed
-// vars already present in process.env (so CI can inject the DSN without a
-// file).
+// Keep the explicit defines for configured overrides and release identity.
+// The canonical release builder verifies the built bundle, same-origin route,
+// and consent invariants; a missing/broken reporter still fails the release.
 function resolveReporterEnv(mode) {
   const env = loadEnv(mode, projectRoot, 'VITE_')
   return {
@@ -106,35 +90,8 @@ function resolveReporterEnv(mode) {
   }
 }
 
-// A bundle with no DSN ships blind. How loudly that fails depends on WHO is
-// building:
-//
-//   * A release build (VIOLA_RELEASE_BUILD=1, set by the publish path) hard
-//     fails. Shipping a reporter-less bundle to real users is the incident.
-//   * Any other build (a contributor, a CI lint job, a nightly Playwright
-//     run) only warns. Those builds legitimately have no DSN — the repo-root
-//     .env is off-VCS, so a fresh clone has none — and reddening every one of
-//     them would just teach people to bypass the check.
-//
-// The warning is not the safety net. scripts/check_release_reporting_alive.py
-// inspects the BUILT artifact and is what actually blocks a blind release, so
-// the guarantee does not depend on an env var being set correctly here.
-function assertReporterConfigured(mode, reporter) {
-  if (mode !== 'production' || reporter.dsn) return
-  const message =
-    'VITE_SENTRY_DSN is not set, so this production bundle cannot report a single error. ' +
-    `Vite loaded env from: ${projectRoot}. ` +
-    'Set VITE_SENTRY_DSN in the repo-root .env or the build environment.'
-  if (process.env.VIOLA_RELEASE_BUILD === '1') {
-    throw new Error(`[viola] release build refused: ${message}`)
-  }
-  // eslint-disable-next-line no-console
-  console.warn(`[viola] ${message}`)
-}
-
 export default defineConfig(({ mode }) => {
   const reporter = resolveReporterEnv(mode)
-  assertReporterConfigured(mode, reporter)
   const embedUrl = resolveYouTubeEmbedUrl(loadEnv(mode, projectRoot, 'VITE_').VITE_YOUTUBE_EMBED_URL)
 
   return {
@@ -169,8 +126,7 @@ export default defineConfig(({ mode }) => {
       'import.meta.env.VITE_VIOLA_VERSION': JSON.stringify(violaVersion),
       'import.meta.env.VITE_VIOLA_BUILD_SHA': JSON.stringify(gitSha),
       'import.meta.env.VITE_SENTRY_RELEASE': JSON.stringify(sentryRelease),
-      // Without these two the shipped bundle has no DSN and the reporter
-      // never initializes. See resolveReporterEnv() above.
+      // An empty override preserves the committed same-origin capture fallback.
       'import.meta.env.VITE_SENTRY_DSN': JSON.stringify(reporter.dsn),
       'import.meta.env.VITE_SENTRY_ENVIRONMENT': JSON.stringify(reporter.environment),
     },

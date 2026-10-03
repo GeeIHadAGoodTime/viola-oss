@@ -173,7 +173,7 @@ class ChatStoreBackend(Protocol):
     ) -> ChatMessageRecord:
         """Append one message to a thread."""
 
-    async def list_messages(self, user_id: str, thread_id: str, *, limit: int = 200) -> list[ChatMessageRecord]:
+    async def list_messages(self, user_id: str, thread_id: str, *, limit: int = 200, newest: bool = False) -> list[ChatMessageRecord]:
         """List messages in one thread."""
 
     async def update_message(
@@ -565,10 +565,10 @@ class SqliteChatBackend:
             status=cleaned_status,
         )
 
-    async def list_messages(self, user_id: str, thread_id: str, *, limit: int = 200) -> list[ChatMessageRecord]:
-        return await asyncio.to_thread(self._list_messages_sync, user_id, thread_id, limit)
+    async def list_messages(self, user_id: str, thread_id: str, *, limit: int = 200, newest: bool = False) -> list[ChatMessageRecord]:
+        return await asyncio.to_thread(self._list_messages_sync, user_id, thread_id, limit, newest)
 
-    def _list_messages_sync(self, user_id: str, thread_id: str, limit: int) -> list[ChatMessageRecord]:
+    def _list_messages_sync(self, user_id: str, thread_id: str, limit: int, newest: bool = False) -> list[ChatMessageRecord]:
         uid = require_user_id(user_id)
         tid = _clean_text(thread_id, fallback="")
         if not tid:
@@ -584,11 +584,13 @@ class SqliteChatBackend:
                     WHERE user_id = ? AND thread_id = ?
                     ORDER BY created_at ASC
                     LIMIT ?
-                    """,
+                    """.replace("created_at ASC", "created_at DESC" if newest else "created_at ASC"),
                     (uid, tid, capped_limit),
                 ).fetchall()
             finally:
                 conn.close()
+        if newest:
+            rows = list(reversed(rows))
         return [_message_from_row(row) for row in rows]
 
     async def update_message(
@@ -986,7 +988,7 @@ class PostgresChatBackend:
                 )
         return _message_from_row(row)
 
-    async def list_messages(self, user_id: str, thread_id: str, *, limit: int = 200) -> list[ChatMessageRecord]:
+    async def list_messages(self, user_id: str, thread_id: str, *, limit: int = 200, newest: bool = False) -> list[ChatMessageRecord]:
         await self.initialize()
         uid = require_user_id(user_id)
         tid = _clean_text(thread_id, fallback="")
@@ -1002,11 +1004,13 @@ class PostgresChatBackend:
                 WHERE user_id = $1 AND thread_id = $2
                 ORDER BY created_at ASC
                 LIMIT $3
-                """,
+                """.replace("created_at ASC", "created_at DESC" if newest else "created_at ASC"),
                 uid,
                 tid,
                 capped_limit,
             )
+        if newest:
+            rows = list(reversed(rows))
         return [_message_from_row(row) for row in rows]
 
     async def update_message(
@@ -1279,7 +1283,10 @@ class ChatStore:
             status=status,
         )
 
-    async def list_messages(self, user_id: str, thread_id: str, *, limit: int = 200) -> list[ChatMessageRecord]:
+    async def list_messages(self, user_id: str, thread_id: str, *, limit: int = 200, newest: bool = False) -> list[ChatMessageRecord]:
+        # Keep the existing earliest-history contract unless the caller opts in.
+        if newest:
+            return await self._backend.list_messages(user_id, thread_id, limit=limit, newest=True)
         return await self._backend.list_messages(user_id, thread_id, limit=limit)
 
     async def update_message(

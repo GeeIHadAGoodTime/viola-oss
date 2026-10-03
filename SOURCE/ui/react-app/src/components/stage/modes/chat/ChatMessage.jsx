@@ -52,7 +52,7 @@ export default function ChatMessage({
           </div>
         )}
         <Markdown content={message.content || (streaming ? ' ' : '')} />
-        {streaming && <span className="chat-cursor" aria-hidden="true" />}
+        {streaming && message.status !== 'unknown' && <span className="chat-cursor" aria-hidden="true" />}
         <div className="chat-message-actions">
           <button type="button" onClick={handleCopy}>{copied ? 'Copied' : 'Copy'}</button>
           {role === 'assistant' && (
