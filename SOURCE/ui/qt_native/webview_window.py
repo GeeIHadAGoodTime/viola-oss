@@ -2191,12 +2191,26 @@ class ViolaWebViewWindow(QMainWindow):
     def _setup_window(self):
         """Configure window properties."""
         self.setWindowTitle("Viola")
-        self.setMinimumSize(1024, 600)
-        self.resize(1400, 800)
-
         # Frameless window
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, False)
+
+        # Qt exposes logical screen coordinates, including display scaling and
+        # reserved taskbar space. Keep first-run controls within that work area.
+        screen = self.screen()
+        available = screen.availableGeometry() if screen is not None else None
+        if available is not None and available.width() > 0 and available.height() > 0:
+            width = min(1400, available.width())
+            height = min(800, available.height())
+            self.setMinimumSize(min(1024, available.width()), min(600, available.height()))
+            self.resize(width, height)
+            self.move(
+                available.left() + (available.width() - width) // 2,
+                available.top() + (available.height() - height) // 2,
+            )
+        else:
+            self.setMinimumSize(1024, 600)
+            self.resize(1400, 800)
 
         # Dark background
         self.setStyleSheet("QMainWindow { background-color: #000000; }")

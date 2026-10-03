@@ -1,15 +1,14 @@
 {
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "a7251950ba75620e2cd31e4dcd68da7caefc025a8839b018690d612b3b7ee877",
-  "source_tree_sha256": "c6dba0dd4985b4ae152b214fa247796f0300043e0f91228c39965d96c41c07af",
+  "source_manifest_sha256": "fba5edc088c731d600cbe9c4ecbff5c349b9d3a25efc8a4c999acb8e1a77f87a",
+  "source_tree_sha256": "0fd7221ad76ddeba0f3ccba9e4d8e02417c4005fdd78d5636fe39f189e4fcd93",
   "source_file_count": 2474,
-  "source_revision": "31e6a87388c224b127f7de68f91fa53437c82555",
-  "comparison_public_revision": "14a9569c8d2464924fd62e561f483c1df9bebca0",
+  "source_revision": "2b07f2cb80cb7ceabc789670d7aad97afa438ecf",
+  "comparison_public_revision": "e0ddd53018e7f4533ca1edee59cf0671616919bc",
   "changed_source_paths": [
-    "SOURCE/ui/react-app/src/components/stage/modes/chat/ChatMode.consentGate.test.jsx",
-    "SOURCE/ui/react-app/src/components/stage/modes/chat/ChatMode.jsx",
-    "SOURCE/ui/react-app/src/components/stage/modes/chat/ChatMode.test.jsx"
+    "SOURCE/tests/public/test_windows_native_startup_order.py",
+    "SOURCE/ui/qt_native/webview_window.py"
   ],
   "retained_sboms": [
     {
@@ -55,23 +54,22 @@
     "basis": "All dependency inputs unchanged from the preceding public source revision. Retained inventories and dated receipts are not fresh platform qualification or advisory scans."
   },
   "prior_binding": {
-    "public_revision": "14a9569c8d2464924fd62e561f483c1df9bebca0",
+    "public_revision": "e0ddd53018e7f4533ca1edee59cf0671616919bc",
     "path": "PUBLIC_METADATA/source-binding.json",
-    "git_blob": "27d0e6841726ca6b6673e1ff6613ca78f76921c5",
-    "sha256": "5b0b2f2bc1730ab71488690704a84f87c1c1284b8697c136abfc1fce639750dd",
-    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/14a9569c8d2464924fd62e561f483c1df9bebca0/PUBLIC_METADATA/source-binding.json"
+    "git_blob": "5c8aa798461f4479b9cdd80b53cf1507144e3cc2",
+    "sha256": "b327c4765f32c09645421cf783774c792bf70fd8c23448ada353c4126245374f",
+    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/e0ddd53018e7f4533ca1edee59cf0671616919bc/PUBLIC_METADATA/source-binding.json"
   },
   "new_resolution_performed": false,
   "new_advisory_scan_performed": false,
   "new_runtime_qualification_performed": false,
   "qualification": {
-    "scope": "First-turn optimistic message preservation through new-thread creation and send/stream failures; source checks only",
-    "frontend_tests": 985,
-    "frontend_files": 137,
-    "frontend_build": "passed",
-    "frontend_lint": "zero errors; existing warnings retained",
-    "focused_frontend_tests": 16,
-    "negative_controls": "Two fresh-conversation failure tests fail before and pass after; consent gate still requires ensureThread inside try",
+    "scope": "Initial native-window geometry fits available logical work area; focused source and real Qt geometry checks",
+    "focused_unittest_methods": 5,
+    "new_geometry_screen_cases": 5,
+    "negative_controls": "Original geometry fails all five screen cases; original real Qt offscreen window1400x800 exceeds800x800 available area, corrected window fits",
+    "native_qt_probe": "Passed using bundled PySide6 in offscreen QApplication; not installed product GUI acceptance",
+    "frontend": "unchanged from preceding qualified source revision",
     "installed_candidate": "pending for this revision",
     "release_or_deployment": "not_established"
   }
