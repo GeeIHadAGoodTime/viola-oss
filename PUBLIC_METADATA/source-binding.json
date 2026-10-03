@@ -1,13 +1,18 @@
 {
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "de8e01c48f7b52c6d2ff82d781cc73a4478674dd06255133818a68ff718284e4",
-  "source_tree_sha256": "b5e1e2dd6e0e5db5583b5c325dd72f4ae0939df652d07924f6545527070691e7",
+  "source_manifest_sha256": "49ecd8fc26d63f0a48f003046b56321a6fd9c98421e56560064dd0482c082be5",
+  "source_tree_sha256": "bc73c77d8f70ebef41109ab8c0f4e72b0a9c4bec655c1ba6d383455f56134280",
   "source_file_count": 2476,
-  "source_revision": "f389fb7d98e0166382f0ceb1029334715d105e64",
-  "comparison_public_revision": "cb6f55f25c602ea7b67cfbc362b50959462fe23f",
+  "source_revision": "4ab7e4075128e243bbdf27f48534cefee5f72219",
+  "comparison_public_revision": "6658867c8f58af32e49f465c6b44f62a078903d3",
   "changed_source_paths": [
-    "SOURCE/ui/react-app/patches/minimatch+3.1.5.patch"
+    "SOURCE/ui/react-app/src/SmartDisplay.jsx",
+    "SOURCE/ui/react-app/src/__tests__/SmartDisplay.test.jsx",
+    "SOURCE/ui/react-app/src/hooks/useVoice.js",
+    "SOURCE/ui/react-app/src/hooks/useVoice.cancelRecording.test.js",
+    "SOURCE/ui/react-app/src/hooks/useVoiceWs.js",
+    "SOURCE/ui/react-app/src/hooks/useVoiceWs.rapidPress.test.jsx"
   ],
   "retained_sboms": [
     {
@@ -48,27 +53,23 @@
     }
   ],
   "input_equivalence": {
-    "changed_dependency_inputs": [
-      "SOURCE/ui/react-app/patches/minimatch+3.1.5.patch"
-    ],
-    "basis": "Restore the original compatibility patch as a reference for the existing immutable private/public ownership mapping. It is not consumed: postinstall remains the bounded native script and patch-package remains absent. package.json, lockfile, executable postinstall script and all Python dependency inputs are unchanged from the qualified preceding revision."
+    "changed_dependency_inputs": [],
+    "basis": "Only six existing frontend source and regression-test files changed. All dependency manifests, locks, postinstall files, and retained Windows SBOM bytes are unchanged."
   },
   "prior_binding": {
-    "public_revision": "cb6f55f25c602ea7b67cfbc362b50959462fe23f",
+    "public_revision": "6658867c8f58af32e49f465c6b44f62a078903d3",
     "path": "PUBLIC_METADATA/source-binding.json",
-    "git_blob": "fc78b071a4d2b7220e596d9a6f4ef0162997fd51",
-    "sha256": "2443b40e7bbb82c1d83297ef2788536bc6bd8aafa1337ad0191f849fc9abea99",
-    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/cb6f55f25c602ea7b67cfbc362b50959462fe23f/PUBLIC_METADATA/source-binding.json"
+    "sha256": "32eaf9359973dc2b0b768d140a803838cf76ae9cc7daca2a6fc97dda75143666",
+    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/6658867c8f58af32e49f465c6b44f62a078903d3/PUBLIC_METADATA/source-binding.json"
   },
   "new_resolution_performed": false,
   "new_advisory_scan_performed": false,
   "new_runtime_qualification_performed": false,
   "qualification": {
-    "scope": "Compatibility reference retention for canonical source composition",
-    "runtime_changes": "none; the original reference patch is not invoked by npm postinstall",
-    "negative_control": "Windows candidate run37092507505 stopped before packaging because new scripts/test mappings were absent and the old immutable patch mapping lacked its source. Paired private change adds only the two new explicit mappings; no existing ownership mapping or guard is removed.",
-    "previous_ui_checks": "Public PR12 passed all eight Windows checks before merge; this change does not alter its executable files.",
-    "installed_candidate": "pending",
+    "scope": "Disabled voice and mute prevent new frontend capture; disabling or canceling a capture invalidates late permission/transcript work",
+    "negative_controls": "New HTTP and WebSocket disable tests failed against original hooks; retained logs. Real installed 1.0.4 captured while Disabled, as independently reported by Surface acceptance.",
+    "source_checks": "138 frontend files, 1001 tests passed; production frontend build passed on Linux, 2026-10-03. Controlled browser APIs, not physical microphone qualification.",
+    "installed_candidate": "pending; this repair is not in Windows diagnostic run 37093358491",
     "release_or_deployment": "not_established"
   }
 }

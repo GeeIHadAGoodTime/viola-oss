@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "f389fb7d98e0166382f0ceb1029334715d105e64",
-  "sha256": "b5e1e2dd6e0e5db5583b5c325dd72f4ae0939df652d07924f6545527070691e7",
+  "revision": "4ab7e4075128e243bbdf27f48534cefee5f72219",
+  "sha256": "bc73c77d8f70ebef41109ab8c0f4e72b0a9c4bec655c1ba6d383455f56134280",
   "files": [
     {
       "path": ".env.example",
@@ -9210,8 +9210,8 @@
     },
     {
       "path": "ui/react-app/src/SmartDisplay.jsx",
-      "sha256": "64c22d83ec3e8e35a6fc314efb543f17553da7479e2d9461ac60f92106990f86",
-      "bytes": 160043
+      "sha256": "4635fdb0f24b503f72a007006d82c3027a27efddc673d1ee97406b8d220abde6",
+      "bytes": 160857
     },
     {
       "path": "ui/react-app/src/SmartDisplay.stageRouting.test.jsx",
@@ -9230,8 +9230,8 @@
     },
     {
       "path": "ui/react-app/src/__tests__/SmartDisplay.test.jsx",
-      "sha256": "f5ce808e2a0b15536152761c3cf6ddd10cf60fe05b60fe1bed789fdc80c29992",
-      "bytes": 57245
+      "sha256": "a174e069e1023e26c66a14fc071383826b3e183bbae44f99d071e97df93a01ff",
+      "bytes": 58760
     },
     {
       "path": "ui/react-app/src/__tests__/hooks/useEventBus.test.jsx",
@@ -10860,13 +10860,13 @@
     },
     {
       "path": "ui/react-app/src/hooks/useVoice.cancelRecording.test.js",
-      "sha256": "c6e3df7dfb4bdb5e6ed5cb098c762464bf64cd68e458567d457f0a3113b7db0a",
-      "bytes": 1658
+      "sha256": "b74e2849a2963cbf1fcb006c3565080ed9576ee9af8d00e0a9db267080e249cb",
+      "bytes": 6771
     },
     {
       "path": "ui/react-app/src/hooks/useVoice.js",
-      "sha256": "5ffacb3f93685fbcb13d4241a9030b58d4b25fd768a525a1d0f003b50c23b4e5",
-      "bytes": 13627
+      "sha256": "b8b199b98e4ebb3b7f24b43c00a33ac9dac7d8ef79a2a2e25093808d66c08503",
+      "bytes": 15127
     },
     {
       "path": "ui/react-app/src/hooks/useVoiceOnboarding.js",
@@ -10885,13 +10885,13 @@
     },
     {
       "path": "ui/react-app/src/hooks/useVoiceWs.js",
-      "sha256": "6faa03fd0e10594a0f9f096ef143939611db99cbe9a1b91d3ead934d4d5e832d",
-      "bytes": 33858
+      "sha256": "0da805c40ad26adbf43176557189df053b281ea5cd8d5c88ac29e1e66cfb879b",
+      "bytes": 34662
     },
     {
       "path": "ui/react-app/src/hooks/useVoiceWs.rapidPress.test.jsx",
-      "sha256": "f5810bb07a375a459c2023ccf78852a783151bdcc3abd2995ec89ad7713fc891",
-      "bytes": 8101
+      "sha256": "99c0c9c87d53b215e1b47d69315610b29dc3e45208bb9cf27e6afff28d7b7745",
+      "bytes": 10394
     },
     {
       "path": "ui/react-app/src/hooks/useVoiceWs.slowTurnTts.test.jsx",
