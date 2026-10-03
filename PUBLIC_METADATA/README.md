@@ -1,14 +1,16 @@
 # Source snapshot binding
 
-Source revision: `31e6a87388c224b127f7de68f91fa53437c82555`.
+Source revision: `2b07f2cb80cb7ceabc789670d7aad97afa438ecf`.
 
-This source preserves the optimistic first chat turn when a new conversation is
-created, including send refusal and streaming-transport failure feedback.
-The missing-first-message behavior was reproduced in the preceding installed
-Linux candidate. This correction does not resolve the separate stream-token
-authorization failure and has not yet been verified in an installed candidate.
+Initial native window size, minimum dimensions and position now respect Qt
+available logical screen geometry, including taskbar space and negative monitor
+origins. This addresses controls opening outside smaller displays.
 
-Frontend: 985 tests in 137 files, build passed, lint has zero errors. Sixteen
-focused chat/consent tests pass, including two new red-to-green first-turn cases.
-All dependency inputs and retained inventories remain unchanged. No new advisory
-scan, release, deployment, or whole-product acceptance is claimed.
+Five existing/new unittest methods pass. Five screen cases fail before and pass
+after. A real bundled-PySide6 offscreen geometry probe also confirms the original
+1400x800 window exceeds its800x800 work area while the corrected window fits.
+That probe is not a normal installed GUI acceptance run; that remains pending.
+
+Frontend and dependency inputs are unchanged. Existing inventories and prior
+qualification receipts are retained without claiming a fresh advisory scan,
+new product release or deployment.

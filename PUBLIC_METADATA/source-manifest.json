@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "31e6a87388c224b127f7de68f91fa53437c82555",
-  "sha256": "c6dba0dd4985b4ae152b214fa247796f0300043e0f91228c39965d96c41c07af",
+  "revision": "2b07f2cb80cb7ceabc789670d7aad97afa438ecf",
+  "sha256": "0fd7221ad76ddeba0f3ccba9e4d8e02417c4005fdd78d5636fe39f189e4fcd93",
   "files": [
     {
       "path": ".env.example",
@@ -5760,8 +5760,8 @@
     },
     {
       "path": "tests/public/test_windows_native_startup_order.py",
-      "sha256": "afa77c849fc5ea6f5bf327e40bc9374958a17942af9e4613028164f4896fa253",
-      "bytes": 3266
+      "sha256": "bc5a982670c35fa545715fb09a167c274c487d24f95437cb9526dc4d6c2b609a",
+      "bytes": 5021
     },
     {
       "path": "themes/viola-dark.css",
@@ -9060,8 +9060,8 @@
     },
     {
       "path": "ui/qt_native/webview_window.py",
-      "sha256": "15664bb41d7e9676de68c404dda7d714db22bdccee0e1ecb61446d7448c8591a",
-      "bytes": 197782
+      "sha256": "da37e70c12f5fc4a5235d86135b9aaac57d5ee20a60559e83e027ac7750db95a",
+      "bytes": 198567
     },
     {
       "path": "ui/qt_native/widgets/connectivity_status.py",
