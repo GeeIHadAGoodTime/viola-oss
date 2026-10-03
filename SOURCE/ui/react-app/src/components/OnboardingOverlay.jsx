@@ -528,13 +528,14 @@ function CloudConsentPanel({
     if (onOpenSettings) onOpenSettings('ai_agents');
   }, [onOpenSettings]);
 
-  if (status === 'declined') {
+  if (status === 'declined' || status === 'checking') {
     return (
       <Panel>
         <MutedText>{t('onboarding.cloud.settings_needed')}</MutedText>
+        {error ? <ErrorText>{error}</ErrorText> : null}
         <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', justifyContent: 'center' }}>
           <ActionButton label={t('onboarding.cloud.open_settings')} onClick={handleOpenAiSettings} />
-          <ActionButton label={t('onboarding.cloud.added_key')} variant="secondary" onClick={onByokSetupDone} />
+          <ActionButton label={status === 'checking' ? t('onboarding.cloud.checking_provider') : t('onboarding.cloud.added_key')} disabled={status === 'checking'} variant="secondary" onClick={onByokSetupDone} />
         </div>
       </Panel>
     );

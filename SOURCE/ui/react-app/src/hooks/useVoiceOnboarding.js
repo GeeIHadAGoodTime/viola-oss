@@ -201,14 +201,15 @@ async function completeOnboarding() {
   }
 }
 
-async function saveOnboardingStep(stepId, data) {
+async function saveOnboardingStep(stepId, data, { required = false } = {}) {
   try {
     await apiFetch('/v1/onboarding/save', {
       method: 'POST',
       body: JSON.stringify({ step_id: stepId, data }),
     });
-  } catch {
-    // Best effort.
+  } catch (error) {
+    if (required) throw error;
+    // Optional progress markers remain best effort.
   }
 }
 
@@ -380,6 +381,7 @@ export function useVoiceOnboarding() {
   const initStartedRef = useRef(false);
   const lastTryCommandRef = useRef(null);
   const commandFinishedRef = useRef(false);
+  const byokCheckRef = useRef(false);
   const cloudConsentStatusRef = useRef(cloudConsentStatus);
   const accountSkippedRef = useRef(false);
 
@@ -709,17 +711,43 @@ export function useVoiceOnboarding() {
     }
   }, [advancePhase, clearTimers, isOnboarding, onboardingAvailable, t]);
 
-  const onByokSetupDone = useCallback(() => {
-    if (!onboardingAvailable) return;
-    if (!isOnboarding || skipRef.current || phaseIdRef.current !== 'cloud_consent') return;
-    setCloudConsentStatus('byok_ready');
-    setIsSpeaking(true);
-    const tts = speakText(t('onboarding.cloud.byok_ready_tts'));
-    speechRef.current = tts;
-    tts.promise.then(() => {
+  const onByokSetupDone = useCallback(async () => {
+    if (!onboardingAvailable || !isOnboarding || skipRef.current || phaseIdRef.current !== 'cloud_consent' || byokCheckRef.current) return false;
+    byokCheckRef.current = true;
+    setCloudConsentStatus('checking');
+    setCloudConsentError(null);
+    try {
+      // Reuse the server's active-provider readiness, including legacy BYOK
+      // settings and local profiles; never fetch a credential into this panel.
+      const data = await apiFetch('/v1/connectors/status?category=llm');
+      if (skipRef.current || phaseIdRef.current !== 'cloud_consent') return false;
+      const ready = Array.isArray(data?.connectors) && data.connectors.some((connector) => (
+        connector.category === 'llm' && connector.selected === true && connector.ready === true
+        && connector.id !== 'llm.managed'
+      ));
+      if (!ready) {
+        setCloudConsentStatus('declined');
+        setCloudConsentError(t('onboarding.cloud.provider_needed'));
+        return false;
+      }
+      if (skipRef.current || phaseIdRef.current !== 'cloud_consent') return false;
+      setCloudConsentStatus('byok_ready');
+      setIsSpeaking(true);
+      const tts = speakText(t('onboarding.cloud.byok_ready_tts'));
+      speechRef.current = tts;
+      await tts.promise;
       setIsSpeaking(false);
-      if (!skipRef.current) advancePhase();
-    });
+      if (!skipRef.current && phaseIdRef.current === 'cloud_consent') advancePhase();
+      return true;
+    } catch {
+      if (skipRef.current || phaseIdRef.current !== 'cloud_consent') return false;
+      setIsSpeaking(false);
+      setCloudConsentStatus('declined');
+      setCloudConsentError(t('onboarding.cloud.provider_check_error'));
+      return false;
+    } finally {
+      byokCheckRef.current = false;
+    }
   }, [advancePhase, isOnboarding, onboardingAvailable, t]);
 
   const onAttributionChoice = useCallback(async (value) => {
@@ -764,7 +792,7 @@ export function useVoiceOnboarding() {
         agent_autonomy: tier,
         browser_session_mode: TIER_BROWSER_MODE[tier],
       });
-      saveOnboardingStep('autonomy_tier', { agent_autonomy: tier });
+      await saveOnboardingStep('autonomy_tier', { agent_autonomy: tier }, { required: true });
       setAutonomyStatus('idle');
       if (!skipRef.current) advancePhase();
       return true;
@@ -791,8 +819,14 @@ export function useVoiceOnboarding() {
     if (!skipRef.current) advancePhase();
   }, [advancePhase, clearTimers, isOnboarding, onboardingAvailable]);
 
-  const onCommandExecuted = useCallback(() => {
+  const onCommandExecuted = useCallback((result) => {
+    if (!result || result.ok === false || result.success === false || result.error
+      || result.data?.ok === false || result.data?.success === false || result.data?.error) {
+      setTryCommandStatus('error');
+      return false;
+    }
     finishMicTryStep();
+    return true;
   }, [finishMicTryStep]);
 
   const onSuggestionTap = useCallback(async (text, sendCommand) => {
@@ -803,8 +837,8 @@ export function useVoiceOnboarding() {
     lastTryCommandRef.current = text;
     setTryCommandStatus('running');
     try {
-      await sendCommand(text);
-      finishMicTryStep();
+      const result = await sendCommand(text);
+      if (!onCommandExecuted(result)) throw new Error('Tutorial command failed');
     } catch {
       setTryCommandStatus('error');
       setIsSpeaking(true);
@@ -812,7 +846,7 @@ export function useVoiceOnboarding() {
       speechRef.current = tts;
       tts.promise.then(() => setIsSpeaking(false));
     }
-  }, [clearTimers, finishMicTryStep, isOnboarding, onboardingAvailable, t]);
+  }, [clearTimers, onCommandExecuted, isOnboarding, onboardingAvailable, t]);
 
   const onWelcomeContinue = useCallback(() => {
     if (!onboardingAvailable) return;

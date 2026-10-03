@@ -74,10 +74,10 @@ def register_rating_routes(context: ApiContext, toolbox: RouteToolbox) -> None:
             try:
                 rating_value = body.get("rating")  # 'liked', 'disliked', or null
 
-                # Get current track info from playback state
-                from ui.core.bindings import get_bindings
-
-                bindings = get_bindings()
+                # Use the bindings owned by this API instance. There is no
+                # global get_bindings accessor, and a global would also risk
+                # rating a different instance's current track.
+                bindings = context.bindings
                 music = bindings.music if bindings else None
 
                 if not music:
@@ -90,17 +90,17 @@ def register_rating_routes(context: ApiContext, toolbox: RouteToolbox) -> None:
                     state = getattr(music, "get_state", lambda: None)()
                     if state:
                         current_track = (
-                            getattr(state, "now_playing", None) or state.get("now_playing")
+                            state.get("now_playing")
                             if isinstance(state, dict)
-                            else None
+                            else getattr(state, "now_playing", None)
                         )
 
                 if not current_track:
                     return error_response("No track currently playing", status_code=400)
 
                 # Extract track info
-                if hasattr(current_track, "video_id"):
-                    video_id = current_track.video_id
+                if hasattr(current_track, "video_id") or hasattr(current_track, "id"):
+                    video_id = getattr(current_track, "video_id", None) or getattr(current_track, "id", None)
                     title = getattr(current_track, "title", "Unknown")
                     artist = getattr(current_track, "artist", None)
                 elif isinstance(current_track, dict):

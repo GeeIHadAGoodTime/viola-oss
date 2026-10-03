@@ -194,4 +194,83 @@ describe('useVoiceOnboarding microphone capture probe', () => {
     });
     await waitFor(() => expect(result.current.phase).toBe('hear_about'), { timeout: 2000 });
   });
+  function configureHappyTransport(overrides = {}) {
+    apiFetch.mockImplementation((url, options) => {
+      if (overrides[url]) return overrides[url](options);
+      if (url === '/v1/onboarding/status') return Promise.resolve({ completed: false });
+      if (url === '/v1/tts/speak') return Promise.resolve({ spoken: false });
+      return Promise.resolve({ ok: true });
+    });
+  }
+
+  async function walkToAiChoice(result) {
+    await waitFor(() => expect(result.current.isOnboarding).toBe(true));
+    act(() => result.current.onWelcomeContinue());
+    await waitFor(() => expect(result.current.phase).toBe('cloud_consent'), {timeout:3000});
+  }
+
+  it('keeps BYOK setup open when no configured selected profile exists', async () => {
+    configureHappyTransport({'/v1/connectors/status?category=llm': () => Promise.resolve({connectors:[]})});
+    const {result} = renderHook(() => useVoiceOnboarding());
+    await walkToAiChoice(result);
+    await act(async () => { await result.current.onCloudConsentChoice('decline'); });
+    await act(async () => { await result.current.onByokSetupDone(); });
+    expect(result.current.phase).toBe('cloud_consent');
+    expect(result.current.cloudConsentError).toBeTruthy();
+  });
+
+  it.each([
+    {id:'llm.openai',category:'llm',selected:true,ready:true,status_source:'connection_profiles+settings_manager+local_probe'},
+    {id:'llm.ollama',category:'llm',selected:true,ready:true,status_source:'settings_manager+local_probe'},
+    {id:'llm.openai',category:'llm',selected:true,ready:true,status_source:'single_active_settings_key'},
+  ])('allows the server-ready selected provider, including legacy settings', async (profile) => {
+    configureHappyTransport({'/v1/connectors/status?category=llm': () => Promise.resolve({connectors:[profile]})});
+    const {result} = renderHook(() => useVoiceOnboarding());
+    await walkToAiChoice(result);
+    await act(async () => { await result.current.onCloudConsentChoice('decline'); });
+    await act(async () => { await result.current.onByokSetupDone(); });
+    await waitFor(() => expect(result.current.phase).toBe('autonomy_tier'));
+  });
+
+  it('does not advance after autonomy persistence fails', async () => {
+    configureHappyTransport({'/v1/onboarding/save': (options) => {
+      if (JSON.parse(options.body).step_id === 'autonomy_tier') return Promise.reject(new Error('save failed'));
+      return Promise.resolve({ok:true});
+    }});
+    const {result} = renderHook(() => useVoiceOnboarding());
+    await walkToAiChoice(result);
+    await act(async () => { await result.current.onCloudConsentChoice('enable'); });
+    await waitFor(() => expect(result.current.phase).toBe('autonomy_tier'));
+    await act(async () => { await result.current.onAutonomyChoice('solo'); });
+    expect(result.current.phase).toBe('autonomy_tier');
+    expect(result.current.autonomyError).toBeTruthy();
+  });
+
+  it.each([{ok:false,error:{message:'No handler'}},{success:false,message:'No handler'},{data:{ok:false}},undefined])(
+    'does not record a failed tutorial command as completed: %j', async (response) => {
+      configureHappyTransport();
+      installMicrophone({result:'resolve',silent:false});
+      const {result}=renderHook(() => useVoiceOnboarding());
+      await walkToMicPhase(result);
+      await act(async () => { await result.current.onSuggestionTap('test command', async () => response); });
+      expect(result.current.phase).toBe('mic_try');
+      expect(result.current.tryCommandStatus).toBe('error');
+      expect(apiFetch.mock.calls.filter(([url, options]) => url === '/v1/onboarding/save' && JSON.parse(options.body).step_id === 'quick_tutorial')).toHaveLength(0);
+    },
+  );
+
+  it.each([
+    {id:'llm.openai',category:'llm',selected:true,ready:false},
+    {id:'llm.openai',category:'llm',selected:false,ready:true},
+    {id:'llm.managed',category:'llm',selected:true,ready:true},
+  ])('does not treat an unavailable, unselected or managed provider as BYOK readiness', async (connector) => {
+    configureHappyTransport({'/v1/connectors/status?category=llm': () => Promise.resolve({connectors:[connector]})});
+    const {result}=renderHook(() => useVoiceOnboarding());
+    await walkToAiChoice(result);
+    await act(async () => { await result.current.onCloudConsentChoice('decline'); });
+    await act(async () => { await result.current.onByokSetupDone(); });
+    expect(result.current.phase).toBe('cloud_consent');
+    expect(result.current.cloudConsentError).toBeTruthy();
+  });
+
 });

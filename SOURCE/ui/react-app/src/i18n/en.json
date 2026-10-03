@@ -98,7 +98,10 @@
       "byok_ready_tts": "Got it. Try your first command with your own AI key.",
       "save_error": "Couldn't save that AI setting. Try again.",
       "no_account_notice": "You are continuing without a Viola account, so Viola-managed AI is not available. Run Viola on your own provider key or a local model instead.",
-      "sign_in_instead": "Sign in after all"
+      "sign_in_instead": "Sign in after all",
+      "provider_needed": "Choose a saved provider with a model and API key, or a local model, before continuing.",
+      "provider_check_error": "Could not check your saved AI setup. Try again.",
+      "checking_provider": "Checking AI setup..."
     },
     "mic_try": {
       "running": "Running...",

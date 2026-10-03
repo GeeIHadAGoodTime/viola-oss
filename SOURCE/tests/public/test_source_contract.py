@@ -296,5 +296,81 @@ class SourceContract(unittest.TestCase):
                         assert (node.module or "").split(".")[0] != "nltk", str(file)
 
 
+class CurrentTrackRatingContract(unittest.IsolatedAsyncioTestCase):
+    async def _rate(self, music, value):
+        import logging
+        import sys
+        import types
+        from types import SimpleNamespace
+        from unittest.mock import Mock, patch
+
+        source = ROOT / 'ui/api/routes/rating.py'
+        tree = ast.parse(source.read_text(encoding='utf-8'))
+        register = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == 'register_rating_routes')
+        isolated = ast.Module(body=[ast.ImportFrom(module='__future__', names=[ast.alias(name='annotations')], level=0), register], type_ignores=[])
+        routes = {}
+        class Router:
+            def post(self, path, **kwargs):
+                def save(fn): routes[path] = fn; return fn
+                return save
+            get = post
+            delete = post
+        class Toolbox:
+            async def record_and_call(self, callback, **kwargs): return await callback()
+        rating = SimpleNamespace(thumbs_up=Mock(), thumbs_down=Mock(), remove_rating=Mock())
+        module = types.ModuleType('music.rating_system');module.get_rating_system=lambda:rating
+        namespace = {'log':logging.getLogger('rating-contract'),'Body':lambda value:value,
+                     'Depends':lambda value:value,'require_auth':lambda:None,
+                     'error_response':lambda message,status_code=400:{'ok':False,'status':status_code,'error':message},
+                     'handle_route_error':lambda exc,route:{'ok':False,'status':500,'error':str(exc)}}
+        exec(compile(ast.fix_missing_locations(isolated),str(source),'exec'),namespace)
+        context=SimpleNamespace(router=Router(),bindings=SimpleNamespace(music=music))
+        namespace['register_rating_routes'](context,Toolbox())
+        with patch.dict(sys.modules,{'music.rating_system':module}):
+            result=await routes['/v1/rating']({'rating':value})
+        return result,rating
+
+    async def test_current_local_track_can_be_liked_disliked_and_cleared(self):
+        from types import SimpleNamespace
+        music=SimpleNamespace(current_track=SimpleNamespace(id='local-synthetic',video_id=None,title='Acceptance tone',artist='Synthetic'))
+        for value,method in [('liked','thumbs_up'),('disliked','thumbs_down'),(None,'remove_rating')]:
+            with self.subTest(value=value):
+                result,rating=await self._rate(music,value)
+                self.assertEqual(result,{'ok':True,'video_id':'local-synthetic','rating':value})
+                if value is None: rating.remove_rating.assert_called_once_with('local-synthetic')
+                else: getattr(rating,method).assert_called_once_with(video_id='local-synthetic',title='Acceptance tone',artist='Synthetic')
+
+    async def test_object_and_dictionary_player_states_resolve_the_same_track(self):
+        from types import SimpleNamespace
+        track={'id':'synthetic-current','title':'Current'}
+        for state in [{'now_playing':track},SimpleNamespace(now_playing=track)]:
+            result,rating=await self._rate(SimpleNamespace(get_state=lambda:state),'liked')
+            self.assertTrue(result['ok'],result)
+            rating.thumbs_up.assert_called_once_with(video_id='synthetic-current',title='Current',artist=None)
+
+    async def test_missing_track_and_invalid_rating_do_not_mutate_ratings(self):
+        from types import SimpleNamespace
+        for music,value in [(None,'liked'),(SimpleNamespace(current_track=None),'liked'),(SimpleNamespace(current_track={'id':'synthetic'}),'invalid')]:
+            result,rating=await self._rate(music,value)
+            self.assertFalse(result['ok'])
+            self.assertEqual(result['status'],400)
+            rating.thumbs_up.assert_not_called();rating.thumbs_down.assert_not_called();rating.remove_rating.assert_not_called()
+
+
+class OnboardingSavedStepContract(unittest.TestCase):
+    def test_all_frontend_saved_step_identifiers_are_accepted_by_backend_enum(self):
+        from enum import Enum
+        source = ROOT / 'ui/onboarding.py'
+        tree = ast.parse(source.read_text(encoding='utf-8'))
+        enum_node = next(n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == 'OnboardingStep')
+        namespace = {'Enum': Enum}
+        exec(compile(ast.fix_missing_locations(ast.Module(body=[enum_node], type_ignores=[])), str(source), 'exec'), namespace)
+        frontend = (ROOT / 'ui/react-app/src/hooks/useVoiceOnboarding.js').read_text(encoding='utf-8')
+        identifiers = set(re.findall(r"saveOnboardingStep\('([^']+)'", frontend))
+        self.assertIn('autonomy_tier', identifiers)
+        for identifier in identifiers:
+            self.assertEqual(namespace['OnboardingStep'](identifier).value, identifier)
+
+
 if __name__ == "__main__":
     unittest.main()

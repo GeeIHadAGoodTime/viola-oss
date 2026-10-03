@@ -131,32 +131,26 @@ export default function QueueModal({ isOpen, onClose, wsQueue }) {
                 alignItems: 'center',
                 gap: '12px',
                 padding: '12px 16px',
-                backgroundColor: index === 0 ? `${THEME.colors.statusGreen}1A` : THEME.colors.borderSubtle,
+                backgroundColor: THEME.colors.borderSubtle,
                 borderRadius: '12px',
-                border: index === 0 ? `1px solid ${THEME.colors.statusGreen}33` : '1px solid transparent',
+                border: '1px solid transparent',
               }}
             >
-              {/* Index/Now Playing indicator */}
+              {/* The queue contains upcoming tracks; now_playing is a separate state field. */}
               <div style={{
                 width: '28px',
                 height: '28px',
                 borderRadius: '8px',
-                backgroundColor: index === 0 ? `${THEME.colors.statusGreen}33` : THEME.colors.glassBase,
+                backgroundColor: THEME.colors.glassBase,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 fontSize: '12px',
                 fontWeight: 600,
-                color: index === 0 ? THEME.colors.statusGreen : THEME.colors.textMuted,
+                color: THEME.colors.textMuted,
                 flexShrink: 0,
               }}>
-                {index === 0 ? (
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M8 5v14l11-7z" />
-                  </svg>
-                ) : (
-                  index + 1
-                )}
+                {index + 1}
               </div>
 
               {/* Thumbnail */}
@@ -201,7 +195,7 @@ export default function QueueModal({ isOpen, onClose, wsQueue }) {
 
               {/* Actions */}
               <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
-                {index > 0 && (
+                {
                   <button
                     onClick={() => handlePlayItem(item.id)}
                     disabled={actionLoading}
@@ -226,7 +220,7 @@ export default function QueueModal({ isOpen, onClose, wsQueue }) {
                       <path d="M8 5v14l11-7z" />
                     </svg>
                   </button>
-                )}
+                }
                 <button
                   onClick={() => handleRemoveItem(item.id)}
                   disabled={actionLoading}

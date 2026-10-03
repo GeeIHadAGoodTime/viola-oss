@@ -102,3 +102,32 @@ class InitialWindowGeometryTests(unittest.TestCase):
                 self.assertEqual(calls["resize"], expected_size)
                 self.assertEqual(calls["setMinimumSize"], (min(1024, width), min(600, height)))
                 self.assertEqual(calls.get("move"), (left + (width - expected_size[0]) // 2, top + (height - expected_size[1]) // 2))
+
+
+class NativeTitlebarNames(unittest.TestCase):
+    def test_minimize_and_close_have_names_in_the_native_construction_path(self):
+        source = ENTRY.parent / 'ui/qt_native/webview_window.py'
+        tree = ast.parse(source.read_text(encoding='utf-8'))
+        titlebar = next(n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == 'CustomTitleBar')
+        names = {}
+        for node in ast.walk(titlebar):
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == 'setAccessibleName':
+                receiver = node.func.value
+                if isinstance(receiver, ast.Attribute) and node.args and isinstance(node.args[0], ast.Constant):
+                    names[receiver.attr] = node.args[0].value
+        self.assertEqual(names.get('btn_minimize'), 'Minimize')
+        self.assertEqual(names.get('btn_close'), 'Close')
+
+    def test_maximize_name_tracks_restore_state(self):
+        source = ENTRY.parent / 'ui/qt_native/webview_window.py'
+        tree = ast.parse(source.read_text(encoding='utf-8'))
+        cls = next(n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == 'CustomTitleBar')
+        method = next(n for n in cls.body if isinstance(n, ast.FunctionDef) and n.name == '_set_maximize_icon')
+        namespace = {}
+        exec(compile(ast.fix_missing_locations(ast.Module(body=[method], type_ignores=[])), str(source), 'exec'), namespace)
+        for maximized, expected in [(False, 'Maximize'), (True, 'Restore')]:
+            labels = []
+            button = SimpleNamespace(setIcon=lambda icon: None, setAccessibleName=labels.append, setToolTip=lambda text: None)
+            target = SimpleNamespace(btn_maximize=button, _create_icon_from_svg=lambda svg: svg)
+            namespace['_set_maximize_icon'](target, maximized)
+            self.assertEqual(labels, [expected])

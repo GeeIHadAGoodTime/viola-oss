@@ -163,7 +163,7 @@ const AdvancedSettingsWindow = React.memo(({
           <div style={{ padding: '16px 20px' }}>
             <button
               type="button"
-              onClick={() => runDiagnostic('Diagnostics', '/v1/diagnostics/logs')}
+              onClick={() => runDiagnostic('Diagnostics', '/v1/diagnostics')}
               disabled={diagnosticBusy === 'Diagnostics'}
               style={smallButtonStyle()}
             >
@@ -278,7 +278,7 @@ const AdvancedSettingsWindow = React.memo(({
           <div style={{ padding: '16px 20px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
             <button
               type="button"
-              onClick={() => runDiagnostic('YouTube', '/v1/diagnostics/youtube', { method: 'POST' })}
+              onClick={() => runDiagnostic('YouTube', '/v1/diagnostics/youtube')}
               disabled={diagnosticBusy === 'YouTube'}
               style={smallButtonStyle()}
             >

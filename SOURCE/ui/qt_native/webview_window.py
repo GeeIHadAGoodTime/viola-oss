@@ -1637,6 +1637,8 @@ class CustomTitleBar(QWidget):
         layout.addWidget(self.btn_fullscreen)
 
         self.btn_minimize = QPushButton()
+        self.btn_minimize.setAccessibleName("Minimize")
+        self.btn_minimize.setToolTip("Minimize")
         self.btn_minimize.setStyleSheet(btn_style_base.format(hover_bg="rgba(255, 255, 255, 0.1)"))
         self.btn_minimize.setIcon(
             self._create_icon_from_svg(
@@ -1657,6 +1659,8 @@ class CustomTitleBar(QWidget):
 
         # Close button (X)
         self.btn_close = QPushButton()
+        self.btn_close.setAccessibleName("Close")
+        self.btn_close.setToolTip("Close")
         self.btn_close.setStyleSheet(btn_style_base.format(hover_bg="#c42b1c"))
         self.btn_close.setIcon(
             self._create_icon_from_svg(
@@ -1865,6 +1869,9 @@ class CustomTitleBar(QWidget):
             # Maximize icon (single square)
             svg = '<svg viewBox="0 0 10 10"><rect x="0" y="0" width="10" height="10" fill="none" stroke="white" stroke-width="1"/></svg>'
         self.btn_maximize.setIcon(self._create_icon_from_svg(svg))
+        label = "Restore" if is_maximized else "Maximize"
+        self.btn_maximize.setAccessibleName(label)
+        self.btn_maximize.setToolTip(label)
 
     def _set_fullscreen_icon(self, is_fullscreen: bool) -> None:
         """Set the fullscreen button icon based on window state."""

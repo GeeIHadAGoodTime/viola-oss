@@ -92,6 +92,53 @@ describe('ChatMode command registry', () => {
     });
   });
 
+  it('rejects an overlong rename with visible feedback and no request', async () => {
+    render(<ChatMode />);
+    const title = await screen.findByDisplayValue('Existing thread');
+    fireEvent.change(title, { target: { value: 'x'.repeat(201) } });
+    fireEvent.blur(title);
+    expect(await screen.findByRole('alert')).toHaveTextContent('200 characters or fewer');
+    expect(chatHarness.apiFetch.mock.calls.filter(([, opts]) => opts?.method === 'PATCH')).toHaveLength(0);
+    expect(title).toHaveValue('x'.repeat(201));
+  });
+
+  it('shows a failed rename and clears the error after a successful retry', async () => {
+    const fallback = chatHarness.apiFetch.getMockImplementation();
+    let fail = true;
+    chatHarness.apiFetch.mockImplementation((url, options = {}) => {
+      if (options.method === 'PATCH') {
+        if (fail) return Promise.reject(new Error('synthetic offline'));
+        return Promise.resolve({ thread: { ...thread, title: JSON.parse(options.body).title } });
+      }
+      return fallback(url, options);
+    });
+    render(<ChatMode />);
+    const title = await screen.findByDisplayValue('Existing thread');
+    fireEvent.change(title, { target: { value: 'Renamed chat' } });
+    fireEvent.blur(title);
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not confirm the new chat title');
+    expect(title).toHaveValue('Renamed chat');
+    fail = false;
+    fireEvent.blur(title);
+    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByText('Existing thread')).not.toBeInTheDocument());
+  });
+
+  it('counts Unicode characters consistently with the server title limit', async () => {
+    const fallback = chatHarness.apiFetch.getMockImplementation();
+    chatHarness.apiFetch.mockImplementation((url, options = {}) => options.method === 'PATCH'
+      ? Promise.resolve({ thread: { ...thread, title: JSON.parse(options.body).title } })
+      : fallback(url, options));
+    render(<ChatMode />);
+    const title = await screen.findByDisplayValue('Existing thread');
+    fireEvent.change(title, { target: { value: '🎵'.repeat(200) } });
+    fireEvent.blur(title);
+    await waitFor(() => expect(chatHarness.apiFetch).toHaveBeenCalledWith(
+      '/v1/chat/threads/thread-1', expect.objectContaining({ method: 'PATCH', body: JSON.stringify({ title: '🎵'.repeat(200) }) })
+    ));
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
   it('registers active chat commands and reruns the last assistant response', async () => {
     const registerCommands = vi.fn(() => vi.fn());
 

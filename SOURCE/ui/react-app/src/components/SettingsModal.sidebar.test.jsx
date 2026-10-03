@@ -432,4 +432,30 @@ describe('SettingsModal sidebar shell', () => {
       expect(screen.getByText(/Spotify rejected that login identifier/i)).toBeInTheDocument();
     }, { timeout: 4000 });
   }, 10000);
+  it.each([[1, '100'], [0.8, '80'], [80, '80'], [0, '0']])('displays stored TTS volume %s as percent %s', async (stored, shown) => {
+    settingsHarness.settings = {...settingsHarness.settings, tts_volume: stored};
+    render(<SettingsModal isOpen onClose={vi.fn()} initialTab="voice" />);
+    const label = await screen.findByText('Assistant Volume');
+    expect(label.parentElement.textContent).toBe(`Assistant Volume${shown}`);
+  });
+
+  it('stores one-percent assistant volume as 0.01 rather than full-volume 1', async () => {
+    settingsHarness.settings = {...settingsHarness.settings, tts_volume: 1};
+    render(<SettingsModal isOpen onClose={vi.fn()} initialTab="voice" />);
+    const label = await screen.findByText('Assistant Volume');
+    const track = label.parentElement.parentElement.querySelector('[data-hold-interactive]');
+    vi.spyOn(track, 'getBoundingClientRect').mockReturnValue({left:0,width:100,right:100,top:0,bottom:44,height:44});
+    fireEvent.mouseDown(track,{clientX:1});
+    fireEvent.mouseUp(document);
+    fireEvent.click(screen.getByRole('button',{name:'Save Changes'}));
+    await waitFor(() => expect(settingsHarness.updateSettings).toHaveBeenCalledWith(expect.objectContaining({tts_volume:0.01})));
+  });
+
+  it('shows the shipped English tiny model in the accuracy selector', async () => {
+    settingsHarness.settings = {...settingsHarness.settings, whisper_model:'tiny.en', stt_engine:'whisper_local'};
+    render(<SettingsModal isOpen onClose={vi.fn()} initialTab="voice" />);
+    fireEvent.click(await screen.findByRole('button',{name:/Voice Recognition & Advanced/}));
+    expect(await screen.findByRole('button',{name:/Accuracy Level:.*English/})).toBeInTheDocument();
+  });
+
 });

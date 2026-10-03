@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "0f3a947698d20c2a94dcf41b1f3813bcea96f09f",
-  "sha256": "91379356aad9c245159325bd73e4d173cbbf5673d7ae6318da070d709d7a39c9",
+  "revision": "e267b8d8a92a097128abbbee64a26da2218f2080",
+  "sha256": "a55ca2de2e788eccd45d34c7fe3f108bcb64e34485a60ef7afc219adfaf3b6ab",
   "files": [
     {
       "path": ".env.example",
@@ -5745,8 +5745,8 @@
     },
     {
       "path": "tests/public/test_source_contract.py",
-      "sha256": "e1774f976630ce9c78ef04cfd183408907b92ed8d554b89a563260980a5806f4",
-      "bytes": 12309
+      "sha256": "20f069897c275468b5059b7f45494868cdda97c6e7cd164c08d92a6ee0f296be",
+      "bytes": 17058
     },
     {
       "path": "tests/public/test_tool_allowlist_contract.py",
@@ -5760,8 +5760,8 @@
     },
     {
       "path": "tests/public/test_windows_native_startup_order.py",
-      "sha256": "bc5a982670c35fa545715fb09a167c274c487d24f95437cb9526dc4d6c2b609a",
-      "bytes": 5021
+      "sha256": "82264582c8fb357e36194e98e62232c10105a0660b4601e3a18697d560e2050c",
+      "bytes": 6892
     },
     {
       "path": "themes/viola-dark.css",
@@ -8745,8 +8745,8 @@
     },
     {
       "path": "ui/api/routes/rating.py",
-      "sha256": "4dc1d2e347d5ab4c29d8584a0e4615f46feded3cd690ce61e3d86dba86c6360d",
-      "bytes": 9975
+      "sha256": "1034cb6a2dff9cf81208324ff153648770d047795090e48a5bda1482660a0b79",
+      "bytes": 10152
     },
     {
       "path": "ui/api/routes/regression_stubs.py",
@@ -8940,8 +8940,8 @@
     },
     {
       "path": "ui/onboarding.py",
-      "sha256": "8b31ac96a99ce89310e5dcfb08ba7d64fe64eeb1203ae5127709de1653e5c316",
-      "bytes": 34200
+      "sha256": "3ac93fb4a32f7f747cb99eab81badefa098901ccaa555aec5402c1e62da304fd",
+      "bytes": 34236
     },
     {
       "path": "ui/qt_native/README_QT_UI.txt",
@@ -9060,8 +9060,8 @@
     },
     {
       "path": "ui/qt_native/webview_window.py",
-      "sha256": "da37e70c12f5fc4a5235d86135b9aaac57d5ee20a60559e83e027ac7750db95a",
-      "bytes": 198567
+      "sha256": "924cdc137c0b9befbfd101e44ee972c317fe0a85a2e5564731fc857cc5d47c51",
+      "bytes": 198918
     },
     {
       "path": "ui/qt_native/widgets/connectivity_status.py",
@@ -9210,8 +9210,8 @@
     },
     {
       "path": "ui/react-app/src/SmartDisplay.jsx",
-      "sha256": "4635fdb0f24b503f72a007006d82c3027a27efddc673d1ee97406b8d220abde6",
-      "bytes": 160857
+      "sha256": "b1d9bc9d11a63cd2854b8fb43bbbee8b793b668226e171208c761cbc13719a19",
+      "bytes": 160863
     },
     {
       "path": "ui/react-app/src/SmartDisplay.stageRouting.test.jsx",
@@ -9230,8 +9230,8 @@
     },
     {
       "path": "ui/react-app/src/__tests__/SmartDisplay.test.jsx",
-      "sha256": "a174e069e1023e26c66a14fc071383826b3e183bbae44f99d071e97df93a01ff",
-      "bytes": 58760
+      "sha256": "af2a43dfdc4828baf77e4ccd1f58ce21c7ae1bd9468f51afd5886899a5e334b0",
+      "bytes": 60466
     },
     {
       "path": "ui/react-app/src/__tests__/hooks/useEventBus.test.jsx",
@@ -9245,8 +9245,8 @@
     },
     {
       "path": "ui/react-app/src/__tests__/hooks/useVoiceOnboarding.micCaptureProbe.test.jsx",
-      "sha256": "9847256b2d3efd6f78728e1cc9ab956923cdbad5417ec12ce2c6434da19a8ab8",
-      "bytes": 7344
+      "sha256": "f686f4b79b08488595f58f32403212bd21d32750b5f3713670e6ae127a4c20e6",
+      "bytes": 11830
     },
     {
       "path": "ui/react-app/src/__tests__/hooks/useVoiceOnboarding.micPermissionGuidance.test.jsx",
@@ -9775,8 +9775,8 @@
     },
     {
       "path": "ui/react-app/src/components/OnboardingOverlay.jsx",
-      "sha256": "3aa16bc0e556bf1bc3e38d394cd924547a7944f4db17abd0e67f1a3f27dd5468",
-      "bytes": 30061
+      "sha256": "0aafc75684816c5d47e77de2e256ad0c140126c9e595b6b4ab4674bf159077bc",
+      "bytes": 30241
     },
     {
       "path": "ui/react-app/src/components/OnboardingOverlay.test.jsx",
@@ -9810,8 +9810,8 @@
     },
     {
       "path": "ui/react-app/src/components/QueueModal.jsx",
-      "sha256": "f129f3283cdf54b129c3914ff4ebef82311a9a51f7b234905c7575f06bbc052c",
-      "bytes": 9659
+      "sha256": "93b8db6c14a178a8b1394e433b117625f25910c2c4ac6e72e68fa29dadd371b1",
+      "bytes": 9263
     },
     {
       "path": "ui/react-app/src/components/ReviewPage.jsx",
@@ -9860,13 +9860,13 @@
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.jsx",
-      "sha256": "9ee65bba24dd4298b73ef6497f25955ecbd8c4fc3cf5aa6852367b1944a59ef6",
-      "bytes": 196366
+      "sha256": "da64cf1e427c18ef2de06f93268658b649a06527f83ef52fe9ffc0ed2abb75ed",
+      "bytes": 197175
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.sidebar.test.jsx",
-      "sha256": "b771d997bb0543ba727e9005fc75a8f2a294235c337a51d23214990578f48329",
-      "bytes": 15772
+      "sha256": "d4116c60d1b755a189de2a1a6e2ec49cf90cec8791f83fcfb3ad2649ae9b485c",
+      "bytes": 17490
     },
     {
       "path": "ui/react-app/src/components/SpokePairingGate.jsx",
@@ -9965,13 +9965,13 @@
     },
     {
       "path": "ui/react-app/src/components/advanced/AdvancedSettingsWindow.jsx",
-      "sha256": "860acb1c7dafccdf3def91bbb93258cbb0474ecdda3664c50531c1d34850670d",
-      "bytes": 18016
+      "sha256": "76a54bbff8db2e2ecfa876c07abbafd65d3aa755ecba9957d53d618b86ee6862",
+      "bytes": 17991
     },
     {
       "path": "ui/react-app/src/components/advanced/AdvancedSettingsWindow.test.jsx",
-      "sha256": "398a94f7e09eef096c994f42a399f56bec150c1c3ab5534c1cfa3d1b15ee0bf0",
-      "bytes": 2344
+      "sha256": "cd479a1b08777384b26d23cf212556e2457ee4fcefad63f84f50a881547c4c0e",
+      "bytes": 3157
     },
     {
       "path": "ui/react-app/src/components/ai/CodexAuthCard.jsx",
@@ -10300,13 +10300,13 @@
     },
     {
       "path": "ui/react-app/src/components/settings/Slider.jsx",
-      "sha256": "9c82c708d5ade38ca5cb39bd58b411c21206999d0824497c145dd53226fd7354",
-      "bytes": 4858
+      "sha256": "3e17c0c367543674e4e8fd62c67e5520e011bdffd8a8bb8f93c269f4124fd8a5",
+      "bytes": 5564
     },
     {
       "path": "ui/react-app/src/components/settings/Slider.test.jsx",
-      "sha256": "3d8c1d0ded01b6f205eae28bec10718f1d5da9d515bc307a17b830893daa9745",
-      "bytes": 2323
+      "sha256": "3145591ef8d94c50de40585035a7e87b1dfd20b0d76996cb7b2210e45bf3d961",
+      "bytes": 3280
     },
     {
       "path": "ui/react-app/src/components/settings/SpeakerIcon.jsx",
@@ -10515,13 +10515,13 @@
     },
     {
       "path": "ui/react-app/src/components/stage/modes/chat/ChatMode.jsx",
-      "sha256": "1ba6f747fe750cf99551b114a8adc9d46b197323b477c0138a8864d747f6425a",
-      "bytes": 37970
+      "sha256": "688a11237c8c1cb54f32ff60282233d79170191eb96546e0d93d94ef8e37e096",
+      "bytes": 38701
     },
     {
       "path": "ui/react-app/src/components/stage/modes/chat/ChatMode.test.jsx",
-      "sha256": "f68f96b374b5deda446a864fb922afdfe6e199c648f3badf2b384f4671ef95fe",
-      "bytes": 24375
+      "sha256": "eed5199b5437a649748d38a9009e4847da32e5bd9bbed05e78722e20ef6eed4e",
+      "bytes": 26850
     },
     {
       "path": "ui/react-app/src/components/stage/modes/chat/ChatSidebar.jsx",
@@ -10870,8 +10870,8 @@
     },
     {
       "path": "ui/react-app/src/hooks/useVoiceOnboarding.js",
-      "sha256": "f16177ac685696662e6df7af1011ad9505734d73374d54562815d982759dc267",
-      "bytes": 33618
+      "sha256": "3f79f1575bce5c05089d5351d20cd8d18f90dd748367c8a2e1ffc903108f761c",
+      "bytes": 35423
     },
     {
       "path": "ui/react-app/src/hooks/useVoiceStream.js",
@@ -10925,8 +10925,8 @@
     },
     {
       "path": "ui/react-app/src/i18n/en.json",
-      "sha256": "923ae3adfc1d379426f497f3640d6f7ca4201cef4d5732b4a23de76f9fca23cf",
-      "bytes": 7297
+      "sha256": "21b9794e3bc73aa575d027cf9a244c2f692d881ef0ab00e1c6b431b593410a00",
+      "bytes": 7544
     },
     {
       "path": "ui/react-app/src/i18n/index.js",

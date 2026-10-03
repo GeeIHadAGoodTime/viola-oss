@@ -1,17 +1,32 @@
 {
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "5d7508466076f2a7d38d6e3a6a3fefc680ddf7cd4d45b8afd92eff09303633df",
-  "source_tree_sha256": "91379356aad9c245159325bd73e4d173cbbf5673d7ae6318da070d709d7a39c9",
+  "source_manifest_sha256": "453dc9145bc06d23d00a08b9d10febc9929b938c614f8c7f3a26d7f9db634fd1",
+  "source_tree_sha256": "a55ca2de2e788eccd45d34c7fe3f108bcb64e34485a60ef7afc219adfaf3b6ab",
   "source_file_count": 2476,
-  "source_revision": "0f3a947698d20c2a94dcf41b1f3813bcea96f09f",
-  "comparison_public_revision": "49f4ed2c52eb9e4a93f7db8ec3d35b16a8740b51",
+  "source_revision": "e267b8d8a92a097128abbbee64a26da2218f2080",
+  "comparison_public_revision": "55c180d2060d18312b8239eb027d80ec9baa3f9f",
   "changed_source_paths": [
-    "SOURCE/music/backends/simple_audio.py",
-    "SOURCE/music/backends/simple.py",
-    "SOURCE/tests/public/test_execution_safety_contract.py",
-    "SOURCE/ui/react-app/src/hooks/useViolaApi.js",
-    "SOURCE/ui/react-app/src/hooks/useViolaApi.test.js"
+    "SOURCE/tests/public/test_source_contract.py",
+    "SOURCE/tests/public/test_windows_native_startup_order.py",
+    "SOURCE/ui/api/routes/rating.py",
+    "SOURCE/ui/onboarding.py",
+    "SOURCE/ui/qt_native/webview_window.py",
+    "SOURCE/ui/react-app/src/SmartDisplay.jsx",
+    "SOURCE/ui/react-app/src/__tests__/SmartDisplay.test.jsx",
+    "SOURCE/ui/react-app/src/__tests__/hooks/useVoiceOnboarding.micCaptureProbe.test.jsx",
+    "SOURCE/ui/react-app/src/components/OnboardingOverlay.jsx",
+    "SOURCE/ui/react-app/src/components/QueueModal.jsx",
+    "SOURCE/ui/react-app/src/components/SettingsModal.jsx",
+    "SOURCE/ui/react-app/src/components/SettingsModal.sidebar.test.jsx",
+    "SOURCE/ui/react-app/src/components/advanced/AdvancedSettingsWindow.jsx",
+    "SOURCE/ui/react-app/src/components/advanced/AdvancedSettingsWindow.test.jsx",
+    "SOURCE/ui/react-app/src/components/settings/Slider.jsx",
+    "SOURCE/ui/react-app/src/components/settings/Slider.test.jsx",
+    "SOURCE/ui/react-app/src/components/stage/modes/chat/ChatMode.jsx",
+    "SOURCE/ui/react-app/src/components/stage/modes/chat/ChatMode.test.jsx",
+    "SOURCE/ui/react-app/src/hooks/useVoiceOnboarding.js",
+    "SOURCE/ui/react-app/src/i18n/en.json"
   ],
   "retained_sboms": [
     {
@@ -53,24 +68,24 @@
   ],
   "input_equivalence": {
     "changed_dependency_inputs": [],
-    "basis": "Five existing Python/frontend source and test files changed. Dependency manifests, locks and retained SBOM bytes are unchanged."
+    "basis": "Twenty existing Python/frontend source and test files changed. Dependency manifests, locks and retained SBOM bytes are unchanged."
   },
   "prior_binding": {
-    "public_revision": "49f4ed2c52eb9e4a93f7db8ec3d35b16a8740b51",
+    "public_revision": "55c180d2060d18312b8239eb027d80ec9baa3f9f",
     "path": "PUBLIC_METADATA/source-binding.json",
-    "git_blob": "8595eee917ba216ebffb12cba675246ea07319d8",
-    "sha256": "554c3f60e8d0db62256ce33a1cb6000433f9571c6e98b3e9ac3d72d1b9fe7c33",
-    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/49f4ed2c52eb9e4a93f7db8ec3d35b16a8740b51/PUBLIC_METADATA/source-binding.json"
+    "git_blob": "b5981640141b202c15eba04b1b1c6814a3732284",
+    "sha256": "f2ce2ab674fdeba3f26d8c0eee176faaedeaee71d91eb1deab8806671e72c7c6",
+    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/55c180d2060d18312b8239eb027d80ec9baa3f9f/PUBLIC_METADATA/source-binding.json"
   },
   "new_resolution_performed": false,
   "new_advisory_scan_performed": false,
   "new_runtime_qualification_performed": false,
   "qualification": {
-    "scope": "Local audio pause preserves decoded content; UI seek converts seconds to REST milliseconds",
-    "negative_controls": "Original playback loop failed all three pause contracts (four assertion failures); original seek failed three nonzero conversions. Real FFmpeg 3-second PCM probe paused 3.5 seconds: original delivered 3840 of 576000 bytes; corrected delivered all 576000 bytes exactly, with 144000 frames and no decode error. Fake sink only, not audible output.",
-    "python_checks": "All 83 public Python contracts passed on Linux after installing required test dependencies; earlier missing-dependency errors retained.",
-    "frontend_checks": "Final combined source includes the Disabled Voice repair: 138 frontend test files, 1005 tests passed; production build passed on Linux. No physical audio or installed-candidate claim.",
-    "installed_candidate": "pending",
+    "scope": "Onboarding readiness/completion and save failure; queue playback controls; local-track ratings; settings volume/model choices; diagnostics routes; keyboard sliders; native control names; visible chat rename validation and retry",
+    "negative_controls": "Retained original-source failures for queue, rating, onboarding, settings, diagnostics, native titlebar, keyboard slider and chat rename. Synthetic behavior and source-contract evidence only.",
+    "python_checks": "89 public Python contracts passed on Linux; no native Windows GUI or physical audio claim.",
+    "frontend_checks": "Final source: 138 frontend test files and 1039 tests passed on Linux; production frontend build passed in 4.82 seconds. Protected Windows CI and installed acceptance remain pending.",
+    "installed_candidate": "pending; Surface held at owner instruction until consolidated repair batch",
     "release_or_deployment": "not_established"
   }
 }

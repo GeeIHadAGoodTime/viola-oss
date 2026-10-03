@@ -53,4 +53,20 @@ describe('Slider', () => {
     expect(emitted).toBeGreaterThanOrEqual(0);
     expect(emitted).toBeLessThanOrEqual(10);
   });
+  it('exposes its name, current value and bounds to keyboard and assistive technology', () => {
+    const {getByRole}=render(<Slider value={40} onChange={vi.fn()} min={0} max={100} label="Assistant Volume" />);
+    const slider=getByRole('slider',{name:'Assistant Volume'});
+    expect(slider.getAttribute('tabindex')).toBe('0');
+    expect(slider.getAttribute('aria-valuenow')).toBe('40');
+    expect(slider.getAttribute('aria-valuemin')).toBe('0');
+    expect(slider.getAttribute('aria-valuemax')).toBe('100');
+  });
+
+  it.each([['ArrowRight',41],['ArrowUp',41],['ArrowLeft',39],['ArrowDown',39],['Home',0],['End',100],['PageUp',50],['PageDown',30]])('supports keyboard %s without dragging', (key, expected) => {
+    const onChange=vi.fn();
+    const {getByRole}=render(<Slider value={40} onChange={onChange} label="Volume" />);
+    fireEvent.keyDown(getByRole('slider',{name:'Volume'}),{key});
+    expect(onChange).toHaveBeenCalledWith(expected);
+  });
+
 });
