@@ -120,7 +120,17 @@ export default function CallHistoryList({ pageSize = 50, focusCallId = null }) {
       {loading ? (
         <div style={{ color: THEME.colors.textMuted, padding: '18px 2px' }}>Loading calls...</div>
       ) : error ? (
-        <div style={{ color: THEME.colors.statusRed, padding: '18px 2px' }}>{error}</div>
+        <div role="alert" style={{ color: THEME.colors.statusRed, padding: '18px 2px' }}>
+          <p style={{ marginTop: 0 }}>{error}</p>
+          <button
+            type="button"
+            onClick={() => void loadPage(0)}
+            disabled={loading || loadingMore}
+            style={{ minHeight: 44, padding: '10px 14px', borderRadius: 8, border: `1px solid ${THEME.colors.borderLight}`, backgroundColor: THEME.colors.glassBase, color: THEME.colors.textPrimary, cursor: 'pointer' }}
+          >
+            Try again
+          </button>
+        </div>
       ) : calls.length === 0 ? (
         <div
           data-testid="call-history-empty"

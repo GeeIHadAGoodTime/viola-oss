@@ -1,21 +1,16 @@
 {
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "4d511c280263a1b01975002eaaab3e293ca4f25d31b843d74214015cd784d88e",
-  "source_tree_sha256": "532e9958e64021d0a2e0439e757c08d2ffd01e9635a73a1019db9dc962f5d59e",
+  "source_manifest_sha256": "2862efa64bb2a58adbaf5f91ea4fca6d9b674fdccf87a3881bb710bd67b33ff0",
+  "source_tree_sha256": "93228efb8378790e714a68364ef769bbd1ef032834420fcb2a04b6b5d58261c0",
   "source_file_count": 2474,
-  "source_revision": "ed8446207b9a86cb01198472830fdc67c9c57bf1",
-  "comparison_public_revision": "65b928ce9f7821c5c857d6b6c7e8c76de53773b4",
+  "source_revision": "a6165b06babf017cb50897a85839abf783958058",
+  "comparison_public_revision": "a7710dd9a78dadd68322c788bd3e0478ba762bed",
   "changed_source_paths": [
-    "SOURCE/requirements_linux.txt",
-    "SOURCE/requirements_macos.txt",
     "SOURCE/tests/public/test_tts_profile_dependencies.py",
-    "SOURCE/tests/public/test_windows_native_startup_order.py",
-    "SOURCE/ui/react-app/src/components/AccentPicker.jsx",
-    "SOURCE/ui/react-app/src/components/AccentPicker.test.jsx",
-    "SOURCE/ui/react-app/src/hooks/useDeviceDiscovery.js",
-    "SOURCE/ui/react-app/src/hooks/useDeviceDiscovery.test.jsx",
-    "SOURCE/viola_qt.py"
+    "SOURCE/ui/react-app/src/components/CallHistoryList.jsx",
+    "SOURCE/ui/react-app/src/components/CallHistoryList.test.jsx",
+    "SOURCE/voice/synthesis/kokoro_engine.py"
   ],
   "retained_sboms": [
     {
@@ -56,31 +51,30 @@
     }
   ],
   "input_equivalence": {
-    "unchanged_dependency_input_count": 543,
-    "changed_dependency_inputs": [
-      "requirements_linux.txt",
-      "requirements_macos.txt"
-    ],
-    "basis": "Linux and macOS profiles add num2words==0.5.14, already pinned in the unchanged Windows desktop profile. Existing six Windows/frontend inventories and dated receipts are retained unchanged; they are not Linux or macOS inventories. No new platform dependency resolution or vulnerability scan is claimed."
+    "unchanged_dependency_input_count": 545,
+    "changed_dependency_inputs": [],
+    "basis": "All dependency inputs unchanged from the preceding public source revision. Retained inventories and dated receipts are not fresh platform qualification or advisory scans."
   },
   "prior_binding": {
-    "public_revision": "65b928ce9f7821c5c857d6b6c7e8c76de53773b4",
+    "public_revision": "a7710dd9a78dadd68322c788bd3e0478ba762bed",
     "path": "PUBLIC_METADATA/source-binding.json",
-    "git_blob": "f280eb6c2ce2e18ac2465a1063018fe73e255693",
-    "sha256": "61c14badbdfbc187f2082afaf7f7de583fe76d9d964fc232ddaf82bc87c54f97",
-    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/65b928ce9f7821c5c857d6b6c7e8c76de53773b4/PUBLIC_METADATA/source-binding.json"
+    "git_blob": "9481dced1c7a395309cd693df0e5f52baf199156",
+    "sha256": "a6f2656ab01fa42b65d39ef10f7670bcf24d71b4d4bf2384f9054bc91ea69795",
+    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/a7710dd9a78dadd68322c788bd3e0478ba762bed/PUBLIC_METADATA/source-binding.json"
   },
   "new_resolution_performed": false,
   "new_advisory_scan_performed": false,
   "new_runtime_qualification_performed": false,
   "qualification": {
-    "scope": "Focused source corrections following installed-product failures; this source revision is not installed-qualified",
-    "frontend_tests": 981,
+    "scope": "Call-history retry and accurate optional native speech readiness; source checks only",
+    "frontend_tests": 983,
     "frontend_files": 137,
     "frontend_build": "passed",
-    "focused_unittest_methods": 5,
-    "negative_controls": "original room response parsing and accent styles fail added regressions; original entrypoint lacks preload contract",
-    "installed_candidate": "pending for this revision",
+    "frontend_lint": "zero errors; 169 warnings",
+    "focused_unittest_methods": 3,
+    "negative_controls": "Both new native-readiness tests fail the prior probe; call-history retry tests fail without the new control",
+    "full_python_contracts": "pending canonical Windows CI; local minimal environment lacks required dependencies",
+    "installed_candidate": "pending for this source revision",
     "release_or_deployment": "not_established"
   }
 }

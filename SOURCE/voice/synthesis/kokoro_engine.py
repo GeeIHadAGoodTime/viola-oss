@@ -60,9 +60,10 @@ def _probe_kokoro_package() -> str:
         ``kokoro_onnx.config`` executes ``DEFAULT_VOCAB = get_vocab()`` at
         import, which opens ``kokoro_onnx/config.json`` *package data* — in a
         frozen build that file only exists if the bundle collected it.
-      * eSpeak-NG is optional for the open-source core. The phonemizer reports
-        a clear runtime error when Kokoro is used without a user-installed
-        system eSpeak-NG library/data directory.
+      * The optional Kokoro backend also needs the user-installed eSpeak-NG
+        runtime. Construct its lightweight tokenizer to check that dependency
+        before advertising Kokoro as available. This does not load the ONNX
+        model, synthesize audio, or download any dependency.
 
     Returns "" when everything the constructor needs is present, else the
     error message. Result is cached: a missing package cannot heal without a
@@ -74,13 +75,15 @@ def _probe_kokoro_package() -> str:
 
     error = ""
     try:
-        import kokoro_onnx
+        from kokoro_onnx.tokenizer import Tokenizer
+
+        Tokenizer()
     except (ImportError, AttributeError, OSError, KeyError, ValueError, RuntimeError) as exc:
         # Import executes kokoro_onnx.config.get_vocab(): a frozen bundle
         # missing package data raises FileNotFoundError (OSError); corrupt
         # JSON raises JSONDecodeError (ValueError) / KeyError; broken module
         # deps raise ImportError/AttributeError/RuntimeError.
-        error = "kokoro_onnx package not importable (missing package data such as config.json?): %s" % exc
+        error = "Kokoro runtime unavailable (package data or system eSpeak-NG dependency): %s" % exc
 
     _KOKORO_PKG_PROBE_ERROR = error
     if error:

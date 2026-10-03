@@ -1,19 +1,17 @@
 # Source snapshot binding
 
-Source revision: `ed8446207b9a86cb01198472830fdc67c9c57bf1`.
+Source revision: `a6165b06babf017cb50897a85839abf783958058`.
 
-This snapshot contains source corrections for the observed Windows native-import
-lock inversion, room response parsing, light-theme accent contrast, and missing
-Linux/macOS number-normalization dependencies. The Windows access-violation crash
-has not been established as the same cause as the native-import deadlock.
+This source adds a retry control for failed call-history loading and checks the
+optional Kokoro tokenizer runtime before reporting the backend available.
+It does not install or redistribute a system speech library, change the configured
+backend, or claim that a fallback voice has passed installed acceptance.
 
-The frontend suite passes 981 tests across 137 files and builds. Five focused
-unittest methods cover startup ordering and all three desktop dependency profiles.
-These are source checks. This revision has not passed installed acceptance and
-is not a released product.
+Frontend: 983 tests in 137 files, build passed, lint has zero errors and 169 warnings.
+Three focused Python unittest methods pass, including two new red-to-green
+readiness tests. Full Python qualification remains pending canonical Windows CI;
+the local minimal environment lacks unrelated desktop test dependencies.
 
-Only Linux and macOS requirements add num2words==0.5.14, already pinned on Windows.
-The six existing Windows/frontend inventories and dated receipts remain unchanged.
-They do not establish Linux/macOS inventory coverage or a fresh advisory scan.
-
-Verify using the unchanged canonical source-binding verifier.
+All dependency inputs and retained inventories remain unchanged. No fresh
+advisory scan, installed-candidate acceptance, release, or deployment is claimed.
+Use the existing canonical source-binding verifier.

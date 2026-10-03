@@ -123,4 +123,26 @@ describe('CallHistoryList', () => {
     expect(screen.queryByText('+1 555 0100')).not.toBeInTheDocument();
     expect(fetchCallHistory).toHaveBeenCalledTimes(2);
   });
+  it('offers a real retry after startup failure and renders the recovered result', async () => {
+    fetchCallHistory.mockRejectedValueOnce(new Error('startup unavailable'))
+      .mockResolvedValueOnce({ count: 1, calls: [firstCall] });
+    const { user } = render(<CallHistoryList />);
+    const retry = await screen.findByRole('button', { name: /try again/i });
+    await user.click(retry);
+    expect(await screen.findByText('+1 555 0100')).toBeInTheDocument();
+    expect(fetchCallHistory).toHaveBeenNthCalledWith(2, 50, 0);
+    expect(screen.queryByRole('button', { name: /try again/i })).not.toBeInTheDocument();
+  });
+
+  it('keeps retry available after another failure and can recover to an empty history', async () => {
+    fetchCallHistory.mockRejectedValueOnce(new Error('startup unavailable'))
+      .mockRejectedValueOnce(new Error('still unavailable'))
+      .mockResolvedValueOnce({ count: 0, calls: [] });
+    const { user } = render(<CallHistoryList />);
+    await user.click(await screen.findByRole('button', { name: /try again/i }));
+    await user.click(await screen.findByRole('button', { name: /try again/i }));
+    expect(await screen.findByText('No call history yet.')).toBeInTheDocument();
+    expect(fetchCallHistory).toHaveBeenCalledTimes(3);
+  });
+
 });
