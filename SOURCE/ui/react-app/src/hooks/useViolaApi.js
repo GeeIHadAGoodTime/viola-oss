@@ -303,7 +303,8 @@ export function useViolaApi() {
     skip: () => apiFetch('/v1/skip', { method: 'POST' }),
     next: () => apiFetch('/v1/next', { method: 'POST' }),
     previous: () => apiFetch('/v1/previous', { method: 'POST' }),
-    seek: (position) => apiFetch('/v1/seek', { method: 'POST', body: JSON.stringify({ position }) }),
+    // ProgressBar and iframe seek positions are seconds; the REST contract is milliseconds.
+    seek: (seconds) => apiFetch('/v1/seek', { method: 'POST', body: JSON.stringify({ position: Math.round(seconds * 1000) }) }),
     setVolume: (level) => apiFetch('/v1/volume', { method: 'POST', body: JSON.stringify({ level }) }),
 
     // Rating

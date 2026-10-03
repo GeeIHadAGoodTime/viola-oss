@@ -1,18 +1,17 @@
 {
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "49ecd8fc26d63f0a48f003046b56321a6fd9c98421e56560064dd0482c082be5",
-  "source_tree_sha256": "bc73c77d8f70ebef41109ab8c0f4e72b0a9c4bec655c1ba6d383455f56134280",
+  "source_manifest_sha256": "5d7508466076f2a7d38d6e3a6a3fefc680ddf7cd4d45b8afd92eff09303633df",
+  "source_tree_sha256": "91379356aad9c245159325bd73e4d173cbbf5673d7ae6318da070d709d7a39c9",
   "source_file_count": 2476,
-  "source_revision": "4ab7e4075128e243bbdf27f48534cefee5f72219",
-  "comparison_public_revision": "6658867c8f58af32e49f465c6b44f62a078903d3",
+  "source_revision": "0f3a947698d20c2a94dcf41b1f3813bcea96f09f",
+  "comparison_public_revision": "49f4ed2c52eb9e4a93f7db8ec3d35b16a8740b51",
   "changed_source_paths": [
-    "SOURCE/ui/react-app/src/SmartDisplay.jsx",
-    "SOURCE/ui/react-app/src/__tests__/SmartDisplay.test.jsx",
-    "SOURCE/ui/react-app/src/hooks/useVoice.js",
-    "SOURCE/ui/react-app/src/hooks/useVoice.cancelRecording.test.js",
-    "SOURCE/ui/react-app/src/hooks/useVoiceWs.js",
-    "SOURCE/ui/react-app/src/hooks/useVoiceWs.rapidPress.test.jsx"
+    "SOURCE/music/backends/simple_audio.py",
+    "SOURCE/music/backends/simple.py",
+    "SOURCE/tests/public/test_execution_safety_contract.py",
+    "SOURCE/ui/react-app/src/hooks/useViolaApi.js",
+    "SOURCE/ui/react-app/src/hooks/useViolaApi.test.js"
   ],
   "retained_sboms": [
     {
@@ -54,22 +53,24 @@
   ],
   "input_equivalence": {
     "changed_dependency_inputs": [],
-    "basis": "Only six existing frontend source and regression-test files changed. All dependency manifests, locks, postinstall files, and retained Windows SBOM bytes are unchanged."
+    "basis": "Five existing Python/frontend source and test files changed. Dependency manifests, locks and retained SBOM bytes are unchanged."
   },
   "prior_binding": {
-    "public_revision": "6658867c8f58af32e49f465c6b44f62a078903d3",
+    "public_revision": "49f4ed2c52eb9e4a93f7db8ec3d35b16a8740b51",
     "path": "PUBLIC_METADATA/source-binding.json",
-    "sha256": "32eaf9359973dc2b0b768d140a803838cf76ae9cc7daca2a6fc97dda75143666",
-    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/6658867c8f58af32e49f465c6b44f62a078903d3/PUBLIC_METADATA/source-binding.json"
+    "git_blob": "8595eee917ba216ebffb12cba675246ea07319d8",
+    "sha256": "554c3f60e8d0db62256ce33a1cb6000433f9571c6e98b3e9ac3d72d1b9fe7c33",
+    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/49f4ed2c52eb9e4a93f7db8ec3d35b16a8740b51/PUBLIC_METADATA/source-binding.json"
   },
   "new_resolution_performed": false,
   "new_advisory_scan_performed": false,
   "new_runtime_qualification_performed": false,
   "qualification": {
-    "scope": "Disabled voice and mute prevent new frontend capture; disabling or canceling a capture invalidates late permission/transcript work",
-    "negative_controls": "New HTTP and WebSocket disable tests failed against original hooks; retained logs. Real installed 1.0.4 captured while Disabled, as independently reported by Surface acceptance.",
-    "source_checks": "138 frontend files, 1001 tests passed; production frontend build passed on Linux, 2026-10-03. Controlled browser APIs, not physical microphone qualification.",
-    "installed_candidate": "pending; this repair is not in Windows diagnostic run 37093358491",
+    "scope": "Local audio pause preserves decoded content; UI seek converts seconds to REST milliseconds",
+    "negative_controls": "Original playback loop failed all three pause contracts (four assertion failures); original seek failed three nonzero conversions. Real FFmpeg 3-second PCM probe paused 3.5 seconds: original delivered 3840 of 576000 bytes; corrected delivered all 576000 bytes exactly, with 144000 frames and no decode error. Fake sink only, not audible output.",
+    "python_checks": "All 83 public Python contracts passed on Linux after installing required test dependencies; earlier missing-dependency errors retained.",
+    "frontend_checks": "Final combined source includes the Disabled Voice repair: 138 frontend test files, 1005 tests passed; production build passed on Linux. No physical audio or installed-candidate claim.",
+    "installed_candidate": "pending",
     "release_or_deployment": "not_established"
   }
 }

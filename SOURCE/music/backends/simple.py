@@ -179,13 +179,9 @@ class SimpleBackend(BaseBackend):
             self._paused = True
             if self._simulate_only:
                 return
-            # LP-8 fix: Do NOT call stream.stop() or clear _resume_event.
-            # The playback loop keeps draining FFmpeg stdout during pause
-            # (preventing pipe starvation) and writes silence to the
-            # sounddevice stream (keeping the audio session alive).
-            # The loop checks _paused directly to decide whether to
-            # discard audio data or write it to the output.
-            log_kv(self._logger, "debug", "paused", note="drain-mode")
+            # Keep the output session alive with paced silence while the
+            # playback loop backpressures FFmpeg instead of discarding PCM.
+            log_kv(self._logger, "debug", "paused", note="preserve-pcm")
 
     def resume(self) -> None:
         with self._lock:
@@ -198,7 +194,7 @@ class SimpleBackend(BaseBackend):
             # never stopped.  Clearing _paused is sufficient; the playback
             # loop will switch from silence back to real audio on the next
             # iteration.
-            log_kv(self._logger, "debug", "resumed", note="drain-mode")
+            log_kv(self._logger, "debug", "resumed", note="preserve-pcm")
 
     def stop(self) -> None:
         with self._lock:
