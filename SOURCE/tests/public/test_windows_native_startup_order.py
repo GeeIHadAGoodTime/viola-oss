@@ -134,13 +134,13 @@ class NativeTitlebarNames(unittest.TestCase):
 
 
 class NativeDownloadContract(unittest.TestCase):
-    def _load(self, choice):
+    def _load(self, choice, path_type=Path):
         from unittest.mock import Mock
         source = ENTRY.parent / 'ui/qt_native/webview_window.py'
         tree = ast.parse(source.read_text())
         node = next((n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == '_handle_download_request'), None)
         self.assertIsNotNone(node, 'Qt profile has no download handler')
-        ns = {'Path': Path, 'QFileDialog': SimpleNamespace(getSaveFileName=Mock(return_value=(choice, ''))),
+        ns = {'Path': path_type, 'QFileDialog': SimpleNamespace(getSaveFileName=Mock(return_value=(choice, ''))),
               'QApplication': SimpleNamespace(activeWindow=lambda: None),
               'QStandardPaths': SimpleNamespace(StandardLocation=SimpleNamespace(DownloadLocation=1), writableLocation=lambda _: '/synthetic-downloads'),
               'QMessageBox': SimpleNamespace(warning=Mock()), 'logger': Mock()}
@@ -159,12 +159,17 @@ class NativeDownloadContract(unittest.TestCase):
         request.cancel.assert_called_once(); request.accept.assert_not_called(); request.setDownloadDirectory.assert_not_called()
 
     def test_selected_path_is_applied_before_accepting(self):
+        from pathlib import PurePosixPath, PureWindowsPath
         from unittest.mock import Mock, call
-        ns = self._load('/synthetic-downloads/renamed.md'); request = Mock()
-        request.downloadFileName.return_value = '../../chat.md'
-        ns['_handle_download_request'](request)
-        self.assertEqual(ns['QFileDialog'].getSaveFileName.call_args.args[2], '/synthetic-downloads/chat.md')
-        calls = request.mock_calls
-        self.assertLess(calls.index(call.setDownloadDirectory('/synthetic-downloads')), calls.index(call.accept()))
-        self.assertLess(calls.index(call.setDownloadFileName('renamed.md')), calls.index(call.accept()))
-        request.cancel.assert_not_called()
+        for path_type in (PurePosixPath, PureWindowsPath):
+            with self.subTest(path_style=path_type.__name__):
+                directory = path_type('/synthetic-downloads')
+                ns = self._load(str(directory / 'renamed.md'), path_type=path_type)
+                request = Mock()
+                request.downloadFileName.return_value = '../../chat.md'
+                ns['_handle_download_request'](request)
+                self.assertEqual(ns['QFileDialog'].getSaveFileName.call_args.args[2], str(directory / 'chat.md'))
+                calls = request.mock_calls
+                self.assertLess(calls.index(call.setDownloadDirectory(str(directory))), calls.index(call.accept()))
+                self.assertLess(calls.index(call.setDownloadFileName('renamed.md')), calls.index(call.accept()))
+                request.cancel.assert_not_called()
