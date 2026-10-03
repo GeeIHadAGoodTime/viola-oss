@@ -1,18 +1,15 @@
 # Source snapshot binding
 
-Source revision: `bf964ed8dc21eaa558aa8dd31119516eb17c5422`.
+Source revision: `f389fb7d98e0166382f0ceb1029334715d105e64`.
 
-The expanded calendar remains outside inert ancestors while its background stage
-is hidden. Sibling dialogs still make the entire underlying card inert. Cancel
-and Escape restore the saved theme and accent after a Customize preview; Save
-preserves the selected theme.
+Retain the original minimatch compatibility patch as a reference so the existing
+immutable private/public source ownership mapping remains valid. npm postinstall
+continues to invoke only the bounded native script. patch-package and its
+vulnerable transitive graph remain absent. No executable code or dependency
+resolution changes here.
 
-Both defects were observed in the signed Windows 1.0.4 product. Regression probes
-fail against the preceding source and pass with these changes. The combined
-frontend passes 138 test files / 992 tests and its production build on Linux.
-Installed-candidate verification and public delivery remain pending.
-
-Dependency inputs are unchanged from f0a3f33074df76269dca76293aa413ed8e1bfb46.
-The frontend inventory retains that revision's successful Windows installation
-(job 111110266035); five Python inventories are unchanged. This is not a new
-runtime or release qualification.
+The paired private mapping change adds only the two newly published script/test
+paths. The original Windows composition failure is preserved as the negative
+control; neither the mapping verifier nor immutable-ownership guard is weakened.
+The preceding chat/calendar/appearance source passed all Windows checks, but
+installed-candidate and public-delivery qualification remain pending.

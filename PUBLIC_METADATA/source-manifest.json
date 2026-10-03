@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "bf964ed8dc21eaa558aa8dd31119516eb17c5422",
-  "sha256": "e680f093c10be66ce6f7f8a76510f740b0b1f1312287e0ebcab3d8139ce92689",
+  "revision": "f389fb7d98e0166382f0ceb1029334715d105e64",
+  "sha256": "b5e1e2dd6e0e5db5583b5c325dd72f4ae0939df652d07924f6545527070691e7",
   "files": [
     {
       "path": ".env.example",
@@ -9107,6 +9107,11 @@
       "path": "ui/react-app/package.json",
       "sha256": "c6c8bfcae858d9b95169788bb1b5ff1ed1fa97a9fff21f59b3debf4862ec2064",
       "bytes": 1249
+    },
+    {
+      "path": "ui/react-app/patches/minimatch+3.1.5.patch",
+      "sha256": "b0e09e056b65e2d805da3011777b6f6b6490f9969bea782895c346c232526c38",
+      "bytes": 543
     },
     {
       "path": "ui/react-app/public/audio-worklets/takeover-pcm-worklet.js",
