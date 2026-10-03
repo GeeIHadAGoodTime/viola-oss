@@ -323,7 +323,13 @@ vi.mock('../components/HelpModal', () => ({
   default: () => <div data-testid="help-modal">Help</div>,
 }));
 vi.mock('../components/CalendarView', () => ({
-  default: () => <div data-testid="calendar-view">Calendar</div>,
+  default: ({ onModalOpenChange }) => <div data-testid="calendar-view">
+    Calendar
+    {onModalOpenChange && <>
+      <button onClick={() => onModalOpenChange(true)}>Expand test calendar</button>
+      <button onClick={() => onModalOpenChange(false)}>Close test calendar</button>
+    </>}
+  </div>,
 }));
 
 // Dynamically import SmartDisplay AFTER mocks are set up
@@ -595,6 +601,22 @@ describe('SmartDisplay', () => {
     const modal = await screen.findByTestId('room-groups-modal');
     expect(modal).toHaveTextContent('add-speaker');
     expect(modal).toHaveTextContent('kitchen');
+  });
+
+  it('keeps the nested expanded calendar outside inert ancestors and restores the stage on close', async () => {
+    const { user, container } = render(<SmartDisplay />);
+    await user.click(screen.getByRole('button', { name: 'Expand test calendar' }));
+    const calendar = screen.getByTestId('calendar-view');
+    expect(calendar.closest('[inert]')).toBeNull();
+    expect(calendar.closest('[aria-hidden="true"]')).toBeNull();
+    expect(container.querySelector('.viola-inner-card [inert]')).not.toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Close test calendar' }));
+    expect(container.querySelector('.viola-inner-card [inert]')).toBeNull();
+    act(() => window.dispatchEvent(new CustomEvent('viola:ui-action', {
+      detail: { action: 'open_settings', payload: {} },
+    })));
+    expect(container.querySelector('.viola-inner-card')).toHaveAttribute('inert');
+    expect(container.querySelector('.viola-inner-card')).toHaveAttribute('aria-hidden', 'true');
   });
 
   it('opens the calendar view from a ui_action event', async () => {

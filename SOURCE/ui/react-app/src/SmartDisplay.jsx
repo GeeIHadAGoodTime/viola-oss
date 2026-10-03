@@ -1004,9 +1004,12 @@ export default function SmartDisplay({ isSpoke = false, micStream = null, room =
   // useCloudLlmConsent below.
   const [cloudLlmConsentOpen, setCloudLlmConsentOpen] = useState(false);
   const [cloudWelcomeOpen, setCloudWelcomeOpen] = useState(false);
-  const anyModalOpen = settingsOpen || queueOpen || historyOpen || roomsOpen || helpOpen
+  const siblingModalOpen = settingsOpen || queueOpen || historyOpen || roomsOpen || helpOpen
     || bugReportOpen || workbenchPanelOpen || !!loginPromptPayload || !!phoneTosPayload
-    || calendarModalOpen || cloudWelcomeOpen || cloudLlmConsentOpen;
+    || cloudWelcomeOpen || cloudLlmConsentOpen;
+  // The calendar is nested inside the card: pause onboarding for it, but
+  // only sibling overlays may make the entire card inert.
+  const anyModalOpen = siblingModalOpen || calendarModalOpen;
 
   // Pause onboarding when any modal is open
   useEffect(() => {
@@ -3141,8 +3144,8 @@ export default function SmartDisplay({ isSpoke = false, micStream = null, room =
           this wrapper never hides the modals themselves. */}
       <div
         className="viola-inner-card"
-        aria-hidden={anyModalOpen ? 'true' : undefined}
-        inert={anyModalOpen ? '' : undefined}
+        aria-hidden={siblingModalOpen ? 'true' : undefined}
+        inert={siblingModalOpen ? '' : undefined}
         style={{
           width: '100%',
           maxWidth: '1400px',
