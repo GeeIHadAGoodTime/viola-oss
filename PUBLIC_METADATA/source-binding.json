@@ -1,13 +1,26 @@
 {
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "ff4e678b8964ab7b98223d48a88573bf3b9709e5bb62729007ee51773ed755d7",
-  "source_tree_sha256": "e1e39723d14c3c2397fe460e9fb2bd2975e1147972be052d5790771a5895ffa0",
-  "source_file_count": 2489,
-  "source_revision": "cc9cde01ebbea40d9ebf8cacad792ff0de996a29",
-  "comparison_public_revision": "8cdaca6646a470f8baf13576d90e984561fa0144",
+  "source_manifest_sha256": "fea71439d0c292acc9e32df66f6bf4b565287dab701a010612134286560a4950",
+  "source_tree_sha256": "9a280f7a96b58a23a781b595d873dc1025f7760a04451f835434905a4644bb0b",
+  "source_file_count": 2490,
+  "source_revision": "2990c41b2eb21baf20713345342040fdb7fb90d3",
+  "comparison_public_revision": "cbfb3d77bb2719f374d267d920e3e9c755ce7c44",
   "changed_source_paths": [
-    "SOURCE/core/constants.py"
+    "SOURCE/intent/tools/media_tools.py",
+    "SOURCE/services/persistence/chat_store.py",
+    "SOURCE/tests/public/test_source_contract.py",
+    "SOURCE/tests/public/test_windows_native_startup_order.py",
+    "SOURCE/ui/api/routes/chat_mode.py",
+    "SOURCE/ui/react-app/src/components/RoomGroupsModal.cloudSurface.test.jsx",
+    "SOURCE/ui/react-app/src/components/stage/modes/chat/ChatMessage.jsx",
+    "SOURCE/ui/react-app/src/components/stage/modes/chat/ChatMode.jsx",
+    "SOURCE/ui/react-app/src/components/stage/modes/chat/ChatMode.test.jsx",
+    "SOURCE/ui/react-app/src/hooks/useRoomGroups.js",
+    "SOURCE/ui/react-app/src/hooks/useViolaApi.test.js",
+    "SOURCE/ui/react-app/src/sentryTransport.test.js",
+    "SOURCE/ui/react-app/vite.config.js",
+    "SOURCE/viola_qt.py"
   ],
   "retained_sboms": [
     {
@@ -49,24 +62,25 @@
   ],
   "input_equivalence": {
     "changed_dependency_inputs": [],
-    "basis": "Only the runtime VIOLA_VERSION constant advances from 1.0.4 to 1.0.5. Dependency manifests, lockfiles, public SOURCE/pyproject.toml, and all six retained SBOM bytes are unchanged. No public source mappings are added."
+    "basis": "Fourteen public source/test paths change for reviewed chat recovery and principal isolation, authoritative room acknowledgments, media/provider regressions, capture-only frontend reporting builds, and a scoped Windows startup GC mitigation. Dependency manifests and lockfiles, the 1.0.5 runtime version, and all six retained SBOM bytes are unchanged. The only added public source path is ui/react-app/src/sentryTransport.test.js."
   },
   "prior_binding": {
-    "public_revision": "8cdaca6646a470f8baf13576d90e984561fa0144",
+    "public_revision": "cbfb3d77bb2719f374d267d920e3e9c755ce7c44",
     "path": "PUBLIC_METADATA/source-binding.json",
-    "git_blob": "726bb0ee381f8f3263d9f1f7b8872ee6570f764b",
-    "sha256": "3dd819e0970a93c6d915d94b04185d343370f3c27eb02a516bf2cfa10e677338",
-    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/8cdaca6646a470f8baf13576d90e984561fa0144/PUBLIC_METADATA/source-binding.json"
+    "git_blob": "d52f7c4d61a4408b886b87df7e8a204053fd717d",
+    "sha256": "5526f12a8880bef0ed0add6d0104905de7751817550312701519b48894ea1c87",
+    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/cbfb3d77bb2719f374d267d920e3e9c755ce7c44/PUBLIC_METADATA/source-binding.json"
   },
   "new_resolution_performed": false,
   "new_advisory_scan_performed": false,
   "new_runtime_qualification_performed": false,
   "qualification": {
-    "scope": "Source-only preparation of the 1.0.5 candidate runtime version; no installer or publication metadata is changed.",
-    "source_integrity": "2489 public source files verified against the regenerated manifest; all six retained SBOM hashes and component counts verified.",
-    "python_checks": "134 shipped public Python contract tests passed on Linux using a disposable profile. Exact-head Windows public CI remains required.",
-    "build_version_checks": "The complete runtime/private-package/Inno version tuple and idempotent build-only preparation passed on a disposable composed copy. Each of four single-field mismatches fails closed.",
-    "installed_candidate": "pending; source preparation does not establish installer qualification",
+    "scope": "Source-level repairs and synthetic regression coverage; no installer, dependency, release, or publication metadata changes.",
+    "source_integrity": "2490 public source files verified against the regenerated manifest; all six retained SBOM hashes and component counts verified.",
+    "frontend_checks": "1171 tests in 146 files passed on the combined surface/reporting source with the existing lock-matched Linux dependency cache. The later two-file Python-only startup mitigation leaves those frontend bytes unchanged. Release-mode Vite build passed with an empty optional DSN override and source-map credentials removed; the unchanged built-artifact reporting gate passed.",
+    "python_checks": "152 public Python tests passed on the final source with a disposable Linux profile, including the scoped startup guard tests. All 21 inventory evidence contracts passed. Exact-head Windows public CI remains required.",
+    "startup_mitigation": "The documented pywin32 issue #691 workaround pauses cyclic GC only around the early win32ui import and restores prior collection state. Synthetic tests cover enabled/disabled state, unchanged thresholds, success and exception outcomes, and helper/platform skips. Installed Windows startup and native GC crash resolution remain unverified.",
+    "installed_candidate": "pending; source tests and frontend builds do not establish installed Windows qualification",
     "release_or_deployment": "not_established"
   }
 }

@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "cc9cde01ebbea40d9ebf8cacad792ff0de996a29",
-  "sha256": "e1e39723d14c3c2397fe460e9fb2bd2975e1147972be052d5790771a5895ffa0",
+  "revision": "2990c41b2eb21baf20713345342040fdb7fb90d3",
+  "sha256": "9a280f7a96b58a23a781b595d873dc1025f7760a04451f835434905a4644bb0b",
   "files": [
     {
       "path": ".env.example",
@@ -2050,8 +2050,8 @@
     },
     {
       "path": "intent/tools/media_tools.py",
-      "sha256": "9c4ac4ac37c9e58a693fd0222ad4b3feffb046734f54f6f2788821333dcaafe8",
-      "bytes": 28990
+      "sha256": "f4f01262d9a5a0881db0fcf4b9700f955eb13da419812e7af112c788cc6dafda",
+      "bytes": 29562
     },
     {
       "path": "intent/tools/memory.py",
@@ -4785,8 +4785,8 @@
     },
     {
       "path": "services/persistence/chat_store.py",
-      "sha256": "c70f44953dfdbfcaf515c3336785872ad9b852bee66b28fdbd8d5e9cdd30db9a",
-      "bytes": 46183
+      "sha256": "6fb6169cb5b983753b2290fff7ce8a0506ee8a67342e29ae894fb72e9e8a2c7d",
+      "bytes": 46772
     },
     {
       "path": "services/persistence/conversation_crypto.py",
@@ -5770,8 +5770,8 @@
     },
     {
       "path": "tests/public/test_source_contract.py",
-      "sha256": "45fdfeb0f951da29318d265d5685008e8ed05c33376cb197a05158ce527b446f",
-      "bytes": 29104
+      "sha256": "91671e3d2821eaef0acb4e6521d0b272dc554c9a6c8b0051c3d20e77bf0f3894",
+      "bytes": 45886
     },
     {
       "path": "tests/public/test_tool_allowlist_contract.py",
@@ -5785,8 +5785,8 @@
     },
     {
       "path": "tests/public/test_windows_native_startup_order.py",
-      "sha256": "65ca4f3a750b752c5557089e638870eec5ea99b686ba61ed7218708948731212",
-      "bytes": 9656
+      "sha256": "476eab0eae6a0664cf65a95ca3e313ebaceefb0a93b01c52a6569806492efd1c",
+      "bytes": 15470
     },
     {
       "path": "themes/viola-dark.css",
@@ -8605,8 +8605,8 @@
     },
     {
       "path": "ui/api/routes/chat_mode.py",
-      "sha256": "f7f00a2e9aea6f56726ae49e9dd4384de3f61d5be7e70a90a68ec314b15a5f2d",
-      "bytes": 39088
+      "sha256": "a5c15ded01f33e78ab15861015b9cdf5b02704dec99139cb4c2df39a983b9cf5",
+      "bytes": 39908
     },
     {
       "path": "ui/api/routes/clock.py",
@@ -9870,8 +9870,8 @@
     },
     {
       "path": "ui/react-app/src/components/RoomGroupsModal.cloudSurface.test.jsx",
-      "sha256": "41acc105156391792c7632bd4e30c47f82cf6476a956feb7a0af6f956b1275e0",
-      "bytes": 4478
+      "sha256": "e2625876f6c87e99a9fd84141e2d5bb1c7c88c14880b9840fff352e4c3a4f491",
+      "bytes": 4458
     },
     {
       "path": "ui/react-app/src/components/RoomGroupsModal.jsx",
@@ -10555,8 +10555,8 @@
     },
     {
       "path": "ui/react-app/src/components/stage/modes/chat/ChatMessage.jsx",
-      "sha256": "ae05419ce82e255344f5043cd216afd6adf269e953e59c53a54acc0b14c601a5",
-      "bytes": 4092
+      "sha256": "be3d69487867fb6f45637b3ded38a3f70a7dc84185abdbfbcae276bd2db0ba39",
+      "bytes": 4124
     },
     {
       "path": "ui/react-app/src/components/stage/modes/chat/ChatMode.consentGate.test.jsx",
@@ -10570,13 +10570,13 @@
     },
     {
       "path": "ui/react-app/src/components/stage/modes/chat/ChatMode.jsx",
-      "sha256": "0a3b6e973eb94f4a76163a45ed100da31f68fe61ddc53cf20dc468231452fd34",
-      "bytes": 39696
+      "sha256": "5e63a033bc2d45e96e8611baef05da2d4670eaa1c44c72652175583b264a547b",
+      "bytes": 53376
     },
     {
       "path": "ui/react-app/src/components/stage/modes/chat/ChatMode.test.jsx",
-      "sha256": "a86bedf8a3070204258643e23edd080b0686411642b7d4fb35cb11d7e064827f",
-      "bytes": 29071
+      "sha256": "033335acc8d7dbb26a84d59e9358b0c2d40e0c34049252add88daef97c80f56a",
+      "bytes": 64774
     },
     {
       "path": "ui/react-app/src/components/stage/modes/chat/ChatSidebar.jsx",
@@ -10890,8 +10890,8 @@
     },
     {
       "path": "ui/react-app/src/hooks/useRoomGroups.js",
-      "sha256": "8f8782537f95931b63fb94c7ec9b97fb7805f8be579e532b2886ec2fcc11dcbf",
-      "bytes": 7218
+      "sha256": "d37976baf26dfea9fd3cc248417a54988d709694cf10723e45f2b93201439cdd",
+      "bytes": 7767
     },
     {
       "path": "ui/react-app/src/hooks/useSettings.js",
@@ -10920,8 +10920,8 @@
     },
     {
       "path": "ui/react-app/src/hooks/useViolaApi.test.js",
-      "sha256": "2e38cc6b7fcc9d1d9766cec0259db1fbe05a8f9197c732b0f48bb2fd37d5d503",
-      "bytes": 9666
+      "sha256": "955fb24c8e45a7a2348cd3d62fd4d361f549c518912f1f78009c12cf76cc07af",
+      "bytes": 17526
     },
     {
       "path": "ui/react-app/src/hooks/useVoice.cancelRecording.test.js",
@@ -11102,6 +11102,11 @@
       "path": "ui/react-app/src/sentryClient.test.js",
       "sha256": "4d0583c1314014f9d946d4b78280745a86f1f6e815d5765d6a5598e409b635c8",
       "bytes": 1819
+    },
+    {
+      "path": "ui/react-app/src/sentryTransport.test.js",
+      "sha256": "463976a858938ca4fe588fb9fffaa2deaed747ffe8d0a4f00e9ffacf30ace891",
+      "bytes": 2193
     },
     {
       "path": "ui/react-app/src/state/uiState.jsx",
@@ -11365,8 +11370,8 @@
     },
     {
       "path": "ui/react-app/vite.config.js",
-      "sha256": "ccf97e502b7aa0d19aeac96dbec902e57ed10e289ad9eee6748e6f6cff64d8f8",
-      "bytes": 10786
+      "sha256": "f7fe8206e18712e11f43d014ac17a0129d5d0892aa1e8bad8dd491f175586f33",
+      "bytes": 8436
     },
     {
       "path": "ui/react-app/vite.harness.config.js",
@@ -11920,8 +11925,8 @@
     },
     {
       "path": "viola_qt.py",
-      "sha256": "7446519ef315c89989a5de71c4a6be5afbb30051228e7baf6caa04434000801c",
-      "bytes": 80024
+      "sha256": "1f5c98e5ebbcb9857d569150af7f6c36d881b0e664a24d8e878dc7d0623fffc8",
+      "bytes": 80630
     },
     {
       "path": "viola_spoke.py",
