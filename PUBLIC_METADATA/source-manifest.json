@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "4ab7e4075128e243bbdf27f48534cefee5f72219",
-  "sha256": "bc73c77d8f70ebef41109ab8c0f4e72b0a9c4bec655c1ba6d383455f56134280",
+  "revision": "0f3a947698d20c2a94dcf41b1f3813bcea96f09f",
+  "sha256": "91379356aad9c245159325bd73e4d173cbbf5673d7ae6318da070d709d7a39c9",
   "files": [
     {
       "path": ".env.example",
@@ -2500,13 +2500,13 @@
     },
     {
       "path": "music/backends/simple.py",
-      "sha256": "dee1e8c372bd139f5b6dc6a15c66129780231b8b83e1e368adcce4cb90385c67",
-      "bytes": 31976
+      "sha256": "c57fb66bbafd450be99ba65916a06e22d23a3fdb4eec5e7c2768c4d2d865d396",
+      "bytes": 31716
     },
     {
       "path": "music/backends/simple_audio.py",
-      "sha256": "42d63fca30cfd5bb7b3dc8b81e32e32c066348e236b59547ba0b067aa42edb20",
-      "bytes": 26376
+      "sha256": "aa1cc71695feeeec1112764ad7001f2e458bec6fe42f77d44dae01f9e8b59162",
+      "bytes": 27059
     },
     {
       "path": "music/backends/simple_av.py",
@@ -5725,8 +5725,8 @@
     },
     {
       "path": "tests/public/test_execution_safety_contract.py",
-      "sha256": "b3e7b4223bd315d842fef1ef5e4dad3b1504d24efddf0663855cbbde66c195b0",
-      "bytes": 36289
+      "sha256": "9658b026392f52e05a9bc86618a3292357b21210e8b639d51921e455f59668a7",
+      "bytes": 40547
     },
     {
       "path": "tests/public/test_phone_call_plan_confirmation.py",
@@ -10845,8 +10845,8 @@
     },
     {
       "path": "ui/react-app/src/hooks/useViolaApi.js",
-      "sha256": "5fb083020d2dde1d486e3cdd687848475c7ae5721a6c7e3ecf92d9ac81c34a55",
-      "bytes": 13224
+      "sha256": "cc9956e88f1d1fc05fa7fb2e7338b2d39892dc9f6c14dd8bdb128bc41bfbb3e9",
+      "bytes": 13344
     },
     {
       "path": "ui/react-app/src/hooks/useViolaApi.shuffleFailure.test.js",
@@ -10855,8 +10855,8 @@
     },
     {
       "path": "ui/react-app/src/hooks/useViolaApi.test.js",
-      "sha256": "b4a8308b0d645c8d9966e5df57895e16463ee298f137bc9c48365251bb60eebe",
-      "bytes": 8772
+      "sha256": "2e38cc6b7fcc9d1d9766cec0259db1fbe05a8f9197c732b0f48bb2fd37d5d503",
+      "bytes": 9666
     },
     {
       "path": "ui/react-app/src/hooks/useVoice.cancelRecording.test.js",
