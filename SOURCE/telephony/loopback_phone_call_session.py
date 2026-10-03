@@ -873,6 +873,7 @@ class LoopbackPhoneCallSession:
                 tts_provider=self.config.tts_provider,
             )
         self._hold_handler, language_handler, self._voicemail_handler = self._build_handlers(llm, record, tts_processor)
+        language_handler.set_context_frame_target(user_aggregator)
         self._register_phone_functions(llm, record, phone_tool_surface.mcp_name_by_llm_name)
         if self._voicemail_handler is not None:
             self._voicemail_handler.set_context_frame_target(user_aggregator)

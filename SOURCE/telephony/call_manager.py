@@ -6636,6 +6636,7 @@ class CallManager:
             async def _on_user_turn_started_floor(_agg: Any, _strategy: Any) -> None:
                 bot_turn_floor_state.note_generation_ended()
 
+            language_handler.set_context_frame_target(user_aggregator)
             voicemail_handler.set_context_frame_target(user_aggregator)
 
             # Assemble the Pipecat pipeline (official Telnyx pattern)
