@@ -70,6 +70,16 @@ describe('CalendarView', () => {
     delete window.viola;
   });
 
+  it('exposes an accessible retry after a calendar load failure', () => {
+    const refetch = vi.fn();
+    calendarHarness.useCalendarEvents.mockReturnValue({
+      ...calendarHarness.useCalendarEvents(), error:'synthetic offline', eventsByDate:{}, refetch,
+    });
+    render(<CalendarView theme={theme} compact />);
+    fireEvent.click(screen.getByRole('button',{name:'Retry loading calendar'}));
+    expect(refetch).toHaveBeenCalledTimes(1);
+  });
+
   it('updates compact events when a day is clicked without expanding the calendar', () => {
     render(<CalendarView theme={theme} compact />);
 

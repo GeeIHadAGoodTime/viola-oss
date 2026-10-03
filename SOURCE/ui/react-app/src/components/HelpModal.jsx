@@ -200,28 +200,22 @@ function TroubleshootingTab() {
         <ul style={{ margin: 0, paddingLeft: 20 }}>
           <li>Check microphone permissions at the OS level.</li>
           <li>Background noise can mask the wake word — try speaking at conversational volume.</li>
-          <li>Adjust wake sensitivity in Settings → Music &amp; Voice if she misses or fires too often.</li>
+          <li>Adjust wake sensitivity in Settings → Voice if she misses or fires too often.</li>
           <li>Hold push-to-talk (Space by default) any time you want to skip wake detection.</li>
         </ul>
       </AccordionItem>
 
-      <AccordionItem title="Training a custom wake word keeps failing">
+      <AccordionItem title="Custom wake-word training is unavailable">
         <ul style={{ margin: 0, paddingLeft: 20 }}>
-          <li>Pick a wake word with 2 to 4 syllables, like &quot;Athena&quot; or &quot;hey buddy&quot;, and avoid words you say often.</li>
-          <li>Speak at a normal indoor volume. Say the whole phrase in about a second and a half, right after you press Record.</li>
-          <li>Record 8 to 10 samples instead of the minimum 5, with a little variation in pace and distance from the mic.</li>
-          <li>
-            A grade of F after training means the automated quality check did not pass. That does not mean your
-            recordings were bad: try training again with the same recordings before you re-record, since the
-            same recordings sometimes pass on a later attempt.
-          </li>
-          <li>If it fails several times in a row for the same wake word, wait a few minutes and try again, or contact support.</li>
+          <li>Custom wake-word training is currently unavailable.</li>
+          <li>Existing local models can still be selected in desktop Settings → Customize.</li>
+          <li>Use the installed Viola wake word or push-to-talk in Settings → Voice.</li>
         </ul>
       </AccordionItem>
 
       <AccordionItem title="Music won't play">
         <ul style={{ margin: 0, paddingLeft: 20 }}>
-          <li>Verify your music provider is connected in Settings → Services.</li>
+          <li>Verify your music provider is connected in Settings → Music.</li>
           <li>For Spotify/YouTube Music, your subscription needs to be active.</li>
           <li>Local music: check that your library folder is set under Settings → Music.</li>
           <li>If a specific track fails, try a different one — region/licensing may apply.</li>
@@ -238,7 +232,7 @@ function TroubleshootingTab() {
 
       <AccordionItem title="Calendar / email isn't responding">
         <ul style={{ margin: 0, paddingLeft: 20 }}>
-          <li>Connect Google in Settings → Services. Calendar and Gmail share one sign-in.</li>
+          <li>Connect your calendar provider in Settings → Connections → Calendar.</li>
           <li>If you revoked access, reconnect to get fresh tokens.</li>
           <li>Try &quot;What&apos;s on my calendar?&quot; — this verifies the read path.</li>
         </ul>
@@ -247,8 +241,8 @@ function TroubleshootingTab() {
       <AccordionItem title="Phone calls fail or get rejected">
         <ul style={{ margin: 0, paddingLeg: 20, paddingLeft: 20 }}>
           <li>Outbound calling requires a paid plan and a verified number.</li>
-          <li>Some businesses block AI-originated calls; Viola identifies herself as AI when enabled in Settings → Preferences.</li>
-          <li>For recording, check Settings → Phone — recording is gated by jurisdiction.</li>
+          <li>Some businesses block AI-originated calls; Viola identifies herself as AI when enabled in Settings → Account → Phone.</li>
+          <li>For recording, check Settings → Account → Phone — recording is gated by jurisdiction.</li>
         </ul>
       </AccordionItem>
 
@@ -262,7 +256,7 @@ function TroubleshootingTab() {
 
       <AccordionItem title="Audio output is wrong / silent">
         <ul style={{ margin: 0, paddingLeft: 20 }}>
-          <li>Set the output device in Settings → Music &amp; Voice.</li>
+          <li>Set the output device in desktop Settings → System → Audio Devices → Speaker.</li>
           <li>System mute / OS-level volume can mask Viola&apos;s output.</li>
           <li>For multiroom hub setups, the hub plays through its own device, not the desktop.</li>
         </ul>

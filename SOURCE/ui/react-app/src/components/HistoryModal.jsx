@@ -4,8 +4,9 @@ import Modal, { secondaryButtonStyle, dangerButtonStyle } from './Modal';
 import { THEME } from '../config';
 import { formatTimeDisplay } from '../utils/timeFormat';
 import { humanizeIdentifier } from '../utils/humanizeIdentifier';
+import SavedChatHistory from './SavedChatHistory';
 
-export default function HistoryModal({ isOpen, onClose, history = [], onClearHistory, timeFormat = 'auto' }) {
+export default function HistoryModal({ isOpen, onClose, history = [], onClearHistory, timeFormat = 'auto', principalKey = 'device' }) {
   const [filter, setFilter] = useState('all');
 
   const filteredHistory = history.filter(item => {
@@ -30,12 +31,12 @@ export default function HistoryModal({ isOpen, onClose, history = [], onClearHis
           {history.length > 0 && (
             <button
               onClick={onClearHistory}
-              aria-label="Clear all chat history"
+              aria-label="Clear recent activity"
               style={dangerButtonStyle}
               onMouseOver={(e) => e.currentTarget.style.backgroundColor = `${THEME.colors.statusRed}4D`}
               onMouseOut={(e) => e.currentTarget.style.backgroundColor = `${THEME.colors.statusRed}33`}
             >
-              Clear History
+              Clear Recent Activity
             </button>
           )}
           <button
@@ -50,6 +51,8 @@ export default function HistoryModal({ isOpen, onClose, history = [], onClearHis
         </>
       }
     >
+      {isOpen && <SavedChatHistory key={principalKey} />}
+      <h3 style={{ color: THEME.colors.textPrimary, fontSize: 16 }}>Recent voice and command activity</h3>
       {/* Filter buttons */}
       {history.length > 0 && (
         <div style={{
@@ -87,7 +90,7 @@ export default function HistoryModal({ isOpen, onClose, history = [], onClearHis
       {filteredHistory.length === 0 ? (
         <div style={{ textAlign: 'center', color: THEME.colors.textMuted, padding: '40px' }}>
           {history.length === 0
-            ? 'No chat history yet. Start a conversation!'
+            ? 'No recent voice or command activity.'
             : 'No items match the selected filter.'
           }
         </div>
@@ -196,6 +199,7 @@ HistoryModal.propTypes = {
   isOpen: PropTypes.bool.isRequired,
   onClose: PropTypes.func.isRequired,
   history: PropTypes.array,
+  principalKey: PropTypes.string,
   onClearHistory: PropTypes.func,
   timeFormat: PropTypes.oneOf(['auto', '12h', '24h']),
 };

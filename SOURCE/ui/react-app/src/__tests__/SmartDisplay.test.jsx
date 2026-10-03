@@ -7,6 +7,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 const { default: QueueModal } = await vi.importActual('../components/QueueModal');
+const { default: HistoryModal } = await vi.importActual('../components/HistoryModal');
 import { act, fireEvent, render, screen, waitFor, within } from '../test/test-utils';
 
 const wsHarness = vi.hoisted(() => ({
@@ -19,6 +20,7 @@ const wsHarness = vi.hoisted(() => ({
 
 const playerHarness = vi.hoisted(() => ({
   overlayCallback: null,
+  chatResponseCallback: null,
   progressCallback: null,
   state: null,
 }));
@@ -29,6 +31,10 @@ const playerHarness = vi.hoisted(() => ({
 const agentBrowserStreamHarness = vi.hoisted(() => ({ calls: [] }));
 const apiHarness = vi.hoisted(() => ({
   submitBugReport: null,
+  savedThreads: [],
+  account: null,
+  realHistory: false,
+  sendCommandStreaming: vi.fn(() => Promise.resolve(null)),
   getQueue: vi.fn(() => Promise.resolve({ok: true, queue: []})),
   playQueueItem: vi.fn(() => Promise.resolve({ok: true})),
   setShuffle: vi.fn(() => Promise.resolve({})),
@@ -90,7 +96,7 @@ vi.mock('../hooks/usePlayerState', () => ({
     setDisplayPriorityCallback: vi.fn(),
     setAgentFrameCallback: vi.fn(),
     setPlaybackCommandCallback: vi.fn(),
-    setChatResponseCallback: vi.fn(),
+    setChatResponseCallback: vi.fn((callback) => { playerHarness.chatResponseCallback = callback; }),
     setCalendarUpdateCallback: vi.fn(),
     setDisconnectCallback: vi.fn(),
     getWsDebug: vi.fn(() => ({})),
@@ -119,7 +125,7 @@ vi.mock('../hooks/useViolaApi', () => ({
       });
     }
     if (url === '/v1/chat/threads' || url.startsWith('/v1/chat/threads?')) {
-      return Promise.resolve({ threads: [] });
+      return Promise.resolve({ threads: apiHarness.savedThreads });
     }
     if (url.startsWith('/v1/chat/threads/')) {
       return Promise.resolve({
@@ -150,6 +156,7 @@ vi.mock('../hooks/useViolaApi', () => ({
     playQueueItem: apiHarness.playQueueItem,
     clearQueue: vi.fn(),
     sendCommand: vi.fn(() => Promise.resolve({ message: 'ok' })),
+    sendCommandStreaming: apiHarness.sendCommandStreaming,
     getWeather: vi.fn(() => Promise.resolve({})),
     submitBugReport: apiHarness.submitBugReport || (apiHarness.submitBugReport = vi.fn(() => Promise.resolve({ bug_ticket_id: 42 }))),
     setShuffle: apiHarness.setShuffle,
@@ -194,6 +201,7 @@ vi.mock('../hooks/useAgentBrowserStream', () => ({
 
 vi.mock('../hooks/useVoice', () => ({
   useVoice: (_callback, options) => {
+    voiceHarness.onCommandResult = _callback;
     voiceHarness.options = options;
     return {
       isListening: false, isRecording: false, isProcessing: false,
@@ -246,7 +254,7 @@ vi.mock('../hooks/useSettings', () => ({
 // SmartDisplay reads the signed-in account identity via useAuth (issue #772);
 // stub it signed-out so these render tests don't require an AuthProvider.
 vi.mock('../hooks/useAuth', () => ({
-  useAuth: () => ({ user: null, status: 'signedOut' }),
+  useAuth: () => ({ user: apiHarness.account, status: apiHarness.account ? 'signedIn' : 'signedOut' }),
 }));
 
 function mockSettingsState() {
@@ -319,7 +327,7 @@ vi.mock('../components/QueueModal', () => ({
   default: () => <div data-testid="queue-modal">Queue</div>,
 }));
 vi.mock('../components/HistoryModal', () => ({
-  default: () => <div data-testid="history-modal">History</div>,
+  default: (props) => apiHarness.realHistory ? <HistoryModal {...props} /> : <div data-testid="history-modal">History</div>,
 }));
 vi.mock('../components/RoomGroupsModal', () => ({
   default: ({ initialTab, prefill }) => (
@@ -346,6 +354,10 @@ let SmartDisplay;
 let agentContextPillCooldownMs;
 
 beforeEach(async () => {
+  apiHarness.savedThreads = [];
+  apiHarness.account = null;
+  apiHarness.realHistory = false;
+  apiHarness.sendCommandStreaming.mockReset().mockResolvedValue(null);
   wsHarness.handler = null;
   wsHarness.handlers = [];
   wsHarness.sent = [];
@@ -616,6 +628,33 @@ describe('SmartDisplay', () => {
     expect(await screen.findByTestId('settings-modal')).toBeInTheDocument();
     // The menu closes once an item is chosen.
     expect(screen.queryByRole('menu', { name: 'Navigation menu' })).not.toBeInTheDocument();
+  });
+
+  it('opens durable history from the real menu, resets on account switch and restores menu focus', async () => {
+    apiHarness.realHistory = true;
+    apiHarness.account = { id: 'account-a' };
+    apiHarness.savedThreads = [{ id: 'thread-a', title: 'Saved account A chat' }];
+    const { user, rerender } = render(<SmartDisplay />);
+    let opener = screen.getByRole('button', { name: 'Open menu' });
+    await user.click(opener);
+    await user.click(screen.getByRole('menuitem', { name: 'Chat History' }));
+    expect(await screen.findByRole('button', { name: 'Saved account A chat' })).toBeInTheDocument();
+    apiHarness.account = { id: 'account-b' };
+    apiHarness.savedThreads = [{ id: 'thread-b', title: 'Saved account B chat' }];
+    rerender(<SmartDisplay />);
+    expect(screen.queryByRole('button', { name: 'Saved account A chat' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: 'Chat History' })).not.toBeInTheDocument();
+    opener = screen.getByRole('button', { name: 'Open menu' });
+    await user.click(opener);
+    await user.click(screen.getByRole('menuitem', { name: 'Chat History' }));
+    expect(await screen.findByRole('button', { name: 'Saved account B chat' })).toBeInTheDocument();
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog', { name: 'Chat History' })).not.toBeInTheDocument();
+    expect(opener).toHaveFocus();
+    await user.click(opener);
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    expect(opener).toHaveFocus();
   });
 
   it('opens Rooms Add Speaker with prefill from a ui_action event', async () => {
@@ -1563,4 +1602,77 @@ describe('upcoming queue controls', () => {
     fireEvent.click(within(row).getByRole('button', {name: 'Play Second future track now'}));
     await waitFor(() => expect(apiHarness.playQueueItem).toHaveBeenCalledWith('next-2'));
   });
+});
+
+
+async function openReviewHistory(user) {
+  if (!screen.queryByRole('dialog', { name: 'Chat History' })) {
+    await user.click(screen.getByRole('button', { name: 'Open menu' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Chat History' }));
+  }
+  return screen.findByRole('dialog', { name: 'Chat History' });
+}
+
+it.each([{ id: 'account-b' }, null])('review: clears prior-account transient history when principal becomes %j', async account => {
+  apiHarness.realHistory = true;
+  apiHarness.account = { id: 'account-a' };
+  const { user, rerender } = render(<SmartDisplay />);
+  await waitFor(() => expect(playerHarness.chatResponseCallback).toBeTypeOf('function'));
+  act(() => { playerHarness.chatResponseCallback({ text: 'Account A confidential synthetic response' }); });
+  let dialog = await openReviewHistory(user);
+  expect(await within(dialog).findByText('Account A confidential synthetic response')).toBeInTheDocument();
+  apiHarness.account = account;
+  rerender(<SmartDisplay />);
+  dialog = await openReviewHistory(user);
+  await within(dialog).findByText('No saved chats yet.');
+  expect(within(dialog).queryByText('Account A confidential synthetic response')).not.toBeInTheDocument();
+});
+
+it('review: preserves voice history across same-principal auth object refreshes', async () => {
+  apiHarness.realHistory = true;
+  apiHarness.account = { id: 'account-a' };
+  const { user, rerender } = render(<SmartDisplay />);
+  act(() => { playerHarness.chatResponseCallback({ text: 'Current principal history' }); });
+  apiHarness.account = { id: 'account-a', user_metadata: { full_name: 'Updated name' } };
+  rerender(<SmartDisplay />);
+  const dialog = await openReviewHistory(user);
+  expect(await within(dialog).findByText('Current principal history')).toBeInTheDocument();
+});
+
+it.each(['websocket', 'voice'])('review: ignores a late old-principal %s callback and its global UI actions', async kind => {
+  apiHarness.realHistory = true;
+  apiHarness.account = { id: 'account-a' };
+  const { user, rerender } = render(<SmartDisplay />);
+  const oldCallback = kind === 'websocket' ? playerHarness.chatResponseCallback : voiceHarness.onCommandResult;
+  apiHarness.account = { id: 'account-b' };
+  rerender(<SmartDisplay />);
+  act(() => { oldCallback({ text: 'Old principal late response', message: 'Old principal late response', ui_action: 'open_settings', tab: 'account' }); });
+  expect(screen.queryByTestId('settings-modal')).not.toBeInTheDocument();
+  act(() => { playerHarness.chatResponseCallback({ text: 'New principal current response' }); });
+  const dialog = await openReviewHistory(user);
+  expect(await within(dialog).findByText('New principal current response')).toBeInTheDocument();
+  expect(within(dialog).queryByText('Old principal late response')).not.toBeInTheDocument();
+});
+
+it('review: ignores a late old-principal streaming completion', async () => {
+  window.viola = {};
+  apiHarness.realHistory = true;
+  apiHarness.account = { id: 'account-a' };
+  let finish;
+  apiHarness.sendCommandStreaming.mockImplementation(() => new Promise(resolve => { finish = resolve; }));
+  const { user, rerender } = render(<SmartDisplay />);
+  await user.keyboard('synthetic{Enter}');
+  expect(apiHarness.sendCommandStreaming).toHaveBeenCalledTimes(1);
+  const oldToken = apiHarness.sendCommandStreaming.mock.calls[0][1];
+  apiHarness.account = { id: 'account-b' };
+  rerender(<SmartDisplay />);
+  await act(async () => {
+    oldToken('Old streaming token');
+    finish({ message: 'Old streaming completion', ui_action: 'open_settings', tab: 'account' });
+  });
+  expect(screen.queryByTestId('settings-modal')).not.toBeInTheDocument();
+  expect(document.querySelector('.viola-bottom-row [role="status"]')).not.toHaveTextContent('Old streaming token');
+  const dialog = await openReviewHistory(user);
+  expect(within(dialog).queryByText('Old streaming completion')).not.toBeInTheDocument();
+  delete window.viola;
 });

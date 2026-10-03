@@ -2,6 +2,7 @@
 /**
  * BottomRow — AI response area, PTT button, spoke chat, and connection status.
  */
+import { useId } from 'react';
 import PropTypes from 'prop-types';
 import { useTranslation } from 'react-i18next';
 import { THEME } from '../../config';
@@ -21,7 +22,13 @@ const WAKE_STATUS_LABELS = {
   processing: 'processing',
   wake_listening: 'listening',
   degraded: 'limited',
-  enabled: 'on',
+  enabled: 'configured',
+  muted: 'muted',
+  paused: 'paused',
+  starting: 'starting',
+  unavailable: 'unavailable',
+  stopped: 'not listening',
+  unknown: 'status unknown',
   off: 'off',
 };
 
@@ -49,6 +56,7 @@ const BottomRow = ({
   connected,
 }) => {
   const { t } = useTranslation();
+  const micStatusId = useId();
 
   return (
     <div className={`viola-bottom-row ${styles.container}`}>
@@ -151,11 +159,16 @@ const BottomRow = ({
           active={voice.isRecording}
           disabled={voice.isBusy && !voice.isRecording}
           wakeStatus={wakeStatus}
+          statusDescriptionId={micStatusId}
           onMouseDown={handlePTTStart}
           onMouseUp={handlePTTEnd}
           onIntent={handleMicIntent}
         />
         <span
+          id={micStatusId}
+          role="status"
+          aria-label="Microphone status"
+          aria-live="polite"
           className={styles.pttLabel}
           style={{
             color: voice.isRecording ? THEME.colors.textSecondary : THEME.colors.textFaint,

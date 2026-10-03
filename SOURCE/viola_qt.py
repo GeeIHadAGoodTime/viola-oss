@@ -667,23 +667,21 @@ if sys.platform == "win32":
     # Linux/macOS have no ProcTap consumer, so they keep Chromium's default
     # out-of-process audio service instead (see comment block above).
     _chromium_stability_flags = "--disable-features=AudioServiceOutOfProcess " + _chromium_stability_flags
-# Linux: QtWebEngine's Chromium render process uses a SUID sandbox helper
-# (chrome-sandbox) that is frequently unavailable or mis-permissioned inside
-# VMs, containers, and AppImage bundles. When it can't initialize, the render
-# process dies on launch and the React UI never paints (the QMainWindow still
-# shows, but its WebEngine surface is blank). Disabling the Chromium sandbox is
-# the standard desktop-AppImage workaround; the app already runs with the
-# invoking user's full privileges, so the sandbox adds little for a local
-# single-user desktop process. Gated to Linux only so Windows/macOS keep the
-# sandbox. Operators who ship a correctly-SUID chrome-sandbox can opt back in by
-# pre-setting QTWEBENGINE_DISABLE_SANDBOX=0 in the environment.
-# NOTE (cross-lane / L3 packaging): the durable fix is to bundle a correctly
-# permissioned chrome-sandbox in the AppImage; this flag is the safe default
-# until that lands and must be re-verified on a real Ubuntu VM.
-if sys.platform.startswith("linux") and os.environ.get("QTWEBENGINE_DISABLE_SANDBOX") != "0":
-    os.environ.setdefault("QTWEBENGINE_DISABLE_SANDBOX", "1")
-    if "--no-sandbox" not in _chromium_stability_flags:
-        _chromium_stability_flags = _chromium_stability_flags + " --no-sandbox"
+# Linux AppImages deliberately default to disabling Chromium's sandbox for
+# compatibility with hosts that restrict unprivileged user namespaces. This
+# lowers renderer isolation and is not equivalent to a sandboxed deployment.
+# Preserve the documented opt-in: QTWEBENGINE_DISABLE_SANDBOX=0 requests Qt's
+# sandbox. Qt 6.8 tests whether this variable EXISTS, not its boolean value, so
+# remove it before Qt initialization rather than passing the literal "0" on.
+# A sandbox-enabled launch still requires compatible host namespace/seccomp
+# support and no caller-supplied --no-sandbox flag; do not fall back silently.
+if sys.platform.startswith("linux"):
+    if os.environ.get("QTWEBENGINE_DISABLE_SANDBOX") == "0":
+        os.environ.pop("QTWEBENGINE_DISABLE_SANDBOX", None)
+    else:
+        os.environ.setdefault("QTWEBENGINE_DISABLE_SANDBOX", "1")
+        if "--no-sandbox" not in _chromium_stability_flags:
+            _chromium_stability_flags = _chromium_stability_flags + " --no-sandbox"
 _existing_flags = os.environ.get("QTWEBENGINE_CHROMIUM_FLAGS", "")
 # Merge: keep any flags already set (e.g. by caller or .env) and append ours
 for _flag in _chromium_stability_flags.split():

@@ -202,6 +202,7 @@ WakeWordTrainingTips.defaultProps = {
 
 export default function WakeWordSection({ theme = THEME }) {
   const [models, setModels] = useState([]);
+  const [modelsLoading, setModelsLoading] = useState(true);
   const [activeModelPath, setActiveModelPath] = useState('');
   const [loadError, setLoadError] = useState(null);
   const [notice, setNotice] = useState(null);
@@ -218,7 +219,7 @@ export default function WakeWordSection({ theme = THEME }) {
   const [tipsOpen, setTipsOpen] = useState(false);
 
   const activeModel = useMemo(
-    () => models.find((model) => model.is_active) || models[0] || null,
+    () => models.find((model) => model.is_active) || null,
     [models],
   );
 
@@ -233,15 +234,21 @@ export default function WakeWordSection({ theme = THEME }) {
       setModels([]);
       setActiveModelPath('');
       setLoadError(null);
+      setModelsLoading(false);
       return;
     }
+    setModelsLoading(true);
     try {
       const data = await wakeRequest('/v1/wake/models');
       setModels(data.models || []);
       setActiveModelPath(data.active_model_path || '');
       setLoadError(null);
     } catch (err) {
+      setModels([]);
+      setActiveModelPath('');
       setLoadError(err?.message || 'Custom wake-words are temporarily unavailable.');
+    } finally {
+      setModelsLoading(false);
     }
   }, []);
 
@@ -362,7 +369,7 @@ export default function WakeWordSection({ theme = THEME }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ model_id: model.model_id, model_path: model.model_path }),
       });
-      setNotice(`Now listening for "${model.name || 'Viola'}".`);
+      setNotice(`Selected "${model.name || 'Viola'}" as your wake word.`);
       setLoadError(null);
       await reloadModels();
     } catch (err) {
@@ -424,8 +431,12 @@ export default function WakeWordSection({ theme = THEME }) {
 
       <div style={{ marginBottom: 18 }}>
         <div style={{ fontSize: 14, color: theme.colors.textSecondary, marginBottom: 6 }}>
-          Currently listening for:{' '}
-          <strong style={{ color: theme.colors.textPrimary }}>{activeModel?.name || 'Viola'}</strong>
+          {modelsLoading ? 'Loading wake word selection…' : loadError ? 'Wake word selection unavailable' : activeModel ? (
+            <>
+              Selected wake word:{' '}
+              <strong style={{ color: theme.colors.textPrimary }}>{activeModel.name}</strong>
+            </>
+          ) : 'No wake word selected'}
         </div>
         {activeModelPath && (
           <div style={{ fontSize: 11, color: theme.colors.textMuted, overflowWrap: 'anywhere' }}>
@@ -529,7 +540,7 @@ export default function WakeWordSection({ theme = THEME }) {
                       fontSize: 10,
                       fontWeight: 700,
                     }}>
-                      Active
+                      Selected
                     </span>
                   )}
                   {!canActivate && (

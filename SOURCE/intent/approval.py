@@ -532,7 +532,7 @@ class ApprovalManager:
             tool_args.get("_approval_confirmation_id") or tool_args.get("confirmation_id") or ""
         ).strip()
         confirmed = tool_args.get("_approval_confirmed", tool_args.get("confirmed"))
-        if confirmation_id == "" or confirmed is not True:
+        if confirmation_id == "" or (confirmed is not True and confirmed is not False):
             return "rejected"
 
         now = time.monotonic()
@@ -552,6 +552,12 @@ class ApprovalManager:
             ):
                 return "rejected"
             store.confirmations.pop(confirmation_id, None)
+
+        # A bound explicit cancellation is terminal, just like acceptance.
+        # Leaving it pending would let a later exact native-tool reissue consume
+        # the cancelled action through the implicit cross-turn approval path.
+        if confirmed is False:
+            return "rejected"
 
         for key in _CONFIRMATION_ARG_KEYS:
             tool_args.pop(key, None)

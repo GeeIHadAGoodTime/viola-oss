@@ -821,10 +821,17 @@ function CalendarViewInner({ theme, timeFormat = 'auto', compact: compactProp = 
   // --- Error state ---
   if (error && Object.keys(eventsByDate).length === 0) {
     return (
-      <div
+      <button
+        type="button"
+        aria-label="Retry loading calendar"
+        disabled={loading}
         onClick={refetch}
         style={{
           padding: '12px 0 4px 0',
+          minHeight: 44,
+          border: 0,
+          background: 'transparent',
+          textAlign: 'left',
           cursor: 'pointer',
           color: colors.textMuted,
           fontSize: 'clamp(12px, 1.5vw, 15px)',
@@ -832,7 +839,7 @@ function CalendarViewInner({ theme, timeFormat = 'auto', compact: compactProp = 
         title="Try again"
       >
         Calendar couldn't load. Try again.
-      </div>
+      </button>
     );
   }
 

@@ -966,6 +966,18 @@ function MemoryPanelContent({ isOpen, onClose }) {
     return undefined;
   }, [isOpen, refresh]);
 
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const handleEscape = (event) => {
+      if (event.key === 'Escape' && !event.defaultPrevented) {
+        event.preventDefault();
+        onClose();
+      }
+    };
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [isOpen, onClose]);
+
   const saveViola = useCallback(async () => {
     setBusy(true);
     setError('');
