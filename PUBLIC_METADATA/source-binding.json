@@ -1,45 +1,13 @@
 {
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "267e6efc6425c9391d11562be6a7b0af2a01f03ceb893fec2cb49b3f9c5acda1",
-  "source_tree_sha256": "9d600709dd79f4b5b1390a501771a127a7ad7f89665cedeccfae7edaff0fbbb5",
+  "source_manifest_sha256": "ff4e678b8964ab7b98223d48a88573bf3b9709e5bb62729007ee51773ed755d7",
+  "source_tree_sha256": "e1e39723d14c3c2397fe460e9fb2bd2975e1147972be052d5790771a5895ffa0",
   "source_file_count": 2489,
-  "source_revision": "1608c78c1b4464b96232c22174c73cac4025ba6b",
-  "comparison_public_revision": "5495051979e2cbeed9c6bf3edabed888b97dbf4d",
+  "source_revision": "cc9cde01ebbea40d9ebf8cacad792ff0de996a29",
+  "comparison_public_revision": "8cdaca6646a470f8baf13576d90e984561fa0144",
   "changed_source_paths": [
-    "SOURCE/intent/agent_executor.py",
-    "SOURCE/intent/approval.py",
-    "SOURCE/scripts/ci/check_bandit_report.py",
-    "SOURCE/tests/public/test_bandit_report_contract.py",
-    "SOURCE/tests/public/test_deferred_confirmation_cancellation.py",
-    "SOURCE/tests/public/test_linux_sandbox_opt_in.py",
-    "SOURCE/tests/public/test_request_tool_surface_boundary.py",
-    "SOURCE/ui/react-app/src/SmartDisplay.jsx",
-    "SOURCE/ui/react-app/src/SmartDisplay.wakeStatus.test.jsx",
-    "SOURCE/ui/react-app/src/__tests__/SmartDisplay.test.jsx",
-    "SOURCE/ui/react-app/src/components/CalendarView.jsx",
-    "SOURCE/ui/react-app/src/components/CalendarView.test.jsx",
-    "SOURCE/ui/react-app/src/components/HelpModal.jsx",
-    "SOURCE/ui/react-app/src/components/HelpModal.test.jsx",
-    "SOURCE/ui/react-app/src/components/HistoryModal.jsx",
-    "SOURCE/ui/react-app/src/components/HistoryModal.test.jsx",
-    "SOURCE/ui/react-app/src/components/MemoryPanel.jsx",
-    "SOURCE/ui/react-app/src/components/MemoryPanel.test.jsx",
-    "SOURCE/ui/react-app/src/components/SavedChatHistory.jsx",
-    "SOURCE/ui/react-app/src/components/SavedChatHistory.review.test.jsx",
-    "SOURCE/ui/react-app/src/components/WakeWordSection.jsx",
-    "SOURCE/ui/react-app/src/components/WakeWordSection.status.test.jsx",
-    "SOURCE/ui/react-app/src/components/topbar/DropdownMenu.jsx",
-    "SOURCE/ui/react-app/src/components/topbar/DropdownMenu.test.jsx",
-    "SOURCE/ui/react-app/src/components/voice/BottomRow.jsx",
-    "SOURCE/ui/react-app/src/components/voice/HandsFreeMicIndicator.jsx",
-    "SOURCE/ui/react-app/src/components/voice/HandsFreeMicIndicator.test.jsx",
-    "SOURCE/ui/react-app/src/components/voice/PTTButton.jsx",
-    "SOURCE/ui/react-app/src/hooks/useBrowserWakeWord.js",
-    "SOURCE/ui/react-app/src/hooks/useBrowserWakeWord.lifecycle.test.jsx",
-    "SOURCE/ui/react-app/src/hooks/useVoice.cancelRecording.test.js",
-    "SOURCE/ui/react-app/src/hooks/useVoice.js",
-    "SOURCE/viola_qt.py"
+    "SOURCE/core/constants.py"
   ],
   "retained_sboms": [
     {
@@ -81,24 +49,24 @@
   ],
   "input_equivalence": {
     "changed_dependency_inputs": [],
-    "basis": "33 public implementation/test paths changed; dependency manifests and locks and all six retained SBOM bytes are unchanged. 13 new public source/test paths require private mapping integration."
+    "basis": "Only the runtime VIOLA_VERSION constant advances from 1.0.4 to 1.0.5. Dependency manifests, lockfiles, public SOURCE/pyproject.toml, and all six retained SBOM bytes are unchanged. No public source mappings are added."
   },
   "prior_binding": {
-    "public_revision": "5495051979e2cbeed9c6bf3edabed888b97dbf4d",
+    "public_revision": "8cdaca6646a470f8baf13576d90e984561fa0144",
     "path": "PUBLIC_METADATA/source-binding.json",
-    "git_blob": "17e3969f2f55589cc616ffdfed314439827cfead",
-    "sha256": "c6db622fc8acd04d91490a43efac2993760daf759bf05300bb38181e7e458194",
-    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/5495051979e2cbeed9c6bf3edabed888b97dbf4d/PUBLIC_METADATA/source-binding.json"
+    "git_blob": "726bb0ee381f8f3263d9f1f7b8872ee6570f764b",
+    "sha256": "3dd819e0970a93c6d915d94b04185d343370f3c27eb02a516bf2cfa10e677338",
+    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/8cdaca6646a470f8baf13576d90e984561fa0144/PUBLIC_METADATA/source-binding.json"
   },
   "new_resolution_performed": false,
   "new_advisory_scan_performed": false,
   "new_runtime_qualification_performed": false,
   "qualification": {
-    "scope": "Consolidated principal isolation, voice teardown, durable history validation, calendar/memory/menu controls, wake status and lifecycle, approval cancellation/schema boundaries, Bandit evidence verdict, and Linux sandbox opt-in correction.",
-    "negative_controls": "Pre-fix failures retained in bounded worker evidence; cross-batch principal removal fails both account-switch cases. Actual shipped Qt 6.8.1 presence predicate verified for Linux override.",
-    "python_checks": "134 shipped public Python tests passed on final Linux source with isolated synthetic profile. First parent rerun omitted profile environment and failed one test on read-only HOME; corrected documented isolated-profile rerun passed. Windows CI pending.",
-    "frontend_checks": "145 files / 1120 tests passed and contributor frontend build passed on consolidated source before disjoint Python-only Linux opt-in addition. No release/source-map upload.",
-    "installed_candidate": "pending; Surface remains held for consolidated batch",
+    "scope": "Source-only preparation of the 1.0.5 candidate runtime version; no installer or publication metadata is changed.",
+    "source_integrity": "2489 public source files verified against the regenerated manifest; all six retained SBOM hashes and component counts verified.",
+    "python_checks": "134 shipped public Python contract tests passed on Linux using a disposable profile. Exact-head Windows public CI remains required.",
+    "build_version_checks": "The complete runtime/private-package/Inno version tuple and idempotent build-only preparation passed on a disposable composed copy. Each of four single-field mismatches fails closed.",
+    "installed_candidate": "pending; source preparation does not establish installer qualification",
     "release_or_deployment": "not_established"
   }
 }

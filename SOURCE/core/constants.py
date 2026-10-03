@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from enum import StrEnum
 
-VIOLA_VERSION = "1.0.4"
+VIOLA_VERSION = "1.0.5"
 
 
 class Status(StrEnum):
