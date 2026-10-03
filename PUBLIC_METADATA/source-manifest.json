@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "2990c41b2eb21baf20713345342040fdb7fb90d3",
-  "sha256": "9a280f7a96b58a23a781b595d873dc1025f7760a04451f835434905a4644bb0b",
+  "revision": "b555d6f9893f429a8a02a94300e8aef5c3cd025b",
+  "sha256": "c6065834c8f39e34d35a66658afdf72a4d90df9387bb959e3668645c4011fbc5",
   "files": [
     {
       "path": ".env.example",
@@ -5415,8 +5415,8 @@
     },
     {
       "path": "telephony/call_manager.py",
-      "sha256": "960bf67c5aac88ec9544f520ec511c3fa8e1568eb3b59cc8415097a2c0eb6a93",
-      "bytes": 371465
+      "sha256": "c6eb928426afd92a85e3d2dae2a7e702c831e76e7c9ba9376538a9541a67f675",
+      "bytes": 371536
     },
     {
       "path": "telephony/call_queue.py",
@@ -5500,8 +5500,8 @@
     },
     {
       "path": "telephony/language_handler.py",
-      "sha256": "db9bf07816be38456c7e8bc1e6209e08ed719866c822c490709f9941e203e5d9",
-      "bytes": 3913
+      "sha256": "70fe4616587a134187cbbc19d694dfe6308d622da91c72de3ce540307fb9e0d0",
+      "bytes": 7037
     },
     {
       "path": "telephony/listen_ws.py",
@@ -5515,8 +5515,8 @@
     },
     {
       "path": "telephony/loopback_phone_call_session.py",
-      "sha256": "d426e858cc3139f39494c36e253686064c9511ce8f278ce2be15fcf177ce356e",
-      "bytes": 122444
+      "sha256": "ce160458f4ba343561b495011e9c1a0262c93424cb2faef671087cf2ce6d8402",
+      "bytes": 122511
     },
     {
       "path": "telephony/loopback_transport.py",
@@ -5752,6 +5752,11 @@
       "path": "tests/public/test_phone_call_plan_confirmation.py",
       "sha256": "d623e2d4c1b81de9020133e5bdb6a7cf0262473b69afc8e0990f59a63c65ea7b",
       "bytes": 8358
+    },
+    {
+      "path": "tests/public/test_phone_language_switch.py",
+      "sha256": "61a57fe645c99884d3435826f5183ca597ad13ab792ce71a79b2aeaca81f4e8a",
+      "bytes": 20832
     },
     {
       "path": "tests/public/test_pipecat_runner_security.py",
