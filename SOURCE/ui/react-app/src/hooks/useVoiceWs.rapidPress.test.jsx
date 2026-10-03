@@ -168,6 +168,46 @@ describe('useVoiceWs rapid-succession PTT (#385): no silent drop during teardown
     vi.useRealTimers();
   });
 
+  it('does not acquire a microphone when capture is disabled', async () => {
+    const hook = renderHook(() => useVoiceWs(vi.fn(), { enabled: false }));
+    act(() => { void hook.result.current.startRecording(); });
+    await act(async () => { for (let i = 0; i < 10; i += 1) await Promise.resolve(); });
+    expect(navigator.mediaDevices.getUserMedia).not.toHaveBeenCalled();
+    expect(wsInstances).toHaveLength(0);
+    hook.unmount();
+  });
+
+  it('releases a delayed microphone grant after voice is disabled', async () => {
+    const stream = makeMediaStream();
+    let release;
+    navigator.mediaDevices.getUserMedia.mockImplementation(() => new Promise(resolve => { release = resolve; }));
+    const hook = renderHook(({ enabled }) => useVoiceWs(vi.fn(), { enabled }), { initialProps: { enabled: true } });
+    act(() => { void hook.result.current.startRecording(); });
+    hook.rerender({ enabled: false });
+    await act(async () => { release(stream); for (let i = 0; i < 10; i += 1) await Promise.resolve(); });
+    expect(stream.getTracks()[0].stop).toHaveBeenCalled();
+    expect(wsInstances).toHaveLength(0);
+    expect(hook.result.current.isBusy).toBe(false);
+    hook.unmount();
+  });
+
+  it('closes a pending voice turn when disabled instead of accepting another capture', async () => {
+    const hook = renderHook(({ enabled }) => useVoiceWs(vi.fn(), { enabled }), { initialProps: { enabled: true } });
+    const ws = await startAndStop(hook);
+    expect(hook.result.current.isBusy).toBe(true);
+    const submitsBeforeCancel = ws.sent.filter(data => typeof data === 'string' && JSON.parse(data).type === 'ptt_stop').length;
+    hook.rerender({ enabled: false });
+    expect(ws.sent.filter(data => typeof data === 'string' && JSON.parse(data).type === 'ptt_stop')).toHaveLength(submitsBeforeCancel);
+    expect(hook.result.current.isProcessing).toBe(false);
+    expect(ws.readyState).toBe(DriverWebSocket.CLOSED);
+    expect(hook.result.current.isBusy).toBe(false);
+    expect(hook.result.current.isRecording).toBe(false);
+    const before = navigator.mediaDevices.getUserMedia.mock.calls.length;
+    await act(async () => { await hook.result.current.startRecording(); });
+    expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledTimes(before);
+    hook.unmount();
+  });
+
   it('exposes a busy state for the ENTIRE guard window, incl. after command_result while TTS is still expected', async () => {
     const hook = renderHook(() => useVoiceWs(vi.fn()));
     const ws = await startAndStop(hook);

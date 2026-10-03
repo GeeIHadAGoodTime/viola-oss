@@ -140,7 +140,7 @@ function _describeWsCloseCode(code, reason) {
 }
 
 export function useVoiceWs(onCommandResult, options = {}) {
-  const { room, executeCommand = true, existingStream } = options;
+  const { room, executeCommand = true, existingStream, enabled = true } = options;
 
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -170,6 +170,9 @@ export function useVoiceWs(onCommandResult, options = {}) {
   const onCommandResultRef = useRef(onCommandResult);
   const executeCommandRef = useRef(executeCommand);
   const roomRef = useRef(room);
+  const enabledRef = useRef(enabled);
+  enabledRef.current = enabled;
+  const captureGenerationRef = useRef(0);
   const responseTimerRef = useRef(null);
   const sessionActiveRef = useRef(false);
   // Pending-teardown timer used AFTER command_result while we wait for the TTS
@@ -289,6 +292,7 @@ export function useVoiceWs(onCommandResult, options = {}) {
       navigator.audioSession.type = 'playback';
     }
     setIsRecording(false);
+    setIsProcessing(false);
   }, [_clearResponseTimer, _clearTtsWaitTimer, _clearPingTimer, _clearIdleCloseTimer]);
 
   // End-of-turn teardown that keeps the WS warm: releases the mic/AudioContext
@@ -580,7 +584,8 @@ export function useVoiceWs(onCommandResult, options = {}) {
     // real job — never overlap two capture sessions on one socket — but do NOT
     // do it silently: `isBusy` is already true and drives a visible busy state on
     // the PTT surface, so a rapid second press is acknowledged, not swallowed.
-    if (sessionActiveRef.current) return;
+    if (!enabledRef.current || sessionActiveRef.current) return;
+    const generation = ++captureGenerationRef.current;
     setError(null);
     setTranscript('');
     sessionActiveRef.current = true;
@@ -595,12 +600,13 @@ export function useVoiceWs(onCommandResult, options = {}) {
       }
 
       let mediaStream;
+      let borrowedStream = false;
       if (existingStreamRef.current && existingStreamRef.current.active
           && existingStreamRef.current.getAudioTracks().some((t) => t.readyState === 'live')) {
         mediaStream = existingStreamRef.current;
-        usingSharedStreamRef.current = true;
+        borrowedStream = true;
       } else {
-        usingSharedStreamRef.current = false;
+        borrowedStream = false;
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
           setError('Microphone access is not available.');
           sessionActiveRef.current = false;
@@ -617,6 +623,11 @@ export function useVoiceWs(onCommandResult, options = {}) {
           },
         });
       }
+      if (!enabledRef.current || generation !== captureGenerationRef.current) {
+        if (!borrowedStream) mediaStream.getTracks().forEach(track => track.stop());
+        return;
+      }
+      usingSharedStreamRef.current = borrowedStream;
       streamRef.current = mediaStream;
 
       const AudioCtor = window.AudioContext || window.webkitAudioContext;
@@ -637,8 +648,10 @@ export function useVoiceWs(onCommandResult, options = {}) {
         // do.
         return;
       }
+      if (!enabledRef.current || generation !== captureGenerationRef.current) return;
       _startAudioCapture(ws, audioContext, mediaStream);
     } catch (err) {
+      if (!enabledRef.current || generation !== captureGenerationRef.current) return;
       // Was showing the browser's raw DOMException text ("Requested device not
       // found"). The HTTP voice path already had human wording for each
       // getUserMedia failure name; describeMicError is that same mapping,
@@ -680,14 +693,17 @@ export function useVoiceWs(onCommandResult, options = {}) {
   }, [_armResponseTimeout, isProcessing, isRecording]);
 
   const cancelRecording = useCallback(() => {
-    const ws = wsRef.current;
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      try { ws.send(JSON.stringify({ type: 'ptt_stop' })); } catch { /* noop */ }
-    }
+    captureGenerationRef.current += 1;
+    // ptt_stop submits buffered speech for command execution. Cancellation
+    // must only close capture/transport, never submit the abandoned turn.
     // An explicit cancel always fully tears down (including the WS) rather
     // than warm-keeping — a deliberate abort, not a normal turn boundary.
     _teardown();
   }, [_teardown]);
+
+  useEffect(() => {
+    if (!enabled && captureGenerationRef.current > 0) cancelRecording();
+  }, [enabled, cancelRecording]);
 
   // Speculative warm-up on an intent signal (mic-button hover/focus, mic
   // permission already granted from a prior turn) — opens the connection
