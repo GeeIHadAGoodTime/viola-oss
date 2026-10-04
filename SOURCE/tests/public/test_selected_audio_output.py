@@ -464,6 +464,163 @@ class SharedSounddeviceOutput(unittest.TestCase):
         new.close.assert_not_called()
         self.assertIs(self.driver._session.stream, new)
 
+    def test_shared_write_failure_detaches_closes_and_propagates(self):
+        self.driver.start(48000, 2, 2)
+        failure = OSError("selected speaker unplugged")
+        self.stream.write.side_effect = failure
+        with self.assertRaises(OSError) as raised:
+            self.driver.write(b"\0\0")
+        self.assertIs(raised.exception, failure)
+        self.assertFalse(self.driver._running)
+        self.assertIsNone(self.driver._session)
+        self.assertEqual(self.driver.runtime_failure["reason"], "output_write_failed")
+        self.assertIsInstance(self.driver.runtime_failure["since_epoch"], float)
+        exposed = self.driver.runtime_failure
+        exposed["reason"] = "caller mutation"
+        self.assertEqual(self.driver.runtime_failure["reason"], "output_write_failed")
+        self.stream.abort.assert_called_once()
+        self.stream.close.assert_called_once()
+        with self.assertRaisesRegex(RuntimeError, "output write failed"):
+            self.driver.write(b"\0\0")
+        self.driver.stop()
+        self.stream.write.assert_called_once()
+        self.stream.close.assert_called_once()
+        self.sd.RawOutputStream.assert_called_once()
+
+    def test_shared_successful_restart_clears_write_failure(self):
+        self.driver.start(48000, 2, 2)
+        self.stream.write.side_effect = OSError("unplugged")
+        with self.assertRaises(OSError):
+            self.driver.write(b"\0\0")
+        new = types.SimpleNamespace(start=Mock(), write=Mock(), abort=Mock(), close=Mock())
+        self.sd.RawOutputStream.return_value = new
+        self.driver.start(48000, 2, 2)
+        self.assertIsNone(self.driver.runtime_failure)
+        self.driver.write(b"\0\0")
+        new.write.assert_called_once()
+
+    def test_shared_failed_restart_does_not_clear_write_failure(self):
+        self.driver.start(48000, 2, 2)
+        self.stream.write.side_effect = OSError("unplugged")
+        with self.assertRaises(OSError):
+            self.driver.write(b"\0\0")
+        failure = self.driver.runtime_failure
+        new = types.SimpleNamespace(start=Mock(side_effect=OSError("still missing")), abort=Mock(), close=Mock())
+        self.sd.RawOutputStream.return_value = new
+        with self.assertRaises(OSError):
+            self.driver.start(48000, 2, 2)
+        self.assertEqual(self.driver.runtime_failure, failure)
+        self.assertFalse(self.driver._running)
+        new.close.assert_called_once()
+
+    def test_shared_old_write_failure_cannot_poison_new_stream(self):
+        from audio_core.output import sounddevice_output
+
+        entered, release = threading.Event(), threading.Event()
+        errors = []
+
+        def old_write(*args):
+            entered.set()
+            release.wait(2)
+            raise OSError("old device vanished")
+
+        def write():
+            try:
+                self.driver.write(b"\0\0")
+            except OSError as exc:
+                errors.append(exc)
+
+        self.stream.write.side_effect = old_write
+        self.driver.start(48000, 2, 2)
+        old = self.stream
+        worker = threading.Thread(target=write)
+        worker.start()
+        self.addCleanup(lambda: (release.set(), worker.join(3)))
+        self.assertTrue(entered.wait(2))
+        with patch.object(sounddevice_output, "_STOP_DRAIN_TIMEOUT_SEC", 0.01):
+            self.driver.stop()
+        new = types.SimpleNamespace(start=Mock(), write=Mock(), abort=Mock(), close=Mock())
+        self.sd.RawOutputStream.return_value = new
+        self.driver.start(48000, 2, 2)
+        release.set()
+        worker.join(2)
+        self.assertFalse(worker.is_alive())
+        self.assertEqual(len(errors), 1)
+        self.assertIsNone(self.driver.runtime_failure)
+        self.assertTrue(self.driver._running)
+        self.assertIs(self.driver._session.stream, new)
+        old.close.assert_called_once()
+        new.close.assert_not_called()
+
+    def test_shared_failed_writer_waits_for_other_writer_before_close(self):
+        entered, release = threading.Event(), threading.Event()
+
+        def blocked_write(*args):
+            entered.set()
+            release.wait(2)
+
+        self.stream.write.side_effect = blocked_write
+        self.driver.start(48000, 2, 2)
+        worker = threading.Thread(target=self.driver.write, args=(b"\0\0",))
+        worker.start()
+        self.addCleanup(lambda: (release.set(), worker.join(3)))
+        self.assertTrue(entered.wait(2))
+        self.stream.write.side_effect = OSError("second writer sees disconnect")
+        with self.assertRaises(OSError):
+            self.driver.write(b"\0\0")
+        self.stream.close.assert_not_called()
+        release.set()
+        worker.join(2)
+        self.assertFalse(worker.is_alive())
+        self.stream.close.assert_called_once()
+
+    def test_shared_two_failed_writers_close_exactly_once(self):
+        ready = threading.Barrier(2)
+        errors = []
+
+        def fail_write(*args):
+            ready.wait(timeout=2)
+            raise OSError("device disappeared")
+
+        def write():
+            try:
+                self.driver.write(b"\0\0")
+            except OSError as exc:
+                errors.append(exc)
+
+        self.stream.write.side_effect = fail_write
+        self.driver.start(48000, 2, 2)
+        workers = [threading.Thread(target=write) for _ in range(2)]
+        for worker in workers:
+            worker.start()
+        for worker in workers:
+            worker.join(3)
+            self.assertFalse(worker.is_alive())
+        self.assertEqual(len(errors), 2)
+        self.assertEqual(self.driver.runtime_failure["reason"], "output_write_failed")
+        self.assertFalse(self.driver._running)
+        self.stream.abort.assert_called_once()
+        self.stream.close.assert_called_once()
+
+    def test_playback_loop_stops_consuming_after_output_failure(self):
+        from audio_core.output.playback_loop import SpokePlaybackLoop
+
+        self.driver.start(48000, 2, 2)
+        self.stream.write.side_effect = OSError("unplugged")
+        stop = threading.Event()
+        calls = []
+
+        def next_chunk():
+            calls.append(1)
+            if len(calls) > 1:
+                stop.set()
+            return types.SimpleNamespace(pcm_data=b"\0\0")
+
+        loop = SpokePlaybackLoop(types.SimpleNamespace(get_next_chunk=next_chunk), self.driver)
+        loop._run(stop)
+        self.assertEqual(len(calls), 1)
+        self.stream.write.assert_called_once()
+
 
 class PipelineOutputHealth(unittest.TestCase):
     def run_pipeline(self, failure=None):
@@ -501,6 +658,7 @@ class PipelineOutputHealth(unittest.TestCase):
             stack.enter_context(patch.object(SingletonManager, "get", return_value=manager))
             stack.enter_context(patch("audio_core.output.get_output_driver", return_value=SounddeviceAudioOutput()))
             stack.enter_context(patch.object(pipeline, "_initial_clock_sync", return_value=0))
+            stack.enter_context(patch.object(pipeline, "_output_health_driver", None, create=True))
             stack.enter_context(
                 patch.dict(
                     pipeline._output_health_state, {"state": "not_started", "provider": None, "fallback_reason": None}
@@ -508,9 +666,21 @@ class PipelineOutputHealth(unittest.TestCase):
             )
             app = types.SimpleNamespace(state=types.SimpleNamespace())
             result = pipeline.setup_device_pipeline(app, "synthetic-room")
+            if failure == "write":
+                stream.write.side_effect = OSError("selected speaker unplugged")
+                with self.assertRaises(OSError):
+                    app.state.device_output_driver.write(b"\0\0")
             snapshot = pipeline.get_output_health()
             api_health = health._check_audio_output_health()
-            if failure:
+            if failure == "write":
+                self.assertIsNotNone(result)
+                self.assertEqual(snapshot["state"], "error")
+                self.assertEqual(snapshot["fallback_reason"], "output_write_failed")
+                self.assertEqual(api_health["status"], "error")
+                self.assertEqual(api_health["reason"], "output_write_failed")
+                self.assertIn("stopped", api_health["message"])
+                stream.close.assert_called_once()
+            elif failure:
                 self.assertIsNone(result)
                 self.assertEqual(snapshot["state"], "error")
                 self.assertEqual(snapshot["fallback_reason"], "output_start_failed")
@@ -540,6 +710,29 @@ class PipelineOutputHealth(unittest.TestCase):
 
     def test_pipeline_success_remains_healthy(self):
         self.run_pipeline()
+
+    def test_pipeline_midplay_disconnect_and_health_api_are_truthful(self):
+        self.run_pipeline("write")
+
+    def test_replaced_driver_failure_does_not_poison_new_health(self):
+        from audio_core.streaming import pipeline_wiring as pipeline
+
+        old = types.SimpleNamespace(runtime_failure={"reason": "output_write_failed", "since_epoch": 123.0})
+        new = types.SimpleNamespace(runtime_failure=None)
+        with (
+            patch.dict(pipeline._output_health_state),
+            patch.object(pipeline, "_output_health_driver", None),
+        ):
+            pipeline._set_output_health("ok", provider="OldDriver", driver=old)
+            self.assertEqual(pipeline.get_output_health()["state"], "error")
+            self.assertEqual(pipeline.get_output_health()["since_epoch"], 123.0)
+            pipeline._set_output_health("ok", provider="NewDriver", driver=new)
+            snapshot = pipeline.get_output_health()
+            self.assertEqual(snapshot["state"], "ok")
+            self.assertEqual(snapshot["provider"], "NewDriver")
+            pipeline._set_output_health("not_started")
+            self.assertIsNone(pipeline._output_health_driver)
+            self.assertEqual(pipeline.get_output_health()["state"], "not_started")
 
     def test_starting_health_is_not_a_playback_success(self):
         from audio_core.streaming import pipeline_wiring as pipeline

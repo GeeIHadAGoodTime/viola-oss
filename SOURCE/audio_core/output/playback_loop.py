@@ -199,6 +199,9 @@ class SpokePlaybackLoop:
                         self._driver.write(chunk.pcm_data)
                     except Exception:
                         logger.exception("Error writing chunk to output driver")
+                        # A failed output must not keep consuming scheduled
+                        # audio as if it played. Recovery requires a new run.
+                        break
                 else:
                     # Nothing due -- sleep briefly to avoid busy-waiting
                     time.sleep(self._poll_interval)

@@ -210,7 +210,11 @@ def _check_audio_output_health() -> dict[str, Any]:
 
         if state == "error":
             return _health_error(
-                "Device audio output could not start; check the selected output device.",
+                (
+                    "Device audio output stopped after a playback failure; check the selected output device."
+                    if snapshot.get("fallback_reason") == "output_write_failed"
+                    else "Device audio output could not start; check the selected output device."
+                ),
                 provider=snapshot.get("provider"),
                 reason=snapshot.get("fallback_reason") or "output_start_failed",
                 since_epoch=snapshot.get("since_epoch"),

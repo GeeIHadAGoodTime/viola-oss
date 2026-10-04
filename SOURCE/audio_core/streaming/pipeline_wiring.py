@@ -249,6 +249,8 @@ _output_health_state: dict[str, Any] = {
     "provider": None,
     "fallback_reason": None,
 }
+_output_health_driver: Any = None
+_output_health_lock = threading.Lock()
 
 
 def _set_output_health(
@@ -256,16 +258,20 @@ def _set_output_health(
     *,
     provider: str | None = None,
     fallback_reason: str | None = None,
+    driver: Any = None,
 ) -> None:
     """Update the output-driver health snapshot.
 
     Called from the device setup path before and after driver startup.  Kept module-private; external consumers go through
     :func:`get_output_health`.
     """
-    _output_health_state["state"] = state
-    _output_health_state["since_epoch"] = time.time()
-    _output_health_state["provider"] = provider
-    _output_health_state["fallback_reason"] = fallback_reason
+    global _output_health_driver
+    with _output_health_lock:
+        _output_health_driver = driver
+        _output_health_state["state"] = state
+        _output_health_state["since_epoch"] = time.time()
+        _output_health_state["provider"] = provider
+        _output_health_state["fallback_reason"] = fallback_reason
 
 
 def get_output_health() -> dict[str, Any]:
@@ -280,7 +286,21 @@ def get_output_health() -> dict[str, Any]:
         fallback_reason: Machine-readable reason for a silent fallback or
                   startup failure; ``None`` for normal operation.
     """
-    return dict(_output_health_state)
+    with _output_health_lock:
+        snapshot = dict(_output_health_state)
+        driver = _output_health_driver
+    # Startup success says nothing about a later unplug/write failure. Read
+    # only the currently published driver's locked, per-session failure state;
+    # a writer returning from a replaced stream cannot poison this snapshot.
+    if snapshot["state"] in {"ok", "degraded"}:
+        failure = getattr(driver, "runtime_failure", None)
+        if isinstance(failure, dict) and failure:
+            snapshot.update(
+                state="error",
+                fallback_reason=failure["reason"],
+                since_epoch=failure["since_epoch"],
+            )
+    return snapshot
 
 
 def _component_is_running(component: Any) -> bool:
@@ -1393,6 +1413,7 @@ def setup_device_pipeline(
             "degraded" if output_fallback_reason else "ok",
             provider=type(driver).__name__,
             fallback_reason=output_fallback_reason,
+            driver=driver,
         )
 
         app.state.device_receiver = receiver
