@@ -1,26 +1,13 @@
 {
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "fea71439d0c292acc9e32df66f6bf4b565287dab701a010612134286560a4950",
-  "source_tree_sha256": "9a280f7a96b58a23a781b595d873dc1025f7760a04451f835434905a4644bb0b",
-  "source_file_count": 2490,
-  "source_revision": "2990c41b2eb21baf20713345342040fdb7fb90d3",
-  "comparison_public_revision": "cbfb3d77bb2719f374d267d920e3e9c755ce7c44",
+  "source_manifest_sha256": "c53c93e222e5c2b0aee739a92ba039e5f29ba341d125a6842f1cb9d7ea36c033",
+  "source_tree_sha256": "fc99425b0bcfdf91686cabb0bd7d9cd287f80a27ff6362e41f1ff60a9fed319a",
+  "source_file_count": 2491,
+  "source_revision": "ff81985ff9e1eca32052d0bff9e66d1e58e285e1",
+  "comparison_public_revision": "dda409a83955dcbd60edaf5fbf7d9459f88f63ff",
   "changed_source_paths": [
-    "SOURCE/intent/tools/media_tools.py",
-    "SOURCE/services/persistence/chat_store.py",
-    "SOURCE/tests/public/test_source_contract.py",
-    "SOURCE/tests/public/test_windows_native_startup_order.py",
-    "SOURCE/ui/api/routes/chat_mode.py",
-    "SOURCE/ui/react-app/src/components/RoomGroupsModal.cloudSurface.test.jsx",
-    "SOURCE/ui/react-app/src/components/stage/modes/chat/ChatMessage.jsx",
-    "SOURCE/ui/react-app/src/components/stage/modes/chat/ChatMode.jsx",
-    "SOURCE/ui/react-app/src/components/stage/modes/chat/ChatMode.test.jsx",
-    "SOURCE/ui/react-app/src/hooks/useRoomGroups.js",
-    "SOURCE/ui/react-app/src/hooks/useViolaApi.test.js",
-    "SOURCE/ui/react-app/src/sentryTransport.test.js",
-    "SOURCE/ui/react-app/vite.config.js",
-    "SOURCE/viola_qt.py"
+    "SOURCE/tests/public/test_phone_language_switch.py"
   ],
   "retained_sboms": [
     {
@@ -62,25 +49,29 @@
   ],
   "input_equivalence": {
     "changed_dependency_inputs": [],
-    "basis": "Fourteen public source/test paths change for reviewed chat recovery and principal isolation, authoritative room acknowledgments, media/provider regressions, capture-only frontend reporting builds, and a scoped Windows startup GC mitigation. Dependency manifests and lockfiles, the 1.0.5 runtime version, and all six retained SBOM bytes are unchanged. The only added public source path is ui/react-app/src/sentryTransport.test.js."
+    "basis": "One existing public test changes only import-fixture isolation for normal unittest discovery after the installed Pipecat package was already imported. The three reviewed phone runtime files, source assertions, workflows, dependencies, runtime version 1.0.5, all frontend bytes and all six retained SBOMs are unchanged."
   },
   "prior_binding": {
-    "public_revision": "cbfb3d77bb2719f374d267d920e3e9c755ce7c44",
+    "public_revision": "dda409a83955dcbd60edaf5fbf7d9459f88f63ff",
     "path": "PUBLIC_METADATA/source-binding.json",
-    "git_blob": "d52f7c4d61a4408b886b87df7e8a204053fd717d",
-    "sha256": "5526f12a8880bef0ed0add6d0104905de7751817550312701519b48894ea1c87",
-    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/cbfb3d77bb2719f374d267d920e3e9c755ce7c44/PUBLIC_METADATA/source-binding.json"
+    "git_blob": "d831446b1ae6db55042b3afb0866fb3ffddc6b97",
+    "sha256": "3710423f25a3b049fc22c64c4e73510134ef890fedb60e5a8d59a4507334d175",
+    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/dda409a83955dcbd60edaf5fbf7d9459f88f63ff/PUBLIC_METADATA/source-binding.json"
   },
   "new_resolution_performed": false,
   "new_advisory_scan_performed": false,
   "new_runtime_qualification_performed": false,
   "qualification": {
-    "scope": "Source-level repairs and synthetic regression coverage; no installer, dependency, release, or publication metadata changes.",
-    "source_integrity": "2490 public source files verified against the regenerated manifest; all six retained SBOM hashes and component counts verified.",
-    "frontend_checks": "1171 tests in 146 files passed on the combined surface/reporting source with the existing lock-matched Linux dependency cache. The later two-file Python-only startup mitigation leaves those frontend bytes unchanged. Release-mode Vite build passed with an empty optional DSN override and source-map credentials removed; the unchanged built-artifact reporting gate passed.",
-    "python_checks": "152 public Python tests passed on the final source with a disposable Linux profile, including the scoped startup guard tests. All 21 inventory evidence contracts passed. Exact-head Windows public CI remains required.",
-    "startup_mitigation": "The documented pywin32 issue #691 workaround pauses cyclic GC only around the early win32ui import and restores prior collection state. Synthetic tests cover enabled/disabled state, unchanged thresholds, success and exception outcomes, and helper/platform skips. Installed Windows startup and native GC crash resolution remain unverified.",
-    "installed_candidate": "pending; source tests and frontend builds do not establish installed Windows qualification",
+    "scope": "Test-only module-isolation follow-up to the reviewed phone-language source correction; no runtime or workflow changes and no installed/live qualification.",
+    "source_integrity": "2491 source files verified against the regenerated manifest; all six retained SBOM hashes/component counts verified; only one test path and the source manifest/binding change from the preceding published head.",
+    "python_checks": "The exact normal unittest discovery command passes 167 tests without a source Pipecat PYTHONPATH. With installed Pipecat and phone adapters preloaded, phone-first and phone-last full-suite orders each pass 167 tests plus restoration checks. Independent review repeats these and preloaded/absent/failed-setup restoration probes: scoped modules, parent attributes and sys.path restore exactly, unrelated imports persist, and no model modules leak. Existing Linux Python 3.12 tooling and unused-import boundaries are used; no dependencies or model assets were acquired.",
+    "phone_control_checks": "Real pinned Kokoro/TTS/AI classes, actual settings frames, real queued transcription observer, and real user/assistant context aggregators were exercised. Two Spanish transcriptions during an inert in-flight English stream commit exactly one Spanish context; barge-in preserves it and subsequent synthesis forwards es. The old output-context route is a failing negative control. All eight locales, missing/no-op adapters/targets, before-append rollback, after-append retention, cancellation and retry are covered.",
+    "model_and_turn_boundaries": "Model construction, file acquisition and audio generation are inert boundaries; queued aggregation uses external turn strategies rather than constructing VAD/SmartTurn models. No actual phone call, model inference, native resampling, voice/language audio pairing or hardware playback was performed.",
+    "lint": "Black checks pass on all four source files. Whole-file Ruff retains the same three unrelated baseline findings in the two large phone builders; no added-line findings. The language handler passes the existing repository rules.",
+    "frontend_checks": "Frontend bytes are unchanged; no new frontend build or test qualification is claimed for this Python-only correction.",
+    "installed_candidate": "pending; multilingual installed/live phone audio remains unverified",
+    "prior_hosted_checks": "On preceding head dda409a83955dcbd60edaf5fbf7d9459f88f63ff, Windows frontend and dependency inventories passed, while python-contracts failed the strict source-origin setup assertion after earlier tests cached installed Pipecat. The assertion is preserved; new exact-head hosted checks remain pending.",
+    "exact_head_hosted_checks": "pending",
     "release_or_deployment": "not_established"
   }
 }
