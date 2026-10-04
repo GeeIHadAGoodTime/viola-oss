@@ -43,6 +43,7 @@ strictly better than freeing memory out from under a live PortAudio call.
 from __future__ import annotations
 
 import threading
+import time
 from typing import Any
 
 import numpy as np
@@ -112,13 +113,18 @@ class SounddeviceAudioOutput(AudioOutputDriver):
         self._lock = threading.Lock()
         self._session: _StreamSession | None = None
         self._running = False
+        self._runtime_failure: dict[str, Any] | None = None
         self._channels: int = 1
         self._sample_width: int = 2
 
     # -- AudioOutputDriver interface ----------------------------------------
 
     def start(self, sample_rate: int, channels: int, sample_width: int) -> None:
-        import sounddevice as sd  # deferred to avoid import failure at module level
+        from audio_core.device_validation import resolve_output_device
+        from audio_core.portaudio_guard import sounddevice_guard
+
+        with sounddevice_guard():
+            import sounddevice as sd  # deferred to avoid import failure at module level
 
         with self._lock:
             if self._running:
@@ -127,17 +133,27 @@ class SounddeviceAudioOutput(AudioOutputDriver):
             self._channels = channels
             self._sample_width = sample_width
 
-            stream = sd.RawOutputStream(
-                samplerate=sample_rate,
-                channels=channels,
-                dtype="int16",
-            )
-            stream.start()
+            device = resolve_output_device(sd)
+            with sounddevice_guard():
+                stream = sd.RawOutputStream(
+                    samplerate=sample_rate,
+                    channels=channels,
+                    dtype="int16",
+                    device=device,
+                )
+            try:
+                stream.start()
+            except Exception:
+                # No writer can own an unpublished session. Release the opened
+                # handle on start failure, without replaying on another speaker.
+                self._close_stream(stream)
+                raise
             # A session from a previous stop() may still be alive with a wedged
             # writer inside it; it owns its own close and is deliberately not
             # touched here.  This driver simply moves on to the new stream.
             self._session = _StreamSession(stream)
             self._running = True
+            self._runtime_failure = None
 
         logger.info(
             "SounddeviceAudioOutput started: rate=%d channels=%d width=%d",
@@ -150,6 +166,8 @@ class SounddeviceAudioOutput(AudioOutputDriver):
         with self._lock:
             session = self._session
             if not self._running or session is None:
+                if self._runtime_failure is not None:
+                    raise RuntimeError("Audio output write failed; restart the output device before writing")
                 return
             # Registering under the lock is what makes stop() correct: once
             # stop() has detached the session, no writer can get here, and any
@@ -163,9 +181,26 @@ class SounddeviceAudioOutput(AudioOutputDriver):
             samples = np.frombuffer(data, dtype=np.int16)
             session.stream.write(samples)
         except Exception:
+            with self._lock:
+                # A detached old writer may return after start() publishes a
+                # new session. It owns its close, never the new stream's state.
+                if self._session is session:
+                    self._session = None
+                    self._running = False
+                    self._runtime_failure = {"reason": "output_write_failed", "since_epoch": time.time()}
+                # Other writers can still be inside this session. The last
+                # writer to leave closes it through the existing ownership rule.
+                session.close_pending = True
             logger.exception("SounddeviceAudioOutput write error")
+            raise
         finally:
             self._writer_finished(session)
+
+    @property
+    def runtime_failure(self) -> dict[str, Any] | None:
+        """Return a privacy-safe failure snapshot until a successful restart."""
+        with self._lock:
+            return dict(self._runtime_failure) if self._runtime_failure is not None else None
 
     def stop(self) -> None:
         with self._lock:

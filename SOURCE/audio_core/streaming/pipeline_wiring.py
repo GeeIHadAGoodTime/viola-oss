@@ -23,16 +23,18 @@ import threading
 import time
 from typing import TYPE_CHECKING, Any
 
+from fastapi import Request
+
 from auth.ip_utils import extract_client_ip
 from contracts.api_response import failure_response, success_response
 from core.constants import DEFAULT_API_PORT, TIMEOUT_MEDIUM
 from core.logging_config import get_logger
-from fastapi import Request
 
 if TYPE_CHECKING:
+    from fastapi import FastAPI
+
     from audio_core.capture.base import AudioCaptureProvider
     from audio_core.sync_engine import SyncEngine
-    from fastapi import FastAPI
     from ui.api.routes.audio_stream import AudioStreamManager
 
     from .audio_tee import AudioTee
@@ -236,6 +238,8 @@ def get_capture_health() -> dict[str, Any]:
 # States:
 #   "not_started" â€” device pipeline has not been set up yet (default,
 #                   also the state for source/hub-only setups).
+#   "starting"    — output setup is in progress, not yet verified.
+#   "error"       — output could not start; no working driver is published.
 #   "ok"          â€” a real output driver is active.
 #   "degraded"    â€” NullAudioOutput is active because no real output
 #                   driver was available; PCM is being silently discarded.
@@ -245,6 +249,8 @@ _output_health_state: dict[str, Any] = {
     "provider": None,
     "fallback_reason": None,
 }
+_output_health_driver: Any = None
+_output_health_lock = threading.Lock()
 
 
 def _set_output_health(
@@ -252,33 +258,49 @@ def _set_output_health(
     *,
     provider: str | None = None,
     fallback_reason: str | None = None,
+    driver: Any = None,
 ) -> None:
     """Update the output-driver health snapshot.
 
-    Called from the device setup path right after ``get_output_driver()``
-    resolves.  Kept module-private; external consumers go through
+    Called from the device setup path before and after driver startup.  Kept module-private; external consumers go through
     :func:`get_output_health`.
     """
-    _output_health_state["state"] = state
-    _output_health_state["since_epoch"] = time.time()
-    _output_health_state["provider"] = provider
-    _output_health_state["fallback_reason"] = fallback_reason
+    global _output_health_driver
+    with _output_health_lock:
+        _output_health_driver = driver
+        _output_health_state["state"] = state
+        _output_health_state["since_epoch"] = time.time()
+        _output_health_state["provider"] = provider
+        _output_health_state["fallback_reason"] = fallback_reason
 
 
 def get_output_health() -> dict[str, Any]:
     """Return the current output-driver health snapshot.
 
     Fields:
-        state: "not_started" | "ok" | "degraded"
+        state: "not_started" | "starting" | "error" | "ok" | "degraded"
         since_epoch: ``time.time()`` at the last state transition.
         provider: Name of the output driver class (e.g.
                   "SounddeviceAudioOutput" or "NullAudioOutput"); ``None``
                   before device pipeline setup.
-        fallback_reason: Set when state == "degraded" -- machine-readable
-                  reason the driver is a silent fallback (e.g.
-                  "sounddevice_unavailable"); ``None`` otherwise.
+        fallback_reason: Machine-readable reason for a silent fallback or
+                  startup failure; ``None`` for normal operation.
     """
-    return dict(_output_health_state)
+    with _output_health_lock:
+        snapshot = dict(_output_health_state)
+        driver = _output_health_driver
+    # Startup success says nothing about a later unplug/write failure. Read
+    # only the currently published driver's locked, per-session failure state;
+    # a writer returning from a replaced stream cannot poison this snapshot.
+    if snapshot["state"] in {"ok", "degraded"}:
+        failure = getattr(driver, "runtime_failure", None)
+        if isinstance(failure, dict) and failure:
+            snapshot.update(
+                state="error",
+                fallback_reason=failure["reason"],
+                since_epoch=failure["since_epoch"],
+            )
+    return snapshot
 
 
 def _component_is_running(component: Any) -> bool:
@@ -1344,7 +1366,7 @@ def setup_device_pipeline(
             state = sync_engine.get_state()
             scheduler.set_hub_time_offset(state.hub_time_offset)
 
-        event_bus.subscribe(SyncPulse, _on_sync_pulse)
+        sync_subscription = event_bus.subscribe(SyncPulse, _on_sync_pulse)
 
         sync_engine.start()
         app.state.device_sync_engine = sync_engine
@@ -1360,18 +1382,39 @@ def setup_device_pipeline(
                 type(driver).__name__,
                 output_fallback_reason,
             )
+        _set_output_health("starting", provider=type(driver).__name__)
+        playback_loop = None
+        try:
+            driver.start(
+                sample_rate=SAMPLE_RATE,
+                channels=CHANNELS,
+                sample_width=BYTES_PER_SAMPLE,
+            )
+            playback_loop = DevicePlaybackLoop(scheduler, driver)
+            playback_loop.start()
+        except Exception:
+            _set_output_health("error", provider=type(driver).__name__, fallback_reason="output_start_failed")
+            # Nothing from this failed setup should keep consuming PCM or
+            # clock probes. Driver stop retains its own in-flight close rules.
+            for component in (playback_loop, driver, sync_engine, receiver):
+                if component is not None:
+                    try:
+                        component.stop()
+                    except Exception:
+                        logger.exception("Could not stop component after output startup failure")
+            try:
+                event_bus.unsubscribe(sync_subscription)
+            except Exception:
+                logger.exception("Could not remove clock subscription after output startup failure")
+            if getattr(app.state, "device_sync_engine", None) is sync_engine:
+                app.state.device_sync_engine = None
+            raise
         _set_output_health(
             "degraded" if output_fallback_reason else "ok",
             provider=type(driver).__name__,
             fallback_reason=output_fallback_reason,
+            driver=driver,
         )
-        driver.start(
-            sample_rate=SAMPLE_RATE,
-            channels=CHANNELS,
-            sample_width=BYTES_PER_SAMPLE,
-        )
-        playback_loop = DevicePlaybackLoop(scheduler, driver)
-        playback_loop.start()
 
         app.state.device_receiver = receiver
         app.state.playback_scheduler = scheduler
@@ -1649,7 +1692,7 @@ def _register_sync_offset_endpoint(app: FastAPI) -> None:
     A positive offset means the device is scheduled LATER (behind source).
     A negative offset means the device is AHEAD of the source.
     """
-    import json as _json  # noqa: I001
+    import json as _json
 
     from fastapi import Query
     from fastapi.responses import JSONResponse

@@ -1,13 +1,14 @@
 {
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "63445d718440d564346f2607254c278fd95a2f6f6818c63e670996f6f3eab8b6",
-  "source_tree_sha256": "7e26dc007862352e797f9dfc442caa1d58c112f6ef9d5a1bd6667e39df411b47",
-  "source_file_count": 2497,
-  "source_revision": "512c66fbc5ec0d1b17fd6acdec2f2e71aeb94419",
-  "comparison_public_revision": "9da0a2e5ae7fdb6012cfaafefda953cded769e0c",
+  "source_manifest_sha256": "180e459dc0a6c07a837617261422eb2fcbfd5340b4e6fe5eb4dd345b1fbbf415",
+  "source_tree_sha256": "c27631f0b7003fcb703c8685e2e9756b5beb75ff1f233986b9c5dfef4299a24a",
+  "source_file_count": 2502,
+  "source_revision": "b6eba99343a9b2c26e513f51f42c68e485b83631",
+  "comparison_public_revision": "361fbaa777e7915e74afbe56bd72a813675fb0f5",
   "changed_source_paths": [
-    "SOURCE/mcp_servers/core_tools/server.py"
+    "SOURCE/tests/public/test_selected_audio_output.py",
+    "SOURCE/tests/public/test_speech_volume_wiring.py"
   ],
   "retained_sboms": [
     {
@@ -49,27 +50,87 @@
   ],
   "input_equivalence": {
     "changed_dependency_inputs": [],
-    "basis": "Only 47 parameter-help strings in the reviewed public core tool server change. Tool names, schemas apart from those descriptions, handlers, validation, permissions and cancellation behavior are unchanged. All dependencies, workflows, licences, notices, model assets, vendor provenance and six prior resolved inventories remain byte-identical. No new resolution, advisory scan or installed qualification."
+    "basis": "Exactly two existing public test files change. All 2500 other SOURCE files, including all production code, remain byte-identical to public head 361fbaa777e7915e74afbe56bd72a813675fb0f5. Dependency inputs, workflows, licences, notices, model assets, vendor provenance, tool schemas and all six retained SBOMs are unchanged. No new dependency resolution, advisory scan or runtime qualification is claimed."
   },
   "prior_binding": {
-    "public_revision": "9da0a2e5ae7fdb6012cfaafefda953cded769e0c",
+    "public_revision": "361fbaa777e7915e74afbe56bd72a813675fb0f5",
     "path": "PUBLIC_METADATA/source-binding.json",
-    "git_blob": "cf4cc63e3f3c32e6f6c438a6116b0ad7db18af6e",
-    "sha256": "7b08278eca2928f1233279d68c90d8ecc93063cd419f42caf6e95674a3fd9ae3",
-    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/9da0a2e5ae7fdb6012cfaafefda953cded769e0c/PUBLIC_METADATA/source-binding.json"
+    "git_blob": "d7182ba9f2e07814fc69c2f3514cee515dd4aedb",
+    "sha256": "d596b3d45148c2f8a67d80bc27ad54ca55564141af8e5ef8738f23b2b9bed796",
+    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/361fbaa777e7915e74afbe56bd72a813675fb0f5/PUBLIC_METADATA/source-binding.json"
   },
   "new_resolution_performed": false,
   "new_advisory_scan_performed": false,
   "new_runtime_qualification_performed": false,
   "qualification": {
-    "scope": "Bounded description compaction preserving intended 76-tool surface and the original strict 62000-byte tool-array budget. No model-quality, full safety suite, native Windows or installed/live qualification.",
-    "source_integrity": "Exactly one reviewed public source path and canonical manifest/binding change. All 2497 source files remain inventoried. Dependency/model/licence/notice/vendor/workflow files and six SBOMs are unchanged.",
-    "behavior": "47 before/after description pairs independently reviewed for every instructional fact, including required confirmation and workbench fallback title. All other AST and converted schema structure remains identical.",
-    "checks": "18 focused tests pass; independent negative controls reject bloat, added/removed tools, missing contacts/daily_briefing, strictness loss and legacy Gmail. SDK MockTransport confirms actual tools-array serialization without network calls.",
-    "budget": "76 tools serialize to 61977 UTF-8 bytes under unchanged strict <62000 cap; 23 bytes margin. Bound excludes HTTP envelope and is not a tokenizer budget.",
-    "integration_limit": "Private count fixture and Windows Safety runtime composition routing are required separately. Do not copy public runtime into private shadows.",
+    "scope": "Public test-harness import and module-cache isolation correction only. This does not change production behavior or establish installed, native-device, physical-audio, provider, release or deployment qualification.",
+    "source_integrity": "Exactly two existing public test leaves change on the complete 2529-leaf public tree. The source-only commit preserves 2527 other leaves and all 2500 other SOURCE files. The unchanged canonical generator binds all 2502 source files to the actual new source commit. After the two required metadata replacements, 2525 other public leaves and all six SBOMs remain byte-identical.",
+    "behavior": "Load the adjacent speech fixture by its exact file path so both unittest discovery and importlib-style runners can resolve it. Restore only mocked module keys while retaining real lazy imports, and restore the two transient mock-dependent consumer caches and their parent package attributes. Preserve all original 120 public test methods and assertions; add four focused module-isolation guards.",
+    "checks": "The focused public unittest scopes pass: 51 selected-output methods and 73 speech/settings/module-isolation/network methods. The four added guards cover exceptional cleanup, nested overrides, real-import retention, transient consumer cleanup and actual fixture cache/package restoration. Independent review audited 75 mock scopes without surviving synthetic bindings. Scoped Ruff, Black, strict patch replay and original-assertion preservation checks pass. These overlapping scopes are not additive evidence of full aggregate or runtime acceptance.",
+    "lineage": "The prior published qualification below is retained verbatim as historical evidence for 361fbaa777e7915e74afbe56bd72a813675fb0f5. The current correction concerns the public test harness and does not convert earlier incomplete or rejected qualification into a pass.",
+    "exact_head_hosted_checks": "pending for the new bound test-only correction head",
     "installed_candidate": "pending",
-    "exact_head_hosted_checks": "pending",
-    "release_or_deployment": "not_established"
+    "release_or_deployment": "not_established",
+    "prior_source_qualification": {
+      "scope": "Focused synthetic shared-output failure, concurrent-writer lifecycle, pipeline health and existing speech/settings regression qualification. No native audio device, installed app, physical audibility or release/deployment qualification.",
+      "source_integrity": "The complete official public archive matches all 2529 Git blobs at 7af826b. Exactly five reviewed source/test leaves change; the source-only tree preserves 2524 unrelated Git leaves. The canonical unchanged generator inventories all 2502 source files with the actual new source commit. Canonical final binding verification covers all 2502 source files and all six unchanged SBOMs. After two metadata replacements, 2522 unrelated Git leaves remain unchanged.",
+      "behavior": "Propagate shared output write errors; detach only the current failed stream, defer close until its last writer exits, and prevent stale writers from changing a restarted stream. Failed outputs reject subsequent writes, and the playback loop stops consuming scheduled PCM. Pipeline health observes the active driver failure snapshot and reports output_write_failed. A successful restart clears failure; an unsuccessful restart retains it. Existing selected-device resolution and fallback rules are unchanged; failed audio is not replayed on another speaker.",
+      "checks": "51 selected-output and 69 speech/settings methods pass using the documented public unittest route. An independent reviewer repeated the public 120 and six existing private health cases through the unchanged private tester/config. Supplemental extracted pytest runs passed 126 combined public/private health methods and 11 existing private device-loss/pipeline setup methods; those extracted runs bypassed private conftest and are not canonical private aggregate proof. Eight new assertions reject exact original source, with one additional expected missing-new-state error. Ruff 0.14.6, Black 26.5.1 py311/120, strict-whitespace replay, exact changed bytes and reverse application pass.",
+      "retained_failure": "One initial extracted private lifecycle run failed a timer-vs-stop test which schedules release at the same 0.5-second timeout as stop and cancels the timer immediately afterward. Original stop and writer-close methods are unchanged; original nine and candidate eleven lifecycle checks subsequently passed, as did new deterministic two-writer and stale-writer controls. No private test was altered, skipped or weakened.",
+      "tool_schema_retention": "Tool schema and cap bytes are unchanged from qualified 7af826b: the prior retained measurement is 76 tools / 61977 UTF-8 tools-array bytes under the unchanged strict 62000-byte cap. This correction adds or removes no tool.",
+      "public_aggregate_limit": "Full candidate discovery initially ran 315 tests with 27 missing-import/setup errors. After authorized test-only dependency installation, candidate ran 329 tests and exact original 7af826b ran 320 tests; both ended with the same one assertion failure and four errors. The incomplete, non-release-pinned local environment lacked Pipecat distribution metadata, hit an unwritable default cache, and encountered a repeated-module-load error causing empty synthetic speech. Earlier isolated public 120-method evidence remains scoped to its recorded environment. No full local aggregate, native or installed qualification is claimed; exact successor hosted checks remain required.",
+      "prior_hosted_checks": "Historical public head 7af826b completed all eight hosted checks successfully (source run 37193295745; inventory run 37193295734). Those results do not qualify this new successor. Earlier rejected Windows evidence is retained as history under prior_selected_output_qualification.",
+      "output_scope_limit": "Qt, VLC, embedded/browser and native pyttsx3 playback remain separate unresolved paths. Standalone spoke constructor-selected output remains unchanged. Historical numeric identities cannot be recovered after historical PyAudio renumbering. Open streams do not immediately reroute. Device-change timeout may still refresh despite undrained transient playback. Actual hot-unplug, re-enumeration, packaged playback, physical audibility and complete issue4544 closure remain unqualified.",
+      "persistence_limit": "No cross-store transaction or rollback guarantee. Credentials can persist independently when a mixed request returns False; ordinary mixed user/global updates can commit the user store before a global failure. Direct externally mutable manager.settings writes remain outside managed copy-on-write paths. Explicit staging with save_immediately=False retains its existing semantics. Existing loader selection is unchanged.",
+      "integration_limit": "Private adoption must consume the resulting public pin through canonical ownership composition, preserve the five already required new source mappings and accumulate the existing phone/settings/speaker corrections. Do not copy runtime changes into private shadows or revert a newer pin. Exact successor hosted checks and private integration remain pending.",
+      "prior_selected_output_qualification": {
+        "scope": "Focused synthetic integration of selected-output behavior and Windows-compatible speech-test isolation on the existing approved speech-volume/settings persistence source. No native Windows, physical audio, installed startup, full public/composed aggregate or whole issue4544 acceptance.",
+        "source_integrity": "Exactly fourteen reviewed source paths change, four are added, and the canonical manifest and binding are regenerated for this actual source revision. All 2502 source files are inventoried. The source-only stage retains 2515 unrelated existing Git leaves; after two canonical metadata replacements, the final bound tree retains 2513 unchanged existing leaves and all six SBOMs from public27.",
+        "selected_output": "Save new output selections as name plus host-API identities. Resolve legacy PyAudio indices through their owning binding, and resolve sounddevice devices fresh at Kokoro utterance, simple music stream, and shared RawOutputStream start. Default/missing/ambiguous choices follow existing default fallback. Explicit open/start/mid-play failures do not authorize replay on another speaker. Shared pipeline open/start failures publish error/output_start_failed and clean up initialized components. Serialize Kokoro convenience play/wait without holding the lifecycle lock for the utterance.",
+        "checks": "The combined ordered 131 shipped tests pass on Linux and with the actual CPython TCP socketpair fallback. 206 distinct focused Python methods pass in the integration runs, including independent settings/output/guard controls; additionally 57 frontend tests, 18 schema tests and two API-reset probes pass. Scoped runtime/new-test Ruff and Black, ESLint, atomic-JSON and sync-bridge checks pass under recorded commands. Broad default Ruff over all changed Python files still reports four unchanged pre-existing E701 statements in the existing execution-safety module. Original65 speech assertions remain preserved plus four new guard methods. Independent component mutation negatives are retained.",
+        "windows_guard": "Only the stdlib socketpair code object, its exact client/listener, loopback address, stream family/type and listener bound endpoint can use saved connect. Unrelated application loopback, external targets, create_connection and connect_ex remain denied. This is faithful CPython fallback execution on Linux, not a genuine Windows runner result.",
+        "tool_schema_retention": "Prior description compaction remains byte-identical. 76 tools serialize to 61977 UTF-8 tools-array bytes under the unchanged strict <62000 cap; 23 bytes of margin. This is neither an HTTP-envelope limit nor a model-token budget.",
+        "persistence_limit": "No cross-store transaction or rollback guarantee. Credentials can persist independently when a mixed request returns False; ordinary mixed user/global updates can commit the user store before a global failure. Direct externally mutable manager.settings writes remain outside managed copy-on-write paths. Explicit staging with save_immediately=False retains its existing semantics. Existing loader selection is unchanged.",
+        "output_scope_limit": "Qt, VLC, embedded/browser and native pyttsx3 playback remain separate unresolved paths. Standalone spoke constructor-selected output remains unchanged. Historical numeric identities cannot be recovered after historical PyAudio renumbering. Open streams do not immediately reroute. Shared midstream write errors retain catch-and-log behavior, and device-change timeout may still refresh despite undrained transient playback. Hot-unplug, re-enumeration, packaged playback, physical audibility and complete issue4544 closure remain unqualified.",
+        "public_aggregate_limit": "The unfiltered final local public aggregate ran327 tests with one setup error because pyloudnorm is absent in PhoneLanguageSwitch. No other failures were found; this remains an incomplete aggregate, not full acceptance.",
+        "native_windows_evidence": "The prior public27 Windows Python3.11.9 run reported 296 tests,21 failures,2 errors. It remains rejected evidence; this synthetic repair does not replace a new genuine exact-head Windows run.",
+        "integration_limit": "Adopt the resulting public pin with the canonical ownership composition. Add the four new paths in the source-plan inventory alongside the already required speech regression mapping. Do not copy public runtime code into private shadows.",
+        "prior_speech_settings_qualification": {
+          "scope": "Focused synthetic settings-to-speech gain, quiet-hours and acknowledged settings persistence repair, including bounded save/reset/import paths. No complete public/composed aggregate, real Postgres, model inference, packaged startup, physical playback/device, Windows installer, installed-app or live qualification.",
+          "source_integrity": "Exactly five reviewed public source paths and canonical manifest/binding change. All 2498 source files are inventoried, including the new speech/settings regression. Dependencies, workflows, licences, notices, model assets, vendor provenance and all six retained SBOMs remain unchanged.",
+          "behavior": "Use current saved volume and quiet-hours policy at speech execution; preserve explicit overrides and mute; carry isolated request context to fallback worker; cache unity PCM and apply current gain at playback. Publish managed immediate global/per-user snapshots only after accepted persistence. Fallback success requires all requested non-secret values in the JSON snapshot selected by the existing loader; full replacement paths also prove removed non-secret keys are absent. Stage reset/import privately and keep authenticated imports scoped to the active user. Persist and publish the same retained import blob even if a slow DB save exceeds cache TTL.",
+          "checks": "On the actual merged PR26 source tree plus the reviewed successor: 65 shipped speech/settings methods, 17 existing speech methods, 11 prior independent controls and 21 renewed independent settings controls pass (114 methods total), plus two API reset probes and 18 tool-schema tests. Ruff, Black, atomic-JSON and sync-bridge gates pass. Six independent mutation negatives include the expired staging-cache fault. Synthetic provider/model/audio boundaries and no model calls.",
+          "tool_schema_retention": "Prior description compaction remains byte-identical. 76 tools serialize to 61977 UTF-8 tools-array bytes under the unchanged strict <62000 cap; 23 bytes of margin. This is neither an HTTP-envelope limit nor a model-token budget.",
+          "persistence_limit": "No cross-store transaction or rollback guarantee. Credentials can persist independently when a mixed request returns False; ordinary mixed user/global updates can commit the user store before a global failure. Direct externally mutable manager.settings writes remain outside managed copy-on-write paths. Explicit staging with save_immediately=False retains its existing semantics. Existing loader selection is unchanged.",
+          "integration_limit": "Private adoption must consume the resulting public pin and map the new regression through the canonical ownership list. Do not copy public runtime corrections into private shadows.",
+          "installed_candidate": "pending",
+          "exact_head_hosted_checks": "pending",
+          "release_or_deployment": "not_established"
+        },
+        "installed_candidate": "pending",
+        "exact_head_hosted_checks": "pending",
+        "release_or_deployment": "not_established"
+      },
+      "installed_candidate": "pending",
+      "exact_head_hosted_checks": "pending",
+      "release_or_deployment": "not_established"
+    }
+  },
+  "reviewed_source_patch": {
+    "test_harness_sha256": "49fb9d3634ab630fc4549ab4e42da997ee03cb0a0b1e0cc1ad97a7301db33242",
+    "prior_source_patch": {
+      "combined_sha256": "3ef2e0f5c645dd3b307710dcf2e7ca390432821a8066e800ed827e4638c219ef",
+      "prior_selected_output": {
+        "combined_sha256": "4fcf83691fda7ba6b8c1dd86a3d4426ce552c167880bfae701160ee7c7e082b8",
+        "selected_output_sha256": "81958e85dd4f0642e56adbb05d34688ba8dab42a8d337570b06c55dae8d6753f",
+        "windows_test_guard_sha256": "43e86eb1e40c7e544422f314ded17bd9fae4cb9e1ae0fb846f43701f0888e2ba",
+        "prior_speech_settings": {
+          "version": 2,
+          "combined_sha256": "a9bebc0d7eb9c222db435b86b6cfd4903c7be887499bdbb3853b7476c65eafe8",
+          "settings_delta_sha256": "4962ef08d2189e6e6a8ea1242e10c6e4f4bd6e09f077e42c56d43e04bf6ff865",
+          "original_volume_sha256": "4e4f0252436f746bcd95d133e33bbc20eb30af2e83d27d5dc56ed62e82be43d0"
+        }
+      }
+    }
   }
 }

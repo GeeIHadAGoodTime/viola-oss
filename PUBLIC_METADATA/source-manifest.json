@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "512c66fbc5ec0d1b17fd6acdec2f2e71aeb94419",
-  "sha256": "7e26dc007862352e797f9dfc442caa1d58c112f6ef9d5a1bd6667e39df411b47",
+  "revision": "b6eba99343a9b2c26e513f51f42c68e485b83631",
+  "sha256": "c27631f0b7003fcb703c8685e2e9756b5beb75ff1f233986b9c5dfef4299a24a",
   "files": [
     {
       "path": ".env.example",
@@ -255,8 +255,8 @@
     },
     {
       "path": "audio_core/device_validation.py",
-      "sha256": "a05c58d326c7fc267c151948411257a4facc09a55cde24a247c699f0f5f29d2d",
-      "bytes": 10314
+      "sha256": "c129fff1083644167c3cc8377b992b81c7e69454aa5575611e33daf74e2393c0",
+      "bytes": 15525
     },
     {
       "path": "audio_core/events.py",
@@ -305,13 +305,13 @@
     },
     {
       "path": "audio_core/output/playback_loop.py",
-      "sha256": "9e76b1baf53b9bd51d00ea9a2e14e978c82ee28534b81cc4eeff33bbc5597fcb",
-      "bytes": 8199
+      "sha256": "33f28020cb11fc975ad9914091e40511505c6a670a7d6fae00a238c026aaeb22",
+      "bytes": 8383
     },
     {
       "path": "audio_core/output/sounddevice_output.py",
-      "sha256": "af9375e318f4cec0c9373a95b559f1cc586aedd975c8b70b49af1f5e8863ca89",
-      "bytes": 10090
+      "sha256": "007059422d747f54724750297a579f64b8b417d1d0da33ab5cb0e8b825e9bffd",
+      "bytes": 11868
     },
     {
       "path": "audio_core/portaudio_guard.py",
@@ -435,8 +435,8 @@
     },
     {
       "path": "audio_core/streaming/pipeline_wiring.py",
-      "sha256": "bfca06bed40dc3fe4a8bcb103c57773d1f5f8baa368886ff60ce120bef97f975",
-      "bytes": 88215
+      "sha256": "24e617478202cd25721868cc8273c73df689250505336593b7c6a83071bc0095",
+      "bytes": 90323
     },
     {
       "path": "audio_core/streaming/playback_scheduler.py",
@@ -2505,8 +2505,8 @@
     },
     {
       "path": "music/backends/simple_audio.py",
-      "sha256": "aa1cc71695feeeec1112764ad7001f2e458bec6fe42f77d44dae01f9e8b59162",
-      "bytes": 27059
+      "sha256": "beed4cb4533dbd441e99a0b36cd6015f22a6a2749276094dc85f93aa35b2b5ec",
+      "bytes": 27685
     },
     {
       "path": "music/backends/simple_av.py",
@@ -5740,8 +5740,8 @@
     },
     {
       "path": "tests/public/test_execution_safety_contract.py",
-      "sha256": "9658b026392f52e05a9bc86618a3292357b21210e8b639d51921e455f59668a7",
-      "bytes": 40547
+      "sha256": "7129bfddb65c45e2e7a049018a40a6434614c952928ade88cccb95c2528ac7e8",
+      "bytes": 41072
     },
     {
       "path": "tests/public/test_kokoro_chunking.py",
@@ -5789,9 +5789,19 @@
       "bytes": 2733
     },
     {
+      "path": "tests/public/test_selected_audio_output.py",
+      "sha256": "944e23e3221176fe35799a428e89479ae4a7bce27e236e5186ffa81c587bdee6",
+      "bytes": 35677
+    },
+    {
       "path": "tests/public/test_source_contract.py",
       "sha256": "91671e3d2821eaef0acb4e6521d0b272dc554c9a6c8b0051c3d20e77bf0f3894",
       "bytes": 45886
+    },
+    {
+      "path": "tests/public/test_speech_volume_wiring.py",
+      "sha256": "61d07fab425c0a685ad51e34df88c6a639c0401c5a82dc74660c60b820330cf3",
+      "bytes": 79627
     },
     {
       "path": "tests/public/test_step_logger_status.py",
@@ -8715,8 +8725,8 @@
     },
     {
       "path": "ui/api/routes/health.py",
-      "sha256": "82662b417fa5311003406cbe6d77c99ba876dcbbca6e98f6de6bbc21043961a6",
-      "bytes": 24473
+      "sha256": "2154cb84f0f399f5f9e9ab5573e9c22ff0dd5f8a56f0fed3acb1ab5eb2951f12",
+      "bytes": 25377
     },
     {
       "path": "ui/api/routes/intent_market.py",
@@ -9940,8 +9950,13 @@
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.jsx",
-      "sha256": "75e6b6a9c732623ea37c54e03bf4cdd47d8bd7fa80dd5ca760625d161ff4d21c",
-      "bytes": 197464
+      "sha256": "04aa42bbdb52e3adf8a474e5cefe459b3a60f18a73d8c4effb2b92fa7f008c30",
+      "bytes": 197586
+    },
+    {
+      "path": "ui/react-app/src/components/SettingsModal.outputDevice.test.jsx",
+      "sha256": "19ce4310b69ffcd552a7d6dea9b47e93f501601b7054b4f9959fe3f8ee58e7f8",
+      "bytes": 3129
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.sidebar.test.jsx",
@@ -11209,6 +11224,16 @@
       "bytes": 844
     },
     {
+      "path": "ui/react-app/src/utils/audioOutputSelection.js",
+      "sha256": "e19ddb2cc606d4f7c93c3e04f7b2b82e2de05c57cad22b6624f09e3cd95f0239",
+      "bytes": 2157
+    },
+    {
+      "path": "ui/react-app/src/utils/audioOutputSelection.test.js",
+      "sha256": "4ea8f272ed303ffb38976144aae0fea7e1688e57f6801ac0f353c72d3b8be718",
+      "bytes": 3129
+    },
+    {
       "path": "ui/react-app/src/utils/backendSurface.js",
       "sha256": "17383ea5e1508f10c39f4a2c83e8bcdb8983c47525a640ded3d14b21919e3bd0",
       "bytes": 374
@@ -11500,8 +11525,8 @@
     },
     {
       "path": "ui/settings_api.py",
-      "sha256": "59b2bebdad0c50239eedad8510cdc1b87580bba126264f6a16f46984b282d7e4",
-      "bytes": 81096
+      "sha256": "f00c9be2b826c38bdbaf08afb267ff3abd55ac550e61a595ff32bef3c72787a2",
+      "bytes": 81780
     },
     {
       "path": "ui/settings_effects.py",
@@ -11510,8 +11535,8 @@
     },
     {
       "path": "ui/settings_manager.py",
-      "sha256": "3e984166687797ef9b95f0609aab0607004fbae87eb9c3d6e01e2766bd5bfc0b",
-      "bytes": 151149
+      "sha256": "89db01d87215726803f79154ca7808eb1d6863d49209d98704e8547d6b83c894",
+      "bytes": 160040
     },
     {
       "path": "ui/settings_schema.py",
@@ -12220,8 +12245,8 @@
     },
     {
       "path": "voice/synthesis/engine.py",
-      "sha256": "dba751e9c85410dbf4fef9dba8edca83147f12b07f791977442f065a5ab64afe",
-      "bytes": 14749
+      "sha256": "4932de72512eadf35b57fe64ca4e4d61f7be38d7e16f939db1118e43e5706e48",
+      "bytes": 14905
     },
     {
       "path": "voice/synthesis/factory.py",
@@ -12230,8 +12255,8 @@
     },
     {
       "path": "voice/synthesis/kokoro_engine.py",
-      "sha256": "50748c7ad935f6cab2be690c26c41aa0aab52db620b9e607294f8dd404f2749e",
-      "bytes": 58223
+      "sha256": "55ef5c8f77cc5eaa7266c6f903587cfcbde1f51266b053d9d1605140900a4f40",
+      "bytes": 59449
     },
     {
       "path": "voice/synthesis/lazy_engine.py",
@@ -12240,8 +12265,8 @@
     },
     {
       "path": "voice/synthesis/opener_cache.py",
-      "sha256": "4c667a3f7db748a207cb879fe2d4d9c965cb78da2720fce843f7ed4b5ab4c098",
-      "bytes": 11526
+      "sha256": "2e3a610861e01090947c2f11644ce357007362902b5a6053b532789e69858039",
+      "bytes": 11594
     },
     {
       "path": "voice/synthesis/spoke_tts_broadcast.py",

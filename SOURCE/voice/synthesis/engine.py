@@ -23,7 +23,8 @@ import asyncio
 import queue
 import threading
 import time
-from dataclasses import dataclass
+from contextvars import Context, copy_context
+from dataclasses import dataclass, field
 from typing import Any
 
 from config.settings import settings
@@ -41,6 +42,9 @@ class TTSRequest:
     text: str
     completion_event: threading.Event
     success: bool = False
+    # queue.Queue does not propagate ContextVars to its dedicated worker.
+    # Keep each request's user settings isolated, including queued/retried speech.
+    context: Context = field(default_factory=copy_context, repr=False)
 
 
 class TTSWorker(threading.Thread):
@@ -96,9 +100,8 @@ class TTSWorker(threading.Thread):
             self._set_female_voice()
             # Use config values if available, otherwise sensible defaults
             rate = getattr(self.config, "tts_rate", 155)
-            volume_pct = getattr(self.config, "tts_volume", 100)
             self._engine.setProperty("rate", rate)
-            self._engine.setProperty("volume", tts_volume_for_now(volume_pct))
+            self._engine.setProperty("volume", tts_volume_for_now())
             self._engine_failure_count = 0
             logger.info("TTS engine initialized in worker thread")
         except Exception as e:
@@ -164,7 +167,7 @@ class TTSWorker(threading.Thread):
                 )
                 return
 
-            self._speak_internal(request.text)
+            request.context.run(self._speak_internal, request.text)
             self._engine_failure_count = 0  # Reset on success
             request.success = True
 
@@ -195,8 +198,7 @@ class TTSWorker(threading.Thread):
         if self._engine is None:
             return
 
-        volume_pct = getattr(self.config, "tts_volume", 100)
-        self._engine.setProperty("volume", tts_volume_for_now(volume_pct))
+        self._engine.setProperty("volume", tts_volume_for_now())
         self._engine.say(text)
         self._engine.runAndWait()
 

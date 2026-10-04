@@ -19,10 +19,11 @@ Usage (from bootstrap)::
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from typing import Any
 
-from audio_core.portaudio_guard import sounddevice_guard
+from audio_core.portaudio_guard import portaudio_instance, sounddevice_guard
 from config.settings import settings
 from core.logging_config import get_logger
 
@@ -91,6 +92,106 @@ def _find_device_by_name(
         if name_lower in dev_name.lower():
             return idx
 
+    return None
+
+
+# Persist names plus host API, never a sounddevice/PyAudio process-local index.
+# The two bindings can enumerate the same hardware in different orders.
+_OUTPUT_SELECTION_PREFIX = "portaudio:"
+_UNSET_OUTPUT_SELECTION = object()
+
+
+def output_device_selection(name: str, host_api: str) -> str:
+    """Build the stable selection value used by the desktop output picker."""
+    return _OUTPUT_SELECTION_PREFIX + json.dumps({"name": name, "hostapi": host_api}, separators=(",", ":"))
+
+
+def _output_selection_identity(raw: object) -> tuple[str, str | None, bool] | None:
+    """Decode new identities, legacy PyAudio indices, or legacy name aliases."""
+    if raw is None or (isinstance(raw, str) and raw.strip().lower() in {"", "default", "system default", "none", "-1"}):
+        return None
+    if isinstance(raw, bool) or not isinstance(raw, (str, int)):
+        raise ValueError("output selection must be a device identity, name, or legacy index")
+    if isinstance(raw, int) or raw.strip().lstrip("-").isdigit():
+        index = int(raw)
+        if index == -1:
+            return None
+        if index < 0:
+            raise ValueError("invalid output device index")
+        # Old UI values are PyAudio indices, NOT sounddevice indices. Resolve
+        # through the owning binding, including host API to disambiguate names.
+        with portaudio_instance() as pa:
+            info = pa.get_device_info_by_index(index)
+            if int(info.get("maxOutputChannels", 0)) <= 0:
+                raise ValueError("selected legacy device has no output channels")
+            host_api = pa.get_host_api_info_by_index(int(info["hostApi"]))
+        name, host = info.get("name"), host_api.get("name")
+        if not isinstance(name, str) or not name or not isinstance(host, str) or not host:
+            raise ValueError("legacy output device identity unavailable")
+        return name, host, True
+    value = raw.strip()
+    if value.startswith(_OUTPUT_SELECTION_PREFIX):
+        identity = json.loads(value[len(_OUTPUT_SELECTION_PREFIX) :])
+        name, host = identity.get("name"), identity.get("hostapi")
+        if not isinstance(name, str) or not name or not isinstance(host, str) or not host:
+            raise ValueError("invalid output device identity")
+        return name, host, True
+    return value, None, False
+
+
+def resolve_output_device(sd: Any, *, selection: object = _UNSET_OUTPUT_SELECTION) -> int | None:
+    """Resolve the current picker value for a new sounddevice output stream.
+
+    Peek the existing settings singleton: first-touch construction and disk/DB
+    initialization must never happen on the audio thread. Cold settings use the already-loaded AppConfig without initializing the
+    settings manager. Empty, invalid, disconnected, or ambiguous selections
+    use the system default.
+    Re-resolve on each open rather than caching indices across device changes.
+    This never mutates sd.default or refreshes a live PortAudio device table.
+    A failure after a selected stream opens is the caller's playback failure,
+    not permission to replay that audio through another speaker.
+    """
+    try:
+        if selection is _UNSET_OUTPUT_SELECTION:
+            from utils.singleton import SingletonManager
+
+            manager = SingletonManager.get("settings_manager")
+            selection = manager.get("output_device", "") if manager is not None else settings.output_device
+        identity = _output_selection_identity(selection)
+        if identity is None:
+            return None
+        name, host, exact_only = identity
+        with sounddevice_guard():
+            devices = list(sd.query_devices())
+            host_apis = list(sd.query_hostapis()) if host is not None else []
+        candidates = []
+        for index, device in enumerate(devices):
+            if not isinstance(device, dict) or int(device.get("max_output_channels", 0)) <= 0:
+                continue
+            if host is not None:
+                api_index = device.get("hostapi")
+                if not isinstance(api_index, int) or not 0 <= api_index < len(host_apis):
+                    continue
+                if host_apis[api_index].get("name") != host:
+                    continue
+            candidates.append((index, device))
+        exact = [(index, device) for index, device in candidates if device.get("name") == name]
+        matches = exact or (
+            []
+            if exact_only
+            else [
+                (index, device) for index, device in candidates if name.lower() in str(device.get("name", "")).lower()
+            ]
+        )
+        if len(matches) == 1:
+            # Keep the existing name-matching owner as the final lookup; the
+            # uniqueness check prevents its legacy first-match ambiguity.
+            match = _find_device_by_name([matches[0][1]], name, direction="output")
+            if match is not None:
+                return matches[0][0]
+        logger.warning("Configured output device %r is unavailable or ambiguous; using system default", selection)
+    except Exception:
+        logger.warning("Could not resolve configured output device %r; using system default", selection, exc_info=True)
     return None
 
 
@@ -193,11 +294,7 @@ def _validate_with_sounddevice() -> AudioDeviceStatus:
             status.output_name,
         )
     else:
-        idx = _find_device_by_name(
-            devices,
-            configured_output,
-            direction="output",
-        )
+        idx = resolve_output_device(sd, selection=configured_output)
         if idx is not None:
             dev = devices[idx]
             status.output_ok = True
@@ -297,4 +394,4 @@ def validate_audio_devices() -> AudioDeviceStatus:
         )
 
 
-__all__ = ["AudioDeviceStatus", "validate_audio_devices"]
+__all__ = ["AudioDeviceStatus", "output_device_selection", "resolve_output_device", "validate_audio_devices"]

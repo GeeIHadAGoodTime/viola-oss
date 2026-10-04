@@ -16,7 +16,8 @@ import numpy as np
 from core.logging_config import get_logger
 from core.platform import get_data_dir
 
-SCHEMA_VERSION = 1
+# Version 1 baked build-time volume/quiet hours into persisted PCM.
+SCHEMA_VERSION = 2
 DEFAULT_VARIANTS = 5
 MIN_VARIANTS = 2
 MAX_VARIANTS = 12
