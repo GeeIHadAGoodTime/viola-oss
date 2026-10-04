@@ -8,6 +8,7 @@ import platform
 import re
 import time
 from collections.abc import AsyncGenerator
+from contextlib import suppress
 
 import numpy as np
 import onnxruntime as rt
@@ -94,11 +95,6 @@ class Kokoro:
         self, phonemes: str, voice: NDArray[np.float32], speed: float
     ) -> tuple[NDArray[np.float32], int]:
         log.debug(f"Phonemes: {phonemes}")
-        if len(phonemes) > MAX_PHONEME_LENGTH:
-            log.warning(
-                f"Phonemes are too long, truncating to {MAX_PHONEME_LENGTH} phonemes"
-            )
-        phonemes = phonemes[:MAX_PHONEME_LENGTH]
         start_t = time.time()
         tokens = np.array(self.tokenizer.tokenize(phonemes), dtype=np.int64)
         assert len(tokens) <= MAX_PHONEME_LENGTH, (
@@ -134,38 +130,21 @@ class Kokoro:
         return self.voices[name]
 
     def _split_phonemes(self, phonemes: str) -> list[str]:
-        """
-        Split phonemes into batches of MAX_PHONEME_LENGTH
-        Prefer splitting at punctuation marks.
-        """
-        # Regular expression to split by punctuation and keep them
-        words = re.split(r"([.,!?;])", phonemes)
-        batched_phoenemes: list[str] = []
-        current_batch = ""
-
-        for part in words:
-            # Remove leading/trailing whitespace
-            part = part.strip()
-
-            if part:
-                # If adding the part exceeds the max length, split into a new batch
-                # TODO: make it more accurate
-                if len(current_batch) + len(part) + 1 >= MAX_PHONEME_LENGTH:
-                    batched_phoenemes.append(current_batch.strip())
-                    current_batch = part
-                else:
-                    if part in ".,!?;":
-                        current_batch += part
-                    else:
-                        if current_batch:
-                            current_batch += " "
-                        current_batch += part
-
-        # Append the last batch if it contains any phonemes
-        if current_batch:
-            batched_phoenemes.append(current_batch.strip())
-
-        return batched_phoenemes
+        """Split losslessly, preferring punctuation, then whitespace boundaries."""
+        batches: list[str] = []
+        start = 0
+        while start < len(phonemes):
+            end = min(start + MAX_PHONEME_LENGTH, len(phonemes))
+            if end < len(phonemes):
+                window = phonemes[start:end]
+                for boundary in (r"[.,!?;]", r"\s"):
+                    matches = list(re.finditer(boundary, window))
+                    if matches:
+                        end = start + matches[-1].end()
+                        break
+            batches.append(phonemes[start:end])
+            start = end
+        return batches
 
     def create(
         self,
@@ -204,7 +183,7 @@ class Kokoro:
                 # (initial ~2s, subsequent ~0.02s)
                 audio_part, _ = trim_audio(audio_part)
             audio.append(audio_part)
-        audio = np.concatenate(audio)
+        audio = np.concatenate(audio) if audio else np.empty(0, dtype=np.float32)
         log.debug(f"Created audio in {time.time() - start_t:.2f}s")
         return audio, SAMPLE_RATE
 
@@ -236,28 +215,34 @@ class Kokoro:
 
         async def process_batches():
             """Process phoneme batches in the background."""
-            for i, phonemes in enumerate(batched_phonemes):
-                loop = asyncio.get_event_loop()
-                # Execute in separate thread since it's blocking operation
-                audio_part, sample_rate = await loop.run_in_executor(
-                    None, self._create_audio, phonemes, voice, speed
-                )
-                if trim:
-                    # Trim leading and trailing silence for a more natural sound concatenation
-                    # (initial ~2s, subsequent ~0.02s)
-                    audio_part, _ = trim_audio(audio_part)
-                log.debug(f"Processed chunk {i} of stream")
-                await queue.put((audio_part, sample_rate))
-            await queue.put(None)  # Signal the end of the stream
+            try:
+                for i, phonemes in enumerate(batched_phonemes):
+                    loop = asyncio.get_event_loop()
+                    # Execute in separate thread since it's blocking operation
+                    audio_part, sample_rate = await loop.run_in_executor(
+                        None, self._create_audio, phonemes, voice, speed
+                    )
+                    if trim:
+                        # Trim leading and trailing silence for a more natural sound concatenation
+                        # (initial ~2s, subsequent ~0.02s)
+                        audio_part, _ = trim_audio(audio_part)
+                    log.debug(f"Processed chunk {i} of stream")
+                    await queue.put((audio_part, sample_rate))
+            finally:
+                queue.put_nowait(None)  # Wake the consumer on completion or failure.
 
-        # Start processing in the background
-        asyncio.create_task(process_batches())
-
-        while True:
-            chunk = await queue.get()
-            if chunk is None:
-                break
-            yield chunk
+        # Retain ownership so closing/cancelling a stream stops remaining batches.
+        task = asyncio.create_task(process_batches())
+        try:
+            while True:
+                chunk = await queue.get()
+                if chunk is None:
+                    break
+                yield chunk
+        finally:
+            task.cancel()
+            with suppress(asyncio.CancelledError):
+                await task  # Propagate inference failures instead of hanging.
 
     def get_voices(self) -> list[str]:
         return list(sorted(self.voices.keys()))
