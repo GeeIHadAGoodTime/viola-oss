@@ -65,6 +65,101 @@ def _isolated_network():
         yield
 
 
+@contextlib.contextmanager
+def _isolated_modules(replacements, *, transient_imports=()):
+    """Restore only mocked module keys; retain real imports and native modules."""
+    absent = object()
+    names = set(replacements) | set(transient_imports)
+    previous = {name: sys.modules.get(name, absent) for name in names}
+    parent_bindings = {}
+    for name in transient_imports:
+        parent_name, _, attribute = name.rpartition(".")
+        parent = sys.modules.get(parent_name)
+        parent_bindings[name] = (parent_name, attribute, getattr(parent, attribute, absent))
+    sys.modules.update(replacements)
+    try:
+        yield
+    finally:
+        for name, original in previous.items():
+            if original is absent:
+                sys.modules.pop(name, None)
+            else:
+                sys.modules[name] = original
+        for parent_name, attribute, original in parent_bindings.values():
+            parent = sys.modules.get(parent_name)
+            if parent is None:
+                continue
+            if original is absent:
+                vars(parent).pop(attribute, None)
+            else:
+                setattr(parent, attribute, original)
+
+
+class ModuleIsolation(unittest.TestCase):
+    def test_restores_mocked_keys_after_exception_without_removing_real_imports(self):
+        existing, added, imported = "_gain_existing", "_gain_added", "_gain_imported"
+        original, replacement, real_module = object(), object(), object()
+        self.assertNotIn(existing, sys.modules)
+        self.assertNotIn(added, sys.modules)
+        self.assertNotIn(imported, sys.modules)
+        sys.modules[existing] = original
+        self.addCleanup(sys.modules.pop, existing, None)
+        self.addCleanup(sys.modules.pop, imported, None)
+        with self.assertRaisesRegex(RuntimeError, "synthetic failure"):
+            with _isolated_modules({existing: replacement, added: replacement}):
+                self.assertIs(sys.modules[existing], replacement)
+                self.assertIs(sys.modules[added], replacement)
+                sys.modules[imported] = real_module
+                raise RuntimeError("synthetic failure")
+        self.assertIs(sys.modules[existing], original)
+        self.assertNotIn(added, sys.modules)
+        self.assertIs(sys.modules[imported], real_module)
+
+    def test_nested_overrides_restore_each_scope(self):
+        name = "_gain_nested"
+        self.assertNotIn(name, sys.modules)
+        outer, inner = object(), object()
+        with _isolated_modules({name: outer}):
+            with _isolated_modules({name: inner}):
+                self.assertIs(sys.modules[name], inner)
+            self.assertIs(sys.modules[name], outer)
+        self.assertNotIn(name, sys.modules)
+
+    def test_removes_transient_mock_consumers_and_parent_bindings(self):
+        parent_name = "_gain_parent"
+        consumer_name = parent_name + ".consumer"
+        dependency_name = "_gain_dependency"
+        self.assertNotIn(parent_name, sys.modules)
+        parent = types.ModuleType(parent_name)
+        sys.modules[parent_name] = parent
+        self.addCleanup(sys.modules.pop, parent_name, None)
+        replacement = object()
+        with _isolated_modules({dependency_name: replacement}, transient_imports=(consumer_name,)):
+            consumer = types.ModuleType(consumer_name)
+            consumer.dependency = sys.modules[dependency_name]
+            sys.modules[consumer_name] = consumer
+            parent.consumer = consumer
+            self.assertIs(consumer.dependency, replacement)
+        self.assertNotIn(consumer_name, sys.modules)
+        self.assertNotIn(dependency_name, sys.modules)
+        self.assertFalse(hasattr(parent, "consumer"))
+
+    def test_fixture_class_setup_restores_consumer_caches_and_package_attributes(self):
+        absent = object()
+        consumers = ("voice.synthesis.text_normalizer", "ui.settings_api")
+        parents = {}
+        previous = {name: sys.modules.get(name, absent) for name in consumers}
+        for name in consumers:
+            parent_name, _, attribute = name.rpartition(".")
+            parent = importlib.import_module(parent_name)
+            parents[name] = (parent, attribute, getattr(parent, attribute, absent))
+        SpeechVolumeWiring.setUpClass()
+        for name in consumers:
+            self.assertIs(sys.modules.get(name, absent), previous[name])
+            parent, attribute, original = parents[name]
+            self.assertIs(getattr(parent, attribute, absent), original)
+
+
 class SocketPairNetworkGuard(unittest.TestCase):
     def test_socketpair_is_bidirectional_under_guard(self):
         with _isolated_network():
@@ -127,7 +222,7 @@ class SpeechVolumeWiring(unittest.TestCase):
         if "voice.synthesis.text_normalizer" not in sys.modules:
             numbers = types.ModuleType("num2words")
             numbers.num2words = Mock(side_effect=AssertionError("No number conversion in gain fixtures"))
-            with patch.dict(sys.modules, {"num2words": numbers}):
+            with _isolated_modules({"num2words": numbers}, transient_imports=("voice.synthesis.text_normalizer",)):
                 cls.normalizer = importlib.import_module("voice.synthesis.text_normalizer")
         else:
             cls.normalizer = sys.modules["voice.synthesis.text_normalizer"]
@@ -136,7 +231,9 @@ class SpeechVolumeWiring(unittest.TestCase):
         playlist.get_playlist_manager = lambda: types.SimpleNamespace()
         local = types.ModuleType("services.llm.local_models")
         local.detect_local_ai_servers = Mock(side_effect=AssertionError("No provider discovery in gain tests"))
-        with patch.dict(sys.modules, {playlist.__name__: playlist, local.__name__: local}):
+        with _isolated_modules(
+            {playlist.__name__: playlist, local.__name__: local}, transient_imports=("ui.settings_api",)
+        ):
             cls.api = importlib.import_module("ui.settings_api")
         for module in (cls.manager_module, cls.quiet, cls.kokoro, cls.fallback, cls.cache_module, cls.api):
             assert Path(module.__file__).resolve().is_relative_to(ROOT), module.__file__
@@ -176,8 +273,7 @@ class SpeechVolumeWiring(unittest.TestCase):
         auth = types.ModuleType("auth.dependencies")
         auth.require_auth_or_api_key = lambda: None
         self.patches.enter_context(
-            patch.dict(
-                sys.modules,
+            _isolated_modules(
                 {
                     "voice.synthesis.text_normalizer": self.normalizer,
                     telemetry.__name__: telemetry,
@@ -390,7 +486,7 @@ class SpeechVolumeWiring(unittest.TestCase):
 
         native.init = initialize
         self.manager.update({"tts_volume": 0.9, "quiet_hours_enabled": False})
-        with patch.dict(sys.modules, {"pyttsx3": native}):
+        with _isolated_modules({"pyttsx3": native}):
             worker = self.fallback.TTSWorker(self.config)
             worker.start()
             try:
@@ -514,7 +610,7 @@ class SpeechVolumeWiring(unittest.TestCase):
         native.init = lambda: fake
         worker = self.fallback.TTSWorker(self.config)
         self.manager.update({"tts_volume": 0.5, "quiet_hours_enabled": True})
-        with patch.dict(sys.modules, {"pyttsx3": native}):
+        with _isolated_modules({"pyttsx3": native}):
             worker._init_engine()
             self.assertEqual(properties["volume"], 0.5)
             with patch.dict("os.environ", {self.quiet.QUIET_HOURS_TIME_OVERRIDE_ENV: "23:30"}):

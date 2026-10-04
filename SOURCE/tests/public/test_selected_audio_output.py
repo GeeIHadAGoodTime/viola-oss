@@ -7,10 +7,12 @@ from __future__ import annotations
 
 import contextlib
 import io
+import runpy
 import sys
 import threading
 import types
 import unittest
+from pathlib import Path
 from unittest.mock import Mock, patch
 
 import numpy as np
@@ -317,7 +319,10 @@ class SelectedAudioOutput(unittest.TestCase):
 
 class SelectedOutputPersistence(unittest.TestCase):
     def test_api_save_restart_routes_stable_selection(self):
-        from test_speech_volume_wiring import SpeechVolumeWiring
+        # Load this exact sibling under both unittest discovery and pytest importlib mode.
+        SpeechVolumeWiring = runpy.run_path(str(Path(__file__).with_name("test_speech_volume_wiring.py")))[
+            "SpeechVolumeWiring"
+        ]
 
         SpeechVolumeWiring.setUpClass()
         fixture = SpeechVolumeWiring()
@@ -335,7 +340,11 @@ class SelectedOutputPersistence(unittest.TestCase):
         import asyncio
         import httpx
         from audio_core import portaudio_guard
-        from test_speech_volume_wiring import SpeechVolumeWiring
+
+        # Load this exact sibling under both unittest discovery and pytest importlib mode.
+        SpeechVolumeWiring = runpy.run_path(str(Path(__file__).with_name("test_speech_volume_wiring.py")))[
+            "SpeechVolumeWiring"
+        ]
 
         SpeechVolumeWiring.setUpClass()
         fixture = SpeechVolumeWiring()
