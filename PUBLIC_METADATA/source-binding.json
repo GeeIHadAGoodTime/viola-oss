@@ -1,16 +1,20 @@
 {
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "faa1d74d824d0c6ed4fe9a1ce13c7d046d7d0b7ccd226f49c07b661f7b567d40",
-  "source_tree_sha256": "8dd9db43a2a701980b2f089a60ca8f402d6cee1c3b51234b6925e171ee43c183",
-  "source_file_count": 2493,
-  "source_revision": "0a8ebf7020df72a97f15d4968d1dcc194be1011f",
-  "comparison_public_revision": "3de429e35be974a6305158dbced160611ff5ca51",
+  "source_manifest_sha256": "15522106f9528cdf9866a1f59e549ce652de7ea1fd7cf246c347aa1e12eda67e",
+  "source_tree_sha256": "cbc2aeb8b0564748de8d722098c6234ed816303ac6ce756a3bb01cbee1aa1621",
+  "source_file_count": 2496,
+  "source_revision": "36a399bc60731eff24a29c270be5220d05fbebea",
+  "comparison_public_revision": "adb9117157a7111e580224b129266efd6260d8a3",
   "changed_source_paths": [
-    "SOURCE/tests/public/test_kokoro_chunking.py",
-    "SOURCE/third_party/kokoro_onnx.patch",
-    "SOURCE/third_party/kokoro_onnx/src/kokoro_onnx/__init__.py",
-    "SOURCE/third_party/sources.toml"
+    "SOURCE/tests/public/test_rating_target.py",
+    "SOURCE/tests/public/test_wake_listener_lifecycle.py",
+    "SOURCE/ui/api/routes/rating.py",
+    "SOURCE/ui/react-app/src/SmartDisplay.jsx",
+    "SOURCE/ui/react-app/src/__tests__/SmartDisplay.test.jsx",
+    "SOURCE/ui/react-app/src/hooks/useViolaApi.js",
+    "SOURCE/ui/react-app/src/hooks/useViolaApi.rating.test.js",
+    "SOURCE/voice/wake_detector/violawake_listener.py"
   ],
   "retained_sboms": [
     {
@@ -51,34 +55,31 @@
     }
   ],
   "input_equivalence": {
-    "changed_dependency_inputs": [
-      "SOURCE/third_party/kokoro_onnx.patch",
-      "SOURCE/third_party/kokoro_onnx/src/kokoro_onnx/__init__.py",
-      "SOURCE/third_party/sources.toml"
-    ],
-    "basis": "The vendored Kokoro implementation and its exact source checksum/reconstruction patch change. Dependency declarations, lockfiles, package/runtime versions, model assets, language provider and vocabulary, licence data, frontend bytes and workflows are unchanged. All six prior resolved dependency inventories are retained byte-for-byte; no re-resolution or new advisory scan is claimed. This source manifest identifies the repaired vendored bytes; retained inventories do not constitute a new runtime qualification."
+    "changed_dependency_inputs": [],
+    "basis": "Only wake-listener lifecycle, coordinated music-rating UI/API behavior and their regression tests change. Dependency declarations, lockfiles, package/runtime versions, vendored sources and their provenance, model assets, licence and notice data, and workflows are unchanged. All six prior resolved dependency inventories are retained byte-for-byte. No re-resolution, new advisory scan or installed-runtime qualification is claimed."
   },
   "prior_binding": {
-    "public_revision": "3de429e35be974a6305158dbced160611ff5ca51",
+    "public_revision": "adb9117157a7111e580224b129266efd6260d8a3",
     "path": "PUBLIC_METADATA/source-binding.json",
-    "git_blob": "a06fadd0e6851f86962447f1c2845cd34080dbe7",
-    "sha256": "564c5da512953f6ae3f3d32ead7f46fba67ad4d8142ff6795b52d61e75e97306",
-    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/3de429e35be974a6305158dbced160611ff5ca51/PUBLIC_METADATA/source-binding.json"
+    "git_blob": "72ee72de20242d24c2260f923a49a51fbf7558f1",
+    "sha256": "55423b3c971f7d6361a8f0026e8d8ae26552ac7406559969eb45cebbe675486b",
+    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/adb9117157a7111e580224b129266efd6260d8a3/PUBLIC_METADATA/source-binding.json"
   },
   "new_resolution_performed": false,
   "new_advisory_scan_performed": false,
   "new_runtime_qualification_performed": false,
   "qualification": {
-    "scope": "Public-owned Kokoro lossless long-speech correction, synthetic source contracts and bounded real local CPU synthesis; no installed-app, release or deployment qualification.",
-    "source_integrity": "2493 source files verified against a manifest bound to the real source commit; all six retained SBOM hashes/component counts verified; exactly four reviewed source/vendor paths plus manifest/binding change. Independent offline reverse/reapply reconstructs all ten pinned upstream files and the exact repaired fork; strict outer patch replay matches every source byte.",
-    "python_checks": "Exact normal public unittest discovery passes 194 tests without failures/errors/skips. Fourteen focused real-wrapper/tokenizer tests pass. The original negative control yields 37 failing subcases plus two expected behavior errors for empty concatenate and stream-error timeout. Independent review reproduces regressions and checks final artifact bytes, unchanged existing assertions and source verifier. Existing Linux Python 3.12 tooling and four fail-loud unused optional import leaves support full-suite execution; no packages or models were acquired.",
-    "chunking_contract": "Phoneme strings split into exact contiguous nonempty spans of at most 510 characters, preferring punctuation then whitespace before a hard boundary. Model tokens appear in their original order exactly once, subject only to unchanged vocabulary filtering. Existing direct-call tokenizer validation replaces silent slicing. Both model input conventions, voices/styles, speed representations, trimming and locale arguments are preserved.",
-    "customer_path_reproduction": "The actual legacy phonemizer turns 150 space-separated hello words (899 text characters) into 1049 tokens. Original desktop synthesize/chunk methods pass all 899 characters unchanged. Original wrapper counting-session calls contain 0 then 510 tokens, losing 539; corrected calls contain 504, 504 and 41 tokens with zero loss. This original evidence is not an installed-customer or actual original audio-loss observation.",
-    "local_model_synthesis": "Using already present legacy pronunciation and CPU ONNX assets, repaired sync and stream each synthesize all 1049 tokens into 1174800 finite nonzero float32 samples at 24000 Hz (48.95 seconds), bit-identical across sync/stream. Short default speech and blended-style 1.25-speed trimmed speech match the original bitwise; all 54 voice IDs remain. Seven actual locale fixtures retain identical pronunciation bytes; the bundled backend rejects the same existing fr and zh aliases before and after. All nine locale argument paths are covered synthetically; no multilingual-quality claim.",
-    "cancellation_and_failure": "The producer task is owned and cancelled/awaited on cancellation or generator close; failures wake the consumer and propagate. Empty sync output is a one-dimensional empty float32 array at 24000 Hz and empty streaming yields nothing. A native inference already running may finish, while remaining batches stop. No hard native cancellation guarantee.",
-    "lint": "Both changed Python files pass their applicable Ruff profiles; the public test passes Black at line length 120 and the vendored wrapper passes its Ruff formatter.",
-    "frontend_checks": "All frontend bytes are unchanged; no new local frontend qualification is claimed.",
-    "installed_candidate": "pending; native UI, installed Windows app, playback/listening, intelligibility and carrier behavior remain unverified",
+    "scope": "Public-owned wake-listener lifecycle and coordinated music-rating UI/API source repair with local synthetic qualification; no installed-app, hardware, provider, production-build, release or deployment acceptance.",
+    "source_integrity": "2496 source files match the independently reviewed combined source and the canonical generated manifest. All six retained SBOM hashes and component counts are verified. Exactly eight reviewed source paths plus source manifest and binding change; all other repository blobs, modes and types remain unchanged. Strict patch application and reverse checks pass.",
+    "python_checks": "Exact public unittest discovery passes 215 tests without failures, errors or skips. Existing Linux Python tooling and four unchanged fail-on-use optional import leaves support execution; external sockets are blocked and no attempted connection was recorded. No package or model was acquired.",
+    "frontend_checks": "Focused combined React command covers SmartDisplay, every useViolaApi suite, PlayerSection and all SmartDisplay companion suites: 10 files and 193 tests pass without failures or skips. This is not the complete React suite or a production build.",
+    "wake_lifecycle": "Failed-start wake listeners unregister the actual device-change owner on exit and reset active-loop state. An RLock resolves same-thread failed-open cleanup deadlock while preserving cross-thread exclusion. Synthetic real-loop reads advance WorkSignal; failed starts do not. Read-loop AST, existing catch handlers, thresholds and inference/read/retry cadence are unchanged.",
+    "rating_contract": "The caller captures video_id || id and serializes writes for each persisted rating ID within its display instance. Per-visit pending and confirmed state rejects stale completions and drops departed unsent work. The additive optional expected_track_id API field is validated and checked before store acquisition; delayed mismatches return 409 without a write. Legacy callers omitting the field retain existing behavior. Route, transport helper and caller ship together.",
+    "negative_controls": "Independent review killed six known-bad controls: missing unregister, missing active-loop reset, restored non-reentrant lock, original unbound route, disabled UI serialization, and original UI. The deadlocking subprocess was bounded and reaped. Full source hashes match again after all controls were restored.",
+    "compatibility": "Focused existing wake-listener, device-routing and Linux-log source checks pass: 23 passed with the unchanged strict inference-cadence xfail retained. No source-inspection compatibility failure was found. This is not a canonical private composition or whole-private-suite qualification.",
+    "lint": "New wake regression Python checks and focused route/helper checks pass. Whole-listener Ruff retains exactly five pre-existing E402 findings. Changed UI ESLint has zero errors and the same eleven pre-existing warnings. No clean whole-file lint claim is made for the listener.",
+    "network_ordering_limit": "An HTTP transport rejection remains an ambiguous persistence result: the server operation might still finish later. No exactly-once, server-versioning, cross-client or cross-remount ordering guarantee is established. A never-settling request continues to block subsequent writes for its ID. Existing cross-provider ID collisions and absence of rating readback on track entry remain unchanged.",
+    "installed_candidate": "pending; native device hot-plug, physical microphone/model operation, installed rendering and customer behavior remain unverified",
     "exact_head_hosted_checks": "pending",
     "release_or_deployment": "not_established"
   }
