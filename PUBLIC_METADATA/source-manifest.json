@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "ec9e681779a8985f7ecdfdb9f8aa9c9104c21d03",
-  "sha256": "8d9f282dd711ffcdf16ff41cf9c3eefb74890f7b39e61457a7b4b9deff26eeff",
+  "revision": "16c332e4741727aeaf1f61bf964407559e44c46f",
+  "sha256": "0545711d9a02af07d1052e2fa38ae17450ecff7784048e7f46777eeb3cddae4e",
   "files": [
     {
       "path": ".env.example",
@@ -305,13 +305,13 @@
     },
     {
       "path": "audio_core/output/playback_loop.py",
-      "sha256": "9e76b1baf53b9bd51d00ea9a2e14e978c82ee28534b81cc4eeff33bbc5597fcb",
-      "bytes": 8199
+      "sha256": "33f28020cb11fc975ad9914091e40511505c6a670a7d6fae00a238c026aaeb22",
+      "bytes": 8383
     },
     {
       "path": "audio_core/output/sounddevice_output.py",
-      "sha256": "57b014f58458ec0070b16b55856c76596cb109be11c0e4fc795b47a19ce6e22d",
-      "bytes": 10681
+      "sha256": "007059422d747f54724750297a579f64b8b417d1d0da33ab5cb0e8b825e9bffd",
+      "bytes": 11868
     },
     {
       "path": "audio_core/portaudio_guard.py",
@@ -435,8 +435,8 @@
     },
     {
       "path": "audio_core/streaming/pipeline_wiring.py",
-      "sha256": "4e683ff2317f74b31ec4d9c16eb5cb5e8d83575b4e1d8448a9944e1a34a32bce",
-      "bytes": 89418
+      "sha256": "24e617478202cd25721868cc8273c73df689250505336593b7c6a83071bc0095",
+      "bytes": 90323
     },
     {
       "path": "audio_core/streaming/playback_scheduler.py",
@@ -5790,8 +5790,8 @@
     },
     {
       "path": "tests/public/test_selected_audio_output.py",
-      "sha256": "5d9060bf8b8c71b2d00f83a533bebac55e5a9e0b730128656af8908e3ce3cdf0",
-      "bytes": 26799
+      "sha256": "a4f302b10de8d9887dc8895f6c14a964c16cf5eae7758f243fbe1ae3dd9640be",
+      "bytes": 35284
     },
     {
       "path": "tests/public/test_source_contract.py",
@@ -8725,8 +8725,8 @@
     },
     {
       "path": "ui/api/routes/health.py",
-      "sha256": "ec59e76077ad51e647a2a5b1f7f0e8217732adacb4aeae2097e29672ce4b66c9",
-      "bytes": 25142
+      "sha256": "2154cb84f0f399f5f9e9ab5573e9c22ff0dd5f8a56f0fed3acb1ab5eb2951f12",
+      "bytes": 25377
     },
     {
       "path": "ui/api/routes/intent_market.py",
