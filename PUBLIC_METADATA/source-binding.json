@@ -1,14 +1,16 @@
 {
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "27d26b1575bda85dd0c56750db3582318148ce94cf9a15b9c5555cbf60a6a788",
-  "source_tree_sha256": "bff4a79065249cedff77ad2706f6e6f96bdaf014ff0263a5677667760a8d2ffc",
-  "source_file_count": 2492,
-  "source_revision": "31ec42e1665fa236694c967bab3f2ee0d7cfece8",
-  "comparison_public_revision": "b81aedd0e50a32e6ddbf030611e2889cbd8ef13e",
+  "source_manifest_sha256": "faa1d74d824d0c6ed4fe9a1ce13c7d046d7d0b7ccd226f49c07b661f7b567d40",
+  "source_tree_sha256": "8dd9db43a2a701980b2f089a60ca8f402d6cee1c3b51234b6925e171ee43c183",
+  "source_file_count": 2493,
+  "source_revision": "0a8ebf7020df72a97f15d4968d1dcc194be1011f",
+  "comparison_public_revision": "3de429e35be974a6305158dbced160611ff5ca51",
   "changed_source_paths": [
-    "SOURCE/intent/agent_middleware.py",
-    "SOURCE/tests/public/test_step_logger_status.py"
+    "SOURCE/tests/public/test_kokoro_chunking.py",
+    "SOURCE/third_party/kokoro_onnx.patch",
+    "SOURCE/third_party/kokoro_onnx/src/kokoro_onnx/__init__.py",
+    "SOURCE/third_party/sources.toml"
   ],
   "retained_sboms": [
     {
@@ -49,28 +51,34 @@
     }
   ],
   "input_equivalence": {
-    "changed_dependency_inputs": [],
-    "basis": "Two public Python source/test paths change for truthful live tool-step status. Dependency manifests and lockfiles, runtime version 1.0.5, model assets, all frontend bytes, workflows and all six retained SBOMs are unchanged. The only added source path is tests/public/test_step_logger_status.py."
+    "changed_dependency_inputs": [
+      "SOURCE/third_party/kokoro_onnx.patch",
+      "SOURCE/third_party/kokoro_onnx/src/kokoro_onnx/__init__.py",
+      "SOURCE/third_party/sources.toml"
+    ],
+    "basis": "The vendored Kokoro implementation and its exact source checksum/reconstruction patch change. Dependency declarations, lockfiles, package/runtime versions, model assets, language provider and vocabulary, licence data, frontend bytes and workflows are unchanged. All six prior resolved dependency inventories are retained byte-for-byte; no re-resolution or new advisory scan is claimed. This source manifest identifies the repaired vendored bytes; retained inventories do not constitute a new runtime qualification."
   },
   "prior_binding": {
-    "public_revision": "b81aedd0e50a32e6ddbf030611e2889cbd8ef13e",
+    "public_revision": "3de429e35be974a6305158dbced160611ff5ca51",
     "path": "PUBLIC_METADATA/source-binding.json",
-    "git_blob": "d97acbc19eb8dcd1014a342995d1285aa220a179",
-    "sha256": "3ae233acb8cea59c6ff8ccf8f908f9e98473d37c09c60fbbcf281fdee38c9175",
-    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/b81aedd0e50a32e6ddbf030611e2889cbd8ef13e/PUBLIC_METADATA/source-binding.json"
+    "git_blob": "a06fadd0e6851f86962447f1c2845cd34080dbe7",
+    "sha256": "564c5da512953f6ae3f3d32ead7f46fba67ad4d8142ff6795b52d61e75e97306",
+    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/3de429e35be974a6305158dbced160611ff5ca51/PUBLIC_METADATA/source-binding.json"
   },
   "new_resolution_performed": false,
   "new_advisory_scan_performed": false,
   "new_runtime_qualification_performed": false,
   "qualification": {
-    "scope": "Public Python live-status correction with inert persistence and telemetry test boundaries; no installed-runtime, real-tool, release or deployment qualification.",
-    "source_integrity": "2492 source files verified against the regenerated manifest; all six retained SBOM hashes/component counts verified; exactly two source paths and the source manifest/binding change.",
-    "python_checks": "Exact normal public unittest discovery passes 180 tests with zero failures/errors/skips. The 13 focused real-middleware tests all pass; replay against exact original middleware produces 9 expected assertion failures. Independent review repeats the focused positive and negative controls and verifies metadata omission, empty error and unchanged telemetry behavior. Existing Linux Python 3.12 tooling and fail-loud unused optional import boundaries were used; no dependencies or model assets were acquired.",
-    "status_contract": "Explicit execution error takes precedence; otherwise unverified results retain unknown; otherwise the returned ok verdict maps to ok or error. Tests cover returned failure with and without explanation, structured payload failure, both unverified boolean verdicts, explicit error precedence, cancellation propagation, bounded/failed background broadcasting, telemetry failure, image-strip delegation and input snapshot preservation.",
-    "privacy_and_execution_boundaries": "Payload fields, stripping/redaction paths, return values, boolean telemetry and terminal/cancellation mapping are unchanged. Persistence and telemetry test boundaries are inert. No real model inference, external tool, phone call, native build or app runtime was started; no external connections were attempted under the full-suite local egress guard.",
-    "lint": "Black checks pass on both changed files at line length 120. The new test passes Ruff. Middleware retains exactly its baseline unused append_step import finding at line 687; no added-line lint findings.",
-    "frontend_checks": "All frontend bytes are unchanged; no new frontend build or test qualification is claimed for this Python-only correction.",
-    "installed_candidate": "pending; installed Windows and real-tool/UI behavior remain unverified",
+    "scope": "Public-owned Kokoro lossless long-speech correction, synthetic source contracts and bounded real local CPU synthesis; no installed-app, release or deployment qualification.",
+    "source_integrity": "2493 source files verified against a manifest bound to the real source commit; all six retained SBOM hashes/component counts verified; exactly four reviewed source/vendor paths plus manifest/binding change. Independent offline reverse/reapply reconstructs all ten pinned upstream files and the exact repaired fork; strict outer patch replay matches every source byte.",
+    "python_checks": "Exact normal public unittest discovery passes 194 tests without failures/errors/skips. Fourteen focused real-wrapper/tokenizer tests pass. The original negative control yields 37 failing subcases plus two expected behavior errors for empty concatenate and stream-error timeout. Independent review reproduces regressions and checks final artifact bytes, unchanged existing assertions and source verifier. Existing Linux Python 3.12 tooling and four fail-loud unused optional import leaves support full-suite execution; no packages or models were acquired.",
+    "chunking_contract": "Phoneme strings split into exact contiguous nonempty spans of at most 510 characters, preferring punctuation then whitespace before a hard boundary. Model tokens appear in their original order exactly once, subject only to unchanged vocabulary filtering. Existing direct-call tokenizer validation replaces silent slicing. Both model input conventions, voices/styles, speed representations, trimming and locale arguments are preserved.",
+    "customer_path_reproduction": "The actual legacy phonemizer turns 150 space-separated hello words (899 text characters) into 1049 tokens. Original desktop synthesize/chunk methods pass all 899 characters unchanged. Original wrapper counting-session calls contain 0 then 510 tokens, losing 539; corrected calls contain 504, 504 and 41 tokens with zero loss. This original evidence is not an installed-customer or actual original audio-loss observation.",
+    "local_model_synthesis": "Using already present legacy pronunciation and CPU ONNX assets, repaired sync and stream each synthesize all 1049 tokens into 1174800 finite nonzero float32 samples at 24000 Hz (48.95 seconds), bit-identical across sync/stream. Short default speech and blended-style 1.25-speed trimmed speech match the original bitwise; all 54 voice IDs remain. Seven actual locale fixtures retain identical pronunciation bytes; the bundled backend rejects the same existing fr and zh aliases before and after. All nine locale argument paths are covered synthetically; no multilingual-quality claim.",
+    "cancellation_and_failure": "The producer task is owned and cancelled/awaited on cancellation or generator close; failures wake the consumer and propagate. Empty sync output is a one-dimensional empty float32 array at 24000 Hz and empty streaming yields nothing. A native inference already running may finish, while remaining batches stop. No hard native cancellation guarantee.",
+    "lint": "Both changed Python files pass their applicable Ruff profiles; the public test passes Black at line length 120 and the vendored wrapper passes its Ruff formatter.",
+    "frontend_checks": "All frontend bytes are unchanged; no new local frontend qualification is claimed.",
+    "installed_candidate": "pending; native UI, installed Windows app, playback/listening, intelligibility and carrier behavior remain unverified",
     "exact_head_hosted_checks": "pending",
     "release_or_deployment": "not_established"
   }

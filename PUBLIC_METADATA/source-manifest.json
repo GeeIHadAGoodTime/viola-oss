@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "31ec42e1665fa236694c967bab3f2ee0d7cfece8",
-  "sha256": "bff4a79065249cedff77ad2706f6e6f96bdaf014ff0263a5677667760a8d2ffc",
+  "revision": "0a8ebf7020df72a97f15d4968d1dcc194be1011f",
+  "sha256": "8dd9db43a2a701980b2f089a60ca8f402d6cee1c3b51234b6925e171ee43c183",
   "files": [
     {
       "path": ".env.example",
@@ -5744,6 +5744,11 @@
       "bytes": 40547
     },
     {
+      "path": "tests/public/test_kokoro_chunking.py",
+      "sha256": "b69ba6dce685a550062e634416be379219c780a442278f5a92bafa33e06b32b1",
+      "bytes": 12250
+    },
+    {
       "path": "tests/public/test_linux_sandbox_opt_in.py",
       "sha256": "a02a49dbc341223a9b79c99fd8af6880763072155eaf6635d7b4f0ddc259f488",
       "bytes": 4396
@@ -5825,8 +5830,8 @@
     },
     {
       "path": "third_party/kokoro_onnx.patch",
-      "sha256": "9ea0520f045e3e32f5bcd8d99f7a3343c906339a163c9d59174eb7ea958b389e",
-      "bytes": 1462
+      "sha256": "e245c139183364403b4fcbd3b6f2b4563a78f827b47182e9cad8e32b07aa3338",
+      "bytes": 6318
     },
     {
       "path": "third_party/kokoro_onnx/LICENSE",
@@ -5845,8 +5850,8 @@
     },
     {
       "path": "third_party/kokoro_onnx/src/kokoro_onnx/__init__.py",
-      "sha256": "e844a0cf96dd01b0a162693c507690ec49eba211c2358bda3c14f00140c30f29",
-      "bytes": 9693
+      "sha256": "82c9368b2ea73448e1d730903a96b209e97ad06a8e4ed9e95f16a7122dd19b0f",
+      "bytes": 9340
     },
     {
       "path": "third_party/kokoro_onnx/src/kokoro_onnx/config.json",
@@ -8450,7 +8455,7 @@
     },
     {
       "path": "third_party/sources.toml",
-      "sha256": "120fb4787988a64375c65fab296c53dcac4795126b36995d8eb43a41979ca219",
+      "sha256": "a4fb9373d2f4fb5bb3f1e02f7a60eca231bc3bb9d801b43aab265cde65beed99",
       "bytes": 203193
     },
     {
