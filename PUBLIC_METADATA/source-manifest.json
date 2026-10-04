@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "512c66fbc5ec0d1b17fd6acdec2f2e71aeb94419",
-  "sha256": "7e26dc007862352e797f9dfc442caa1d58c112f6ef9d5a1bd6667e39df411b47",
+  "revision": "e5d6ec742672f3f39213f5fd317f18feada7237e",
+  "sha256": "0c040e93c2bf17042a01ef1fdd9e6cd2fd52c1cb31c4c4121872bf578c5be276",
   "files": [
     {
       "path": ".env.example",
@@ -5794,6 +5794,11 @@
       "bytes": 45886
     },
     {
+      "path": "tests/public/test_speech_volume_wiring.py",
+      "sha256": "11e8900f9dd88e454d45539615853fc3556ff5fc35e037121b5b290a09089546",
+      "bytes": 71533
+    },
+    {
       "path": "tests/public/test_step_logger_status.py",
       "sha256": "f43a8f369828481307fc8031f767240eb0774a80b17b0f54e89fcaff7fdffdf7",
       "bytes": 7499
@@ -11510,8 +11515,8 @@
     },
     {
       "path": "ui/settings_manager.py",
-      "sha256": "3e984166687797ef9b95f0609aab0607004fbae87eb9c3d6e01e2766bd5bfc0b",
-      "bytes": 151149
+      "sha256": "89db01d87215726803f79154ca7808eb1d6863d49209d98704e8547d6b83c894",
+      "bytes": 160040
     },
     {
       "path": "ui/settings_schema.py",
@@ -12220,8 +12225,8 @@
     },
     {
       "path": "voice/synthesis/engine.py",
-      "sha256": "dba751e9c85410dbf4fef9dba8edca83147f12b07f791977442f065a5ab64afe",
-      "bytes": 14749
+      "sha256": "4932de72512eadf35b57fe64ca4e4d61f7be38d7e16f939db1118e43e5706e48",
+      "bytes": 14905
     },
     {
       "path": "voice/synthesis/factory.py",
@@ -12230,8 +12235,8 @@
     },
     {
       "path": "voice/synthesis/kokoro_engine.py",
-      "sha256": "50748c7ad935f6cab2be690c26c41aa0aab52db620b9e607294f8dd404f2749e",
-      "bytes": 58223
+      "sha256": "1f70664cf469756f633602d64bb081889e99d3b4133fe403106c01b9df8ef87a",
+      "bytes": 58909
     },
     {
       "path": "voice/synthesis/lazy_engine.py",
@@ -12240,8 +12245,8 @@
     },
     {
       "path": "voice/synthesis/opener_cache.py",
-      "sha256": "4c667a3f7db748a207cb879fe2d4d9c965cb78da2720fce843f7ed4b5ab4c098",
-      "bytes": 11526
+      "sha256": "2e3a610861e01090947c2f11644ce357007362902b5a6053b532789e69858039",
+      "bytes": 11594
     },
     {
       "path": "voice/synthesis/spoke_tts_broadcast.py",
