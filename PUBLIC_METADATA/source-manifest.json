@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "36a399bc60731eff24a29c270be5220d05fbebea",
-  "sha256": "cbc2aeb8b0564748de8d722098c6234ed816303ac6ce756a3bb01cbee1aa1621",
+  "revision": "e6a13d13786b85375a1a234cc61fed04d87f6269",
+  "sha256": "0d3a890411b6ee9f00e8601c5abb25874b2239f0af5179c85c70df6df57934c9",
   "files": [
     {
       "path": ".env.example",
@@ -5515,8 +5515,8 @@
     },
     {
       "path": "telephony/loopback_phone_call_session.py",
-      "sha256": "ce160458f4ba343561b495011e9c1a0262c93424cb2faef671087cf2ce6d8402",
-      "bytes": 122511
+      "sha256": "780d920f7f7972a5557ccbcdd25e8f6c395457cca1345573bafb8d001a474647",
+      "bytes": 124405
     },
     {
       "path": "telephony/loopback_transport.py",
@@ -5752,6 +5752,11 @@
       "path": "tests/public/test_linux_sandbox_opt_in.py",
       "sha256": "a02a49dbc341223a9b79c99fd8af6880763072155eaf6635d7b4f0ddc259f488",
       "bytes": 4396
+    },
+    {
+      "path": "tests/public/test_loopback_media_stop.py",
+      "sha256": "bb2258416579abd015192c3c0951841756b93571566464105b4cee1f488a81e1",
+      "bytes": 17882
     },
     {
       "path": "tests/public/test_phone_call_plan_confirmation.py",

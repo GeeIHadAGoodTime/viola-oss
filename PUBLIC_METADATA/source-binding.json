@@ -1,20 +1,14 @@
 {
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "15522106f9528cdf9866a1f59e549ce652de7ea1fd7cf246c347aa1e12eda67e",
-  "source_tree_sha256": "cbc2aeb8b0564748de8d722098c6234ed816303ac6ce756a3bb01cbee1aa1621",
-  "source_file_count": 2496,
-  "source_revision": "36a399bc60731eff24a29c270be5220d05fbebea",
-  "comparison_public_revision": "adb9117157a7111e580224b129266efd6260d8a3",
+  "source_manifest_sha256": "2e807124f098573575eb10519509cbbb6a3a13ec30f3715aea652ce5389df773",
+  "source_tree_sha256": "0d3a890411b6ee9f00e8601c5abb25874b2239f0af5179c85c70df6df57934c9",
+  "source_file_count": 2497,
+  "source_revision": "e6a13d13786b85375a1a234cc61fed04d87f6269",
+  "comparison_public_revision": "f82dd6219670aa6150ac5b2d43c49a002a0ecfff",
   "changed_source_paths": [
-    "SOURCE/tests/public/test_rating_target.py",
-    "SOURCE/tests/public/test_wake_listener_lifecycle.py",
-    "SOURCE/ui/api/routes/rating.py",
-    "SOURCE/ui/react-app/src/SmartDisplay.jsx",
-    "SOURCE/ui/react-app/src/__tests__/SmartDisplay.test.jsx",
-    "SOURCE/ui/react-app/src/hooks/useViolaApi.js",
-    "SOURCE/ui/react-app/src/hooks/useViolaApi.rating.test.js",
-    "SOURCE/voice/wake_detector/violawake_listener.py"
+    "SOURCE/telephony/loopback_phone_call_session.py",
+    "SOURCE/tests/public/test_loopback_media_stop.py"
   ],
   "retained_sboms": [
     {
@@ -56,30 +50,28 @@
   ],
   "input_equivalence": {
     "changed_dependency_inputs": [],
-    "basis": "Only wake-listener lifecycle, coordinated music-rating UI/API behavior and their regression tests change. Dependency declarations, lockfiles, package/runtime versions, vendored sources and their provenance, model assets, licence and notice data, and workflows are unchanged. All six prior resolved dependency inventories are retained byte-for-byte. No re-resolution, new advisory scan or installed-runtime qualification is claimed."
+    "basis": "Only loopback phone clean-stop lifecycle source and its extracted-method regression test change. Dependency declarations, lockfiles, versions, vendored sources and provenance, model assets, licences, notices, and workflows remain unchanged. All six prior resolved inventories remain byte-for-byte unchanged. No new dependency resolution, advisory scan, or installed-runtime qualification is claimed."
   },
   "prior_binding": {
-    "public_revision": "adb9117157a7111e580224b129266efd6260d8a3",
+    "public_revision": "f82dd6219670aa6150ac5b2d43c49a002a0ecfff",
     "path": "PUBLIC_METADATA/source-binding.json",
-    "git_blob": "72ee72de20242d24c2260f923a49a51fbf7558f1",
-    "sha256": "55423b3c971f7d6361a8f0026e8d8ae26552ac7406559969eb45cebbe675486b",
-    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/adb9117157a7111e580224b129266efd6260d8a3/PUBLIC_METADATA/source-binding.json"
+    "git_blob": "20edb9cf710cccfce5e4169dca944315c0d941ef",
+    "sha256": "b5d772e79536d5ad774f731a030954fe7c4feb14afb059b075b04cfe4dbb4c94",
+    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/f82dd6219670aa6150ac5b2d43c49a002a0ecfff/PUBLIC_METADATA/source-binding.json"
   },
   "new_resolution_performed": false,
   "new_advisory_scan_performed": false,
   "new_runtime_qualification_performed": false,
   "qualification": {
-    "scope": "Public-owned wake-listener lifecycle and coordinated music-rating UI/API source repair with local synthetic qualification; no installed-app, hardware, provider, production-build, release or deployment acceptance.",
-    "source_integrity": "2496 source files match the independently reviewed combined source and the canonical generated manifest. All six retained SBOM hashes and component counts are verified. Exactly eight reviewed source paths plus source manifest and binding change; all other repository blobs, modes and types remain unchanged. Strict patch application and reverse checks pass.",
-    "python_checks": "Exact public unittest discovery passes 215 tests without failures, errors or skips. Existing Linux Python tooling and four unchanged fail-on-use optional import leaves support execution; external sockets are blocked and no attempted connection was recorded. No package or model was acquired.",
-    "frontend_checks": "Focused combined React command covers SmartDisplay, every useViolaApi suite, PlayerSection and all SmartDisplay companion suites: 10 files and 193 tests pass without failures or skips. This is not the complete React suite or a production build.",
-    "wake_lifecycle": "Failed-start wake listeners unregister the actual device-change owner on exit and reset active-loop state. An RLock resolves same-thread failed-open cleanup deadlock while preserving cross-thread exclusion. Synthetic real-loop reads advance WorkSignal; failed starts do not. Read-loop AST, existing catch handlers, thresholds and inference/read/retry cadence are unchanged.",
-    "rating_contract": "The caller captures video_id || id and serializes writes for each persisted rating ID within its display instance. Per-visit pending and confirmed state rejects stale completions and drops departed unsent work. The additive optional expected_track_id API field is validated and checked before store acquisition; delayed mismatches return 409 without a write. Legacy callers omitting the field retain existing behavior. Route, transport helper and caller ship together.",
-    "negative_controls": "Independent review killed six known-bad controls: missing unregister, missing active-loop reset, restored non-reentrant lock, original unbound route, disabled UI serialization, and original UI. The deadlocking subprocess was bounded and reaped. Full source hashes match again after all controls were restored.",
-    "compatibility": "Focused existing wake-listener, device-routing and Linux-log source checks pass: 23 passed with the unchanged strict inference-cadence xfail retained. No source-inspection compatibility failure was found. This is not a canonical private composition or whole-private-suite qualification.",
-    "lint": "New wake regression Python checks and focused route/helper checks pass. Whole-listener Ruff retains exactly five pre-existing E402 findings. Changed UI ESLint has zero errors and the same eleven pre-existing warnings. No clean whole-file lint claim is made for the listener.",
-    "network_ordering_limit": "An HTTP transport rejection remains an ambiguous persistence result: the server operation might still finish later. No exactly-once, server-versioning, cross-client or cross-remount ordering guarantee is established. A never-settling request continues to block subsequent writes for its ID. Existing cross-provider ID collisions and absence of rating readback on track entry remain unchanged.",
-    "installed_candidate": "pending; native device hot-plug, physical microphone/model operation, installed rendering and customer behavior remain unverified",
+    "scope": "Bounded loopback clean-stop lifecycle source correction and synthetic extracted-method checks; no full Pipecat integration, carrier/live-call, installed-app, build, release, or deployment acceptance.",
+    "source_integrity": "Exactly two reviewed public-owned source/test paths plus this canonical manifest and binding change. All 2497 source files are inventoried. All other repository bytes, modes and types, including licences, notices, provenance, dependencies, workflows and all six retained SBOMs, are preserved. Strict patch apply and reverse checks pass.",
+    "lifecycle_checks": "16 controls compile selected actual watchdog, end_call, stop, _stop_once, media-stop simulation, and terminal speech-guard method bodies unchanged, with inert media runner, storage and carrier boundaries. All 16 pass in the independently reviewed R3 and exact-byte integrated candidate.",
+    "behavior": "A clean media-stop invokes the existing drain/finalization path. Abnormal loss remains FAILED. Per-session serialization and success latching prevent repeated successful recording, trace and completion effects and preserve terminal time across repeated or concurrent stop calls. Failed or cancelled cleanup remains retryable. Previously delivered owner cancellation may finish finally cleanup; a new cancellation propagates while the shared runner is shielded.",
+    "negative_controls": "Independent review observed three baseline failures, six R1 failures, and the R2 ordinary-cancelled-owner-finally regression. Exact R3 source passes the original duplicate-finalization and cancelled-owner probes. Superseded candidates are not publication inputs.",
+    "lint": "Installed Ruff checks pass for both changed public Python files; Black passes the new regression test. No clean whole-runtime Black or whole-repository lint claim is made.",
+    "integration_limit": "Actual constructor/start wiring, full Pipecat PipelineTask/PipelineRunner, audio/model behavior, carrier WebSocket execution, persistence integration and user-facing live-call behavior are not qualified by these extracted-method controls. Full integration collection was blocked by missing optional runtime dependencies in the bounded local environment.",
+    "side_effect_limit": "Retry controls use synthetic fail-before-success boundaries. They do not establish transactional exactly-once semantics for external operations that commit before reporting failure.",
+    "installed_candidate": "pending; native audio/model and live phone behavior remain unverified",
     "exact_head_hosted_checks": "pending",
     "release_or_deployment": "not_established"
   }

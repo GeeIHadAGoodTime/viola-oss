@@ -554,6 +554,9 @@ class LoopbackPhoneCallSession:
         self._subscriptions: list[Subscription] = []
         self._pipeline_task: Any | None = None
         self._runner_task: asyncio.Task[None] | None = None
+        self._stop_lock = asyncio.Lock()
+        self._stop_complete = False
+        self._stop_trace_complete = False
         self._opening_settle_task: asyncio.Task[str] | None = None
         self._text_injector: _TextInjectionProcessor | None = None
         self._receptionist_bot: _TTSBotReceptionist | None = None
@@ -1032,6 +1035,18 @@ class LoopbackPhoneCallSession:
         )
 
     async def stop(self) -> None:
+        # Media-stop simulation and the caller's finally block can both stop
+        # the same session. Serialize their cleanup and commit completion only
+        # after success, so interrupted/failed cleanup remains retryable.
+        async with self._stop_lock:
+            if self._stop_complete:
+                return
+            await self._stop_once()
+            self._stop_complete = self.record is not None
+
+    async def _stop_once(self) -> None:
+        current_task = asyncio.current_task()
+        cancellation_requests = current_task.cancelling() if current_task is not None else 0
         if self.record is None:
             # Even when start() never produced a record, restore any bus we swapped.
             self._dispose_event_subscriptions()
@@ -1067,9 +1082,14 @@ class LoopbackPhoneCallSession:
                     await self._pipeline_task.stop_when_done()
             if self._runner_task is not None:
                 with suppress(asyncio.CancelledError):
-                    await asyncio.wait_for(self._runner_task, timeout=_TURN_WAIT_TIMEOUT_SECONDS)
+                    await asyncio.wait_for(asyncio.shield(self._runner_task), timeout=_TURN_WAIT_TIMEOUT_SECONDS)
+            # An already-cancelled owner still needs its finally: stop() cleanup.
+            # Only a NEW cancellation delivered during this cleanup should abort
+            # finalization; cancelled child tasks alone are normal teardown.
+            if current_task is not None and current_task.cancelling() > cancellation_requests:
+                raise asyncio.CancelledError
             await asyncio.sleep(_TEE_DRAIN_SECONDS)
-        except Exception:
+        except (Exception, asyncio.CancelledError):
             self._dispose_event_subscriptions()
             self._restore_event_bus()
             raise
@@ -1080,17 +1100,17 @@ class LoopbackPhoneCallSession:
 
         if self.record.status not in _TERMINAL_CALL_STATUSES:
             self.record.status = CallStatus.COMPLETED
-        self.record.ended_at = datetime.now(tz=UTC)
+        if self.record.ended_at is None:
+            self.record.ended_at = datetime.now(tz=UTC)
         if self.record.started_at is not None:
             self.record.duration_seconds = (self.record.ended_at - self.record.started_at).total_seconds()
-        if self._phone_latency_trace is not None:
-            self._phone_latency_trace.complete(
-                status=self.record.status.value,
-                duration_seconds=self.record.duration_seconds,
-            )
-
         self._mark_loopback_disclosure_if_spoken()
-        if self.record.recording_enabled and self.record.disclosure_spoken and self.recorded_audio:
+        if (
+            self.record.recording_enabled
+            and self.record.disclosure_spoken
+            and self.recorded_audio
+            and not self._recording_storage_paths
+        ):
             path = await self.call_manager._recording_storage.save(
                 self.record.call_id,
                 "loopback",
@@ -1100,25 +1120,32 @@ class LoopbackPhoneCallSession:
             if path:
                 self.record.recording_paths["loopback"] = path
 
-        self._append_phone_trace_event(
-            "recording_state",
-            recording_enabled=self.record.recording_enabled,
-            disclosure_spoken=self.record.disclosure_spoken,
-            disclosure_text_confirmed=self.record.disclosure_text_confirmed,
-            recording_started_after_disclosure=self.record.recording_started_after_disclosure,
-            recording_paths=dict(self.record.recording_paths),
-            recorded_audio_bytes=len(self.recorded_audio),
-        )
         if self._hold_handler is not None:
             with suppress(Exception):
                 await self._hold_handler.cleanup()
         if self._voicemail_handler is not None and hasattr(self._voicemail_handler, "cleanup"):
             with suppress(Exception):
                 await self._voicemail_handler.cleanup()
-        self._append_trace_complete()
-        if self._task_trace is not None:
-            with suppress(Exception):
-                self._task_trace.flush()
+        if not self._stop_trace_complete:
+            if self._phone_latency_trace is not None:
+                self._phone_latency_trace.complete(
+                    status=self.record.status.value,
+                    duration_seconds=self.record.duration_seconds,
+                )
+            self._append_phone_trace_event(
+                "recording_state",
+                recording_enabled=self.record.recording_enabled,
+                disclosure_spoken=self.record.disclosure_spoken,
+                disclosure_text_confirmed=self.record.disclosure_text_confirmed,
+                recording_started_after_disclosure=self.record.recording_started_after_disclosure,
+                recording_paths=dict(self.record.recording_paths),
+                recorded_audio_bytes=len(self.recorded_audio),
+            )
+            self._append_trace_complete()
+            if self._task_trace is not None:
+                with suppress(Exception):
+                    self._task_trace.flush()
+            self._stop_trace_complete = True
         self._publish_lifecycle("completed")
         for subscription in self._subscriptions:
             subscription.dispose()
@@ -1193,6 +1220,13 @@ class LoopbackPhoneCallSession:
             _LoopbackStoppedMediaTransport(reason=reason),
             grace_seconds=0.0,
         )
+        if reason == "telnyx_stop":
+            # A real Telnyx clean stop also sends EndFrame and lets the normal
+            # completion path finalize the call. The watchdog deliberately
+            # leaves that status alone. Loopback has no carrier input task, so
+            # drive its existing drain/cleanup path as the other half of the
+            # simulated event instead of leaving the session ACTIVE forever.
+            await self.stop()
 
     def _mark_loopback_disclosure_if_spoken(self) -> bool:
         if self.record is None:
