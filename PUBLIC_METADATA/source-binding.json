@@ -1,15 +1,12 @@
 {
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "93d6c33640ae82201794ec8468ee3347f67fcbd319010e413c86d7086ac451c0",
-  "source_tree_sha256": "c6065834c8f39e34d35a66658afdf72a4d90df9387bb959e3668645c4011fbc5",
+  "source_manifest_sha256": "c53c93e222e5c2b0aee739a92ba039e5f29ba341d125a6842f1cb9d7ea36c033",
+  "source_tree_sha256": "fc99425b0bcfdf91686cabb0bd7d9cd287f80a27ff6362e41f1ff60a9fed319a",
   "source_file_count": 2491,
-  "source_revision": "b555d6f9893f429a8a02a94300e8aef5c3cd025b",
-  "comparison_public_revision": "d9c441969fc1eee00f4703bbf72106bafcb29f95",
+  "source_revision": "ff81985ff9e1eca32052d0bff9e66d1e58e285e1",
+  "comparison_public_revision": "dda409a83955dcbd60edaf5fbf7d9459f88f63ff",
   "changed_source_paths": [
-    "SOURCE/telephony/call_manager.py",
-    "SOURCE/telephony/language_handler.py",
-    "SOURCE/telephony/loopback_phone_call_session.py",
     "SOURCE/tests/public/test_phone_language_switch.py"
   ],
   "retained_sboms": [
@@ -52,27 +49,28 @@
   ],
   "input_equivalence": {
     "changed_dependency_inputs": [],
-    "basis": "Four public source/test paths change for interruption-safe phone language settings and direct conversation-context publication. Dependency manifests and lockfiles, runtime version 1.0.5, voices/models, all frontend bytes, and all six retained SBOMs are unchanged. The only added source path is tests/public/test_phone_language_switch.py."
+    "basis": "One existing public test changes only import-fixture isolation for normal unittest discovery after the installed Pipecat package was already imported. The three reviewed phone runtime files, source assertions, workflows, dependencies, runtime version 1.0.5, all frontend bytes and all six retained SBOMs are unchanged."
   },
   "prior_binding": {
-    "public_revision": "d9c441969fc1eee00f4703bbf72106bafcb29f95",
+    "public_revision": "dda409a83955dcbd60edaf5fbf7d9459f88f63ff",
     "path": "PUBLIC_METADATA/source-binding.json",
-    "git_blob": "443b1c59b40bc19ddae8a6ab4b26768d74b81898",
-    "sha256": "62f07c419acf8caa0f134ddac140d2547604105428053e31d000d53266f70523",
-    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/d9c441969fc1eee00f4703bbf72106bafcb29f95/PUBLIC_METADATA/source-binding.json"
+    "git_blob": "d831446b1ae6db55042b3afb0866fb3ffddc6b97",
+    "sha256": "3710423f25a3b049fc22c64c4e73510134ef890fedb60e5a8d59a4507334d175",
+    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/dda409a83955dcbd60edaf5fbf7d9459f88f63ff/PUBLIC_METADATA/source-binding.json"
   },
   "new_resolution_performed": false,
   "new_advisory_scan_performed": false,
   "new_runtime_qualification_performed": false,
   "qualification": {
-    "scope": "Public Python source/control-flow correction with synthetic model boundaries; no installed-runtime, carrier/provider, audio-quality, release or deployment qualification.",
-    "source_integrity": "2491 source files verified against the regenerated manifest; all six retained SBOM hashes/component counts verified; only four source paths and the source manifest/binding change.",
-    "python_checks": "167 public Python contracts passed with no failures/errors/skips, including 15 phone-language cases. Independent review repeated these checks and exact source/patch verification. Existing Linux Python 3.12 tooling and fail-loud stubs for unused optional imports were used; no dependencies or model assets were acquired.",
+    "scope": "Test-only module-isolation follow-up to the reviewed phone-language source correction; no runtime or workflow changes and no installed/live qualification.",
+    "source_integrity": "2491 source files verified against the regenerated manifest; all six retained SBOM hashes/component counts verified; only one test path and the source manifest/binding change from the preceding published head.",
+    "python_checks": "The exact normal unittest discovery command passes 167 tests without a source Pipecat PYTHONPATH. With installed Pipecat and phone adapters preloaded, phone-first and phone-last full-suite orders each pass 167 tests plus restoration checks. Independent review repeats these and preloaded/absent/failed-setup restoration probes: scoped modules, parent attributes and sys.path restore exactly, unrelated imports persist, and no model modules leak. Existing Linux Python 3.12 tooling and unused-import boundaries are used; no dependencies or model assets were acquired.",
     "phone_control_checks": "Real pinned Kokoro/TTS/AI classes, actual settings frames, real queued transcription observer, and real user/assistant context aggregators were exercised. Two Spanish transcriptions during an inert in-flight English stream commit exactly one Spanish context; barge-in preserves it and subsequent synthesis forwards es. The old output-context route is a failing negative control. All eight locales, missing/no-op adapters/targets, before-append rollback, after-append retention, cancellation and retry are covered.",
     "model_and_turn_boundaries": "Model construction, file acquisition and audio generation are inert boundaries; queued aggregation uses external turn strategies rather than constructing VAD/SmartTurn models. No actual phone call, model inference, native resampling, voice/language audio pairing or hardware playback was performed.",
     "lint": "Black checks pass on all four source files. Whole-file Ruff retains the same three unrelated baseline findings in the two large phone builders; no added-line findings. The language handler passes the existing repository rules.",
     "frontend_checks": "Frontend bytes are unchanged; no new frontend build or test qualification is claimed for this Python-only correction.",
     "installed_candidate": "pending; multilingual installed/live phone audio remains unverified",
+    "prior_hosted_checks": "On preceding head dda409a83955dcbd60edaf5fbf7d9459f88f63ff, Windows frontend and dependency inventories passed, while python-contracts failed the strict source-origin setup assertion after earlier tests cached installed Pipecat. The assertion is preserved; new exact-head hosted checks remain pending.",
     "exact_head_hosted_checks": "pending",
     "release_or_deployment": "not_established"
   }

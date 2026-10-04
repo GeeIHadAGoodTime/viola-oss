@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "b555d6f9893f429a8a02a94300e8aef5c3cd025b",
-  "sha256": "c6065834c8f39e34d35a66658afdf72a4d90df9387bb959e3668645c4011fbc5",
+  "revision": "ff81985ff9e1eca32052d0bff9e66d1e58e285e1",
+  "sha256": "fc99425b0bcfdf91686cabb0bd7d9cd287f80a27ff6362e41f1ff60a9fed319a",
   "files": [
     {
       "path": ".env.example",
@@ -5755,8 +5755,8 @@
     },
     {
       "path": "tests/public/test_phone_language_switch.py",
-      "sha256": "61a57fe645c99884d3435826f5183ca597ad13ab792ce71a79b2aeaca81f4e8a",
-      "bytes": 20832
+      "sha256": "297c23b9a36e0533b29da8383602cc8db7d103599ee44c5844b249e2879942ad",
+      "bytes": 22387
     },
     {
       "path": "tests/public/test_pipecat_runner_security.py",
