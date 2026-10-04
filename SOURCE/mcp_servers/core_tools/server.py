@@ -1304,25 +1304,23 @@ async def think(
 async def file_read(
     action: Annotated[
         str,
-        Field(description="Filesystem read action. Use one of: 'list', 'read', 'info', or 'search'."),
+        Field(description="Filesystem action: list, read, info or search."),
     ] = "list",
     path: Annotated[
         str,
-        Field(
-            description="Filesystem path to inspect. Use a directory for 'list' and 'search', or a file path for 'read' and 'info'."
-        ),
+        Field(description="Path: directory for list/search, file for read/info."),
     ] = "~",
     offset: Annotated[
         int,
-        Field(description="Zero-based line offset for action='read'."),
+        Field(description="For read: zero-based line offset."),
     ] = 0,
     limit: Annotated[
         int,
-        Field(description="Maximum number of lines to return for action='read'."),
+        Field(description="For read: maximum lines returned."),
     ] = 100,
     pattern: Annotated[
         str,
-        Field(description="Filename glob pattern for action='search', such as '*.py' or 'README*'."),
+        Field(description="Search filename glob, e.g. '*.py' or 'README*'."),
     ] = "",
 ) -> str:
     """Read from the filesystem.
@@ -1972,27 +1970,27 @@ async def google_workspace(
 async def desktop_interact(
     action: Annotated[
         str,
-        Field(description="Desktop action: focus, click, type, key, hotkey, mouse_click, or scroll."),
+        Field(description="Action: focus, click, type, key, hotkey, mouse_click or scroll."),
     ] = "focus",
-    title: Annotated[str, Field(description="Window title substring for action='focus'.")] = "",
-    window_title: Annotated[str, Field(description="Target window title for scoped click/type/key actions.")] = "",
-    name: Annotated[str, Field(description="Accessibility element name for action='click'.")] = "",
-    text: Annotated[str, Field(description="Text to type for action='type'.")] = "",
+    title: Annotated[str, Field(description="Window-title substring for focus.")] = "",
+    window_title: Annotated[str, Field(description="Target window title for scoped click/type/key.")] = "",
+    name: Annotated[str, Field(description="Accessibility element name for click.")] = "",
+    text: Annotated[str, Field(description="Text for type.")] = "",
     keys: Annotated[
         str,
-        Field(description="Key chord for action='key' or action='hotkey', such as ctrl+s."),
+        Field(description="Key/hotkey chord, e.g. ctrl+s."),
     ] = "",
-    x: Annotated[int | None, Field(description="Physical x coordinate for action='mouse_click'.")] = None,
-    y: Annotated[int | None, Field(description="Physical y coordinate for action='mouse_click'.")] = None,
+    x: Annotated[int | None, Field(description="Physical x coordinate for mouse_click.")] = None,
+    y: Annotated[int | None, Field(description="Physical y coordinate for mouse_click.")] = None,
     button: Annotated[
         str,
-        Field(description="Mouse button for click actions: left, right, or middle."),
+        Field(description="Click button: left, right or middle."),
     ] = "left",
-    direction: Annotated[str, Field(description="Scroll direction: up, down, left, or right.")] = "down",
-    amount: Annotated[int, Field(description="Scroll amount for action='scroll'.")] = 5,
+    direction: Annotated[str, Field(description="Scroll direction: up, down, left or right.")] = "down",
+    amount: Annotated[int, Field(description="Scroll amount.")] = 5,
     respect_focus: Annotated[
         bool,
-        Field(description="For action='type', preserve target-window focus discipline."),
+        Field(description="For type: preserve target-window focus discipline."),
     ] = True,
 ) -> str:
     """Compatibility wrapper for the compact desktop_interact MCP surface."""
@@ -3782,50 +3780,43 @@ async def workbench(
     ] = "search",
     content: Annotated[
         str,
-        Field(description="Text content for action='remember'. For voice path: the transcribed user content."),
+        Field(description="For remember: text, including transcribed user speech on the voice path."),
     ] = "",
     query: Annotated[
         str,
-        Field(description="Free-text search query for action='search'."),
+        Field(description="For search: free-text query."),
     ] = "",
     item_id: Annotated[
         str,
-        Field(description="Deprecated item id for compatibility. Prefer filename."),
+        Field(description="Deprecated compatibility item ID; prefer filename."),
     ] = "",
     result_id: Annotated[
         str,
-        Field(description="Stable r1..rN id from a prior action='search' result for action='path_for'."),
+        Field(description="For path_for: stable r1..rN ID from a prior search result."),
     ] = "",
     filename: Annotated[
         str,
-        Field(description="Filename for action='path_for' or action='forget'."),
+        Field(description="Filename for path_for or forget."),
     ] = "",
     title_hint: Annotated[
         str,
         Field(
             description=(
-                "Filename for action='remember'. A 3-6 word slug from the content works well "
-                "(e.g. 'pizza-recipe', 'monday-dentist-notes', 'apartment-lease-2025'). "
-                "Without a hint, the handler derives a fallback title from the content."
+                "For remember: filename hint; try a 3-6 word content slug (pizza-recipe, monday-dentist-notes, apartment-lease-2025). Blank derives title from content."
             )
         ),
     ] = "",
     tags: Annotated[
         str,
-        Field(description="Comma-separated tag filter for action='search'."),
+        Field(description="For search: comma-separated tag filter."),
     ] = "",
     limit: Annotated[
         int,
-        Field(description="Max results for action='search' or action='list'."),
+        Field(description="Max results for search or list."),
     ] = 10,
     confirm: Annotated[
         bool,
-        Field(
-            description=(
-                "Required True to actually forget for action='forget'. False returns a preview "
-                "of files that would be forgotten."
-            )
-        ),
+        Field(description=("For forget: requires true to delete; false previews files.")),
     ] = False,
 ) -> str:
     """Manage the user's Workbench folder.
@@ -5023,12 +5014,7 @@ async def weather(
 async def daily_briefing(
     city: Annotated[
         str,
-        Field(
-            description=(
-                "Optional city for the weather portion (e.g. 'Madison, WI'). "
-                "Leave empty to use the user's saved weather_location."
-            )
-        ),
+        Field(description=("Optional weather city, e.g. 'Madison, WI'; empty uses the user's saved weather_location.")),
     ] = "",
 ) -> str:
     """Aggregate weather, today's calendar, and today's tasks into one briefing."""
@@ -5271,74 +5257,73 @@ async def calendar(
         str,
         Field(
             description=(
-                "Calendar action. Use one of: 'list', 'list_calendars', 'get', 'add', 'update', 'delete', "
-                "'respond', 'find_free_time', or 'icloud_status'."
+                "Action: list, list_calendars, get, add, update, delete, respond, find_free_time or icloud_status."
             )
         ),
     ] = "list",
     start_date: Annotated[
         str,
-        Field(description="Start of the date range for action='list' in ISO-8601 format."),
+        Field(description="ISO-8601 range start for action='list'."),
     ] = "",
     end_date: Annotated[
         str,
-        Field(description="End of the date range for action='list' in ISO-8601 format."),
+        Field(description="ISO-8601 range end for action='list'."),
     ] = "",
     max_results: Annotated[
         int,
-        Field(description="Maximum number of events to return for action='list'."),
+        Field(description="Max events for action='list'."),
     ] = 10,
     provider: Annotated[
         str,
-        Field(description="Calendar provider. Use 'auto', 'all', 'local', 'google', 'graph', or 'caldav'."),
+        Field(description="Provider: auto, all, local, google, graph or caldav."),
     ] = "auto",
     calendar_id: Annotated[
         str,
-        Field(description="Optional provider-specific calendar ID. Leave blank for the primary/default calendar."),
+        Field(description="Optional provider calendar ID; blank uses primary/default."),
     ] = "",
     title: Annotated[
         str,
-        Field(description="Event title/summary for action='add'. Also accepts 'summary' as an alias."),
+        Field(description="For add: event title; summary is an alias."),
     ] = "",
     summary: Annotated[
         str,
-        Field(description="Alias for title (Google Calendar convention). Use title or summary, not both."),
+        Field(description="Google Calendar alias for title; use one, not both."),
     ] = "",
     start_time: Annotated[
         str,
-        Field(description="Event start time for action='add' in ISO-8601 format."),
+        Field(description="For add: ISO-8601 event start."),
     ] = "",
     end_time: Annotated[
         str,
-        Field(description="Optional event end time for action='add' in ISO-8601 format."),
+        Field(description="For add: optional ISO-8601 event end."),
     ] = "",
     description: Annotated[
         str,
-        Field(description="Optional event description for action='add'."),
+        Field(description="For add: optional event description."),
     ] = "",
     location: Annotated[
         str,
-        Field(description="Optional event location for action='add'."),
+        Field(description="For add: optional event location."),
     ] = "",
     all_day: Annotated[
         bool,
-        Field(description="Set true for an all-day event when action='add'."),
+        Field(description="For add: true for an all-day event."),
     ] = False,
     event_id: Annotated[
         str,
-        Field(description="Calendar event ID for action='get', 'update', 'delete', or 'respond'."),
+        Field(description="Event ID for get, update, delete or respond."),
     ] = "",
     response_status: Annotated[
         str,
-        Field(description="For action='respond': 'accepted', 'declined', or 'tentative'."),
+        Field(description="For respond: accepted, declined or tentative."),
     ] = "",
     attendees: Annotated[
         list[str] | None,
-        Field(description="Optional attendee email addresses for action='add' or action='find_free_time'."),
+        Field(description="Optional attendee emails for add or find_free_time."),
     ] = None,
     duration_minutes: Annotated[
         int,
-        Field(description="For action='find_free_time': desired slot duration in minutes."),
+        Field(description="For find_free_time: slot duration in minutes."),
     ] = 30,
 ) -> str:
     """Manage calendar events.
@@ -5476,15 +5461,15 @@ async def calendar(
 async def contacts(
     action: Annotated[
         str,
-        Field(description="Contacts action. Use one of: 'find' or 'list'."),
+        Field(description="Action: find or list."),
     ] = "find",
     name: Annotated[
         str,
-        Field(description="For action='find': the contact name to resolve, e.g. 'Jay' or 'Mom'."),
+        Field(description="For find: contact name, e.g. 'Jay' or 'Mom'."),
     ] = "",
     max_results: Annotated[
         int,
-        Field(description="For action='list': maximum contacts to return."),
+        Field(description="For list: max contacts returned."),
     ] = 50,
 ) -> str:
     """Resolve or list a user's connected contacts.

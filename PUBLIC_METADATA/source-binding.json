@@ -1,14 +1,13 @@
 {
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "2e807124f098573575eb10519509cbbb6a3a13ec30f3715aea652ce5389df773",
-  "source_tree_sha256": "0d3a890411b6ee9f00e8601c5abb25874b2239f0af5179c85c70df6df57934c9",
+  "source_manifest_sha256": "63445d718440d564346f2607254c278fd95a2f6f6818c63e670996f6f3eab8b6",
+  "source_tree_sha256": "7e26dc007862352e797f9dfc442caa1d58c112f6ef9d5a1bd6667e39df411b47",
   "source_file_count": 2497,
-  "source_revision": "e6a13d13786b85375a1a234cc61fed04d87f6269",
-  "comparison_public_revision": "f82dd6219670aa6150ac5b2d43c49a002a0ecfff",
+  "source_revision": "512c66fbc5ec0d1b17fd6acdec2f2e71aeb94419",
+  "comparison_public_revision": "9da0a2e5ae7fdb6012cfaafefda953cded769e0c",
   "changed_source_paths": [
-    "SOURCE/telephony/loopback_phone_call_session.py",
-    "SOURCE/tests/public/test_loopback_media_stop.py"
+    "SOURCE/mcp_servers/core_tools/server.py"
   ],
   "retained_sboms": [
     {
@@ -50,28 +49,26 @@
   ],
   "input_equivalence": {
     "changed_dependency_inputs": [],
-    "basis": "Only loopback phone clean-stop lifecycle source and its extracted-method regression test change. Dependency declarations, lockfiles, versions, vendored sources and provenance, model assets, licences, notices, and workflows remain unchanged. All six prior resolved inventories remain byte-for-byte unchanged. No new dependency resolution, advisory scan, or installed-runtime qualification is claimed."
+    "basis": "Only 47 parameter-help strings in the reviewed public core tool server change. Tool names, schemas apart from those descriptions, handlers, validation, permissions and cancellation behavior are unchanged. All dependencies, workflows, licences, notices, model assets, vendor provenance and six prior resolved inventories remain byte-identical. No new resolution, advisory scan or installed qualification."
   },
   "prior_binding": {
-    "public_revision": "f82dd6219670aa6150ac5b2d43c49a002a0ecfff",
+    "public_revision": "9da0a2e5ae7fdb6012cfaafefda953cded769e0c",
     "path": "PUBLIC_METADATA/source-binding.json",
-    "git_blob": "20edb9cf710cccfce5e4169dca944315c0d941ef",
-    "sha256": "b5d772e79536d5ad774f731a030954fe7c4feb14afb059b075b04cfe4dbb4c94",
-    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/f82dd6219670aa6150ac5b2d43c49a002a0ecfff/PUBLIC_METADATA/source-binding.json"
+    "git_blob": "cf4cc63e3f3c32e6f6c438a6116b0ad7db18af6e",
+    "sha256": "7b08278eca2928f1233279d68c90d8ecc93063cd419f42caf6e95674a3fd9ae3",
+    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/9da0a2e5ae7fdb6012cfaafefda953cded769e0c/PUBLIC_METADATA/source-binding.json"
   },
   "new_resolution_performed": false,
   "new_advisory_scan_performed": false,
   "new_runtime_qualification_performed": false,
   "qualification": {
-    "scope": "Bounded loopback clean-stop lifecycle source correction and synthetic extracted-method checks; no full Pipecat integration, carrier/live-call, installed-app, build, release, or deployment acceptance.",
-    "source_integrity": "Exactly two reviewed public-owned source/test paths plus this canonical manifest and binding change. All 2497 source files are inventoried. All other repository bytes, modes and types, including licences, notices, provenance, dependencies, workflows and all six retained SBOMs, are preserved. Strict patch apply and reverse checks pass.",
-    "lifecycle_checks": "16 controls compile selected actual watchdog, end_call, stop, _stop_once, media-stop simulation, and terminal speech-guard method bodies unchanged, with inert media runner, storage and carrier boundaries. All 16 pass in the independently reviewed R3 and exact-byte integrated candidate.",
-    "behavior": "A clean media-stop invokes the existing drain/finalization path. Abnormal loss remains FAILED. Per-session serialization and success latching prevent repeated successful recording, trace and completion effects and preserve terminal time across repeated or concurrent stop calls. Failed or cancelled cleanup remains retryable. Previously delivered owner cancellation may finish finally cleanup; a new cancellation propagates while the shared runner is shielded.",
-    "negative_controls": "Independent review observed three baseline failures, six R1 failures, and the R2 ordinary-cancelled-owner-finally regression. Exact R3 source passes the original duplicate-finalization and cancelled-owner probes. Superseded candidates are not publication inputs.",
-    "lint": "Installed Ruff checks pass for both changed public Python files; Black passes the new regression test. No clean whole-runtime Black or whole-repository lint claim is made.",
-    "integration_limit": "Actual constructor/start wiring, full Pipecat PipelineTask/PipelineRunner, audio/model behavior, carrier WebSocket execution, persistence integration and user-facing live-call behavior are not qualified by these extracted-method controls. Full integration collection was blocked by missing optional runtime dependencies in the bounded local environment.",
-    "side_effect_limit": "Retry controls use synthetic fail-before-success boundaries. They do not establish transactional exactly-once semantics for external operations that commit before reporting failure.",
-    "installed_candidate": "pending; native audio/model and live phone behavior remain unverified",
+    "scope": "Bounded description compaction preserving intended 76-tool surface and the original strict 62000-byte tool-array budget. No model-quality, full safety suite, native Windows or installed/live qualification.",
+    "source_integrity": "Exactly one reviewed public source path and canonical manifest/binding change. All 2497 source files remain inventoried. Dependency/model/licence/notice/vendor/workflow files and six SBOMs are unchanged.",
+    "behavior": "47 before/after description pairs independently reviewed for every instructional fact, including required confirmation and workbench fallback title. All other AST and converted schema structure remains identical.",
+    "checks": "18 focused tests pass; independent negative controls reject bloat, added/removed tools, missing contacts/daily_briefing, strictness loss and legacy Gmail. SDK MockTransport confirms actual tools-array serialization without network calls.",
+    "budget": "76 tools serialize to 61977 UTF-8 bytes under unchanged strict <62000 cap; 23 bytes margin. Bound excludes HTTP envelope and is not a tokenizer budget.",
+    "integration_limit": "Private count fixture and Windows Safety runtime composition routing are required separately. Do not copy public runtime into private shadows.",
+    "installed_candidate": "pending",
     "exact_head_hosted_checks": "pending",
     "release_or_deployment": "not_established"
   }
