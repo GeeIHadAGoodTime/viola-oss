@@ -725,12 +725,19 @@ class StepLoggerMiddleware(Middleware):
             # UI/stream broadcast is useful but must not block the next model
             # turn. The JSONL append above and tool-execution trace append in
             # agent_loop remain synchronous forensic records.
+            # Returned failures need not raise; unverified is a third verdict.
+            if tool_error:
+                status = "error"
+            elif tool_result.unverified:
+                status = "unknown"
+            else:
+                status = "ok" if tool_result.ok else "error"
             self._schedule_background(
                 self._broadcast_step_bounded(
                     tool_name=tool_name,
                     iteration=context.iteration,
                     tool_elapsed_ms=tool_elapsed_ms,
-                    status="error" if tool_error else "ok",
+                    status=status,
                     reasoning=context.llm_reasoning,
                     tool_args=copy.deepcopy(tool_args),
                     tool_output=_summarize(summary_text, 4000),
