@@ -64,8 +64,9 @@ def register_rating_routes(context: ApiContext, toolbox: RouteToolbox) -> None:
     async def set_rating(body: dict = Body(...)):
         """Unified rating endpoint for React UI.
 
-        Accepts: { rating: 'liked' | 'disliked' | null }
-        Gets current track info from playback state.
+        Accepts: { rating: 'liked' | 'disliked' | null, expected_track_id?: string }
+        An optional expected ID binds the request to the displayed track.
+        Callers omitting it retain the current-track behavior.
         """
 
         async def _inner():
@@ -112,6 +113,17 @@ def register_rating_routes(context: ApiContext, toolbox: RouteToolbox) -> None:
 
                 if not video_id:
                     return error_response("Track has no video_id", status_code=400)
+
+                # Check the same ID that will be persisted, before opening the
+                # rating store. A delayed UI request must not rate a new track.
+                if "expected_track_id" in body:
+                    if rating_value not in ("liked", "disliked", None):
+                        return error_response(f"Invalid rating value: {rating_value}", status_code=400)
+                    expected_track_id = body["expected_track_id"]
+                    if not isinstance(expected_track_id, str) or not expected_track_id.strip():
+                        return error_response("invalid_expected_track_id", status_code=400)
+                    if expected_track_id != video_id:
+                        return error_response("rating_track_changed", status_code=409)
 
                 rating_system = get_rating_system()
 

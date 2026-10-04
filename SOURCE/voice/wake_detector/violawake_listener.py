@@ -354,7 +354,9 @@ class ViolaWakeListener:
         self._audio: pyaudio.PyAudio | None = None
         self._stream: GuardedStream | None = None
         self._is_initialized = False
-        self._state_lock = threading.Lock()
+        # _init() may call cleanup() on failure while already holding this
+        # lock. Keep teardown exclusive without deadlocking that same thread.
+        self._state_lock = threading.RLock()
         self._engine_lock = threading.RLock()
         self._engine_callback: Callable[[], None] | None = None
         self._device_name: str = "unknown"
@@ -1886,10 +1888,23 @@ class ViolaWakeListener:
         # gets driven. Registering also starts the device watch (see
         # audio_core/device_change.register_stream_owner), which is what keeps a
         # hot-plug from going unnoticed for the life of the process.
-        from audio_core.device_change import register_stream_owner
+        from audio_core.device_change import register_stream_owner, unregister_stream_owner
 
-        register_stream_owner(self)
+        try:
+            # Registration can append the owner before starting the watcher,
+            # so even a watcher-start failure must pass through this finally.
+            register_stream_owner(self)
+            self._run_registered(stop_event)
+        finally:
+            # Cover initialization and loop setup as well as the read loop.
+            # Stop receiving device handoffs before tearing down capture.
+            self._loop_active.clear()
+            unregister_stream_owner(self)
+            logger.info("ViolaWake detection stopped")
+            self.cleanup()
 
+    def _run_registered(self, stop_event: threading.Event) -> None:
+        """Initialize and listen while run() owns registration and teardown."""
         if not self._init():
             logger.error("Failed to initialize ViolaWake listener")
             # Record the DEFINITE fact that capture never opened. The detection
@@ -1905,7 +1920,6 @@ class ViolaWakeListener:
             # sitting here permanently deaf while /health says listening.
             while not stop_event.is_set():
                 time.sleep(TIMEOUT_MEDIUM)
-            self.cleanup()
             return
 
         logger.info("🎤 ViolaWake detection started")
@@ -2734,16 +2748,6 @@ class ViolaWakeListener:
 
         except Exception as e:
             logger.exception("ViolaWake detection error: %s", e)
-        finally:
-            # Stop receiving device-change handoffs before tearing the stream
-            # down, so the watcher cannot start a suspend on a loop that is
-            # already exiting and then block waiting for a quiesce that will
-            # never come.
-            from audio_core.device_change import unregister_stream_owner
-
-            unregister_stream_owner(self)
-            logger.info("ViolaWake detection stopped")
-            self.cleanup()
 
     def listen_and_record_command(
         self,

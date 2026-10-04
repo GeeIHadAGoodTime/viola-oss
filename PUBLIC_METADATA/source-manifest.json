@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "0a8ebf7020df72a97f15d4968d1dcc194be1011f",
-  "sha256": "8dd9db43a2a701980b2f089a60ca8f402d6cee1c3b51234b6925e171ee43c183",
+  "revision": "36a399bc60731eff24a29c270be5220d05fbebea",
+  "sha256": "cbc2aeb8b0564748de8d722098c6234ed816303ac6ce756a3bb01cbee1aa1621",
   "files": [
     {
       "path": ".env.example",
@@ -5774,6 +5774,11 @@
       "bytes": 17545
     },
     {
+      "path": "tests/public/test_rating_target.py",
+      "sha256": "86a97bd4002f0aa1d1db0ec6505bfa5ca83d2d30d159d8584a95dcf244a6b938",
+      "bytes": 10081
+    },
+    {
       "path": "tests/public/test_request_tool_surface_boundary.py",
       "sha256": "d366c57f3be4a86250fb42233fc909f5f2d1c4f533961f2c5f99a8264f5d5531",
       "bytes": 2733
@@ -5797,6 +5802,11 @@
       "path": "tests/public/test_tts_profile_dependencies.py",
       "sha256": "028ad001dc2d0e3643e09b6a2f1d893840bac97add50af152d9cfd3bd3aea26f",
       "bytes": 2491
+    },
+    {
+      "path": "tests/public/test_wake_listener_lifecycle.py",
+      "sha256": "4a4022d887988c5ec60f724f182f2aad22e7bea38547ad202ba7042c770e293c",
+      "bytes": 13426
     },
     {
       "path": "tests/public/test_windows_native_startup_order.py",
@@ -8785,8 +8795,8 @@
     },
     {
       "path": "ui/api/routes/rating.py",
-      "sha256": "1034cb6a2dff9cf81208324ff153648770d047795090e48a5bda1482660a0b79",
-      "bytes": 10152
+      "sha256": "03950a5da994de4012e0a4600df3fbbfa4d7465c4cfa489a1d4b8f841d0debb3",
+      "bytes": 11043
     },
     {
       "path": "ui/api/routes/regression_stubs.py",
@@ -9250,8 +9260,8 @@
     },
     {
       "path": "ui/react-app/src/SmartDisplay.jsx",
-      "sha256": "76a892602dd01cf70b34e4f18177ff26f2cd04888f55bdabed966b4512a0c0bb",
-      "bytes": 162973
+      "sha256": "635a5893f006ba27e7c04af5cd13ec408a525b8eec5b8c6cd2312ed385207a91",
+      "bytes": 165748
     },
     {
       "path": "ui/react-app/src/SmartDisplay.stageRouting.test.jsx",
@@ -9275,8 +9285,8 @@
     },
     {
       "path": "ui/react-app/src/__tests__/SmartDisplay.test.jsx",
-      "sha256": "ee8be55b83d65112b4b790c04b8a6b0730d0de9993c23e253da8524ea6138809",
-      "bytes": 66687
+      "sha256": "0d25bb5c4e1c8bb95821bf8dba6ea4261270f9671589027e42a38c34c488c0fc",
+      "bytes": 76912
     },
     {
       "path": "ui/react-app/src/__tests__/hooks/useEventBus.test.jsx",
@@ -10925,8 +10935,13 @@
     },
     {
       "path": "ui/react-app/src/hooks/useViolaApi.js",
-      "sha256": "cc9956e88f1d1fc05fa7fb2e7338b2d39892dc9f6c14dd8bdb128bc41bfbb3e9",
-      "bytes": 13344
+      "sha256": "306905f7652387b7bdbcad27918c72fc97998923e180bdb23d8bc9336eccb3d4",
+      "bytes": 13413
+    },
+    {
+      "path": "ui/react-app/src/hooks/useViolaApi.rating.test.js",
+      "sha256": "d00bfcaddde5d400c5863a3b4dd3a694fbff10ff3412440f84da376a756c4e98",
+      "bytes": 3382
     },
     {
       "path": "ui/react-app/src/hooks/useViolaApi.shuffleFailure.test.js",
@@ -12435,8 +12450,8 @@
     },
     {
       "path": "voice/wake_detector/violawake_listener.py",
-      "sha256": "e06bbb5a94a64f5a9b094a15cd1632cc344c98c090d57320bf4c7819824cb88e",
-      "bytes": 134555
+      "sha256": "03835328bb88734428a6ac3d1ef3c344703ca0cba479d186ccb7371301d106ac",
+      "bytes": 134929
     },
     {
       "path": "voice/wake_detector/wake/__init__.py",
