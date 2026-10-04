@@ -12,6 +12,7 @@ ENHANCED: Now uses SecureSettingsManager for encryption of sensitive data.
 from __future__ import annotations
 
 import contextlib
+import copy
 import json
 import os
 import tempfile
@@ -1017,7 +1018,7 @@ class SettingsManager:
 
         # Per-user settings cache (avoids DB round-trip on every get())
         self._user_settings_cache = _UserSettingsCache()
-        self._save_lock = threading.Lock()
+        self._save_lock = threading.RLock()
 
         # Per-user write serialization for the DB-backed per-user settings blob
         # (#2781). Guards the load -> mutate -> cache.put -> DELETE+re-INSERT
@@ -1215,7 +1216,12 @@ class SettingsManager:
         logger.info("📋 Using default settings (no file or secure storage available)")
         return self._default_settings_base()
 
-    def save(self, settings: dict[str, object] | None = None) -> bool:
+    def save(
+        self,
+        settings: dict[str, object] | None = None,
+        *,
+        required_keys: frozenset[str] | None = None,
+    ) -> bool:
         """
         Save settings to file with graceful fallback.
 
@@ -1224,24 +1230,38 @@ class SettingsManager:
         2. Try creating backup of primary before overwriting
         3. Try saving to backup file if primary fails
         4. Try secure storage if file save fails
-        5. Return False only if all methods fail
+        5. Accept recovery only if requested non-secret values are reloadable
 
         Args:
             settings: Settings dict to save, or None to save current
+            required_keys: Keys requested by a partial update. By default, all
+                non-secret keys in the saved snapshot must be reloadable.
 
         Returns:
-            True if successful (any method), False if all failed
+            True if the requested non-secret values are persisted. Recovery may
+            save encrypted fields independently; that alone cannot make a mixed
+            request successful. False does not roll back those recovered secrets.
         """
         with self._save_lock:
-            if settings is not None:
-                self.settings = (
-                    _GuardedSettingsDict(settings) if not isinstance(settings, _GuardedSettingsDict) else settings
-                )
+            # Keep proposed values private until persistence accepts them. Live
+            # readers must keep seeing the previous committed snapshot on failure.
+            pending = _GuardedSettingsDict(self.settings if settings is None else settings)
 
             # Stamp the current time so the UI can show "Last Updated"
-            self.settings, _ = self._migrate_setting_aliases(self.settings)
-            self.settings, _ = self._drop_removed_legacy_settings(self.settings)
-            self.settings["_settings_last_saved"] = time.strftime("%Y-%m-%dT%H:%M:%S")
+            pending, _ = self._migrate_setting_aliases(pending)
+            pending, _ = self._drop_removed_legacy_settings(pending)
+            require_full_snapshot = required_keys is None
+            required_keys = frozenset(
+                key
+                for key in (pending if required_keys is None else required_keys)
+                if key in pending and key != "_settings_last_saved" and not self._is_encrypted_field(key)
+            )
+            # A direct secret-only recovery retains its existing narrow meaning.
+            # Other full saves must also prove removed non-secret keys stay gone.
+            require_full_snapshot = require_full_snapshot and (
+                bool(required_keys) or not any(self._is_encrypted_field(key) for key in pending)
+            )
+            pending["_settings_last_saved"] = time.strftime("%Y-%m-%dT%H:%M:%S")
 
             # Strategy 1: Try saving to primary file
             try:
@@ -1260,9 +1280,10 @@ class SettingsManager:
 
                 # Write settings atomically (temp file + os.replace) so a crash/kill
                 # mid-write can never leave a truncated/corrupt primary settings.json.
-                _atomic_write_json(self.settings_file, self.settings)
+                _atomic_write_json(self.settings_file, pending)
 
                 logger.info("Settings saved to %s", self.settings_file)
+                self.settings = pending
                 return True
 
             except Exception as e:
@@ -1271,9 +1292,11 @@ class SettingsManager:
                 try:
                     backup_file = self.settings_file.with_suffix(".json.bak")
                     self.settings_file.parent.mkdir(parents=True, exist_ok=True)
-                    _atomic_write_json(backup_file, self.settings)
+                    _atomic_write_json(backup_file, pending)
                     logger.info("Settings saved to backup file %s", backup_file)
-                    return True
+                    return self._accept_settings_fallback(
+                        pending, required_keys, require_full_snapshot=require_full_snapshot
+                    )
                 except Exception as e2:
                     logger.warning("Failed to save to backup file: %s", e2)
                     # Strategy 3: Try secure storage for encrypted fields
@@ -1281,7 +1304,7 @@ class SettingsManager:
                         try:
                             saved_count = 0
                             for key in self.ENCRYPTED_FIELDS:
-                                value = self.settings.get(key)
+                                value = pending.get(key)
                                 if isinstance(value, str) and value and value not in _SECRET_PLACEHOLDERS:
                                     self._secure_manager.set_secret(key, value)
                                     saved_count += 1
@@ -1292,13 +1315,55 @@ class SettingsManager:
                                     "Saved %s encrypted settings to secure storage (fallback)",
                                     saved_count,
                                 )
-                                return True
+                                return self._accept_settings_fallback(
+                                    pending, required_keys, require_full_snapshot=require_full_snapshot
+                                )
                         except Exception as e3:
                             logger.debug("Secure storage fallback failed: %s", e3)
 
                     # All methods failed
                     logger.error("All save methods failed: primary=%s, backup=%s", e, e2)
                     return False
+
+    def _accept_settings_fallback(
+        self,
+        pending: dict[str, object],
+        required_keys: frozenset[str],
+        *,
+        require_full_snapshot: bool = False,
+    ) -> bool:
+        """Keep recovery fallbacks without claiming unsaved requested values.
+
+        load() prefers a valid primary. It reads the backup only if the primary
+        is invalid JSON; a missing/unreadable primary does not select the backup.
+        Saving encrypted fields alone cannot persist requested non-secret values.
+        """
+        if required_keys or require_full_snapshot:
+            try:
+                try:
+                    with self.settings_file.open(encoding="utf-8") as handle:
+                        durable = json.load(handle)
+                except json.JSONDecodeError:
+                    with self.settings_file.with_suffix(".json.bak").open(encoding="utf-8") as handle:
+                        durable = json.load(handle)
+            except (OSError, ValueError, TypeError):
+                durable = None
+            durable_keys = (
+                frozenset(key for key in durable if key != "_settings_last_saved" and not self._is_encrypted_field(key))
+                if isinstance(durable, dict)
+                else frozenset()
+            )
+            if (
+                not isinstance(durable, dict)
+                or any(key not in durable or durable[key] != pending[key] for key in required_keys)
+                or (require_full_snapshot and durable_keys != required_keys)
+            ):
+                logger.error(
+                    "Requested settings are not durable through the settings fallback: %s", sorted(required_keys)
+                )
+                return False
+        self.settings = pending if isinstance(pending, _GuardedSettingsDict) else _GuardedSettingsDict(pending)
+        return True
 
     @staticmethod
     def _run_async(coro):
@@ -1478,7 +1543,8 @@ class SettingsManager:
             settings_blob, normalized = self._normalize_runtime_model_settings(settings_blob)
             settings_blob, dropped_removed_legacy = self._drop_removed_legacy_settings(settings_blob)
             settings_blob, relocated_credentials = self._relocate_user_credentials_from_blob(user_id, settings_blob)
-            if renamed_aliases or normalized or dropped_removed_legacy or relocated_credentials:
+            rescaled_volume = self._migrate_tts_volume_percent_scale(settings_blob)
+            if renamed_aliases or normalized or dropped_removed_legacy or relocated_credentials or rescaled_volume:
                 save_settings = getattr(repo, "save_settings", None)
                 version = loaded[1] if isinstance(loaded, tuple) and len(loaded) > 1 else 1
                 if callable(save_settings):
@@ -1512,7 +1578,8 @@ class SettingsManager:
         settings_blob, normalized = self._normalize_runtime_model_settings(settings_blob)
         settings_blob, dropped_removed_legacy = self._drop_removed_legacy_settings(settings_blob)
         settings_blob, relocated_credentials = self._relocate_user_credentials_from_blob(user_id, settings_blob)
-        normalized = normalized or renamed_aliases or dropped_removed_legacy or relocated_credentials
+        rescaled_volume = self._migrate_tts_volume_percent_scale(settings_blob)
+        normalized = normalized or renamed_aliases or dropped_removed_legacy or relocated_credentials or rescaled_volume
 
         if migration_marker_seen:
             if normalized:
@@ -2003,13 +2070,9 @@ class SettingsManager:
         # ``_GuardedSettingsDict`` that refuses system-key writes. For the
         # trusted server-side path we must skip that guard — go directly to
         # ``dict.__setitem__`` so billing/auth bootstrap can land the value.
-        if _is_system_key(key):
-            dict.__setitem__(self.settings, key, value)
-        else:
-            self._apply_global_setting_updates({key: value})
-        if not save_immediately:
-            return True
-        return self.save()
+        return self._write_global_setting_updates(
+            {key: value}, save_immediately=save_immediately, trusted_system_write=True
+        )
 
     @overload
     def get(self, key: str) -> object: ...
@@ -2150,12 +2213,7 @@ class SettingsManager:
                 "context or call set_user_setting(user_id, ...): %s" % key
             )
 
-        self._apply_global_setting_updates(pending_updates)
-
-        if save_immediately:
-            return self.save()
-
-        return True
+        return self._write_global_setting_updates(pending_updates, save_immediately=save_immediately)
 
     @classmethod
     def _is_user_scoped_key(cls, key: str) -> bool:
@@ -2249,10 +2307,7 @@ class SettingsManager:
         save_immediately: bool,
     ) -> bool:
         if _uses_global_settings_only(user_id):
-            self._apply_global_setting_updates(updates)
-            if not save_immediately:
-                return True
-            return self.save()
+            return self._write_global_setting_updates(updates, save_immediately=save_immediately)
 
         for update_key in updates:
             if _is_system_key(update_key):
@@ -2286,7 +2341,7 @@ class SettingsManager:
         with self._lock_for_user_settings_write(user_id):
             cached = self._user_settings_cache.get(user_id)
             if cached is not None:
-                settings_blob = cached
+                settings_blob = dict(cached)
             else:
                 try:
                     settings_blob = self._load_user_settings_blob(user_id)
@@ -2331,10 +2386,20 @@ class SettingsManager:
                     continue
                 settings_blob[update_key] = update_value
 
+            if save_immediately:
+                saved = False
+                try:
+                    saved = self._save_user_settings_blob(user_id, settings_blob)
+                    if not saved:
+                        return False
+                finally:
+                    if not saved:
+                        # A failed DB acknowledgement can follow a commit. Drop
+                        # the cache so the next read checks durable state instead
+                        # of publishing the proposal or restoring a stale guess.
+                        self._user_settings_cache.invalidate(user_id)
             self._user_settings_cache.put(user_id, settings_blob)
-            if not save_immediately:
-                return True
-            return self._save_user_settings_blob(user_id, settings_blob)
+            return True
 
     def _persist_setting_updates(
         self,
@@ -2391,12 +2456,9 @@ class SettingsManager:
             else:
                 global_updates[key] = value
 
-        # Hold the per-user write lock (#2781) across BOTH the mutate-cache
-        # step (_set_user_settings_values) and the persist-to-DB step
-        # (_persist_cached_user_settings) below, not just each individually --
-        # otherwise a second concurrent update() call for the same user could
-        # still interleave between the two steps and lose a key. RLock lets
-        # the nested calls into those (also-locking) methods re-enter safely.
+        # Serialize each user's full read/modify/persist/cache publication.
+        # Immediate writes must not publish the save_immediately=False staging
+        # state before the backing store accepts it.
         user_write_lock = (
             self._lock_for_user_settings_write(resolved_user_id) if user_updates and resolved_user_id else None
         )
@@ -2404,21 +2466,13 @@ class SettingsManager:
             if user_updates:
                 if not resolved_user_id:
                     return False
-                if not self._set_user_settings_values(resolved_user_id, user_updates, save_immediately=False):
+                if not self._set_user_settings_values(
+                    resolved_user_id, user_updates, save_immediately=save_immediately
+                ):
                     return False
-
             if global_updates:
-                self._apply_global_setting_updates(global_updates)
-
-            if not save_immediately:
-                return True
-
-            results: list[bool] = []
-            if user_updates and resolved_user_id:
-                results.append(self._persist_cached_user_settings(resolved_user_id))
-            if global_updates:
-                results.append(self.save())
-            return all(results) if results else True
+                return self._write_global_setting_updates(global_updates, save_immediately=save_immediately)
+            return True
 
     def _persist_cached_user_settings(self, user_id: str) -> bool:
         if _uses_global_settings_only(user_id):
@@ -2447,7 +2501,35 @@ class SettingsManager:
             self._user_settings_cache.put(user_id, settings_blob)
             return self._save_user_settings_blob(user_id, settings_blob)
 
-    def _apply_global_setting_updates(self, updates: dict[str, object]) -> None:
+    def _write_global_setting_updates(
+        self,
+        updates: dict[str, object],
+        *,
+        save_immediately: bool,
+        trusted_system_write: bool = False,
+    ) -> bool:
+        # RLock spans snapshot, merge and save, preventing concurrent writers
+        # from replacing each other's keys. Readers see only published blobs.
+        with self._save_lock:
+            pending = _GuardedSettingsDict(self.settings)
+            if trusted_system_write:
+                for key, value in updates.items():
+                    if _is_system_key(key):
+                        dict.__setitem__(pending, key, value)
+                    else:
+                        self._apply_global_setting_updates({key: value}, target=pending)
+            else:
+                self._apply_global_setting_updates(updates, target=pending)
+            if save_immediately:
+                return self.save(pending, required_keys=frozenset(updates))
+            # Explicit deferred writes retain their intentional live staging.
+            self.settings = pending
+            return True
+
+    def _apply_global_setting_updates(
+        self, updates: dict[str, object], *, target: dict[str, object] | None = None
+    ) -> None:
+        target_settings = self.settings if target is None else target
         for update_key, update_value in updates.items():
             if update_key in self.REMOVED_LEGACY_SETTING_KEYS:
                 continue
@@ -2463,12 +2545,12 @@ class SettingsManager:
                         # Clearing/deleting a secret that was never encrypted-stored
                         # (secure storage unavailable): there is nothing sensitive
                         # to persist, so just drop it from the plaintext blob.
-                        self.settings.pop(update_key, None)
+                        target_settings.pop(update_key, None)
                         continue
                     # Fail CLOSED (#2785): secure settings storage is unavailable
                     # (missing 'cryptography' dependency, or SecureSettingsManager
                     # init failed -- see the warning logged at import time above).
-                    # Falling through to `self.settings[update_key] = update_value`
+                    # Falling through to `target_settings[update_key] = update_value`
                     # here would write this secret in PLAINTEXT to settings.json on
                     # the next save() -- canon says secrets NEVER belong there.
                     # Refuse the write instead of masking the failure.
@@ -2493,10 +2575,25 @@ class SettingsManager:
                     self._secure_manager.delete_secret(update_key)
                     if self._encrypted_cache_path:
                         self._secure_manager.save_to_file(self._encrypted_cache_path)
-                self.settings[update_key] = _ENCRYPTED_PLACEHOLDER if update_value else ""
+                target_settings[update_key] = _ENCRYPTED_PLACEHOLDER if update_value else ""
                 continue
 
-            self.settings[update_key] = update_value
+            target_settings[update_key] = update_value
+
+    @staticmethod
+    def _migrate_tts_volume_percent_scale(settings: dict[str, object]) -> bool:
+        """Normalize unambiguous legacy percentages once in every settings store.
+
+        The current UI stores 0.0-1.0; older sliders wrote 0-100. Preserve
+        normalized values (including 1 == full volume), mute and invalid data.
+        """
+        raw = settings.get("tts_volume")
+        if isinstance(raw, bool) or not isinstance(raw, (int, float)):
+            return False
+        if not 1.0 < raw <= 100.0:
+            return False
+        settings["tts_volume"] = round(raw / 100.0, 4)
+        return True
 
     def _migrate_settings(self, settings: dict[str, object], loaded: dict[str, object]) -> dict[str, object]:
         """
@@ -2564,6 +2661,9 @@ class SettingsManager:
 
         settings, normalized = self._normalize_runtime_model_settings(settings)
         if normalized:
+            needs_save = True
+
+        if self._migrate_tts_volume_percent_scale(settings):
             needs_save = True
 
         # Migration: v1 -> v2 (OpenAI-specific to provider-agnostic)
@@ -2962,12 +3062,12 @@ class SettingsManager:
         Returns:
             True if successful
         """
-        self.settings = _GuardedSettingsDict(self._default_settings_base())
-
-        if save_immediately:
-            return self.save()
-
-        return True
+        with self._save_lock:
+            pending = _GuardedSettingsDict(self._default_settings_base())
+            if save_immediately:
+                return self.save(pending)
+            self.settings = pending
+            return True
 
     def reset_user_settings(self, user_id: str | None, save_immediately: bool = True) -> bool:
         """Reset settings for one authenticated user without touching device defaults."""
@@ -2982,14 +3082,17 @@ class SettingsManager:
             return self.reset(save_immediately=save_immediately)
 
         with self._lock_for_user_settings_write(resolved_user_id):
+            if save_immediately:
+                saved = False
+                try:
+                    saved = self._save_user_settings_blob(resolved_user_id, {})
+                    if not saved:
+                        return False
+                finally:
+                    if not saved:
+                        self._user_settings_cache.invalidate(resolved_user_id)
             self._user_settings_cache.put(resolved_user_id, {})
-            if not save_immediately:
-                return True
-
-            success = self._save_user_settings_blob(resolved_user_id, {})
-            if not success:
-                self._user_settings_cache.invalidate(resolved_user_id)
-            return success
+            return True
 
     def export_settings(self, export_path: Path) -> bool:
         """Export settings to a file (for backup)."""
@@ -3003,7 +3106,12 @@ class SettingsManager:
             return False
 
     def import_settings(self, import_path: Path) -> bool:
-        """Import settings from a file."""
+        """Replace the active scope with defaults plus imported settings.
+
+        Real authenticated users replace only their user snapshot; global fields
+        are refused. Desktop/pseudo-user imports replace the global snapshot.
+        Credentials may persist independently even when the import returns False.
+        """
         try:
             with open(import_path, encoding="utf-8") as f:
                 imported = json.load(f)
@@ -3012,10 +3120,66 @@ class SettingsManager:
             if not isinstance(imported, dict):
                 raise ValueError("Invalid settings file format")
 
-            # Merge imported values into a fresh defaults snapshot so
-            # encrypted settings follow the same write path as set().
-            self.settings = _GuardedSettingsDict(self._default_settings_base())
-            self.update(imported, save_immediately=True)
+            # Stage defaults-plus-import privately while reusing update()'s
+            # guards, aliases, normalization and credential handling.
+            user_id = self._resolve_user_id()
+            if user_id and not _uses_global_settings_only(user_id):
+                # An authenticated import replaces only that user's settings.
+                # Reject global fields rather than changing shared state.
+                for key in imported:
+                    canonical_key = self.canonicalize_setting_key(key)
+                    if canonical_key in self.REMOVED_LEGACY_SETTING_KEYS:
+                        continue
+                    if not self._is_user_scoped_key(canonical_key):
+                        logger.error("Refusing global setting in per-user import: %s", canonical_key)
+                        return False
+                with self._lock_for_user_settings_write(user_id):
+                    candidate = copy.copy(self)
+                    candidate._user_settings_cache = _UserSettingsCache()
+                    candidate._user_settings_cache.put(
+                        user_id,
+                        {
+                            key: value
+                            for key, value in self._default_settings_base().items()
+                            if self._is_user_scoped_key(key) and not self._is_encrypted_field(key)
+                        },
+                    )
+                    saved = False
+                    try:
+                        if not candidate.update(imported, save_immediately=False, user_id=user_id):
+                            return False
+                        pending_user_settings = candidate._user_settings_cache.get(user_id)
+                        if pending_user_settings is None:
+                            return False
+                        saved = candidate._save_user_settings_blob(user_id, pending_user_settings)
+                        if not saved:
+                            return False
+                        self._user_settings_cache.put(user_id, pending_user_settings)
+                    finally:
+                        if not saved:
+                            self._user_settings_cache.invalidate(user_id)
+            else:
+                with self._save_lock:
+                    candidate = copy.copy(self)
+                    pending = _GuardedSettingsDict(self._default_settings_base())
+                    candidate.settings = pending
+                    if not candidate.update(imported, save_immediately=True):
+                        return False
+                    # Empty imports still need to persist the replacement.
+                    if candidate.settings is pending and not candidate.save():
+                        return False
+                    # Imported values, omitted defaults and removed extension
+                    # keys must all agree with the loader-selected snapshot.
+                    required_keys = frozenset(
+                        key
+                        for key in candidate.settings
+                        if key != "_settings_last_saved" and not self._is_encrypted_field(key)
+                    )
+                    if not candidate._accept_settings_fallback(
+                        candidate.settings, required_keys, require_full_snapshot=True
+                    ):
+                        return False
+                    self.settings = candidate.settings
             logger.info("Settings imported from %s", import_path)
             return True
 

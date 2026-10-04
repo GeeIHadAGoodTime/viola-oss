@@ -259,7 +259,9 @@ class KokoroTTSEngine:
         self._speed = (
             float(raw_speed) / 150.0 if isinstance(raw_speed, (int, float)) and raw_speed > 5 else _DEFAULT_SPEED
         )
-        self._base_volume = volume if volume is not None else getattr(cfg, "tts_volume", 80)
+        # None resolves the live SettingsManager value at synthesis time.
+        # Only an explicit caller override may bypass the saved UI preference.
+        self._base_volume = volume
 
         self._kokoro: Kokoro | None = None
         self._lock = threading.Lock()
@@ -473,7 +475,9 @@ class KokoroTTSEngine:
                 chunks.append(chunk)
         return self._join_sentence_chunks(chunks, sentences)
 
-    def _synthesize_locked(self, text: str, voice: str | None, speed: float | None = None) -> bytes:
+    def _synthesize_locked(
+        self, text: str, voice: str | None, speed: float | None = None, *, apply_volume: bool = True
+    ) -> bytes:
         """Thread-safe wrapper around ``_synthesize_internal``.
 
         ``speed`` overrides the per-utterance jitter when callers need a
@@ -490,7 +494,7 @@ class KokoroTTSEngine:
                 return b""
 
             try:
-                return self._synthesize_internal(text, voice, speed)
+                return self._synthesize_internal(text, voice, speed, apply_volume=apply_volume)
             except Exception as exc:
                 logger.error(
                     "Kokoro synthesis failed text_length=%d: %s",
@@ -499,7 +503,9 @@ class KokoroTTSEngine:
                 )
                 return b""
 
-    def _synthesize_internal(self, text: str, voice: str | None, speed: float | None = None) -> bytes:
+    def _synthesize_internal(
+        self, text: str, voice: str | None, speed: float | None = None, *, apply_volume: bool = True
+    ) -> bytes:
         """Blocking synthesis — MUST be called under ``self._lock``.
 
         ``speed=None`` applies the engine's normal jittered speed; an
@@ -550,13 +556,16 @@ class KokoroTTSEngine:
         pcm_native = self._float_to_int16(samples)
 
         # Apply volume scaling, including quiet-hours time-of-day policy.
-        volume = self._current_volume()
-        if volume < 1.0:
-            pcm_native = (
-                (pcm_native.astype(np.float32) * volume).clip(-AUDIO_INT16_MAX, AUDIO_INT16_MAX).astype(np.int16)
-            )
+        if apply_volume:
+            pcm_native = self._scale_pcm_volume(pcm_native, self._current_volume())
 
         return pcm_native.tobytes()
+
+    @staticmethod
+    def _scale_pcm_volume(pcm: np.ndarray, volume: float) -> np.ndarray:
+        if volume >= 1.0:
+            return pcm
+        return (pcm.astype(np.float32) * volume).clip(-AUDIO_INT16_MAX, AUDIO_INT16_MAX).astype(np.int16)
 
     def _current_volume(self) -> float:
         return tts_volume_for_now(self._base_volume)
@@ -859,7 +868,7 @@ class KokoroTTSEngine:
         if getattr(self, "_opener_cache", None) is None:
             return None
         cfg = getattr(self, "_config", None) or settings
-        if getattr(cfg, "tts_opener_cache_enabled", True) is False:
+        if not getattr(cfg, "tts_enabled", True) or getattr(cfg, "tts_opener_cache_enabled", True) is False:
             return None
         # Pass synthesize_variant=None so the lookup never blocks on a
         # synchronous build. If the background build hasn't finished yet,
@@ -873,9 +882,12 @@ class KokoroTTSEngine:
         # which would cause cached openers to play in a different voice from the
         # rest of the response. (Branch A's `_resolve_voice_for_create` only
         # consults the blend when the explicit voice argument is falsy.)
-        return self._synthesize_locked(text, None, speed)
+        # Persist unity-gain PCM, never a user's volume or build-time quiet hours.
+        return self._synthesize_locked(text, None, speed, apply_volume=False)
 
     def _speak_cached_pcm(self, pcm_bytes: bytes) -> None:
+        # Cached audio shares the live policy with newly synthesized speech.
+        pcm_bytes = self._scale_pcm_volume(np.frombuffer(pcm_bytes, dtype=np.int16), self._current_volume()).tobytes()
         monitor = None
         try:
             from diagnostics.wake_state_sync import get_state_sync_monitor
