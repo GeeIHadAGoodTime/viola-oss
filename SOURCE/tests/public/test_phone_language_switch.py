@@ -28,12 +28,46 @@ class PhoneLanguageSwitch(unittest.IsolatedAsyncioTestCase):
                 raise AssertionError("Language control must not construct a turn model")
 
         transformers.WhisperFeatureExtractor = ForbiddenModel
-        modules = patch.dict(
-            sys.modules,
-            {"kokoro_onnx": model, "onnxruntime": types.ModuleType("onnxruntime"), "transformers": transformers},
+        # Earlier public tests may cache the installed Pipecat wheel. Isolate
+        # only these runtime/model families and adapters; restore their exact
+        # objects and parent attributes without clearing unrelated imports.
+        prefixes = ("pipecat", "kokoro_onnx", "onnxruntime", "transformers")
+        adapters = {
+            "telephony.language_handler",
+            "telephony.tts_normalizer",
+            "telephony.transcription_observer",
+            "telephony.continuous_stream_resampler",
+        }
+
+        def scoped(name):
+            return name in adapters or any(name == prefix or name.startswith(prefix + ".") for prefix in prefixes)
+
+        saved_modules = {name: module for name, module in sys.modules.items() if scoped(name)}
+        missing = object()
+        parent = sys.modules.get("telephony")
+        saved_attributes = {
+            name.rsplit(".", 1)[1]: getattr(parent, name.rsplit(".", 1)[1], missing) for name in adapters
+        }
+
+        def restore_modules():
+            for name in tuple(sys.modules):
+                if scoped(name):
+                    sys.modules.pop(name)
+            sys.modules.update(saved_modules)
+            parent = sys.modules.get("telephony")
+            if parent is not None:
+                for name, value in saved_attributes.items():
+                    if value is missing:
+                        parent.__dict__.pop(name, None)
+                    else:
+                        setattr(parent, name, value)
+
+        cls.addClassCleanup(restore_modules)
+        for name in saved_modules:
+            sys.modules.pop(name)
+        sys.modules.update(
+            {"kokoro_onnx": model, "onnxruntime": types.ModuleType("onnxruntime"), "transformers": transformers}
         )
-        modules.start()
-        cls.addClassCleanup(modules.stop)
         paths = patch.object(sys, "path", [str(ROOT / "third_party/pipecat/src"), str(ROOT), *sys.path])
         paths.start()
         cls.addClassCleanup(paths.stop)
@@ -54,7 +88,7 @@ class PhoneLanguageSwitch(unittest.IsolatedAsyncioTestCase):
         cls.strategies = importlib.import_module("pipecat.turns.user_turn_strategies")
         cls.processors = importlib.import_module("pipecat.processors.frame_processor")
         for module in (cls.kokoro, cls.handler_module, base_tts_module, ai_module, cls.frames, cls.settings):
-            assert Path(module.__file__).resolve().is_relative_to(ROOT)
+            assert Path(module.__file__).resolve().is_relative_to(ROOT), (module.__name__, module.__file__)
 
     def setUp(self):
         self.llm = types.SimpleNamespace(push_frame=AsyncMock())
