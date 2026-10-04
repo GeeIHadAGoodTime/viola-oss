@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "ff81985ff9e1eca32052d0bff9e66d1e58e285e1",
-  "sha256": "fc99425b0bcfdf91686cabb0bd7d9cd287f80a27ff6362e41f1ff60a9fed319a",
+  "revision": "31ec42e1665fa236694c967bab3f2ee0d7cfece8",
+  "sha256": "bff4a79065249cedff77ad2706f6e6f96bdaf014ff0263a5677667760a8d2ffc",
   "files": [
     {
       "path": ".env.example",
@@ -1550,8 +1550,8 @@
     },
     {
       "path": "intent/agent_middleware.py",
-      "sha256": "a9b9f84e878c088822279b868bda86826eeef849cb637e80f6e71f9745929bc3",
-      "bytes": 29005
+      "sha256": "e08992e11e01506d0080c5fbcecfbac60452d19161d250768ec47b8455f3173a",
+      "bytes": 29274
     },
     {
       "path": "intent/agent_subagent_types.py",
@@ -5777,6 +5777,11 @@
       "path": "tests/public/test_source_contract.py",
       "sha256": "91671e3d2821eaef0acb4e6521d0b272dc554c9a6c8b0051c3d20e77bf0f3894",
       "bytes": 45886
+    },
+    {
+      "path": "tests/public/test_step_logger_status.py",
+      "sha256": "f43a8f369828481307fc8031f767240eb0774a80b17b0f54e89fcaff7fdffdf7",
+      "bytes": 7499
     },
     {
       "path": "tests/public/test_tool_allowlist_contract.py",
