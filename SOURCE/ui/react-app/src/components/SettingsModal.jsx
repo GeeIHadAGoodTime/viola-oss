@@ -7,6 +7,7 @@ import { isCloudSurface } from './auth/cloudSurface';
 import { apiFetch } from '../hooks/useViolaApi';
 import { THEME, applyTheme, setAccent } from '../config';
 import { isFeatureHidden } from '../utils/featureSurface';
+import { outputDeviceOptions as buildOutputDeviceOptions, outputDeviceValue } from '../utils/audioOutputSelection';
 import DesktopUpsell from './DesktopUpsell';
 import AccountTab, { CalendarSettings } from './AccountTab';
 import ICloudCalendarSettings from './ICloudCalendarSettings';
@@ -1495,10 +1496,10 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
     ...devices.input.map(d => ({ value: String(d.index), label: d.name })),
   ], [devices.input]);
 
-  const outputDeviceOptions = useMemo(() => [
-    { value: '', label: 'System Default' },
-    ...devices.output.map(d => ({ value: String(d.index), label: d.name })),
-  ], [devices.output]);
+  const outputDeviceOptions = useMemo(
+    () => buildOutputDeviceOptions(devices.output, localSettings.output_device),
+    [devices.output, localSettings.output_device],
+  );
 
   const renderTabContent = (tabId) => {
     switch (tabId) {
@@ -3688,7 +3689,7 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
                 <Select
                   label="Speaker"
                   tooltip="Choose the speaker Viola uses for playback and speech."
-                  value={String(localSettings.output_device ?? '')}
+                  value={outputDeviceValue(localSettings.output_device, devices.output)}
                   onChange={(v) => updateLocal('output_device', v)}
                   options={outputDeviceOptions}
                 />

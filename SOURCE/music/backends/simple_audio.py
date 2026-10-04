@@ -51,9 +51,13 @@ class SimpleBackendAudioOutput:
         # Bound before the try so the finally can always ask whether this thread
         # got as far as opening a stream it now owns closing.
         stream: object | None = None
+        _set_direct_injection = None
 
         try:
             import numpy as np
+
+            from audio_core.device_validation import resolve_output_device
+            from audio_core.portaudio_guard import sounddevice_guard
 
             # Bug #29 fix: grab ChunkStamper once for direct PCM injection.
             # This bypasses ProcTap (which can't capture sounddevice/PortAudio
@@ -101,12 +105,17 @@ class SimpleBackendAudioOutput:
             )
             last_progress_at = time.monotonic() - progress_interval
 
-            stream = output_stream_factory(
-                samplerate=float(self.backend._sample_rate),
-                channels=int(self.backend._channels),
-                dtype=np.int16,
-                blocksize=1024,
-            )
+            device = resolve_output_device(self._sounddevice)
+            with sounddevice_guard():
+                stream = output_stream_factory(
+                    samplerate=float(self.backend._sample_rate),
+                    channels=int(self.backend._channels),
+                    dtype=np.int16,
+                    blocksize=1024,
+                    device=device,
+                )
+            if self.backend._play_generation != generation or self.backend._stop_event.is_set():
+                return
             self.backend._stream = stream
 
             start = getattr(stream, "start", None)
@@ -300,6 +309,8 @@ class SimpleBackendAudioOutput:
 
         except Exception as e:
             logger.exception("Error in playback loop: %s", e)
+            if self.backend._play_generation == generation:
+                self.backend._playback_error = "Audio playback failed; check the selected output device"
         finally:
             # Only clear state if this is still the active generation.
             # A newer _start_stream() call increments _play_generation and

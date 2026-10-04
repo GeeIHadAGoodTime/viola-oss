@@ -838,6 +838,13 @@ class SimpleAudioPauseContract(unittest.TestCase):
         wiring = types.ModuleType('audio_core.streaming.pipeline_wiring')
         wiring.get_active_chunk_stamper = lambda: None
         wiring.set_direct_injection = lambda value: None
+        # Keep this narrow PCM/pause test independent of device enumeration.
+        # Real routing and lifecycle guard behavior have separate contracts.
+        import contextlib
+        routing = types.ModuleType('audio_core.device_validation')
+        routing.resolve_output_device = lambda sd: None
+        guard = types.ModuleType('audio_core.portaudio_guard')
+        guard.sounddevice_guard = contextlib.nullcontext
         spec = importlib.util.spec_from_file_location(
             '_pause_contract_audio', SOURCE_ROOT / 'music/backends/simple_audio.py'
         )
@@ -846,6 +853,8 @@ class SimpleAudioPauseContract(unittest.TestCase):
             'core.logging_config': logger_module,
             'music.backends.base': base_module,
             'audio_core.streaming.pipeline_wiring': wiring,
+            'audio_core.device_validation': routing,
+            'audio_core.portaudio_guard': guard,
         }):
             spec.loader.exec_module(module)
             backend = SimpleNamespace(

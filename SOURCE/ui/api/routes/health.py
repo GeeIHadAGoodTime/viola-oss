@@ -5,8 +5,9 @@ import time
 from collections.abc import Callable
 from typing import Any
 
-from core.logging_config import get_logger
 from fastapi import Request
+
+from core.logging_config import get_logger
 from routing.health import (
     UI_STALLED_STATUS,
     build_basic_health_payload,
@@ -207,6 +208,20 @@ def _check_audio_output_health() -> dict[str, Any]:
         snapshot = get_output_health()
         state = snapshot.get("state", "not_started")
 
+        if state == "error":
+            return _health_error(
+                "Device audio output could not start; check the selected output device.",
+                provider=snapshot.get("provider"),
+                reason=snapshot.get("fallback_reason") or "output_start_failed",
+                since_epoch=snapshot.get("since_epoch"),
+            )
+        if state == "starting":
+            return _health_degraded(
+                "Device audio output is starting; playback is not ready yet.",
+                provider=snapshot.get("provider"),
+                reason="output_starting",
+                since_epoch=snapshot.get("since_epoch"),
+            )
         if state == "degraded":
             return _health_degraded(
                 "Device audio output is discarding all audio (no real sound driver available); "

@@ -118,7 +118,11 @@ class SounddeviceAudioOutput(AudioOutputDriver):
     # -- AudioOutputDriver interface ----------------------------------------
 
     def start(self, sample_rate: int, channels: int, sample_width: int) -> None:
-        import sounddevice as sd  # deferred to avoid import failure at module level
+        from audio_core.device_validation import resolve_output_device
+        from audio_core.portaudio_guard import sounddevice_guard
+
+        with sounddevice_guard():
+            import sounddevice as sd  # deferred to avoid import failure at module level
 
         with self._lock:
             if self._running:
@@ -127,12 +131,21 @@ class SounddeviceAudioOutput(AudioOutputDriver):
             self._channels = channels
             self._sample_width = sample_width
 
-            stream = sd.RawOutputStream(
-                samplerate=sample_rate,
-                channels=channels,
-                dtype="int16",
-            )
-            stream.start()
+            device = resolve_output_device(sd)
+            with sounddevice_guard():
+                stream = sd.RawOutputStream(
+                    samplerate=sample_rate,
+                    channels=channels,
+                    dtype="int16",
+                    device=device,
+                )
+            try:
+                stream.start()
+            except Exception:
+                # No writer can own an unpublished session. Release the opened
+                # handle on start failure, without replaying on another speaker.
+                self._close_stream(stream)
+                raise
             # A session from a previous stop() may still be alive with a wedged
             # writer inside it; it owns its own close and is deliberately not
             # touched here.  This driver simply moves on to the new stream.

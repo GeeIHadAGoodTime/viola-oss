@@ -9,6 +9,7 @@ from __future__ import annotations
 import re as _re
 from typing import Any, NamedTuple
 
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
@@ -16,7 +17,6 @@ from config import env as config_env
 from contracts.api_response import failure_response, success_response
 from core.constants import TIMEOUT_LONG, WAKE_SENSITIVITY_MIN
 from core.logging_config import get_logger
-from fastapi import APIRouter, Depends, HTTPException, Request
 from music.playlist_manager import get_playlist_manager
 from services.llm.local_models import detect_local_ai_servers
 from ui.settings_manager import (
@@ -497,11 +497,29 @@ def _validate_llm_cross_field_requirements(
 
 def _normalize_hotkey_for_compare(value: str) -> str:
     """Compare the physical combo understood by the frontend hotkey parser."""
-    modifiers = {"ctrl": "ctrl", "control": "ctrl", "alt": "alt", "option": "alt",
-                 "shift": "shift", "meta": "meta", "cmd": "meta", "command": "meta",
-                 "win": "meta", "windows": "meta", "super": "meta"}
-    aliases = {"spacebar": "space", "esc": "escape", "return": "enter", "del": "delete",
-               "up": "arrowup", "down": "arrowdown", "left": "arrowleft", "right": "arrowright"}
+    modifiers = {
+        "ctrl": "ctrl",
+        "control": "ctrl",
+        "alt": "alt",
+        "option": "alt",
+        "shift": "shift",
+        "meta": "meta",
+        "cmd": "meta",
+        "command": "meta",
+        "win": "meta",
+        "windows": "meta",
+        "super": "meta",
+    }
+    aliases = {
+        "spacebar": "space",
+        "esc": "escape",
+        "return": "enter",
+        "del": "delete",
+        "up": "arrowup",
+        "down": "arrowdown",
+        "left": "arrowleft",
+        "right": "arrowright",
+    }
     active = set()
     code = "space"
     for raw in str(value or "space").split("+"):
@@ -726,6 +744,8 @@ class DeviceInfo(BaseModel):
     index: int
     name: str
     channels: int
+    selection: str | None = None
+    hostapi: str | None = None
 
 
 class DevicesResponse(BaseModel):
@@ -1482,6 +1502,7 @@ def create_settings_router(*, music_service: object | None = None) -> APIRouter:
             # route in the cloud (ModuleNotFoundError at request time) — same bug
             # class as the 2026-06-22 tiktoken incident. This GET runs desktop-only,
             # so importing inside it keeps the cloud import-clean.
+            from audio_core.device_validation import output_device_selection
             from audio_core.portaudio_guard import open_portaudio, terminate_portaudio
 
             p = open_portaudio()
@@ -1500,7 +1521,16 @@ def create_settings_router(*, music_service: object | None = None) -> APIRouter:
                         input_devices.append({"index": i, "name": device_name, "channels": max_input_channels})
 
                     if max_output_channels > 0:
-                        output_devices.append({"index": i, "name": device_name, "channels": max_output_channels})
+                        host_api = str(p.get_host_api_info_by_index(int(info["hostApi"]))["name"])
+                        output_devices.append(
+                            {
+                                "index": i,
+                                "name": device_name,
+                                "channels": max_output_channels,
+                                "hostapi": host_api,
+                                "selection": output_device_selection(device_name, host_api),
+                            }
+                        )
                 except Exception as exc:
                     logger.debug("Skipping device %d due to error: %s", i, exc)
                     continue

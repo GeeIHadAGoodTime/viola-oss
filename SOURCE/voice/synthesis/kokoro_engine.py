@@ -30,6 +30,10 @@ from voice.synthesis.opener_cache import DEFAULT_VARIANTS, OpenerCache
 # always a stuck ONNX session; cancel and let the caller retry.
 STREAM_TIMEOUT_SECONDS = 30.0
 
+# sounddevice.play()/wait() share a module-global convenience stream. Serialize
+# the pair across engine instances so one utterance cannot stop/wait on another.
+_LOCAL_PLAYBACK_LOCK = threading.RLock()
+
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
 
@@ -742,13 +746,18 @@ class KokoroTTSEngine:
         played_locally = False
         broadcasted = False
         try:
-            import sounddevice as sd
+            from audio_core.device_validation import resolve_output_device
+            from audio_core.portaudio_guard import sounddevice_guard, sounddevice_playback_guard
+
+            with sounddevice_guard():
+                import sounddevice as sd
 
             pcm = np.frombuffer(pcm_bytes, dtype=np.int16).astype(np.float32) / AUDIO_INT16_MAX
-            sd.play(pcm, samplerate=sample_rate)
-            broadcasted = KokoroTTSEngine._broadcast_pcm_to_spokes(pcm_bytes, sample_rate)
-            sd.wait()
-            played_locally = True
+            with _LOCAL_PLAYBACK_LOCK, sounddevice_playback_guard():
+                sd.play(pcm, samplerate=sample_rate, device=resolve_output_device(sd))
+                broadcasted = KokoroTTSEngine._broadcast_pcm_to_spokes(pcm_bytes, sample_rate)
+                sd.wait()
+                played_locally = True
         except ImportError:
             # No sounddevice at all: a headless/cloud process, where hub-local
             # playback was never the delivery path. Not a user-facing fault.
@@ -790,7 +799,7 @@ class KokoroTTSEngine:
         return KokoroTTSEngine._play_pcm_raw(pcm_bytes, sample_rate)
 
     async def speak(self, text: str) -> None:
-        """Synthesize and play *text* on the default audio output.
+        """Synthesize and play *text* on the configured audio output.
 
         For long text (> ``_CHUNK_THRESHOLD`` chars), sentences are
         synthesised and played **one at a time** so the user hears the

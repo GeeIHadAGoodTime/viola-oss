@@ -11,6 +11,7 @@ import asyncio
 import contextlib
 import importlib
 import json
+import socket
 import sqlite3
 import sys
 import tempfile
@@ -26,6 +27,90 @@ import numpy as np
 from fastapi import FastAPI
 
 ROOT = Path(__file__).resolve().parents[2]
+_SOCKET_CONNECT = socket.socket.connect
+_SOCKETPAIR_CODES = frozenset(
+    function.__code__
+    for function in (socket.socketpair, getattr(socket, "_fallback_socketpair", None))
+    if function is not None
+)
+
+
+def _connect_without_network(sock, address):
+    # Windows implements asyncio's self-pipe using the stdlib TCP socketpair.
+    # Permit only that implementation's own client-to-listener connection, never
+    # arbitrary application loopback traffic or a process/thread-wide bypass.
+    caller = sys._getframe(1)
+    if caller.f_code in _SOCKETPAIR_CODES:
+        listener = caller.f_locals.get("lsock")
+        if (
+            caller.f_locals.get("csock") is sock
+            and isinstance(listener, socket.socket)
+            and sock.family in (socket.AF_INET, socket.AF_INET6)
+            and sock.type == listener.type == socket.SOCK_STREAM
+            and sock.family == listener.family
+            and address == listener.getsockname()[:2]
+            and address[0] in ("127.0.0.1", "::1")
+        ):
+            return _SOCKET_CONNECT(sock, address)
+    raise AssertionError("No network in gain tests")
+
+
+@contextlib.contextmanager
+def _isolated_network():
+    with (
+        patch.object(socket.socket, "connect", new=_connect_without_network),
+        patch.object(socket.socket, "connect_ex", side_effect=AssertionError("No network in gain tests")),
+        patch.object(socket, "create_connection", side_effect=AssertionError("No network in gain tests")),
+    ):
+        yield
+
+
+class SocketPairNetworkGuard(unittest.TestCase):
+    def test_socketpair_is_bidirectional_under_guard(self):
+        with _isolated_network():
+            left, right = socket.socketpair()
+            with left, right:
+                left.settimeout(1)
+                right.settimeout(1)
+                left.sendall(b"left")
+                self.assertEqual(right.recv(4), b"left")
+                right.sendall(b"right")
+                self.assertEqual(left.recv(5), b"right")
+
+    def test_direct_external_and_loopback_connections_stay_blocked(self):
+        with _isolated_network():
+            for family, host in (
+                (socket.AF_INET, "127.0.0.1"),
+                (socket.AF_INET, "192.0.2.1"),
+                (socket.AF_INET6, "::1"),
+                (socket.AF_INET6, "2001:db8::1"),
+            ):
+                with self.subTest(host=host), socket.socket(family, socket.SOCK_STREAM) as client:
+                    for connect in (client.connect, client.connect_ex):
+                        with self.assertRaisesRegex(AssertionError, "No network in gain tests"):
+                            connect((host, 9))
+            with self.assertRaisesRegex(AssertionError, "No network in gain tests"):
+                socket.create_connection(("localhost", 9))
+
+    def test_event_loop_and_worker_thread_remain_usable(self):
+        async def value():
+            return "self-pipe ready"
+
+        with _isolated_network():
+            self.assertEqual(asyncio.run(value()), "self-pipe ready")
+            results = []
+            worker = threading.Thread(target=lambda: results.append(asyncio.run(value())))
+            worker.start()
+            worker.join(timeout=5)
+            self.assertFalse(worker.is_alive())
+            self.assertEqual(results, ["self-pipe ready"])
+
+    def test_guard_restores_socket_methods_after_error(self):
+        original = (socket.socket.connect, socket.socket.connect_ex, socket.create_connection)
+        with self.assertRaisesRegex(RuntimeError, "synthetic guard failure"):
+            with _isolated_network():
+                raise RuntimeError("synthetic guard failure")
+        self.assertEqual((socket.socket.connect, socket.socket.connect_ex, socket.create_connection), original)
 
 
 class SpeechVolumeWiring(unittest.TestCase):
@@ -62,12 +147,7 @@ class SpeechVolumeWiring(unittest.TestCase):
         self.root = Path(self.temp.name)
         self.patches = contextlib.ExitStack()
         self.addCleanup(self.patches.close)
-        self.patches.enter_context(
-            patch("socket.socket.connect", side_effect=AssertionError("No network in gain tests"))
-        )
-        self.patches.enter_context(
-            patch("socket.create_connection", side_effect=AssertionError("No network in gain tests"))
-        )
+        self.patches.enter_context(_isolated_network())
         self.patches.enter_context(patch.object(self.manager_module, "SECURE_SETTINGS_AVAILABLE", False))
         self.patches.enter_context(
             patch.object(
@@ -862,15 +942,13 @@ class SpeechVolumeWiring(unittest.TestCase):
         user = "volume-user-a"
         self.assertTrue(self.manager.update({"theme": "light"}, user_id=user))
         for method in ("POST", "PATCH"):
-            with (
-                self.subTest(method=method),
-                patch.object(self.manager, "_save_user_settings_blob", return_value=False),
-            ):
-                response = self.post_values({"theme": "dark"}, user=user, method=method)
-            self.assertEqual(response.status_code, 500, response.text)
-            self.assertIsNone(self.manager._user_settings_cache.get(user))
-            self.assertEqual(self.manager.get("theme", user_id=user), "light")
-            self.assertEqual(self.new_manager().get("theme", user_id=user), "light")
+            with self.subTest(method=method):
+                with patch.object(self.manager, "_save_user_settings_blob", return_value=False):
+                    response = self.post_values({"theme": "dark"}, user=user, method=method)
+                self.assertEqual(response.status_code, 500, response.text)
+                self.assertIsNone(self.manager._user_settings_cache.get(user))
+                self.assertEqual(self.manager.get("theme", user_id=user), "light")
+                self.assertEqual(self.new_manager().get("theme", user_id=user), "light")
 
     def test_user_mixed_secret_failure_does_not_claim_nonsecret_saved(self):
         user = "volume-user-a"
