@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "16c332e4741727aeaf1f61bf964407559e44c46f",
-  "sha256": "0545711d9a02af07d1052e2fa38ae17450ecff7784048e7f46777eeb3cddae4e",
+  "revision": "b6eba99343a9b2c26e513f51f42c68e485b83631",
+  "sha256": "c27631f0b7003fcb703c8685e2e9756b5beb75ff1f233986b9c5dfef4299a24a",
   "files": [
     {
       "path": ".env.example",
@@ -5790,8 +5790,8 @@
     },
     {
       "path": "tests/public/test_selected_audio_output.py",
-      "sha256": "a4f302b10de8d9887dc8895f6c14a964c16cf5eae7758f243fbe1ae3dd9640be",
-      "bytes": 35284
+      "sha256": "944e23e3221176fe35799a428e89479ae4a7bce27e236e5186ffa81c587bdee6",
+      "bytes": 35677
     },
     {
       "path": "tests/public/test_source_contract.py",
@@ -5800,8 +5800,8 @@
     },
     {
       "path": "tests/public/test_speech_volume_wiring.py",
-      "sha256": "e3bcf4f565338bf0c675b48df5dbd2a6c718486061e3064f8557775ab4571c1e",
-      "bytes": 75058
+      "sha256": "61d07fab425c0a685ad51e34df88c6a639c0401c5a82dc74660c60b820330cf3",
+      "bytes": 79627
     },
     {
       "path": "tests/public/test_step_logger_status.py",
