@@ -1676,3 +1676,233 @@ it('review: ignores a late old-principal streaming completion', async () => {
   expect(within(dialog).queryByText('Old streaming completion')).not.toBeInTheDocument();
   delete window.viola;
 });
+
+
+describe('SmartDisplay rating requests follow track and click order', () => {
+  const trackA = { id: 'track-a', title: 'Track A', artist: 'Fixture Artist', provider: 'local' };
+  const trackB = { id: 'track-b', title: 'Track B', artist: 'Fixture Artist', provider: 'local' };
+  const failedCopy = "Couldn't save that rating. Please try again.";
+  const refusedCopy = "Couldn't rate this track right now.";
+  const apiRejection = (status = 500) => Object.assign(
+    new Error("We couldn't complete that request. Please try again."),
+    { status, code: status === 409 ? 'rating_track_changed' : 'rating_failed' },
+  );
+  const deferred = () => {
+    let resolve, reject;
+    const promise = new Promise((yes, no) => { resolve = yes; reject = no; });
+    return { promise, resolve, reject };
+  };
+  const button = (name) => screen.getByRole('button', { name: `${name} track` });
+  const expectRating = (rating) => {
+    expect(button('Like').style.transform).toBe(rating === 'liked' ? 'scale(1.1)' : 'scale(1)');
+    expect(button('Dislike').style.transform).toBe(rating === 'disliked' ? 'scale(1.1)' : 'scale(1)');
+  };
+  const mount = (track = trackA) => {
+    playerHarness.state = { now_playing: track };
+    return render(<SmartDisplay />);
+  };
+  const switchTrack = (view, track) => {
+    playerHarness.state = { now_playing: track };
+    view.rerender(<SmartDisplay />);
+  };
+
+  beforeEach(() => apiHarness.setRating.mockReset().mockResolvedValue({ ok: true }));
+
+  it.each([
+    ['Like', 'liked', 500, failedCopy],
+    ['Dislike', 'disliked', 500, failedCopy],
+    ['Like', 'liked', 409, refusedCopy],
+    ['Dislike', 'disliked', 409, refusedCopy],
+  ])('rolls back failed %s (%s, HTTP %i) visibly and allows retry', async (name, rating, status, copy) => {
+    const request = deferred();
+    apiHarness.setRating.mockReturnValueOnce(request.promise);
+    const { user } = mount();
+    await user.click(button(name));
+    expectRating(rating);
+    expect(button(name)).toBeEnabled();
+    await act(async () => request.reject(apiRejection(status)));
+    expectRating(null);
+    expect(await screen.findByText(copy)).toBeInTheDocument();
+    await user.click(button(name));
+    expectRating(rating);
+    expect(apiHarness.setRating.mock.calls).toEqual([[rating, 'track-a'], [rating, 'track-a']]);
+  });
+
+  it('keeps the newest choice when an older save fails, and orders the actual writes', async () => {
+    const older = deferred();
+    const newer = deferred();
+    apiHarness.setRating.mockReturnValueOnce(older.promise).mockReturnValueOnce(newer.promise);
+    const { user } = mount();
+    await user.click(button('Like'));
+    await user.click(button('Dislike'));
+    expectRating('disliked');
+    expect(button('Like')).toBeEnabled();
+    expect(button('Dislike')).toBeEnabled();
+    // The second save cannot persist first. Neither optimistic UI nor a
+    // newest-request guard alone can establish that ordering guarantee.
+    expect(apiHarness.setRating.mock.calls).toEqual([['liked', 'track-a']]);
+    await act(async () => older.reject(apiRejection()));
+    expectRating('disliked');
+    expect(await screen.findByText(failedCopy)).toBeInTheDocument();
+    expect(apiHarness.setRating.mock.calls).toEqual([['liked', 'track-a'], ['disliked', 'track-a']]);
+    await act(async () => newer.resolve({ ok: true, rating: 'disliked' }));
+    expectRating('disliked');
+  });
+
+  it.each([
+    [false, false, false], [false, false, true],
+    [false, true, false], [false, true, true],
+    [true, false, false], [true, false, true],
+    [true, true, false], [true, true, true],
+  ])('reconciles three repeated clicks with results %s / %s / %s', async (...outcomes) => {
+    const requests = [deferred(), deferred(), deferred()];
+    requests.forEach(request => apiHarness.setRating.mockReturnValueOnce(request.promise));
+    const values = ['liked', 'disliked', 'liked'];
+    const { user } = mount();
+    await user.click(button('Like'));
+    await user.click(button('Dislike'));
+    await user.click(button('Like'));
+    expectRating('liked');
+    let confirmed = null;
+    for (let i = 0; i < requests.length; i += 1) {
+      expect(apiHarness.setRating.mock.calls).toEqual(values.slice(0, i + 1).map(value => [value, 'track-a']));
+      await act(async () => {
+        if (outcomes[i]) requests[i].resolve({ ok: true, rating: values[i] });
+        else requests[i].reject(apiRejection());
+      });
+      if (outcomes[i]) confirmed = values[i];
+      expectRating(i < requests.length - 1 ? 'liked' : confirmed);
+    }
+    if (outcomes.includes(false)) expect(screen.getAllByText(failedCopy).length).toBeGreaterThan(0);
+  });
+
+  it.each(['resolve', 'reject'])('reads same-render clicks and handles a toggle-removal %s', async (outcome) => {
+    const first = deferred();
+    const removal = deferred();
+    apiHarness.setRating.mockReturnValueOnce(first.promise).mockReturnValueOnce(removal.promise);
+    mount();
+    await act(async () => {
+      button('Like').click();
+      button('Like').click();
+    });
+    expectRating(null);
+    expect(apiHarness.setRating.mock.calls).toEqual([['liked', 'track-a']]);
+    await act(async () => first.resolve({ ok: true }));
+    expectRating(null);
+    expect(apiHarness.setRating.mock.calls).toEqual([['liked', 'track-a'], [null, 'track-a']]);
+    await act(async () => {
+      if (outcome === 'resolve') removal.resolve({ ok: true, rating: null });
+      else removal.reject(apiRejection());
+    });
+    expectRating(outcome === 'resolve' ? null : 'liked');
+  });
+
+  it('does not reset rating when the same track receives a metadata/state broadcast', async () => {
+    const request = deferred();
+    apiHarness.setRating.mockReturnValueOnce(request.promise);
+    const view = mount();
+    await view.user.click(button('Like'));
+    switchTrack(view, { ...trackA, title: 'Track A (metadata updated)', artwork_url: '/art.png' });
+    expectRating('liked');
+    await act(async () => request.resolve({ ok: true }));
+    expectRating('liked');
+  });
+
+  it.each([
+    ['different ID with the same title', { ...trackA, id: 'track-b' }],
+    ['different provider with the same ID', { ...trackA, provider: 'spotify' }],
+    ['different video ID with the same fallback ID', { ...trackA, video_id: 'video-b' }],
+  ])('resets rating for a %s', async (_label, nextTrack) => {
+    const view = mount();
+    await view.user.click(button('Like'));
+    expectRating('liked');
+    switchTrack(view, nextTrack);
+    expectRating(null);
+  });
+
+  it.each(['resolve', 'reject'])('ignores an old-track %s after the new track saved Dislike', async (outcome) => {
+    const older = deferred();
+    apiHarness.setRating.mockReturnValueOnce(older.promise);
+    const view = mount();
+    await view.user.click(button('Like'));
+    switchTrack(view, trackB);
+    expectRating(null);
+    await view.user.click(button('Dislike'));
+    expectRating('disliked');
+    expect(apiHarness.setRating.mock.calls).toEqual([['liked', 'track-a'], ['disliked', 'track-b']]);
+    await act(async () => {
+      if (outcome === 'resolve') older.resolve({ ok: true });
+      else older.reject(apiRejection());
+    });
+    expectRating('disliked');
+    expect(screen.queryByText(failedCopy)).not.toBeInTheDocument();
+  });
+
+  it('keeps ordering across A -> B -> A and drops unsent clicks from the departed visit', async () => {
+    const older = deferred();
+    const returned = deferred();
+    apiHarness.setRating.mockReturnValueOnce(older.promise).mockReturnValueOnce(returned.promise);
+    const view = mount();
+    await view.user.click(button('Like'));
+    await view.user.click(button('Dislike'));
+    switchTrack(view, trackB);
+    switchTrack(view, trackA);
+    expectRating(null);
+    await view.user.click(button('Like'));
+    expectRating('liked');
+    expect(apiHarness.setRating.mock.calls).toEqual([['liked', 'track-a']]);
+    await act(async () => older.reject(apiRejection()));
+    // No Dislike from the first visit is sent, and its failure cannot roll
+    // back the second visit or show a misleading toast on that visit.
+    expect(apiHarness.setRating.mock.calls).toEqual([['liked', 'track-a'], ['liked', 'track-a']]);
+    expect(screen.queryByText(failedCopy)).not.toBeInTheDocument();
+    expectRating('liked');
+    await act(async () => returned.resolve({ ok: true }));
+    expectRating('liked');
+    switchTrack(view, trackB);
+    switchTrack(view, trackA);
+    await view.user.click(button('Dislike'));
+    expect(apiHarness.setRating).toHaveBeenLastCalledWith('disliked', 'track-a');
+    expectRating('disliked');
+  });
+
+  it('clears rating when playback stops and ignores the outstanding rejection', async () => {
+    const older = deferred();
+    apiHarness.setRating.mockReturnValueOnce(older.promise);
+    const view = mount();
+    await view.user.click(button('Like'));
+    switchTrack(view, null);
+    expectRating(null);
+    expect(button('Like')).toBeDisabled();
+    expect(button('Dislike')).toBeDisabled();
+    await act(async () => older.reject(apiRejection()));
+    expectRating(null);
+    expect(screen.queryByText(failedCopy)).not.toBeInTheDocument();
+  });
+
+  it('handles outstanding rejection after unmount without leaking rating into a new display', async () => {
+    const older = deferred();
+    apiHarness.setRating.mockReturnValueOnce(older.promise);
+    const view = mount();
+    await view.user.click(button('Like'));
+    view.unmount();
+    await act(async () => older.reject(apiRejection()));
+    mount();
+    expectRating(null);
+    expect(screen.queryByText(failedCopy)).not.toBeInTheDocument();
+  });
+
+  it('binds each write to video_id before id, matching the route target', async () => {
+    const { user } = mount({ ...trackA, video_id: 'video-a' });
+    await user.click(button('Like'));
+    expect(apiHarness.setRating).toHaveBeenCalledWith('liked', 'video-a');
+  });
+
+  it('fails visibly without dispatch if the displayed track has no supported identity', async () => {
+    const { user } = mount({ title: 'Unknown track', artist: 'Fixture Artist' });
+    await user.click(button('Like'));
+    expect(apiHarness.setRating).not.toHaveBeenCalled();
+    expectRating(null);
+    expect(await screen.findByText(refusedCopy)).toBeInTheDocument();
+  });
+});

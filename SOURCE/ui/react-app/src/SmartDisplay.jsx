@@ -1646,8 +1646,26 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null 
     }
   }, [agentTaskActive, agentFrameSrc]);
 
-  // Track rating
+  // Rating requests belong to one visit to one track. State broadcasts create
+  // new objects, so use media identity rather than nowPlaying object identity.
+  const ratingTrackId = nowPlaying?.video_id || nowPlaying?.id || null;
+  const ratingTrackKey = nowPlaying ? JSON.stringify([nowPlaying.provider || '', ratingTrackId]) : null;
   const [rating, setRating] = useState(null);
+  const ratingSessionRef = useRef(null);
+  const ratingWritesRef = useRef(new Map());
+  useLayoutEffect(() => {
+    ratingSessionRef.current = {
+      value: null,
+      confirmed: null,
+      confirmedId: 0,
+      nextId: 0,
+      pending: new Map(),
+    };
+    setRating(null);
+    // Invalidate before displaying a different track, including A -> B -> A,
+    // and on unmount. Late completions must not change that new visit's UI.
+    return () => { ratingSessionRef.current = null; };
+  }, [ratingTrackKey]);
 
   // Reuse the existing health poll. Configuration and a previous successful
   // response are not proof that the detector is still listening.
@@ -2117,19 +2135,65 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null 
   }, [api, notifyTransportFailure]);
 
   const handleRating = (newRating) => {
-    if (!nowPlaying) return;
-    const actualRating = rating === newRating ? null : newRating;
+    const session = ratingSessionRef.current;
+    if (!nowPlaying || !session) return;
+    const expectedTrackId = ratingTrackId;
+    if (!expectedTrackId) {
+      notifyTransportFailure({ status: 409 }, { refused: "Couldn't rate this track right now." });
+      return;
+    }
+    // Read the optimistic value synchronously, including clicks in one render.
+    const actualRating = session.value === newRating ? null : newRating;
+    const requestId = ++session.nextId;
+    session.pending.set(requestId, actualRating);
+    session.value = actualRating;
     setRating(actualRating);
-    // The star flips optimistically, so a failed save must flip it back rather
-    // than leave the UI claiming a rating the server never stored (#4214's
-    // shape, on the rating control).
-    api.setRating(actualRating).catch((err) => {
-      setRating(rating);
-      notifyTransportFailure(err, {
-        refused: "Couldn't rate this track right now.",
-        failed: "Couldn't save that rating. Please try again.",
-      });
+
+    const settleRating = (saved) => {
+      if (ratingSessionRef.current !== session) return;
+      session.pending.delete(requestId);
+      if (saved && requestId > session.confirmedId) {
+        session.confirmedId = requestId;
+        session.confirmed = actualRating;
+      }
+      // Roll back to the newest remaining choice, never to the captured value
+      // of a different request (which may itself have failed). A newer accepted
+      // choice also supersedes every older pending response.
+      let latestId = session.confirmedId;
+      let nextRating = session.confirmed;
+      for (const [pendingId, pendingRating] of session.pending) {
+        if (pendingId > latestId) {
+          latestId = pendingId;
+          nextRating = pendingRating;
+        }
+      }
+      session.value = nextRating;
+      setRating(nextRating);
+    };
+
+    // Serialize writes for this track so response guards cannot merely hide
+    // an older save arriving at the server after a newer choice. Keep that
+    // ordering across A -> B -> A, while unrelated tracks remain independent.
+    const writes = ratingWritesRef.current;
+    const previousWrite = writes.get(expectedTrackId) || Promise.resolve();
+    const write = previousWrite.then(async () => {
+      // A queued click for a track we left must never rate the next track.
+      if (ratingSessionRef.current !== session) return;
+      try {
+        await api.setRating(actualRating, expectedTrackId);
+        settleRating(true);
+      } catch (err) {
+        if (ratingSessionRef.current !== session) return;
+        settleRating(false);
+        notifyTransportFailure(err, {
+          refused: "Couldn't rate this track right now.",
+          failed: "Couldn't save that rating. Please try again.",
+        });
+      }
+    }).finally(() => {
+      if (writes.get(expectedTrackId) === write) writes.delete(expectedTrackId);
     });
+    writes.set(expectedTrackId, write);
   };
 
   // Shuffle flips optimistically, so it MUST be able to flip back (#4214).

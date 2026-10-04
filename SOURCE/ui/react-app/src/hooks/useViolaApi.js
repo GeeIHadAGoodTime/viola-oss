@@ -308,7 +308,10 @@ export function useViolaApi() {
     setVolume: (level) => apiFetch('/v1/volume', { method: 'POST', body: JSON.stringify({ level }) }),
 
     // Rating
-    setRating: (rating) => apiFetch('/v1/rating', { method: 'POST', body: JSON.stringify({ rating }) }),
+    setRating: (rating, expectedTrackId) => apiFetch('/v1/rating', {
+      method: 'POST',
+      body: JSON.stringify({ rating, expected_track_id: expectedTrackId })
+    }),
 
     // Queue
     getQueue: () => apiFetch('/v1/queue'),
