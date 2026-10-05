@@ -123,6 +123,12 @@ export function normalizeErrorFrameForTest(msg) {
 
 export function usePlayerState() {
   const [state, setState] = useState(INITIAL_STATE);
+  // An initial [] is a placeholder; an observed [] is an authoritative empty
+  // queue. Keep that distinction and retire older reads only for this field.
+  const [queueSnapshot, setQueueSnapshot] = useState(null);
+  const queueRevisionRef = useRef(0);
+  const queueReadRef = useRef(0);
+  const queueDelayTimerRef = useRef(null);
   const [connected, setConnected] = useState(false);
   // Optimistic state: allows UI to update immediately before server confirms
   const [localIsPlaying, setLocalIsPlaying] = useState(null);
@@ -163,10 +169,21 @@ export function usePlayerState() {
     if (rehydrateRef.current.inFlight && rehydrateRef.current.key === key) return;
 
     rehydrateRef.current = { key, inFlight: true };
+    const queueRevision = queueRevisionRef.current;
+    const queueRead = ++queueReadRef.current;
     api.getState()
       .then((res) => {
         const authoritative = res?.data || res;
-        if (!isObject(authoritative) || !isObject(authoritative.now_playing)) return;
+        if (!isObject(authoritative)) return;
+        if (queueReadRef.current === queueRead && queueRevisionRef.current === queueRevision
+            && res?.ok !== false && authoritative.ok !== false && Array.isArray(authoritative.queue)) {
+          queueRevisionRef.current += 1;
+          if (queueDelayTimerRef.current !== null) clearTimeout(queueDelayTimerRef.current);
+          queueDelayTimerRef.current = null;
+          setQueueSnapshot(authoritative.queue);
+        }
+        // Queue admission is independent of embedded track rehydration.
+        if (!isObject(authoritative.now_playing)) return;
         setState(prev => normalizePlayerStatePayloadForTest({
           ...prev,
           ...authoritative,
@@ -184,6 +201,7 @@ export function usePlayerState() {
 
   const handleMessage = useCallback((msg) => {
     if (msg.type === 'state' && msg.payload) {
+      const queueRevision = Array.isArray(msg.payload.queue) ? ++queueRevisionRef.current : null;
       // DIAGNOSTIC: Log volume changes from WebSocket to backend
       if (import.meta.env.DEV) {
         const newVolume = msg.payload.volume;
@@ -209,6 +227,23 @@ export function usePlayerState() {
       // speakers are playing.  Volume and error changes bypass the delay.
       const hubActive = msg.payload.hub_local_playback_active || false;
       const hubBufferMs = msg.payload.hub_buffer_ms || 0;
+
+      if (queueRevision !== null) {
+        if (queueDelayTimerRef.current !== null) clearTimeout(queueDelayTimerRef.current);
+        queueDelayTimerRef.current = null;
+        const publishQueue = () => {
+          if (queueRevisionRef.current !== queueRevision) return;
+          queueDelayTimerRef.current = null;
+          setQueueSnapshot(msg.payload.queue);
+        };
+        // Partial state frames may replace the visual timer, but cannot lose
+        // a valid queue or move its original publication deadline.
+        if (hubActive && hubBufferMs > 0) {
+          queueDelayTimerRef.current = setTimeout(publishQueue, hubBufferMs);
+        } else {
+          publishQueue();
+        }
+      }
 
       if (hubActive && hubBufferMs > 0) {
         // Volume and error changes apply IMMEDIATELY
@@ -349,6 +384,12 @@ export function usePlayerState() {
   // still land and overwrite the newer state on a later mount of this hook.
   useEffect(() => {
     return () => {
+      queueRevisionRef.current += 1;
+      queueReadRef.current += 1;
+      if (queueDelayTimerRef.current !== null) {
+        clearTimeout(queueDelayTimerRef.current);
+        queueDelayTimerRef.current = null;
+      }
       if (delayTimerRef.current !== null) {
         clearTimeout(delayTimerRef.current);
         delayTimerRef.current = null;
@@ -417,10 +458,20 @@ export function usePlayerState() {
 
   // Initial fetch
   useEffect(() => {
+    const queueRevision = queueRevisionRef.current;
+    const queueRead = ++queueReadRef.current;
     api.getState()
       .then((res) => {
         if (res.ok !== false) {
-          setState(res.data || res);
+          const payload = res.data || res;
+          if (queueReadRef.current === queueRead && queueRevisionRef.current === queueRevision
+              && payload.ok !== false && Array.isArray(payload.queue)) {
+            queueRevisionRef.current += 1;
+            if (queueDelayTimerRef.current !== null) clearTimeout(queueDelayTimerRef.current);
+            queueDelayTimerRef.current = null;
+            setQueueSnapshot(payload.queue);
+          }
+          setState(payload);
           setConnected(true);
         }
       })
@@ -434,6 +485,8 @@ export function usePlayerState() {
 
   return {
     ...state,
+    queue: queueSnapshot ?? INITIAL_STATE.queue,
+    hasQueueSnapshot: queueSnapshot !== null,
     is_playing: effectiveIsPlaying,
     connected,
     send,  // Expose WebSocket send for youtube_state messages
