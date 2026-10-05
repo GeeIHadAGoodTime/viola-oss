@@ -1,22 +1,14 @@
 {
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "d6bbf32c739fbafb8d7e24b6f01e63f26b7ca95e33a03985b5cea53d2250e925",
-  "source_tree_sha256": "26b15da401d4de29f8e215e7983421d7dbd798c93c41976ba6ffdef5795349ad",
-  "source_file_count": 2508,
-  "source_revision": "587d6089afce57c462f71e8fd66de1b78abdb701",
+  "source_manifest_sha256": "5b63c4dc809479adb68085a3536ea28257c67c539041cead4b7e03efaeb03e1b",
+  "source_tree_sha256": "629374f5477b6914b1089053d4b6418a3fc94513598181d92f10e24b44b9a85c",
+  "source_file_count": 2507,
+  "source_revision": "bb45ca52e9960e67747b22ca088cae5a8db8497a",
   "comparison_public_revision": "27cc96065e4cac22b73ae079e2d3d5bd0dcaf11c",
   "changed_source_paths": [
-    "SOURCE/ui/react-app/src/__tests__/hooks/useSettings.snapshotOrdering.test.jsx",
-    "SOURCE/ui/react-app/src/components/SettingsModal.cloudSyncConsent.test.jsx",
-    "SOURCE/ui/react-app/src/components/SettingsModal.desktopAi.test.jsx",
-    "SOURCE/ui/react-app/src/components/SettingsModal.desktopOnlyPanels.test.jsx",
-    "SOURCE/ui/react-app/src/components/SettingsModal.jsx",
-    "SOURCE/ui/react-app/src/components/SettingsModal.outputDevice.test.jsx",
-    "SOURCE/ui/react-app/src/components/SettingsModal.sidebar.test.jsx",
-    "SOURCE/ui/react-app/src/hooks/useSettings.js",
-    "SOURCE/ui/react-app/src/hooks/useSettingsDraft.js",
-    "SOURCE/ui/react-app/src/hooks/useSettingsDraft.test.jsx"
+    "SOURCE/services/notifications/windows_toast.py",
+    "SOURCE/tests/public/test_windows_toast_delivery_contract.py"
   ],
   "retained_sboms": [
     {
@@ -58,7 +50,7 @@
   ],
   "input_equivalence": {
     "changed_dependency_inputs": [],
-    "basis": "Eight existing SOURCE files change and two are added. All other 2498 SOURCE files remain byte-identical to authoritative public 27cc96065e4cac22b73ae079e2d3d5bd0dcaf11c, preserving wake activation admission v2, startup visibility v2, and all prior playback, mute and Settings dismissal corrections. Dependencies, build profiles, vendor/model assets, licences, notices and all six retained SBOMs are unchanged. No new resolution or advisory scan is claimed."
+    "basis": "One existing runtime source changes and one stdlib source-contract test is added. All 2505 other SOURCE files remain byte-identical to public 27cc96065e4cac22b73ae079e2d3d5bd0dcaf11c, including startup visibility v2, Settings dismissal and wake-admission generation ownership. Dependencies, build profiles, vendor/model assets, licences, notices and all six retained SBOMs are unchanged. No new dependency resolution or advisory scan is claimed."
   },
   "prior_binding": {
     "public_revision": "27cc96065e4cac22b73ae079e2d3d5bd0dcaf11c",
@@ -71,14 +63,13 @@
   "new_advisory_scan_performed": false,
   "new_runtime_qualification_performed": false,
   "qualification": {
-    "scope": "Offline source qualification of Settings draft ownership and exact save acknowledgements. No installed desktop, physical microphone, account-principal, live provider or customer release qualification.",
-    "source_integrity": "All 2533 authoritative base Git leaves were reconciled by exact blob identity before overlay. Eight existing source leaves change and two are added; the source-only commit preserves 2525 other original leaves. Two canonical metadata replacements preserve 2523 original leaves. Manifest inventories 2508 SOURCE files, and all six prior SBOMs are retained exactly.",
-    "behavior": "Server refreshes update clean top-level fields while unsaved and post-submit edits remain local. Each save returns its own exact response snapshot; acknowledged normalized/redacted values and field removals are adopted only for fields not subsequently edited. Edit generations preserve ABA edits. Cancel restores the latest backend snapshot and invalidates tickets. The prior dismissed/reopened save completion guard remains intact; footer completion does not close a newer unsaved draft. Existing boolean updateSettings/updateSetting callers remain compatible.",
-    "checks": "97 focused cases pass. Exact frontend coverage is 151 files and 1331 case occurrences across 20 successful disjoint execution partitions, preserving all 1304 prior occurrences and adding 27. Four targeted mutation variants fail with 7, 4, 1 and 1 assertions. Scoped ESLint reports zero errors and 13 inherited warnings. Normal upload-disabled production Vite build passes using a 512 MB Node heap.",
-    "review": "Independent reviewer verified all ten source hashes, replayed all 97 focused cases, and passed five additional combined-hook, field-deletion, duplicate-receipt, Cancel and unmount probes. All 20 terminal process/log/XML partitions were independently reconciled against exact case multiplicities; no blocking finding.",
-    "fixture_scope": "Four existing modal test harnesses expose the detailed receipt through their prior boolean-save mock and publish accepted snapshots. One older-success/newer-refusal case now submits an actual newer Disabled edit rather than an identical already-saved payload; its ownership and close assertions remain. No assertions were weakened to permit draft loss.",
-    "execution_limits": "An unsplit remaining-suite process and the initial production build exited 137/Killed; their causes remain unassigned and receipts are retained as failed execution. An initial final partition lacked unchanged embed.js in the sparse test tree; its exact accepted source bytes were restored before the successful rerun. Partial XML and collection-only receipts are excluded from passing evidence.",
-    "integration_limit": "Private adoption must consume the reviewed public pin and map ui/react-app/src/hooks/useSettingsDraft.js plus ui/react-app/src/hooks/useSettingsDraft.test.jsx through the canonical source inventory. Do not copy public runtime changes into private shadows. Concurrent backend mutation ordering, cancellation, cross-store transactions, account transitions and actual persisted restart remain unqualified.",
+    "scope": "Offline execution of actual Windows toast registration, delivery and notification-routing source with inert COM and process boundaries. No native Windows or installed notification result.",
+    "source_integrity": "All 2533 authenticated base Git blobs reconciled. One existing runtime leaf changes and one public test is added; the source-only commit retains 2532 original leaves. Two metadata replacements retain 2530 original leaves. Canonical manifest contains 2507 source files and all six previous SBOMs are retained exactly.",
+    "behavior": "A pywintypes.com_error from COM initialization, shortcut/property registration or cleanup is translated to the existing RuntimeError delivery boundary. Failed local delivery returns false and allows each existing user-scoped normal/high/urgent web-push leg to continue. Successful delivery, app identity, platform/cloud/permission gates and COM cleanup are preserved. Unexpected programming errors still propagate.",
+    "checks": "11 public controls pass; exact original runtime yields 15 failing subcases. Independent reviewer repeats the 11 controls plus four permission-error/retry/programming-error/cleanup probes, all 15 pass. A composed-source union of web-push, quiet-hours, macOS/Linux fallbacks, C2 resilience and new public controls passes all 66 cases. Latest public startup-v2 plus toast union passes all 35 cases. Black and Ruff pass on changed source.",
+    "private_fixture_scope": "A separately reviewed private test-only fixture isolates every web-push test from all three OS notification boundaries. All 11 cases pass with an independent hard-failure OS sentinel; original fixture produces three failures. This private fixture is not part of the public runtime patch.",
+    "integration_limit": "The private repository must adopt this public revision and explicitly map the new public test. The Windows safety job that exposed this defect remains a historical failed result until a fresh native gate runs on the integrated exact head. No UI toast, COM registration, Windows permission, installed process, native device or Surface result is claimed.",
+    "review": "Independent source review verifies both exact hashes and AST-limits the runtime change to _ensure_app_shortcut. No blocking defect found for this bounded correction.",
     "lineage": "Prior qualification is retained below as historical evidence; it does not independently qualify this successor.",
     "exact_head_hosted_checks": "pending for this exact bound successor",
     "installed_candidate": "not_established",
@@ -258,7 +249,7 @@
     }
   },
   "reviewed_source_patch": {
-    "settings_draft_ownership_sha256": "2bac6ea900dbea914785b16ea40854475549707641cf891094794b6776dfae77",
+    "windows_toast_com_failure_sha256": "03bca923720781e9f0bdb3b3cf6fac5f9b285992340681b29787415b2409373e",
     "prior_source_patch": {
       "wake_admission_v2_sha256": "cd012e2d296139da8d775eac6623a496f56a6e4e42b49a50433f58a69adfa3c4",
       "prior_source_patch": {
