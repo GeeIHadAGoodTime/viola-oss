@@ -25,6 +25,10 @@ import ResetPasswordScreen from './ResetPasswordScreen';
 import RecoveryConfirmScreen from './RecoveryConfirmScreen';
 import VerifyEmailScreen from './VerifyEmailScreen';
 import AuthLoadingScreen from './AuthLoadingScreen';
+import AuthShell from './AuthShell';
+import AuthNotice from './AuthNotice';
+import AuthButton from './AuthButton';
+import { authErrorMessage } from './authValidation';
 import { useAuth } from '../../auth/useAuth';
 import { parseRecoveryHash } from '../../auth/authClient';
 
@@ -48,7 +52,7 @@ const VIEW = {
 };
 
 export default function CloudAuthGate({ children }) {
-  const { status } = useAuth();
+  const { status, signOut, signOutFeedback } = useAuth();
   const [view, setView] = useState(VIEW.LOGIN);
   // Carries the address from sign-up -> verify, where it is a CONFIRMED
   // address (the account was just created with it) — VerifyEmailScreen shows
@@ -77,6 +81,20 @@ export default function CloudAuthGate({ children }) {
           setView(VIEW.LOGIN);
         }}
       />
+    );
+  }
+
+  // AccountTab is inside this gate and can disappear before SDK cleanup
+  // finishes. Keep the real action outcome above that dashboard boundary.
+  if (signOutFeedback?.pending || signOutFeedback?.error) {
+    const pending = Boolean(signOutFeedback.pending);
+    return (
+      <AuthShell title={pending ? 'Signing out…' : 'Sign-out incomplete'}>
+        <AuthNotice message={signOutFeedback.error ? authErrorMessage(signOutFeedback.error, 'Sign-out could not be completed. Please retry.') : ''} kind="error" />
+        <AuthButton type="button" busy={pending} onClick={() => { void signOut(); }}>
+          {pending ? 'Signing out…' : 'Retry sign-out'}
+        </AuthButton>
+      </AuthShell>
     );
   }
 

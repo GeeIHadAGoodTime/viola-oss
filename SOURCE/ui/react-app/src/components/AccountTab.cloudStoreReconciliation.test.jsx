@@ -26,6 +26,7 @@ import { useAuth as useCloudAuth } from '../auth/useAuth';
 import { AuthProvider as AppAuthProvider, useAuth as useAppAuth } from '../hooks/useAuth';
 import { gotrueClient } from '../lib/gotrue_client';
 import { AccountTab } from './AccountTab';
+import ProductionCloudAuthGate from './auth/CloudAuthGate';
 
 /** Unsigned three-segment JWT - decodeJWT never verifies the signature. */
 function fakeJwt(payload) {
@@ -441,4 +442,121 @@ describe('C-400 - the app-wide store is reconciled for a cloud front-door sign-i
     expect(await screen.findByText('Free Plan')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Manage Subscription/i })).not.toBeInTheDocument();
   });
+});
+
+it('keeps a visible cleanup failure after the real cloud gate unmounts AccountTab', async () => {
+  const server = fakeGoTrue({ expiresIn: 3600 });
+  let refuseSdkCleanup = false;
+  let refused = 0;
+  vi.stubGlobal('fetch', vi.fn(async (input, init) => {
+    const url = new URL(typeof input === 'string' ? input : input.url, 'http://localhost');
+    if (refuseSdkCleanup && url.pathname.endsWith('/auth/v1/logout') && url.searchParams.get('scope') === 'local') {
+      refused += 1;
+      return jsonResponse({ message: 'Synthetic cleanup unavailable' }, 503);
+    }
+    return server.fetchMock(input, init);
+  }));
+  const view = render(
+    <UiStateProvider>
+      <CloudAccountProvider>
+        <CloudDriver />
+        <ProductionCloudAuthGate>
+          <AppAuthProvider><StoreProbe /><AccountTab /></AppAuthProvider>
+        </ProductionCloudAuthGate>
+      </CloudAccountProvider>
+    </UiStateProvider>,
+  );
+  try {
+    await waitFor(() => expect(screen.getByTestId('cloud-status').textContent).toBe('signedOut'));
+    await signInThroughFrontDoor();
+    await waitFor(() => expect(screen.getByTestId('store-logged-in').textContent).toBe('true'));
+    refuseSdkCleanup = true;
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /^Sign Out$/i })); });
+    await waitFor(() => expect(screen.getByTestId('cloud-status').textContent).toBe('signedOut'));
+    expect(await screen.findByRole('heading', { name: 'Sign-out incomplete' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Welcome back' })).not.toBeInTheDocument();
+    expect(refused).toBeGreaterThan(0);
+    expect((await gotrueClient.getSession()).data.session).not.toBeNull();
+    await waitFor(() => expect(screen.queryByText('Sign-out could not clear the app session. Please retry.')).toBeInTheDocument());
+    refuseSdkCleanup = false;
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Retry sign-out' })); });
+    expect(await screen.findByRole('heading', { name: 'Welcome back' })).toBeInTheDocument();
+    expect((await gotrueClient.getSession()).data.session).toBeNull();
+  } finally {
+    refuseSdkCleanup = false;
+    view.unmount();
+    await gotrueClient.signOut({ scope: 'local' });
+  }
+});
+
+it('keeps actual SDK cleanup pending visible above the production gate until it drains', async () => {
+  const server = fakeGoTrue({ expiresIn: 3600 });
+  let holdCleanup = false;
+  let release;
+  let entered;
+  const started = new Promise((resolve) => { entered = resolve; });
+  const response = new Promise((resolve) => { release = resolve; });
+  let localCalls = 0;
+  vi.stubGlobal('fetch', vi.fn(async (input, init) => {
+    const url = new URL(typeof input === 'string' ? input : input.url, 'http://localhost');
+    if (holdCleanup && url.pathname.endsWith('/auth/v1/logout') && url.searchParams.get('scope') === 'local') {
+      localCalls += 1;
+      entered();
+      return response;
+    }
+    return server.fetchMock(input, init);
+  }));
+  const view = render(
+    <UiStateProvider><CloudAccountProvider><CloudDriver />
+      <ProductionCloudAuthGate><AppAuthProvider><StoreProbe /><AccountTab /></AppAuthProvider></ProductionCloudAuthGate>
+    </CloudAccountProvider></UiStateProvider>,
+  );
+  try {
+    await waitFor(() => expect(screen.getByTestId('cloud-status').textContent).toBe('signedOut'));
+    await signInThroughFrontDoor();
+    await waitFor(() => expect(screen.getByTestId('store-logged-in').textContent).toBe('true'));
+    holdCleanup = true;
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Sign Out' })); await started; });
+    expect(screen.getByRole('heading', { name: 'Signing out…' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Welcome back' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Signing out…' })).toBeDisabled();
+    expect(localCalls).toBe(1);
+    await act(async () => { release(jsonResponse({}, 204)); });
+    expect(await screen.findByRole('heading', { name: 'Welcome back' })).toBeInTheDocument();
+    expect((await gotrueClient.getSession()).data.session).toBeNull();
+  } finally {
+    holdCleanup = false;
+    release(jsonResponse({}, 204));
+    view.unmount();
+    await gotrueClient.signOut({ scope: 'local' });
+  }
+});
+
+it('same-turn duplicate clicks on actual gate Retry do not create two pending revocations', async () => {
+  const server = fakeGoTrue({ expiresIn: 3600 });
+  let calls = 0;
+  let release;
+  const pending = new Promise((resolve) => { release = resolve; });
+  vi.stubGlobal('fetch', vi.fn(async (input, init) => {
+    const url = new URL(typeof input === 'string' ? input : input.url, 'http://localhost');
+    if (url.pathname.endsWith('/auth/v1/logout') && url.searchParams.get('scope') !== 'local') {
+      calls += 1;
+      if (calls === 1) return jsonResponse({ message: 'Review synthetic revocation refusal' }, 503);
+      return pending;
+    }
+    return server.fetchMock(input, init);
+  }));
+  const view = render(<UiStateProvider><CloudAccountProvider><CloudDriver /><ProductionCloudAuthGate><AppAuthProvider><StoreProbe /><AccountTab /></AppAuthProvider></ProductionCloudAuthGate></CloudAccountProvider></UiStateProvider>);
+  try {
+    await waitFor(() => expect(screen.getByTestId('cloud-status').textContent).toBe('signedOut'));
+    await signInThroughFrontDoor();
+    await waitFor(() => expect(screen.getByTestId('store-logged-in').textContent).toBe('true'));
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Sign Out' })); });
+    const retry = await screen.findByRole('button', { name: 'Retry sign-out' });
+    await act(async () => { retry.click(); retry.click(); });
+    expect(screen.getByRole('button', { name: 'Signing out…' })).toBeDisabled();
+    expect(calls).toBe(2);
+    await act(async () => { release(jsonResponse({}, 204)); });
+    expect(await screen.findByRole('heading', { name: 'Welcome back' })).toBeInTheDocument();
+  } finally { release(jsonResponse({}, 204)); view.unmount(); await gotrueClient.signOut({ scope: 'local' }); }
 });
