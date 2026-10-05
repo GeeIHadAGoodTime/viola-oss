@@ -1,0 +1,20 @@
+[
+  {
+    "path": "_romance_vendor/spanish.py",
+    "upstream_sha256": "948bc543f36d6982b882eb3cb6c6ccd1fc0dc58a28c64486ff5f7271a7cd8d7b",
+    "modified_sha256": "dd1506f6e1030c14ef1b9a4997e6155746cf5594ee47907d5282c14c20e97327",
+    "change": "one unknown-grapheme skip changed to explicit error; visible modification notice"
+  },
+  {
+    "path": "_romance_vendor/french.py",
+    "upstream_sha256": "5c125d981490a0409cfc181daffdc0462ce006e740bf9e68190a3a6f492785d7",
+    "modified_sha256": "f188040463369508218947a6e241bbb5a219b09c10515fa3e5bb996e192e73a9",
+    "change": "one unknown-grapheme skip changed to explicit error; visible modification notice"
+  },
+  {
+    "path": "_romance_vendor/portuguese.py",
+    "upstream_sha256": "74fdb32dba21e6de2397a13e1f99885b8ef3838ff6d86a8573197c899be91287",
+    "modified_sha256": "005304915518187a49f13a2ca3217d23abce9530d432b68d19a198bd0aa4db41",
+    "change": "one unknown-grapheme skip changed to explicit error; visible modification notice"
+  }
+]
