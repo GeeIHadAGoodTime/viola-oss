@@ -15,6 +15,8 @@ import { useAuth } from '../hooks/useAuth';
 import { useAuth as useCloudAuth } from '../auth/useAuth';
 import { enabledAuthProviders } from '../auth/authProviders';
 import { isDesktopApp } from '../utils/runtimeSurface';
+import { isCloudSurface } from './auth/cloudSurface';
+import { authErrorMessage } from './auth/authValidation';
 import { decodePlanFromUser } from '../lib/auth_context';
 import { useCalendarProviders } from '../hooks/useCalendarProviders';
 import { useUsage } from '../hooks/useUsage';
@@ -665,7 +667,7 @@ UpgradePanel.propTypes = {
 };
 
 // User Profile Card
-const ProfileCard = ({ user, subscription, onLogout, addToast, refreshUser }) => {
+const ProfileCard = ({ user, subscription, onLogout, logoutPending = false, addToast, refreshUser }) => {
   const [portalLoading, setPortalLoading] = useState(false);
   const canManageSubscription = Boolean(
     subscription?.hasPaidAccess && subscription?.paymentProvider === 'stripe',
@@ -763,8 +765,8 @@ const ProfileCard = ({ user, subscription, onLogout, addToast, refreshUser }) =>
       )}
 
       <div style={{ marginTop: '16px' }}>
-        <Button variant="secondary" fullWidth onClick={onLogout}>
-          Sign Out
+        <Button variant="secondary" fullWidth onClick={onLogout} disabled={logoutPending}>
+          {logoutPending ? 'Signing out…' : 'Sign Out'}
         </Button>
       </div>
     </div>
@@ -782,6 +784,7 @@ ProfileCard.propTypes = {
     paymentProvider: PropTypes.string,
   }),
   onLogout: PropTypes.func.isRequired,
+  logoutPending: PropTypes.bool,
   addToast: PropTypes.func.isRequired,
   refreshUser: PropTypes.func.isRequired,
 };
@@ -1949,6 +1952,33 @@ export function AccountTab({
   const cloudIsLoggedIn = cloudStatus === 'signedIn';
   const effectiveIsLoggedIn = isLoggedIn || cloudIsLoggedIn;
   const effectiveUser = user || cloudUser;
+  const [logoutPending, setLogoutPending] = useState(false);
+  const [logoutError, setLogoutError] = useState('');
+  const logoutInFlightRef = useRef(null);
+  const logoutRetryActionsRef = useRef([]);
+  const logoutMountedRef = useRef(true);
+  const logoutPrincipal = cloudIsLoggedIn ? cloudUser?.id || cloudUser?.email
+    : isLoggedIn ? user?.id || user?.email : null;
+  const logoutPrincipalRef = useRef(logoutPrincipal);
+  const logoutEpochRef = useRef(0);
+  if (logoutPrincipal !== logoutPrincipalRef.current) {
+    // Our own signed-out transition must keep a late failure visible. A
+    // subsequent sign-in (including same-account ABA) retires that outcome.
+    if (logoutPrincipal) logoutEpochRef.current += 1;
+    logoutPrincipalRef.current = logoutPrincipal;
+  }
+  useEffect(() => {
+    logoutMountedRef.current = true;
+    return () => { logoutMountedRef.current = false; logoutInFlightRef.current = null; };
+  }, []);
+  useEffect(() => {
+    if (!logoutPrincipal) return;
+    logoutInFlightRef.current = null;
+    logoutRetryActionsRef.current = [];
+    setLogoutPending(false);
+    setLogoutError('');
+  }, [logoutPrincipal]);
+
 
   // Billing/plan display (issue #2741). `subscription` above is the source of
   // truth and IS populated for a cloud sign-in — the front door's bridge is
@@ -1971,15 +2001,50 @@ export function AccountTab({
     paymentProvider: cloudPlan.paymentProvider,
   });
 
-  // Sign Out must clear whichever session(s) are actually live — a click that
-  // only cleared the disconnected hooks/useAuth session would leave a
-  // cloud-authenticated user still signed in after "signing out".
+  // On cloud the front door owns the SDK bridge and its cleanup. A second
+  // direct SDK logout would bypass that ownership queue. Desktop retains its
+  // separate store/cookie paths. Returned refusals matter as much as throws.
   const handleLogout = useCallback(async () => {
-    await Promise.allSettled([
-      isLoggedIn ? logout() : null,
-      cloudIsLoggedIn ? cloudSignOut() : null,
-    ].filter(Boolean));
+    if (logoutInFlightRef.current) return;
+    const attempt = {};
+    const epoch = logoutEpochRef.current;
+    logoutInFlightRef.current = attempt;
+    setLogoutPending(true);
+    setLogoutError('');
+    let actions = cloudIsLoggedIn && isCloudSurface()
+      ? [{ run: cloudSignOut, kind: 'cloud' }]
+      : [isLoggedIn && { run: logout, kind: 'legacy' }, cloudIsLoggedIn && { run: cloudSignOut, kind: 'cloud' }].filter(Boolean);
+    if (!actions.length) actions = logoutRetryActionsRef.current;
+    try {
+      const results = await Promise.allSettled(actions.map(({ run }) => Promise.resolve().then(() => run())));
+      if (!logoutMountedRef.current || epoch !== logoutEpochRef.current || logoutInFlightRef.current !== attempt) return;
+      if (results.some((result) => result.status === 'fulfilled' && result.value?.error?.code === 'auth_session_changed')) return;
+      const failedIndex = results.findIndex((result, index) => result.status === 'rejected'
+        || (actions[index].kind === 'cloud' ? result.value?.ok !== true : result.value?.success !== true));
+      if (failedIndex >= 0 || !actions.length) {
+        const failed = results[failedIndex];
+        const error = failed?.status === 'fulfilled' ? failed.value?.error : null;
+        setLogoutError(authErrorMessage(error, 'Sign-out could not be completed. Please retry.'));
+        logoutRetryActionsRef.current = actions;
+      } else {
+        logoutRetryActionsRef.current = [];
+      }
+    } finally {
+      if (logoutInFlightRef.current === attempt) {
+        logoutInFlightRef.current = null;
+        if (logoutMountedRef.current) setLogoutPending(false);
+      }
+    }
   }, [isLoggedIn, logout, cloudIsLoggedIn, cloudSignOut]);
+
+  const logoutNotice = logoutError ? (
+    <div role="alert" style={{ color: theme.colors.statusRed, marginBottom: '16px' }}>
+      <p>{logoutError}</p>
+      <Button variant="secondary" onClick={handleLogout} disabled={logoutPending}>
+        {logoutPending ? 'Signing out…' : 'Retry sign-out'}
+      </Button>
+    </div>
+  ) : null;
 
   if (loading) {
     return (
@@ -2002,7 +2067,8 @@ export function AccountTab({
     return (
       <>
         <Section title="Account">
-          <ProfileCard user={effectiveUser} subscription={effectiveSubscription} onLogout={handleLogout} addToast={addToast} refreshUser={refreshUser} />
+          {logoutNotice}
+          <ProfileCard user={effectiveUser} subscription={effectiveSubscription} onLogout={handleLogout} logoutPending={logoutPending} addToast={addToast} refreshUser={refreshUser} />
         </Section>
 
         <Section title="Phone">
@@ -2026,6 +2092,7 @@ export function AccountTab({
   return (
     <>
       <Section title="Account">
+        {logoutNotice}
         <AuthForm />
       </Section>
 
