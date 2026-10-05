@@ -2047,3 +2047,49 @@ describe('SmartDisplay repeated preference acceptance', () => {
   });
 
 });
+
+
+describe('SmartDisplay zero-volume acceptance', () => {
+  const playing = (volume) => ({
+    is_playing: true,
+    now_playing: { id: 'muted-track', title: 'Synthetic muted track', provider: 'youtube_iframe', video_id: 'muted-video' },
+    volume,
+    yt_hub_muted: false,
+  });
+  const slider = () => screen.getByRole('slider', { name: 'Volume' });
+
+  it.each([0, 1, 50, 100])('renders the server volume %i without substituting a loud default', (volume) => {
+    playerHarness.state = playing(volume);
+    render(<SmartDisplay />);
+    expect(slider()).toHaveAttribute('aria-valuenow', String(volume));
+    expect(slider()).toHaveValue(String(volume));
+  });
+
+  it.each([undefined, null])('keeps the fallback only when volume is absent: %s', (volume) => {
+    playerHarness.state = playing(volume);
+    render(<SmartDisplay />);
+    expect(slider()).toHaveAttribute('aria-valuenow', '80');
+  });
+
+  it('propagates server mute-to-zero and recovery to the real embedded player', async () => {
+    playerHarness.state = playing(40);
+    const view = render(<SmartDisplay />);
+    const iframe = view.container.querySelector('iframe');
+    expect(iframe).not.toBeNull();
+    const send = vi.spyOn(iframe.contentWindow, 'postMessage');
+    try {
+      for (const volume of [0, 25, 0]) {
+        send.mockClear();
+        playerHarness.state = playing(volume);
+        await act(async () => view.rerender(<SmartDisplay />));
+        const controls = send.mock.calls.filter(([message]) => message.type === 'control' && message.command === 'setVolume');
+        expect(controls.length).toBeGreaterThan(0);
+        expect([...new Set(controls.map(([message]) => message.level))]).toEqual([volume]);
+        expect(slider()).toHaveAttribute('aria-valuenow', String(volume));
+        expect(controls.every(([message, origin]) => message.level === volume && origin === window.location.origin)).toBe(true);
+      }
+    } finally {
+      send.mockRestore();
+    }
+  });
+});

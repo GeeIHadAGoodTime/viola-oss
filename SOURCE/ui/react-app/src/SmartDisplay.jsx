@@ -1424,7 +1424,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null 
   const nowPlaying = playerState.now_playing;
   const hasQueuedTracks = Array.isArray(playerState.queue) && playerState.queue.length > 0;
   const canResumePlayback = Boolean(nowPlaying) || hasQueuedTracks;
-  const volume = playerState.volume || 80;
+  const volume = playerState.volume ?? 80;
 
   // Desktop notification on track change
   const prevTrackTitleRef = useRef(null);
