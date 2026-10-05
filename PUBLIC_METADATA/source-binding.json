@@ -1,17 +1,14 @@
 {
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "ac51f2cb168ccbecfade922722ec6d802d9e1d9e7326d8b70b3897e0a498a67b",
-  "source_tree_sha256": "9f30d6253945e9c070ab318c8ee8f784d3bde7111ede92f3d5831d167ecd4e85",
+  "source_manifest_sha256": "99429e188ed9e8b1c00815da9914fc1653f02c061bc77513c1a7e77f0ca3971e",
+  "source_tree_sha256": "ad9aedc660c0069770fee0ceea639babf0d642824d43430e6ff33f3736c95b74",
   "source_file_count": 2512,
-  "source_revision": "25684d1776ea11417e254887e37110c66fd3ec90",
+  "source_revision": "c7dcdbfbd1fac900c23dc41e23bdefec70a11591",
   "comparison_public_revision": "b6d84daa42d1f2f782f11c849c635e78ef9dc8f9",
   "changed_source_paths": [
-    "SOURCE/ui/react-app/src/SmartDisplay.jsx",
-    "SOURCE/ui/react-app/src/components/player/PlayerSection.jsx",
-    "SOURCE/ui/react-app/src/components/player/VolumeControl.jsx",
-    "SOURCE/ui/react-app/src/components/player/VolumeControl.test.jsx",
-    "SOURCE/ui/react-app/src/__tests__/SmartDisplay.test.jsx"
+    "SOURCE/ui/react-app/src/auth/AuthProvider.jsx",
+    "SOURCE/ui/react-app/src/auth/AuthProvider.test.jsx"
   ],
   "retained_sboms": [
     {
@@ -53,7 +50,7 @@
   ],
   "input_equivalence": {
     "changed_dependency_inputs": [],
-    "basis": "Five existing SOURCE files change; all other 2507 SOURCE files remain byte-identical to public b6d84daa, including newly merged music identity guard and its public test, all Rooms, wake, Settings, startup and toast source. All six SBOMs, dependencies, build profiles, model/vendor assets, licences and notices are unchanged. No new dependency resolution or advisory scan."
+    "basis": "Two existing AuthProvider SOURCE files change. All other 2510 SOURCE files and all six retained SBOMs remain byte-identical to public main b6d84daa42d1f2f782f11c849c635e78ef9dc8f9. Merged OSS41 media-identity rejection, Rooms, Settings, wake stop/drain and startup fixes are preserved. Dependency/build inputs, assets, licenses and notices are unchanged. No new resolution or advisory scan is claimed."
   },
   "prior_binding": {
     "public_revision": "b6d84daa42d1f2f782f11c849c635e78ef9dc8f9",
@@ -66,15 +63,14 @@
   "new_advisory_scan_performed": false,
   "new_runtime_qualification_performed": false,
   "qualification": {
-    "scope": "Offline source qualification of native music volume acknowledgement and recovery. No installed desktop, physical audio, native output-device, deployed service or customer release qualification.",
-    "source_integrity": "All 2539 authoritative base Git leaves were reconciled before overlay. Exactly five existing SOURCE leaves change; 2534 original leaves remain exact in the source-only commit and 2532 after replacing two canonical metadata leaves. The manifest contains 2512 source files and retains all six SBOMs byte-for-byte.",
-    "behavior": "Preserve immediate input, trailing 50 ms throttle and 300 ms idle release. Admit final input before old-prop reconciliation. Native requests require explicit ok:true and a finite applied volume 0..100; normalized acknowledgements update rollback truth. Coalesce intermediate drag intent and order writes until acknowledgement or uncertainty. Show pending/aria-busy and 15 s uncertainty; actual monotonic deadline and request/component/input ownership prevent stale completion, feedback or younger-request release. Later observed server state stays authoritative. Target/provider/video/embed/spoke and existing principal boundaries retire old UI ownership. Unmount discards unsubmitted/queued changes under the prior component contract. The embedded direct-message route remains separate and unchanged in behavior.",
-    "checks": "43 focused cases pass:33 actual VolumeControl cases and 10 new real SmartDisplay cases. Exact 152-file/1413-case frontend union preserves all 1377 prior case occurrences and adds 36. All 166 SmartDisplay cases execute in bounded groups. Nine source mutation variants fail with 2/17/5/1/1/3/1/2/1 assertions and zero errors. Scoped ESLint reports 0errors and 12 inherited warnings. Normal upload-disabled production Vite build passes with 512 MB heap.",
-    "execution_partitioning": "A complete 1411-case union passed across 22 disjoint terminal process/XML executions. Two additional permanent expired-request/younger-owner tests changed only the existing test file; its entire 15-file partition was replayed and replaced the prior batch. The other 21 executed partitions remain valid on byte-identical production source. The final 1413 counter multiset has no missing/extra cases. Collection-only or partial output is never pass evidence; all original failed reproductions remain retained.",
-    "review": "Independent reviewer verified all five frozen hashes, replayed 43 focused plus four actual useViolaApi/apiFetch-to-control probes, and reconciled 22 terminal executions to the exact 1413-case multiset including the test-only replacement. Reviewed backend acknowledgement shape, normalized zero, refusal/deadline/younger ownership and direct iframe routing; no blocking finding.",
-    "contract_limits": "UI timeout cannot cancel HTTP or backend audio work and does not guarantee backend write ordering after a timed-out write. General WebSocket chronology, physical loudness/silence, selected-output identity, installed persistence and visual layout on native target hardware remain unqualified. Embedded direct messages are not newly claimed as acknowledged physical volume. No account/security-access setting or dependency is changed.",
-    "integration_limit": "Private adoption should consume this reviewed public pin through the existing canonical composition. No new source-map paths are required; do not copy runtime fixes into private shadows.",
-    "exact_head_hosted_checks": "pending for this exact bound successor",
+    "scope": "Bounded offline provider refresh ownership and newer-session renewal source correction. Synthetic accounts and network responses only.",
+    "source_integrity": "All 2539 authoritative base blobs verified. Two approved source replacements plus two canonical metadata replacements preserve every other 2535 Git blob. Manifest covers 2512 SOURCE files and six unchanged SBOMs. Existing snapshot was reused with only changed leaves overlaid; the separately consumed base remains byte-identical.",
+    "behavior": "Committed session generation retires stale refresh success, rejection and transient retry. Same-generation callers share one redemption. A newer generation waits for old work to drain, then rechecks mounted state, generation and token before redeeming its current token. Multiple current waiters share that new flight and await its completion. Sign-out, unmount, newer replacement and same-token ABA retain ownership.",
+    "checks": "104 scoped controls pass through the unchanged frontend test runner, including the existing real-SDK single-refresher control. Scoped ESLint has zero errors and warnings. Original 20 provider tests remain verbatim. This is scoped qualification, not a newly executed full frontend suite or production build.",
+    "review": "Independent exact-source review approved c7e9846d: 104 shipped and 123 additional controls pass; eight source mutants fail intended assertions. The rejected 715d80da lost-timer implementation and its failure evidence are retained.",
+    "known_adjacent_failure": "The separate pending first SDK setSession bridge can complete after front-door sign-out and repopulate SDK memory. This was reproduced with the real installed SDK and synthetic fetch on these exact approved bytes. This patch does not qualify whole-account logout; a separate ownership/cleanup successor remains under development.",
+    "contract_limits": "No request cancellation/timeout is added. Newer work waits for older transport to settle. Pending sign-in, sign-up, hydration and logout ownership outside runRefresh is not comprehensively qualified. No real credentials, account service, cookie, installed/native Windows UI, installer, audio or hardware execution occurred.",
+    "exact_head_hosted_checks": "pending for the new canonical metadata head",
     "installed_candidate": "not_established",
     "release_or_deployment": "not_established",
     "prior_source_qualification": {
@@ -315,10 +311,11 @@
           "integration_requalification": "The final current-main union independently replays all 91 wake lifecycle, native-startup source and toast controls with zero failures/errors/skips. The ten newly landed Settings source/test files remain exact; their prior qualification is retained as history, without claiming a fresh frontend rerun."
         }
       }
-    }
+    },
+    "source_union": "Source-only merge commit c7dcdbfb has current main b6d84daa and prior reviewed auth head c304fa1 as parents. This permits a fast-forward feature-branch update without losing source history. Both approved AuthProvider hashes remain unchanged."
   },
   "reviewed_source_patch": {
-    "native_volume_acknowledgement_sha256": "f15e4e8a05eb55932f05f417206f69aafbcd60921db15a871234f794224c5828",
+    "auth_refresh_generation_v2_sha256": "c7e9846ddc3d6d4137908947e5dbb4614e570a752c5e0941422b1b84d3dc1445",
     "prior_source_patch": {
       "music_state_desktop_fallback_sha256": "44a82877ae8974f5d75e1cfd4ae39f51f6a330fe9e6ad76e997fe2f1464dd24b",
       "dependent_private_test_sha256": "3e0ff3491bcf2a3a793da6fe633faf7fcff12c88bb96d0bef475e4c465549ce5",
