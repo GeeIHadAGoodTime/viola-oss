@@ -12,7 +12,8 @@ export default function QueueModal({ isOpen, onClose, wsQueue }) {
   const api = useViolaApi();
 
   // Use wsQueue as primary data source, HTTP fetch as fallback
-  const queue = (wsQueue && wsQueue.length > 0) ? wsQueue : (httpQueue || []);
+  const hasPlayerQueue = Array.isArray(wsQueue);
+  const queue = hasPlayerQueue ? wsQueue : (httpQueue || []);
 
   // Fetch queue via HTTP when modal opens (fallback for when WebSocket data is not available)
   useEffect(() => {
@@ -111,7 +112,7 @@ export default function QueueModal({ isOpen, onClose, wsQueue }) {
           {actionError}
         </div>
       )}
-      {loading ? (
+      {loading && !hasPlayerQueue ? (
         <div style={{ textAlign: 'center', color: THEME.colors.textMuted, padding: '40px' }}>
           Loading queue...
         </div>

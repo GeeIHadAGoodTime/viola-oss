@@ -35,6 +35,7 @@ const apiHarness = vi.hoisted(() => ({
   savedThreads: [],
   account: null,
   realHistory: false,
+  realQueue: false,
   sendCommandStreaming: vi.fn(() => Promise.resolve(null)),
   getQueue: vi.fn(() => Promise.resolve({ok: true, queue: []})),
   playQueueItem: vi.fn(() => Promise.resolve({ok: true})),
@@ -328,7 +329,7 @@ vi.mock('../components/SettingsModal', () => ({
   ),
 }));
 vi.mock('../components/QueueModal', () => ({
-  default: () => <div data-testid="queue-modal">Queue</div>,
+  default: (props) => apiHarness.realQueue ? <QueueModal {...props} /> : <div data-testid="queue-modal">Queue</div>,
 }));
 vi.mock('../components/HistoryModal', () => ({
   default: (props) => apiHarness.realHistory ? <HistoryModal {...props} /> : <div data-testid="history-modal">History</div>,
@@ -361,6 +362,7 @@ beforeEach(async () => {
   apiHarness.savedThreads = [];
   apiHarness.account = null;
   apiHarness.realHistory = false;
+  apiHarness.realQueue = false;
   apiHarness.sendCommandStreaming.mockReset().mockResolvedValue(null);
   wsHarness.handler = null;
   wsHarness.handlers = [];
@@ -2526,5 +2528,37 @@ describe('Native music volume response and target ownership', () => {
     expect(send).toHaveBeenCalledWith({ type: 'control', command: 'setVolume', level: 0 }, window.location.origin);
     expect(screen.getByRole('slider', { name: 'Volume' })).toHaveValue('0');
     expect(screen.getByText("Couldn't change the volume. Please try again.")).toBeInTheDocument();
+  });
+});
+
+
+describe('SmartDisplay Queue snapshot boundary', () => {
+  const future = { id: 'synthetic-future', title: 'Synthetic future HTTP track' };
+  it.each([false, true])('distinguishes initial unknown from observed empty (known=%s)', async known => {
+    apiHarness.realQueue = true;
+    apiHarness.getQueue.mockResolvedValue({ ok: true, queue: [future] });
+    playerHarness.state = { queue: [], hasQueueSnapshot: known };
+    const { user } = render(<SmartDisplay />);
+    await user.click(screen.getByRole('button', { name: 'Open menu' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Queue' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Queue' });
+    if (known) {
+      expect(within(dialog).queryByText(future.title)).not.toBeInTheDocument();
+      expect(within(dialog).getByText('Queue is empty. Ask me to play some music!')).toBeInTheDocument();
+    } else {
+      expect(await within(dialog).findByText(future.title)).toBeInTheDocument();
+    }
+  });
+  it('replaces the visible HTTP fallback when a known empty snapshot arrives', async () => {
+    apiHarness.realQueue = true;
+    apiHarness.getQueue.mockResolvedValue({ ok: true, queue: [future] });
+    playerHarness.state = { queue: [], hasQueueSnapshot: false };
+    const { user, rerender } = render(<SmartDisplay />);
+    await user.click(screen.getByRole('button', { name: 'Open menu' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Queue' }));
+    expect(await screen.findByText(future.title)).toBeInTheDocument();
+    playerHarness.state = { queue: [], hasQueueSnapshot: true };
+    rerender(<SmartDisplay />);
+    expect(screen.queryByText(future.title)).not.toBeInTheDocument();
   });
 });

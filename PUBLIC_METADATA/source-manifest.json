@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "8035ead0ac0af68abd27c057e166b789dd2f6499",
-  "sha256": "7876c973f8c36617e771a1ee9073468a0eb70457ff98996cb25df59bf207f958",
+  "revision": "f780c767c2d282c841dd207c2824ebd2c1b6a08f",
+  "sha256": "36407924d0483178c734faed77949310385063ef9638256f6d5ade4803a0e38d",
   "files": [
     {
       "path": ".env.example",
@@ -9385,8 +9385,8 @@
     },
     {
       "path": "ui/react-app/src/SmartDisplay.jsx",
-      "sha256": "e7d31cc00916b73412730f8c1fa2a796ce75d10a11aa2ecfb0311459e129cc21",
-      "bytes": 169749
+      "sha256": "0a4f56b391c1036bd371d3f1de395e910b9586ed69be231b06c4de30ee4cda53",
+      "bytes": 169792
     },
     {
       "path": "ui/react-app/src/SmartDisplay.stageRouting.test.jsx",
@@ -9410,8 +9410,8 @@
     },
     {
       "path": "ui/react-app/src/__tests__/SmartDisplay.test.jsx",
-      "sha256": "3aff332a578c1302d3b90ec9113c5b3423eb38912244e113eff065ca3a6804eb",
-      "bytes": 106769
+      "sha256": "b01906c95779633f15735c3c67557d8b76e152b465b26ef74079675dd5612435",
+      "bytes": 108586
     },
     {
       "path": "ui/react-app/src/__tests__/hooks/useEventBus.test.jsx",
@@ -10005,8 +10005,13 @@
     },
     {
       "path": "ui/react-app/src/components/QueueModal.jsx",
-      "sha256": "93b8db6c14a178a8b1394e433b117625f25910c2c4ac6e72e68fa29dadd371b1",
-      "bytes": 9263
+      "sha256": "fd292fa0883f64793c105c4e50df464ab863dfc2b27927ca00fac2689d74b2c7",
+      "bytes": 9314
+    },
+    {
+      "path": "ui/react-app/src/components/QueueModal.test.jsx",
+      "sha256": "5948a627ef7e639c8a60ca9e4e8131837c5e5c2c78b548670907dd334462f4ba",
+      "bytes": 16481
     },
     {
       "path": "ui/react-app/src/components/ReviewPage.jsx",
@@ -11045,8 +11050,8 @@
     },
     {
       "path": "ui/react-app/src/hooks/usePlayerState.js",
-      "sha256": "5a3be449ef6a8b61331feebfeac3f6681983e225200913311364360eb83ddc52",
-      "bytes": 18250
+      "sha256": "faa2342261b8587bf4bdbdc815a66c0b8a052a69ad67d4b3b19484938ddebf3d",
+      "bytes": 20867
     },
     {
       "path": "ui/react-app/src/hooks/usePlayerState.rehydrate.test.js",

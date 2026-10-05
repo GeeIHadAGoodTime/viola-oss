@@ -3651,7 +3651,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null 
       {queueOpen && (
         <ChunkLoadErrorBoundary name="Queue">
           <Suspense fallback={<ModalLoadingSpinner />}>
-            <QueueModal isOpen={queueOpen} onClose={() => setQueueOpen(false)} wsQueue={playerState.queue} />
+            <QueueModal isOpen={queueOpen} onClose={() => setQueueOpen(false)} wsQueue={playerState.hasQueueSnapshot ? playerState.queue : undefined} />
           </Suspense>
         </ChunkLoadErrorBoundary>
       )}
