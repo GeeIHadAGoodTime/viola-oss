@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "87e7391ede486737cc44f0f7635899624019f916",
-  "sha256": "49c1b6ce92f446f7954a80c014be73ca00655e952157ed7661e38cfb314399a3",
+  "revision": "f780c767c2d282c841dd207c2824ebd2c1b6a08f",
+  "sha256": "36407924d0483178c734faed77949310385063ef9638256f6d5ade4803a0e38d",
   "files": [
     {
       "path": ".env.example",
@@ -10004,14 +10004,9 @@
       "bytes": 9418
     },
     {
-      "path": "ui/react-app/src/components/QueueModal.actions.test.jsx",
-      "sha256": "92aa47eaac2d953d090b84f7c72600b56ced23dfa9486d0c9c85039031dcb415",
-      "bytes": 8321
-    },
-    {
       "path": "ui/react-app/src/components/QueueModal.jsx",
-      "sha256": "5978b4310ba40a94ddb23823a802c097a20608dcc2694cfd4d9cef50f6d1e2b3",
-      "bytes": 11476
+      "sha256": "fd292fa0883f64793c105c4e50df464ab863dfc2b27927ca00fac2689d74b2c7",
+      "bytes": 9314
     },
     {
       "path": "ui/react-app/src/components/QueueModal.test.jsx",

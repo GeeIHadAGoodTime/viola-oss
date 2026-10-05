@@ -181,7 +181,7 @@ export async function authFetch(path, options = {}) {
 // (telephony/desktop_cloud_proxy.py). A same-origin web client reaches the cloud
 // through its normal authFetch base.
 
-export async function apiFetch(path, options = {}) {
+export async function apiFetch(path, options = {}, responseMode = 'data') {
   const wantsJsonHeader = !(options.body instanceof FormData);
   const response = await authFetch(path, {
     ...options,
@@ -217,6 +217,7 @@ export async function apiFetch(path, options = {}) {
   }
   try {
     const json = await response.json();
+    if (responseMode === 'envelope') return json;
     // Auto-unwrap ResponseEnvelope — only unwrap on success.
     // On error (ok===false), return the full envelope so callers can inspect the error.
     if (json.data !== undefined && json.ok !== false) {
@@ -226,6 +227,20 @@ export async function apiFetch(path, options = {}) {
   } catch {
     throw new Error("We couldn't complete that request. Please try again.");
   }
+}
+
+// Queue routes use RouteToolbox's canonical envelope. Preserve its explicit
+// acknowledgement before unwrapping; successful action data is normally {}.
+// Keep the default apiFetch contract unchanged for every other consumer.
+async function queueFetch(path, options = {}) {
+  const response = await apiFetch(path, options, 'envelope');
+  if (response?.ok !== true || response.data === undefined) return response;
+  if (response.data === null || typeof response.data !== 'object' || Array.isArray(response.data)) {
+    return { ...response, ok: false };
+  }
+  const data = response.data;
+  const accepted = !Object.prototype.hasOwnProperty.call(data, 'ok') || data.ok === true;
+  return { ...data, ok: accepted };
 }
 
 export async function sendCommandStreaming(text, onToken, history = [], onThinking) {
@@ -314,10 +329,10 @@ export function useViolaApi() {
     }),
 
     // Queue
-    getQueue: () => apiFetch('/v1/queue'),
-    clearQueue: () => apiFetch('/v1/queue/clear', { method: 'POST' }),
-    removeFromQueue: (itemId) => apiFetch(`/v1/queue/item/${itemId}`, { method: 'DELETE' }),
-    playQueueItem: (itemId) => apiFetch('/v1/queue/play', { method: 'POST', body: JSON.stringify({ item_id: itemId }) }),
+    getQueue: () => queueFetch('/v1/queue'),
+    clearQueue: () => queueFetch('/v1/queue/clear', { method: 'POST' }),
+    removeFromQueue: (itemId) => queueFetch(`/v1/queue/item/${itemId}`, { method: 'DELETE' }),
+    playQueueItem: (itemId) => queueFetch('/v1/queue/play', { method: 'POST', body: JSON.stringify({ item_id: itemId }) }),
     reorderQueue: (fromIndex, toIndex) => apiFetch('/v1/queue/reorder', {
       method: 'POST',
       body: JSON.stringify({ from_index: fromIndex, to_index: toIndex })

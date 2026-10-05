@@ -1,0 +1,93 @@
+{
+  "get_success": {
+    "status": 200,
+    "body": {
+      "ok": true,
+      "error": null,
+      "data": {
+        "is_playing": false,
+        "now_playing": null,
+        "current": null,
+        "queue": [
+          {
+            "id": "synthetic-queue-track",
+            "title": "Synthetic queued song"
+          }
+        ],
+        "queue_size": 1
+      }
+    }
+  },
+  "get_refused": {
+    "status": 500,
+    "body": {
+      "ok": false,
+      "error": {
+        "code": "internal_error",
+        "message": "An unexpected server error occurred.",
+        "details": {
+          "route": "/v1/queue",
+          "method": "GET"
+        }
+      },
+      "data": null
+    }
+  },
+  "clear_success": {
+    "status": 200,
+    "body": {
+      "ok": true,
+      "error": null,
+      "data": {}
+    }
+  },
+  "clear_refused": {
+    "status": 501,
+    "body": {
+      "ok": false,
+      "error": {
+        "code": "not_supported",
+        "message": "This queue action is not available right now."
+      },
+      "data": null
+    }
+  },
+  "play_success": {
+    "status": 200,
+    "body": {
+      "ok": true,
+      "error": null,
+      "data": {}
+    }
+  },
+  "play_refused": {
+    "status": 404,
+    "body": {
+      "ok": false,
+      "error": {
+        "code": "item_not_found",
+        "message": "The selected queue item was not found."
+      },
+      "data": null
+    }
+  },
+  "remove_success": {
+    "status": 200,
+    "body": {
+      "ok": true,
+      "error": null,
+      "data": {}
+    }
+  },
+  "remove_refused": {
+    "status": 404,
+    "body": {
+      "ok": false,
+      "error": {
+        "code": "item_not_found",
+        "message": "The selected queue item was not found."
+      },
+      "data": null
+    }
+  }
+}
