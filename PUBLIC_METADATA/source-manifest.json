@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "89c117fac45114d1cce7a2d9eacc778c3b1e1e1d",
-  "sha256": "bfc1f48a20451da5607995b638bba06dc1e9b9f0a63e01579598165e1a9989f7",
+  "revision": "8035ead0ac0af68abd27c057e166b789dd2f6499",
+  "sha256": "7876c973f8c36617e771a1ee9073468a0eb70457ff98996cb25df59bf207f958",
   "files": [
     {
       "path": ".env.example",
@@ -40,8 +40,8 @@
     },
     {
       "path": "LICENSES/SPEECH_COMPONENT_NOTICES.md",
-      "sha256": "9f3fccbd9bd75f07dcb696f3043c0f1b3e69aa193be55ee97a05044954152d24",
-      "bytes": 1961
+      "sha256": "e894a28327eecbabbe7393e594c8e29cf83cd5bfd6f5001cc7a030053de25d0c",
+      "bytes": 2570
     },
     {
       "path": "LICENSES/Silero-MIT.txt",
@@ -1472,6 +1472,11 @@
       "path": "docs/CONFIGURATION.md",
       "sha256": "a11cfaa39bfc047dd5a5b9f9db2eaeef2643715eb8d68db7c0451acebea9ff8e",
       "bytes": 4416
+    },
+    {
+      "path": "docs/CUSTOMER_SPEECH_QUALIFICATION.md",
+      "sha256": "aa0d6a5b16d934956a4f472cc0698031b4be3d08295c3b3597d786f4bb277b42",
+      "bytes": 7383
     },
     {
       "path": "docs/INSTALLATION.md",
@@ -3534,29 +3539,34 @@
       "bytes": 228
     },
     {
+      "path": "requirements_customer_speech.txt",
+      "sha256": "69926739e50290e37c4e5f83ba2b38ec2099d53407f34fc2cb2c7c70cafac383",
+      "bytes": 618
+    },
+    {
       "path": "requirements_deepfilter.txt",
       "sha256": "c6eb7c571897d8646d1f1892b17f7f7dad2122652d384f732bb8b1f8ff69b21d",
       "bytes": 287
     },
     {
       "path": "requirements_desktop.txt",
-      "sha256": "aea34e38815c39bdf90ead61e2d301278a6a3687950d2e14e2ede9d6c0cb9973",
-      "bytes": 8587
+      "sha256": "6273c990fb8f86033af485b59ab51fee479537bfd7023ba1004868c1f9c2b096",
+      "bytes": 8505
     },
     {
       "path": "requirements_kokoro.txt",
-      "sha256": "1084d214cda43d4461ac2ceb06308c1533a667c8b688b4733f18f186a8876989",
-      "bytes": 327
+      "sha256": "e202acaee16f06edd3d35bedce5eef08424be1ccb5414631c296075825b174d3",
+      "bytes": 335
     },
     {
       "path": "requirements_linux.txt",
-      "sha256": "f791e52d4968fb5fe7fbcbf966a48c038b2652dc144df6f43b65314f05f56226",
-      "bytes": 11740
+      "sha256": "7d4463c0c7dc3b9cab8c47fae7ca10a7f6e2f6c0322e92f48314902b841b65cc",
+      "bytes": 11662
     },
     {
       "path": "requirements_macos.txt",
-      "sha256": "2024e864bba2bc67f8434bd2c568f00ce25755ea965675bd0074a6ac162a8584",
-      "bytes": 13215
+      "sha256": "c452d005091998bf6a5706b03a0865f3d4c463a99bbfa83c8d66ac89fa86a18f",
+      "bytes": 13137
     },
     {
       "path": "requirements_optional.txt",
@@ -3587,6 +3597,11 @@
       "path": "scripts/ci/check_bandit_report.py",
       "sha256": "2324300617569fa7e0afa7897eaa9516fc70b97c89414dd5d94ad70b9694514f",
       "bytes": 3898
+    },
+    {
+      "path": "scripts/dependencies/verify_customer_speech.py",
+      "sha256": "6abe786e925327a613e6f6945edc199e1cb18f08caca9420fb7e5a83a52399f3",
+      "bytes": 4846
     },
     {
       "path": "scripts/dependencies/verify_sources.py",
@@ -5719,6 +5734,11 @@
       "bytes": 27604
     },
     {
+      "path": "tests/customer_speech/test_real_pronunciation.py",
+      "sha256": "62b47679f5a578f3c2b82cd0a85a48e1c82450331026986b2781379d7ef0eed0",
+      "bytes": 3511
+    },
+    {
       "path": "tests/public/test_bandit_report_contract.py",
       "sha256": "59566553c4323224ad70e157fc7564db4d792ebcae1e9986de6d4a716edd0dde",
       "bytes": 5122
@@ -5739,6 +5759,16 @@
       "bytes": 24803
     },
     {
+      "path": "tests/public/test_customer_pronunciation.py",
+      "sha256": "21ce268e40d823398f2fa8dd9a6810641e431491cc6143288a7f0030ce3aee1f",
+      "bytes": 12652
+    },
+    {
+      "path": "tests/public/test_customer_speech_dependencies.py",
+      "sha256": "e7393b9a050741b234e944c8158d42cf1e82242ec8e626bcfacce5c707b3cbc8",
+      "bytes": 2769
+    },
+    {
       "path": "tests/public/test_deferred_confirmation_cancellation.py",
       "sha256": "4787e38288d184737e1e31db49ca23364901fb0a921f1c33ca8137519f4132d0",
       "bytes": 8622
@@ -5750,8 +5780,8 @@
     },
     {
       "path": "tests/public/test_kokoro_chunking.py",
-      "sha256": "b69ba6dce685a550062e634416be379219c780a442278f5a92bafa33e06b32b1",
-      "bytes": 12250
+      "sha256": "9708193d333394d7870a6abfc6ca80d5cb9752711854b12db2bfe4d3413252f4",
+      "bytes": 12345
     },
     {
       "path": "tests/public/test_linux_sandbox_opt_in.py",
@@ -5830,8 +5860,8 @@
     },
     {
       "path": "tests/public/test_tts_profile_dependencies.py",
-      "sha256": "028ad001dc2d0e3643e09b6a2f1d893840bac97add50af152d9cfd3bd3aea26f",
-      "bytes": 2491
+      "sha256": "336fdcb851a32fa536bb32ed4b16d9fb5db20ef653a60d4a3cbdd0457dc5843c",
+      "bytes": 2598
     },
     {
       "path": "tests/public/test_wake_listener_lifecycle.py",
@@ -5875,8 +5905,8 @@
     },
     {
       "path": "third_party/kokoro_onnx.patch",
-      "sha256": "e245c139183364403b4fcbd3b6f2b4563a78f827b47182e9cad8e32b07aa3338",
-      "bytes": 6318
+      "sha256": "506cca42d323433165ee1ae5005892d89d2ab570d4dd2ece33dfbae6fd4d0117",
+      "bytes": 9778
     },
     {
       "path": "third_party/kokoro_onnx/LICENSE",
@@ -5890,13 +5920,13 @@
     },
     {
       "path": "third_party/kokoro_onnx/pyproject.toml",
-      "sha256": "4778e51cf860f615e38b0be177d9dae72989638c4fc510c06f5d78f53b59e54c",
-      "bytes": 1233
+      "sha256": "6d50678c37c7e4505a8bbf0086de0ebd3e42173dd86e84b65c5f358b4ebc317c",
+      "bytes": 1239
     },
     {
       "path": "third_party/kokoro_onnx/src/kokoro_onnx/__init__.py",
-      "sha256": "82c9368b2ea73448e1d730903a96b209e97ad06a8e4ed9e95f16a7122dd19b0f",
-      "bytes": 9340
+      "sha256": "6e93de212047b2dbc01b46da1695e0cbc60e9f155625e77190b1ab1ba420ed8e",
+      "bytes": 10844
     },
     {
       "path": "third_party/kokoro_onnx/src/kokoro_onnx/config.json",
@@ -5920,13 +5950,73 @@
     },
     {
       "path": "third_party/kokoro_onnx/src/kokoro_onnx/tokenizer.py",
-      "sha256": "efaec29c4ab6932eff94127b83cbc5f5544b0f1285cd160d56897dfb0592bb00",
-      "bytes": 3486
+      "sha256": "47c2c2829a1e8e4cacb769b3af8e9b64f5151e9f727c565ad1b3509d9be0f469",
+      "bytes": 4412
     },
     {
       "path": "third_party/kokoro_onnx/src/kokoro_onnx/trim.py",
       "sha256": "f1b776d3975a99104743428fd9ba63f14255f5226a3855c6059fe464c6520d23",
       "bytes": 24178
+    },
+    {
+      "path": "third_party/misaki_en.patch",
+      "sha256": "204efeeb31a15906771646fce0f26507ed2bdf55404c80c620e95e576718ccf8",
+      "bytes": 5313
+    },
+    {
+      "path": "third_party/misaki_en/LICENSE",
+      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+      "bytes": 11357
+    },
+    {
+      "path": "third_party/misaki_en/README.md",
+      "sha256": "2a86d8e7460eec42e8153ff3c67226790012fc45146a0ff72f79ad84749c7591",
+      "bytes": 5658
+    },
+    {
+      "path": "third_party/misaki_en/misaki/__init__.py",
+      "sha256": "3ebbe9b05a7115f57ef4291eaea1fcc3d6a3ee3a78e19ce5436d855dfe483889",
+      "bytes": 22
+    },
+    {
+      "path": "third_party/misaki_en/misaki/data/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "third_party/misaki_en/misaki/data/gb_gold.json",
+      "sha256": "29e62f4b60261c88f7f3c2c7811ca3825978948090b72d2b27d565b729282f71",
+      "bytes": 2838552
+    },
+    {
+      "path": "third_party/misaki_en/misaki/data/gb_silver.json",
+      "sha256": "48131e2d92ccc41655f4543e87e0f938e71463eb5a54be7f0693bb712ebb6bce",
+      "bytes": 3663898
+    },
+    {
+      "path": "third_party/misaki_en/misaki/data/us_gold.json",
+      "sha256": "dc414872a49a28ae6c141463d502fd945f3b2fde040484fdc47d00cc4612686f",
+      "bytes": 3000469
+    },
+    {
+      "path": "third_party/misaki_en/misaki/data/us_silver.json",
+      "sha256": "de8f67be911bb6c659187b4a65fd966b6a30e56350e0f790d763210b053ac475",
+      "bytes": 3099517
+    },
+    {
+      "path": "third_party/misaki_en/misaki/en.py",
+      "sha256": "93570805f4e672163fe0a21648f505a5964d70801961c70c8a6eb0bc98ac48b6",
+      "bytes": 31834
+    },
+    {
+      "path": "third_party/misaki_en/misaki/token.py",
+      "sha256": "5ff6ce45da6766cdc1e3d5c91b0b2b093d912b8df6f2da327af56f88ad43f073",
+      "bytes": 433
+    },
+    {
+      "path": "third_party/misaki_en/pyproject.toml",
+      "sha256": "bb17d18add365879f81af815485afd6d8ad1d815d84bc21050082133a26819f7",
+      "bytes": 784
     },
     {
       "path": "third_party/pipecat.patch",
@@ -8500,8 +8590,8 @@
     },
     {
       "path": "third_party/sources.toml",
-      "sha256": "a4fb9373d2f4fb5bb3f1e02f7a60eca231bc3bb9d801b43aab265cde65beed99",
-      "bytes": 203193
+      "sha256": "49598c4641f840ffcb37979da961c9602d7681fb4d3fce37e18bc70aa5c633cf",
+      "bytes": 207501
     },
     {
       "path": "tools/release/create_source_manifest.py",
@@ -12169,6 +12259,11 @@
       "bytes": 19230
     },
     {
+      "path": "voice/customer_pronunciation.py",
+      "sha256": "e6628858f9abe5cb672890ed52556db31b80004806efe384d1547b37ce758aca",
+      "bytes": 5547
+    },
+    {
       "path": "voice/dictation/__init__.py",
       "sha256": "4f7535f4c8a0be584de02930a0fc98a218f8b72c07badc8972b538d7a87a9d5a",
       "bytes": 649
@@ -12197,6 +12292,11 @@
       "path": "voice/dictation/text_injector.py",
       "sha256": "7a33fa33416c33cbcf83c5452a9586d1f48f25b6c9210b6d3f2600266b5ef127",
       "bytes": 19466
+    },
+    {
+      "path": "voice/english_numbers.py",
+      "sha256": "b74dbc4e11d56b4aa9b8eba4383a117eeef552c2bdf872b5bde52ed2ac94e61b",
+      "bytes": 4431
     },
     {
       "path": "voice/mic_mute_controller.py",
@@ -12325,8 +12425,8 @@
     },
     {
       "path": "voice/synthesis/text_normalizer.py",
-      "sha256": "feabbbdf43973092c8fd69e0b5483a3803fdf36563ece45dc9af9fa0fc621532",
-      "bytes": 19719
+      "sha256": "6d3589cabb12c2e43d66549d62d673e65a9d37edc9ab2e28137ef3ba47f4944f",
+      "bytes": 20140
     },
     {
       "path": "voice/synthesis/tts_wire.py",
