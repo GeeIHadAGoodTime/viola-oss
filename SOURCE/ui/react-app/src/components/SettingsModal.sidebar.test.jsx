@@ -1,5 +1,6 @@
+import { useState } from 'react';
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import SettingsModal from './SettingsModal';
 import { applyTheme, getCurrentThemeMode, setAccent, THEME } from '../config';
@@ -480,4 +481,103 @@ describe('SettingsModal sidebar shell', () => {
     })));
   });
 
+});
+
+
+describe('SettingsModal dismissed save ownership', () => {
+  const deferredSave = () => {
+    let resolve;
+    const promise = new Promise(done => { resolve = done; });
+    return { promise, resolve };
+  };
+  const editAndSave = async () => {
+    fireEvent.click(await screen.findByRole('button', { name: /Color Theme:/ }));
+    fireEvent.click(await screen.findByRole('option', { name: 'Light' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
+  };
+  beforeEach(() => {
+    window.viola = {};
+    settingsHarness.settings = { theme: 'dark', ai_source: 'managed', active_music_provider_id: 'youtube_music' };
+    settingsHarness.saving = false;
+    settingsHarness.error = null;
+    settingsHarness.updateSettings.mockReset().mockResolvedValue(true);
+  });
+  afterEach(() => { delete window.viola; });
+
+  it.each(['Cancel', 'Escape', 'Close', 'Backdrop'])('does not let an old save close reopened settings after %s', async dismiss => {
+    const save = deferredSave();
+    settingsHarness.updateSettings.mockReturnValueOnce(save.promise);
+    const closed = vi.fn();
+    function Host() {
+      const [open, setOpen] = useState(true);
+      return <>
+        <button onClick={() => setOpen(true)}>Reopen settings</button>
+        {open && <SettingsModal isOpen initialTab="customize" onClose={() => { closed(); setOpen(false); }} />}
+      </>;
+    }
+    render(<Host />);
+    await editAndSave();
+    if (dismiss === 'Escape') fireEvent.keyDown(document, { key: 'Escape' });
+    else if (dismiss === 'Backdrop') fireEvent.click(screen.getByRole('dialog', { name: 'Settings' }).parentElement);
+    else fireEvent.click(screen.getByRole('button', { name: dismiss }));
+    expect(closed).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Reopen settings' }));
+    expect(await screen.findByRole('button', { name: 'Save Changes' })).toBeInTheDocument();
+    await act(async () => save.resolve(true));
+    expect(closed).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('dialog', { name: 'Settings' })).toBeInTheDocument();
+  });
+
+  it('drops a successful completion after parent-driven unmount', async () => {
+    const save = deferredSave();
+    settingsHarness.updateSettings.mockReturnValueOnce(save.promise);
+    const closed = vi.fn();
+    const view = render(<SettingsModal isOpen initialTab="customize" onClose={closed} />);
+    await editAndSave();
+    view.unmount();
+    await act(async () => save.resolve(true));
+    expect(closed).not.toHaveBeenCalled();
+  });
+
+  it('invalidates dismissal before parent unmount and preserves a new draft', async () => {
+    const save = deferredSave();
+    settingsHarness.updateSettings.mockReturnValueOnce(save.promise);
+    const closed = vi.fn();
+    render(<SettingsModal isOpen initialTab="customize" onClose={closed} />);
+    await editAndSave();
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    fireEvent.click(screen.getByRole('button', { name: /Color Theme:/ }));
+    fireEvent.click(screen.getByRole('option', { name: 'Light' }));
+    await act(async () => save.resolve(true));
+    expect(closed).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('button', { name: 'Save Changes' })).toBeEnabled();
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Save Changes' })));
+    expect(closed).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not close for an older success after a newer submission was refused', async () => {
+    const first = deferredSave(), second = deferredSave();
+    settingsHarness.updateSettings.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+    const closed = vi.fn();
+    render(<SettingsModal isOpen initialTab="customize" onClose={closed} />);
+    await editAndSave();
+    fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
+    expect(settingsHarness.updateSettings).toHaveBeenCalledTimes(2);
+    await act(async () => second.resolve(false));
+    await act(async () => first.resolve(true));
+    expect(closed).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Save Changes' })).toBeEnabled();
+  });
+
+  it('keeps a refused save open and closes only after an accepted retry', async () => {
+    settingsHarness.updateSettings.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+    const closed = vi.fn();
+    render(<SettingsModal isOpen initialTab="customize" onClose={closed} />);
+    await editAndSave();
+    await act(async () => {});
+    expect(closed).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Save Changes' })).toBeEnabled();
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Save Changes' })));
+    expect(closed).toHaveBeenCalledTimes(1);
+  });
 });
