@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "6adebd766cb886dc9cfabb8c213e71970ae202ff",
-  "sha256": "b9d5a85715e6bb132875d48c476cf09df45b059a31e7520db19fefdd7224d227",
+  "revision": "4a2ad803ae7e01bfdff50c54996296581ab2d2e8",
+  "sha256": "30f179e6e62ee371a4d8cf68fb59d7448c86c6937130342761105ddd667cb587",
   "files": [
     {
       "path": ".env.example",
@@ -5835,8 +5835,8 @@
     },
     {
       "path": "tests/public/test_windows_native_startup_order.py",
-      "sha256": "476eab0eae6a0664cf65a95ca3e313ebaceefb0a93b01c52a6569806492efd1c",
-      "bytes": 15470
+      "sha256": "78ef446927057a67890043144a8b4f7b21bd32b2003f53b9a24741fccca421ee",
+      "bytes": 25460
     },
     {
       "path": "themes/viola-dark.css",
@@ -12005,8 +12005,8 @@
     },
     {
       "path": "viola_qt.py",
-      "sha256": "1f5c98e5ebbcb9857d569150af7f6c36d881b0e664a24d8e878dc7d0623fffc8",
-      "bytes": 80630
+      "sha256": "f3ff99346d4cd93cb0294d3302b13a3c97da8a9f3f3b263d09bddc595b46bdb0",
+      "bytes": 80814
     },
     {
       "path": "viola_spoke.py",
