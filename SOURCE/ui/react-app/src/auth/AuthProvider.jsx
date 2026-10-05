@@ -43,8 +43,8 @@ import {
   resendVerification as apiResendVerification,
 } from './authClient';
 import { setCloudSession } from '../config';
-import { purgeLegacyLocalStorageSessions } from '../lib/sessionStore';
-import { gotrueClient } from '../lib/gotrue_client';
+import { inMemorySessionStorage, purgeLegacyLocalStorageSessions } from '../lib/sessionStore';
+import { GOTRUE_STORAGE_KEY, gotrueClient } from '../lib/gotrue_client';
 import { isDesktopApp } from '../utils/runtimeSurface';
 import { isCloudSurface } from '../components/auth/cloudSurface';
 
@@ -80,6 +80,14 @@ const BRIDGE_ATTEMPTS = 3;
 
 /** Delay between bridge attempts. */
 const BRIDGE_RETRY_MS = 750;
+
+function bridgeSignOutError(code, message) {
+  return { ok: false, error: { code, message, status: 0, retryAfter: null } };
+}
+
+function supersededSignOut() {
+  return bridgeSignOutError('auth_session_changed', 'The session changed before sign-out completed.');
+}
 
 /**
  * Retry delay after a TRANSIENT refresh failure (cloud 5xx / network drop —
@@ -129,6 +137,19 @@ purgeLegacyLocalStorageSessions([SESSION_STORAGE_KEY]);
 
 /** @type {object|null} In-memory session, scoped to this document's JS heap. */
 let inMemorySession = null;
+
+// The SDK and its memory store outlive any one provider mount. Admission and
+// cleanup ownership must have the same document lifetime as that singleton.
+let appStoreBridgeQueue = Promise.resolve(true);
+let appStoreBridgeOwner = null;
+let appStoreOwnedPair = null;
+
+function sameSessionPair(left, right) {
+  return Boolean(left?.access_token && left?.refresh_token
+    && left.access_token === right?.access_token
+    && left.refresh_token === right?.refresh_token);
+}
+
 
 /**
  * Read the in-memory session.
@@ -209,14 +230,11 @@ export function AuthProvider({ children }) {
   // stale across renders / re-schedules.
   const refreshTokenRef = useRef('');
   const sessionGenerationRef = useRef(0);
+  const signOutIntentRef = useRef(null);
   const mountedRef = useRef(true);
-  // True once this provider has bridged a real session into gotrueClient (see
-  // commitSession below). Guards the sign-out side of the bridge: only clear
-  // gotrueClient's session in response to OUR OWN transition to signed-out,
-  // never on an initial null commit (e.g. this provider hydrating to
-  // signed-out while gotrueClient already independently holds a session from
-  // somewhere else) — that would blow away a session this provider never set.
-  const gotrueBridgeActiveRef = useRef(false);
+  // A ticket distinguishes this mount's latest SDK intent from a replacement
+  // provider, including a same-token ABA sign-in after remount.
+  const bridgeOwnerRef = useRef(null);
   // Resolves once the most recent commit has finished mirroring into
   // gotrueClient. `refreshSessionNow` awaits it so a caller that asked this
   // provider to refresh can rely on the OTHER store already carrying the
@@ -268,9 +286,9 @@ export function AuthProvider({ children }) {
    * cloud surface (see `refreshSessionNow`). Handing an expired session to the
    * bridge would make it a second redeemer and revoke the token family.
    */
-  const bridgeIntoAppStore = useCallback(async (nextSession) => {
+  const bridgeIntoAppStore = useCallback(async (nextSession, generation, owner) => {
     for (let attempt = 1; attempt <= BRIDGE_ATTEMPTS; attempt += 1) {
-      if (isExpired(nextSession)) return false;
+      if (!mountedRef.current || generation !== sessionGenerationRef.current || owner !== appStoreBridgeOwner || isExpired(nextSession)) return false;
       // Never let a bridge failure escape as a rejection: this promise is
       // parked in a ref and only sometimes awaited, so a rejection would
       // surface as an unhandled one rather than as the `false` the caller
@@ -283,10 +301,20 @@ export function AuthProvider({ children }) {
           });
         } catch (err) {
           return { error: err || new Error('setSession rejected') };
+        } finally {
+          // auth-js saves before notifying subscribers, which can then throw.
+          // Read the singleton's existing passive memory adapter, never an SDK
+          // getter/subscription that might itself redeem a near-expiry token.
+          try {
+            const written = JSON.parse(inMemorySessionStorage.getItem(GOTRUE_STORAGE_KEY));
+            if (sameSessionPair(written, nextSession)) {
+              appStoreOwnedPair = { access_token: nextSession.access_token, refresh_token: nextSession.refresh_token };
+            }
+          } catch { /* no readable matching owned write */ }
         }
       })();
       if (!error) {
-        gotrueBridgeActiveRef.current = true;
+        appStoreOwnedPair = { access_token: nextSession.access_token, refresh_token: nextSession.refresh_token };
         // CRITICAL: gotrueClient (lib/gotrue_client.ts) is constructed with
         // autoRefreshToken: true and starts its own background refresh ticker
         // at module load, independent of whether it ever holds a session. Once
@@ -315,6 +343,9 @@ export function AuthProvider({ children }) {
         } catch { /* ticker already stopped / not available */ }
         return true;
       }
+      if (appStoreOwnedPair) {
+        try { await gotrueClient.stopAutoRefresh(); } catch { /* ticker already stopped */ }
+      }
       if (attempt < BRIDGE_ATTEMPTS) {
         await new Promise((resolve) => { setTimeout(resolve, BRIDGE_RETRY_MS); });
       }
@@ -323,12 +354,13 @@ export function AuthProvider({ children }) {
   }, []);
 
   /**
-   * Commit a session (or sign-out) to state, localStorage, and config.js.
+   * Commit a session (or sign-out) to state, module memory, and config.js.
    * Centralised so every auth path keeps the three stores consistent.
    */
   const commitSession = useCallback((nextSession) => {
     // A committed sign-out or replacement session retires pending refreshes.
-    sessionGenerationRef.current += 1;
+    const generation = ++sessionGenerationRef.current;
+    if (nextSession) signOutIntentRef.current = null;
     setSession(nextSession);
     setStatus(nextSession ? 'signedIn' : 'signedOut');
     storeSession(nextSession);
@@ -348,21 +380,46 @@ export function AuthProvider({ children }) {
     // signed-out / free-plan, silently breaking the account tab, plan/subscription
     // display, and paid-feature gating (#3547).
     if (isCloudSurface()) {
+      // The SDK write itself cannot be cancelled. Serialize subsequent writes
+      // and cleanup behind it, so a first pending bridge cannot repopulate the
+      // SDK after logout has already acknowledged success. Retired tasks never
+      // start another write/retry or clear a newer committed session.
       if (nextSession?.access_token && nextSession?.refresh_token) {
-        bridgeSettledRef.current = bridgeIntoAppStore(nextSession);
-      } else if (gotrueBridgeActiveRef.current) {
-        // Only clear gotrueClient's session when WE previously put one there —
-        // never on the initial signed-out hydration (nothing to undo, and
-        // gotrueClient may independently already hold an unrelated session).
-        gotrueBridgeActiveRef.current = false;
-        bridgeSettledRef.current = gotrueClient
-          .signOut({ scope: 'local' })
-          .then(() => false)
-          .catch(() => false);
-      } else {
-        bridgeSettledRef.current = Promise.resolve(false);
+        bridgeOwnerRef.current = {};
+        appStoreBridgeOwner = bridgeOwnerRef.current;
       }
+      const owner = bridgeOwnerRef.current;
+      // Empty hydration has no SDK ownership and must not retire an old
+      // mount's already-requested cleanup or claim an unrelated SDK session.
+      if (!owner) return Promise.resolve({ ok: true, error: null });
+      const previousBridge = appStoreBridgeQueue;
+      const bridge = previousBridge.then(async () => {
+        if (generation !== sessionGenerationRef.current || owner !== appStoreBridgeOwner) return supersededSignOut();
+        if (nextSession?.access_token && nextSession?.refresh_token) {
+          return bridgeIntoAppStore(nextSession, generation, owner);
+        }
+        if (!appStoreOwnedPair) return { ok: true, error: null };
+        try {
+          const stored = JSON.parse(inMemorySessionStorage.getItem(GOTRUE_STORAGE_KEY));
+          if (!sameSessionPair(stored, appStoreOwnedPair)) {
+            // Another SDK owner replaced our last known write (or it is
+            // already absent). Do not clear that independent session.
+            appStoreOwnedPair = null;
+            return { ok: true, error: null };
+          }
+          const { error } = await gotrueClient.signOut({ scope: 'local' });
+          if (error) return bridgeSignOutError('app_store_signout_failed', 'Sign-out could not clear the app session. Please retry.');
+          appStoreOwnedPair = null;
+          return owner === appStoreBridgeOwner ? { ok: true, error: null } : supersededSignOut();
+        } catch {
+          return bridgeSignOutError('app_store_signout_failed', 'Sign-out could not clear the app session. Please retry.');
+        }
+      });
+      appStoreBridgeQueue = bridge;
+      bridgeSettledRef.current = bridge;
+      return bridgeSettledRef.current;
     }
+    return Promise.resolve({ ok: true, error: null });
   }, [bridgeIntoAppStore]);
 
   // Forward declaration: scheduleRefresh and runRefresh are mutually
@@ -394,6 +451,7 @@ export function AuthProvider({ children }) {
    * a just-written entitlement still lands on the next attempt.
    */
   const runRefresh = useCallback(async () => {
+    if (signOutIntentRef.current) return;
     const generation = sessionGenerationRef.current;
     const inFlight = inFlightRefreshRef.current;
     if (inFlight) {
@@ -645,12 +703,30 @@ export function AuthProvider({ children }) {
   const signOut = useCallback(async () => {
     clearRefreshTimer();
     clearMfaPending();
-    const token = session?.access_token || '';
-    const result = await apiSignOut(token);
-    // Always drop local state, even if the server call failed — never trap
-    // the user in a signed-in shell.
-    commitSession(null);
-    return { ok: result.ok, error: result.ok ? null : result.error };
+    // Retire ordinary rotations immediately; they are not newer sign-ins.
+    const generation = ++sessionGenerationRef.current;
+    const intent = {};
+    signOutIntentRef.current = intent;
+    const sdkOwner = isCloudSurface() ? bridgeOwnerRef.current : null;
+    try {
+      const token = session?.access_token || '';
+      const result = await apiSignOut(token);
+      // A slower logout must not erase a newer committed sign-in.
+      if (generation !== sessionGenerationRef.current
+        || (sdkOwner && sdkOwner !== appStoreBridgeOwner)) return supersededSignOut();
+      // Always drop front-door state even when server revocation fails. SDK
+      // cleanup remains awaited and its failure cannot be reported as success.
+      const cleanup = commitSession(null);
+      const signedOutGeneration = sessionGenerationRef.current;
+      const cleanupResult = await cleanup;
+      if (signedOutGeneration !== sessionGenerationRef.current) return supersededSignOut();
+      if (!cleanupResult.ok) return cleanupResult;
+      return { ok: result.ok, error: result.ok ? null : result.error };
+    } finally {
+      // Retain the fence through owned SDK cleanup without retiring a newer
+      // login or a second explicit logout's own intent.
+      if (signOutIntentRef.current === intent) signOutIntentRef.current = null;
+    }
   }, [session, commitSession, clearRefreshTimer, clearMfaPending]);
 
   const resetPassword = useCallback(async (email) => {

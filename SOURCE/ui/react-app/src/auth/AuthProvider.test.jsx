@@ -25,15 +25,26 @@ vi.mock('./authClient', async () => {
 // AccountTab / useUsage / ReviewPage read identity + plan/billing through
 // (hooks/useAuth.jsx -> lib/auth_context.tsx). Mocked so the bridge tests
 // below can assert it receives the session without a real network client.
-vi.mock('../lib/gotrue_client', () => ({
-  gotrueClient: {
-    setSession: vi.fn().mockResolvedValue({ data: { session: null, user: null }, error: null }),
-    signOut: vi.fn().mockResolvedValue({ error: null }),
-    // The bridge stops this client's own auto-refresh ticker so exactly one
-    // refresher owns the rotating token; the mock has to carry it too.
-    stopAutoRefresh: vi.fn().mockResolvedValue(undefined),
-  },
-}));
+vi.mock('../lib/gotrue_client', async () => {
+  const { inMemorySessionStorage } = await vi.importActual('../lib/sessionStore');
+  const key = 'viola-gotrue-session';
+  return {
+    GOTRUE_STORAGE_KEY: key,
+    gotrueClient: {
+      setSession: vi.fn(async (pair) => {
+        inMemorySessionStorage.setItem(key, JSON.stringify(pair));
+        return { data: { session: pair, user: null }, error: null };
+      }),
+      signOut: vi.fn(async () => {
+        inMemorySessionStorage.removeItem(key);
+        return { error: null };
+      }),
+      // The real SDK uses this same passive adapter; model the write so
+      // ownership/cleanup assertions cannot pass on metadata alone.
+      stopAutoRefresh: vi.fn().mockResolvedValue(undefined),
+    },
+  };
+});
 
 import * as authClient from './authClient';
 import { gotrueClient } from '../lib/gotrue_client';
@@ -823,5 +834,62 @@ it.each(['cloud', 'desktop'])('a same-token replacement-session timer still owns
     expect(captured.status).toBe('signedIn');
     expect(getCloudAccessToken()).toBe('synthetic-current-access');
     expect(vi.getTimerCount()).toBeGreaterThan(0);
+  });
+});
+
+it.each([
+  ['cloud', 'success'], ['cloud', 'rejected'], ['cloud', 'transient'],
+  ['desktop', 'success'], ['desktop', 'rejected'], ['desktop', 'transient'],
+])('pending ordinary refresh cannot defeat an acknowledged logout (%s, %s)', async (surface, outcome) => {
+  await withPendingScheduledRefresh(surface, async (resolveRefresh) => {
+    let releaseLogout;
+    authClient.signOut.mockImplementationOnce(() => new Promise((resolve) => { releaseLogout = resolve; }));
+    let logout;
+    await act(async () => { logout = captured.signOut(); });
+    await act(async () => {
+      resolveRefresh(outcome === 'success'
+        ? { ok: true, session: makeSession({ access_token: 'synthetic-rotation', refresh_token: 'synthetic-rotation-refresh' }), error: null }
+        : { ok: false, session: null, error: { status: outcome === 'transient' ? 503 : 401 } });
+    });
+    await act(async () => { releaseLogout({ ok: true, error: null }); await logout; });
+    expect(await logout).toEqual({ ok: true, error: null });
+    expect(captured.status).toBe('signedOut');
+    expect(getCloudAccessToken()).toBe('');
+    expect(vi.getTimerCount()).toBe(0);
+  });
+});
+
+it('does not admit new manual refresh demand while logout is pending', async () => {
+  await withPendingScheduledRefresh('cloud', async (resolveRefresh) => {
+    let releaseLogout;
+    authClient.signOut.mockImplementationOnce(() => new Promise((resolve) => { releaseLogout = resolve; }));
+    let logout;
+    await act(async () => { logout = captured.signOut(); });
+    await act(async () => { resolveRefresh({ ok: true, session: makeSession(), error: null }); });
+    authClient.refresh.mockResolvedValue({ ok: true, session: makeSession(), error: null });
+    await act(async () => { await captured.refreshSessionNow(); });
+    expect(authClient.refresh).toHaveBeenCalledTimes(1);
+    await act(async () => { releaseLogout({ ok: true, error: null }); await logout; });
+    expect(await logout).toEqual({ ok: true, error: null });
+    expect(captured.status).toBe('signedOut');
+  });
+});
+
+it.each([
+  ['cloud', 'new-account'], ['cloud', 'same-token-aba'],
+  ['desktop', 'new-account'], ['desktop', 'same-token-aba'],
+])('explicit newer sign-in still supersedes pending logout (%s, %s)', async (surface, action) => {
+  await withPendingScheduledRefresh(surface, async (resolveRefresh) => {
+    let releaseLogout;
+    authClient.signOut.mockImplementationOnce(() => new Promise((resolve) => { releaseLogout = resolve; }));
+    let logout;
+    await act(async () => { logout = captured.signOut(); });
+    const newer = action === 'same-token-aba' ? makeSession() : makeSession({ access_token: 'synthetic-other', user: { id: 'synthetic-other' } });
+    authClient.signInWithPassword.mockResolvedValue({ ok: true, session: newer, error: null });
+    await act(async () => { await captured.signIn('synthetic@example.invalid', 'synthetic-password'); });
+    await act(async () => { releaseLogout({ ok: true, error: null }); resolveRefresh({ ok: false, session: null, error: { status: 401 } }); await logout; });
+    expect((await logout).error?.code).toBe('auth_session_changed');
+    expect(captured.status).toBe('signedIn');
+    expect(getCloudAccessToken()).toBe(newer.access_token);
   });
 });

@@ -224,3 +224,382 @@ describe('AuthProvider + real gotrueClient: single-refresher bridge (#3547 adver
     expect(refreshGrantBodies.length).toBeGreaterThanOrEqual(2);
   });
 });
+
+function bridgeSession(id) {
+  const expiresAt = Math.floor(Date.now() / 1000) + 3600;
+  return {
+    access_token: fakeJwt({ sub: id, exp: expiresAt, aal: 'aal1' }),
+    refresh_token: `${id}-refresh`, token_type: 'bearer', expires_in: 3600,
+    expires_at: expiresAt, user: { id, factors: [], app_metadata: {}, user_metadata: {} },
+  };
+}
+
+function deferredBridge() {
+  let resolve;
+  const promise = new Promise((done) => { resolve = done; });
+  return { promise, resolve };
+}
+
+async function withBridgeFixture(check) {
+  const previousSurface = window.viola;
+  delete window.viola;
+  const first = bridgeSession('synthetic-first');
+  const second = bridgeSession('synthetic-second');
+  const state = { current: first, userReplies: [], sdkLogoutReplies: [], apiLogoutReplies: [], calls: [] };
+  const fetchMock = vi.fn(async (input, init) => {
+    const url = new URL(typeof input === 'string' ? input : input.url, 'http://localhost');
+    const scope = url.searchParams.get('scope');
+    state.calls.push({ path: url.pathname, scope });
+    if (url.pathname.endsWith('/auth/v1/token')) return jsonResponse(state.current);
+    if (url.pathname.endsWith('/auth/v1/user')) {
+      if (state.userReplies.length) return state.userReplies.shift()();
+      const token = new Headers(init?.headers).get('authorization');
+      return jsonResponse(token === `Bearer ${second.access_token}` ? second.user : first.user);
+    }
+    if (url.pathname.endsWith('/auth/v1/logout')) {
+      const replies = scope === 'local' ? state.sdkLogoutReplies : state.apiLogoutReplies;
+      return replies.length ? replies.shift()() : jsonResponse({}, 204);
+    }
+    throw new Error(`Unexpected synthetic route: ${url.pathname}`);
+  });
+  vi.stubGlobal('fetch', fetchMock);
+  await gotrueClient.stopAutoRefresh();
+  await gotrueClient.signOut({ scope: 'local' });
+  state.calls.length = 0;
+  let view;
+  const fixture = {
+    first, second, state,
+    render: () => { view = renderProvider(); return view; },
+    signIn: async (session = first) => {
+      state.current = session;
+      await act(async () => { await captured.signIn('synthetic@example.invalid', 'synthetic-password'); });
+    },
+  };
+  try {
+    await check(fixture);
+  } finally {
+    view?.unmount();
+    state.sdkLogoutReplies.length = 0;
+    state.apiLogoutReplies.length = 0;
+    state.userReplies.length = 0;
+    await gotrueClient.signOut({ scope: 'local' });
+    await gotrueClient.stopAutoRefresh();
+    if (previousSurface === undefined) delete window.viola;
+    else window.viola = previousSurface;
+  }
+}
+
+it('waits for the first owned SDK write and its cleanup before acknowledging logout', async () => {
+  await withBridgeFixture(async (f) => {
+    const user = deferredBridge();
+    const entered = deferredBridge();
+    const cleanup = deferredBridge();
+    const cleanupEntered = deferredBridge();
+    f.state.userReplies.push(() => { entered.resolve(); return user.promise; });
+    f.state.sdkLogoutReplies.push(() => { cleanupEntered.resolve(); return cleanup.promise; });
+    f.render();
+    await f.signIn();
+    await entered.promise;
+    let acknowledged = false;
+    let logout;
+    await act(async () => { logout = captured.signOut().then((result) => { acknowledged = true; return result; }); });
+    try {
+      expect(captured.status).toBe('signedOut');
+      expect(acknowledged).toBe(false);
+      await act(async () => { user.resolve(jsonResponse(f.first.user)); await cleanupEntered.promise; });
+      expect(acknowledged).toBe(false);
+    } finally {
+      user.resolve(jsonResponse(f.first.user));
+      cleanup.resolve(jsonResponse({}, 204));
+      await act(async () => { await logout; });
+    }
+    expect(await logout).toEqual({ ok: true, error: null });
+    expect((await gotrueClient.getSession()).data.session).toBeNull();
+  });
+});
+
+it.each([429, 500, 503, 'throw'])('reports SDK cleanup failure and permits an explicit retry (%s)', async (failure) => {
+  await withBridgeFixture(async (f) => {
+    f.render();
+    await f.signIn();
+    expect((await gotrueClient.getSession()).data.session?.refresh_token).toBe(f.first.refresh_token);
+    f.state.sdkLogoutReplies.push(() => {
+      if (failure === 'throw') throw new Error('Synthetic cleanup transport failure');
+      return jsonResponse({ message: 'Synthetic cleanup failure' }, failure);
+    });
+    let result;
+    await act(async () => { result = await captured.signOut(); });
+    expect(result.ok).toBe(false);
+    expect(result.error.code).toBe('app_store_signout_failed');
+    expect(captured.status).toBe('signedOut');
+    expect((await gotrueClient.getSession()).data.session?.refresh_token).toBe(f.first.refresh_token);
+    await act(async () => { result = await captured.signOut(); });
+    expect(result).toEqual({ ok: true, error: null });
+    expect((await gotrueClient.getSession()).data.session).toBeNull();
+  });
+});
+
+it.each([204, 401, 403, 404])('keeps successful or already-revoked SDK cleanup successful (%s)', async (status) => {
+  await withBridgeFixture(async (f) => {
+    f.render();
+    await f.signIn();
+    expect((await gotrueClient.getSession()).data.session?.refresh_token).toBe(f.first.refresh_token);
+    f.state.sdkLogoutReplies.push(() => jsonResponse({}, status));
+    let result;
+    await act(async () => { result = await captured.signOut(); });
+    expect(result).toEqual({ ok: true, error: null });
+    expect((await gotrueClient.getSession()).data.session).toBeNull();
+  });
+});
+
+it('preserves independently owned SDK state during initial signed-out hydration', async () => {
+  await withBridgeFixture(async (f) => {
+    await gotrueClient.setSession(f.second);
+    f.render();
+    await act(async () => { await Promise.resolve(); });
+    expect(captured.status).toBe('signedOut');
+    expect((await gotrueClient.getSession()).data.session?.refresh_token).toBe(f.second.refresh_token);
+    expect(f.state.calls.filter((call) => call.scope === 'local')).toHaveLength(0);
+  });
+});
+
+it('retires an obsolete bridge retry before acknowledging logout', async () => {
+  await withBridgeFixture(async (f) => {
+    vi.useFakeTimers();
+    f.state.userReplies.push(() => jsonResponse({ message: 'Synthetic user read failure' }, 503));
+    f.render();
+    await f.signIn();
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+    let result;
+    await act(async () => {
+      const logout = captured.signOut();
+      await vi.advanceTimersByTimeAsync(2251);
+      result = await logout;
+    });
+    expect(result).toEqual({ ok: true, error: null });
+    expect(f.state.calls.filter((call) => call.path.endsWith('/user'))).toHaveLength(1);
+    expect((await gotrueClient.getSession()).data.session).toBeNull();
+  });
+});
+
+it.each(['queued', 'started'])('preserves a newer committed session while older SDK cleanup is %s', async (phase) => {
+  await withBridgeFixture(async (f) => {
+    const held = deferredBridge();
+    const entered = deferredBridge();
+    if (phase === 'queued') f.state.userReplies.push(() => { entered.resolve(); return held.promise; });
+    else f.state.sdkLogoutReplies.push(() => { entered.resolve(); return held.promise; });
+    f.render();
+    await f.signIn();
+    if (phase === 'queued') await entered.promise;
+    else expect((await gotrueClient.getSession()).data.session?.refresh_token).toBe(f.first.refresh_token);
+    let logout;
+    await act(async () => { logout = captured.signOut(); });
+    if (phase === 'started') await entered.promise;
+    await f.signIn(f.second);
+    try {
+      expect(captured.user.id).toBe(f.second.user.id);
+    } finally {
+      held.resolve(phase === 'queued' ? jsonResponse(f.first.user) : jsonResponse({}, 204));
+      await act(async () => { await logout; });
+    }
+    expect((await logout).ok).toBe(false);
+    expect((await logout).error?.code).toBe('auth_session_changed');
+    expect(captured.user.id).toBe(f.second.user.id);
+    expect((await gotrueClient.getSession()).data.session?.refresh_token).toBe(f.second.refresh_token);
+  });
+});
+
+it('does not let a slower server logout clear a newer committed session', async () => {
+  await withBridgeFixture(async (f) => {
+    f.render();
+    await f.signIn();
+    const response = deferredBridge();
+    f.state.apiLogoutReplies.push(() => response.promise);
+    let logout;
+    await act(async () => { logout = captured.signOut(); });
+    await f.signIn(f.second);
+    response.resolve(jsonResponse({}, 204));
+    await act(async () => { await logout; });
+    expect((await logout).error?.code).toBe('auth_session_changed');
+    expect(captured.user.id).toBe(f.second.user.id);
+    expect((await gotrueClient.getSession()).data.session?.refresh_token).toBe(f.second.refresh_token);
+  });
+});
+
+it('retains a server revocation failure after successful local SDK cleanup', async () => {
+  await withBridgeFixture(async (f) => {
+    f.render();
+    await f.signIn();
+    f.state.apiLogoutReplies.push(() => jsonResponse({ message: 'Synthetic revocation failure' }, 503));
+    let result;
+    await act(async () => { result = await captured.signOut(); });
+    expect(result.ok).toBe(false);
+    expect(result.error.status).toBe(503);
+    expect(captured.status).toBe('signedOut');
+    expect((await gotrueClient.getSession()).data.session).toBeNull();
+  });
+});
+
+it('cleans an owned SDK write even when a subscriber throws after storage was updated', async () => {
+  await withBridgeFixture(async (f) => {
+    vi.useFakeTimers();
+    const { data: { subscription } } = gotrueClient.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' && session?.refresh_token === f.first.refresh_token) {
+        throw new Error('Synthetic post-storage subscriber failure');
+      }
+    });
+    try {
+      f.render();
+      await f.signIn();
+      await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+      expect((await gotrueClient.getSession()).data.session?.refresh_token).toBe(f.first.refresh_token);
+      let result;
+      await act(async () => {
+        const logout = captured.signOut();
+        await vi.advanceTimersByTimeAsync(2251);
+        result = await logout;
+      });
+      expect(result).toEqual({ ok: true, error: null });
+      expect((await gotrueClient.getSession()).data.session).toBeNull();
+    } finally {
+      subscription.unsubscribe();
+    }
+  });
+});
+
+it('a failed first bridge does not claim an unrelated pre-existing SDK session', async () => {
+  await withBridgeFixture(async (f) => {
+    await gotrueClient.setSession(f.second);
+    vi.useFakeTimers();
+    f.state.userReplies.push(() => jsonResponse({ message: 'Synthetic bridge failure' }, 503));
+    f.render();
+    await f.signIn();
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+    let result;
+    await act(async () => {
+      const logout = captured.signOut();
+      await vi.advanceTimersByTimeAsync(2251);
+      result = await logout;
+    });
+    expect(result).toEqual({ ok: true, error: null });
+    expect((await gotrueClient.getSession()).data.session?.refresh_token).toBe(f.second.refresh_token);
+    expect(f.state.calls.filter((call) => call.scope === 'local')).toHaveLength(0);
+  });
+});
+
+it('keeps logout intent while SDK cleanup is pending despite new refresh demand', async () => {
+  await withBridgeFixture(async (f) => {
+    f.render();
+    await f.signIn();
+    const cleanup = deferredBridge();
+    const entered = deferredBridge();
+    f.state.sdkLogoutReplies.push(() => { entered.resolve(); return cleanup.promise; });
+    let logout;
+    await act(async () => { logout = captured.signOut(); });
+    await entered.promise;
+    let refresh;
+    await act(async () => { refresh = captured.refreshSessionNow(); });
+    cleanup.resolve(jsonResponse({}, 204));
+    await act(async () => { await Promise.all([logout, refresh]); });
+    expect(await logout).toEqual({ ok: true, error: null });
+    expect(captured.status).toBe('signedOut');
+    expect((await gotrueClient.getSession()).data.session).toBeNull();
+  });
+});
+
+it.each([
+  ['write', 'new-user'], ['write', 'same-token-aba'], ['write', 'signed-out'],
+  ['cleanup', 'new-user'], ['cleanup', 'same-token-aba'], ['cleanup', 'signed-out'],
+])('document SDK ownership survives provider remount during %s (%s)', async (phase, replacement) => {
+  await withBridgeFixture(async (f) => {
+    const admittedWrites = vi.spyOn(gotrueClient, 'setSession');
+    const held = deferredBridge();
+    const entered = deferredBridge();
+    if (phase === 'write') f.state.userReplies.push(() => { entered.resolve(); return held.promise; });
+    else f.state.sdkLogoutReplies.push(() => { entered.resolve(); return held.promise; });
+    const oldView = f.render();
+    await f.signIn();
+    if (phase === 'write') await entered.promise;
+    let logout;
+    await act(async () => { logout = captured.signOut(); });
+    if (phase === 'cleanup') await entered.promise;
+    oldView.unmount();
+    f.render();
+    await act(async () => { await Promise.resolve(); });
+    const target = replacement === 'new-user' ? f.second : f.first;
+    if (replacement !== 'signed-out') await f.signIn(target);
+    const writesBeforeDrain = admittedWrites.mock.calls.length;
+    held.resolve(phase === 'write' ? jsonResponse(f.first.user) : jsonResponse({}, 204));
+    await act(async () => { await logout; });
+    expect(writesBeforeDrain).toBe(1);
+    expect((await gotrueClient.getSession()).data.session?.refresh_token || null)
+      .toBe(replacement === 'signed-out' ? null : target.refresh_token);
+    expect(captured.status).toBe(replacement === 'signed-out' ? 'signedOut' : 'signedIn');
+    expect((await logout).ok).toBe(replacement === 'signed-out');
+    if (phase === 'write' && replacement !== 'signed-out') {
+      expect(f.state.calls.filter((call) => call.scope === 'local')).toHaveLength(0);
+    }
+  });
+});
+
+it('a failed replacement bridge still cleans the document-owned prior write on logout', async () => {
+  await withBridgeFixture(async (f) => {
+    vi.useFakeTimers();
+    const held = deferredBridge();
+    const entered = deferredBridge();
+    f.state.userReplies.push(() => { entered.resolve(); return held.promise; });
+    const oldView = f.render();
+    await f.signIn();
+    await entered.promise;
+    let oldLogout;
+    await act(async () => { oldLogout = captured.signOut(); });
+    oldView.unmount();
+    f.render();
+    for (let index = 0; index < 3; index += 1) {
+      f.state.userReplies.push(() => jsonResponse({ message: 'Synthetic replacement bridge failure' }, 503));
+    }
+    await f.signIn(f.second);
+    await act(async () => {
+      held.resolve(jsonResponse(f.first.user));
+      await vi.advanceTimersByTimeAsync(2251);
+      await oldLogout;
+    });
+    expect((await oldLogout).ok).toBe(false);
+    expect((await gotrueClient.getSession()).data.session?.refresh_token).toBe(f.first.refresh_token);
+    let result;
+    await act(async () => { result = await captured.signOut(); });
+    expect(result).toEqual({ ok: true, error: null });
+    expect((await gotrueClient.getSession()).data.session).toBeNull();
+  });
+});
+
+it('a former provider server logout cannot clear a replacement provider session', async () => {
+  await withBridgeFixture(async (f) => {
+    const oldView = f.render();
+    await f.signIn();
+    const held = deferredBridge();
+    f.state.apiLogoutReplies.push(() => held.promise);
+    let logout;
+    await act(async () => { logout = captured.signOut(); });
+    oldView.unmount();
+    f.render();
+    await f.signIn(f.second);
+    held.resolve(jsonResponse({}, 204));
+    await act(async () => { await logout; });
+    expect((await logout).ok).toBe(false);
+    expect(captured.user.id).toBe(f.second.user.id);
+    expect((await gotrueClient.getSession()).data.session?.refresh_token).toBe(f.second.refresh_token);
+  });
+});
+
+it('cleanup preserves SDK state independently replaced after the provider owned a different pair', async () => {
+  await withBridgeFixture(async (f) => {
+    f.render();
+    await f.signIn();
+    await gotrueClient.setSession(f.second);
+    let result;
+    await act(async () => { result = await captured.signOut(); });
+    expect(result).toEqual({ ok: true, error: null });
+    expect((await gotrueClient.getSession()).data.session?.refresh_token).toBe(f.second.refresh_token);
+  });
+});
