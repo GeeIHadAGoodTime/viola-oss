@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 
 from voice.english_numbers import num2words
+from voice.pronunciation_tables import _ACRONYM_INITIALISMS, _ACRONYM_WORDS, _BRAND_PRONUNCIATIONS
 
 from core.logging_config import get_logger
 
@@ -16,6 +17,7 @@ _BULLET_LINE_RE = re.compile(r"^\s*(?:[-*+]|\d+[.)])\s+(.+?)\s*$")
 _MARKDOWN_LINK_RE = re.compile(r"\[([^\]]+)\]\((https?://[^\s)]+)[^)]*\)", flags=re.IGNORECASE)
 _URL_RE = re.compile(r"https?://[^\s<>)\]]+", flags=re.IGNORECASE)
 _SENTENCE_BOUNDARY_RE = re.compile(r"(?<=[.!?])\s+")
+_NON_ENGLISH_SENTENCE_BOUNDARY_RE = re.compile(r"(?<=[。！？।])\s*|(?<=[.!?])\s+")
 
 # ---------------------------------------------------------------------------
 # Currency: $25 → "twenty-five dollars", $15.99 → "fifteen dollars and ninety-nine cents"
@@ -67,6 +69,14 @@ _TRAILING_HEDGE_RE = re.compile(
 # Only matches bare digit sequences bounded by non-word characters so tokens like
 # "mp3", "16kHz", or already-converted ordinals ("2nd") are left untouched.
 _STANDALONE_NUMBER_RE = re.compile(r"\b(\d+)\b")
+# Plain decimal tokens are isolated before phone/year/integer substitutions.
+# Complete-token boundaries exclude currency, percentages, identifiers, dotted
+# phone/IP/version strings and path fragments; those retain their existing path.
+_DECIMAL_RE = re.compile(
+    r"(?<![\w.$£€¥₹₩₽₿¢,@#+\-−/\\:])(?P<sign>[+\-−]?)(?P<whole>[0-9]*)\.(?P<fraction>[0-9]+)"
+    r"(?![\w%$£€¥₹₩₽₿¢@#/\\:+\-−]|\.[\w]|,[0-9])"
+)
+
 _ONES = [
     "zero",
     "one",
@@ -96,99 +106,9 @@ _MAX_SPOKEN_SENTENCES = 3
 _SUMMARY_SUFFIX = "I'll send the full details in chat."
 
 # Initialisms: spell each letter or digit-like suffix as a spoken token.
-_ACRONYM_INITIALISMS = {
-    "AI": "A I",
-    "API": "A P I",
-    "CPU": "C P U",
-    "GPU": "G P U",
-    "USB": "U S B",
-    "URL": "U R L",
-    "FAQ": "F A Q",
-    "CEO": "C E O",
-    "CTO": "C T O",
-    "CFO": "C F O",
-    "HR": "H R",
-    "NYC": "N Y C",
-    "LA": "L A",
-    "UK": "U K",
-    "US": "U S",
-    "EU": "E U",
-    "UN": "U N",
-    "FBI": "F B I",
-    "CIA": "C I A",
-    "PNG": "P N G",
-    "MP3": "M P three",
-    "MP4": "M P four",
-    "HTML": "H T M L",
-    "CSS": "C S S",
-    "JS": "J S",
-    "XML": "X M L",
-    "PDF": "P D F",
-    "DVD": "D V D",
-    "GPS": "G P S",
-}
 
 # Word-style acronyms: common lexicalized pronunciations, not letter-by-letter.
-_ACRONYM_WORDS = {
-    "RAM": "ram",
-    "ROM": "rom",
-    "NATO": "nay toe",
-    "NASA": "nassa",
-    "JPEG": "jay peg",
-    "GIF": "giff",
-    "JSON": "jay sawn",
-    "Wi-Fi": "why fie",
-    "WiFi": "why fie",
-}
 _ACRONYM_PRONUNCIATIONS = {**_ACRONYM_INITIALISMS, **_ACRONYM_WORDS}
-
-_BRAND_PRONUNCIATIONS = {
-    "Spotify": "Spot if eye",
-    "YouTube": "you tube",
-    "Anthropic": "Ann throw pick",
-    "GitHub": "git hub",
-    "OpenAI": "Open A I",
-    "ChatGPT": "chat G P T",
-    "Claude": "clawed",
-    "Slack": "slack",
-    "Discord": "discord",
-    "Reddit": "red it",
-    "Twitter": "twitter",
-    "Instagram": "in stuh gram",
-    "TikTok": "tick tock",
-    "Netflix": "net flicks",
-    "Amazon": "amazon",
-    "Microsoft": "my crow soft",
-    "Google": "goo gull",
-    "Apple": "apple",
-    "NVIDIA": "en vid ee uh",
-    "AMD": "A M D",
-    "Intel": "in tell",
-    "Stripe": "stripe",
-    "PayPal": "pay pal",
-    "Venmo": "ven moe",
-    "Lyft": "lift",
-    "Uber": "oo ber",
-    "Airbnb": "air B N B",
-    "DoorDash": "door dash",
-    "GrubHub": "grub hub",
-    "Roku": "roh koo",
-    "Sonos": "soh nohs",
-    "Bose": "bohz",
-    "Yamaha": "yah muh hah",
-    "Wikipedia": "wick ih pee dee uh",
-    "LinkedIn": "linked in",
-    "Pinterest": "pin ter est",
-    "Notion": "notion",
-    "Figma": "fig muh",
-    "Linear": "linear",
-    "Asana": "uh sah nuh",
-    "Trello": "trell oh",
-    "Dropbox": "drop box",
-    "iCloud": "eye cloud",
-    "Gmail": "G mail",
-    "Outlook": "out look",
-}
 
 
 def _literal_dict_re(keys: object, *, flags: int = 0) -> re.Pattern[str]:
@@ -267,8 +187,10 @@ def _replace_trailing_hedge(match: re.Match[str]) -> str:
     return "%s, %s…" % (prefix, phrase)
 
 
-def _apply_prosody_hints(text: str) -> str:
+def _apply_prosody_hints(text: str, *, english: bool = True) -> str:
     result = _PARENTHETICAL_RE.sub(_replace_parenthetical, text)
+    if not english:
+        return result
     result = _STRONG_CONJUNCTION_RE.sub(r", \1 ", result)
     result = _AND_CLAUSE_RE.sub(", and ", result)
     return _TRAILING_HEDGE_RE.sub(_replace_trailing_hedge, result)
@@ -331,6 +253,45 @@ def _replace_number(match: re.Match[str]) -> str:
         return _number_to_words(int(match.group(0)))
     except (ValueError, IndexError):
         return match.group(0)
+
+
+
+def _replace_decimal(match: re.Match[str]) -> str:
+    """Speak an exact decimal without float/context rounding or dropped zeros."""
+    raw = match.group(0)
+    # Keep unsupported tokens whole; never let a later pattern rewrite only
+    # their fraction, mistake it for a phone number, or erase precision.
+    if len(raw) > 128:
+        return raw
+    try:
+        whole = _clean_num2words_output(num2words(match.group("whole") or "0", lang="en"))
+    except (NotImplementedError, OverflowError, TypeError, ValueError):
+        return raw
+    sign = match.group("sign")
+    prefix = "minus " if sign in {"-", "−"} else "plus " if sign == "+" else ""
+    fraction = " ".join(_DIGIT_NAMES[int(digit)] for digit in match.group("fraction"))
+    return prefix + whole + " point " + fraction
+
+
+def _normalize_english_numbers(text: str) -> str:
+    def other_numbers(segment: str) -> str:
+        # Keep the established priority for all non-decimal numeric contracts.
+        segment = _ORDINAL_RE.sub(_replace_ordinal, segment)
+        segment = _CURRENCY_RE.sub(_replace_currency, segment)
+        segment = _PHONE_RE.sub(_replace_phone, segment)
+        segment = _PERCENT_RE.sub(_replace_percent, segment)
+        segment = _TIME_RE.sub(_replace_time, segment)
+        segment = _YEAR_RE.sub(_replace_year, segment)
+        return _STANDALONE_NUMBER_RE.sub(_replace_number, segment)
+
+    parts = []
+    cursor = 0
+    for decimal in _DECIMAL_RE.finditer(text):
+        parts.append(other_numbers(text[cursor : decimal.start()]))
+        parts.append(_replace_decimal(decimal))
+        cursor = decimal.end()
+    parts.append(other_numbers(text[cursor:]))
+    return "".join(parts)
 
 
 def _replace_currency(match: re.Match[str]) -> str:
@@ -427,6 +388,23 @@ def _replace_markdown_link(match: re.Match[str]) -> str:
     return "(link sent in chat)"
 
 
+def _replace_markdown_link_neutral(match: re.Match[str]) -> str:
+    # Keep the user's label and hide the URL without inventing an English
+    # delivery claim. Bare URLs below become a punctuation-only pause.
+    return _WHITESPACE_RE.sub(" ", match.group(1)).strip() or "…"
+
+
+def _is_english_locale(language: object | None) -> bool:
+    """Missing locale preserves the historical English formatter contract."""
+    if language is None:
+        return True
+    value = getattr(language, "value", language)
+    return (
+        isinstance(value, str)
+        and value.strip().lower().replace("_", "-").split("-", 1)[0] == "en"
+    )
+
+
 def _replace_url(match: re.Match[str]) -> str:
     """Replace URLs with a natural spoken reference instead of reading them aloud."""
     return "(link sent in chat)"
@@ -466,8 +444,9 @@ def _replace_bullets(text: str) -> str:
     return "\n".join(converted)
 
 
-def _split_sentences(text: str) -> list[str]:
-    return [part.strip() for part in _SENTENCE_BOUNDARY_RE.split(text) if part.strip()]
+def _split_sentences(text: str, *, english: bool = True) -> list[str]:
+    boundary = _SENTENCE_BOUNDARY_RE if english else _NON_ENGLISH_SENTENCE_BOUNDARY_RE
+    return [part.strip() for part in boundary.split(text) if part.strip()]
 
 
 def _truncate_at_word(text: str, limit: int) -> str:
@@ -477,11 +456,11 @@ def _truncate_at_word(text: str, limit: int) -> str:
     return truncated or text[:limit].strip()
 
 
-def _summarize_oversized(text: str) -> str:
+def _summarize_oversized(text: str, *, english: bool = True) -> str:
     if not text:
         return text
 
-    sentences = _split_sentences(text)
+    sentences = _split_sentences(text, english=english)
     too_many_sentences = len(sentences) > _MAX_SPOKEN_SENTENCES
     too_long = len(text) > _MAX_SPOKEN_CHARS
     if not too_many_sentences and not too_long:
@@ -493,6 +472,8 @@ def _summarize_oversized(text: str) -> str:
         summary = text
 
     summary = _truncate_at_word(summary, _SUMMARY_CHARS).rstrip(" ,;:")
+    if not english:
+        return summary.rstrip(".!?。！？।…") + "…" if summary else ""
     if summary and summary[-1] not in ".!?":
         summary += "."
     if summary:
@@ -514,42 +495,44 @@ class SpeechFormatter:
         self._summarize = summarize
         self._config = config
 
-    def format(self, text: str) -> str:
-        """Normalize raw LLM/tool output into concise TTS-friendly speech text."""
+    def format(self, text: str, *, language: object | None = None) -> str:
+        """Format text for its active locale without guessing another language.
+
+        English retains the existing spoken-number and respelling rules. Other
+        locales keep exact numbers, currency units, names and scripts for their
+        own pronunciation adapter. Common markup/URL cleanup and length limits
+        still apply; they do not qualify a downstream language or voice.
+        """
         try:
             original_text = str(text)
             result = original_text
+            english = _is_english_locale(language)
             cfg = _get_runtime_config(self._config)
 
             result = _CODE_BLOCK_RE.sub(" ", result)
             result = _INLINE_CODE_RE.sub(r"\1", result)
-            result = _MARKDOWN_LINK_RE.sub(_replace_markdown_link, result)
+            link_replacement = _replace_markdown_link if english else _replace_markdown_link_neutral
+            result = _MARKDOWN_LINK_RE.sub(link_replacement, result)
             result = _HEADER_RE.sub("", result)
             result = _BLOCKQUOTE_RE.sub("", result)
             result = _replace_markdown_emphasis(result)
             result = _replace_bullets(result)
-            result = _URL_RE.sub(_replace_url, result)
-            result = _ORDINAL_RE.sub(_replace_ordinal, result)
-            # Specialized number patterns BEFORE generic standalone number conversion.
-            # Order matters: currency/phone/percent/time consume specific patterns so
-            # the generic regex doesn't mangle them (e.g. phone digits as integers).
-            result = _CURRENCY_RE.sub(_replace_currency, result)
-            result = _PHONE_RE.sub(_replace_phone, result)
-            result = _PERCENT_RE.sub(_replace_percent, result)
-            result = _TIME_RE.sub(_replace_time, result)
-            result = _YEAR_RE.sub(_replace_year, result)
-            result = _STANDALONE_NUMBER_RE.sub(_replace_number, result)
+            result = _URL_RE.sub(_replace_url if english else "…", result)
+            if english:
+                result = _normalize_english_numbers(result)
+            # Explicit user overrides keep their existing scope. The built-in
+            # dictionaries are English respellings, not multilingual rules.
             result = _apply_pronunciation_overrides(result, cfg)
-            if getattr(cfg, "tts_brand_dict_enabled", True):
+            if english and getattr(cfg, "tts_brand_dict_enabled", True):
                 result = _apply_literal_dictionary(result, _BRAND_PRONUNCIATIONS, _BRAND_RE, ignore_case=True)
-            if getattr(cfg, "tts_acronym_dict_enabled", True):
+            if english and getattr(cfg, "tts_acronym_dict_enabled", True):
                 result = _apply_literal_dictionary(result, _ACRONYM_PRONUNCIATIONS, _ACRONYM_RE)
             result = _ISOLATED_SYMBOL_RE.sub(" ", result)
             result = _WHITESPACE_RE.sub(" ", result).strip()
             if self._summarize:
-                result = _summarize_oversized(result)
+                result = _summarize_oversized(result, english=english)
             if getattr(cfg, "tts_prosody_hints_enabled", True):
-                result = _apply_prosody_hints(result)
+                result = _apply_prosody_hints(result, english=english)
             result = _WHITESPACE_RE.sub(" ", result).strip()
 
             logger.debug("TTS speech formatter: %s -> %s", len(original_text), len(result))
@@ -563,8 +546,12 @@ _DEFAULT_FORMATTER = SpeechFormatter(summarize=True)
 _VERBATIM_FORMATTER = SpeechFormatter(summarize=False)
 
 
-def normalize_for_speech(text: str, *, summarize: bool = True) -> str:
-    """Normalize raw LLM output into cleaner TTS-friendly speech text.
+def normalize_for_speech(text: str, *, summarize: bool = True, language: object | None = None) -> str:
+    """Normalize speech text using its per-call locale (English by default).
+
+    Explicit non-English or unknown locales never receive automatic English
+    number words, brand/acronym respellings or English chat-delivery messages.
+    This is text preservation, not multilingual pronunciation qualification.
 
     ``summarize=False`` keeps every sentence and never appends Viola's
     "I'll send the full details in chat." suffix. Use it for non-Viola
@@ -572,4 +559,4 @@ def normalize_for_speech(text: str, *, summarize: bool = True) -> str:
     be capped at three sentences.
     """
     formatter = _DEFAULT_FORMATTER if summarize else _VERBATIM_FORMATTER
-    return formatter.format(text)
+    return formatter.format(text, language=language)
