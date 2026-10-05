@@ -27,7 +27,7 @@ from core.quiet_hours import tts_volume_for_now
 from voice.synthesis.opener_cache import DEFAULT_VARIANTS, OpenerCache
 
 # Per-sentence watchdog. A single Kokoro inference past 30 s is almost
-# always a stuck ONNX session; cancel and let the caller retry.
+# potentially a stuck ONNX session. Bound the waiter without replacing a live worker.
 STREAM_TIMEOUT_SECONDS = 30.0
 
 # sounddevice.play()/wait() share a module-global convenience stream. Serialize
@@ -240,6 +240,8 @@ class KokoroTTSEngine:
     ) -> None:
         self._config = config
         self._tts_disable_marker = object()
+        self._synthesis_work_lock = threading.Lock()
+        self._synthesis_work = None
         cfg = config or settings
 
         # Resolve paths: explicit arg → config/settings attr → default
@@ -451,21 +453,103 @@ class KokoroTTSEngine:
     async def _run_synthesize_with_watchdog(
         self, text: str, voice: str | None, *, policy_marker: object | None = None
     ) -> bytes:
-        """Run one ``_synthesize_locked`` call, guarded by the watchdog."""
+        """Bound admission and waiting while retaining actual worker ownership."""
         if policy_marker is None:
             policy_marker = getattr(self, "_tts_disable_marker", 0)
+        deadline = time.monotonic() + STREAM_TIMEOUT_SECONDS
+        # The fallback preserves fixtures which intentionally bypass construction.
+        if not hasattr(self, "_synthesis_work_lock"):
+            self._synthesis_work_lock = threading.Lock()
+        gate = self._synthesis_work_lock
+        loop = asyncio.get_running_loop()
+
+        while True:
+            if not self._tts_is_enabled() or policy_marker is not getattr(self, "_tts_disable_marker", 0):
+                return b""
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                logger.warning("Kokoro synthesis admission exceeded watchdog; dropping chunk")
+                return b""
+            with gate:
+                active = getattr(self, "_synthesis_work", None)
+                if active is None or active["done"]:
+                    work = {"done": False, "started": False, "cancelled": threading.Event(), "waiters": set()}
+                    self._synthesis_work = work
+                    break
+                waiter = loop.create_future()
+                waiting = (loop, waiter)
+                active["waiters"].add(waiting)
+            try:
+                await asyncio.wait_for(waiter, timeout=remaining)
+            except TimeoutError:
+                logger.warning("Kokoro synthesis admission exceeded watchdog; dropping chunk")
+                return b""
+            finally:
+                with gate:
+                    active["waiters"].discard(waiting)
+
+        def resolve(waiter):
+            if not waiter.done():
+                waiter.set_result(None)
+
+        def finish():
+            with gate:
+                work["done"] = True
+                waiting = tuple(work["waiters"])
+                work["waiters"].clear()
+            for waiting_loop, waiter in waiting:
+                try:
+                    waiting_loop.call_soon_threadsafe(resolve, waiter)
+                except RuntimeError:
+                    # A closed caller loop no longer owns an admission waiter.
+                    pass
+
+        def run_owned():
+            with gate:
+                started = not work["cancelled"].is_set()
+                work["started"] = started
+            try:
+                if not started:
+                    return b""
+                return self._synthesize_locked(text, voice, policy_marker=policy_marker, cancel_event=work["cancelled"])
+            finally:
+                finish()
+
+        def completed(task):
+            if task.cancelled():
+                work["cancelled"].set()
+            else:
+                task.exception()  # Retrieve a late failure even if its waiter has left.
+            with gate:
+                not_started = not work["started"]
+            if not_started:
+                # Cancellation or executor submission failure did not own native work.
+                work["cancelled"].set()
+                finish()
+
+        task = asyncio.create_task(asyncio.to_thread(run_owned))
+        work["task"] = task
+        task.add_done_callback(completed)
         try:
-            return await asyncio.wait_for(
-                asyncio.to_thread(self._synthesize_locked, text, voice, policy_marker=policy_marker),
-                timeout=STREAM_TIMEOUT_SECONDS,
-            )
+            result = await asyncio.wait_for(asyncio.shield(task), timeout=max(0.0, deadline - time.monotonic()))
+            if work["cancelled"].is_set() or not self._tts_is_enabled():
+                return b""
+            if policy_marker is not getattr(self, "_tts_disable_marker", 0):
+                return b""
+            return result
         except TimeoutError:
+            work["cancelled"].set()
+            task.cancel()
             logger.warning(
                 "Kokoro synthesis exceeded %.0fs watchdog text_length=%d; dropping chunk",
                 STREAM_TIMEOUT_SECONDS,
                 len(text),
             )
             return b""
+        except asyncio.CancelledError:
+            work["cancelled"].set()
+            task.cancel()
+            raise
 
     async def _synthesize_chunked(self, text: str, voice: str | None, *, policy_marker: object | None = None) -> bytes:
         """Synthesise long text sentence-by-sentence and concatenate."""
@@ -516,6 +600,7 @@ class KokoroTTSEngine:
         *,
         apply_volume: bool = True,
         policy_marker: object | None = None,
+        cancel_event: threading.Event | None = None,
     ) -> bytes:
         """Thread-safe wrapper around ``_synthesize_internal``.
 
@@ -526,12 +611,20 @@ class KokoroTTSEngine:
         """
         if policy_marker is None:
             policy_marker = getattr(self, "_tts_disable_marker", 0)
-        if not self._tts_is_enabled() or policy_marker is not getattr(self, "_tts_disable_marker", 0):
+        if (
+            (cancel_event is not None and cancel_event.is_set())
+            or not self._tts_is_enabled()
+            or policy_marker is not getattr(self, "_tts_disable_marker", 0)
+        ):
             return b""
         with self._lock:
             # Streaming/prefetch callers enter here without synthesize().
             # Recheck after acquiring the lock so queued work respects disable.
-            if not self._tts_is_enabled() or policy_marker is not getattr(self, "_tts_disable_marker", 0):
+            if (
+                (cancel_event is not None and cancel_event.is_set())
+                or not self._tts_is_enabled()
+                or policy_marker is not getattr(self, "_tts_disable_marker", 0)
+            ):
                 return b""
             if not self._ensure_loaded():
                 logger.warning(
@@ -539,7 +632,11 @@ class KokoroTTSEngine:
                     len(text),
                 )
                 return b""
-            if not self._tts_is_enabled() or policy_marker is not getattr(self, "_tts_disable_marker", 0):
+            if (
+                (cancel_event is not None and cancel_event.is_set())
+                or not self._tts_is_enabled()
+                or policy_marker is not getattr(self, "_tts_disable_marker", 0)
+            ):
                 return b""
 
             try:
@@ -1061,6 +1158,7 @@ class KokoroTTSEngine:
             logger.debug("Audio ducking unavailable: %s", e)
             duck_ctx = nullcontext()
 
+        prefetch_task: asyncio.Task[bytes] | None = None
         try:
             with duck_ctx:
                 logger.debug(
@@ -1075,7 +1173,6 @@ class KokoroTTSEngine:
                 # each subsequent sentence is kicked off before playback
                 # of the current one begins.
 
-                prefetch_task: asyncio.Task[bytes] | None = None
                 previous_pcm: bytes | None = None
 
                 for i, sentence in enumerate(sentences):
@@ -1092,12 +1189,7 @@ class KokoroTTSEngine:
                         pcm = await prefetch_task
                         prefetch_task = None
                     else:
-                        pcm = await asyncio.to_thread(
-                            self._synthesize_locked,
-                            sentence,
-                            None,
-                            policy_marker=policy_marker,
-                        )
+                        pcm = await self._run_synthesize_with_watchdog(sentence, None, policy_marker=policy_marker)
 
                     if policy_marker is not getattr(self, "_tts_disable_marker", 0):
                         previous_pcm = None
@@ -1108,12 +1200,7 @@ class KokoroTTSEngine:
                     if i + 1 < len(sentences):
                         next_sentence = sentences[i + 1]
                         prefetch_task = asyncio.ensure_future(
-                            asyncio.to_thread(
-                                self._synthesize_locked,
-                                next_sentence,
-                                None,
-                                policy_marker=policy_marker,
-                            )
+                            self._run_synthesize_with_watchdog(next_sentence, None, policy_marker=policy_marker)
                         )
 
                     if not pcm:
@@ -1159,6 +1246,12 @@ class KokoroTTSEngine:
                             self._play_pcm_if_enabled, remaining_pcm, self.last_sample_rate, policy_marker=policy_marker
                         )
         finally:
+            if prefetch_task is not None and not prefetch_task.done():
+                prefetch_task.cancel()
+                try:
+                    await prefetch_task
+                except asyncio.CancelledError:
+                    pass  # Worker ownership persists until its actual completion.
             # Clear is_speaking (once)
             if monitor is not None:
                 try:
@@ -1226,9 +1319,9 @@ class KokoroTTSEngine:
                 logger.debug("Audio ducking unavailable: %s", e)
                 duck_ctx = nullcontext()
 
+            prefetch_task: asyncio.Task[bytes] | None = None
             try:
                 with duck_ctx:
-                    prefetch_task: asyncio.Task[bytes] | None = None
                     sentence_count = 0
                     previous_pcm: bytes | None = None
                     previous_sentence: str | None = None
@@ -1288,11 +1381,8 @@ class KokoroTTSEngine:
                                 pcm = await prefetch_task
                                 prefetch_task = None
                             else:
-                                pcm = await asyncio.to_thread(
-                                    self._synthesize_locked,
-                                    sentence,
-                                    None,
-                                    policy_marker=policy_marker,
+                                pcm = await self._run_synthesize_with_watchdog(
+                                    sentence, None, policy_marker=policy_marker
                                 )
 
                             if policy_marker is not getattr(self, "_tts_disable_marker", 0):
@@ -1303,12 +1393,7 @@ class KokoroTTSEngine:
                             if sentences_queue:
                                 next_s = sentences_queue[0]
                                 prefetch_task = asyncio.ensure_future(
-                                    asyncio.to_thread(
-                                        self._synthesize_locked,
-                                        next_s,
-                                        None,
-                                        policy_marker=policy_marker,
-                                    )
+                                    self._run_synthesize_with_watchdog(next_s, None, policy_marker=policy_marker)
                                 )
 
                             if not pcm:
@@ -1357,12 +1442,7 @@ class KokoroTTSEngine:
                             pcm = await prefetch_task
                             prefetch_task = None
                         else:
-                            pcm = await asyncio.to_thread(
-                                self._synthesize_locked,
-                                sentence,
-                                None,
-                                policy_marker=policy_marker,
-                            )
+                            pcm = await self._run_synthesize_with_watchdog(sentence, None, policy_marker=policy_marker)
                         if pcm:
                             if previous_sentence is not None:
                                 await self._sleep_sentence_gap(previous_sentence, sentence)
@@ -1401,6 +1481,12 @@ class KokoroTTSEngine:
                     )
 
             finally:
+                if prefetch_task is not None and not prefetch_task.done():
+                    prefetch_task.cancel()
+                    try:
+                        await prefetch_task
+                    except asyncio.CancelledError:
+                        pass  # Worker ownership persists until its actual completion.
                 if monitor is not None:
                     try:
                         monitor.update_tts_state(is_speaking=False)

@@ -6,6 +6,7 @@ import ast
 import asyncio
 import re
 import time
+import threading
 import types
 import unittest
 from pathlib import Path
@@ -24,7 +25,8 @@ def load_streaming_method(source: Path):
     policy_methods = [
         node
         for node in ast.walk(tree)
-        if isinstance(node, ast.FunctionDef) and node.name in {"_tts_is_enabled", "_play_pcm_if_enabled"}
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        and node.name in {"_tts_is_enabled", "_play_pcm_if_enabled", "_run_synthesize_with_watchdog"}
     ]
     helpers = [
         node
@@ -32,13 +34,14 @@ def load_streaming_method(source: Path):
         if (
             isinstance(node, ast.Assign)
             and any(
-                isinstance(target, ast.Name) and target.id in {"_SENTENCE_RE", "_EMOJI_RE"} for target in node.targets
+                isinstance(target, ast.Name) and target.id in {"_SENTENCE_RE", "_EMOJI_RE", "STREAM_TIMEOUT_SECONDS"}
+                for target in node.targets
             )
         )
         or (isinstance(node, ast.FunctionDef) and node.name == "_strip_emoji")
     ]
     logger = types.SimpleNamespace(**{name: lambda *args, **kwargs: None for name in ("debug", "info", "warning")})
-    namespace = {"asyncio": asyncio, "re": re, "time": time, "logger": logger}
+    namespace = {"asyncio": asyncio, "re": re, "time": time, "threading": threading, "logger": logger}
     module = ast.Module(
         body=[
             ast.ImportFrom(module="__future__", names=[ast.alias(name="annotations")], level=0),
@@ -83,7 +86,7 @@ class StreamingDecimalBoundaryTests(unittest.IsolatedAsyncioTestCase):
         self.calls = []
         self.played = []
 
-        def synthesize(text, voice, *, policy_marker=None):
+        def synthesize(text, voice, *, policy_marker=None, cancel_event=None):
             self.calls.append(text)
             return b"\x00\x00" * 16
 
