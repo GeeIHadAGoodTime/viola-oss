@@ -208,6 +208,7 @@ export function AuthProvider({ children }) {
   // Latest refresh token, kept in a ref so the refresh callback never goes
   // stale across renders / re-schedules.
   const refreshTokenRef = useRef('');
+  const sessionGenerationRef = useRef(0);
   const mountedRef = useRef(true);
   // True once this provider has bridged a real session into gotrueClient (see
   // commitSession below). Guards the sign-out side of the bridge: only clear
@@ -231,6 +232,7 @@ export function AuthProvider({ children }) {
   // and `focus` — so they share this one promise instead of each starting a
   // redemption (see `runRefresh`).
   const inFlightRefreshRef = useRef(null);
+  const inFlightRefreshGenerationRef = useRef(null);
 
   const clearRefreshTimer = useCallback(() => {
     if (refreshTimer.current) {
@@ -325,6 +327,8 @@ export function AuthProvider({ children }) {
    * Centralised so every auth path keeps the three stores consistent.
    */
   const commitSession = useCallback((nextSession) => {
+    // A committed sign-out or replacement session retires pending refreshes.
+    sessionGenerationRef.current += 1;
     setSession(nextSession);
     setStatus(nextSession ? 'signedIn' : 'signedOut');
     storeSession(nextSession);
@@ -390,7 +394,17 @@ export function AuthProvider({ children }) {
    * a just-written entitlement still lands on the next attempt.
    */
   const runRefresh = useCallback(async () => {
-    if (inFlightRefreshRef.current) return inFlightRefreshRef.current;
+    const generation = sessionGenerationRef.current;
+    const inFlight = inFlightRefreshRef.current;
+    if (inFlight) {
+      if (inFlightRefreshGenerationRef.current === generation) return inFlight;
+      // A newer session's timer/explicit refresh must not be consumed by an
+      // obsolete redemption. Drain it, then recheck the caller's ownership.
+      // Its rejected promise belongs to that old caller, not this session.
+      await inFlight.catch(() => {});
+      if (!mountedRef.current || generation !== sessionGenerationRef.current || !refreshTokenRef.current) return;
+      return runRefresh();
+    }
     const attempt = (async () => {
       const token = refreshTokenRef.current;
       if (!token) {
@@ -398,7 +412,7 @@ export function AuthProvider({ children }) {
         return;
       }
       const result = await apiRefresh(token);
-      if (!mountedRef.current) return;
+      if (!mountedRef.current || generation !== sessionGenerationRef.current) return;
       if (result.ok && result.session) {
         commitSession(result.session);
         scheduleRefreshRef.current(result.session);
@@ -417,12 +431,16 @@ export function AuthProvider({ children }) {
       }
     })();
     inFlightRefreshRef.current = attempt;
+    inFlightRefreshGenerationRef.current = generation;
     try {
       return await attempt;
     } finally {
       // Identity-checked so a slow loser can never clear a NEWER in-flight
       // refresh and re-open the double-redemption window it just closed.
-      if (inFlightRefreshRef.current === attempt) inFlightRefreshRef.current = null;
+      if (inFlightRefreshRef.current === attempt) {
+        inFlightRefreshRef.current = null;
+        inFlightRefreshGenerationRef.current = null;
+      }
     }
   }, [commitSession, clearRefreshTimer]);
 

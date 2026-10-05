@@ -580,3 +580,248 @@ describe('AuthProvider TOTP second factor (#2404)', () => {
     expect(getCloudAccessToken()).toBe('access-jwt');
   });
 });
+
+it.each(['cloud', 'desktop'])('does not restore a signed-out session after older scheduled refresh resolves (%s)', async (surface) => {
+  const previousBridge = window.viola;
+  if (surface === 'desktop') window.viola = {};
+  else delete window.viola;
+  vi.useFakeTimers();
+  try {
+    __setInMemorySessionForTest(makeSession({ expires_at: Math.floor(Date.now() / 1000) + 65 }));
+    authClient.signOut.mockResolvedValue({ ok: true, error: null });
+    let resolveRefresh;
+    authClient.refresh.mockReset();
+    authClient.refresh.mockImplementationOnce(() => new Promise((resolve) => { resolveRefresh = resolve; }));
+    renderProvider();
+    await act(async () => { await Promise.resolve(); });
+    expect(captured.status).toBe('signedIn');
+    await act(async () => { await vi.advanceTimersByTimeAsync(10_000); });
+    expect(authClient.refresh).toHaveBeenCalledWith('refresh-jwt');
+    await act(async () => { await captured.signOut(); });
+    expect(captured.status).toBe('signedOut');
+    expect(getCloudAccessToken()).toBe('');
+    await act(async () => {
+      resolveRefresh({ ok: true, session: makeSession({ access_token: 'synthetic-late-access', refresh_token: 'synthetic-late-refresh' }), error: null });
+      await Promise.resolve();
+    });
+    expect({
+      status: screen.getByTestId('status').textContent,
+      hasSession: captured.session !== null,
+      hasMirroredToken: getCloudAccessToken() !== '',
+    }).toEqual({ status: 'signedOut', hasSession: false, hasMirroredToken: false });
+  } finally {
+    if (previousBridge === undefined) delete window.viola;
+    else window.viola = previousBridge;
+  }
+});
+
+async function withPendingScheduledRefresh(surface, check) {
+  const previousBridge = window.viola;
+  if (surface === 'desktop') window.viola = {};
+  else delete window.viola;
+  vi.useFakeTimers();
+  let resolveRefresh;
+  let view;
+  authClient.refresh.mockReset();
+  try {
+    __setInMemorySessionForTest(makeSession({ expires_at: Math.floor(Date.now() / 1000) + 65 }));
+    authClient.refresh.mockImplementationOnce(() => new Promise((resolve) => { resolveRefresh = resolve; }));
+    view = renderProvider();
+    await act(async () => { await Promise.resolve(); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(10_000); });
+    expect(authClient.refresh).toHaveBeenCalledTimes(1);
+    await check(resolveRefresh, view);
+  } finally {
+    view?.unmount();
+    resolveRefresh?.({ ok: false, session: null, error: { status: 401 } });
+    if (previousBridge === undefined) delete window.viola;
+    else window.viola = previousBridge;
+  }
+}
+
+it.each(['cloud', 'desktop'])('does not schedule an obsolete transient refresh retry after sign-out (%s)', async (surface) => {
+  await withPendingScheduledRefresh(surface, async (resolveRefresh) => {
+    authClient.signOut.mockResolvedValue({ ok: true, error: null });
+    await act(async () => { await captured.signOut(); });
+    expect(vi.getTimerCount()).toBe(0);
+    await act(async () => { resolveRefresh({ ok: false, session: null, error: { status: 503 } }); });
+    expect(captured.status).toBe('signedOut');
+    expect(getCloudAccessToken()).toBe('');
+    expect(vi.getTimerCount()).toBe(0);
+  });
+});
+
+it.each([
+  ['cloud', 'success'], ['cloud', 'rejected'], ['cloud', 'transient'],
+  ['desktop', 'success'], ['desktop', 'rejected'], ['desktop', 'transient'],
+])('an older refresh cannot replace or clear a newer signed-in session (%s, %s)', async (surface, outcome) => {
+  await withPendingScheduledRefresh(surface, async (resolveRefresh) => {
+    const newer = makeSession({ access_token: 'synthetic-new-access', refresh_token: 'synthetic-new-refresh', user: { id: 'synthetic-user-2' } });
+    authClient.signInWithPassword.mockResolvedValue({ ok: true, session: newer, error: null });
+    await act(async () => { await captured.signIn('synthetic@example.invalid', 'synthetic-test-password'); });
+    expect(captured.user.id).toBe('synthetic-user-2');
+    await act(async () => {
+      resolveRefresh(outcome === 'success'
+        ? { ok: true, session: makeSession({ access_token: 'synthetic-old-access' }), error: null }
+        : { ok: false, session: null, error: { status: outcome === 'transient' ? 503 : 401 } });
+    });
+    expect(captured.status).toBe('signedIn');
+    expect(captured.user.id).toBe('synthetic-user-2');
+    expect(getCloudAccessToken()).toBe('synthetic-new-access');
+    await act(async () => { await vi.advanceTimersByTimeAsync(15_001); });
+    expect(authClient.refresh).toHaveBeenCalledTimes(1);
+  });
+});
+
+it.each(['cloud', 'desktop'])('same-token ABA authentication still retires a pre-sign-out refresh (%s)', async (surface) => {
+  await withPendingScheduledRefresh(surface, async (resolveRefresh) => {
+    authClient.signOut.mockResolvedValue({ ok: true, error: null });
+    await act(async () => { await captured.signOut(); });
+    authClient.signInWithPassword.mockResolvedValue({ ok: true, session: makeSession(), error: null });
+    await act(async () => { await captured.signIn('synthetic@example.invalid', 'synthetic-test-password'); });
+    await act(async () => { resolveRefresh({ ok: false, session: null, error: { status: 401 } }); });
+    expect(captured.status).toBe('signedIn');
+    expect(getCloudAccessToken()).toBe('access-jwt');
+  });
+});
+
+it('preserves the unmount fence for a pending refresh', async () => {
+  await withPendingScheduledRefresh('cloud', async (resolveRefresh, view) => {
+    view.unmount();
+    await act(async () => {
+      resolveRefresh({ ok: true, session: makeSession({ access_token: 'synthetic-after-unmount' }), error: null });
+    });
+    expect(getCloudAccessToken()).toBe('access-jwt');
+  });
+});
+
+it.each([
+  ['cloud', 'success'], ['cloud', 'rejected'], ['cloud', 'transient'],
+  ['desktop', 'success'], ['desktop', 'rejected'], ['desktop', 'transient'],
+])('a newer session timer refreshes current state after the old flight drains (%s, %s)', async (surface, outcome) => {
+  await withPendingScheduledRefresh(surface, async (resolveOld) => {
+    const newer = makeSession({
+      access_token: 'synthetic-new-access', refresh_token: 'synthetic-new-refresh', user: { id: 'synthetic-user-2' },
+      expires_at: Math.floor(Date.now() / 1000) + 65,
+    });
+    authClient.signInWithPassword.mockResolvedValue({ ok: true, session: newer, error: null });
+    await act(async () => { await captured.signIn('synthetic@example.invalid', 'synthetic-test-password'); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(10_000); });
+    expect(authClient.refresh).toHaveBeenCalledTimes(1);
+    authClient.refresh.mockResolvedValueOnce({
+      ok: true,
+      session: makeSession({ access_token: 'synthetic-renewed-access', refresh_token: 'synthetic-renewed-refresh', user: newer.user }),
+      error: null,
+    });
+    await act(async () => {
+      resolveOld(outcome === 'success'
+        ? { ok: true, session: makeSession({ access_token: 'synthetic-obsolete-access' }), error: null }
+        : { ok: false, session: null, error: { status: outcome === 'transient' ? 503 : 401 } });
+    });
+    expect(authClient.refresh).toHaveBeenCalledTimes(2);
+    expect(authClient.refresh).toHaveBeenLastCalledWith('synthetic-new-refresh');
+    expect(captured.user.id).toBe('synthetic-user-2');
+    expect(getCloudAccessToken()).toBe('synthetic-renewed-access');
+    expect(vi.getTimerCount()).toBeGreaterThan(0);
+  });
+});
+
+it('multiple newer callers drain the old flight and share one current redemption until it settles', async () => {
+  await withPendingScheduledRefresh('cloud', async (resolveOld) => {
+    const newer = makeSession({ access_token: 'synthetic-new-access', refresh_token: 'synthetic-new-refresh', user: { id: 'synthetic-user-2' } });
+    authClient.signInWithPassword.mockResolvedValue({ ok: true, session: newer, error: null });
+    await act(async () => { await captured.signIn('synthetic@example.invalid', 'synthetic-test-password'); });
+    let resolveNew;
+    authClient.refresh.mockImplementationOnce(() => new Promise((resolve) => { resolveNew = resolve; }));
+    let first;
+    let second;
+    let firstDone = false;
+    await act(async () => {
+      first = captured.refreshSessionNow().then(() => { firstDone = true; });
+      second = captured.refreshSessionNow();
+    });
+    expect(authClient.refresh).toHaveBeenCalledTimes(1);
+    await act(async () => { resolveOld({ ok: false, session: null, error: { status: 401 } }); });
+    expect(authClient.refresh).toHaveBeenCalledTimes(2);
+    expect(firstDone).toBe(false);
+    await act(async () => {
+      resolveNew({ ok: true, session: makeSession({ access_token: 'synthetic-renewed-access', refresh_token: 'synthetic-renewed-refresh', user: newer.user }), error: null });
+      await Promise.all([first, second]);
+    });
+    expect(firstDone).toBe(true);
+    expect(authClient.refresh).toHaveBeenCalledTimes(2);
+    expect(getCloudAccessToken()).toBe('synthetic-renewed-access');
+  });
+});
+
+it.each(['cloud', 'desktop'])('newer sign-out cancels a queued replacement-session refresh (%s)', async (surface) => {
+  await withPendingScheduledRefresh(surface, async (resolveOld) => {
+    const newer = makeSession({ refresh_token: 'synthetic-new-refresh', expires_at: Math.floor(Date.now() / 1000) + 65 });
+    authClient.signInWithPassword.mockResolvedValue({ ok: true, session: newer, error: null });
+    await act(async () => { await captured.signIn('synthetic@example.invalid', 'synthetic-test-password'); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(10_000); });
+    authClient.signOut.mockResolvedValue({ ok: true, error: null });
+    await act(async () => { await captured.signOut(); });
+    await act(async () => { resolveOld({ ok: true, session: makeSession(), error: null }); });
+    expect(authClient.refresh).toHaveBeenCalledTimes(1);
+    expect(captured.status).toBe('signedOut');
+    expect(getCloudAccessToken()).toBe('');
+    expect(vi.getTimerCount()).toBe(0);
+  });
+});
+
+it('unmount cancels a queued replacement-session refresh', async () => {
+  await withPendingScheduledRefresh('cloud', async (resolveOld, view) => {
+    const newer = makeSession({ access_token: 'synthetic-new-access', refresh_token: 'synthetic-new-refresh', expires_at: Math.floor(Date.now() / 1000) + 65 });
+    authClient.signInWithPassword.mockResolvedValue({ ok: true, session: newer, error: null });
+    await act(async () => { await captured.signIn('synthetic@example.invalid', 'synthetic-test-password'); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(10_000); });
+    view.unmount();
+    authClient.refresh.mockResolvedValue({ ok: true, session: newer, error: null });
+    await act(async () => { resolveOld({ ok: false, session: null, error: { status: 401 } }); });
+    expect(authClient.refresh).toHaveBeenCalledTimes(1);
+    expect(getCloudAccessToken()).toBe('synthetic-new-access');
+    expect(vi.getTimerCount()).toBe(0);
+  });
+});
+
+it('a third committed session supersedes a waiting second-session refresh', async () => {
+  await withPendingScheduledRefresh('cloud', async (resolveOld) => {
+    const second = makeSession({ access_token: 'synthetic-second', refresh_token: 'synthetic-second-refresh', user: { id: 'second' } });
+    authClient.signInWithPassword.mockResolvedValueOnce({ ok: true, session: second, error: null });
+    await act(async () => { await captured.signIn('synthetic@example.invalid', 'synthetic-test-password'); });
+    let waitingSecond;
+    await act(async () => { waitingSecond = captured.refreshSessionNow(); });
+    const third = makeSession({ access_token: 'synthetic-third', refresh_token: 'synthetic-third-refresh', user: { id: 'third' } });
+    authClient.signInWithPassword.mockResolvedValueOnce({ ok: true, session: third, error: null });
+    await act(async () => { await captured.signIn('synthetic@example.invalid', 'synthetic-test-password'); });
+    authClient.refresh.mockResolvedValue({ ok: true, session: third, error: null });
+    await act(async () => { resolveOld({ ok: false, session: null, error: { status: 401 } }); await waitingSecond; });
+    expect(authClient.refresh).toHaveBeenCalledTimes(1);
+    expect(captured.user.id).toBe('third');
+    expect(getCloudAccessToken()).toBe('synthetic-third');
+    expect(vi.getTimerCount()).toBeGreaterThan(0);
+  });
+});
+
+it.each(['cloud', 'desktop'])('a same-token replacement-session timer still owns a new refresh demand (%s)', async (surface) => {
+  await withPendingScheduledRefresh(surface, async (resolveOld) => {
+    authClient.signOut.mockResolvedValue({ ok: true, error: null });
+    await act(async () => { await captured.signOut(); });
+    authClient.signInWithPassword.mockResolvedValue({
+      ok: true, session: makeSession({ expires_at: Math.floor(Date.now() / 1000) + 65 }), error: null,
+    });
+    await act(async () => { await captured.signIn('synthetic@example.invalid', 'synthetic-test-password'); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(10_000); });
+    expect(authClient.refresh).toHaveBeenCalledTimes(1);
+    authClient.refresh.mockResolvedValueOnce({
+      ok: true, session: makeSession({ access_token: 'synthetic-current-access', refresh_token: 'synthetic-current-refresh' }), error: null,
+    });
+    await act(async () => { resolveOld({ ok: false, session: null, error: { status: 401 } }); });
+    expect(authClient.refresh).toHaveBeenCalledTimes(2);
+    expect(authClient.refresh).toHaveBeenLastCalledWith('refresh-jwt');
+    expect(captured.status).toBe('signedIn');
+    expect(getCloudAccessToken()).toBe('synthetic-current-access');
+    expect(vi.getTimerCount()).toBeGreaterThan(0);
+  });
+});
