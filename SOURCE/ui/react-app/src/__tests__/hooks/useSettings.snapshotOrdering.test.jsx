@@ -210,3 +210,52 @@ describe('useSettings current snapshot acceptance', () => {
   });
 
 });
+
+
+describe('useSettings explicit acknowledgement receipts', () => {
+  it('returns exact normalized and redacted values for the acknowledged request', async () => {
+    const { result } = await load();
+    const acknowledged = { ...savedSettings, tts_volume: 1, llm_api_key: '••••••' };
+    harness.api.mockResolvedValueOnce(payload(acknowledged));
+    let receipt;
+    await act(async () => { receipt = await result.current.saveSettingsWithSnapshot({ tts_volume: 2, llm_api_key: 'synthetic input' }); });
+    expect(receipt).toEqual({ ok: true, settings: acknowledged });
+    expect(result.current.settings).toEqual(acknowledged);
+  });
+
+  it('keeps the request receipt separate from a later pushed snapshot', async () => {
+    const { result } = await load();
+    const response = deferred();
+    harness.api.mockReturnValueOnce(response.promise);
+    let pendingSave;
+    act(() => { pendingSave = result.current.saveSettingsWithSnapshot(savedSettings); });
+    let receipt;
+    const later = { ...savedSettings, theme: 'system' };
+    await act(async () => {
+      response.resolve(payload(savedSettings));
+      receipt = await pendingSave;
+      harness.receive({ type: 'settings_changed', payload: { settings: later } });
+    });
+    expect(receipt).toEqual({ ok: true, settings: savedSettings });
+    expect(result.current.settings).toEqual(later);
+  });
+
+  it('returns an explicit refusal without fabricating a settings snapshot', async () => {
+    const { result } = await load();
+    harness.api.mockRejectedValueOnce(new Error('synthetic write refusal'));
+    let receipt;
+    await act(async () => { receipt = await result.current.saveSettingsWithSnapshot({ theme: 'light' }); });
+    expect(receipt).toEqual({ ok: false });
+    expect(result.current.error).toBe('Failed to save settings');
+    expect(result.current.saving).toBe(false);
+  });
+
+  it('keeps both legacy update methods strictly boolean', async () => {
+    const { result } = await load();
+    harness.api.mockResolvedValueOnce(payload(savedSettings)).mockRejectedValueOnce(new Error('refused'));
+    await act(async () => {
+      expect(await result.current.updateSettings(savedSettings)).toBe(true);
+      expect(await result.current.updateSetting('theme', 'light')).toBe(false);
+    });
+  });
+});

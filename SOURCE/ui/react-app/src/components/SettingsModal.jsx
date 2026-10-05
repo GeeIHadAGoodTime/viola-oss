@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo } from 'react';
 import PropTypes from 'prop-types';
 import { useSettings } from '../hooks/useSettings';
+import { useSettingsDraft } from '../hooks/useSettingsDraft';
 import { useOptionalAuth } from '../hooks/useAuth';
 import { useHandsFreeWake } from '../hooks/useHandsFreeWake';
 import { isCloudSurface } from './auth/cloudSurface';
@@ -343,8 +344,6 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
       setActiveTab(normalizeTabId(initialTab));
     }
   }, [isOpen, initialTab]);
-  const [localSettings, setLocalSettings] = useState({});
-  const [hasChanges, setHasChanges] = useState(false);
   // Platform-appropriate label for the login-item / autostart toggle. macOS
   // must not read "Start on Windows Boot" (issue #770); computed from the host
   // OS, stable for the session.
@@ -403,7 +402,7 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
     error,
     devices,
     playlists,
-    updateSettings,
+    saveSettingsWithSnapshot,
     syncPlaylists,
     renamePlaylist,
     setDefaultPlaylist,
@@ -412,6 +411,10 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
     refreshDevices,
     refreshPlaylists,
   } = useSettings({ initialFetchDelayMs: MODAL_OPEN_DEFER_MS });
+  const {
+    draft: localSettings, hasChanges, setDraft: setLocalSettings,
+    beginSave: beginDraftSave, finishSave: finishDraftSave, resetDraft,
+  } = useSettingsDraft(settings, isOpen);
   const currentAiSource = localSettings.ai_source || 'managed';
   const localAiModelOptions = useMemo(() => localAiServers.flatMap((server) => (
     server.models.map((model) => ({
@@ -695,16 +698,6 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
   const [localTrackCount, setLocalTrackCount] = useState(null);
   const [isLoadingTrackCount, setIsLoadingTrackCount] = useState(false);
 
-  // Sync local settings when modal opens or settings change
-  useEffect(() => {
-    if (isOpen && settings && Object.keys(settings).length > 0) {
-      setLocalSettings({
-        ...settings,
-      });
-      setHasChanges(false);
-    }
-  }, [settings, isOpen]);
-
   useEffect(() => {
     if (!isOpen) return undefined;
     // C-401 follow-up: the connector CATALOG is the fourth call site into the
@@ -782,26 +775,14 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
     };
   }, [isOpen, isScanning, settings?.active_music_provider_id, settings?.local_music_folder]);
 
-  const hasLocalSettingsChanges = useCallback((nextSettings) => (
-    JSON.stringify(nextSettings || {}) !== JSON.stringify(settings || {})
-  ), [settings]);
-
-  // Update a local setting
+  // The draft owns edits; incoming snapshots only replace clean fields.
   const updateLocal = useCallback((key, value) => {
-    setLocalSettings(prev => {
-      const next = { ...prev, [key]: value };
-      setHasChanges(hasLocalSettingsChanges(next));
-      return next;
-    });
-  }, [hasLocalSettingsChanges]);
+    setLocalSettings(prev => ({ ...prev, [key]: value }));
+  }, [setLocalSettings]);
 
   const updateLocalSettings = useCallback((nextSettings) => {
-    setLocalSettings(prev => {
-      const next = typeof nextSettings === 'function' ? nextSettings(prev) : { ...prev, ...nextSettings };
-      setHasChanges(hasLocalSettingsChanges(next));
-      return next;
-    });
-  }, [hasLocalSettingsChanges]);
+    setLocalSettings(prev => typeof nextSettings === 'function' ? nextSettings(prev) : { ...prev, ...nextSettings });
+  }, [setLocalSettings]);
 
   const refreshLlmProfiles = useCallback(async ({ silent = false } = {}) => {
     // C-401: `/v1/connectors/profiles*` belongs to the LOCAL_ONLY `connectors`
@@ -878,13 +859,12 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
       ...patch,
       llm_api_key: '',
     };
-    const success = await updateSettings(nextSettings);
-    if (success) {
-      setLocalSettings(nextSettings);
-      setHasChanges(false);
-    }
-    return success;
-  }, [localSettings, updateSettings]);
+    const ticket = beginDraftSave(nextSettings);
+    if (!ticket) return false;
+    const receipt = await saveSettingsWithSnapshot(ticket.submitted);
+    const result = finishDraftSave(ticket, receipt);
+    return result.applied && result.accepted;
+  }, [localSettings, beginDraftSave, saveSettingsWithSnapshot, finishDraftSave]);
 
   const handleSaveLlmProfile = useCallback(async () => {
     // C-401: this is the secret-bearing write -- `body.api_key` below carries a
@@ -1216,18 +1196,21 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
     const session = saveSessionRef.current;
     if (!session) return;
     const generation = ++session.saveGeneration;
-    const weatherChanged = (localSettings.weather_location || '') !== (settings.weather_location || '');
-    const success = await updateSettings(localSettings);
+    const ticket = beginDraftSave();
+    if (!ticket) return;
+    const weatherChanged = (ticket.submitted.weather_location || '') !== (settings.weather_location || '');
+    const receipt = await saveSettingsWithSnapshot(ticket.submitted);
+    const current = saveSessionRef.current === session && session.saveGeneration === generation;
+    const result = finishDraftSave(ticket, receipt, current);
     // Dismissal, reopening or a newer submission retires this UI completion.
     // The settings write may still finish; closing does not cancel persistence.
     if (saveSessionRef.current !== session || session.saveGeneration !== generation) return;
-    if (success) {
-      setHasChanges(false);
+    if (result.applied && result.accepted) {
       // Refresh weather if location changed
       if (weatherChanged) {
         apiFetch('/v1/weather?force_refresh=true').catch(() => {});
       }
-      onClose();
+      if (!result.laterEdits) onClose();
     }
   };
 
@@ -1238,11 +1221,10 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
     // Resetting the draft alone leaves those effects behind after dismissal.
     applyTheme(settings.theme || 'dark');
     setAccent(settings.accent_color || THEME.colors.accent);
-    setLocalSettings(settings);
-    setHasChanges(false);
+    resetDraft();
     clearError();
     onClose();
-  }, [settings, clearError, onClose]);
+  }, [settings, resetDraft, clearError, onClose]);
 
   // Escape key closes the modal (a11y / keyboard parity with other modals)
   useEffect(() => {
@@ -1306,14 +1288,16 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
     setIsScanning(true);
     setScanResult(null);
     // Save settings with local provider active
-    const success = await updateSettings({
+    const ticket = beginDraftSave({
       ...localSettings,
       active_music_provider_id: 'local',
       local_music_folder: folder.trim(),
     });
-    if (success) {
-      setHasChanges(false);
-      setIsEditingSource(false);
+    if (!ticket) { setIsScanning(false); return; }
+    const receipt = await saveSettingsWithSnapshot(ticket.submitted);
+    const result = finishDraftSave(ticket, receipt);
+    if (result.applied && result.accepted) {
+      if (!result.laterEdits) setIsEditingSource(false);
       // Trigger rescan — endpoint now waits for completion
       try {
         const result = await apiFetch('/v1/local/library/rescan', { method: 'POST' });
@@ -1331,7 +1315,7 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
     } else {
       setIsScanning(false);
     }
-  }, [localSettings, updateSettings]);
+  }, [localSettings, beginDraftSave, saveSettingsWithSnapshot, finishDraftSave]);
 
   // Music provider auth and staged source changes
   const [isSwitchingSource, setIsSwitchingSource] = useState(false);
@@ -1344,15 +1328,11 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
   const [spotifyDisconnecting, setSpotifyDisconnecting] = useState(false);
 
   const stageMusicProvider = useCallback((providerId) => {
-    setLocalSettings(prev => {
-      const next = { ...prev, active_music_provider_id: providerId };
-      setHasChanges(hasLocalSettingsChanges(next));
-      return next;
-    });
+    setLocalSettings(prev => ({ ...prev, active_music_provider_id: providerId }));
     setScanResult(null);
     setLocalTrackCount(null);
     setSwitchError(null);
-  }, [hasLocalSettingsChanges]);
+  }, [setLocalSettings]);
 
   const refreshSpotifyStatus = useCallback(async ({ silent = false } = {}) => {
     // #4226: the Spotify connect flow drives a real Chrome on the user's own

@@ -10,7 +10,16 @@ const harness = vi.hoisted(() => ({
   syncPlaylists: vi.fn(), renamePlaylist: vi.fn(), setDefaultPlaylist: vi.fn(),
   deletePlaylist: vi.fn(), clearError: vi.fn(), refreshDevices: vi.fn(), refreshPlaylists: vi.fn(),
 }));
-vi.mock('../hooks/useSettings', () => ({ useSettings: () => harness }));
+// Preserve the boolean fixture while exposing the hook's exact save receipt.
+const saveSettingsWithSnapshot = async values => {
+  const ok = await harness.updateSettings(values);
+  if (!ok) return { ok: false };
+  const settings = { ...values };
+  harness.settings = settings;
+  return { ok: true, settings };
+};
+
+vi.mock('../hooks/useSettings', () => ({ useSettings: () => ({ ...harness, saveSettingsWithSnapshot }) }));
 vi.mock('../hooks/useViolaApi', () => ({
   apiFetch: vi.fn(() => Promise.resolve({})),
   authFetch: vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({}) })),
