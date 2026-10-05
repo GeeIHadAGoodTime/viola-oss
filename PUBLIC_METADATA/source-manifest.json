@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "5e7186a7f5ba10ea4a3fd8161dbe7852fb755516",
-  "sha256": "cdc4559bfa17c6f4582af4b8a509efcb251e00d0577ca0421d9db7f0ede8a560",
+  "revision": "a8080977116e9b463ab357d06bdbf661d1f17771",
+  "sha256": "e8f64a351d5945046f878d9eca4ed5d0b130dd8d5b647d2e50eec9f392730367",
   "files": [
     {
       "path": ".env.example",
@@ -9935,13 +9935,13 @@
     },
     {
       "path": "ui/react-app/src/components/RoomGroupsModal.jsx",
-      "sha256": "ab584e5524bb74fa54d093f5f49e6f2b6e6a5f37431c81b43162fd7999442167",
-      "bytes": 26537
+      "sha256": "6520d146135b5e2d9cc55f5baab62dbc07b441b31d5bf2a91ebfdcde399ab2ef",
+      "bytes": 26974
     },
     {
       "path": "ui/react-app/src/components/RoomGroupsModal.test.jsx",
-      "sha256": "172b22f89b76267fc0b2efc1c946ce651fe25819f676e6779ebe80f103b8a168",
-      "bytes": 9838
+      "sha256": "65706986863779730db2a7c463d201a69a9bd64e707f08cc28959ef3324f9d26",
+      "bytes": 19026
     },
     {
       "path": "ui/react-app/src/components/SavedChatHistory.jsx",
@@ -10779,6 +10779,16 @@
       "bytes": 299
     },
     {
+      "path": "ui/react-app/src/hooks/useAcknowledgedSliderValue.js",
+      "sha256": "6e3dcf55a8d585ad97b81ce1589fedd54b17e7e38ce79b98a3d1a4bde85084da",
+      "bytes": 4876
+    },
+    {
+      "path": "ui/react-app/src/hooks/useAcknowledgedSliderValue.test.jsx",
+      "sha256": "3ec8e17047ba50dce3bc5428552b9275bdfb8ce78386cbafbb2e8f068bdf85c3",
+      "bytes": 8711
+    },
+    {
       "path": "ui/react-app/src/hooks/useAgentBrowserStream.js",
       "sha256": "ae3b88e2797664174027ba3861678a8cb63e5989f51bd2f2759dcacd0d0ab93b",
       "bytes": 15515
@@ -10960,8 +10970,8 @@
     },
     {
       "path": "ui/react-app/src/hooks/useRoomGroups.js",
-      "sha256": "d37976baf26dfea9fd3cc248417a54988d709694cf10723e45f2b93201439cdd",
-      "bytes": 7767
+      "sha256": "7bceeeb1c1559e32c6d91bd2725d97eec63f6836a091f504fa509909caee13e7",
+      "bytes": 9081
     },
     {
       "path": "ui/react-app/src/hooks/useSettings.js",
@@ -11005,8 +11015,8 @@
     },
     {
       "path": "ui/react-app/src/hooks/useViolaApi.test.js",
-      "sha256": "955fb24c8e45a7a2348cd3d62fd4d361f549c518912f1f78009c12cf76cc07af",
-      "bytes": 17526
+      "sha256": "715d5b79763fcf32960250929d79315b3b62e324ddb718c7480ffb2f4dbfb558",
+      "bytes": 22124
     },
     {
       "path": "ui/react-app/src/hooks/useVoice.cancelRecording.test.js",
