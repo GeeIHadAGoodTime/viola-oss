@@ -396,14 +396,16 @@ class VoicePipeline:
             logger.debug("Restart request ignored: VoicePipeline stop event set")
             return False
 
-        try:
-            if self.wake_detector is not None:
-                self.wake_detector.stop()
-        except (OSError, RuntimeError) as exc:  # pragma: no cover - defensive cleanup
-            logger.debug("Wake detector stop during restart failed: %s", exc)
+        from voice.wake_detector.facade import WakeDetectorFacade
+
+        previous = self.wake_detector
+        generation = WakeDetectorFacade.begin_restart(previous)
+        if generation is None:
+            logger.debug("Wake restart ignored: newer instance or disabled listening intent")
+            return False
 
         try:
-            self.wake_detector = WakeDetector(
+            replacement = WakeDetector(
                 self.config,
                 self._build_wake_callback(),
                 heartbeat_callback=(self._emit_wake_heartbeat if self._supervisor else None),
@@ -417,14 +419,15 @@ class VoicePipeline:
             )
             return False
 
-        assert self.wake_detector is not None, "Wake detector should be initialized"
-
-        # Update facade with new instance for health checks
-        from voice.wake_detector.facade import WakeDetectorFacade
-
-        WakeDetectorFacade.set_instance(self.wake_detector)
-
-        started = self.wake_detector.start(self._stop_event)
+        adopted, started = WakeDetectorFacade.replace_and_start(previous, replacement, generation, self._stop_event)
+        if not adopted:
+            try:
+                replacement.stop()
+            except (OSError, RuntimeError) as exc:
+                logger.warning("Discarded wake restart cleanup failed: %s", exc)
+            logger.info("Prepared wake restart discarded after newer listening intent")
+            return False
+        self.wake_detector = replacement
         if started:
             # Deliberately does NOT emit a wake heartbeat. Starting a thread is
             # not evidence that detection works -- the new loop proves itself by
@@ -597,7 +600,9 @@ class VoicePipeline:
                 return False
 
             # Start wake word detection
-            if self.wake_detector.start(self._stop_event):
+            from voice.wake_detector.facade import WakeDetectorFacade
+
+            if WakeDetectorFacade.start_current(self.wake_detector, self._stop_event):
                 self._try_start_continuous_capture()
                 logger.info("✅ Voice pipeline started (wake word enabled)")
                 return True

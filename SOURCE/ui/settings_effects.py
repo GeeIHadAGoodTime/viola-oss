@@ -126,15 +126,17 @@ def _apply_voice_mode(key: str, value: object, *, settings_mgr: Any, **_: object
     except Exception as exc:  # noqa: BLE001, RUF100 - an apply must report its outcome, never raise into the caller
         return EffectResult(key, EffectOutcome.DEFERRED, "wake detector unavailable here: %s" % exc)
 
-    if WakeDetectorFacade.get_instance() is None:
-        return EffectResult(key, EffectOutcome.DEFERRED, "no wake detector running in this process")
-
     try:
         mic_muted = bool(settings_mgr.get("mic_muted", False))
         WakeDetectorFacade.sync_to_state(str(value), mic_muted)
     except Exception as exc:  # noqa: BLE001, RUF100 - an apply must report its outcome, never raise into the caller
         logger.exception("Failed to sync wake detector to voice_mode=%s", value)
         return EffectResult(key, EffectOutcome.FAILED, "could not re-arm the wake detector: %s" % exc)
+
+    if WakeDetectorFacade.get_instance() is None:
+        # Keep the existing deferred result while retaining intent for a
+        # detector whose startup/construction has not reached registration yet.
+        return EffectResult(key, EffectOutcome.DEFERRED, "no wake detector running in this process")
 
     return EffectResult(key, EffectOutcome.APPLIED, "wake detector synced to voice_mode=%s" % value)
 
