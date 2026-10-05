@@ -140,25 +140,31 @@ export function useSettings(options = {}) {
   }, [publishSnapshot, publishError]);
 
   // Update settings
-  const updateSettings = useCallback(async (newSettings) => {
+  const saveSettingsWithSnapshot = useCallback(async (newSettings) => {
     try {
       setSaving(true);
       publishError(null);
       const data = await pushSettingsPayload(newSettings);
       if (data.ok !== false) {
         publishSnapshot(data);
-        return true;
+        return { ok: true, settings: data.settings || {} };
       } else {
         publishError(data.error);
-        return false;
+        return { ok: false };
       }
     } catch (err) {
       publishError(SETTINGS_ERROR_BY_CODE[err?.code] || 'Failed to save settings');
-      return false;
+      return { ok: false };
     } finally {
       setSaving(false);
     }
   }, [publishSnapshot, publishError]);
+
+  // Keep every existing caller's boolean contract, while draft editors can
+  // use the exact response belonging to their own acknowledged submission.
+  const updateSettings = useCallback(async (newSettings) => (
+    (await saveSettingsWithSnapshot(newSettings)).ok
+  ), [saveSettingsWithSnapshot]);
 
   // Update a single setting
   const updateSetting = useCallback(async (key, value) => {
@@ -330,6 +336,7 @@ export function useSettings(options = {}) {
     devices,
     playlists,
     updateSettings,
+    saveSettingsWithSnapshot,
     updateSetting,
     resetSettings,
     refreshSettings: fetchSettings,

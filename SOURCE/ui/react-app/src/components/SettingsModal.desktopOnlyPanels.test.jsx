@@ -48,8 +48,17 @@ const settingsHarness = vi.hoisted(() => ({
 
 const apiFetchMock = vi.hoisted(() => vi.fn(() => Promise.resolve({})));
 
+// Preserve the boolean fixture while exposing the hook's exact save receipt.
+const saveSettingsWithSnapshot = async values => {
+  const ok = await settingsHarness.updateSettings(values);
+  if (!ok) return { ok: false };
+  const settings = { ...values };
+  settingsHarness.settings = settings;
+  return { ok: true, settings };
+};
+
 vi.mock('../hooks/useSettings', () => ({
-  useSettings: () => settingsHarness,
+  useSettings: () => ({ ...settingsHarness, saveSettingsWithSnapshot }),
 }));
 
 vi.mock('../hooks/useViolaApi', () => ({

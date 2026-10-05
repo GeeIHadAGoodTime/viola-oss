@@ -1,15 +1,22 @@
 {
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "916f0d2978606badfb5cb3112d0045a77a44d1b074ab1e7219819b3aec5303c2",
-  "source_tree_sha256": "efd821c2f5b38db6ee1c3b5c0d8b66d5a255b9cea7da0a8b0642a561a95884cc",
-  "source_file_count": 2507,
-  "source_revision": "0ac6340b4d29472916301f49af5043086acb26d9",
+  "source_manifest_sha256": "05bbe42b099f6c7e429c345348f0997fafffac80142cc8a6af1b14367ed840d0",
+  "source_tree_sha256": "550738605b70ecf3b98fb021186994fa4588439c463af09bc3ed9a9e4abb3410",
+  "source_file_count": 2509,
+  "source_revision": "0d26adae672a878007a6a977797c53b97024efcc",
   "comparison_public_revision": "2a7282293efdfe85ed684da04e295d324793b24a",
   "changed_source_paths": [
-    "SOURCE/voice/wake_detector/facade.py",
-    "SOURCE/voice/wake_detector/violawake_listener.py",
-    "SOURCE/tests/public/test_wake_listener_lifecycle.py"
+    "SOURCE/ui/react-app/src/__tests__/hooks/useSettings.snapshotOrdering.test.jsx",
+    "SOURCE/ui/react-app/src/components/SettingsModal.cloudSyncConsent.test.jsx",
+    "SOURCE/ui/react-app/src/components/SettingsModal.desktopAi.test.jsx",
+    "SOURCE/ui/react-app/src/components/SettingsModal.desktopOnlyPanels.test.jsx",
+    "SOURCE/ui/react-app/src/components/SettingsModal.jsx",
+    "SOURCE/ui/react-app/src/components/SettingsModal.outputDevice.test.jsx",
+    "SOURCE/ui/react-app/src/components/SettingsModal.sidebar.test.jsx",
+    "SOURCE/ui/react-app/src/hooks/useSettings.js",
+    "SOURCE/ui/react-app/src/hooks/useSettingsDraft.js",
+    "SOURCE/ui/react-app/src/hooks/useSettingsDraft.test.jsx"
   ],
   "retained_sboms": [
     {
@@ -51,7 +58,7 @@
   ],
   "input_equivalence": {
     "changed_dependency_inputs": [],
-    "basis": "Exactly two existing runtime leaves and one existing public test change. All 2504 other SOURCE files, including landed Windows toast recovery, startup visibility and wake admission, remain byte-identical to public 2a7282293efdfe85ed684da04e295d324793b24a. Dependencies, platform profiles, assets, licensing and all six retained SBOMs are unchanged; no new resolution or advisory scan is claimed."
+    "basis": "Eight existing SOURCE files change and two are added. All other 2499 SOURCE files remain byte-identical to authoritative public 2a7282293efdfe85ed684da04e295d324793b24a, preserving Windows COM toast failure recovery, wake activation admission v2, startup visibility v2, and all prior playback, mute and Settings dismissal corrections. Dependencies, build profiles, vendor/model assets, licences, notices and all six retained SBOMs are unchanged. No new resolution or advisory scan is claimed."
   },
   "prior_binding": {
     "public_revision": "2a7282293efdfe85ed684da04e295d324793b24a",
@@ -64,13 +71,16 @@
   "new_advisory_scan_performed": false,
   "new_runtime_qualification_performed": false,
   "qualification": {
-    "scope": "Source-level admitted wake worker cancellation, native-open/read boundaries and latest enabled intent after drain, with native audio/model/platform boundaries inert. No physical capture, installed app, Surface or release qualification.",
-    "source_integrity": "All 2534 authenticated public-base blobs reconciled. Three reviewed SOURCE replacements preserve 2531 base leaves; two canonical metadata replacements preserve 2529 unrelated leaves. Manifest binds 2507 source files and retains all six SBOMs.",
-    "behavior": "Cancel each detector attempt without mutating caller shutdown. Keep draining ownership until cleanup, reject cancelled initial/recovery open and late frames, and resume only the latest explicitly enabled request after old cleanup. Facade and detector generations retire stale callbacks on newer mute/Disabled, owner changes including ABA, direct stop/start, supervisor restart and shutdown. No unconditional restart loop or new polling worker.",
-    "checks": "72 canonical focused controls pass: 56 public lifecycle/admission/stop/resume plus nine unchanged private sync and seven unchanged private health controls. Four final source/guard-negative mutants each fail with zero errors. Independent reviewer replays all 72 plus four released-callback probes. Actual-method baseline/stop-only/successor comparison proves old unsafe overlap, interim lost enable and corrected maximum-one-run sequence. Exact publication-source union with startup and Windows toast controls passes 91/91. Black line length 120 passes; Ruff retains 29 inherited diagnostics and adds zero.",
-    "review": "Independent Windows release owner approved combined patch f35c2d3597974be0fd2f3975e89c7be8b79d0d8974431262b7de0edf1fa75361; this supersedes the held stop-only freeze.",
-    "limitations": "Thread join is bounded; native cleanup/open calls are not newly bounded. Source tests do not prove driver timing, physical capture cessation, command-recording cancellation, installed microphone privacy or platform acceptance.",
-    "exact_head_hosted_checks": "pending",
+    "scope": "Offline source qualification of Settings draft ownership and exact save acknowledgements. No installed desktop, physical microphone, account-principal, live provider or customer release qualification.",
+    "source_integrity": "All 2534 authoritative base Git leaves were reconciled by exact blob identity before overlay. Eight existing source leaves change and two are added; the source-only commit preserves 2526 other original leaves. Two canonical metadata replacements preserve 2524 original leaves. Manifest inventories 2509 SOURCE files, and all six prior SBOMs are retained exactly.",
+    "behavior": "Server refreshes update clean top-level fields while unsaved and post-submit edits remain local. Each save returns its own exact response snapshot; acknowledged normalized/redacted values and field removals are adopted only for fields not subsequently edited. Edit generations preserve ABA edits. Cancel restores the latest backend snapshot and invalidates tickets. The prior dismissed/reopened save completion guard remains intact; footer completion does not close a newer unsaved draft. Existing boolean updateSettings/updateSetting callers remain compatible.",
+    "checks": "97 focused cases pass. Exact frontend coverage is 151 files and 1331 case occurrences across 20 successful disjoint execution partitions, preserving all 1304 prior occurrences and adding 27. Four targeted mutation variants fail with 7, 4, 1 and 1 assertions. Scoped ESLint reports zero errors and 13 inherited warnings. Normal upload-disabled production Vite build passes using a 512 MB Node heap. On the refreshed OSS37 base, all ten reviewed source hashes and the entire frontend source remain unchanged; all 11 newly inherited toast source controls were replayed successfully. The complete prior frontend receipt remains source-equivalent, not a claimed repeat of that full execution.",
+    "review": "Independent reviewer verified all ten source hashes, replayed all 97 focused cases, and passed five additional combined-hook, field-deletion, duplicate-receipt, Cancel and unmount probes. All 20 terminal process/log/XML partitions were independently reconciled against exact case multiplicities; no blocking finding.",
+    "fixture_scope": "Four existing modal test harnesses expose the detailed receipt through their prior boolean-save mock and publish accepted snapshots. One older-success/newer-refusal case now submits an actual newer Disabled edit rather than an identical already-saved payload; its ownership and close assertions remain. No assertions were weakened to permit draft loss.",
+    "execution_limits": "An unsplit remaining-suite process and the initial production build exited 137/Killed; their causes remain unassigned and receipts are retained as failed execution. An initial final partition lacked unchanged embed.js in the sparse test tree; its exact accepted source bytes were restored before the successful rerun. Partial XML and collection-only receipts are excluded from passing evidence.",
+    "integration_limit": "Private adoption must consume the reviewed public pin and map ui/react-app/src/hooks/useSettingsDraft.js plus ui/react-app/src/hooks/useSettingsDraft.test.jsx through the canonical source inventory. Do not copy public runtime changes into private shadows. Concurrent backend mutation ordering, cancellation, cross-store transactions, account transitions and actual persisted restart remain unqualified.",
+    "lineage": "Prior qualification is retained below as historical evidence; it does not independently qualify this successor.",
+    "exact_head_hosted_checks": "pending for this exact bound successor",
     "installed_candidate": "not_established",
     "release_or_deployment": "not_established",
     "prior_source_qualification": {
@@ -261,10 +271,54 @@
     }
   },
   "reviewed_source_patch": {
-    "sha256": "f35c2d3597974be0fd2f3975e89c7be8b79d0d8974431262b7de0edf1fa75361",
-    "manifest_sha256": "81a8e3a74436c6e02e82e2968a29491ec8ae372756cf9773f3d674b1ec04404a",
-    "reviewed_base": "27cc96065e4cac22b73ae079e2d3d5bd0dcaf11c",
-    "publication_base": "2a7282293efdfe85ed684da04e295d324793b24a",
-    "rebasing": "Three source bytes unchanged; preserve disjoint landed toast correction and regenerate canonical source binding."
+    "settings_draft_ownership_sha256": "2bac6ea900dbea914785b16ea40854475549707641cf891094794b6776dfae77",
+    "prior_source_patch": {
+      "windows_toast_com_failure_sha256": "03bca923720781e9f0bdb3b3cf6fac5f9b285992340681b29787415b2409373e",
+      "prior_source_patch": {
+        "wake_admission_v2_sha256": "cd012e2d296139da8d775eac6623a496f56a6e4e42b49a50433f58a69adfa3c4",
+        "prior_source_patch": {
+          "startup_visibility_intent_v2_sha256": "c9e0f9888f83dcebcb3d7e031130553c3ff3129d49e5b99b0044f845d36fc0d8",
+          "prior_source_patch": {
+            "settings_dismissed_save_sha256": "bd290f109f9a45a167eb748ef30d7829231e44631e7ab78a9de49f0a7fb407a0",
+            "prior_source_patch": {
+              "mic_mute_acknowledgement_sha256": "642e251f93a569991d0f5015e99cdcf00703cd0cd633bdbe3421e43769b9d9d2",
+              "prior_source_patch": {
+                "settings_snapshot_ordering_sha256": "3c3d7dc1872be85ac1c1cac9ced78c403d1ae6852ca70792f28cc19b61d4ed29",
+                "prior_source_patch": {
+                  "pause_acknowledgement_v2_sha256": "9d9833adbf6649e2c1881b3fd23e37e3259b5361cefb82528509c820d1a17dcb",
+                  "prior_source_patch": {
+                    "zero_volume_sha256": "5c6b60d91e8b06e99ae713e4c042edd606f64002c6b3900ba1c5c7348b9ab8e3",
+                    "prior_source_patch": {
+                      "ordered_playback_preferences_sha256": "cd844b8c923dcf3765de781533718d4fc16d9f91574599dc8ab0729823e0e262",
+                      "prior_source_patch": {
+                        "core_sha256": "b7f70c3100ac8337499d90a34800c2733987d5134e5e3e705c56495937ba0c09",
+                        "test_sha256": "f66a15b8d2f536339739e527e22e20a3ae7d7ee3a3e9d7c9cd4fab4745d0a5a7",
+                        "prior_source_patch": {
+                          "test_harness_sha256": "49fb9d3634ab630fc4549ab4e42da997ee03cb0a0b1e0cc1ad97a7301db33242",
+                          "prior_source_patch": {
+                            "combined_sha256": "3ef2e0f5c645dd3b307710dcf2e7ca390432821a8066e800ed827e4638c219ef",
+                            "prior_selected_output": {
+                              "combined_sha256": "4fcf83691fda7ba6b8c1dd86a3d4426ce552c167880bfae701160ee7c7e082b8",
+                              "selected_output_sha256": "81958e85dd4f0642e56adbb05d34688ba8dab42a8d337570b06c55dae8d6753f",
+                              "windows_test_guard_sha256": "43e86eb1e40c7e544422f314ded17bd9fae4cb9e1ae0fb846f43701f0888e2ba",
+                              "prior_speech_settings": {
+                                "version": 2,
+                                "combined_sha256": "a9bebc0d7eb9c222db435b86b6cfd4903c7be887499bdbb3853b7476c65eafe8",
+                                "settings_delta_sha256": "4962ef08d2189e6e6a8ea1242e10c6e4f4bd6e09f077e42c56d43e04bf6ff865",
+                                "original_volume_sha256": "4e4f0252436f746bcd95d133e33bbc20eb30af2e83d27d5dc56ed62e82be43d0"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
   }
 }
