@@ -282,3 +282,247 @@ class NativeDownloadContract(unittest.TestCase):
                 self.assertLess(calls.index(call.setDownloadDirectory(str(directory))), calls.index(call.accept()))
                 self.assertLess(calls.index(call.setDownloadFileName('renamed.md')), calls.index(call.accept()))
                 request.cancel.assert_not_called()
+
+
+class StartupSurfaceVisibilityTests(unittest.TestCase):
+    """Exercise real startup wiring with inert window/signal seams, never Qt UI.
+
+    QWidget starts hidden. The seam tracks explicit show/hide calls, while the
+    selected entrypoint statements and loading/error/retry handlers are real.
+    This proves call ordering, not Windows first-paint or hardware readiness.
+    """
+
+    def _startup(self, failure=None):
+        import html
+        from types import MethodType
+        from unittest.mock import Mock
+
+        events = []
+
+        class SignalSeam:
+            def __init__(self):
+                self.callbacks = []
+
+            def connect(self, callback):
+                self.callbacks.append(callback)
+
+            def emit(self, *args):
+                for callback in list(self.callbacks):
+                    callback(*args)
+
+        class WindowSeam:
+            def __init__(self):
+                self.visible = False
+                self.html = "local loading"
+                self._react_ui_loaded = False
+                self._react_ui_load_url = None
+                self._bootstrap = None
+                self._coordinator = None
+                self.webview = SimpleNamespace(setHtml=self._set_html)
+                self._force_quit = False
+                self._tray_icon = SimpleNamespace(isVisible=lambda: True)
+
+            def _set_html(self, value):
+                self.html = value
+                events.append("html")
+
+            def show(self):
+                self.visible = True
+                events.append("show")
+
+            def hide(self):
+                self.visible = False
+                events.append("hide")
+
+            def showNormal(self):
+                self.show()
+
+            def activateWindow(self):
+                pass
+
+            def raise_(self):
+                pass
+
+            def _load_react_ui(self):
+                self._react_ui_loaded = True
+                events.append("navigate-ready-ui")
+
+        window = WindowSeam()
+        source = ENTRY.parent / "ui/qt_native/webview_window.py"
+        tree = ast.parse(source.read_text(encoding="utf-8"))
+        cls = next(n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == "ViolaWebViewWindow")
+        methods = [
+            n
+            for n in cls.body
+            if isinstance(n, ast.FunctionDef)
+            and n.name
+            in {
+                "attach_startup_coordinator",
+                "_on_backend_failed",
+                "_on_backend_ready",
+                "_retry_startup",
+                "closeEvent",
+                "_restore_from_tray",
+            }
+        ]
+        namespace = {
+            "html": html,
+            "logger": Mock(),
+            "_STARTUP_RETRY_URL": "viola://startup-retry",
+            "_LOADING_HTML": "local loading",
+        }
+        original_import = builtins.__import__
+
+        def import_settings(name, *args, **kwargs):
+            if name == "ui.settings_manager":
+                return SimpleNamespace(get_settings_manager=lambda: SimpleNamespace(get=lambda *args: True))
+            return original_import(name, *args, **kwargs)
+
+        namespace["__builtins__"] = {**vars(builtins), "__import__": import_settings}
+        exec(compile(ast.Module(body=methods, type_ignores=[]), str(source), "exec"), namespace)
+        for method in methods:
+            setattr(window, method.name, MethodType(namespace[method.name], window))
+
+        class CoordinatorSeam:
+            def __init__(self):
+                self.ready = SignalSeam()
+                self.failed = SignalSeam()
+                self.retry_calls = 0
+                self.terminal = False
+
+            def start(self):
+                events.append("start")
+                if failure:
+                    self.terminal = True
+                    self.failed.emit(failure, {"detail": "controlled <startup> failure"})
+
+            def retry(self):
+                self.retry_calls += 1
+                if not self.terminal:
+                    return False
+                self.terminal = False
+                return True
+
+        coordinator = CoordinatorSeam()
+        main_tree = ast.parse(ENTRY.read_text(encoding="utf-8"))
+        main = next(n for n in main_tree.body if isinstance(n, ast.FunctionDef) and n.name == "main")
+        start = next(
+            i
+            for i, n in enumerate(main.body)
+            if isinstance(n, ast.Assign) and any(isinstance(t, ast.Name) and t.id == "early_window" for t in n.targets)
+        )
+        end = next(i for i in range(start + 1, len(main.body)) if isinstance(main.body[i], ast.If))
+        statements = main.body[start:end]
+        execution = {
+            "_ensure_window": lambda: window,
+            "window_holder": {"window": window},
+            "_attach_window_startup": lambda w: (
+                w.attach_startup_coordinator(coordinator) if w._coordinator is None else None
+            ),
+            "coordinator": coordinator,
+            "logger": Mock(),
+            "run_in_background": lambda *args: None,
+            "_preload_phone_stt_at_startup": lambda: None,
+        }
+        for name in (
+            "_wire_video_widget",
+            "_wire_browser_webview",
+            "_wire_browser_overlay_controller",
+            "_wire_frame_streamer",
+            "_wire_cdp_browser_server",
+            "_attach_update_scheduler",
+        ):
+            execution[name] = lambda *args: None
+        main_ready = next(n for n in main.body if isinstance(n, ast.FunctionDef) and n.name == "_on_backend_ready")
+        exec(compile(ast.Module(body=[main_ready], type_ignores=[]), str(ENTRY), "exec"), execution)
+        coordinator.ready.connect(execution["_on_backend_ready"])
+        exec(compile(ast.Module(body=statements, type_ignores=[]), str(ENTRY), "exec"), execution)
+        return window, coordinator, events
+
+    def test_normal_start_shows_local_loading_without_waiting_for_backend_ready(self):
+        window, coordinator, events = self._startup()
+        assert window.visible, "normal startup must show its local loading surface"
+        assert not window._react_ui_loaded
+        assert events == ["start", "show"]
+        coordinator.ready.emit(object())
+        assert window._react_ui_loaded
+        assert events[-1] == "navigate-ready-ui"
+
+    def test_failed_backend_stays_visible_and_retains_a_real_retry_surface(self):
+        for phase in ("backend_start", "readiness_timeout"):
+            with self.subTest(phase=phase):
+                window, coordinator, events = self._startup(failure=phase)
+                assert window.visible, "startup failure must not leave a hidden process"
+                assert not window._react_ui_loaded
+                assert "Backend Failed" in window.html
+                assert "controlled &lt;startup&gt; failure" in window.html
+                assert 'href="viola://startup-retry"' in window.html
+                assert events == ["start", "html", "show"]
+                window._retry_startup()
+                assert coordinator.retry_calls == 1
+                assert window.html == "local loading"
+                assert window.visible
+                assert not window._react_ui_loaded
+                coordinator.ready.emit(object())
+                assert window._react_ui_loaded
+
+    def test_later_startup_failure_remains_visible_without_navigating_unready_http(self):
+        window, coordinator, events = self._startup()
+        coordinator.terminal = True
+        coordinator.failed.emit("readiness_timeout", {"detail": "not ready"})
+        assert window.visible
+        assert "Backend Failed" in window.html
+        assert "navigate-ready-ui" not in events
+
+    def test_retry_while_starting_does_not_reset_or_duplicate_the_surface(self):
+        window, coordinator, events = self._startup()
+        window._retry_startup()
+        assert coordinator.retry_calls == 1
+        assert events == ["start", "show"]
+        assert not window._react_ui_loaded
+
+    def test_close_to_tray_before_ready_stays_hidden_until_explicit_restore(self):
+        from unittest.mock import Mock
+
+        window, coordinator, events = self._startup()
+        event = Mock()
+        window.closeEvent(event)
+        event.ignore.assert_called_once_with()
+        assert not window.visible
+        coordinator.ready.emit(object())
+        assert not window.visible
+        assert window._react_ui_loaded
+        assert events.count("show") == 1
+        window._restore_from_tray()
+        assert window.visible
+        assert events.count("show") == 2
+
+    def test_hidden_failure_and_retry_do_not_override_user_dismissal(self):
+        from unittest.mock import Mock
+
+        window, coordinator, events = self._startup()
+        window.closeEvent(Mock())
+        coordinator.terminal = True
+        coordinator.failed.emit("readiness_timeout", {"detail": "not ready"})
+        assert not window.visible and "Backend Failed" in window.html
+        window._retry_startup()
+        coordinator.ready.emit(object())
+        assert not window.visible and window._react_ui_loaded
+        assert events.count("show") == 1
+
+    def test_show_occurs_before_event_loop_without_processing_events_or_relaxing_readiness(self):
+        tree = ast.parse(ENTRY.read_text(encoding="utf-8"))
+        main = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "main")
+        calls = [n for n in ast.walk(main) if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)]
+        early_show = next(
+            n
+            for n in calls
+            if isinstance(n.func.value, ast.Name) and n.func.value.id == "early_window" and n.func.attr == "show"
+        )
+        app_exec = next(
+            n
+            for n in calls
+            if isinstance(n.func.value, ast.Name) and n.func.value.id == "app" and n.func.attr == "exec"
+        )
+        assert early_show.lineno < app_exec.lineno
+        assert not any(n.func.attr == "processEvents" for n in calls)

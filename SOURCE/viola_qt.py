@@ -1627,10 +1627,13 @@ def main():
         window = window_holder.get("window")
         if window is None:
             window = _ensure_window()
+            show = getattr(window, "show", None)
+            if callable(show):
+                show()
         _attach_window_startup(window)
-        # NOTE: update wiring deliberately runs at the END of this slot, after
-        # show(). This is the main thread, and nothing about checking for a new
-        # version is on the path to what the user actually asked for.
+        # The startup surface has already been presented. Preserve subsequent
+        # user hiding/minimizing; readiness must not reopen it. Update wiring
+        # still runs last and cannot delay the initial presentation.
         # React UI WebView handles its own loading via _on_backend_ready
         logger.info("✅ Backend ready - React UI WebView will load now")
         # Wire video widget to QtMediaBackend if available
@@ -1643,12 +1646,9 @@ def main():
         _wire_frame_streamer(window, bootstrap)
         # Wire browser webview into CDP browser MCP server (visible browser mode)
         _wire_cdp_browser_server(window)
-        show = getattr(window, "show", None)
-        if callable(show):
-            show()
         run_in_background("phone_stt", _preload_phone_stt_at_startup)
         # Update wiring is the LAST thing this slot does: the window is already
-        # on screen, so nothing here can delay first paint. It only starts
+        # presented, so nothing here can delay first paint. It only starts
         # background daemon threads and must never make a network call inline.
         _attach_update_scheduler(window)
 
@@ -1686,6 +1686,9 @@ def main():
     # Phase 3B: Start backend BEFORE window.show() so bootstrap runs
     # in parallel with Qt's first-paint and WebEngine initialization.
     coordinator.start()
+    # Keep the local loading/error surface reachable even if readiness never
+    # arrives. React navigation still waits for the verified ready signal.
+    early_window.show()
 
     if pending_ready.get("bootstrap") is not None:
         _on_backend_ready(pending_ready.pop("bootstrap"))
