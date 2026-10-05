@@ -10,12 +10,13 @@ import styles from './TransportButton.module.css';
 // from the highlight is the same state a screen reader announces (#4214).
 // Momentary buttons (play, next) and the three-way repeat cycle are not
 // pressed/unpressed, so they deliberately do not carry it.
-const TransportButton = ({ onClick, active, children, ariaLabel, disabled, toggle }) => (
+const TransportButton = ({ onClick, active, children, ariaLabel, disabled, toggle, busy }) => (
   <button
     onClick={onClick}
     aria-label={ariaLabel}
     aria-pressed={toggle ? Boolean(active) : undefined}
     aria-disabled={disabled || undefined}
+    aria-busy={busy || undefined}
     disabled={disabled}
     className={`${styles.button} ${active ? styles.active : ''} ${disabled ? styles.disabled : ''}`}
     style={{
@@ -33,6 +34,7 @@ TransportButton.propTypes = {
   ariaLabel: PropTypes.string,
   disabled: PropTypes.bool,
   toggle: PropTypes.bool,
+  busy: PropTypes.bool,
 };
 
 export default TransportButton;

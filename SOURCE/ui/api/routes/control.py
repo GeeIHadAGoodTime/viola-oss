@@ -193,17 +193,17 @@ def register_control_routes(context: ApiContext, toolbox: RouteToolbox) -> None:
         return result
 
     def _direct_backend_pause():
-        """Bypass adapter lock chain — pause backend and set flags directly."""
+        """Bypass the adapter lock, but publish paused flags only after success."""
         player = getattr(music, "player", None)
         if player is None:
-            return
+            raise RuntimeError("No player is available to pause")
         bm = getattr(player, "_backend_manager", None)
         backend = getattr(bm, "backend", None) if bm else getattr(player, "_backend", None)
-        if backend and hasattr(backend, "pause"):
-            try:
-                backend.pause()
-            except Exception as exc:
-                log.warning("Direct backend pause failed: %s", exc)
+        if backend is None or not callable(getattr(backend, "pause", None)):
+            raise RuntimeError("No playback backend is available to pause")
+        # The outer endpoint owns failure/fallback reporting. Swallowing an
+        # error here would let it report success while the device kept playing.
+        backend.pause()
         # Set ALL flags — state computation uses _is_playing and _paused, not _state.is_playing
         player._user_paused = True
         player._paused = True
@@ -521,6 +521,11 @@ def register_control_routes(context: ApiContext, toolbox: RouteToolbox) -> None:
                     )
                 except Exception as exc:
                     log.warning("Direct backend pause also failed: %s", exc)
+                    return _control_error_response(
+                        500,
+                        "pause_failed",
+                        "Pause is temporarily unavailable right now.",
+                    )
             except Exception as exc:
                 log.exception("music.pause() failed: %s", exc)
                 try:

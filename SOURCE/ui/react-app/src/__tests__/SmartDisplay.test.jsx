@@ -23,6 +23,7 @@ const playerHarness = vi.hoisted(() => ({
   chatResponseCallback: null,
   progressCallback: null,
   state: null,
+  setLocalIsPlaying: vi.fn(),
 }));
 
 // Records the `enabled` flag the dedicated agent-browser stream hook was last
@@ -54,6 +55,8 @@ const apiHarness = vi.hoisted(() => ({
   setVolume: vi.fn(() => Promise.resolve({})),
   seek: vi.fn(() => Promise.resolve({})),
   setRating: vi.fn(() => Promise.resolve({})),
+  pause: vi.fn(() => Promise.resolve({})),
+  resume: vi.fn(() => Promise.resolve({})),
 }));
 const sentryHarness = vi.hoisted(() => ({
   openSentryUserFeedback: vi.fn(() => Promise.resolve(true)),
@@ -88,7 +91,7 @@ vi.mock('../hooks/usePlayerState', () => ({
     // recording here is how a test sees what it told the backend.
     send: vi.fn((message) => { wsHarness.sent.push(message); }),
     connectCount: 0,
-    setLocalIsPlaying: vi.fn(),
+    setLocalIsPlaying: playerHarness.setLocalIsPlaying,
     setDiagnosticRequestCallback: vi.fn(),
     setErrorCallback: vi.fn(),
     setSpokeMessageCallback: vi.fn(),
@@ -143,8 +146,8 @@ vi.mock('../hooks/useViolaApi', () => ({
   useViolaApi: () => ({
     getState: vi.fn(() => Promise.resolve({})),
     play: vi.fn(),
-    pause: vi.fn(),
-    resume: vi.fn(),
+    pause: apiHarness.pause,
+    resume: apiHarness.resume,
     stop: vi.fn(),
     skip: apiHarness.skip,
     next: vi.fn(() => Promise.resolve({})),
@@ -365,6 +368,9 @@ beforeEach(async () => {
   playerHarness.overlayCallback = null;
   playerHarness.progressCallback = null;
   playerHarness.state = null;
+  playerHarness.setLocalIsPlaying.mockReset();
+  apiHarness.pause.mockReset().mockResolvedValue({ ok: true });
+  apiHarness.resume.mockReset().mockResolvedValue({ ok: true });
   agentBrowserStreamHarness.calls = [];
   apiHarness.submitBugReport?.mockClear?.();
   apiHarness.submitBugReport?.mockResolvedValue?.({ bug_ticket_id: 42 });
@@ -2048,6 +2054,156 @@ describe('SmartDisplay repeated preference acceptance', () => {
 
 });
 
+
+describe('SmartDisplay acknowledged pause acceptance', () => {
+  const deferred = () => {
+    let resolve, reject;
+    const promise = new Promise((yes, no) => { resolve = yes; reject = no; });
+    return { promise, resolve, reject };
+  };
+  const state = (id = 'track-a', isPlaying = true) => ({
+    now_playing: { id, video_id: id, provider: 'youtube_iframe', title: 'Synthetic transport track' },
+    is_playing: isPlaying,
+  });
+  const pauseButton = () => screen.getByRole('button', { name: 'Pause' });
+  const mount = () => {
+    playerHarness.state = state();
+    return render(<SmartDisplay />);
+  };
+
+  it('only claims paused and pauses the iframe after acknowledgement', async () => {
+    const request = deferred();
+    apiHarness.pause.mockReturnValueOnce(request.promise);
+    const view = mount();
+    const iframe = view.container.querySelector('iframe');
+    const send = vi.spyOn(iframe.contentWindow, 'postMessage');
+    try {
+      await view.user.click(pauseButton());
+      expect(playerHarness.setLocalIsPlaying).not.toHaveBeenCalled();
+      expect(send.mock.calls.filter(([message]) => message.command === 'pause')).toEqual([]);
+    } finally {
+      await act(async () => request.resolve({ ok: true }));
+      send.mockRestore();
+    }
+    expect(playerHarness.setLocalIsPlaying).toHaveBeenCalledExactlyOnceWith(false);
+  });
+
+  it.each([
+    [409, "Can't pause playback right now."],
+    [500, "Couldn't pause playback. Please try again."],
+    [0, "Couldn't pause playback. Please try again."],
+  ])('reports rejected pause %i without a false paused state and allows retry', async (status, message) => {
+    const error = Object.assign(new Error('synthetic rejection'), { status });
+    apiHarness.pause.mockRejectedValueOnce(error);
+    const { user } = mount();
+    await user.click(pauseButton());
+    expect(await screen.findByText(message)).toBeInTheDocument();
+    expect(playerHarness.setLocalIsPlaying).not.toHaveBeenCalled();
+    await user.click(pauseButton());
+    expect(apiHarness.pause).toHaveBeenCalledTimes(2);
+    expect(playerHarness.setLocalIsPlaying).toHaveBeenCalledExactlyOnceWith(false);
+  });
+
+  it('does not send a second pause while the first result is pending', async () => {
+    const request = deferred();
+    apiHarness.pause.mockReturnValueOnce(request.promise);
+    const { user } = mount();
+    try {
+      await user.click(pauseButton());
+      await user.click(pauseButton());
+      expect(apiHarness.pause).toHaveBeenCalledTimes(1);
+    } finally {
+      await act(async () => request.resolve({ ok: true }));
+    }
+  });
+
+  it.each(['success', 'failure'])('ignores a late pause %s after switching tracks', async (outcome) => {
+    const request = deferred();
+    apiHarness.pause.mockReturnValueOnce(request.promise);
+    const view = mount();
+    await view.user.click(pauseButton());
+    playerHarness.setLocalIsPlaying.mockClear();
+    playerHarness.state = state('track-b');
+    view.rerender(<SmartDisplay />);
+    await act(async () => outcome === 'success' ? request.resolve({ ok: true }) : request.reject(new Error('old failure')));
+    expect(playerHarness.setLocalIsPlaying).not.toHaveBeenCalled();
+    expect(screen.queryByText("Couldn't pause playback. Please try again.")).not.toBeInTheDocument();
+    await view.user.click(pauseButton());
+    expect(apiHarness.pause).toHaveBeenCalledTimes(2);
+    expect(playerHarness.setLocalIsPlaying).toHaveBeenCalledExactlyOnceWith(false);
+  });
+
+  it.each(['success', 'failure'])('ignores a late pause %s after unmount', async (outcome) => {
+    const request = deferred();
+    apiHarness.pause.mockReturnValueOnce(request.promise);
+    const view = mount();
+    await view.user.click(pauseButton());
+    playerHarness.setLocalIsPlaying.mockClear();
+    view.unmount();
+    await act(async () => outcome === 'success' ? request.resolve({ ok: true }) : request.reject(new Error('old failure')));
+    expect(playerHarness.setLocalIsPlaying).not.toHaveBeenCalled();
+  });
+
+  it.each(['success', 'failure'])('observed paused state unlocks Play before a late HTTP %s', async (outcome) => {
+    const request = deferred();
+    apiHarness.pause.mockReturnValueOnce(request.promise);
+    const view = mount();
+    await view.user.click(pauseButton());
+    expect(pauseButton()).toBeDisabled();
+    expect(pauseButton()).toHaveAttribute('aria-busy', 'true');
+    playerHarness.state = state('track-a', false);
+    view.rerender(<SmartDisplay />);
+    const play = screen.getByRole('button', { name: 'Play' });
+    expect(play).toBeEnabled();
+    expect(play).not.toHaveAttribute('aria-busy');
+    await view.user.click(play);
+    expect(apiHarness.resume).toHaveBeenCalledTimes(1);
+    expect(playerHarness.setLocalIsPlaying).toHaveBeenCalledExactlyOnceWith(true);
+    await act(async () => outcome === 'success' ? request.resolve({ ok: true }) : request.reject(new Error('old pause failure')));
+    expect(playerHarness.setLocalIsPlaying).toHaveBeenCalledExactlyOnceWith(true);
+    expect(screen.queryByText("Couldn't pause playback. Please try again.")).not.toBeInTheDocument();
+  });
+
+  it('observed playing state unlocks Pause before a pending resume response', async () => {
+    const request = deferred();
+    apiHarness.resume.mockReturnValueOnce(request.promise);
+    playerHarness.state = state('track-a', false);
+    const view = render(<SmartDisplay />);
+    await view.user.click(screen.getByRole('button', { name: 'Play' }));
+    playerHarness.state = state();
+    view.rerender(<SmartDisplay />);
+    await view.user.click(pauseButton());
+    expect(apiHarness.pause).toHaveBeenCalledTimes(1);
+    expect(playerHarness.setLocalIsPlaying).toHaveBeenCalledExactlyOnceWith(false);
+    await act(async () => request.resolve({ ok: true }));
+    expect(playerHarness.setLocalIsPlaying).toHaveBeenCalledExactlyOnceWith(false);
+  });
+
+  it.each(['success', 'failure'])('releases an unacknowledged request for retry and ignores its late %s', async (outcome) => {
+    const request = deferred();
+    apiHarness.pause.mockReturnValueOnce(request.promise);
+    mount();
+    vi.useFakeTimers();
+    try {
+      act(() => fireEvent.click(pauseButton()));
+      expect(pauseButton()).toBeDisabled();
+      expect(pauseButton()).toHaveAttribute('aria-busy', 'true');
+      await act(async () => vi.advanceTimersByTimeAsync(15000));
+      expect(pauseButton()).toBeEnabled();
+      expect(pauseButton()).not.toHaveAttribute('aria-busy');
+      expect(screen.getByText('Playback has not responded. Check playback and try again.')).toBeInTheDocument();
+      expect(playerHarness.setLocalIsPlaying).not.toHaveBeenCalled();
+      await act(async () => fireEvent.click(pauseButton()));
+      expect(apiHarness.pause).toHaveBeenCalledTimes(2);
+      expect(playerHarness.setLocalIsPlaying).toHaveBeenCalledExactlyOnceWith(false);
+      await act(async () => outcome === 'success' ? request.resolve({ ok: true }) : request.reject(new Error('expired request')));
+      expect(playerHarness.setLocalIsPlaying).toHaveBeenCalledExactlyOnceWith(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+});
 
 describe('SmartDisplay zero-volume acceptance', () => {
   const playing = (volume) => ({

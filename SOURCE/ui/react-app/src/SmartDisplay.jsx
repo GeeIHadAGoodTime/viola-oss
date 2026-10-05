@@ -2078,25 +2078,6 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null 
   // =========================================================================
   // HANDLERS
   // =========================================================================
-  const handlePlayPause = useCallback(() => {
-    if (isPlaying) {
-      setLocalIsPlaying(false);
-      api.pause();
-      sendToIframe('pause');
-    } else if (!canResumePlayback) {
-      // Nothing loaded and nothing queued — tell the user instead of doing
-      // nothing silently (2026-07-10 UX audit, #774).
-      addToast({ message: 'Nothing queued yet — ask me to play something first.', level: 'info' });
-    } else {
-      api.resume().then(() => { setLocalIsPlaying(true); sendToIframe('play'); }).catch((err) => {
-        const message = err?.code === 'nothing_to_resume'
-          ? 'Nothing queued yet — ask me to play something first.'
-          : "Couldn't resume playback. Please try again.";
-        addToast({ message, level: 'error' });
-      });
-    }
-  }, [isPlaying, api, sendToIframe, setLocalIsPlaying, canResumePlayback, addToast]);
-
   // Every transport control fires its request and moves on, so the rejection
   // needs an owner or it escapes to `window.onerror` as an uncaught error that
   // no surface ever renders — the user clicks and simply nothing happens. That
@@ -2107,6 +2088,75 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null 
     const toast = describeTransportFailure(err, copy);
     if (toast) addToast(toast);
   }, [addToast]);
+
+  const playbackActionSessionRef = useRef(null);
+  const [playbackActionPending, setPlaybackActionPending] = useState(false);
+  const finishPlaybackAction = useCallback((session, operation) => {
+    if (playbackActionSessionRef.current !== session || session.pending !== operation) return false;
+    clearTimeout(operation.timeout);
+    session.pending = null;
+    setPlaybackActionPending(false);
+    return true;
+  }, []);
+  useLayoutEffect(() => {
+    const session = { pending: null };
+    playbackActionSessionRef.current = session;
+    setPlaybackActionPending(false);
+    return () => {
+      clearTimeout(session.pending?.timeout);
+      playbackActionSessionRef.current = null;
+    };
+  }, [ratingTrackKey]);
+  useEffect(() => {
+    const session = playbackActionSessionRef.current;
+    const operation = session?.pending;
+    // The state stream can acknowledge playback before its HTTP response.
+    // That acknowledgement must unlock the next action and invalidate the old
+    // response, which must never undo a newer Play/Pause choice.
+    if (operation && isPlaying === operation.playing && finishPlaybackAction(session, operation)) {
+      sendToIframe(operation.playing ? 'play' : 'pause');
+    }
+  }, [isPlaying, finishPlaybackAction, sendToIframe]);
+
+  const handlePlayPause = useCallback(() => {
+    const session = playbackActionSessionRef.current;
+    if (!session || session.pending) return;
+    if (!isPlaying && !canResumePlayback) {
+      addToast({ message: 'Nothing queued yet — ask me to play something first.', level: 'info' });
+      return;
+    }
+    // A request is not an acknowledgement. Keep actual displayed/iframe state
+    // until the backend or state stream confirms it, and own every rejection.
+    const pausing = isPlaying;
+    const operation = { playing: !pausing, timeout: null };
+    session.pending = operation;
+    setPlaybackActionPending(true);
+    operation.timeout = setTimeout(() => {
+      if (!finishPlaybackAction(session, operation)) return;
+      // This only releases UI ownership, not a claim of backend cancellation.
+      // Later HTTP completion is stale; authoritative state can still arrive.
+      addToast({ message: 'Playback has not responded. Check playback and try again.', level: 'warning' });
+    }, 15000);
+    const request = pausing ? api.pause() : api.resume();
+    request.then(() => {
+      if (!finishPlaybackAction(session, operation)) return;
+      setLocalIsPlaying(operation.playing);
+      sendToIframe(pausing ? 'pause' : 'play');
+    }).catch(err => {
+      if (!finishPlaybackAction(session, operation)) return;
+      if (!pausing && err?.code === 'nothing_to_resume') {
+        addToast({ message: 'Nothing queued yet — ask me to play something first.', level: 'error' });
+      } else {
+        notifyTransportFailure(err, pausing ? {
+          refused: "Can't pause playback right now.",
+          failed: "Couldn't pause playback. Please try again.",
+        } : {
+          refused: "Can't resume playback right now.",
+          failed: "Couldn't resume playback. Please try again.",
+        });
+      }
+    });
+  }, [isPlaying, canResumePlayback, api, setLocalIsPlaying, sendToIframe, addToast, notifyTransportFailure, finishPlaybackAction]);
 
   const handleNext = useCallback(() => {
     if (skipDebounceRef.current) return;
@@ -3075,6 +3125,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null 
       repeatMode={repeatMode}
       rating={rating}
       canResumePlayback={canResumePlayback}
+      playbackActionPending={playbackActionPending}
       onPlayPause={handlePlayPause}
       onNext={handleNext}
       onPrevious={handlePrevious}

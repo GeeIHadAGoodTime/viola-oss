@@ -28,6 +28,7 @@ const PlayerSection = ({
   repeatMode,
   rating,
   canResumePlayback,
+  playbackActionPending,
   // Handlers
   onPlayPause,
   onNext,
@@ -113,7 +114,8 @@ const PlayerSection = ({
             <TransportButton
               onClick={onPlayPause}
               ariaLabel={isPlaying ? 'Pause' : 'Play'}
-              disabled={!isPlaying && !canResumePlayback}
+              disabled={playbackActionPending || (!isPlaying && !canResumePlayback)}
+              busy={playbackActionPending}
             >
               {isPlaying ? <PauseIcon /> : <PlayIcon />}
             </TransportButton>
@@ -144,6 +146,7 @@ PlayerSection.propTypes = {
   repeatMode: PropTypes.string.isRequired,
   rating: PropTypes.string,
   canResumePlayback: PropTypes.bool,
+  playbackActionPending: PropTypes.bool,
   onPlayPause: PropTypes.func.isRequired,
   onNext: PropTypes.func.isRequired,
   onPrevious: PropTypes.func.isRequired,
