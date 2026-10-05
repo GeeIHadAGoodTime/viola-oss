@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "f780c767c2d282c841dd207c2824ebd2c1b6a08f",
-  "sha256": "36407924d0483178c734faed77949310385063ef9638256f6d5ade4803a0e38d",
+  "revision": "d2684db6c19b5d35c45d98eae46ac33d51f366ee",
+  "sha256": "529cfc942970ebfb68ecad7a31743c09502d3c1b29a40e59ff6295c3bb1de142",
   "files": [
     {
       "path": ".env.example",
@@ -5430,8 +5430,8 @@
     },
     {
       "path": "telephony/call_manager.py",
-      "sha256": "c6eb928426afd92a85e3d2dae2a7e702c831e76e7c9ba9376538a9541a67f675",
-      "bytes": 371536
+      "sha256": "85b3934138464a51a81b62d531d7390ccad07c2a567291071ffec254e33d0bd5",
+      "bytes": 374785
     },
     {
       "path": "telephony/call_queue.py",
@@ -5515,8 +5515,8 @@
     },
     {
       "path": "telephony/language_handler.py",
-      "sha256": "70fe4616587a134187cbbc19d694dfe6308d622da91c72de3ce540307fb9e0d0",
-      "bytes": 7037
+      "sha256": "67d97119e9eb0a8c46b3011e7ad761dd4000dbe93d131a8fcc799b9e8d519e8c",
+      "bytes": 9511
     },
     {
       "path": "telephony/listen_ws.py",
@@ -5710,8 +5710,8 @@
     },
     {
       "path": "telephony/tts_normalizer.py",
-      "sha256": "35fb2ac7b29074b8861275232a224f42006499b1b9e51b20b22edbbc882eec63",
-      "bytes": 7725
+      "sha256": "54b7748c5bae3d7e7d1fcda599317610e7e43330feca968318f9cfb1d34b9e78",
+      "bytes": 7964
     },
     {
       "path": "telephony/tunnel.py",
@@ -5735,8 +5735,13 @@
     },
     {
       "path": "tests/customer_speech/test_real_pronunciation.py",
-      "sha256": "62b47679f5a578f3c2b82cd0a85a48e1c82450331026986b2781379d7ef0eed0",
-      "bytes": 3511
+      "sha256": "c4f0efd1322de6de47dfeed438ca722b6b8c83aed224d7d0e4c53eafdcea399a",
+      "bytes": 5841
+    },
+    {
+      "path": "tests/customer_speech/test_real_routing.py",
+      "sha256": "8c61b823665c0019c3c5a8aea3477dbecca53af5c6682eb7f318083511ce9a96",
+      "bytes": 2988
     },
     {
       "path": "tests/public/test_bandit_report_contract.py",
@@ -5759,9 +5764,19 @@
       "bytes": 24803
     },
     {
+      "path": "tests/public/test_customer_desktop_startup.py",
+      "sha256": "ea4c12d4448756c486d7f427a2f94db722a260de203f217105a17c247481cf12",
+      "bytes": 8435
+    },
+    {
+      "path": "tests/public/test_customer_phone_routing.py",
+      "sha256": "f4be4baf6d172781159e22bcad1543a55b9c6605098f9cda42cc502b0d559cc9",
+      "bytes": 18647
+    },
+    {
       "path": "tests/public/test_customer_pronunciation.py",
-      "sha256": "21ce268e40d823398f2fa8dd9a6810641e431491cc6143288a7f0030ce3aee1f",
-      "bytes": 12652
+      "sha256": "9f36a967280d84da321ce66dfa10332cf1013effb099137b38435d1a903d7f6e",
+      "bytes": 16090
     },
     {
       "path": "tests/public/test_customer_speech_dependencies.py",
@@ -5772,6 +5787,11 @@
       "path": "tests/public/test_deferred_confirmation_cancellation.py",
       "sha256": "4787e38288d184737e1e31db49ca23364901fb0a921f1c33ca8137519f4132d0",
       "bytes": 8622
+    },
+    {
+      "path": "tests/public/test_english_decimal_normalization.py",
+      "sha256": "59c39ec501956082b392c817de5022c283da67171288ba48bce94882e86cc06c",
+      "bytes": 6612
     },
     {
       "path": "tests/public/test_execution_safety_contract.py",
@@ -5809,9 +5829,19 @@
       "bytes": 8358
     },
     {
+      "path": "tests/public/test_phone_customer_startup.py",
+      "sha256": "18f97e10557b8ab2955c3b86777c6afb1233199e04e18e02abd4bd503589996a",
+      "bytes": 4881
+    },
+    {
       "path": "tests/public/test_phone_language_switch.py",
       "sha256": "297c23b9a36e0533b29da8383602cc8db7d103599ee44c5844b249e2879942ad",
       "bytes": 22387
+    },
+    {
+      "path": "tests/public/test_phone_locale_normalization.py",
+      "sha256": "8ee1af94237192d1349bcce8f77761ba59f58c6ecee449f9074c3edbb012d3f7",
+      "bytes": 9729
     },
     {
       "path": "tests/public/test_pipecat_runner_security.py",
@@ -12130,8 +12160,8 @@
     },
     {
       "path": "viola_qt.py",
-      "sha256": "f3ff99346d4cd93cb0294d3302b13a3c97da8a9f3f3b263d09bddc595b46bdb0",
-      "bytes": 80814
+      "sha256": "298a669bf966d45f2d329858dddff0372b0cd5452c2db92e90743b3ba6a97294",
+      "bytes": 82192
     },
     {
       "path": "viola_spoke.py",
@@ -12265,8 +12295,8 @@
     },
     {
       "path": "voice/customer_pronunciation.py",
-      "sha256": "e6628858f9abe5cb672890ed52556db31b80004806efe384d1547b37ce758aca",
-      "bytes": 5547
+      "sha256": "b333138ac21703a61d9e05e4f19967b4823df24133a55ed924a601c6598055eb",
+      "bytes": 8443
     },
     {
       "path": "voice/dictation/__init__.py",
@@ -12384,6 +12414,11 @@
       "bytes": 10742
     },
     {
+      "path": "voice/pronunciation_tables.py",
+      "sha256": "9a2ae21c6bf5d795ee87a35a5529f3d99586fabe782ee80e4812780e398eff23",
+      "bytes": 2309
+    },
+    {
       "path": "voice/spoke_handler.py",
       "sha256": "0b42790618eb906ab41074af7008bc2ab92e51756ba07e020130b8e8233b64a6",
       "bytes": 12078
@@ -12430,8 +12465,8 @@
     },
     {
       "path": "voice/synthesis/text_normalizer.py",
-      "sha256": "6d3589cabb12c2e43d66549d62d673e65a9d37edc9ab2e28137ef3ba47f4944f",
-      "bytes": 20140
+      "sha256": "832761f2003f339abdae225753a58c8598b959af9eb4294055a38c0829636b74",
+      "bytes": 21792
     },
     {
       "path": "voice/synthesis/tts_wire.py",
