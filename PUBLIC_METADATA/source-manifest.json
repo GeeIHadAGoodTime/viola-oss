@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "a8080977116e9b463ab357d06bdbf661d1f17771",
-  "sha256": "e8f64a351d5945046f878d9eca4ed5d0b130dd8d5b647d2e50eec9f392730367",
+  "revision": "8cff692487810497d42b2e83f7e6dabde00ff21f",
+  "sha256": "3de1479d3197655b417e92b93f047a5f453f65634c188b8a092457bb3c7fbe04",
   "files": [
     {
       "path": ".env.example",
@@ -9530,13 +9530,13 @@
     },
     {
       "path": "ui/react-app/src/auth/AuthProvider.jsx",
-      "sha256": "ecd1fab176a247d8c8ad502bf786f71ca777082770e57727be311b2b2f4d011b",
-      "bytes": 29867
+      "sha256": "b61952c8444088f8361ae192bdc157784630db94f6e305d3853729383b9879da",
+      "bytes": 30798
     },
     {
       "path": "ui/react-app/src/auth/AuthProvider.test.jsx",
-      "sha256": "ceb6752602c440ef7bb162bbc085605e6592e2134883c1d20a518d5df7b4fb0b",
-      "bytes": 23084
+      "sha256": "64470e57c5c6f0ad5c616bb8a25bf583427ccc53236df41ca76f4ca8a470bebf",
+      "bytes": 36726
     },
     {
       "path": "ui/react-app/src/auth/authClient.csrf.test.js",
