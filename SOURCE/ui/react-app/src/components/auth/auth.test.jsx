@@ -543,3 +543,38 @@ describe('VerifyEmailScreen', () => {
     expect(screen.getByText(/Enter your email address/i)).toBeInTheDocument();
   });
 });
+
+describe('CloudAuthGate durable logout outcome', () => {
+  afterEach(() => { delete mockAuth.signOutFeedback; });
+
+  it.each(['signedIn', 'signedOut'])('keeps pending cleanup visible instead of dashboard or login (%s)', (status) => {
+    mockAuth.status = status;
+    mockAuth.signOutFeedback = { pending: true, error: null };
+    render(<CloudAuthGate><div>private-dashboard</div></CloudAuthGate>);
+    expect(screen.getByRole('heading', { name: 'Signing out…' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Signing out…' })).toBeDisabled();
+    expect(screen.queryByText('private-dashboard')).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Welcome back' })).not.toBeInTheDocument();
+  });
+
+  it('shows the retained failure and lets the user retry before returning to login', async () => {
+    mockAuth.signOutFeedback = { pending: false, error: { message: 'Synthetic cleanup refused' } };
+    const view = render(<CloudAuthGate><div>private-dashboard</div></CloudAuthGate>);
+    expect(screen.getByRole('alert')).toHaveTextContent('Synthetic cleanup refused');
+    await userEvent.click(screen.getByRole('button', { name: 'Retry sign-out' }));
+    expect(mockAuth.signOut).toHaveBeenCalledTimes(1);
+    mockAuth.signOutFeedback = { pending: false, error: null };
+    view.rerender(<CloudAuthGate><div>private-dashboard</div></CloudAuthGate>);
+    expect(screen.getByRole('heading', { name: 'Welcome back' })).toBeInTheDocument();
+  });
+
+  it('new sign-in can replace a retired logout failure', () => {
+    mockAuth.signOutFeedback = { pending: false, error: { message: 'Old cleanup failure' } };
+    const view = render(<CloudAuthGate><div>private-dashboard</div></CloudAuthGate>);
+    mockAuth.status = 'signedIn';
+    mockAuth.signOutFeedback = { pending: false, error: null };
+    view.rerender(<CloudAuthGate><div>private-dashboard</div></CloudAuthGate>);
+    expect(screen.getByText('private-dashboard')).toBeInTheDocument();
+    expect(screen.queryByText('Old cleanup failure')).not.toBeInTheDocument();
+  });
+});

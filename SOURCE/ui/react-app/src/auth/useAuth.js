@@ -15,6 +15,7 @@
  *     verifyMfaTotp(code)                -> Promise<{ ok, error }>
  *     cancelMfa()                        -> Promise<{ ok, error }>
  *     signUp(email, password, consents)  -> Promise<{ ok, needsEmailVerification, error }>
+ *     signOutFeedback,       // { pending, error } survives dashboard gate changes
  *     signOut()                          -> Promise<{ ok, error }>
  *     resetPassword(email)               -> Promise<{ ok, error }>
  *     resendVerification(email)          -> Promise<{ ok, error }>
@@ -40,6 +41,7 @@ import { AuthContext } from './AuthProvider';
  * @property {'loading'|'signedOut'|'signedIn'} status
  * @property {object|null} user
  * @property {object|null} session
+ * @property {{ pending: boolean, error: AuthClientError|null }} signOutFeedback
  * @property {boolean} mfaPending
  * @property {string|null} mfaFactorId
  * @property {(email: string, password: string) => Promise<{ ok: boolean, mfaRequired?: boolean, factorId?: string, error: AuthClientError|null }>} signIn
