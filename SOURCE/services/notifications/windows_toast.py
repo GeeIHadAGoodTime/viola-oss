@@ -96,6 +96,7 @@ def _ensure_app_shortcut(app_id: str = APP_ID) -> None:
 
     try:
         import pythoncom
+        import pywintypes
         import win32com.client
         from win32com.propsys import propsys, pscon
         from win32com.shell import shellcon
@@ -109,27 +110,31 @@ def _ensure_app_shortcut(app_id: str = APP_ID) -> None:
     target = Path(sys.executable)
     args = _quote_windows_arg(str(launcher)) if launcher.exists() else ""
 
-    pythoncom.CoInitialize()
     try:
-        shell = win32com.client.Dispatch("WScript.Shell")
-        shortcut = shell.CreateShortCut(str(shortcut_path))
-        shortcut.Targetpath = str(target)
-        shortcut.Arguments = args
-        shortcut.WorkingDirectory = str(root)
-        shortcut.IconLocation = str(target)
-        shortcut.Description = APP_NAME
-        shortcut.save()
+        pythoncom.CoInitialize()
+        try:
+            shell = win32com.client.Dispatch("WScript.Shell")
+            shortcut = shell.CreateShortCut(str(shortcut_path))
+            shortcut.Targetpath = str(target)
+            shortcut.Arguments = args
+            shortcut.WorkingDirectory = str(root)
+            shortcut.IconLocation = str(target)
+            shortcut.Description = APP_NAME
+            shortcut.save()
 
-        store = propsys.SHGetPropertyStoreFromParsingName(
-            str(shortcut_path),
-            None,
-            shellcon.GPS_READWRITE,
-            propsys.IID_IPropertyStore,
-        )
-        store.SetValue(pscon.PKEY_AppUserModel_ID, propsys.PROPVARIANTType(app_id))
-        store.Commit()
-    finally:
-        pythoncom.CoUninitialize()
+            store = propsys.SHGetPropertyStoreFromParsingName(
+                str(shortcut_path),
+                None,
+                shellcon.GPS_READWRITE,
+                propsys.IID_IPropertyStore,
+            )
+            store.SetValue(pscon.PKEY_AppUserModel_ID, propsys.PROPVARIANTType(app_id))
+            store.Commit()
+        finally:
+            pythoncom.CoUninitialize()
+    except pywintypes.com_error as exc:
+        # A local COM registration failure must not abort other delivery legs.
+        raise RuntimeError("Windows toast shortcut registration failed") from exc
 
 
 def _quote_windows_arg(value: str) -> str:
