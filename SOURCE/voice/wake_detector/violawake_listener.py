@@ -357,6 +357,7 @@ class ViolaWakeListener:
         # _init() may call cleanup() on failure while already holding this
         # lock. Keep teardown exclusive without deadlocking that same thread.
         self._state_lock = threading.RLock()
+        self._run_stop_event: threading.Event | None = None
         self._engine_lock = threading.RLock()
         self._engine_callback: Callable[[], None] | None = None
         self._device_name: str = "unknown"
@@ -1426,9 +1427,16 @@ class ViolaWakeListener:
 
         return snapshot
 
+    def _capture_allowed_locked(self) -> bool:
+        """Check this attempt's cancellation while native open owns the lock."""
+        event = self._run_stop_event
+        return event is None or not event.is_set()
+
     def _init(self) -> bool:
         """Initialize audio stream and ViolaWake engine."""
         with self._state_lock:
+            if not self._capture_allowed_locked():
+                return False
             if self._is_initialized:
                 return True
 
@@ -1671,6 +1679,13 @@ class ViolaWakeListener:
         Returns True if a fresh stream was opened, False otherwise. On
         failure ``self._stream`` is left as None so the caller can retry.
         """
+        with self._state_lock:
+            if not self._capture_allowed_locked():
+                return False
+            return self._reopen_audio_stream_locked()
+
+    def _reopen_audio_stream_locked(self) -> bool:
+        """Recover capture only after the cancellation check under state lock."""
         try:
             if self._stream is not None:
                 try:
@@ -1877,6 +1892,8 @@ class ViolaWakeListener:
         Args:
             stop_event: Event to signal when to stop listening
         """
+        with self._state_lock:
+            self._run_stop_event = stop_event
         # A fresh attempt starts now: give model load and device open their
         # cold-start allowance, measured from here rather than from whenever
         # this listener object happened to be constructed.
@@ -1905,7 +1922,16 @@ class ViolaWakeListener:
 
     def _run_registered(self, stop_event: threading.Event) -> None:
         """Initialize and listen while run() owns registration and teardown."""
-        if not self._init():
+        with self._state_lock:
+            # Serialize the final cancellation check with native open and the
+            # cleanup used by mute/stop. A stopped pending worker cannot open
+            # after cleanup has already returned to its caller.
+            if stop_event.is_set():
+                return
+            initialized = self._init()
+            if initialized and stop_event.is_set():
+                return
+        if not initialized:
             logger.error("Failed to initialize ViolaWake listener")
             # Record the DEFINITE fact that capture never opened. The detection
             # signal alone would eventually report stalled, but only after its
@@ -2354,6 +2380,10 @@ class ViolaWakeListener:
                 # Read audio chunk
                 try:
                     audio_data = self._stream.read(self.CHUNK_SIZE, exception_on_overflow=False)
+                    if stop_event.is_set():
+                        # A read may complete after cancellation/cleanup. Do
+                        # not count or forward that late frame to consumers.
+                        break
                     read_duration = time.time() - read_start
                     # Post-read diagnostic for first few frames
                     if frame_count <= 3:
