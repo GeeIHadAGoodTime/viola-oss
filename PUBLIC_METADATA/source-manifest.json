@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "0bf35fb1e196bd05871c67228fe8d5edd2c43447",
-  "sha256": "c97f900d76e685d695aa804f60b8cebaa3a2530a7a3f81835c7144dd0ed12761",
+  "revision": "44789f5624acfc7ca3687cdb5f4903b4293f57d5",
+  "sha256": "63401e6005bc8aadecf5d65e1f9eb3fef9b3c4133b09312d9c4524db75192cd2",
   "files": [
     {
       "path": ".env.example",
@@ -9285,8 +9285,8 @@
     },
     {
       "path": "ui/react-app/src/SmartDisplay.jsx",
-      "sha256": "e0f20b737a92120e3ac196f93bb37e576dbf50b9e963f2d29328e92b6e390b4b",
-      "bytes": 166927
+      "sha256": "04263c9704f3f2b307a6d0e43bff8879bb17ec9189d1c9571817183a785dc15c",
+      "bytes": 169332
     },
     {
       "path": "ui/react-app/src/SmartDisplay.stageRouting.test.jsx",
@@ -9310,8 +9310,8 @@
     },
     {
       "path": "ui/react-app/src/__tests__/SmartDisplay.test.jsx",
-      "sha256": "c8060e42b272a2eca902b62487f165c511b9e8acf2f5b0668943bf7bf61eab8b",
-      "bytes": 92856
+      "sha256": "367c575236c69dd57982f8ee9f0fefd5498763b2b0856ee8423c5e114b190299",
+      "bytes": 99960
     },
     {
       "path": "ui/react-app/src/__tests__/hooks/useEventBus.test.jsx",
