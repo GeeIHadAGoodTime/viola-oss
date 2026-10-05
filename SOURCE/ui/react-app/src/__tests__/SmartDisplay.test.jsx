@@ -5,7 +5,7 @@
  * without crashing and renders essential UI landmarks. Deep interaction tests
  * live in __tests__/integration/.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 const { default: QueueModal } = await vi.importActual('../components/QueueModal');
 const { default: HistoryModal } = await vi.importActual('../components/HistoryModal');
 import { act, fireEvent, render, screen, waitFor, within } from '../test/test-utils';
@@ -2247,5 +2247,153 @@ describe('SmartDisplay zero-volume acceptance', () => {
     } finally {
       send.mockRestore();
     }
+  });
+});
+
+
+describe('Microphone mute acknowledgement acceptance', () => {
+  let notices;
+  let clock = 1800000000000;
+  const pending = () => {
+    let resolve, reject;
+    const promise = new Promise((yes, no) => { resolve = yes; reject = no; });
+    return { promise, resolve, reject };
+  };
+  const pressMute = () => act(() => document.dispatchEvent(new KeyboardEvent('keydown', {
+    key: 'm', code: 'KeyM', ctrlKey: true, bubbles: true,
+  })));
+  const configure = (settings = {}) => settingsHarness.useSettings.mockImplementation(() => ({
+    ...mockSettingsState(), settings: { mic_muted: false, ...settings },
+  }));
+  beforeEach(() => {
+    notices = [];
+    class TestNotification {
+      static permission = 'granted';
+      constructor(title, options) { notices.push({ title, ...options }); }
+    }
+    vi.stubGlobal('Notification', TestNotification);
+    vi.spyOn(Date, 'now').mockImplementation(() => clock);
+    clock += 10000;
+    settingsHarness.updateSetting.mockReset().mockResolvedValue(true);
+    configure();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it.each([false, true])('announces a saved change only after acknowledgement (previously muted=%s)', async muted => {
+    const save = pending();
+    configure({ mic_muted: muted });
+    settingsHarness.updateSetting.mockReturnValueOnce(save.promise);
+    render(<SmartDisplay />);
+    pressMute();
+    expect(settingsHarness.updateSetting).toHaveBeenCalledWith('mic_muted', !muted);
+    expect(notices).toEqual([]);
+    expect(screen.getByText('Saving microphone change…')).toBeInTheDocument();
+    await act(async () => save.resolve(true));
+    expect(notices.map(notice => notice.body)).toEqual([muted ? 'Microphone unmuted' : 'Microphone muted']);
+    expect(screen.queryByText('Saving microphone change…')).not.toBeInTheDocument();
+  });
+
+  it.each(['refused', 'rejected', 'thrown'])('reports %s writes visibly without a false muted notification', async outcome => {
+    if (outcome === 'refused') settingsHarness.updateSetting.mockResolvedValueOnce(false);
+    else if (outcome === 'rejected') settingsHarness.updateSetting.mockRejectedValueOnce(new Error('synthetic offline'));
+    else settingsHarness.updateSetting.mockImplementationOnce(() => { throw new Error('synthetic immediate failure'); });
+    render(<SmartDisplay />);
+    await act(async () => pressMute());
+    expect(notices).toEqual([]);
+    expect(screen.getByText("Couldn't confirm the microphone change. Check its status and try again.")).toBeInTheDocument();
+    expect(screen.queryByText('Saving microphone change…')).not.toBeInTheDocument();
+    expect(voiceHarness.options.enabled).toBe(true);
+  });
+
+  it('honors disabled desktop notifications after a successful save', async () => {
+    configure({ show_notifications: false });
+    render(<SmartDisplay />);
+    await act(async () => pressMute());
+    expect(settingsHarness.updateSetting).toHaveBeenCalledWith('mic_muted', true);
+    expect(notices).toEqual([]);
+    expect(screen.queryByText('Saving microphone change…')).not.toBeInTheDocument();
+  });
+
+  it('allows a successful retry after refusal', async () => {
+    settingsHarness.updateSetting.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+    render(<SmartDisplay />);
+    await act(async () => pressMute());
+    expect(notices).toEqual([]);
+    await act(async () => pressMute());
+    expect(settingsHarness.updateSetting).toHaveBeenCalledTimes(2);
+    expect(notices.map(notice => notice.body)).toEqual(['Microphone muted']);
+    expect(screen.queryByText("Couldn't confirm the microphone change. Check its status and try again.")).not.toBeInTheDocument();
+  });
+
+  it('keeps a later refusal current when an older request subsequently succeeds', async () => {
+    const first = pending(), second = pending();
+    settingsHarness.updateSetting.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+    render(<SmartDisplay />);
+    pressMute(); pressMute();
+    expect(settingsHarness.updateSetting).toHaveBeenCalledTimes(2);
+    expect(screen.getAllByText('Saving microphone change…')).toHaveLength(1);
+    await act(async () => second.resolve(false));
+    await act(async () => first.resolve(true));
+    expect(notices).toEqual([]);
+    expect(screen.getByText("Couldn't confirm the microphone change. Check its status and try again.")).toBeInTheDocument();
+  });
+
+  it('accepts an authoritative settings acknowledgement before HTTP and ignores its late rejection', async () => {
+    const save = pending();
+    let muted = false;
+    settingsHarness.useSettings.mockImplementation(() => ({ ...mockSettingsState(), settings: { mic_muted: muted } }));
+    settingsHarness.updateSetting.mockReturnValueOnce(save.promise);
+    const { rerender } = render(<SmartDisplay />);
+    pressMute();
+    expect(notices).toEqual([]);
+    muted = true;
+    rerender(<SmartDisplay />);
+    expect(notices.map(notice => notice.body)).toEqual(['Microphone muted']);
+    expect(screen.queryByText('Saving microphone change…')).not.toBeInTheDocument();
+    expect(voiceHarness.options.enabled).toBe(false);
+    await act(async () => save.reject(new Error('late HTTP failure')));
+    expect(screen.queryByText("Couldn't confirm the microphone change. Check its status and try again.")).not.toBeInTheDocument();
+  });
+
+  it('expires unacknowledged feedback, ignores late success and permits retry', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    const first = pending();
+    settingsHarness.updateSetting.mockReturnValueOnce(first.promise).mockResolvedValueOnce(true);
+    const view = render(<SmartDisplay />);
+    pressMute();
+    await act(async () => vi.advanceTimersByTime(15000));
+    expect(screen.getByText('Microphone change has not been confirmed. Check its status and try again.')).toBeInTheDocument();
+    expect(screen.queryByText('Saving microphone change…')).not.toBeInTheDocument();
+    await act(async () => first.resolve(true));
+    expect(notices).toEqual([]);
+    await act(async () => pressMute());
+    expect(notices.map(notice => notice.body)).toEqual(['Microphone muted']);
+    view.unmount();
+  });
+
+  it('drops acknowledgement feedback after the component unmounts', async () => {
+    const save = pending();
+    settingsHarness.updateSetting.mockReturnValueOnce(save.promise);
+    const view = render(<SmartDisplay />);
+    pressMute();
+    view.unmount();
+    await act(async () => save.resolve(true));
+    expect(notices).toEqual([]);
+  });
+
+  it('cannot announce an old principal request in the next principal UI', async () => {
+    const save = pending();
+    settingsHarness.updateSetting.mockReturnValueOnce(save.promise);
+    apiHarness.account = { id: 'mute-account-a' };
+    const view = render(<SmartDisplay />);
+    pressMute();
+    apiHarness.account = { id: 'mute-account-b' };
+    view.rerender(<SmartDisplay />);
+    await act(async () => save.resolve(true));
+    expect(notices).toEqual([]);
+    expect(screen.queryByText('Saving microphone change…')).not.toBeInTheDocument();
   });
 });
