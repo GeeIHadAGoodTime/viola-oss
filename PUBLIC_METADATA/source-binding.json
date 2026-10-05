@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "a5b7c944d7d307687838fdc35758f4720f5063a8c5f39f7a5d8e811d185d4554",
+  "source_manifest_sha256": "9e0183ac77fa2feceda56332f1055e61e5cf995b67fe67f9cb407b890a4da2c9",
   "source_tree_sha256": "3e8c6feec31e78c403dff66b68d908d651befbbf5349b8a68d39d8c62c5fb604",
   "source_file_count": 2544,
-  "source_revision": "148f441561d32989f587703b804ab7844f01ca5e",
-  "comparison_public_revision": "f6ffd66e03441d2783350dd829c53ccb6eb53eee",
+  "source_revision": "97048cd6e91da54ad9280ab91ba9a67471c33b0f",
+  "comparison_public_revision": "c4891d863f70bdac888499d27c99a2d925ba6696",
   "changed_source_paths": [
     "SOURCE/ui/react-app/src/auth/authClient.js",
     "SOURCE/ui/react-app/src/auth/AuthProvider.jsx",
@@ -69,12 +69,12 @@
     }
   ],
   "prior_binding": {
-    "public_revision": "f6ffd66e03441d2783350dd829c53ccb6eb53eee",
+    "public_revision": "c4891d863f70bdac888499d27c99a2d925ba6696",
     "path": "PUBLIC_METADATA/source-binding.json",
     "git_blob": "c214ae2b580a0b9741673a3ff8873e0ca5e739eb",
     "sha256": "94e2a65d30327ac8eece3fda32835dd03cc236492e197787832669c67ed71420",
-    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/f6ffd66e03441d2783350dd829c53ccb6eb53eee/PUBLIC_METADATA/source-binding.json",
-    "history": "The immutable prerequisite binding retains earlier source qualification and public history. Its limits continue to apply."
+    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/c4891d863f70bdac888499d27c99a2d925ba6696/PUBLIC_METADATA/source-binding.json",
+    "history": "Merged feedback48 retains the same immutable prerequisite tree as the originally reviewed feature head. All earlier qualification limits remain inherited."
   },
   "input_equivalence": {
     "changed_dependency_inputs": [],
@@ -88,18 +88,26 @@
     "prerequisite_feedback_sha256": "d02a9781836fbef1b274993a6ed1877c54c7688834f92f4ed1d2e56497c99706"
   },
   "qualification": {
-    "scope": "Bounded source qualification using synthetic accounts, real SDK storage behavior and inert HTTP responses. This draft depends on feedback48 and preserves its source scope.",
-    "source_integrity": "All 2568 prerequisite Git blobs were verified before and after detached hardlink preparation. Only ten reviewed source files and two canonical metadata paths differ. All seven existing changed files match the independently reviewed prerequisite blobs; three paths are new.",
+    "scope": "Bounded source qualification using synthetic accounts, real SDK storage behavior and inert HTTP responses. Feedback48 is now merged; this draft is synchronized onto that main without including the separate interrupted-sign-in successor.",
+    "source_integrity": "All 2,568 current-main blobs match the previously verified feedback prerequisite. The complete 2,571-blob reviewed transport tree is preserved except the two regenerated canonical metadata paths. Only ten reviewed source/test files and canonical metadata differ from main, including three new source files.",
     "behavior": "A same-origin nonsecret logout marker blocks automatic cookie restoration after locally completed logout with unconfirmed server transport. Explicit accepted new login retires it; pending or failed login cannot erase an earlier logout. Admitted owned SDK writes drain before logout acknowledgment. Ambiguous post-storage errors retain uncertainty, including automatic hydration and sessionless registration. Operation-returned matching pairs permit bounded cleanup; different observed pairs are retained.",
     "checks": "The normal sixteen-file union passes 302 controls with no errors or skips. Twenty-eight author mutation variants expose intended assertions with unaffected positives; exact source bytes were restored. Scoped JS/JSX lint has zero errors and one inherited unused-React warning. Six underlying provider method ASTs match feedback48. Guarded processes record zero native network attempts.",
     "independent_review": "Exact 9cc95f19 replacement approved: 302 normal controls, seven retained real-SDK contrasts before and after restoration, and seven isolated fresh-process mutants. The mutants fail 1/1/2/1/1/1/1 intended assertions with three positives each in separate processes. All ten source hashes and six provider method ASTs are verified.",
-    "input_reuse": "The scoped source and configuration inputs are byte-identical to the frozen V8 qualification. That source proof is retained without claiming a fresh full-frontend or production build.",
+    "input_reuse": "All ten reviewed source hashes and all 78 scoped source/configuration inputs remain exact. The retained 302-control and independent mutation/contrast source proof is reused on identical inputs; no redundant full-frontend or production build is claimed. Fresh exact-head hosted checks remain required.",
     "storage_limits": "The marker contains only nonsecret intent metadata and is limited to the same origin and profile. Site-data removal, unavailable storage, other origins/profiles/tabs/devices and actual server revocation require separate validation. Storage failure remains explicit and uses a conservative memory-only fallback.",
     "ownership_limits": "Matching-pair observation immediately before public SDK signOut is not an atomic compare-and-swap against arbitrary unqueued SDK writers during its await. Normal owned operations share a document queue. Ambiguous SDK state can remain and is reported rather than blindly deleted. Requests are not newly cancelled or time-bounded.",
     "tooling_limits": "Vite/Vitest exercises TSX transpilation; no standalone typecheck or full production build is claimed. No live account, actual cookie revocation, installer, Windows native UI or physical hardware acceptance is established.",
     "inherited_limits": "Feedback48, SDK/provider fixes and the landed speech/Queue source retain their prior bounded qualification. Retained Windows SBOMs are historical; no new dependency resolution, advisory scan, signed candidate, installed acceptance, customer speech eligibility, release eligibility or deployment is inferred.",
     "exact_head_hosted_checks": "pending",
     "installed_candidate": "not_established",
-    "release_or_deployment": "not_established"
+    "release_or_deployment": "not_established",
+    "source_union": "Source-only ancestry union 97048cd6e91da54ad9280ab91ba9a67471c33b0f preserves main c4891d863f70bdac888499d27c99a2d925ba6696 and previously reviewed transport head 05e1b301352b15d4088111546ba650b115a929d8. No protected ref or release route is changed by this source branch."
+  },
+  "previous_reviewed_transport_binding": {
+    "public_revision": "05e1b301352b15d4088111546ba650b115a929d8",
+    "path": "PUBLIC_METADATA/source-binding.json",
+    "git_blob": "a6254f343b6eee66709393b0df4a32c2ab984082",
+    "sha256": "67f45ac3599ddbbf50affd933ecb3147b755f55f8b1ffea7dc9e062057f789a4",
+    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/05e1b301352b15d4088111546ba650b115a929d8/PUBLIC_METADATA/source-binding.json"
   }
 }
