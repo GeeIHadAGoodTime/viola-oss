@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "e823755522c97580cffdee95a0d99965f8ac13a7",
-  "sha256": "1f4e6eac5a77a6ba78f85be11eaf3c778d0eb3105c8c9dfa71b0e192ef263085",
+  "revision": "16c860779fd040d5ab4fac5301c40f057f1a99df",
+  "sha256": "476fb123bdfe8dadfb8995bf67c14a49f7fcd1ff075d2e5fd89b4f3b1c114e90",
   "files": [
     {
       "path": ".env.example",
@@ -5970,8 +5970,8 @@
     },
     {
       "path": "tests/public/test_romance_qualification_packet.py",
-      "sha256": "a04d17c0d93760aec0f8ae1643271dce0f1392176023741b9978afd904470e2c",
-      "bytes": 9184
+      "sha256": "d459d9bfb870463559e6395f0176ba7f14879d64428804d6dad191a39ecd0d52",
+      "bytes": 10014
     },
     {
       "path": "tests/public/test_selected_audio_output.py",
@@ -5992,6 +5992,11 @@
       "path": "tests/public/test_step_logger_status.py",
       "sha256": "f43a8f369828481307fc8031f767240eb0774a80b17b0f54e89fcaff7fdffdf7",
       "bytes": 7499
+    },
+    {
+      "path": "tests/public/test_streaming_decimal_boundaries.py",
+      "sha256": "79b710751f8da16fa76c3e6956da238ad51d9cd2e0ee9eccde595ae81a0b2c00",
+      "bytes": 10832
     },
     {
       "path": "tests/public/test_tool_allowlist_contract.py",
@@ -12555,8 +12560,8 @@
     },
     {
       "path": "voice/synthesis/kokoro_engine.py",
-      "sha256": "55ef5c8f77cc5eaa7266c6f903587cfcbde1f51266b053d9d1605140900a4f40",
-      "bytes": 59449
+      "sha256": "7796e9aaab114cd37ffa2b971bfe6ad9129baf915f78270f8863b50476e0b04f",
+      "bytes": 59527
     },
     {
       "path": "voice/synthesis/lazy_engine.py",
@@ -12575,8 +12580,8 @@
     },
     {
       "path": "voice/synthesis/text_normalizer.py",
-      "sha256": "832761f2003f339abdae225753a58c8598b959af9eb4294055a38c0829636b74",
-      "bytes": 21792
+      "sha256": "0d8543d6f69b2a295045e09cfec2c56b1f346a2286495b2980183613f6930282",
+      "bytes": 22351
     },
     {
       "path": "voice/synthesis/tts_wire.py",

@@ -1106,7 +1106,7 @@ class KokoroTTSEngine:
         Returns:
             The full concatenated text that was spoken.
         """
-        from voice.synthesis.text_normalizer import normalize_for_speech
+        from voice.synthesis.text_normalizer import has_pending_decimal_point, normalize_for_speech
 
         # Lazy-create the asyncio lock
         if self._speak_lock is None:
@@ -1169,7 +1169,7 @@ class KokoroTTSEngine:
                                     if cleaned:
                                         sentences_queue.append(cleaned)
                             buffer = parts[-1]
-                        elif buffer.rstrip()[-1:] in ".!?":
+                        elif buffer.rstrip()[-1:] in ".!?" and not has_pending_decimal_point(buffer.rstrip()):
                             # Buffer ends with sentence punctuation (no trailing space yet)
                             cleaned = _strip_emoji(buffer.strip())
                             if cleaned:

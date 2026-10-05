@@ -11,6 +11,7 @@ import shutil
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 SOURCE = Path(__file__).resolve().parents[2]
 PACKET = SOURCE / "qualification/romance_semantic_lowering"
@@ -21,9 +22,23 @@ SPEC.loader.exec_module(RUNNER)
 
 class RomanceQualificationPacketTests(unittest.TestCase):
     def setUp(self):
-        self.temporary = self.enterContext(tempfile.TemporaryDirectory())
+        # Application startup can pin the process-wide temp root inside SOURCE.
+        # Positive report fixtures must remain outside the protected inputs.
+        self.temporary = self.enterContext(tempfile.TemporaryDirectory(prefix="romance-test-", dir=SOURCE.parent))
         self.root = Path(self.temporary)
         self.integrity = json.loads((PACKET / "integrity.json").read_text(encoding="utf-8"))
+
+    def test_fixture_stays_external_when_application_pins_the_default_temp_root(self):
+        with patch.object(tempfile, "tempdir", str(SOURCE)):
+            probe = RomanceQualificationPacketTests("test_existing_destination_cannot_be_overwritten")
+            try:
+                probe.setUp()
+                self.assertNotEqual(probe.root, SOURCE)
+                self.assertNotIn(SOURCE, probe.root.parents)
+                self.assertNotIn(PACKET, probe.root.parents)
+                self.assertEqual(probe.root.parent, SOURCE.parent)
+            finally:
+                probe.doCleanups()
 
     def test_exact_packet_and_config_stage_with_only_temporary_path_rebinding(self):
         fixture = self.root / "fixture"
