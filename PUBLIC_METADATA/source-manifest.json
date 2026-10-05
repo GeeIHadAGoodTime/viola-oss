@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "73d80294cca4e66ab56dcead4097c9d7a0d76a5e",
-  "sha256": "005aecfb75a9a837ffcc52bc2812fc7a9ad2ded8a5156e230eea407f563226a2",
+  "revision": "66840556e152f2292a03bd03f898f5b32b9eb04e",
+  "sha256": "9a047cb9c0e3919aa0960e259a3c4d3ed8eec0fad9843929f84b2c36ca76d86e",
   "files": [
     {
       "path": ".env.example",
@@ -5790,8 +5790,8 @@
     },
     {
       "path": "tests/public/test_disabled_tts_streaming.py",
-      "sha256": "df08d4a9057925751aa1335d85ccc2f75875a61eac5d4e2093782411f58f8429",
-      "bytes": 24743
+      "sha256": "b89aa53c72989086cf08b0617325c13018ebd9bd477dd13a1b0b61091713de66",
+      "bytes": 24850
     },
     {
       "path": "tests/public/test_english_decimal_normalization.py",
@@ -5890,8 +5890,13 @@
     },
     {
       "path": "tests/public/test_streaming_decimal_boundaries.py",
-      "sha256": "cee9a06fba907607b6c7a60b388f0118317be4f40a4af0890cf85ac7affd74d7",
-      "bytes": 11155
+      "sha256": "d9338a597a68ccc651293e1921a74595372600593a7d71faf7b319dd9808ee7a",
+      "bytes": 11322
+    },
+    {
+      "path": "tests/public/test_streaming_watchdog_ownership.py",
+      "sha256": "4b438a068d6ece3e1036b62f7ce701dbede98c455af1d430574669058bb40b95",
+      "bytes": 14979
     },
     {
       "path": "tests/public/test_tool_allowlist_contract.py",
@@ -12455,8 +12460,8 @@
     },
     {
       "path": "voice/synthesis/kokoro_engine.py",
-      "sha256": "8fd502419f16e2d6d393b8eed9fdd95d3f958c842df54cdd69924e916defbc65",
-      "bytes": 66465
+      "sha256": "6d638682fa4b88a22dfb34741e6341270366958df41bfc364f6ec3c706945509",
+      "bytes": 70151
     },
     {
       "path": "voice/synthesis/lazy_engine.py",
