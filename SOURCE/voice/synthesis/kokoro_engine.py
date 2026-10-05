@@ -239,6 +239,7 @@ class KokoroTTSEngine:
         config: object | None = None,
     ) -> None:
         self._config = config
+        self._tts_disable_marker = object()
         cfg = config or settings
 
         # Resolve paths: explicit arg → config/settings attr → default
@@ -422,9 +423,10 @@ class KokoroTTSEngine:
             return b""
 
         # Honour the tts_enabled config flag
-        cfg = self._config or settings
-        if not getattr(cfg, "tts_enabled", True):
+        if not self._tts_is_enabled():
             return b""
+
+        policy_marker = getattr(self, "_tts_disable_marker", 0)
 
         # Strip emoji before phonemisation
         text = _strip_emoji(text)
@@ -442,15 +444,19 @@ class KokoroTTSEngine:
 
         # For long text, chunk into sentences for lower latency
         if len(text) > _CHUNK_THRESHOLD:
-            return await self._synthesize_chunked(text, voice)
+            return await self._synthesize_chunked(text, voice, policy_marker=policy_marker)
 
-        return await self._run_synthesize_with_watchdog(text, voice)
+        return await self._run_synthesize_with_watchdog(text, voice, policy_marker=policy_marker)
 
-    async def _run_synthesize_with_watchdog(self, text: str, voice: str | None) -> bytes:
+    async def _run_synthesize_with_watchdog(
+        self, text: str, voice: str | None, *, policy_marker: object | None = None
+    ) -> bytes:
         """Run one ``_synthesize_locked`` call, guarded by the watchdog."""
+        if policy_marker is None:
+            policy_marker = getattr(self, "_tts_disable_marker", 0)
         try:
             return await asyncio.wait_for(
-                asyncio.to_thread(self._synthesize_locked, text, voice),
+                asyncio.to_thread(self._synthesize_locked, text, voice, policy_marker=policy_marker),
                 timeout=STREAM_TIMEOUT_SECONDS,
             )
         except TimeoutError:
@@ -461,26 +467,55 @@ class KokoroTTSEngine:
             )
             return b""
 
-    async def _synthesize_chunked(self, text: str, voice: str | None) -> bytes:
+    async def _synthesize_chunked(self, text: str, voice: str | None, *, policy_marker: object | None = None) -> bytes:
         """Synthesise long text sentence-by-sentence and concatenate."""
+        if policy_marker is None:
+            policy_marker = getattr(self, "_tts_disable_marker", 0)
         sentences = _split_sentences(text)
         if not sentences:
             return b""
 
         # Single sentence or failed split -- synthesise in one go
         if len(sentences) == 1:
-            return await self._run_synthesize_with_watchdog(sentences[0], voice)
+            return await self._run_synthesize_with_watchdog(sentences[0], voice, policy_marker=policy_marker)
 
         logger.debug("Chunked synthesis: %d sentences from %d chars", len(sentences), len(text))
         chunks: list[bytes] = []
         for sentence in sentences:
-            chunk = await self._run_synthesize_with_watchdog(sentence, voice)
+            chunk = await self._run_synthesize_with_watchdog(sentence, voice, policy_marker=policy_marker)
             if chunk:
                 chunks.append(chunk)
         return self._join_sentence_chunks(chunks, sentences)
 
+    def _tts_is_enabled(self) -> bool:
+        cfg = getattr(self, "_config", None) or settings
+        enabled = bool(getattr(cfg, "tts_enabled", True))
+        if not enabled:
+            # A fresh identity retires work admitted before an observed disable.
+            # It cannot return to an earlier identity after rapid re-enabling.
+            self._tts_disable_marker = object()
+        return enabled
+
+    def _play_pcm_if_enabled(
+        self, pcm_bytes: bytes, sample_rate: int, *, local: bool = False, policy_marker: object | None = None
+    ) -> bool:
+        # A cached/prefetched result can finish after the user disables speech.
+        # Check on the playback worker immediately before the audio boundary.
+        if policy_marker is None:
+            policy_marker = getattr(self, "_tts_disable_marker", 0)
+        if not self._tts_is_enabled() or policy_marker is not getattr(self, "_tts_disable_marker", 0):
+            return False
+        playback = self._play_pcm_locally if local else self._play_pcm_raw
+        return playback(pcm_bytes, sample_rate)
+
     def _synthesize_locked(
-        self, text: str, voice: str | None, speed: float | None = None, *, apply_volume: bool = True
+        self,
+        text: str,
+        voice: str | None,
+        speed: float | None = None,
+        *,
+        apply_volume: bool = True,
+        policy_marker: object | None = None,
     ) -> bytes:
         """Thread-safe wrapper around ``_synthesize_internal``.
 
@@ -489,12 +524,22 @@ class KokoroTTSEngine:
         from ``OpenerCache.build``). Passing ``None`` keeps the normal
         jitter-around-default behavior.
         """
+        if policy_marker is None:
+            policy_marker = getattr(self, "_tts_disable_marker", 0)
+        if not self._tts_is_enabled() or policy_marker is not getattr(self, "_tts_disable_marker", 0):
+            return b""
         with self._lock:
+            # Streaming/prefetch callers enter here without synthesize().
+            # Recheck after acquiring the lock so queued work respects disable.
+            if not self._tts_is_enabled() or policy_marker is not getattr(self, "_tts_disable_marker", 0):
+                return b""
             if not self._ensure_loaded():
                 logger.warning(
                     "Kokoro model not available, returning empty bytes text_length=%d",
                     len(text),
                 )
+                return b""
+            if not self._tts_is_enabled() or policy_marker is not getattr(self, "_tts_disable_marker", 0):
                 return b""
 
             try:
@@ -806,6 +851,9 @@ class KokoroTTSEngine:
         first sentence while later sentences are still being generated
         (streaming TTS).  Short text is synthesised in a single shot.
         """
+        if not self._tts_is_enabled():
+            return
+        policy_marker = getattr(self, "_tts_disable_marker", 0)
         from voice.synthesis.text_normalizer import normalize_for_speech
 
         text = normalize_for_speech(text)
@@ -824,13 +872,15 @@ class KokoroTTSEngine:
             self._speak_lock = asyncio.Lock()
 
         cached_opener_pcm = await asyncio.to_thread(self._lookup_opener_cache, text)
+        if policy_marker is not getattr(self, "_tts_disable_marker", 0):
+            return
         if cached_opener_pcm:
             async with self._speak_lock:
                 # Worker thread: _speak_cached_pcm ends in a blocking sd.wait(),
                 # so calling it inline froze the event loop (and with it every
                 # local API request) for the whole utterance. The streaming path
                 # below already offloads playback the same way.
-                await asyncio.to_thread(self._speak_cached_pcm, cached_opener_pcm)
+                await asyncio.to_thread(self._speak_cached_pcm, cached_opener_pcm, policy_marker=policy_marker)
             return
 
         # Determine whether to use streaming path
@@ -847,10 +897,12 @@ class KokoroTTSEngine:
             use_streaming = False
 
         async with self._speak_lock:
+            if not self._tts_is_enabled() or policy_marker is not getattr(self, "_tts_disable_marker", 0):
+                return
             if use_streaming:
-                await self._speak_streaming(clean_text, sentences)
+                await self._speak_streaming(clean_text, sentences, policy_marker=policy_marker)
             else:
-                await self._speak_single(text)
+                await self._speak_single(text, policy_marker=policy_marker)
 
     def _create_opener_cache(self, cfg: object) -> OpenerCache | None:
         if getattr(cfg, "tts_opener_cache_enabled", True) is False:
@@ -877,7 +929,7 @@ class KokoroTTSEngine:
         if getattr(self, "_opener_cache", None) is None:
             return None
         cfg = getattr(self, "_config", None) or settings
-        if not getattr(cfg, "tts_enabled", True) or getattr(cfg, "tts_opener_cache_enabled", True) is False:
+        if not self._tts_is_enabled() or getattr(cfg, "tts_opener_cache_enabled", True) is False:
             return None
         # Pass synthesize_variant=None so the lookup never blocks on a
         # synchronous build. If the background build hasn't finished yet,
@@ -894,7 +946,9 @@ class KokoroTTSEngine:
         # Persist unity-gain PCM, never a user's volume or build-time quiet hours.
         return self._synthesize_locked(text, None, speed, apply_volume=False)
 
-    def _speak_cached_pcm(self, pcm_bytes: bytes) -> None:
+    def _speak_cached_pcm(self, pcm_bytes: bytes, *, policy_marker: object | None = None) -> None:
+        if policy_marker is None:
+            policy_marker = getattr(self, "_tts_disable_marker", 0)
         # Cached audio shares the live policy with newly synthesized speech.
         pcm_bytes = self._scale_pcm_volume(np.frombuffer(pcm_bytes, dtype=np.int16), self._current_volume()).tobytes()
         monitor = None
@@ -919,7 +973,8 @@ class KokoroTTSEngine:
 
         try:
             with duck_ctx:
-                self._play_pcm_locally(pcm_bytes)
+                if self._tts_is_enabled() and policy_marker is getattr(self, "_tts_disable_marker", 0):
+                    self._play_pcm_locally(pcm_bytes)
         finally:
             if monitor is not None:
                 try:
@@ -927,8 +982,10 @@ class KokoroTTSEngine:
                 except Exception as e:
                     logger.debug("TTS state tracking update failed: %s", e)
 
-    async def _speak_single(self, text: str) -> None:
+    async def _speak_single(self, text: str, *, policy_marker: object | None = None) -> None:
         """Single-shot synthesize-then-play (original path)."""
+        if policy_marker is None:
+            policy_marker = getattr(self, "_tts_disable_marker", 0)
         monitor = None
         try:
             from diagnostics.wake_state_sync import get_state_sync_monitor
@@ -958,7 +1015,9 @@ class KokoroTTSEngine:
                 # streaming paths: _play_pcm_locally blocks on sd.wait() until
                 # the audio finishes, which would otherwise stall the event loop
                 # serving the local API for the length of every spoken line.
-                await asyncio.to_thread(self._play_pcm_locally, pcm_bytes, self.last_sample_rate)
+                await asyncio.to_thread(
+                    self._play_pcm_if_enabled, pcm_bytes, self.last_sample_rate, local=True, policy_marker=policy_marker
+                )
         finally:
             if monitor is not None:
                 try:
@@ -966,13 +1025,17 @@ class KokoroTTSEngine:
                 except Exception as e:
                     logger.debug("TTS state tracking update failed: %s", e)
 
-    async def _speak_streaming(self, full_text: str, sentences: list[str]) -> None:
+    async def _speak_streaming(
+        self, full_text: str, sentences: list[str], *, policy_marker: object | None = None
+    ) -> None:
         """Synthesize and play each sentence as it is ready (streaming).
 
         Ducking, ``is_speaking``, and the hub-local capture guard each
         activate **once** at the start and deactivate **once** at the
         end — they are NOT toggled per-sentence.
         """
+        if policy_marker is None:
+            policy_marker = getattr(self, "_tts_disable_marker", 0)
         t_start = time.perf_counter()
         ttfb_logged = False
 
@@ -1016,6 +1079,12 @@ class KokoroTTSEngine:
                 previous_pcm: bytes | None = None
 
                 for i, sentence in enumerate(sentences):
+                    if not self._tts_is_enabled() or policy_marker is not getattr(self, "_tts_disable_marker", 0):
+                        previous_pcm = None
+                        if prefetch_task is not None:
+                            await prefetch_task  # Drain already-owned work, discarding its retired result.
+                            prefetch_task = None
+                        break
                     # If we have a prefetched result, await it; otherwise
                     # synthesise this sentence now (first iteration or
                     # after a prefetch skip).
@@ -1027,7 +1096,12 @@ class KokoroTTSEngine:
                             self._synthesize_locked,
                             sentence,
                             None,
+                            policy_marker=policy_marker,
                         )
+
+                    if policy_marker is not getattr(self, "_tts_disable_marker", 0):
+                        previous_pcm = None
+                        break
 
                     # Kick off synthesis of the NEXT sentence while we
                     # play the current one.
@@ -1038,6 +1112,7 @@ class KokoroTTSEngine:
                                 self._synthesize_locked,
                                 next_sentence,
                                 None,
+                                policy_marker=policy_marker,
                             )
                         )
 
@@ -1061,8 +1136,10 @@ class KokoroTTSEngine:
                     # because the capture guard is managed at this level).
                     # While this plays, the prefetch task synthesises the
                     # next sentence in parallel.
-                    await asyncio.to_thread(self._play_pcm_raw, pcm, self.last_sample_rate)
-                    previous_pcm = pcm
+                    await asyncio.to_thread(
+                        self._play_pcm_if_enabled, pcm, self.last_sample_rate, policy_marker=policy_marker
+                    )
+                    previous_pcm = pcm if policy_marker is getattr(self, "_tts_disable_marker", 0) else None
                     logger.debug(
                         "Streaming TTS: played sentence %d/%d (%d bytes)",
                         i + 1,
@@ -1078,7 +1155,9 @@ class KokoroTTSEngine:
                     remaining_pcm = await prefetch_task
                     if remaining_pcm:
                         remaining_pcm = self._smooth_sentence_boundary(previous_pcm, remaining_pcm)
-                        await asyncio.to_thread(self._play_pcm_raw, remaining_pcm, self.last_sample_rate)
+                        await asyncio.to_thread(
+                            self._play_pcm_if_enabled, remaining_pcm, self.last_sample_rate, policy_marker=policy_marker
+                        )
         finally:
             # Clear is_speaking (once)
             if monitor is not None:
@@ -1153,9 +1232,25 @@ class KokoroTTSEngine:
                     sentence_count = 0
                     previous_pcm: bytes | None = None
                     previous_sentence: str | None = None
+                    policy_marker = getattr(self, "_tts_disable_marker", 0)
+
+                    async def retire_pending():
+                        nonlocal buffer, previous_pcm, previous_sentence, prefetch_task
+                        buffer = ""
+                        sentences_queue.clear()
+                        previous_pcm = previous_sentence = None
+                        if prefetch_task is not None:
+                            await prefetch_task  # Retirement does not claim to interrupt native inference.
+                            prefetch_task = None
 
                     async for chunk in text_chunks:
                         full_text_parts.append(chunk)
+                        enabled = self._tts_is_enabled()
+                        if not enabled or policy_marker is not getattr(self, "_tts_disable_marker", 0):
+                            await retire_pending()
+                            policy_marker = getattr(self, "_tts_disable_marker", 0)
+                        if not enabled:
+                            continue
                         buffer += chunk
 
                         # Check for complete sentences
@@ -1180,6 +1275,11 @@ class KokoroTTSEngine:
 
                         # Play any queued sentences immediately
                         while sentences_queue:
+                            if not self._tts_is_enabled() or policy_marker is not getattr(
+                                self, "_tts_disable_marker", 0
+                            ):
+                                await retire_pending()
+                                break
                             sentence = sentences_queue.pop(0)
                             sentence_count += 1
 
@@ -1192,7 +1292,12 @@ class KokoroTTSEngine:
                                     self._synthesize_locked,
                                     sentence,
                                     None,
+                                    policy_marker=policy_marker,
                                 )
+
+                            if policy_marker is not getattr(self, "_tts_disable_marker", 0):
+                                await retire_pending()
+                                break
 
                             # Kick off next sentence synthesis if more queued
                             if sentences_queue:
@@ -1202,6 +1307,7 @@ class KokoroTTSEngine:
                                         self._synthesize_locked,
                                         next_s,
                                         None,
+                                        policy_marker=policy_marker,
                                     )
                                 )
 
@@ -1222,9 +1328,18 @@ class KokoroTTSEngine:
                                 else:
                                     logger.info("LLM-streaming TTS TTFB %.0f ms", ttfb_ms)
 
-                            await asyncio.to_thread(self._play_pcm_raw, pcm, self.last_sample_rate)
-                            previous_pcm = pcm
-                            previous_sentence = sentence
+                            await asyncio.to_thread(
+                                self._play_pcm_if_enabled, pcm, self.last_sample_rate, policy_marker=policy_marker
+                            )
+                            if policy_marker is getattr(self, "_tts_disable_marker", 0):
+                                previous_pcm = pcm
+                                previous_sentence = sentence
+                            else:
+                                previous_pcm = previous_sentence = None
+                                buffer = ""
+
+                    if not self._tts_is_enabled() or policy_marker is not getattr(self, "_tts_disable_marker", 0):
+                        await retire_pending()
 
                     # --- Flush remaining buffer ---
                     if buffer.strip():
@@ -1246,6 +1361,7 @@ class KokoroTTSEngine:
                                 self._synthesize_locked,
                                 sentence,
                                 None,
+                                policy_marker=policy_marker,
                             )
                         if pcm:
                             if previous_sentence is not None:
@@ -1255,16 +1371,27 @@ class KokoroTTSEngine:
                                 ttfb_ms = (time.perf_counter() - t_start) * 1000
                                 ttfb_logged = True
                                 logger.info("LLM-streaming TTS TTFB %.0f ms", ttfb_ms)
-                            await asyncio.to_thread(self._play_pcm_raw, pcm, self.last_sample_rate)
-                            previous_pcm = pcm
-                            previous_sentence = sentence
+                            await asyncio.to_thread(
+                                self._play_pcm_if_enabled, pcm, self.last_sample_rate, policy_marker=policy_marker
+                            )
+                            if policy_marker is getattr(self, "_tts_disable_marker", 0):
+                                previous_pcm = pcm
+                                previous_sentence = sentence
+                            else:
+                                previous_pcm = previous_sentence = None
+                                buffer = ""
 
                     # Await any remaining prefetch
                     if prefetch_task is not None:
                         remaining_pcm = await prefetch_task
                         if remaining_pcm:
                             remaining_pcm = self._smooth_sentence_boundary(previous_pcm, remaining_pcm)
-                            await asyncio.to_thread(self._play_pcm_raw, remaining_pcm, self.last_sample_rate)
+                            await asyncio.to_thread(
+                                self._play_pcm_if_enabled,
+                                remaining_pcm,
+                                self.last_sample_rate,
+                                policy_marker=policy_marker,
+                            )
 
                     elapsed = time.perf_counter() - t_start
                     logger.info(
