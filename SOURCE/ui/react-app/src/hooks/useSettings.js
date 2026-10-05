@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { apiFetch } from './useViolaApi';
 import { useWebSocket } from './useWebSocket';
 import { isCloudSurface } from '../components/auth/cloudSurface';
@@ -75,59 +75,90 @@ export function useSettings(options = {}) {
   const [devices, setDevices] = useState({ input: [], output: [] });
   const [playlists, setPlaylists] = useState([]);
 
+  // A REST read belongs to the snapshot generation in which it started.
+  // A newer read, acknowledged write/reset or server-pushed snapshot makes
+  // its later success/failure stale, including privacy and device-status fields.
+  const snapshotGeneration = useRef(0);
+  const mounted = useRef(true);
+  const errorGeneration = useRef(0);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      snapshotGeneration.current += 1;
+    };
+  }, []);
+
+  const publishError = useCallback((value) => {
+    if (!mounted.current) return;
+    errorGeneration.current += 1;
+    setError(value);
+  }, []);
+
+  const publishSnapshot = useCallback((data, preserveAbsentVoiceStatus = false) => {
+    if (!mounted.current) return;
+    snapshotGeneration.current += 1;
+    setSettings(data.settings || {});
+    if (!preserveAbsentVoiceStatus || data.voice_status !== undefined) {
+      setVoiceStatus(data.voice_status ?? null);
+    }
+    setLoading(false);
+  }, []);
+
   // Listen for real-time settings changes via WebSocket.
   // This covers settings changed by voice commands or other clients.
   // The REST-based fetch on mount remains as the initial load and fallback.
   const handleWsMessage = useCallback((msg) => {
     if (msg.type === 'settings_changed' && msg.payload?.settings) {
-      setSettings(msg.payload.settings);
-      if (msg.payload.voice_status) {
-        setVoiceStatus(msg.payload.voice_status);
-      }
+      publishSnapshot(msg.payload, true);
     }
-  }, []);
+  }, [publishSnapshot]);
 
   useWebSocket(handleWsMessage);
 
   // Fetch current settings
   const fetchSettings = useCallback(async () => {
+    const generation = ++snapshotGeneration.current;
+    const errorVersion = errorGeneration.current;
+    const canPublishError = () => errorVersion === errorGeneration.current;
+    const isCurrent = () => mounted.current && generation === snapshotGeneration.current;
     try {
       setLoading(true);
       const data = await fetchSettingsPayload();
+      if (!isCurrent()) return;
       if (data.ok !== false) {
-        setSettings(data.settings || {});
-        setVoiceStatus(data.voice_status || null);
+        if (canPublishError()) publishError(null);
+        publishSnapshot(data);
       } else {
-        setError(data.error);
+        if (canPublishError()) publishError(data.error);
       }
     } catch (err) {
-      setError('Failed to load settings');
+      if (isCurrent() && canPublishError()) publishError('Failed to load settings');
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
-  }, []);
+  }, [publishSnapshot, publishError]);
 
   // Update settings
   const updateSettings = useCallback(async (newSettings) => {
     try {
       setSaving(true);
-      setError(null);
+      publishError(null);
       const data = await pushSettingsPayload(newSettings);
       if (data.ok !== false) {
-        setSettings(data.settings || {});
-        setVoiceStatus(data.voice_status || null);
+        publishSnapshot(data);
         return true;
       } else {
-        setError(data.error);
+        publishError(data.error);
         return false;
       }
     } catch (err) {
-      setError(SETTINGS_ERROR_BY_CODE[err?.code] || 'Failed to save settings');
+      publishError(SETTINGS_ERROR_BY_CODE[err?.code] || 'Failed to save settings');
       return false;
     } finally {
       setSaving(false);
     }
-  }, []);
+  }, [publishSnapshot, publishError]);
 
   // Update a single setting
   const updateSetting = useCallback(async (key, value) => {
@@ -140,20 +171,19 @@ export function useSettings(options = {}) {
       setSaving(true);
       const data = await apiFetch('/v1/settings/reset', { method: 'POST' });
       if (data.ok !== false) {
-        setSettings(data.settings || {});
-        setVoiceStatus(data.voice_status || null);
+        publishSnapshot(data);
         return true;
       } else {
-        setError(data.error);
+        publishError(data.error);
         return false;
       }
     } catch (err) {
-      setError('Failed to reset settings');
+      publishError('Failed to reset settings');
       return false;
     } finally {
       setSaving(false);
     }
-  }, []);
+  }, [publishSnapshot, publishError]);
 
   // Fetch audio devices
   const fetchDevices = useCallback(async () => {
@@ -311,6 +341,6 @@ export function useSettings(options = {}) {
     starPlaylist,
     setDefaultPlaylist,
     syncPlaylists,
-    clearError: () => setError(null),
+    clearError: () => publishError(null),
   };
 }
