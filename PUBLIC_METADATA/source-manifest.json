@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "4a2ad803ae7e01bfdff50c54996296581ab2d2e8",
-  "sha256": "30f179e6e62ee371a4d8cf68fb59d7448c86c6937130342761105ddd667cb587",
+  "revision": "1802845ae6ae4199f615ddf239f8d006a826ea6f",
+  "sha256": "75bde65dfdb538e71f32de175947df2ef0efd921f2dba477584525a3daa78ab3",
   "files": [
     {
       "path": ".env.example",
@@ -5830,8 +5830,8 @@
     },
     {
       "path": "tests/public/test_wake_listener_lifecycle.py",
-      "sha256": "4a4022d887988c5ec60f724f182f2aad22e7bea38547ad202ba7042c770e293c",
-      "bytes": 13426
+      "sha256": "f59c5009e9709e7d08fd08a440a26565c1af16c64f06b5e299d0243b5768a8c5",
+      "bytes": 25137
     },
     {
       "path": "tests/public/test_windows_native_startup_order.py",
@@ -11550,8 +11550,8 @@
     },
     {
       "path": "ui/settings_effects.py",
-      "sha256": "cf6b75528978b840cf2a4c2f637127a1c33cb6c8244449c4317d755fa1ee5858",
-      "bytes": 20876
+      "sha256": "9b7227374f0692c6f6993fb21e5d60e4bb5c95cedd352e331d8610f7dae63540",
+      "bytes": 21029
     },
     {
       "path": "ui/settings_manager.py",
@@ -12230,8 +12230,8 @@
     },
     {
       "path": "voice/pipeline.py",
-      "sha256": "913659e6021f54cbdb400b21c2f4774d47459c7a0ce28130887724676fcaa4c2",
-      "bytes": 43595
+      "sha256": "1d2d320d8d1f32b9ae03cfa1226988cfaac1c9193c82d39d41e200eca68effe0",
+      "bytes": 43883
     },
     {
       "path": "voice/pipeline_initialization.py",
@@ -12455,8 +12455,8 @@
     },
     {
       "path": "voice/wake_detector/facade.py",
-      "sha256": "9f362d226946ffe253139e0e6909b69cd0baaec7d256ca88af503318f0a7bb44",
-      "bytes": 33836
+      "sha256": "85cb43719c290403f949103003990897c1ace6947ac4efa5aed2339aa547a07b",
+      "bytes": 36508
     },
     {
       "path": "voice/wake_detector/fp_collector.py",
