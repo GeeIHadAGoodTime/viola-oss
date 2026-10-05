@@ -680,7 +680,9 @@ class WakeDetectorFacade:
     """
 
     _instance: WakeDetector | None = None
-    _lock: threading.Lock = threading.Lock()
+    _lock = threading.RLock()
+    _state_generation = 0
+    _requested_running: bool | None = None
 
     @classmethod
     def get_instance(cls) -> WakeDetector | None:
@@ -692,7 +694,59 @@ class WakeDetectorFacade:
     def set_instance(cls, detector: WakeDetector | None) -> None:
         """Set the singleton wake detector instance."""
         with cls._lock:
+            # Re-registration retires prepared work even if an intervening
+            # owner change eventually returns to the same object (ABA).
+            cls._state_generation += 1
             cls._instance = detector
+
+    @classmethod
+    def begin_restart(cls, detector: WakeDetector | None) -> int | None:
+        """Stop the owned instance and capture intent before slow construction."""
+        with cls._lock:
+            if cls._instance is not detector or cls._requested_running is False:
+                return None
+            try:
+                if detector is not None:
+                    detector.stop()
+            except (OSError, RuntimeError) as exc:
+                logger.debug("Wake detector stop during restart failed: %s", exc)
+            return cls._state_generation
+
+    @classmethod
+    def start_current(cls, detector: WakeDetector, stop_event: threading.Event) -> bool:
+        """Admit startup only while this is still the enabled current instance."""
+        with cls._lock:
+            if cls._instance is not detector or cls._requested_running is False or stop_event.is_set():
+                return False
+            if detector.is_running():
+                return True
+            return detector.start(stop_event)
+
+    @classmethod
+    def replace_and_start(
+        cls,
+        expected: WakeDetector | None,
+        replacement: WakeDetector,
+        generation: int,
+        stop_event: threading.Event,
+    ) -> tuple[bool, bool]:
+        """Commit one prepared replacement only if no newer user intent won.
+
+        The same lock covers settings sync and activation, so disable cannot
+        acknowledge between this ownership check and starting the replacement.
+        Rejected candidates remain caller-owned and must be cleaned up.
+        """
+        with cls._lock:
+            if (
+                cls._instance is not expected
+                or cls._state_generation != generation
+                or cls._requested_running is False
+                or stop_event.is_set()
+            ):
+                return False, False
+            cls._state_generation += 1
+            cls._instance = replacement
+            return True, replacement.start(stop_event)
 
     @classmethod
     def is_available(cls) -> bool:
@@ -768,7 +822,15 @@ class WakeDetectorFacade:
         Returns the detector's ``is_running()`` state after the sync (False
         if no detector instance exists).
         """
-        instance = cls.get_instance()
+        with cls._lock:
+            cls._state_generation += 1
+            cls._requested_running = voice_mode == "wake_word" and not mic_muted
+            return cls._sync_current(voice_mode, mic_muted)
+
+    @classmethod
+    def _sync_current(cls, voice_mode: str, mic_muted: bool) -> bool:
+        """Apply the recorded intent while holding the lifecycle lock."""
+        instance = cls._instance
         if instance is None:
             logger.debug("No wake detector instance to sync to voice_mode/mic_muted state")
             return False
@@ -804,6 +866,8 @@ class WakeDetectorFacade:
         """Reset the singleton for testing purposes."""
         with cls._lock:
             cls._instance = None
+            cls._state_generation = 0
+            cls._requested_running = None
 
 
 class WakeDetectorAdapter:

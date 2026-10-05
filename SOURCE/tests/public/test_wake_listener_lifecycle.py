@@ -282,6 +282,289 @@ class WakeListenerLifecycleTests(unittest.TestCase):
         self.assert_released()
 
 
+class WakeRestartOwnershipTests(unittest.TestCase):
+    """Actual pipeline/facade control flow, with no model or capture device."""
+
+    def setUp(self):
+        import ast
+        from typing import Any
+
+        self.calls = []
+        calls = self.calls
+
+        class Detector:
+            def __init__(self, name, running=False):
+                self.name, self.running = name, running
+                self._intentionally_stopped = False
+
+            def is_running(self):
+                return self.running
+
+            def is_available(self):
+                return True
+
+            def start(self, event):
+                calls.append(self.name + ":start")
+                self.running = True
+                self._intentionally_stopped = False
+                return True
+
+            def stop(self):
+                calls.append(self.name + ":stop")
+                self.running = False
+                self._intentionally_stopped = True
+
+        self.Detector = Detector
+        self.old, self.new = Detector("old", True), Detector("replacement")
+        self.namespace = {"threading": threading, "logger": Mock(), "Path": Path, "Any": Any}
+        self.future = ast.ImportFrom(module="__future__", names=[ast.alias(name="annotations")], level=0)
+        path = ROOT / "voice/wake_detector/facade.py"
+        tree = ast.parse(path.read_text())
+        facade = next(n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == "WakeDetectorFacade")
+        self.execute([facade], path)
+        self.facade = self.namespace["WakeDetectorFacade"]
+        self.facade.set_instance(self.old)
+        overrides = patch.dict(
+            sys.modules,
+            {"voice.wake_detector.facade": module("voice.wake_detector.facade", WakeDetectorFacade=self.facade)},
+        )
+        overrides.start()
+        self.addCleanup(overrides.stop)
+        path = ROOT / "voice/pipeline.py"
+        tree = ast.parse(path.read_text())
+        cls = next(n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == "VoicePipeline")
+        self.execute(
+            [n for n in cls.body if isinstance(n, ast.FunctionDef) and n.name in {"_restart_wake_detector", "start"}],
+            path,
+        )
+        self.factory = Mock(return_value=self.new)
+        self.namespace["WakeDetector"] = self.factory
+        self.namespace["WakeDetectorUnavailableError"] = RuntimeError
+        self.pipeline = types.SimpleNamespace(
+            wake_detector=self.old,
+            _stop_event=threading.Event(),
+            config=object(),
+            _build_wake_callback=lambda: lambda: None,
+            _supervisor=None,
+            _rewire_aec_after_restart=Mock(),
+            _try_start_continuous_capture=Mock(),
+        )
+
+    def execute(self, nodes, path):
+        import ast
+
+        exec(
+            compile(
+                ast.fix_missing_locations(ast.Module(body=[self.future, *nodes], type_ignores=[])), str(path), "exec"
+            ),
+            self.namespace,
+        )
+
+    def restart(self):
+        return self.namespace["_restart_wake_detector"](self.pipeline)
+
+    def deferred_restart(self, action):
+        entered, release = threading.Event(), threading.Event()
+        results, errors = [], []
+
+        def build(*args, **kwargs):
+            entered.set()
+            assert release.wait(2), "synthetic replacement construction was not released"
+            return self.new
+
+        def run():
+            try:
+                results.append(self.restart())
+            except BaseException as exc:
+                errors.append(exc)
+
+        self.factory.side_effect = build
+        worker = threading.Thread(target=run, daemon=True)
+        worker.start()
+        try:
+            assert entered.wait(1)
+            action()
+            self.calls.append("newer-intent-completed")
+        finally:
+            release.set()
+            worker.join(2)
+        assert not worker.is_alive()
+        assert not errors
+        return results
+
+    def test_disable_during_replacement_construction_cannot_restart(self):
+        results = self.deferred_restart(lambda: self.facade.sync_to_state("disabled", False))
+        assert results == [False]
+        assert "replacement:start" not in self.calls
+        assert self.calls[-1] == "replacement:stop"
+        assert self.pipeline.wake_detector is self.old
+        assert self.facade.get_instance() is self.old
+        assert self.old._intentionally_stopped
+
+    def test_mute_during_replacement_construction_cannot_restart(self):
+        results = self.deferred_restart(lambda: self.facade.sync_to_state("wake_word", True))
+        assert results == [False]
+        assert "replacement:start" not in self.calls
+        assert not self.old.is_running() and not self.new.is_running()
+
+    def test_unchanged_enabled_restart_adopts_exactly_one_replacement(self):
+        assert self.restart() is True
+        assert self.pipeline.wake_detector is self.new
+        assert self.facade.get_instance() is self.new
+        assert self.calls == ["old:stop", "replacement:start"]
+        self.pipeline._rewire_aec_after_restart.assert_called_once_with()
+
+    def test_enabled_restart_can_construct_a_missing_detector(self):
+        self.pipeline.wake_detector = None
+        self.facade.set_instance(None)
+        assert self.restart() is True
+        assert self.pipeline.wake_detector is self.new
+        assert self.calls == ["replacement:start"]
+
+    def test_rejected_cleanup_failure_does_not_activate_replacement(self):
+        self.new.stop = Mock(side_effect=RuntimeError("controlled cleanup failure"))
+        assert self.deferred_restart(lambda: self.facade.sync_to_state("disabled", False)) == [False]
+        assert "replacement:start" not in self.calls
+        self.namespace["logger"].warning.assert_called_once()
+
+    def test_queued_restart_after_disable_does_not_construct_or_start(self):
+        self.facade.sync_to_state("disabled", False)
+        assert self.restart() is False
+        self.factory.assert_not_called()
+        assert self.calls == ["old:stop"]
+
+    def test_newer_unmute_owns_old_instance_and_invalidates_prepared_restart(self):
+        def action():
+            self.facade.sync_to_state("wake_word", True)
+            self.facade.sync_to_state("wake_word", False)
+
+        assert self.deferred_restart(action) == [False]
+        assert self.old.is_running()
+        assert self.facade.get_instance() is self.old
+        assert "replacement:start" not in self.calls
+
+    def test_replaced_owner_invalidates_prepared_restart(self):
+        other = self.Detector("new-owner", True)
+        assert self.deferred_restart(lambda: self.facade.set_instance(other)) == [False]
+        assert self.facade.get_instance() is other
+        assert other.is_running()
+        assert "replacement:start" not in self.calls
+
+    def test_shutdown_during_construction_discards_replacement(self):
+        assert self.deferred_restart(self.pipeline._stop_event.set) == [False]
+        assert "replacement:start" not in self.calls
+
+    def test_owner_aba_reregistration_retires_prepared_restart(self):
+        other = self.Detector("intervening-owner")
+
+        def action():
+            self.facade.set_instance(other)
+            self.facade.set_instance(self.old)
+
+        assert self.deferred_restart(action) == [False]
+        assert self.facade.get_instance() is self.old
+        assert "replacement:start" not in self.calls
+
+    def test_same_instance_reregistration_retires_prepared_restart(self):
+        assert self.deferred_restart(lambda: self.facade.set_instance(self.old)) == [False]
+        assert self.facade.get_instance() is self.old
+        assert "replacement:start" not in self.calls
+
+    def test_pending_pipeline_start_respects_acknowledged_disable(self):
+        self.old.running = False
+        self.facade.sync_to_state("disabled", False)
+        assert self.namespace["start"](self.pipeline) is False
+        assert "old:start" not in self.calls
+        self.pipeline._try_start_continuous_capture.assert_not_called()
+
+    def test_pending_pipeline_start_respects_acknowledged_mute(self):
+        self.old.running = False
+        self.facade.sync_to_state("wake_word", True)
+        assert self.namespace["start"](self.pipeline) is False
+        assert "old:start" not in self.calls
+
+    def test_later_explicit_unmute_allows_current_start(self):
+        self.old.running = False
+        self.facade.sync_to_state("wake_word", True)
+        self.facade.sync_to_state("wake_word", False)
+        assert self.old.is_running()
+        assert self.calls == ["old:start"]
+
+    def test_pending_pipeline_start_does_not_duplicate_newer_unmute(self):
+        self.old.running = False
+        self.facade.sync_to_state("wake_word", True)
+        self.facade.sync_to_state("wake_word", False)
+        assert self.namespace["start"](self.pipeline) is True
+        assert self.calls.count("old:start") == 1
+
+    def test_disable_cannot_acknowledge_between_activation_check_and_start(self):
+        entered, release, disabling, acknowledged = (threading.Event() for _ in range(4))
+        original_start = self.old.start
+        self.old.running = False
+        errors = []
+
+        def delayed_start(event):
+            entered.set()
+            assert release.wait(2)
+            return original_start(event)
+
+        def disable():
+            disabling.set()
+            try:
+                self.facade.sync_to_state("wake_word", True)
+                self.calls.append("disable-acknowledged")
+                acknowledged.set()
+            except BaseException as exc:
+                errors.append(exc)
+
+        self.old.start = delayed_start
+        start_worker = threading.Thread(
+            target=lambda: self.facade.start_current(self.old, self.pipeline._stop_event), daemon=True
+        )
+        disable_worker = threading.Thread(target=disable, daemon=True)
+        start_worker.start()
+        try:
+            assert entered.wait(1)
+            disable_worker.start()
+            assert disabling.wait(1)
+            assert not acknowledged.wait(0.05)
+        finally:
+            release.set()
+            start_worker.join(2)
+            if disable_worker.ident is not None:
+                disable_worker.join(2)
+        assert not start_worker.is_alive() and not disable_worker.is_alive()
+        assert not errors and acknowledged.is_set()
+        assert self.calls == ["old:start", "old:stop", "disable-acknowledged"]
+        assert not self.old.is_running()
+
+    def test_effect_before_registration_retains_disable_for_later_start(self):
+        import ast
+
+        self.facade.set_instance(None)
+        self.namespace.update(
+            EffectOutcome=types.SimpleNamespace(DEFERRED="deferred", FAILED="failed", APPLIED="applied"),
+            EffectResult=lambda key, outcome, detail: types.SimpleNamespace(outcome=outcome),
+        )
+        path = ROOT / "ui/settings_effects.py"
+        tree = ast.parse(path.read_text())
+        self.execute([n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "_apply_voice_mode"], path)
+        effect = self.namespace["_apply_voice_mode"](
+            "voice_mode", "disabled", settings_mgr=types.SimpleNamespace(get=lambda key, default: False)
+        )
+        assert effect.outcome == "deferred"
+        self.old.running = False
+        self.facade.set_instance(self.old)
+        assert self.namespace["start"](self.pipeline) is False
+        assert "old:start" not in self.calls
+
+    def test_test_reset_does_not_leak_prior_disable_intent(self):
+        self.facade.sync_to_state("disabled", False)
+        self.facade.reset_for_tests()
+        self.facade.set_instance(self.old)
+        assert self.restart() is True
+
+
 if __name__ == "__main__":
     if sys.argv[1:] == ["--device-open-failure"]:
         faulthandler.dump_traceback_later(2)

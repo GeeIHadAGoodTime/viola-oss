@@ -1,14 +1,16 @@
 {
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "9eba11dd0e90518d53f7f1043c05bbebc9965b279a45f2122418bacc0c51a720",
-  "source_tree_sha256": "c89e65e79bda2b6fe4f2e304d5da505a25fd030338d0388faac9667e718dfcbc",
-  "source_file_count": 2507,
-  "source_revision": "fb7feac4882fafde256d7e6af28402fe057d7d62",
+  "source_manifest_sha256": "549d40926767dd27df3a2ad9c2b9f22d15656af05b1407afdc641a43079a47c2",
+  "source_tree_sha256": "75bde65dfdb538e71f32de175947df2ef0efd921f2dba477584525a3daa78ab3",
+  "source_file_count": 2506,
+  "source_revision": "1802845ae6ae4199f615ddf239f8d006a826ea6f",
   "comparison_public_revision": "e28c90fca8902a466400947ecd39aae569fdeaaf",
   "changed_source_paths": [
-    "SOURCE/services/notifications/windows_toast.py",
-    "SOURCE/tests/public/test_windows_toast_delivery_contract.py"
+    "SOURCE/voice/wake_detector/facade.py",
+    "SOURCE/voice/pipeline.py",
+    "SOURCE/ui/settings_effects.py",
+    "SOURCE/tests/public/test_wake_listener_lifecycle.py"
   ],
   "retained_sboms": [
     {
@@ -50,7 +52,7 @@
   ],
   "input_equivalence": {
     "changed_dependency_inputs": [],
-    "basis": "One existing runtime source changes and one stdlib source-contract test is added. All 2505 other SOURCE files remain byte-identical to public e28c90fca8902a466400947ecd39aae569fdeaaf, including startup visibility v2 and Settings dismissal. Dependencies, build profiles, vendor/model assets, licences, notices and all six retained SBOMs are unchanged. No new dependency resolution or advisory scan is claimed."
+    "basis": "Four existing admission SOURCE runtime/test paths change; all2502 other source files, including landed startup and settings corrections, dependency inputs, workflows, licenses, assets, schemas and six SBOMs remain byte-identical to e28c90fca8902a466400947ecd39aae569fdeaaf. No dependency resolution or advisory scan."
   },
   "prior_binding": {
     "public_revision": "e28c90fca8902a466400947ecd39aae569fdeaaf",
@@ -63,17 +65,18 @@
   "new_advisory_scan_performed": false,
   "new_runtime_qualification_performed": false,
   "qualification": {
-    "scope": "Offline execution of actual Windows toast registration, delivery and notification-routing source with inert COM and process boundaries. No native Windows or installed notification result.",
-    "source_integrity": "All 2533 authenticated base Git blobs reconciled. One existing runtime leaf changes and one public test is added; the source-only commit retains 2532 original leaves. Two metadata replacements retain 2530 original leaves. Canonical manifest contains 2507 source files and all six previous SBOMs are retained exactly.",
-    "behavior": "A pywintypes.com_error from COM initialization, shortcut/property registration or cleanup is translated to the existing RuntimeError delivery boundary. Failed local delivery returns false and allows each existing user-scoped normal/high/urgent web-push leg to continue. Successful delivery, app identity, platform/cloud/permission gates and COM cleanup are preserved. Unexpected programming errors still propagate.",
-    "checks": "11 public controls pass; exact original runtime yields 15 failing subcases. Independent reviewer repeats the 11 controls plus four permission-error/retry/programming-error/cleanup probes, all 15 pass. A composed-source union of web-push, quiet-hours, macOS/Linux fallbacks, C2 resilience and new public controls passes all 66 cases. Latest public startup-v2 plus toast union passes all 35 cases. Black and Ruff pass on changed source.",
-    "private_fixture_scope": "A separately reviewed private test-only fixture isolates every web-push test from all three OS notification boundaries. All 11 cases pass with an independent hard-failure OS sentinel; original fixture produces three failures. This private fixture is not part of the public runtime patch.",
-    "integration_limit": "The private repository must adopt this public revision and explicitly map the new public test. The Windows safety job that exposed this defect remains a historical failed result until a fresh native gate runs on the integrated exact head. No UI toast, COM registration, Windows permission, installed process, native device or Surface result is claimed.",
-    "review": "Independent source review verifies both exact hashes and AST-limits the runtime change to _ensure_app_shortcut. No blocking defect found for this bounded correction.",
-    "lineage": "Prior qualification is retained below as historical evidence; it does not independently qualify this successor.",
-    "exact_head_hosted_checks": "pending for this exact bound successor",
+    "scope": "Pending wake startup/replacement admission with synthetic hardware boundaries only. No physical capture cessation, installed app, Surface, release or deployment qualification.",
+    "source_integrity": "Authoritative base e28c90fca8902a466400947ecd39aae569fdeaaf includes landed startup visibility v2. Source commit1802845ae6ae4199f615ddf239f8d006a826ea6f changes only the four reviewed admission SOURCE leaves and preserves2529 other base leaves. Canonical metadata binds2506 source files; final tree preserves2527 unrelated base leaves and all six SBOMs.",
+    "behavior": "Serialize requested listening state and detector activation; retain disable/mute intent before registration. Capture generation/instance ownership before construction and atomically commit only still-current replacements. Registration, including A-to-B-to-A and same-object registration, retires prior tickets. Newer disable, unmute, owner change or shutdown discards the prepared detector. Pending pipeline startup uses the same gate and does not duplicate a newer unmute start.",
+    "checks": "Thirty public methods pass:12 accepted listener lifecycle controls plus18 new deterministic admission controls. Nine unchanged private sync tests replay through their actual extracted class, for39 supplied controls total. Five selected behavioral controls fail on original source. Independent reviewer replayed all39 plus five independent concurrency controls,44/44, including the original registration ABA counterexample; WakeDetector class AST remains unchanged. Four changed files are Black-formatted. Ruff retains29 inherited unittest-style findings with zero new diagnostics.",
+    "retained_failure": "Initial review found an A-to-B-to-A ownership hole because registration did not advance the ticket generation. V2 advances generation on registration and replacement adoption, preserving listening intent. Two persistent registration controls retain this case. A smaller test environment lacked NumPy; that collection error is retained, and the complete stated scope passed in the existing NumPy2.2.6 environment without installation or exclusion.",
+    "review": "Independent whole-product owner approved exact patchcd012e2d after source hash, unchanged WakeDetector AST and39+5 control verification.",
+    "integration_limit": "Admission scope only. Native stop/drain, already admitted workers, continuous conversational capture, alternate direct-start callers and persisted consent across process restart remain separate. A retained adjacent source probe demonstrates an already-admitted listener can attempt mocked capture after mute; that stop/drain fix is explicitly not included here. No physical microphone privacy pass may be inferred from synthetic detector stopped flags.",
+    "lineage": "Prior source qualification is retained below as history and does not independently qualify this successor.",
+    "exact_head_hosted_checks": "pending for this exact successor",
     "installed_candidate": "not_established",
     "release_or_deployment": "not_established",
+    "integration_requalification": "Landed OSS34 startup visibility and OSS33/35 settings fixes are preserved exactly. The reviewed four admission SOURCE hashes are unchanged. Canonical2506-source/6-SBOM binding and63 focused source controls (30 public wake,9 unchanged private sync,24 startup) are replayed on this preserved union. These remain hardware-inert scoped checks; fresh exact-head hosted checks are required.",
     "prior_source_qualification": {
       "scope": "Desktop startup surface visibility source correction; no installed Windows, Chromium rendering, physical device, release or deployment qualification.",
       "source_integrity": "All 2533 authoritative public base leaves are preserved except the two reviewed startup SOURCE files and two canonical metadata files. Source revision 4a2ad803ae7e01bfdff50c54996296581ab2d2e8 is based on landed OSS35 merge31be8941 and preserves 2531 other leaves at its source-only stage. Final binding inventories all2506 source files and preserves2529 unrelated base leaves plus all six SBOMs.",
@@ -235,7 +238,7 @@
     }
   },
   "reviewed_source_patch": {
-    "windows_toast_com_failure_sha256": "03bca923720781e9f0bdb3b3cf6fac5f9b285992340681b29787415b2409373e",
+    "wake_admission_v2_sha256": "cd012e2d296139da8d775eac6623a496f56a6e4e42b49a50433f58a69adfa3c4",
     "prior_source_patch": {
       "startup_visibility_intent_v2_sha256": "c9e0f9888f83dcebcb3d7e031130553c3ff3129d49e5b99b0044f845d36fc0d8",
       "prior_source_patch": {
