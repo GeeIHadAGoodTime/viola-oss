@@ -110,6 +110,26 @@ class WakeDetectorPort(Protocol):
         ...
 
 
+class _WakeStopEvent:
+    """Read-only union of caller shutdown and one detector attempt's stop."""
+
+    def __init__(self, shutdown: threading.Event, cancelled: threading.Event):
+        self._shutdown = shutdown
+        self._cancelled = cancelled
+
+    def is_set(self) -> bool:
+        return self._shutdown.is_set() or self._cancelled.is_set()
+
+    def wait(self, timeout: float | None = None) -> bool:
+        deadline = None if timeout is None else time.monotonic() + max(0.0, timeout)
+        while not self.is_set():
+            remaining = None if deadline is None else deadline - time.monotonic()
+            if remaining is not None and remaining <= 0:
+                return False
+            self._cancelled.wait(0.05 if remaining is None else min(0.05, remaining))
+        return True
+
+
 class WakeDetector:
     """
     Unified wake word detection abstraction.
@@ -162,6 +182,10 @@ class WakeDetector:
             self._raw_listener = getattr(implementation, "_listener", implementation)
         self._stop_event: threading.Event | None = None
         self._thread: threading.Thread | None = None
+        self._lifecycle_lock = threading.RLock()
+        self._run_cancel: threading.Event | None = None
+        self._lifecycle_generation = 0
+        self._drain_callback: Callable[[], None] | None = None
         self._gain_scheduler = self._create_gain_scheduler()
         # Heartbeats for wake detection are no longer PUSHED from here. The
         # supervisor pulls health() instead, which reads the signal the
@@ -292,30 +316,78 @@ class WakeDetector:
         Returns:
             True if started successfully, False otherwise
         """
-        if self._impl is None:
-            logger.warning("Wake word detector not available")
-            return False
+        with self._lifecycle_lock:
+            if self._impl is None or stop_event.is_set():
+                logger.warning("Wake word detector unavailable or shutdown requested")
+                return False
+            if self.is_running():
+                # Never share one listener with a prior worker still draining.
+                return not self._intentionally_stopped
 
-        self._stop_event = stop_event
-        try:
-            self._thread = threading.Thread(
-                target=self._run_loop,
-                args=(stop_event,),
-                daemon=True,
-                name="wake-detector-thread",
-            )
-            self._thread.start()
-            if self._gain_scheduler:
-                self._gain_scheduler.start()
+            self._lifecycle_generation += 1
+            self._drain_callback = None
+            self._stop_event = stop_event
+            cancelled = threading.Event()
+            self._run_cancel = cancelled
             self._intentionally_stopped = False
-            logger.info("✅ Wake word detection started")
+            try:
+                self._thread = threading.Thread(
+                    target=self._run_attempt,
+                    args=(_WakeStopEvent(stop_event, cancelled),),
+                    daemon=True,
+                    name="wake-detector-thread",
+                )
+                self._thread.start()
+                if self._gain_scheduler:
+                    self._gain_scheduler.start()
+                logger.info("✅ Wake word detection started")
+                return True
+            except Exception as e:
+                cancelled.set()
+                self._intentionally_stopped = True
+                logger.error("Failed to start wake word detector: %s", e)
+                return False
+
+    def _run_attempt(self, stop_event: threading.Event) -> None:
+        """Retire ownership only after the implementation has drained cleanup."""
+        try:
+            self._run_loop(stop_event)
+        finally:
+            callback = None
+            with self._lifecycle_lock:
+                if self._thread is threading.current_thread():
+                    self._thread = None
+                    callback = self._drain_callback
+                    self._drain_callback = None
+            # Never acquire the facade lock while holding the detector lock.
+            if callback is not None:
+                callback()
+
+    def when_drained(self, callback: Callable[[int], None]) -> bool:
+        """Keep one latest resume request while an intentionally stopped run exits."""
+        with self._lifecycle_lock:
+            if not self.is_running() or not self._intentionally_stopped:
+                return False
+            generation = self._lifecycle_generation
+            self._drain_callback = lambda: callback(generation)
             return True
-        except Exception as e:
-            logger.error("Failed to start wake word detector: %s", e)
-            return False
+
+    def resume_after_drain(self, generation: int, stop_event: threading.Event) -> bool:
+        """Resume only if no intervening stop/start retired the drain request."""
+        with self._lifecycle_lock:
+            if (
+                self._lifecycle_generation != generation
+                or not self._intentionally_stopped
+                or self.is_running()
+                or stop_event.is_set()
+            ):
+                return False
+            return self.start(stop_event)
 
     def _run_loop(self, stop_event: threading.Event) -> None:
         """Internal run loop that calls implementation with circuit breaker protection."""
+        if stop_event.is_set():
+            return
         if self._impl:
             # Check circuit breaker before starting
             if self._detection_circuit.is_open:
@@ -389,17 +461,29 @@ class WakeDetector:
         # Muting the mic or leaving wake-word mode must not look like a death,
         # or the supervisor "recovers" the detector and silently undoes the
         # user's choice a few seconds later.
-        self._intentionally_stopped = True
-        if self._gain_scheduler:
-            self._gain_scheduler.stop()
-        if self._impl and hasattr(self._impl, "cleanup"):
-            try:
-                self._impl.cleanup()
-            except Exception as e:
-                logger.debug("Error during wake detector cleanup: %s", e)
-        # Clear thread reference immediately so is_running() returns False right away.
-        # The daemon thread will exit on its own when stop_event fires.
-        self._thread = None
+        with self._lifecycle_lock:
+            self._lifecycle_generation += 1
+            self._drain_callback = None
+            self._intentionally_stopped = True
+            if self._run_cancel is not None:
+                self._run_cancel.set()
+            thread = self._thread
+            if self._gain_scheduler:
+                self._gain_scheduler.stop()
+            if self._impl and hasattr(self._impl, "cleanup"):
+                try:
+                    self._impl.cleanup()
+                except Exception as e:
+                    logger.debug("Error during wake detector cleanup: %s", e)
+        # The worker retires its identity under the same lock after cleanup.
+        # Joining while holding it would prevent an otherwise finished run
+        # from draining until this timeout expires.
+        if thread is not None and thread is not threading.current_thread() and thread.is_alive():
+            thread.join(timeout=TIMEOUT_MEDIUM)
+        with self._lifecycle_lock:
+            # A later explicit enable may already own a different worker.
+            if self._thread is thread and (thread is None or not thread.is_alive()):
+                self._thread = None
 
     @property
     def detection_signal(self) -> WorkSignal | None:
@@ -436,7 +520,8 @@ class WakeDetector:
         device read -- do not use it to decide whether detection works. That
         question is :meth:`is_detecting`.
         """
-        return self._thread is not None and self._thread.is_alive()
+        thread = self._thread
+        return thread is not None and thread.is_alive()
 
     def is_detecting(self) -> bool:
         """Whether wake detection is REALLY happening right now.
@@ -719,7 +804,8 @@ class WakeDetectorFacade:
             if cls._instance is not detector or cls._requested_running is False or stop_event.is_set():
                 return False
             if detector.is_running():
-                return True
+                # A stopped worker can still be draining its final cleanup.
+                return not detector._intentionally_stopped
             return detector.start(stop_event)
 
     @classmethod
@@ -838,8 +924,18 @@ class WakeDetectorFacade:
         should_run = voice_mode == "wake_word" and not mic_muted
         try:
             if should_run:
-                if not instance.is_running():
-                    started = instance.start(threading.Event())
+                deferred = False
+                start_event = threading.Event()
+                if instance.is_running() and instance._intentionally_stopped:
+                    generation = cls._state_generation
+                    shutdown = instance._stop_event
+                    if shutdown is not None:
+                        start_event = shutdown
+                        deferred = instance.when_drained(
+                            lambda lifecycle: cls._resume_current_after_drain(instance, generation, lifecycle, shutdown)
+                        )
+                if not deferred and not instance.is_running():
+                    started = instance.start(start_event)
                     logger.info(
                         "Wake detector started (voice_mode=%s mic_muted=%s): %s",
                         voice_mode,
@@ -860,6 +956,25 @@ class WakeDetectorFacade:
                 mic_muted,
             )
         return instance.is_running()
+
+    @classmethod
+    def _resume_current_after_drain(
+        cls,
+        instance: WakeDetector,
+        generation: int,
+        lifecycle: int,
+        shutdown: threading.Event,
+    ) -> None:
+        """Commit retained enabled intent only for this owner and request."""
+        with cls._lock:
+            if (
+                cls._instance is not instance
+                or cls._state_generation != generation
+                or cls._requested_running is not True
+                or shutdown.is_set()
+            ):
+                return
+            instance.resume_after_drain(lifecycle, shutdown)
 
     @classmethod
     def reset_for_tests(cls) -> None:

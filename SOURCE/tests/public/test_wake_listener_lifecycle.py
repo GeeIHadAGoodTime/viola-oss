@@ -151,8 +151,23 @@ class WakeListenerLifecycleTests(unittest.TestCase):
         self.native_stream.return_value = stream
         return audio, stream
 
+    def stop_after_next_init(self, listener=None):
+        """Exercise real init success/failure before requesting orderly stop."""
+        listener = listener or self.listener
+        actual_init = listener._init
+        self.stop.clear()
+
+        def initialize_then_stop():
+            listener._init = actual_init
+            try:
+                return actual_init()
+            finally:
+                self.stop.set()
+
+        listener._init = initialize_then_stop
+
     def test_real_failed_init_unregisters_on_stop(self):
-        self.stop.set()
+        self.stop_after_next_init()
         self.listener.run(self.stop)
         self.assertTrue(self.listener._capture_open_failed.is_set())
         self.native_open.assert_not_called()
@@ -163,9 +178,9 @@ class WakeListenerLifecycleTests(unittest.TestCase):
     def test_repeated_supervisor_replacements_do_not_accumulate_owners(self):
         other_owner = object()
         self.registry.register_stream_owner(other_owner)
-        self.stop.set()
         for _ in range(3):
             listener = self.make_listener()
+            self.stop_after_next_init(listener)
             listener.run(self.stop)
             self.assertTrue(listener._capture_open_failed.is_set())
             self.assert_released(listener)
@@ -194,7 +209,7 @@ class WakeListenerLifecycleTests(unittest.TestCase):
 
     def test_successful_init_then_stop_cleans_after_unregistering(self):
         audio, stream = self.prepare_capture()
-        self.stop.set()
+        self.stop_after_next_init()
         stream.stop_stream.side_effect = lambda: self.assertNotIn(self.listener, self.registry._snapshot_owners())
         self.listener.run(self.stop)
         self.native_open.assert_called_once_with()
@@ -206,7 +221,7 @@ class WakeListenerLifecycleTests(unittest.TestCase):
         self.assertFalse(self.listener._capture_open_failed.is_set())
 
     def test_failed_listener_can_restart_read_work_and_stop_repeatedly(self):
-        self.stop.set()
+        self.stop_after_next_init()
         self.listener.run(self.stop)
         self.assertTrue(self.listener._capture_open_failed.is_set())
         self.assertEqual(self.listener.detection_signal.count, 0)
@@ -217,10 +232,12 @@ class WakeListenerLifecycleTests(unittest.TestCase):
             def read_frame(*args, **kwargs):
                 self.assertIn(self.listener, self.registry._snapshot_owners())
                 self.assertTrue(self.listener._loop_active.is_set())
-                self.stop.set()
                 return np.ones(self.listener.CHUNK_SIZE, dtype=np.int16).tobytes()
 
             stream.read.side_effect = read_frame
+            # Stop after the real frame has been accepted, not while read is
+            # returning: post-cancellation frames are intentionally discarded.
+            self.listener.set_frame_tap(lambda _frame: self.stop.set())
             self.listener.run(self.stop)
             stream.read.assert_called_once_with(self.listener.CHUNK_SIZE, exception_on_overflow=False)
             self.assertFalse(self.listener._capture_open_failed.is_set())
@@ -565,6 +582,537 @@ class WakeRestartOwnershipTests(unittest.TestCase):
         assert self.restart() is True
 
 
+class WakeCaptureStopTests(unittest.TestCase):
+    """Actual detector/listener control with native audio/model boundaries inert."""
+
+    def setUp(self):
+        import ast
+
+        self.case = WakeListenerLifecycleTests()
+        self.case.setUp()
+        self.addCleanup(self.case.doCleanups)
+        self.listener = self.case.listener
+        self.parent_stop = threading.Event()
+        self._workers = []
+        self._releases = []
+        self.addCleanup(self._finish_workers)
+        path = ROOT / "voice/wake_detector/facade.py"
+        tree = ast.parse(path.read_text())
+        names = {"_WakeStopEvent", "WakeDetector", "WakeDetectorFacade"}
+        nodes = [n for n in tree.body if isinstance(n, ast.ClassDef) and n.name in names]
+        future = ast.ImportFrom(module="__future__", names=[ast.alias(name="annotations")], level=0)
+        self.namespace = {
+            "threading": threading,
+            "time": __import__("time"),
+            "Path": Path,
+            "logger": Mock(),
+            "TIMEOUT_MEDIUM": 0.02,
+        }
+        exec(
+            compile(ast.fix_missing_locations(ast.Module(body=[future, *nodes], type_ignores=[])), str(path), "exec"),
+            self.namespace,
+        )
+        self.detector = self.make_detector(self.listener)
+
+    def _finish_workers(self):
+        self.parent_stop.set()
+        for release in self._releases:
+            release.set()
+        current = getattr(getattr(self, "detector", None), "_thread", None)
+        workers = [*self._workers, *([current] if current is not None else [])]
+        for worker in workers:
+            if worker is not threading.current_thread():
+                worker.join(2.5)
+                assert not worker.is_alive(), "worker must drain before inert module cleanup"
+
+    def make_detector(self, implementation):
+        detector = object.__new__(self.namespace["WakeDetector"])
+        detector._impl = implementation
+        detector._raw_listener = implementation
+        detector._stop_event = None
+        detector._thread = None
+        detector._lifecycle_lock = threading.RLock()
+        detector._run_cancel = None
+        detector._lifecycle_generation = 0
+        detector._drain_callback = None
+        detector._gain_scheduler = None
+        detector._intentionally_stopped = False
+        detector._detection_circuit = Mock()
+        detector._detection_circuit.is_open = False
+        return detector
+
+    def prepare_native_boundary(self):
+        audio, stream = self.case.prepare_capture()
+        self.listener._model_path.write_bytes(b"inert model boundary, never executed")
+        self.listener._load_engine = Mock(return_value=Mock())
+
+        def finish_unexpected_read(*args, **kwargs):
+            # Bound negative controls too: if a broken source reaches capture,
+            # let its real loop exit before the inert module fixture is reset.
+            self.parent_stop.set()
+            return np.ones(self.listener.CHUNK_SIZE, dtype=np.int16).tobytes()
+
+        stream.read.side_effect = finish_unexpected_read
+        return audio, stream
+
+    def paused_attempt(self, *, before_listener=False):
+        entered, release = threading.Event(), threading.Event()
+        self._releases.append(release)
+        owner = self.detector if before_listener else self.listener
+        name = "_run_loop" if before_listener else "_run_registered"
+        actual = getattr(owner, name)
+
+        def delayed(event):
+            entered.set()
+            assert release.wait(2), "controlled worker was not released"
+            actual(event)
+
+        setattr(owner, name, delayed)
+        assert self.detector.start(self.parent_stop)
+        worker = self.detector._thread
+        self._workers.append(worker)
+        assert entered.wait(1)
+        return worker, release
+
+    def test_cancelled_listener_never_initializes_native_capture(self):
+        _, stream = self.prepare_native_boundary()
+        self.parent_stop.set()
+        self.listener.run(self.parent_stop)
+        self.case.native_open.assert_not_called()
+        self.case.native_stream.assert_not_called()
+        stream.read.assert_not_called()
+        self.case.assert_released()
+
+    def test_cancelled_parent_does_not_create_a_worker(self):
+        self.parent_stop.set()
+        assert self.detector.start(self.parent_stop) is False
+        assert self.detector._thread is None
+        self.case.native_open.assert_not_called()
+
+    def test_stop_before_listener_entry_cannot_open_after_return(self):
+        _, stream = self.prepare_native_boundary()
+        worker, release = self.paused_attempt(before_listener=True)
+        try:
+            self.detector.stop()
+            assert not self.parent_stop.is_set()
+            assert self.detector.is_running(), "draining worker must remain observable"
+            assert self.detector.start(self.parent_stop) is False
+        finally:
+            release.set()
+            worker.join(1)
+        assert not worker.is_alive()
+        self.case.native_open.assert_not_called()
+        stream.read.assert_not_called()
+
+    def test_stop_after_registration_cannot_open_after_return(self):
+        _, stream = self.prepare_native_boundary()
+        worker, release = self.paused_attempt()
+        try:
+            self.detector.stop()
+            assert self.detector._thread is worker
+            assert self.detector._run_cancel.is_set()
+            assert not self.parent_stop.is_set()
+            assert self.detector.start(self.parent_stop) is False
+            facade = self.namespace["WakeDetectorFacade"]
+            facade.set_instance(self.detector)
+            # Keep disabled intent for this no-capture control. A separate
+            # retained enable is now expected to resume only after drain.
+            facade.sync_to_state("disabled", False)
+            assert facade.start_current(self.detector, self.parent_stop) is False
+        finally:
+            release.set()
+            worker.join(1)
+        assert not worker.is_alive()
+        self.case.native_open.assert_not_called()
+        self.case.native_stream.assert_not_called()
+        stream.read.assert_not_called()
+        self.case.assert_released()
+
+    def test_active_start_is_idempotent_without_duplicate_worker(self):
+        self.prepare_native_boundary()
+        worker, release = self.paused_attempt()
+        try:
+            assert self.detector.start(self.parent_stop) is True
+            assert self.detector._thread is worker
+            self.detector.stop()
+        finally:
+            release.set()
+            worker.join(1)
+        assert not worker.is_alive()
+        self.case.native_stream.assert_not_called()
+
+    def test_restart_after_drain_uses_fresh_local_cancellation(self):
+        self.prepare_native_boundary()
+        actual = self.listener._run_registered
+        worker, release = self.paused_attempt()
+        try:
+            self.detector.stop()
+            old_cancel = self.detector._run_cancel
+        finally:
+            release.set()
+            worker.join(1)
+        assert not worker.is_alive()
+        self.listener._run_registered = actual
+        _, stream = self.prepare_native_boundary()
+
+        def read(*args, **kwargs):
+            self.detector._run_cancel.set()
+            return np.ones(self.listener.CHUNK_SIZE, dtype=np.int16).tobytes()
+
+        stream.read.side_effect = read
+        assert self.detector.start(self.parent_stop)
+        worker = self.detector._thread
+        worker.join(1)
+        assert not worker.is_alive()
+        assert self.detector._run_cancel is not old_cancel
+        assert old_cancel.is_set() and not self.parent_stop.is_set()
+        self.case.native_stream.assert_called_once()
+        stream.read.assert_called_once()
+        self.case.assert_released()
+
+    def test_stop_called_from_worker_does_not_join_itself(self):
+        implementation = types.SimpleNamespace(cleanup=Mock())
+        detector = self.make_detector(implementation)
+        implementation.run = lambda event: detector.stop()
+        assert detector.start(self.parent_stop)
+        worker = detector._thread
+        worker.join(1)
+        assert not worker.is_alive()
+        assert detector._intentionally_stopped
+        assert detector._run_cancel.is_set()
+        assert not self.parent_stop.is_set()
+        implementation.cleanup.assert_called_once()
+        self.namespace["logger"].exception.assert_not_called()
+
+    def test_stop_waits_for_in_progress_init_cleanup_before_return(self):
+        audio, stream = self.prepare_native_boundary()
+        entered, release, stopping, returned = (threading.Event() for _ in range(4))
+        order = []
+
+        def initialize_audio():
+            entered.set()
+            assert release.wait(2)
+            return audio
+
+        def open_stream(*args, **kwargs):
+            order.append("capture-open")
+            return stream
+
+        def stop():
+            stopping.set()
+            self.detector.stop()
+            order.append("stop-returned")
+            returned.set()
+
+        self.case.native_open.side_effect = initialize_audio
+        self.case.native_stream.side_effect = open_stream
+        assert self.detector.start(self.parent_stop)
+        worker = self.detector._thread
+        assert entered.wait(1)
+        stopper = threading.Thread(target=stop, daemon=True)
+        stopper.start()
+        try:
+            assert stopping.wait(1)
+            assert not returned.wait(0.03)
+        finally:
+            release.set()
+            stopper.join(1)
+            worker.join(1)
+        assert not stopper.is_alive() and not worker.is_alive()
+        assert order == ["capture-open", "stop-returned"]
+        stream.close.assert_called_once()
+        stream.read.assert_not_called()
+        assert not self.parent_stop.is_set()
+        self.case.assert_released()
+
+    def test_stop_union_wait_observes_either_owner_without_mutating_them(self):
+        cancelled = threading.Event()
+        signal = self.namespace["_WakeStopEvent"](self.parent_stop, cancelled)
+        assert not signal.wait(0)
+        self.parent_stop.set()
+        assert signal.wait(0)
+        assert not cancelled.is_set()
+        self.parent_stop.clear()
+        cancelled.set()
+        assert signal.wait(0)
+        assert not self.parent_stop.is_set()
+
+    def test_late_read_error_cannot_reopen_capture_after_stop_returns(self):
+        _, stream = self.prepare_native_boundary()
+        reading, release = threading.Event(), threading.Event()
+        self._releases.append(release)
+
+        def failed_read(*args, **kwargs):
+            reading.set()
+            assert release.wait(2)
+            raise OSError("controlled read failure delivered after stop")
+
+        stream.read.side_effect = failed_read
+        assert self.detector.start(self.parent_stop)
+        worker = self.detector._thread
+        self._workers.append(worker)
+        try:
+            assert reading.wait(1)
+            assert self.case.native_stream.call_count == 1
+            self.detector.stop()
+        finally:
+            release.set()
+            worker.join(1)
+        assert not worker.is_alive()
+        assert self.case.native_stream.call_count == 1, "late recovery must not reopen after stop"
+        self.case.assert_released()
+
+    def test_late_read_completion_is_not_forwarded_after_stop(self):
+        _, stream = self.prepare_native_boundary()
+        reading, release = threading.Event(), threading.Event()
+        self._releases.append(release)
+        tap = Mock()
+        self.listener.set_frame_tap(tap)
+
+        def late_frame(*args, **kwargs):
+            reading.set()
+            assert release.wait(2)
+            return np.ones(self.listener.CHUNK_SIZE, dtype=np.int16).tobytes()
+
+        stream.read.side_effect = late_frame
+        assert self.detector.start(self.parent_stop)
+        worker = self.detector._thread
+        self._workers.append(worker)
+        try:
+            assert reading.wait(1)
+            self.detector.stop()
+        finally:
+            release.set()
+            worker.join(1)
+        assert not worker.is_alive()
+        tap.assert_not_called()
+        assert self.listener.detection_signal.count == 0
+        self.case.assert_released()
+
+    def test_shared_recovery_and_command_open_stay_cancelled_until_new_run(self):
+        self.prepare_native_boundary()
+        self.parent_stop.set()
+        self.listener.run(self.parent_stop)
+        assert self.listener._reopen_audio_stream() is False
+        assert self.listener._init() is False
+        assert self.listener.listen_and_record_command() is None
+        self.case.native_open.assert_not_called()
+        self.case.native_stream.assert_not_called()
+
+    def test_uncancelled_stream_recovery_remains_available(self):
+        _, stream = self.prepare_native_boundary()
+        try:
+            assert self.listener._reopen_audio_stream() is True
+            self.case.native_open.assert_called_once()
+            self.case.native_stream.assert_called_once()
+        finally:
+            self.listener.cleanup()
+        stream.close.assert_called_once()
+
+    def pending_reenable(self):
+        _, stream = self.prepare_native_boundary()
+        opened = threading.Event()
+
+        def open_capture(*args, **kwargs):
+            opened.set()
+            return stream
+
+        def read_frame(*args, **kwargs):
+            self.parent_stop.wait(0.002)
+            return np.ones(self.listener.CHUNK_SIZE, dtype=np.int16).tobytes()
+
+        self.case.native_stream.side_effect = open_capture
+        stream.read.side_effect = read_frame
+        worker, release = self.paused_attempt()
+        facade = self.namespace["WakeDetectorFacade"]
+        facade.set_instance(self.detector)
+        facade.sync_to_state("wake_word", True)
+        assert self.detector.is_running() and self.detector._intentionally_stopped
+        self.resume_start = Mock(wraps=self.detector.start)
+        self.detector.start = self.resume_start
+        facade.sync_to_state("wake_word", False)
+        self.case.native_stream.assert_not_called()
+        return facade, worker, release, opened
+
+    def finish_without_resume(self, worker, release):
+        release.set()
+        worker.join(1)
+        assert not worker.is_alive()
+        assert not self.detector.is_running()
+        self.resume_start.assert_not_called()
+        self.case.native_stream.assert_not_called()
+        self.case.assert_released()
+
+    def test_latest_reenable_resumes_only_after_old_cleanup_drains(self):
+        facade, worker, release, opened = self.pending_reenable()
+        release.set()
+        assert opened.wait(1)
+        worker.join(1)
+        assert not worker.is_alive()
+        resumed = self.detector._thread
+        assert resumed is not worker and resumed.is_alive()
+        self._workers.append(resumed)
+        assert self.detector._stop_event is self.parent_stop
+        assert not self.parent_stop.is_set()
+        assert self.case.native_stream.call_count == 1
+        self.resume_start.assert_called_once_with(self.parent_stop)
+        facade.sync_to_state("wake_word", True)
+        resumed.join(1)
+        assert not resumed.is_alive()
+        self.case.assert_released()
+
+    def test_repeated_enabled_intent_collapses_to_one_resume(self):
+        facade, worker, release, opened = self.pending_reenable()
+        facade.sync_to_state("wake_word", False)
+        facade.sync_to_state("wake_word", False)
+        release.set()
+        assert opened.wait(1)
+        worker.join(1)
+        assert self.case.native_stream.call_count == 1
+        assert self.detector._thread is not worker
+
+    def test_newer_disabled_intent_cancels_queued_resume(self):
+        facade, worker, release, _ = self.pending_reenable()
+        facade.sync_to_state("disabled", False)
+        self.finish_without_resume(worker, release)
+
+    def test_newer_mute_cancels_queued_resume(self):
+        facade, worker, release, _ = self.pending_reenable()
+        facade.sync_to_state("wake_word", True)
+        self.finish_without_resume(worker, release)
+
+    def test_new_owner_cancels_queued_resume(self):
+        facade, worker, release, _ = self.pending_reenable()
+        replacement = self.make_detector(Mock())
+        facade.set_instance(replacement)
+        self.finish_without_resume(worker, release)
+        replacement._impl.run.assert_not_called()
+
+    def test_owner_aba_cancels_queued_resume(self):
+        facade, worker, release, _ = self.pending_reenable()
+        facade.set_instance(self.make_detector(Mock()))
+        facade.set_instance(self.detector)
+        self.finish_without_resume(worker, release)
+
+    def test_parent_shutdown_cancels_queued_resume(self):
+        _, worker, release, _ = self.pending_reenable()
+        self.parent_stop.set()
+        self.finish_without_resume(worker, release)
+
+    def test_direct_stop_cancels_queued_resume(self):
+        _, worker, release, _ = self.pending_reenable()
+        self.detector.stop()
+        self.finish_without_resume(worker, release)
+
+    def test_restart_retires_callback_already_released_by_old_worker(self):
+        facade, worker, release, _ = self.pending_reenable()
+        callback_entered, callback_release = threading.Event(), threading.Event()
+        self._releases.append(callback_release)
+        actual = facade._resume_current_after_drain
+
+        def paused_callback(cls, *args):
+            callback_entered.set()
+            assert callback_release.wait(2)
+            actual(*args)
+
+        facade._resume_current_after_drain = classmethod(paused_callback)
+        release.set()
+        assert callback_entered.wait(1)
+        generation = facade._state_generation
+        assert facade.begin_restart(self.detector) == generation
+        # begin_restart deliberately preserves facade intent/ticket for its
+        # own prepared replacement. The detector stop must retire this callback.
+        callback_release.set()
+        worker.join(1)
+        assert not worker.is_alive()
+        self.resume_start.assert_not_called()
+        self.case.native_stream.assert_not_called()
+
+    def test_newer_start_retires_callback_without_duplicating_capture(self):
+        facade, worker, release, opened = self.pending_reenable()
+        callback_entered, callback_release = threading.Event(), threading.Event()
+        self._releases.append(callback_release)
+        actual = facade._resume_current_after_drain
+
+        def paused_callback(cls, *args):
+            callback_entered.set()
+            assert callback_release.wait(2)
+            actual(*args)
+
+        facade._resume_current_after_drain = classmethod(paused_callback)
+        release.set()
+        assert callback_entered.wait(1)
+        facade.sync_to_state("wake_word", False)
+        assert opened.wait(1)
+        resumed = self.detector._thread
+        callback_release.set()
+        worker.join(1)
+        assert not worker.is_alive()
+        assert self.detector._thread is resumed
+        assert self.case.native_stream.call_count == 1
+
+    def test_drain_before_registration_falls_back_to_one_start(self):
+        facade, worker, release, opened = self.pending_reenable()
+        # Replace the queued intent with another enable whose registration
+        # loses the race to a completed drain. It must neither lose nor duplicate.
+        actual = self.detector.when_drained
+
+        def finish_before_register(callback):
+            release.set()
+            # The old callback waits on the facade lock held by this sync;
+            # retirement itself must not hold/acquire that lock.
+            deadline = __import__("time").monotonic() + 1
+            while self.detector.is_running() and __import__("time").monotonic() < deadline:
+                __import__("time").sleep(0.001)
+            assert not self.detector.is_running()
+            return actual(callback)
+
+        self.detector.when_drained = finish_before_register
+        facade.sync_to_state("wake_word", False)
+        assert opened.wait(1)
+        worker.join(1)
+        assert not worker.is_alive()
+        assert self.detector._stop_event is self.parent_stop
+        assert self.case.native_stream.call_count == 1
+
+    def test_shutdown_during_drain_registration_cannot_fall_back_to_fresh_event(self):
+        facade, worker, release, opened = self.pending_reenable()
+        actual = self.detector.when_drained
+
+        def finish_before_register(callback):
+            self.parent_stop.set()
+            release.set()
+            deadline = __import__("time").monotonic() + 1
+            while self.detector.is_running() and __import__("time").monotonic() < deadline:
+                __import__("time").sleep(0.001)
+            assert not self.detector.is_running()
+            return actual(callback)
+
+        self.detector.when_drained = finish_before_register
+        facade.sync_to_state("wake_word", False)
+        worker.join(1)
+        assert not worker.is_alive()
+        assert not self.detector.is_running()
+        self.resume_start.assert_called_once_with(self.parent_stop)
+        assert not opened.is_set()
+        self.case.native_stream.assert_not_called()
+
+    def test_ordinary_worker_exit_does_not_create_unrequested_restart_loop(self):
+        implementation = Mock()
+        detector = self.make_detector(implementation)
+        self.detector = detector
+        facade = self.namespace["WakeDetectorFacade"]
+        facade.set_instance(detector)
+        facade.sync_to_state("wake_word", False)
+        worker = detector._thread
+        if worker is not None:
+            self._workers.append(worker)
+            worker.join(1)
+            assert not worker.is_alive()
+        assert not detector.is_running()
+        implementation.run.assert_called_once()
+
+
 if __name__ == "__main__":
     if sys.argv[1:] == ["--device-open-failure"]:
         faulthandler.dump_traceback_later(2)
@@ -573,7 +1121,7 @@ if __name__ == "__main__":
         try:
             audio, stream = case.prepare_capture()
             case.native_stream.side_effect = OSError("synthetic device unavailable")
-            case.stop.set()
+            case.stop_after_next_init()
             case.listener.run(case.stop)
             case.assert_released()
             case.assertTrue(case.listener._capture_open_failed.is_set())
