@@ -11,7 +11,8 @@ class TtsProfileDependencyTests(unittest.TestCase):
         for profile in ("requirements_desktop.txt", "requirements_linux.txt", "requirements_macos.txt"):
             with self.subTest(profile=profile):
                 requirements = {line.split("#", 1)[0].strip() for line in (root / profile).read_text(encoding="utf-8").splitlines()}
-                self.assertIn("num2words==0.5.14", requirements)
+                self.assertFalse(any(line.startswith("num2words") for line in requirements))
+                self.assertTrue((root / "voice/english_numbers.py").is_file())
 
 
 class KokoroNativeReadinessTests(unittest.TestCase):

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 
-from num2words import num2words
+from voice.english_numbers import num2words
 
 from core.logging_config import get_logger
 
@@ -21,7 +21,7 @@ _SENTENCE_BOUNDARY_RE = re.compile(r"(?<=[.!?])\s+")
 # Currency: $25 → "twenty-five dollars", $15.99 → "fifteen dollars and ninety-nine cents"
 # Must run BEFORE the generic standalone number regex.
 # ---------------------------------------------------------------------------
-_CURRENCY_RE = re.compile(r"\$(\d{1,}(?:,\d{3})*)(?:\.(\d{1,2}))?")
+_CURRENCY_RE = re.compile(r"\$(\d{1,}(?:,\d{3})*)(?:\.(\d+))?")
 
 # ---------------------------------------------------------------------------
 # Phone numbers: 555-123-4567 → digit-by-digit with commas for pauses
@@ -339,7 +339,12 @@ def _replace_currency(match: re.Match[str]) -> str:
         dollars_str = match.group(1).replace(",", "")
         cents_str = match.group(2)
         dollars = int(dollars_str)
-        cents = int(cents_str) if cents_str else 0
+        if cents_str and len(cents_str) > 2 and any(digit != "0" for digit in cents_str):
+            # Preserve fractional currency beyond cents instead of consuming a
+            # two-digit prefix and leaving unrelated digits behind.
+            fraction = " ".join(_DIGIT_NAMES[int(digit)] for digit in cents_str)
+            return "%s point %s dollars" % (_number_to_words(dollars), fraction)
+        cents = int(cents_str.ljust(2, "0")) if cents_str else 0
 
         if dollars == 0 and cents > 0:
             cent_word = "cent" if cents == 1 else "cents"

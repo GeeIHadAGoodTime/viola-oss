@@ -72,6 +72,8 @@ class KokoroChunkingTests(unittest.IsolatedAsyncioTestCase):
         model = self.module.Kokoro.__new__(self.module.Kokoro)
         model.tokenizer = self.tokenizer_class.__new__(self.tokenizer_class)
         model.tokenizer.vocab = self.config.DEFAULT_VOCAB
+        model.tokenizer._customer = None
+        model.tokenizer._phonemizer = self.phonemizer
         model.sess = RecordingSession()
         model.voices = {"fixture": np.arange(511, dtype=np.float32).reshape(511, 1, 1)}
         return model

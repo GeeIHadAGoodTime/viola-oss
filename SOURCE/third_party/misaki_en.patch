@@ -1,0 +1,108 @@
+--- a/misaki_en/README.md
++++ b/misaki_en/README.md
+@@ -0,0 +1,13 @@
++# Viola English-only Misaki fork
++
++Based on Misaki 0.9.4, Apache-2.0, with original attribution below.
++Only the English module, token representation and four English lexicons are retained.
++The distribution is named viola-misaki-en to distinguish it from upstream misaki.
++Do not co-install upstream misaki: both use the misaki import namespace.
++The caller must supply a local spaCy tagger and an English number converter.
++No eSpeak, phonemizer, num2words, transformer or downloaded fallback is included.
++The G2P algorithm and lexicons are retained with exact-decimal and currency-preservation fixes; unknown words remain explicit failures
++at the Viola customer adapter boundary. This does not qualify other languages.
++
++## Original upstream README (historical, not installation instructions)
++
+--- a/misaki_en/misaki/en.py
++++ b/misaki_en/misaki/en.py
+@@ -0,0 +1 @@
++# Modified for Viola: injected permissive number conversion; offline explicit spaCy model; no fallback.
+@@ -4 +4,0 @@
+-from num2words import num2words
+@@ -138 +138,2 @@
+-    def __init__(self, british):
++    def __init__(self, british, number_to_words):
++        self.number_to_words = number_to_words
+@@ -368 +369 @@
+-        return len(cents) < 3 or set(cents) == {0}
++        return len(cents) < 3 or set(cents) == {'0'}
+@@ -379 +380 @@
+-            splits = re.split(r'[^a-z]+', num if escape else num2words(int(num)))
++            splits = re.split(r'[^a-z]+', num if escape else self.number_to_words(int(num)))
+@@ -389 +390 @@
+-            extend_num(num2words(int(word), to='ordinal'), escape=True)
++            extend_num(self.number_to_words(int(word), to='ordinal'), escape=True)
+@@ -391 +392 @@
+-            extend_num(num2words(int(word), to='year'), escape=True)
++            extend_num(self.number_to_words(int(word), to='year'), escape=True)
+@@ -415,2 +416,12 @@
+-        elif currency in CURRENCIES and Lexicon.is_currency(word):
+-            pairs = [(int(num) if num else 0, unit) for num, unit in zip(word.replace(',', '').split('.'), CURRENCIES[currency])]
++        elif currency in CURRENCIES:
++            if not Lexicon.is_currency(word):
++                # Preserve sub-cent precision and its currency unit; never
++                # discard the symbol or round through binary floating point.
++                extend_num(self.number_to_words(word.replace(',', '')), escape=True)
++                result.append(self.stem_s(CURRENCIES[currency][0]+'s', None, None, None))
++                pairs = []
++            else:
++                parts = word.replace(',', '').split('.')
++                if len(parts) == 2:
++                    parts[1] = parts[1].ljust(2, '0')
++                pairs = [(int(num) if num else 0, unit) for num, unit in zip(parts, CURRENCIES[currency])]
+@@ -429 +440 @@
+-                word = num2words(int(word), to='cardinal')
++                word = self.number_to_words(int(word), to='cardinal')
+@@ -431 +442 @@
+-                word = num2words(int(word.replace(',', '')), to='ordinal' if suffix in ORDINALS else 'cardinal')
++                word = self.number_to_words(int(word.replace(',', '')), to='ordinal' if suffix in ORDINALS else 'cardinal')
+@@ -435 +446 @@
+-                    word = 'point ' + ' '.join(num2words(int(n)) for n in word[1:])
++                    word = 'point ' + ' '.join(self.number_to_words(int(n)) for n in word[1:])
+@@ -437 +448 @@
+-                    word = num2words(float(word))
++                    word = self.number_to_words(word)
+@@ -496 +507,2 @@
+-    def __init__(self, version=None, trf=False, british=False, fallback=None, unk='❓'):
++    def __init__(self, *, nlp, number_to_words, version=None, british=False, unk='❓'):
++        # Never download a model or import a fallback, even when one is installed.
+@@ -499,7 +511,3 @@
+-        name = f"en_core_web_{'trf' if trf else 'sm'}"
+-        if not spacy.util.is_package(name):
+-            spacy.cli.download(name)
+-        components = ['transformer' if trf else 'tok2vec', 'tagger']
+-        self.nlp = spacy.load(name, enable=components)
+-        self.lexicon = Lexicon(british)
+-        self.fallback = fallback if fallback else None
++        self.nlp = nlp
++        self.lexicon = Lexicon(british, number_to_words)
++        self.fallback = None
+--- a/misaki_en/pyproject.toml
++++ b/misaki_en/pyproject.toml
+@@ -0,0 +1 @@
++# Modified for Viola: English-only package identity, dependencies and offline injected inputs.
+@@ -5,2 +6,2 @@
+-name = "misaki"
+-version = "0.9.4"
++name = "viola-misaki-en"
++version = "0.9.4+viola.1"
+@@ -19,4 +20 @@
+-dependencies = [
+-    "addict",
+-    "regex",
+-]
++dependencies = ["addict==2.4.0", "numpy==2.2.6", "regex==2024.11.6", "spacy==3.8.16"]
+@@ -24,7 +22,2 @@
+-[project.optional-dependencies]
+-en = ["num2words", "spacy", "spacy-curated-transformers", "phonemizer-fork", "espeakng-loader"]
+-ja = ["fugashi", "jaconv", "mojimoji", "unidic", "pyopenjtalk"]
+-ko = ["jamo", "nltk"]
+-zh = ["jieba", "ordered-set", "pypinyin", "cn2an", "pypinyin-dict"]
+-vi = ["num2words", "spacy", "spacy-curated-transformers", "underthesea"]
+-he = ["mishkal-hebrew>=0.3.2"]
++[tool.hatch.build.targets.wheel]
++packages = ["misaki"]
+@@ -33 +26 @@
+-requires = ["hatchling"]
++requires = ["hatchling==1.29.0"]

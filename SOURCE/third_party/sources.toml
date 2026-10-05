@@ -2572,11 +2572,9 @@
 "source_url" = "https://files.pythonhosted.org/packages/36/7c/4d74f7243f546716003bd0cfaae8f562f5d75672142f23fa731f69069efd/kokoro_onnx-0.4.9.tar.gz"
 "source_sha256" = "08682138939f61548a7186ef5cdae79180a5dff6fa23781910eddb1583dcf30b" # pragma: allowlist secret (public artifact checksum)
 "source_filename" = "kokoro_onnx-0.4.9.tar.gz"
-"fork_version" = "0.4.9+viola.1"
+"fork_version" = "0.4.9+viola.2"
 "patch" = "kokoro_onnx.patch"
 "normalization" = "UTF-8 text CRCRLF and CRLF to LF; binary unchanged"
-
-["kokoro_onnx"."upstream_files"]
 
 ["kokoro_onnx"."upstream_files"."LICENSE"]
 "sha256" = "807ef3768c755f1d4ab609bc73cd833a88f304717ac9116bfe9c052cd90f4f74" # pragma: allowlist secret (public artifact checksum)
@@ -2621,11 +2619,78 @@
 ["kokoro_onnx"."files"]
 "LICENSE" = "f61fdd0217de9ece8fa699912848d91187d84879fc2e689f0906d0c1299e955e" # pragma: allowlist secret (public artifact checksum)
 "README.md" = "38e418ec238e3bcbf791c65fb499bac6a22a8e409756605f8c6a9e4507f1b5c1" # pragma: allowlist secret (public artifact checksum)
-"pyproject.toml" = "4778e51cf860f615e38b0be177d9dae72989638c4fc510c06f5d78f53b59e54c" # pragma: allowlist secret (public artifact checksum)
-"src/kokoro_onnx/__init__.py" = "82c9368b2ea73448e1d730903a96b209e97ad06a8e4ed9e95f16a7122dd19b0f" # pragma: allowlist secret (public artifact checksum)
+"pyproject.toml" = "6d50678c37c7e4505a8bbf0086de0ebd3e42173dd86e84b65c5f358b4ebc317c" # pragma: allowlist secret (public artifact checksum)
+"src/kokoro_onnx/__init__.py" = "6e93de212047b2dbc01b46da1695e0cbc60e9f155625e77190b1ab1ba420ed8e" # pragma: allowlist secret (public artifact checksum)
 "src/kokoro_onnx/config.json" = "5abb01e2403b072bf03d04fde160443e209d7a0dad49a423be15196b9b43c17f" # pragma: allowlist secret (public artifact checksum)
 "src/kokoro_onnx/config.py" = "0f50f15f7c362a04ec62345f6ec53535194136417cea39912d412fef70661f11" # pragma: allowlist secret (public artifact checksum)
 "src/kokoro_onnx/log.py" = "2c56e73146eac2aa3e47b144ec53ae28964b41c06095975a606a53466218863c" # pragma: allowlist secret (public artifact checksum)
 "src/kokoro_onnx/py.typed" = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" # pragma: allowlist secret (public artifact checksum)
-"src/kokoro_onnx/tokenizer.py" = "efaec29c4ab6932eff94127b83cbc5f5544b0f1285cd160d56897dfb0592bb00" # pragma: allowlist secret (public artifact checksum)
+"src/kokoro_onnx/tokenizer.py" = "47c2c2829a1e8e4cacb769b3af8e9b64f5151e9f727c565ad1b3509d9be0f469" # pragma: allowlist secret (public artifact checksum)
 "src/kokoro_onnx/trim.py" = "f1b776d3975a99104743428fd9ba63f14255f5226a3855c6059fe464c6520d23" # pragma: allowlist secret (public artifact checksum)
+
+["misaki_en"]
+"name" = "viola-misaki-en"
+"upstream_version" = "0.9.4"
+"source_url" = "https://files.pythonhosted.org/packages/1a/c7/fb01370a76585b46595a01b52f18e65c8ba6d7a313a05e5d9fff0a8e1c69/misaki-0.9.4.tar.gz"
+"source_sha256" = "3960fa3e6de179a90ee8e628446a4a4f6b8c730b6e3410999cf396189f4d9c40" # pragma: allowlist secret (public artifact checksum)
+"source_filename" = "misaki-0.9.4.tar.gz"
+"fork_version" = "0.9.4+viola.1"
+"patch" = "misaki_en.patch"
+"normalization" = "UTF-8 text CRCRLF and CRLF to LF; binary unchanged"
+
+["misaki_en"."upstream_files"."LICENSE"]
+"sha256" = "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4" # pragma: allowlist secret (public artifact checksum)
+"bytes" = 11357
+
+["misaki_en"."upstream_files"."README.md"]
+"sha256" = "68e5d589242b64a7b9278850689d832c9179ab20775204bfc95b4f770762bebc" # pragma: allowlist secret (public artifact checksum)
+"bytes" = 4868
+
+["misaki_en"."upstream_files"."misaki/__init__.py"]
+"sha256" = "3ebbe9b05a7115f57ef4291eaea1fcc3d6a3ee3a78e19ce5436d855dfe483889" # pragma: allowlist secret (public artifact checksum)
+"bytes" = 22
+
+["misaki_en"."upstream_files"."misaki/data/__init__.py"]
+"sha256" = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" # pragma: allowlist secret (public artifact checksum)
+"bytes" = 0
+
+["misaki_en"."upstream_files"."misaki/data/gb_gold.json"]
+"sha256" = "29e62f4b60261c88f7f3c2c7811ca3825978948090b72d2b27d565b729282f71" # pragma: allowlist secret (public artifact checksum)
+"bytes" = 2838552
+
+["misaki_en"."upstream_files"."misaki/data/gb_silver.json"]
+"sha256" = "48131e2d92ccc41655f4543e87e0f938e71463eb5a54be7f0693bb712ebb6bce" # pragma: allowlist secret (public artifact checksum)
+"bytes" = 3663898
+
+["misaki_en"."upstream_files"."misaki/data/us_gold.json"]
+"sha256" = "dc414872a49a28ae6c141463d502fd945f3b2fde040484fdc47d00cc4612686f" # pragma: allowlist secret (public artifact checksum)
+"bytes" = 3000469
+
+["misaki_en"."upstream_files"."misaki/data/us_silver.json"]
+"sha256" = "de8f67be911bb6c659187b4a65fd966b6a30e56350e0f790d763210b053ac475" # pragma: allowlist secret (public artifact checksum)
+"bytes" = 3099517
+
+["misaki_en"."upstream_files"."misaki/en.py"]
+"sha256" = "ddf67ad3bc4dd98143dcc9b6fbcde259b9d879d8b91684201cf0deeb07aa9910" # pragma: allowlist secret (public artifact checksum)
+"bytes" = 31278
+
+["misaki_en"."upstream_files"."misaki/token.py"]
+"sha256" = "5ff6ce45da6766cdc1e3d5c91b0b2b093d912b8df6f2da327af56f88ad43f073" # pragma: allowlist secret (public artifact checksum)
+"bytes" = 433
+
+["misaki_en"."upstream_files"."pyproject.toml"]
+"sha256" = "e52e3283a3f748be921081481417e45dbffdd67b4486ff9d0fba741d00ded5c2" # pragma: allowlist secret (public artifact checksum)
+"bytes" = 955
+
+["misaki_en"."files"]
+"LICENSE" = "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4" # pragma: allowlist secret (public artifact checksum)
+"README.md" = "2a86d8e7460eec42e8153ff3c67226790012fc45146a0ff72f79ad84749c7591" # pragma: allowlist secret (public artifact checksum)
+"misaki/__init__.py" = "3ebbe9b05a7115f57ef4291eaea1fcc3d6a3ee3a78e19ce5436d855dfe483889" # pragma: allowlist secret (public artifact checksum)
+"misaki/data/__init__.py" = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" # pragma: allowlist secret (public artifact checksum)
+"misaki/data/gb_gold.json" = "29e62f4b60261c88f7f3c2c7811ca3825978948090b72d2b27d565b729282f71" # pragma: allowlist secret (public artifact checksum)
+"misaki/data/gb_silver.json" = "48131e2d92ccc41655f4543e87e0f938e71463eb5a54be7f0693bb712ebb6bce" # pragma: allowlist secret (public artifact checksum)
+"misaki/data/us_gold.json" = "dc414872a49a28ae6c141463d502fd945f3b2fde040484fdc47d00cc4612686f" # pragma: allowlist secret (public artifact checksum)
+"misaki/data/us_silver.json" = "de8f67be911bb6c659187b4a65fd966b6a30e56350e0f790d763210b053ac475" # pragma: allowlist secret (public artifact checksum)
+"misaki/en.py" = "93570805f4e672163fe0a21648f505a5964d70801961c70c8a6eb0bc98ac48b6" # pragma: allowlist secret (public artifact checksum)
+"misaki/token.py" = "5ff6ce45da6766cdc1e3d5c91b0b2b093d912b8df6f2da327af56f88ad43f073" # pragma: allowlist secret (public artifact checksum)
+"pyproject.toml" = "bb17d18add365879f81af815485afd6d8ad1d815d84bc21050082133a26819f7" # pragma: allowlist secret (public artifact checksum)
