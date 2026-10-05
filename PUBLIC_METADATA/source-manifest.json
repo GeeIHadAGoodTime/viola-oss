@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "a26674d1b868e5066f2a11da7884390037f29db6",
-  "sha256": "90c1ac1e4de8a48ff456a38463d33c3b2d72810ff432558543160c86032b50ea",
+  "revision": "25684d1776ea11417e254887e37110c66fd3ec90",
+  "sha256": "9f30d6253945e9c070ab318c8ee8f784d3bde7111ede92f3d5831d167ecd4e85",
   "files": [
     {
       "path": ".env.example",
@@ -9295,8 +9295,8 @@
     },
     {
       "path": "ui/react-app/src/SmartDisplay.jsx",
-      "sha256": "04263c9704f3f2b307a6d0e43bff8879bb17ec9189d1c9571817183a785dc15c",
-      "bytes": 169332
+      "sha256": "e7d31cc00916b73412730f8c1fa2a796ce75d10a11aa2ecfb0311459e129cc21",
+      "bytes": 169749
     },
     {
       "path": "ui/react-app/src/SmartDisplay.stageRouting.test.jsx",
@@ -9320,8 +9320,8 @@
     },
     {
       "path": "ui/react-app/src/__tests__/SmartDisplay.test.jsx",
-      "sha256": "367c575236c69dd57982f8ee9f0fefd5498763b2b0856ee8423c5e114b190299",
-      "bytes": 99960
+      "sha256": "3aff332a578c1302d3b90ec9113c5b3423eb38912244e113eff065ca3a6804eb",
+      "bytes": 106769
     },
     {
       "path": "ui/react-app/src/__tests__/hooks/useEventBus.test.jsx",
@@ -10300,8 +10300,8 @@
     },
     {
       "path": "ui/react-app/src/components/player/PlayerSection.jsx",
-      "sha256": "6b4b5d86dd3cab47383a65fc931801ba6aa6ced40969d2e31812f4a74acc324c",
-      "bytes": 6540
+      "sha256": "577305c3990faf2ab3920d6182c9711f8a5a45f7fd7a1822c88f6adfe6e59cc6",
+      "bytes": 6799
     },
     {
       "path": "ui/react-app/src/components/player/PlayerSection.module.css",
@@ -10350,8 +10350,8 @@
     },
     {
       "path": "ui/react-app/src/components/player/VolumeControl.jsx",
-      "sha256": "9de6ca886fc901b09b953356f23f31f1627cced0a76d287157989f3daa8dd41b",
-      "bytes": 6891
+      "sha256": "06cd43e0644299ef20136ad65114934bed1893e208e0518f49dceea245410332",
+      "bytes": 9813
     },
     {
       "path": "ui/react-app/src/components/player/VolumeControl.module.css",
@@ -10360,8 +10360,8 @@
     },
     {
       "path": "ui/react-app/src/components/player/VolumeControl.test.jsx",
-      "sha256": "889d916253814a2bc84cde2a74f7d09c7688f6114a208a21c2a6d5a34f4c15eb",
-      "bytes": 7529
+      "sha256": "0586fc4dd0052705721e8edc2e3af656cec7c0a5a29f84c257aefb77f5d03609",
+      "bytes": 15979
     },
     {
       "path": "ui/react-app/src/components/settings/AccountRow.jsx",
