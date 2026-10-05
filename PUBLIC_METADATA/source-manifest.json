@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "d2684db6c19b5d35c45d98eae46ac33d51f366ee",
-  "sha256": "529cfc942970ebfb68ecad7a31743c09502d3c1b29a40e59ff6295c3bb1de142",
+  "revision": "6d1e2b14334edcabe01b6dbe4575ca760e7192f7",
+  "sha256": "de4c0a28e2b021b6c56557c992095023bd38ba593be201ffdee4d31aebd3de01",
   "files": [
     {
       "path": ".env.example",
@@ -5854,6 +5854,11 @@
       "bytes": 17545
     },
     {
+      "path": "tests/public/test_queue_wire_contract.py",
+      "sha256": "34d64dcc21c1be272c49ec663aaa3e96e4ae4733aaa58e1695c452cb6780f735",
+      "bytes": 7588
+    },
+    {
       "path": "tests/public/test_rating_target.py",
       "sha256": "86a97bd4002f0aa1d1db0ec6505bfa5ca83d2d30d159d8584a95dcf244a6b938",
       "bytes": 10081
@@ -10034,14 +10039,24 @@
       "bytes": 9418
     },
     {
+      "path": "ui/react-app/src/components/QueueModal.actions.test.jsx",
+      "sha256": "92aa47eaac2d953d090b84f7c72600b56ced23dfa9486d0c9c85039031dcb415",
+      "bytes": 8321
+    },
+    {
       "path": "ui/react-app/src/components/QueueModal.jsx",
-      "sha256": "fd292fa0883f64793c105c4e50df464ab863dfc2b27927ca00fac2689d74b2c7",
-      "bytes": 9314
+      "sha256": "5978b4310ba40a94ddb23823a802c097a20608dcc2694cfd4d9cef50f6d1e2b3",
+      "bytes": 11476
     },
     {
       "path": "ui/react-app/src/components/QueueModal.test.jsx",
       "sha256": "5948a627ef7e639c8a60ca9e4e8131837c5e5c2c78b548670907dd334462f4ba",
       "bytes": 16481
+    },
+    {
+      "path": "ui/react-app/src/components/QueueModal.wire.test.jsx",
+      "sha256": "bf920d5c7fa348912ea1b7c39bb7a3eaeb9bafea7a8d296a4298e7458b4ea3e6",
+      "bytes": 4802
     },
     {
       "path": "ui/react-app/src/components/ReviewPage.jsx",
@@ -10367,6 +10382,11 @@
       "path": "ui/react-app/src/components/extensions/index.js",
       "sha256": "e29e08ac2ead7dc4cbfdc00aba9cc7267574aea9c014f6fc8d04276e0097b020",
       "bytes": 318
+    },
+    {
+      "path": "ui/react-app/src/components/fixtures/queueWireContract.json",
+      "sha256": "dd4d3fbce24ef7975f647664a17fccb97bfd03ae52cdcc5c323ba19549bea6b1",
+      "bytes": 1725
     },
     {
       "path": "ui/react-app/src/components/icons/index.jsx",
@@ -11130,8 +11150,8 @@
     },
     {
       "path": "ui/react-app/src/hooks/useViolaApi.js",
-      "sha256": "306905f7652387b7bdbcad27918c72fc97998923e180bdb23d8bc9336eccb3d4",
-      "bytes": 13413
+      "sha256": "f170c7e80e5332b2615a7a84fed15029c77efd44e32ad6a785b8866406df1b21",
+      "bytes": 14212
     },
     {
       "path": "ui/react-app/src/hooks/useViolaApi.rating.test.js",
