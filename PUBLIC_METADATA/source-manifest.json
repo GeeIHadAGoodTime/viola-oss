@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "4a2ad803ae7e01bfdff50c54996296581ab2d2e8",
-  "sha256": "30f179e6e62ee371a4d8cf68fb59d7448c86c6937130342761105ddd667cb587",
+  "revision": "fb7feac4882fafde256d7e6af28402fe057d7d62",
+  "sha256": "c89e65e79bda2b6fe4f2e304d5da505a25fd030338d0388faac9667e718dfcbc",
   "files": [
     {
       "path": ".env.example",
@@ -4675,8 +4675,8 @@
     },
     {
       "path": "services/notifications/windows_toast.py",
-      "sha256": "d0044f30f112479a1a5f634afa13581253d07eeed4f82d4005c0d67bea465810",
-      "bytes": 7400
+      "sha256": "29eddfb63d1e30d605bc2d90d2815b54885fbdc5448aa141db8cdfeefe14cf99",
+      "bytes": 7716
     },
     {
       "path": "services/oauth/__init__.py",
@@ -5837,6 +5837,11 @@
       "path": "tests/public/test_windows_native_startup_order.py",
       "sha256": "78ef446927057a67890043144a8b4f7b21bd32b2003f53b9a24741fccca421ee",
       "bytes": 25460
+    },
+    {
+      "path": "tests/public/test_windows_toast_delivery_contract.py",
+      "sha256": "f7ca8b42c3b629e9c45d25dd23dac1fd09038415938a9ad675d8b43b536dadc5",
+      "bytes": 10332
     },
     {
       "path": "themes/viola-dark.css",
