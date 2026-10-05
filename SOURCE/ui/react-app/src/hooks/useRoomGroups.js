@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { apiFetch } from './useViolaApi';
+import { ACKNOWLEDGEMENT_TIMEOUT_MS } from './useAcknowledgedSliderValue';
 import { isFeatureAvailable } from '../utils/featureSurface';
 
 // apiFetch unwraps successful ResponseEnvelope.data; only failure envelopes retain ok/error.
@@ -19,6 +20,7 @@ export function useRoomGroups() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  const volumeRequests = useRef(new Map());
 
   // Fetch all room groups
   const fetchGroups = useCallback(async () => {
@@ -122,46 +124,65 @@ export function useRoomGroups() {
   }, []);
 
   // Set master volume for a group
+  // A late HTTP receipt must not republish an expired or superseded volume
+  // through parent props after the slider has retired that request. This only
+  // governs local response admission; the backend operation is not cancelled.
   const setMasterVolume = useCallback(async (groupId, volume) => {
+    const key = JSON.stringify(['master', groupId]);
+    const ticket = { expires: performance.now() + ACKNOWLEDGEMENT_TIMEOUT_MS };
+    volumeRequests.current.set(key, ticket);
     try {
       const data = await apiFetch(`/v1/rooms/groups/${groupId}/volume`, {
         method: 'POST',
         body: JSON.stringify({ volume }),
       });
       if (data?.ok !== false && data?.group?.group_id === groupId && Number.isFinite(data?.master_volume)) {
-        setGroups(prev => prev.map(g =>
-          g.group_id === groupId ? { ...g, master_volume: data.master_volume } : g
-        ));
-        return { ok: true };
+        const uiCurrent = volumeRequests.current.get(key) === ticket && performance.now() < ticket.expires;
+        if (uiCurrent) {
+          setGroups(prev => prev.map(g =>
+            g.group_id === groupId ? { ...g, master_volume: data.master_volume } : g
+          ));
+        }
+        return { ok: true, value: data.master_volume, uiCurrent };
       }
       return { ok: false, error: data?.error };
     } catch (err) {
       return { ok: false, error: "Couldn't set room volume. Check your connection and try again." };
+    } finally {
+      if (volumeRequests.current.get(key) === ticket) volumeRequests.current.delete(key);
     }
   }, []);
 
   // Set volume offset for a specific room in a group
   const setRoomVolume = useCallback(async (groupId, roomId, offset) => {
+    const key = JSON.stringify(['room', groupId, roomId]);
+    const ticket = { expires: performance.now() + ACKNOWLEDGEMENT_TIMEOUT_MS };
+    volumeRequests.current.set(key, ticket);
     try {
       const data = await apiFetch(`/v1/rooms/groups/${groupId}/rooms/${roomId}/volume`, {
         method: 'POST',
         body: JSON.stringify({ offset: offset }),
       });
       if (data?.ok !== false && data?.room_id === roomId && Number.isFinite(data?.offset)) {
-        setGroups(prev => prev.map(g => {
-          if (g.group_id !== groupId) return g;
-          return {
-            ...g,
-            members: g.members.map(m =>
-              m.room_id === roomId ? { ...m, volume_offset: data.offset } : m
-            ),
-          };
-        }));
-        return { ok: true };
+        const uiCurrent = volumeRequests.current.get(key) === ticket && performance.now() < ticket.expires;
+        if (uiCurrent) {
+          setGroups(prev => prev.map(g => {
+            if (g.group_id !== groupId) return g;
+            return {
+              ...g,
+              members: g.members.map(m =>
+                m.room_id === roomId ? { ...m, volume_offset: data.offset } : m
+              ),
+            };
+          }));
+        }
+        return { ok: true, value: data.offset, uiCurrent };
       }
       return { ok: false, error: data?.error };
     } catch (err) {
       return { ok: false, error: "Couldn't adjust room volume. Check your connection and try again." };
+    } finally {
+      if (volumeRequests.current.get(key) === ticket) volumeRequests.current.delete(key);
     }
   }, []);
 

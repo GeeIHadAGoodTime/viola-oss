@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useId } from 'react';
 import PropTypes from 'prop-types';
 import { useRoomGroups } from '../hooks/useRoomGroups';
-import { useOptimisticSliderValue } from '../hooks/useOptimisticSliderValue';
+import { useAcknowledgedSliderValue } from '../hooks/useAcknowledgedSliderValue';
 import DeviceDiscoveryPanel from './DeviceDiscoveryPanel';
 import ConnectSpeakerPanel from './ConnectSpeakerPanel';
 import DesktopUpsell from './DesktopUpsell';
@@ -126,7 +126,7 @@ VolumeSlider.propTypes = {
 // class as #2772). It now renders the user's own value and writes once.
 export const RoomMemberItem = ({ member, onVolumeChange, onMuteToggle }) => {
   const [hovered, setHovered] = useState(false);
-  const [offset, setOffset, commitOffset] = useOptimisticSliderValue(
+  const [offset, setOffset, commitOffset, volumeError, volumePending] = useAcknowledgedSliderValue(
     member.volume_offset ?? 0,
     onVolumeChange,
   );
@@ -170,6 +170,8 @@ export const RoomMemberItem = ({ member, onVolumeChange, onMuteToggle }) => {
           {member.is_muted ? <Icons.VolumeMute /> : <Icons.Volume />}
         </button>
       </div>
+      {volumePending && <p role="status">Saving volume...</p>}
+      {volumeError && <p role="alert" style={{ color: theme.colors.statusRed }}>{volumeError}</p>}
       <VolumeSlider
         value={offset}
         onChange={setOffset}
@@ -208,7 +210,7 @@ export const GroupCard = ({ group, onDelete, onMasterVolumeChange, onRoomVolumeC
   // as a falsy 0 and rendered as 50, so the slider could not be left at zero —
   // and once the value is optimistic that stale 50 also reads as an external
   // change and drags the thumb back up.
-  const [masterVolume, setMasterVolume, commitMasterVolume] = useOptimisticSliderValue(
+  const [masterVolume, setMasterVolume, commitMasterVolume, volumeError, volumePending] = useAcknowledgedSliderValue(
     group.master_volume ?? 50,
     onMasterVolumeChange,
   );
@@ -281,6 +283,8 @@ export const GroupCard = ({ group, onDelete, onMasterVolumeChange, onRoomVolumeC
         </div>
       </div>
 
+      {volumePending && <p role="status" style={{ padding: '0 20px' }}>Saving volume...</p>}
+      {volumeError && <p role="alert" style={{ color: theme.colors.statusRed, padding: '0 20px' }}>{volumeError}</p>}
       {/* Expanded content */}
       {expanded && (
         <div style={{ padding: '16px 20px' }}>

@@ -292,7 +292,7 @@ describe('room groups through the real API envelope boundary', () => {
     });
   });
 
-  afterEach(() => { cleanup(); delete window.viola; });
+  afterEach(() => { cleanup(); delete window.viola; vi.useRealTimers(); });
 
   async function mountGroups() {
     const hook = renderHook(() => useRoomGroups());
@@ -341,11 +341,11 @@ describe('room groups through the real API envelope boundary', () => {
     let answer;
     global.fetch.mockResolvedValueOnce(response({ group: { ...group, master_volume: 0 }, master_volume: 0 }));
     await act(async () => { answer = await result.current.setMasterVolume('g1', 0); });
-    expect(answer).toEqual({ ok: true });
+    expect(answer).toEqual({ ok: true, value: 0, uiCurrent: true });
     expect(result.current.groups[0].master_volume).toBe(0);
     global.fetch.mockResolvedValueOnce(response({ room_id: 'local', offset: 0, effective_volume: 0 }));
     await act(async () => { answer = await result.current.setRoomVolume('g1', 'local', 0); });
-    expect(answer).toEqual({ ok: true });
+    expect(answer).toEqual({ ok: true, value: 0, uiCurrent: true });
     for (const muted of [true, false]) {
       global.fetch.mockResolvedValueOnce(response({ room_id: 'local', is_muted: muted, effective_volume: 0 }));
       await act(async () => { answer = await result.current.setRoomMute('g1', 'local', muted); });
@@ -358,10 +358,10 @@ describe('room groups through the real API envelope boundary', () => {
     stored = [group];
     const { result } = await mountGroups();
     global.fetch.mockResolvedValueOnce(response({ group: { ...group, master_volume: 80 }, master_volume: 80 }));
-    await act(async () => { await result.current.setMasterVolume('g1', 84); });
+    await act(async () => { expect(await result.current.setMasterVolume('g1', 84)).toEqual({ ok: true, value: 80, uiCurrent: true }); });
     expect(result.current.groups[0].master_volume).toBe(80);
     global.fetch.mockResolvedValueOnce(response({ room_id: 'local', offset: 8, effective_volume: 88 }));
-    await act(async () => { await result.current.setRoomVolume('g1', 'local', 10); });
+    await act(async () => { expect(await result.current.setRoomVolume('g1', 'local', 10)).toEqual({ ok: true, value: 8, uiCurrent: true }); });
     expect(result.current.groups[0].members[0].volume_offset).toBe(8);
     global.fetch.mockResolvedValueOnce(response({ room_id: 'local', is_muted: false, effective_volume: 88 }));
     await act(async () => { await result.current.setRoomMute('g1', 'local', true); });
@@ -423,4 +423,81 @@ describe('room groups through the real API envelope boundary', () => {
     expect(result.current.groups).toEqual([]);
     expect(result.current.saving).toBe(false);
   });
+
+  const volumeReply = (kind, value, groupId = 'g1') => kind === 'master'
+    ? { group: { ...group, group_id: groupId, master_volume: value }, master_volume: value }
+    : { room_id: 'local', offset: value };
+  const sendVolume = (current, kind, value, groupId = 'g1') => kind === 'master'
+    ? current.setMasterVolume(groupId, value) : current.setRoomVolume(groupId, 'local', value);
+  const readVolume = (current, kind, groupId = 'g1') => {
+    const row = current.groups.find(item => item.group_id === groupId);
+    return kind === 'master' ? row.master_volume : row.members[0].volume_offset;
+  };
+  const deferredResponse = () => {
+    let resolve;
+    const promise = new Promise(done => { resolve = done; });
+    return { promise, resolve };
+  };
+  it.each(['master', 'volume'].flatMap(kind => ['none', 'pending', 'accepted'].map(newer => ({ kind, newer }))))(
+    'retires timed-out $kind parent publication with newer request $newer', async ({ kind, newer }) => {
+      stored = [group];
+      const { result } = await mountGroups();
+      vi.useFakeTimers();
+      const old = deferredResponse(), next = deferredResponse();
+      global.fetch.mockReturnValueOnce(old.promise);
+      let first, second;
+      await act(async () => { first = sendVolume(result.current, kind, 10); });
+      await act(async () => vi.advanceTimersByTime(15000));
+      if (newer !== 'none') {
+        global.fetch.mockReturnValueOnce(next.promise);
+        await act(async () => { second = sendVolume(result.current, kind, 20); });
+        if (newer === 'accepted') await act(async () => { next.resolve(response(volumeReply(kind, 20))); await second; });
+      }
+      await act(async () => { old.resolve(response(volumeReply(kind, 10))); expect(await first).toEqual({ ok: true, value: 10, uiCurrent: false }); });
+      expect(readVolume(result.current, kind)).toBe(newer === 'accepted' ? 20 : kind === 'master' ? 60 : 0);
+      if (newer === 'pending') {
+        await act(async () => { next.resolve(response(volumeReply(kind, 20))); await second; });
+        expect(readVolume(result.current, kind)).toBe(20);
+      }
+    },
+  );
+  it.each(['master', 'volume'])('does not overwrite a newer acknowledgement before expiry for %s', async kind => {
+    stored = [group];
+    const { result } = await mountGroups();
+    const old = deferredResponse();
+    global.fetch.mockReturnValueOnce(old.promise);
+    let first;
+    await act(async () => { first = sendVolume(result.current, kind, 10); });
+    global.fetch.mockResolvedValueOnce(response(volumeReply(kind, 20)));
+    await act(async () => { await sendVolume(result.current, kind, 20); });
+    await act(async () => { old.resolve(response(volumeReply(kind, 10))); await first; });
+    expect(readVolume(result.current, kind)).toBe(20);
+  });
+  it.each(['master', 'volume'])('still publishes a timely response immediately before expiry for %s', async kind => {
+    stored = [group];
+    const { result } = await mountGroups();
+    vi.useFakeTimers();
+    const request = deferredResponse();
+    global.fetch.mockReturnValueOnce(request.promise);
+    let pending;
+    await act(async () => { pending = sendVolume(result.current, kind, 10); });
+    await act(async () => vi.advanceTimersByTime(14999));
+    await act(async () => { request.resolve(response(volumeReply(kind, 10))); await pending; });
+    expect(readVolume(result.current, kind)).toBe(10);
+  });
+  it.each(['different control', 'different group'])('keeps volume request ownership independent for %s', async scope => {
+    stored = [group, { ...group, group_id: 'g2' }];
+    const { result } = await mountGroups();
+    const first = deferredResponse(), second = deferredResponse();
+    global.fetch.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+    const nextKind = scope === 'different control' ? 'volume' : 'master';
+    const nextGroup = scope === 'different group' ? 'g2' : 'g1';
+    let one, two;
+    await act(async () => { one = sendVolume(result.current, 'master', 30); two = sendVolume(result.current, nextKind, 40, nextGroup); });
+    await act(async () => { second.resolve(response(volumeReply(nextKind, 40, nextGroup))); await two; });
+    await act(async () => { first.resolve(response(volumeReply('master', 30))); await one; });
+    expect(readVolume(result.current, 'master')).toBe(30);
+    expect(readVolume(result.current, nextKind, nextGroup)).toBe(40);
+  });
+
 });
