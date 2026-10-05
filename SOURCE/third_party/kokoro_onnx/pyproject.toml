@@ -1,6 +1,6 @@
 [project]
 name = "kokoro-onnx"
-version = "0.4.9+viola.1"
+version = "0.4.9+viola.2"
 description = "TTS with kokoro and onnx runtime"
 license = "MIT"
 license-files = ["LICENSE"]
@@ -12,7 +12,6 @@ requires-python = ">=3.10,<3.14"
 dependencies = [
     "onnxruntime>=1.20.1",
     "colorlog>=6.9.0",
-    "phonemizer-fork>=3.3.2",
     "numpy>=2.0.2",
 ]
 
@@ -23,6 +22,7 @@ Issues = "https://github.com/thewh1teagle/kokoro-onnx/issues"
 
 
 [project.optional-dependencies]
+espeak = ["phonemizer-fork>=3.3.2"]
 # Windows/Linux GPU feature
 # Install with kokoro-onnx[gpu]
 gpu = [

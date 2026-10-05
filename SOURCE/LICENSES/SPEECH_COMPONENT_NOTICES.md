@@ -33,3 +33,13 @@ separate from this source distribution.
 Included Silero VAD is covered by `Silero-MIT.txt`; included wake-model hashes and
 notices are mapped in `asset_inventory.toml`. User-trained and optional downloaded
 models retain their own applicable terms.
+
+## Explicit customer English component candidate
+
+The separately selected `requirements_customer_speech.txt` profile preserves
+Kokoro with a maintained Apache-2.0 Misaki English fork and an offline MIT spaCy
+English model. It excludes the upstream Misaki extra, phonemizer/eSpeak and
+num2words. See `docs/CUSTOMER_SPEECH_QUALIFICATION.md` for exact scope, retained
+licenses, transitive notice limitations, unknown-word behavior and the still-open
+multilingual, frozen, signed-artifact and installed acceptance gates. This is not
+clearance for customer distribution or an English-only product-scope decision.

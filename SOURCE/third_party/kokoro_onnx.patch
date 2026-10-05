@@ -2,52 +2,89 @@
 +++ b/kokoro_onnx/pyproject.toml
 @@ -3 +3 @@
 -version = "0.4.9"
-+version = "0.4.9+viola.1"
++version = "0.4.9+viola.2"
 @@ -4,0 +5,2 @@
 +license = "MIT"
 +license-files = ["LICENSE"]
-@@ -13 +14,0 @@
+@@ -13,2 +14,0 @@
 -    "espeakng-loader>=0.2.4",
+-    "phonemizer-fork>=3.3.2",
+@@ -24,0 +25 @@
++espeak = ["phonemizer-fork>=3.3.2"]
 @@ -33 +34 @@
 -requires = ["hatchling"]
 +requires = ["hatchling==1.29.0"]
---- a/kokoro_onnx/src/kokoro_onnx/tokenizer.py
-+++ b/kokoro_onnx/src/kokoro_onnx/tokenizer.py
-@@ -1,0 +2 @@
-+import ctypes.util
-@@ -6 +6,0 @@
--import espeakng_loader
-@@ -21 +21 @@
--            espeak_config.data_path = espeakng_loader.get_data_path()
-+            espeak_config.data_path = os.getenv("PHONEMIZER_ESPEAK_DATA_PATH")
-@@ -23 +23,10 @@
--            espeak_config.lib_path = espeakng_loader.get_library_path()
-+            espeak_config.lib_path = (
-+                os.getenv("PHONEMIZER_ESPEAK_LIBRARY")
-+                or ctypes.util.find_library("espeak-ng")
-+                or ctypes.util.find_library("espeak")
-+            )
-+        if not espeak_config.lib_path:
-+            raise RuntimeError(
-+                "Kokoro requires a separately installed system eSpeak-NG library. "
-+                "Set PHONEMIZER_ESPEAK_LIBRARY to its shared library path."
-+            )
-@@ -53 +62,3 @@
--        EspeakWrapper.set_data_path(espeak_config.data_path)
-+        # Use the system library data directory unless explicitly overridden.
-+        if espeak_config.data_path:
-+            EspeakWrapper.set_data_path(espeak_config.data_path)
 --- a/kokoro_onnx/src/kokoro_onnx/__init__.py
 +++ b/kokoro_onnx/src/kokoro_onnx/__init__.py
-@@ -10,0 +11 @@
+@@ -8,0 +9 @@
++import sys
+@@ -11,9 +12,46 @@
+-
+-import numpy as np
+-import onnxruntime as rt
+-from numpy.typing import NDArray
+-
+-from .config import MAX_PHONEME_LENGTH, SAMPLE_RATE, EspeakConfig, KoKoroConfig
+-from .log import log
+-from .tokenizer import Tokenizer
+-from .trim import trim as trim_audio
 +from contextlib import suppress
-@@ -97,5 +97,0 @@
++
++_CUSTOMER_PROFILE_AT_IMPORT = os.getenv("VIOLA_KOKORO_PHONEMIZER") == "misaki-en"
++_ORT_OPT_OUT_AT_IMPORT = os.getenv("ORT_DISABLE_TELEMETRY") == "1"
++_ORT_PRESENT_AT_IMPORT = any(
++    name == "onnxruntime" or name.startswith("onnxruntime.") for name in sys.modules
++)
++
++
++def _require_customer_telemetry_opt_out():
++    # Official ORT 1.30.0 non-Windows telemetry initializes before callers can
++    # invoke its Python API. The explicit customer profile must opt out before
++    # this module imports it. Whole-application startup ordering is separately
++    # verified by packaging; this check cannot undo an earlier third-party import.
++    if (
++        os.getenv("VIOLA_KOKORO_PHONEMIZER") == "misaki-en"
++        and sys.platform != "win32"
++        and (
++            os.getenv("ORT_DISABLE_TELEMETRY") != "1"
++            or not _CUSTOMER_PROFILE_AT_IMPORT
++            or not _ORT_OPT_OUT_AT_IMPORT
++            or _ORT_PRESENT_AT_IMPORT
++        )
++    ):
++        raise RuntimeError(
++            "Customer Kokoro requires both profile and ORT_DISABLE_TELEMETRY=1 before Python starts; "
++            "import customer Kokoro before any other ONNX Runtime consumer"
++        )
++
++
++_require_customer_telemetry_opt_out()
++
++# E402: enforce the customer privacy contract before all dependent imports.
++import numpy as np  # noqa: E402
++import onnxruntime as rt  # noqa: E402
++from numpy.typing import NDArray  # noqa: E402
++
++from .config import (  # noqa: E402
++    MAX_PHONEME_LENGTH,
++    SAMPLE_RATE,
++    EspeakConfig,
++    KoKoroConfig,
++)
++from .log import log  # noqa: E402
++from .tokenizer import Tokenizer  # noqa: E402
++from .trim import trim as trim_audio  # noqa: E402
+@@ -29,0 +68 @@
++        _require_customer_telemetry_opt_out()
+@@ -64,0 +104 @@
++        _require_customer_telemetry_opt_out()
+@@ -97,5 +136,0 @@
 -        if len(phonemes) > MAX_PHONEME_LENGTH:
 -            log.warning(
 -                f"Phonemes are too long, truncating to {MAX_PHONEME_LENGTH} phonemes"
 -            )
 -        phonemes = phonemes[:MAX_PHONEME_LENGTH]
-@@ -137,32 +133,15 @@
+@@ -137,32 +172,15 @@
 -        """
 -        Split phonemes into batches of MAX_PHONEME_LENGTH
 -        Prefer splitting at punctuation marks.
@@ -95,10 +132,10 @@
 +            batches.append(phonemes[start:end])
 +            start = end
 +        return batches
-@@ -207 +186 @@
+@@ -207 +225 @@
 -        audio = np.concatenate(audio)
 +        audio = np.concatenate(audio) if audio else np.empty(0, dtype=np.float32)
-@@ -239,22 +218,28 @@
+@@ -239,22 +257,28 @@
 -            for i, phonemes in enumerate(batched_phonemes):
 -                loop = asyncio.get_event_loop()
 -                # Execute in separate thread since it's blocking operation
@@ -149,3 +186,57 @@
 +            task.cancel()
 +            with suppress(asyncio.CancelledError):
 +                await task  # Propagate inference failures instead of hanging.
+--- a/kokoro_onnx/src/kokoro_onnx/tokenizer.py
++++ b/kokoro_onnx/src/kokoro_onnx/tokenizer.py
+@@ -1,0 +2 @@
++import ctypes.util
+@@ -5,4 +5,0 @@
+-
+-import espeakng_loader
+-import phonemizer
+-from phonemizer.backend.espeak.wrapper import EspeakWrapper
+@@ -16,0 +14,15 @@
++        self._customer = None
++        backend = os.getenv("VIOLA_KOKORO_PHONEMIZER", "espeak")
++        if backend == "misaki-en":
++            from . import _require_customer_telemetry_opt_out
++            _require_customer_telemetry_opt_out()
++            if espeak_config is not None:
++                raise ValueError("Customer pronunciation cannot accept eSpeak configuration")
++            from voice.customer_pronunciation import CustomerTokenizer
++            self._customer = CustomerTokenizer(self.vocab)
++            return
++        if backend != "espeak":
++            raise ValueError("Unknown Kokoro pronunciation backend")
++        import phonemizer
++        from phonemizer.backend.espeak.wrapper import EspeakWrapper
++        self._phonemizer = phonemizer
+@@ -21 +33 @@
+-            espeak_config.data_path = espeakng_loader.get_data_path()
++            espeak_config.data_path = os.getenv("PHONEMIZER_ESPEAK_DATA_PATH")
+@@ -23 +35,10 @@
+-            espeak_config.lib_path = espeakng_loader.get_library_path()
++            espeak_config.lib_path = (
++                os.getenv("PHONEMIZER_ESPEAK_LIBRARY")
++                or ctypes.util.find_library("espeak-ng")
++                or ctypes.util.find_library("espeak")
++            )
++        if not espeak_config.lib_path:
++            raise RuntimeError(
++                "Kokoro requires a separately installed system eSpeak-NG library. "
++                "Set PHONEMIZER_ESPEAK_LIBRARY to its shared library path."
++            )
+@@ -53 +74,3 @@
+-        EspeakWrapper.set_data_path(espeak_config.data_path)
++        # Use the system library data directory unless explicitly overridden.
++        if espeak_config.data_path:
++            EspeakWrapper.set_data_path(espeak_config.data_path)
+@@ -60,0 +84,2 @@
++        if getattr(self, "_customer", None) is not None:
++            return self._customer.tokenize(phonemes)
+@@ -70,0 +96,2 @@
++        if getattr(self, "_customer", None) is not None:
++            return self._customer.phonemize(text, lang=lang, norm=norm)
+@@ -74 +101 @@
+-        phonemes = phonemizer.phonemize(
++        phonemes = self._phonemizer.phonemize(

@@ -2,4 +2,4 @@
 # Run from the repository root after installing the desktop requirements.
 # eSpeak-NG must be installed separately under its own license; no library/data
 # is downloaded or bundled by this fork. See docs/INSTALLATION.md.
-./third_party/kokoro_onnx
+./third_party/kokoro_onnx[espeak]

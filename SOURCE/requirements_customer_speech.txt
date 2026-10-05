@@ -1,0 +1,7 @@
+# Explicit English customer speech candidate. Install after the desktop profile.
+# Select VIOLA_KOKORO_PHONEMIZER=misaki-en; no eSpeak or upstream misaki extra.
+# On non-Windows set ORT_DISABLE_TELEMETRY=1 before Python starts.
+./third_party/kokoro_onnx
+./third_party/misaki_en
+# Official English spaCy model, MIT; installed at build time, never at runtime.
+en-core-web-sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl#sha256=1932429db727d4bff3deed6b34cfc05df17794f4a52eeb26cf8928f7c1a0fb85  # pragma: allowlist secret (public model checksum)

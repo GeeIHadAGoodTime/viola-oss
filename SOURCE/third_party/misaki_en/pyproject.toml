@@ -1,0 +1,27 @@
+# Modified for Viola: English-only package identity, dependencies and offline injected inputs.
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[project]
+name = "viola-misaki-en"
+version = "0.9.4+viola.1"
+description = "G2P engine for TTS"
+readme = "README.md"
+authors = [
+    { name = "hexgrad", email = "hello@hexgrad.com" }
+]
+license = { file = "LICENSE" }
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+]
+requires-python = ">=3.8, <3.13"
+dependencies = ["addict==2.4.0", "numpy==2.2.6", "regex==2024.11.6", "spacy==3.8.16"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["misaki"]
+
+[build-system]
+requires = ["hatchling==1.29.0"]
+build-backend = "hatchling.build"

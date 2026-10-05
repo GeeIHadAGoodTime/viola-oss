@@ -4,9 +4,6 @@ import os
 import platform
 import sys
 
-import phonemizer
-from phonemizer.backend.espeak.wrapper import EspeakWrapper
-
 from .config import DEFAULT_VOCAB, MAX_PHONEME_LENGTH, EspeakConfig
 from .log import log
 
@@ -14,6 +11,21 @@ from .log import log
 class Tokenizer:
     def __init__(self, espeak_config: EspeakConfig | None = None, vocab: dict = None):
         self.vocab = vocab or DEFAULT_VOCAB
+        self._customer = None
+        backend = os.getenv("VIOLA_KOKORO_PHONEMIZER", "espeak")
+        if backend == "misaki-en":
+            from . import _require_customer_telemetry_opt_out
+            _require_customer_telemetry_opt_out()
+            if espeak_config is not None:
+                raise ValueError("Customer pronunciation cannot accept eSpeak configuration")
+            from voice.customer_pronunciation import CustomerTokenizer
+            self._customer = CustomerTokenizer(self.vocab)
+            return
+        if backend != "espeak":
+            raise ValueError("Unknown Kokoro pronunciation backend")
+        import phonemizer
+        from phonemizer.backend.espeak.wrapper import EspeakWrapper
+        self._phonemizer = phonemizer
 
         if not espeak_config:
             espeak_config = EspeakConfig()
@@ -69,6 +81,8 @@ class Tokenizer:
         return text.strip()
 
     def tokenize(self, phonemes):
+        if getattr(self, "_customer", None) is not None:
+            return self._customer.tokenize(phonemes)
         if len(phonemes) > MAX_PHONEME_LENGTH:
             raise ValueError(
                 f"text is too long, must be less than {MAX_PHONEME_LENGTH} phonemes"
@@ -79,10 +93,12 @@ class Tokenizer:
         """
         lang can be 'en-us' or 'en-gb'
         """
+        if getattr(self, "_customer", None) is not None:
+            return self._customer.phonemize(text, lang=lang, norm=norm)
         if norm:
             text = Tokenizer.normalize_text(text)
 
-        phonemes = phonemizer.phonemize(
+        phonemes = self._phonemizer.phonemize(
             text, lang, preserve_punctuation=True, with_stress=True
         )
         phonemes = "".join(filter(lambda p: p in self.vocab, phonemes))

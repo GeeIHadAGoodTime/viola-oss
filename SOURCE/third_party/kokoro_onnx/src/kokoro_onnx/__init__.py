@@ -6,18 +6,55 @@ import json
 import os
 import platform
 import re
+import sys
 import time
 from collections.abc import AsyncGenerator
 from contextlib import suppress
 
-import numpy as np
-import onnxruntime as rt
-from numpy.typing import NDArray
+_CUSTOMER_PROFILE_AT_IMPORT = os.getenv("VIOLA_KOKORO_PHONEMIZER") == "misaki-en"
+_ORT_OPT_OUT_AT_IMPORT = os.getenv("ORT_DISABLE_TELEMETRY") == "1"
+_ORT_PRESENT_AT_IMPORT = any(
+    name == "onnxruntime" or name.startswith("onnxruntime.") for name in sys.modules
+)
 
-from .config import MAX_PHONEME_LENGTH, SAMPLE_RATE, EspeakConfig, KoKoroConfig
-from .log import log
-from .tokenizer import Tokenizer
-from .trim import trim as trim_audio
+
+def _require_customer_telemetry_opt_out():
+    # Official ORT 1.30.0 non-Windows telemetry initializes before callers can
+    # invoke its Python API. The explicit customer profile must opt out before
+    # this module imports it. Whole-application startup ordering is separately
+    # verified by packaging; this check cannot undo an earlier third-party import.
+    if (
+        os.getenv("VIOLA_KOKORO_PHONEMIZER") == "misaki-en"
+        and sys.platform != "win32"
+        and (
+            os.getenv("ORT_DISABLE_TELEMETRY") != "1"
+            or not _CUSTOMER_PROFILE_AT_IMPORT
+            or not _ORT_OPT_OUT_AT_IMPORT
+            or _ORT_PRESENT_AT_IMPORT
+        )
+    ):
+        raise RuntimeError(
+            "Customer Kokoro requires both profile and ORT_DISABLE_TELEMETRY=1 before Python starts; "
+            "import customer Kokoro before any other ONNX Runtime consumer"
+        )
+
+
+_require_customer_telemetry_opt_out()
+
+# E402: enforce the customer privacy contract before all dependent imports.
+import numpy as np  # noqa: E402
+import onnxruntime as rt  # noqa: E402
+from numpy.typing import NDArray  # noqa: E402
+
+from .config import (  # noqa: E402
+    MAX_PHONEME_LENGTH,
+    SAMPLE_RATE,
+    EspeakConfig,
+    KoKoroConfig,
+)
+from .log import log  # noqa: E402
+from .tokenizer import Tokenizer  # noqa: E402
+from .trim import trim as trim_audio  # noqa: E402
 
 
 class Kokoro:
@@ -28,6 +65,7 @@ class Kokoro:
         espeak_config: EspeakConfig | None = None,
         vocab_config: dict | str | None = None,
     ):
+        _require_customer_telemetry_opt_out()
         # Show useful information for bug reports
         log.debug(
             f"koko-onnx version {importlib.metadata.version('kokoro-onnx')} on {platform.platform()} {platform.version()}"
@@ -63,6 +101,7 @@ class Kokoro:
         espeak_config: EspeakConfig | None = None,
         vocab_config: dict | str | None = None,
     ):
+        _require_customer_telemetry_opt_out()
         instance = cls.__new__(cls)
         instance.sess = session
         instance.config = KoKoroConfig(session._model_path, voices_path, espeak_config)

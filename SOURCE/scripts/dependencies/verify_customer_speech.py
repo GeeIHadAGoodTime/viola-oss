@@ -1,0 +1,118 @@
+"""Reject contaminated customer speech graphs and frozen payload inventories.
+
+This is a dependency-separation check, not legal advice or release acceptance.
+A passing source graph never stands in for frozen/native, signing, installed
+speech or human listening evidence. The wider application's notices and every
+resolved transitive dependency still need their ordinary license review.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import re
+from pathlib import Path, PurePosixPath
+
+REQUIRED = {
+    "kokoro-onnx": "0.4.9+viola.2",
+    "viola-misaki-en": "0.9.4+viola.1",
+    "en-core-web-sm": "3.8.0",
+    "spacy": "3.8.16",
+    "numpy": "2.2.6",
+    "regex": "2024.11.6",
+    "addict": "2.4.0",
+}
+FORBIDDEN = frozenset(
+    {"phonemizer", "phonemizer-fork", "espeakng-loader", "espeak-ng", "espeak", "num2words", "misaki"}
+)
+_FORBIDDEN_PAYLOAD = re.compile(
+    r"(?:^|/)(?:phonemizer(?:[/.\-_]|$)|num2words(?:[/.\-_]|$)|(?:lib)?espeak[^/]*|internal-speech-notices(?:/|$)|internal-use-only\.json$)",
+    re.IGNORECASE,
+)
+
+
+def canonical_name(value: str) -> str:
+    return re.sub(r"[-_.]+", "-", value.lower())
+
+
+def validate_graph(report: dict) -> list[str]:
+    """Inspect a complete pip --dry-run --ignore-installed --report result."""
+    rows = report.get("install")
+    if not isinstance(rows, list) or not rows:
+        return ["missing resolved distribution inventory"]
+    errors = []
+    observed = {}
+    for row in rows:
+        metadata = row.get("metadata", {}) if isinstance(row, dict) else {}
+        raw_name = metadata.get("name")
+        version = metadata.get("version")
+        if not isinstance(raw_name, str) or not raw_name or not isinstance(version, str) or not version:
+            errors.append("distribution is missing its exact name/version")
+            continue
+        name = canonical_name(raw_name)
+        if name in observed:
+            errors.append("duplicate distribution: " + name)
+        observed[name] = version
+        if name in FORBIDDEN:
+            errors.append("forbidden customer speech dependency: " + name)
+    for name, version in REQUIRED.items():
+        if observed.get(name) != version:
+            errors.append("missing or unreviewed customer speech distribution: " + name)
+    if "onnxruntime" not in observed:
+        errors.append("Kokoro ONNX runtime is missing")
+    return errors
+
+
+def validate_payload(paths: list[str]) -> list[str]:
+    """Check complete frozen file and PYZ/module inventories supplied by builder.
+
+    The builder must supply both inventories, since a filesystem-only check
+    cannot establish that Python bytecode was excluded from a frozen archive.
+    This function deliberately does not manufacture or certify that inventory.
+    """
+    if not paths:
+        return ["missing frozen customer speech inventory"]
+    errors = []
+    for value in paths:
+        if not isinstance(value, str) or not value:
+            errors.append("invalid frozen inventory entry")
+            continue
+        value = value.replace("\\", "/")
+        path = PurePosixPath(value)
+        if path.is_absolute() or ".." in path.parts or ":" in value:
+            errors.append("non-relative frozen inventory entry")
+            continue
+        # Native/Python file paths and dotted Python module names are accepted.
+        candidates = (value, value.replace(".", "/"))
+        if any(_FORBIDDEN_PAYLOAD.search(candidate) for candidate in candidates):
+            errors.append("forbidden customer speech payload: " + value)
+    return errors
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--pip-report", required=True, type=Path)
+    parser.add_argument("--frozen-inventory", type=Path)
+    args = parser.parse_args()
+    try:
+        errors = validate_graph(json.loads(args.pip_report.read_text(encoding="utf-8")))
+        if args.frozen_inventory:
+            data = json.loads(args.frozen_inventory.read_text(encoding="utf-8"))
+            if not isinstance(data, dict) or set(data) != {"files", "python_modules"}:
+                errors.append("frozen inventory must contain files and python_modules")
+            elif not all(isinstance(data[key], list) and data[key] for key in data):
+                errors.append("frozen file and Python module inventories must both be nonempty")
+            else:
+                errors.extend(validate_payload(data["files"] + data["python_modules"]))
+    except (OSError, ValueError, TypeError) as exc:
+        print("Invalid customer speech evidence: " + str(exc))
+        return 1
+    for error in errors:
+        print(error)
+    if not errors:
+        print("Customer speech dependency separation passed; release and listening acceptance remain separate")
+    return int(bool(errors))
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
