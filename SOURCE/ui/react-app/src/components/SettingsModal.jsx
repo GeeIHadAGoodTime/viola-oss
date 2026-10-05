@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo } from 'react';
 import PropTypes from 'prop-types';
 import { useSettings } from '../hooks/useSettings';
 import { useOptionalAuth } from '../hooks/useAuth';
@@ -328,6 +328,14 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [modalWidth, setModalWidth] = useState(() => (typeof window === 'undefined' ? 960 : Math.min(window.innerWidth, 960)));
   const modalRef = useRef(null);
+  const saveSessionRef = useRef(null);
+  useLayoutEffect(() => {
+    const session = isOpen ? { saveGeneration: 0 } : null;
+    saveSessionRef.current = session;
+    return () => {
+      if (saveSessionRef.current === session) saveSessionRef.current = null;
+    };
+  }, [isOpen]);
 
   // Reset to initialTab when modal opens with a specific tab
   useEffect(() => {
@@ -1205,8 +1213,14 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
 
   // Save settings
   const handleSave = async () => {
+    const session = saveSessionRef.current;
+    if (!session) return;
+    const generation = ++session.saveGeneration;
     const weatherChanged = (localSettings.weather_location || '') !== (settings.weather_location || '');
     const success = await updateSettings(localSettings);
+    // Dismissal, reopening or a newer submission retires this UI completion.
+    // The settings write may still finish; closing does not cancel persistence.
+    if (saveSessionRef.current !== session || session.saveGeneration !== generation) return;
     if (success) {
       setHasChanges(false);
       // Refresh weather if location changed
@@ -1219,6 +1233,7 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
 
   // Cancel - reset local changes and close
   const handleCancel = useCallback(() => {
+    if (saveSessionRef.current) saveSessionRef.current.saveGeneration += 1;
     // Customize previews update the live palette and theme cache immediately.
     // Resetting the draft alone leaves those effects behind after dismissal.
     applyTheme(settings.theme || 'dark');
