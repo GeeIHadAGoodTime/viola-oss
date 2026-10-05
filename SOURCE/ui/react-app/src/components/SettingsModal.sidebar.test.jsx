@@ -30,8 +30,17 @@ const apiFetchMock = vi.hoisted(() => vi.fn(() => Promise.resolve({
   json: () => Promise.resolve({ devices: [] }),
 })));
 
+// Preserve the boolean fixture while exposing the hook's exact save receipt.
+const saveSettingsWithSnapshot = async values => {
+  const ok = await settingsHarness.updateSettings(values);
+  if (!ok) return { ok: false };
+  const settings = settingsHarness.acknowledgedSettings?.(values) ?? { ...values };
+  settingsHarness.settings = settings;
+  return { ok: true, settings };
+};
+
 vi.mock('../hooks/useSettings', () => ({
-  useSettings: () => settingsHarness,
+  useSettings: () => ({ ...settingsHarness, saveSettingsWithSnapshot }),
 }));
 
 vi.mock('../hooks/useViolaApi', () => ({
@@ -561,8 +570,15 @@ describe('SettingsModal dismissed save ownership', () => {
     const closed = vi.fn();
     render(<SettingsModal isOpen initialTab="customize" onClose={closed} />);
     await editAndSave();
+    // The structured fixture publishes accepted snapshots like the real hook.
+    // Stage a genuinely newer draft, rather than resubmitting the same value.
+    fireEvent.click(screen.getByRole('button', { name: 'Voice' }));
+    fireEvent.click(await screen.findByRole('button', { name: /Voice Input Mode:/ }));
+    fireEvent.click(screen.getByRole('option', { name: 'Disabled' }));
     fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
     expect(settingsHarness.updateSettings).toHaveBeenCalledTimes(2);
+    expect(settingsHarness.updateSettings.mock.calls[0][0].theme).toBe('light');
+    expect(settingsHarness.updateSettings.mock.calls[1][0].voice_mode).toBe('disabled');
     await act(async () => second.resolve(false));
     await act(async () => first.resolve(true));
     expect(closed).not.toHaveBeenCalled();
@@ -579,5 +595,126 @@ describe('SettingsModal dismissed save ownership', () => {
     expect(screen.getByRole('button', { name: 'Save Changes' })).toBeEnabled();
     await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Save Changes' })));
     expect(closed).toHaveBeenCalledTimes(1);
+  });
+});
+
+
+describe('SettingsModal unsaved privacy draft acceptance', () => {
+  beforeEach(() => {
+    window.viola = {};
+    settingsHarness.settings = { theme: 'dark', ai_source: 'managed', voice_mode: 'wake_word', mic_muted: false, tts_volume: 1 };
+    settingsHarness.updateSettings.mockReset().mockResolvedValue(true);
+  });
+  afterEach(() => { delete window.viola; });
+
+  it('preserves an unsaved Disabled choice while adopting unrelated server changes', async () => {
+    const onClose = vi.fn();
+    const view = render(<SettingsModal isOpen initialTab="voice" onClose={onClose} />);
+    fireEvent.click(await screen.findByRole('button', { name: /Voice Input Mode:/ }));
+    fireEvent.click(screen.getByRole('option', { name: 'Disabled' }));
+    expect(screen.getByRole('button', { name: 'Voice Input Mode: Disabled' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save Changes' })).toBeEnabled();
+    settingsHarness.settings = { ...settingsHarness.settings, tts_volume: 0.42 };
+    // A real hook snapshot updates through memo; this fixture forces that same render.
+    view.rerender(<SettingsModal isOpen initialTab="voice" onClose={() => onClose()} />);
+    expect(screen.getByRole('button', { name: 'Voice Input Mode: Disabled' })).toBeInTheDocument();
+    expect((await screen.findByText('Assistant Volume')).parentElement.textContent).toBe('Assistant Volume42');
+    expect(screen.getByRole('button', { name: 'Save Changes' })).toBeEnabled();
+  });
+
+  it('preserves an unsaved mute choice through a newer unrelated settings snapshot', async () => {
+    const onClose = vi.fn();
+    const view = render(<SettingsModal isOpen initialTab="voice" onClose={onClose} />);
+    const mute = await screen.findByRole('switch', { name: 'Mute microphone' });
+    fireEvent.click(mute);
+    expect(mute).toBeChecked();
+    settingsHarness.settings = { ...settingsHarness.settings, show_notifications: false };
+    // A real hook snapshot updates through memo; this fixture forces that same render.
+    view.rerender(<SettingsModal isOpen initialTab="voice" onClose={() => onClose()} />);
+    expect(screen.getByRole('switch', { name: 'Mute microphone' })).toBeChecked();
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Save Changes' })));
+    expect(settingsHarness.updateSettings).toHaveBeenCalledWith(expect.objectContaining({ mic_muted: true, show_notifications: false }));
+  });
+});
+
+describe('Independent open-draft source probes', () => {
+  const pending = () => { let resolve; const promise = new Promise(done => { resolve = done; }); return {promise, resolve}; };
+  beforeEach(() => {
+    window.viola = {};
+    settingsHarness.settings = {theme:'dark', voice_mode:'wake_word', mic_muted:false, ai_source:'managed', active_music_provider_id:'youtube_music'};
+    settingsHarness.saving = false;
+    settingsHarness.error = null;
+    settingsHarness.updateSettings.mockReset().mockResolvedValue(true);
+  });
+  afterEach(() => { delete window.viola; });
+  const saveMuteAThenDraftDisabledB = async () => {
+    fireEvent.click(await screen.findByRole('switch', {name:'Mute microphone'}));
+    fireEvent.click(screen.getByRole('button', {name:'Save Changes'}));
+    expect(settingsHarness.updateSettings).toHaveBeenCalledWith(expect.objectContaining({mic_muted:true,voice_mode:'wake_word'}));
+    fireEvent.click(screen.getByRole('button', {name:/Voice Input Mode:/}));
+    fireEvent.click(screen.getByRole('option', {name:'Disabled'}));
+    expect(screen.getByRole('button', {name:/Voice Input Mode:/})).toHaveTextContent('Disabled');
+  };
+  it('save-A completion must not close a newer unsubmitted Disabled draft-B', async () => {
+    const save = pending();
+    settingsHarness.updateSettings.mockReturnValueOnce(save.promise);
+    const closed = vi.fn();
+    render(<SettingsModal isOpen initialTab="voice" onClose={closed} />);
+    await saveMuteAThenDraftDisabledB();
+    await act(async () => save.resolve(true));
+    expect(closed).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', {name:'Save Changes'})).toBeEnabled();
+  });
+  it('save-A server acknowledgement must not replace a newer Disabled draft-B', async () => {
+    const save = pending();
+    settingsHarness.updateSettings.mockReturnValueOnce(save.promise);
+    const closed = vi.fn();
+    const view = render(<SettingsModal isOpen initialTab="voice" onClose={closed} />);
+    await saveMuteAThenDraftDisabledB();
+    settingsHarness.settings = {...settingsHarness.settings, mic_muted:true};
+    view.rerender(<SettingsModal isOpen initialTab="voice" onClose={() => closed()} />);
+    await act(async () => save.resolve(true));
+    expect(screen.getByRole('button', {name:/Voice Input Mode:/})).toHaveTextContent('Disabled');
+    expect(screen.getByRole('button', {name:'Save Changes'})).toBeEnabled();
+  });
+  it('Cancel returns previews to the newest backend snapshot rather than the opening snapshot', async () => {
+    const closed = vi.fn();
+    applyTheme('dark');
+    const view = render(<SettingsModal isOpen initialTab="customize" onClose={closed} />);
+    fireEvent.click(await screen.findByRole('button', {name:/Color Theme:/}));
+    fireEvent.click(screen.getByRole('option', {name:'Light'}));
+    expect(getCurrentThemeMode()).toBe('light');
+    settingsHarness.settings = {...settingsHarness.settings, theme:'system'};
+    view.rerender(<SettingsModal isOpen initialTab="customize" onClose={() => closed()} />);
+    fireEvent.click(screen.getByRole('button', {name:'Cancel'}));
+    expect(getCurrentThemeMode()).toBe('system');
+    expect(closed).toHaveBeenCalledTimes(1);
+  });
+});
+
+
+describe('SettingsModal acknowledged draft values', () => {
+  beforeEach(() => {
+    window.viola = {};
+    settingsHarness.settings = { theme: 'dark', ai_source: 'managed', voice_mode: 'wake_word', mic_muted: false, tts_volume: 1 };
+    settingsHarness.updateSettings.mockReset().mockResolvedValue(true);
+    settingsHarness.acknowledgedSettings = null;
+  });
+  afterEach(() => { delete window.viola; delete settingsHarness.acknowledgedSettings; });
+  it('adopts exact acknowledged values while retaining a later Disabled choice', async () => {
+    let resolve;
+    settingsHarness.updateSettings.mockReturnValueOnce(new Promise(done => { resolve = done; }));
+    settingsHarness.acknowledgedSettings = values => ({ ...values, tts_volume: 0.42 });
+    const closed = vi.fn();
+    render(<SettingsModal isOpen initialTab="voice" onClose={closed} />);
+    fireEvent.click(await screen.findByRole('switch', { name: 'Mute microphone' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
+    fireEvent.click(screen.getByRole('button', { name: /Voice Input Mode:/ }));
+    fireEvent.click(screen.getByRole('option', { name: 'Disabled' }));
+    await act(async () => resolve(true));
+    expect(closed).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: /Voice Input Mode:/ })).toHaveTextContent('Disabled');
+    expect((await screen.findByText('Assistant Volume')).parentElement.textContent).toBe('Assistant Volume42');
+    expect(screen.getByRole('button', { name: 'Save Changes' })).toBeEnabled();
   });
 });

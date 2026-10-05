@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "bb45ca52e9960e67747b22ca088cae5a8db8497a",
-  "sha256": "629374f5477b6914b1089053d4b6418a3fc94513598181d92f10e24b44b9a85c",
+  "revision": "0d26adae672a878007a6a977797c53b97024efcc",
+  "sha256": "550738605b70ecf3b98fb021186994fa4588439c463af09bc3ed9a9e4abb3410",
   "files": [
     {
       "path": ".env.example",
@@ -9325,8 +9325,8 @@
     },
     {
       "path": "ui/react-app/src/__tests__/hooks/useSettings.snapshotOrdering.test.jsx",
-      "sha256": "9da8ec2b932a3aa55f0b49129fc203a3519f52196f8411f39b8d1b447f9ae29c",
-      "bytes": 11290
+      "sha256": "e6fb77f9998d4a8df1e1bce9d6bd761ed764a8f8481ea27dd1ad8a705a3c0d91",
+      "bytes": 13578
     },
     {
       "path": "ui/react-app/src/__tests__/hooks/useSpokeSurfaceGuards.test.jsx",
@@ -9955,33 +9955,33 @@
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.cloudSyncConsent.test.jsx",
-      "sha256": "3f1b7e082624ce137a4c29c6be7325db104c4c74e29719b81a2148893be6c424",
-      "bytes": 4730
+      "sha256": "4af3973b04ad0288bf8815058bc33219eb9db8d731fb7b99b235f27402e0783b",
+      "bytes": 5096
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.desktopAi.test.jsx",
-      "sha256": "f996f6db5f622ccf0cf901e26e6ee2eb4ce9e6be9664e5420756202ccfcea690",
-      "bytes": 7469
+      "sha256": "13622f3580f92c29cfa02d9cd5507cece7038c84fdf9359e078872633b14453c",
+      "bytes": 7835
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.desktopOnlyPanels.test.jsx",
-      "sha256": "206e71529d4122a045c2f74d4566d73db4da63c2bbd0515838a25ee59dfd063d",
-      "bytes": 12377
+      "sha256": "934f14bf7def3d80195425c7298005c15ce7ba2a68761437375ad0f50ab10c78",
+      "bytes": 12743
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.jsx",
-      "sha256": "6ff35b71ae4078b2f7733ff06ddbd850a7ac95364e3b49ad5cf04502feda1220",
-      "bytes": 198331
+      "sha256": "fd90d5d08efefef4c096cdc756e2f358da4a04f1eadd120ea2adfc9dd964a659",
+      "bytes": 198376
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.outputDevice.test.jsx",
-      "sha256": "19ce4310b69ffcd552a7d6dea9b47e93f501601b7054b4f9959fe3f8ee58e7f8",
-      "bytes": 3129
+      "sha256": "02c05bb1891e7058a8aeea835f8913c5ee8b2186cc8ef6f2762667ad5d071860",
+      "bytes": 3479
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.sidebar.test.jsx",
-      "sha256": "2c9893485757d549df3dbec06d8d84278e933a234d6705d9cb292d11fabeceb2",
-      "bytes": 23776
+      "sha256": "2230c3cfdc6c8819ef2e010b0d378dddfa077a4635ed5e112f1fa05a8a548b6a",
+      "bytes": 31927
     },
     {
       "path": "ui/react-app/src/components/SpokePairingGate.jsx",
@@ -10965,8 +10965,18 @@
     },
     {
       "path": "ui/react-app/src/hooks/useSettings.js",
-      "sha256": "1842ffbd9ce280600fdb756374c86ce712da09d5f30582c4dc1af2604fbccc10",
-      "bytes": 11218
+      "sha256": "1d1c6a4fabd8bd4dfd1b33d2e85be2c3931987271bab559c79a379c6e0badbb8",
+      "bytes": 11615
+    },
+    {
+      "path": "ui/react-app/src/hooks/useSettingsDraft.js",
+      "sha256": "7013d451a2ed698071db6fd65da7a0a5f43e508f7b316d433e1b144d4210c5fe",
+      "bytes": 5009
+    },
+    {
+      "path": "ui/react-app/src/hooks/useSettingsDraft.test.jsx",
+      "sha256": "7e939ee77801a7a17a4d82029b1337d4e527d0212363c97743cb9d954c64a49b",
+      "bytes": 8259
     },
     {
       "path": "ui/react-app/src/hooks/useUsage.jsx",
