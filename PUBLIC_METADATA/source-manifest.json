@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "34d9e5f86f968b50b9b97c1d338a3aba581e78e5",
-  "sha256": "7bc239b1239572d1891b096b4217f70aa14eecbf058ab9eb288168a39c34a8ea",
+  "revision": "0bf35fb1e196bd05871c67228fe8d5edd2c43447",
+  "sha256": "c97f900d76e685d695aa804f60b8cebaa3a2530a7a3f81835c7144dd0ed12761",
   "files": [
     {
       "path": ".env.example",
@@ -9319,6 +9319,11 @@
       "bytes": 2209
     },
     {
+      "path": "ui/react-app/src/__tests__/hooks/useSettings.snapshotOrdering.test.jsx",
+      "sha256": "9da8ec2b932a3aa55f0b49129fc203a3519f52196f8411f39b8d1b447f9ae29c",
+      "bytes": 11290
+    },
+    {
       "path": "ui/react-app/src/__tests__/hooks/useSpokeSurfaceGuards.test.jsx",
       "sha256": "50c1d99f5dfeec8a3404c46f57494eb6a595eb1bdfe2d05aedf51faf5182da94",
       "bytes": 2720
@@ -10955,8 +10960,8 @@
     },
     {
       "path": "ui/react-app/src/hooks/useSettings.js",
-      "sha256": "faaba1e2da12cb68e6555bebb58702b0244eeb3e42dd5b75f821565584ae7991",
-      "bytes": 9928
+      "sha256": "1842ffbd9ce280600fdb756374c86ce712da09d5f30582c4dc1af2604fbccc10",
+      "bytes": 11218
     },
     {
       "path": "ui/react-app/src/hooks/useUsage.jsx",
