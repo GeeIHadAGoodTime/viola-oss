@@ -2814,15 +2814,67 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null 
   const pttHotkey = userSettings?.ptt_hotkey || DEFAULT_PTT_HOTKEY;
   const muteHotkey = userSettings?.mute_hotkey || DEFAULT_MUTE_HOTKEY;
   const micMuted = Boolean(userSettings?.mic_muted);
+  const micMuteSessionRef = useRef(null);
+  const finishMicMuteChange = useCallback((session, operation, outcome) => {
+    if (micMuteSessionRef.current !== session || session.pending !== operation) return false;
+    clearTimeout(operation.timeout);
+    session.pending = null;
+    removeToast(operation.toast);
+    if (outcome === 'accepted') {
+      showNotification('Viola', {
+        body: operation.muted ? 'Microphone muted' : 'Microphone unmuted',
+      }, operation.notificationsEnabled);
+    } else {
+      session.feedback = addToast({
+        message: outcome === 'timeout'
+          ? 'Microphone change has not been confirmed. Check its status and try again.'
+          : "Couldn't confirm the microphone change. Check its status and try again.",
+        level: outcome === 'timeout' ? 'warning' : 'error',
+      });
+    }
+    return true;
+  }, [addToast, removeToast]);
+  useLayoutEffect(() => {
+    const session = { pending: null, feedback: null };
+    micMuteSessionRef.current = session;
+    return () => {
+      clearTimeout(session.pending?.timeout);
+      micMuteSessionRef.current = null;
+    };
+  }, []);
+  useEffect(() => {
+    const session = micMuteSessionRef.current;
+    const operation = session?.pending;
+    // A pushed settings snapshot can acknowledge the change before HTTP.
+    if (operation && micMuted === operation.muted) {
+      finishMicMuteChange(session, operation, 'accepted');
+    }
+  }, [micMuted, finishMicMuteChange]);
   const toggleMicMuted = useCallback(() => {
-    const nextMuted = !micMuted;
-    updateSetting('mic_muted', nextMuted);
-    showNotification(
-      'Viola',
-      { body: nextMuted ? 'Microphone muted' : 'Microphone unmuted' },
-      userSettings?.show_notifications ?? true,
-    );
-  }, [micMuted, updateSetting, userSettings?.show_notifications]);
+    const session = micMuteSessionRef.current;
+    if (!session) return;
+    // A retry owns the feedback, even if an earlier request later settles.
+    // This retires UI ownership only; it cannot cancel a server-side write.
+    clearTimeout(session.pending?.timeout);
+    if (session.pending) removeToast(session.pending.toast);
+    if (session.feedback) removeToast(session.feedback);
+    session.feedback = null;
+    const operation = {
+      muted: !micMuted,
+      notificationsEnabled: userSettings?.show_notifications ?? true,
+      toast: addToast({ message: 'Saving microphone change…', level: 'info', persist: true }),
+      timeout: null,
+    };
+    session.pending = operation;
+    operation.timeout = setTimeout(() => finishMicMuteChange(session, operation, 'timeout'), 15000);
+    try {
+      Promise.resolve(updateSetting('mic_muted', operation.muted))
+        .then(accepted => finishMicMuteChange(session, operation, accepted === true ? 'accepted' : 'refused'))
+        .catch(() => finishMicMuteChange(session, operation, 'refused'));
+    } catch {
+      finishMicMuteChange(session, operation, 'refused');
+    }
+  }, [micMuted, updateSetting, userSettings?.show_notifications, addToast, removeToast, finishMicMuteChange]);
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (settingsOpen || queueOpen || historyOpen || roomsOpen || bugReportOpen || workbenchPanelOpen || commandPaletteOpen) return;
