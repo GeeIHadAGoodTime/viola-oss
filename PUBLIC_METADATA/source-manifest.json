@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "d2684db6c19b5d35c45d98eae46ac33d51f366ee",
-  "sha256": "529cfc942970ebfb68ecad7a31743c09502d3c1b29a40e59ff6295c3bb1de142",
+  "revision": "97cb29729f21596d4dc6a924a151d9dbc0a4ee77",
+  "sha256": "13b10c9f037f9c38ea52d866527341a21d3755648b09acaaea84e01252442369",
   "files": [
     {
       "path": ".env.example",
@@ -5882,6 +5882,11 @@
       "path": "tests/public/test_step_logger_status.py",
       "sha256": "f43a8f369828481307fc8031f767240eb0774a80b17b0f54e89fcaff7fdffdf7",
       "bytes": 7499
+    },
+    {
+      "path": "tests/public/test_streaming_decimal_boundaries.py",
+      "sha256": "79b710751f8da16fa76c3e6956da238ad51d9cd2e0ee9eccde595ae81a0b2c00",
+      "bytes": 10832
     },
     {
       "path": "tests/public/test_tool_allowlist_contract.py",
@@ -12445,8 +12450,8 @@
     },
     {
       "path": "voice/synthesis/kokoro_engine.py",
-      "sha256": "55ef5c8f77cc5eaa7266c6f903587cfcbde1f51266b053d9d1605140900a4f40",
-      "bytes": 59449
+      "sha256": "7796e9aaab114cd37ffa2b971bfe6ad9129baf915f78270f8863b50476e0b04f",
+      "bytes": 59527
     },
     {
       "path": "voice/synthesis/lazy_engine.py",
@@ -12465,8 +12470,8 @@
     },
     {
       "path": "voice/synthesis/text_normalizer.py",
-      "sha256": "832761f2003f339abdae225753a58c8598b959af9eb4294055a38c0829636b74",
-      "bytes": 21792
+      "sha256": "0d8543d6f69b2a295045e09cfec2c56b1f346a2286495b2980183613f6930282",
+      "bytes": 22351
     },
     {
       "path": "voice/synthesis/tts_wire.py",
