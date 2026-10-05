@@ -2397,3 +2397,134 @@ describe('Microphone mute acknowledgement acceptance', () => {
     expect(screen.queryByText('Saving microphone change…')).not.toBeInTheDocument();
   });
 });
+
+describe('Native music refused-volume acceptance', () => {
+  it.each([409, 503])('does not leave a false zero-volume indication after refusal %i', async status => {
+    playerHarness.state = {
+      is_playing: true,
+      now_playing: { id: 'synthetic-native-file', title: 'Synthetic local WAV', provider: 'local' },
+      volume: 60,
+      hub_local_playback_active: true,
+    };
+    apiHarness.setVolume.mockRejectedValueOnce(Object.assign(new Error('synthetic refusal'), { status, code: 'volume_failed' }));
+    const view = render(<SmartDisplay />);
+    expect(view.container.querySelector('iframe')).toBeNull();
+    const slider = screen.getByRole('slider', { name: 'Volume' });
+    fireEvent.change(slider, { target: { value: '0' } });
+    fireEvent.pointerUp(slider);
+    await waitFor(() => expect(apiHarness.setVolume).toHaveBeenCalledExactlyOnceWith(0));
+    expect(await screen.findByText(status === 409
+      ? "Can't change the volume right now."
+      : "Couldn't change the volume. Please try again.")).toBeInTheDocument();
+    expect(playerHarness.state.volume).toBe(60);
+    expect(slider).toHaveValue('60');
+    expect(slider).toHaveAttribute('aria-valuenow', '60');
+  });
+});
+
+describe('Native music committed-volume recovery', () => {
+  const mountNative = () => {
+    playerHarness.state = {
+      is_playing: true,
+      now_playing: { id: 'synthetic-native-file', title: 'Synthetic local WAV', provider: 'local' },
+      volume: 60,
+      hub_local_playback_active: true,
+    };
+    const view = render(<SmartDisplay />);
+    expect(view.container.querySelector('iframe')).toBeNull();
+    return screen.getByRole('slider', { name: 'Volume' });
+  };
+  it('restores the last confirmed volume after a throttled zero write is refused', async () => {
+    const slider = mountNative();
+    let reject;
+    apiHarness.setVolume.mockReturnValueOnce(new Promise((_, fail) => { reject = fail; }));
+    vi.useFakeTimers();
+    try {
+      fireEvent.change(slider, { target: { value: '0' } });
+      await act(async () => vi.advanceTimersByTimeAsync(50));
+      expect(apiHarness.setVolume).toHaveBeenCalledExactlyOnceWith(0);
+      fireEvent.pointerUp(slider);
+      await act(async () => reject(Object.assign(new Error('synthetic refusal'), { status: 503, code: 'volume_failed' })));
+      expect(screen.getByText("Couldn't change the volume. Please try again.")).toBeInTheDocument();
+      expect(playerHarness.state.volume).toBe(60);
+      expect(slider).toHaveValue('60');
+    } finally { vi.useRealTimers(); }
+  });
+  it('retains an acknowledged quick drag instead of snapping to the pre-submit server value', async () => {
+    const slider = mountNative();
+    apiHarness.setVolume.mockResolvedValueOnce({ ok: true, volume: 0 });
+    fireEvent.change(slider, { target: { value: '0' } });
+    fireEvent.pointerUp(slider);
+    await act(async () => {});
+    expect(apiHarness.setVolume).toHaveBeenCalledExactlyOnceWith(0);
+    expect(slider).toHaveValue('0');
+  });
+});
+
+describe('Native music volume response and target ownership', () => {
+  const pending = () => {
+    let resolve; let reject;
+    const promise = new Promise((yes, no) => { resolve = yes; reject = no; });
+    return { promise, resolve, reject };
+  };
+  const nativeState = (id = 'synthetic-native-a', volume = 60) => ({
+    is_playing: true, now_playing: { id, title: 'Synthetic WAV', provider: 'local' },
+    volume, hub_local_playback_active: true,
+  });
+  const drag = value => {
+    const slider = screen.getByRole('slider', { name: 'Volume' });
+    fireEvent.change(slider, { target: { value: String(value) } });
+    fireEvent.pointerUp(slider);
+    return slider;
+  };
+  it('adopts the applied native level rather than the requested level', async () => {
+    playerHarness.state = nativeState();
+    apiHarness.setVolume.mockResolvedValueOnce({ ok: true, volume: 25 });
+    render(<SmartDisplay />);
+    await act(async () => drag(30));
+    expect(screen.getByRole('slider', { name: 'Volume' })).toHaveValue('25');
+  });
+  it('reports an unacknowledged success envelope and restores the confirmed native level', async () => {
+    playerHarness.state = nativeState();
+    apiHarness.setVolume.mockResolvedValueOnce({});
+    render(<SmartDisplay />);
+    await act(async () => drag(0));
+    expect(screen.getByRole('slider', { name: 'Volume' })).toHaveValue('60');
+    expect(screen.getByText("Couldn't change the volume. Please try again.")).toBeInTheDocument();
+  });
+  it.each(['resolve', 'reject'])('drops a late native %s after switching tracks', async completion => {
+    playerHarness.state = nativeState();
+    const write = pending();
+    apiHarness.setVolume.mockReturnValueOnce(write.promise);
+    const view = render(<SmartDisplay />);
+    drag(0);
+    playerHarness.state = nativeState('synthetic-native-b', 40);
+    view.rerender(<SmartDisplay />);
+    await act(async () => write[completion](completion === 'resolve'
+      ? { ok: true, volume: 0 } : Object.assign(new Error('old refusal'), { status: 503 })));
+    expect(screen.getByRole('slider', { name: 'Volume' })).toHaveValue('40');
+    expect(screen.queryByText("Couldn't change the volume. Please try again.")).not.toBeInTheDocument();
+  });
+  it('drops native feedback after a principal change', async () => {
+    playerHarness.state = nativeState(); apiHarness.account = { id: 'volume-account-a' };
+    const write = pending(); apiHarness.setVolume.mockReturnValueOnce(write.promise);
+    const view = render(<SmartDisplay />); drag(0);
+    apiHarness.account = { id: 'volume-account-b' }; playerHarness.state = nativeState('synthetic-native-a', 40);
+    view.rerender(<SmartDisplay />);
+    await act(async () => write.reject(Object.assign(new Error('old refusal'), { status: 503 })));
+    expect(screen.getByRole('slider', { name: 'Volume' })).toHaveValue('40');
+    expect(screen.queryByText("Couldn't change the volume. Please try again.")).not.toBeInTheDocument();
+  });
+  it('preserves the existing embedded direct-message volume route', async () => {
+    playerHarness.state = { is_playing: true, now_playing: { id: 'synthetic-video', provider: 'youtube', video_id: 'fJ9rUzIMcZQ' }, volume: 60 };
+    apiHarness.setVolume.mockRejectedValueOnce(Object.assign(new Error('refused'), { status: 503 }));
+    const view = render(<SmartDisplay />);
+    const frame = view.container.querySelector('iframe');
+    expect(frame).not.toBeNull();
+    const send = vi.spyOn(frame.contentWindow, 'postMessage');
+    await act(async () => drag(0));
+    expect(send).toHaveBeenCalledWith({ type: 'control', command: 'setVolume', level: 0 }, window.location.origin);
+    expect(screen.getByRole('slider', { name: 'Volume' })).toHaveValue('0');
+    expect(screen.getByText("Couldn't change the volume. Please try again.")).toBeInTheDocument();
+  });
+});
