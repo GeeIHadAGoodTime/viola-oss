@@ -3189,12 +3189,20 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null 
         sendToIframe('seekTo', { seconds: seekPos });
       }}
       onVolumeChange={(newVol) => {
-        api.setVolume(newVol).catch((err) => notifyTransportFailure(err, {
+        const result = api.setVolume(newVol);
+        if (!iframeRef.current) return result;
+        // Embedded volume also has a direct message route. Preserve that
+        // existing behavior separately from the native API-owned control.
+        result.catch((err) => notifyTransportFailure(err, {
           refused: "Can't change the volume right now.",
           failed: "Couldn't change the volume. Please try again.",
         }));
         sendToIframe('setVolume', { level: newVol });
       }}
+      onVolumeError={(err) => notifyTransportFailure(err, {
+        refused: "Can't change the volume right now.",
+        failed: "Couldn't change the volume. Please try again.",
+      })}
       onShuffleToggle={handleShuffleToggle}
       onRepeatCycle={() => updateRepeat(
         previous => {

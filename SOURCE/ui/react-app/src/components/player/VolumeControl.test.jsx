@@ -1,3 +1,4 @@
+import { StrictMode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, cleanup } from '@testing-library/react';
 import VolumeControl from './VolumeControl';
@@ -59,7 +60,7 @@ describe('VolumeControl optimistic state + throttle (#2772)', () => {
     // Nothing has committed yet — still inside the throttle window.
     expect(onVolumeChange).not.toHaveBeenCalled();
 
-    vi.advanceTimersByTime(50);
+    act(() => { vi.advanceTimersByTime(50); });
 
     // Exactly one trailing-edge commit for the whole burst, carrying the
     // latest (final) value from the burst — not one per tick.
@@ -80,7 +81,7 @@ describe('VolumeControl optimistic state + throttle (#2772)', () => {
     expect(onVolumeChange).toHaveBeenCalledWith(65);
 
     // No further delayed commit fires afterward.
-    vi.advanceTimersByTime(200);
+    act(() => { vi.advanceTimersByTime(200); });
     expect(onVolumeChange).toHaveBeenCalledTimes(1);
   });
 
@@ -108,11 +109,11 @@ describe('VolumeControl optimistic state + throttle (#2772)', () => {
 
     fireEvent.change(getSlider(), { target: { value: '60' } });
     // No pointerup — e.g. the pointer was released outside the window.
-    vi.advanceTimersByTime(50);
+    act(() => { vi.advanceTimersByTime(50); });
     expect(onVolumeChange).toHaveBeenCalledWith(60);
 
     // Idle-release window elapses; the guard clears on its own.
-    vi.advanceTimersByTime(300);
+    act(() => { vi.advanceTimersByTime(300); });
 
     rerender(<VolumeControl volume={40} onVolumeChange={onVolumeChange} />);
     expect(getSlider()).toHaveValue('40');
@@ -130,7 +131,7 @@ describe('VolumeControl optimistic state + throttle (#2772)', () => {
     const { rerender } = render(<VolumeControl volume={50} onVolumeChange={onVolumeChange} />);
 
     fireEvent.change(getSlider(), { target: { value: '11' } });
-    vi.advanceTimersByTime(50);            // our own commit goes out
+    act(() => { vi.advanceTimersByTime(50); });            // our own commit goes out
     expect(onVolumeChange).toHaveBeenCalledWith(11);
 
     // Somebody else sets 42 while we are still inside the drag window.
@@ -155,7 +156,7 @@ describe('VolumeControl optimistic state + throttle (#2772)', () => {
     // Stale echo of the pre-drag value arrives BEFORE we commit anything.
     rerender(<VolumeControl volume={50} onVolumeChange={onVolumeChange} />);
     fireEvent.change(getSlider(), { target: { value: '80' } });
-    vi.advanceTimersByTime(50);
+    act(() => { vi.advanceTimersByTime(50); });
     expect(onVolumeChange).toHaveBeenCalledWith(80);
 
     // Drag settles with the server still reporting the old 50 (our write has
@@ -163,4 +164,167 @@ describe('VolumeControl optimistic state + throttle (#2772)', () => {
     act(() => { vi.advanceTimersByTime(300); });
     expect(getSlider()).toHaveValue('80');
   });
+});
+
+describe('VolumeControl native acknowledgement ownership', () => {
+  const pending = () => {
+    let resolve; let reject;
+    const promise = new Promise((yes, no) => { resolve = yes; reject = no; });
+    return { promise, resolve, reject };
+  };
+  const drag = value => {
+    fireEvent.change(getSlider(), { target: { value: String(value) } });
+    fireEvent.pointerUp(getSlider());
+  };
+  const accepted = volume => ({ ok: true, volume });
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.useRealTimers(); });
+
+  it.each(['pointerUp', 'keyUp', 'blur'])('keeps an acknowledged quick zero after %s', async release => {
+    const write = pending();
+    render(<VolumeControl volume={60} onVolumeChange={() => write.promise} />);
+    fireEvent.change(getSlider(), { target: { value: '0' } });
+    fireEvent[release](getSlider());
+    expect(getSlider()).toHaveValue('0');
+    expect(getSlider()).toHaveAttribute('aria-busy', 'true');
+    expect(screen.getByText('Changing volume…')).toBeInTheDocument();
+    await act(async () => write.resolve(accepted(0)));
+    expect(getSlider()).toHaveValue('0');
+    expect(getSlider()).toHaveAttribute('aria-busy', 'false');
+  });
+
+  it('restores confirmed volume after a throttled zero write is refused', async () => {
+    const write = pending(); const error = vi.fn();
+    render(<VolumeControl volume={60} onVolumeChange={() => write.promise} onVolumeError={error} />);
+    fireEvent.change(getSlider(), { target: { value: '0' } });
+    await act(async () => vi.advanceTimersByTimeAsync(50));
+    fireEvent.pointerUp(getSlider());
+    await act(async () => write.reject(new Error('refused')));
+    expect(getSlider()).toHaveValue('60');
+    expect(error).toHaveBeenCalledTimes(1);
+  });
+
+  it('retains a normalized acknowledgement as the next rollback baseline', async () => {
+    const write = vi.fn().mockResolvedValueOnce(accepted(25)).mockRejectedValueOnce(new Error('refused'));
+    render(<VolumeControl volume={60} onVolumeChange={write} />);
+    await act(async () => drag(30));
+    expect(getSlider()).toHaveValue('25');
+    await act(async () => drag(0));
+    expect(getSlider()).toHaveValue('25');
+  });
+
+  it('serializes and coalesces newer drag intentions without overwriting them', async () => {
+    const first = pending(); const second = pending();
+    const write = vi.fn().mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+    render(<VolumeControl volume={60} onVolumeChange={write} />);
+    drag(20); drag(30); drag(40);
+    expect(write.mock.calls).toEqual([[20]]);
+    expect(getSlider()).toHaveValue('40');
+    await act(async () => first.resolve(accepted(18)));
+    expect(write.mock.calls).toEqual([[20], [40]]);
+    expect(getSlider()).toHaveValue('40');
+    await act(async () => second.reject(new Error('refused')));
+    expect(getSlider()).toHaveValue('18');
+  });
+
+  it.each([{}, undefined, { ok: false, volume: 0 }, { ok: true, volume: NaN },
+    { ok: true, volume: Infinity }, { ok: true, volume: -1 }, { ok: true, volume: 101 },
+    { ok: true, volume: false }, { ok: 'true', volume: 0 }])('refuses malformed acknowledgement %j', async value => {
+    const error = vi.fn();
+    render(<VolumeControl volume={60} onVolumeChange={() => Promise.resolve(value)} onVolumeError={error} />);
+    await act(async () => drag(0));
+    expect(getSlider()).toHaveValue('60');
+    expect(error).toHaveBeenCalledTimes(1);
+  });
+
+  it('owns a synchronous callback exception', () => {
+    const error = vi.fn();
+    render(<VolumeControl volume={60} onVolumeChange={() => { throw new Error('refused'); }} onVolumeError={error} />);
+    drag(0);
+    expect(getSlider()).toHaveValue('60');
+    expect(error).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['resolve', 'reject'])('retires timed-out %s and permits a new acknowledgement', async completion => {
+    const first = pending(); const second = pending(); const error = vi.fn();
+    const write = vi.fn().mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+    render(<VolumeControl volume={60} onVolumeChange={write} onVolumeError={error} />);
+    drag(0);
+    await act(async () => vi.advanceTimersByTimeAsync(15000));
+    expect(getSlider()).toHaveValue('60');
+    expect(screen.getByText('Volume change not confirmed. Check the level and try again.')).toBeInTheDocument();
+    drag(30);
+    await act(async () => second.resolve(accepted(30)));
+    await act(async () => first[completion](completion === 'resolve' ? accepted(0) : new Error('late')));
+    expect(getSlider()).toHaveValue('30');
+    expect(error).not.toHaveBeenCalled();
+  });
+
+  it('checks the response deadline even before a delayed timeout task executes', async () => {
+    let now = 0; vi.spyOn(performance, 'now').mockImplementation(() => now);
+    const write = pending();
+    render(<VolumeControl volume={60} onVolumeChange={() => write.promise} />);
+    drag(0); now = 15000;
+    await act(async () => write.resolve(accepted(0)));
+    expect(getSlider()).toHaveValue('60');
+    expect(screen.getByText('Volume change not confirmed. Check the level and try again.')).toBeInTheDocument();
+  });
+
+  it.each(['resolve', 'reject'])('drops queued writes and late %s after unmount', async completion => {
+    const first = pending(); const error = vi.fn(); const write = vi.fn().mockReturnValue(first.promise);
+    const view = render(<VolumeControl volume={60} onVolumeChange={write} onVolumeError={error} />);
+    drag(0); drag(30); view.unmount();
+    await act(async () => first[completion](completion === 'resolve' ? accepted(0) : new Error('late')));
+    expect(write.mock.calls).toEqual([[0]]);
+    expect(error).not.toHaveBeenCalled();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('retains authoritative state received during a request as the rollback baseline', async () => {
+    const first = pending(); const write = vi.fn().mockReturnValueOnce(first.promise).mockRejectedValueOnce(new Error('refused'));
+    const view = render(<VolumeControl volume={60} onVolumeChange={write} />);
+    drag(20);
+    view.rerender(<VolumeControl volume={17} onVolumeChange={write} />);
+    await act(async () => first.resolve(accepted(20)));
+    expect(getSlider()).toHaveValue('17');
+    await act(async () => drag(0));
+    expect(getSlider()).toHaveValue('17');
+  });
+
+  it('keeps a not-yet-committed newer drag when the previous write fails', async () => {
+    const first = pending(); const error = vi.fn(); const write = vi.fn().mockReturnValueOnce(first.promise).mockResolvedValueOnce(accepted(30));
+    render(<VolumeControl volume={60} onVolumeChange={write} onVolumeError={error} />);
+    drag(0);
+    fireEvent.change(getSlider(), { target: { value: '30' } });
+    await act(async () => first.reject(new Error('earlier refusal')));
+    expect(getSlider()).toHaveValue('30');
+    expect(error).not.toHaveBeenCalled();
+    await act(async () => fireEvent.pointerUp(getSlider()));
+    expect(write.mock.calls).toEqual([[0], [30]]);
+    expect(getSlider()).toHaveValue('30');
+  });
+  it('accepts a current request under StrictMode effect replay', async () => {
+    const write = vi.fn().mockResolvedValue(accepted(0));
+    render(<StrictMode><VolumeControl volume={60} onVolumeChange={write} /></StrictMode>);
+    await act(async () => drag(0));
+    expect(getSlider()).toHaveValue('0');
+    expect(write.mock.calls).toEqual([[0]]);
+  });
+
+  it.each(['resolve', 'reject'])('cannot release a newer pending request after a retired %s', async completion => {
+    const first = pending(); const second = pending(); const error = vi.fn();
+    const write = vi.fn().mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+    render(<VolumeControl volume={60} onVolumeChange={write} onVolumeError={error} />);
+    drag(0);
+    await act(async () => vi.advanceTimersByTimeAsync(15000));
+    drag(30);
+    await act(async () => first[completion](completion === 'resolve' ? accepted(0) : new Error('late')));
+    expect(getSlider()).toHaveValue('30');
+    expect(getSlider()).toHaveAttribute('aria-busy', 'true');
+    expect(error).not.toHaveBeenCalled();
+    await act(async () => second.resolve(accepted(30)));
+    expect(getSlider()).toHaveValue('30');
+    expect(getSlider()).toHaveAttribute('aria-busy', 'false');
+  });
+
 });

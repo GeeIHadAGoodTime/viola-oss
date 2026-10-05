@@ -35,6 +35,7 @@ const PlayerSection = ({
   onPrevious,
   onSeek,
   onVolumeChange,
+  onVolumeError,
   onShuffleToggle,
   onRepeatCycle,
   onRating,
@@ -47,6 +48,10 @@ const PlayerSection = ({
   ProviderEmbed,
   playerState,
 }) => {
+  const volumeTarget = JSON.stringify([
+    nowPlaying?.provider, nowPlaying?.id, nowPlaying?.video_id,
+    nowPlaying?.capabilities?.embed_url, isSpoke,
+  ]);
   return (
     <ErrorBoundary name="Now Playing">
       <div className={`viola-player-section now-playing-container ${styles.section}`} data-testid="now-playing">
@@ -125,7 +130,7 @@ const PlayerSection = ({
               <RepeatIcon mode={repeatMode} />
             </TransportButton>
             <div className={styles.spacer} />
-            <VolumeControl volume={volume} onVolumeChange={onVolumeChange} />
+            <VolumeControl key={volumeTarget} volume={volume} onVolumeChange={onVolumeChange} onVolumeError={onVolumeError} />
           </div>
         </div>
       </div>
@@ -152,6 +157,7 @@ PlayerSection.propTypes = {
   onPrevious: PropTypes.func.isRequired,
   onSeek: PropTypes.func.isRequired,
   onVolumeChange: PropTypes.func.isRequired,
+  onVolumeError: PropTypes.func,
   onShuffleToggle: PropTypes.func.isRequired,
   onRepeatCycle: PropTypes.func.isRequired,
   onRating: PropTypes.func.isRequired,
