@@ -9,6 +9,7 @@ For unsupported TTS languages, Viola exits gracefully in English.
 from __future__ import annotations
 
 import asyncio
+import os
 
 from core.logging_config import get_logger
 
@@ -29,6 +30,44 @@ LANGUAGE_NAMES = {
     "vi": "Vietnamese",
     "ru": "Russian",
 }
+
+
+def _parse_phone_language(value: object):
+    """Accept complete codes from the pinned language registry, never prefixes."""
+    from pipecat.transcriptions.language import Language
+
+    if not isinstance(value, str):
+        return None
+    raw = value.strip()
+    if raw.lower().startswith("language."):
+        raw = raw[len("language.") :]
+        member = Language.__members__.get(raw.upper())
+        if member is not None:
+            return member
+    normalized = raw.replace("_", "-").lower()
+    return next((language for language in Language if language.value.lower() == normalized), None)
+
+
+def _selected_backend_supports_locale(tts, locale: str) -> bool:
+    """Check the bound pronunciation component, separately from voice/assets.
+
+    The remote-first wrapper delegates tokenizer access to its local fallback.
+    Never advertise a customer locale based only on the product-wide language
+    list or a mutable environment selector. Legacy forwarding stays unchanged.
+    """
+    try:
+        runtime = getattr(tts, "_kokoro", None)
+        tokenizer = getattr(runtime, "tokenizer", None)
+        customer = getattr(tokenizer, "_customer", None)
+        if customer is not None:
+            supports = getattr(customer, "supports_locale", None)
+            return callable(supports) and supports(locale) is True
+        # A selected customer profile with an absent/unknown component is not
+        # evidence of readiness. Only the existing default backend may use the
+        # legacy product-wide forwarding contract without this declaration.
+        return os.getenv("VIOLA_KOKORO_PHONEMIZER", "espeak") == "espeak"
+    except Exception:
+        return False
 
 
 class LanguageHandler:
@@ -67,21 +106,30 @@ class LanguageHandler:
         if self._switched:
             return  # Already switched, stay in new language
 
-        # Normalize language code — Pipecat Language enum values may be like "Language.ES" or "es"
-        lang = detected_lang.lower().split(".")[-1].split("-")[0][:2]
-
-        if lang == "en" or confidence < 0.7:
+        language = _parse_phone_language(detected_lang)
+        if (
+            language is None
+            or isinstance(confidence, bool)
+            or not isinstance(confidence, (int, float))
+            or not 0.7 <= confidence <= 1.0
+        ):
+            self._consecutive_non_english = 0
+            return
+        lang = language.value.split("-", 1)[0]
+        if lang == "en":
             self._consecutive_non_english = 0
             return
 
         self._consecutive_non_english += 1
 
         if self._consecutive_non_english >= self._switch_threshold:
-            await self._switch_language(lang)
+            await self._switch_language(language)
 
     async def _switch_language(self, lang_code: str):
         from pipecat.frames.frames import LLMMessagesAppendFrame
 
+        language = _parse_phone_language(lang_code)
+        lang_code = language.value.split("-", 1)[0] if language is not None else "unknown"
         lang_name = LANGUAGE_NAMES.get(lang_code, lang_code)
 
         if lang_code in KOKORO_SUPPORTED:
@@ -89,7 +137,6 @@ class LanguageHandler:
             # Other phone providers do not necessarily consume that setting.
             from pipecat.frames.frames import TTSUpdateSettingsFrame
             from pipecat.processors.frame_processor import FrameDirection
-            from pipecat.transcriptions.language import Language
 
             try:
                 from pipecat.services.kokoro.tts import KokoroTTSService
@@ -101,7 +148,10 @@ class LanguageHandler:
                 logger.warning("Phone TTS cannot switch language to %s", lang_code)
                 return
 
-            language = Language(lang_code)
+            locale = self._tts.language_to_service_language(language)
+            if not _selected_backend_supports_locale(self._tts, locale):
+                await self._report_unsupported_language(lang_code, lang_name, selected_backend=True)
+                return
             previous_language = self._tts._settings.language
             context = "\n".join(
                 [
@@ -145,21 +195,28 @@ class LanguageHandler:
             logger.info("Language switched to %s (%s)", lang_name, lang_code)
 
         else:
-            context = "\n".join(
-                [
-                    "phone_event: language_detected",
-                    "source: asr_language_metadata",
-                    "recipient_language_code: %s" % lang_code,
-                    "recipient_language_name: %s" % lang_name,
-                    "tts_language_supported: false",
-                ]
-            )
-            frame = LLMMessagesAppendFrame(messages=[{"role": "system", "content": context}], run_llm=False)
-            try:
-                await self._push_context_frame(frame)
-            finally:
-                self._switched = self._context_frame_applied(frame)
-            logger.info("Unsupported language %s — exiting gracefully", lang_name)
+            await self._report_unsupported_language(lang_code, lang_name)
+
+    async def _report_unsupported_language(self, lang_code: str, lang_name: str, *, selected_backend: bool = False):
+        from pipecat.frames.frames import LLMMessagesAppendFrame
+
+        context = "\n".join(
+            [
+                "phone_event: language_detected",
+                "source: asr_language_metadata",
+                "recipient_language_code: %s" % lang_code,
+                "recipient_language_name: %s" % lang_name,
+                "tts_language_supported: false",
+            ]
+        )
+        if selected_backend:
+            context += "\ntts_language_scope: selected_pronunciation_backend"
+        frame = LLMMessagesAppendFrame(messages=[{"role": "system", "content": context}], run_llm=False)
+        try:
+            await self._push_context_frame(frame)
+        finally:
+            self._switched = self._context_frame_applied(frame)
+        logger.info("Unsupported language %s — exiting gracefully", lang_name)
 
     @property
     def current_language(self) -> str:

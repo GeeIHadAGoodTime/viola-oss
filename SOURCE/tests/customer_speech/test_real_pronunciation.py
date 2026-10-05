@@ -29,6 +29,55 @@ class RealCustomerPronunciationTests(unittest.TestCase):
         if not cls._had_onnx_entry:
             sys.modules.pop("onnxruntime", None)
 
+    def test_initialism_a_matches_explicit_letter_not_ordinary_article(self):
+        for locale in ("en-us", "en-gb"):
+            for raw, explicit in [
+                ("A I", "[A](/ˈA/) I"),
+                ("A P I", "[A](/ˈA/) P I"),
+                ("Open A I", "Open [A](/ˈA/) I"),
+                ("'A I'", "'[A](/ˈA/) I'"),
+                ("'A P I'", "'[A](/ˈA/) P I'"),
+                ("'Open A I'", "'Open [A](/ˈA/) I'"),
+            ]:
+                with self.subTest(locale=locale, raw=raw):
+                    self.assertEqual(self.g2p.phonemize(raw, locale), self.g2p.phonemize(explicit, locale))
+                    self.assertNotIn("ɐ", self.g2p.phonemize(raw, locale))
+            for article in (
+                "A book",
+                "A U.S. citizen",
+                "A U S citizen",
+                "A C P U",
+                "A C I A agent",
+                "A A P I response",
+                "A C++ developer",
+                "A I/O error",
+            ):
+                with self.subTest(locale=locale, article=article):
+                    self.assertTrue(self.g2p.phonemize(article, locale).startswith("ɐ"))
+            self.assertEqual(self.g2p.phonemize("[A I](/həlˈO/)", locale), "həlˈO")
+
+    def test_every_retained_a_bearing_expansion_matches_explicit_letter_reading(self):
+        import re
+        from voice.pronunciation_tables import _ACRONYM_INITIALISMS, _ACRONYM_WORDS, _BRAND_PRONUNCIATIONS
+
+        expansions = {
+            key: value
+            for table in (_ACRONYM_INITIALISMS, _ACRONYM_WORDS, _BRAND_PRONUNCIATIONS)
+            for key, value in table.items()
+            if re.search(r"\bA\b", value)
+        }
+        self.assertIn("AMD", expansions)
+        self.assertEqual(len(expansions), 7)
+        for locale in ("en-us", "en-gb"):
+            for key, value in expansions.items():
+                explicit = re.sub(r"\bA\b", "[A](/ˈA/)", value)
+                for template in ("{}", "Read {} please.", "'{}'", '"{}"', "A {} example."):
+                    with self.subTest(locale=locale, key=key, template=template):
+                        self.assertEqual(
+                            self.g2p.phonemize(template.format(value), locale),
+                            self.g2p.phonemize(template.format(explicit), locale),
+                        )
+
     def test_exact_decimal_values_are_not_rounded_to_neighbours(self):
         for left, right in [
             ("Value 12345678901234567.25.", "Value 12345678901234568."),
@@ -62,7 +111,7 @@ class RealCustomerPronunciationTests(unittest.TestCase):
         self.assertTrue(self.g2p.phonemize("Hello [name](/həlˈO/) world."))
 
     def test_all_retained_brand_and_acronym_tables_remain_pronounceable(self):
-        tree = ast.parse((ROOT / "voice/synthesis/text_normalizer.py").read_text())
+        tree = ast.parse((ROOT / "voice/pronunciation_tables.py").read_text())
         tables = {"_BRAND_PRONUNCIATIONS", "_ACRONYM_WORDS", "_ACRONYM_INITIALISMS"}
         count = 0
         for node in tree.body:

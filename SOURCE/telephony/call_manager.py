@@ -54,59 +54,84 @@ from pathlib import Path
 from typing import Any, Literal, Protocol
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
-from config import defaults
-from core.constants import (
+# Bootstrap the explicitly selected customer route before any application or
+# Pipecat import can initialize ONNX Runtime through VAD/turn detection.
+_PHONE_CUSTOMER_PROFILE_AT_IMPORT = os.getenv("VIOLA_KOKORO_PHONEMIZER") == "misaki-en"
+
+
+def _require_phone_customer_startup() -> None:
+    """Preserve profile identity and enforce Kokoro's pre-import privacy guard.
+
+    The process owner must set the profile and non-Windows telemetry opt-out
+    before startup. Never set either here, accept late profile switching, or
+    hide this error as a missing optional dependency. Windows import ordering
+    alone does not qualify ETW/privacy behavior.
+    """
+    customer_selected = os.getenv("VIOLA_KOKORO_PHONEMIZER") == "misaki-en"
+    if customer_selected != _PHONE_CUSTOMER_PROFILE_AT_IMPORT:
+        raise RuntimeError("Phone customer speech profile cannot change after startup")
+    if not customer_selected:
+        return
+    from kokoro_onnx import _require_customer_telemetry_opt_out
+
+    _require_customer_telemetry_opt_out()
+
+
+_require_phone_customer_startup()
+
+from config import defaults  # noqa: E402 - customer privacy bootstrap precedes application imports
+from core.constants import (  # noqa: E402 - customer privacy bootstrap precedes application imports
     BIND_ALL_INTERFACES,
     LOCALHOST,
     LOCALHOST_NAME,
     TIMEOUT_SHUTDOWN,
 )
-from core.cpu_quota import effective_cpu_count
-from core.exceptions import ErrorContext, ErrorSeverity, ServiceError
-from core.logging_config import get_logger
-from core.platform import configure_environment, get_cache_dir, get_data_dir
-from core.user_profile import build_phone_info_manifest
-from telephony.call_context import (
+from core.cpu_quota import effective_cpu_count  # noqa: E402 - customer privacy bootstrap precedes application imports
+from core.exceptions import ErrorContext, ErrorSeverity, ServiceError  # noqa: E402 - customer privacy bootstrap precedes application imports
+from core.logging_config import get_logger  # noqa: E402 - customer privacy bootstrap precedes application imports
+from core.platform import configure_environment, get_cache_dir, get_data_dir  # noqa: E402 - customer privacy bootstrap precedes application imports
+from core.user_profile import build_phone_info_manifest  # noqa: E402 - customer privacy bootstrap precedes application imports
+from telephony.call_context import (  # noqa: E402 - customer privacy bootstrap precedes application imports
     build_phone_system_instruction,
     build_phone_volatile_context,
 )
-from telephony.call_disclosures import (
+from telephony.call_disclosures import (  # noqa: E402 - customer privacy bootstrap precedes application imports
     PHONE_CALL_RETENTION_DAYS,
     detect_called_party_opt_out,
     detect_persistence_objection,
 )
-from telephony.call_queue import PhoneCallQueue, QueuedOutboundCall
-from telephony.call_tools import (
+from telephony.call_queue import PhoneCallQueue, QueuedOutboundCall  # noqa: E402 - customer privacy bootstrap precedes application imports
+from telephony.call_tools import (  # noqa: E402 - customer privacy bootstrap precedes application imports
     PIPELINE_FUNCTION_TIMEOUT_MARGIN_SECS,
     consult_user_pipeline_timeout_secs,
 )
-from telephony.caller_validation import is_assistant_caller_name, validate_caller_name
-from telephony.config import TelnyxConfig
-from telephony.number_pool import NumberPool
-from telephony.number_validation import normalize_us_e164
-from telephony.openai_chat import phone_chat_completion_options
-from telephony.opt_out import add_opt_out, is_opted_out
-from telephony.phone_latency_trace import (
+from telephony.caller_validation import is_assistant_caller_name, validate_caller_name  # noqa: E402 - customer privacy bootstrap precedes application imports
+from telephony.config import TelnyxConfig  # noqa: E402 - customer privacy bootstrap precedes application imports
+from telephony.number_pool import NumberPool  # noqa: E402 - customer privacy bootstrap precedes application imports
+from telephony.number_validation import normalize_us_e164  # noqa: E402 - customer privacy bootstrap precedes application imports
+from telephony.openai_chat import phone_chat_completion_options  # noqa: E402 - customer privacy bootstrap precedes application imports
+from telephony.opt_out import add_opt_out, is_opted_out  # noqa: E402 - customer privacy bootstrap precedes application imports
+from telephony.phone_latency_trace import (  # noqa: E402 - customer privacy bootstrap precedes application imports
     PhoneLatencyTraceProcessor,
     PhoneLatencyTraceRecorder,
     PhoneLatencyTraceWriter,
 )
-from telephony.phone_stt_options import (
+from telephony.phone_stt_options import (  # noqa: E402 - customer privacy bootstrap precedes application imports
     PHONE_STT_NO_SPEECH_THRESHOLD,
     phone_pcm_to_whisper_float,
     phone_whisper_transcribe_options,
 )
-from telephony.phone_tos import get_phone_tos
-from telephony.precall_planner import (
+from telephony.phone_tos import get_phone_tos  # noqa: E402 - customer privacy bootstrap precedes application imports
+from telephony.precall_planner import (  # noqa: E402 - customer privacy bootstrap precedes application imports
     merge_info_manifests,
     plan_phone_call_prerequisites,
 )
-from telephony.recording_storage import RecordingStorage, create_recording_storage
-from telephony.remote_voice import maybe_remote_first_kokoro, remote_transcribe_pcm
-from telephony.telnyx_dial_response import telnyx_dial_call_control_id
-from telephony.usage import company_phone_billing_available, get_phone_billing
-from telephony.user_settings_lookup import load_cloud_user_settings_blob
-from telephony.voicemail_detection import PipecatVoicemailDetectionHandler
+from telephony.recording_storage import RecordingStorage, create_recording_storage  # noqa: E402 - customer privacy bootstrap precedes application imports
+from telephony.remote_voice import maybe_remote_first_kokoro, remote_transcribe_pcm  # noqa: E402 - customer privacy bootstrap precedes application imports
+from telephony.telnyx_dial_response import telnyx_dial_call_control_id  # noqa: E402 - customer privacy bootstrap precedes application imports
+from telephony.usage import company_phone_billing_available, get_phone_billing  # noqa: E402 - customer privacy bootstrap precedes application imports
+from telephony.user_settings_lookup import load_cloud_user_settings_blob  # noqa: E402 - customer privacy bootstrap precedes application imports
+from telephony.voicemail_detection import PipecatVoicemailDetectionHandler  # noqa: E402 - customer privacy bootstrap precedes application imports
 
 logger = get_logger(__name__)
 
@@ -1198,6 +1223,7 @@ def _phone_tts_runtime_key(config: TelnyxConfig) -> tuple[str, str, str]:
 
 
 def _create_phone_kokoro_session(model_path: Path, providers: tuple[str, ...]) -> Any:
+    _require_phone_customer_startup()
     import onnxruntime as ort
 
     preload = getattr(ort, "preload_dlls", None)
@@ -1210,6 +1236,7 @@ def _create_phone_kokoro_session(model_path: Path, providers: tuple[str, ...]) -
 
 
 def _phone_kokoro_from_session(session: Any, voices_path: Path) -> Any:
+    _require_phone_customer_startup()
     from kokoro_onnx import Kokoro
 
     return Kokoro.from_session(session, str(voices_path))
@@ -1230,6 +1257,7 @@ def _load_phone_kokoro_tts_runtime(
     voice: str,
     requested_provider: str,
 ) -> _PhoneKokoroTTSRuntime:
+    _require_phone_customer_startup()
     import onnxruntime as ort
 
     configure_environment()
@@ -1272,6 +1300,7 @@ def _load_phone_kokoro_tts_runtime(
 
 def _ensure_phone_kokoro_tts_runtime(config: TelnyxConfig) -> _PhoneKokoroTTSRuntime:
     """Load, warm, and retain one Kokoro ONNX runtime for phone TTS."""
+    _require_phone_customer_startup()
     global _phone_tts_runtime, _phone_tts_warm_key
 
     requested_key = _phone_tts_runtime_key(config)
@@ -1429,6 +1458,7 @@ _PHONE_RUNTIME_REQUIRED_BINARIES: tuple[tuple[str, str], ...] = (("espeak-ng", "
 
 def _ensure_phone_runtime_dependencies(tts_provider: str = "local") -> None:
     """Fail before billing/dial state is created if the phone runtime is incomplete."""
+    _require_phone_customer_startup()
     missing = []
     provider = (tts_provider or "local").strip().lower()
     for module_name, package_name in _PHONE_RUNTIME_REQUIRED_MODULES:
@@ -8000,6 +8030,7 @@ class CallManager:
         All providers include SpeechTextFilter for normalizing currency,
         phone numbers, percentages, and times into TTS-friendly speech text.
         """
+        _require_phone_customer_startup()
         configure_environment()
 
         from pipecat.services.tts_service import TextAggregationMode

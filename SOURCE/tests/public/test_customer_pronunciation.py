@@ -12,7 +12,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from voice.customer_pronunciation import CustomerTokenizer, PronunciationError
+from voice.customer_pronunciation import CustomerTokenizer, PronunciationError, _protect_initialism_a
 from voice.english_numbers import num2words
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -112,6 +112,77 @@ class CustomerAdapterTests(unittest.TestCase):
         obj._g2p = {lang: lambda text: (phonemes, tokens) for lang in ("en-us", "en-gb")}
         return obj
 
+    def test_formatter_and_customer_bind_the_complete_canonical_tables(self):
+        import re
+        import voice.customer_pronunciation as customer
+        import voice.pronunciation_tables as tables
+
+        logging = types.ModuleType("core.logging_config")
+        logging.get_logger = lambda name: types.SimpleNamespace(debug=lambda *args: None)
+        spec = importlib.util.spec_from_file_location(
+            "_shared_pronunciation_formatter", ROOT / "voice/synthesis/text_normalizer.py"
+        )
+        formatter = importlib.util.module_from_spec(spec)
+        with patch.dict(sys.modules, {"core.logging_config": logging}):
+            spec.loader.exec_module(formatter)
+        checked = 0
+        for name in ("_ACRONYM_INITIALISMS", "_ACRONYM_WORDS", "_BRAND_PRONUNCIATIONS"):
+            table = getattr(tables, name)
+            self.assertIs(getattr(customer, name), table)
+            self.assertIs(getattr(formatter, name), table)
+            for key, expansion in table.items():
+                expected = re.sub(r"\bA\b", "[A](/ˈA/)", expansion)
+                with self.subTest(key=key):
+                    self.assertEqual(_protect_initialism_a(expansion), expected)
+                checked += 1
+        self.assertEqual(checked, 83)
+
+    def test_initialism_a_is_customer_scoped_and_not_an_article(self):
+        for raw, expected in [
+            ("A I", "[A](/ˈA/) I"),
+            ("A P I", "[A](/ˈA/) P I"),
+            ("A M D", "[A](/ˈA/) M D"),
+            ("A A M D chip", "A [A](/ˈA/) M D chip"),
+            ("Open A I", "Open [A](/ˈA/) I"),
+            ("A book and A I", "A book and [A](/ˈA/) I"),
+            ("A B A", "A B A"),
+            ("A I.", "[A](/ˈA/) I."),
+            ("A P I, please.", "[A](/ˈA/) P I, please."),
+            ("“A I” and (A P I).", "“[A](/ˈA/) I” and ([A](/ˈA/) P I)."),
+            ("'A P I'", "'[A](/ˈA/) P I'"),
+            ("Read 'A P I.' please.", "Read '[A](/ˈA/) P I.' please."),
+            ("O'A P I'", "O'A P I'"),
+            ("A P I-like", "A P I-like"),
+            ("A U S citizen", "A U S citizen"),
+            ("A C P U", "A C P U"),
+            ("A C I A agent", "A C I [A](/ˈA/) agent"),
+            ("A A P I response", "A [A](/ˈA/) P I response"),
+            ("A F A Q page", "A F [A](/ˈA/) Q page"),
+            ("L A", "L [A](/ˈA/)"),
+            ("A U.S. citizen", "A U.S. citizen"),
+            ("A C++ developer", "A C++ developer"),
+            ("A I/O error", "A I/O error"),
+            ("A B2 example", "A B2 example"),
+            ("X/A I", "X/A I"),
+            ("A book", "A book"),
+            ("a I", "a I"),
+            ("A Item", "A Item"),
+            ("[A I](/həlˈO/) and A P I", "[A I](/həlˈO/) and [A](/ˈA/) P I"),
+        ]:
+            with self.subTest(raw=raw):
+                self.assertEqual(_protect_initialism_a(raw), expected)
+
+    def test_initialism_transform_reaches_only_the_customer_g2p_boundary(self):
+        obj = self.adapter()
+        inputs = []
+        obj._g2p["en-us"] = lambda text: (
+            inputs.append(text) or "abc",
+            [types.SimpleNamespace(text="word", phonemes="abc")],
+        )
+        obj.phonemize("A I")
+        obj.phonemize("A book")
+        self.assertEqual(inputs, ["[A](/ˈA/) I", "A book"])
+
     def test_supported_dialects_and_lossless_tokens(self):
         obj = self.adapter()
         self.assertEqual(obj.phonemize("hello", lang="en_US"), "abc")
@@ -152,8 +223,9 @@ class CustomerAdapterTests(unittest.TestCase):
                 obj.phonemize(text, lang)
 
     def test_offline_missing_fork_is_an_error_before_nlp_import(self):
-        with patch("importlib.metadata.version", return_value="wrong"), self.assertRaisesRegex(
-            RuntimeError, "reviewed"
+        with (
+            patch("importlib.metadata.version", return_value="wrong"),
+            self.assertRaisesRegex(RuntimeError, "reviewed"),
         ):
             CustomerTokenizer({"a": 1})
 
@@ -167,12 +239,14 @@ class CustomerAdapterTests(unittest.TestCase):
         log.log = types.SimpleNamespace()
         module_spec = importlib.util.spec_from_file_location(name + ".tokenizer", folder / "tokenizer.py")
         module = importlib.util.module_from_spec(module_spec)
-        with patch.dict(
-            sys.modules,
-            {name: package, name + ".log": log, "phonemizer": None, "phonemizer.backend.espeak.wrapper": None},
-        ), patch.dict(os.environ, {"VIOLA_KOKORO_PHONEMIZER": "misaki-en"}), patch(
-            "voice.customer_pronunciation.CustomerTokenizer", return_value=self.adapter()
-        ) as customer:
+        with (
+            patch.dict(
+                sys.modules,
+                {name: package, name + ".log": log, "phonemizer": None, "phonemizer.backend.espeak.wrapper": None},
+            ),
+            patch.dict(os.environ, {"VIOLA_KOKORO_PHONEMIZER": "misaki-en"}),
+            patch("voice.customer_pronunciation.CustomerTokenizer", return_value=self.adapter()) as customer,
+        ):
             module_spec.loader.exec_module(module)
             tokenizer = module.Tokenizer()
             self.assertEqual(tokenizer.phonemize("hello"), "abc")
@@ -193,7 +267,7 @@ class RetainedFormatterCurrencyTests(unittest.TestCase):
         source = ROOT / "voice/synthesis/text_normalizer.py"
         names = {"_CURRENCY_RE", "_DIGIT_NAMES", "_clean_num2words_output", "_number_to_words", "_replace_currency"}
         nodes = []
-        for node in ast.parse(source.read_text()).body:
+        for node in ast.parse(source.read_text(encoding="utf-8")).body:
             if isinstance(node, ast.FunctionDef) and node.name in names:
                 nodes.append(node)
             elif isinstance(node, ast.Assign) and any(isinstance(t, ast.Name) and t.id in names for t in node.targets):
@@ -218,7 +292,7 @@ class CustomerTelemetryImportGuardTests(unittest.TestCase):
         import ast
 
         source = ROOT / "third_party/kokoro_onnx/src/kokoro_onnx/__init__.py"
-        tree = ast.parse(source.read_text())
+        tree = ast.parse(source.read_text(encoding="utf-8"))
         function = next(
             n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "_require_customer_telemetry_opt_out"
         )
@@ -261,9 +335,11 @@ class CustomerTelemetryImportGuardTests(unittest.TestCase):
         ):
             previous = namespace[name]
             namespace[name] = unsafe
-            with self.subTest(import_provenance=name), patch.dict(
-                os.environ, {"VIOLA_KOKORO_PHONEMIZER": "misaki-en", "ORT_DISABLE_TELEMETRY": "1"}
-            ), self.assertRaises(RuntimeError):
+            with (
+                self.subTest(import_provenance=name),
+                patch.dict(os.environ, {"VIOLA_KOKORO_PHONEMIZER": "misaki-en", "ORT_DISABLE_TELEMETRY": "1"}),
+                self.assertRaises(RuntimeError),
+            ):
                 namespace[function.name]()
             namespace[name] = previous
         kokoro = next(n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == "Kokoro")

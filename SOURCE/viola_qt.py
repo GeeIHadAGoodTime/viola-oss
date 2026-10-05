@@ -4,6 +4,10 @@
 import os
 import sys as _sys
 
+# Capture the process-selected speech profile before startup helpers/config can
+# change the environment. This is stdlib-only and leaves Velopack first.
+_DESKTOP_CUSTOMER_PROFILE_AT_IMPORT = os.getenv("VIOLA_KOKORO_PHONEMIZER") == "misaki-en"
+
 
 def _install_frozen_safe_stdio() -> None:
     """Install discard streams for frozen windowed builds with no console."""
@@ -459,6 +463,29 @@ del _sys, _pathlib, _expected_venv
 _boot_checkpoint("06-venv-check-done")
 
 
+def _require_desktop_customer_startup() -> None:
+    """Load the selected customer guard before the desktop ORT preload.
+
+    Keep native win32ui preload and environment-directory setup ahead of this
+    boundary, and Qt/config/backend imports after it. Never set the pronunciation
+    selector or telemetry flags here. Windows import order does not establish
+    Windows telemetry/ETW privacy or frozen-runtime-hook qualification.
+    """
+    try:
+        customer_selected = os.getenv("VIOLA_KOKORO_PHONEMIZER") == "misaki-en"
+        if customer_selected != _DESKTOP_CUSTOMER_PROFILE_AT_IMPORT:
+            raise RuntimeError("Desktop customer speech profile cannot change after startup")
+        if customer_selected:
+            from kokoro_onnx import _require_customer_telemetry_opt_out
+
+            _require_customer_telemetry_opt_out()
+    except BaseException as exc:  # noqa: BLE001, RUF100 - retain visible early-boot diagnostics
+        _fatal_boot_unless_clean_exit("customer speech bootstrap", exc)
+
+
+_require_desktop_customer_startup()
+
+
 # Must stay module-level: DLL load order conflict with Qt C++ runtime.
 # Importing onnxruntime first claims the native DLLs before Qt/config loads
 # conflicting runtimes.
@@ -595,6 +622,7 @@ def _daemon_argv_from_qt_args(argv: list[str]) -> list[str]:
 
 
 def _run_headless_daemon() -> None:
+    _require_desktop_customer_startup()
     from services.daemon.viola_daemon import main as daemon_main
 
     sys.argv = _daemon_argv_from_qt_args(sys.argv)
@@ -1182,6 +1210,7 @@ _boot_checkpoint("12-module-level-complete")
 def main():
     """Main entry point"""
     global _configure_observability, _get_debug_bus, _install_debug_event_mirror, logger
+    _require_desktop_customer_startup()
     _boot_checkpoint("13-main-entered")
 
     from diagnostics.startup_telemetry import record_process_start, run_in_background
