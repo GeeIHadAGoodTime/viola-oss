@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "e7613d1a32ec6a51b118f8da154beb337da66680",
-  "sha256": "4b04549c2d8ece1a42dfade6fa104392c55df6cce50903b1bda2c0e9f4917ef7",
+  "revision": "34d9e5f86f968b50b9b97c1d338a3aba581e78e5",
+  "sha256": "7bc239b1239572d1891b096b4217f70aa14eecbf058ab9eb288168a39c34a8ea",
   "files": [
     {
       "path": ".env.example",
@@ -5764,6 +5764,11 @@
       "bytes": 17882
     },
     {
+      "path": "tests/public/test_pause_response_contract.py",
+      "sha256": "63a5fc99652782f8579b04cffa939c8e1207756235d29f2bd8b3b0ad2f188ed8",
+      "bytes": 9635
+    },
+    {
       "path": "tests/public/test_phone_call_plan_confirmation.py",
       "sha256": "d623e2d4c1b81de9020133e5bdb6a7cf0262473b69afc8e0990f59a63c65ea7b",
       "bytes": 8358
@@ -8685,8 +8690,8 @@
     },
     {
       "path": "ui/api/routes/control.py",
-      "sha256": "1a536bb6adfa10b11cd3a85e7df4188174c5ded18a018ce8787240e6bba0a64d",
-      "bytes": 66460
+      "sha256": "075ddc4a9a23c95b44f7762f3046afc71b338ba8bef5d926f7aceb3b225ae418",
+      "bytes": 66852
     },
     {
       "path": "ui/api/routes/cost.py",
@@ -9280,8 +9285,8 @@
     },
     {
       "path": "ui/react-app/src/SmartDisplay.jsx",
-      "sha256": "baa3c56eee3f378d7e07f87b57b2b15b272c5e917382c305919563ae770322ea",
-      "bytes": 164497
+      "sha256": "e0f20b737a92120e3ac196f93bb37e576dbf50b9e963f2d29328e92b6e390b4b",
+      "bytes": 166927
     },
     {
       "path": "ui/react-app/src/SmartDisplay.stageRouting.test.jsx",
@@ -9305,8 +9310,8 @@
     },
     {
       "path": "ui/react-app/src/__tests__/SmartDisplay.test.jsx",
-      "sha256": "b253ee01cc7eba207dc7d5d6ecec030fe39028f274b37fa24782c5863c0df1c5",
-      "bytes": 85414
+      "sha256": "c8060e42b272a2eca902b62487f165c511b9e8acf2f5b0668943bf7bf61eab8b",
+      "bytes": 92856
     },
     {
       "path": "ui/react-app/src/__tests__/hooks/useEventBus.test.jsx",
@@ -10280,8 +10285,8 @@
     },
     {
       "path": "ui/react-app/src/components/player/PlayerSection.jsx",
-      "sha256": "d7bb764ca54a7783a24d9c861f0e40a5471ecdb1747e5ffa9f23556060fb2ef8",
-      "bytes": 6404
+      "sha256": "6b4b5d86dd3cab47383a65fc931801ba6aa6ced40969d2e31812f4a74acc324c",
+      "bytes": 6540
     },
     {
       "path": "ui/react-app/src/components/player/PlayerSection.module.css",
@@ -10315,8 +10320,8 @@
     },
     {
       "path": "ui/react-app/src/components/player/TransportButton.jsx",
-      "sha256": "71c370604299b736080f23b74ca31b4dcfedcb48a580f080d0d2852c81987d96",
-      "bytes": 1322
+      "sha256": "eb3ce1521dfff2b5b90cd904977f8eda5b5039dfb6fa54be6a3d65f90a95c123",
+      "bytes": 1386
     },
     {
       "path": "ui/react-app/src/components/player/TransportButton.module.css",
