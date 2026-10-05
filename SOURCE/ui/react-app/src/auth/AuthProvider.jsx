@@ -22,6 +22,8 @@
  * keeps working regardless — see `setCloudSession` in config.js.
  */
 
+import { beginLogoutIntent, beginInteractiveSignIn, completeInteractiveSignIn,
+  captureSessionRestoration, mayRestoreSession, confirmRemoteLogout, logoutIntentWarning, ownsLogoutIntent, ownsInteractiveSignIn, waitForSessionRestoration } from './logoutIntent';
 import {
   createContext,
   useCallback,
@@ -210,7 +212,7 @@ export function AuthProvider({ children }) {
   // 'loading' until the first hydration + (if needed) refresh resolves.
   const [status, setStatus] = useState('loading');
   const [session, setSession] = useState(null);
-  const [signOutFeedback, setSignOutFeedback] = useState({ pending: false, error: null });
+  const [signOutFeedback, setSignOutFeedback] = useState(() => ({ pending: false, error: null, ...(logoutIntentWarning() ? { warning: logoutIntentWarning() } : {}) }));
   const signOutRetryTokenRef = useRef('');
 
   // MFA step-up state. When a password sign-in yields an AAL1 session for an
@@ -553,6 +555,9 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     mountedRef.current = true;
     let cancelled = false;
+    const restoration = captureSessionRestoration();
+    const hydrationGeneration = sessionGenerationRef.current;
+    const ownsHydration = () => !cancelled && hydrationGeneration === sessionGenerationRef.current && mayRestoreSession(restoration);
 
     // Commit a hydrated session — UNLESS it still owes a TOTP second factor, in
     // which case fail closed: hold it as pending and stay signed-out until the
@@ -571,7 +576,7 @@ export function AuthProvider({ children }) {
       scheduleRefresh(hydrated);
     };
 
-    const stored = loadStoredSession();
+    const stored = mayRestoreSession(restoration) ? loadStoredSession() : null;
     if (!stored) {
       // #2604 — persistent desktop sign-in. No in-memory session (SEC-017: the
       // webview never persists tokens to disk), so a fresh desktop launch would
@@ -580,9 +585,9 @@ export function AuthProvider({ children }) {
       // cookie that outlives the relaunch; hydrate from it before deciding
       // signed-out. On the cloud surface (or when no cookie resolves) this stays
       // signed-out exactly as before — config.js still has the desktop key path.
-      if (isDesktopApp()) {
+      if (isDesktopApp() && mayRestoreSession(restoration)) {
         apiHydrateDesktopSession().then((result) => {
-          if (cancelled) return;
+          if (!ownsHydration()) return;
           if (result.ok && result.session) {
             applyHydratedSession(result.session);
           } else {
@@ -604,7 +609,7 @@ export function AuthProvider({ children }) {
     if (isExpired(stored)) {
       // Stored session is stale — refresh before exposing it.
       apiRefresh(stored.refresh_token).then((result) => {
-        if (cancelled) return;
+        if (!ownsHydration()) return;
         if (result.ok && result.session) {
           applyHydratedSession(result.session);
         } else {
@@ -626,8 +631,14 @@ export function AuthProvider({ children }) {
   // ---- Auth actions exposed through context -----------------------------
 
   const signIn = useCallback(async (email, password) => {
+    const loginTicket = beginInteractiveSignIn();
+    try { await waitForSessionRestoration(); } catch {
+      return bridgeSignOutError('session_cleanup_failed', 'Previous session cleanup could not be completed. Please retry.');
+    }
+    if (!ownsInteractiveSignIn(loginTicket)) return supersededSignOut();
     const result = await apiSignIn(email, password);
     if (result.ok && result.session) {
+      if (!ownsInteractiveSignIn(loginTicket)) return supersededSignOut();
       const stepUp = mfaStepUpForSession(result.session);
       if (stepUp.required && stepUp.factorId) {
         // MFA-enrolled account: the password satisfied AAL1 but a verified TOTP
@@ -641,6 +652,7 @@ export function AuthProvider({ children }) {
         setMfaFactorId(stepUp.factorId);
         return { ok: false, mfaRequired: true, factorId: stepUp.factorId, error: null };
       }
+      if (!completeInteractiveSignIn(loginTicket)) return supersededSignOut();
       commitSession(result.session);
       scheduleRefresh(result.session);
       return { ok: true, error: null };
@@ -666,9 +678,15 @@ export function AuthProvider({ children }) {
         },
       };
     }
+    const loginTicket = beginInteractiveSignIn();
+    try { await waitForSessionRestoration(); } catch {
+      return bridgeSignOutError('session_cleanup_failed', 'Previous session cleanup could not be completed. Please retry.');
+    }
+    if (!ownsInteractiveSignIn(loginTicket)) return supersededSignOut();
     const result = await apiChallengeAndVerifyMfaTotp(pending.access_token, factorId, code);
     if (!mountedRef.current) return { ok: result.ok, error: result.error || null };
     if (result.ok && result.session) {
+      if (!completeInteractiveSignIn(loginTicket)) return supersededSignOut();
       clearMfaPending();
       commitSession(result.session);
       scheduleRefresh(result.session);
@@ -690,6 +708,11 @@ export function AuthProvider({ children }) {
   }, [clearMfaPending]);
 
   const signUp = useCallback(async (email, password, consents = {}) => {
+    const loginTicket = beginInteractiveSignIn();
+    try { await waitForSessionRestoration(); } catch {
+      return bridgeSignOutError('session_cleanup_failed', 'Previous session cleanup could not be completed. Please retry.');
+    }
+    if (!ownsInteractiveSignIn(loginTicket)) return supersededSignOut();
     const result = await apiSignUp(email, password, consents);
     if (!result.ok) {
       return { ok: false, needsEmailVerification: false, error: result.error };
@@ -697,6 +720,7 @@ export function AuthProvider({ children }) {
     // GoTrue may (rarely, when email confirmation is disabled) return a
     // session directly; honour it. Normally needsEmailVerification is true.
     if (result.session) {
+      if (!completeInteractiveSignIn(loginTicket)) return supersededSignOut();
       commitSession(result.session);
       scheduleRefresh(result.session);
     }
@@ -717,6 +741,7 @@ export function AuthProvider({ children }) {
     // Retire ordinary rotations immediately; they are not newer sign-ins.
     const generation = ++sessionGenerationRef.current;
     const intent = {};
+    const logoutTicket = beginLogoutIntent();
     signOutIntentRef.current = intent;
     setSignOutFeedback({ pending: true, error: null });
     let outcome = bridgeSignOutError('signout_failed', 'Sign-out could not be completed. Please retry.');
@@ -727,18 +752,26 @@ export function AuthProvider({ children }) {
         const token = session?.access_token || signOutRetryTokenRef.current || '';
         signOutRetryTokenRef.current = token;
         const result = await apiSignOut(token);
+        confirmRemoteLogout(logoutTicket, result.ok && result.remoteRevocationConfirmed !== false);
         // A slower logout must not erase a newer committed sign-in.
         if (generation !== sessionGenerationRef.current
+          || !ownsLogoutIntent(logoutTicket)
           || (sdkOwner && sdkOwner !== appStoreBridgeOwner)) return finish(supersededSignOut());
         // Always drop front-door state even when server revocation fails. SDK
         // cleanup remains awaited and its failure cannot be reported as success.
         const cleanup = commitSession(null);
         const signedOutGeneration = sessionGenerationRef.current;
+        await waitForSessionRestoration();
         const cleanupResult = await cleanup;
-        if (signedOutGeneration !== sessionGenerationRef.current) return finish(supersededSignOut());
+        if (signedOutGeneration !== sessionGenerationRef.current || !ownsLogoutIntent(logoutTicket)) return finish(supersededSignOut());
         if (!cleanupResult.ok) return finish(cleanupResult);
-        return finish({ ok: result.ok, error: result.ok ? null : result.error });
-      } catch {
+        return finish({ ok: result.ok, error: result.ok ? null : result.error,
+          ...(logoutIntentWarning() ? { warning: logoutIntentWarning() } : {}),
+        });
+      } catch (error) {
+        if (error?.code === 'local_session_uncertain') {
+          return finish(bridgeSignOutError(error.code, error.message));
+        }
         return outcome;
       } finally {
         // Retain the fence through owned SDK cleanup without retiring a newer
@@ -750,6 +783,7 @@ export function AuthProvider({ children }) {
             setSignOutFeedback({
               pending: false,
               error: outcome.ok || outcome.error?.code === 'auth_session_changed' ? null : outcome.error,
+              ...(outcome.ok && logoutIntentWarning() ? { warning: logoutIntentWarning() } : {}),
             });
           }
         }
