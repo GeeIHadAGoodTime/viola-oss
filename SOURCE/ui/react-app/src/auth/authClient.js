@@ -30,6 +30,7 @@
  * this client is only consulted when running as a cloud/LAN web client.
  */
 
+import { captureSessionRestoration, mayRestoreSession } from './logoutIntent';
 import { withCsrfHeader } from '../lib/csrf';
 import { ACCEPTED_PRIVACY_VERSION, ACCEPTED_TERMS_VERSION } from './legalVersions';
 
@@ -589,6 +590,9 @@ export async function refresh(refreshToken) {
  * @returns {Promise<{ ok: boolean, session: object|null, error: AuthClientError|null }>}
  */
 export async function hydrateDesktopSessionFromCookie() {
+  const restoration = captureSessionRestoration();
+  const suppressed = () => ({ ok: false, session: null, error: null });
+  if (!mayRestoreSession(restoration)) return suppressed();
   // Empty body: the persistent httpOnly cookie (sent via same-origin
   // credentials by postGoTrue) is the sole credential. The proxy MUST NOT
   // receive a browser-held refresh token here — there isn't one, and the
@@ -597,6 +601,7 @@ export async function hydrateDesktopSessionFromCookie() {
     query: { grant_type: 'refresh_token' },
     body: {},
   });
+  if (!mayRestoreSession(restoration)) return suppressed();
   if (!result.ok) {
     // 400 invalid_grant (no cookie / signed out) is the ordinary signed-out
     // path — surface it as a clean miss, not an error the UI must explain.
@@ -622,16 +627,18 @@ export async function hydrateDesktopSessionFromCookie() {
  * Sign out — revokes the GoTrue session server-side. The proxy returns 204
  * and clears compatibility cookies. A failed logout still clears local state
  * (handled by the caller), so this resolves `ok:true` on transport failure to
- * avoid trapping the user in a signed-in shell.
+ * avoid trapping the user in a signed-in shell. That local usability result
+ * does not establish server revocation: remoteRevocationConfirmed is false
+ * when the request was lost or refused. Callers retain local logout intent.
  * @param {string} accessToken - the session's access token.
- * @returns {Promise<{ ok: boolean, error: AuthClientError|null }>}
+ * @returns {Promise<{ ok: boolean, error: AuthClientError|null, remoteRevocationConfirmed: boolean }>}
  */
 export async function signOut(accessToken) {
   const result = await postGoTrue('/logout', { token: accessToken });
   if (!result.ok && result.status !== 0 && result.status !== 401) {
-    return { ok: false, error: result.error };
+    return { ok: false, error: result.error, remoteRevocationConfirmed: false };
   }
-  return { ok: true, error: null };
+  return { ok: true, error: null, remoteRevocationConfirmed: result.ok };
 }
 
 /**
