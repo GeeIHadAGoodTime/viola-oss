@@ -24,7 +24,7 @@
  * in AccountTab.cloudStoreReconciliation.test.jsx — mocked hooks cannot see it.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen } from '../test/test-utils';
+import { render, screen, waitFor, act } from '../test/test-utils';
 import { AccountTab } from './AccountTab';
 
 const hooksAuthMock = vi.hoisted(() => ({ value: null }));
@@ -220,4 +220,154 @@ describe('AccountTab — reconciled auth state (#1067)', () => {
     expect(cloudSignOut).toHaveBeenCalledTimes(1);
     expect(logout).not.toHaveBeenCalled();
   });
+});
+
+describe('AccountTab logout outcome witnesses', () => {
+  beforeEach(() => { stubFetch(); });
+  afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+
+  it.each(['cloud', 'legacy', 'rejected'])('shows a usable failure when logout does not complete (%s)', async (source) => {
+    const message = 'Sign-out could not clear the app session. Please retry.';
+    const logout = source === 'rejected'
+      ? vi.fn(async () => { throw new Error(message); })
+      : vi.fn(async () => ({ success: false, error: message }));
+    const cloudSignOut = vi.fn(async () => ({ ok: false, error: { code: 'app_store_signout_failed', message } }));
+    hooksAuthMock.value = baseHooksAuth({
+      isLoggedIn: source !== 'cloud', user: source === 'cloud' ? null : { id: 'synthetic-user', email: 'synthetic@example.invalid' }, logout,
+    });
+    cloudAuthMock.value = baseCloudAuth({
+      status: source === 'cloud' ? 'signedIn' : 'signedOut',
+      user: { id: 'synthetic-user', email: 'synthetic@example.invalid' }, signOut: cloudSignOut,
+    });
+    const { user } = render(<AccountTab />);
+    await user.click(screen.getByRole('button', { name: /^Sign Out$/i }));
+    expect(source === 'cloud' ? cloudSignOut : logout).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(screen.queryByText(source === 'rejected' ? 'Sign-out could not be completed. Please retry.' : message)).toBeInTheDocument());
+  });
+
+  it('does not submit a second logout while the first user action is pending', async () => {
+    const releases = [];
+    const cloudSignOut = vi.fn(() => new Promise((resolve) => { releases.push(resolve); }));
+    hooksAuthMock.value = baseHooksAuth();
+    cloudAuthMock.value = baseCloudAuth({
+      status: 'signedIn', user: { id: 'synthetic-user', email: 'synthetic@example.invalid' }, signOut: cloudSignOut,
+    });
+    const { user } = render(<AccountTab />);
+    const button = screen.getByRole('button', { name: /^Sign Out$/i });
+    await user.click(button);
+    await user.click(button);
+    const calls = cloudSignOut.mock.calls.length;
+    releases.forEach((release) => release({ ok: true, error: null }));
+    expect(calls).toBe(1);
+  });
+});
+
+describe('AccountTab logout action ownership', () => {
+  beforeEach(() => { stubFetch(); });
+  afterEach(() => { delete window.viola; vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+  function signedIn(logout, id = 'synthetic-user') {
+    return baseHooksAuth({ isLoggedIn: true, user: { id, email: `${id}@example.invalid` }, logout });
+  }
+
+  it.each(['cloud', 'desktop'])('uses the correct store owners when both stores are live (%s)', async (surface) => {
+    if (surface === 'desktop') window.viola = {};
+    const logout = vi.fn(async () => ({ success: true }));
+    const cloudSignOut = vi.fn(async () => ({ ok: true, error: null }));
+    hooksAuthMock.value = signedIn(logout);
+    cloudAuthMock.value = baseCloudAuth({ status: 'signedIn', user: { id: 'synthetic-user' }, signOut: cloudSignOut });
+    const { user } = render(<AccountTab />);
+    await user.click(screen.getByRole('button', { name: 'Sign Out' }));
+    expect(cloudSignOut).toHaveBeenCalledTimes(1);
+    expect(logout).toHaveBeenCalledTimes(surface === 'cloud' ? 0 : 1);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('explicitly retries a returned failure and clears it only after success', async () => {
+    const logout = vi.fn().mockResolvedValueOnce({ success: false, error: 'Synthetic logout refused' }).mockResolvedValueOnce({ success: true });
+    hooksAuthMock.value = signedIn(logout);
+    cloudAuthMock.value = baseCloudAuth();
+    const { user } = render(<AccountTab />);
+    await user.click(screen.getByRole('button', { name: 'Sign Out' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('Synthetic logout refused');
+    await user.click(screen.getByRole('button', { name: 'Retry sign-out' }));
+    expect(logout).toHaveBeenCalledTimes(2);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('keeps a late failure visible across its own local signed-out transition and retries the captured action', async () => {
+    let release;
+    const logout = vi.fn().mockImplementationOnce(() => new Promise((resolve) => { release = resolve; })).mockResolvedValueOnce({ success: true });
+    hooksAuthMock.value = signedIn(logout);
+    cloudAuthMock.value = baseCloudAuth();
+    const view = render(<AccountTab />);
+    await view.user.click(screen.getByRole('button', { name: 'Sign Out' }));
+    hooksAuthMock.value = baseHooksAuth({ logout });
+    view.rerender(<AccountTab />);
+    await act(async () => { release({ success: false, error: 'Synthetic late failure' }); });
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Synthetic late failure'));
+    await view.user.click(screen.getByRole('button', { name: 'Retry sign-out' }));
+    expect(logout).toHaveBeenCalledTimes(2);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it.each(['new-user', 'same-user-aba'])('a late previous action cannot publish over a newer principal (%s)', async (transition) => {
+    let release;
+    const oldLogout = vi.fn(() => new Promise((resolve) => { release = resolve; }));
+    const nextLogout = vi.fn(async () => ({ success: true }));
+    hooksAuthMock.value = signedIn(oldLogout);
+    cloudAuthMock.value = baseCloudAuth();
+    const view = render(<AccountTab />);
+    await view.user.click(screen.getByRole('button', { name: 'Sign Out' }));
+    if (transition === 'same-user-aba') {
+      hooksAuthMock.value = baseHooksAuth();
+      view.rerender(<AccountTab />);
+    }
+    hooksAuthMock.value = signedIn(nextLogout, transition === 'new-user' ? 'synthetic-next' : 'synthetic-user');
+    view.rerender(<AccountTab />);
+    await act(async () => { release({ success: false, error: 'Obsolete logout refusal' }); });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Sign Out' })).not.toBeDisabled());
+    expect(screen.queryByText('Obsolete logout refusal')).not.toBeInTheDocument();
+    await view.user.click(screen.getByRole('button', { name: 'Sign Out' }));
+    expect(nextLogout).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([undefined, { success: false, error: { message: {} } }])('unknown outcomes show a safe generic failure (%j)', async (result) => {
+    hooksAuthMock.value = signedIn(vi.fn(async () => result));
+    cloudAuthMock.value = baseCloudAuth();
+    const { user } = render(<AccountTab />);
+    await user.click(screen.getByRole('button', { name: 'Sign Out' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('Sign-out could not be completed. Please retry.');
+  });
+
+  it('does not show a retired cloud action as a current failure', async () => {
+    hooksAuthMock.value = baseHooksAuth();
+    cloudAuthMock.value = baseCloudAuth({ status: 'signedIn', user: { id: 'synthetic-user' }, signOut: vi.fn(async () => ({ ok: false, error: { code: 'auth_session_changed' } })) });
+    const { user } = render(<AccountTab />);
+    await user.click(screen.getByRole('button', { name: 'Sign Out' }));
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+});
+
+it('an older completion cannot release a newer account logout action', async () => {
+  stubFetch();
+  const releases = [];
+  const first = vi.fn(() => new Promise((resolve) => { releases.push(resolve); }));
+  const second = vi.fn(() => new Promise((resolve) => { releases.push(resolve); }));
+  hooksAuthMock.value = baseHooksAuth({ isLoggedIn: true, user: { id: 'synthetic-first', email: 'first@example.invalid' }, logout: first });
+  cloudAuthMock.value = baseCloudAuth();
+  const view = render(<AccountTab />);
+  try {
+    await view.user.click(screen.getByRole('button', { name: 'Sign Out' }));
+    hooksAuthMock.value = baseHooksAuth({ isLoggedIn: true, user: { id: 'synthetic-second', email: 'second@example.invalid' }, logout: second });
+    view.rerender(<AccountTab />);
+    await view.user.click(screen.getByRole('button', { name: 'Sign Out' }));
+    await act(async () => { releases[0]({ success: false, error: 'Obsolete first failure' }); });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Signing out…' })).toBeDisabled());
+    expect(screen.queryByText('Obsolete first failure')).not.toBeInTheDocument();
+    expect(second).toHaveBeenCalledTimes(1);
+  } finally {
+    releases.forEach((release) => release({ success: true }));
+    view.unmount();
+    vi.unstubAllGlobals();
+  }
 });
