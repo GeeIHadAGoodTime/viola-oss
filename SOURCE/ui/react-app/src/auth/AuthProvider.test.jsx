@@ -893,3 +893,132 @@ it.each([
     expect(getCloudAccessToken()).toBe(newer.access_token);
   });
 });
+
+it('retains a failed sign-out outcome and retries the original session token after local state cleared', async () => {
+  const original = makeSession({ access_token: 'synthetic-original-signout-token' });
+  __setInMemorySessionForTest(original);
+  renderProvider();
+  await waitFor(() => expect(captured.status).toBe('signedIn'));
+  let release;
+  authClient.signOut.mockImplementationOnce(() => new Promise((resolve) => { release = resolve; }));
+  let pending;
+  await act(async () => { pending = captured.signOut(); });
+  expect(captured.signOutFeedback).toEqual({ pending: true, error: null });
+  await act(async () => { release({ ok: false, error: { code: 'service_unavailable', message: 'Synthetic service unavailable', status: 503 } }); await pending; });
+  expect(captured.status).toBe('signedOut');
+  expect(captured.signOutFeedback.pending).toBe(false);
+  expect(captured.signOutFeedback.error.code).toBe('service_unavailable');
+  authClient.signOut.mockResolvedValueOnce({ ok: true, error: null });
+  await act(async () => { await captured.signOut(); });
+  expect(authClient.signOut).toHaveBeenLastCalledWith(original.access_token);
+  expect(captured.signOutFeedback).toEqual({ pending: false, error: null });
+});
+
+it('a newer committed account clears pending logout feedback and cannot receive the old error', async () => {
+  __setInMemorySessionForTest(makeSession());
+  renderProvider();
+  await waitFor(() => expect(captured.status).toBe('signedIn'));
+  let release;
+  authClient.signOut.mockImplementationOnce(() => new Promise((resolve) => { release = resolve; }));
+  let pending;
+  await act(async () => { pending = captured.signOut(); });
+  authClient.signInWithPassword.mockResolvedValueOnce({ ok: true, session: makeSession({ access_token: 'synthetic-next', user: { id: 'synthetic-next' } }), error: null });
+  await act(async () => { await captured.signIn('synthetic@example.invalid', 'synthetic-password'); });
+  expect(captured.signOutFeedback).toEqual({ pending: false, error: null });
+  await act(async () => { release({ ok: false, error: { status: 503, message: 'Obsolete synthetic failure' } }); await pending; });
+  expect(captured.signOutFeedback).toEqual({ pending: false, error: null });
+  expect(captured.user.id).toBe('synthetic-next');
+});
+
+it('unexpected logout rejection becomes a safe retryable outcome without exposing the thrown details', async () => {
+  __setInMemorySessionForTest(makeSession());
+  renderProvider();
+  await waitFor(() => expect(captured.status).toBe('signedIn'));
+  authClient.signOut.mockRejectedValueOnce(new Error('synthetic-private-detail-must-not-render'));
+  let result;
+  await act(async () => { result = await captured.signOut(); });
+  expect(result).toEqual({ ok: false, error: { code: 'signout_failed', message: 'Sign-out could not be completed. Please retry.', status: 0, retryAfter: null } });
+  expect(captured.signOutFeedback).toEqual({ pending: false, error: result.error });
+  expect(JSON.stringify(captured.signOutFeedback)).not.toContain('synthetic-private-detail');
+});
+
+it('newer login retires the prior logout retry token', async () => {
+  __setInMemorySessionForTest(makeSession({ access_token: 'synthetic-old-logout-token' }));
+  renderProvider();
+  await waitFor(() => expect(captured.status).toBe('signedIn'));
+  authClient.signOut.mockResolvedValueOnce({ ok: false, error: { status: 503, message: 'Synthetic failure' } });
+  await act(async () => { await captured.signOut(); });
+  authClient.signInWithPassword.mockResolvedValueOnce({ ok: true, session: makeSession({ access_token: 'synthetic-new-logout-token' }), error: null });
+  await act(async () => { await captured.signIn('synthetic@example.invalid', 'synthetic-password'); });
+  authClient.signOut.mockResolvedValueOnce({ ok: true, error: null });
+  await act(async () => { await captured.signOut(); });
+  expect(authClient.signOut).toHaveBeenLastCalledWith('synthetic-new-logout-token');
+  expect(captured.signOutFeedback).toEqual({ pending: false, error: null });
+});
+
+it('does not retain an earlier account retry token after a newer account itself becomes signed out', async () => {
+  __setInMemorySessionForTest(makeSession({ access_token: 'synthetic-earlier-token' }));
+  renderProvider();
+  await waitFor(() => expect(captured.status).toBe('signedIn'));
+  authClient.signOut.mockResolvedValueOnce({ ok: false, error: { status: 503, message: 'Synthetic earlier failure' } });
+  await act(async () => { await captured.signOut(); });
+  authClient.signInWithPassword.mockResolvedValueOnce({ ok: true, session: makeSession({ access_token: 'synthetic-replacement-token' }), error: null });
+  await act(async () => { await captured.signIn('synthetic@example.invalid', 'synthetic-password'); });
+  authClient.refresh.mockResolvedValueOnce({ ok: false, session: null, error: { status: 401 } });
+  await act(async () => { await captured.refreshSessionNow(); });
+  expect(captured.status).toBe('signedOut');
+  authClient.signOut.mockResolvedValueOnce({ ok: true, error: null });
+  await act(async () => { await captured.signOut(); });
+  expect(authClient.signOut).toHaveBeenLastCalledWith('');
+});
+
+it('same-intent concurrent logout callers share one pending revocation and outcome', async () => {
+  __setInMemorySessionForTest(makeSession());
+  renderProvider();
+  await waitFor(() => expect(captured.status).toBe('signedIn'));
+  let release;
+  authClient.signOut.mockImplementationOnce(() => new Promise((resolve) => { release = resolve; }));
+  let first;
+  let second;
+  await act(async () => { first = captured.signOut(); second = captured.signOut(); });
+  const admittedCalls = authClient.signOut.mock.calls.length;
+  const wasPending = captured.signOutFeedback.pending;
+  await act(async () => { release({ ok: true, error: null }); await Promise.all([first, second]); });
+  expect(admittedCalls).toBe(1);
+  expect(wasPending).toBe(true);
+  expect(await first).toEqual({ ok: true, error: null });
+  expect(await second).toEqual(await first);
+  expect(captured.signOutFeedback).toEqual({ pending: false, error: null });
+});
+
+it('a newer same-account login can start its own logout while the previous action is pending', async () => {
+  __setInMemorySessionForTest(makeSession({ access_token: 'synthetic-original-logout' }));
+  renderProvider();
+  await waitFor(() => expect(captured.status).toBe('signedIn'));
+  let releaseOld;
+  let releaseNew;
+  authClient.signOut.mockImplementationOnce(() => new Promise((resolve) => { releaseOld = resolve; }));
+  let oldLogout;
+  await act(async () => { oldLogout = captured.signOut(); });
+  authClient.signInWithPassword.mockResolvedValueOnce({ ok: true, session: makeSession({ access_token: 'synthetic-newer-logout' }), error: null });
+  await act(async () => { await captured.signIn('synthetic@example.invalid', 'synthetic-password'); });
+  authClient.signOut.mockImplementationOnce(() => new Promise((resolve) => { releaseNew = resolve; }));
+  let newLogout;
+  await act(async () => { newLogout = captured.signOut(); });
+  try {
+    expect(authClient.signOut).toHaveBeenCalledTimes(2);
+    expect(authClient.signOut).toHaveBeenLastCalledWith('synthetic-newer-logout');
+    await act(async () => { releaseOld({ ok: false, error: { status: 503 } }); await oldLogout; });
+    expect((await oldLogout).error.code).toBe('auth_session_changed');
+    expect(captured.signOutFeedback).toEqual({ pending: true, error: null });
+    let shared;
+    await act(async () => { shared = captured.signOut(); });
+    expect(authClient.signOut).toHaveBeenCalledTimes(2);
+    await act(async () => { releaseNew({ ok: true, error: null }); await Promise.all([newLogout, shared]); });
+    expect(await newLogout).toEqual({ ok: true, error: null });
+  } finally {
+    releaseOld({ ok: true, error: null });
+    releaseNew?.({ ok: true, error: null });
+    await act(async () => { await Promise.all([oldLogout, newLogout]); });
+  }
+});

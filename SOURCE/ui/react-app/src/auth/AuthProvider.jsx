@@ -210,6 +210,8 @@ export function AuthProvider({ children }) {
   // 'loading' until the first hydration + (if needed) refresh resolves.
   const [status, setStatus] = useState('loading');
   const [session, setSession] = useState(null);
+  const [signOutFeedback, setSignOutFeedback] = useState({ pending: false, error: null });
+  const signOutRetryTokenRef = useRef('');
 
   // MFA step-up state. When a password sign-in yields an AAL1 session for an
   // account that has a verified TOTP factor, the second factor is still owed:
@@ -231,6 +233,7 @@ export function AuthProvider({ children }) {
   const refreshTokenRef = useRef('');
   const sessionGenerationRef = useRef(0);
   const signOutIntentRef = useRef(null);
+  const signOutFlightRef = useRef(null);
   const mountedRef = useRef(true);
   // A ticket distinguishes this mount's latest SDK intent from a replacement
   // provider, including a same-token ABA sign-in after remount.
@@ -360,7 +363,11 @@ export function AuthProvider({ children }) {
   const commitSession = useCallback((nextSession) => {
     // A committed sign-out or replacement session retires pending refreshes.
     const generation = ++sessionGenerationRef.current;
-    if (nextSession) signOutIntentRef.current = null;
+    if (nextSession) {
+      signOutIntentRef.current = null;
+      signOutRetryTokenRef.current = '';
+      setSignOutFeedback({ pending: false, error: null });
+    }
     setSession(nextSession);
     setStatus(nextSession ? 'signedIn' : 'signedOut');
     storeSession(nextSession);
@@ -701,31 +708,59 @@ export function AuthProvider({ children }) {
   }, [commitSession, scheduleRefresh]);
 
   const signOut = useCallback(async () => {
+    const current = signOutFlightRef.current;
+    // Share only this still-owned logout. A newer committed account retires
+    // its intent and must be able to start its own action without joining it.
+    if (current && current.intent === signOutIntentRef.current) return current.promise;
     clearRefreshTimer();
     clearMfaPending();
     // Retire ordinary rotations immediately; they are not newer sign-ins.
     const generation = ++sessionGenerationRef.current;
     const intent = {};
     signOutIntentRef.current = intent;
+    setSignOutFeedback({ pending: true, error: null });
+    let outcome = bridgeSignOutError('signout_failed', 'Sign-out could not be completed. Please retry.');
+    const finish = (result) => { outcome = result; return result; };
     const sdkOwner = isCloudSurface() ? bridgeOwnerRef.current : null;
+    const attempt = (async () => {
+      try {
+        const token = session?.access_token || signOutRetryTokenRef.current || '';
+        signOutRetryTokenRef.current = token;
+        const result = await apiSignOut(token);
+        // A slower logout must not erase a newer committed sign-in.
+        if (generation !== sessionGenerationRef.current
+          || (sdkOwner && sdkOwner !== appStoreBridgeOwner)) return finish(supersededSignOut());
+        // Always drop front-door state even when server revocation fails. SDK
+        // cleanup remains awaited and its failure cannot be reported as success.
+        const cleanup = commitSession(null);
+        const signedOutGeneration = sessionGenerationRef.current;
+        const cleanupResult = await cleanup;
+        if (signedOutGeneration !== sessionGenerationRef.current) return finish(supersededSignOut());
+        if (!cleanupResult.ok) return finish(cleanupResult);
+        return finish({ ok: result.ok, error: result.ok ? null : result.error });
+      } catch {
+        return outcome;
+      } finally {
+        // Retain the fence through owned SDK cleanup without retiring a newer
+        // login or a second explicit logout's own intent.
+        if (signOutIntentRef.current === intent) {
+          signOutIntentRef.current = null;
+          if (outcome.ok) signOutRetryTokenRef.current = '';
+          if (mountedRef.current) {
+            setSignOutFeedback({
+              pending: false,
+              error: outcome.ok || outcome.error?.code === 'auth_session_changed' ? null : outcome.error,
+            });
+          }
+        }
+      }
+    })();
+    const flight = { intent, promise: attempt };
+    signOutFlightRef.current = flight;
     try {
-      const token = session?.access_token || '';
-      const result = await apiSignOut(token);
-      // A slower logout must not erase a newer committed sign-in.
-      if (generation !== sessionGenerationRef.current
-        || (sdkOwner && sdkOwner !== appStoreBridgeOwner)) return supersededSignOut();
-      // Always drop front-door state even when server revocation fails. SDK
-      // cleanup remains awaited and its failure cannot be reported as success.
-      const cleanup = commitSession(null);
-      const signedOutGeneration = sessionGenerationRef.current;
-      const cleanupResult = await cleanup;
-      if (signedOutGeneration !== sessionGenerationRef.current) return supersededSignOut();
-      if (!cleanupResult.ok) return cleanupResult;
-      return { ok: result.ok, error: result.ok ? null : result.error };
+      return await attempt;
     } finally {
-      // Retain the fence through owned SDK cleanup without retiring a newer
-      // login or a second explicit logout's own intent.
-      if (signOutIntentRef.current === intent) signOutIntentRef.current = null;
+      if (signOutFlightRef.current === flight) signOutFlightRef.current = null;
     }
   }, [session, commitSession, clearRefreshTimer, clearMfaPending]);
 
@@ -745,6 +780,7 @@ export function AuthProvider({ children }) {
     session,
     mfaPending,
     mfaFactorId,
+    signOutFeedback,
     signIn,
     verifyMfaTotp,
     cancelMfa,
@@ -759,7 +795,7 @@ export function AuthProvider({ children }) {
     // by auth/desktop_gotrue_proxy.py) exactly as before.
     refreshSessionNow: isCloudSurface() ? refreshSessionNow : null,
   }), [
-    status, session, mfaPending, mfaFactorId,
+    status, session, mfaPending, mfaFactorId, signOutFeedback,
     signIn, verifyMfaTotp, cancelMfa, signUp, signOut, resetPassword, resendVerification,
     refreshSessionNow,
   ]);
