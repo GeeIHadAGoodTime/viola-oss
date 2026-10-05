@@ -38,6 +38,7 @@ const apiHarness = vi.hoisted(() => ({
   getQueue: vi.fn(() => Promise.resolve({ok: true, queue: []})),
   playQueueItem: vi.fn(() => Promise.resolve({ok: true})),
   setShuffle: vi.fn(() => Promise.resolve({})),
+  setRepeat: vi.fn(() => Promise.resolve({})),
   // Transport calls a test needs to fail on demand. Every one of these is
   // `apiFetch` in production, which ALWAYS returns a promise -- so the mocks
   // must too, or a component that legitimately attaches `.catch()` blows up on
@@ -151,7 +152,7 @@ vi.mock('../hooks/useViolaApi', () => ({
     seek: apiHarness.seek,
     setVolume: apiHarness.setVolume,
     setRating: apiHarness.setRating,
-    setRepeat: vi.fn(() => Promise.resolve({})),
+    setRepeat: apiHarness.setRepeat,
     getQueue: apiHarness.getQueue,
     playQueueItem: apiHarness.playQueueItem,
     clearQueue: vi.fn(),
@@ -371,6 +372,7 @@ beforeEach(async () => {
   apiHarness.playQueueItem.mockReset().mockResolvedValue({ok: true});
   apiHarness.setShuffle.mockReset();
   apiHarness.setShuffle.mockResolvedValue({});
+  apiHarness.setRepeat.mockReset().mockResolvedValue({});
   for (const name of ['skip', 'previous', 'setVolume', 'seek', 'setRating']) {
     apiHarness[name]?.mockClear?.();
     apiHarness[name]?.mockResolvedValue?.({});
@@ -1905,4 +1907,143 @@ describe('SmartDisplay rating requests follow track and click order', () => {
     expectRating(null);
     expect(await screen.findByText(refusedCopy)).toBeInTheDocument();
   });
+});
+
+
+describe('SmartDisplay repeated preference acceptance', () => {
+  const deferred = () => {
+    let resolve, reject;
+    const promise = new Promise((yes, no) => { resolve = yes; reject = no; });
+    return { promise, resolve, reject };
+  };
+  const cases = [
+    ['shuffle', 'setShuffle', false, [true, false, true]],
+    ['repeat', 'setRepeat', 'off', ['all', 'one', 'off']],
+  ];
+  const button = (kind) => screen.getByRole('button', {
+    name: kind === 'shuffle' ? 'Shuffle tracks' : /^Repeat:/,
+  });
+  const shown = (kind) => kind === 'shuffle'
+    ? button(kind).getAttribute('aria-pressed') === 'true'
+    : button(kind).getAttribute('aria-label').replace('Repeat: ', '');
+  const mount = () => {
+    playerHarness.state = {
+      now_playing: { id: 'fixture', title: 'Synthetic acceptance track' },
+      shuffle: false, repeat_mode: 'off',
+    };
+    return render(<SmartDisplay />);
+  };
+
+  it.each(cases)('%s restores confirmed state after two rapid failed writes', async (kind, apiName, initial, choices) => {
+    const first = deferred(), second = deferred();
+    apiHarness[apiName].mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+    const { user } = mount();
+    await user.click(button(kind));
+    await user.click(button(kind));
+    expect(shown(kind)).toBe(choices[1]);
+    await act(async () => first.reject(new Error('offline')));
+    // A failed older save cannot erase a newer visible choice still pending.
+    expect(shown(kind)).toBe(choices[1]);
+    await act(async () => second.reject(new Error('offline')));
+    expect(shown(kind)).toBe(initial);
+  });
+
+  it.each(cases)('%s serializes writes in click order while preserving the newest intent', async (kind, apiName, _initial, choices) => {
+    const requests = [deferred(), deferred(), deferred()];
+    requests.forEach(request => apiHarness[apiName].mockReturnValueOnce(request.promise));
+    const { user } = mount();
+    await user.click(button(kind));
+    await user.click(button(kind));
+    await user.click(button(kind));
+    expect(shown(kind)).toBe(choices[2]);
+    expect(apiHarness[apiName].mock.calls).toEqual([[choices[0]]]);
+    await act(async () => requests[0].resolve({ ok: true }));
+    expect(shown(kind)).toBe(choices[2]);
+    expect(apiHarness[apiName].mock.calls).toEqual([[choices[0]], [choices[1]]]);
+    await act(async () => requests[1].reject(new Error('offline')));
+    expect(shown(kind)).toBe(choices[2]);
+    await act(async () => requests[2].resolve({ ok: true }));
+    expect(shown(kind)).toBe(choices[2]);
+    expect(apiHarness[apiName].mock.calls).toEqual(choices.map(choice => [choice]));
+  });
+
+  const outcomes = [
+    [false, false, false], [false, false, true],
+    [false, true, false], [false, true, true],
+    [true, false, false], [true, false, true],
+    [true, true, false], [true, true, true],
+  ];
+  it.each(cases.flatMap(testCase => outcomes.map(results => [...testCase, results])))( '%s (%s, baseline %s, choices %j) keeps persisted truth for outcomes %j', async (kind, apiName, initial, choices, results) => {
+    const requests = [deferred(), deferred(), deferred()];
+    let persisted = initial;
+    requests.forEach((request, index) => apiHarness[apiName].mockImplementationOnce(async next => {
+      await request.promise;
+      persisted = next;
+      return { ok: true, value: choices[index] };
+    }));
+    const { user } = mount();
+    for (let i = 0; i < 3; i += 1) await user.click(button(kind));
+    for (let i = 0; i < 3; i += 1) {
+      expect(apiHarness[apiName].mock.calls).toEqual(choices.slice(0, i + 1).map(value => [value]));
+      await act(async () => results[i] ? requests[i].resolve() : requests[i].reject(new Error('offline')));
+      expect(shown(kind)).toBe(i < 2 ? choices[2] : persisted);
+    }
+    // A retry must derive from the corrected state, not a failed optimistic value.
+    await user.click(button(kind));
+    const retry = kind === 'shuffle' ? !persisted : ['all', 'one', 'off'][['off', 'all', 'one'].indexOf(persisted)];
+    expect(apiHarness[apiName]).toHaveBeenLastCalledWith(retry);
+    expect(shown(kind)).toBe(retry);
+  });
+
+  it.each(cases)('%s drops queued writes after unmount', async (kind, apiName) => {
+    const first = deferred();
+    apiHarness[apiName].mockReturnValueOnce(first.promise);
+    const view = mount();
+    await view.user.click(button(kind));
+    await view.user.click(button(kind));
+    view.unmount();
+    await act(async () => first.resolve({ ok: true }));
+    expect(apiHarness[apiName]).toHaveBeenCalledTimes(1);
+    mount();
+    expect(shown(kind)).toBe(kind === 'shuffle' ? false : 'off');
+  });
+
+  it.each(cases)('%s keeps newer intent visible during an earlier server echo', async (kind, apiName, _initial, choices) => {
+    const first = deferred(), second = deferred();
+    apiHarness[apiName].mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+    const view = mount();
+    await view.user.click(button(kind));
+    await view.user.click(button(kind));
+    playerHarness.state = { ...playerHarness.state, [kind === 'shuffle' ? 'shuffle' : 'repeat_mode']: choices[0] };
+    view.rerender(<SmartDisplay />);
+    expect(shown(kind)).toBe(choices[1]);
+    await act(async () => first.resolve({ ok: true }));
+    await act(async () => second.reject(new Error('offline')));
+    expect(shown(kind)).toBe(choices[0]);
+  });
+
+  it.each(cases)('%s reads rapid same-render clicks synchronously', async (kind, apiName, _initial, choices) => {
+    const first = deferred();
+    apiHarness[apiName].mockReturnValueOnce(first.promise);
+    mount();
+    const control = button(kind);
+    act(() => { fireEvent.click(control); fireEvent.click(control); fireEvent.click(control); });
+    expect(shown(kind)).toBe(choices[2]);
+    await act(async () => first.resolve({ ok: true }));
+    expect(apiHarness[apiName].mock.calls).toEqual(choices.map(choice => [choice]));
+  });
+
+  it('keeps repeat and shuffle queues independent', async () => {
+    const shuffle = deferred();
+    apiHarness.setShuffle.mockReturnValueOnce(shuffle.promise);
+    const { user } = mount();
+    await user.click(button('shuffle'));
+    await user.click(button('repeat'));
+    expect(apiHarness.setRepeat).toHaveBeenCalledWith('all');
+    expect(shown('repeat')).toBe('all');
+    await act(async () => shuffle.reject(new Error('offline')));
+    expect(shown('shuffle')).toBe(false);
+    expect(shown('repeat')).toBe('all');
+  });
+
 });

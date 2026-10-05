@@ -2,6 +2,7 @@
 import React, { Suspense, lazy, useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef } from 'react';
 import PropTypes from 'prop-types';
 import { usePlayerState } from './hooks/usePlayerState';
+import { useOrderedPreference } from './hooks/useOrderedPreference';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useViolaApi, authFetch } from './hooks/useViolaApi';
 import { useAuth } from './hooks/useAuth';
@@ -582,8 +583,8 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null 
   const [weatherForecastLoading, setWeatherForecastLoading] = useState(false);
   const [weatherForecastError, setWeatherForecastError] = useState('');
   const [weatherForecastFetchedAt, setWeatherForecastFetchedAt] = useState(0);
-  const [shuffleOn, setShuffleOn] = useState(playerState.shuffle || false);
-  const [repeatMode, setRepeatMode] = useState(playerState.repeat_mode || 'off');
+  const [shuffleOn, updateShuffle] = useOrderedPreference(playerState.shuffle, false);
+  const [repeatMode, updateRepeat] = useOrderedPreference(playerState.repeat_mode, 'off');
 
   // =========================================================================
   // DISPLAY MODE STATE - now_playing, phone_tab, browser, agentic_task,
@@ -1425,12 +1426,6 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null 
   const canResumePlayback = Boolean(nowPlaying) || hasQueuedTracks;
   const volume = playerState.volume || 80;
 
-  // Sync repeat/shuffle from backend
-  useEffect(() => {
-    if (playerState.repeat_mode !== undefined) setRepeatMode(playerState.repeat_mode);
-    if (playerState.shuffle !== undefined) setShuffleOn(playerState.shuffle);
-  }, [playerState.repeat_mode, playerState.shuffle]);
-
   // Desktop notification on track change
   const prevTrackTitleRef = useRef(null);
   useEffect(() => {
@@ -2196,27 +2191,15 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null 
     writes.set(expectedTrackId, write);
   };
 
-  // Shuffle flips optimistically, so it MUST be able to flip back (#4214).
-  // Before the fix this was `setShuffleOn(next); api.setShuffle(next);` with
-  // the promise neither awaited nor caught. On any failure the toggle stayed
-  // showing the state the user asked for while the server kept the old one,
-  // and it could not self-correct: the reconcile effect below only re-runs
-  // when the server's value *changes*, which a failed request never does. So
-  // the divergence lasted until some other actor moved shuffle.
   const handleShuffleToggle = useCallback(() => {
-    const previous = shuffleOn;
-    const next = !previous;
-    setShuffleOn(next);
-    api.setShuffle(next).catch((err) => {
-      // Prefer the server's own answer: `/v1/shuffle` reorders before it
-      // records, so its error envelope reports the preference actually in
-      // effect. Fall back to the pre-toggle value, which is what the server
-      // still holds for a network/auth failure that never reached the route.
-      const truth = typeof err?.data?.shuffle === 'boolean' ? err.data.shuffle : previous;
-      setShuffleOn(truth);
-      addToast({ message: "Couldn't change shuffle. Please try again.", level: 'error' });
-    });
-  }, [shuffleOn, api, setShuffleOn, addToast]);
+    updateShuffle(
+      previous => !previous,
+      next => api.setShuffle(next),
+      () => addToast({ message: "Couldn't change shuffle. Please try again.", level: 'error' }),
+      // The route may reorder before rejecting and reports the actual state.
+      err => typeof err?.data?.shuffle === 'boolean' ? err.data.shuffle : undefined,
+    );
+  }, [updateShuffle, api, addToast]);
 
   // PTT supports tap-vs-hold on the same button:
   //   - tap (press < 250 ms then release): keep recording; client-side VAD
@@ -3110,21 +3093,17 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null 
         sendToIframe('setVolume', { level: newVol });
       }}
       onShuffleToggle={handleShuffleToggle}
-      onRepeatCycle={() => {
-        const modes = ['off', 'all', 'one'];
-        const idx = modes.indexOf(repeatMode);
-        const next = modes[(idx + 1) % modes.length];
-        setRepeatMode(next);
-        // Optimistic like shuffle, so it rolls back to what the server still
-        // holds when the write fails instead of showing a mode nobody stored.
-        api.setRepeat(next).catch((err) => {
-          setRepeatMode(repeatMode);
-          notifyTransportFailure(err, {
-            refused: "Can't change repeat right now.",
-            failed: "Couldn't change repeat. Please try again.",
-          });
-        });
-      }}
+      onRepeatCycle={() => updateRepeat(
+        previous => {
+          const modes = ['off', 'all', 'one'];
+          return modes[(modes.indexOf(previous) + 1) % modes.length];
+        },
+        next => api.setRepeat(next),
+        err => notifyTransportFailure(err, {
+          refused: "Can't change repeat right now.",
+          failed: "Couldn't change repeat. Please try again.",
+        }),
+      )}
       onRating={handleRating}
       onSubmitText={submitTextCommand}
       mediaAreaRef={mediaAreaRef}

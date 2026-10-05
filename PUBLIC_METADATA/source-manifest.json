@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "00ada4de6734a6333bc41ebceb36e1133da21c41",
-  "sha256": "dcb0c1ab8437a5ec162c99c2c46854a323bacba984d9b8002bf20a3c65bb20a0",
+  "revision": "b2e00b55bbe82db8fad1fd8dc19d49f79e99e9ca",
+  "sha256": "592002b97ab436b29260bf086fbe85c312f2baf29e7ba209ce77e396ad344d5c",
   "files": [
     {
       "path": ".env.example",
@@ -9280,8 +9280,8 @@
     },
     {
       "path": "ui/react-app/src/SmartDisplay.jsx",
-      "sha256": "635a5893f006ba27e7c04af5cd13ec408a525b8eec5b8c6cd2312ed385207a91",
-      "bytes": 165748
+      "sha256": "03f8e684b8dcee457aa0ed41342bc70ebf74a4be6b05e762392564bd12f33975",
+      "bytes": 164497
     },
     {
       "path": "ui/react-app/src/SmartDisplay.stageRouting.test.jsx",
@@ -9305,8 +9305,8 @@
     },
     {
       "path": "ui/react-app/src/__tests__/SmartDisplay.test.jsx",
-      "sha256": "0d25bb5c4e1c8bb95821bf8dba6ea4261270f9671589027e42a38c34c488c0fc",
-      "bytes": 76912
+      "sha256": "07f927d98b25a5ce4d7bee37221284c1b2972b8cb10a9e234395be7edb329074",
+      "bytes": 83451
     },
     {
       "path": "ui/react-app/src/__tests__/hooks/useEventBus.test.jsx",
@@ -10912,6 +10912,11 @@
       "path": "ui/react-app/src/hooks/useOptimisticSliderValue.test.jsx",
       "sha256": "5107fa0b1834266a8014abfe4d7366424f7f5b397d68a6d2e125235386c7c206",
       "bytes": 3770
+    },
+    {
+      "path": "ui/react-app/src/hooks/useOrderedPreference.js",
+      "sha256": "2123ce48069e4e8af8c4d4846ef683d31e079902440d7e00206c67cf3a6273cd",
+      "bytes": 2028
     },
     {
       "path": "ui/react-app/src/hooks/usePlayerState.errorFrame.test.js",
