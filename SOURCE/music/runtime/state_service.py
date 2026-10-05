@@ -87,7 +87,15 @@ class PlayerStateService(StateService):
 
         try:
             user_id = get_current_user_id()
-        except LookupError:
+        except LookupError as exc:
+            try:
+                from config.settings import settings
+
+                desktop = str(getattr(settings, "app_surface", "") or "").strip().lower() == "desktop"
+            except (ImportError, AttributeError, TypeError, ValueError, RuntimeError) as config_exc:
+                raise LookupError("user_id is required for music state persistence") from config_exc
+            if not desktop:
+                raise LookupError("user_id is required for music state persistence") from exc
             # Music is materialized during desktop startup, before a request
             # establishes authenticated user context.  The desktop is a
             # single-listener boundary at that point, so restore the same

@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "a8080977116e9b463ab357d06bdbf661d1f17771",
-  "sha256": "e8f64a351d5945046f878d9eca4ed5d0b130dd8d5b647d2e50eec9f392730367",
+  "revision": "a26674d1b868e5066f2a11da7884390037f29db6",
+  "sha256": "90c1ac1e4de8a48ff456a38463d33c3b2d72810ff432558543160c86032b50ea",
   "files": [
     {
       "path": ".env.example",
@@ -3190,8 +3190,8 @@
     },
     {
       "path": "music/runtime/state_service.py",
-      "sha256": "3afe7552f70729f0eacd4d10b7f6e15ea1e775994c98d3b69b1d21494a338c0f",
-      "bytes": 22404
+      "sha256": "f0316b4494009f86c669fbf11a9132d899f111257dfecc1586d952e6d79ebb77",
+      "bytes": 22909
     },
     {
       "path": "music/runtime/telemetry_service.py",
@@ -5762,6 +5762,11 @@
       "path": "tests/public/test_loopback_media_stop.py",
       "sha256": "bb2258416579abd015192c3c0951841756b93571566464105b4cee1f488a81e1",
       "bytes": 17882
+    },
+    {
+      "path": "tests/public/test_music_state_identity.py",
+      "sha256": "766a361eb7cd729ded5ec7f04d96af306062c9014174ea9c37f549add0ebfcd2",
+      "bytes": 6965
     },
     {
       "path": "tests/public/test_pause_response_contract.py",
