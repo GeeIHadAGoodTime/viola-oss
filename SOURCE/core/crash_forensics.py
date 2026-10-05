@@ -119,6 +119,7 @@ from __future__ import annotations
 
 import json
 import os
+import stat
 import sys
 import threading
 from dataclasses import dataclass, field
@@ -809,7 +810,50 @@ def _open_run_log(component: str, stamp: str) -> tuple[IO[str], Path, list[str]]
     raise OSError("no writable crash-log location (last error: %r)" % (last_error,))
 
 
-def install_crash_forensics(component: str) -> CrashForensics:
+def _validate_supplied_log(stream: IO[str], log_path: Path, modules_path: Path) -> None:
+    """Check caller-owned targets without reopening or reallocating the log.
+
+    The caller owns allocation, access control, retention and stream lifetime.
+    In particular, the module-map directory must already be private and must
+    not be included in any upload of the crash log. These checks catch invalid
+    targets; they cannot replace secure allocation of the files/directories.
+    """
+    # Standard text-file wrappers (e.g. NamedTemporaryFile) delegate these
+    # attributes without inheriting TextIOBase. Binary streams lack encoding.
+    if not isinstance(getattr(stream, "encoding", None), str):
+        raise TypeError("stream must be an open writable text file")
+    if stream.closed or not stream.writable():
+        raise ValueError("stream must be an open writable text file")
+    opened = os.fstat(stream.fileno())
+    named = log_path.lstat()
+    if not stat.S_ISREG(opened.st_mode) or not stat.S_ISREG(named.st_mode):
+        raise ValueError("log_path must name the stream's regular file without a symlink")
+    if not os.path.samestat(opened, named):
+        raise ValueError("log_path does not name the supplied stream")
+    if not modules_path.parent.is_dir():
+        raise ValueError("modules_path parent must already exist")
+    # The atomic sidecar writer also writes a temporary sibling. Neither name
+    # may alias the supplied log, including via an existing hard link.
+    for target in (modules_path, modules_path.with_name(modules_path.name + ".tmp%d" % os.getpid())):
+        try:
+            target_stat = target.lstat()
+        except FileNotFoundError:
+            continue
+        if not stat.S_ISREG(target_stat.st_mode):
+            raise ValueError("module-map targets must be regular files without symlinks")
+        if os.path.samestat(opened, target_stat):
+            raise ValueError("modules_path and its temporary file must be separate from log_path")
+        if target_stat.st_nlink != 1:
+            raise ValueError("module-map targets must not have multiple hard links")
+
+
+def install_crash_forensics(
+    component: str,
+    *,
+    stream: IO[str] | None = None,
+    log_path: Path | None = None,
+    modules_path: Path | None = None,
+) -> CrashForensics:
     """Prepare run-scoped, attributable crash artifacts for this process.
 
     The caller enables faulthandler on the returned stream::
@@ -822,13 +866,39 @@ def install_crash_forensics(component: str) -> CrashForensics:
     entrypoint is what
     ``tests/security/test_payment_pan_never_in_exceptions.py`` asserts.
 
-    Everything except opening the log file is best-effort: a failure is
-    recorded in ``notes`` and boot continues. Only a box where NO location at
-    all is writable raises, which is the pre-existing behaviour of the code
-    this replaces.
+    By default, everything except opening the log file is best-effort: a
+    failure is recorded in ``notes`` and boot continues. Only a box where NO
+    location at all is writable raises, preserving existing behaviour.
+
+    A caller that securely allocates its own run log may supply ``stream``,
+    ``log_path`` and ``modules_path`` together. The stream must be an open,
+    writable text file with a real file descriptor matching ``log_path``.
+    The module map (which contains local module paths) must have an explicit
+    separate destination in an existing caller-controlled private directory.
+    Invalid targets raise before any diagnostic hook runs. In this mode we
+    never reopen, close or replace the stream, allocate a fallback log, or
+    prune files; the caller owns allocation, retention and stream lifetime.
+    Optional diagnostic failures still appear in ``notes`` without redirecting
+    output to another location.
     """
+    supplied = (stream is not None, log_path is not None, modules_path is not None)
+    if any(supplied) and not all(supplied):
+        raise ValueError("stream, log_path and modules_path must be supplied together")
+    caller_owned = all(supplied)
+    if caller_owned:
+        assert stream is not None and log_path is not None and modules_path is not None
+        # Keep delayed refreshes bound to this destination even if the caller
+        # changes cwd. Do not resolve symlinks before validating the log.
+        log_path = Path(log_path).absolute()
+        modules_path = Path(modules_path).absolute()
+        _validate_supplied_log(stream, log_path, modules_path)
+
     stamp, iso = _utc_now()
-    stream, log_path, notes = _open_run_log(component, stamp)
+    if not caller_owned:
+        stream, log_path, notes = _open_run_log(component, stamp)
+    else:
+        notes = []
+    assert stream is not None and log_path is not None
 
     session_id = _resolve_session_id()
     dialog_suppression = "unattempted"
@@ -839,10 +909,12 @@ def install_crash_forensics(component: str) -> CrashForensics:
         notes.append("dialog-suppression-failed")
 
     modules = snapshot_loaded_modules()
-    modules_path: Path | None = None
+    requested_modules_path = modules_path
+    modules_path = None
     if modules:
         try:
-            modules_path = _sidecar_for(log_path)
+            modules_path = requested_modules_path if caller_owned else _sidecar_for(log_path)
+            assert modules_path is not None
             _write_module_map(
                 modules_path,
                 component=component,
@@ -868,11 +940,12 @@ def install_crash_forensics(component: str) -> CrashForensics:
         except Exception:  # noqa: BLE001, RUF100 - never let a diagnostic thread fail the boot
             notes.append("module-refresh-unstarted")
 
-    try:
-        keep = _retention_limit()
-        _prune_old_runs(log_path.parent, component, keep)
-    except Exception:  # noqa: BLE001, RUF100 - housekeeping is never worth a failed boot
-        notes.append("prune-failed")
+    if not caller_owned:
+        try:
+            keep = _retention_limit()
+            _prune_old_runs(log_path.parent, component, keep)
+        except Exception:  # noqa: BLE001, RUF100 - housekeeping is never worth a failed boot
+            notes.append("prune-failed")
 
     try:
         _register_clean_exit_marker(stream)

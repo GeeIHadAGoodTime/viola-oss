@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "b6eba99343a9b2c26e513f51f42c68e485b83631",
-  "sha256": "c27631f0b7003fcb703c8685e2e9756b5beb75ff1f233986b9c5dfef4299a24a",
+  "revision": "00ada4de6734a6333bc41ebceb36e1133da21c41",
+  "sha256": "dcb0c1ab8437a5ec162c99c2c46854a323bacba984d9b8002bf20a3c65bb20a0",
   "files": [
     {
       "path": ".env.example",
@@ -980,8 +980,8 @@
     },
     {
       "path": "core/crash_forensics.py",
-      "sha256": "e578d178a2dee333e450e627c76e6f3fa29a62b3a8b20127728fe10564e7cfaf",
-      "bytes": 41848
+      "sha256": "b7f70c3100ac8337499d90a34800c2733987d5134e5e3e705c56495937ba0c09",
+      "bytes": 45743
     },
     {
       "path": "core/database_strategy.py",
@@ -5732,6 +5732,11 @@
       "path": "tests/public/test_carrier_event_adapter_contract.py",
       "sha256": "0e6b2c96b6b89887680fcbedb672609b63eefc4c9c7a86e7161b61dcd96e57c4",
       "bytes": 11905
+    },
+    {
+      "path": "tests/public/test_crash_forensics_targets.py",
+      "sha256": "f66a15b8d2f536339739e527e22e20a3ae7d7ee3a3e9d7c9cd4fab4745d0a5a7",
+      "bytes": 24803
     },
     {
       "path": "tests/public/test_deferred_confirmation_cancellation.py",
