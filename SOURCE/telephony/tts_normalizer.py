@@ -2,8 +2,8 @@
 
 Wraps voice.synthesis.text_normalizer.normalize_for_speech as a Pipecat
 BaseTextFilter so it can be passed to KokoroTTSService's text_filters
-parameter. This ensures numbers, currency, phone numbers, percentages,
-and times are spoken correctly during phone calls.
+parameter. English keeps its spoken-number rules; other active locales retain
+exact values, units and script for their own pronunciation path.
 
 It ALSO runs the defense-in-depth corruption guard
 (telephony.tts_corruption_guard) on every TTS turn, BEFORE normalization, so
@@ -44,7 +44,9 @@ if PIPECAT_AVAILABLE:
         Converts currency ($25 → twenty-five dollars), phone numbers
         (555-123-4567 → digit-by-digit), percentages (15% → fifteen percent),
         times (2:30 PM → two thirty PM), ordinals (1st → first), and bare
-        numbers to English words.
+        numbers to English words only when the active TTS locale is English.
+        Other locales receive language-neutral markup/URL cleanup and retain
+        exact values and text for their locale-specific pronunciation adapter.
 
         Set ``summarize=False`` for non-Viola speakers (e.g. the receptionist
         role-play in tools/devbench/phone_receptionist_pipeline.py) whose dialogue
@@ -159,4 +161,4 @@ if PIPECAT_AVAILABLE:
                 # Garbage-only turn -> speak nothing.
                 return ""
 
-            return normalize_for_speech(cleaned, summarize=self._summarize)
+            return normalize_for_speech(cleaned, summarize=self._summarize, language=language)
