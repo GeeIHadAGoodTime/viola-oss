@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "f96d330fcf05850fdd837a418d8d344cc130e219",
-  "sha256": "78dcd50f6205c75258154688f6e683a99b9169311f2793dbef0fbfade87b355f",
+  "revision": "c131b561adb6e2da0124ef4d8a01cc0788d98b13",
+  "sha256": "4cde77d704ad1cef81fd87b34ccc7503e74cccd25f3be7b83fdb57f9ff598e0b",
   "files": [
     {
       "path": ".env.example",
@@ -10955,8 +10955,8 @@
     },
     {
       "path": "ui/react-app/src/components/stage/modes/chat/ChatMode.jsx",
-      "sha256": "e059e44146e15891466cfc57e96cce6c8b98b960bd726390df83d840caeafb23",
-      "bytes": 62223
+      "sha256": "6c29eca8d67c3c823f7d1434dec04f14a16b9785bd89b376efce384109f5c93f",
+      "bytes": 64257
     },
     {
       "path": "ui/react-app/src/components/stage/modes/chat/ChatMode.modelRecovery.test.jsx",
@@ -10967,6 +10967,11 @@
       "path": "ui/react-app/src/components/stage/modes/chat/ChatMode.modelRestoration.test.jsx",
       "sha256": "265fb4b0e3e3f02d5b84db55524ee1c317537f7349e458ebfc9abf8ba14601c0",
       "bytes": 18419
+    },
+    {
+      "path": "ui/react-app/src/components/stage/modes/chat/ChatMode.searchOwnership.test.jsx",
+      "sha256": "92dfcc0131582e8d6a9c1217c0ed4098ec9ae3c150ef94febb22078d477150ab",
+      "bytes": 20148
     },
     {
       "path": "ui/react-app/src/components/stage/modes/chat/ChatMode.test.jsx",
