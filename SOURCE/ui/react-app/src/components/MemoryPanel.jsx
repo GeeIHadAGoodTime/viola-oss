@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { THEME } from '../config';
 import { authFetch } from '../hooks/useViolaApi';
@@ -911,6 +911,29 @@ function MemoryPanelContent({ isOpen, onClose }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const inputRef = useRef(null);
+  const documentSessionRef = useRef(null);
+  const [violaSaving, setViolaSaving] = useState(false);
+
+  useLayoutEffect(() => {
+    const session = isOpen ? { revision: 0, save: null } : null;
+    documentSessionRef.current = session;
+    setViolaSaving(false);
+    return () => { documentSessionRef.current = null; };
+  }, [isOpen]);
+
+  const closePanel = useCallback(() => {
+    // A close intent retires this editor before the parent's prop update.
+    documentSessionRef.current = null;
+    setViolaSaving(false);
+    onClose();
+  }, [onClose]);
+
+  const changeViolaDraft = useCallback((content) => {
+    const session = documentSessionRef.current;
+    if (!session) return;
+    session.revision += 1;
+    setViolaDraft(content);
+  }, []);
 
   const loadViola = useCallback(async () => {
     // VIOLA.md + entries read the desktop's local D-layout memory files --
@@ -918,45 +941,53 @@ function MemoryPanelContent({ isOpen, onClose }) {
     // Memory tab is now cloud-native via CloudMemoryTab above, but VIOLA.md
     // itself has nothing to rewire to). Skip the dead fetch on the cloud SPA.
     if (isCloudSurface()) return;
+    const session = documentSessionRef.current;
+    if (!session) return;
     const resp = await authFetch('/api/memory/viola');
     const data = await parseResponse(resp);
+    if (documentSessionRef.current !== session) return;
     const content = data?.content || '';
     setViolaContent(content);
     setViolaDraft(content);
   }, []);
 
-  const loadMemoryEntries = useCallback(async () => {
+  const loadMemoryEntries = useCallback(async (isCurrent = () => true) => {
     // Same desktop-only D-layout file source as loadViola above; the cloud
     // SPA's Memory tab renders CloudMemoryTab instead (#1182), which does its
     // own /v1/memories fetching, so this desktop-file loader stays skipped.
     if (isCloudSurface()) return;
     const resp = await authFetch('/api/memory/entries');
     const data = await parseResponse(resp);
+    if (!isCurrent()) return;
     setMemoryEntries({
       index: data?.index || { entries: [] },
       topics: Array.isArray(data?.topics) ? data.topics : [],
     });
   }, []);
 
-  const loadWorkbench = useCallback(async () => {
+  const loadWorkbench = useCallback(async (isCurrent = () => true) => {
     // Workbench files live on the desktop's local disk -- desktop-only
     // (#1064). Skip the dead fetch on the cloud SPA; the Workbench tab
     // renders a DesktopUpsell.
     if (isFeatureHidden('workbench')) return;
     const resp = await authFetch('/api/workbench/files');
     const data = await parseResponse(resp);
+    if (!isCurrent()) return;
     setWorkbenchFiles(Array.isArray(data?.files) ? data.files : []);
   }, []);
 
   const refresh = useCallback(async () => {
+    const session = documentSessionRef.current;
+    if (!session) return;
+    const isCurrent = () => documentSessionRef.current === session;
     setBusy(true);
     setError('');
     try {
-      await Promise.all([loadViola(), loadMemoryEntries(), loadWorkbench()]);
+      await Promise.all([loadViola(), loadMemoryEntries(isCurrent), loadWorkbench(isCurrent)]);
     } catch (err) {
-      setError(err.message || 'Could not load memory.');
+      if (isCurrent()) setError(err.message || 'Could not load memory.');
     } finally {
-      setBusy(false);
+      if (isCurrent()) setBusy(false);
     }
   }, [loadMemoryEntries, loadViola, loadWorkbench]);
 
@@ -971,34 +1002,50 @@ function MemoryPanelContent({ isOpen, onClose }) {
     const handleEscape = (event) => {
       if (event.key === 'Escape' && !event.defaultPrevented) {
         event.preventDefault();
-        onClose();
+        closePanel();
       }
     };
     document.addEventListener('keydown', handleEscape);
     return () => document.removeEventListener('keydown', handleEscape);
-  }, [isOpen, onClose]);
+  }, [isOpen, closePanel]);
 
   const saveViola = useCallback(async () => {
+    const session = documentSessionRef.current;
+    if (!session || session.save) return;
+    const ticket = { revision: session.revision, content: violaDraft };
+    session.save = ticket;
+    const isCurrent = () => documentSessionRef.current === session && session.save === ticket;
+    setViolaSaving(true);
     setBusy(true);
     setError('');
     try {
       const resp = await authFetch('/api/memory/viola', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: violaDraft }),
+        body: JSON.stringify({ content: ticket.content }),
       });
       await parseResponse(resp);
-      setViolaContent(violaDraft);
-      setEditingViola(false);
-      await loadMemoryEntries();
+      if (!isCurrent()) return;
+      setViolaContent(ticket.content);
+      // Acknowledgement belongs to the submitted text. Later edits remain an
+      // unsaved draft and must not be hidden by an older Save completion.
+      if (session.revision === ticket.revision) setEditingViola(false);
+      await loadMemoryEntries(isCurrent);
     } catch (err) {
-      setError(err.message || 'Could not save VIOLA.md.');
+      if (isCurrent()) setError(err.message || 'Could not save VIOLA.md.');
     } finally {
-      setBusy(false);
+      if (isCurrent()) {
+        session.save = null;
+        setViolaSaving(false);
+        setBusy(false);
+      }
     }
   }, [loadMemoryEntries, violaDraft]);
 
   const insertTemplate = useCallback((template) => {
+    const session = documentSessionRef.current;
+    if (!session) return;
+    session.revision += 1;
     setEditingViola(true);
     setViolaDraft((prev) => `${prev}${prev && !prev.endsWith('\n') ? '\n' : ''}${template.trimStart()}`);
   }, []);
@@ -1114,10 +1161,10 @@ function MemoryPanelContent({ isOpen, onClose }) {
           content={violaContent}
           draft={violaDraft}
           editing={editingViola}
-          busy={busy}
-          onDraftChange={setViolaDraft}
+          busy={busy || violaSaving}
+          onDraftChange={changeViolaDraft}
           onEdit={() => setEditingViola(true)}
-          onCancel={() => { setViolaDraft(violaContent); setEditingViola(false); }}
+          onCancel={() => { changeViolaDraft(violaContent); setEditingViola(false); }}
           onSave={saveViola}
           onInsertTemplate={insertTemplate}
         />
@@ -1151,6 +1198,8 @@ function MemoryPanelContent({ isOpen, onClose }) {
   }, [
     activeTab,
     busy,
+    violaSaving,
+    changeViolaDraft,
     deleteIndexEntry,
     deleteTopicEntry,
     deleteTopicFile,
@@ -1191,7 +1240,7 @@ function MemoryPanelContent({ isOpen, onClose }) {
         backgroundColor: THEME.colors.overlay,
         fontFamily: PANEL_FONT,
       }}
-      onClick={onClose}
+      onClick={closePanel}
     >
       <div
         onClick={(event) => event.stopPropagation()}
@@ -1214,7 +1263,7 @@ function MemoryPanelContent({ isOpen, onClose }) {
           <div style={{ flex: 1, minWidth: 0, fontSize: 18, fontWeight: 700 }}>
             {tabs.find((tab) => tab.id === activeTab)?.label || 'Memory'}
           </div>
-          <button type="button" onClick={onClose} aria-label="Close" style={{ ...buttonBase, width: 44, padding: 0 }}>X</button>
+          <button type="button" onClick={closePanel} aria-label="Close" style={{ ...buttonBase, width: 44, padding: 0 }}>X</button>
         </div>
 
         <div style={{ display: 'flex', gap: 6, padding: '10px 18px', borderBottom: `1px solid ${THEME.colors.divider}` }}>
