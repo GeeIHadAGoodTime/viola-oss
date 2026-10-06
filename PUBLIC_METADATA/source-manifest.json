@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "62a22b00bc1ba5d686bc3a5ccf4554942f9231bc",
-  "sha256": "cfb76f4af47a1dbcccc72dbf6dddd8e947c989159b6c050ec786121a23549fe2",
+  "revision": "f96d330fcf05850fdd837a418d8d344cc130e219",
+  "sha256": "78dcd50f6205c75258154688f6e683a99b9169311f2793dbef0fbfade87b355f",
   "files": [
     {
       "path": ".env.example",
@@ -10255,13 +10255,18 @@
     },
     {
       "path": "ui/react-app/src/components/SavedChatHistory.jsx",
-      "sha256": "35950524e79c6aef5e6cc01a837dfe215e52dc7b15573fa9c26303d2cf6cbe03",
-      "bytes": 5357
+      "sha256": "cd0b6bd24e73951c9a1647a19bba20427ec98ce706d44722902aec4e14148bfd",
+      "bytes": 6300
     },
     {
       "path": "ui/react-app/src/components/SavedChatHistory.review.test.jsx",
       "sha256": "c0b9ede7d3582999e904a5347e758d566f17ae00c65f9498bb60706d11053797",
       "bytes": 2300
+    },
+    {
+      "path": "ui/react-app/src/components/SavedChatHistory.timeout.test.jsx",
+      "sha256": "b49d1270df75da2d52e4a4d8a4e46969f1e11017e3bdf54972c1aa5f9a06a827",
+      "bytes": 16129
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.cloudSyncConsent.test.jsx",
