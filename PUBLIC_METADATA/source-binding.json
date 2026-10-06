@@ -1,43 +1,32 @@
 {
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "42b1f4c3a111e53987b34356254d0cafd26a75779e1adf1127c42f287820428c",
-  "source_tree_sha256": "17f72b8e3ff0bf19bc0eb33aa0a9a5ba4e055b930147c98436d544541bb7857c",
-  "source_file_count": 2563,
-  "source_revision": "0af74f98065865d980cb717eeeab5656810b0632",
+  "source_manifest_sha256": "30f48a0aed124cb6a175a9bf1e35e06a899f9399e8bda8005566c5b30a5e8a57",
+  "source_tree_sha256": "ad44b3bc2d9040ee2d0c1c442119f49f93acc9623395014ccf8ae7d5348adbb9",
+  "source_file_count": 2542,
+  "source_revision": "5db590409955156a4d3df61c6439f09c5bdb19f6",
   "comparison_public_revision": "c4891d863f70bdac888499d27c99a2d925ba6696",
   "changed_source_paths": [
-    "SOURCE/qualification/romance_semantic_lowering/README.md",
-    "SOURCE/qualification/romance_semantic_lowering/integrity.json",
-    "SOURCE/qualification/romance_semantic_lowering/romance-prototype/README.md",
-    "SOURCE/qualification/romance_semantic_lowering/romance-prototype/_romance_vendor/LICENSE",
-    "SOURCE/qualification/romance_semantic_lowering/romance-prototype/_romance_vendor/__init__.py",
-    "SOURCE/qualification/romance_semantic_lowering/romance-prototype/_romance_vendor/base.py",
-    "SOURCE/qualification/romance_semantic_lowering/romance-prototype/_romance_vendor/french.py",
-    "SOURCE/qualification/romance_semantic_lowering/romance-prototype/_romance_vendor/portuguese.py",
-    "SOURCE/qualification/romance_semantic_lowering/romance-prototype/_romance_vendor/spanish.py",
-    "SOURCE/qualification/romance_semantic_lowering/romance-prototype/qualify_provenance.py",
-    "SOURCE/qualification/romance_semantic_lowering/romance-prototype/romance_coverage.py",
-    "SOURCE/qualification/romance_semantic_lowering/romance-prototype/test_romance_coverage.py",
-    "SOURCE/qualification/romance_semantic_lowering/romance-prototype/upstream-bindings.json",
-    "SOURCE/qualification/romance_semantic_lowering/romance-prototype/upstream-fail-closed.patch",
-    "SOURCE/qualification/romance_semantic_lowering/romance-prototype/upstream-modifications.json",
-    "SOURCE/qualification/romance_semantic_lowering/run_qualification.py",
-    "SOURCE/qualification/romance_semantic_lowering/upstream/LICENSE",
-    "SOURCE/qualification/romance_semantic_lowering/upstream/base.py",
-    "SOURCE/qualification/romance_semantic_lowering/upstream/french.py",
-    "SOURCE/qualification/romance_semantic_lowering/upstream/portuguese.py",
-    "SOURCE/qualification/romance_semantic_lowering/upstream/spanish.py",
-    "SOURCE/tests/public/test_romance_qualification_packet.py"
+    "SOURCE/ui/react-app/package-lock.json",
+    "SOURCE/ui/react-app/tests/source_map_advisory.test.js"
   ],
   "retained_sboms": [
     {
       "path": "frontend.sbom.json",
       "sha256": "937a2d0ad8aecc2c7eb7dd69eca48789c995edd6ef69af43a58cb60da819c80d",
       "components": 406,
-      "inventory_status": "retained_historical_frontend_inventory; exact current manifest and lock dependency inputs unchanged by this packet",
+      "inventory_status": "Historical frontend inventory retained as prior evidence. source-map-js changed from 1.2.1 to 1.2.2 in the exact lockfile; this SBOM is not current-input-equivalent. Fresh final-head Windows frontend installation and inventory are required.",
       "prior_inventory_status": "retained_exact_windows_inventory_20261003_job_111110266035",
-      "current_source_dependency_input_equivalence": true
+      "current_source_dependency_input_equivalence": false,
+      "prior_source_binding_inventory": {
+        "path": "frontend.sbom.json",
+        "sha256": "937a2d0ad8aecc2c7eb7dd69eca48789c995edd6ef69af43a58cb60da819c80d",
+        "components": 406,
+        "inventory_status": "retained_historical_frontend_inventory; exact current manifest and lock dependency inputs unchanged by this packet",
+        "prior_inventory_status": "retained_exact_windows_inventory_20261003_job_111110266035",
+        "current_source_dependency_input_equivalence": true
+      },
+      "current_source_resolution_qualified": false
     },
     {
       "path": "windows-all-optional.sbom.json",
@@ -81,84 +70,17 @@
     }
   ],
   "input_equivalence": {
-    "changed_dependency_inputs": [],
-    "basis": "All runtime source, requirements, package metadata and frontend dependency inputs remain unchanged. The additions are an inactive qualification packet, retained MIT original/adapted sources and source-only tests; no production mapping, package install or backend selection is introduced. Six retained SBOMs remain historical and are not claimed to inventory or qualify these new source-only research files.",
-    "compared_to_public_revision": "c4891d863f70bdac888499d27c99a2d925ba6696",
-    "verified_inputs": [
-      {
-        "path": "SOURCE/optional/deepfilter-runtime/pyproject.toml",
-        "sha256": "a896f84f4ebd802c7455859e8519f807c23169a3944237e5a44a0865f06febfd"
-      },
-      {
-        "path": "SOURCE/pyproject.toml",
-        "sha256": "a52a4ab5968580d99d1f15bfd0a6a3555d33d606c403873f0cf97e03dbbcbf1b"
-      },
-      {
-        "path": "SOURCE/requirements_bootstrap.txt",
-        "sha256": "8e6e936041efef32a7a51ec1d711f1b24844b1928308c9ac54849788351f5db2"
-      },
-      {
-        "path": "SOURCE/requirements_customer_speech.txt",
-        "sha256": "69926739e50290e37c4e5f83ba2b38ec2099d53407f34fc2cb2c7c70cafac383"
-      },
-      {
-        "path": "SOURCE/requirements_deepfilter.txt",
-        "sha256": "c6eb7c571897d8646d1f1892b17f7f7dad2122652d384f732bb8b1f8ff69b21d"
-      },
-      {
-        "path": "SOURCE/requirements_desktop.txt",
-        "sha256": "6273c990fb8f86033af485b59ab51fee479537bfd7023ba1004868c1f9c2b096"
-      },
-      {
-        "path": "SOURCE/requirements_kokoro.txt",
-        "sha256": "e202acaee16f06edd3d35bedce5eef08424be1ccb5414631c296075825b174d3"
-      },
-      {
-        "path": "SOURCE/requirements_linux.txt",
-        "sha256": "7d4463c0c7dc3b9cab8c47fae7ca10a7f6e2f6c0322e92f48314902b841b65cc"
-      },
-      {
-        "path": "SOURCE/requirements_macos.txt",
-        "sha256": "c452d005091998bf6a5706b03a0865f3d4c463a99bbfa83c8d66ac89fa86a18f"
-      },
-      {
-        "path": "SOURCE/requirements_optional.txt",
-        "sha256": "ba61a3a82990d2e5726fc9771d5796e7bbab1f559a48513224d123948c20515b"
-      },
-      {
-        "path": "SOURCE/services/weather-gfs/requirements.txt",
-        "sha256": "accab6138ad7e0fd4f1cd43c325fc0154fc358e2aaaec8aec6e3fa03723b548c"
-      },
-      {
-        "path": "SOURCE/third_party/kokoro_onnx/pyproject.toml",
-        "sha256": "6d50678c37c7e4505a8bbf0086de0ebd3e42173dd86e84b65c5f358b4ebc317c"
-      },
-      {
-        "path": "SOURCE/third_party/misaki_en/pyproject.toml",
-        "sha256": "bb17d18add365879f81af815485afd6d8ad1d815d84bc21050082133a26819f7"
-      },
-      {
-        "path": "SOURCE/third_party/pipecat/MODEL_LICENSES/sources.toml",
-        "sha256": "74759b67b52d87d8bd49b9aba3bbf625794d70731828c0a3b4d3f7beb44a15f6"
-      },
-      {
-        "path": "SOURCE/third_party/pipecat/pyproject.toml",
-        "sha256": "0fde019a97ecfc4c6d6a38e5ed175812f0b60afd7e665dedac74575b04d40c1f"
-      },
-      {
-        "path": "SOURCE/third_party/sources.toml",
-        "sha256": "49598c4641f840ffcb37979da961c9602d7681fb4d3fce37e18bc70aa5c633cf"
-      },
-      {
-        "path": "SOURCE/ui/react-app/package-lock.json",
-        "sha256": "e2537605cc28b2972a29f8d6e5952f3d5ab2f9539979b9246cea5645264ed8f4"
-      },
-      {
-        "path": "SOURCE/ui/react-app/package.json",
-        "sha256": "c6c8bfcae858d9b95169788bb1b5ff1ed1fa97a9fff21f59b3debf4862ec2064"
-      }
+    "changed_dependency_inputs": [
+      "SOURCE/ui/react-app/package-lock.json"
     ],
-    "historical_sboms_newly_qualified": false
+    "basis": "Only one transitive source-map-js lock record changes (version, URL and integrity), and one ten-case regression test is added. package.json, every other dependency record, both audit workflow policies, all other 2,540 prior SOURCE files and all six historical SBOM payloads are exact relative to c4891d86. The retained frontend SBOM is not equivalent to the current lock; fresh final-head Windows frontend installation/inventory is required. Existing Python inventory limits remain unchanged.",
+    "frontend_dependency_inputs_changed": true,
+    "frontend_scope_equivalence_claimed": false,
+    "python_scope_equivalence_claimed": false,
+    "prior_dependency_input_qualification": {
+      "changed_dependency_inputs": [],
+      "basis": "Eight existing frontend source/test files change. Every other authenticated Git leaf, including the newly landed streaming decimal/locale boundary, speech routing/startup successor, Queue snapshot source, inactive English speech foundation, SDK44, provider42, native volume, wake, Settings and startup source, is preserved. Dependencies, build profiles, assets, licenses, notices and all six retained SBOMs are unchanged. No fresh dependency resolution or advisory scan is claimed."
+    }
   },
   "prior_binding": {
     "public_revision": "c4891d863f70bdac888499d27c99a2d925ba6696",
@@ -167,40 +89,29 @@
     "sha256": "94e2a65d30327ac8eece3fda32835dd03cc236492e197787832669c67ed71420",
     "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/c4891d863f70bdac888499d27c99a2d925ba6696/PUBLIC_METADATA/source-binding.json"
   },
-  "new_resolution_performed": false,
-  "new_advisory_scan_performed": false,
+  "new_resolution_performed": true,
+  "new_advisory_scan_performed": true,
   "new_runtime_qualification_performed": false,
   "qualification": {
-    "scope": "Inactive Romance semantic-lowering prototype source publication only; no production profile, packaging mapping or runtime import integration.",
-    "source_integrity": "Thirteen original ac1491 packet files retain exact reviewed bytes; five original upstream code/license files retain SHA256 and Git blob identities. A portable runner, integrity manifest, explanatory README and public tests complete the 22-file addition. All inherited source leaves remain byte-identical to merged main.",
-    "checks": "The accepted560-method source replay is reused after proving every Python and non-frontend source input identical to corrected head a14a686c. Only eight already-reviewed/merged feedback48 frontend files differ. Applicable fresh hosted checks must bind this final synchronized head. The actual portable wrapper also passes all 122 original source controls and the unchanged provenance/mutant checks. Eleven public wrapper methods cover missing/tampered payloads, config/Git identity, output collisions, hardlink aliases and atomic external reports. Destructive negatives operate only on disposable copies. The one-file Windows correction explicitly places those copies outside protected source roots and has 33 independently passing executions under external/source-local/packet-local temp defaults; runtime writer and18 immutable payloads remain unchanged.",
-    "upstream_provenance": {
-      "repository": "https://github.com/ayutaz/piper-plus",
-      "commit": "82ee4e7a9b7aded42e0d0d5fd8298b42bfa51a16",
-      "selected_subtree": "src/python/g2p",
-      "terms": "Retained MIT license and original notices; three documented fail-closed adaptations. Other Piper subtrees/models are not adopted.",
-      "binding_path": "SOURCE/qualification/romance_semantic_lowering/integrity.json"
-    },
-    "limits": "Bounded source/prosody/semantic-lowering qualification only. Digits, currency, unsupported phones and mixed scripts fail closed. Retained French/Portuguese quality witnesses remain unresolved. No native model inference, new dependency installation, full multilingual/acoustic eligibility, Windows packaging or customer release qualification. All eight language families and 54 canonical voices remain unchanged.",
-    "exact_head_hosted_checks": "pending for ancestry-preserving main48 synchronization",
-    "input_reconciliation": {
-      "base": "c4891d863f70bdac888499d27c99a2d925ba6696",
-      "verified_base_blobs": 2568,
-      "preserved_romance_files": 22,
-      "prior_corrected_head": "a14a686c86fab637fac6034bc52bab2d0e2e0f98",
-      "changed_source_inputs": [
-        "SOURCE/ui/react-app/src/auth/AuthProvider.jsx",
-        "SOURCE/ui/react-app/src/auth/useAuth.js",
-        "SOURCE/ui/react-app/src/auth/AuthProvider.test.jsx",
-        "SOURCE/ui/react-app/src/components/AccountTab.jsx",
-        "SOURCE/ui/react-app/src/components/AccountTab.authSync.test.jsx",
-        "SOURCE/ui/react-app/src/components/AccountTab.cloudStoreReconciliation.test.jsx",
-        "SOURCE/ui/react-app/src/components/auth/CloudAuthGate.jsx",
-        "SOURCE/ui/react-app/src/components/auth/auth.test.jsx"
-      ],
-      "all_python_and_non_frontend_source_inputs_identical": true,
-      "accepted_560_method_evidence_reused": true
-    },
+    "scope": "Bounded developer-tool dependency advisory repair, separate from MemoryPanel or other behavior changes; no production exploitability, installed Windows or release qualification claimed.",
+    "source_integrity": "All 2,568 current-main Git leaves are authenticated. One existing SOURCE lockfile changes, one regression file is added and two canonical metadata files are regenerated. Source-only commit retains 2,567 base leaves; the final tree retains 2,565 base leaves and has 2,569 leaves total. Canonical source count is 2,542. Both MemoryPanel draft-recovery slices are excluded from this standalone branch.",
+    "advisory": "GHSA-68fv-2mgg-jv7q / CVE-2026-93749 affects source-map-js >=1.0.0,<1.2.2; patched in 1.2.2. Published September 18, reviewed/updated October 5, 2026. Maintainer release 1.2.2 is dated September 30. The c4891d86 base and observed PR57 cc884760 lock are identical; the observed failure is newly surfaced advisory data, not a dependency introduced by MemoryPanel. Precise npm ingestion time is not established.",
+    "primary_sources": [
+      "https://github.com/advisories/GHSA-68fv-2mgg-jv7q",
+      "https://github.com/7rulnik/source-map-js/releases/tag/v1.2.2",
+      "https://github.com/7rulnik/source-map-js/pull/79"
+    ],
+    "reachability": "The dev-only graph is Vite 6.4.3 -> overridden PostCSS 8.5.25 -> source-map-js. Tests resolve the actual PostCSS consumer. Application source has no direct source-map-js import; build-tool reachability does not establish production exploitability or an observed attack.",
+    "checks": "Targeted npm lock regeneration changes only source-map-js version, tarball URL and integrity. Official registry metadata and 18 tarball payload files independently match. Old exact-lock audit exits 1 with one high finding; current complete exact-lock audit and plain installed-fixture audit exit 0 with zero findings. No omit, threshold reduction or ignore policy is used. All 410 installed Linux package versions match the lock, and npm ls --all exits 0. Scoped ESLint has zero diagnostics.",
+    "regression": "Ten tests cover invalid line/column offsets, summed nested offsets, ordinary indexed source mapping/source text and PostCSS CSS/source-map preservation. The predecessor yields eight ordinary AssertionErrors plus two preservation passes; the corrected package passes ten. Heap is capped at 256 MB with a 30-second parent deadline and two-second per-case timeout. Hostile offsets are only passed to constructors; no huge mapping expansion, OOM or timeout is counted as a passing negative control.",
+    "independent_review": "Exact two-file patch dedc44e6ef0647b2042999e50920032ce6b6ee06356f2668c5f20f48aed0a8c6 independently approved. Reviewer verifies the unchanged canonical Vite config/global setup through normal npm run test:run (10/10), 30 extra nonexpanding constructor boundaries, exact lock graph/SRI, unchanged audit workflow policies and a fresh zero-finding npm audit. All 21,465 original shared dependency files and 468 author build inputs are unchanged. No full aggregate rerun is inferred.",
+    "build": "A related source-bound PR57 MemoryPanel snapshot carrying these exact dependency/test bytes passes production npm run build in 6.948 seconds at the unchanged 512 MB Node heap, with uploads disabled and all existing resource floors met; all three emitted wake assets match canonical bytes. The standalone main-based branch excludes that MemoryPanel slice, so this related build is not relabeled a build of the final standalone source. Its fresh exact-head hosted build remains required.",
+    "retained_failures": "The initial local build attempt failed before compilation because an owned directory name broke Node dependency resolution; corrected owned node_modules layout passes. Independent first audit under a minimal environment failed DNS resolution; one retry with the established inherited environment passes. A separate raw-indexed-map PostCSS probe has the same inherited undefined-sourceRoot TypeError on old/new packages; it is outside this bounded dependency repair.",
+    "inventory_limit": "All six checked-in SBOM payloads and their qualified historical receipts are retained unchanged. The frontend SBOM is explicitly not current-input-equivalent after the lock update. Fresh final-head Windows frontend installation and inventory are required. Python-scope historical qualification limits remain unchanged.",
+    "limits": "No fresh full frontend aggregate, Windows clean install, native app, installer, deployed service or customer release proof is inferred from the scoped local checks. Earlier PR57 green tests/build are predecessor evidence only. No merge, deployment, credentials, access changes, workflow weakening or spending is part of this source patch.",
+    "exact_head_hosted_checks": "pending for final published metadata head",
+    "installed_candidate": "not_established",
+    "release_or_deployment": "not_established",
     "prior_source_qualification": {
       "scope": "Bounded source qualification of visible logout pending/failure/retry outcomes using synthetic accounts and inert network responses.",
       "source_integrity": "All 2568 current-main Git blobs verified before and after hardlink preparation. Only eight reviewed source files and two canonical metadata files differ. The manifest inventories 2541 SOURCE files; six retained SBOMs remain exact.",
@@ -571,27 +482,10 @@
           "qualification_reused_only_for_identical_source_inputs": true
         }
       }
-    },
-    "previous_reviewed_romance_binding": {
-      "head": "a14a686c86fab637fac6034bc52bab2d0e2e0f98",
-      "source_revision": "16c860779fd040d5ab4fac5301c40f057f1a99df",
-      "git_blob": "82545be7d29fb818ceaa007221217b20446c3f47",
-      "sha256": "e4a1c200f8fa60397f46d6b1381a42c5192e0cc4edb8f1b81e840618605e11aa",
-      "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/a14a686c86fab637fac6034bc52bab2d0e2e0f98/PUBLIC_METADATA/source-binding.json"
-    },
-    "original_reviewed_romance_binding": {
-      "head": "ec1149cc7b1e205ad661cdc004dd2fb4bb9c60cd",
-      "source_revision": "e823755522c97580cffdee95a0d99965f8ac13a7",
-      "git_blob": "0cc5d45417ba33eb0d4ef60edc59a008f75d9534",
-      "sha256": "eb57d68598af91007ac6af4f09e9621b0417584bbdb07bbb92c86d551be84f8d",
-      "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/ec1149cc7b1e205ad661cdc004dd2fb4bb9c60cd/PUBLIC_METADATA/source-binding.json"
     }
   },
   "reviewed_source_patch": {
-    "inactive_romance_portable_packet_sha256": "a1bcb6e8480eac57a05f51117f592fa5aa6f7e3f6ff7784ead53352e66874cfe",
-    "original_semantic_lowering_sha256": "ac1491f19a3295931bda9cf72cb1649235bf75be742dccbb12a32e89fa63a030",
-    "reviewed_source_paths": 22,
-    "windows_external_temp_fixture_delta_sha256": "a2c5c421339f2637bcbc71e779e30efaa562460e212bdc4a0958491a8949fb38",
+    "source_map_js_advisory_sha256": "dedc44e6ef0647b2042999e50920032ce6b6ee06356f2668c5f20f48aed0a8c6",
     "prior_source_patch": {
       "logout_feedback_v2_sha256": "d02a9781836fbef1b274993a6ed1877c54c7688834f92f4ed1d2e56497c99706",
       "prior_source_patch": {
@@ -809,5 +703,7 @@
     "git_blob": "605c214e4c6abb3cdd0100f574304298add4006a",
     "sha256": "e7380d33f4de1bc53c3707a550a14b777d72c6de68e1fc987c02a91f167f9abb",
     "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/cf37df7c72d977e981b943358b9f3f1aceffe659/PUBLIC_METADATA/source-binding.json"
-  }
+  },
+  "new_resolution_scope": "Frontend lockfile-only targeted npm update. A Linux installed fixture reuses unchanged dependencies with the verified 1.2.2 tarball; this is not a fresh clean Windows installation or inventory.",
+  "new_advisory_scan_scope": "Current complete candidate package-lock via npm audit, with no omitted scope, changed severity threshold or waiver; independent replay reports zero vulnerabilities. Final-head hosted checks remain pending."
 }
