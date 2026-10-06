@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "dee3a641081114dc8dc48b92b566d889ce5030c9",
-  "sha256": "fe2874c829ca3cf7c6f1139f491b71ce29cb53838f407f4b5cc8e7ce1d942941",
+  "revision": "177cb414ab382ba502eae3115c3696b96d5cf017",
+  "sha256": "dc21ab9fa07fe384b9d759bc52dfe244610d4bb0bd67af83a46a10399f786f1c",
   "files": [
     {
       "path": ".env.example",
@@ -9770,13 +9770,13 @@
     },
     {
       "path": "ui/react-app/src/auth/AuthProvider.jsx",
-      "sha256": "490322707b8f887acc7376ea8d81bda8d99fabed99885cc9bc9d0acd6da23e31",
-      "bytes": 36566
+      "sha256": "779c06cfb57739078d19ad9d9e37fe29c4c0e1ff66c17408f0c29f2bebe37b95",
+      "bytes": 39084
     },
     {
       "path": "ui/react-app/src/auth/AuthProvider.test.jsx",
-      "sha256": "845f33b3458ce114ffb4f78ee92fa6183b7755f9163328ec566261f1442fafa4",
-      "bytes": 48202
+      "sha256": "770456e4abebce9add61f0df5117505f8dcba4cd5e0c5ddabc72517fd767ec02",
+      "bytes": 50130
     },
     {
       "path": "ui/react-app/src/auth/authClient.csrf.test.js",
@@ -9790,8 +9790,8 @@
     },
     {
       "path": "ui/react-app/src/auth/authClient.js",
-      "sha256": "f6267de98e6d9a40996bc28d781a5f4672283be18619d210f23a4c03dd6d9611",
-      "bytes": 29447
+      "sha256": "6c474157ad2291039d57fd2aedaaf441bec934b94618c9fe472478cfd5c4057f",
+      "bytes": 30058
     },
     {
       "path": "ui/react-app/src/auth/authClient.test.js",
@@ -9819,9 +9819,19 @@
       "bytes": 237
     },
     {
+      "path": "ui/react-app/src/auth/logoutIntent.js",
+      "sha256": "3614f9e8241221543d341e0bf9a3f3f925a0eb20e44ced1b73730bedca127a2a",
+      "bytes": 8082
+    },
+    {
+      "path": "ui/react-app/src/auth/logoutIntent.test.js",
+      "sha256": "48faab88ec585a12f8478c8efbc375b2406695976a549c28f3e11b52522c7d7b",
+      "bytes": 11472
+    },
+    {
       "path": "ui/react-app/src/auth/useAuth.js",
-      "sha256": "ed62469bb5113b79404df2ec30380a0069d783bdfdc99886e6d7d40ce168d2c0",
-      "bytes": 3215
+      "sha256": "107b54f684ecb359b59116a1dd33c82d2bb4d19d7ca6d74340d24a5df1dd500a",
+      "bytes": 3261
     },
     {
       "path": "ui/react-app/src/components/AccentPicker.jsx",
@@ -9850,13 +9860,18 @@
     },
     {
       "path": "ui/react-app/src/components/AccountTab.jsx",
-      "sha256": "6d83cfec33677b762a517185cacab5529e7d03c09914274e5b8b41cd58d893c0",
-      "bytes": 75936
+      "sha256": "95b0de56b8b6851841e11939249d54743ad89f521526a0d2db98743d20b43476",
+      "bytes": 76064
     },
     {
       "path": "ui/react-app/src/components/AccountTab.legacy.jsx",
       "sha256": "e8cac7a43b4295fdc7c7d7513605f1bc832313aa784a2b9f5aeb3c6ac8a2b73d",
       "bytes": 53267
+    },
+    {
+      "path": "ui/react-app/src/components/AccountTab.logoutRestoration.test.jsx",
+      "sha256": "e8defd427dc6dc4bb8840b7739d493dcb141159cdad4d103731f10f875768217",
+      "bytes": 34008
     },
     {
       "path": "ui/react-app/src/components/AccountTab.mfa.test.jsx",
@@ -10375,8 +10390,8 @@
     },
     {
       "path": "ui/react-app/src/components/auth/CloudAuthGate.jsx",
-      "sha256": "9b538528f6e081df07810b0b342daeec05c19485006da55c97dc502b5bad38a3",
-      "bytes": 5556
+      "sha256": "24efd280be70abae5aca6af5fd1ca457edf2c4a3896ece35ef7d5918960a6f93",
+      "bytes": 5668
     },
     {
       "path": "ui/react-app/src/components/auth/LoginScreen.jsx",
@@ -11345,8 +11360,8 @@
     },
     {
       "path": "ui/react-app/src/lib/auth_context.tsx",
-      "sha256": "168e63a532895d1f7cbf1d76d086ff3064ebb0db2a9f2838949745d2c2c6e451",
-      "bytes": 26972
+      "sha256": "2913a66e255e8393fa6e0c7e5a862aa250261b57c88c2241e8104b543e7a4fde",
+      "bytes": 35004
     },
     {
       "path": "ui/react-app/src/lib/csrf.js",
