@@ -1,0 +1,58 @@
+{
+  "commit": "82ee4e7a9b7aded42e0d0d5fd8298b42bfa51a16",
+  "files": [
+    {
+      "path": "src/python/g2p/piper_plus_g2p/base.py",
+      "git_sha": "a96b34421db8f041998cebd689b825cb8bf767ec",
+      "file": "/workspace/shared/viola-customer-speech-20261005/evidence/locale-options/piper-plus-g2p/piper_plus_g2p__base.py",
+      "sha256": "de7cd41b7d7c932ffe7c8a23cd2fa8c9cafa037ab4d16f2180e5768d67de207a",
+      "imports": [
+        "from abc import ABC, abstractmethod",
+        "from dataclasses import dataclass"
+      ]
+    },
+    {
+      "path": "src/python/g2p/piper_plus_g2p/spanish.py",
+      "git_sha": "3fe05493ba57b4bae346c2a59ff1caf054b2d6c3",
+      "file": "/workspace/shared/viola-customer-speech-20261005/evidence/locale-options/piper-plus-g2p/piper_plus_g2p__spanish.py",
+      "sha256": "948bc543f36d6982b882eb3cb6c6ccd1fc0dc58a28c64486ff5f7271a7cd8d7b",
+      "imports": [
+        "import re",
+        "import unicodedata",
+        "from .base import Phonemizer, ProsodyInfo"
+      ]
+    },
+    {
+      "path": "src/python/g2p/piper_plus_g2p/french.py",
+      "git_sha": "b8bc7b6d877e02648101f09b8312049e77670fe8",
+      "file": "/workspace/shared/viola-customer-speech-20261005/evidence/locale-options/piper-plus-g2p/piper_plus_g2p__french.py",
+      "sha256": "5c125d981490a0409cfc181daffdc0462ce006e740bf9e68190a3a6f492785d7",
+      "imports": [
+        "import logging",
+        "import re",
+        "import unicodedata",
+        "from .base import Phonemizer, ProsodyInfo"
+      ]
+    },
+    {
+      "path": "src/python/g2p/piper_plus_g2p/portuguese.py",
+      "git_sha": "1c5e062324c323cc09bdcae77ae46daae2ef010f",
+      "file": "/workspace/shared/viola-customer-speech-20261005/evidence/locale-options/piper-plus-g2p/piper_plus_g2p__portuguese.py",
+      "sha256": "74fdb32dba21e6de2397a13e1f99885b8ef3838ff6d86a8573197c899be91287",
+      "imports": [
+        "import enum",
+        "import logging",
+        "import re",
+        "import unicodedata",
+        "from .base import Phonemizer, ProsodyInfo"
+      ]
+    },
+    {
+      "path": "src/python/g2p/LICENSE",
+      "git_sha": "575f54166fdf09db4f17fb8baab5ace46891524d",
+      "file": "/workspace/shared/viola-customer-speech-20261005/evidence/locale-options/piper-plus-g2p/LICENSE",
+      "sha256": "f6fb33ef599022318fb3fe61e3db72fa6591c83269131c9245139aa1eb800e90"
+    }
+  ],
+  "scope": "Previously inspected exact sources, now used for bounded inactive source qualification; no install/profile activation"
+}

@@ -111,6 +111,21 @@ _SUMMARY_SUFFIX = "I'll send the full details in chat."
 _ACRONYM_PRONUNCIATIONS = {**_ACRONYM_INITIALISMS, **_ACRONYM_WORDS}
 
 
+def has_pending_decimal_point(text: str) -> bool:
+    """Keep an ambiguous streaming decimal point until its next character.
+
+    Existing numeric/currency prefixes remain conservative. Leading-dot forms
+    use the exact accepted decimal grammar, including all supported signs and
+    token boundaries, rather than maintaining a second partial grammar.
+    """
+    if not text.endswith("."):
+        return False
+    if text[-2:-1].isdigit():
+        return True
+    candidate = text + "0"
+    return any(match.end() == len(candidate) for match in _DECIMAL_RE.finditer(candidate))
+
+
 def _literal_dict_re(keys: object, *, flags: int = 0) -> re.Pattern[str]:
     ordered = sorted((str(key) for key in keys), key=len, reverse=True)
     return re.compile(r"(?<!\w)(" + "|".join(re.escape(key) for key in ordered) + r")(?!\w)", flags=flags)
@@ -253,7 +268,6 @@ def _replace_number(match: re.Match[str]) -> str:
         return _number_to_words(int(match.group(0)))
     except (ValueError, IndexError):
         return match.group(0)
-
 
 
 def _replace_decimal(match: re.Match[str]) -> str:
@@ -399,10 +413,7 @@ def _is_english_locale(language: object | None) -> bool:
     if language is None:
         return True
     value = getattr(language, "value", language)
-    return (
-        isinstance(value, str)
-        and value.strip().lower().replace("_", "-").split("-", 1)[0] == "en"
-    )
+    return isinstance(value, str) and value.strip().lower().replace("_", "-").split("-", 1)[0] == "en"
 
 
 def _replace_url(match: re.Match[str]) -> str:

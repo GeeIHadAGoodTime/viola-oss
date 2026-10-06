@@ -1781,7 +1781,9 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null 
   const spokeEmbedReadyRef = useRef(false);
   const spokeInitialSyncDoneRef = useRef(false);
   const iframeRef = useRef(null);
-  const skipDebounceRef = useRef(false);
+  const skipSessionRef = useRef(null);
+  const skipCooldownUntilRef = useRef(0);
+  const [nextActionPending, setNextActionPending] = useState(false);
   const skipCountRef = useRef({ count: 0, resetTime: 0 });
   const iframePositionRef = useRef(0);
   const iframeDurationRef = useRef(0);
@@ -2158,19 +2160,83 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null 
     });
   }, [isPlaying, canResumePlayback, api, setLocalIsPlaying, sendToIframe, addToast, notifyTransportFailure, finishPlaybackAction]);
 
-  const handleNext = useCallback(() => {
-    if (skipDebounceRef.current) return;
-    skipDebounceRef.current = true;
-    api.skip()
-      // `.finally()` does NOT handle a rejection — it re-raises it. The catch
-      // has to come first, or the debounce reset alone leaves the rejection
-      // unowned (the pre-fix shape).
-      .catch((err) => notifyTransportFailure(err, {
-        refused: 'No more tracks in the queue.',
-        failed: "Couldn't skip to the next track. Please try again.",
-      }))
-      .finally(() => { setTimeout(() => { skipDebounceRef.current = false; }, 500); });
-  }, [api, notifyTransportFailure]);
+  const finishSkipAction = useCallback((session, operation) => {
+    if (skipSessionRef.current !== session || session.pending !== operation) return false;
+    clearTimeout(operation.timeout);
+    session.pending = null;
+    if (operation.phase === 'cooldown') skipCooldownUntilRef.current = 0;
+    setNextActionPending(false);
+    return true;
+  }, []);
+  const expireSkipAction = useCallback((session, operation) => {
+    if (operation.phase !== 'request' || !finishSkipAction(session, operation) || operation.automatic) return;
+    addToast({ message: 'Next track has not responded. Check playback and try again.', level: 'warning' });
+  }, [finishSkipAction, addToast]);
+  useLayoutEffect(() => {
+    const session = { pending: null };
+    skipSessionRef.current = session;
+    // Track acknowledgement retires an unresolved request, but must not
+    // bypass the display-wide cooldown of an already settled request.
+    const remaining = Math.max(0, skipCooldownUntilRef.current - performance.now());
+    if (remaining > 0) {
+      const operation = { phase: 'cooldown', deadline: skipCooldownUntilRef.current, timeout: null };
+      session.pending = operation;
+      operation.timeout = setTimeout(() => finishSkipAction(session, operation), remaining);
+      setNextActionPending(true);
+    } else {
+      skipCooldownUntilRef.current = 0;
+      setNextActionPending(false);
+    }
+    return () => {
+      clearTimeout(session.pending?.timeout);
+      skipSessionRef.current = null;
+    };
+  }, [ratingTrackKey, finishSkipAction]);
+
+  const runSkipAction = useCallback(({ automatic = false } = {}) => {
+    const session = skipSessionRef.current;
+    if (!session) return false;
+    const pending = session.pending;
+    if (pending) {
+      if (performance.now() < pending.deadline) return false;
+      if (pending.phase === 'request') expireSkipAction(session, pending);
+      else finishSkipAction(session, pending);
+    }
+    const operation = { automatic, phase: 'request', deadline: performance.now() + 15000, timeout: null };
+    session.pending = operation;
+    setNextActionPending(true);
+    operation.timeout = setTimeout(() => expireSkipAction(session, operation), 15000);
+    const settle = (error) => {
+      if (skipSessionRef.current !== session || session.pending !== operation) return;
+      // Response microtasks can run before an overdue timer. Check the actual
+      // deadline as well; a retired response must not own a newer action.
+      if (performance.now() >= operation.deadline) {
+        expireSkipAction(session, operation);
+        return;
+      }
+      clearTimeout(operation.timeout);
+      if (error && !automatic) {
+        notifyTransportFailure(error, {
+          refused: 'No more tracks in the queue.',
+          failed: "Couldn't skip to the next track. Please try again.",
+        });
+      }
+      // Preserve the existing short debounce after a current response.
+      operation.phase = 'cooldown';
+      const cooldown = automatic ? 1000 : 500;
+      operation.deadline = performance.now() + cooldown;
+      skipCooldownUntilRef.current = operation.deadline;
+      operation.timeout = setTimeout(() => finishSkipAction(session, operation), cooldown);
+    };
+    try {
+      Promise.resolve(api.skip()).then(() => settle(), error => settle(error));
+    } catch (error) {
+      settle(error);
+    }
+    // UI ownership expires; underlying HTTP/backend work is not cancelled.
+    return true;
+  }, [api, expireSkipAction, finishSkipAction, notifyTransportFailure]);
+  const handleNext = useCallback(() => { runSkipAction(); }, [runSkipAction]);
 
   const handlePrevious = useCallback(() => {
     api.previous().catch((err) => notifyTransportFailure(err, {
@@ -2522,7 +2588,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null 
         const isFatal = payload.fatal;
         const errorVideoId = payload.videoId;
         const currentVideoId = playerState?.now_playing?.video_id;
-        if (errorVideoId && currentVideoId && errorVideoId !== currentVideoId) return;
+        if (!currentVideoId || (errorVideoId && errorVideoId !== currentVideoId)) return;
         console.error('[DIAG] YouTube iframe error:', errorCode, 'fatal:', isFatal);
         if (isSpoke) return;
         // Tell the backend playback did not start. The player never reaches
@@ -2536,27 +2602,22 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null 
         // "now playing" would otherwise linger longest (#2757).
         reportPlaybackDidNotStart(errorVideoId || currentVideoId);
         if ([101, 150].includes(errorCode)) return;
-        if (isFatal && !skipDebounceRef.current) {
+        if (isFatal) {
           const now = Date.now();
           const skipData = skipCountRef.current;
           if (now - skipData.resetTime > 10000) { skipData.count = 0; skipData.resetTime = now; }
           if (skipData.count >= 3) return;
-          skipData.count++;
-          skipDebounceRef.current = true;
-          api.skip()
-            // Automatic recovery, not something the user asked for, so a failed
-            // auto-skip gets no toast — but it still needs an owner or it
-            // escapes as an uncaught error. `apiFetch` already console.warn's
-            // the status and body, and the stuck track is visible on its own.
-            .catch(() => {})
-            .finally(() => { setTimeout(() => { skipDebounceRef.current = false; }, 1000); });
+          // Automatic and manual skips share one bounded owner. Failed
+          // automatic recovery stays quiet and retains its existing rate cap.
+          if (runSkipAction({ automatic: true })) skipData.count++;
+
         }
       }
     };
     window.addEventListener('message', handleIframeMessage);
     return () => window.removeEventListener('message', handleIframeMessage);
 
-  }, [api, isSpoke, playerState?.is_playing, playerState?.now_playing?.video_id, playerState.position, playerState?.queue?.length, sendToIframe, wsSend]);
+  }, [api, runSkipAction, isSpoke, playerState?.is_playing, playerState?.now_playing?.video_id, playerState.position, playerState?.queue?.length, sendToIframe, wsSend]);
 
   // Reset iframe state when track changes. spokeEmbedReadyRef deliberately
   // survives a track change: the spoke's embed player object persists across
@@ -3178,6 +3239,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null 
       rating={rating}
       canResumePlayback={canResumePlayback}
       playbackActionPending={playbackActionPending}
+      nextActionPending={nextActionPending}
       onPlayPause={handlePlayPause}
       onNext={handleNext}
       onPrevious={handlePrevious}

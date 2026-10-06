@@ -8,7 +8,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 const { default: QueueModal } = await vi.importActual('../components/QueueModal');
 const { default: HistoryModal } = await vi.importActual('../components/HistoryModal');
-import { act, fireEvent, render, screen, waitFor, within } from '../test/test-utils';
+import { act, fireEvent, render, renderHook, screen, waitFor, within } from '../test/test-utils';
 
 const wsHarness = vi.hoisted(() => ({
   handler: null,
@@ -2561,4 +2561,275 @@ describe('SmartDisplay Queue snapshot boundary', () => {
     rerender(<SmartDisplay />);
     expect(screen.queryByText(future.title)).not.toBeInTheDocument();
   });
+});
+
+
+describe('SmartDisplay bounded Next recovery through the actual API adapter', () => {
+  const deferred = () => {
+    let resolve, reject;
+    const promise = new Promise((yes, no) => { resolve = yes; reject = no; });
+    return { promise, resolve, reject };
+  };
+  const wire = (status = 200, code = null) => new Response(JSON.stringify(
+    status === 200 ? { ok: true, data: {} } : { ok: false, error: { code, message: 'Synthetic player refusal' } },
+  ), { status, headers: { 'Content-Type': 'application/json' } });
+  const track = id => ({ is_playing: true, now_playing: { id, title: id, provider: 'local' }, queue: [] });
+  const button = () => screen.getByRole('button', { name: 'Next track' });
+  let requests;
+  beforeEach(async () => {
+    const realApi = await vi.importActual('../hooks/useViolaApi');
+    window.__VIOLA_API_KEY__ = 'synthetic-next-fixture';
+    requests = vi.fn().mockImplementation(async () => wire());
+    vi.stubGlobal('fetch', (url, options) => {
+      if (url !== '/v1/skip') throw new Error(`Unexpected synthetic request: ${url}`);
+      return requests(url, options);
+    });
+    const api = renderHook(() => realApi.useViolaApi());
+    apiHarness.skip.mockReset().mockImplementation(api.result.current.skip);
+    playerHarness.state = track('track-a');
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+    delete window.__VIOLA_API_KEY__;
+  });
+  const click = async () => act(async () => { fireEvent.click(button()); });
+
+  it('exposes the pending Next request and excludes same-turn duplicates', async () => {
+    requests.mockReturnValueOnce(new Promise(() => {}));
+    render(<SmartDisplay />);
+    await act(async () => { fireEvent.click(button()); fireEvent.click(button()); });
+    expect(requests).toHaveBeenCalledTimes(1);
+    expect(button()).toBeDisabled();
+    expect(button()).toHaveAttribute('aria-busy', 'true');
+  });
+
+  it('recovers a hung Next after the deadline and ignores its late refusal', async () => {
+    const old = deferred();
+    requests.mockReturnValueOnce(old.promise);
+    render(<SmartDisplay />);
+    vi.useFakeTimers();
+    await click();
+    await act(async () => vi.advanceTimersByTimeAsync(15000));
+    expect(button()).toBeEnabled();
+    await click();
+    expect(requests).toHaveBeenCalledTimes(2);
+    expect(screen.getByText('Next track has not responded. Check playback and try again.')).toBeInTheDocument();
+    await act(async () => old.resolve(wire(500, 'skip_failed')));
+    expect(screen.queryByText("Couldn't skip to the next track. Please try again.")).not.toBeInTheDocument();
+  });
+
+  it('admits Next for a newly observed track before an old HTTP response', async () => {
+    const old = deferred();
+    requests.mockReturnValueOnce(old.promise);
+    const view = render(<SmartDisplay />);
+    await click();
+    playerHarness.state = track('track-b');
+    view.rerender(<SmartDisplay />);
+    await click();
+    expect(requests).toHaveBeenCalledTimes(2);
+    await act(async () => old.resolve(wire(500, 'skip_failed')));
+    expect(screen.queryByText("Couldn't skip to the next track. Please try again.")).not.toBeInTheDocument();
+  });
+
+  it('retains successful Next and its short duplicate-click cooldown', async () => {
+    render(<SmartDisplay />);
+    vi.useFakeTimers();
+    await click();
+    expect(requests).toHaveBeenCalledWith('/v1/skip', expect.objectContaining({ method: 'POST' }));
+    await click();
+    expect(requests).toHaveBeenCalledTimes(1);
+    await act(async () => vi.advanceTimersByTimeAsync(500));
+    await click();
+    expect(requests).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([
+    [409, 'empty_queue', 'No more tracks in the queue.'],
+    [500, 'skip_failed', "Couldn't skip to the next track. Please try again."],
+  ])('preserves current server refusal %i and permits recovery', async (status, code, message) => {
+    requests.mockResolvedValueOnce(wire(status, code));
+    render(<SmartDisplay />);
+    vi.useFakeTimers();
+    await click();
+    expect(screen.getByText(message)).toBeInTheDocument();
+    await act(async () => vi.advanceTimersByTimeAsync(500));
+    await click();
+    expect(requests).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([200, 500])('checks the actual deadline before accepting a delayed-timer response %i', async status => {
+    const old = deferred();
+    requests.mockReturnValueOnce(old.promise);
+    render(<SmartDisplay />);
+    vi.useFakeTimers();
+    let now = 0;
+    const monotonic = vi.spyOn(performance, 'now').mockImplementation(() => now);
+    try {
+      await click();
+      now = 15000; // No timer task has run yet.
+      await act(async () => old.resolve(wire(status, 'skip_failed')));
+      expect(button()).toBeEnabled();
+      expect(screen.getByText('Next track has not responded. Check playback and try again.')).toBeInTheDocument();
+      expect(screen.queryByText("Couldn't skip to the next track. Please try again.")).not.toBeInTheDocument();
+      await click();
+      expect(requests).toHaveBeenCalledTimes(2);
+    } finally { monotonic.mockRestore(); }
+  });
+
+  it.each([200, 500])('an expired response %i cannot unlock or report over a younger request', async status => {
+    const old = deferred(), younger = deferred();
+    requests.mockReturnValueOnce(old.promise).mockReturnValueOnce(younger.promise);
+    render(<SmartDisplay />);
+    vi.useFakeTimers();
+    await click();
+    await act(async () => vi.advanceTimersByTimeAsync(15000));
+    await click();
+    await act(async () => old.resolve(wire(status, 'skip_failed')));
+    await act(async () => vi.advanceTimersByTimeAsync(1000));
+    expect(button()).toBeDisabled();
+    await click();
+    expect(requests).toHaveBeenCalledTimes(2);
+    expect(screen.queryByText("Couldn't skip to the next track. Please try again.")).not.toBeInTheDocument();
+    await act(async () => younger.resolve(wire()));
+    await act(async () => vi.advanceTimersByTimeAsync(500));
+    expect(button()).toBeEnabled();
+  });
+
+  it.each(['request', 'cooldown'])('cleans its own %s timer on unmount and ignores late completion', async phase => {
+    const old = deferred();
+    requests.mockReturnValueOnce(old.promise);
+    const view = render(<SmartDisplay />);
+    vi.useFakeTimers();
+    await click();
+    if (phase === 'cooldown') await act(async () => old.resolve(wire()));
+    const delay = phase === 'request' ? 15000 : 500;
+    const owned = Object.values(setTimeout.clock.timers).filter(timer => timer.delay === delay);
+    expect(owned).toHaveLength(1);
+    view.unmount();
+    expect(Object.values(setTimeout.clock.timers).some(timer => timer.id === owned[0].id)).toBe(false);
+    if (phase === 'request') await act(async () => old.resolve(wire(500, 'skip_failed')));
+    expect(Object.values(setTimeout.clock.timers).some(timer => timer.delay === 500)).toBe(false);
+  });
+
+  const fatal = async (error = 100, videoId = 'video-a') => act(async () => {
+    window.dispatchEvent(new MessageEvent('message', {
+      origin: window.location.origin,
+      data: { type: 'yt_iframe_error', payload: { error, fatal: true, videoId } },
+    }));
+  });
+  const embedded = () => {
+    playerHarness.state = {
+      is_playing: true,
+      now_playing: { id: 'video-a', video_id: 'video-a', provider: 'youtube_iframe', title: 'Synthetic video' },
+      queue: [],
+    };
+    return render(<SmartDisplay />);
+  };
+
+  it('recovers manual Next from a hung automatic skip without automatic error feedback', async () => {
+    const old = deferred();
+    requests.mockReturnValueOnce(old.promise);
+    embedded();
+    vi.useFakeTimers();
+    await fatal();
+    await fatal();
+    expect(requests).toHaveBeenCalledTimes(1);
+    expect(button()).toBeDisabled();
+    await act(async () => vi.advanceTimersByTimeAsync(15000));
+    expect(button()).toBeEnabled();
+    expect(screen.queryByText('Next track has not responded. Check playback and try again.')).not.toBeInTheDocument();
+    await click();
+    expect(requests).toHaveBeenCalledTimes(2);
+    await act(async () => old.resolve(wire(500, 'skip_failed')));
+    expect(screen.queryByText("Couldn't skip to the next track. Please try again.")).not.toBeInTheDocument();
+  });
+
+  it('retains quiet automatic refusal and its one-second cooldown', async () => {
+    requests.mockResolvedValueOnce(wire(500, 'skip_failed'));
+    embedded();
+    vi.useFakeTimers();
+    await fatal();
+    expect(screen.queryByText("Couldn't skip to the next track. Please try again.")).not.toBeInTheDocument();
+    await act(async () => vi.advanceTimersByTimeAsync(999));
+    await click();
+    expect(requests).toHaveBeenCalledTimes(1);
+    await act(async () => vi.advanceTimersByTimeAsync(1));
+    await click();
+    expect(requests).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([101, 150])('preserves excluded automatic embed error %i', async error => {
+    embedded();
+    await fatal(error);
+    expect(requests).not.toHaveBeenCalled();
+    expect(button()).toBeEnabled();
+  });
+
+  it('preserves three automatic skips per ten seconds without blocking manual Next', async () => {
+    embedded();
+    vi.useFakeTimers();
+    for (let i = 0; i < 3; i++) {
+      await fatal();
+      await act(async () => vi.advanceTimersByTimeAsync(1000));
+    }
+    await fatal();
+    expect(requests).toHaveBeenCalledTimes(3);
+    await click();
+    expect(requests).toHaveBeenCalledTimes(4);
+    await act(async () => vi.advanceTimersByTimeAsync(10001));
+    await fatal();
+    expect(requests).toHaveBeenCalledTimes(5);
+  });
+
+
+  it.each(['local', 'stopped'])('retires old iframe failures after observing a %s player state', async mode => {
+    requests.mockReturnValueOnce(new Promise(() => {}));
+    const view = embedded();
+    await fatal();
+    expect(requests).toHaveBeenCalledTimes(1);
+    playerHarness.state = mode === 'local' ? track('local-b') : { is_playing: false, now_playing: null, queue: [] };
+    view.rerender(<SmartDisplay />);
+    await fatal();
+    expect(requests).toHaveBeenCalledTimes(1);
+    expect(button()).toBeEnabled();
+  });
+
+  it('admits current iframe recovery after track retirement while ignoring its old video error', async () => {
+    const old = deferred();
+    requests.mockReturnValueOnce(old.promise);
+    const view = embedded();
+    await fatal();
+    playerHarness.state = { is_playing: true, now_playing: { id: 'video-b', video_id: 'video-b', provider: 'youtube_iframe', title: 'New video' }, queue: [] };
+    view.rerender(<SmartDisplay />);
+    await fatal();
+    expect(requests).toHaveBeenCalledTimes(1);
+    await fatal(100, 'video-b');
+    expect(requests).toHaveBeenCalledTimes(2);
+    await act(async () => old.resolve(wire(500, 'skip_failed')));
+    expect(screen.queryByText("Couldn't skip to the next track. Please try again.")).not.toBeInTheDocument();
+  });
+
+  it('retains current embedded recovery when the legacy event omits a video ID', async () => {
+    embedded();
+    await fatal(100, null);
+    expect(requests).toHaveBeenCalledTimes(1);
+  });
+
+
+  it.each([['manual', 500], ['automatic', 1000]])('preserves the settled %s cooldown across a track change', async (kind, delay) => {
+    const view = embedded();
+    vi.useFakeTimers();
+    if (kind === 'manual') await click(); else await fatal();
+    expect(requests).toHaveBeenCalledTimes(1);
+    playerHarness.state = { is_playing: true, now_playing: { id: 'video-b', video_id: 'video-b', provider: 'youtube_iframe', title: 'New video' }, queue: [] };
+    view.rerender(<SmartDisplay />);
+    await act(async () => vi.advanceTimersByTimeAsync(delay - 1));
+    if (kind === 'manual') await click(); else await fatal(100, 'video-b');
+    expect(requests).toHaveBeenCalledTimes(1);
+    await act(async () => vi.advanceTimersByTimeAsync(1));
+    if (kind === 'manual') await click(); else await fatal(100, 'video-b');
+    expect(requests).toHaveBeenCalledTimes(2);
+  });
+
 });

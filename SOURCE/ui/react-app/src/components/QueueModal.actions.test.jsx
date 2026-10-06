@@ -116,6 +116,9 @@ describe('Queue action bounded ownership', () => {
     let view;await act(async()=>{view=render(<StrictMode><QueueModal isOpen onClose={()=>{}} /></StrictMode>);});
     await act(async()=>fireEvent.click(screen.getByRole('button',{name:'Clear Queue'})));
     expect(screen.getByRole('button',{name:'Working...'})).toBeDisabled();view.unmount();
+    // Drain only browser-turn callbacks such as JSDOM selectionchange.
+    // A leaked 15-second Queue deadline must remain detectable below.
+    act(() => vi.advanceTimersByTime(0));
     expect(vi.getTimerCount()).toBe(0);
     await act(async()=>resolve(response({ok:true,error:null})));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
