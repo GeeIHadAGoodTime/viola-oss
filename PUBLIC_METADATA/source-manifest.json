@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "62a22b00bc1ba5d686bc3a5ccf4554942f9231bc",
-  "sha256": "cfb76f4af47a1dbcccc72dbf6dddd8e947c989159b6c050ec786121a23549fe2",
+  "revision": "3342f4bccb181e38bfb56e45e4d6b16b4173986a",
+  "sha256": "3ac94f4110e68d22f0fa92cde3f6c57c1efc369a44df54b0182cc341ed41dc10",
   "files": [
     {
       "path": ".env.example",
@@ -10280,8 +10280,13 @@
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.jsx",
-      "sha256": "fd90d5d08efefef4c096cdc756e2f358da4a04f1eadd120ea2adfc9dd964a659",
-      "bytes": 198376
+      "sha256": "d3162559dac508aab8565765cc71fd4642abc1587cb32355e9a0834a8e7abb63",
+      "bytes": 199427
+    },
+    {
+      "path": "ui/react-app/src/components/SettingsModal.localDiscovery.test.jsx",
+      "sha256": "339856734ed4156ce8ab0d9d0ee6e1e319680d01504300baf67de68c50cc817d",
+      "bytes": 13452
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.outputDevice.test.jsx",
