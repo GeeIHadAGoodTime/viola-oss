@@ -1,0 +1,54 @@
+--- a/spanish.py
++++ b/spanish.py
+@@ -1,3 +1,4 @@
++# Modified for Viola: fail closed on the upstream unknown-grapheme branch.
+ """Rule-based Spanish G2P (grapheme-to-phoneme) module.
+ 
+ Converts Spanish text to IPA phonemes using orthographic rules.
+@@ -623,8 +624,8 @@
+             i += 1
+             continue
+ 
+-        # Unknown character -- skip
+-        i += 1
++        # Modified for Viola: never silently discard an unsupported grapheme.
++        raise ValueError(f"Unsupported grapheme {base_ch!r} at offset {i} in {word!r}")
+ 
+     units = _segment_graphemes(word)
+     boundaries = _find_syllable_boundaries(word, units=units)
+--- a/french.py
++++ b/french.py
+@@ -1,3 +1,4 @@
++# Modified for Viola: fail closed on the upstream unknown-grapheme branch.
+ """Rule-based French phonemizer for piper-plus-g2p.
+ 
+ Converts French text to IPA phonemes using grapheme-to-phoneme rules.
+@@ -759,8 +760,8 @@
+             i += 1
+             continue
+ 
+-        # Skip unknown characters
+-        i += 1
++        # Modified for Viola: never silently discard an unsupported grapheme.
++        raise ValueError(f"Unsupported grapheme {ch!r} at offset {i} in {word!r}")
+ 
+     return phonemes
+ 
+--- a/portuguese.py
++++ b/portuguese.py
+@@ -1,3 +1,4 @@
++# Modified for Viola: fail closed on the upstream unknown-grapheme branch.
+ """Rule-based Portuguese phonemizer for piper-plus-g2p (BR + EU dialects).
+ 
+ Converts Portuguese text to IPA phonemes using grapheme-to-phoneme rules.
+@@ -519,8 +520,8 @@
+             i += 1
+             continue
+ 
+-        # Skip unknown characters
+-        i += 1
++        # Modified for Viola: never silently discard an unsupported grapheme.
++        raise ValueError(f"Unsupported grapheme {ch!r} at offset {i} in {word!r}")
+ 
+     # Apply BR Portuguese post-processing
+     phonemes = _remove_duplicate_nasal_coda(phonemes)

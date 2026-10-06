@@ -654,10 +654,14 @@ it.each(['cloud', 'desktop'])('does not schedule an obsolete transient refresh r
   await withPendingScheduledRefresh(surface, async (resolveRefresh) => {
     authClient.signOut.mockResolvedValue({ ok: true, error: null });
     await act(async () => { await captured.signOut(); });
+    // Flush jsdom’s zero-delay StorageEvent delivery, never refresh deadlines.
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
     expect(vi.getTimerCount()).toBe(0);
     await act(async () => { resolveRefresh({ ok: false, session: null, error: { status: 503 } }); });
     expect(captured.status).toBe('signedOut');
     expect(getCloudAccessToken()).toBe('');
+    // Flush jsdom’s zero-delay StorageEvent delivery, never refresh deadlines.
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
     expect(vi.getTimerCount()).toBe(0);
   });
 });
@@ -777,6 +781,8 @@ it.each(['cloud', 'desktop'])('newer sign-out cancels a queued replacement-sessi
     expect(authClient.refresh).toHaveBeenCalledTimes(1);
     expect(captured.status).toBe('signedOut');
     expect(getCloudAccessToken()).toBe('');
+    // Flush jsdom’s zero-delay StorageEvent delivery, never refresh deadlines.
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
     expect(vi.getTimerCount()).toBe(0);
   });
 });
@@ -792,6 +798,8 @@ it('unmount cancels a queued replacement-session refresh', async () => {
     await act(async () => { resolveOld({ ok: false, session: null, error: { status: 401 } }); });
     expect(authClient.refresh).toHaveBeenCalledTimes(1);
     expect(getCloudAccessToken()).toBe('synthetic-new-access');
+    // Flush jsdom’s zero-delay StorageEvent delivery, never refresh deadlines.
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
     expect(vi.getTimerCount()).toBe(0);
   });
 });
@@ -855,6 +863,8 @@ it.each([
     expect(await logout).toEqual({ ok: true, error: null });
     expect(captured.status).toBe('signedOut');
     expect(getCloudAccessToken()).toBe('');
+    // Flush jsdom’s zero-delay StorageEvent delivery, never refresh deadlines.
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
     expect(vi.getTimerCount()).toBe(0);
   });
 });
@@ -1021,4 +1031,23 @@ it('a newer same-account login can start its own logout while the previous actio
     releaseNew?.({ ok: true, error: null });
     await act(async () => { await Promise.all([oldLogout, newLogout]); });
   }
+});
+
+it('a failed newer login attempt cannot cancel a pending successful logout', async () => {
+  authClient.signInWithPassword.mockResolvedValue({ ok: true, session: makeSession(), error: null });
+  renderProvider();
+  await waitFor(() => expect(captured.status).toBe('signedOut'));
+  await act(async () => { await captured.signIn('synthetic@example.invalid', 'synthetic password'); });
+  let release;
+  authClient.signOut.mockImplementationOnce(() => new Promise((resolve) => { release = resolve; }));
+  let logout;
+  try {
+    await act(async () => { logout = captured.signOut(); });
+    authClient.signInWithPassword.mockResolvedValueOnce({ ok: false, session: null, error: { status: 0, code: 'network_error', message: 'Synthetic offline' } });
+    await act(async () => { expect((await captured.signIn('synthetic@example.invalid', 'synthetic password')).ok).toBe(false); });
+    await act(async () => { release({ ok: true, error: null }); await logout; });
+    expect(await logout).toEqual({ ok: true, error: null });
+    expect(captured.status).toBe('signedOut');
+    expect(getCloudAccessToken()).toBe('');
+  } finally { release?.({ ok: true, error: null }); }
 });

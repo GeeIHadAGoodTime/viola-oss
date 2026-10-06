@@ -15,7 +15,7 @@
  *     verifyMfaTotp(code)                -> Promise<{ ok, error }>
  *     cancelMfa()                        -> Promise<{ ok, error }>
  *     signUp(email, password, consents)  -> Promise<{ ok, needsEmailVerification, error }>
- *     signOutFeedback,       // { pending, error } survives dashboard gate changes
+ *     signOutFeedback,       // { pending, error, warning? } survives dashboard gate changes
  *     signOut()                          -> Promise<{ ok, error }>
  *     resetPassword(email)               -> Promise<{ ok, error }>
  *     resendVerification(email)          -> Promise<{ ok, error }>
@@ -41,14 +41,14 @@ import { AuthContext } from './AuthProvider';
  * @property {'loading'|'signedOut'|'signedIn'} status
  * @property {object|null} user
  * @property {object|null} session
- * @property {{ pending: boolean, error: AuthClientError|null }} signOutFeedback
+ * @property {{ pending: boolean, error: AuthClientError|null, warning?: string }} signOutFeedback
  * @property {boolean} mfaPending
  * @property {string|null} mfaFactorId
  * @property {(email: string, password: string) => Promise<{ ok: boolean, mfaRequired?: boolean, factorId?: string, error: AuthClientError|null }>} signIn
  * @property {(code: string) => Promise<{ ok: boolean, error: AuthClientError|null }>} verifyMfaTotp
  * @property {() => Promise<{ ok: boolean, error: AuthClientError|null }>} cancelMfa
  * @property {(email: string, password: string, consents?: { tosAccepted?: boolean, legalEligibilityConfirmed?: boolean, termsVersion?: string, privacyVersion?: string }) => Promise<{ ok: boolean, needsEmailVerification: boolean, error: AuthClientError|null }>} signUp
- * @property {() => Promise<{ ok: boolean, error: AuthClientError|null }>} signOut
+ * @property {() => Promise<{ ok: boolean, error: AuthClientError|null, warning?: string }>} signOut
  * @property {(email: string) => Promise<{ ok: boolean, error: AuthClientError|null }>} resetPassword
  * @property {(email: string) => Promise<{ ok: boolean, error: AuthClientError|null }>} resendVerification
  */

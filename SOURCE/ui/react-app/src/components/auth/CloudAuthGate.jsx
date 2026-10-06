@@ -136,6 +136,8 @@ export default function CloudAuthGate({ children }) {
     case VIEW.LOGIN:
     default:
       return (
+        <>
+        {signOutFeedback?.warning && <div role="status">{signOutFeedback.warning}</div>}
         <LoginScreen
           onSwitchToSignUp={() => setView(VIEW.SIGNUP)}
           onForgotPassword={() => setView(VIEW.RESET)}
@@ -145,6 +147,7 @@ export default function CloudAuthGate({ children }) {
             setView(VIEW.VERIFY);
           }}
         />
+        </>
       );
   }
 }
