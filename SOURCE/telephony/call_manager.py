@@ -705,7 +705,7 @@ _phone_stt_model: Any | None = None
 _phone_stt_device_fallbacks: dict[tuple[str, str, str], tuple[str, str, str]] = {}
 _phone_tts_runtime_lock = threading.RLock()
 _phone_tts_runtime: _PhoneKokoroTTSRuntime | None = None
-_phone_tts_provider_fallbacks: dict[tuple[str, str, str], tuple[str, str, str]] = {}
+_phone_tts_provider_fallbacks: dict[tuple[Any, ...], tuple[Any, ...]] = {}
 
 
 async def _require_owner_safety_control(key: str, *, user_id: str, action: str) -> None:
@@ -721,7 +721,7 @@ async def _require_owner_safety_control(key: str, *, user_id: str, action: str) 
 
 
 _phone_stt_warm_key: tuple[str, str, str] | None = None
-_phone_tts_warm_key: tuple[str, str, str] | None = None
+_phone_tts_warm_key: tuple[Any, ...] | None = None
 _shutdown_call_managers: weakref.WeakSet[Any] = weakref.WeakSet()
 _shutdown_atexit_installed = False
 _shutdown_signal_hooks_installed = False
@@ -1217,9 +1217,10 @@ def _phone_tts_provider_plans(
     return ((_PHONE_TTS_CUDA_EP, _PHONE_TTS_CPU_EP), (_PHONE_TTS_CPU_EP,))
 
 
-def _phone_tts_runtime_key(config: TelnyxConfig) -> tuple[str, str, str]:
+def _phone_tts_runtime_key(config: TelnyxConfig, *, customer_tokenizer=None) -> tuple[Any, ...]:
     model_path, voices_path = _phone_kokoro_model_paths()
-    return (str(model_path), str(voices_path), _phone_tts_provider_preference())
+    key = (str(model_path), str(voices_path), _phone_tts_provider_preference())
+    return key if customer_tokenizer is None else (*key, id(customer_tokenizer))
 
 
 def _create_phone_kokoro_session(model_path: Path, providers: tuple[str, ...]) -> Any:
@@ -1235,11 +1236,12 @@ def _create_phone_kokoro_session(model_path: Path, providers: tuple[str, ...]) -
     return ort.InferenceSession(str(model_path), providers=list(providers))
 
 
-def _phone_kokoro_from_session(session: Any, voices_path: Path) -> Any:
+def _phone_kokoro_from_session(session: Any, voices_path: Path, *, customer_tokenizer=None) -> Any:
     _require_phone_customer_startup()
     from kokoro_onnx import Kokoro
 
-    return Kokoro.from_session(session, str(voices_path))
+    pronunciation_kwargs = {} if customer_tokenizer is None else {"customer_tokenizer": customer_tokenizer}
+    return Kokoro.from_session(session, str(voices_path), **pronunciation_kwargs)
 
 
 def _warm_phone_kokoro_tts_runtime(kokoro: Any, *, voice: str) -> float:
@@ -1256,8 +1258,13 @@ def _load_phone_kokoro_tts_runtime(
     *,
     voice: str,
     requested_provider: str,
+    customer_tokenizer=None,
 ) -> _PhoneKokoroTTSRuntime:
     _require_phone_customer_startup()
+    if customer_tokenizer is not None:
+        from kokoro_onnx.tokenizer import Tokenizer
+
+        Tokenizer(customer_tokenizer=customer_tokenizer)
     import onnxruntime as ort
 
     configure_environment()
@@ -1273,7 +1280,8 @@ def _load_phone_kokoro_tts_runtime(
                 raise RuntimeError(
                     "CUDAExecutionProvider was requested but ONNX Runtime activated %s" % ", ".join(actual_providers)
                 )
-            kokoro = _phone_kokoro_from_session(session, voices_path)
+            pronunciation_kwargs = {} if customer_tokenizer is None else {"customer_tokenizer": customer_tokenizer}
+            kokoro = _phone_kokoro_from_session(session, voices_path, **pronunciation_kwargs)
             warm_seconds = _warm_phone_kokoro_tts_runtime(kokoro, voice=voice)
             provider = _PHONE_TTS_PROVIDER_CUDA if _PHONE_TTS_CUDA_EP in actual_providers else _PHONE_TTS_PROVIDER_CPU
             return _PhoneKokoroTTSRuntime(
@@ -1298,12 +1306,17 @@ def _load_phone_kokoro_tts_runtime(
     raise RuntimeError("No ONNX Runtime providers available for phone Kokoro TTS")
 
 
-def _ensure_phone_kokoro_tts_runtime(config: TelnyxConfig) -> _PhoneKokoroTTSRuntime:
+def _ensure_phone_kokoro_tts_runtime(config: TelnyxConfig, *, customer_tokenizer=None) -> _PhoneKokoroTTSRuntime:
     """Load, warm, and retain one Kokoro ONNX runtime for phone TTS."""
     _require_phone_customer_startup()
+    if customer_tokenizer is not None:
+        from kokoro_onnx.tokenizer import Tokenizer
+
+        Tokenizer(customer_tokenizer=customer_tokenizer)
     global _phone_tts_runtime, _phone_tts_warm_key
 
-    requested_key = _phone_tts_runtime_key(config)
+    pronunciation_kwargs = {} if customer_tokenizer is None else {"customer_tokenizer": customer_tokenizer}
+    requested_key = _phone_tts_runtime_key(config, **pronunciation_kwargs)
     with _phone_tts_runtime_lock:
         key = _phone_tts_provider_fallbacks.get(requested_key, requested_key)
         if _phone_tts_runtime is not None and _phone_tts_warm_key == key:
@@ -1323,9 +1336,10 @@ def _ensure_phone_kokoro_tts_runtime(config: TelnyxConfig) -> _PhoneKokoroTTSRun
             voices_path,
             voice=config.tts_voice,
             requested_provider=requested_provider,
+            **pronunciation_kwargs,
         )
         if requested_provider != _PHONE_TTS_PROVIDER_CPU and _phone_tts_runtime.provider == _PHONE_TTS_PROVIDER_CPU:
-            fallback_key = (str(model_path), str(voices_path), _PHONE_TTS_PROVIDER_CPU)
+            fallback_key = (str(model_path), str(voices_path), _PHONE_TTS_PROVIDER_CPU, *key[3:])
             _phone_tts_provider_fallbacks[requested_key] = fallback_key
             key = fallback_key
         _phone_tts_warm_key = key
@@ -1345,6 +1359,7 @@ def preload_phone_tts(
     *,
     respect_disable: bool = True,
     raise_on_failure: bool = False,
+    customer_tokenizer=None,
 ) -> bool:
     """Warm the local phone Kokoro TTS runtime without placing a call."""
     if respect_disable and not _phone_tts_preload_enabled():
@@ -1361,7 +1376,8 @@ def preload_phone_tts(
         return False
 
     try:
-        _ensure_phone_kokoro_tts_runtime(cfg)
+        pronunciation_kwargs = {} if customer_tokenizer is None else {"customer_tokenizer": customer_tokenizer}
+        _ensure_phone_kokoro_tts_runtime(cfg, **pronunciation_kwargs)
         return True
     except Exception as exc:
         if raise_on_failure:
@@ -4009,7 +4025,15 @@ class CallManager:
         *,
         queue_store: PhoneCallQueue | None = None,
         carrier_event_adapter: CarrierEventAdapter | None = None,
+        customer_tokenizer=None,
     ) -> None:
+        if customer_tokenizer is not None:
+            _require_phone_customer_startup()
+            from voice.customer_composition import require_customer_composition
+            require_customer_composition(customer_tokenizer)
+            if config.tts_provider != "local":
+                raise ValueError("Explicit customer pronunciation requires local Kokoro")
+        self._customer_tokenizer = customer_tokenizer
         if not config.is_configured:
             raise ValueError("TelnyxConfig is incomplete. Need api_key, phone_number, sip_connection_id.")
         self.config = config
@@ -8116,7 +8140,9 @@ class CallManager:
 
         # Default: "local" — fail closed if Kokoro is unavailable.
         try:
-            runtime = _ensure_phone_kokoro_tts_runtime(self.config)
+            customer_tokenizer = getattr(self, "_customer_tokenizer", None)
+            pronunciation_kwargs = {} if customer_tokenizer is None else {"customer_tokenizer": customer_tokenizer}
+            runtime = _ensure_phone_kokoro_tts_runtime(self.config, **pronunciation_kwargs)
             logger.info(
                 "Using shared local Kokoro phone TTS runtime: provider=%s session_providers=%s",
                 runtime.provider,

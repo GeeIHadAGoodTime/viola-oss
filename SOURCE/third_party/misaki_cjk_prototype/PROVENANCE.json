@@ -1,0 +1,56 @@
+{
+  "status": "new reconstructed inactive source; old package acd08b18 not recovered as a whole",
+  "source_commit": "e820629b96334db28227df37f280e4836d46fadb",
+  "source_tree": "c5255b8adda62f2559f02d3a96329bc59759d468",
+  "upstream_files_recovered_identical": [
+    {
+      "path": "LICENSE",
+      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+    },
+    {
+      "path": "misaki/num2kana.py",
+      "sha256": "26ca4b39ac7165104e53971bd2459df6466ff8140e1dac836a3bf1f9e811e2d2"
+    },
+    {
+      "path": "misaki/zh.py",
+      "sha256": "97d16aec581832845d2566cb24da2ba045d4552fb65a5017a6eac8feef654c81"
+    },
+    {
+      "path": "misaki/transcription.py",
+      "sha256": "14f0f1b5eb89c5b684229a30ae8b0c19c8266b537967786a2079ba887f5fbc32"
+    },
+    {
+      "path": "misaki/cutlet.py",
+      "sha256": "7695fc7d853ae4e99679dff4ca0c8404d4804a6fb1059a9d6ad02baeabc4d4de"
+    },
+    {
+      "path": "misaki/_licenses/pinyin-to-ipa-MIT.txt",
+      "sha256": "0bc847bdc29b0ba04afb7ef9660dc0ba9b8796a9a7a814d106db5aa373a8a86d"
+    },
+    {
+      "path": "misaki/_licenses/convert-numbers-to-japanese-MIT.txt",
+      "sha256": "a2d0e21948ca52f09926d17de411f1d989bf7b99ec05deb668c0358ce5196e57"
+    },
+    {
+      "path": "misaki/_licenses/cutlet-MIT.txt",
+      "sha256": "8736ad0d4636cb6dabae3e97e99c08f5c0c08b8c451f1d489b29a0d63bebf074"
+    },
+    {
+      "path": "misaki/data/ja_words.txt",
+      "sha256": "a93a8e8aee24db307a32becb8bf01c4c2908ecf37e6c91f7a705fafdfeba67ff"
+    }
+  ],
+  "authored_decimal_preparer_sha256": "ff9a4e3844fd948d42becda438d4e99927f3bc9afd11a08e044e800f964ca8bf",
+  "historical_authored_bridge_dispatcher_factory_bytes": "missing; replacement source needs fresh review",
+  "japanese_dictionary_receipt": {
+    "identity": "fresh official unidic-py 3.1.0+2021-08-31 candidate; old per-file equality unknown",
+    "archive_sha256": "638718c4c63625ab300de4c92c67925d54c0e9e3830009eaa992f29819d59c43",
+    "manifest_sha256": "5bdb8a6e9c5fbecd5b364cf284301f1dd44a715771ace8c6d19ccc6d31933cd7",
+    "required_files": 18,
+    "required_bytes": 811662835,
+    "original_notices_unchanged": true,
+    "native_execution": false
+  },
+  "dependency_versions": "same retained nine declarations; environments not restored or installed",
+  "old_wheel_identity_not_reused": true
+}

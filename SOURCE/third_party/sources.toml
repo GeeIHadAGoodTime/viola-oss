@@ -2620,12 +2620,12 @@
 "LICENSE" = "f61fdd0217de9ece8fa699912848d91187d84879fc2e689f0906d0c1299e955e" # pragma: allowlist secret (public artifact checksum)
 "README.md" = "38e418ec238e3bcbf791c65fb499bac6a22a8e409756605f8c6a9e4507f1b5c1" # pragma: allowlist secret (public artifact checksum)
 "pyproject.toml" = "6d50678c37c7e4505a8bbf0086de0ebd3e42173dd86e84b65c5f358b4ebc317c" # pragma: allowlist secret (public artifact checksum)
-"src/kokoro_onnx/__init__.py" = "6e93de212047b2dbc01b46da1695e0cbc60e9f155625e77190b1ab1ba420ed8e" # pragma: allowlist secret (public artifact checksum)
+"src/kokoro_onnx/__init__.py" = "e750127065780f06d67d96ed53aaba7aedd23a884bf23e4a4d1e61e6c371d9cc" # pragma: allowlist secret (public artifact checksum)
 "src/kokoro_onnx/config.json" = "5abb01e2403b072bf03d04fde160443e209d7a0dad49a423be15196b9b43c17f" # pragma: allowlist secret (public artifact checksum)
 "src/kokoro_onnx/config.py" = "0f50f15f7c362a04ec62345f6ec53535194136417cea39912d412fef70661f11" # pragma: allowlist secret (public artifact checksum)
 "src/kokoro_onnx/log.py" = "2c56e73146eac2aa3e47b144ec53ae28964b41c06095975a606a53466218863c" # pragma: allowlist secret (public artifact checksum)
 "src/kokoro_onnx/py.typed" = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" # pragma: allowlist secret (public artifact checksum)
-"src/kokoro_onnx/tokenizer.py" = "47c2c2829a1e8e4cacb769b3af8e9b64f5151e9f727c565ad1b3509d9be0f469" # pragma: allowlist secret (public artifact checksum)
+"src/kokoro_onnx/tokenizer.py" = "e546af7b16c11ffc2a4426da7447a5ccb7ea42c9447eaa7454a1c413ac118461" # pragma: allowlist secret (public artifact checksum)
 "src/kokoro_onnx/trim.py" = "f1b776d3975a99104743428fd9ba63f14255f5226a3855c6059fe464c6520d23" # pragma: allowlist secret (public artifact checksum)
 
 ["misaki_en"]
@@ -2694,3 +2694,58 @@
 "misaki/en.py" = "93570805f4e672163fe0a21648f505a5964d70801961c70c8a6eb0bc98ac48b6" # pragma: allowlist secret (public artifact checksum)
 "misaki/token.py" = "5ff6ce45da6766cdc1e3d5c91b0b2b093d912b8df6f2da327af56f88ad43f073" # pragma: allowlist secret (public artifact checksum)
 "pyproject.toml" = "bb17d18add365879f81af815485afd6d8ad1d815d84bc21050082133a26819f7" # pragma: allowlist secret (public artifact checksum)
+
+["misaki_cjk_prototype"]
+"name" = "viola-misaki-cjk-prototype"
+"upstream_version" = "0.9.4"
+"source_url" = "https://files.pythonhosted.org/packages/1a/c7/fb01370a76585b46595a01b52f18e65c8ba6d7a313a05e5d9fff0a8e1c69/misaki-0.9.4.tar.gz"
+"source_sha256" = "3960fa3e6de179a90ee8e628446a4a4f6b8c730b6e3410999cf396189f4d9c40"
+"source_filename" = "misaki-0.9.4.tar.gz"
+"fork_version" = "0.9.4+viola.cjk.2"
+"patch" = "misaki_cjk_prototype.patch"
+"normalization" = "UTF-8 text CRCRLF and CRLF to LF; binary unchanged"
+
+["misaki_cjk_prototype"."upstream_files"."LICENSE"]
+"sha256" = "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+"bytes" = 11357
+
+["misaki_cjk_prototype"."upstream_files"."misaki/cutlet.py"]
+"sha256" = "7695fc7d853ae4e99679dff4ca0c8404d4804a6fb1059a9d6ad02baeabc4d4de"
+"bytes" = 13809
+
+["misaki_cjk_prototype"."upstream_files"."misaki/num2kana.py"]
+"sha256" = "26ca4b39ac7165104e53971bd2459df6466ff8140e1dac836a3bf1f9e811e2d2"
+"bytes" = 12956
+
+["misaki_cjk_prototype"."upstream_files"."misaki/transcription.py"]
+"sha256" = "14f0f1b5eb89c5b684229a30ae8b0c19c8266b537967786a2079ba887f5fbc32"
+"bytes" = 9354
+
+["misaki_cjk_prototype"."upstream_files"."misaki/zh.py"]
+"sha256" = "97d16aec581832845d2566cb24da2ba045d4552fb65a5017a6eac8feef654c81"
+"bytes" = 3320
+
+["misaki_cjk_prototype"."upstream_files"."misaki/data/ja_words.txt"]
+"sha256" = "a93a8e8aee24db307a32becb8bf01c4c2908ecf37e6c91f7a705fafdfeba67ff"
+"bytes" = 1921140
+
+["misaki_cjk_prototype"."files"]
+"LICENSE" = "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+"PROVENANCE.json" = "186cdf9e1ad80213c63c67d47a477e4a8906084a20c7cb495243fc89ed56d0d2"
+"README.md" = "a89d38367145b787c5cd9f6f32b7f01ed7e783cee2c87353bcd3340fbddce87d"
+"misaki/_licenses/convert-numbers-to-japanese-MIT.txt" = "a2d0e21948ca52f09926d17de411f1d989bf7b99ec05deb668c0358ce5196e57"
+"misaki/_licenses/cutlet-MIT.txt" = "8736ad0d4636cb6dabae3e97e99c08f5c0c08b8c451f1d489b29a0d63bebf074"
+"misaki/_licenses/pinyin-to-ipa-MIT.txt" = "0bc847bdc29b0ba04afb7ef9660dc0ba9b8796a9a7a814d106db5aa373a8a86d"
+"misaki/cutlet.py" = "7695fc7d853ae4e99679dff4ca0c8404d4804a6fb1059a9d6ad02baeabc4d4de"
+"misaki/data/ja_words.txt" = "a93a8e8aee24db307a32becb8bf01c4c2908ecf37e6c91f7a705fafdfeba67ff"
+"misaki/num2kana.py" = "26ca4b39ac7165104e53971bd2459df6466ff8140e1dac836a3bf1f9e811e2d2"
+"misaki/transcription.py" = "14f0f1b5eb89c5b684229a30ae8b0c19c8266b537967786a2079ba887f5fbc32"
+"misaki/zh.py" = "97d16aec581832845d2566cb24da2ba045d4552fb65a5017a6eac8feef654c81"
+"pyproject.toml" = "801c0685e86a36d5389865457d9f407d50a067bb5629b563fe3e607c68fc829f"
+"viola_cjk/__init__.py" = "3eee7a3f5db5e15971fe61d0d8bafb7226466a9f296865d029f4a8451d5ef533"
+"viola_cjk/coverage.py" = "65f1d310d6ab32533f374186c42ae1c08c212655e386bef10911743935b81c56"
+"viola_cjk/customer_english_span.py" = "fc145197f88b4ec3194a3d34260e5957703cc061c025af132cf9228bd87c8983"
+"viola_cjk/japanese_factory.py" = "ab43b75415d134d2efa3d65885b87ff1cdcbe5d3e2484cad24dd887e7d716f3c"
+"viola_cjk/locale_numbers.py" = "ff9a4e3844fd948d42becda438d4e99927f3bc9afd11a08e044e800f964ca8bf"
+"viola_cjk/mecabrc" = "909a7044e39b38dbd39d0d44523ce3b9c14e41b11f7b55495621408633f3f779"
+"viola_cjk/unidic.json" = "5bdb8a6e9c5fbecd5b364cf284301f1dd44a715771ace8c6d19ccc6d31933cd7"
