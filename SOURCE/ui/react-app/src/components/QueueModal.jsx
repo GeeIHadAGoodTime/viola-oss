@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react';
 import PropTypes from 'prop-types';
 import Modal, { secondaryButtonStyle, dangerButtonStyle } from './Modal';
 import { useViolaApi } from '../hooks/useViolaApi';
@@ -7,81 +7,115 @@ import { THEME } from '../config';
 export default function QueueModal({ isOpen, onClose, wsQueue }) {
   const [httpQueue, setHttpQueue] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [actionLoading, setActionLoading] = useState(false);
-  const [actionError, setActionError] = useState(null);
+  const [actionState, setActionState] = useState({ generation: 0, pending: false, error: null });
+  const sessionRef = useRef({ generation: 0, open: isOpen, active: true, pending: null, read: 0 });
+  const session = sessionRef.current;
+  const retireSession = useCallback(() => {
+    if (session.pending) clearTimeout(session.pending.timer);
+    session.pending = null;
+    session.generation += 1;
+    session.read += 1;
+  }, [session]);
+  const actionLoading = actionState.generation === session.generation && actionState.pending;
+  const actionError = actionState.generation === session.generation ? actionState.error : null;
   const api = useViolaApi();
 
-  // Use wsQueue as primary data source, HTTP fetch as fallback
+  // Use wsQueue as primary data source, HTTP fetch as fallback.
   const hasPlayerQueue = Array.isArray(wsQueue);
   const queue = hasPlayerQueue ? wsQueue : (httpQueue || []);
 
-  // Fetch queue via HTTP when modal opens (fallback for when WebSocket data is not available)
-  useEffect(() => {
-    if (isOpen) {
-      fetchQueue();
-    }
-  }, [isOpen]);
+  useLayoutEffect(() => {
+    session.active = true;
+    return () => {
+      session.active = false;
+      retireSession();
+    };
+  }, [session, retireSession]);
 
-  const fetchQueue = async () => {
+  useLayoutEffect(() => {
+    if (session.open !== isOpen) {
+      retireSession();
+      session.open = isOpen;
+      setActionState({ generation: session.generation, pending: false, error: null });
+    }
+  }, [isOpen, session, retireSession]);
+
+  const fetchQueue = useCallback(async () => {
+    const generation = session.generation;
+    const read = ++session.read;
+    const ownsRead = () => session.active && session.open && session.generation === generation && session.read === read;
     try {
       setLoading(true);
       const result = await api.getQueue();
-      if (result.ok) {
-        setHttpQueue(result.queue || result.data?.queue || []);
+      if (ownsRead() && result?.ok === true) {
+        const received = result.queue ?? result.data?.queue;
+        if (Array.isArray(received)) setHttpQueue(received);
       }
-    } catch (e) {
-      // Failed to fetch queue - continue with empty list
+    } catch {
+      // Generic fallback read/retry feedback remains a separate UI contract.
     } finally {
-      setLoading(false);
+      if (ownsRead()) setLoading(false);
+    }
+  }, [api, session]);
+
+  useEffect(() => {
+    if (isOpen) fetchQueue();
+  }, [isOpen, fetchQueue]);
+
+  const closeModal = () => {
+    retireSession();
+    setActionState({ generation: session.generation, pending: false, error: null });
+    onClose();
+  };
+
+  const runAction = async (request, accepted, failure) => {
+    if (!session.active || !session.open || session.pending) return;
+    const owner = { generation: session.generation, deadline: performance.now() + 15000, timer: null };
+    const ownsAction = () => session.active && session.open && session.generation === owner.generation && session.pending === owner;
+    const settle = (error) => {
+      if (!ownsAction()) return;
+      clearTimeout(owner.timer);
+      session.pending = null;
+      setActionState({ generation: owner.generation, pending: false, error });
+    };
+    const uncertainty = 'The queue request is taking too long. Its result is unknown. Please check the queue before trying again.';
+    session.pending = owner;
+    setActionState({ generation: owner.generation, pending: true, error: null });
+    owner.timer = setTimeout(() => settle(uncertainty), 15000);
+    try {
+      const result = await request();
+      if (!ownsAction()) return;
+      if (performance.now() >= owner.deadline) {
+        settle(uncertainty);
+        return;
+      }
+      if (result?.ok !== true) {
+        settle(failure);
+        return;
+      }
+      accepted();
+      settle(null);
+    } catch {
+      if (ownsAction()) settle(performance.now() >= owner.deadline ? uncertainty : failure);
     }
   };
 
-  const handlePlayItem = async (itemId) => {
-    if (actionLoading) return;
-    setActionError(null);
-    setActionLoading(true);
-    try {
-      await api.playQueueItem(itemId);
-      fetchQueue();
-    } catch (e) {
-      setActionError('Could not play item. Please try again.');
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const handleRemoveItem = async (itemId) => {
-    if (actionLoading) return;
-    setActionError(null);
-    setActionLoading(true);
-    try {
-      await api.removeFromQueue(itemId);
-      fetchQueue();
-    } catch (e) {
-      setActionError('Could not remove item. Please try again.');
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const handleClearQueue = async () => {
-    if (actionLoading) return;
-    setActionError(null);
-    setActionLoading(true);
-    try {
-      await api.clearQueue();
-      setHttpQueue([]);
-    } catch (e) {
-      setActionError('Could not clear queue. Please try again.');
-    } finally {
-      setActionLoading(false);
-    }
-  };
+  const handlePlayItem = (itemId) => runAction(
+    () => api.playQueueItem(itemId), fetchQueue, 'Could not play item. Please try again.',
+  );
+  const handleRemoveItem = (itemId) => runAction(
+    () => api.removeFromQueue(itemId), fetchQueue, 'Could not remove item. Please try again.',
+  );
+  const handleClearQueue = () => runAction(
+    () => api.clearQueue(),
+    () => { session.read += 1; setHttpQueue([]); setLoading(false); },
+    'Could not clear queue. Please try again.',
+  );
 
   return (
     <Modal
       isOpen={isOpen}
-      onClose={onClose}
+      onClose={closeModal}
       title="Queue"
       footer={
         <>
@@ -97,7 +131,7 @@ export default function QueueModal({ isOpen, onClose, wsQueue }) {
             </button>
           )}
           <button
-            onClick={onClose}
+            onClick={closeModal}
             style={secondaryButtonStyle}
             onMouseOver={(e) => e.currentTarget.style.backgroundColor = THEME.colors.glassHover}
             onMouseOut={(e) => e.currentTarget.style.backgroundColor = THEME.colors.glassBase}
@@ -108,7 +142,7 @@ export default function QueueModal({ isOpen, onClose, wsQueue }) {
       }
     >
       {actionError && (
-        <div style={{ color: THEME.colors.statusRed, marginBottom: '12px', fontSize: '13px' }}>
+        <div role="alert" style={{ color: THEME.colors.statusRed, marginBottom: '12px', fontSize: '13px' }}>
           {actionError}
         </div>
       )}
