@@ -146,7 +146,7 @@
 +SOFTWARE.
 --- /dev/null
 +++ b/misaki_cjk_prototype/pyproject.toml
-@@ -0,0 +1,33 @@
+@@ -0,0 +1,32 @@
 +[build-system]
 +requires = ["hatchling==1.29.0"]
 +build-backend = "hatchling.build"
@@ -176,7 +176,6 @@
 +
 +[tool.hatch.build.targets.wheel.force-include]
 +"misaki/data/ja_words.txt" = "misaki/data/ja_words.txt"
-+"misaki/_licenses" = "misaki/_licenses"
 +"PROVENANCE.json" = "viola_cjk/PROVENANCE.json"
 +"viola_cjk/unidic.json" = "viola_cjk/unidic.json"
 +"viola_cjk/mecabrc" = "viola_cjk/mecabrc"
