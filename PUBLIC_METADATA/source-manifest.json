@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "8ad4df39c499699ad90989e7f8ab88244adc9e65",
-  "sha256": "b295008e05d9d6f60578dcec110e16c9f53eb58f4beb03d390d7a4586f8ce350",
+  "revision": "5db590409955156a4d3df61c6439f09c5bdb19f6",
+  "sha256": "ad44b3bc2d9040ee2d0c1c442119f49f93acc9623395014ccf8ae7d5348adbb9",
   "files": [
     {
       "path": ".env.example",
@@ -9310,7 +9310,7 @@
     },
     {
       "path": "ui/react-app/package-lock.json",
-      "sha256": "e2537605cc28b2972a29f8d6e5952f3d5ab2f9539979b9246cea5645264ed8f4",
+      "sha256": "81f7fbef0f2c717256cde0ec911bebfa239aeffe0c42cafa948666525827d3af",
       "bytes": 236773
     },
     {
@@ -11602,6 +11602,11 @@
       "path": "ui/react-app/tests/minimatch_interop.test.js",
       "sha256": "13ea8afc1fedb7a0fd58733509fa56cfd7b658755c6919adcd910dd520be9254",
       "bytes": 1582
+    },
+    {
+      "path": "ui/react-app/tests/source_map_advisory.test.js",
+      "sha256": "1e7fadfde51fb50ae7db43c01cc5ec95f0deef1cfb68aa7d5219aa38ac1c868f",
+      "bytes": 2543
     },
     {
       "path": "ui/react-app/tests/youtube_embed_bridge.test.js",
