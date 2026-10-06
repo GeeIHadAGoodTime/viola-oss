@@ -918,13 +918,28 @@ class DictionaryFactoryTests(unittest.TestCase):
                 reads.append(size)
                 return self.stream.read(size)
 
-        def tracked(path, *args, **kwargs):
-            stream = original_open(path, *args, **kwargs)
-            return Reader(stream) if path.is_relative_to(self.a) else stream
+        def check(dictionary_dir):
+            canonical_root = dictionary_dir.resolve(strict=True)
+            opened = set()
 
-        with patch.object(Path, "open", tracked):
-            self.build(self.a)
-        self.assertGreaterEqual(len(reads), 18)
+            def tracked(path, *args, **kwargs):
+                stream = original_open(path, *args, **kwargs)
+                if path.is_relative_to(canonical_root):
+                    opened.add(path.relative_to(canonical_root).as_posix())
+                    return Reader(stream)
+                return stream
+
+            reads.clear()
+            with patch.object(Path, "open", tracked):
+                self.build(dictionary_dir)
+            self.assertGreaterEqual(len(reads), 18)
+            self.assertEqual(opened, {row["path"] for row in self.manifest["files"]})
+
+        alias = self.root / "bounded-read-alias"
+        alias.symlink_to(self.a, target_is_directory=True)
+        for label, directory in (("original", self.a), ("alias", alias)):
+            with self.subTest(directory=label):
+                check(directory)
 
 
 class SharedCutletTests(unittest.TestCase):
