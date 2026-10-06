@@ -11,6 +11,12 @@ import ChatSidebar from './ChatSidebar.jsx';
 import ChatThread from './ChatThread.jsx';
 import './ChatMode.css';
 
+function createThreadListRead() {
+  let retire;
+  const retired = new Promise(resolve => { retire = resolve; });
+  return { retired, retire, promise: null };
+}
+
 let pendingNewChatRequests = 0;
 const EMPTY_COMMANDS = [];
 const STREAM_STATUS_POLL_MS = 2000;
@@ -195,6 +201,31 @@ function ChatModeInner({
   // already-rendered thread list/thread/messages with the old principal's
   // data -- cross-account bleed on the same install.
   const requestGenerationRef = useRef(0);
+  const threadListReadRef = useRef(null);
+  const threadSearchRef = useRef({ query: '' });
+
+  useLayoutEffect(() => {
+    const reads = threadListReadRef;
+    const searches = threadSearchRef;
+    searches.current = { query: '' };
+    reads.current?.retire();
+    reads.current = null;
+    return () => {
+      searches.current = { query: '' };
+      reads.current?.retire();
+      reads.current = null;
+    };
+  }, [principalKey]);
+
+  const updateSearch = useCallback((query) => {
+    if (threadSearchRef.current.query !== query) {
+      // Retire the old query now, before its replacement fetch is debounced.
+      threadSearchRef.current = { query };
+      threadListReadRef.current?.retire();
+      threadListReadRef.current = null;
+    }
+    setSearch(query);
+  }, []);
 
   const retireThreadRead = useCallback(() => {
     const read = threadReadRef.current;
@@ -261,29 +292,54 @@ function ChatModeInner({
     return () => window.clearTimeout(timer);
   }, [streaming, streamingMessageId]);
 
-  const loadThreads = useCallback(async (query = '') => {
+  const loadThreads = useCallback(async (query = threadSearchRef.current.query) => {
     const generation = requestGenerationRef.current;
+    const queryScope = threadSearchRef.current;
+    if (query !== queryScope.query) return [];
+    const read = createThreadListRead();
+    const previous = threadListReadRef.current;
+    threadListReadRef.current = read;
+    previous?.retire();
+    const sameQuery = () => requestGenerationRef.current === generation
+      && threadSearchRef.current === queryScope;
+    const followCurrentRead = async () => {
+      while (sameQuery()) {
+        const current = threadListReadRef.current;
+        if (!current || current === read) return [];
+        // A pending current result is unknown, not an empty list. Only the
+        // current caller publishes errors; retired callers cannot replay them.
+        const threads = await current.promise.catch(() => []);
+        if (!sameQuery()) return [];
+        if (threadListReadRef.current === current) return threads;
+      }
+      return [];
+    };
     const params = new URLSearchParams();
     if (query) params.set('search', query);
-    try {
-      const data = await apiFetch(`/v1/chat/threads${params.toString() ? `?${params.toString()}` : ''}`);
-      // Stale: a principal switch happened while this request was in
-      // flight. Return the data to the (stale) caller but do not touch
-      // shared state -- the current principal's own boot has already reset
-      // and refetched it (#2395/C-071).
-      if (requestGenerationRef.current !== generation) return data.threads || [];
-      setConsentRequired(false);
-      setThreads(data.threads || []);
-      return data.threads || [];
-    } catch (err) {
-      if (requestGenerationRef.current !== generation) return [];
-      if (err?.code === 'consent_required') {
-        setConsentRequired(true);
-        setThreads([]);
-        return [];
+    // Retirement releases UI ownership; it does not cancel the HTTP request.
+    // Capture late failures so retired network work cannot reject unobserved.
+    const network = Promise.resolve()
+      .then(() => apiFetch(`/v1/chat/threads${params.toString() ? `?${params.toString()}` : ''}`))
+      .then(data => ({ data }), error => ({ error }));
+    read.promise = (async () => {
+      const outcome = await Promise.race([network, read.retired]);
+      if (!sameQuery()) return [];
+      if (threadListReadRef.current !== read) return followCurrentRead();
+      if (!outcome) return [];
+      if (outcome.error) {
+        if (outcome.error.code === 'consent_required') {
+          setConsentRequired(true);
+          setThreads([]);
+          return [];
+        }
+        throw outcome.error;
       }
-      throw err;
-    }
+      const threads = outcome.data.threads || [];
+      setConsentRequired(false);
+      setThreads(threads);
+      return threads;
+    })();
+    return read.promise;
   }, []);
 
   const loadThread = useCallback(async (threadId) => {
@@ -1309,7 +1365,7 @@ function ChatModeInner({
         activeThreadId={activeThreadId}
         search={search}
         collapsed={sidebarCollapsed}
-        onSearch={setSearch}
+        onSearch={updateSearch}
         onToggleCollapsed={() => setSidebarCollapsed((value) => !value)}
         onNewChat={createNewChat}
         onSelectThread={selectThread}
