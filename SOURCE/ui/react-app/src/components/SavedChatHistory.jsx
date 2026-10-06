@@ -3,6 +3,39 @@ import { apiFetch } from '../hooks/useViolaApi';
 import { THEME } from '../config';
 import { secondaryButtonStyle } from './Modal';
 
+const HISTORY_READ_TIMEOUT_MS = 15000;
+
+function createHistoryReadOwner(onExpired) {
+  let active = true;
+  const deadline = performance.now() + HISTORY_READ_TIMEOUT_MS;
+  const retire = () => {
+    active = false;
+    clearTimeout(timer);
+  };
+  const expire = () => {
+    if (!active) return;
+    retire();
+    onExpired();
+  };
+  const timer = setTimeout(expire, HISTORY_READ_TIMEOUT_MS);
+  return {
+    accepts: () => {
+      if (!active) return false;
+      if (performance.now() >= deadline) {
+        expire();
+        return false;
+      }
+      return true;
+    },
+    finish: () => {
+      if (!active) return false;
+      retire();
+      return true;
+    },
+    retire,
+  };
+}
+
 const consentMessage = 'To view saved chats, enable Cloud Sync in Settings → Account → Privacy & Data.';
 
 function readHistoryItems(data, key, validItem) {
@@ -37,37 +70,43 @@ export default function SavedChatHistory() {
   const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
-    let cancelled = false;
     setListLoading(true);
     setListError('');
+    const owner = createHistoryReadOwner(() => {
+      setListError('Could not load saved chats in time. Try again.');
+      setListLoading(false);
+    });
     apiFetch('/v1/chat/threads').then((data) => {
-      if (!cancelled) setThreads(readHistoryItems(data, 'threads', validThread));
+      if (owner.accepts()) setThreads(readHistoryItems(data, 'threads', validThread));
     }).catch((err) => {
-      if (!cancelled) setListError(err?.code === 'consent_required'
+      if (owner.accepts()) setListError(err?.code === 'consent_required'
         ? consentMessage : 'Could not load saved chats. Try again.');
     }).finally(() => {
-      if (!cancelled) setListLoading(false);
+      if (owner.finish()) setListLoading(false);
     });
-    return () => { cancelled = true; };
+    return owner.retire;
   }, [listAttempt]);
 
   useEffect(() => {
     if (!selected) return undefined;
-    let cancelled = false;
     setLoading(true);
     setError('');
     setMessages([]);
+    const owner = createHistoryReadOwner(() => {
+      setError('Could not load this conversation in time. Try again.');
+      setLoading(false);
+    });
     apiFetch(`/v1/chat/threads/${encodeURIComponent(selected.id)}`).then((data) => {
-      if (!cancelled) setMessages(readHistoryItems(data, 'messages', validMessage).filter((message) => (
+      if (owner.accepts()) setMessages(readHistoryItems(data, 'messages', validMessage).filter((message) => (
         message.role === 'user' || message.role === 'assistant'
       )));
     }).catch((err) => {
-      if (!cancelled) setError(err?.code === 'consent_required'
+      if (owner.accepts()) setError(err?.code === 'consent_required'
         ? consentMessage : 'Could not load this conversation. Try again.');
     }).finally(() => {
-      if (!cancelled) setLoading(false);
+      if (owner.finish()) setLoading(false);
     });
-    return () => { cancelled = true; };
+    return owner.retire;
   }, [selected, attempt]);
 
   return (
