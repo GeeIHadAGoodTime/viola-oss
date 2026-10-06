@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import ErrorBoundary from '../../../ErrorBoundary.jsx';
 import { THEME } from '../../../../config';
@@ -16,6 +16,8 @@ const EMPTY_COMMANDS = [];
 const STREAM_STATUS_POLL_MS = 2000;
 const STREAM_STATUS_TIMEOUT_MS = 5000;
 const STREAM_STATUS_MAX_FAILURES = 3;
+const MODEL_SAVE_TIMEOUT_MS = 15000;
+const THREAD_READ_TIMEOUT_MS = 15000;
 const STREAM_ACCEPTANCE_WARNING_MS = 15000;
 if (typeof window !== 'undefined' && !window.__violaChatModeNewChatListener) {
   window.__violaChatModeNewChatListener = true;
@@ -148,12 +150,19 @@ function ChatModeInner({
   const streamSessionRef = useRef(null);
   const streamAttachRef = useRef(null);
   const threadRequestRef = useRef(0);
+  const threadReadRef = useRef(null);
+  const [threadReadState, setThreadReadState] = useState(null);
   const pendingStopRef = useRef(false);
   const [modelOptions, setModelOptions] = useState([]);
   const [modelError, setModelError] = useState('');
   const [modelsLoading, setModelsLoading] = useState(false);
   const modelRequestRef = useRef(0);
   const [selectedModel, setSelectedModel] = useState('');
+  const [modelSaving, setModelSaving] = useState(false);
+  const [modelSaveError, setModelSaveError] = useState('');
+  const modelSaveRef = useRef(null);
+  const confirmedModelRef = useRef(null);
+  const modelPrincipalRef = useRef(principalKey);
   const [titleDraft, setTitleDraft] = useState('');
   const [dragActive, setDragActive] = useState(false);
   const [uploadingFileCount, setUploadingFileCount] = useState(0);
@@ -186,6 +195,51 @@ function ChatModeInner({
   // already-rendered thread list/thread/messages with the old principal's
   // data -- cross-account bleed on the same install.
   const requestGenerationRef = useRef(0);
+
+  const retireThreadRead = useCallback(() => {
+    const read = threadReadRef.current;
+    threadReadRef.current = null;
+    window.clearTimeout(read?.timer);
+    read?.retire();
+  }, []);
+
+  const threadReadBlocksSend = useCallback(() => {
+    const read = threadReadRef.current;
+    return read?.generation === requestGenerationRef.current
+      && read.threadId === activeThreadIdRef.current && read.blocksSend;
+  }, []);
+
+  const retireThreadRefresh = useCallback(() => {
+    const read = threadReadRef.current;
+    if (!read || read.blocksSend) return;
+    window.clearTimeout(read.timer);
+    read.retire();
+    read.status = 'ready';
+    setThreadReadState({ threadId: read.threadId, generation: read.generation, status: 'ready', blocksSend: false });
+  }, []);
+
+  const retireModelSave = useCallback(() => {
+    window.clearTimeout(modelSaveRef.current?.timer);
+    modelSaveRef.current = null;
+    setModelSaving(false);
+    setModelSaveError('');
+  }, []);
+
+  useLayoutEffect(() => {
+    // A fast thread read can settle before the matching render commits.
+    // Keep that same-scope snapshot while retiring previous thread/account data.
+    if (modelPrincipalRef.current !== principalKey || confirmedModelRef.current?.threadId !== activeThreadId) {
+      confirmedModelRef.current = null;
+    }
+    modelPrincipalRef.current = principalKey;
+    if (threadReadRef.current?.threadId !== activeThreadId) retireThreadRead();
+    retireModelSave();
+    return () => {
+      window.clearTimeout(modelSaveRef.current?.timer);
+      modelSaveRef.current = null;
+    };
+  }, [principalKey, activeThreadId, retireModelSave, retireThreadRead]);
+
 
   useEffect(() => {
     activeThreadIdRef.current = activeThreadId;
@@ -234,38 +288,79 @@ function ChatModeInner({
 
   const loadThread = useCallback(async (threadId) => {
     const generation = requestGenerationRef.current;
+    const previousRead = threadReadRef.current;
+    const alreadyConfirmed = previousRead?.generation === generation
+      && previousRead.threadId === threadId && !previousRead.blocksSend;
+    retireThreadRead();
     const request = ++threadRequestRef.current;
-    const isCurrent = () => requestGenerationRef.current === generation
-      && threadRequestRef.current === request && activeThreadIdRef.current === threadId;
     if (!threadId) {
-      if (!isCurrent()) return;
+      setThreadReadState(null);
       setActiveThread(null);
       setMessages([]);
       return;
     }
-    const data = await apiFetch(`/v1/chat/threads/${encodeURIComponent(threadId)}`);
-    if (!isCurrent()) return;
-    setActiveThread(data.thread);
-    setTitleDraft(data.thread?.title || 'New chat');
-    const restoredMessages = normalizeMessages(data.messages);
-    const runningId = data.active_stream_ids?.[0];
-    if (runningId && !streamingRef.current) {
-      // A same-principal remount/navigation must not orphan a task that outlived
-      // its viewer. Replay into a fresh buffer, never append history twice.
-      const existing = restoredMessages.find((message) => message.role === 'assistant'
-        && message.metadata?.stream_id === runningId);
-      const assistant = existing || makeTemporaryAssistant();
-      setMessages(existing ? restoredMessages.map((message) => message.id === assistant.id
-        ? { ...message, content: '', tools: [], status: 'streaming' } : message)
-        : [...restoredMessages, assistant]);
-      streamingRef.current = true;
-      setStreaming(true);
-      setStreamingMessageId(assistant.id);
-      void streamAttachRef.current?.(runningId, assistant.id, generation, threadId);
-    } else {
-      setMessages(restoredMessages);
+    let retire;
+    const retired = new Promise((resolve) => { retire = resolve; });
+    const read = { generation, threadId, status: 'pending', blocksSend: !alreadyConfirmed, deadline: performance.now() + THREAD_READ_TIMEOUT_MS, retire };
+    threadReadRef.current = read;
+    setThreadReadState({ threadId, generation, status: 'pending', blocksSend: read.blocksSend });
+    const isCurrent = () => requestGenerationRef.current === generation
+      && threadRequestRef.current === request && activeThreadIdRef.current === threadId && threadReadRef.current === read;
+    const currentModelOwner = () => {
+      const owner = confirmedModelRef.current;
+      return owner?.generation === generation && owner.threadId === threadId ? owner : null;
+    };
+    const modelOwnerAtRead = currentModelOwner();
+    const expired = new Promise((_, reject) => {
+      read.timer = window.setTimeout(() => reject(new Error('Thread read deadline expired')), THREAD_READ_TIMEOUT_MS);
+    });
+    try {
+      const data = await Promise.race([apiFetch(`/v1/chat/threads/${encodeURIComponent(threadId)}`), expired, retired]);
+      if (!isCurrent()) return;
+      if (performance.now() >= read.deadline || data?.ok === false || data?.thread?.id !== threadId) {
+        throw new Error('Current conversation could not be confirmed');
+      }
+      const storedModel = data.thread?.model;
+      if (data.thread?.id === threadId && (typeof storedModel === 'string' || storedModel === null)
+        && currentModelOwner() === modelOwnerAtRead) {
+        const restored = storedModel ?? '';
+        confirmedModelRef.current = { generation, threadId, value: restored };
+        setSelectedModel(restored);
+        if (restored) setModelOptions((current) => current.some((item) => item.id === restored)
+          ? current : [...current, { id: restored, label: restored }]);
+      }
+      const owner = currentModelOwner();
+      setActiveThread(owner && data.thread?.id === threadId ? { ...data.thread, model: owner.value || null } : data.thread);
+      setTitleDraft(data.thread?.title || 'New chat');
+      const restoredMessages = normalizeMessages(data.messages);
+      const runningId = data.active_stream_ids?.[0];
+      if (runningId && !streamingRef.current) {
+        // A same-principal remount/navigation must not orphan a task that outlived
+        // its viewer. Replay into a fresh buffer, never append history twice.
+        const existing = restoredMessages.find((message) => message.role === 'assistant'
+          && message.metadata?.stream_id === runningId);
+        const assistant = existing || makeTemporaryAssistant();
+        setMessages(existing ? restoredMessages.map((message) => message.id === assistant.id
+          ? { ...message, content: '', tools: [], status: 'streaming' } : message)
+          : [...restoredMessages, assistant]);
+        streamingRef.current = true;
+        setStreaming(true);
+        setStreamingMessageId(assistant.id);
+        void streamAttachRef.current?.(runningId, assistant.id, generation, threadId);
+      } else {
+        setMessages(restoredMessages);
+      }
+      read.status = 'ready';
+      read.blocksSend = false;
+      setThreadReadState({ threadId, generation, status: 'ready', blocksSend: false });
+    } catch {
+      if (!isCurrent()) return;
+      read.status = 'error';
+      setThreadReadState({ threadId, generation, status: 'error', blocksSend: read.blocksSend });
+    } finally {
+      window.clearTimeout(read.timer);
     }
-  }, []);
+  }, [retireThreadRead]);
 
   const loadModels = useCallback(async () => {
     const generation = requestGenerationRef.current;
@@ -276,8 +371,13 @@ function ChatModeInner({
       const data = await apiFetch('/v1/chat/models');
       const flattened = flattenModels(data);
       if (!isCurrent()) return flattened;
-      setModelOptions(flattened.models);
-      setSelectedModel((current) => (
+      const confirmed = confirmedModelRef.current;
+      const ownsSelection = confirmed?.generation === generation && confirmed.threadId === activeThreadIdRef.current;
+      const options = ownsSelection && confirmed.value && !flattened.models.some((item) => item.id === confirmed.value)
+        ? [...flattened.models, { id: confirmed.value, label: confirmed.value }] : flattened.models;
+      setModelOptions(options);
+      // A catalog owns available choices, not an acknowledged thread setting.
+      setSelectedModel((current) => ownsSelection ? confirmed.value : (
         current && flattened.models.some((item) => item.id === current)
           ? current
           : flattened.current
@@ -300,6 +400,8 @@ function ChatModeInner({
     // loadThread/loadModels) is now stale and will no-op instead of
     // applying its response when it eventually resolves (#2395/C-071).
     const generation = ++requestGenerationRef.current;
+    retireThreadRead();
+    setThreadReadState(null);
     const modelRequests = modelRequestRef;
     const generations = requestGenerationRef;
     streamSessionRef.current?.dispose();
@@ -359,13 +461,14 @@ function ChatModeInner({
     return () => {
       cancelled = true;
       ++generations.current;
+      retireThreadRead();
       streamSessionRef.current?.dispose();
       streamSessionRef.current = null;
       ++modelRequests.current;
       exportRequestRef.current = null;
       if (eventSourceRef.current) eventSourceRef.current.close();
     };
-  }, [principalKey, loadModels, loadThread, loadThreads]);
+  }, [principalKey, loadModels, loadThread, loadThreads, retireThreadRead]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -702,7 +805,7 @@ function ChatModeInner({
 
   const sendText = useCallback(async (text) => {
     const clean = text.trim();
-    if (!clean || streamingRef.current) return;
+    if (!clean || streamingRef.current || threadReadBlocksSend()) return;
     // The SAME first-run consent gate every other turn entry point uses. This
     // composer had none: a brand-new cloud user who opened Chat first could not
     // run a single agent command, was never prompted, and saw nothing at all
@@ -714,6 +817,7 @@ function ChatModeInner({
     }
     const generation = requestGenerationRef.current;
     ++threadRequestRef.current;
+    retireThreadRefresh();
     pendingStopRef.current = false;
     setStreamNotice(null);
     streamingRef.current = true;
@@ -734,9 +838,11 @@ function ChatModeInner({
     setMessages((current) => [...current, ...pendingMessages]);
     let dispatched = false;
     const postSend = (id) => {
+      const owner = confirmedModelRef.current;
+      const model = owner?.generation === generation && owner.threadId === id ? owner.value : selectedModel;
       dispatched = true;
       return apiFetch(`/v1/chat/threads/${encodeURIComponent(id)}/send`, {
-        method: 'POST', body: JSON.stringify({ text: clean, model: selectedModel || null }),
+        method: 'POST', body: JSON.stringify({ text: clean, model: model || null }),
       });
     };
     try {
@@ -799,7 +905,7 @@ function ChatModeInner({
           : message
       )));
     }
-  }, [attachStream, ensureThread, selectedModel, interceptCloudConsent, showUnconfirmedRequest]);
+  }, [attachStream, ensureThread, selectedModel, interceptCloudConsent, showUnconfirmedRequest, threadReadBlocksSend, retireThreadRefresh]);
 
   const stopStreaming = useCallback(async () => {
     pendingStopRef.current = true;
@@ -814,6 +920,7 @@ function ChatModeInner({
     const generation = requestGenerationRef.current;
     if (streamingRef.current && !(await stopStreaming())) return;
     if (requestGenerationRef.current !== generation) return;
+    retireModelSave();
     const data = await apiFetch('/v1/chat/threads', {
       method: 'POST',
       body: JSON.stringify({ title: 'New chat', model: selectedModel || null }),
@@ -825,7 +932,7 @@ function ChatModeInner({
     setActiveThread(data.thread);
     setTitleDraft(data.thread.title);
     setMessages([]);
-  }, [selectedModel, stopStreaming]);
+  }, [selectedModel, stopStreaming, retireModelSave]);
 
   useEffect(() => {
     let cancelled = false;
@@ -850,10 +957,11 @@ function ChatModeInner({
 
   const selectThread = useCallback(async (threadId) => {
     if (streamingRef.current && !(await stopStreaming())) return;
+    retireModelSave();
     setActiveThreadId(threadId);
     activeThreadIdRef.current = threadId;
     await loadThread(threadId);
-  }, [loadThread, stopStreaming]);
+  }, [loadThread, stopStreaming, retireModelSave]);
 
   const renameThread = useCallback(async (thread, nextTitle) => {
     const title = nextTitle ?? window.prompt('Rename chat', thread.title || 'New chat');
@@ -934,25 +1042,70 @@ function ChatModeInner({
   }, [activeThread, renameThread, titleDraft]);
 
   const handleModelChange = useCallback(async (event) => {
+    if (modelSaveRef.current) return;
     const generation = requestGenerationRef.current;
     const threadId = activeThreadIdRef.current;
     const model = event.target.value;
-    setSelectedModel(model);
-    if (threadId) {
+    setModelSaveError('');
+    if (!threadId) {
+      // An unsaved new conversation has only a local model choice.
+      setSelectedModel(model);
+      return;
+    }
+    const request = { deadline: performance.now() + MODEL_SAVE_TIMEOUT_MS };
+    modelSaveRef.current = request;
+    setModelSaving(true);
+    const isCurrent = () => modelSaveRef.current === request
+      && requestGenerationRef.current === generation && activeThreadIdRef.current === threadId;
+    const uncertain = () => {
+      if (!isCurrent()) return;
+      window.clearTimeout(request.timer);
+      modelSaveRef.current = null;
+      setModelSaving(false);
+      setModelSaveError('Could not confirm the model change. It may have reached the server; you can try again.');
+    };
+    request.timer = window.setTimeout(uncertain, MODEL_SAVE_TIMEOUT_MS);
+    try {
       const data = await apiFetch(`/v1/chat/threads/${encodeURIComponent(threadId)}`, {
         method: 'PATCH',
         body: JSON.stringify({ model }),
       });
-      if (requestGenerationRef.current !== generation || data.thread?.id !== threadId) return;
-      if (activeThreadIdRef.current === threadId) setActiveThread(data.thread);
-      setThreads((current) => current.map((item) => (item.id === data.thread.id ? data.thread : item)));
+      if (!isCurrent()) return;
+      if (performance.now() >= request.deadline) {
+        uncertain();
+        return;
+      }
+      if (data?.ok === false || data.thread?.id !== threadId || !(typeof data.thread.model === 'string' || data.thread.model === null)) {
+        throw new Error('Model acknowledgement unavailable');
+      }
+      const acknowledged = data.thread.model ?? '';
+      confirmedModelRef.current = { generation, threadId, value: acknowledged };
+      // An acknowledged selection supersedes catalog reads issued before it.
+      modelRequestRef.current += 1;
+      setModelsLoading(false);
+      setModelError('');
+      setSelectedModel(acknowledged);
+      if (acknowledged) setModelOptions((current) => current.some((item) => item.id === acknowledged)
+        ? current : [...current, { id: acknowledged, label: acknowledged }]);
+      // This acknowledgement owns the model field, not concurrent title edits.
+      setActiveThread((current) => current?.id === threadId ? { ...current, model: data.thread.model } : current);
+      setThreads((current) => current.map((item) => item.id === threadId ? { ...item, model: data.thread.model } : item));
+    } catch {
+      uncertain();
+    } finally {
+      if (modelSaveRef.current === request) {
+        window.clearTimeout(request.timer);
+        modelSaveRef.current = null;
+        setModelSaving(false);
+      }
     }
   }, []);
 
   const handleRegenerate = useCallback(async (message) => {
-    if (!activeThreadIdRef.current || streamingRef.current) return;
+    if (!activeThreadIdRef.current || streamingRef.current || threadReadBlocksSend()) return;
     const generation = requestGenerationRef.current;
     ++threadRequestRef.current;
+    retireThreadRefresh();
     pendingStopRef.current = false;
     setStreamNotice(null);
     streamingRef.current = true;
@@ -993,10 +1146,10 @@ function ChatModeInner({
           : item
       )));
     }
-  }, [attachStream, selectedModel, showUnconfirmedRequest]);
+  }, [attachStream, selectedModel, showUnconfirmedRequest, threadReadBlocksSend, retireThreadRefresh]);
 
   const handleFork = useCallback(async (message) => {
-    if (streamingRef.current) return;
+    if (streamingRef.current || threadReadBlocksSend()) return;
     const generation = requestGenerationRef.current;
     const startingText = message.role === 'user'
       ? message.content
@@ -1012,6 +1165,7 @@ function ChatModeInner({
         .find((item) => item.role === 'user')?.id;
     if (!sourceMessageId) return;
     ++threadRequestRef.current;
+    retireThreadRefresh();
     pendingStopRef.current = false;
     setStreamNotice(null);
     streamingRef.current = true;
@@ -1045,7 +1199,7 @@ function ChatModeInner({
       setMessages((current) => current.map((item) => item.id === temporaryAssistant.id
         ? { ...item, content: 'Something went wrong while branching this response.', status: 'error' } : item));
     }
-  }, [attachStream, loadThreads, messages, selectedModel, showUnconfirmedRequest]);
+  }, [attachStream, loadThreads, messages, selectedModel, showUnconfirmedRequest, threadReadBlocksSend, retireThreadRefresh]);
 
   const handleFeedback = useCallback(async (message, rating) => {
     const generation = requestGenerationRef.current;
@@ -1193,20 +1347,23 @@ function ChatModeInner({
           />
           <div className="chat-topbar-actions">
             <select
-              value={modelError ? '' : selectedModel}
-              disabled={Boolean(modelError)}
+              value={modelError && !confirmedModelRef.current ? '' : selectedModel}
+              disabled={Boolean(modelError) || modelSaving}
+              aria-busy={modelSaving}
               onChange={handleModelChange}
               onFocus={() => { loadModels().catch(() => {}); }}
               aria-label="Model"
             >
-              <option value="">{modelError ? 'Model list unavailable' : 'Default model'}</option>
-              {!modelError && modelOptions.map((item) => (
+              <option value="">{modelError && !confirmedModelRef.current ? 'Model list unavailable' : 'Default model'}</option>
+              {(!modelError || confirmedModelRef.current) && modelOptions.map((item) => (
                 <option key={item.id} value={item.id}>{item.label}</option>
               ))}
             </select>
             <button type="button" onClick={() => exportThread()} disabled={!activeThread || exporting}>{exporting ? 'Exporting…' : 'Export'}</button>
           </div>
         </header>
+        {modelSaving && <div className="chat-upload-status" role="status">Saving chat model…</div>}
+        {modelSaveError && <div className="chat-error" role="alert">{modelSaveError}</div>}
         {modelError && (
           <div className="chat-error" role="alert">
             <span>{modelError}</span>
@@ -1234,6 +1391,15 @@ function ChatModeInner({
         />
         <div className="chat-composer-row">
           {loading && <span className="chat-loading">Loading chats...</span>}
+          {threadReadState?.threadId === activeThreadId && threadReadState.generation === requestGenerationRef.current && (
+            threadReadState.status === 'pending' ? <span role="status" className="chat-loading">{threadReadState.blocksSend ? 'Loading this conversation before sending...' : 'Refreshing this conversation...'}</span>
+              : threadReadState.status === 'error' && <span role="alert" className="chat-upload-status is-error">
+                {threadReadState.blocksSend
+                  ? 'Could not confirm this conversation. Your draft is kept. Retry before sending.'
+                  : 'Could not refresh this conversation. The confirmed conversation is kept.'}
+                <button type="button" onClick={() => void loadThread(activeThreadIdRef.current)}>Retry conversation</button>
+              </span>
+          )}
           {uploadingFileCount > 0 && (
             <span className="chat-upload-status">
               Uploading {uploadingFileCount} {uploadingFileCount === 1 ? 'file' : 'files'}...
@@ -1247,7 +1413,8 @@ function ChatModeInner({
             onStop={stopStreaming}
             onAttachFiles={uploadFilesToWorkbench}
             streaming={streaming}
-            disabled={loading}
+            disabled={loading || (threadReadState?.threadId === activeThreadId
+              && threadReadState.generation === requestGenerationRef.current && threadReadState.blocksSend)}
             handlePTTStart={handlePTTStart}
             handlePTTEnd={handlePTTEnd}
           />

@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "85a28bf1c092b9d25efef1c8ea3e92cc741992dc",
-  "sha256": "1c816ad5c405c40cf4ac9f508c7c38da3f6406c1ed2200cb36181e3db7b1d237",
+  "revision": "62a22b00bc1ba5d686bc3a5ccf4554942f9231bc",
+  "sha256": "cfb76f4af47a1dbcccc72dbf6dddd8e947c989159b6c050ec786121a23549fe2",
   "files": [
     {
       "path": ".env.example",
@@ -5984,6 +5984,11 @@
       "bytes": 2733
     },
     {
+      "path": "tests/public/test_resume_response_contract.py",
+      "sha256": "f1b8d3321051ffa2940d3c07cd0385f367fef853c1cd1ad64fda28aacfbfe3ae",
+      "bytes": 11393
+    },
+    {
       "path": "tests/public/test_romance_qualification_packet.py",
       "sha256": "d459d9bfb870463559e6395f0176ba7f14879d64428804d6dad191a39ecd0d52",
       "bytes": 10014
@@ -8955,8 +8960,8 @@
     },
     {
       "path": "ui/api/routes/control.py",
-      "sha256": "075ddc4a9a23c95b44f7762f3046afc71b338ba8bef5d926f7aceb3b225ae418",
-      "bytes": 66852
+      "sha256": "b54cef7506ceb05c9353bc2d70522c550c7788e30e883f5403872ce176af91f5",
+      "bytes": 67165
     },
     {
       "path": "ui/api/routes/cost.py",
@@ -10124,9 +10129,14 @@
       "bytes": 16773
     },
     {
+      "path": "ui/react-app/src/components/MemoryPanel.initialRead.test.jsx",
+      "sha256": "b46ed328f29d895cb1c1c563567c1bee9d53398477db985a3f0a37443e2112a4",
+      "bytes": 12976
+    },
+    {
       "path": "ui/react-app/src/components/MemoryPanel.jsx",
-      "sha256": "5f4e7f3a611edc8b2b2f96ce683b3ba5c4896c58ab878c84111bb28c1f2f4ea1",
-      "bytes": 48077
+      "sha256": "29eb1feed2b9319081544110feb32780c4bfadae0c7c11fb1d55f4f460bf907b",
+      "bytes": 49894
     },
     {
       "path": "ui/react-app/src/components/MemoryPanel.test.jsx",
@@ -10195,8 +10205,13 @@
     },
     {
       "path": "ui/react-app/src/components/QueueModal.jsx",
-      "sha256": "5978b4310ba40a94ddb23823a802c097a20608dcc2694cfd4d9cef50f6d1e2b3",
-      "bytes": 11476
+      "sha256": "98bc3374d9a4aa55372e13492bfd483b07a56ae6e1e48131a4769218b4c2dce4",
+      "bytes": 13843
+    },
+    {
+      "path": "ui/react-app/src/components/QueueModal.readRecovery.test.jsx",
+      "sha256": "43c077a230f50caeed77d42f18b66aab52bb10fde2f9aad9b28faeea9133f204",
+      "bytes": 13114
     },
     {
       "path": "ui/react-app/src/components/QueueModal.test.jsx",
@@ -10935,8 +10950,18 @@
     },
     {
       "path": "ui/react-app/src/components/stage/modes/chat/ChatMode.jsx",
-      "sha256": "5e63a033bc2d45e96e8611baef05da2d4670eaa1c44c72652175583b264a547b",
-      "bytes": 53376
+      "sha256": "e059e44146e15891466cfc57e96cce6c8b98b960bd726390df83d840caeafb23",
+      "bytes": 62223
+    },
+    {
+      "path": "ui/react-app/src/components/stage/modes/chat/ChatMode.modelRecovery.test.jsx",
+      "sha256": "d0f10d74b48f04bea2c58cb141889973c0c487949340d07fd7d0ddb5edf454f7",
+      "bytes": 16423
+    },
+    {
+      "path": "ui/react-app/src/components/stage/modes/chat/ChatMode.modelRestoration.test.jsx",
+      "sha256": "265fb4b0e3e3f02d5b84db55524ee1c317537f7349e458ebfc9abf8ba14601c0",
+      "bytes": 18419
     },
     {
       "path": "ui/react-app/src/components/stage/modes/chat/ChatMode.test.jsx",

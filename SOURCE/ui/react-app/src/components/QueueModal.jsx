@@ -5,24 +5,33 @@ import { useViolaApi } from '../hooks/useViolaApi';
 import { THEME } from '../config';
 
 export default function QueueModal({ isOpen, onClose, wsQueue }) {
-  const [httpQueue, setHttpQueue] = useState([]);
+  const [httpQueue, setHttpQueue] = useState(null);
+  const [readState, setReadState] = useState({ generation: 0, error: null });
   const [loading, setLoading] = useState(true);
   const [actionState, setActionState] = useState({ generation: 0, pending: false, error: null });
-  const sessionRef = useRef({ generation: 0, open: isOpen, active: true, pending: null, read: 0 });
+  const sessionRef = useRef({ generation: 0, open: isOpen, active: true, pending: null, read: 0, pendingRead: null, readOpen: isOpen });
   const session = sessionRef.current;
+  const retireRead = useCallback(() => {
+    if (session.pendingRead) clearTimeout(session.pendingRead.timer);
+    session.pendingRead = null;
+    session.read += 1;
+  }, [session]);
   const retireSession = useCallback(() => {
     if (session.pending) clearTimeout(session.pending.timer);
     session.pending = null;
     session.generation += 1;
-    session.read += 1;
-  }, [session]);
+    retireRead();
+  }, [session, retireRead]);
   const actionLoading = actionState.generation === session.generation && actionState.pending;
   const actionError = actionState.generation === session.generation ? actionState.error : null;
+  const readError = readState.generation === session.generation ? readState.error : null;
   const api = useViolaApi();
+  const getQueue = api.getQueue;
 
   // Use wsQueue as primary data source, HTTP fetch as fallback.
   const hasPlayerQueue = Array.isArray(wsQueue);
   const queue = hasPlayerQueue ? wsQueue : (httpQueue || []);
+  const hasHttpQueue = Array.isArray(httpQueue);
 
   useLayoutEffect(() => {
     session.active = true;
@@ -36,33 +45,71 @@ export default function QueueModal({ isOpen, onClose, wsQueue }) {
     if (session.open !== isOpen) {
       retireSession();
       session.open = isOpen;
+      session.readOpen = isOpen;
+      setHttpQueue(null);
+      setReadState({ generation: session.generation, error: null });
       setActionState({ generation: session.generation, pending: false, error: null });
     }
   }, [isOpen, session, retireSession]);
 
   const fetchQueue = useCallback(async () => {
+    if (!session.active || !session.open || !session.readOpen) return;
+    retireRead();
     const generation = session.generation;
     const read = ++session.read;
-    const ownsRead = () => session.active && session.open && session.generation === generation && session.read === read;
+    const owner = { deadline: performance.now() + 15000, timer: null };
+    session.pendingRead = owner;
+    const ownsRead = () => session.active && session.open && session.readOpen
+      && session.generation === generation && session.read === read && session.pendingRead === owner;
+    const settle = (error) => {
+      if (!ownsRead()) return;
+      clearTimeout(owner.timer);
+      session.pendingRead = null;
+      setReadState({ generation, error });
+      setLoading(false);
+    };
+    const failure = 'Could not load the queue. Please try again.';
+    const uncertainty = 'Could not load the queue in time. Please try again.';
+    setLoading(true);
+    setReadState({ generation, error: null });
+    owner.timer = setTimeout(() => settle(uncertainty), 15000);
     try {
-      setLoading(true);
-      const result = await api.getQueue();
-      if (ownsRead() && result?.ok === true) {
-        const received = result.queue ?? result.data?.queue;
-        if (Array.isArray(received)) setHttpQueue(received);
+      const result = await getQueue();
+      if (!ownsRead()) return;
+      if (performance.now() >= owner.deadline) {
+        settle(uncertainty);
+        return;
       }
+      const received = result?.queue ?? result?.data?.queue;
+      if (result?.ok !== true || !Array.isArray(received)) {
+        settle(failure);
+        return;
+      }
+      setHttpQueue(received);
+      settle(null);
     } catch {
-      // Generic fallback read/retry feedback remains a separate UI contract.
-    } finally {
-      if (ownsRead()) setLoading(false);
+      if (ownsRead()) settle(performance.now() >= owner.deadline ? uncertainty : failure);
     }
-  }, [api, session]);
+  }, [getQueue, session, retireRead]);
+
+  const retryQueue = () => {
+    if (!session.pendingRead) void fetchQueue();
+  };
+
+  useLayoutEffect(() => {
+    if (hasPlayerQueue) {
+      retireRead();
+      setReadState({ generation: session.generation, error: null });
+      setLoading(false);
+    }
+  }, [hasPlayerQueue, wsQueue, session, retireRead]);
 
   useEffect(() => {
     if (isOpen) fetchQueue();
   }, [isOpen, fetchQueue]);
 
   const closeModal = () => {
+    session.readOpen = false;
     retireSession();
     setActionState({ generation: session.generation, pending: false, error: null });
     onClose();
@@ -108,7 +155,7 @@ export default function QueueModal({ isOpen, onClose, wsQueue }) {
   );
   const handleClearQueue = () => runAction(
     () => api.clearQueue(),
-    () => { session.read += 1; setHttpQueue([]); setLoading(false); },
+    () => { retireRead(); setReadState({ generation: session.generation, error: null }); setHttpQueue([]); setLoading(false); },
     'Could not clear queue. Please try again.',
   );
 
@@ -146,9 +193,19 @@ export default function QueueModal({ isOpen, onClose, wsQueue }) {
           {actionError}
         </div>
       )}
+      {readError && !hasPlayerQueue && (
+        <div role="alert" style={{ color: THEME.colors.statusRed, marginBottom: '12px', fontSize: '13px' }}>
+          {readError}
+          <button type="button" onClick={retryQueue} style={secondaryButtonStyle}>Retry queue</button>
+        </div>
+      )}
       {loading && !hasPlayerQueue ? (
         <div style={{ textAlign: 'center', color: THEME.colors.textMuted, padding: '40px' }}>
           Loading queue...
+        </div>
+      ) : !hasPlayerQueue && !hasHttpQueue ? (
+        <div style={{ textAlign: 'center', color: THEME.colors.textMuted, padding: '40px' }}>
+          Queue unavailable. Please try again.
         </div>
       ) : queue.length === 0 ? (
         <div style={{ textAlign: 'center', color: THEME.colors.textMuted, padding: '40px' }}>
