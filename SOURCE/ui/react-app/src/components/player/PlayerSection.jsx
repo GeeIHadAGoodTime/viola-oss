@@ -29,6 +29,7 @@ const PlayerSection = ({
   rating,
   canResumePlayback,
   playbackActionPending,
+  nextActionPending,
   // Handlers
   onPlayPause,
   onNext,
@@ -124,7 +125,7 @@ const PlayerSection = ({
             >
               {isPlaying ? <PauseIcon /> : <PlayIcon />}
             </TransportButton>
-            <TransportButton onClick={onNext} ariaLabel="Next track"><NextIcon /></TransportButton>
+            <TransportButton onClick={onNext} ariaLabel="Next track" disabled={nextActionPending} busy={nextActionPending}><NextIcon /></TransportButton>
             <div className={styles.spacer} />
             <TransportButton onClick={onRepeatCycle} active={repeatMode !== 'off'} ariaLabel={`Repeat: ${repeatMode}`}>
               <RepeatIcon mode={repeatMode} />
@@ -152,6 +153,7 @@ PlayerSection.propTypes = {
   rating: PropTypes.string,
   canResumePlayback: PropTypes.bool,
   playbackActionPending: PropTypes.bool,
+  nextActionPending: PropTypes.bool,
   onPlayPause: PropTypes.func.isRequired,
   onNext: PropTypes.func.isRequired,
   onPrevious: PropTypes.func.isRequired,
