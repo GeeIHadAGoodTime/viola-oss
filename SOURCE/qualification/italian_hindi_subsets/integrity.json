@@ -1,0 +1,167 @@
+{
+  "schema_version": 1,
+  "reviewed_core_patch_sha256": "3d6ed03580a869c9bf5afdb79a4d38a99a3a055aa1e508bea436ae65d9215931",
+  "reviewed_core_manifest_sha256": "1eb26f12d124d032ed46346f0e54ee3ef342afbc66d878e2143097db9f1aa21e",
+  "payloads": [
+    {
+      "path": "packet/README.md",
+      "bytes": 1887,
+      "sha256": "daed387f0c5aab9a0e694fb21b5ac5499a83a3bd6d9b8e69f07f15fa57e314b6",
+      "git_blob": "0e93f6d3fa22dab00bdbbb730cd686ee11e353df",
+      "git_sha": "0e93f6d3fa22dab00bdbbb730cd686ee11e353df"
+    },
+    {
+      "path": "packet/evidence/kokoro-config.json",
+      "bytes": 2351,
+      "sha256": "5abb01e2403b072bf03d04fde160443e209d7a0dad49a423be15196b9b43c17f",
+      "git_blob": "14a726edd3718279eac426630879ff743955b16a",
+      "git_sha": "14a726edd3718279eac426630879ff743955b16a"
+    },
+    {
+      "path": "packet/evidence/upstream-inputs.json",
+      "bytes": 2111,
+      "sha256": "cbce39bc8e0b57302c971f166e7ebfb6a6762b69aae1664df344c5929892613f",
+      "git_blob": "4eef1c3619caec2ae4c52366fb575b426651c033",
+      "git_sha": "4eef1c3619caec2ae4c52366fb575b426651c033"
+    },
+    {
+      "path": "packet/hindi-word-prototype/README.md",
+      "bytes": 1811,
+      "sha256": "8b9113e96d95361dad9de653ac8d5caea072cdd06ed564b709c835aa41b7d08c",
+      "git_blob": "48227ee3bd6ce745441361208183b693da6d0749",
+      "git_sha": "48227ee3bd6ce745441361208183b693da6d0749"
+    },
+    {
+      "path": "packet/hindi-word-prototype/data/map",
+      "bytes": 833,
+      "sha256": "47fda9f103ed0b70b812e28cb7589b03e58f8c9025bae99c20a45d126d8e57bb",
+      "git_blob": "23b372b56382a27e104a51aa45e2ffe024b45c04",
+      "git_sha": "23b372b56382a27e104a51aa45e2ffe024b45c04"
+    },
+    {
+      "path": "packet/hindi-word-prototype/data/post",
+      "bytes": 677,
+      "sha256": "6f21a68256a0732c1d1019e895563bec66b82bea53b75947e0a1072a442ea3e4",
+      "git_blob": "09363aa716f8578f49ab36105f77580bb1b10383",
+      "git_sha": "09363aa716f8578f49ab36105f77580bb1b10383"
+    },
+    {
+      "path": "packet/hindi-word-prototype/epitran-authors",
+      "bytes": 19,
+      "sha256": "2b911411addd2de4081f4c037cb737d212d751b8175ee9c78145c599fcaaa342",
+      "git_blob": "4307b71a2d22605a3e45ca28124df138d6d9e3e7",
+      "git_sha": "4307b71a2d22605a3e45ca28124df138d6d9e3e7"
+    },
+    {
+      "path": "packet/hindi-word-prototype/epitran-license",
+      "bytes": 1082,
+      "sha256": "bd46b34e5bc6a0b5042a7fb115058213b7ffa112a864124b0a67ecb92cf040d5",
+      "git_blob": "89ddb9476a5bcb5d9ab1c01f44339207a6eebea5",
+      "git_sha": "89ddb9476a5bcb5d9ab1c01f44339207a6eebea5"
+    },
+    {
+      "path": "packet/hindi-word-prototype/hindi_word.py",
+      "bytes": 8359,
+      "sha256": "9f1f192cb50864f49caeaf0ee609c4598859b64d342896662808192a658802fd",
+      "git_blob": "6f9e55e837d07ffd1a7eed4003d53ac66dab9fba",
+      "git_sha": "6f9e55e837d07ffd1a7eed4003d53ac66dab9fba"
+    },
+    {
+      "path": "packet/hindi-word-prototype/test_hindi_word.py",
+      "bytes": 7795,
+      "sha256": "04a1f1f5e2c3db7119053e71bf6db7566dc7e095b4ac7c08e2263a751eb78a23",
+      "git_blob": "69086f0c803601244ab095b35e01fa68ff7bcefd",
+      "git_sha": "69086f0c803601244ab095b35e01fa68ff7bcefd"
+    },
+    {
+      "path": "packet/italian-stress-prototype/README.md",
+      "bytes": 1982,
+      "sha256": "7e8a88b32b4a22238c62976c7168db49188c17aa021f7ad4d4a3ec95865104f8",
+      "git_blob": "d756c5f71357486e90258d2107bf75a760fbe09e",
+      "git_sha": "d756c5f71357486e90258d2107bf75a760fbe09e"
+    },
+    {
+      "path": "packet/italian-stress-prototype/data/map",
+      "bytes": 363,
+      "sha256": "8207dbad4e96c104b25d23951be28e1e2eedfeaf73495b84938dbbbba60382ca",
+      "git_blob": "f452f77e82b4e8e6a9bbda2ee10d60129332125e",
+      "git_sha": "f452f77e82b4e8e6a9bbda2ee10d60129332125e"
+    },
+    {
+      "path": "packet/italian-stress-prototype/data/post",
+      "bytes": 109,
+      "sha256": "fd4104d79ff9896686e7b7e8075115445f733405939c29cc91e18a952b0d6593",
+      "git_blob": "64e89029b28bad366c21c7649b6e17b4fdb93942",
+      "git_sha": "64e89029b28bad366c21c7649b6e17b4fdb93942"
+    },
+    {
+      "path": "packet/italian-stress-prototype/data/pre",
+      "bytes": 189,
+      "sha256": "98e391381506cccf1ed489ff6dba9412be557924f2a0540fcaff32137bc39927",
+      "git_blob": "c9e7f7b3edf27baeeaed680e8e1675c37cbe0c4c",
+      "git_sha": "c9e7f7b3edf27baeeaed680e8e1675c37cbe0c4c"
+    },
+    {
+      "path": "packet/italian-stress-prototype/data/strip",
+      "bytes": 3,
+      "sha256": "ea73e40f19748cb5b516fb00adff366050ad9cd7b3df21cf3085c3a4c2b5c0fd",
+      "git_blob": "47b171ac20bc6ca320543cd0c3d1d688dddde211",
+      "git_sha": "47b171ac20bc6ca320543cd0c3d1d688dddde211"
+    },
+    {
+      "path": "packet/italian-stress-prototype/epitran-authors",
+      "bytes": 19,
+      "sha256": "2b911411addd2de4081f4c037cb737d212d751b8175ee9c78145c599fcaaa342",
+      "git_blob": "4307b71a2d22605a3e45ca28124df138d6d9e3e7",
+      "git_sha": "4307b71a2d22605a3e45ca28124df138d6d9e3e7"
+    },
+    {
+      "path": "packet/italian-stress-prototype/epitran-license",
+      "bytes": 1082,
+      "sha256": "bd46b34e5bc6a0b5042a7fb115058213b7ffa112a864124b0a67ecb92cf040d5",
+      "git_blob": "89ddb9476a5bcb5d9ab1c01f44339207a6eebea5",
+      "git_sha": "89ddb9476a5bcb5d9ab1c01f44339207a6eebea5"
+    },
+    {
+      "path": "packet/italian-stress-prototype/italian_stress.py",
+      "bytes": 7824,
+      "sha256": "9dae920e97b519c08bbd1478e09c1333fa0e340f2ca8762cbfa1300d3f0bc0f2",
+      "git_blob": "3bc9d5559fcc3425b5ed35210e57087d6235958b",
+      "git_sha": "3bc9d5559fcc3425b5ed35210e57087d6235958b"
+    },
+    {
+      "path": "packet/italian-stress-prototype/test_italian_stress.py",
+      "bytes": 6665,
+      "sha256": "78f7b41aa94dc8aed5200e5ca38adc7b0738d6e5672f5db7867f6a4383dd7b9f",
+      "git_blob": "c2981e4640365e149f819a7f5f0fa3ad0c50fecf",
+      "git_sha": "c2981e4640365e149f819a7f5f0fa3ad0c50fecf"
+    },
+    {
+      "path": "packet/run_controls.py",
+      "bytes": 3568,
+      "sha256": "c9535cf260f104d6b10be1b7dbe942d460301c3879f9e0708aefaa9b16d3c0f5",
+      "git_blob": "b49bdb61d66e17916ed2e66648bc6aad417bbb4a",
+      "git_sha": "b49bdb61d66e17916ed2e66648bc6aad417bbb4a"
+    },
+    {
+      "path": "packet/run_mutations.py",
+      "bytes": 5171,
+      "sha256": "3d3d98886b06354f82f858afe454183b95839390f134b71932face3283da6b69",
+      "git_blob": "e493fbf1ec05cc0c7921119cba5c64841000fde7",
+      "git_sha": "e493fbf1ec05cc0c7921119cba5c64841000fde7"
+    }
+  ],
+  "kokoro_config": {
+    "path": "third_party/kokoro_onnx/src/kokoro_onnx/config.json",
+    "bytes": 2351,
+    "sha256": "5abb01e2403b072bf03d04fde160443e209d7a0dad49a423be15196b9b43c17f",
+    "git_blob": "14a726edd3718279eac426630879ff743955b16a",
+    "git_sha": "14a726edd3718279eac426630879ff743955b16a"
+  },
+  "expected": {
+    "methods": 19,
+    "subtests": 412,
+    "mutants": 16
+  },
+  "activation": false
+}

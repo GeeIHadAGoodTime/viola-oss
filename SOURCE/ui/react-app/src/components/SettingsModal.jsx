@@ -330,6 +330,7 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
   const [modalWidth, setModalWidth] = useState(() => (typeof window === 'undefined' ? 960 : Math.min(window.innerWidth, 960)));
   const modalRef = useRef(null);
   const saveSessionRef = useRef(null);
+  const localAiReadRef = useRef(null);
   useLayoutEffect(() => {
     const session = isOpen ? { saveGeneration: 0 } : null;
     saveSessionRef.current = session;
@@ -385,6 +386,15 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
   const [isDetectingLocalAi, setIsDetectingLocalAi] = useState(false);
   const [localAiDetectStatus, setLocalAiDetectStatus] = useState('');
   const [localAiServers, setLocalAiServers] = useState([]);
+  const retireLocalAiRead = useCallback(() => {
+    localAiReadRef.current = null;
+    setIsDetectingLocalAi(false);
+    setLocalAiDetectStatus('');
+  }, []);
+  useLayoutEffect(() => {
+    retireLocalAiRead();
+    return () => { localAiReadRef.current = null; };
+  }, [isOpen, retireLocalAiRead]);
   const [llmConnectorManifests, setLlmConnectorManifests] = useState([]);
   const [llmConnectorStatus, setLlmConnectorStatus] = useState('');
   const [llmProfiles, setLlmProfiles] = useState([]);
@@ -775,14 +785,21 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
     };
   }, [isOpen, isScanning, settings?.active_music_provider_id, settings?.local_music_folder]);
 
+  // A discovery result must not replace a newer provider choice or field edit.
+  const updateLocalSettings = useCallback((nextSettings) => {
+    setLocalSettings(prev => {
+      const next = typeof nextSettings === 'function' ? nextSettings(prev) : { ...prev, ...nextSettings };
+      if (['ai_source', 'llm_provider', 'llm_base_url', 'llm_model', 'llm_api_key'].some(key => prev[key] !== next[key])) {
+        retireLocalAiRead();
+      }
+      return next;
+    });
+  }, [setLocalSettings, retireLocalAiRead]);
+
   // The draft owns edits; incoming snapshots only replace clean fields.
   const updateLocal = useCallback((key, value) => {
-    setLocalSettings(prev => ({ ...prev, [key]: value }));
-  }, [setLocalSettings]);
-
-  const updateLocalSettings = useCallback((nextSettings) => {
-    setLocalSettings(prev => typeof nextSettings === 'function' ? nextSettings(prev) : { ...prev, ...nextSettings });
-  }, [setLocalSettings]);
+    updateLocalSettings(prev => ({ ...prev, [key]: value }));
+  }, [updateLocalSettings]);
 
   const refreshLlmProfiles = useCallback(async ({ silent = false } = {}) => {
     // C-401: `/v1/connectors/profiles*` belongs to the LOCAL_ONLY `connectors`
@@ -901,6 +918,7 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
       return;
     }
 
+    retireLocalAiRead();
     setLlmProfileBusyId('save-current');
     setLlmProfileActionStatus('');
     try {
@@ -956,10 +974,12 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
     selectedLlmConnectorManifest,
     selectedLlmConnectorOption,
     settingsForLlmProfile,
+    retireLocalAiRead,
   ]);
 
   const handleSelectLlmProfile = useCallback(async (profile) => {
     if (!profile?.profileId) return;
+    retireLocalAiRead();
     setLlmProfileBusyId(`select:${profile.profileId}`);
     setLlmProfileActionStatus('');
     try {
@@ -979,7 +999,7 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
     } finally {
       setLlmProfileBusyId('');
     }
-  }, [persistLlmSettingsPatch, refreshLlmProfiles, settingsForLlmProfile]);
+  }, [persistLlmSettingsPatch, refreshLlmProfiles, settingsForLlmProfile, retireLocalAiRead]);
 
   const handleValidateLlmProfile = useCallback(async (profile) => {
     if (!profile?.profileId) return;
@@ -1007,6 +1027,7 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
   }, [refreshLlmProfiles]);
 
   const handleDetectLocalAi = useCallback(async () => {
+    if (!isOpen) return;
     // C-401: local-model detection scans the user's own machine via
     // /v1/settings/detect-local-ai, which is unwired on cloud. Part of the
     // desktop_ai surface.
@@ -1014,10 +1035,13 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
       setLocalAiDetectStatus('Local models are set up in the desktop app.');
       return;
     }
+    const read = {};
+    localAiReadRef.current = read;
     setIsDetectingLocalAi(true);
     setLocalAiDetectStatus('');
     try {
       const data = await apiFetch('/v1/settings/detect-local-ai');
+      if (localAiReadRef.current !== read) return;
       const servers = normalizeLocalAiServers(data?.servers ?? data?.data?.servers ?? []);
       setLocalAiServers(servers);
       const detected = servers.find((server) => server.models.length > 0) || servers[0];
@@ -1025,7 +1049,7 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
         setLocalAiDetectStatus('No local servers found.');
         return;
       }
-      updateLocalSettings((prev) => ({
+      setLocalSettings((prev) => ({
         ...prev,
         ai_source: 'local',
         llm_provider: detected.type || prev.llm_provider || 'ollama',
@@ -1038,11 +1062,14 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
         + (detected.running === false ? ' Start the local server before running commands.' : '')
       );
     } catch {
-      setLocalAiDetectStatus('Local server detection failed.');
+      if (localAiReadRef.current === read) setLocalAiDetectStatus('Local server detection failed.');
     } finally {
-      setIsDetectingLocalAi(false);
+      if (localAiReadRef.current === read) {
+        localAiReadRef.current = null;
+        setIsDetectingLocalAi(false);
+      }
     }
-  }, [updateLocalSettings]);
+  }, [isOpen, setLocalSettings]);
 
   const openAddPaymentCardDialog = useCallback(() => {
     setPaymentCardActionError('');
@@ -1216,6 +1243,7 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
 
   // Cancel - reset local changes and close
   const handleCancel = useCallback(() => {
+    retireLocalAiRead();
     if (saveSessionRef.current) saveSessionRef.current.saveGeneration += 1;
     // Customize previews update the live palette and theme cache immediately.
     // Resetting the draft alone leaves those effects behind after dismissal.
@@ -1224,7 +1252,7 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
     resetDraft();
     clearError();
     onClose();
-  }, [settings, resetDraft, clearError, onClose]);
+  }, [settings, resetDraft, clearError, onClose, retireLocalAiRead]);
 
   // Escape key closes the modal (a11y / keyboard parity with other modals)
   useEffect(() => {
