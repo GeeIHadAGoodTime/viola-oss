@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import ErrorBoundary from '../../../ErrorBoundary.jsx';
 import { THEME } from '../../../../config';
@@ -16,6 +16,7 @@ const EMPTY_COMMANDS = [];
 const STREAM_STATUS_POLL_MS = 2000;
 const STREAM_STATUS_TIMEOUT_MS = 5000;
 const STREAM_STATUS_MAX_FAILURES = 3;
+const MODEL_SAVE_TIMEOUT_MS = 15000;
 const STREAM_ACCEPTANCE_WARNING_MS = 15000;
 if (typeof window !== 'undefined' && !window.__violaChatModeNewChatListener) {
   window.__violaChatModeNewChatListener = true;
@@ -154,6 +155,10 @@ function ChatModeInner({
   const [modelsLoading, setModelsLoading] = useState(false);
   const modelRequestRef = useRef(0);
   const [selectedModel, setSelectedModel] = useState('');
+  const [modelSaving, setModelSaving] = useState(false);
+  const [modelSaveError, setModelSaveError] = useState('');
+  const modelSaveRef = useRef(null);
+  const confirmedModelRef = useRef(null);
   const [titleDraft, setTitleDraft] = useState('');
   const [dragActive, setDragActive] = useState(false);
   const [uploadingFileCount, setUploadingFileCount] = useState(0);
@@ -186,6 +191,23 @@ function ChatModeInner({
   // already-rendered thread list/thread/messages with the old principal's
   // data -- cross-account bleed on the same install.
   const requestGenerationRef = useRef(0);
+
+  const retireModelSave = useCallback(() => {
+    window.clearTimeout(modelSaveRef.current?.timer);
+    modelSaveRef.current = null;
+    setModelSaving(false);
+    setModelSaveError('');
+  }, []);
+
+  useLayoutEffect(() => {
+    confirmedModelRef.current = null;
+    retireModelSave();
+    return () => {
+      window.clearTimeout(modelSaveRef.current?.timer);
+      modelSaveRef.current = null;
+    };
+  }, [principalKey, activeThreadId, retireModelSave]);
+
 
   useEffect(() => {
     activeThreadIdRef.current = activeThreadId;
@@ -276,8 +298,13 @@ function ChatModeInner({
       const data = await apiFetch('/v1/chat/models');
       const flattened = flattenModels(data);
       if (!isCurrent()) return flattened;
-      setModelOptions(flattened.models);
-      setSelectedModel((current) => (
+      const confirmed = confirmedModelRef.current;
+      const ownsSelection = confirmed?.generation === generation && confirmed.threadId === activeThreadIdRef.current;
+      const options = ownsSelection && confirmed.value && !flattened.models.some((item) => item.id === confirmed.value)
+        ? [...flattened.models, { id: confirmed.value, label: confirmed.value }] : flattened.models;
+      setModelOptions(options);
+      // A catalog owns available choices, not an acknowledged thread setting.
+      setSelectedModel((current) => ownsSelection ? confirmed.value : (
         current && flattened.models.some((item) => item.id === current)
           ? current
           : flattened.current
@@ -814,6 +841,7 @@ function ChatModeInner({
     const generation = requestGenerationRef.current;
     if (streamingRef.current && !(await stopStreaming())) return;
     if (requestGenerationRef.current !== generation) return;
+    retireModelSave();
     const data = await apiFetch('/v1/chat/threads', {
       method: 'POST',
       body: JSON.stringify({ title: 'New chat', model: selectedModel || null }),
@@ -825,7 +853,7 @@ function ChatModeInner({
     setActiveThread(data.thread);
     setTitleDraft(data.thread.title);
     setMessages([]);
-  }, [selectedModel, stopStreaming]);
+  }, [selectedModel, stopStreaming, retireModelSave]);
 
   useEffect(() => {
     let cancelled = false;
@@ -850,10 +878,11 @@ function ChatModeInner({
 
   const selectThread = useCallback(async (threadId) => {
     if (streamingRef.current && !(await stopStreaming())) return;
+    retireModelSave();
     setActiveThreadId(threadId);
     activeThreadIdRef.current = threadId;
     await loadThread(threadId);
-  }, [loadThread, stopStreaming]);
+  }, [loadThread, stopStreaming, retireModelSave]);
 
   const renameThread = useCallback(async (thread, nextTitle) => {
     const title = nextTitle ?? window.prompt('Rename chat', thread.title || 'New chat');
@@ -934,18 +963,62 @@ function ChatModeInner({
   }, [activeThread, renameThread, titleDraft]);
 
   const handleModelChange = useCallback(async (event) => {
+    if (modelSaveRef.current) return;
     const generation = requestGenerationRef.current;
     const threadId = activeThreadIdRef.current;
     const model = event.target.value;
-    setSelectedModel(model);
-    if (threadId) {
+    setModelSaveError('');
+    if (!threadId) {
+      // An unsaved new conversation has only a local model choice.
+      setSelectedModel(model);
+      return;
+    }
+    const request = { deadline: performance.now() + MODEL_SAVE_TIMEOUT_MS };
+    modelSaveRef.current = request;
+    setModelSaving(true);
+    const isCurrent = () => modelSaveRef.current === request
+      && requestGenerationRef.current === generation && activeThreadIdRef.current === threadId;
+    const uncertain = () => {
+      if (!isCurrent()) return;
+      window.clearTimeout(request.timer);
+      modelSaveRef.current = null;
+      setModelSaving(false);
+      setModelSaveError('Could not confirm the model change. It may have reached the server; you can try again.');
+    };
+    request.timer = window.setTimeout(uncertain, MODEL_SAVE_TIMEOUT_MS);
+    try {
       const data = await apiFetch(`/v1/chat/threads/${encodeURIComponent(threadId)}`, {
         method: 'PATCH',
         body: JSON.stringify({ model }),
       });
-      if (requestGenerationRef.current !== generation || data.thread?.id !== threadId) return;
-      if (activeThreadIdRef.current === threadId) setActiveThread(data.thread);
-      setThreads((current) => current.map((item) => (item.id === data.thread.id ? data.thread : item)));
+      if (!isCurrent()) return;
+      if (performance.now() >= request.deadline) {
+        uncertain();
+        return;
+      }
+      if (data?.ok === false || data.thread?.id !== threadId || !(typeof data.thread.model === 'string' || data.thread.model === null)) {
+        throw new Error('Model acknowledgement unavailable');
+      }
+      const acknowledged = data.thread.model ?? '';
+      confirmedModelRef.current = { generation, threadId, value: acknowledged };
+      // An acknowledged selection supersedes catalog reads issued before it.
+      modelRequestRef.current += 1;
+      setModelsLoading(false);
+      setModelError('');
+      setSelectedModel(acknowledged);
+      if (acknowledged) setModelOptions((current) => current.some((item) => item.id === acknowledged)
+        ? current : [...current, { id: acknowledged, label: acknowledged }]);
+      // This acknowledgement owns the model field, not concurrent title edits.
+      setActiveThread((current) => current?.id === threadId ? { ...current, model: data.thread.model } : current);
+      setThreads((current) => current.map((item) => item.id === threadId ? { ...item, model: data.thread.model } : item));
+    } catch {
+      uncertain();
+    } finally {
+      if (modelSaveRef.current === request) {
+        window.clearTimeout(request.timer);
+        modelSaveRef.current = null;
+        setModelSaving(false);
+      }
     }
   }, []);
 
@@ -1193,20 +1266,23 @@ function ChatModeInner({
           />
           <div className="chat-topbar-actions">
             <select
-              value={modelError ? '' : selectedModel}
-              disabled={Boolean(modelError)}
+              value={modelError && !confirmedModelRef.current ? '' : selectedModel}
+              disabled={Boolean(modelError) || modelSaving}
+              aria-busy={modelSaving}
               onChange={handleModelChange}
               onFocus={() => { loadModels().catch(() => {}); }}
               aria-label="Model"
             >
-              <option value="">{modelError ? 'Model list unavailable' : 'Default model'}</option>
-              {!modelError && modelOptions.map((item) => (
+              <option value="">{modelError && !confirmedModelRef.current ? 'Model list unavailable' : 'Default model'}</option>
+              {(!modelError || confirmedModelRef.current) && modelOptions.map((item) => (
                 <option key={item.id} value={item.id}>{item.label}</option>
               ))}
             </select>
             <button type="button" onClick={() => exportThread()} disabled={!activeThread || exporting}>{exporting ? 'Exporting…' : 'Export'}</button>
           </div>
         </header>
+        {modelSaving && <div className="chat-upload-status" role="status">Saving chat model…</div>}
+        {modelSaveError && <div className="chat-error" role="alert">{modelSaveError}</div>}
         {modelError && (
           <div className="chat-error" role="alert">
             <span>{modelError}</span>
