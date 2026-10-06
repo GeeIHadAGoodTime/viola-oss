@@ -7,7 +7,7 @@
  * account is usable immediately, the AuthProvider flips `status` to
  * 'signedIn' and the gate swaps in the dashboard.
  */
-import React, { useState } from 'react';
+import React, { useLayoutEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import AuthShell from './AuthShell';
 import AuthField from './AuthField';
@@ -34,6 +34,14 @@ export default function SignUpScreen({ onSwitchToLogin, onNeedsVerification }) {
   const [fieldErrors, setFieldErrors] = useState({});
   const [formError, setFormError] = useState('');
   const [busy, setBusy] = useState(false);
+  const submitOwnerRef = useRef(null);
+  useLayoutEffect(() => () => { submitOwnerRef.current = null; }, []);
+
+  function switchToLogin() {
+    // Navigation retires this form before a queued response can change the gate.
+    submitOwnerRef.current = null;
+    onSwitchToLogin();
+  }
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -54,6 +62,8 @@ export default function SignUpScreen({ onSwitchToLogin, onNeedsVerification }) {
       setFormError('Confirm eligibility and accept the Terms of Service to create an account.');
       return;
     }
+    const owner = {};
+    submitOwnerRef.current = owner;
     setFieldErrors({});
     setFormError('');
     setBusy(true);
@@ -64,6 +74,7 @@ export default function SignUpScreen({ onSwitchToLogin, onNeedsVerification }) {
         termsVersion: ACCEPTED_TERMS_VERSION,
         privacyVersion: ACCEPTED_PRIVACY_VERSION,
       });
+      if (submitOwnerRef.current !== owner) return;
       if (!result?.ok) {
         setFormError(authErrorMessage(
           result?.error,
@@ -78,9 +89,12 @@ export default function SignUpScreen({ onSwitchToLogin, onNeedsVerification }) {
       // Account usable immediately — the AuthProvider flips status to
       // 'signedIn' and the gate swaps in the dashboard.
     } catch {
-      setFormError('Something went wrong. Please try again.');
+      if (submitOwnerRef.current === owner) setFormError('Something went wrong. Please try again.');
     } finally {
-      setBusy(false);
+      if (submitOwnerRef.current === owner) {
+        submitOwnerRef.current = null;
+        setBusy(false);
+      }
     }
   }
 
@@ -91,7 +105,7 @@ export default function SignUpScreen({ onSwitchToLogin, onNeedsVerification }) {
       footer={
         <span>
           Already have an account?{' '}
-          <button type="button" style={linkButtonStyle()} onClick={onSwitchToLogin}>
+          <button type="button" style={linkButtonStyle()} onClick={switchToLogin}>
             Sign in
           </button>
         </span>
