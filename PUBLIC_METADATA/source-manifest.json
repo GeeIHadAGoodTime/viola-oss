@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "1af750126272a9eb4bec1a0201278df2739cfa5c",
-  "sha256": "a476fe151618314456f883fe008e81c1443f3faf7ddeab89d4d4ee33a1cac8d9",
+  "revision": "62a22b00bc1ba5d686bc3a5ccf4554942f9231bc",
+  "sha256": "cfb76f4af47a1dbcccc72dbf6dddd8e947c989159b6c050ec786121a23549fe2",
   "files": [
     {
       "path": ".env.example",
@@ -3519,126 +3519,6 @@
       "bytes": 323
     },
     {
-      "path": "qualification/italian_hindi_subsets/README.md",
-      "sha256": "6e0da2894dc64a5da3b38a0d0d3076e47b8894f211c2082b8282d339585f74bb",
-      "bytes": 1843
-    },
-    {
-      "path": "qualification/italian_hindi_subsets/integrity.json",
-      "sha256": "440bc01f00842f3aa7c67552cfe5782741fd83c26d84217323fcd69d786403b3",
-      "bytes": 6884
-    },
-    {
-      "path": "qualification/italian_hindi_subsets/packet/README.md",
-      "sha256": "daed387f0c5aab9a0e694fb21b5ac5499a83a3bd6d9b8e69f07f15fa57e314b6",
-      "bytes": 1887
-    },
-    {
-      "path": "qualification/italian_hindi_subsets/packet/evidence/kokoro-config.json",
-      "sha256": "5abb01e2403b072bf03d04fde160443e209d7a0dad49a423be15196b9b43c17f",
-      "bytes": 2351
-    },
-    {
-      "path": "qualification/italian_hindi_subsets/packet/evidence/upstream-inputs.json",
-      "sha256": "cbce39bc8e0b57302c971f166e7ebfb6a6762b69aae1664df344c5929892613f",
-      "bytes": 2111
-    },
-    {
-      "path": "qualification/italian_hindi_subsets/packet/hindi-word-prototype/README.md",
-      "sha256": "8b9113e96d95361dad9de653ac8d5caea072cdd06ed564b709c835aa41b7d08c",
-      "bytes": 1811
-    },
-    {
-      "path": "qualification/italian_hindi_subsets/packet/hindi-word-prototype/data/map",
-      "sha256": "47fda9f103ed0b70b812e28cb7589b03e58f8c9025bae99c20a45d126d8e57bb",
-      "bytes": 833
-    },
-    {
-      "path": "qualification/italian_hindi_subsets/packet/hindi-word-prototype/data/post",
-      "sha256": "6f21a68256a0732c1d1019e895563bec66b82bea53b75947e0a1072a442ea3e4",
-      "bytes": 677
-    },
-    {
-      "path": "qualification/italian_hindi_subsets/packet/hindi-word-prototype/epitran-authors",
-      "sha256": "2b911411addd2de4081f4c037cb737d212d751b8175ee9c78145c599fcaaa342",
-      "bytes": 19
-    },
-    {
-      "path": "qualification/italian_hindi_subsets/packet/hindi-word-prototype/epitran-license",
-      "sha256": "bd46b34e5bc6a0b5042a7fb115058213b7ffa112a864124b0a67ecb92cf040d5",
-      "bytes": 1082
-    },
-    {
-      "path": "qualification/italian_hindi_subsets/packet/hindi-word-prototype/hindi_word.py",
-      "sha256": "9f1f192cb50864f49caeaf0ee609c4598859b64d342896662808192a658802fd",
-      "bytes": 8359
-    },
-    {
-      "path": "qualification/italian_hindi_subsets/packet/hindi-word-prototype/test_hindi_word.py",
-      "sha256": "04a1f1f5e2c3db7119053e71bf6db7566dc7e095b4ac7c08e2263a751eb78a23",
-      "bytes": 7795
-    },
-    {
-      "path": "qualification/italian_hindi_subsets/packet/italian-stress-prototype/README.md",
-      "sha256": "7e8a88b32b4a22238c62976c7168db49188c17aa021f7ad4d4a3ec95865104f8",
-      "bytes": 1982
-    },
-    {
-      "path": "qualification/italian_hindi_subsets/packet/italian-stress-prototype/data/map",
-      "sha256": "8207dbad4e96c104b25d23951be28e1e2eedfeaf73495b84938dbbbba60382ca",
-      "bytes": 363
-    },
-    {
-      "path": "qualification/italian_hindi_subsets/packet/italian-stress-prototype/data/post",
-      "sha256": "fd4104d79ff9896686e7b7e8075115445f733405939c29cc91e18a952b0d6593",
-      "bytes": 109
-    },
-    {
-      "path": "qualification/italian_hindi_subsets/packet/italian-stress-prototype/data/pre",
-      "sha256": "98e391381506cccf1ed489ff6dba9412be557924f2a0540fcaff32137bc39927",
-      "bytes": 189
-    },
-    {
-      "path": "qualification/italian_hindi_subsets/packet/italian-stress-prototype/data/strip",
-      "sha256": "ea73e40f19748cb5b516fb00adff366050ad9cd7b3df21cf3085c3a4c2b5c0fd",
-      "bytes": 3
-    },
-    {
-      "path": "qualification/italian_hindi_subsets/packet/italian-stress-prototype/epitran-authors",
-      "sha256": "2b911411addd2de4081f4c037cb737d212d751b8175ee9c78145c599fcaaa342",
-      "bytes": 19
-    },
-    {
-      "path": "qualification/italian_hindi_subsets/packet/italian-stress-prototype/epitran-license",
-      "sha256": "bd46b34e5bc6a0b5042a7fb115058213b7ffa112a864124b0a67ecb92cf040d5",
-      "bytes": 1082
-    },
-    {
-      "path": "qualification/italian_hindi_subsets/packet/italian-stress-prototype/italian_stress.py",
-      "sha256": "9dae920e97b519c08bbd1478e09c1333fa0e340f2ca8762cbfa1300d3f0bc0f2",
-      "bytes": 7824
-    },
-    {
-      "path": "qualification/italian_hindi_subsets/packet/italian-stress-prototype/test_italian_stress.py",
-      "sha256": "78f7b41aa94dc8aed5200e5ca38adc7b0738d6e5672f5db7867f6a4383dd7b9f",
-      "bytes": 6665
-    },
-    {
-      "path": "qualification/italian_hindi_subsets/packet/run_controls.py",
-      "sha256": "c9535cf260f104d6b10be1b7dbe942d460301c3879f9e0708aefaa9b16d3c0f5",
-      "bytes": 3568
-    },
-    {
-      "path": "qualification/italian_hindi_subsets/packet/run_mutations.py",
-      "sha256": "3d3d98886b06354f82f858afe454183b95839390f134b71932face3283da6b69",
-      "bytes": 5171
-    },
-    {
-      "path": "qualification/italian_hindi_subsets/run_qualification.py",
-      "sha256": "b04aebf098731313d8754fa04164b677c339e79f8dc25a379b17db8a8687d004",
-      "bytes": 8732
-    },
-    {
       "path": "qualification/romance_semantic_lowering/README.md",
       "sha256": "c175bce287d2460b8037ef6855203e74dd1750bd69088832942a44eb44bc4fdc",
       "bytes": 2452
@@ -6034,11 +5914,6 @@
       "bytes": 41072
     },
     {
-      "path": "tests/public/test_italian_hindi_qualification_packet.py",
-      "sha256": "669785e09e44c290e92a54a6d44821bd943372244fbefcb6cd435a980d281483",
-      "bytes": 8502
-    },
-    {
       "path": "tests/public/test_kokoro_chunking.py",
       "sha256": "9708193d333394d7870a6abfc6ca80d5cb9752711854b12db2bfe4d3413252f4",
       "bytes": 12345
@@ -6107,6 +5982,11 @@
       "path": "tests/public/test_request_tool_surface_boundary.py",
       "sha256": "d366c57f3be4a86250fb42233fc909f5f2d1c4f533961f2c5f99a8264f5d5531",
       "bytes": 2733
+    },
+    {
+      "path": "tests/public/test_resume_response_contract.py",
+      "sha256": "f1b8d3321051ffa2940d3c07cd0385f367fef853c1cd1ad64fda28aacfbfe3ae",
+      "bytes": 11393
     },
     {
       "path": "tests/public/test_romance_qualification_packet.py",
@@ -9080,8 +8960,8 @@
     },
     {
       "path": "ui/api/routes/control.py",
-      "sha256": "075ddc4a9a23c95b44f7762f3046afc71b338ba8bef5d926f7aceb3b225ae418",
-      "bytes": 66852
+      "sha256": "b54cef7506ceb05c9353bc2d70522c550c7788e30e883f5403872ce176af91f5",
+      "bytes": 67165
     },
     {
       "path": "ui/api/routes/cost.py",
@@ -10249,9 +10129,14 @@
       "bytes": 16773
     },
     {
+      "path": "ui/react-app/src/components/MemoryPanel.initialRead.test.jsx",
+      "sha256": "b46ed328f29d895cb1c1c563567c1bee9d53398477db985a3f0a37443e2112a4",
+      "bytes": 12976
+    },
+    {
       "path": "ui/react-app/src/components/MemoryPanel.jsx",
-      "sha256": "5f4e7f3a611edc8b2b2f96ce683b3ba5c4896c58ab878c84111bb28c1f2f4ea1",
-      "bytes": 48077
+      "sha256": "29eb1feed2b9319081544110feb32780c4bfadae0c7c11fb1d55f4f460bf907b",
+      "bytes": 49894
     },
     {
       "path": "ui/react-app/src/components/MemoryPanel.test.jsx",
@@ -10320,8 +10205,13 @@
     },
     {
       "path": "ui/react-app/src/components/QueueModal.jsx",
-      "sha256": "5978b4310ba40a94ddb23823a802c097a20608dcc2694cfd4d9cef50f6d1e2b3",
-      "bytes": 11476
+      "sha256": "98bc3374d9a4aa55372e13492bfd483b07a56ae6e1e48131a4769218b4c2dce4",
+      "bytes": 13843
+    },
+    {
+      "path": "ui/react-app/src/components/QueueModal.readRecovery.test.jsx",
+      "sha256": "43c077a230f50caeed77d42f18b66aab52bb10fde2f9aad9b28faeea9133f204",
+      "bytes": 13114
     },
     {
       "path": "ui/react-app/src/components/QueueModal.test.jsx",
@@ -11060,8 +10950,18 @@
     },
     {
       "path": "ui/react-app/src/components/stage/modes/chat/ChatMode.jsx",
-      "sha256": "5e63a033bc2d45e96e8611baef05da2d4670eaa1c44c72652175583b264a547b",
-      "bytes": 53376
+      "sha256": "e059e44146e15891466cfc57e96cce6c8b98b960bd726390df83d840caeafb23",
+      "bytes": 62223
+    },
+    {
+      "path": "ui/react-app/src/components/stage/modes/chat/ChatMode.modelRecovery.test.jsx",
+      "sha256": "d0f10d74b48f04bea2c58cb141889973c0c487949340d07fd7d0ddb5edf454f7",
+      "bytes": 16423
+    },
+    {
+      "path": "ui/react-app/src/components/stage/modes/chat/ChatMode.modelRestoration.test.jsx",
+      "sha256": "265fb4b0e3e3f02d5b84db55524ee1c317537f7349e458ebfc9abf8ba14601c0",
+      "bytes": 18419
     },
     {
       "path": "ui/react-app/src/components/stage/modes/chat/ChatMode.test.jsx",
