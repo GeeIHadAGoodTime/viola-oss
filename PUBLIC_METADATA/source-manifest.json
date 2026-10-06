@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "8ad4df39c499699ad90989e7f8ab88244adc9e65",
-  "sha256": "b295008e05d9d6f60578dcec110e16c9f53eb58f4beb03d390d7a4586f8ce350",
+  "revision": "7d3b011eb5ab609f651a8533a39932a61bae963b",
+  "sha256": "156a82fedf24fa5854a050c7d76ee0f16efdd3a4f1b287dac2e24333db21cd2c",
   "files": [
     {
       "path": ".env.example",
@@ -9420,8 +9420,8 @@
     },
     {
       "path": "ui/react-app/src/SmartDisplay.jsx",
-      "sha256": "0a4f56b391c1036bd371d3f1de395e910b9586ed69be231b06c4de30ee4cda53",
-      "bytes": 169792
+      "sha256": "08d3425d0a17f1013fd2f23111d3762ca049f7472cf7b44af351ca9ac9233c9f",
+      "bytes": 172585
     },
     {
       "path": "ui/react-app/src/SmartDisplay.stageRouting.test.jsx",
@@ -9445,8 +9445,8 @@
     },
     {
       "path": "ui/react-app/src/__tests__/SmartDisplay.test.jsx",
-      "sha256": "b01906c95779633f15735c3c67557d8b76e152b465b26ef74079675dd5612435",
-      "bytes": 108586
+      "sha256": "0795fa55996da366fa484650e118b1dcccae3d2bee352c8ac74d3f53411963d3",
+      "bytes": 120438
     },
     {
       "path": "ui/react-app/src/__tests__/hooks/useEventBus.test.jsx",
@@ -10430,8 +10430,8 @@
     },
     {
       "path": "ui/react-app/src/components/player/PlayerSection.jsx",
-      "sha256": "577305c3990faf2ab3920d6182c9711f8a5a45f7fd7a1822c88f6adfe6e59cc6",
-      "bytes": 6799
+      "sha256": "9f31939c2f91214d748e6ae5823bcb48a6b03fcf47541a6b09cf0c1fec631eda",
+      "bytes": 6911
     },
     {
       "path": "ui/react-app/src/components/player/PlayerSection.module.css",
