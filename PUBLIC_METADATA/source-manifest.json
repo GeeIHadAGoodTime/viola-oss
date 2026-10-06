@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "8ad4df39c499699ad90989e7f8ab88244adc9e65",
-  "sha256": "b295008e05d9d6f60578dcec110e16c9f53eb58f4beb03d390d7a4586f8ce350",
+  "revision": "a2e504a3f16d1f1fe62eeded1e18e45ce200e038",
+  "sha256": "294f59b06c2ebd126fa309ae5b8096080d7946e15a8675cd2376188dd8765ab6",
   "files": [
     {
       "path": ".env.example",
@@ -9974,9 +9974,14 @@
       "bytes": 926
     },
     {
+      "path": "ui/react-app/src/components/MemoryPanel.draftRecovery.test.jsx",
+      "sha256": "bdcc09496bd4000ae7472f95d82c5d1030723def2442cd61069a73c0ae888ea4",
+      "bytes": 16773
+    },
+    {
       "path": "ui/react-app/src/components/MemoryPanel.jsx",
-      "sha256": "0868b2f4c2ac59ab6f73a73c325638aaa12009d31d404b9a1e44d4414e56a2d2",
-      "bytes": 46050
+      "sha256": "5f4e7f3a611edc8b2b2f96ce683b3ba5c4896c58ab878c84111bb28c1f2f4ea1",
+      "bytes": 48077
     },
     {
       "path": "ui/react-app/src/components/MemoryPanel.test.jsx",
