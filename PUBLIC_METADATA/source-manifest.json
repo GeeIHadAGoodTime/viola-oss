@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "c131b561adb6e2da0124ef4d8a01cc0788d98b13",
-  "sha256": "4cde77d704ad1cef81fd87b34ccc7503e74cccd25f3be7b83fdb57f9ff598e0b",
+  "revision": "d4f82518aa088c192a6c4211fd86d00fd0a4c68d",
+  "sha256": "4552032c8be57163b5f97e7db57c9a658478a5e81f11ac4465eb92ac53b2dda3",
   "files": [
     {
       "path": ".env.example",
@@ -10465,8 +10465,13 @@
     },
     {
       "path": "ui/react-app/src/components/auth/SignUpScreen.jsx",
-      "sha256": "13ae7e49ca838f9ecee6aadc021dd0b5e6c40695b7aeaf68060800af45356876",
-      "bytes": 6374
+      "sha256": "06d62c8a8ec83e131662dc1068331a1ae5b3664f35c76658b08795f8d351a013",
+      "bytes": 6924
+    },
+    {
+      "path": "ui/react-app/src/components/auth/SignUpScreen.ownership.test.jsx",
+      "sha256": "566117662ab85d63ba26529e7d3fd4ea58001eeea7eeea4da82532442a7af5bc",
+      "bytes": 10791
     },
     {
       "path": "ui/react-app/src/components/auth/VerifyEmailScreen.jsx",
