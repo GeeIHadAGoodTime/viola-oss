@@ -266,12 +266,29 @@ def get_desktop_authenticated_user_id() -> str:
 def _desktop_session_rows_by_recent_use(store: Any) -> list[sqlite3.Row]:
     store._ensure_sqlite_schema()
     with store._connect() as conn:
-        return list(conn.execute("""
+        rows = list(conn.execute("""
                 SELECT session_hash, user_id, email, email_verified, gotrue_session_id,
                        created_at, expires_at, last_used_at, access_expires_at
                 FROM desktop_sessions
-                ORDER BY datetime(last_used_at) DESC, datetime(created_at) DESC
                 """).fetchall())
+    # SQLite datetime() drops fractional seconds. Preserve the stored instant
+    # so two valid sign-ins inside one second cannot select the older account.
+    earliest = datetime.min.replace(tzinfo=UTC)
+
+    def timestamp(value: Any) -> tuple[bool, datetime]:
+        try:
+            parsed = _parse_sqlite_datetime(value)
+        except OverflowError:
+            # An ISO offset can normalize beyond Python's UTC year range.
+            # Like an unusable SQL ordering value, it must not hide valid rows.
+            parsed = None
+        return parsed is not None, parsed or earliest
+
+    return sorted(
+        rows,
+        key=lambda row: (timestamp(row["last_used_at"]), timestamp(row["created_at"])),
+        reverse=True,
+    )
 
 
 def _legacy_desktop_session_user_id() -> str | None:
