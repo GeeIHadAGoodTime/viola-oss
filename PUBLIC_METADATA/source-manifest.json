@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "a6eb83fd85a877944970a6b1c38caee58d60c448",
-  "sha256": "d73c24a8c837573b2abad5bb99bfcefbb4189f7e138014e6fd35e1afa635cfbb",
+  "revision": "62a22b00bc1ba5d686bc3a5ccf4554942f9231bc",
+  "sha256": "cfb76f4af47a1dbcccc72dbf6dddd8e947c989159b6c050ec786121a23549fe2",
   "files": [
     {
       "path": ".env.example",
@@ -5984,6 +5984,11 @@
       "bytes": 2733
     },
     {
+      "path": "tests/public/test_resume_response_contract.py",
+      "sha256": "f1b8d3321051ffa2940d3c07cd0385f367fef853c1cd1ad64fda28aacfbfe3ae",
+      "bytes": 11393
+    },
+    {
       "path": "tests/public/test_romance_qualification_packet.py",
       "sha256": "d459d9bfb870463559e6395f0176ba7f14879d64428804d6dad191a39ecd0d52",
       "bytes": 10014
@@ -8955,8 +8960,8 @@
     },
     {
       "path": "ui/api/routes/control.py",
-      "sha256": "075ddc4a9a23c95b44f7762f3046afc71b338ba8bef5d926f7aceb3b225ae418",
-      "bytes": 66852
+      "sha256": "b54cef7506ceb05c9353bc2d70522c550c7788e30e883f5403872ce176af91f5",
+      "bytes": 67165
     },
     {
       "path": "ui/api/routes/cost.py",
