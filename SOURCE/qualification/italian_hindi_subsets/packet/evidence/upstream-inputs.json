@@ -1,0 +1,58 @@
+[
+  {
+    "name": "epitran-authors",
+    "git_blob": "4307b71a2d22605a3e45ca28124df138d6d9e3e7",
+    "sha256": "2b911411addd2de4081f4c037cb737d212d751b8175ee9c78145c599fcaaa342",
+    "bytes": 19,
+    "status": "recovered exact authenticated original upstream bytes"
+  },
+  {
+    "name": "epitran-license",
+    "git_blob": "89ddb9476a5bcb5d9ab1c01f44339207a6eebea5",
+    "sha256": "bd46b34e5bc6a0b5042a7fb115058213b7ffa112a864124b0a67ecb92cf040d5",
+    "bytes": 1082,
+    "status": "recovered exact authenticated original upstream bytes"
+  },
+  {
+    "name": "hi-map",
+    "git_blob": "23b372b56382a27e104a51aa45e2ffe024b45c04",
+    "sha256": "47fda9f103ed0b70b812e28cb7589b03e58f8c9025bae99c20a45d126d8e57bb",
+    "bytes": 833,
+    "status": "recovered exact authenticated original upstream bytes"
+  },
+  {
+    "name": "hi-post",
+    "git_blob": "09363aa716f8578f49ab36105f77580bb1b10383",
+    "sha256": "6f21a68256a0732c1d1019e895563bec66b82bea53b75947e0a1072a442ea3e4",
+    "bytes": 677,
+    "status": "recovered exact authenticated original upstream bytes"
+  },
+  {
+    "name": "it-map",
+    "git_blob": "f452f77e82b4e8e6a9bbda2ee10d60129332125e",
+    "sha256": "8207dbad4e96c104b25d23951be28e1e2eedfeaf73495b84938dbbbba60382ca",
+    "bytes": 363,
+    "status": "recovered exact authenticated original upstream bytes"
+  },
+  {
+    "name": "it-post",
+    "git_blob": "64e89029b28bad366c21c7649b6e17b4fdb93942",
+    "sha256": "fd4104d79ff9896686e7b7e8075115445f733405939c29cc91e18a952b0d6593",
+    "bytes": 109,
+    "status": "recovered exact authenticated original upstream bytes"
+  },
+  {
+    "name": "it-pre",
+    "git_blob": "c9e7f7b3edf27baeeaed680e8e1675c37cbe0c4c",
+    "sha256": "98e391381506cccf1ed489ff6dba9412be557924f2a0540fcaff32137bc39927",
+    "bytes": 189,
+    "status": "recovered exact authenticated original upstream bytes"
+  },
+  {
+    "name": "it-strip",
+    "git_blob": "47b171ac20bc6ca320543cd0c3d1d688dddde211",
+    "sha256": "ea73e40f19748cb5b516fb00adff366050ad9cd7b3df21cf3085c3a4c2b5c0fd",
+    "bytes": 3,
+    "status": "recovered exact authenticated original upstream bytes"
+  }
+]
