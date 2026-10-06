@@ -80,6 +80,7 @@ class DisabledTTSStreamingTests(unittest.IsolatedAsyncioTestCase):
 
         namespace = dict(
             asyncio=asyncio,
+            threading=threading,
             re=re,
             time=time,
             logger=Mock(),
@@ -552,7 +553,10 @@ class DisabledTTSStreamingTests(unittest.IsolatedAsyncioTestCase):
 
             def submit(inner, fn, *args, **kwargs):
                 result = super().submit(fn, *args, **kwargs)
-                if isinstance(fn, functools.partial) and getattr(fn.args[0], "__name__", None) == "_synthesize_locked":
+                if isinstance(fn, functools.partial) and getattr(fn.args[0], "__name__", None) in {
+                    "_synthesize_locked",
+                    "run_owned",
+                }:
                     submitted.set()
                 return result
 
