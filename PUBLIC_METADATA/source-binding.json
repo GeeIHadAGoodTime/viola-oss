@@ -1,41 +1,13 @@
 {
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "a9ed11f5818b8bb774b8867a10b276d615e6bdda8b7b0ee001f4df890bc0b5b0",
-  "source_tree_sha256": "7e7d1efa084cb0eb50fe2be641c87b13c0d0d17b63a5fdb7c6ebb4c7d1615808",
+  "source_manifest_sha256": "66d4bf160d414fd4083a70f76baa8e63a0f1d84358442ec82f85334e4c144fee",
+  "source_tree_sha256": "826dc0864432136b71fbc7eca6f6139f61e66e309128131fd79c8bb2a9c76a4d",
   "source_file_count": 2603,
-  "source_revision": "56b94251b594a4028f783c57ded4de43972a5f28",
-  "comparison_public_revision": "fe2fcc21ca0fcf47d0111c74ca0b35f0bd0b904e",
+  "source_revision": "3f861f99bcd17bda4cfbf131546455229003e9de",
+  "comparison_public_revision": "efcc2e0614d88fd0413a4255f51dd94a069a1fda",
   "changed_source_paths": [
-    "SOURCE/telephony/call_manager.py",
-    "SOURCE/tests/public/test_cjk_runtime_reconstruction.py",
-    "SOURCE/third_party/kokoro_onnx/src/kokoro_onnx/__init__.py",
-    "SOURCE/third_party/kokoro_onnx/src/kokoro_onnx/tokenizer.py",
-    "SOURCE/third_party/kokoro_onnx.patch",
-    "SOURCE/third_party/misaki_cjk_prototype/LICENSE",
-    "SOURCE/third_party/misaki_cjk_prototype/PROVENANCE.json",
-    "SOURCE/third_party/misaki_cjk_prototype/README.md",
-    "SOURCE/third_party/misaki_cjk_prototype/misaki/_licenses/convert-numbers-to-japanese-MIT.txt",
-    "SOURCE/third_party/misaki_cjk_prototype/misaki/_licenses/cutlet-MIT.txt",
-    "SOURCE/third_party/misaki_cjk_prototype/misaki/_licenses/pinyin-to-ipa-MIT.txt",
-    "SOURCE/third_party/misaki_cjk_prototype/misaki/cutlet.py",
-    "SOURCE/third_party/misaki_cjk_prototype/misaki/data/ja_words.txt",
-    "SOURCE/third_party/misaki_cjk_prototype/misaki/num2kana.py",
-    "SOURCE/third_party/misaki_cjk_prototype/misaki/transcription.py",
-    "SOURCE/third_party/misaki_cjk_prototype/misaki/zh.py",
-    "SOURCE/third_party/misaki_cjk_prototype/pyproject.toml",
-    "SOURCE/third_party/misaki_cjk_prototype/viola_cjk/__init__.py",
-    "SOURCE/third_party/misaki_cjk_prototype/viola_cjk/coverage.py",
-    "SOURCE/third_party/misaki_cjk_prototype/viola_cjk/customer_english_span.py",
-    "SOURCE/third_party/misaki_cjk_prototype/viola_cjk/japanese_factory.py",
-    "SOURCE/third_party/misaki_cjk_prototype/viola_cjk/locale_numbers.py",
-    "SOURCE/third_party/misaki_cjk_prototype/viola_cjk/mecabrc",
-    "SOURCE/third_party/misaki_cjk_prototype/viola_cjk/unidic.json",
-    "SOURCE/third_party/misaki_cjk_prototype.patch",
-    "SOURCE/third_party/sources.toml",
-    "SOURCE/tools/qualification/cjk_runtime_replay.py",
-    "SOURCE/voice/customer_composition.py",
-    "SOURCE/voice/synthesis/kokoro_engine.py"
+    "SOURCE/tools/qualification/cjk_runtime_replay.py"
   ],
   "retained_sboms": [
     {
@@ -97,22 +69,25 @@
     }
   ],
   "input_equivalence": {
-    "all_fe2_main_leaves_preserved_except_six_reviewed_source_changes_and_final_metadata": true,
-    "all29_feature_source_paths_unchanged": true,
-    "frontend_inputs_and_existing_runtime_profiles_unchanged_from_fe2": true,
-    "existing_feature_control_inputs_identical": true,
-    "retained_SBOMs_qualify_optional_CJK_graph": false,
-    "unrelated64_65_drafts_excluded": true
+    "all_production_runtime_default_profile_dependency_and_notice_files_unchanged": true,
+    "all_other2629_parent_leaves_unchanged_before_metadata": true,
+    "only_one_existing_fixture_method_changes": true,
+    "earlier_inert_runtime_source_evidence_preserved_for_identical_inputs": true,
+    "retained_SBOMs_qualify_optional_CJK_graph": false
   },
   "prior_binding": {
-    "source_revision": "62a22b00bc1ba5d686bc3a5ccf4554942f9231bc",
-    "source_manifest_sha256": "89ea5611d5c07a21b01a617fd7bf5c2da950d762f6fedf99f8cbf56a4e97eee7",
+    "source_revision": "56b94251b594a4028f783c57ded4de43972a5f28",
+    "source_manifest_sha256": "a9ed11f5818b8bb774b8867a10b276d615e6bdda8b7b0ee001f4df890bc0b5b0",
     "retained_prior_binding": {
-      "public_revision": "746d599aa11be05fb21d7089769d16b0ee48e7b1",
-      "path": "PUBLIC_METADATA/source-binding.json",
-      "git_blob": "3947230618cd6d1cf2404f3312c146c7c2cd1d5e",
-      "sha256": "b43f8bffc18357ac66cf462208e12b0e0ecfc088224deb7f2795f1a172004213",
-      "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/746d599aa11be05fb21d7089769d16b0ee48e7b1/PUBLIC_METADATA/source-binding.json"
+      "source_revision": "62a22b00bc1ba5d686bc3a5ccf4554942f9231bc",
+      "source_manifest_sha256": "89ea5611d5c07a21b01a617fd7bf5c2da950d762f6fedf99f8cbf56a4e97eee7",
+      "retained_prior_binding": {
+        "public_revision": "746d599aa11be05fb21d7089769d16b0ee48e7b1",
+        "path": "PUBLIC_METADATA/source-binding.json",
+        "git_blob": "3947230618cd6d1cf2404f3312c146c7c2cd1d5e",
+        "sha256": "b43f8bffc18357ac66cf462208e12b0e0ecfc088224deb7f2795f1a172004213",
+        "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/746d599aa11be05fb21d7089769d16b0ee48e7b1/PUBLIC_METADATA/source-binding.json"
+      }
     }
   },
   "new_resolution_performed": false,
@@ -4107,11 +4082,58 @@
     "reviewed_source_payloads_unchanged": true,
     "full_local_source_binding_verifier_rerun": true,
     "exact_head_hosted_checks": "pending updated feature head",
-    "native_runtime_installed_or_customer_qualification": false
+    "native_runtime_installed_or_customer_qualification": false,
+    "current_fixture_correction": {
+      "source_revision": "3f861f99bcd17bda4cfbf131546455229003e9de",
+      "base_commit": "efcc2e0614d88fd0413a4255f51dd94a069a1fda",
+      "patch_sha256": "765abbf4f8597d21308fcd28dee14af9d8ad7fa5dfa2cbd84775a756447783eb",
+      "author_tests": {
+        "fresh_public_wrapper": 1,
+        "actual_inert_child_methods": 34,
+        "baseline_alias_witness": "1 pass, 1 intended assertion failure",
+        "mutants": [
+          {
+            "case": "unresolved observer",
+            "assertion_failures": 1
+          },
+          {
+            "case": "whole-file read",
+            "assertion_failures": 2
+          },
+          {
+            "case": "oversized read",
+            "assertion_failures": 2
+          }
+        ],
+        "all_mutants_keep_positive": true,
+        "clean_mutant_errors": 0,
+        "ruff_diagnostics": 0,
+        "native_speech_or_model_execution": false,
+        "hosted_windows_result": "pending corrected head"
+      },
+      "independent_review_sha256": "5a0ceba955b004ef1cb408cdab96e2fc7fa48a28c6347b220f0b2f9829ac3b20",
+      "independent_review_scope": "34 actual inert child controls, alias and 4 MiB positives; five rejecting observer/partial/whole-file/oversized mutants; production bytes unchanged",
+      "original_exact_head_windows_failure": {
+        "head": "efcc2e0614d88fd0413a4255f51dd94a069a1fda",
+        "job_id": 112504757749,
+        "raw_log_sha256": "fab252f4bf059f0130da6a4612d9d8087bc4b39c17ea251d370666d921f501f9",
+        "one_child_failure": "bounded-read observer sees zero reads for unresolved path alias",
+        "other_child_methods_passed": 33
+      },
+      "corrected_windows_exact_head_checks": "pending final publication",
+      "native_speech_model_or_dictionary_execution": false,
+      "scope": "Source fixture only; this does not add runtime, packaging, acoustic or customer-release evidence"
+    },
+    "retained_predecessor_fields_context": {
+      "source_revision": "56b94251b594a4028f783c57ded4de43972a5f28",
+      "metadata_commit": "efcc2e0614d88fd0413a4255f51dd94a069a1fda",
+      "all_preexisting_fields_retained_exact": true,
+      "reference_paths_keep_original_targets": true
+    }
   },
   "reviewed_source_patch": {
-    "sha256": "a794c75c1ec8b09f2916256f5fd9cde3427b62328ece6cf611ad83a280719e7b",
-    "scope": "mechanical fe2 synchronization of the exact reviewed29 inactive CJK runtime paths",
+    "sha256": "765abbf4f8597d21308fcd28dee14af9d8ad7fa5dfa2cbd84775a756447783eb",
+    "scope": "One test-method correction: observe exact bounded dictionary reads through canonical path aliases; all production files unchanged",
     "prior_parent_source_patch": {
       "original_reviewed_source_commit": "d04eae717708e106abe2d8c17bb102846a75e3d8",
       "preserved_feature_head": "d85faddbfcd19ffba51bc537669c051a48b0b4cb",
@@ -5617,6 +5639,10 @@
       ],
       "canonical_sha256": "52dfb1e25cb1db3c18a3f0ad8eb2dcebf5d8c84fb859813bf8d2c862786787cb",
       "retention": "exact duplicate historical patch object remains in current main history"
+    },
+    "predecessor_source_patch_identity": {
+      "sha256": "a794c75c1ec8b09f2916256f5fd9cde3427b62328ece6cf611ad83a280719e7b",
+      "scope": "mechanical fe2 synchronization of the exact reviewed29 inactive CJK runtime paths"
     }
   },
   "native_volume_pre_rebase_evidence": {
@@ -5633,8 +5659,8 @@
     "sha256": "e7380d33f4de1bc53c3707a550a14b777d72c6de68e1fc987c02a91f167f9abb",
     "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/cf37df7c72d977e981b943358b9f3f1aceffe659/PUBLIC_METADATA/source-binding.json"
   },
-  "new_resolution_scope": "Mechanical source synchronization only; no new dependency resolution or graph choice. The optional CJK dependency declarations remain unchanged. All six retained inventories and their historical limits are preserved; they do not cover or qualify the optional CJK graph.",
-  "new_advisory_scan_scope": "No new local advisory scan. Applicable hosted gates must run on the final updated feature head.",
+  "new_resolution_scope": "Fixture-only correction. No dependency resolution, new installation, graph choice or production runtime change. Six inventories remain historical and do not qualify the optional CJK graph.",
+  "new_advisory_scan_scope": "No new local advisory scan. Fresh unchanged hosted checks are required on the corrected final feature head.",
   "retained_feature_binding": {
     "public_revision": "cc88476004f2a7b7ef443ef2e4ec4c85605690f6",
     "path": "PUBLIC_METADATA/source-binding.json",
@@ -5654,5 +5680,11 @@
     "path": "PUBLIC_METADATA/source-binding.json",
     "git_blob": "ae4a2b1cf161cd373fcdc0d0d6affe831cb780cc",
     "sha256": "7a45c1420d46822ff93557286a3853660530e402282132855700d246c686f734"
+  },
+  "previous_fixture_parent_binding": {
+    "commit": "efcc2e0614d88fd0413a4255f51dd94a069a1fda",
+    "git_blob": "1648d82bcd414894a835ed45f8c9c444b3c622b5",
+    "sha256": "5d9035c03ab55b91811d4ecf73da283c0789669f9ba09614fcefd1c8e8d383a4",
+    "path": "PUBLIC_METADATA/source-binding.json"
   }
 }

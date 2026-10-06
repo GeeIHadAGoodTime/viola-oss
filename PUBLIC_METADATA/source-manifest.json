@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "56b94251b594a4028f783c57ded4de43972a5f28",
-  "sha256": "7e7d1efa084cb0eb50fe2be641c87b13c0d0d17b63a5fdb7c6ebb4c7d1615808",
+  "revision": "3f861f99bcd17bda4cfbf131546455229003e9de",
+  "sha256": "826dc0864432136b71fbc7eca6f6139f61e66e309128131fd79c8bb2a9c76a4d",
   "files": [
     {
       "path": ".env.example",
@@ -8870,8 +8870,8 @@
     },
     {
       "path": "tools/qualification/cjk_runtime_replay.py",
-      "sha256": "33eedce3f1b1ec5c82f3e95f29c3a50815788e727409e735f0322443220a376d",
-      "bytes": 44361
+      "sha256": "fa88b8eceb243b5da9438ebce5151973db39dd9ce848430d604b331a2828d7f6",
+      "bytes": 45020
     },
     {
       "path": "tools/release/create_source_manifest.py",
