@@ -214,17 +214,16 @@ def register_control_routes(context: ApiContext, toolbox: RouteToolbox) -> None:
         _sm_transition(player, PlaybackPhase.PAUSED, user_initiated=True)
 
     def _direct_backend_resume():
-        """Bypass adapter lock chain — resume backend and set flags directly."""
+        """Publish playing flags only after an available backend resumes."""
         player = getattr(music, "player", None)
         if player is None:
-            return
+            raise RuntimeError("No player is available to resume")
         bm = getattr(player, "_backend_manager", None)
         backend = getattr(bm, "backend", None) if bm else getattr(player, "_backend", None)
-        if backend and hasattr(backend, "resume"):
-            try:
-                backend.resume()
-            except Exception as exc:
-                log.warning("Direct backend resume failed: %s", exc)
+        if backend is None or not callable(getattr(backend, "resume", None)):
+            raise RuntimeError("No playback backend is available to resume")
+        # Let the endpoint report failure without publishing false playing state.
+        backend.resume()
         # Set ALL flags — state computation uses _is_playing and _paused, not _state.is_playing
         player._user_paused = False
         player._paused = False
@@ -606,6 +605,11 @@ def register_control_routes(context: ApiContext, toolbox: RouteToolbox) -> None:
                     )
                 except Exception as exc:
                     log.warning("Direct backend resume also failed: %s", exc)
+                    return _control_error_response(
+                        500,
+                        "resume_failed",
+                        "Resume is temporarily unavailable right now.",
+                    )
             except Exception as exc:
                 log.exception("music.resume() failed: %s", exc)
                 try:
