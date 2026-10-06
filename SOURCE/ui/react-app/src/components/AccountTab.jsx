@@ -1948,7 +1948,7 @@ export function AccountTab({
   // above is still false for the first paint after sign-in. Treat either
   // session as "logged in" (issue #1067) rather than flashing the full
   // Google/Apple/email sign-in form at an already-authenticated user.
-  const { status: cloudStatus, user: cloudUser, signOut: cloudSignOut } = useCloudAuth();
+  const { status: cloudStatus, user: cloudUser, signOut: cloudSignOut, signOutFeedback } = useCloudAuth();
   const cloudIsLoggedIn = cloudStatus === 'signedIn';
   const effectiveIsLoggedIn = isLoggedIn || cloudIsLoggedIn;
   const effectiveUser = user || cloudUser;
@@ -2044,7 +2044,7 @@ export function AccountTab({
         {logoutPending ? 'Signing out…' : 'Retry sign-out'}
       </Button>
     </div>
-  ) : null;
+  ) : !effectiveIsLoggedIn && signOutFeedback?.warning ? <div role="status"><p>{signOutFeedback.warning}</p></div> : null;
 
   if (loading) {
     return (

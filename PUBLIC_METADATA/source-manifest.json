@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "7d3b011eb5ab609f651a8533a39932a61bae963b",
-  "sha256": "156a82fedf24fa5854a050c7d76ee0f16efdd3a4f1b287dac2e24333db21cd2c",
+  "revision": "473b8e235d24e1ff4b57aa42dbc50b0c3cd690b0",
+  "sha256": "67f1de0a52d6a0f6222a1cca4d3716b385e1c974d453f334b37c17410d4e2008",
   "files": [
     {
       "path": ".env.example",
@@ -515,8 +515,8 @@
     },
     {
       "path": "auth/desktop_session.py",
-      "sha256": "b0f25fc7d0376f177b7ed50aee69382a4579f1200b54379c667290dc0b1defb3",
-      "bytes": 45317
+      "sha256": "c3bf796aa11388f2b311128efb6ad7ce9309fa498c45f77adae9acaee5a9906a",
+      "bytes": 45955
     },
     {
       "path": "auth/field_encryption.py",
@@ -1175,8 +1175,8 @@
     },
     {
       "path": "core/user_context.py",
-      "sha256": "2647a2d6d60ae6cb558f095d613bde6b451c20ee80f1ba0581f3f39b4a46ca24",
-      "bytes": 18430
+      "sha256": "9983eacc790f9de230178513fd97ff794a4741fec704beb88ca3bfa74d203728",
+      "bytes": 19090
     },
     {
       "path": "core/user_notice.py",
@@ -3519,6 +3519,111 @@
       "bytes": 323
     },
     {
+      "path": "qualification/romance_semantic_lowering/README.md",
+      "sha256": "c175bce287d2460b8037ef6855203e74dd1750bd69088832942a44eb44bc4fdc",
+      "bytes": 2452
+    },
+    {
+      "path": "qualification/romance_semantic_lowering/integrity.json",
+      "sha256": "de2aa46b64bbf40de5113782e25f571faaebefa9e13e4136aeeaacf01446fc95",
+      "bytes": 3742
+    },
+    {
+      "path": "qualification/romance_semantic_lowering/romance-prototype/README.md",
+      "sha256": "9eb4677f3403b3dbc7023373754dda40fac539d4132cca4e6b2677ece66f11fc",
+      "bytes": 3515
+    },
+    {
+      "path": "qualification/romance_semantic_lowering/romance-prototype/_romance_vendor/LICENSE",
+      "sha256": "f6fb33ef599022318fb3fe61e3db72fa6591c83269131c9245139aa1eb800e90",
+      "bytes": 1080
+    },
+    {
+      "path": "qualification/romance_semantic_lowering/romance-prototype/_romance_vendor/__init__.py",
+      "sha256": "47e3e9b0ed6669ff4f0631c6c25cb322385f849697f91277bc4eb326df59112c",
+      "bytes": 213
+    },
+    {
+      "path": "qualification/romance_semantic_lowering/romance-prototype/_romance_vendor/base.py",
+      "sha256": "de7cd41b7d7c932ffe7c8a23cd2fa8c9cafa037ab4d16f2180e5768d67de207a",
+      "bytes": 2894
+    },
+    {
+      "path": "qualification/romance_semantic_lowering/romance-prototype/_romance_vendor/french.py",
+      "sha256": "f188040463369508218947a6e241bbb5a219b09c10515fa3e5bb996e192e73a9",
+      "bytes": 31085
+    },
+    {
+      "path": "qualification/romance_semantic_lowering/romance-prototype/_romance_vendor/portuguese.py",
+      "sha256": "005304915518187a49f13a2ca3217d23abce9530d432b68d19a198bd0aa4db41",
+      "bytes": 32526
+    },
+    {
+      "path": "qualification/romance_semantic_lowering/romance-prototype/_romance_vendor/spanish.py",
+      "sha256": "dd1506f6e1030c14ef1b9a4997e6155746cf5594ee47907d5282c14c20e97327",
+      "bytes": 25211
+    },
+    {
+      "path": "qualification/romance_semantic_lowering/romance-prototype/qualify_provenance.py",
+      "sha256": "7e42b415d374720d9a6e354122fa1bc9362caf8d2b01bb3e00a64194d7041a8a",
+      "bytes": 5128
+    },
+    {
+      "path": "qualification/romance_semantic_lowering/romance-prototype/romance_coverage.py",
+      "sha256": "6ee50ff62ac8c4b49345414b9d7eb8cfc415ac871cc119245b1dc9644e5b1c4d",
+      "bytes": 13933
+    },
+    {
+      "path": "qualification/romance_semantic_lowering/romance-prototype/test_romance_coverage.py",
+      "sha256": "74c133196c5d552c6e03afb3e02a54f26d8b97353a17c0f38b0bf0cf4e410af9",
+      "bytes": 8812
+    },
+    {
+      "path": "qualification/romance_semantic_lowering/romance-prototype/upstream-bindings.json",
+      "sha256": "020413fbc9ff52e7175d8e14e348fadb8fd3e80ca56a563e62e1463139d1131d",
+      "bytes": 2491
+    },
+    {
+      "path": "qualification/romance_semantic_lowering/romance-prototype/upstream-fail-closed.patch",
+      "sha256": "75c33f87caed731c98912369a10db1e2a17a65620801c6a253388ef63b3d0d34",
+      "bytes": 1854
+    },
+    {
+      "path": "qualification/romance_semantic_lowering/romance-prototype/upstream-modifications.json",
+      "sha256": "dcf1bd7850dcf5d1afd2c1edc39044830ce5161f2fa7e12ed99c4d8740f1a8c0",
+      "bytes": 995
+    },
+    {
+      "path": "qualification/romance_semantic_lowering/run_qualification.py",
+      "sha256": "1ea59efcc24bc78b57d85c143f7f481ec456e86eb2405da581f55243d0425ceb",
+      "bytes": 7557
+    },
+    {
+      "path": "qualification/romance_semantic_lowering/upstream/LICENSE",
+      "sha256": "f6fb33ef599022318fb3fe61e3db72fa6591c83269131c9245139aa1eb800e90",
+      "bytes": 1080
+    },
+    {
+      "path": "qualification/romance_semantic_lowering/upstream/base.py",
+      "sha256": "de7cd41b7d7c932ffe7c8a23cd2fa8c9cafa037ab4d16f2180e5768d67de207a",
+      "bytes": 2894
+    },
+    {
+      "path": "qualification/romance_semantic_lowering/upstream/french.py",
+      "sha256": "5c125d981490a0409cfc181daffdc0462ce006e740bf9e68190a3a6f492785d7",
+      "bytes": 30898
+    },
+    {
+      "path": "qualification/romance_semantic_lowering/upstream/portuguese.py",
+      "sha256": "74fdb32dba21e6de2397a13e1f99885b8ef3838ff6d86a8573197c899be91287",
+      "bytes": 32339
+    },
+    {
+      "path": "qualification/romance_semantic_lowering/upstream/spanish.py",
+      "sha256": "948bc543f36d6982b882eb3cb6c6ccd1fc0dc58a28c64486ff5f7271a7cd8d7b",
+      "bytes": 25021
+    },
+    {
       "path": "registry/TEMPLATE/__init__.py",
       "sha256": "20a2f43e9c2f1d8f09f7e4f4283e4d706793861f67a30e485e581893f3655299",
       "bytes": 911
@@ -5789,6 +5894,16 @@
       "bytes": 8622
     },
     {
+      "path": "tests/public/test_desktop_session_ordering.py",
+      "sha256": "8d5840f76fb1847c29856aec0be7e3353455881445ee2fd7b3a2aeafc4b8ba62",
+      "bytes": 7131
+    },
+    {
+      "path": "tests/public/test_disabled_tts_streaming.py",
+      "sha256": "b89aa53c72989086cf08b0617325c13018ebd9bd477dd13a1b0b61091713de66",
+      "bytes": 24850
+    },
+    {
       "path": "tests/public/test_english_decimal_normalization.py",
       "sha256": "59c39ec501956082b392c817de5022c283da67171288ba48bce94882e86cc06c",
       "bytes": 6612
@@ -5864,6 +5979,11 @@
       "bytes": 2733
     },
     {
+      "path": "tests/public/test_romance_qualification_packet.py",
+      "sha256": "d459d9bfb870463559e6395f0176ba7f14879d64428804d6dad191a39ecd0d52",
+      "bytes": 10014
+    },
+    {
       "path": "tests/public/test_selected_audio_output.py",
       "sha256": "944e23e3221176fe35799a428e89479ae4a7bce27e236e5186ffa81c587bdee6",
       "bytes": 35677
@@ -5885,8 +6005,13 @@
     },
     {
       "path": "tests/public/test_streaming_decimal_boundaries.py",
-      "sha256": "79b710751f8da16fa76c3e6956da238ad51d9cd2e0ee9eccde595ae81a0b2c00",
-      "bytes": 10832
+      "sha256": "d9338a597a68ccc651293e1921a74595372600593a7d71faf7b319dd9808ee7a",
+      "bytes": 11322
+    },
+    {
+      "path": "tests/public/test_streaming_watchdog_ownership.py",
+      "sha256": "4b438a068d6ece3e1036b62f7ce701dbede98c455af1d430574669058bb40b95",
+      "bytes": 14979
     },
     {
       "path": "tests/public/test_tool_allowlist_contract.py",
@@ -9310,7 +9435,7 @@
     },
     {
       "path": "ui/react-app/package-lock.json",
-      "sha256": "e2537605cc28b2972a29f8d6e5952f3d5ab2f9539979b9246cea5645264ed8f4",
+      "sha256": "81f7fbef0f2c717256cde0ec911bebfa239aeffe0c42cafa948666525827d3af",
       "bytes": 236773
     },
     {
@@ -9420,8 +9545,8 @@
     },
     {
       "path": "ui/react-app/src/SmartDisplay.jsx",
-      "sha256": "08d3425d0a17f1013fd2f23111d3762ca049f7472cf7b44af351ca9ac9233c9f",
-      "bytes": 172585
+      "sha256": "0a4f56b391c1036bd371d3f1de395e910b9586ed69be231b06c4de30ee4cda53",
+      "bytes": 169792
     },
     {
       "path": "ui/react-app/src/SmartDisplay.stageRouting.test.jsx",
@@ -9445,8 +9570,8 @@
     },
     {
       "path": "ui/react-app/src/__tests__/SmartDisplay.test.jsx",
-      "sha256": "0795fa55996da366fa484650e118b1dcccae3d2bee352c8ac74d3f53411963d3",
-      "bytes": 120438
+      "sha256": "b01906c95779633f15735c3c67557d8b76e152b465b26ef74079675dd5612435",
+      "bytes": 108586
     },
     {
       "path": "ui/react-app/src/__tests__/hooks/useEventBus.test.jsx",
@@ -9660,13 +9785,13 @@
     },
     {
       "path": "ui/react-app/src/auth/AuthProvider.jsx",
-      "sha256": "490322707b8f887acc7376ea8d81bda8d99fabed99885cc9bc9d0acd6da23e31",
-      "bytes": 36566
+      "sha256": "779c06cfb57739078d19ad9d9e37fe29c4c0e1ff66c17408f0c29f2bebe37b95",
+      "bytes": 39084
     },
     {
       "path": "ui/react-app/src/auth/AuthProvider.test.jsx",
-      "sha256": "845f33b3458ce114ffb4f78ee92fa6183b7755f9163328ec566261f1442fafa4",
-      "bytes": 48202
+      "sha256": "770456e4abebce9add61f0df5117505f8dcba4cd5e0c5ddabc72517fd767ec02",
+      "bytes": 50130
     },
     {
       "path": "ui/react-app/src/auth/authClient.csrf.test.js",
@@ -9680,8 +9805,8 @@
     },
     {
       "path": "ui/react-app/src/auth/authClient.js",
-      "sha256": "f6267de98e6d9a40996bc28d781a5f4672283be18619d210f23a4c03dd6d9611",
-      "bytes": 29447
+      "sha256": "6c474157ad2291039d57fd2aedaaf441bec934b94618c9fe472478cfd5c4057f",
+      "bytes": 30058
     },
     {
       "path": "ui/react-app/src/auth/authClient.test.js",
@@ -9709,9 +9834,19 @@
       "bytes": 237
     },
     {
+      "path": "ui/react-app/src/auth/logoutIntent.js",
+      "sha256": "3614f9e8241221543d341e0bf9a3f3f925a0eb20e44ced1b73730bedca127a2a",
+      "bytes": 8082
+    },
+    {
+      "path": "ui/react-app/src/auth/logoutIntent.test.js",
+      "sha256": "48faab88ec585a12f8478c8efbc375b2406695976a549c28f3e11b52522c7d7b",
+      "bytes": 11472
+    },
+    {
       "path": "ui/react-app/src/auth/useAuth.js",
-      "sha256": "ed62469bb5113b79404df2ec30380a0069d783bdfdc99886e6d7d40ce168d2c0",
-      "bytes": 3215
+      "sha256": "107b54f684ecb359b59116a1dd33c82d2bb4d19d7ca6d74340d24a5df1dd500a",
+      "bytes": 3261
     },
     {
       "path": "ui/react-app/src/components/AccentPicker.jsx",
@@ -9740,13 +9875,18 @@
     },
     {
       "path": "ui/react-app/src/components/AccountTab.jsx",
-      "sha256": "6d83cfec33677b762a517185cacab5529e7d03c09914274e5b8b41cd58d893c0",
-      "bytes": 75936
+      "sha256": "95b0de56b8b6851841e11939249d54743ad89f521526a0d2db98743d20b43476",
+      "bytes": 76064
     },
     {
       "path": "ui/react-app/src/components/AccountTab.legacy.jsx",
       "sha256": "e8cac7a43b4295fdc7c7d7513605f1bc832313aa784a2b9f5aeb3c6ac8a2b73d",
       "bytes": 53267
+    },
+    {
+      "path": "ui/react-app/src/components/AccountTab.logoutRestoration.test.jsx",
+      "sha256": "e8defd427dc6dc4bb8840b7739d493dcb141159cdad4d103731f10f875768217",
+      "bytes": 34008
     },
     {
       "path": "ui/react-app/src/components/AccountTab.mfa.test.jsx",
@@ -10265,8 +10405,8 @@
     },
     {
       "path": "ui/react-app/src/components/auth/CloudAuthGate.jsx",
-      "sha256": "9b538528f6e081df07810b0b342daeec05c19485006da55c97dc502b5bad38a3",
-      "bytes": 5556
+      "sha256": "24efd280be70abae5aca6af5fd1ca457edf2c4a3896ece35ef7d5918960a6f93",
+      "bytes": 5668
     },
     {
       "path": "ui/react-app/src/components/auth/LoginScreen.jsx",
@@ -10430,8 +10570,8 @@
     },
     {
       "path": "ui/react-app/src/components/player/PlayerSection.jsx",
-      "sha256": "9f31939c2f91214d748e6ae5823bcb48a6b03fcf47541a6b09cf0c1fec631eda",
-      "bytes": 6911
+      "sha256": "577305c3990faf2ab3920d6182c9711f8a5a45f7fd7a1822c88f6adfe6e59cc6",
+      "bytes": 6799
     },
     {
       "path": "ui/react-app/src/components/player/PlayerSection.module.css",
@@ -11235,8 +11375,8 @@
     },
     {
       "path": "ui/react-app/src/lib/auth_context.tsx",
-      "sha256": "168e63a532895d1f7cbf1d76d086ff3064ebb0db2a9f2838949745d2c2c6e451",
-      "bytes": 26972
+      "sha256": "2913a66e255e8393fa6e0c7e5a862aa250261b57c88c2241e8104b543e7a4fde",
+      "bytes": 35004
     },
     {
       "path": "ui/react-app/src/lib/csrf.js",
@@ -11602,6 +11742,11 @@
       "path": "ui/react-app/tests/minimatch_interop.test.js",
       "sha256": "13ea8afc1fedb7a0fd58733509fa56cfd7b658755c6919adcd910dd520be9254",
       "bytes": 1582
+    },
+    {
+      "path": "ui/react-app/tests/source_map_advisory.test.js",
+      "sha256": "1e7fadfde51fb50ae7db43c01cc5ec95f0deef1cfb68aa7d5219aa38ac1c868f",
+      "bytes": 2543
     },
     {
       "path": "ui/react-app/tests/youtube_embed_bridge.test.js",
@@ -12450,8 +12595,8 @@
     },
     {
       "path": "voice/synthesis/kokoro_engine.py",
-      "sha256": "7796e9aaab114cd37ffa2b971bfe6ad9129baf915f78270f8863b50476e0b04f",
-      "bytes": 59527
+      "sha256": "6d638682fa4b88a22dfb34741e6341270366958df41bfc364f6ec3c706945509",
+      "bytes": 70151
     },
     {
       "path": "voice/synthesis/lazy_engine.py",
