@@ -1,3 +1,6 @@
+import { ownsLogoutIntent, beginLogoutIntent, beginInteractiveSignIn, completeInteractiveSignIn,
+  captureSessionRestoration, mayRestoreSession, ownsInteractiveSignIn, mayApplySdkSession,
+  runSessionRestoration, retainRestorationCleanup, retainSessionUncertainty, runOwnedSessionAction } from '../auth/logoutIntent';
 import {
   createContext,
   useCallback,
@@ -17,7 +20,8 @@ import { AuthContext as CloudFrontDoorContext } from '../auth/AuthProvider';
 import { hydrateDesktopSessionFromCookie } from '../auth/authClient';
 import { completeDesktopOAuth } from '../auth/desktopOAuth';
 import { isDesktopApp } from '../utils/runtimeSurface';
-import { externalOAuthAuthorizeUrl, gotrueClient } from './gotrue_client';
+import { inMemorySessionStorage } from './sessionStore';
+import { externalOAuthAuthorizeUrl, gotrueClient, GOTRUE_STORAGE_KEY } from './gotrue_client';
 
 type AuthErrorDetails = {
   code: string;
@@ -295,6 +299,52 @@ function openExternalAuthUrl(url: string) {
   }
 }
 
+function passiveSdkPair(): { access_token: string; refresh_token: string } | null {
+  const raw = inMemorySessionStorage.getItem(GOTRUE_STORAGE_KEY);
+  if (raw === null) return null;
+  const value = JSON.parse(raw);
+  if (!value?.access_token && !value?.refresh_token) return null;
+  return { access_token: value.access_token || '', refresh_token: value.refresh_token || '' };
+}
+
+function sdkSessionPresent(): boolean {
+  try { return passiveSdkPair() !== null; } catch {
+    // Unreadable local state cannot be called clean. No credential values
+    // leave this passive check and no SDK getter/subscription is invoked.
+    return true;
+  }
+}
+
+function sameSdkPair(left: { access_token?: string; refresh_token?: string } | null,
+  right: { access_token?: string; refresh_token?: string } | null): boolean {
+  return Boolean(left?.access_token && left?.refresh_token && right
+    && left.access_token === right.access_token && left.refresh_token === right.refresh_token);
+}
+
+async function cleanupMatchingSdkPair(expected: { access_token?: string; refresh_token?: string } | null): Promise<void> {
+  let current;
+  try { current = passiveSdkPair(); } catch {
+    throw new Error('Local session state could not be read safely. Restart Viola before trying again.');
+  }
+  // This pre-call check is not a lock against arbitrary independent writers.
+  // Never treat a changed before/after snapshot as ownership of another pair.
+  if (!sameSdkPair(current, expected)) {
+    if (current) retainSessionUncertainty(sdkSessionPresent);
+    return;
+  }
+  const { error } = await gotrueClient.signOut({ scope: 'local' });
+  if (error) throw error;
+}
+
+async function retireSupersededSdkWrite(expected: { access_token?: string; refresh_token?: string } | null): Promise<AuthActionResult> {
+  const cleanup = () => cleanupMatchingSdkPair(expected);
+  try { await cleanup(); } catch (error) {
+    retainRestorationCleanup(cleanup, sdkSessionPresent);
+    throw error;
+  }
+  return { success: false, error: 'The account action was superseded. Please sign in again.' };
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<ViolaUser | null>(null);
@@ -319,7 +369,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     frontDoorRef.current = frontDoor;
   }, [frontDoor]);
 
-  const applySession = useCallback((nextSession: Session | null) => {
+  const applySession = useCallback((nextSession: Session | null, allowPendingMfa = false) => {
+    if (nextSession && !mayApplySdkSession() && !allowPendingMfa) nextSession = null;
     const nextUser = buildViolaUser(nextSession?.user || null);
     const nextPlan = decodePlanFromUser(nextSession?.user || null);
     const stepUp = mfaStepUpForSession(nextSession);
@@ -382,6 +433,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let mounted = true;
+    const restoration = captureSessionRestoration();
 
     // #2604 — persistent desktop sign-in. SEC-017 keeps the webview's GoTrue
     // tokens in memory only (never localStorage), so a fresh launch has no
@@ -393,23 +445,50 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // after sign-out) resolves to null exactly as before. Never runs on the
     // cloud surface (no desktop session store there).
     const resolveInitialSession = async (): Promise<Session | null> => {
+      if (!mayRestoreSession(restoration)) return null;
       const { data } = await gotrueClient.getSession();
+      if (!mayRestoreSession(restoration)) return null;
       if (data.session) return data.session;
       if (!isDesktopApp()) return null;
       const hydrated = await hydrateDesktopSessionFromCookie();
       if (!hydrated.ok || !hydrated.session) return null;
       // Seed the auth-js client so its normal auto-refresh lifecycle takes over
       // (the returned pair is already rotated/valid from the store).
-      const { data: setData } = await gotrueClient.setSession({
-        access_token: hydrated.session.access_token,
-        refresh_token: hydrated.session.refresh_token,
-      });
-      return setData.session || null;
+      return runSessionRestoration(async () => {
+        if (!mounted || !mayRestoreSession(restoration)) return null;
+        let restoredSession: Session | null;
+        try {
+          const { data: setData, error: restoreError } = await gotrueClient.setSession({
+            access_token: hydrated.session.access_token,
+            refresh_token: hydrated.session.refresh_token,
+          });
+          if (restoreError) throw restoreError;
+          restoredSession = setData.session || null;
+        } catch (restoreError) {
+          // Both thrown notifications and returned SDK errors can follow a
+          // write. Preserve that uncertainty across later unrelated work.
+          // An empty store remains a recoverable miss, not a poisoned drain.
+          if (sdkSessionPresent()) retainSessionUncertainty(sdkSessionPresent);
+          if (mounted && mayRestoreSession(restoration)) setAuthError(restoreError);
+          return null;
+        }
+        if (!mayRestoreSession(restoration)) {
+          // Explicit login/logout waits for this admitted write and cleanup.
+          // Do not leave a late cookie restoration in the singleton SDK.
+          const cleanup = () => cleanupMatchingSdkPair(hydrated.session);
+          try { await cleanup(); } catch (cleanupError) {
+            retainRestorationCleanup(cleanup, sdkSessionPresent);
+            throw cleanupError;
+          }
+          return null;
+        }
+        return restoredSession;
+      }, restoration);
     };
 
     resolveInitialSession()
       .then((initialSession) => {
-        if (mounted) applySession(initialSession);
+        if (mounted && mayRestoreSession(restoration)) applySession(initialSession);
       })
       .catch((err) => {
         if (mounted) setAuthError(err);
@@ -441,50 +520,69 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = useCallback(async (email: string, password: string): Promise<AuthActionResult> => {
+    const loginTicket = beginInteractiveSignIn();
     clearError();
-    try {
-      const { data, error: signInError } = await gotrueClient.signInWithPassword({
-        email: email.trim(),
-        password,
-      });
-      if (signInError) throw signInError;
-      applySession(data.session || null);
-      // GoTrue returns a session for an MFA-enrolled account, but only at AAL1.
-      // Surface the required TOTP step-up so the UI can prompt for the second
-      // factor instead of treating the half-authenticated session as done.
-      const stepUp = mfaStepUpForSession(data.session || null);
-      if (stepUp.pending && stepUp.factorId) {
-        return { success: false, mfaRequired: true, factorId: stepUp.factorId };
+    return runOwnedSessionAction(async (admitWrite, acceptSession) => {
+      try {
+        if (!ownsInteractiveSignIn(loginTicket)) return { success: false, error: 'The account action was superseded. Please sign in again.' };
+        admitWrite();
+        const { data, error: signInError } = await gotrueClient.signInWithPassword({
+          email: email.trim(),
+          password,
+        });
+        if (signInError) throw signInError;
+        // GoTrue returns a session for an MFA-enrolled account, but only at AAL1.
+        // Surface the required TOTP step-up so the UI can prompt for the second
+        // factor instead of treating the half-authenticated session as done.
+        const stepUp = mfaStepUpForSession(data.session || null);
+        if (stepUp.pending && stepUp.factorId) {
+          if (!ownsInteractiveSignIn(loginTicket)) return await retireSupersededSdkWrite(data.session);
+          applySession(data.session || null, true);
+          return { success: false, mfaRequired: true, factorId: stepUp.factorId };
+        }
+        if (!data.session || !completeInteractiveSignIn(loginTicket)) return await retireSupersededSdkWrite(data.session);
+        acceptSession();
+        applySession(data.session);
+        return { success: true };
+      } catch (err) {
+        if (!ownsInteractiveSignIn(loginTicket)) return { success: false, error: 'The account action was superseded. Please sign in again.' };
+        const { message, details } = setAuthError(err);
+        return { success: false, error: message, errorDetails: details };
       }
-      return { success: true };
-    } catch (err) {
-      const { message, details } = setAuthError(err);
-      return { success: false, error: message, errorDetails: details };
-    }
+    }, loginTicket, sdkSessionPresent);
   }, [applySession, clearError, setAuthError]);
 
   const verifyMfaTotp = useCallback(async (
     factorId: string,
     code: string,
   ): Promise<AuthActionResult> => {
+    const loginTicket = beginInteractiveSignIn();
     clearError();
-    try {
-      // challengeAndVerify does the GoTrue AAL2 step-up (mfa.challenge then
-      // mfa.verify) and, on success, upgrades the client's stored session to
-      // AAL2. Re-read it so React state reflects the fully-authenticated
-      // (step-up cleared) session as canonical truth.
-      const { error: verifyError } = await gotrueClient.mfa.challengeAndVerify({
-        factorId,
-        code: code.trim(),
-      });
-      if (verifyError) throw verifyError;
-      const { data: sessionData } = await gotrueClient.getSession();
-      applySession(sessionData.session || null);
-      return { success: true };
-    } catch (err) {
-      const { message, details } = setAuthError(err);
-      return { success: false, error: message, errorDetails: details };
-    }
+    return runOwnedSessionAction(async (admitWrite, acceptSession) => {
+      try {
+        if (!ownsInteractiveSignIn(loginTicket)) return { success: false, error: 'The account action was superseded. Please sign in again.' };
+        // challengeAndVerify does the GoTrue AAL2 step-up (mfa.challenge then
+        // mfa.verify) and, on success, upgrades the client's stored session to
+        // AAL2. Re-read it so React state reflects the fully-authenticated
+        // (step-up cleared) session as canonical truth.
+        admitWrite();
+        const { data: verifiedData, error: verifyError } = await gotrueClient.mfa.challengeAndVerify({
+          factorId,
+          code: code.trim(),
+        });
+        if (verifyError) throw verifyError;
+        if (!ownsInteractiveSignIn(loginTicket)) return await retireSupersededSdkWrite(verifiedData);
+        const { data: sessionData } = await gotrueClient.getSession();
+        if (!(sessionData.session || null) || !completeInteractiveSignIn(loginTicket)) return await retireSupersededSdkWrite(verifiedData);
+        acceptSession();
+        applySession(sessionData.session || null);
+        return { success: true };
+      } catch (err) {
+        if (!ownsInteractiveSignIn(loginTicket)) return { success: false, error: 'The account action was superseded. Please sign in again.' };
+        const { message, details } = setAuthError(err);
+        return { success: false, error: message, errorDetails: details };
+      }
+    }, loginTicket, sdkSessionPresent);
   }, [applySession, clearError, setAuthError]);
 
   const register = useCallback(
@@ -493,33 +591,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       password: string,
       consents: RegistrationConsents = { tosAccepted: false, legalEligibilityConfirmed: false },
     ): Promise<AuthActionResult> => {
+      const loginTicket = beginInteractiveSignIn();
       clearError();
-      try {
-        const { error: signUpError } = await gotrueClient.signUp({
-          email: email.trim(),
-          password,
-          options: {
-            emailRedirectTo: authRedirectUrl('verify'),
-            data: {
-              coppa_age_confirmed: consents.legalEligibilityConfirmed === true,
-              legal_eligibility_confirmed: consents.legalEligibilityConfirmed === true,
-              tos_accepted: consents.tosAccepted === true,
-              terms_version: consents.termsVersion || ACCEPTED_TERMS_VERSION,
-              privacy_version: consents.privacyVersion || ACCEPTED_PRIVACY_VERSION,
+      return runOwnedSessionAction(async (admitWrite, acceptSession) => {
+        try {
+          if (!ownsInteractiveSignIn(loginTicket)) return { success: false, error: 'The account action was superseded. Please sign in again.' };
+          admitWrite();
+          const { data, error: signUpError } = await gotrueClient.signUp({
+            email: email.trim(),
+            password,
+            options: {
+              emailRedirectTo: authRedirectUrl('verify'),
+              data: {
+                coppa_age_confirmed: consents.legalEligibilityConfirmed === true,
+                legal_eligibility_confirmed: consents.legalEligibilityConfirmed === true,
+                tos_accepted: consents.tosAccepted === true,
+                terms_version: consents.termsVersion || ACCEPTED_TERMS_VERSION,
+                privacy_version: consents.privacyVersion || ACCEPTED_PRIVACY_VERSION,
+              },
             },
-          },
-        });
-        if (signUpError) throw signUpError;
-        return {
-          success: true,
-          message: 'Account created. Check your email to verify, then sign in.',
-        };
-      } catch (err) {
-        const { message, details } = setAuthError(err);
-        return { success: false, error: message, errorDetails: details };
-      }
+          });
+          if (signUpError) throw signUpError;
+          if (data?.session) {
+            if (!completeInteractiveSignIn(loginTicket)) return await retireSupersededSdkWrite(data.session);
+            acceptSession();
+            applySession(data.session);
+          }
+          return {
+            success: true,
+            message: 'Account created. Check your email to verify, then sign in.',
+          };
+        } catch (err) {
+        if (!ownsInteractiveSignIn(loginTicket)) return { success: false, error: 'The account action was superseded. Please sign in again.' };
+          const { message, details } = setAuthError(err);
+          return { success: false, error: message, errorDetails: details };
+        }
+      }, loginTicket, sdkSessionPresent);
     },
-    [clearError, setAuthError],
+    [applySession, clearError, setAuthError],
   );
 
   const requestMagicLink = useCallback(async (email: string): Promise<AuthActionResult> => {
@@ -544,20 +653,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     email: string,
     token: string,
   ): Promise<AuthActionResult> => {
+    const loginTicket = beginInteractiveSignIn();
     clearError();
-    try {
-      const { data, error: otpError } = await gotrueClient.verifyOtp({
-        email: email.trim(),
-        token: token.trim(),
-        type: 'magiclink',
-      });
-      if (otpError) throw otpError;
-      applySession(data.session || null);
-      return { success: true };
-    } catch (err) {
-      const { message, details } = setAuthError(err);
-      return { success: false, error: message, errorDetails: details };
-    }
+    return runOwnedSessionAction(async (admitWrite, acceptSession) => {
+      try {
+        if (!ownsInteractiveSignIn(loginTicket)) return { success: false, error: 'The account action was superseded. Please sign in again.' };
+        admitWrite();
+        const { data, error: otpError } = await gotrueClient.verifyOtp({
+          email: email.trim(),
+          token: token.trim(),
+          type: 'magiclink',
+        });
+        if (otpError) throw otpError;
+        if (!(data.session || null) || !completeInteractiveSignIn(loginTicket)) return await retireSupersededSdkWrite(data.session);
+        acceptSession();
+        applySession(data.session || null);
+        return { success: true };
+      } catch (err) {
+        if (!ownsInteractiveSignIn(loginTicket)) return { success: false, error: 'The account action was superseded. Please sign in again.' };
+        const { message, details } = setAuthError(err);
+        return { success: false, error: message, errorDetails: details };
+      }
+    }, loginTicket, sdkSessionPresent);
   }, [applySession, clearError, setAuthError]);
 
   const requestPasswordReset = useCallback(async (email: string): Promise<AuthActionResult> => {
@@ -593,17 +710,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [applySession, clearError, setAuthError]);
 
   const logout = useCallback(async (): Promise<AuthActionResult> => {
+    const logoutTicket = beginLogoutIntent();
     clearError();
-    try {
-      const { error: signOutError } = await gotrueClient.signOut({ scope: 'local' });
-      if (signOutError) throw signOutError;
-      applySession(null);
-      setPasswordRecovery(false);
-      return { success: true };
-    } catch (err) {
-      const { message, details } = setAuthError(err);
-      return { success: false, error: message, errorDetails: details };
-    }
+    return runOwnedSessionAction(async (admitWrite) => {
+      try {
+        if (!ownsLogoutIntent(logoutTicket)) return { success: false, error: 'The account action was superseded. Please sign in again.' };
+        admitWrite();
+        const { error: signOutError } = await gotrueClient.signOut({ scope: 'local' });
+        if (signOutError) throw signOutError;
+        applySession(null);
+        setPasswordRecovery(false);
+        return { success: true };
+      } catch (err) {
+        const { message, details } = setAuthError(err);
+        return { success: false, error: message, errorDetails: details };
+      }
+    }, logoutTicket, sdkSessionPresent);
   }, [applySession, clearError, setAuthError]);
 
   // Provider sign-in. Resolves `success: true` ONLY once a real session
@@ -623,28 +745,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // so there is no honest provider sign-in to offer there, and this refuses
   // rather than pretending. That surface has its own front door.
   const startOAuthFlow = useCallback(async (provider: string): Promise<AuthActionResult> => {
+    const loginTicket = beginInteractiveSignIn();
     clearError();
     if (!isDesktopApp()) {
       const message = 'Provider sign-in is not available here. Use your email and password.';
       setError(message);
       return { success: false, error: message, errorDetails: null };
     }
-    try {
-      const outcome = await completeDesktopOAuth(
-        provider,
-        (url: string) => openExternalAuthUrl(externalOAuthAuthorizeUrl(url)),
-      );
-      if (outcome.status !== 'signed_in') {
-        setError(outcome.message);
-        setErrorDetails({ code: outcome.code, status: 0, retryAfter: null, details: null });
-        return { success: false, error: outcome.message };
+    return runOwnedSessionAction(async (admitWrite, acceptSession) => {
+      try {
+        if (!ownsInteractiveSignIn(loginTicket)) return { success: false, error: 'The account action was superseded. Please sign in again.' };
+        admitWrite();
+        const outcome = await completeDesktopOAuth(
+          provider,
+          (url: string) => openExternalAuthUrl(externalOAuthAuthorizeUrl(url)),
+        );
+        if (outcome.status !== 'signed_in') {
+          setError(outcome.message);
+          setErrorDetails({ code: outcome.code, status: 0, retryAfter: null, details: null });
+          return { success: false, error: outcome.message };
+        }
+        if (!(outcome.session) || !completeInteractiveSignIn(loginTicket)) return await retireSupersededSdkWrite(outcome.session);
+        acceptSession();
+        applySession(outcome.session);
+        return { success: true };
+      } catch (err) {
+        if (!ownsInteractiveSignIn(loginTicket)) return { success: false, error: 'The account action was superseded. Please sign in again.' };
+        const { message, details } = setAuthError(err);
+        return { success: false, error: message, errorDetails: details };
       }
-      applySession(outcome.session);
-      return { success: true };
-    } catch (err) {
-      const { message, details } = setAuthError(err);
-      return { success: false, error: message, errorDetails: details };
-    }
+    }, loginTicket, sdkSessionPresent);
   }, [applySession, clearError, setAuthError]);
 
   const value = useMemo<AuthContextValue>(() => ({
