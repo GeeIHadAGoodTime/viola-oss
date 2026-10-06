@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "3f861f99bcd17bda4cfbf131546455229003e9de",
-  "sha256": "826dc0864432136b71fbc7eca6f6139f61e66e309128131fd79c8bb2a9c76a4d",
+  "revision": "5a9f48867811ab951e368f0ca1cc28cd53f17e7c",
+  "sha256": "40522929698b94f6a5995999f5287b9f2a61edf09fb819c7e66e551e40dccc9d",
   "files": [
     {
       "path": ".env.example",
@@ -6135,8 +6135,8 @@
     },
     {
       "path": "third_party/misaki_cjk_prototype.patch",
-      "sha256": "f2bbfc78c224814590245eed900d61f8ad8f8204521481ba6bc80b4508307ad3",
-      "bytes": 36138
+      "sha256": "5fe0ed15c335b4a6d33d1ee40524e61215399a49c5118a47547511f831b951ad",
+      "bytes": 36097
     },
     {
       "path": "third_party/misaki_cjk_prototype/LICENSE",
@@ -6195,8 +6195,8 @@
     },
     {
       "path": "third_party/misaki_cjk_prototype/pyproject.toml",
-      "sha256": "801c0685e86a36d5389865457d9f407d50a067bb5629b563fe3e607c68fc829f",
-      "bytes": 967
+      "sha256": "cd88246eedf56422b2c12c97655fe597e171d2de64395b8cb5c15248fa419c13",
+      "bytes": 927
     },
     {
       "path": "third_party/misaki_cjk_prototype/viola_cjk/__init__.py",
@@ -8865,7 +8865,7 @@
     },
     {
       "path": "third_party/sources.toml",
-      "sha256": "9d27d477b0dec208a5a27dd53a6d740621ec58b52edcbecc03904583a4bbc6f7",
+      "sha256": "c3c01e5702e24747f2cc6a47544bf3bf3fef4194f53baaa535d878e8750313cc",
       "bytes": 210783
     },
     {

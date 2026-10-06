@@ -1,13 +1,15 @@
 {
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "66d4bf160d414fd4083a70f76baa8e63a0f1d84358442ec82f85334e4c144fee",
-  "source_tree_sha256": "826dc0864432136b71fbc7eca6f6139f61e66e309128131fd79c8bb2a9c76a4d",
+  "source_manifest_sha256": "cd353915ac4e6eb592c2f0fa9a35c33dacf20e659c44db7e6faba71a4eced868",
+  "source_tree_sha256": "40522929698b94f6a5995999f5287b9f2a61edf09fb819c7e66e551e40dccc9d",
   "source_file_count": 2603,
-  "source_revision": "3f861f99bcd17bda4cfbf131546455229003e9de",
-  "comparison_public_revision": "efcc2e0614d88fd0413a4255f51dd94a069a1fda",
+  "source_revision": "5a9f48867811ab951e368f0ca1cc28cd53f17e7c",
+  "comparison_public_revision": "098258228a35523aae59e0e09d22e07a868ec98f",
   "changed_source_paths": [
-    "SOURCE/tools/qualification/cjk_runtime_replay.py"
+    "SOURCE/third_party/misaki_cjk_prototype/pyproject.toml",
+    "SOURCE/third_party/misaki_cjk_prototype.patch",
+    "SOURCE/third_party/sources.toml"
   ],
   "retained_sboms": [
     {
@@ -69,24 +71,29 @@
     }
   ],
   "input_equivalence": {
-    "all_production_runtime_default_profile_dependency_and_notice_files_unchanged": true,
-    "all_other2629_parent_leaves_unchanged_before_metadata": true,
-    "only_one_existing_fixture_method_changes": true,
-    "earlier_inert_runtime_source_evidence_preserved_for_identical_inputs": true,
+    "all_runtime_English_notice_license_and_dependency_values_unchanged": true,
+    "only_one_packaging_entry_and_two_vendor_provenance_mirrors_change": true,
+    "all_predecessor_Windows_test_method_bodies_unchanged": true,
+    "fresh_hosted_checks_required_for_changed_packaging_inputs": true,
+    "both_actual_wheel_build_inputs_match_this_source_commit": true,
     "retained_SBOMs_qualify_optional_CJK_graph": false
   },
   "prior_binding": {
-    "source_revision": "56b94251b594a4028f783c57ded4de43972a5f28",
-    "source_manifest_sha256": "a9ed11f5818b8bb774b8867a10b276d615e6bdda8b7b0ee001f4df890bc0b5b0",
+    "source_revision": "3f861f99bcd17bda4cfbf131546455229003e9de",
+    "source_manifest_sha256": "66d4bf160d414fd4083a70f76baa8e63a0f1d84358442ec82f85334e4c144fee",
     "retained_prior_binding": {
-      "source_revision": "62a22b00bc1ba5d686bc3a5ccf4554942f9231bc",
-      "source_manifest_sha256": "89ea5611d5c07a21b01a617fd7bf5c2da950d762f6fedf99f8cbf56a4e97eee7",
+      "source_revision": "56b94251b594a4028f783c57ded4de43972a5f28",
+      "source_manifest_sha256": "a9ed11f5818b8bb774b8867a10b276d615e6bdda8b7b0ee001f4df890bc0b5b0",
       "retained_prior_binding": {
-        "public_revision": "746d599aa11be05fb21d7089769d16b0ee48e7b1",
-        "path": "PUBLIC_METADATA/source-binding.json",
-        "git_blob": "3947230618cd6d1cf2404f3312c146c7c2cd1d5e",
-        "sha256": "b43f8bffc18357ac66cf462208e12b0e0ecfc088224deb7f2795f1a172004213",
-        "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/746d599aa11be05fb21d7089769d16b0ee48e7b1/PUBLIC_METADATA/source-binding.json"
+        "source_revision": "62a22b00bc1ba5d686bc3a5ccf4554942f9231bc",
+        "source_manifest_sha256": "89ea5611d5c07a21b01a617fd7bf5c2da950d762f6fedf99f8cbf56a4e97eee7",
+        "retained_prior_binding": {
+          "public_revision": "746d599aa11be05fb21d7089769d16b0ee48e7b1",
+          "path": "PUBLIC_METADATA/source-binding.json",
+          "git_blob": "3947230618cd6d1cf2404f3312c146c7c2cd1d5e",
+          "sha256": "b43f8bffc18357ac66cf462208e12b0e0ecfc088224deb7f2795f1a172004213",
+          "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/746d599aa11be05fb21d7089769d16b0ee48e7b1/PUBLIC_METADATA/source-binding.json"
+        }
       }
     }
   },
@@ -4129,11 +4136,122 @@
       "metadata_commit": "efcc2e0614d88fd0413a4255f51dd94a069a1fda",
       "all_preexisting_fields_retained_exact": true,
       "reference_paths_keep_original_targets": true
+    },
+    "current_packaging_correction": {
+      "source_revision": "5a9f48867811ab951e368f0ca1cc28cd53f17e7c",
+      "base_commit": "098258228a35523aae59e0e09d22e07a868ec98f",
+      "patch_sha256": "65b0428b0501ec547e99652e681bf97f4f45c34e160d2226247c15880332e9bd",
+      "independent_review_sha256": "b5ec144a0a943993702c8e9de2d9c9a6e56340e619f27cb4b3e72e834c2819a6",
+      "source_review_manifest_sha256": "cf79ca0acc23de830f47f8a22fedb13169bc50559cec4e93bd35cde87095a160",
+      "packet_manifest_sha256": "8c0ae0bb28e99628fd4ee566d1f05b73076f633817a8861da8b87d11d80d5c78",
+      "backend_staging_sha256": "a7698623e25e85f84a4e512b104601f45d93a182d5bc583f5d93088c420d42f6",
+      "builds": {
+        "misaki_en": {
+          "source": "misaki_en",
+          "wheel": "viola_misaki_en-0.9.4+viola.1-py3-none-any.whl",
+          "sha256": "671af76bbde1413610ad405e605b9aac099dbf89c6197b8c853e157f570e6496",
+          "bytes": 2981960,
+          "backend_versions": {
+            "packaging": "26.3",
+            "pluggy": "1.6.0",
+            "trove-classifiers": "2026.9.21.13",
+            "pathspec": "1.1.1",
+            "hatchling": "1.29.0"
+          },
+          "extra_build_requirements": [],
+          "source_inputs_unchanged": true,
+          "blocked_external_operations": [],
+          "elapsed_seconds": 0.8200504639971768,
+          "peak_rss_kib": 22416,
+          "native_speech_model_or_dictionary_execution": false,
+          "installed_runtime_or_release_qualification": false
+        },
+        "misaki_cjk_prototype": {
+          "source": "misaki_cjk_prototype",
+          "wheel": "viola_misaki_cjk_prototype-0.9.4+viola.cjk.2-py3-none-any.whl",
+          "sha256": "1b0417261b0c412329f6554a6b476af97d9c5039a02a24ea457184d9362ec323",
+          "bytes": 513604,
+          "backend_versions": {
+            "packaging": "26.3",
+            "pluggy": "1.6.0",
+            "trove-classifiers": "2026.9.21.13",
+            "pathspec": "1.1.1",
+            "hatchling": "1.29.0"
+          },
+          "extra_build_requirements": [],
+          "source_inputs_unchanged": true,
+          "blocked_external_operations": [],
+          "elapsed_seconds": 0.30492419900838286,
+          "peak_rss_kib": 24264,
+          "native_speech_model_or_dictionary_execution": false,
+          "installed_runtime_or_release_qualification": false
+        },
+        "misaki_cjk_no_duplicate_notices": {
+          "source": "misaki_cjk_no_duplicate_notices",
+          "wheel": "viola_misaki_cjk_prototype-0.9.4+viola.cjk.2-py3-none-any.whl",
+          "sha256": "2b3ad0e0dd1e97af8fe028597c2bdc378311c20ecfc094d7db42e19d2e5e3ea4",
+          "bytes": 511205,
+          "backend_versions": {
+            "packaging": "26.3",
+            "pluggy": "1.6.0",
+            "trove-classifiers": "2026.9.21.13",
+            "pathspec": "1.1.1",
+            "hatchling": "1.29.0"
+          },
+          "extra_build_requirements": [],
+          "source_inputs_unchanged": true,
+          "blocked_external_operations": [],
+          "elapsed_seconds": 0.353995636003674,
+          "peak_rss_kib": 24264,
+          "native_speech_model_or_dictionary_execution": false,
+          "installed_runtime_or_release_qualification": false
+        }
+      },
+      "artifact_delta": {
+        "original_CJK_wheel_has_three_duplicate_notice_members_and_RECORD_rows": true,
+        "corrected_CJK_unique_members": 23,
+        "English_unique_members": 12,
+        "all22_non_RECORD_CJK_members_byte_identical": true,
+        "RECORD_unique_rows_unchanged": true,
+        "all_notice_bytes_preserved": true
+      },
+      "author_controls": {
+        "coherent_wheel_negatives": 66,
+        "physical_layout_negatives": 22,
+        "physical_preservation_positives": 12,
+        "combined_files": 35,
+        "module_specs_without_imports": 13,
+        "vendor_files_verified": 19,
+        "zero_fuzz_additive_vendor_patch_files": 13
+      },
+      "independent_controls": {
+        "coherent_artifact_negatives": 82,
+        "byte_identical_corrected_wheel_rebuild": true,
+        "combined_files": 35,
+        "module_specs_without_imports": 13,
+        "source_and_backend_remain_read_only": true,
+        "final_packaging_and_review_bytes": 38061638,
+        "approved_packaging_bound_bytes": 41943040
+      },
+      "exact_head_hosted_checks": "pending final published packaging source head",
+      "runtime_installation_native_speech_model_dictionary_execution_or_customer_eligibility": false,
+      "scope": "Vendor wheel bytes, dependency metadata, source/data/notice ownership and namespace availability only; transitive graph/native/frozen/audio/installed gates remain open",
+      "qualified_vendor_wheel_sha256s": [
+        "671af76bbde1413610ad405e605b9aac099dbf89c6197b8c853e157f570e6496",
+        "2b3ad0e0dd1e97af8fe028597c2bdc378311c20ecfc094d7db42e19d2e5e3ea4"
+      ],
+      "rejected_original_CJK_wheel_sha256": "1b0417261b0c412329f6554a6b476af97d9c5039a02a24ea457184d9362ec323"
+    },
+    "packaging_predecessor_fields_context": {
+      "source_revision": "3f861f99bcd17bda4cfbf131546455229003e9de",
+      "metadata_commit": "098258228a35523aae59e0e09d22e07a868ec98f",
+      "all_preexisting_qualification_fields_retained_exact": true,
+      "existing_history_reference_paths_keep_original_targets": true
     }
   },
   "reviewed_source_patch": {
-    "sha256": "765abbf4f8597d21308fcd28dee14af9d8ad7fa5dfa2cbd84775a756447783eb",
-    "scope": "One test-method correction: observe exact bounded dictionary reads through canonical path aliases; all production files unchanged",
+    "sha256": "65b0428b0501ec547e99652e681bf97f4f45c34e160d2226247c15880332e9bd",
+    "scope": "Remove one redundant notice force-include entry and update only its vendor reconstruction and hash declaration",
     "prior_parent_source_patch": {
       "original_reviewed_source_commit": "d04eae717708e106abe2d8c17bb102846a75e3d8",
       "preserved_feature_head": "d85faddbfcd19ffba51bc537669c051a48b0b4cb",
@@ -5643,6 +5761,10 @@
     "predecessor_source_patch_identity": {
       "sha256": "a794c75c1ec8b09f2916256f5fd9cde3427b62328ece6cf611ad83a280719e7b",
       "scope": "mechanical fe2 synchronization of the exact reviewed29 inactive CJK runtime paths"
+    },
+    "predecessor_packaging_source_patch_identity": {
+      "sha256": "765abbf4f8597d21308fcd28dee14af9d8ad7fa5dfa2cbd84775a756447783eb",
+      "scope": "One test-method correction: observe exact bounded dictionary reads through canonical path aliases; all production files unchanged"
     }
   },
   "native_volume_pre_rebase_evidence": {
@@ -5659,8 +5781,8 @@
     "sha256": "e7380d33f4de1bc53c3707a550a14b777d72c6de68e1fc987c02a91f167f9abb",
     "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/cf37df7c72d977e981b943358b9f3f1aceffe659/PUBLIC_METADATA/source-binding.json"
   },
-  "new_resolution_scope": "Fixture-only correction. No dependency resolution, new installation, graph choice or production runtime change. Six inventories remain historical and do not qualify the optional CJK graph.",
-  "new_advisory_scan_scope": "No new local advisory scan. Fresh unchanged hosted checks are required on the corrected final feature head.",
+  "new_resolution_scope": "No speech dependency installation or runtime resolution. The approved task-local build closure staged only two exact official wheels and reused three existing verified build dependencies; no additional backend requirement was requested. Retained SBOMs remain historical and do not qualify the optional CJK graph.",
+  "new_advisory_scan_scope": "No new local advisory scan. Applicable hosted checks must run on the final packaging-source head.",
   "retained_feature_binding": {
     "public_revision": "cc88476004f2a7b7ef443ef2e4ec4c85605690f6",
     "path": "PUBLIC_METADATA/source-binding.json",
@@ -5686,5 +5808,12 @@
     "git_blob": "1648d82bcd414894a835ed45f8c9c444b3c622b5",
     "sha256": "5d9035c03ab55b91811d4ecf73da283c0789669f9ba09614fcefd1c8e8d383a4",
     "path": "PUBLIC_METADATA/source-binding.json"
-  }
+  },
+  "previous_packaging_parent_binding": {
+    "commit": "098258228a35523aae59e0e09d22e07a868ec98f",
+    "path": "PUBLIC_METADATA/source-binding.json",
+    "git_blob": "9493d02e82140b8f003d528a069e07b7c54fad53",
+    "sha256": "95f73b5b2268b8fdadc8012d11a5a23ec7e82270b21ad3e5d1fb55fe77fc9cbf"
+  },
+  "new_vendor_wheel_qualification_performed": true
 }
