@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "5db590409955156a4d3df61c6439f09c5bdb19f6",
-  "sha256": "ad44b3bc2d9040ee2d0c1c442119f49f93acc9623395014ccf8ae7d5348adbb9",
+  "revision": "dee3a641081114dc8dc48b92b566d889ce5030c9",
+  "sha256": "fe2874c829ca3cf7c6f1139f491b71ce29cb53838f407f4b5cc8e7ce1d942941",
   "files": [
     {
       "path": ".env.example",
@@ -3519,6 +3519,111 @@
       "bytes": 323
     },
     {
+      "path": "qualification/romance_semantic_lowering/README.md",
+      "sha256": "c175bce287d2460b8037ef6855203e74dd1750bd69088832942a44eb44bc4fdc",
+      "bytes": 2452
+    },
+    {
+      "path": "qualification/romance_semantic_lowering/integrity.json",
+      "sha256": "de2aa46b64bbf40de5113782e25f571faaebefa9e13e4136aeeaacf01446fc95",
+      "bytes": 3742
+    },
+    {
+      "path": "qualification/romance_semantic_lowering/romance-prototype/README.md",
+      "sha256": "9eb4677f3403b3dbc7023373754dda40fac539d4132cca4e6b2677ece66f11fc",
+      "bytes": 3515
+    },
+    {
+      "path": "qualification/romance_semantic_lowering/romance-prototype/_romance_vendor/LICENSE",
+      "sha256": "f6fb33ef599022318fb3fe61e3db72fa6591c83269131c9245139aa1eb800e90",
+      "bytes": 1080
+    },
+    {
+      "path": "qualification/romance_semantic_lowering/romance-prototype/_romance_vendor/__init__.py",
+      "sha256": "47e3e9b0ed6669ff4f0631c6c25cb322385f849697f91277bc4eb326df59112c",
+      "bytes": 213
+    },
+    {
+      "path": "qualification/romance_semantic_lowering/romance-prototype/_romance_vendor/base.py",
+      "sha256": "de7cd41b7d7c932ffe7c8a23cd2fa8c9cafa037ab4d16f2180e5768d67de207a",
+      "bytes": 2894
+    },
+    {
+      "path": "qualification/romance_semantic_lowering/romance-prototype/_romance_vendor/french.py",
+      "sha256": "f188040463369508218947a6e241bbb5a219b09c10515fa3e5bb996e192e73a9",
+      "bytes": 31085
+    },
+    {
+      "path": "qualification/romance_semantic_lowering/romance-prototype/_romance_vendor/portuguese.py",
+      "sha256": "005304915518187a49f13a2ca3217d23abce9530d432b68d19a198bd0aa4db41",
+      "bytes": 32526
+    },
+    {
+      "path": "qualification/romance_semantic_lowering/romance-prototype/_romance_vendor/spanish.py",
+      "sha256": "dd1506f6e1030c14ef1b9a4997e6155746cf5594ee47907d5282c14c20e97327",
+      "bytes": 25211
+    },
+    {
+      "path": "qualification/romance_semantic_lowering/romance-prototype/qualify_provenance.py",
+      "sha256": "7e42b415d374720d9a6e354122fa1bc9362caf8d2b01bb3e00a64194d7041a8a",
+      "bytes": 5128
+    },
+    {
+      "path": "qualification/romance_semantic_lowering/romance-prototype/romance_coverage.py",
+      "sha256": "6ee50ff62ac8c4b49345414b9d7eb8cfc415ac871cc119245b1dc9644e5b1c4d",
+      "bytes": 13933
+    },
+    {
+      "path": "qualification/romance_semantic_lowering/romance-prototype/test_romance_coverage.py",
+      "sha256": "74c133196c5d552c6e03afb3e02a54f26d8b97353a17c0f38b0bf0cf4e410af9",
+      "bytes": 8812
+    },
+    {
+      "path": "qualification/romance_semantic_lowering/romance-prototype/upstream-bindings.json",
+      "sha256": "020413fbc9ff52e7175d8e14e348fadb8fd3e80ca56a563e62e1463139d1131d",
+      "bytes": 2491
+    },
+    {
+      "path": "qualification/romance_semantic_lowering/romance-prototype/upstream-fail-closed.patch",
+      "sha256": "75c33f87caed731c98912369a10db1e2a17a65620801c6a253388ef63b3d0d34",
+      "bytes": 1854
+    },
+    {
+      "path": "qualification/romance_semantic_lowering/romance-prototype/upstream-modifications.json",
+      "sha256": "dcf1bd7850dcf5d1afd2c1edc39044830ce5161f2fa7e12ed99c4d8740f1a8c0",
+      "bytes": 995
+    },
+    {
+      "path": "qualification/romance_semantic_lowering/run_qualification.py",
+      "sha256": "1ea59efcc24bc78b57d85c143f7f481ec456e86eb2405da581f55243d0425ceb",
+      "bytes": 7557
+    },
+    {
+      "path": "qualification/romance_semantic_lowering/upstream/LICENSE",
+      "sha256": "f6fb33ef599022318fb3fe61e3db72fa6591c83269131c9245139aa1eb800e90",
+      "bytes": 1080
+    },
+    {
+      "path": "qualification/romance_semantic_lowering/upstream/base.py",
+      "sha256": "de7cd41b7d7c932ffe7c8a23cd2fa8c9cafa037ab4d16f2180e5768d67de207a",
+      "bytes": 2894
+    },
+    {
+      "path": "qualification/romance_semantic_lowering/upstream/french.py",
+      "sha256": "5c125d981490a0409cfc181daffdc0462ce006e740bf9e68190a3a6f492785d7",
+      "bytes": 30898
+    },
+    {
+      "path": "qualification/romance_semantic_lowering/upstream/portuguese.py",
+      "sha256": "74fdb32dba21e6de2397a13e1f99885b8ef3838ff6d86a8573197c899be91287",
+      "bytes": 32339
+    },
+    {
+      "path": "qualification/romance_semantic_lowering/upstream/spanish.py",
+      "sha256": "948bc543f36d6982b882eb3cb6c6ccd1fc0dc58a28c64486ff5f7271a7cd8d7b",
+      "bytes": 25021
+    },
+    {
       "path": "registry/TEMPLATE/__init__.py",
       "sha256": "20a2f43e9c2f1d8f09f7e4f4283e4d706793861f67a30e485e581893f3655299",
       "bytes": 911
@@ -5862,6 +5967,11 @@
       "path": "tests/public/test_request_tool_surface_boundary.py",
       "sha256": "d366c57f3be4a86250fb42233fc909f5f2d1c4f533961f2c5f99a8264f5d5531",
       "bytes": 2733
+    },
+    {
+      "path": "tests/public/test_romance_qualification_packet.py",
+      "sha256": "d459d9bfb870463559e6395f0176ba7f14879d64428804d6dad191a39ecd0d52",
+      "bytes": 10014
     },
     {
       "path": "tests/public/test_selected_audio_output.py",
