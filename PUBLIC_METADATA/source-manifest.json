@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "991672032ba11ad0f50a2495e097eb46c9c3085c",
-  "sha256": "f28c4b5cfdb5759244acd580c117d38ad8f7ef14c8d6e2e5a013a5a62f5974ed",
+  "revision": "9ede9c8f4c775730ad5675a7561cd18194794836",
+  "sha256": "ba1babe550ff52f262637b2a3a060b2164edc40e8c2d3dab526532839411ee83",
   "files": [
     {
       "path": ".env.example",
@@ -10900,8 +10900,13 @@
     },
     {
       "path": "ui/react-app/src/components/stage/modes/chat/ChatMode.jsx",
-      "sha256": "5e63a033bc2d45e96e8611baef05da2d4670eaa1c44c72652175583b264a547b",
-      "bytes": 53376
+      "sha256": "8ee32556068df13bb3eaa62ba296335aa10fb6df6c287afc0f1520e096ae65b5",
+      "bytes": 56932
+    },
+    {
+      "path": "ui/react-app/src/components/stage/modes/chat/ChatMode.modelRecovery.test.jsx",
+      "sha256": "d0f10d74b48f04bea2c58cb141889973c0c487949340d07fd7d0ddb5edf454f7",
+      "bytes": 16423
     },
     {
       "path": "ui/react-app/src/components/stage/modes/chat/ChatMode.test.jsx",
