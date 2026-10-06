@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "c131b561adb6e2da0124ef4d8a01cc0788d98b13",
-  "sha256": "4cde77d704ad1cef81fd87b34ccc7503e74cccd25f3be7b83fdb57f9ff598e0b",
+  "revision": "05d5f28ac1c9714a4af472a876a1c3ed18ea06dc",
+  "sha256": "eecae7e492e8a10a5d2578e1b8df75d18285b1d1d347a7dcfcddb22698274f18",
   "files": [
     {
       "path": ".env.example",
@@ -5535,8 +5535,8 @@
     },
     {
       "path": "telephony/call_manager.py",
-      "sha256": "85b3934138464a51a81b62d531d7390ccad07c2a567291071ffec254e33d0bd5",
-      "bytes": 374785
+      "sha256": "b13091353108cbdcb379abb4b6dd688b897eff5cf472f3b1b0365e1d2f08b6f6",
+      "bytes": 376541
     },
     {
       "path": "telephony/call_queue.py",
@@ -5864,6 +5864,11 @@
       "bytes": 11905
     },
     {
+      "path": "tests/public/test_cjk_runtime_reconstruction.py",
+      "sha256": "88657b35de58bcaadc9329ae725ebf531837b948e16f501cbddd30f4f3c720fe",
+      "bytes": 1123
+    },
+    {
       "path": "tests/public/test_crash_forensics_targets.py",
       "sha256": "f66a15b8d2f536339739e527e22e20a3ae7d7ee3a3e9d7c9cd4fab4745d0a5a7",
       "bytes": 24803
@@ -6075,8 +6080,8 @@
     },
     {
       "path": "third_party/kokoro_onnx.patch",
-      "sha256": "506cca42d323433165ee1ae5005892d89d2ab570d4dd2ece33dfbae6fd4d0117",
-      "bytes": 9778
+      "sha256": "9598f21dd743de956f09b63de0febd46892ce3b3629763d8fb5d99ada1707320",
+      "bytes": 15394
     },
     {
       "path": "third_party/kokoro_onnx/LICENSE",
@@ -6095,8 +6100,8 @@
     },
     {
       "path": "third_party/kokoro_onnx/src/kokoro_onnx/__init__.py",
-      "sha256": "6e93de212047b2dbc01b46da1695e0cbc60e9f155625e77190b1ab1ba420ed8e",
-      "bytes": 10844
+      "sha256": "e750127065780f06d67d96ed53aaba7aedd23a884bf23e4a4d1e61e6c371d9cc",
+      "bytes": 11434
     },
     {
       "path": "third_party/kokoro_onnx/src/kokoro_onnx/config.json",
@@ -6120,13 +6125,113 @@
     },
     {
       "path": "third_party/kokoro_onnx/src/kokoro_onnx/tokenizer.py",
-      "sha256": "47c2c2829a1e8e4cacb769b3af8e9b64f5151e9f727c565ad1b3509d9be0f469",
-      "bytes": 4412
+      "sha256": "e546af7b16c11ffc2a4426da7447a5ccb7ea42c9447eaa7454a1c413ac118461",
+      "bytes": 4901
     },
     {
       "path": "third_party/kokoro_onnx/src/kokoro_onnx/trim.py",
       "sha256": "f1b776d3975a99104743428fd9ba63f14255f5226a3855c6059fe464c6520d23",
       "bytes": 24178
+    },
+    {
+      "path": "third_party/misaki_cjk_prototype.patch",
+      "sha256": "5fe0ed15c335b4a6d33d1ee40524e61215399a49c5118a47547511f831b951ad",
+      "bytes": 36097
+    },
+    {
+      "path": "third_party/misaki_cjk_prototype/LICENSE",
+      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+      "bytes": 11357
+    },
+    {
+      "path": "third_party/misaki_cjk_prototype/PROVENANCE.json",
+      "sha256": "186cdf9e1ad80213c63c67d47a477e4a8906084a20c7cb495243fc89ed56d0d2",
+      "bytes": 2322
+    },
+    {
+      "path": "third_party/misaki_cjk_prototype/README.md",
+      "sha256": "a89d38367145b787c5cd9f6f32b7f01ed7e783cee2c87353bcd3340fbddce87d",
+      "bytes": 2567
+    },
+    {
+      "path": "third_party/misaki_cjk_prototype/misaki/_licenses/convert-numbers-to-japanese-MIT.txt",
+      "sha256": "a2d0e21948ca52f09926d17de411f1d989bf7b99ec05deb668c0358ce5196e57",
+      "bytes": 1108
+    },
+    {
+      "path": "third_party/misaki_cjk_prototype/misaki/_licenses/cutlet-MIT.txt",
+      "sha256": "8736ad0d4636cb6dabae3e97e99c08f5c0c08b8c451f1d489b29a0d63bebf074",
+      "bytes": 1076
+    },
+    {
+      "path": "third_party/misaki_cjk_prototype/misaki/_licenses/pinyin-to-ipa-MIT.txt",
+      "sha256": "0bc847bdc29b0ba04afb7ef9660dc0ba9b8796a9a7a814d106db5aa373a8a86d",
+      "bytes": 1071
+    },
+    {
+      "path": "third_party/misaki_cjk_prototype/misaki/cutlet.py",
+      "sha256": "7695fc7d853ae4e99679dff4ca0c8404d4804a6fb1059a9d6ad02baeabc4d4de",
+      "bytes": 13809
+    },
+    {
+      "path": "third_party/misaki_cjk_prototype/misaki/data/ja_words.txt",
+      "sha256": "a93a8e8aee24db307a32becb8bf01c4c2908ecf37e6c91f7a705fafdfeba67ff",
+      "bytes": 1921140
+    },
+    {
+      "path": "third_party/misaki_cjk_prototype/misaki/num2kana.py",
+      "sha256": "26ca4b39ac7165104e53971bd2459df6466ff8140e1dac836a3bf1f9e811e2d2",
+      "bytes": 12956
+    },
+    {
+      "path": "third_party/misaki_cjk_prototype/misaki/transcription.py",
+      "sha256": "14f0f1b5eb89c5b684229a30ae8b0c19c8266b537967786a2079ba887f5fbc32",
+      "bytes": 9354
+    },
+    {
+      "path": "third_party/misaki_cjk_prototype/misaki/zh.py",
+      "sha256": "97d16aec581832845d2566cb24da2ba045d4552fb65a5017a6eac8feef654c81",
+      "bytes": 3320
+    },
+    {
+      "path": "third_party/misaki_cjk_prototype/pyproject.toml",
+      "sha256": "cd88246eedf56422b2c12c97655fe597e171d2de64395b8cb5c15248fa419c13",
+      "bytes": 927
+    },
+    {
+      "path": "third_party/misaki_cjk_prototype/viola_cjk/__init__.py",
+      "sha256": "3eee7a3f5db5e15971fe61d0d8bafb7226466a9f296865d029f4a8451d5ef533",
+      "bytes": 81
+    },
+    {
+      "path": "third_party/misaki_cjk_prototype/viola_cjk/coverage.py",
+      "sha256": "65f1d310d6ab32533f374186c42ae1c08c212655e386bef10911743935b81c56",
+      "bytes": 11503
+    },
+    {
+      "path": "third_party/misaki_cjk_prototype/viola_cjk/customer_english_span.py",
+      "sha256": "fc145197f88b4ec3194a3d34260e5957703cc061c025af132cf9228bd87c8983",
+      "bytes": 2772
+    },
+    {
+      "path": "third_party/misaki_cjk_prototype/viola_cjk/japanese_factory.py",
+      "sha256": "ab43b75415d134d2efa3d65885b87ff1cdcbe5d3e2484cad24dd887e7d716f3c",
+      "bytes": 4227
+    },
+    {
+      "path": "third_party/misaki_cjk_prototype/viola_cjk/locale_numbers.py",
+      "sha256": "ff9a4e3844fd948d42becda438d4e99927f3bc9afd11a08e044e800f964ca8bf",
+      "bytes": 3055
+    },
+    {
+      "path": "third_party/misaki_cjk_prototype/viola_cjk/mecabrc",
+      "sha256": "909a7044e39b38dbd39d0d44523ce3b9c14e41b11f7b55495621408633f3f779",
+      "bytes": 82
+    },
+    {
+      "path": "third_party/misaki_cjk_prototype/viola_cjk/unidic.json",
+      "sha256": "5bdb8a6e9c5fbecd5b364cf284301f1dd44a715771ace8c6d19ccc6d31933cd7",
+      "bytes": 3454
     },
     {
       "path": "third_party/misaki_en.patch",
@@ -8760,8 +8865,13 @@
     },
     {
       "path": "third_party/sources.toml",
-      "sha256": "49598c4641f840ffcb37979da961c9602d7681fb4d3fce37e18bc70aa5c633cf",
-      "bytes": 207501
+      "sha256": "c3c01e5702e24747f2cc6a47544bf3bf3fef4194f53baaa535d878e8750313cc",
+      "bytes": 210783
+    },
+    {
+      "path": "tools/qualification/cjk_runtime_replay.py",
+      "sha256": "fa88b8eceb243b5da9438ebce5151973db39dd9ce848430d604b331a2828d7f6",
+      "bytes": 45020
     },
     {
       "path": "tools/release/create_source_manifest.py",
@@ -12504,6 +12614,11 @@
       "bytes": 19230
     },
     {
+      "path": "voice/customer_composition.py",
+      "sha256": "ef8cd557fa3fd1fe30b5142ff9562d71244f99b392e7d0540d6b4850f30ef3e7",
+      "bytes": 7407
+    },
+    {
       "path": "voice/customer_pronunciation.py",
       "sha256": "b333138ac21703a61d9e05e4f19967b4823df24133a55ed924a601c6598055eb",
       "bytes": 8443
@@ -12655,8 +12770,8 @@
     },
     {
       "path": "voice/synthesis/kokoro_engine.py",
-      "sha256": "6d638682fa4b88a22dfb34741e6341270366958df41bfc364f6ec3c706945509",
-      "bytes": 70151
+      "sha256": "da6b92aee2164bb891c893a01d812f35498872a7109645bf8e027d9c1de492cf",
+      "bytes": 72056
     },
     {
       "path": "voice/synthesis/lazy_engine.py",
