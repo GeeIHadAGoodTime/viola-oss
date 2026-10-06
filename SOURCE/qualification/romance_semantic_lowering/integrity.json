@@ -1,0 +1,106 @@
+{
+  "reviewed_patch_sha256": "ac1491f19a3295931bda9cf72cb1649235bf75be742dccbb12a32e89fa63a030",
+  "upstream_commit": "82ee4e7a9b7aded42e0d0d5fd8298b42bfa51a16",
+  "payloads": [
+    {
+      "path": "romance-prototype/romance_coverage.py",
+      "bytes": 13933,
+      "sha256": "6ee50ff62ac8c4b49345414b9d7eb8cfc415ac871cc119245b1dc9644e5b1c4d"
+    },
+    {
+      "path": "romance-prototype/test_romance_coverage.py",
+      "bytes": 8812,
+      "sha256": "74c133196c5d552c6e03afb3e02a54f26d8b97353a17c0f38b0bf0cf4e410af9"
+    },
+    {
+      "path": "romance-prototype/qualify_provenance.py",
+      "bytes": 5128,
+      "sha256": "7e42b415d374720d9a6e354122fa1bc9362caf8d2b01bb3e00a64194d7041a8a"
+    },
+    {
+      "path": "romance-prototype/README.md",
+      "bytes": 3515,
+      "sha256": "9eb4677f3403b3dbc7023373754dda40fac539d4132cca4e6b2677ece66f11fc"
+    },
+    {
+      "path": "romance-prototype/upstream-bindings.json",
+      "bytes": 2491,
+      "sha256": "020413fbc9ff52e7175d8e14e348fadb8fd3e80ca56a563e62e1463139d1131d"
+    },
+    {
+      "path": "romance-prototype/upstream-modifications.json",
+      "bytes": 995,
+      "sha256": "dcf1bd7850dcf5d1afd2c1edc39044830ce5161f2fa7e12ed99c4d8740f1a8c0"
+    },
+    {
+      "path": "romance-prototype/upstream-fail-closed.patch",
+      "bytes": 1854,
+      "sha256": "75c33f87caed731c98912369a10db1e2a17a65620801c6a253388ef63b3d0d34"
+    },
+    {
+      "path": "romance-prototype/_romance_vendor/LICENSE",
+      "bytes": 1080,
+      "sha256": "f6fb33ef599022318fb3fe61e3db72fa6591c83269131c9245139aa1eb800e90"
+    },
+    {
+      "path": "romance-prototype/_romance_vendor/__init__.py",
+      "bytes": 213,
+      "sha256": "47e3e9b0ed6669ff4f0631c6c25cb322385f849697f91277bc4eb326df59112c"
+    },
+    {
+      "path": "romance-prototype/_romance_vendor/base.py",
+      "bytes": 2894,
+      "sha256": "de7cd41b7d7c932ffe7c8a23cd2fa8c9cafa037ab4d16f2180e5768d67de207a"
+    },
+    {
+      "path": "romance-prototype/_romance_vendor/french.py",
+      "bytes": 31085,
+      "sha256": "f188040463369508218947a6e241bbb5a219b09c10515fa3e5bb996e192e73a9"
+    },
+    {
+      "path": "romance-prototype/_romance_vendor/portuguese.py",
+      "bytes": 32526,
+      "sha256": "005304915518187a49f13a2ca3217d23abce9530d432b68d19a198bd0aa4db41"
+    },
+    {
+      "path": "romance-prototype/_romance_vendor/spanish.py",
+      "bytes": 25211,
+      "sha256": "dd1506f6e1030c14ef1b9a4997e6155746cf5594ee47907d5282c14c20e97327"
+    },
+    {
+      "path": "upstream/base.py",
+      "bytes": 2894,
+      "sha256": "de7cd41b7d7c932ffe7c8a23cd2fa8c9cafa037ab4d16f2180e5768d67de207a",
+      "git_sha": "a96b34421db8f041998cebd689b825cb8bf767ec"
+    },
+    {
+      "path": "upstream/spanish.py",
+      "bytes": 25021,
+      "sha256": "948bc543f36d6982b882eb3cb6c6ccd1fc0dc58a28c64486ff5f7271a7cd8d7b",
+      "git_sha": "3fe05493ba57b4bae346c2a59ff1caf054b2d6c3"
+    },
+    {
+      "path": "upstream/french.py",
+      "bytes": 30898,
+      "sha256": "5c125d981490a0409cfc181daffdc0462ce006e740bf9e68190a3a6f492785d7",
+      "git_sha": "b8bc7b6d877e02648101f09b8312049e77670fe8"
+    },
+    {
+      "path": "upstream/portuguese.py",
+      "bytes": 32339,
+      "sha256": "74fdb32dba21e6de2397a13e1f99885b8ef3838ff6d86a8573197c899be91287",
+      "git_sha": "1c5e062324c323cc09bdcae77ae46daae2ef010f"
+    },
+    {
+      "path": "upstream/LICENSE",
+      "bytes": 1080,
+      "sha256": "f6fb33ef599022318fb3fe61e3db72fa6591c83269131c9245139aa1eb800e90",
+      "git_sha": "575f54166fdf09db4f17fb8baab5ace46891524d"
+    }
+  ],
+  "kokoro_config": {
+    "path": "third_party/kokoro_onnx/src/kokoro_onnx/config.json",
+    "sha256": "5abb01e2403b072bf03d04fde160443e209d7a0dad49a423be15196b9b43c17f",
+    "bytes": 2351
+  }
+}

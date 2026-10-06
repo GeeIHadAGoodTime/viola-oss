@@ -1,31 +1,52 @@
 {
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "9e0183ac77fa2feceda56332f1055e61e5cf995b67fe67f9cb407b890a4da2c9",
-  "source_tree_sha256": "3e8c6feec31e78c403dff66b68d908d651befbbf5349b8a68d39d8c62c5fb604",
-  "source_file_count": 2544,
-  "source_revision": "97048cd6e91da54ad9280ab91ba9a67471c33b0f",
-  "comparison_public_revision": "c4891d863f70bdac888499d27c99a2d925ba6696",
+  "source_manifest_sha256": "6f445993444c304675f4273776974abce960b5fed577c0d858e977909cff8666",
+  "source_tree_sha256": "fe2874c829ca3cf7c6f1139f491b71ce29cb53838f407f4b5cc8e7ce1d942941",
+  "source_file_count": 2564,
+  "source_revision": "dee3a641081114dc8dc48b92b566d889ce5030c9",
+  "comparison_public_revision": "694db4e8af07d1a527c644260a9460ca825538bd",
   "changed_source_paths": [
-    "SOURCE/ui/react-app/src/auth/authClient.js",
-    "SOURCE/ui/react-app/src/auth/AuthProvider.jsx",
-    "SOURCE/ui/react-app/src/auth/useAuth.js",
-    "SOURCE/ui/react-app/src/auth/logoutIntent.js",
-    "SOURCE/ui/react-app/src/auth/logoutIntent.test.js",
-    "SOURCE/ui/react-app/src/auth/AuthProvider.test.jsx",
-    "SOURCE/ui/react-app/src/lib/auth_context.tsx",
-    "SOURCE/ui/react-app/src/components/AccountTab.jsx",
-    "SOURCE/ui/react-app/src/components/auth/CloudAuthGate.jsx",
-    "SOURCE/ui/react-app/src/components/AccountTab.logoutRestoration.test.jsx"
+    "SOURCE/qualification/romance_semantic_lowering/README.md",
+    "SOURCE/qualification/romance_semantic_lowering/integrity.json",
+    "SOURCE/qualification/romance_semantic_lowering/romance-prototype/README.md",
+    "SOURCE/qualification/romance_semantic_lowering/romance-prototype/_romance_vendor/LICENSE",
+    "SOURCE/qualification/romance_semantic_lowering/romance-prototype/_romance_vendor/__init__.py",
+    "SOURCE/qualification/romance_semantic_lowering/romance-prototype/_romance_vendor/base.py",
+    "SOURCE/qualification/romance_semantic_lowering/romance-prototype/_romance_vendor/french.py",
+    "SOURCE/qualification/romance_semantic_lowering/romance-prototype/_romance_vendor/portuguese.py",
+    "SOURCE/qualification/romance_semantic_lowering/romance-prototype/_romance_vendor/spanish.py",
+    "SOURCE/qualification/romance_semantic_lowering/romance-prototype/qualify_provenance.py",
+    "SOURCE/qualification/romance_semantic_lowering/romance-prototype/romance_coverage.py",
+    "SOURCE/qualification/romance_semantic_lowering/romance-prototype/test_romance_coverage.py",
+    "SOURCE/qualification/romance_semantic_lowering/romance-prototype/upstream-bindings.json",
+    "SOURCE/qualification/romance_semantic_lowering/romance-prototype/upstream-fail-closed.patch",
+    "SOURCE/qualification/romance_semantic_lowering/romance-prototype/upstream-modifications.json",
+    "SOURCE/qualification/romance_semantic_lowering/run_qualification.py",
+    "SOURCE/qualification/romance_semantic_lowering/upstream/LICENSE",
+    "SOURCE/qualification/romance_semantic_lowering/upstream/base.py",
+    "SOURCE/qualification/romance_semantic_lowering/upstream/french.py",
+    "SOURCE/qualification/romance_semantic_lowering/upstream/portuguese.py",
+    "SOURCE/qualification/romance_semantic_lowering/upstream/spanish.py",
+    "SOURCE/tests/public/test_romance_qualification_packet.py"
   ],
   "retained_sboms": [
     {
       "path": "frontend.sbom.json",
       "sha256": "937a2d0ad8aecc2c7eb7dd69eca48789c995edd6ef69af43a58cb60da819c80d",
       "components": 406,
-      "inventory_status": "retained_historical_frontend_inventory; exact current manifest and lock dependency inputs unchanged by this packet",
+      "inventory_status": "Historical frontend inventory retained as prior evidence. source-map-js changed from 1.2.1 to 1.2.2 in the exact lockfile; this SBOM is not current-input-equivalent. Fresh final-head Windows frontend installation and inventory are required.",
       "prior_inventory_status": "retained_exact_windows_inventory_20261003_job_111110266035",
-      "current_source_dependency_input_equivalence": true
+      "current_source_dependency_input_equivalence": false,
+      "prior_source_binding_inventory": {
+        "path": "frontend.sbom.json",
+        "sha256": "937a2d0ad8aecc2c7eb7dd69eca48789c995edd6ef69af43a58cb60da819c80d",
+        "components": 406,
+        "inventory_status": "retained_historical_frontend_inventory; exact current manifest and lock dependency inputs unchanged by this packet",
+        "prior_inventory_status": "retained_exact_windows_inventory_20261003_job_111110266035",
+        "current_source_dependency_input_equivalence": true
+      },
+      "current_source_resolution_qualified": false
     },
     {
       "path": "windows-all-optional.sbom.json",
@@ -68,46 +89,810 @@
       "current_source_resolution_qualified": false
     }
   ],
-  "prior_binding": {
-    "public_revision": "c4891d863f70bdac888499d27c99a2d925ba6696",
-    "path": "PUBLIC_METADATA/source-binding.json",
-    "git_blob": "c214ae2b580a0b9741673a3ff8873e0ca5e739eb",
-    "sha256": "94e2a65d30327ac8eece3fda32835dd03cc236492e197787832669c67ed71420",
-    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/c4891d863f70bdac888499d27c99a2d925ba6696/PUBLIC_METADATA/source-binding.json",
-    "history": "Merged feedback48 retains the same immutable prerequisite tree as the originally reviewed feature head. All earlier qualification limits remain inherited."
-  },
   "input_equivalence": {
+    "comparison_basis": "repaired main 694db4e8af07d1a527c644260a9460ca825538bd",
     "changed_dependency_inputs": [],
-    "basis": "Ten reviewed frontend source/test files differ from feedback48, including three additions. All other authenticated Git leaves, dependency inputs, build profiles, assets, licenses, notices and six SBOMs remain exact. Prior Windows SBOMs retain historical status and do not establish current speech resolution."
+    "frontend_dependency_inputs_changed": false,
+    "frontend_scope_equivalence_claimed": false,
+    "python_scope_equivalence_claimed": false,
+    "basis": "All 22 reviewed inactive Romance source/test leaves remain exact to feature head 0212ca05. All 2,569 repaired-main leaves are inherited before replacing only canonical metadata. The main source-map-js 1.2.2 lock and advisory regression are preserved exactly. Dependency inputs are unchanged relative to repaired main but differ from the prior feature head by the approved lock upgrade. Retained checked-in SBOM payloads stay historical and frontend current-input equivalence remains false. Fresh combined-head checks and inventory are required.",
+    "changed_dependency_inputs_relative_to_prior_feature": [
+      "SOURCE/ui/react-app/package-lock.json"
+    ],
+    "prior_main_dependency_input_qualification": {
+      "changed_dependency_inputs": [
+        "SOURCE/ui/react-app/package-lock.json"
+      ],
+      "basis": "Only one transitive source-map-js lock record changes (version, URL and integrity), and one ten-case regression test is added. package.json, every other dependency record, both audit workflow policies, all other 2,540 prior SOURCE files and all six historical SBOM payloads are exact relative to c4891d86. The retained frontend SBOM is not equivalent to the current lock; fresh final-head Windows frontend installation/inventory is required. Existing Python inventory limits remain unchanged.",
+      "frontend_dependency_inputs_changed": true,
+      "frontend_scope_equivalence_claimed": false,
+      "python_scope_equivalence_claimed": false,
+      "prior_dependency_input_qualification": {
+        "changed_dependency_inputs": [],
+        "basis": "Eight existing frontend source/test files change. Every other authenticated Git leaf, including the newly landed streaming decimal/locale boundary, speech routing/startup successor, Queue snapshot source, inactive English speech foundation, SDK44, provider42, native volume, wake, Settings and startup source, is preserved. Dependencies, build profiles, assets, licenses, notices and all six retained SBOMs are unchanged. No fresh dependency resolution or advisory scan is claimed."
+      }
+    },
+    "prior_feature_dependency_input_qualification": {
+      "changed_dependency_inputs": [],
+      "basis": "All runtime source, requirements, package metadata and frontend dependency inputs remain unchanged. The additions are an inactive qualification packet, retained MIT original/adapted sources and source-only tests; no production mapping, package install or backend selection is introduced. Six retained SBOMs remain historical and are not claimed to inventory or qualify these new source-only research files.",
+      "compared_to_public_revision": "c4891d863f70bdac888499d27c99a2d925ba6696",
+      "verified_inputs": [
+        {
+          "path": "SOURCE/optional/deepfilter-runtime/pyproject.toml",
+          "sha256": "a896f84f4ebd802c7455859e8519f807c23169a3944237e5a44a0865f06febfd"
+        },
+        {
+          "path": "SOURCE/pyproject.toml",
+          "sha256": "a52a4ab5968580d99d1f15bfd0a6a3555d33d606c403873f0cf97e03dbbcbf1b"
+        },
+        {
+          "path": "SOURCE/requirements_bootstrap.txt",
+          "sha256": "8e6e936041efef32a7a51ec1d711f1b24844b1928308c9ac54849788351f5db2"
+        },
+        {
+          "path": "SOURCE/requirements_customer_speech.txt",
+          "sha256": "69926739e50290e37c4e5f83ba2b38ec2099d53407f34fc2cb2c7c70cafac383"
+        },
+        {
+          "path": "SOURCE/requirements_deepfilter.txt",
+          "sha256": "c6eb7c571897d8646d1f1892b17f7f7dad2122652d384f732bb8b1f8ff69b21d"
+        },
+        {
+          "path": "SOURCE/requirements_desktop.txt",
+          "sha256": "6273c990fb8f86033af485b59ab51fee479537bfd7023ba1004868c1f9c2b096"
+        },
+        {
+          "path": "SOURCE/requirements_kokoro.txt",
+          "sha256": "e202acaee16f06edd3d35bedce5eef08424be1ccb5414631c296075825b174d3"
+        },
+        {
+          "path": "SOURCE/requirements_linux.txt",
+          "sha256": "7d4463c0c7dc3b9cab8c47fae7ca10a7f6e2f6c0322e92f48314902b841b65cc"
+        },
+        {
+          "path": "SOURCE/requirements_macos.txt",
+          "sha256": "c452d005091998bf6a5706b03a0865f3d4c463a99bbfa83c8d66ac89fa86a18f"
+        },
+        {
+          "path": "SOURCE/requirements_optional.txt",
+          "sha256": "ba61a3a82990d2e5726fc9771d5796e7bbab1f559a48513224d123948c20515b"
+        },
+        {
+          "path": "SOURCE/services/weather-gfs/requirements.txt",
+          "sha256": "accab6138ad7e0fd4f1cd43c325fc0154fc358e2aaaec8aec6e3fa03723b548c"
+        },
+        {
+          "path": "SOURCE/third_party/kokoro_onnx/pyproject.toml",
+          "sha256": "6d50678c37c7e4505a8bbf0086de0ebd3e42173dd86e84b65c5f358b4ebc317c"
+        },
+        {
+          "path": "SOURCE/third_party/misaki_en/pyproject.toml",
+          "sha256": "bb17d18add365879f81af815485afd6d8ad1d815d84bc21050082133a26819f7"
+        },
+        {
+          "path": "SOURCE/third_party/pipecat/MODEL_LICENSES/sources.toml",
+          "sha256": "74759b67b52d87d8bd49b9aba3bbf625794d70731828c0a3b4d3f7beb44a15f6"
+        },
+        {
+          "path": "SOURCE/third_party/pipecat/pyproject.toml",
+          "sha256": "0fde019a97ecfc4c6d6a38e5ed175812f0b60afd7e665dedac74575b04d40c1f"
+        },
+        {
+          "path": "SOURCE/third_party/sources.toml",
+          "sha256": "49598c4641f840ffcb37979da961c9602d7681fb4d3fce37e18bc70aa5c633cf"
+        },
+        {
+          "path": "SOURCE/ui/react-app/package-lock.json",
+          "sha256": "e2537605cc28b2972a29f8d6e5952f3d5ab2f9539979b9246cea5645264ed8f4"
+        },
+        {
+          "path": "SOURCE/ui/react-app/package.json",
+          "sha256": "c6c8bfcae858d9b95169788bb1b5ff1ed1fa97a9fff21f59b3debf4862ec2064"
+        }
+      ],
+      "historical_sboms_newly_qualified": false
+    }
+  },
+  "prior_binding": {
+    "public_revision": "694db4e8af07d1a527c644260a9460ca825538bd",
+    "path": "PUBLIC_METADATA/source-binding.json",
+    "git_blob": "4adcf608b4f20a8d18300b2212f827c2c3500b48",
+    "sha256": "029cf6eeee2d6b07b3223fb792defebe0b1f3c0650d172407bb86260a568f0ca",
+    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/694db4e8af07d1a527c644260a9460ca825538bd/PUBLIC_METADATA/source-binding.json"
   },
   "new_resolution_performed": false,
   "new_advisory_scan_performed": false,
   "new_runtime_qualification_performed": false,
-  "reviewed_source_patch": {
-    "logout_restoration_v8_sha256": "9cc95f19a54fed09a34e635cfc65b247917ab97f01d1fa1987e369791129cf51",
-    "prerequisite_feedback_sha256": "d02a9781836fbef1b274993a6ed1877c54c7688834f92f4ed1d2e56497c99706"
-  },
   "qualification": {
-    "scope": "Bounded source qualification using synthetic accounts, real SDK storage behavior and inert HTTP responses. Feedback48 is now merged; this draft is synchronized onto that main without including the separate interrupted-sign-in successor.",
-    "source_integrity": "All 2,568 current-main blobs match the previously verified feedback prerequisite. The complete 2,571-blob reviewed transport tree is preserved except the two regenerated canonical metadata paths. Only ten reviewed source/test files and canonical metadata differ from main, including three new source files.",
-    "behavior": "A same-origin nonsecret logout marker blocks automatic cookie restoration after locally completed logout with unconfirmed server transport. Explicit accepted new login retires it; pending or failed login cannot erase an earlier logout. Admitted owned SDK writes drain before logout acknowledgment. Ambiguous post-storage errors retain uncertainty, including automatic hydration and sessionless registration. Operation-returned matching pairs permit bounded cleanup; different observed pairs are retained.",
-    "checks": "The normal sixteen-file union passes 302 controls with no errors or skips. Twenty-eight author mutation variants expose intended assertions with unaffected positives; exact source bytes were restored. Scoped JS/JSX lint has zero errors and one inherited unused-React warning. Six underlying provider method ASTs match feedback48. Guarded processes record zero native network attempts.",
-    "independent_review": "Exact 9cc95f19 replacement approved: 302 normal controls, seven retained real-SDK contrasts before and after restoration, and seven isolated fresh-process mutants. The mutants fail 1/1/2/1/1/1/1 intended assertions with three positives each in separate processes. All ten source hashes and six provider method ASTs are verified.",
-    "input_reuse": "All ten reviewed source hashes and all 78 scoped source/configuration inputs remain exact. The retained 302-control and independent mutation/contrast source proof is reused on identical inputs; no redundant full-frontend or production build is claimed. Fresh exact-head hosted checks remain required.",
-    "storage_limits": "The marker contains only nonsecret intent metadata and is limited to the same origin and profile. Site-data removal, unavailable storage, other origins/profiles/tabs/devices and actual server revocation require separate validation. Storage failure remains explicit and uses a conservative memory-only fallback.",
-    "ownership_limits": "Matching-pair observation immediately before public SDK signOut is not an atomic compare-and-swap against arbitrary unqueued SDK writers during its await. Normal owned operations share a document queue. Ambiguous SDK state can remain and is reported rather than blindly deleted. Requests are not newly cancelled or time-bounded.",
-    "tooling_limits": "Vite/Vitest exercises TSX transpilation; no standalone typecheck or full production build is claimed. No live account, actual cookie revocation, installer, Windows native UI or physical hardware acceptance is established.",
-    "inherited_limits": "Feedback48, SDK/provider fixes and the landed speech/Queue source retain their prior bounded qualification. Retained Windows SBOMs are historical; no new dependency resolution, advisory scan, signed candidate, installed acceptance, customer speech eligibility, release eligibility or deployment is inferred.",
-    "exact_head_hosted_checks": "pending",
+    "scope": "Ancestry-preserving synchronization of the reviewed inactive Romance packet with repaired main. No customer profile activation, runtime integration, packaging mapping or release qualification is introduced.",
+    "source_integrity": "Source-only commit has reviewed feature head 0212ca05 and repaired main 694db4e8 as parents. Its authenticated tree preserves all 22 reviewed Romance leaves and all 2,569 repaired-main leaves. Canonical metadata replaces two inherited metadata leaves; final tree has 2,591 leaves, preserves 2,567 main leaves and inventories 2,564 SOURCE files. No feature bytes, dependency policy, CI gate or historical SBOM payload changes.",
+    "dependency_reconciliation": "The source-map-js 1.2.2 lock and ten-case advisory regression are inherited byte-for-byte from merged OSS58. There are no other dependency changes. Both audit workflows and all historical Python qualifications remain intact.",
+    "predecessor_exact_head_evidence": {
+      "head": "799af85810deb86cfe092bc109ce9402fb1dc802",
+      "source_checks_run": "https://github.com/GeeIHadAGoodTime/viola-oss/actions/runs/37401911873",
+      "dependency_inventories_run": "https://github.com/GeeIHadAGoodTime/viola-oss/actions/runs/37401911938",
+      "conclusion": "All eight jobs succeeded; frontend 1,552 passes across 154 files, Python 548 passes plus one POSIX-only skip, six checksum-verified Windows inventory scopes. This is repaired-main predecessor evidence, not an execution of the new combined source."
+    },
+    "retained_feature_qualification": {
+      "scope": "Inactive Romance semantic-lowering prototype source publication only; no production profile, packaging mapping or runtime import integration.",
+      "source_integrity": "Thirteen original ac1491 packet files retain exact reviewed bytes; five original upstream code/license files retain SHA256 and Git blob identities. A portable runner, integrity manifest, explanatory README and public tests complete the 22-file addition. All inherited source leaves remain byte-identical to merged main.",
+      "checks": "The accepted560-method source replay is reused after proving every Python and non-frontend source input identical to corrected head a14a686c. Only eight already-reviewed/merged feedback48 frontend files differ. Applicable fresh hosted checks must bind this final synchronized head. The actual portable wrapper also passes all 122 original source controls and the unchanged provenance/mutant checks. Eleven public wrapper methods cover missing/tampered payloads, config/Git identity, output collisions, hardlink aliases and atomic external reports. Destructive negatives operate only on disposable copies. The one-file Windows correction explicitly places those copies outside protected source roots and has 33 independently passing executions under external/source-local/packet-local temp defaults; runtime writer and18 immutable payloads remain unchanged.",
+      "upstream_provenance": {
+        "repository": "https://github.com/ayutaz/piper-plus",
+        "commit": "82ee4e7a9b7aded42e0d0d5fd8298b42bfa51a16",
+        "selected_subtree": "src/python/g2p",
+        "terms": "Retained MIT license and original notices; three documented fail-closed adaptations. Other Piper subtrees/models are not adopted.",
+        "binding_path": "SOURCE/qualification/romance_semantic_lowering/integrity.json"
+      },
+      "limits": "Bounded source/prosody/semantic-lowering qualification only. Digits, currency, unsupported phones and mixed scripts fail closed. Retained French/Portuguese quality witnesses remain unresolved. No native model inference, new dependency installation, full multilingual/acoustic eligibility, Windows packaging or customer release qualification. All eight language families and 54 canonical voices remain unchanged.",
+      "exact_head_hosted_checks": "pending for ancestry-preserving main48 synchronization",
+      "input_reconciliation": {
+        "base": "c4891d863f70bdac888499d27c99a2d925ba6696",
+        "verified_base_blobs": 2568,
+        "preserved_romance_files": 22,
+        "prior_corrected_head": "a14a686c86fab637fac6034bc52bab2d0e2e0f98",
+        "changed_source_inputs": [
+          "SOURCE/ui/react-app/src/auth/AuthProvider.jsx",
+          "SOURCE/ui/react-app/src/auth/useAuth.js",
+          "SOURCE/ui/react-app/src/auth/AuthProvider.test.jsx",
+          "SOURCE/ui/react-app/src/components/AccountTab.jsx",
+          "SOURCE/ui/react-app/src/components/AccountTab.authSync.test.jsx",
+          "SOURCE/ui/react-app/src/components/AccountTab.cloudStoreReconciliation.test.jsx",
+          "SOURCE/ui/react-app/src/components/auth/CloudAuthGate.jsx",
+          "SOURCE/ui/react-app/src/components/auth/auth.test.jsx"
+        ],
+        "all_python_and_non_frontend_source_inputs_identical": true,
+        "accepted_560_method_evidence_reused": true
+      },
+      "previous_reviewed_romance_binding": {
+        "head": "a14a686c86fab637fac6034bc52bab2d0e2e0f98",
+        "source_revision": "16c860779fd040d5ab4fac5301c40f057f1a99df",
+        "git_blob": "82545be7d29fb818ceaa007221217b20446c3f47",
+        "sha256": "e4a1c200f8fa60397f46d6b1381a42c5192e0cc4edb8f1b81e840618605e11aa",
+        "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/a14a686c86fab637fac6034bc52bab2d0e2e0f98/PUBLIC_METADATA/source-binding.json"
+      },
+      "original_reviewed_romance_binding": {
+        "head": "ec1149cc7b1e205ad661cdc004dd2fb4bb9c60cd",
+        "source_revision": "e823755522c97580cffdee95a0d99965f8ac13a7",
+        "git_blob": "0cc5d45417ba33eb0d4ef60edc59a008f75d9534",
+        "sha256": "eb57d68598af91007ac6af4f09e9621b0417584bbdb07bbb92c86d551be84f8d",
+        "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/ec1149cc7b1e205ad661cdc004dd2fb4bb9c60cd/PUBLIC_METADATA/source-binding.json"
+      }
+    },
+    "exact_head_hosted_checks": "pending for final synchronized metadata head",
+    "limits": "Preserved historical source/control receipts do not substitute for fresh combined-head Python, frontend build/test/audit and installed dependency inventories. No installed app, native model, Windows release, live service, merge or deployment is qualified by this source synchronization.",
     "installed_candidate": "not_established",
     "release_or_deployment": "not_established",
-    "source_union": "Source-only ancestry union 97048cd6e91da54ad9280ab91ba9a67471c33b0f preserves main c4891d863f70bdac888499d27c99a2d925ba6696 and previously reviewed transport head 05e1b301352b15d4088111546ba650b115a929d8. No protected ref or release route is changed by this source branch."
+    "prior_source_qualification": {
+      "scope": "Bounded developer-tool dependency advisory repair, separate from MemoryPanel or other behavior changes; no production exploitability, installed Windows or release qualification claimed.",
+      "source_integrity": "All 2,568 current-main Git leaves are authenticated. One existing SOURCE lockfile changes, one regression file is added and two canonical metadata files are regenerated. Source-only commit retains 2,567 base leaves; the final tree retains 2,565 base leaves and has 2,569 leaves total. Canonical source count is 2,542. Both MemoryPanel draft-recovery slices are excluded from this standalone branch.",
+      "advisory": "GHSA-68fv-2mgg-jv7q / CVE-2026-93749 affects source-map-js >=1.0.0,<1.2.2; patched in 1.2.2. Published September 18, reviewed/updated October 5, 2026. Maintainer release 1.2.2 is dated September 30. The c4891d86 base and observed PR57 cc884760 lock are identical; the observed failure is newly surfaced advisory data, not a dependency introduced by MemoryPanel. Precise npm ingestion time is not established.",
+      "primary_sources": [
+        "https://github.com/advisories/GHSA-68fv-2mgg-jv7q",
+        "https://github.com/7rulnik/source-map-js/releases/tag/v1.2.2",
+        "https://github.com/7rulnik/source-map-js/pull/79"
+      ],
+      "reachability": "The dev-only graph is Vite 6.4.3 -> overridden PostCSS 8.5.25 -> source-map-js. Tests resolve the actual PostCSS consumer. Application source has no direct source-map-js import; build-tool reachability does not establish production exploitability or an observed attack.",
+      "checks": "Targeted npm lock regeneration changes only source-map-js version, tarball URL and integrity. Official registry metadata and 18 tarball payload files independently match. Old exact-lock audit exits 1 with one high finding; current complete exact-lock audit and plain installed-fixture audit exit 0 with zero findings. No omit, threshold reduction or ignore policy is used. All 410 installed Linux package versions match the lock, and npm ls --all exits 0. Scoped ESLint has zero diagnostics.",
+      "regression": "Ten tests cover invalid line/column offsets, summed nested offsets, ordinary indexed source mapping/source text and PostCSS CSS/source-map preservation. The predecessor yields eight ordinary AssertionErrors plus two preservation passes; the corrected package passes ten. Heap is capped at 256 MB with a 30-second parent deadline and two-second per-case timeout. Hostile offsets are only passed to constructors; no huge mapping expansion, OOM or timeout is counted as a passing negative control.",
+      "independent_review": "Exact two-file patch dedc44e6ef0647b2042999e50920032ce6b6ee06356f2668c5f20f48aed0a8c6 independently approved. Reviewer verifies the unchanged canonical Vite config/global setup through normal npm run test:run (10/10), 30 extra nonexpanding constructor boundaries, exact lock graph/SRI, unchanged audit workflow policies and a fresh zero-finding npm audit. All 21,465 original shared dependency files and 468 author build inputs are unchanged. No full aggregate rerun is inferred.",
+      "build": "A related source-bound PR57 MemoryPanel snapshot carrying these exact dependency/test bytes passes production npm run build in 6.948 seconds at the unchanged 512 MB Node heap, with uploads disabled and all existing resource floors met; all three emitted wake assets match canonical bytes. The standalone main-based branch excludes that MemoryPanel slice, so this related build is not relabeled a build of the final standalone source. Its fresh exact-head hosted build remains required.",
+      "retained_failures": "The initial local build attempt failed before compilation because an owned directory name broke Node dependency resolution; corrected owned node_modules layout passes. Independent first audit under a minimal environment failed DNS resolution; one retry with the established inherited environment passes. A separate raw-indexed-map PostCSS probe has the same inherited undefined-sourceRoot TypeError on old/new packages; it is outside this bounded dependency repair.",
+      "inventory_limit": "All six checked-in SBOM payloads and their qualified historical receipts are retained unchanged. The frontend SBOM is explicitly not current-input-equivalent after the lock update. Fresh final-head Windows frontend installation and inventory are required. Python-scope historical qualification limits remain unchanged.",
+      "limits": "No fresh full frontend aggregate, Windows clean install, native app, installer, deployed service or customer release proof is inferred from the scoped local checks. Earlier PR57 green tests/build are predecessor evidence only. No merge, deployment, credentials, access changes, workflow weakening or spending is part of this source patch.",
+      "exact_head_hosted_checks": "pending for final published metadata head",
+      "installed_candidate": "not_established",
+      "release_or_deployment": "not_established",
+      "prior_source_qualification": {
+        "scope": "Bounded source qualification of visible logout pending/failure/retry outcomes using synthetic accounts and inert network responses.",
+        "source_integrity": "All 2568 current-main Git blobs verified before and after hardlink preparation. Only eight reviewed source files and two canonical metadata files differ. The manifest inventories 2541 SOURCE files; six retained SBOMs remain exact.",
+        "behavior": "Provider-owned feedback survives actual CloudAuthGate unmount of AccountTab. Returned failures, thrown failures, and SDK cleanup refusals remain visible with retry; duplicate pending actions share only the still-current logout intent. Newer sessions and same-account re-login can start new logout actions without joining an obsolete flight. Old completion cannot clear a newer owner. Retry credentials stay memory-only and are never exposed by feedback.",
+        "checks": "The normal 14-file union passes 247 controls. Scoped lint has zero errors and two pre-existing unused-React warnings, verified against the base. Thirteen underlying provider/SDK method ASTs and all prior assertions remain unchanged. The process-local native-network guard records zero attempts. No full frontend or production build is inferred from this scoped replay.",
+        "independent_review": "Exact d02a9781 replacement approved: 247 shipped plus five independent controls pass (252 total). Three independent mutants expose missing duplicate guard, obsolete-flight joining, and old-flight retirement while retaining positive cases. Author thirteen mutants fail intended assertions with no runner errors. Rejected 37feb2c9 and the independent duplicate-Retry witness are retained.",
+        "known_adjacent_failure": "The inherited authClient status-0 policy still permits local success without confirmed remote revocation. A separately retained synthetic desktop-cookie witness reproduces automatic restoration after a lost logout request and reload on the SDK44 baseline. This patch does not alter or qualify that transport/cookie policy.",
+        "limits": "Underlying requests are not cancelled or newly time-bounded. Synthetic source tests do not establish live account behavior, server revocation, installer correctness, installed Windows UI or physical hardware acceptance.",
+        "source_union": "Source-only merge 8ad4df39 has main7f5aa0f7 and previous feedback head7abce1e7 as parents. All eight d02a9781 source hashes and all 75 scoped test inputs remain exact. The other-optional inventory on the prior head reached its unchanged 30-minute execution cap after tool installation and a CycloneDX warning; that is not a runner-acquisition failure. Limits and workflow definitions remain unchanged. The retained 247-control current-source receipt is reused on exact inputs; no fresh Queue/full-frontend qualification is inferred.",
+        "exact_head_hosted_checks": "pending for this exact metadata head",
+        "installed_candidate": "not_established",
+        "release_or_deployment": "not_established",
+        "prior_source_qualification": {
+          "scope": "Separately reviewed, dependent source-only streaming decimal repair; preserves merged OSS47 at 0ce4e771 (tree-identical to 605003cb).",
+          "source_integrity": "All 2567 predecessor leaves authenticated. Exactly two runtime source paths change and one regression file is added; all other source and source qualification history are retained. Canonical metadata binds the actual source-only commit.",
+          "checks": "549 public test methods and 11 focused whole-stream ingestion methods pass. Original, digit-only v1 and defer-all mutants fail 23, 12 and 8 assertions without setup errors. Independent review additionally passes leading-decimal and request-lock/error-boundary controls. Black 26.5.1 py311/120 and repository Ruff 0.14.6 pass.",
+          "limits": "Source-only inert synthesis/playback evidence. The preserved native SIGKILL cause remains unknown and unchanged. No new native inference, packaging, signing, installer or customer release qualification. Internal reference build cut 19e3a3de is unaffected.",
+          "exact_head_hosted_checks": "pending for synchronized main-based draft",
+          "prior_source_qualification": {
+            "scope": "Independently reviewed English/startup source composition. No customer pronunciation profile is activated and no release acceptance is established.",
+            "source_integrity": "All 15 independently reviewed speech/startup/UTF-8 target bytes are identical to the prior reviewed speech head cf37df7c. All 2560 current-main leaves were verified before composition; the five landed Queue frontend files remain exact. Seven source files are added by the reviewed speech composition. Canonical metadata is regenerated against the actual source-only commit.",
+            "behavior": "Guard selected customer startup before phone and desktop ONNX ingress; preserve default/reference behavior and visible startup semantics. Use retained table-derived initialisms, exact decimal text normalization, per-call non-English formatting and fail-closed locale/capability acknowledgement. Preserve voice identity and existing default language forwarding without inventing prefix/accent restrictions.",
+            "checks": "The accepted exact-source 538-method Linux replay and 24-method cp1252 fixture controls are reused only after proving every Python and non-UI source input remains byte-identical to cf37df7c. The only changed source inputs are five independently qualified Queue frontend files. No new native inference is claimed; applicable hosted checks must run against this final published head.",
+            "language_scope": "All eight product language families and 54 canonical voice arrays remain in scope. The explicit English customer component does not establish full-language readiness. CJK and Romance prototypes, numeric/phonological coverage and all-language acoustic tests remain separate reviewed work.",
+            "dependency_inventory_limit": "All six checked-in historical SBOM payloads and their prior qualifications remain unchanged. Green optional/reference Kokoro inventories include phonemizer-fork and do not establish the customer Misaki graph. Exact current-head dependency inventories and full customer graph/native payload proof remain separate.",
+            "native_privacy_limit": "No native inference is rerun or claimed here. Source import-order controls cannot establish frozen pre-entry Qt behavior, Windows telemetry policy or native DLL compatibility. Prior partial Linux audio and the unexplained exit137 are separate bounded evidence.",
+            "remaining_customer_path": [
+              "qualified follow-on source publication and root-owned private adoption",
+              "complete pronunciation coverage and frozen/native Windows proof",
+              "inclusion in the authorized signed candidate",
+              "installed desktop/Surface speech, audio-quality and privacy proof"
+            ],
+            "exact_head_hosted_checks": "pending for synchronized head",
+            "installed_candidate": "not_established",
+            "release_or_deployment": "not_established",
+            "prior_source_qualification": {
+              "scope": "Offline source qualification of Queue snapshot admission, unknown versus known-empty state, and delayed/read ownership. No installed, physical playback, deployed-service or customer-release qualification.",
+              "source_integrity": "All 2,559 authoritative base Git leaves were verified before overlay. Four existing source leaves change, one new test is added, and two metadata leaves are regenerated. The source-only commit retains 2,555 base leaves; final binding retains 2,553. Canonical source count is 2,533 with six retained SBOMs.",
+              "behavior": "A valid observed queue array, including an empty array, supersedes HTTP fallback; unknown startup retains fallback. Independent read and observation generations prevent old initial/rehydrate responses from replacing newer queue observations. A dedicated queue publication timer preserves observed delayed data and its original deadline across unrelated partial/malformed visual frames. Valid owned queue data is admitted before the track-only rehydrate guard, including now_playing:null responses. New queue observations and component retirement invalidate older callbacks. SmartDisplay passes unknown versus known queue state truthfully to QueueModal. Other player-state fields retain existing behavior.",
+              "checks": "The reviewed pre-SDK Queue source2d2ac230 passed the exact 1,476-case union, 45 scoped controls and three parent cases, 13 author mutants, scoped lint and the observed production build. Those receipts remain tied to the previous source. The final SDK44 union passes exactly 1,514 case occurrences over 153 files in 22 terminal, disjoint executions. All 1,476 prior occurrences remain plus 38 inherited SDK44 cases. The final source-bound production build passes in 6.938 seconds under the unchanged 512 MB heap and upload-disabled flags; all five Queue and three inherited auth source hashes match before and after.",
+              "execution_partitioning": "The earlier 1,435-case v1 inventory used pre-Auth42 inputs. Auth42 adds 26 inherited tests, producing 1,461 on the unchanged v1 Queue patch. V2 adds 13 permanent independent-review witnesses and two lifetime/delay controls, producing the final 1,476-case inventory. Counts are exact source inventories, not cumulative replay totals. All 169 SmartDisplay cases execute in 11 bounded groups; the other files execute in bounded partitions. Collection-only, failed or partial XML is never pass evidence. The later SDK44-only rebind adds 38 inherited auth cases to the final executed inventory of 1,514. All prior 1,476 occurrences remain.",
+              "review": "Before the SDK44 rebase: Independent reviewer verified all five final hashes, the exact 1,476-case multiset and all native-volume bytes/assertions beneath this delta. Replayed 77 scoped hook/reviewer executions plus three parent-wiring cases, and 11 discriminative source mutants. All final-source build/lint receipts were checked; no blocking finding remains. The first v1 review found 13 real admission/deadline defects; v2 fixes and permanently covers them.",
+              "retained_failures": "Original customer-defect witnesses, two interim ordering negatives, v1 independent-review failures, sparse-fixture missing-asset collection error, and the initial exit137/Killed build remain retained. That kill has no proven cause. The original unchanged-source build retry and final v2 build both use observed resource/controller receipts and unchanged caps; their evidence is kept separate.",
+              "contract_limits": "General non-queue player-state ordering, queue mutation acknowledgements/serialization, HTTP fallback failure/retry UX, account transitions, backend cancellation, installed persistence and physical playback remain unqualified. Separate actual API-adapter probes have reproduced refused Queue Play/Remove/Clear feedback defects; that next correction is excluded from this patch.",
+              "integration_limit": "Private adoption must consume the reviewed public source through canonical composition and add the new ui/react-app/src/components/QueueModal.test.jsx source mapping. This publication does not mutate any private pin or map.",
+              "exact_head_hosted_checks": "pending for this exact bound successor",
+              "installed_candidate": "not_established",
+              "release_or_deployment": "not_established",
+              "prior_source_qualification": {
+                "scope": "Independently reviewed non-activating English pronunciation foundation for neural Kokoro. This is not full multilingual, native/frozen, installed, signing or customer-release acceptance.",
+                "source_integrity": "All 33 source payloads exactly match the reviewed packet. Four dictionary objects were read back byte-for-byte. The source-only tree preserves all 2526 other public-main leaves, including the landed Rooms, Settings, wake, toast, visible-startup, music-identity, auth-generation, SDK-bridge drain and native-volume repairs. Only the two canonical metadata leaves are updated afterward.",
+                "behavior": "Add an explicit optional Misaki English fork with injected local NLP/number inputs, exact decimal/currency preservation, strict OOV/override and vocabulary guards, retained source notices, dependency/frozen separation validation and pre-initialization non-Windows ORT telemetry provenance checks. Preserve Kokoro neural inference and lossless phoneme chunking. No product caller or default pronunciation profile is activated.",
+                "checks": "Independent packet review passed 397 public source contracts, 61 source/G2P controls and 19 fresh-process import-order controls with native imports blocked. Fresh replay of the exact 33-path packet on public main 297ce086 passes 478 public contracts with zero failures, skips or errors. Source/vendor reconstructions and exact artifact hashes remain bound to the reviewed packet.",
+                "language_scope": "All eight product language families and 54 canonical voice arrays remain in scope. This English component is focused progress only. Phone/desktop startup, initialism, locale/decimal formatter, routing and CJK successors are separately reviewed work and are not silently included in this 33-path publication.",
+                "licensing_limit": "The local pronunciation component has explicit Apache/MIT provenance and inherited notices. This does not label the entire transitive graph permissive, accept a legal agreement, or establish a cleared proprietary Windows distribution. Internal/reference eSpeak is not customer licensing evidence.",
+                "dependency_inventory_limit": "Retained Windows SBOMs describe their recorded historical graphs. Changed Python inputs require fresh exact-head Windows inventory and separate full customer-profile dependency/native-payload qualification; the current PR workflow does not automatically qualify all eight customer languages.",
+                "native_evidence_limit": "No native audio proof is asserted for this published packet. Later bounded Linux experiments used additional separately reviewed source successors and do not qualify this exact packet, Windows startup privacy, frozen DLL compatibility or installed audio.",
+                "integration_limit": "Private lock adoption and new public/private mappings remain root-owned after public qualification. Packaging profile activation, complete source/bytecode/data proof, signing, physical desktop/Surface audio and full-language acceptance remain separate gates.",
+                "exact_head_hosted_checks": "pending for this draft head",
+                "installed_candidate": "not_established",
+                "release_or_deployment": "not_established",
+                "lineage": "Prior qualification is retained below as historical evidence and does not independently qualify this source successor.",
+                "prior_source_qualification": {
+                  "scope": "Bounded source qualification of SDK bridge ownership, explicit logout drain/outcome and provider remount ordering. Synthetic accounts and in-memory state only.",
+                  "source_integrity": "All2539 current main Git leaves reconciled. Only the three frozen SDK SOURCE files plus two canonical metadata files differ, preserving2534 other blobs. Source inventory2512 and six retained SBOMs are unchanged in scope. Seven newly merged43 leaves were authenticated and overlaid only after unlinking candidate paths; the separately consumed08ad5997 base snapshot remains unchanged.",
+                  "behavior": "Document-wide SDK queue/tickets preserve newer provider login and same-token ABA, while empty remounts permit already-requested cleanup. Owned writes and bounded bridge retries drain before successful logout acknowledgment. SDK cleanup errors remain failures and preserve retry ownership. A passive exact-pair read detects writes followed by subscriber errors without SDK getter/subscription refresh side effects. Independently replaced different pairs remain protected. Ordinary refresh is retired/blocked through logout cleanup.",
+                  "checks": "142 scoped controls pass:57 provider,28 real-SDK and57 unchanged transport/hydration/CSRF controls. Scoped ESLint has zero errors/warnings. Six unchanged real-provider AccountTab reconciliation controls additionally pass, preserving paid/free state and one-token entitlement refresh. This is scoped qualification; no new full frontend or production build is claimed.",
+                  "review": "Independent exact-source and original-assertion review approves3340be76. All142 shipped plus153 independent controls pass (295 total), with zero skips/errors. Nine independent mutants fail intended assertions and restore final bytes. Author nine variants fail7/4/3/4/2/2/1/4/1 intended assertions with preserved positives.",
+                  "execution_limits": "Author mutation replay suffered a tool approval-review cancellation after seven terminal variants. The single authorized poll retry found no session. Static receipts identified an unfinished eighth invocation; its log is retained and excluded. The exact runtime was restored, only two unfinished variants replayed, and full positive scope rerun. No missing whole-run exit status is invented. Earlier callback-observer and per-provider designs plus a test teardown timeout remain rejected and retained.",
+                  "contract_limits": "Underlying requests are not cancelled or newly time-bounded; a stuck owned call keeps logout pending. Unmount itself is not logout. General pending sign-in/signup/MFA/hydration races and arbitrary independent same-pair SDK ownership are not comprehensively qualified. No actual service, account, cookie, installed Windows UI, installer or physical hardware was exercised.",
+                  "known_adjacent_failure": "Normal AccountTab discards both logout outcomes, and production CloudAuthGate unmounts it when front-door state clears. A separately retained real-provider/SDK/component synthetic503 witness leaves SDK state present while login is displayed without a failure notice. Durable UI outcome/error/retry work is a separate successor; this source does not claim complete visible logout acceptance.",
+                  "exact_head_hosted_checks": "pending for this refreshed canonical metadata head",
+                  "installed_candidate": "not_established",
+                  "release_or_deployment": "not_established",
+                  "prior_source_qualification": {
+                    "scope": "Offline source qualification of native music volume acknowledgement and recovery. No installed desktop, physical audio, native output-device, deployed service or customer release qualification.",
+                    "source_integrity": "All 2539 authoritative base Git leaves were reconciled before overlay. Exactly five existing SOURCE leaves change; 2534 original leaves remain exact in the source-only commit and 2532 after replacing two canonical metadata leaves. The manifest contains 2512 source files and retains all six SBOMs byte-for-byte.",
+                    "behavior": "Preserve immediate input, trailing 50 ms throttle and 300 ms idle release. Admit final input before old-prop reconciliation. Native requests require explicit ok:true and a finite applied volume 0..100; normalized acknowledgements update rollback truth. Coalesce intermediate drag intent and order writes until acknowledgement or uncertainty. Show pending/aria-busy and 15 s uncertainty; actual monotonic deadline and request/component/input ownership prevent stale completion, feedback or younger-request release. Later observed server state stays authoritative. Target/provider/video/embed/spoke and existing principal boundaries retire old UI ownership. Unmount discards unsubmitted/queued changes under the prior component contract. The embedded direct-message route remains separate and unchanged in behavior.",
+                    "checks": "Before the Auth42 rebase, the reviewed native-volume source passed 43 focused cases and the exact 152-file/1,413-case union, preserving 1,377 prior occurrences plus 36. Nine mutations failed as intended; scoped lint and bounded production build passed. Those receipts remain tied to source 25684d17, not represented as a newly executed complete suite on this refreshed tree.",
+                    "execution_partitioning": "For the native-volume pre-rebase source: A complete 1411-case union passed across 22 disjoint terminal process/XML executions. Two additional permanent expired-request/younger-owner tests changed only the existing test file; its entire 15-file partition was replayed and replaced the prior batch. The other 21 executed partitions remain valid on byte-identical production source. The final 1413 counter multiset has no missing/extra cases. Collection-only or partial output is never pass evidence; all original failed reproductions remain retained.",
+                    "review": "Prior native-volume independent review: Independent reviewer verified all five frozen hashes, replayed 43 focused plus four actual useViolaApi/apiFetch-to-control probes, and reconciled 22 terminal executions to the exact 1413-case multiset including the test-only replacement. Reviewed backend acknowledgement shape, normalized zero, refusal/deadline/younger ownership and direct iframe routing; no blocking finding.",
+                    "contract_limits": "UI timeout cannot cancel HTTP or backend audio work and does not guarantee backend write ordering after a timed-out write. General WebSocket chronology, physical loudness/silence, selected-output identity, installed persistence and visual layout on native target hardware remain unqualified. Embedded direct messages are not newly claimed as acknowledged physical volume. No account/security-access setting or dependency is changed.",
+                    "integration_limit": "Private adoption should consume this reviewed public pin through the existing canonical composition. No new source-map paths are required; do not copy runtime fixes into private shadows.",
+                    "exact_head_hosted_checks": "pending for this exact bound successor",
+                    "installed_candidate": "not_established",
+                    "release_or_deployment": "not_established",
+                    "prior_source_qualification": {
+                      "scope": "Bounded offline provider refresh ownership and newer-session renewal source correction. Synthetic accounts and network responses only.",
+                      "source_integrity": "All 2539 authoritative base blobs verified. Two approved source replacements plus two canonical metadata replacements preserve every other 2535 Git blob. Manifest covers 2512 SOURCE files and six unchanged SBOMs. Existing snapshot was reused with only changed leaves overlaid; the separately consumed base remains byte-identical.",
+                      "behavior": "Committed session generation retires stale refresh success, rejection and transient retry. Same-generation callers share one redemption. A newer generation waits for old work to drain, then rechecks mounted state, generation and token before redeeming its current token. Multiple current waiters share that new flight and await its completion. Sign-out, unmount, newer replacement and same-token ABA retain ownership.",
+                      "checks": "104 scoped controls pass through the unchanged frontend test runner, including the existing real-SDK single-refresher control. Scoped ESLint has zero errors and warnings. Original 20 provider tests remain verbatim. This is scoped qualification, not a newly executed full frontend suite or production build.",
+                      "review": "Independent exact-source review approved c7e9846d: 104 shipped and 123 additional controls pass; eight source mutants fail intended assertions. The rejected 715d80da lost-timer implementation and its failure evidence are retained.",
+                      "known_adjacent_failure": "The separate pending first SDK setSession bridge can complete after front-door sign-out and repopulate SDK memory. This was reproduced with the real installed SDK and synthetic fetch on these exact approved bytes. This patch does not qualify whole-account logout; a separate ownership/cleanup successor remains under development.",
+                      "contract_limits": "No request cancellation/timeout is added. Newer work waits for older transport to settle. Pending sign-in, sign-up, hydration and logout ownership outside runRefresh is not comprehensively qualified. No real credentials, account service, cookie, installed/native Windows UI, installer, audio or hardware execution occurred.",
+                      "exact_head_hosted_checks": "pending for the new canonical metadata head",
+                      "installed_candidate": "not_established",
+                      "release_or_deployment": "not_established",
+                      "prior_source_qualification": {
+                        "scope": "Offline source qualification of music-state identity fallback and matching playback-evidence test contracts. No native audio, installed persistence, deployed cloud or customer release qualification.",
+                        "source_integrity": "All 2538 authoritative base Git leaves were reconciled. One existing source leaf changes and one is added; 2537 prior leaves remain exact in the source-only tree, and 2535 remain exact after two canonical metadata replacements. The manifest has 2512 source files; all six prior SBOMs are retained byte-for-byte.",
+                        "behavior": "Current request identity wins. Missing context may resolve the local device partition only on positively identified desktop; cloud, unknown, absent and unavailable configuration cannot fall back. The existing desktop saved-zero-volume startup behavior is preserved. Synthetic in-memory tests exercise actual restore/persist and separate account partitions.",
+                        "checks": "102 canonical scoped controls pass with zero failures/errors/skips: ten new public identity methods, complete modified private search/tenant modules, unchanged runtime-service controls, all55 false-success ratchets and four prior public startup/playback controls. Five source negatives fail as intended: original unguarded resolver, denied desktop fallback, device-over-current, bare playback success and ignored unverified evidence. Scoped Ruff and canonical Black py311/120-column checks pass.",
+                        "review": "Independent reviewer verified all four source/test hashes, replayed all102 controls and six additional real ContextVar/store probes. Only the public resolver AST changes; no blocking finding.",
+                        "evidence_limits": "Private media fixture supplies structured provider evidence instead of prose, and its cloud identity case is explicit. Those two private test changes are separately reviewed dependent source, not included in this public tree. Earlier development-test syntax/expectation and disposable-profile failures are retained and excluded from acceptance. Final102 and valid negative receipts are separate.",
+                        "contract_limits": "No authentication settings, actual accounts, permissions or real user data are changed or exercised. This guards missing-context fallback only; existing explicit-principal validation and store failure handling retain their prior contracts. No installed restart, native output or whole-product acceptance claim.",
+                        "integration_limit": "Private adoption must consume this public guard and add tests/public/test_music_state_identity.py to the canonical source inventory before the dependent private fixture can pass against the composed source. Do not change stale private runtime shadows.",
+                        "exact_head_hosted_checks": "pending for this exact bound successor",
+                        "installed_candidate": "not_established",
+                        "release_or_deployment": "not_established",
+                        "prior_source_qualification": {
+                          "scope": "Offline source qualification of Rooms master-volume and per-room-offset acknowledgement, failure and recovery behavior. No installed desktop, physical audio, acoustic synchronization, account-principal or customer release qualification.",
+                          "source_integrity": "All 2536 authoritative base Git leaves were reconciled by exact identity. Four existing source leaves change and two are added; the source-only commit preserves 2532 other original leaves. Two canonical metadata replacements preserve 2530 original leaves. The manifest inventories 2511 SOURCE files, and all six prior SBOMs are retained exactly. The five newly merged OSS39 source/metadata leaves were copied only after authenticated Git identity checks; all six reviewed Rooms hashes remain unchanged.",
+                          "behavior": "Both Rooms sliders retain immediate input, trailing debounce and flush-on-close while showing pending, failure and uncertainty feedback. Admitted writes are ordered; refusal restores confirmed state without overwriting newer intent. Exact normalized values, including zero, are adopted from acknowledgements. The real parent adapter uses independent per-control response tickets and a monotonic deadline. Its truthful ok/value receipt carries a separate uiCurrent publication-admission flag. Slider settlement checks both that flag and its own monotonic deadline, so a delayed timeout callback cannot admit a stale response microtask. Retired completion cannot release another in-flight queue owner. Genuine refreshed parent state remains authoritative, including after failure.",
+                          "checks": "95 focused controls pass: 42 real API-envelope, 24 real component, 24 acknowledgement/queue and five unchanged generic-slider controls. Exact frontend coverage is 152 files and 1377 case occurrences across 21 successful disjoint execution partitions, retaining all 1331 prior occurrences and adding 46. Eight slider mutation variants fail with 14, 11 and six single-assertion failures; four adapter variants each fail two cases. Scoped ESLint reports zero errors and four inherited warnings. Normal upload-disabled production Vite build passes with a 512 MB heap.",
+                          "review": "Independent reviewer verified all six source hashes, replayed all 95 focused cases plus four extra exact-deadline/expired-owner/queued-normalized-zero probes, reconciled the complete 1377-case multiset and all 21 terminal process/XML receipts, and reviewed all 12 mutation variants plus final lint/build. No blocking finding. Two retired-parent failures and one independent delayed-timer failure are retained from rejected earlier local revisions; that independent probe is now a permanent passing control.",
+                          "execution_limits": "An initial component partition exited before collection with ENOSPC. Its failed log/XML/process receipt remains preserved and excluded. Only two owned reproducible Vite output directories were removed before the exact unchanged partition was recovered; all source and evidence remained intact. Collection-only and partial XML are never passing evidence.",
+                          "contract_limits": "The fifteen-second UI recovery cannot cancel underlying HTTP or backend work and cannot guarantee backend write ordering after timeout. This change does not establish general server-read ordering or account-principal transitions. Closing still flushes a deliberate drag, and already admitted queued writes may finish after unmount without publishing into the retired component. Existing calibration keeps its separate unchanged generic-slider contract. No native speaker, actual loudness or acoustic multi-room result is claimed.",
+                          "integration_limit": "Private adoption must consume the resulting public pin and map ui/react-app/src/hooks/useAcknowledgedSliderValue.js plus ui/react-app/src/hooks/useAcknowledgedSliderValue.test.jsx through the canonical source inventory. Do not copy public runtime corrections into private shadows.",
+                          "lineage": "Prior qualification is retained below as historical evidence; it does not independently qualify this successor.",
+                          "exact_head_hosted_checks": "pending for this exact bound successor",
+                          "installed_candidate": "not_established",
+                          "release_or_deployment": "not_established",
+                          "prior_source_qualification": {
+                            "scope": "Source-level admitted wake worker cancellation, native-open/read boundaries and latest enabled intent after drain, with native audio/model/platform boundaries inert. No physical capture, installed app, Surface or release qualification.",
+                            "source_integrity": "All 2536 authenticated public-main Git blobs reconciled. Exactly three reviewed SOURCE leaves differ, retaining 2533 original leaves in the source-only commit. Replacing the two canonical metadata files retains 2531 original leaves in the final five-path diff. All 2509 source hashes and six retained SBOMs verify. The source-only commit is a normal source-branch merge descendant of prior draft07b6a1b6 and main9d1cb8c6; no main ref update.",
+                            "behavior": "Cancel each detector attempt without mutating caller shutdown. Keep draining ownership until cleanup, reject cancelled initial/recovery open and late frames, and resume only the latest explicitly enabled request after old cleanup. Facade and detector generations retire stale callbacks on newer mute/Disabled, owner changes including ABA, direct stop/start, supervisor restart and shutdown. No unconditional restart loop or new polling worker.",
+                            "checks": "72 canonical focused controls pass: 56 public lifecycle/admission/stop/resume plus nine unchanged private sync and seven unchanged private health controls. Four final source/guard-negative mutants each fail with zero errors. Independent reviewer replays all 72 plus four released-callback probes. Actual-method baseline/stop-only/successor comparison proves old unsafe overlap, interim lost enable and corrected maximum-one-run sequence. Exact publication-source union with startup and Windows toast controls passes 91/91. Black line length 120 passes; Ruff retains 29 inherited diagnostics and adds zero.",
+                            "review": "Independent Windows release owner approved combined patch f35c2d3597974be0fd2f3975e89c7be8b79d0d8974431262b7de0edf1fa75361; this supersedes the held stop-only freeze.",
+                            "limitations": "Thread join is bounded; native cleanup/open calls are not newly bounded. Source tests do not prove driver timing, physical capture cessation, command-recording cancellation, installed microphone privacy or platform acceptance.",
+                            "exact_head_hosted_checks": "pending",
+                            "installed_candidate": "not_established",
+                            "release_or_deployment": "not_established",
+                            "prior_source_qualification": {
+                              "scope": "Offline source qualification of Settings draft ownership and exact save acknowledgements. No installed desktop, physical microphone, account-principal, live provider or customer release qualification.",
+                              "source_integrity": "All 2534 authoritative base Git leaves were reconciled by exact blob identity before overlay. Eight existing source leaves change and two are added; the source-only commit preserves 2526 other original leaves. Two canonical metadata replacements preserve 2524 original leaves. Manifest inventories 2509 SOURCE files, and all six prior SBOMs are retained exactly.",
+                              "behavior": "Server refreshes update clean top-level fields while unsaved and post-submit edits remain local. Each save returns its own exact response snapshot; acknowledged normalized/redacted values and field removals are adopted only for fields not subsequently edited. Edit generations preserve ABA edits. Cancel restores the latest backend snapshot and invalidates tickets. The prior dismissed/reopened save completion guard remains intact; footer completion does not close a newer unsaved draft. Existing boolean updateSettings/updateSetting callers remain compatible.",
+                              "checks": "97 focused cases pass. Exact frontend coverage is 151 files and 1331 case occurrences across 20 successful disjoint execution partitions, preserving all 1304 prior occurrences and adding 27. Four targeted mutation variants fail with 7, 4, 1 and 1 assertions. Scoped ESLint reports zero errors and 13 inherited warnings. Normal upload-disabled production Vite build passes using a 512 MB Node heap. On the refreshed OSS37 base, all ten reviewed source hashes and the entire frontend source remain unchanged; all 11 newly inherited toast source controls were replayed successfully. The complete prior frontend receipt remains source-equivalent, not a claimed repeat of that full execution.",
+                              "review": "Independent reviewer verified all ten source hashes, replayed all 97 focused cases, and passed five additional combined-hook, field-deletion, duplicate-receipt, Cancel and unmount probes. All 20 terminal process/log/XML partitions were independently reconciled against exact case multiplicities; no blocking finding.",
+                              "fixture_scope": "Four existing modal test harnesses expose the detailed receipt through their prior boolean-save mock and publish accepted snapshots. One older-success/newer-refusal case now submits an actual newer Disabled edit rather than an identical already-saved payload; its ownership and close assertions remain. No assertions were weakened to permit draft loss.",
+                              "execution_limits": "An unsplit remaining-suite process and the initial production build exited 137/Killed; their causes remain unassigned and receipts are retained as failed execution. An initial final partition lacked unchanged embed.js in the sparse test tree; its exact accepted source bytes were restored before the successful rerun. Partial XML and collection-only receipts are excluded from passing evidence.",
+                              "integration_limit": "Private adoption must consume the reviewed public pin and map ui/react-app/src/hooks/useSettingsDraft.js plus ui/react-app/src/hooks/useSettingsDraft.test.jsx through the canonical source inventory. Do not copy public runtime changes into private shadows. Concurrent backend mutation ordering, cancellation, cross-store transactions, account transitions and actual persisted restart remain unqualified.",
+                              "lineage": "Prior qualification is retained below as historical evidence; it does not independently qualify this successor.",
+                              "exact_head_hosted_checks": "pending for this exact bound successor",
+                              "installed_candidate": "not_established",
+                              "release_or_deployment": "not_established",
+                              "prior_source_qualification": {
+                                "scope": "Offline execution of actual Windows toast registration, delivery and notification-routing source with inert COM and process boundaries. No native Windows or installed notification result.",
+                                "source_integrity": "All 2533 authenticated base Git blobs reconciled. One existing runtime leaf changes and one public test is added; the source-only commit retains 2532 original leaves. Two metadata replacements retain 2530 original leaves. Canonical manifest contains 2507 source files and all six previous SBOMs are retained exactly.",
+                                "behavior": "A pywintypes.com_error from COM initialization, shortcut/property registration or cleanup is translated to the existing RuntimeError delivery boundary. Failed local delivery returns false and allows each existing user-scoped normal/high/urgent web-push leg to continue. Successful delivery, app identity, platform/cloud/permission gates and COM cleanup are preserved. Unexpected programming errors still propagate.",
+                                "checks": "11 public controls pass; exact original runtime yields 15 failing subcases. Independent reviewer repeats the 11 controls plus four permission-error/retry/programming-error/cleanup probes, all 15 pass. A composed-source union of web-push, quiet-hours, macOS/Linux fallbacks, C2 resilience and new public controls passes all 66 cases. Latest public startup-v2 plus toast union passes all 35 cases. Black and Ruff pass on changed source.",
+                                "private_fixture_scope": "A separately reviewed private test-only fixture isolates every web-push test from all three OS notification boundaries. All 11 cases pass with an independent hard-failure OS sentinel; original fixture produces three failures. This private fixture is not part of the public runtime patch.",
+                                "integration_limit": "The private repository must adopt this public revision and explicitly map the new public test. The Windows safety job that exposed this defect remains a historical failed result until a fresh native gate runs on the integrated exact head. No UI toast, COM registration, Windows permission, installed process, native device or Surface result is claimed.",
+                                "review": "Independent source review verifies both exact hashes and AST-limits the runtime change to _ensure_app_shortcut. No blocking defect found for this bounded correction.",
+                                "lineage": "Prior qualification is retained below as historical evidence; it does not independently qualify this successor.",
+                                "exact_head_hosted_checks": "pending for this exact bound successor",
+                                "installed_candidate": "not_established",
+                                "release_or_deployment": "not_established",
+                                "prior_source_qualification": {
+                                  "scope": "Pending wake startup/replacement admission with synthetic hardware boundaries only. No physical capture cessation, installed app, Surface, release or deployment qualification.",
+                                  "source_integrity": "Authoritative base e28c90fca8902a466400947ecd39aae569fdeaaf includes landed startup visibility v2. Source commit1802845ae6ae4199f615ddf239f8d006a826ea6f changes only the four reviewed admission SOURCE leaves and preserves2529 other base leaves. Canonical metadata binds2506 source files; final tree preserves2527 unrelated base leaves and all six SBOMs.",
+                                  "behavior": "Serialize requested listening state and detector activation; retain disable/mute intent before registration. Capture generation/instance ownership before construction and atomically commit only still-current replacements. Registration, including A-to-B-to-A and same-object registration, retires prior tickets. Newer disable, unmute, owner change or shutdown discards the prepared detector. Pending pipeline startup uses the same gate and does not duplicate a newer unmute start.",
+                                  "checks": "Thirty public methods pass:12 accepted listener lifecycle controls plus18 new deterministic admission controls. Nine unchanged private sync tests replay through their actual extracted class, for39 supplied controls total. Five selected behavioral controls fail on original source. Independent reviewer replayed all39 plus five independent concurrency controls,44/44, including the original registration ABA counterexample; WakeDetector class AST remains unchanged. Four changed files are Black-formatted. Ruff retains29 inherited unittest-style findings with zero new diagnostics.",
+                                  "retained_failure": "Initial review found an A-to-B-to-A ownership hole because registration did not advance the ticket generation. V2 advances generation on registration and replacement adoption, preserving listening intent. Two persistent registration controls retain this case. A smaller test environment lacked NumPy; that collection error is retained, and the complete stated scope passed in the existing NumPy2.2.6 environment without installation or exclusion.",
+                                  "review": "Independent whole-product owner approved exact patchcd012e2d after source hash, unchanged WakeDetector AST and39+5 control verification.",
+                                  "integration_limit": "Admission scope only. Native stop/drain, already admitted workers, continuous conversational capture, alternate direct-start callers and persisted consent across process restart remain separate. A retained adjacent source probe demonstrates an already-admitted listener can attempt mocked capture after mute; that stop/drain fix is explicitly not included here. No physical microphone privacy pass may be inferred from synthetic detector stopped flags.",
+                                  "lineage": "Prior source qualification is retained below as history and does not independently qualify this successor.",
+                                  "exact_head_hosted_checks": "pending for this exact successor",
+                                  "installed_candidate": "not_established",
+                                  "release_or_deployment": "not_established",
+                                  "integration_requalification": "Landed OSS34 startup visibility and OSS33/35 settings fixes are preserved exactly. The reviewed four admission SOURCE hashes are unchanged. Canonical2506-source/6-SBOM binding and63 focused source controls (30 public wake,9 unchanged private sync,24 startup) are replayed on this preserved union. These remain hardware-inert scoped checks; fresh exact-head hosted checks are required.",
+                                  "prior_source_qualification": {
+                                    "scope": "Desktop startup surface visibility source correction; no installed Windows, Chromium rendering, physical device, release or deployment qualification.",
+                                    "source_integrity": "All 2533 authoritative public base leaves are preserved except the two reviewed startup SOURCE files and two canonical metadata files. Source revision 4a2ad803ae7e01bfdff50c54996296581ab2d2e8 is based on landed OSS35 merge31be8941 and preserves 2531 other leaves at its source-only stage. Final binding inventories all2506 source files and preserves2529 unrelated base leaves plus all six SBOMs.",
+                                    "behavior": "Show the already-created local loading/error surface immediately after starting the backend coordinator. Verified readiness still gates HTTP React navigation. The ready callback only shows a window if it has to create it; an existing window keeps the user-selected visibility, including close-to-tray. Explicit tray restore remains available. Native preload/GC, helper and headless paths remain unchanged.",
+                                    "checks": "All24 focused source methods pass, preserving17 original methods. The two newly retained close-to-tray/hidden-failure controls fail on the initial early-show-only draft and pass on v2. Independent reviewer replays24 controls, unchanged readiness gate, actual ensure/attach/ready/load/error/retry paths and explicit restore. Non-main entrypoint semantics are unchanged. Private-config Ruff has45 inherited findings with zero new diagnostics; added test block is Black-formatted.",
+                                    "qt_supplement": "Owner and independent reviewer replay Qt6.8.1 Linux offscreen QMainWindow/QObject/QTimer/signals and actual extracted source handlers with synthetic backend/health and QTextBrowser instead of WebEngine. Slow/failing/timed-out startup remains visible; close-to-tray now stays hidden through late readiness and becomes visible only after the actual explicit restore handler. Socket calls are denied. Fontconfig cache and offscreen size-hint warnings are retained.",
+                                    "integration_limit": "One early show call does not establish usable React rendering, physical Windows first-paint, startup duration, or resolution of the historical python311.dll native access violation. Normal signed shortcut startup, repeated cold starts, normal exit, crash interval/dump evidence and hardware acceptance remain required. No private override/pin change belongs to this public source correction.",
+                                    "review": "Independent Windows release owner approved exact v2 patch c9e0f988 after replaying24 controls, readiness policy, three normal/failure/timeout Qt scenarios and actual close-to-tray/late-ready/explicit-restore behavior. This replaces the held initial draft verdict.",
+                                    "lineage": "Prior source qualification remains below as historical evidence and does not independently qualify this successor.",
+                                    "exact_head_hosted_checks": "pending for this exact bound successor",
+                                    "installed_candidate": "not_established",
+                                    "release_or_deployment": "not_established",
+                                    "integration_requalification": "Landed OSS33 acknowledged-mute feedback and OSS35 settings dismissal lifecycle are both retained exactly from31be894100564256e10ca0ca82e26fd3371126f4. The two reviewed startup v2 SOURCE hashes are unchanged. Canonical2506-source/6-SBOM binding,24 scoped source controls and real Qt offscreen normal/error/close-to-tray/restore scenarios are replayed. Earlier review remains scoped to unchanged bytes; fresh exact-head hosted checks are required for this union.",
+                                    "retained_draft_regression": {
+                                      "superseded_head": "54331fb9b11bb29b83e0fcd347d7e3f68fdf514d",
+                                      "superseded_source_patch": "b71d72ea77b678125c530ef2e00839b38aad29ca344463823a65efb85e6d65e6",
+                                      "finding": "Early visibility made user close-to-tray reachable before readiness; the old ready handler reopened that deliberately hidden window. Prior source approval was withdrawn until this new control passed.",
+                                      "resolution": "v2 restricts ready-time show to newly created fallback windows and retains both independent source and real-Qt dismissal/restore controls."
+                                    },
+                                    "prior_source_qualification": {
+                                      "scope": "Real-component synthetic Settings modal save-completion lifetime and submission ownership acceptance. No installed app, backend cancellation, native device, provider, release or deployment qualification.",
+                                      "source_integrity": "All 2533 authenticated public base blobs verified before overlay. Two existing source/component-test leaves change; source-only commit preserves 2531 original public leaves. Two metadata replacements preserve 2529 original leaves. Canonical generator inventories 2506 source files bound to the actual source-only commit; all six retained SBOMs and preceding playback, settings snapshot and mute feedback changes remain unchanged.",
+                                      "behavior": "An open modal lifetime owns each Save completion. Dismissal immediately invalidates the submission before parent unmount; cleanup retires the lifetime; a newer submission supersedes an older one. An old accepted save can no longer close newly reopened Settings or clear a newer draft after dismissal. Current accepted save and refusal/retry behavior remain.",
+                                      "checks": "The complete Settings sidebar scope passes all 25 cases, retaining 17 existing cases and adding eight. Original source fails seven of the eight added cases, with one passing. Removing lifetime ownership fails the unmount control; removing submission ownership fails both immediate-dismissal and newer-submission controls. Exact complete frontend inventory passes all 150 files / 1304 case occurrences in 11 sequential partitions: nine 16-case and one 12-case component partitions plus 1148 remaining cases. Multiset checks preserve all 1296 prior occurrences and add exactly eight, with no missing or extra execution. Independent reviewer replays 25 component cases plus four additional lifecycle/ordering/StrictMode cases and independently verifies exact hashes and all partition multiplicities. Production Vite build passes with uploads disabled; scoped ESLint has zero errors and three inherited warnings.",
+                                      "execution_limit": "An initial added test nested a DOM wait inside async act; the fixture was corrected without weakening its expectation. An initial larger component partition ended with a worker-exit error and remains failed evidence. Final exact-name partitions use one worker, a 640 MiB V8 heap and at most 16 component occurrences per process. Process exit status, terminal console and XML counts are checked for every partition. Collection XML supplies names only; no all-in-one pass is claimed.",
+                                      "integration_limit": "Dismissal cannot cancel or roll back an already submitted backend write. Existing current-open dirty-draft/server-snapshot adoption and editing-during-save races remain outside this correction and are tracked separately. Actual persisted restart, native behavior and installed acceptance remain unqualified. Private adoption adds no mapping for this two-existing-file correction and must preserve prior settings regression ownership and source lineage.",
+                                      "review": "Independent review found no blocking defect in the bounded stale completion/closure repair. Extra cases cover prop-driven close/reopen with accepted and refused results, newest acceptance followed by older success, and current-save StrictMode behavior. The original 81-item scope and all prior installed feature failures retain their corresponding acceptance requirements.",
+                                      "lineage": "Prior source qualification remains below as historical evidence and does not independently qualify this successor.",
+                                      "exact_head_hosted_checks": "pending for this exact bound successor",
+                                      "installed_candidate": "not_established",
+                                      "release_or_deployment": "not_established",
+                                      "prior_source_qualification": {
+                                        "scope": "Real-component synthetic microphone mute acknowledgement and failure-feedback acceptance. No installed app, physical microphone, native capture/device, provider, release or deployment qualification.",
+                                        "source_integrity": "All 2533 authenticated public base blobs verified before overlay. Two existing source/component-test leaves change; source-only commit preserves 2531 original public leaves. Two metadata replacements preserve 2529 original leaves. Canonical generator inventories 2506 source files bound to the actual source-only commit; all six retained SBOMs and prior settings snapshot source remain unchanged.",
+                                        "behavior": "Mute/unmute feedback waits for an explicit successful settings result or a matching authoritative settings snapshot. Pending, refused, rejected and timed-out requests have visible feedback. New retries retire older feedback owners; unmount and principal remount invalidate prior completions. A 15-second unacknowledged timeout changes pending text to uncertainty and permits retry. Existing backend request routing and capture policy are unchanged.",
+                                        "checks": "All 12 added component cases pass. Original handler fails 11 of those cases, passes one, and emits one unhandled synchronous-error event. Removing operation/session ownership fails all three selected stale/unmount/principal controls. The exact complete frontend inventory of 150 files / 1296 case occurrences passes in three partitions of 86, 70 and 1140. Executed case-name multisets preserve every prior 1284 occurrence and add exactly 12, with no missing or extra execution. Independent reviewer replays all 12 cases plus four additional controls, checks exact hashes and independently verifies partition multiplicities. Production Vite build passes with upload credentials disabled; scoped ESLint has zero errors and 11 inherited warnings.",
+                                        "execution_limit": "Two failed all-in-one or whole-component runs are retained: workers received SIGKILL of unassigned cause. They are not passing evidence. Successful complementary test-name partitions and a separate remaining-file run use identical source, assertions, timeouts and total scope with one worker and a 640 MiB V8 heap. Collection XML supplies names only. The local receipt verifier rejects both killed-worker receipts, missing partitions and duplicate execution. No successful all-in-one command is claimed.",
+                                        "integration_limit": "Timeout retires UI feedback ownership only and cannot cancel an already-running server-side write; late authoritative settings may still arrive. Concurrent backend mutation serialization, physical capture blocking, native device lifecycle and persisted restart remain unqualified. Private adoption requires no new mapping for this two-existing-file correction and must retain the preceding settings regression mapping and playback fixes.",
+                                        "review": "Independent review found no blocking defect. Additional controls cover an opposite action after settings-before-HTTP acknowledgement with a late older rejection, truthy non-boolean refusal and key-repeat suppression. The original 81-item roadmap and all prior installed feature failures retain their corresponding acceptance requirements.",
+                                        "lineage": "Prior source qualification remains below as historical evidence and does not independently qualify this successor.",
+                                        "exact_head_hosted_checks": "pending for this exact bound successor",
+                                        "installed_candidate": "not_established",
+                                        "release_or_deployment": "not_established",
+                                        "prior_source_qualification": {
+                                          "scope": "Real-hook synthetic settings snapshot and error ownership acceptance. No installed app, physical microphone, native device, provider, release or deployment qualification.",
+                                          "source_integrity": "All 2532 authenticated public base blobs verified before overlay. One existing source hook changes and one test is added; source-only commit preserves 2531 original public leaves. Two metadata replacements preserve 2529 original leaves. Canonical generator inventories 2506 source files bound to the actual source-only commit; all six retained SBOMs unchanged.",
+                                          "behavior": "A newer settings read, acknowledged save/reset or pushed snapshot invalidates older REST results and their loading/error updates. Separate error ownership protects newer persistence errors from an earlier read. A successful current explicit refresh clears an earlier load error. Omitted pushed voice_status retains its value; explicit null clears it. Unmount and StrictMode cleanup invalidate old reads. Existing desktop/cloud routing and write payloads remain unchanged.",
+                                          "checks": "Sixteen final real-hook controls pass. The identical tests fail 12 cases on the original hook, with four existing behaviors passing. Disabling error ownership fails both selected persistence-error controls. Complete frontend passes 150 files / 1284 cases, zero failures/skips/errors, using one worker and a 640 MiB V8 heap. Production Vite build passes with upload credentials disabled. Scoped ESLint has zero errors and ten inherited unused-catch-variable warnings. Independent reviewer replayed all 16 controls plus four refusal/error-dismissal/reset-order probes and verified the full 1284-case receipt and exact hashes.",
+                                          "execution_limit": "Failed worker receipts are retained. An earlier instrumented worker ended with SIGKILL of unassigned cause; an explicit 384 MiB heap experiment then confirmed V8 heap exhaustion at that imposed ceiling. The 640 MiB single-worker rerun completed the identical full scope without changing assertions, timeouts or exclusions. These failures are not converted into passed evidence.",
+                                          "integration_limit": "Concurrent mutation serialization, cross-store transactions, principal transitions, actual persisted restart, physical capture and device lifecycle remain outside this correction. Private adoption must map new ui/react-app/src/__tests__/hooks/useSettings.snapshotOrdering.test.jsx while preserving all earlier public mappings and playback changes.",
+                                          "review": "Independent async-ownership review found no blocking defect; source hashes and the exact patch were independently verified. The original 81-item program scope and all prior installed feature failures remain open to their corresponding acceptance evidence.",
+                                          "lineage": "Prior source qualification remains below as historical evidence and does not independently qualify this successor.",
+                                          "exact_head_hosted_checks": "pending for this exact bound successor",
+                                          "installed_candidate": "not_established",
+                                          "release_or_deployment": "not_established",
+                                          "prior_source_qualification": {
+                                            "scope": "Synthetic real-component playback acknowledgement/recovery and execution of actual pause endpoint/helper bodies with inert audio boundaries. No installed app, native device, physical output, provider, release or deployment qualification.",
+                                            "source_integrity": "All 2531 authenticated public base blobs verified before overlay. Five existing source leaves change and one test is added; source-only commit preserves 2526 original public leaves. Two metadata replacements preserve 2524 original leaves. Canonical generator inventories 2505 source files bound to the actual source-only commit; all six retained SBOMs unchanged.",
+                                            "behavior": "Pause UI waits for HTTP or authoritative state acknowledgement, displays a disabled aria-busy pending control, permits opposite action after an earlier state-stream acknowledgement, invalidates stale response/track/unmount ownership, and releases unacknowledged UI ownership after 15 seconds with explicit retry guidance. Direct pause capability/device failures propagate before helper flags change; timeout-fallback failure returns an error before false paused state/broadcast. Prior ordered preferences, zero-volume source and all seven zero-volume tests remain preserved.",
+                                            "checks": "Five initial original-source UI cases failed; exact original endpoint/helper source yields seven failing assertion subcases. Revised patch independently replayed 137 component cases, nine dedicated Python methods and the original WebSocket-before-HTTP counterexample. Final combined source preserving OSS30 passes 149 frontend files / 1268 tests, zero failures/skips/errors, plus 16 targeted pause/rating/repeat Python methods and a production Vite build with upload credentials disabled. Scoped ESLint has zero errors and 12 inherited warnings. Python formatting passes; new Python test Ruff-clean and all eight existing control.py Ruff findings remain unchanged.",
+                                            "integration_limit": "The 15-second UI recovery does not cancel an already-running server/audio operation; late authoritative state can still arrive. Physical pause, interruption, real devices and installed behavior remain unverified. Private adoption must consume the qualified public pin and add the explicit tests/public/test_pause_response_contract.py mapping while preserving earlier useOrderedPreference.js ownership and current pin lineage.",
+                                            "review": "Independent review rejected the initial slice for swallowed helper errors and blocked opposite action after early WebSocket acknowledgement. Both findings have dedicated retained cases and were replayed successfully on the revised patch without a blocking finding. The reviewed pause and zero-volume patches are combined only by preserving the exact one-line zero-volume change and both complete test blocks; unrelated base files remain identical.",
+                                            "lineage": "Prior source qualification remains below as historical evidence and does not independently qualify this successor.",
+                                            "exact_head_hosted_checks": "pending for this exact bound successor",
+                                            "installed_candidate": "not_established",
+                                            "release_or_deployment": "not_established",
+                                            "prior_source_qualification": {
+                                              "scope": "Real-component zero-volume display and embedded-player command acceptance only. No native device, physical audibility, installed app, provider, release or deployment qualification.",
+                                              "source_integrity": "All 2531 authenticated public main blobs verified before applying the independently reviewed two-file patch. Source-only commit preserves 2529 original public leaves; two metadata replacements preserve 2527. Canonical generator and verifier bind all 2504 source files and six unchanged SBOMs.",
+                                              "behavior": "Use nullish rather than falsy fallback for playerState.volume so real volume 0 remains 0 in the slider and iframe synchronization. Missing/null values retain the existing 80 fallback. Source includes all prior ordered repeat/shuffle and rating protections unchanged.",
+                                              "checks": "Two new original-byte cases fail; the separate iframe negative explicitly observes level 80 for server 0. All 130 SmartDisplay tests pass including seven new cases for 0/1/50/100, undefined/null fallback and 40-to-0-to-25-to-0 recovery. Complete frontend 149 files / 1254 tests pass, zero failures/skips/errors; production Vite build passes with upload credentials disabled. Scoped ESLint has zero errors and 11 inherited warnings. Independent reviewer verifies both file hashes and patch, replays 130 component cases and checks the complete 1254 receipt without a blocking finding.",
+                                              "integration_limit": "Private adoption must consume the qualified public revision through canonical composition, preserving the prior useOrderedPreference.js mapping and all current pin lineage. This correction adds no source file. Installed rendering, acoustic output and real mute/restore behavior remain separate unverified acceptance.",
+                                              "lineage": "Prior source qualification remains below as historical evidence; it does not independently qualify this successor.",
+                                              "exact_head_hosted_checks": "pending for this exact bound successor",
+                                              "installed_candidate": "not_established",
+                                              "release_or_deployment": "not_established",
+                                              "prior_source_qualification": {
+                                                "scope": "Synthetic real-component repeat/shuffle preference ordering and recovery acceptance. No installed app, native device, physical audibility, provider, release or deployment qualification.",
+                                                "source_integrity": "All 2530 authenticated public base blobs were verified before overlay. Two existing source leaves change and one hook is added; source-only commit preserves 2528 original public leaves. The unchanged canonical generator inventories 2504 SOURCE files and binds them to the actual source-only commit. Updating two metadata leaves preserves 2526 original public leaves and all six SBOMs.",
+                                                "behavior": "Independently serialize repeat and shuffle writes while preserving newest optimistic intent; reconcile failed saves against confirmed or explicitly server-reported state; preserve pending intent during earlier backend echoes; derive same-render clicks from current intent; drop queued writes after unmount. Existing rating ordering, source-aware defaults, principal remount and playback behavior remain.",
+                                                "checks": "Original SmartDisplay96 cases pass; four newly added negative controls fail on original production bytes. Corrected SmartDisplay123 cases pass, including27 new acceptance cases and all eight three-write success/failure permutations for each preference. Complete frontend149 files/1247 tests pass with zero failures/skips/errors. Production Vite build passes with upload credentials disabled. Scoped ESLint has zero errors and11 inherited SmartDisplay warnings. Independent reviewer replayed123 cases and verified full1247-case receipt and exact file hashes without a blocking finding.",
+                                                "integration_limit": "Private adoption must consume the qualified public pin through canonical composition and map new ui/react-app/src/hooks/useOrderedPreference.js. Do not copy runtime changes into private shadows. Real installed repeat/shuffle display, persistence and recovery remain unverified.",
+                                                "lineage": "Prior source qualification is retained below as historical evidence and does not qualify this new source revision.",
+                                                "exact_head_hosted_checks": "pending for this exact bound successor",
+                                                "installed_candidate": "not_established",
+                                                "release_or_deployment": "not_established",
+                                                "prior_source_qualification": {
+                                                  "scope": "Caller-owned crash-forensics target API and synthetic public regression contracts only. No native crash, Windows/macOS runtime, installed-app, release or deployment qualification.",
+                                                  "source_integrity": "The complete authenticated main base matches all 2529 Git blobs. One core file changes and one regression file is added; 2528 original public leaves remain byte-identical in the source-only commit. The unchanged canonical generator inventories 2503 SOURCE files and binds them to the actual source-only commit. Updating the two required metadata leaves preserves 2526 original public leaves and all six SBOMs.",
+                                                  "behavior": "Accept stream, log_path and modules_path only as an explicit complete set. Preserve caller stream and descriptor ownership, bind relative targets before later cwd changes, validate file identity and sidecar targets before hooks, avoid allocator fallback and pruning, and retain dated header, bounded module-map refresher, clean-exit marker and existing heap-free dialog suppression. Default caller allocation, fallback and retention implementation remain unchanged.",
+                                                  "checks": "26 focused contracts pass on Linux/Python 3.11.16 and independently on Linux/Python 3.12.14. Scoped Ruff and formatting checks pass. The custom-stream happy-path regression fails against the unmodified source. Independent review has no outstanding actionable findings. Clean patch replay exactly matches reviewed hashes.",
+                                                  "public_aggregate_limit": "Candidate public unittest discovery in the existing Linux/Python 3.12 QA environment runs 359 methods with three setup/import errors. The same environment runs the exact original base with 333 methods and the same three errors. This is incomplete aggregate evidence; genuine exact-head Windows hosted checks remain required.",
+                                                  "integration_limit": "Caller-controlled private directory security, caller-owned retention and artifact-header sanitization remain required. Supplying a private module-map path does not make raw header or traceback paths safe for upload.",
+                                                  "lineage": "Prior source qualification is retained verbatim below as historical evidence; earlier unresolved qualification is not converted into a pass.",
+                                                  "exact_head_hosted_checks": "pending for this exact bound successor",
+                                                  "installed_candidate": "not_established",
+                                                  "release_or_deployment": "not_established",
+                                                  "prior_source_qualification": {
+                                                    "scope": "Public test-harness import and module-cache isolation correction only. This does not change production behavior or establish installed, native-device, physical-audio, provider, release or deployment qualification.",
+                                                    "source_integrity": "Exactly two existing public test leaves change on the complete 2529-leaf public tree. The source-only commit preserves 2527 other leaves and all 2500 other SOURCE files. The unchanged canonical generator binds all 2502 source files to the actual new source commit. After the two required metadata replacements, 2525 other public leaves and all six SBOMs remain byte-identical.",
+                                                    "behavior": "Load the adjacent speech fixture by its exact file path so both unittest discovery and importlib-style runners can resolve it. Restore only mocked module keys while retaining real lazy imports, and restore the two transient mock-dependent consumer caches and their parent package attributes. Preserve all original 120 public test methods and assertions; add four focused module-isolation guards.",
+                                                    "checks": "The focused public unittest scopes pass: 51 selected-output methods and 73 speech/settings/module-isolation/network methods. The four added guards cover exceptional cleanup, nested overrides, real-import retention, transient consumer cleanup and actual fixture cache/package restoration. Independent review audited 75 mock scopes without surviving synthetic bindings. Scoped Ruff, Black, strict patch replay and original-assertion preservation checks pass. These overlapping scopes are not additive evidence of full aggregate or runtime acceptance.",
+                                                    "lineage": "The prior published qualification below is retained verbatim as historical evidence for 361fbaa777e7915e74afbe56bd72a813675fb0f5. The current correction concerns the public test harness and does not convert earlier incomplete or rejected qualification into a pass.",
+                                                    "exact_head_hosted_checks": "pending for the new bound test-only correction head",
+                                                    "installed_candidate": "pending",
+                                                    "release_or_deployment": "not_established",
+                                                    "prior_source_qualification": {
+                                                      "scope": "Focused synthetic shared-output failure, concurrent-writer lifecycle, pipeline health and existing speech/settings regression qualification. No native audio device, installed app, physical audibility or release/deployment qualification.",
+                                                      "source_integrity": "The complete official public archive matches all 2529 Git blobs at 7af826b. Exactly five reviewed source/test leaves change; the source-only tree preserves 2524 unrelated Git leaves. The canonical unchanged generator inventories all 2502 source files with the actual new source commit. Canonical final binding verification covers all 2502 source files and all six unchanged SBOMs. After two metadata replacements, 2522 unrelated Git leaves remain unchanged.",
+                                                      "behavior": "Propagate shared output write errors; detach only the current failed stream, defer close until its last writer exits, and prevent stale writers from changing a restarted stream. Failed outputs reject subsequent writes, and the playback loop stops consuming scheduled PCM. Pipeline health observes the active driver failure snapshot and reports output_write_failed. A successful restart clears failure; an unsuccessful restart retains it. Existing selected-device resolution and fallback rules are unchanged; failed audio is not replayed on another speaker.",
+                                                      "checks": "51 selected-output and 69 speech/settings methods pass using the documented public unittest route. An independent reviewer repeated the public 120 and six existing private health cases through the unchanged private tester/config. Supplemental extracted pytest runs passed 126 combined public/private health methods and 11 existing private device-loss/pipeline setup methods; those extracted runs bypassed private conftest and are not canonical private aggregate proof. Eight new assertions reject exact original source, with one additional expected missing-new-state error. Ruff 0.14.6, Black 26.5.1 py311/120, strict-whitespace replay, exact changed bytes and reverse application pass.",
+                                                      "retained_failure": "One initial extracted private lifecycle run failed a timer-vs-stop test which schedules release at the same 0.5-second timeout as stop and cancels the timer immediately afterward. Original stop and writer-close methods are unchanged; original nine and candidate eleven lifecycle checks subsequently passed, as did new deterministic two-writer and stale-writer controls. No private test was altered, skipped or weakened.",
+                                                      "tool_schema_retention": "Tool schema and cap bytes are unchanged from qualified 7af826b: the prior retained measurement is 76 tools / 61977 UTF-8 tools-array bytes under the unchanged strict 62000-byte cap. This correction adds or removes no tool.",
+                                                      "public_aggregate_limit": "Full candidate discovery initially ran 315 tests with 27 missing-import/setup errors. After authorized test-only dependency installation, candidate ran 329 tests and exact original 7af826b ran 320 tests; both ended with the same one assertion failure and four errors. The incomplete, non-release-pinned local environment lacked Pipecat distribution metadata, hit an unwritable default cache, and encountered a repeated-module-load error causing empty synthetic speech. Earlier isolated public 120-method evidence remains scoped to its recorded environment. No full local aggregate, native or installed qualification is claimed; exact successor hosted checks remain required.",
+                                                      "prior_hosted_checks": "Historical public head 7af826b completed all eight hosted checks successfully (source run 37193295745; inventory run 37193295734). Those results do not qualify this new successor. Earlier rejected Windows evidence is retained as history under prior_selected_output_qualification.",
+                                                      "output_scope_limit": "Qt, VLC, embedded/browser and native pyttsx3 playback remain separate unresolved paths. Standalone spoke constructor-selected output remains unchanged. Historical numeric identities cannot be recovered after historical PyAudio renumbering. Open streams do not immediately reroute. Device-change timeout may still refresh despite undrained transient playback. Actual hot-unplug, re-enumeration, packaged playback, physical audibility and complete issue4544 closure remain unqualified.",
+                                                      "persistence_limit": "No cross-store transaction or rollback guarantee. Credentials can persist independently when a mixed request returns False; ordinary mixed user/global updates can commit the user store before a global failure. Direct externally mutable manager.settings writes remain outside managed copy-on-write paths. Explicit staging with save_immediately=False retains its existing semantics. Existing loader selection is unchanged.",
+                                                      "integration_limit": "Private adoption must consume the resulting public pin through canonical ownership composition, preserve the five already required new source mappings and accumulate the existing phone/settings/speaker corrections. Do not copy runtime changes into private shadows or revert a newer pin. Exact successor hosted checks and private integration remain pending.",
+                                                      "prior_selected_output_qualification": {
+                                                        "scope": "Focused synthetic integration of selected-output behavior and Windows-compatible speech-test isolation on the existing approved speech-volume/settings persistence source. No native Windows, physical audio, installed startup, full public/composed aggregate or whole issue4544 acceptance.",
+                                                        "source_integrity": "Exactly fourteen reviewed source paths change, four are added, and the canonical manifest and binding are regenerated for this actual source revision. All 2502 source files are inventoried. The source-only stage retains 2515 unrelated existing Git leaves; after two canonical metadata replacements, the final bound tree retains 2513 unchanged existing leaves and all six SBOMs from public27.",
+                                                        "selected_output": "Save new output selections as name plus host-API identities. Resolve legacy PyAudio indices through their owning binding, and resolve sounddevice devices fresh at Kokoro utterance, simple music stream, and shared RawOutputStream start. Default/missing/ambiguous choices follow existing default fallback. Explicit open/start/mid-play failures do not authorize replay on another speaker. Shared pipeline open/start failures publish error/output_start_failed and clean up initialized components. Serialize Kokoro convenience play/wait without holding the lifecycle lock for the utterance.",
+                                                        "checks": "The combined ordered 131 shipped tests pass on Linux and with the actual CPython TCP socketpair fallback. 206 distinct focused Python methods pass in the integration runs, including independent settings/output/guard controls; additionally 57 frontend tests, 18 schema tests and two API-reset probes pass. Scoped runtime/new-test Ruff and Black, ESLint, atomic-JSON and sync-bridge checks pass under recorded commands. Broad default Ruff over all changed Python files still reports four unchanged pre-existing E701 statements in the existing execution-safety module. Original65 speech assertions remain preserved plus four new guard methods. Independent component mutation negatives are retained.",
+                                                        "windows_guard": "Only the stdlib socketpair code object, its exact client/listener, loopback address, stream family/type and listener bound endpoint can use saved connect. Unrelated application loopback, external targets, create_connection and connect_ex remain denied. This is faithful CPython fallback execution on Linux, not a genuine Windows runner result.",
+                                                        "tool_schema_retention": "Prior description compaction remains byte-identical. 76 tools serialize to 61977 UTF-8 tools-array bytes under the unchanged strict <62000 cap; 23 bytes of margin. This is neither an HTTP-envelope limit nor a model-token budget.",
+                                                        "persistence_limit": "No cross-store transaction or rollback guarantee. Credentials can persist independently when a mixed request returns False; ordinary mixed user/global updates can commit the user store before a global failure. Direct externally mutable manager.settings writes remain outside managed copy-on-write paths. Explicit staging with save_immediately=False retains its existing semantics. Existing loader selection is unchanged.",
+                                                        "output_scope_limit": "Qt, VLC, embedded/browser and native pyttsx3 playback remain separate unresolved paths. Standalone spoke constructor-selected output remains unchanged. Historical numeric identities cannot be recovered after historical PyAudio renumbering. Open streams do not immediately reroute. Shared midstream write errors retain catch-and-log behavior, and device-change timeout may still refresh despite undrained transient playback. Hot-unplug, re-enumeration, packaged playback, physical audibility and complete issue4544 closure remain unqualified.",
+                                                        "public_aggregate_limit": "The unfiltered final local public aggregate ran327 tests with one setup error because pyloudnorm is absent in PhoneLanguageSwitch. No other failures were found; this remains an incomplete aggregate, not full acceptance.",
+                                                        "native_windows_evidence": "The prior public27 Windows Python3.11.9 run reported 296 tests,21 failures,2 errors. It remains rejected evidence; this synthetic repair does not replace a new genuine exact-head Windows run.",
+                                                        "integration_limit": "Adopt the resulting public pin with the canonical ownership composition. Add the four new paths in the source-plan inventory alongside the already required speech regression mapping. Do not copy public runtime code into private shadows.",
+                                                        "prior_speech_settings_qualification": {
+                                                          "scope": "Focused synthetic settings-to-speech gain, quiet-hours and acknowledged settings persistence repair, including bounded save/reset/import paths. No complete public/composed aggregate, real Postgres, model inference, packaged startup, physical playback/device, Windows installer, installed-app or live qualification.",
+                                                          "source_integrity": "Exactly five reviewed public source paths and canonical manifest/binding change. All 2498 source files are inventoried, including the new speech/settings regression. Dependencies, workflows, licences, notices, model assets, vendor provenance and all six retained SBOMs remain unchanged.",
+                                                          "behavior": "Use current saved volume and quiet-hours policy at speech execution; preserve explicit overrides and mute; carry isolated request context to fallback worker; cache unity PCM and apply current gain at playback. Publish managed immediate global/per-user snapshots only after accepted persistence. Fallback success requires all requested non-secret values in the JSON snapshot selected by the existing loader; full replacement paths also prove removed non-secret keys are absent. Stage reset/import privately and keep authenticated imports scoped to the active user. Persist and publish the same retained import blob even if a slow DB save exceeds cache TTL.",
+                                                          "checks": "On the actual merged PR26 source tree plus the reviewed successor: 65 shipped speech/settings methods, 17 existing speech methods, 11 prior independent controls and 21 renewed independent settings controls pass (114 methods total), plus two API reset probes and 18 tool-schema tests. Ruff, Black, atomic-JSON and sync-bridge gates pass. Six independent mutation negatives include the expired staging-cache fault. Synthetic provider/model/audio boundaries and no model calls.",
+                                                          "tool_schema_retention": "Prior description compaction remains byte-identical. 76 tools serialize to 61977 UTF-8 tools-array bytes under the unchanged strict <62000 cap; 23 bytes of margin. This is neither an HTTP-envelope limit nor a model-token budget.",
+                                                          "persistence_limit": "No cross-store transaction or rollback guarantee. Credentials can persist independently when a mixed request returns False; ordinary mixed user/global updates can commit the user store before a global failure. Direct externally mutable manager.settings writes remain outside managed copy-on-write paths. Explicit staging with save_immediately=False retains its existing semantics. Existing loader selection is unchanged.",
+                                                          "integration_limit": "Private adoption must consume the resulting public pin and map the new regression through the canonical ownership list. Do not copy public runtime corrections into private shadows.",
+                                                          "installed_candidate": "pending",
+                                                          "exact_head_hosted_checks": "pending",
+                                                          "release_or_deployment": "not_established"
+                                                        },
+                                                        "installed_candidate": "pending",
+                                                        "exact_head_hosted_checks": "pending",
+                                                        "release_or_deployment": "not_established"
+                                                      },
+                                                      "installed_candidate": "pending",
+                                                      "exact_head_hosted_checks": "pending",
+                                                      "release_or_deployment": "not_established"
+                                                    }
+                                                  }
+                                                }
+                                              }
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            },
+                            "integration_requalification": "The final current-main union independently replays all 91 wake lifecycle, native-startup source and toast controls with zero failures/errors/skips. The ten newly landed Settings source/test files remain exact; their prior qualification is retained as history, without claiming a fresh frontend rerun."
+                          }
+                        }
+                      },
+                      "source_union": "Source-only merge commit c7dcdbfb has current main b6d84daa and prior reviewed auth head c304fa1 as parents. This permits a fast-forward feature-branch update without losing source history. Both approved AuthProvider hashes remain unchanged."
+                    },
+                    "integration_requalification": "On this exact refreshed Auth42/native-volume union, all 46 current AuthProvider tests, 33 VolumeControl controls and all 166 SmartDisplay cases pass (245 total), the latter in 11 bounded executions. Every one of the five native-volume source hashes is unchanged; both landed Auth42 source hashes are retained. Full frontend qualification for this updated union is not claimed from the older 1,413-case receipt. Exact-head hosted checks are pending."
+                  },
+                  "source_union": "Source-only merge89c117fa has current main8a927157 and prior reviewed SDK head4383104c as parents. All approved3340be76 source hashes are unchanged. The21 scoped SDK test inputs remain byte-identical; no native-volume qualification is inferred from SDK tests."
+                }
+              },
+              "sdk44_input_reconciliation": "The three newly merged AuthProvider/bridge-test leaves are retained exactly from public297ce086. Their test inventory grows from47 to85 cases, with38 inherited additions and no removals. The Queue five-file patch is unchanged. Final executed inventory is 1,514, not a cumulative replay sum. All 85 current auth controls pass; auth44-input-reconciliation.json enumerates the 38 inherited additions with no removals.",
+              "speech45_rebase": "The 471 tracked frontend/build/test input rows, including package manifests/lockfile, version constant, embed source and optional wake assets, are unchanged across SDK44 to speech45. The same Queue overlay preserves that equality. The accepted 1,514-case union and build-source compilation evidence are reused by exact input identity; no UI matrix was rerun for Python-only changes.",
+              "build_fixture_limit": "The sparse frontend qualification materialized and hash-verified 468 current inputs. Three optional wake-model assets were absent from that runner, as was a nonloaded .env.example template. The production-mode Vite receipt proves source compilation, not optional wake-asset emission or complete release-asset inclusion. The canonical publication snapshot retains all three unchanged model assets exactly. Native/package qualification remains separate."
+            },
+            "windows_ci_history": "The first hosted head failed while its source-reading fixtures decoded UTF-8 entrypoint/normalizer text as cp1252. This test-only delta fixes the demonstrated cause without changing runtime code or weakening any test. The corrected exact head must qualify through a fresh hosted run; no Windows pass is inferred from the Linux cp1252 reproduction.",
+            "queue_input_reconciliation": {
+              "base": "2ace32ae096a64b17c9057df7a1e547960a94dc4",
+              "speech_target_paths_unchanged": 15,
+              "all_python_and_other_non_ui_source_inputs_unchanged": true,
+              "changed_inputs": [
+                "SOURCE/ui/react-app/src/SmartDisplay.jsx",
+                "SOURCE/ui/react-app/src/hooks/usePlayerState.js",
+                "SOURCE/ui/react-app/src/components/QueueModal.test.jsx",
+                "SOURCE/ui/react-app/src/components/QueueModal.jsx",
+                "SOURCE/ui/react-app/src/__tests__/SmartDisplay.test.jsx"
+              ],
+              "historical_sboms_not_relabeled": true
+            }
+          },
+          "base_tree_equivalence": {
+            "merged_main": "0ce4e771c73b639ad4e43c36f88f695bd8f1dd5d",
+            "prior_reviewed_base": "605003cbf489ad59b719965fcae0f1e6ba34469c",
+            "identical_tree": "5ab2a61907b2a7f426caffe5e6666c4ff5e99523",
+            "prior_draft_head": "73928a3fe896e4501e13365413fec65cce3b48e5",
+            "qualification_reused_only_for_identical_source_inputs": true
+          }
+        }
+      }
+    },
+    "feature_prior_qualification_reference": "qualification.prior_source_qualification.prior_source_qualification"
   },
-  "previous_reviewed_transport_binding": {
-    "public_revision": "05e1b301352b15d4088111546ba650b115a929d8",
+  "reviewed_source_patch": {
+    "retained_feature_patch": {
+      "inactive_romance_portable_packet_sha256": "a1bcb6e8480eac57a05f51117f592fa5aa6f7e3f6ff7784ead53352e66874cfe",
+      "original_semantic_lowering_sha256": "ac1491f19a3295931bda9cf72cb1649235bf75be742dccbb12a32e89fa63a030",
+      "reviewed_source_paths": 22,
+      "windows_external_temp_fixture_delta_sha256": "a2c5c421339f2637bcbc71e779e30efaa562460e212bdc4a0958491a8949fb38"
+    },
+    "prior_main_source_patch": {
+      "source_map_js_advisory_sha256": "dedc44e6ef0647b2042999e50920032ce6b6ee06356f2668c5f20f48aed0a8c6",
+      "prior_source_patch": {
+        "logout_feedback_v2_sha256": "d02a9781836fbef1b274993a6ed1877c54c7688834f92f4ed1d2e56497c99706",
+        "prior_source_patch": {
+          "streaming_decimal_boundary_v2_sha256": "68c3d2124d8e17874e8981ffe6efbb944e5f9a9611038213e2b8775cbeb85b08",
+          "reviewed_source_paths": 3,
+          "prior_source_patch": {
+            "frozen_base_composition_sha256": "be6596a9af319e81bfa59319bc53c7b840049220e64db5f02f2e2585750ec6a6",
+            "windows_utf8_test_delta_sha256": "d5af75588e877fc900c0e07b76a93c4b2813848d68d18a4b9b3bf5568ac7d6bd",
+            "source_paths_relative_to_main": 15,
+            "test_paths_changed_in_this_delta": 2,
+            "runtime_paths_changed_in_this_delta": 0,
+            "prior_source_patch": {
+              "composed_successor_sha256": "be6596a9af319e81bfa59319bc53c7b840049220e64db5f02f2e2585750ec6a6",
+              "reviewed_source_paths": 15,
+              "original_reviewed_patches": [
+                {
+                  "name": "phone-customer-startup.patch",
+                  "sha256": "3127d0a220bd47ae8c0812e031f0a780410b601e3e7f69a5006279f83767e076"
+                },
+                {
+                  "name": "phone-locale-normalization.patch",
+                  "sha256": "6dd8843a6d10dbccb8a0cfda5098db7c1b05a30e62ed0dbe8c3b0c67eb449e0c"
+                },
+                {
+                  "name": "english-decimal-normalization.patch",
+                  "sha256": "f5516636b8070400d9abbd44e0e2647182fbd666450b7278ca0c55a59ff57fa3"
+                },
+                {
+                  "name": "customer-initialism.patch",
+                  "sha256": "cbef06dd944340b3484901a66abae65c648561e87a9a0af47047340b4d01dfca"
+                },
+                {
+                  "name": "customer-phone-routing.patch",
+                  "sha256": "d53db244357e3dd2fa975f512197b90260c7d2472f917996852f56fb2ce3b3c6"
+                },
+                {
+                  "name": "desktop-customer-startup.patch",
+                  "sha256": "16b31388035af20cb01e7c35aafc8d2603c7f0eabc577e0a378e5a3852aea089"
+                }
+              ],
+              "prior_source_patch": {
+                "customer_english_component_sha256": "ab80081b685c8fe13438e7422e4de03788d545890a3e2530c6278e6f4ca43c16",
+                "reviewed_source_paths": 33,
+                "prior_source_patch": {
+                  "sdk_bridge_document_ownership_v2_sha256": "3340be7667dfbb15202a83332a1390de05093f185f5c5ce1c2b19f2f7e6ecf21",
+                  "prior_source_patch": {
+                    "native_volume_acknowledgement_sha256": "f15e4e8a05eb55932f05f417206f69aafbcd60921db15a871234f794224c5828",
+                    "prior_source_patch": {
+                      "auth_refresh_generation_v2_sha256": "c7e9846ddc3d6d4137908947e5dbb4614e570a752c5e0941422b1b84d3dc1445",
+                      "prior_source_patch": {
+                        "music_state_desktop_fallback_sha256": "44a82877ae8974f5d75e1cfd4ae39f51f6a330fe9e6ad76e997fe2f1464dd24b",
+                        "dependent_private_test_sha256": "3e0ff3491bcf2a3a793da6fe633faf7fcff12c88bb96d0bef475e4c465549ce5",
+                        "prior_source_patch": {
+                          "rooms_volume_acknowledgement_v3_sha256": "272391d731f41e23b4ad1f629320885c41f46d2806c70f0d0249c94550319831",
+                          "prior_source_patch": {
+                            "sha256": "f35c2d3597974be0fd2f3975e89c7be8b79d0d8974431262b7de0edf1fa75361",
+                            "manifest_sha256": "81a8e3a74436c6e02e82e2968a29491ec8ae372756cf9773f3d674b1ec04404a",
+                            "reviewed_base": "27cc96065e4cac22b73ae079e2d3d5bd0dcaf11c",
+                            "publication_base": "9d1cb8c601e72a5d77d54ca6a9bef9cf272e12a2",
+                            "rebasing": "Exact approved three-file f35c2d35 source preserved while incorporating all newly landed Settings bytes and regenerating canonical metadata on main9d1cb8c6.",
+                            "prior_source_patch": {
+                              "settings_draft_ownership_sha256": "2bac6ea900dbea914785b16ea40854475549707641cf891094794b6776dfae77",
+                              "prior_source_patch": {
+                                "windows_toast_com_failure_sha256": "03bca923720781e9f0bdb3b3cf6fac5f9b285992340681b29787415b2409373e",
+                                "prior_source_patch": {
+                                  "wake_admission_v2_sha256": "cd012e2d296139da8d775eac6623a496f56a6e4e42b49a50433f58a69adfa3c4",
+                                  "prior_source_patch": {
+                                    "startup_visibility_intent_v2_sha256": "c9e0f9888f83dcebcb3d7e031130553c3ff3129d49e5b99b0044f845d36fc0d8",
+                                    "prior_source_patch": {
+                                      "settings_dismissed_save_sha256": "bd290f109f9a45a167eb748ef30d7829231e44631e7ab78a9de49f0a7fb407a0",
+                                      "prior_source_patch": {
+                                        "mic_mute_acknowledgement_sha256": "642e251f93a569991d0f5015e99cdcf00703cd0cd633bdbe3421e43769b9d9d2",
+                                        "prior_source_patch": {
+                                          "settings_snapshot_ordering_sha256": "3c3d7dc1872be85ac1c1cac9ced78c403d1ae6852ca70792f28cc19b61d4ed29",
+                                          "prior_source_patch": {
+                                            "pause_acknowledgement_v2_sha256": "9d9833adbf6649e2c1881b3fd23e37e3259b5361cefb82528509c820d1a17dcb",
+                                            "prior_source_patch": {
+                                              "zero_volume_sha256": "5c6b60d91e8b06e99ae713e4c042edd606f64002c6b3900ba1c5c7348b9ab8e3",
+                                              "prior_source_patch": {
+                                                "ordered_playback_preferences_sha256": "cd844b8c923dcf3765de781533718d4fc16d9f91574599dc8ab0729823e0e262",
+                                                "prior_source_patch": {
+                                                  "core_sha256": "b7f70c3100ac8337499d90a34800c2733987d5134e5e3e705c56495937ba0c09",
+                                                  "test_sha256": "f66a15b8d2f536339739e527e22e20a3ae7d7ee3a3e9d7c9cd4fab4745d0a5a7",
+                                                  "prior_source_patch": {
+                                                    "test_harness_sha256": "49fb9d3634ab630fc4549ab4e42da997ee03cb0a0b1e0cc1ad97a7301db33242",
+                                                    "prior_source_patch": {
+                                                      "combined_sha256": "3ef2e0f5c645dd3b307710dcf2e7ca390432821a8066e800ed827e4638c219ef",
+                                                      "prior_selected_output": {
+                                                        "combined_sha256": "4fcf83691fda7ba6b8c1dd86a3d4426ce552c167880bfae701160ee7c7e082b8",
+                                                        "selected_output_sha256": "81958e85dd4f0642e56adbb05d34688ba8dab42a8d337570b06c55dae8d6753f",
+                                                        "windows_test_guard_sha256": "43e86eb1e40c7e544422f314ded17bd9fae4cb9e1ae0fb846f43701f0888e2ba",
+                                                        "prior_speech_settings": {
+                                                          "version": 2,
+                                                          "combined_sha256": "a9bebc0d7eb9c222db435b86b6cfd4903c7be887499bdbb3853b7476c65eafe8",
+                                                          "settings_delta_sha256": "4962ef08d2189e6e6a8ea1242e10c6e4f4bd6e09f077e42c56d43e04bf6ff865",
+                                                          "original_volume_sha256": "4e4f0252436f746bcd95d133e33bbc20eb30af2e83d27d5dc56ed62e82be43d0"
+                                                        }
+                                                      }
+                                                    }
+                                                  }
+                                                }
+                                              }
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "prior_public_main_source_patch": {
+              "queue_snapshot_recovery_v2_sha256": "72614d43dde0a215607ab60b43ccc259085d6d21538398864ba866b4286ed624",
+              "prior_source_patch": {
+                "customer_english_component_sha256": "ab80081b685c8fe13438e7422e4de03788d545890a3e2530c6278e6f4ca43c16",
+                "reviewed_source_paths": 33,
+                "prior_source_patch": {
+                  "sdk_bridge_document_ownership_v2_sha256": "3340be7667dfbb15202a83332a1390de05093f185f5c5ce1c2b19f2f7e6ecf21",
+                  "prior_source_patch": {
+                    "native_volume_acknowledgement_sha256": "f15e4e8a05eb55932f05f417206f69aafbcd60921db15a871234f794224c5828",
+                    "prior_source_patch": {
+                      "auth_refresh_generation_v2_sha256": "c7e9846ddc3d6d4137908947e5dbb4614e570a752c5e0941422b1b84d3dc1445",
+                      "prior_source_patch": {
+                        "music_state_desktop_fallback_sha256": "44a82877ae8974f5d75e1cfd4ae39f51f6a330fe9e6ad76e997fe2f1464dd24b",
+                        "dependent_private_test_sha256": "3e0ff3491bcf2a3a793da6fe633faf7fcff12c88bb96d0bef475e4c465549ce5",
+                        "prior_source_patch": {
+                          "rooms_volume_acknowledgement_v3_sha256": "272391d731f41e23b4ad1f629320885c41f46d2806c70f0d0249c94550319831",
+                          "prior_source_patch": {
+                            "sha256": "f35c2d3597974be0fd2f3975e89c7be8b79d0d8974431262b7de0edf1fa75361",
+                            "manifest_sha256": "81a8e3a74436c6e02e82e2968a29491ec8ae372756cf9773f3d674b1ec04404a",
+                            "reviewed_base": "27cc96065e4cac22b73ae079e2d3d5bd0dcaf11c",
+                            "publication_base": "9d1cb8c601e72a5d77d54ca6a9bef9cf272e12a2",
+                            "rebasing": "Exact approved three-file f35c2d35 source preserved while incorporating all newly landed Settings bytes and regenerating canonical metadata on main9d1cb8c6.",
+                            "prior_source_patch": {
+                              "settings_draft_ownership_sha256": "2bac6ea900dbea914785b16ea40854475549707641cf891094794b6776dfae77",
+                              "prior_source_patch": {
+                                "windows_toast_com_failure_sha256": "03bca923720781e9f0bdb3b3cf6fac5f9b285992340681b29787415b2409373e",
+                                "prior_source_patch": {
+                                  "wake_admission_v2_sha256": "cd012e2d296139da8d775eac6623a496f56a6e4e42b49a50433f58a69adfa3c4",
+                                  "prior_source_patch": {
+                                    "startup_visibility_intent_v2_sha256": "c9e0f9888f83dcebcb3d7e031130553c3ff3129d49e5b99b0044f845d36fc0d8",
+                                    "prior_source_patch": {
+                                      "settings_dismissed_save_sha256": "bd290f109f9a45a167eb748ef30d7829231e44631e7ab78a9de49f0a7fb407a0",
+                                      "prior_source_patch": {
+                                        "mic_mute_acknowledgement_sha256": "642e251f93a569991d0f5015e99cdcf00703cd0cd633bdbe3421e43769b9d9d2",
+                                        "prior_source_patch": {
+                                          "settings_snapshot_ordering_sha256": "3c3d7dc1872be85ac1c1cac9ced78c403d1ae6852ca70792f28cc19b61d4ed29",
+                                          "prior_source_patch": {
+                                            "pause_acknowledgement_v2_sha256": "9d9833adbf6649e2c1881b3fd23e37e3259b5361cefb82528509c820d1a17dcb",
+                                            "prior_source_patch": {
+                                              "zero_volume_sha256": "5c6b60d91e8b06e99ae713e4c042edd606f64002c6b3900ba1c5c7348b9ab8e3",
+                                              "prior_source_patch": {
+                                                "ordered_playback_preferences_sha256": "cd844b8c923dcf3765de781533718d4fc16d9f91574599dc8ab0729823e0e262",
+                                                "prior_source_patch": {
+                                                  "core_sha256": "b7f70c3100ac8337499d90a34800c2733987d5134e5e3e705c56495937ba0c09",
+                                                  "test_sha256": "f66a15b8d2f536339739e527e22e20a3ae7d7ee3a3e9d7c9cd4fab4745d0a5a7",
+                                                  "prior_source_patch": {
+                                                    "test_harness_sha256": "49fb9d3634ab630fc4549ab4e42da997ee03cb0a0b1e0cc1ad97a7301db33242",
+                                                    "prior_source_patch": {
+                                                      "combined_sha256": "3ef2e0f5c645dd3b307710dcf2e7ca390432821a8066e800ed827e4638c219ef",
+                                                      "prior_selected_output": {
+                                                        "combined_sha256": "4fcf83691fda7ba6b8c1dd86a3d4426ce552c167880bfae701160ee7c7e082b8",
+                                                        "selected_output_sha256": "81958e85dd4f0642e56adbb05d34688ba8dab42a8d337570b06c55dae8d6753f",
+                                                        "windows_test_guard_sha256": "43e86eb1e40c7e544422f314ded17bd9fae4cb9e1ae0fb846f43701f0888e2ba",
+                                                        "prior_speech_settings": {
+                                                          "version": 2,
+                                                          "combined_sha256": "a9bebc0d7eb9c222db435b86b6cfd4903c7be887499bdbb3853b7476c65eafe8",
+                                                          "settings_delta_sha256": "4962ef08d2189e6e6a8ea1242e10c6e4f4bd6e09f077e42c56d43e04bf6ff865",
+                                                          "original_volume_sha256": "4e4f0252436f746bcd95d133e33bbc20eb30af2e83d27d5dc56ed62e82be43d0"
+                                                        }
+                                                      }
+                                                    }
+                                                  }
+                                                }
+                                              }
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "feature_prior_patch_reference": "reviewed_source_patch.prior_main_source_patch.prior_source_patch"
+  },
+  "native_volume_pre_rebase_evidence": {
+    "public_revision": "476ad8bc5652ffbf1ace52de9793e7f2c1b5cf2b",
     "path": "PUBLIC_METADATA/source-binding.json",
-    "git_blob": "a6254f343b6eee66709393b0df4a32c2ab984082",
-    "sha256": "67f45ac3599ddbbf50affd933ecb3147b755f55f8b1ffea7dc9e062057f789a4",
-    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/05e1b301352b15d4088111546ba650b115a929d8/PUBLIC_METADATA/source-binding.json"
+    "sha256": "0d42cc7f020f983a4c072625dbdb63100a8daa5926e79dfd8cafdcc057ce7465",
+    "git_blob": "c6d55e2bcf4ecfb103ac5113a0565bc9cf7457e6",
+    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/476ad8bc5652ffbf1ace52de9793e7f2c1b5cf2b/PUBLIC_METADATA/source-binding.json"
+  },
+  "previous_reviewed_speech_binding": {
+    "head": "cf37df7c72d977e981b943358b9f3f1aceffe659",
+    "source_revision": "7b1a297b40b6de7f071524be272a3401ac902ae3",
+    "git_blob": "605c214e4c6abb3cdd0100f574304298add4006a",
+    "sha256": "e7380d33f4de1bc53c3707a550a14b777d72c6de68e1fc987c02a91f167f9abb",
+    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/cf37df7c72d977e981b943358b9f3f1aceffe659/PUBLIC_METADATA/source-binding.json"
+  },
+  "new_resolution_scope": "No new dependency resolution in this source synchronization; existing repaired-main bytes are reused. Fresh hosted resolution is required for the combined head.",
+  "new_advisory_scan_scope": "The repaired-main predecessor 799af858 has a verified zero-finding audit. That evidence is retained as predecessor evidence; the new combined head must run its unchanged audit gates.",
+  "retained_feature_binding": {
+    "public_revision": "0212ca0523e15e7afcb5b3ba841bd40e924adffb",
+    "path": "PUBLIC_METADATA/source-binding.json",
+    "git_blob": "1361560f13cc0441c41126fda4561ddcaab55696",
+    "sha256": "9825056201b3a86d8ebd26effd0df5eef8f01fe3ccbd7aba0e43a631ac2e642e",
+    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/0212ca0523e15e7afcb5b3ba841bd40e924adffb/PUBLIC_METADATA/source-binding.json"
   }
 }
