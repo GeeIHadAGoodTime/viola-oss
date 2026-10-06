@@ -675,9 +675,24 @@ class DesktopSessionStore:
                 SELECT session_hash, user_id, email, email_verified, gotrue_session_id,
                        created_at, expires_at, last_used_at, access_expires_at
                 FROM desktop_sessions
-                ORDER BY datetime(last_used_at) DESC, datetime(created_at) DESC
                 """).fetchall()
-        return [_row_from_sqlite(row) for row in rows]
+        # Keep sub-second ordering and timezone semantics from the existing
+        # parser; SQLite datetime() reduces both timestamps to whole seconds.
+        earliest = datetime.min.replace(tzinfo=UTC)
+
+        def timestamp(value: datetime) -> tuple[bool, datetime]:
+            try:
+                return True, value.astimezone(UTC)
+            except OverflowError:
+                # Do not prefer a timestamp outside the representable UTC range
+                # over a usable account. Row parsing/validation stays unchanged.
+                return False, earliest
+
+        return sorted(
+            (_row_from_sqlite(row) for row in rows),
+            key=lambda row: (timestamp(row.last_used_at), timestamp(row.created_at)),
+            reverse=True,
+        )
 
     def _touch_session(self, session_hash: str) -> None:
         with self._connect() as conn:
