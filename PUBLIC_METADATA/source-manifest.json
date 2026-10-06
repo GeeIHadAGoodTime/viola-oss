@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "177cb414ab382ba502eae3115c3696b96d5cf017",
-  "sha256": "dc21ab9fa07fe384b9d759bc52dfe244610d4bb0bd67af83a46a10399f786f1c",
+  "revision": "991672032ba11ad0f50a2495e097eb46c9c3085c",
+  "sha256": "f28c4b5cfdb5759244acd580c117d38ad8f7ef14c8d6e2e5a013a5a62f5974ed",
   "files": [
     {
       "path": ".env.example",
@@ -515,8 +515,8 @@
     },
     {
       "path": "auth/desktop_session.py",
-      "sha256": "b0f25fc7d0376f177b7ed50aee69382a4579f1200b54379c667290dc0b1defb3",
-      "bytes": 45317
+      "sha256": "c3bf796aa11388f2b311128efb6ad7ce9309fa498c45f77adae9acaee5a9906a",
+      "bytes": 45955
     },
     {
       "path": "auth/field_encryption.py",
@@ -1175,8 +1175,8 @@
     },
     {
       "path": "core/user_context.py",
-      "sha256": "2647a2d6d60ae6cb558f095d613bde6b451c20ee80f1ba0581f3f39b4a46ca24",
-      "bytes": 18430
+      "sha256": "9983eacc790f9de230178513fd97ff794a4741fec704beb88ca3bfa74d203728",
+      "bytes": 19090
     },
     {
       "path": "core/user_notice.py",
@@ -5892,6 +5892,11 @@
       "path": "tests/public/test_deferred_confirmation_cancellation.py",
       "sha256": "4787e38288d184737e1e31db49ca23364901fb0a921f1c33ca8137519f4132d0",
       "bytes": 8622
+    },
+    {
+      "path": "tests/public/test_desktop_session_ordering.py",
+      "sha256": "8d5840f76fb1847c29856aec0be7e3353455881445ee2fd7b3a2aeafc4b8ba62",
+      "bytes": 7131
     },
     {
       "path": "tests/public/test_english_decimal_normalization.py",
