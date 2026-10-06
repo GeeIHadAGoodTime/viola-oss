@@ -6,6 +6,7 @@ import ast
 import asyncio
 import re
 import time
+import threading
 import types
 import unittest
 from pathlib import Path
@@ -21,24 +22,33 @@ def load_streaming_method(source: Path):
     method = next(
         node for node in ast.walk(tree) if isinstance(node, ast.AsyncFunctionDef) and node.name == "speak_streaming"
     )
+    policy_methods = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        and node.name in {"_tts_is_enabled", "_play_pcm_if_enabled", "_run_synthesize_with_watchdog"}
+    ]
     helpers = [
         node
         for node in tree.body
         if (
             isinstance(node, ast.Assign)
             and any(
-                isinstance(target, ast.Name) and target.id in {"_SENTENCE_RE", "_EMOJI_RE"} for target in node.targets
+                isinstance(target, ast.Name) and target.id in {"_SENTENCE_RE", "_EMOJI_RE", "STREAM_TIMEOUT_SECONDS"}
+                for target in node.targets
             )
         )
         or (isinstance(node, ast.FunctionDef) and node.name == "_strip_emoji")
     ]
     logger = types.SimpleNamespace(**{name: lambda *args, **kwargs: None for name in ("debug", "info", "warning")})
-    namespace = {"asyncio": asyncio, "re": re, "time": time, "logger": logger}
+    namespace = {"asyncio": asyncio, "re": re, "time": time, "threading": threading, "logger": logger}
     module = ast.Module(
         body=[
             ast.ImportFrom(module="__future__", names=[ast.alias(name="annotations")], level=0),
             *helpers,
-            ast.ClassDef(name="BoundStreaming", bases=[], keywords=[], body=[method], decorator_list=[]),
+            ast.ClassDef(
+                name="BoundStreaming", bases=[], keywords=[], body=[method, *policy_methods], decorator_list=[]
+            ),
         ],
         type_ignores=[],
     )
@@ -70,12 +80,13 @@ class StreamingDecimalBoundaryTests(unittest.IsolatedAsyncioTestCase):
             )
         )
         self.engine = load_streaming_method(ROOT / "voice/synthesis/kokoro_engine.py")()
+        self.engine._config = types.SimpleNamespace(tts_enabled=True)
         self.engine._speak_lock = None
         self.engine.last_sample_rate = 24000
         self.calls = []
         self.played = []
 
-        def synthesize(text, voice):
+        def synthesize(text, voice, *, policy_marker=None, cancel_event=None):
             self.calls.append(text)
             return b"\x00\x00" * 16
 

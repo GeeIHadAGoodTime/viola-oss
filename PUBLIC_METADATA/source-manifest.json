@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "9ede9c8f4c775730ad5675a7561cd18194794836",
-  "sha256": "ba1babe550ff52f262637b2a3a060b2164edc40e8c2d3dab526532839411ee83",
+  "revision": "5c20f7b185b50984fadbe08b09a3e5be190a2e15",
+  "sha256": "7104220676fd2a9f9e2a7c01c6362e9f00b10ed58f8ae748fb0955091bb15a88",
   "files": [
     {
       "path": ".env.example",
@@ -5899,6 +5899,11 @@
       "bytes": 7131
     },
     {
+      "path": "tests/public/test_disabled_tts_streaming.py",
+      "sha256": "b89aa53c72989086cf08b0617325c13018ebd9bd477dd13a1b0b61091713de66",
+      "bytes": 24850
+    },
+    {
       "path": "tests/public/test_english_decimal_normalization.py",
       "sha256": "59c39ec501956082b392c817de5022c283da67171288ba48bce94882e86cc06c",
       "bytes": 6612
@@ -5964,6 +5969,11 @@
       "bytes": 17545
     },
     {
+      "path": "tests/public/test_queue_wire_contract.py",
+      "sha256": "34d64dcc21c1be272c49ec663aaa3e96e4ae4733aaa58e1695c452cb6780f735",
+      "bytes": 7588
+    },
+    {
       "path": "tests/public/test_rating_target.py",
       "sha256": "86a97bd4002f0aa1d1db0ec6505bfa5ca83d2d30d159d8584a95dcf244a6b938",
       "bytes": 10081
@@ -6000,8 +6010,13 @@
     },
     {
       "path": "tests/public/test_streaming_decimal_boundaries.py",
-      "sha256": "79b710751f8da16fa76c3e6956da238ad51d9cd2e0ee9eccde595ae81a0b2c00",
-      "bytes": 10832
+      "sha256": "d9338a597a68ccc651293e1921a74595372600593a7d71faf7b319dd9808ee7a",
+      "bytes": 11322
+    },
+    {
+      "path": "tests/public/test_streaming_watchdog_ownership.py",
+      "sha256": "4b438a068d6ece3e1036b62f7ce701dbede98c455af1d430574669058bb40b95",
+      "bytes": 14979
     },
     {
       "path": "tests/public/test_tool_allowlist_contract.py",
@@ -9535,8 +9550,8 @@
     },
     {
       "path": "ui/react-app/src/SmartDisplay.jsx",
-      "sha256": "0a4f56b391c1036bd371d3f1de395e910b9586ed69be231b06c4de30ee4cda53",
-      "bytes": 169792
+      "sha256": "08d3425d0a17f1013fd2f23111d3762ca049f7472cf7b44af351ca9ac9233c9f",
+      "bytes": 172585
     },
     {
       "path": "ui/react-app/src/SmartDisplay.stageRouting.test.jsx",
@@ -9560,8 +9575,8 @@
     },
     {
       "path": "ui/react-app/src/__tests__/SmartDisplay.test.jsx",
-      "sha256": "b01906c95779633f15735c3c67557d8b76e152b465b26ef74079675dd5612435",
-      "bytes": 108586
+      "sha256": "0795fa55996da366fa484650e118b1dcccae3d2bee352c8ac74d3f53411963d3",
+      "bytes": 120438
     },
     {
       "path": "ui/react-app/src/__tests__/hooks/useEventBus.test.jsx",
@@ -10104,9 +10119,19 @@
       "bytes": 926
     },
     {
+      "path": "ui/react-app/src/components/MemoryPanel.draftRecovery.test.jsx",
+      "sha256": "bdcc09496bd4000ae7472f95d82c5d1030723def2442cd61069a73c0ae888ea4",
+      "bytes": 16773
+    },
+    {
+      "path": "ui/react-app/src/components/MemoryPanel.initialRead.test.jsx",
+      "sha256": "b46ed328f29d895cb1c1c563567c1bee9d53398477db985a3f0a37443e2112a4",
+      "bytes": 12976
+    },
+    {
       "path": "ui/react-app/src/components/MemoryPanel.jsx",
-      "sha256": "0868b2f4c2ac59ab6f73a73c325638aaa12009d31d404b9a1e44d4414e56a2d2",
-      "bytes": 46050
+      "sha256": "29eb1feed2b9319081544110feb32780c4bfadae0c7c11fb1d55f4f460bf907b",
+      "bytes": 49894
     },
     {
       "path": "ui/react-app/src/components/MemoryPanel.test.jsx",
@@ -10169,14 +10194,24 @@
       "bytes": 9418
     },
     {
+      "path": "ui/react-app/src/components/QueueModal.actions.test.jsx",
+      "sha256": "888fbfc72405cf4ec7099aec13f4fbb448f168a0e79dc5d55390c8f9724d7263",
+      "bytes": 8506
+    },
+    {
       "path": "ui/react-app/src/components/QueueModal.jsx",
-      "sha256": "fd292fa0883f64793c105c4e50df464ab863dfc2b27927ca00fac2689d74b2c7",
-      "bytes": 9314
+      "sha256": "5978b4310ba40a94ddb23823a802c097a20608dcc2694cfd4d9cef50f6d1e2b3",
+      "bytes": 11476
     },
     {
       "path": "ui/react-app/src/components/QueueModal.test.jsx",
       "sha256": "5948a627ef7e639c8a60ca9e4e8131837c5e5c2c78b548670907dd334462f4ba",
       "bytes": 16481
+    },
+    {
+      "path": "ui/react-app/src/components/QueueModal.wire.test.jsx",
+      "sha256": "bf920d5c7fa348912ea1b7c39bb7a3eaeb9bafea7a8d296a4298e7458b4ea3e6",
+      "bytes": 4802
     },
     {
       "path": "ui/react-app/src/components/ReviewPage.jsx",
@@ -10504,6 +10539,11 @@
       "bytes": 318
     },
     {
+      "path": "ui/react-app/src/components/fixtures/queueWireContract.json",
+      "sha256": "dd4d3fbce24ef7975f647664a17fccb97bfd03ae52cdcc5c323ba19549bea6b1",
+      "bytes": 1725
+    },
+    {
       "path": "ui/react-app/src/components/icons/index.jsx",
       "sha256": "8086a7d5b356430dd48751ccdbe2cb47391430adf2316c16d11040c213f9e9f1",
       "bytes": 10217
@@ -10560,8 +10600,8 @@
     },
     {
       "path": "ui/react-app/src/components/player/PlayerSection.jsx",
-      "sha256": "577305c3990faf2ab3920d6182c9711f8a5a45f7fd7a1822c88f6adfe6e59cc6",
-      "bytes": 6799
+      "sha256": "9f31939c2f91214d748e6ae5823bcb48a6b03fcf47541a6b09cf0c1fec631eda",
+      "bytes": 6911
     },
     {
       "path": "ui/react-app/src/components/player/PlayerSection.module.css",
@@ -10900,13 +10940,8 @@
     },
     {
       "path": "ui/react-app/src/components/stage/modes/chat/ChatMode.jsx",
-      "sha256": "8ee32556068df13bb3eaa62ba296335aa10fb6df6c287afc0f1520e096ae65b5",
-      "bytes": 56932
-    },
-    {
-      "path": "ui/react-app/src/components/stage/modes/chat/ChatMode.modelRecovery.test.jsx",
-      "sha256": "d0f10d74b48f04bea2c58cb141889973c0c487949340d07fd7d0ddb5edf454f7",
-      "bytes": 16423
+      "sha256": "5e63a033bc2d45e96e8611baef05da2d4670eaa1c44c72652175583b264a547b",
+      "bytes": 53376
     },
     {
       "path": "ui/react-app/src/components/stage/modes/chat/ChatMode.test.jsx",
@@ -11270,8 +11305,8 @@
     },
     {
       "path": "ui/react-app/src/hooks/useViolaApi.js",
-      "sha256": "306905f7652387b7bdbcad27918c72fc97998923e180bdb23d8bc9336eccb3d4",
-      "bytes": 13413
+      "sha256": "f170c7e80e5332b2615a7a84fed15029c77efd44e32ad6a785b8866406df1b21",
+      "bytes": 14212
     },
     {
       "path": "ui/react-app/src/hooks/useViolaApi.rating.test.js",
@@ -12590,8 +12625,8 @@
     },
     {
       "path": "voice/synthesis/kokoro_engine.py",
-      "sha256": "7796e9aaab114cd37ffa2b971bfe6ad9129baf915f78270f8863b50476e0b04f",
-      "bytes": 59527
+      "sha256": "6d638682fa4b88a22dfb34741e6341270366958df41bfc364f6ec3c706945509",
+      "bytes": 70151
     },
     {
       "path": "voice/synthesis/lazy_engine.py",
