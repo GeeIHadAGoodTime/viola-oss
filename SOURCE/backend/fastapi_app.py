@@ -1054,23 +1054,22 @@ def _ensure_payment_cards_route(app: FastAPI) -> None:
     encrypted card vault AND the per-card spend-ceiling control
     (PUT/PATCH /api/payments/cards/{label}/ceiling) — losing the ceiling
     endpoint silently is a spend-control regression, not a cosmetic one. A
-     A broken mount must abort app construction loudly when the payment module
-     is part of the edition. A source-only edition may omit the private module;
-     in that case the route is unavailable and the app continues without it.
+    broken installed module must abort app construction loudly. Only a personal
+    source-only edition may omit this declared private module; company-enabled
+    builds require it.
     """
     if _has_route(app, "/api/payments/cards", "GET"):
         return
 
     try:
+        from services.company_service_boundary import shared_company_service_available
+
+        if not shared_company_service_available("ui.api.routes.payment_cards"):
+            return
         from ui.api.routes.payment_cards import router as payment_cards_router
 
         app.include_router(payment_cards_router)
         logger.info("Payment cards router registered for desktop API")
-    except ModuleNotFoundError as exc:
-        if exc.name == "ui.api.routes.payment_cards":
-            logger.info("Payment cards router unavailable in this edition")
-            return
-        raise
     except (AttributeError, ImportError, RuntimeError, TypeError, ValueError):
         logger.exception(
             "Desktop payment cards router failed to mount; every "
@@ -1088,24 +1087,23 @@ def _ensure_payment_confirm_route(app: FastAPI) -> None:
     proxy fix and this PR's own billing checkout/portal/webhook fixes): see
     ``_ensure_payment_cards_route`` above for the full rationale. This
     mounts the entire /confirm/{token}* purchase-approval surface (approve,
-    reject, status, cards, one-shot-card, mark-reentry-*). A broken mount
-     must abort app construction loudly when the payment module is part of the
-     edition. A source-only edition may omit the private module; in that case
-     purchase confirmation is unavailable.
+    reject, status, cards, one-shot-card, mark-reentry-*). A broken installed
+    module must abort app construction loudly. Only a personal source-only
+    edition may omit this declared private module; company-enabled builds
+    require it.
     """
     if _has_route(app, "/confirm/{token}", "GET"):
         return
 
     try:
+        from services.company_service_boundary import shared_company_service_available
+
+        if not shared_company_service_available("ui.api.routes.payment_confirm"):
+            return
         from ui.api.routes.payment_confirm import router as payment_confirm_router
 
         app.include_router(payment_confirm_router)
         logger.info("Payment confirm router registered for desktop API")
-    except ModuleNotFoundError as exc:
-        if exc.name == "ui.api.routes.payment_confirm":
-            logger.info("Payment confirmation router unavailable in this edition")
-            return
-        raise
     except (AttributeError, ImportError, RuntimeError, TypeError, ValueError):
         logger.exception(
             "Desktop payment confirm router failed to mount; every "

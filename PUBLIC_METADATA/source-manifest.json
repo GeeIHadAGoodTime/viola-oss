@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "d1c06ca346de9beb20061cdae1ff4df6b71f6cc2",
-  "sha256": "ca59b94f8b2587dd0ab861e7c18eb371ade2d58eafc80656ef594ed10e19b1e4",
+  "revision": "ff2e4c25254363bf214d33ac651a5393a445366a",
+  "sha256": "84912e8644c2dff66b6ef2c77a8f3303e3eb6ab39be329edb3cdb96a7f9f86f5",
   "files": [
     {
       "path": ".env.example",
@@ -625,8 +625,8 @@
     },
     {
       "path": "backend/fastapi_app.py",
-      "sha256": "dea901f80ff168f92e5afe5948b056c4cfd4f8bc57109aa58d64ceb1794cbd56",
-      "bytes": 66858
+      "sha256": "b6fb0b80d8d985e355c676d96ded158cc2b6ec466b5d3942d3e6b13f296b39df",
+      "bytes": 66736
     },
     {
       "path": "backend/instrumentation.py",
@@ -4245,8 +4245,8 @@
     },
     {
       "path": "services/company_service_boundary.py",
-      "sha256": "ab7fb0b9bb23052297edb972f78b9dfd5258bc203634665e8551016847d37f76",
-      "bytes": 3935
+      "sha256": "996e4f22c1e38eb55f5a42f68bd096132debf0f6b85048a2c9e0626b7757aa02",
+      "bytes": 4360
     },
     {
       "path": "services/computer_use/__init__.py",
@@ -6040,8 +6040,8 @@
     },
     {
       "path": "tests/public/test_execution_safety_contract.py",
-      "sha256": "7129bfddb65c45e2e7a049018a40a6434614c952928ade88cccb95c2528ac7e8",
-      "bytes": 41072
+      "sha256": "89eec9961cf0de270356c8be04e902d0cc2fef8f9cc9869c9843ca1f0a78cb0a",
+      "bytes": 48618
     },
     {
       "path": "tests/public/test_italian_hindi_qualification_packet.py",
