@@ -57,12 +57,22 @@ def require_customer_voice(locale: object, voice: object) -> None:
     family = _VOICE_FAMILIES.get(key)
     if family is None or not isinstance(voice, str) or not voice.startswith(family[:2]):
         raise ValueError("Customer speech requires a named voice matching its pronunciation locale")
+    from voice.customer_runtime import qualification_profile
+
+    profile = qualification_profile()
+    if profile is not None and (key not in profile["locales"] or voice not in profile["selected_voice_ids"]):
+        raise ValueError("The voice and locale are not selected in this qualification artifact")
 
 
 def select_customer_voice(locale: str, current: object, available: Collection[str]) -> str:
     """Preserve a compatible selected voice, otherwise select the locale default."""
     if not isinstance(available, Collection) or isinstance(available, (str, bytes)):
         raise ValueError("The loaded customer voice inventory is unavailable")
+    from voice.customer_runtime import qualification_profile
+
+    profile = qualification_profile()
+    if profile is not None:
+        available = tuple(voice for voice in available if voice in profile["selected_voice_ids"])
     try:
         require_customer_voice(locale, current)
     except ValueError:

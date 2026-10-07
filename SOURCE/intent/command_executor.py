@@ -2643,10 +2643,21 @@ class TTSSpeaker:
                 return
 
         try:
+            import sys
+
+            language = "en-us"
+            if getattr(sys, "frozen", False):
+                from voice.customer_runtime import qualification_profile
+
+                if qualification_profile() is not None:
+                    # Materialize the existing lazy proxy before capturing its
+                    # async method; use the applied route for normalization.
+                    language = getattr(self.tts, "_speech_language", "en-us")
             speak_method = getattr(self.tts, "say", None) or getattr(self.tts, "speak", None)
             if speak_method is None:
                 return
-            spoken_text = normalize_for_speech(text)
+            kwargs = {} if language == "en-us" else {"language": language}
+            spoken_text = normalize_for_speech(text, **kwargs)
             if not spoken_text:
                 return
 
@@ -2676,10 +2687,21 @@ class TTSSpeaker:
                 return
 
         try:
+            import sys
+
+            language = "en-us"
+            if getattr(sys, "frozen", False):
+                from voice.customer_runtime import qualification_profile
+
+                if qualification_profile() is not None:
+                    # Materialize the existing lazy proxy before capturing its
+                    # async method; use the applied route for normalization.
+                    language = getattr(self.tts, "_speech_language", "en-us")
             speak_method = getattr(self.tts, "say", None) or getattr(self.tts, "speak", None)
             if speak_method is None:
                 return
-            spoken_text = normalize_for_speech(text)
+            kwargs = {} if language == "en-us" else {"language": language}
+            spoken_text = normalize_for_speech(text, **kwargs)
             if not spoken_text:
                 return
 

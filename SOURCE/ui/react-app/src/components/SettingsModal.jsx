@@ -9,6 +9,7 @@ import { apiFetch } from '../hooks/useViolaApi';
 import { THEME, applyTheme, setAccent } from '../config';
 import { isFeatureHidden } from '../utils/featureSurface';
 import { outputDeviceOptions as buildOutputDeviceOptions, outputDeviceValue } from '../utils/audioOutputSelection';
+import { customerSpeechSelection, customerSpeechLanguagePatch } from '../utils/customerSpeechSelection';
 import DesktopUpsell from './DesktopUpsell';
 import AccountTab, { CalendarSettings } from './AccountTab';
 import ICloudCalendarSettings from './ICloudCalendarSettings';
@@ -407,6 +408,7 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
 
   const {
     settings,
+    customerSpeech,
     loading,
     saving,
     error,
@@ -425,6 +427,7 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
     draft: localSettings, hasChanges, setDraft: setLocalSettings,
     beginSave: beginDraftSave, finishSave: finishDraftSave, resetDraft,
   } = useSettingsDraft(settings, isOpen);
+  const speechSelection = customerSpeechSelection(localSettings, customerSpeech);
   const currentAiSource = localSettings.ai_source || 'managed';
   const localAiModelOptions = useMemo(() => localAiServers.flatMap((server) => (
     server.models.map((model) => ({
@@ -699,6 +702,61 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
 
   // Weekly review (services/meta_analysis/weekly_review.py)
   const [weeklyReviewSummary, setWeeklyReviewSummary] = useState(null);
+  const [weeklyReviewBusy, setWeeklyReviewBusy] = useState(false);
+  const weeklyReviewRequestRef = useRef(null);
+  const retireWeeklyReview = useCallback(() => {
+    weeklyReviewRequestRef.current = null;
+    setWeeklyReviewBusy(false);
+    setWeeklyReviewSummary(null);
+  }, []);
+  useLayoutEffect(() => {
+    retireWeeklyReview();
+    // Closing the panel retires its result; it does not cancel server work.
+    return () => { weeklyReviewRequestRef.current = null; };
+  }, [isOpen, activeTab, localSettings.weekly_review_enabled, hasCloudAccount, cloudAccountAuth?.user?.id, retireWeeklyReview]);
+
+  const handleWeeklyReview = async (runNow = false) => {
+    if (!isOpen || activeTab !== 'ai_agents' || !localSettings.weekly_review_enabled
+      || isFeatureHidden('weekly_review') || weeklyReviewRequestRef.current) return;
+    if (runNow && !settings.weekly_review_enabled) {
+      setWeeklyReviewSummary('Save Changes to enable Weekly Review before running an analysis.');
+      return;
+    }
+    const request = {};
+    weeklyReviewRequestRef.current = request;
+    setWeeklyReviewBusy(true);
+    setWeeklyReviewSummary(runNow ? 'Running analysis…' : 'Loading review…');
+    try {
+      // apiFetch already parses JSON and unwraps a successful ResponseEnvelope.
+      const payload = runNow
+        ? await apiFetch('/v1/ai/weekly-review/trigger', { method: 'POST' })
+        : await apiFetch('/v1/ai/weekly-review/latest');
+      if (weeklyReviewRequestRef.current !== request) return;
+      if (!payload || typeof payload !== 'object' || payload.ok === false) {
+        throw new Error("We couldn't complete that request. Please try again.");
+      }
+      if (runNow) {
+        const summary = payload.analysis?.summary;
+        setWeeklyReviewSummary(payload.triggered === true && payload.analysis
+          ? (typeof summary === 'string' && summary.trim() ? summary : 'Analysis complete.')
+          : 'Analysis returned no result.');
+      } else {
+        const summary = payload.summary;
+        setWeeklyReviewSummary(typeof summary === 'string' && summary.trim() ? summary : 'No review yet.');
+      }
+    } catch (err) {
+      if (weeklyReviewRequestRef.current !== request) return;
+      const detail = err?.code === 'weekly_review_disabled'
+        ? 'Save Changes to enable Weekly Review before running an analysis.'
+        : (err?.message || String(err));
+      setWeeklyReviewSummary((runNow ? 'Trigger failed: ' : 'Failed to load review: ') + detail);
+    } finally {
+      if (weeklyReviewRequestRef.current === request) {
+        weeklyReviewRequestRef.current = null;
+        setWeeklyReviewBusy(false);
+      }
+    }
+  };
 
   // Music source / local library state
   const [isEditingSource, setIsEditingSource] = useState(false);
@@ -1244,6 +1302,7 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
   // Cancel - reset local changes and close
   const handleCancel = useCallback(() => {
     retireLocalAiRead();
+    retireWeeklyReview();
     if (saveSessionRef.current) saveSessionRef.current.saveGeneration += 1;
     // Customize previews update the live palette and theme cache immediately.
     // Resetting the draft alone leaves those effects behind after dismissal.
@@ -1252,7 +1311,7 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
     resetDraft();
     clearError();
     onClose();
-  }, [settings, resetDraft, clearError, onClose, retireLocalAiRead]);
+  }, [settings, resetDraft, clearError, onClose, retireLocalAiRead, retireWeeklyReview]);
 
   // Escape key closes the modal (a11y / keyboard parity with other modals)
   useEffect(() => {
@@ -1572,16 +1631,8 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
               {localSettings.weekly_review_enabled && (
                 <div style={{ padding: '4px 20px 16px', display: 'flex', gap: '10px', alignItems: 'center' }}>
                   <button
-                    onClick={async () => {
-                      try {
-                        const resp = await apiFetch('/v1/ai/weekly-review/latest');
-                        const data = await resp.json();
-                        const payload = data?.data || {};
-                        setWeeklyReviewSummary(payload.summary || 'No review yet.');
-                      } catch (err) {
-                        setWeeklyReviewSummary('Failed to load review: ' + (err?.message || err));
-                      }
-                    }}
+                    onClick={() => handleWeeklyReview()}
+                    disabled={weeklyReviewBusy}
                     style={{
                       padding: '6px 14px', minHeight: '44px', borderRadius: '8px', border: 'none',
                       backgroundColor: theme.colors.glassActive, color: theme.colors.textPrimary,
@@ -1591,21 +1642,8 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
                     View Last Review
                   </button>
                   <button
-                    onClick={async () => {
-                      setWeeklyReviewSummary('Running analysis…');
-                      try {
-                        const resp = await apiFetch('/v1/ai/weekly-review/trigger', { method: 'POST' });
-                        const data = await resp.json();
-                        const payload = data?.data || {};
-                        if (payload.triggered && payload.analysis) {
-                          setWeeklyReviewSummary(payload.analysis.summary || 'Analysis complete.');
-                        } else {
-                          setWeeklyReviewSummary('Analysis returned no result.');
-                        }
-                      } catch (err) {
-                        setWeeklyReviewSummary('Trigger failed: ' + (err?.message || err));
-                      }
-                    }}
+                    onClick={() => handleWeeklyReview(true)}
+                    disabled={weeklyReviewBusy || !settings.weekly_review_enabled}
                     style={{
                       padding: '6px 14px', minHeight: '44px', borderRadius: '8px', border: 'none',
                       backgroundColor: theme.colors.accent, color: '#fff',
@@ -1616,8 +1654,13 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
                   </button>
                 </div>
               )}
+              {localSettings.weekly_review_enabled && !settings.weekly_review_enabled && (
+                <div style={{ padding: '0 20px 16px', color: theme.colors.textSecondary, fontSize: '13px' }}>
+                  Save Changes to enable Weekly Review before running an analysis.
+                </div>
+              )}
               {weeklyReviewSummary && (
-                <div style={{
+                <div role="status" aria-live="polite" style={{
                   margin: '0 20px 16px', padding: '12px 14px', borderRadius: '10px',
                   backgroundColor: theme.colors.bgElevated,
                   border: `1px solid ${theme.colors.borderSubtle}`,
@@ -3445,15 +3488,34 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
                     />
                   </SettingRow>
                   <SectionDivider />
-                  <TtsStatusIndicator />
+                  {!customerSpeech && <TtsStatusIndicator />}
                   <SectionDivider />
+                  {customerSpeech && (
+                    <div style={{ padding: '16px 20px' }}>
+                      <Select
+                        label="Speech Output Language"
+                        tooltip="Choose the language Viola uses to pronounce spoken responses."
+                        value={speechSelection.language}
+                        options={customerSpeech.locales}
+                        onChange={(language) => {
+                          const patch = customerSpeechLanguagePatch(language, speechSelection.voice, customerSpeech);
+                          if (patch) updateLocalSettings(prev => ({ ...prev, ...patch }));
+                        }}
+                      />
+                      <div style={{ color: theme.colors.textMuted, fontSize: '12px', marginTop: '8px' }}>
+                        Speech qualification build. Choose a language and matching voice, then save.
+                      </div>
+                    </div>
+                  )}
                   <div style={{ padding: '16px 20px' }}>
                     <Select
                       label="Assistant Voice"
                       tooltip="Choose the voice Viola uses when speaking responses aloud."
-                      value={localSettings.tts_voice || 'default'}
-                      onChange={(v) => updateLocal('tts_voice', v)}
-                      options={[
+                      value={customerSpeech ? speechSelection.voice : localSettings.tts_voice || 'default'}
+                      onChange={(voice) => customerSpeech
+                        ? updateLocalSettings(prev => ({ ...prev, tts_language: speechSelection.language, tts_voice: voice }))
+                        : updateLocal('tts_voice', voice)}
+                      options={customerSpeech ? speechSelection.voices.map(voice => ({ value: voice, label: voice })) : [
                         { value: 'default', label: 'Default' },
                         { value: 'alloy', label: 'Alloy' },
                         { value: 'echo', label: 'Echo' },

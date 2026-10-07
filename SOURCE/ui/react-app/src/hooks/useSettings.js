@@ -69,6 +69,7 @@ export function useSettings(options = {}) {
   const { initialFetchDelayMs = 0 } = options;
   const [settings, setSettings] = useState({});
   const [voiceStatus, setVoiceStatus] = useState(null);
+  const [customerSpeech, setCustomerSpeech] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -99,6 +100,9 @@ export function useSettings(options = {}) {
     if (!mounted.current) return;
     snapshotGeneration.current += 1;
     setSettings(data.settings || {});
+    if (!preserveAbsentVoiceStatus || data.customer_speech !== undefined) {
+      setCustomerSpeech(data.customer_speech ?? null);
+    }
     if (!preserveAbsentVoiceStatus || data.voice_status !== undefined) {
       setVoiceStatus(data.voice_status ?? null);
     }
@@ -127,7 +131,9 @@ export function useSettings(options = {}) {
       const data = await fetchSettingsPayload();
       if (!isCurrent()) return;
       if (data.ok !== false) {
-        if (canPublishError()) publishError(null);
+        if (canPublishError()) publishError(data.customer_speech_effect?.outcome === 'failed'
+          ? 'The selected speech route could not be applied. Open Voice settings to choose an available voice or retry your selection.'
+          : null);
         publishSnapshot(data);
       } else {
         if (canPublishError()) publishError(data.error);
@@ -147,6 +153,10 @@ export function useSettings(options = {}) {
       const data = await pushSettingsPayload(newSettings);
       if (data.ok !== false) {
         publishSnapshot(data);
+        if (data.customer_speech_effect?.outcome === 'failed') {
+          publishError('Your speech selection was saved, but could not be applied. Restart Viola or choose another available voice.');
+          return { ok: false };
+        }
         return { ok: true, settings: data.settings || {} };
       } else {
         publishError(data.error);
@@ -156,7 +166,10 @@ export function useSettings(options = {}) {
       const shortcutConflict = err?.status === 422
         && err?.code === 'validation_error'
         && err?.data?.validation_reason === 'hotkey_conflict';
-      publishError(shortcutConflict
+      const speechSelectionError = err?.status === 422 && err?.data?.validation_reason === 'speech_selection';
+      publishError(speechSelectionError
+        ? 'Choose an available output language and a matching assistant voice. Nothing was saved.'
+        : shortcutConflict
         ? 'Push-to-talk and Mute Microphone need different shortcuts. Choose a different key combination and save again. Nothing was saved.'
         : SETTINGS_ERROR_BY_CODE[err?.code] || 'Failed to save settings');
       return { ok: false };
@@ -183,6 +196,10 @@ export function useSettings(options = {}) {
       const data = await apiFetch('/v1/settings/reset', { method: 'POST' });
       if (data.ok !== false) {
         publishSnapshot(data);
+        if (data.customer_speech_effect?.outcome === 'failed') {
+          publishError('Settings were reset, but the default speech route could not be applied. Restart Viola or choose an available voice.');
+          return false;
+        }
         return true;
       } else {
         publishError(data.error);
@@ -335,6 +352,7 @@ export function useSettings(options = {}) {
   return {
     settings,
     voiceStatus,
+    customerSpeech,
     loading,
     saving,
     error,

@@ -716,6 +716,7 @@ class SettingsManager:
         # Text-to-Speech
         "tts_enabled": defaults.TTS_ENABLED_DEFAULT,
         "tts_voice": "default",
+        "tts_language": "en-us",  # Applied only by a marked speech qualification artifact.
         "tts_rate": defaults.TTS_RATE_DEFAULT,
         "tts_volume": defaults.TTS_VOLUME_DEFAULT,
         # TTS naturalness controls (stradivari) — see voice/synthesis/
@@ -1820,7 +1821,9 @@ class SettingsManager:
         user_id: str | None,
     ) -> dict[str, object]:
         """Canonicalize runtime-setting writes before they hit storage."""
-        normalized_updates = dict(updates)
+        from ui.customer_speech_settings import validate_customer_speech_update
+
+        normalized_updates = validate_customer_speech_update(dict(updates), self, user_id=user_id)
         runtime_keys = frozenset(
             {
                 "ai_source",
