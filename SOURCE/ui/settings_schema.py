@@ -159,6 +159,7 @@ USER_SETTING_KEYS: Final[frozenset[str]] = frozenset(
         "tts_prosody_hints_enabled",
         "tts_rate",
         "tts_speed_jitter_pct",
+        "tts_language",
         "tts_voice",
         "tts_voice_blend",
         "tts_volume",

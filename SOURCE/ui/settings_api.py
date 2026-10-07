@@ -421,10 +421,13 @@ def _settings_response_payload(settings: dict[str, Any]) -> dict[str, Any]:
     # release cycle.
     if "agent_autonomy" in redacted and "capability_tier" not in redacted:
         redacted["capability_tier"] = redacted["agent_autonomy"]
-    return {
-        "settings": redacted,
-        "voice_status": get_voice_status(),
-    }
+    from ui.customer_speech_settings import customer_speech_payload
+
+    payload = {"settings": redacted, "voice_status": get_voice_status()}
+    speech = customer_speech_payload(settings)
+    if speech is not None:
+        payload["customer_speech"] = speech
+    return payload
 
 
 def _enforce_llm_lock(
@@ -994,6 +997,10 @@ def create_settings_router(*, music_service: object | None = None) -> APIRouter:
                 canonical = settings_mgr.canonicalize_setting_key(raw_key)
                 normalized_incoming[canonical] = raw_value
 
+            submitted_speech = {
+                key: normalized_incoming[key] for key in ("tts_language", "tts_voice") if key in normalized_incoming
+            }
+
             # The React UI echoes the full localSettings blob on every save.
             # Treat unchanged known values as no-ops before validation so one
             # stale invalid setting cannot block an unrelated setting change.
@@ -1071,11 +1078,25 @@ def create_settings_router(*, music_service: object | None = None) -> APIRouter:
                     ),
                 )
 
+            if submitted_speech:
+                from ui.customer_speech_settings import qualification_profile
+
+                if qualification_profile() is not None:
+                    # Retrying a saved-but-unapplied pair must still reach the
+                    # engine, even when both persisted values are unchanged.
+                    known.update(submitted_speech)
             validated, errors = _validate_settings(known, settings_mgr.DEFAULT_SETTINGS)
+            from ui.customer_speech_settings import validate_customer_speech_update
+
+            speech_errors = []
+            try:
+                validated = validate_customer_speech_update(validated, settings_mgr, user_id=request_user_id)
+            except (ValueError, RuntimeError) as exc:
+                speech_errors.append(str(exc))
             cross_field_errors = _validate_llm_cross_field_requirements(validated, settings_mgr)
             hotkey_cross_field_errors = _validate_hotkey_cross_field_requirements(validated, settings_mgr)
-            all_errors = llm_lock_errors + errors + cross_field_errors + hotkey_cross_field_errors
-            if errors or cross_field_errors or hotkey_cross_field_errors:
+            all_errors = llm_lock_errors + errors + cross_field_errors + hotkey_cross_field_errors + speech_errors
+            if errors or cross_field_errors or hotkey_cross_field_errors or speech_errors:
                 return JSONResponse(
                     status_code=422,
                     content={
@@ -1090,7 +1111,10 @@ def create_settings_router(*, music_service: object | None = None) -> APIRouter:
                         # failures must not be presented as only a shortcut issue.
                         "data": (
                             {"validation_reason": "hotkey_conflict"}
-                            if hotkey_cross_field_errors and not (llm_lock_errors or errors or cross_field_errors)
+                            if hotkey_cross_field_errors
+                            and not (llm_lock_errors or errors or cross_field_errors or speech_errors)
+                            else {"validation_reason": "speech_selection"}
+                            if speech_errors
                             else None
                         ),
                     },
@@ -1345,8 +1369,18 @@ def create_settings_router(*, music_service: object | None = None) -> APIRouter:
                     except Exception as exc:
                         logger.warning("Failed to reload wake detector after settings change: %s", exc)
 
+            speech_effect = None
+            if {"tts_language", "tts_voice"}.intersection(validated):
+                speech_effect = apply_setting_effect(
+                    "tts_language",
+                    settings_mgr.get("tts_language", "en-us", user_id=request_user_id),
+                    settings_mgr=settings_mgr,
+                    user_id=request_user_id,
+                )
             hub = getattr(raw_request.app.state, "event_hub", None)
             payload = _settings_response_payload(_effective_settings_snapshot(raw_request))
+            if speech_effect is not None and "customer_speech" in payload:
+                payload["customer_speech_effect"] = speech_effect.as_dict()
             if hub:
                 broadcast_user_id = _get_broadcast_user_id(raw_request)
                 await hub.broadcast(
@@ -1382,8 +1416,18 @@ def create_settings_router(*, music_service: object | None = None) -> APIRouter:
     async def get_settings(raw_request: Request):
         """Get all current settings."""
         try:
+            from ui.customer_speech_settings import refresh_customer_speech_user
+
+            try:
+                user_id = _get_request_user_id(raw_request)
+            except HTTPException:
+                user_id = None
+            speech_effect = refresh_customer_speech_user(settings_mgr, user_id=user_id)
+            payload = _settings_response_payload(_effective_settings_snapshot(raw_request))
+            if speech_effect is not None:
+                payload["customer_speech_effect"] = speech_effect.as_dict()
             return JSONResponse(
-                content=success_response(_settings_response_payload(_effective_settings_snapshot(raw_request))),
+                content=success_response(payload),
             )
         except Exception:
             logger.exception("Failed to get settings")
@@ -1473,9 +1517,16 @@ def create_settings_router(*, music_service: object | None = None) -> APIRouter:
 
                 raise ConfigurationError("Failed to reset settings")
 
+            from ui.settings_effects import apply_setting_effect
+
+            speech_effect = apply_setting_effect(
+                "tts_language", "en-us", settings_mgr=settings_mgr, user_id=user_id
+            )
             # Broadcast settings reset to all connected WebSocket clients
             hub = getattr(raw_request.app.state, "event_hub", None)
             payload = _settings_response_payload(_effective_settings_snapshot(raw_request))
+            if "customer_speech" in payload:
+                payload["customer_speech_effect"] = speech_effect.as_dict()
             if hub:
                 broadcast_user_id = _get_broadcast_user_id(raw_request)
                 await hub.broadcast(

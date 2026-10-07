@@ -75,6 +75,14 @@ def create_kokoro(
     Returns None if the model files are not present on disk.
     Explicit customer routes propagate construction failures without fallback.
     """
+    from voice.customer_runtime import get_qualification_composition, qualification_profile, resolve_selection
+
+    if qualification_profile() is not None:
+        if getattr(config, "_customer_speech_selection_failed", False):
+            raise RuntimeError("The selected speech settings have not been applied successfully")
+        if customer_tokenizer is None:
+            language, voice = resolve_selection(config)
+            customer_tokenizer = get_qualification_composition()
     if customer_tokenizer is None and (language != "en-us" or voice is not None):
         raise ValueError("Explicit customer routing requires its pronunciation composition")
     try:
@@ -153,6 +161,32 @@ def get_shared_kokoro(config: AppConfig | None = None) -> KokoroTTSEngine | None
     global _shared_kokoro, _shared_kokoro_attempted
 
     with _shared_kokoro_lock:
+        from voice.customer_runtime import get_qualification_composition, qualification_profile, resolve_selection
+
+        if qualification_profile() is not None:
+            if getattr(config, "_customer_speech_selection_failed", False):
+                raise RuntimeError("The selected speech settings have not been applied successfully")
+            if getattr(config, "tts_backend", "kokoro") != "kokoro":
+                raise ValueError("The qualification artifact requires local Kokoro speech")
+            language, voice = resolve_selection(config)
+            if _shared_kokoro is not None:
+                if getattr(_shared_kokoro, "_customer_route_error", None):
+                    raise RuntimeError("The selected speech route needs a successful settings retry")
+                _shared_kokoro.set_customer_route(language, voice)
+                return _shared_kokoro
+            try:
+                engine = create_kokoro(
+                    config, customer_tokenizer=get_qualification_composition(), language=language, voice=voice
+                )
+                if engine is None:
+                    raise RuntimeError("The qualification speech inputs are unavailable")
+            except Exception:
+                if config is not None:
+                    config._customer_speech_selection_failed = True
+                raise
+            _shared_kokoro = engine
+            _shared_kokoro_attempted = True
+            return engine
         if _shared_kokoro is not None or _shared_kokoro_attempted:
             return _shared_kokoro
         _shared_kokoro_attempted = True
@@ -184,6 +218,9 @@ class TTSFactory:
     ):
         self.config = config
         self.policy = policy or self._create_default_policy()
+        from voice.customer_runtime import qualification_profile
+
+        self._qualification_selected = qualification_profile() is not None
         self._customer_kwargs = None
         if customer_tokenizer is not None:
             from voice.customer_composition import require_customer_composition
@@ -215,7 +252,7 @@ class TTSFactory:
             Primary TTS component.
         """
         backend = getattr(self.config, "tts_backend", "kokoro")
-        if self._customer_kwargs is not None and backend != "kokoro":
+        if (self._customer_kwargs is not None or self._qualification_selected) and backend != "kokoro":
             raise ValueError("The explicit customer speech route requires Kokoro")
 
         if backend == "kokoro":
@@ -255,6 +292,8 @@ class TTSFactory:
 
     def create_local(self) -> LocalTTS:
         """Create pyttsx3 local TTS component."""
+        if self._qualification_selected:
+            raise RuntimeError("The qualification artifact cannot fall back to system speech")
         if self._local_tts is None:
             tts_engine = TTSEngine(config=self.config)
             self._local_tts = LocalTTS(tts_engine)
@@ -266,7 +305,7 @@ class TTSFactory:
         Fallback chain: configured primary → pyttsx3 local.
         """
         primary = self.create_primary()
-        if self._customer_kwargs is not None:
+        if self._customer_kwargs is not None or self._qualification_selected:
             # The selected customer route must not turn an unsupported input or
             # missing pronunciation asset into an unqualified system voice.
             return primary
