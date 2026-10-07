@@ -7,6 +7,7 @@ from http import HTTPStatus
 from pathlib import Path
 from typing import Any, Protocol
 
+from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 
 from contracts.api_response import (
@@ -19,7 +20,6 @@ from contracts.fastapi_helpers import SafeJSONResponse
 from core.hub_state_authority import HubStateAuthority
 from core.logging_config import get_logger
 from core.sentry_integration import sentry_initialized
-from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request
 from services.command.idempotency import IdempotencyLedger
 from services.sentry_init import init_sentry
 from services.supervisor import ensure_supervisor
@@ -966,6 +966,20 @@ def _ensure_billing_capacity_routes(app: FastAPI) -> None:
         app.include_router(capacity_router, prefix="/v1/billing")
 
 
+def _ensure_billing_usage_routes(app: FastAPI) -> None:
+    """Read company usage through the same authenticated desktop cloud proxy."""
+    from billing.routes import SpendUsageTodayResponse, get_usage, get_usage_today
+
+    paths = {getattr(route, "path", None) for route in getattr(app.router, "routes", [])}
+    router = APIRouter()
+    if "/billing/usage" not in paths:
+        router.add_api_route("/billing/usage", get_usage, methods=["GET"], name="desktop_billing_usage")
+    if "/billing/usage/today" not in paths:
+        router.add_api_route("/billing/usage/today", get_usage_today, methods=["GET"],
+                             response_model=SpendUsageTodayResponse, name="desktop_billing_usage_today")
+    app.include_router(router)
+
+
 def _ensure_billing_extra_usage_routes(app: FastAPI) -> None:
     """Register the extra-usage top-up endpoints on the desktop API surface.
 
@@ -1331,6 +1345,7 @@ def _register_synchronous_route_definitions(app: FastAPI, *, state: Any, music: 
     ):
         _ensure_billing_checkout_route(app)
         _ensure_billing_capacity_routes(app)
+        _ensure_billing_usage_routes(app)
         _ensure_billing_extra_usage_routes(app)
         _ensure_billing_portal_session_route(app)
         _ensure_billing_webhook_routes(app)

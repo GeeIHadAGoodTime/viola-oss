@@ -77,6 +77,14 @@ class LLMProviderFallbackChain(BaseLLMProvider):
         idx = min(max(self._active_index, 0), len(self._providers) - 1)
         return self._providers[idx]
 
+    @property
+    def MANAGED_SPEND_ACCOUNTED_REMOTELY(self) -> bool:
+        """Describe the next actual native transport, including primary probes."""
+        candidates = self._candidate_indices("route_command_native")
+        if not candidates:
+            return False
+        return getattr(self._providers[candidates[0]], "MANAGED_SPEND_ACCOUNTED_REMOTELY", False) is True
+
     def _first_available_index(self) -> int:
         for index, provider in enumerate(getattr(self, "_providers", ())):
             try:
@@ -275,6 +283,7 @@ class LLMProviderFallbackChain(BaseLLMProvider):
         annotated.setdefault("_model_name", provider_info.get("model") or "")
         annotated["_llm_provider"] = provider_info
         annotated["_llm_fallback"] = fallback_meta
+        annotated["_managed_spend_accounted_remotely"] = getattr(provider, "MANAGED_SPEND_ACCOUNTED_REMOTELY", False) is True
         return annotated
 
     def _should_advance_on_diagnostic(
@@ -348,6 +357,10 @@ class LLMProviderFallbackChain(BaseLLMProvider):
             try:
                 result = await call_factory(provider, provider_kwargs)
             except Exception as exc:
+                from services.llm.managed_budget import ManagedLlmSpendCapError
+
+                if isinstance(exc, ManagedLlmSpendCapError):
+                    raise
                 diagnostic = classify_llm_operator_error(exc)
                 last_error = exc
                 fallback_requested = should_fallback_for_operator_diagnostic(diagnostic)

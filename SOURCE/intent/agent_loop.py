@@ -37,7 +37,6 @@ from intent.agent_middleware import (
     URLTrackerMiddleware,
     run_middleware_pipeline,
 )
-from intent.tool_allowlist import tool_name_allowed_by_allowlist
 from intent.context_compaction import (
     compact_native_messages,
     is_token_limit_error,
@@ -58,6 +57,7 @@ from intent.subagents.lifecycle import (
     subagent_lifecycle,
     subagent_transcript_path,
 )
+from intent.tool_allowlist import tool_name_allowed_by_allowlist
 from intent.tool_types import AgentResult, ToolCall, ToolResult
 from intent.tools.deferred_tool_schemas import expand_tools_with_deferred_references
 from services.conversation.context_frames import (
@@ -1668,12 +1668,24 @@ async def run_agent_loop(
         nonlocal outcome
 
         try:
-            await reservation.settle(failed=True)
+            if reservation is not None:
+                await reservation.settle(failed=True)
         except Exception as settle_exc:
             if _handle_agent_loop_billing_failure(settle_exc):
                 raise _AgentLoopBillingStop() from settle_exc
 
+        from services.llm.managed_budget import ManagedLlmBudgetGate, ManagedLlmSpendCapError
+
         gate = getattr(reservation, "_last_gate", None)
+        if isinstance(exc, ManagedLlmSpendCapError):
+            gate = ManagedLlmBudgetGate(
+                allowed=False,
+                plan=exc.cap_state.get("plan", ""),
+                period=exc.cap_state.get("period", ""),
+                resets_at=exc.cap_state.get("resets_at", ""),
+                public_message=exc.public_message,
+                public_cap_state=exc.cap_state,
+            )
         if gate is None:
             from services.llm.managed_budget import ManagedLlmBudgetGate
 
@@ -1707,7 +1719,7 @@ async def run_agent_loop(
         try:
             from services.llm.managed_budget import build_per_command_spend_guard
 
-            _per_command_spend_guard = build_per_command_spend_guard(executor._user_id)
+            _per_command_spend_guard = build_per_command_spend_guard(executor._user_id, provider=provider)
         except Exception:  # noqa: BLE001, RUF100 - fail closed on ANY construction error, never disable the bound
             # Fail closed: an unbuildable guard must NOT silently disable the
             # per-command bound. Fall back to a ceiling-only guard so blast
@@ -1799,6 +1811,7 @@ async def run_agent_loop(
             operation=call_kind,
             fail_closed_on_settle_error=False,
             reserve_tokens=False,
+            provider=provider,
         )
         try:
             await reservation.reserve()
@@ -1838,11 +1851,14 @@ async def run_agent_loop(
                 raise _AgentLoopBillingStop() from settle_exc
 
         # Accumulate this turn's settled managed spend into the per-command
-        # guard. Only managed-LLM reservations carry a durable spend hold
-        # (``_spend_reservation``); BYOK/Codex/local turns never charge Viola,
-        # so they never move the per-command counter.
+        # guard. A remotely accounted turn has no local monthly hold, but its
+        # server-returned usage must still bound the command on the desktop.
+        # BYOK/Codex/local fallback turns do not move this managed counter.
         _guard = _per_command_spend_guard
-        if _guard is not None and getattr(reservation, "_spend_reservation", None) is not None:
+        remotely_accounted = bool(getattr(reservation, "remotely_accounted", False))
+        if isinstance(response, dict) and response.get("_managed_spend_accounted_remotely") is False:
+            remotely_accounted = False
+        if _guard is not None and (getattr(reservation, "_spend_reservation", None) is not None or remotely_accounted):
             from services.llm.spend_accounting import estimated_spend_cents
 
             _guard.record(estimated_spend_cents(reservation.model, actual_usage))
@@ -2645,6 +2661,10 @@ async def run_agent_loop(
                 exc=exc,
             )
             await _settle_agent_turn_spend_failed(spend_reservation)
+            from services.llm.managed_budget import ManagedLlmSpendCapError
+
+            if isinstance(exc, ManagedLlmSpendCapError):
+                await _handle_spend_reservation_denial(spend_reservation, exc)
             invalid_encrypted_content = False
             if getattr(executor, "_use_native", False) and continuity_before.get("mode") == "response_items":
                 from intent.agent_executor import _is_invalid_encrypted_content_error
@@ -3409,6 +3429,13 @@ async def run_agent_loop(
             except (_AgentLoopBillingStop, _AgentLoopCostLimitStop):
                 break
             except Exception as exc:
+                from services.llm.managed_budget import ManagedLlmSpendCapError
+
+                if isinstance(exc, ManagedLlmSpendCapError):
+                    try:
+                        await _handle_spend_reservation_denial(None, exc)
+                    except _AgentLoopCostLimitStop:
+                        break
                 executor._append_task_trace_llm_attempt_failure(
                     attempt_id=locals().get("_turn_attempt_id"),
                     call_kind="agent_loop",
