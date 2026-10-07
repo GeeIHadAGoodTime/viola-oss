@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "f864e61381ef9e10a09333fce05210427cf7d0f6",
-  "sha256": "481f8f8140353f4e512c0bd772a996989d2be6e00e7f933a0985536eacd3685e",
+  "revision": "59bbbd47b7dfefb1ba2321676aa14351ed628182",
+  "sha256": "9b9b3230cd5b6763c9811a4eea5b551439242679b2f05326482f625ba83c8450",
   "files": [
     {
       "path": ".env.example",
@@ -515,8 +515,8 @@
     },
     {
       "path": "auth/desktop_session.py",
-      "sha256": "c3bf796aa11388f2b311128efb6ad7ce9309fa498c45f77adae9acaee5a9906a",
-      "bytes": 45955
+      "sha256": "acb0c0e18f82b0f30a4c1313dc2faaacb930dc194268f694577d8dcea0412e66",
+      "bytes": 46298
     },
     {
       "path": "auth/field_encryption.py",
@@ -560,8 +560,8 @@
     },
     {
       "path": "auth/models.py",
-      "sha256": "ff6312a4cb8e77e944957b2b564796fe0a84d59216c949ef9130bb0b5406819a",
-      "bytes": 20343
+      "sha256": "105fea6db196af5ae2d833c1fc82b17a1339d382257d588c960dfba7aea4e5fc",
+      "bytes": 20417
     },
     {
       "path": "auth/per_user_rate_limit.py",
@@ -580,8 +580,8 @@
     },
     {
       "path": "auth/routes.py",
-      "sha256": "5d8f406dad6ee6c1ecb2330254d94f81d52eaf044412d15f1a163d2853924fc9",
-      "bytes": 83487
+      "sha256": "d4abc74d940ce74a52439cea8f45ae7cf5881d0f21f23cddbf5e9d8b96b9e569",
+      "bytes": 83530
     },
     {
       "path": "auth/secret_rotation.py",
@@ -1020,8 +1020,8 @@
     },
     {
       "path": "core/exceptions.py",
-      "sha256": "185cdd0f09b3fc8468277a06339d17c12028ecfe3e519a4e4afe013525423157",
-      "bytes": 30098
+      "sha256": "71781fdf3ac75d2b82437bfe7ee38f5ca5b271570dd1d0f056d6adc700c3e0f0",
+      "bytes": 30302
     },
     {
       "path": "core/factories.py",
@@ -1085,8 +1085,8 @@
     },
     {
       "path": "core/request_context.py",
-      "sha256": "8fb516309e02537bef9b5b47688569d5840533b1fd4b13a1cbc55edcbf47a4e7",
-      "bytes": 12420
+      "sha256": "394a3ce1f6bb136156ba3e39446c5a59dc9a5dad77a0c91a25e99efb688ce9d5",
+      "bytes": 13751
     },
     {
       "path": "core/room_registry.py",
@@ -1545,8 +1545,8 @@
     },
     {
       "path": "intent/agent_loop.py",
-      "sha256": "57a0941c08fb0b491cf210799544137dbb2f4b9886167516822df991e2865b00",
-      "bytes": 245382
+      "sha256": "5be50a07ad8a3dd478dfc11a35b63c2ed65de82aeb26b4b55cf6e1e96684a996",
+      "bytes": 246164
     },
     {
       "path": "intent/agent_message_manager.py",
@@ -4515,8 +4515,8 @@
     },
     {
       "path": "services/llm/managed_budget.py",
-      "sha256": "8763e0bb0a92aee906fe5fc2f0e5ea36f19f250c1d66e77a93361d859e2060b9",
-      "bytes": 12529
+      "sha256": "ab9269a9e24407bbcea3006ab0c547be0dd32162178ecd4f984e363ef787c414",
+      "bytes": 13891
     },
     {
       "path": "services/llm/model_fallback.py",
@@ -4665,8 +4665,8 @@
     },
     {
       "path": "services/llm/spend_accounting.py",
-      "sha256": "f22171f4bd78d6cb9cdb703a40332d2b5745602ac4bfb6b960d20ab1f7034f93",
-      "bytes": 13097
+      "sha256": "37cd333eee5b8bc8a9cb97d607d8d8fd970a969ef53158d4d3fb787bb20392f8",
+      "bytes": 14168
     },
     {
       "path": "services/llm/stream_bus.py",
@@ -6145,8 +6145,8 @@
     },
     {
       "path": "tests/public/test_remote_managed_accounting.py",
-      "sha256": "6c6e0de336a0d5e408d2d3224d0365931d8c4756f931e74c1d52f6817096929c",
-      "bytes": 11783
+      "sha256": "2becc2e65696f60b4ebee82925a67b0e927a041498f418367568ff533f5c3a6c",
+      "bytes": 17345
     },
     {
       "path": "tests/public/test_request_tool_surface_boundary.py",
@@ -10155,23 +10155,23 @@
     },
     {
       "path": "ui/react-app/src/components/AccountTab.authSync.test.jsx",
-      "sha256": "19efa827b1e655322920c0b0920ffde84b6736506b6a7f90c936e105f75ef72a",
-      "bytes": 17515
+      "sha256": "2566bf84e403fdf256d5a455d2fca906945811de30a8720904e59ce7874fee0c",
+      "bytes": 17718
     },
     {
       "path": "ui/react-app/src/components/AccountTab.cloudPlan.test.jsx",
-      "sha256": "1957250372914aac2934d9594d6d7f5a81557e2bd42621526f958420e2d6a7ba",
-      "bytes": 5242
+      "sha256": "4fd317654023b952538809d4e9394689edf9a40fd5e00af7f9373ec478a2e2d0",
+      "bytes": 6098
     },
     {
       "path": "ui/react-app/src/components/AccountTab.cloudStoreReconciliation.test.jsx",
-      "sha256": "abdfb2756c9a9c7d9c23a19b6003f6dd956fd4d7ffab9845063ba7d6f4db6bb2",
-      "bytes": 23455
+      "sha256": "80002faabc42bfb3f9acfc275f35388e28104d7741f260e5e21c1fdd96909ac8",
+      "bytes": 26407
     },
     {
       "path": "ui/react-app/src/components/AccountTab.jsx",
-      "sha256": "145c44e25d65c6cac20785442deb6c53a3762509f1e6408faaa7692afc1c93a6",
-      "bytes": 76307
+      "sha256": "4c756041fa2e5e996f1f1197c26ef64089924e3c7b6d44d0a0b673daf6b83c01",
+      "bytes": 76138
     },
     {
       "path": "ui/react-app/src/components/AccountTab.legacy.jsx",
@@ -10195,13 +10195,13 @@
     },
     {
       "path": "ui/react-app/src/components/AccountTab.test.jsx",
-      "sha256": "362588ced86fda7e276d5ae2776f155634e4e744a84ce3d652ad27d8c5ebe53c",
-      "bytes": 18041
+      "sha256": "5e31c5edb980377be19df6a931c8f7d2bd6519df91535549a5e0567ffb04d4ba",
+      "bytes": 18535
     },
     {
       "path": "ui/react-app/src/components/AccountTab.usageCloudAuth.test.jsx",
-      "sha256": "f193d090097f17c1c5398aa0cc54af6142e8c20dc1e02609ccda442e37f2119e",
-      "bytes": 6225
+      "sha256": "d4863aaf277d02dcd3accc3a9d0e69b9300248f94f596660c252385e59fc9fcd",
+      "bytes": 6293
     },
     {
       "path": "ui/react-app/src/components/AgentCard.jsx",
@@ -11415,8 +11415,8 @@
     },
     {
       "path": "ui/react-app/src/config.js",
-      "sha256": "a7a422c99adf85f559f361f470c8c1a5ca9d3a5eeccbf5add376af86480dedce",
-      "bytes": 13104
+      "sha256": "f2a5f07f4b389711181d6debedb7382d1df7b8a81fe82dd57a650b4a5e369e11",
+      "bytes": 13172
     },
     {
       "path": "ui/react-app/src/hooks/cloudConsentGate.jsx",
@@ -11755,8 +11755,18 @@
     },
     {
       "path": "ui/react-app/src/lib/auth_context.tsx",
-      "sha256": "2913a66e255e8393fa6e0c7e5a862aa250261b57c88c2241e8104b543e7a4fde",
-      "bytes": 35004
+      "sha256": "04aa84454c2433a07b5009027d441915d778710ebd4974891a0ae3253d006a35",
+      "bytes": 35135
+    },
+    {
+      "path": "ui/react-app/src/lib/billingEntitlement.test.ts",
+      "sha256": "eaa44ce79a51545f12f00c09f0984d1225b42a4bc932e462a973a4de07a74cbe",
+      "bytes": 2306
+    },
+    {
+      "path": "ui/react-app/src/lib/billingEntitlement.ts",
+      "sha256": "037c4ac47fb99d76a59d2863b2a98157d6a40da5bb2e6083771c15c34c435e33",
+      "bytes": 2303
     },
     {
       "path": "ui/react-app/src/lib/csrf.js",
@@ -12240,8 +12250,8 @@
     },
     {
       "path": "ui/settings_manager.py",
-      "sha256": "66cddaa8ca06501d9e6de379a2dd89231d076a94f0391f24c814751d266f081b",
-      "bytes": 160257
+      "sha256": "b60764ab759bcebe786c5d137e7f796a5da7cfd1d6924e5021aac50acdc1f637",
+      "bytes": 160290
     },
     {
       "path": "ui/settings_schema.py",
