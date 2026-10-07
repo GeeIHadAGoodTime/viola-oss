@@ -25,7 +25,7 @@
  * means the cloud SPA.
  */
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import SettingsModal from './SettingsModal';
 
@@ -108,7 +108,7 @@ const baseSettings = {
 describe('SettingsModal desktop-only panels (#4226)', () => {
   beforeEach(() => {
     settingsHarness.settings = { ...baseSettings };
-    settingsHarness.updateSettings.mockClear();
+    settingsHarness.updateSettings.mockReset().mockResolvedValue(true);
     settingsHarness.refreshDevices.mockClear();
     apiFetchMock.mockReset();
     apiFetchMock.mockResolvedValue({});
@@ -172,6 +172,7 @@ describe('SettingsModal desktop-only panels (#4226)', () => {
       await screen.findByText('YouTube');
       expect(screen.queryByText('Rescan')).toBeNull();
       expect(screen.queryByText('Browse')).toBeNull();
+      expect(screen.queryByRole('button', { name: /^(Set|Change) Folder$/ })).toBeNull();
       await waitFor(() => {
         expect(requestedPaths().filter((p) => p.startsWith('/v1/local/'))).toEqual([]);
       });
@@ -234,6 +235,123 @@ describe('SettingsModal desktop-only panels (#4226)', () => {
       await screen.findByText('YouTube');
       expect(screen.getByText('Spotify')).toBeInTheDocument();
       expect(screen.getByText('Local Files')).toBeInTheDocument();
+    });
+
+    it.each([
+      ['', 'Set Folder'],
+      ['C:/QA Music', 'Change Folder'],
+    ])('opens the existing editor for folder %j without browsing, saving or scanning', async (folder, action) => {
+      settingsHarness.settings = { ...baseSettings, active_music_provider_id: 'local', local_music_folder: folder };
+      render(<SettingsModal isOpen onClose={vi.fn()} />);
+      openTab('Music');
+      fireEvent.click(await screen.findByRole('button', { name: action }));
+      expect(screen.getByRole('textbox', { name: 'Local music folder' })).toHaveValue(folder);
+      expect(screen.queryByRole('button', { name: action })).toBeNull();
+      expect(settingsHarness.updateSettings).not.toHaveBeenCalled();
+      expect(requestedPaths()).not.toContain('/v1/local/browse-folder');
+      expect(requestedPaths()).not.toContain('/v1/local/library/rescan');
+    });
+
+    it('cancels a configured folder edit without persisting or scanning the draft', async () => {
+      const original = 'C:/QA Music';
+      settingsHarness.settings = { ...baseSettings, active_music_provider_id: 'local', local_music_folder: original };
+      const onClose = vi.fn();
+      render(<SettingsModal isOpen onClose={onClose} />);
+      openTab('Music');
+      fireEvent.click(await screen.findByRole('button', { name: 'Change Folder' }));
+      const input = screen.getByRole('textbox', { name: 'Local music folder' });
+      fireEvent.change(input, { target: { value: 'D:/Uncommitted' } });
+      fireEvent.click(within(input.parentElement.parentElement).getByRole('button', { name: 'Cancel' }));
+      expect(screen.queryByRole('textbox', { name: 'Local music folder' })).toBeNull();
+      fireEvent.click(screen.getByRole('button', { name: 'Change Folder' }));
+      expect(screen.getByRole('textbox', { name: 'Local music folder' })).toHaveValue(original);
+      expect(settingsHarness.settings.local_music_folder).toBe(original);
+      expect(settingsHarness.updateSettings).not.toHaveBeenCalled();
+      expect(requestedPaths()).not.toContain('/v1/local/library/rescan');
+      expect(onClose).not.toHaveBeenCalled();
+    });
+
+    it('waits for the configured folder save acknowledgement before scanning and reopens the saved value', async () => {
+      settingsHarness.settings = { ...baseSettings, active_music_provider_id: 'local', local_music_folder: 'C:/QA Music' };
+      let resolveSave;
+      settingsHarness.updateSettings.mockImplementationOnce(() => new Promise(resolve => { resolveSave = resolve; }));
+      apiFetchMock.mockImplementation(path => Promise.resolve(path === '/v1/local/library/rescan' ? { scanned: 2 } : {}));
+      const onClose = vi.fn();
+      const view = render(<SettingsModal isOpen onClose={onClose} />);
+      openTab('Music');
+      fireEvent.click(await screen.findByRole('button', { name: 'Change Folder' }));
+      fireEvent.change(screen.getByRole('textbox', { name: 'Local music folder' }), { target: { value: '  D:/QA Music Two  ' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Save & Scan' }));
+      expect(settingsHarness.updateSettings).toHaveBeenCalledWith(expect.objectContaining({ local_music_folder: 'D:/QA Music Two', active_music_provider_id: 'local' }));
+      expect(requestedPaths()).not.toContain('/v1/local/library/rescan');
+      await act(async () => resolveSave(true));
+      expect(await screen.findByText(/Scan complete.*2 tracks found/)).toBeInTheDocument();
+      expect(requestedPaths().filter(path => path === '/v1/local/library/rescan')).toHaveLength(1);
+      expect(settingsHarness.settings.local_music_folder).toBe('D:/QA Music Two');
+      view.rerender(<SettingsModal isOpen={false} onClose={onClose} />);
+      view.rerender(<SettingsModal isOpen onClose={onClose} />);
+      openTab('Music');
+      fireEvent.click(await screen.findByRole('button', { name: 'Change Folder' }));
+      expect(screen.getByRole('textbox', { name: 'Local music folder' })).toHaveValue('D:/QA Music Two');
+      expect(onClose).not.toHaveBeenCalled();
+    });
+
+    it('keeps a refused folder draft available for correction and never scans it before a successful retry', async () => {
+      settingsHarness.settings = { ...baseSettings, active_music_provider_id: 'local', local_music_folder: 'C:/QA Music' };
+      settingsHarness.updateSettings.mockResolvedValueOnce(false);
+      apiFetchMock.mockImplementation(path => Promise.resolve(path === '/v1/local/library/rescan' ? { scanned: 0 } : {}));
+      render(<SettingsModal isOpen onClose={vi.fn()} />);
+      openTab('Music');
+      fireEvent.click(await screen.findByRole('button', { name: 'Change Folder' }));
+      fireEvent.change(screen.getByRole('textbox', { name: 'Local music folder' }), { target: { value: 'D:/QA Retry' } });
+      await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Save & Scan' })));
+      expect(settingsHarness.updateSettings).toHaveBeenCalledTimes(1);
+      expect(screen.getByRole('textbox', { name: 'Local music folder' })).toHaveValue('D:/QA Retry');
+      expect(settingsHarness.settings.local_music_folder).toBe('C:/QA Music');
+      expect(requestedPaths()).not.toContain('/v1/local/library/rescan');
+      fireEvent.click(screen.getByRole('button', { name: 'Save & Scan' }));
+      expect(await screen.findByText('No audio files found in this folder')).toBeInTheDocument();
+      expect(settingsHarness.updateSettings).toHaveBeenCalledTimes(2);
+      expect(settingsHarness.settings.local_music_folder).toBe('D:/QA Retry');
+      expect(requestedPaths().filter(path => path === '/v1/local/library/rescan')).toHaveLength(1);
+    });
+
+    it('retains the configured folder when the native picker is cancelled', async () => {
+      settingsHarness.settings = { ...baseSettings, active_music_provider_id: 'local', local_music_folder: 'C:/QA Music' };
+      apiFetchMock.mockImplementation(path => Promise.resolve(path === '/v1/local/browse-folder' ? { folder: null } : {}));
+      render(<SettingsModal isOpen onClose={vi.fn()} />);
+      openTab('Music');
+      fireEvent.click(await screen.findByRole('button', { name: 'Change Folder' }));
+      await act(async () => fireEvent.click(screen.getByRole('button', { name: /^Browse\.\.\.$/ })));
+      expect(screen.getByRole('textbox', { name: 'Local music folder' })).toHaveValue('C:/QA Music');
+      expect(settingsHarness.updateSettings).not.toHaveBeenCalled();
+      expect(requestedPaths()).not.toContain('/v1/local/library/rescan');
+      expect(screen.queryByText(/Couldn't open the folder picker/i)).toBeNull();
+    });
+
+    it('clears a configured folder through the existing outer Save and restores YouTube without scanning', async () => {
+      settingsHarness.settings = { ...baseSettings, active_music_provider_id: 'youtube_music', local_music_folder: 'C:/QA Music' };
+      const onClose = vi.fn();
+      const view = render(<SettingsModal isOpen onClose={onClose} />);
+      openTab('Music');
+      fireEvent.click(await screen.findByText('Local Files'));
+      fireEvent.click(await screen.findByRole('button', { name: 'Change Folder' }));
+      fireEvent.change(screen.getByRole('textbox', { name: 'Local music folder' }), { target: { value: '' } });
+      expect(screen.getByRole('button', { name: 'Save & Scan' })).toBeDisabled();
+      fireEvent.click(screen.getByText('YouTube'));
+      fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
+      await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+      expect(settingsHarness.updateSettings).toHaveBeenCalledWith(expect.objectContaining({ local_music_folder: '', active_music_provider_id: 'youtube_music' }));
+      expect(settingsHarness.settings.local_music_folder).toBe('');
+      expect(settingsHarness.settings.active_music_provider_id).toBe('youtube_music');
+      expect(requestedPaths()).not.toContain('/v1/local/library/rescan');
+      expect(requestedPaths()).not.toContain('/v1/local/browse-folder');
+      view.unmount();
+      render(<SettingsModal isOpen onClose={vi.fn()} />);
+      openTab('Music');
+      fireEvent.click(await screen.findByText('Local Files'));
+      fireEvent.click(await screen.findByRole('button', { name: 'Set Folder' }));
+      expect(screen.getByRole('textbox', { name: 'Local music folder' })).toHaveValue('');
     });
 
     it('shows an error when the native local folder picker fails', async () => {
