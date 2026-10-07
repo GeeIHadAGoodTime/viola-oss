@@ -354,27 +354,28 @@ async def _reject_unrelated_candidate_if_needed(
     result: dict[str, Any],
 ) -> ToolResult | None:
     """Return a not-played mismatch envelope when the candidate is unrelated."""
+    resolved_now = result.get("now_playing")
+    # A live candidate is authoritative. Do not fill a different live track's
+    # missing fields with the requested/enqueued candidate's file address.
+    candidate = resolved_now if isinstance(resolved_now, dict) else result
     now_playing = {
-        "title": result.get("title") or "",
-        "artist": result.get("artist") or "",
+        "title": candidate.get("title") or candidate.get("name") or "",
+        "artist": candidate.get("artist") or "",
     }
     for source_key, target_key in (
         ("track_uri", "url"),
         ("url", "url"),
+        ("file_path", "file_path"),
         ("video_id", "video_id"),
         ("provider", "provider"),
     ):
-        value = result.get(source_key)
+        value = candidate.get(source_key)
         if value:
             now_playing[target_key] = value
 
-    # Carry the title provenance flag into this flattened projection
-    # (#2757 item 3 / #2806). ``_prefer_resolved_now_playing`` above keeps the
-    # full resolved dict on ``result["now_playing"]``, but this rebuild reads
-    # only the flat keys -- so without this the browser provider's query-echo
-    # placeholder title compares against itself, scores "exact", and the
-    # ``query_match`` field the model reads asserts a match nothing confirmed.
-    resolved_now = result.get("now_playing")
+    # Preserve title provenance in the projection (#2757 / #2806), so a
+    # browser query-echo placeholder cannot compare against itself and claim
+    # a title match that nothing confirmed.
     resolved_flag = resolved_now.get("title_unverified") if isinstance(resolved_now, dict) else None
     if resolved_flag or result.get("title_unverified"):
         now_playing["title_unverified"] = True
@@ -584,12 +585,14 @@ async def _prefer_resolved_now_playing(
     if not isinstance(live_queue_size, int):
         live_queue_size = 0
 
-    now = result.get("now_playing")
-    if not isinstance(now, dict):
-        now = live_now if isinstance(live_now, dict) else None
+    now = live_now if isinstance(live_now, dict) else result.get("now_playing")
     if not isinstance(now, dict):
         return result
 
+    # Retain even a mismatching live candidate for the rejection guard below.
+    # Dropping it would leave the enqueue address looking like proof that the
+    # requested file is the one actually playing.
+    result["now_playing"] = now
     title = str(now.get("title") or now.get("name") or "").strip()
     if not title:
         return result
@@ -597,7 +600,6 @@ async def _prefer_resolved_now_playing(
     if query and _classify_tool_query_match(query, now) == "fallback_unrelated":
         return result
 
-    result["now_playing"] = now
     result["title"] = title
     artist = str(now.get("artist") or "").strip()
     if artist:
