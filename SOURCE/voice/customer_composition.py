@@ -1,4 +1,4 @@
-"""Explicit, inactive composition for existing English and reviewed CJK G2P.
+"""Explicit, inactive composition for English and bounded CJK/Romance G2P.
 
 No profile, language, voice, model or process setting is selected at import.
 Callers construct this component explicitly and inject it into the existing
@@ -12,7 +12,8 @@ import os
 from pathlib import Path
 from types import MappingProxyType
 
-_COMPANION_VERSION = "0.9.4+viola.cjk.2"
+_COMPANION_VERSION = "0.9.4+viola.cjk.3"
+_ROMANCE_LOCALES = frozenset({"es", "fr", "pt-br"})
 _CJK_DEPENDENCIES = {
     "fugashi": "1.5.2",
     "jaconv": "0.5.0",
@@ -30,22 +31,29 @@ class ComposedCustomerTokenizer:
 
     def __init__(self, english, routes: dict):
         from voice.customer_pronunciation import CustomerTokenizer
-        from viola_cjk.coverage import CoveredCJK
-        from viola_cjk.customer_english_span import CustomerEnglishBridge
 
         if type(english) is not CustomerTokenizer:
             raise ValueError("Composition requires the exact existing English customer tokenizer")
-        if set(routes) - {"ja", "zh"}:
+        if set(routes) - ({"ja", "zh"} | _ROMANCE_LOCALES):
             raise ValueError("Composition contains an unsupported locale")
         for locale, route in routes.items():
-            if (
-                type(route) is not CoveredCJK
-                or route.locale != locale
-                or route.vocab != english.vocab
-                or type(route.english) is not CustomerEnglishBridge
-                or route.english._tokenizer is not english
-            ):
-                raise ValueError("CJK routes must bind the same English component and model vocabulary")
+            if locale in _ROMANCE_LOCALES:
+                from voice.customer_romance.coverage import CoveredRomance
+
+                if type(route) is not CoveredRomance or route.locale != locale or route.vocab != english.vocab:
+                    raise ValueError("Romance routes must bind the exact locale and model vocabulary")
+            else:
+                from viola_cjk.coverage import CoveredCJK
+                from viola_cjk.customer_english_span import CustomerEnglishBridge
+
+                if (
+                    type(route) is not CoveredCJK
+                    or route.locale != locale
+                    or route.vocab != english.vocab
+                    or type(route.english) is not CustomerEnglishBridge
+                    or route.english._tokenizer is not english
+                ):
+                    raise ValueError("CJK routes must bind the same English component and model vocabulary")
         self._english = english
         self._routes = MappingProxyType(dict(routes))
         self.vocab = english.vocab
@@ -71,13 +79,22 @@ class ComposedCustomerTokenizer:
             return CustomerTokenizer.phonemize(self._english, text, lang=locale, norm=norm)
         if not isinstance(text, str) or not text.strip() or len(text) > 5000:
             raise PronunciationError("Customer speech text must contain 1 to 5000 characters")
-        from viola_cjk.coverage import CoveredCJK
+        source = text.strip() if norm else text
+        if locale in _ROMANCE_LOCALES:
+            from voice.customer_romance.coverage import CoverageError, CoveredRomance
 
-        result = CoveredCJK.phonemize(self._routes[locale], text.strip() if norm else text)
+            try:
+                result = CoveredRomance.phonemize(self._routes[locale], source)
+            except CoverageError:
+                raise PronunciationError("Customer speech is outside the bounded Romance coverage") from None
+        else:
+            from viola_cjk.coverage import CoveredCJK
+
+            result = CoveredCJK.phonemize(self._routes[locale], source)
         # Keep Kokoro's existing lossless batching: phonemize may return more
         # than one batch, while tokenize enforces the model limit per batch.
         phones = result["phonemes"]
-        if not phones or any(character not in self.vocab for character in phones):
+        if not isinstance(phones, str) or not phones or any(character not in self.vocab for character in phones):
             raise PronunciationError("Customer speech contains unsupported phonemes")
         return phones
 
@@ -88,13 +105,17 @@ def compose_customer_tokenizer(
     japanese_dictionary_dir: str | Path | None = None,
     mandarin: bool = False,
     english_locale: str = "en-us",
+    romance_locales: tuple[str, ...] = (),
 ) -> ComposedCustomerTokenizer:
     """Build only explicitly requested routes from the existing pinned inputs.
 
     Japanese requires the reviewed explicit eighteen-file dictionary. Mandarin
     initializes the installed Jieba dictionary and existing pypinyin provider;
     no independent global-dictionary contract or custom lexicon is invented.
-    Failure returns no partially ready composition. No voice is selected.
+    Romance accepts an explicit tuple drawn from es/fr/pt-br, with the retained
+    phrase/representation limits. No implicit Portuguese dialect is selected.
+    CJK dependencies are required only when a CJK route is requested. Failure
+    returns no partially ready composition. No voice is selected.
     """
     from voice.customer_pronunciation import CustomerTokenizer
 
@@ -102,6 +123,21 @@ def compose_customer_tokenizer(
         raise ValueError("Composition requires the exact existing English customer tokenizer")
     if type(mandarin) is not bool:
         raise ValueError("Mandarin construction requires an explicit boolean")
+    if (
+        type(romance_locales) is not tuple
+        or any(type(locale) is not str or locale not in _ROMANCE_LOCALES for locale in romance_locales)
+        or len(set(romance_locales)) != len(romance_locales)
+    ):
+        raise ValueError("Romance construction requires distinct explicit es/fr/pt-br locales")
+
+    routes = {}
+    if romance_locales:
+        from voice.customer_romance.coverage import CoveredRomance
+
+        routes.update((locale, CoveredRomance(locale, english.vocab)) for locale in romance_locales)
+    if not mandarin and japanese_dictionary_dir is None:
+        return ComposedCustomerTokenizer(english, routes)
+
     if importlib.metadata.version("viola-misaki-cjk-prototype") != _COMPANION_VERSION:
         raise RuntimeError("The reviewed inactive CJK companion distribution is required")
     for name, version in _CJK_DEPENDENCIES.items():
@@ -113,7 +149,6 @@ def compose_customer_tokenizer(
     from viola_cjk.locale_numbers import prepare_exact_number
 
     bridge = CustomerEnglishBridge(english, english_locale)
-    routes = {}
     if mandarin:
         import cn2an
         import jieba

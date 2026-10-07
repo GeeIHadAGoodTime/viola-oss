@@ -1,6 +1,6 @@
 # Customer speech component qualification
 
-Status: English and explicit Japanese/Mandarin source-QA candidates; not customer-release-qualified.
+Status: bounded component synthesis in all eight language families; application composition, full 54-voice coverage and customer release remain under qualification.
 
 ## Recovered decision and scope
 
@@ -45,6 +45,15 @@ tests alone cannot qualify a customer artifact using this profile.
 - The English adapter accepts `en-us`/`en-gb`, adds exact fragments already used by Viola's
   pronunciation tables, and rejects unknown words, unsupported symbols and
   other locales before neural inference. Errors do not include utterance text.
+- The existing explicit composition can add requested `es`, `fr` and `pt-br`
+  routes from `voice/customer_romance/`. These are the retained qualification
+  components with ordinary package imports, unchanged pronunciation algorithms
+  and original MIT notices. CJK dependencies are checked when a CJK route is
+  requested; constructing English/Romance alone does not admit or initialize
+  CJK. Unsupported words, numbers, currency, scripts and phones still reject
+  the complete input. Bare phone locale `pt` and European `pt-pt` are not
+  silently mapped to Brazilian Portuguese. Italian/Hindi remain separate
+  single-word components until an explicit application text contract is qualified.
 - Existing public number formatting now uses `voice/english_numbers.py` rather
   than importing LGPL num2words. Its bounded cardinal/ordinal/year contract is
   checked against the former implementation using a test-only reference.
@@ -140,7 +149,47 @@ They do not change frozen Windows pins or activate an application profile.
   other diacritics and empty output still fail. With that reviewed source overlay,
   `你好` with `zf_xiaobei` produced component/composed `ni↓xau↓` and bit-identical
   0.832-second WAVs. Mixed Mandarin/English G2P also passed. The original installed
-  companion wheel remained unchanged: corrected-wheel qualification is still open.
+  companion wheel remained unchanged in that source-overlay run. A subsequent
+  offline build installed the corrected `.2` artifact into an isolated target;
+  three real G2P regressions and one composed `你好` synthesis passed through
+  that installed artifact. Its waveform was bit-identical to the earlier source
+  run. That experiment explicitly retained two physical `.2` identities and
+  did not claim clean final packaging.
+- Corrected CJK packaging: version `0.9.4+viola.cjk.3` now identifies the corrected
+  runtime uniquely. Its offline-built wheel is 511,487 bytes, SHA-256
+  `3e4c56598eec635d92aaa79c1c42fd396ba75e61c262744d163d098432fdd238`.
+  All runtime, data and notice bytes match the corrected `.2` artifact; only
+  version/readme metadata and RECORD changed. A fresh owned target combines
+  real installations of the retained English wheel and `.3` with 59 unchanged
+  shared dependency installations. The selected graph contains one companion
+  identity and preserves the other 60 versions. Three real Mandarin G2P tests
+  passed through that installed `.3` package with ONNX unavailable and no CJK
+  source overlay. This is a Linux source-QA
+  packaging step, not a Windows/frozen bundle or registry publication.
+- Romance: the retained ES `pero`/`perro`, FR `tu`/`tout`, and PT-BR
+  `bom dia`/`noite` components produced six finite, non-silent WAVs using
+  `ef_dora`, `ff_siwis` and `pf_dora`. These runs supplied precomputed phones
+  with `is_phonemes=True`; they do not prove original-text application dispatch.
+  The existing Portuguese `noite` `/i/` versus documented `/j/` witness remains
+  open. French liaison, numbers, mixed text and broader linguistic coverage
+  are not qualified by the two French words. A subsequent reviewed composition
+  run supplied the same six original texts to both Kokoro `create` and
+  `create_stream`, with `is_phonemes=False`, the exact bound owner and caller
+  voices. All twelve invocations passed; each stream, complete call and retained
+  component produced bit-identical float PCM. No samples exceeded ±1. One
+  shared session took 13.49 wall seconds and about 661 MiB observed RSS. This
+  proves these bounded text routes through the wrapper; it does not prove a
+  full desktop/phone process, audio device, phone dialect mapping or acoustics.
+- Italian/Hindi: the existing single-word components produced six real WAVs:
+  Italian `pèsca`, `pésca`, `scìa` with `if_sara`, and Hindi `किताब`, `माँ`,
+  `छाता` with `hf_alpha`. The two Italian stress/vowel contrasts produced
+  distinct phones and float PCM. Italian float output exceeded ±1 in 84, 35
+  and 14 samples respectively; PCM16 export clipped those samples. Hindi had
+  no over-range samples. No repair or listening judgment is inferred. These
+  runs also used precomputed phones. Italian still requires exactly one
+  explicit accent in one word; Hindi retains its bounded Devanagari word,
+  schwa, conjunct and unsupported-feature limits. Neither component provides
+  a general sentence, punctuation, number or mixed-language contract.
 
 All successful runs used one CPU session/thread, pre-import telemetry opt-out,
 offline/local assets and no provider credentials. Runs took 8.8–18.0 wall seconds
@@ -152,8 +201,11 @@ The owner gave positive listening feedback on the delivered English clips and
 the exact Japanese `こんにちは` sample. This does not select a winner within
 paired English clips or qualify other utterances, voices or languages. Mandarin
 listening is still pending. The assistant's own audio-input capability was unavailable.
-Four voices across English, Japanese and Mandarin have source-level synthesis
-samples; the full eight-family/54-voice matrix remains open. Frozen-app behavior,
+Nine distinct voices across all eight language families now have bounded
+component synthesis samples; the full language/input/54-voice matrix remains
+open. Romance and Italian/Hindi listening remain unverified. Italian/Hindi
+application text dispatch and complete desktop/phone integration remain open.
+Frozen-app behavior,
 complete dependency/native-library notices and customer release eligibility are
 separate outstanding gates.
 

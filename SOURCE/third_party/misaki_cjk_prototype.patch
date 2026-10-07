@@ -62,11 +62,11 @@
 @@ -0,0 +1,13 @@
 +# Inactive reconstructed CJK companion
 +
-+This is new source after the 2026-10-06 workspace reset. It is not the old reviewed package or a new customer release. Version `0.9.4+viola.cjk.2` distinguishes the reconstruction from the lost `.1` wheel. No registry publication, profile activation or installed/native qualification is implied.
++This companion was reconstructed after the 2026-10-06 workspace reset. Version `0.9.4+viola.cjk.3` gives the corrected Mandarin component a unique packaging identity. It retains the established U+032F model-phone normalization restored in public change #73. The original reconstructed `.2` wheel and the later corrected `.2` isolated-target experiment remain separate historical artifacts; final composition must select `.3` explicitly. No registry publication, profile activation or customer release is implied.
 +
 +The four required official Misaki modules, `ja_words.txt`, Apache license and three inherited MIT notices were recovered from authenticated Git objects and match the previously recorded hashes. The decimal preparer was reconstructed from retained source text and matches its original hash. The authored bridge, dispatcher and runtime forwarding are new source and require fresh tests/review.
 +
-+The old Japanese dictionary receipt was lost. A fresh official unidic-py 3.1.0+2021-08-31 candidate now supplies eighteen exact file identities, including its unchanged notices. The new factory hashes these files in 1 MiB chunks before imports, captures the canonical directory, supplies an explicit neutral configuration and the verified 29-field schema, and checks the dictionary actually selected. It never probes an ambient dictionary. This source/asset qualification does not establish native Japanese initialization, Windows loading or old per-file equality. Mandarin and English dependencies also need their deleted environments restored before real G2P replay. No original native/audio receipt is reused as current proof.
++The old Japanese dictionary receipt was lost. The reconstructed official unidic-py 3.1.0+2021-08-31 input supplies eighteen exact file identities, including its unchanged notices. The factory hashes these files in 1 MiB chunks before imports, captures the canonical directory, supplies an explicit neutral configuration and the verified 29-field schema, and checks the dictionary actually selected. It never probes an ambient dictionary. Fresh 2026-10-07 Linux component runs established native Japanese initialization, bounded Japanese/Mandarin G2P and Kokoro synthesis using retained local inputs. Those dated results do not establish Windows loading, frozen application behavior or old per-file equality. See `docs/CUSTOMER_SPEECH_QUALIFICATION.md` in the source repository for the evidence and remaining boundaries.
 +
 +These eight `misaki` payloads are additions to the existing `viola-misaki-en` files in one physical installed package directory. This distribution owns no `misaki/__init__.py`, `misaki/data/__init__.py`, English module or lexicon. Separate source roots do not automatically merge with the English regular package. Packaging must verify the combined physical layout and retain the English bytes exactly.
 +
@@ -153,7 +153,7 @@
 +
 +[project]
 +name = "viola-misaki-cjk-prototype"
-+version = "0.9.4+viola.cjk.2"
++version = "0.9.4+viola.cjk.3"
 +description = "Inactive reconstructed CJK companion for the retained Viola English pronunciation fork"
 +requires-python = ">=3.11"
 +license = "Apache-2.0 AND MIT"

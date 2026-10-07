@@ -43,3 +43,15 @@ num2words. See `docs/CUSTOMER_SPEECH_QUALIFICATION.md` for exact scope, retained
 licenses, transitive notice limitations, unknown-word behavior and the still-open
 multilingual, frozen, signed-artifact and installed acceptance gates. This is not
 clearance for customer distribution or an English-only product-scope decision.
+
+## Explicit bounded Romance source components
+
+`voice/customer_romance/` retains the already-reviewed piper-plus G2P subset
+from commit `82ee4e7a9b7aded42e0d0d5fd8298b42bfa51a16` under its original MIT
+notice in `voice/customer_romance/_romance_vendor/LICENSE`. The upstream
+repository is https://github.com/ayutaz/piper-plus . Its source identities,
+previous fail-closed modifications and package-relative import changes are
+recorded beside the files in `provenance.json`, `upstream-modifications.json`
+and `upstream-fail-closed.patch`. Preserve these notices and records when
+packaging the explicitly selected subset. No new pronunciation rules or
+whole-application license clearance are implied by this source adoption.
