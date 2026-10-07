@@ -17,6 +17,7 @@ import importlib
 import importlib.util
 import json
 import os
+import tempfile
 import threading
 from collections.abc import Callable, Mapping
 from pathlib import Path
@@ -461,13 +462,43 @@ class SecureSettingsManager:
             logger.info("Migrated %s entries to encrypted storage.", len(migrated))
         return migrated
 
-    def save_to_file(self, file_path: Path) -> None:
+    def save_to_file(self, file_path: Path, *, strict: bool = False) -> None:
+        """Save ciphertext; session callers require an atomic, acknowledged write.
+
+        Other settings callers retain their existing best-effort behavior. A
+        strict failure must reach the caller before it publishes a session.
+        """
+        pending_path: Path | None = None
         try:
             _ensure_parent_dir(file_path)
-            file_path.write_text(json.dumps(self._encrypted_cache, indent=2), encoding="utf-8")
+            payload = json.dumps(self._encrypted_cache, indent=2)
+            if strict:
+                with tempfile.NamedTemporaryFile(
+                    mode="w",
+                    encoding="utf-8",
+                    dir=file_path.parent,
+                    prefix=f".{file_path.name}.",
+                    delete=False,
+                ) as pending:
+                    pending_path = Path(pending.name)
+                    pending.write(payload)
+                    pending.flush()
+                    os.fsync(pending.fileno())
+                os.replace(pending_path, file_path)
+                pending_path = None
+            else:
+                file_path.write_text(payload, encoding="utf-8")
             logger.info("Encrypted cache saved.")
         except Exception as exc:
             logger.warning("Failed to save encrypted cache: %s", exc)
+            if strict:
+                raise SecurityError("Encrypted cache could not be persisted.") from exc
+        finally:
+            if pending_path is not None:
+                try:
+                    pending_path.unlink(missing_ok=True)
+                except OSError:
+                    logger.debug("Failed to remove incomplete encrypted-cache write")
 
     def load_from_file(self, file_path: Path) -> None:
         try:

@@ -633,7 +633,7 @@ class DesktopSessionStore:
         manager = self._secret_manager()
         manager.set_secret(_token_secret_ref(user_id, session_hash, "access"), access_token)
         manager.set_secret(_token_secret_ref(user_id, session_hash, "refresh"), refresh_token)
-        manager.save_to_file(self._token_cache_path)
+        manager.save_to_file(self._token_cache_path, strict=True)
 
     def _delete_token_pair(self, user_id: str, session_hash: str) -> None:
         manager = self._secret_manager()
