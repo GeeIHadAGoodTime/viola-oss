@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "a0e2fe05d89a9e0b67c63403799655ae7c327ed2",
-  "sha256": "1c06d56c92abf02eac48a26679838aee9bf1da31564cc58c6c37145476408f4d",
+  "revision": "f30afd5dc7129eac0eb15acb0bac5ad33999f38f",
+  "sha256": "160fa47605c086e55ecb2e2102df439eb44b6614087bc2fc96e976038e51993a",
   "files": [
     {
       "path": ".env.example",
@@ -6124,6 +6124,11 @@
       "bytes": 35677
     },
     {
+      "path": "tests/public/test_settings_portable_export_contract.py",
+      "sha256": "09a10f3a759c24a345142d7ddcc5318b8195d65b3ed5fef5490049fcbab466fe",
+      "bytes": 8195
+    },
+    {
       "path": "tests/public/test_source_contract.py",
       "sha256": "91671e3d2821eaef0acb4e6521d0b272dc554c9a6c8b0051c3d20e77bf0f3894",
       "bytes": 45886
@@ -12055,8 +12060,8 @@
     },
     {
       "path": "ui/settings_manager.py",
-      "sha256": "89db01d87215726803f79154ca7808eb1d6863d49209d98704e8547d6b83c894",
-      "bytes": 160040
+      "sha256": "66cddaa8ca06501d9e6de379a2dd89231d076a94f0391f24c814751d266f081b",
+      "bytes": 160257
     },
     {
       "path": "ui/settings_schema.py",
