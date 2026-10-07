@@ -68,6 +68,11 @@ export default function SavedChatHistory() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
+  const historyButtonStyle = {
+    ...secondaryButtonStyle,
+    backgroundColor: THEME.colors.glassBase,
+    color: THEME.colors.textSecondary,
+  };
 
   useEffect(() => {
     setListLoading(true);
@@ -110,19 +115,19 @@ export default function SavedChatHistory() {
   }, [selected, attempt]);
 
   return (
-    <section aria-label="Saved chats" style={{ marginBottom: 24 }}>
+    <section aria-label="Saved chats" style={{ marginBottom: 24, color: THEME.colors.textPrimary }}>
       <h3 style={{ color: THEME.colors.textPrimary, fontSize: 16 }}>Saved chats</h3>
       {listLoading ? <p role="status">Loading saved chats...</p> : listError ? (
         <div>
           <p role="alert">{listError}</p>
-          <button type="button" style={secondaryButtonStyle} onClick={() => setListAttempt(n => n + 1)}>
+          <button type="button" style={historyButtonStyle} onClick={() => setListAttempt(n => n + 1)}>
             Retry saved chats
           </button>
         </div>
       ) : threads.length === 0 ? <p>No saved chats yet.</p> : (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
           {threads.map((thread) => (
-            <button key={thread.id} type="button" style={secondaryButtonStyle}
+            <button key={thread.id} type="button" style={historyButtonStyle}
               aria-pressed={selected?.id === thread.id} onClick={() => {
                 if (selected?.id === thread.id) return;
                 setLoading(true);
@@ -139,7 +144,7 @@ export default function SavedChatHistory() {
           {loading ? <p role="status">Loading conversation...</p> : error ? (
             <div>
               <p role="alert">{error}</p>
-              <button type="button" style={secondaryButtonStyle} onClick={() => setAttempt(n => n + 1)}>
+              <button type="button" style={historyButtonStyle} onClick={() => setAttempt(n => n + 1)}>
                 Retry conversation
               </button>
             </div>

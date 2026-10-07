@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "92b03f69702bbbe43c3d585bcee9bc7a10c5ade4",
-  "sha256": "a0dcfe01526b3bee59b2395d22a8a828d6974c1561849b992531e1330325c552",
+  "revision": "7b6877d7d8b175fb55849502bdc964419c806abc",
+  "sha256": "e29637ef3f7a0ee811d92bd35eef477c181567ea1d848253a221aae9af0fff13",
   "files": [
     {
       "path": ".env.example",
@@ -6145,8 +6145,8 @@
     },
     {
       "path": "tests/public/test_speech_volume_wiring.py",
-      "sha256": "424bcc1942181963c7afed12d7f63da90be65d24af624293ef55cc2d65e250ea",
-      "bytes": 83191
+      "sha256": "61d07fab425c0a685ad51e34df88c6a639c0401c5a82dc74660c60b820330cf3",
+      "bytes": 79627
     },
     {
       "path": "tests/public/test_step_logger_status.py",
@@ -9835,8 +9835,8 @@
     },
     {
       "path": "ui/react-app/src/__tests__/hooks/useSettings.snapshotOrdering.test.jsx",
-      "sha256": "0ced15b91babb7cd2a6d7d2b87154b7cef4df8db67bd8992afaa55a1e87e3f88",
-      "bytes": 15828
+      "sha256": "e6fb77f9998d4a8df1e1bce9d6bd761ed764a8f8481ea27dd1ad8a705a3c0d91",
+      "bytes": 13578
     },
     {
       "path": "ui/react-app/src/__tests__/hooks/useSpokeSurfaceGuards.test.jsx",
@@ -10340,8 +10340,8 @@
     },
     {
       "path": "ui/react-app/src/components/HistoryModal.jsx",
-      "sha256": "c851cc6bd2c22959a4960943c3b9a2a8a2c791b6855759cdb2542d40566eeb64",
-      "bytes": 8105
+      "sha256": "4030489300635bb2180effa2b221cfbadc719aaa7d5d7875f03cdec0293d6250",
+      "bytes": 8243
     },
     {
       "path": "ui/react-app/src/components/HistoryModal.test.jsx",
@@ -10500,13 +10500,18 @@
     },
     {
       "path": "ui/react-app/src/components/SavedChatHistory.jsx",
-      "sha256": "cd0b6bd24e73951c9a1647a19bba20427ec98ce706d44722902aec4e14148bfd",
-      "bytes": 6300
+      "sha256": "0bdb7314271a4db534e9c2c2ec6cc9ebfbf2681a6d682cccbb528665a5c56a9a",
+      "bytes": 6476
     },
     {
       "path": "ui/react-app/src/components/SavedChatHistory.review.test.jsx",
       "sha256": "c0b9ede7d3582999e904a5347e758d566f17ae00c65f9498bb60706d11053797",
       "bytes": 2300
+    },
+    {
+      "path": "ui/react-app/src/components/SavedChatHistory.theme.test.jsx",
+      "sha256": "d7916921b95e0b7394ec82749eadaaa9ca119d6b91afc2798d5f96d36193d7b5",
+      "bytes": 6591
     },
     {
       "path": "ui/react-app/src/components/SavedChatHistory.timeout.test.jsx",
@@ -11565,8 +11570,8 @@
     },
     {
       "path": "ui/react-app/src/hooks/useSettings.js",
-      "sha256": "5fc5f838a4681ddf0a3f6c07ee284204611751f5eaf77cfc6d4eeb9542a90206",
-      "bytes": 11941
+      "sha256": "1d1c6a4fabd8bd4dfd1b33d2e85be2c3931987271bab559c79a379c6e0badbb8",
+      "bytes": 11615
     },
     {
       "path": "ui/react-app/src/hooks/useSettingsDraft.js",
@@ -12165,8 +12170,8 @@
     },
     {
       "path": "ui/settings_api.py",
-      "sha256": "b69ac42038078cda0454e9549fa3fdf750487adf8367b532baeee28e6143f8b9",
-      "bytes": 82338
+      "sha256": "f00c9be2b826c38bdbaf08afb267ff3abd55ac550e61a595ff32bef3c72787a2",
+      "bytes": 81780
     },
     {
       "path": "ui/settings_effects.py",

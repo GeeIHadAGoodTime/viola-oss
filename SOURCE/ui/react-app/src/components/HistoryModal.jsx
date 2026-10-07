@@ -42,7 +42,11 @@ export default function HistoryModal({ isOpen, onClose, history = [], onClearHis
           <button
             onClick={onClose}
             aria-label="Close history modal"
-            style={secondaryButtonStyle}
+            style={{
+              ...secondaryButtonStyle,
+              backgroundColor: THEME.colors.glassBase,
+              color: THEME.colors.textSecondary,
+            }}
             onMouseOver={(e) => e.currentTarget.style.backgroundColor = THEME.colors.glassHover}
             onMouseOut={(e) => e.currentTarget.style.backgroundColor = THEME.colors.glassBase}
           >
