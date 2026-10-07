@@ -387,6 +387,62 @@ class SpeechVolumeWiring(unittest.TestCase):
             all(call[1] == {"voice": "af_heart", "speed": 1.0, "lang": "en-us"} for call in self.model_calls)
         )
 
+    def test_shortcut_conflict_has_safe_reason_without_saving_any_settings(self):
+        self.assertTrue(self.manager.update({"theme": "dark", "ptt_hotkey": "space", "mute_hotkey": "ctrl+m"}))
+        before = self.manager.settings_file.read_bytes()
+        for method in ("POST", "PATCH"):
+            for ptt, mute in (("Ctrl+KeyM", "Control+m"), ("Shift+Ctrl+M", "ctrl+shift+KeyM"), ("Space", "spacebar")):
+                with self.subTest(method=method, ptt=ptt, mute=mute):
+                    response = self.post_values(
+                        {"theme": "light", "ptt_hotkey": ptt, "mute_hotkey": mute}, method=method
+                    )
+                    self.assertEqual(response.status_code, 422, response.text)
+                    self.assertEqual(response.json()["error"]["code"], "validation_error")
+                    self.assertEqual(response.json()["data"], {"validation_reason": "hotkey_conflict"})
+                    self.assertEqual(self.manager.settings_file.read_bytes(), before)
+                    self.assertEqual(self.manager.get("theme"), "dark")
+
+    def test_shortcut_conflict_checks_the_saved_counterpart_for_partial_updates(self):
+        self.assertTrue(self.manager.update({"ptt_hotkey": "space", "mute_hotkey": "ctrl+m"}))
+        for values in ({"ptt_hotkey": "Control+KeyM"}, {"mute_hotkey": "Spacebar"}):
+            with self.subTest(values=values):
+                response = self.post_values(values)
+                self.assertEqual(response.status_code, 422, response.text)
+                self.assertEqual(response.json()["data"], {"validation_reason": "hotkey_conflict"})
+
+    def test_shortcut_reason_does_not_hide_other_validation_failures(self):
+        for values in (
+            {"ptt_hotkey": "Ctrl+M", "mute_hotkey": "Control+KeyM", "default_music_volume": 101},
+            {"ptt_hotkey": "Ctrl+M", "mute_hotkey": "Control+KeyM", "tts_volume": "invalid"},
+            {"default_music_volume": 101},
+        ):
+            with self.subTest(values=values):
+                response = self.post_values(values)
+                self.assertEqual(response.status_code, 422, response.text)
+                self.assertEqual(response.json()["error"]["code"], "validation_error")
+                self.assertIsNone(response.json()["data"])
+
+    def test_shortcut_conflict_does_not_override_secret_or_system_refusal(self):
+        for key, value, code in (
+            ("openai_api_key", "synthetic-secret", "secret_key_forbidden"),
+            ("require_account_for_paid_actions", False, "system_key_forbidden"),
+        ):
+            with self.subTest(key=key):
+                response = self.post_values({key: value, "ptt_hotkey": "Ctrl+M", "mute_hotkey": "Control+KeyM"})
+                self.assertEqual(response.status_code, 403, response.text)
+                self.assertEqual(response.json()["error"]["code"], code)
+                self.assertNotEqual(response.json().get("data"), {"validation_reason": "hotkey_conflict"})
+
+    def test_distinct_shortcut_retry_saves_and_survives_reload(self):
+        rejected = self.post_values({"ptt_hotkey": "Ctrl+M", "mute_hotkey": "Control+KeyM"})
+        self.assertEqual(rejected.status_code, 422)
+        response = self.post_values({"ptt_hotkey": "Ctrl+K", "mute_hotkey": "Ctrl+M"})
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertTrue(response.json()["ok"])
+        reopened = self.new_manager()
+        self.assertEqual(reopened.get("ptt_hotkey"), "Ctrl+K")
+        self.assertEqual(reopened.get("mute_hotkey"), "Ctrl+M")
+
     def test_quiet_hours_change_is_live_and_applied_exactly_once(self):
         self.manager.update({"tts_volume": 1.0, "quiet_hours_enabled": True, "quiet_hours_timezone": "UTC"})
         unity = self.render()

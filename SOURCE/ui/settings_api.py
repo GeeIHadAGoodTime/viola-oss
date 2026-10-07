@@ -1084,7 +1084,15 @@ def create_settings_router(*, music_service: object | None = None) -> APIRouter:
                             "code": "validation_error",
                             "message": "; ".join(all_errors),
                         },
-                        "data": None,
+                        # Keep the established validation code. A fixed reason
+                        # lets the UI explain this refusal without rendering
+                        # server prose or echoing submitted values. Mixed
+                        # failures must not be presented as only a shortcut issue.
+                        "data": (
+                            {"validation_reason": "hotkey_conflict"}
+                            if hotkey_cross_field_errors and not (llm_lock_errors or errors or cross_field_errors)
+                            else None
+                        ),
                     },
                 )
 

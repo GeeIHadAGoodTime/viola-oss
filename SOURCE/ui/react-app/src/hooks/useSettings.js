@@ -153,7 +153,12 @@ export function useSettings(options = {}) {
         return { ok: false };
       }
     } catch (err) {
-      publishError(SETTINGS_ERROR_BY_CODE[err?.code] || 'Failed to save settings');
+      const shortcutConflict = err?.status === 422
+        && err?.code === 'validation_error'
+        && err?.data?.validation_reason === 'hotkey_conflict';
+      publishError(shortcutConflict
+        ? 'Push-to-talk and Mute Microphone need different shortcuts. Choose a different key combination and save again. Nothing was saved.'
+        : SETTINGS_ERROR_BY_CODE[err?.code] || 'Failed to save settings');
       return { ok: false };
     } finally {
       setSaving(false);
