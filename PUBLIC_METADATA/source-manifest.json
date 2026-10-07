@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "b7cb5337d0cb84b8256e9ce3ead2c979c158973f",
-  "sha256": "417778161aab3002c49cb7e17f06a5f6780b2e8dcf0b199e1e8d036a9d8ce320",
+  "revision": "f4a3c0919d8f199b9f2e3c897040250feaca47e3",
+  "sha256": "4fa25851592b619f70ab99ff689b83c05ef2bc1d34597b8a122457d579e59b02",
   "files": [
     {
       "path": ".env.example",
@@ -625,8 +625,8 @@
     },
     {
       "path": "backend/fastapi_app.py",
-      "sha256": "b6fb0b80d8d985e355c676d96ded158cc2b6ec466b5d3942d3e6b13f296b39df",
-      "bytes": 66736
+      "sha256": "5bce7c7c72ac68059664e9295ec947c9ed3d87c770c448c268d799012bd342eb",
+      "bytes": 68462
     },
     {
       "path": "backend/instrumentation.py",
@@ -1540,13 +1540,13 @@
     },
     {
       "path": "intent/agent_executor.py",
-      "sha256": "dd1e72202342ad12ca7573e839e44046631e39e45bf8be7f5918944567b909d2",
-      "bytes": 564020
+      "sha256": "0607d00d98cce22efe47b7234e9d065fc4d034c9d48ad170a49d02d0209e7a29",
+      "bytes": 564096
     },
     {
       "path": "intent/agent_loop.py",
-      "sha256": "278a2d53b603cdf9d8efa7cea8887ebb4b469243f6df9fce07fa2ca90b50c9d1",
-      "bytes": 243975
+      "sha256": "57a0941c08fb0b491cf210799544137dbb2f4b9886167516822df991e2865b00",
+      "bytes": 245382
     },
     {
       "path": "intent/agent_message_manager.py",
@@ -1570,8 +1570,8 @@
     },
     {
       "path": "intent/ai_controller.py",
-      "sha256": "343fff506c94ec37c19b26d287d7b298e270a79987a32c94f99cc979cc5d72f9",
-      "bytes": 163417
+      "sha256": "f3ce8382a76ded6cc0ab756e8f6580af3de17e37f732a980c30447fe8a4d2f38",
+      "bytes": 164391
     },
     {
       "path": "intent/ai_interpreter.py",
@@ -4510,8 +4510,8 @@
     },
     {
       "path": "services/llm/managed_budget.py",
-      "sha256": "481b747591624740eb0967e1007be50c3191386447a18255711d3e22bebfc635",
-      "bytes": 8770
+      "sha256": "8763e0bb0a92aee906fe5fc2f0e5ea36f19f250c1d66e77a93361d859e2060b9",
+      "bytes": 12529
     },
     {
       "path": "services/llm/model_fallback.py",
@@ -4590,13 +4590,13 @@
     },
     {
       "path": "services/llm/provider_fallback.py",
-      "sha256": "cab1b29bfb0b31d9c57d24383997248e8709f64c4bbcc7d19adb25273e3af312",
-      "bytes": 22339
+      "sha256": "0a1558394dba84f22090dfa6db007be45f237b478adcc45980cee4d4a3995d31",
+      "bytes": 23014
     },
     {
       "path": "services/llm/provider_router.py",
-      "sha256": "f646e20d08277b994c7362f3d424d5b60bbe7b42eed3ab908e4f1d089ab8532a",
-      "bytes": 65540
+      "sha256": "336c04404791a07160b1b4d97e4b1910a89e682ebb1ed20601f90176acc56f4e",
+      "bytes": 66071
     },
     {
       "path": "services/llm/providers/__init__.py",
@@ -4660,8 +4660,8 @@
     },
     {
       "path": "services/llm/spend_accounting.py",
-      "sha256": "a55b64ab431e3441cdda3ea3e9441ebca4033dc8eadabc92880d2f497b407788",
-      "bytes": 12723
+      "sha256": "f22171f4bd78d6cb9cdb703a40332d2b5745602ac4bfb6b960d20ab1f7034f93",
+      "bytes": 13097
     },
     {
       "path": "services/llm/stream_bus.py",
@@ -5655,8 +5655,8 @@
     },
     {
       "path": "telephony/call_manager.py",
-      "sha256": "b13091353108cbdcb379abb4b6dd688b897eff5cf472f3b1b0365e1d2f08b6f6",
-      "bytes": 376541
+      "sha256": "2888bde2e3f1cb307f25741155148bab49288161bcf0f4785cf7622d5b7d3190",
+      "bytes": 376598
     },
     {
       "path": "telephony/call_queue.py",
@@ -5945,8 +5945,8 @@
     },
     {
       "path": "telephony/usage.py",
-      "sha256": "cb2b27e83196f534ae96ce2246b935f17a5b0254a3378f8057cdf4b5126fd216",
-      "bytes": 6857
+      "sha256": "92672d4de5715278236f2e71d397256d2149cf848887e587283cb5f71de39f58",
+      "bytes": 6885
     },
     {
       "path": "telephony/user_settings_lookup.py",
@@ -5979,9 +5979,19 @@
       "bytes": 5122
     },
     {
+      "path": "tests/public/test_billing_capacity_mount.py",
+      "sha256": "f0b3bfa149c6c21acbe898b0f1978cb8d6183b00fbe2686423f64076bb537a2e",
+      "bytes": 4317
+    },
+    {
       "path": "tests/public/test_call_history_order_contract.py",
       "sha256": "0cc8b760badad62729d74d5a40f9963540cb9821afc8ea951582b7161538d32e",
       "bytes": 5503
+    },
+    {
+      "path": "tests/public/test_capacity_phone_resource_bridge.py",
+      "sha256": "8c5324a4cbb190a02e8c80be06f0f71b803dd6a1d81758c134f2a38c0bc7e099",
+      "bytes": 2356
     },
     {
       "path": "tests/public/test_carrier_event_adapter_contract.py",
@@ -6117,6 +6127,11 @@
       "path": "tests/public/test_rating_target.py",
       "sha256": "86a97bd4002f0aa1d1db0ec6505bfa5ca83d2d30d159d8584a95dcf244a6b938",
       "bytes": 10081
+    },
+    {
+      "path": "tests/public/test_remote_managed_accounting.py",
+      "sha256": "6c6e0de336a0d5e408d2d3224d0365931d8c4756f931e74c1d52f6817096929c",
+      "bytes": 11783
     },
     {
       "path": "tests/public/test_request_tool_surface_boundary.py",
@@ -10095,7 +10110,7 @@
     },
     {
       "path": "ui/react-app/src/auth/legalVersions.js",
-      "sha256": "c17436e49024b8474617a483f4ed2f6660b54b85c7591ec8237d17be9a2f13bb",
+      "sha256": "b555eef240e8ce895331e643dc405bcc93d9229e331ab199b149d3f52b2c1e64",
       "bytes": 237
     },
     {
@@ -10140,8 +10155,8 @@
     },
     {
       "path": "ui/react-app/src/components/AccountTab.jsx",
-      "sha256": "95b0de56b8b6851841e11939249d54743ad89f521526a0d2db98743d20b43476",
-      "bytes": 76064
+      "sha256": "145c44e25d65c6cac20785442deb6c53a3762509f1e6408faaa7692afc1c93a6",
+      "bytes": 76307
     },
     {
       "path": "ui/react-app/src/components/AccountTab.legacy.jsx",
@@ -10187,6 +10202,21 @@
       "path": "ui/react-app/src/components/AgentDrawer.jsx",
       "sha256": "98cfb9b61a53be567c24e963bc5fcf3280a2a00f8da957cb662291316d70ec87",
       "bytes": 5163
+    },
+    {
+      "path": "ui/react-app/src/components/BillingCapacityPanel.css",
+      "sha256": "f0b19d39b74ef6555bf80fef7572dd6b4db2c50320c8d4dec7c1da3c0847c29b",
+      "bytes": 2930
+    },
+    {
+      "path": "ui/react-app/src/components/BillingCapacityPanel.jsx",
+      "sha256": "02aa111fa213473aec4bd746fe2617cb26dee49e749d047cb538c2ebf3fc69b7",
+      "bytes": 18711
+    },
+    {
+      "path": "ui/react-app/src/components/BillingCapacityPanel.test.jsx",
+      "sha256": "9e46ffe1e010c0596b98d8e323f21e165730177a8ef60d0456d1cc65fe7ad489",
+      "bytes": 16974
     },
     {
       "path": "ui/react-app/src/components/BugReportModal.jsx",
@@ -10605,13 +10635,13 @@
     },
     {
       "path": "ui/react-app/src/components/UsageCapNotice.jsx",
-      "sha256": "e0ada59fee1cdd01fa8e0524f15ff4b6d90e1a0ed04d7a4720adf90ccb7100bb",
-      "bytes": 2833
+      "sha256": "ed1f1bd549a72f07d2db668b3cd66518553e7498abd41f6ef976119c6c716220",
+      "bytes": 2239
     },
     {
       "path": "ui/react-app/src/components/UsageCapNotice.test.jsx",
-      "sha256": "877ba1b08805c3abab8edd3b6387161b8b19a0625e637da88f1b99a6f0ce19e8",
-      "bytes": 3797
+      "sha256": "661a5727f01abf1c16ff09affd4fae17f9b13a54fb369e1529bd013765ec9a2c",
+      "bytes": 3635
     },
     {
       "path": "ui/react-app/src/components/WakeWordSection.jsx",
@@ -11424,6 +11454,11 @@
       "bytes": 1939
     },
     {
+      "path": "ui/react-app/src/hooks/useBillingCapacity.js",
+      "sha256": "8c0b0bcc215dff7234a9c9c44428412bb7ec36dbaf03cccd2a35779bdd149c86",
+      "bytes": 9006
+    },
+    {
       "path": "ui/react-app/src/hooks/useBrowserAuth.js",
       "sha256": "7f7e6f1f114f15cdba391d36d6b63cdde2b2b331a4708e126928e215c3e7dd64",
       "bytes": 8365
@@ -11595,8 +11630,8 @@
     },
     {
       "path": "ui/react-app/src/hooks/useUsage.jsx",
-      "sha256": "e2ec7fa08e31b3e1cc9a9facc991ea484522d1d3ca8556ca189ef97c3115f2f1",
-      "bytes": 3100
+      "sha256": "c8406da62d89e944c566f260d659114110a61575e003fe41788215131d95cd88",
+      "bytes": 3322
     },
     {
       "path": "ui/react-app/src/hooks/useUsage.test.jsx",
@@ -11900,8 +11935,8 @@
     },
     {
       "path": "ui/react-app/src/utils/capDenial.test.js",
-      "sha256": "f3fdfea010bfabebfdf128566c08cf04a507eb5010f41df8009abb126cfe3a1b",
-      "bytes": 3860
+      "sha256": "f7d7aef5afda114f282876f7693986047e86773c83448ab0c57903397b6ee321",
+      "bytes": 4240
     },
     {
       "path": "ui/react-app/src/utils/capDenial.voiceFrame.test.js",
