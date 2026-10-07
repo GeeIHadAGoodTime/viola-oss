@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "2a2b95a30908f8db365ee52f1872d102a39ba370",
-  "sha256": "cdbc71b2a01798a1fcc3f62c777cef10b9223eed03d8527f5d37f1e85f0113e1",
+  "revision": "3b5e8dc867fd0c9f207d76f50a77b61085825747",
+  "sha256": "47c049529699cef7198d9f721dd0c77e29276e106181a8a52764336a0748840b",
   "files": [
     {
       "path": ".env.example",
@@ -10540,13 +10540,13 @@
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.desktopOnlyPanels.test.jsx",
-      "sha256": "934f14bf7def3d80195425c7298005c15ce7ba2a68761437375ad0f50ab10c78",
-      "bytes": 12743
+      "sha256": "32847dd1669408cc094cb61959e21d8454f2fa17b928ab7aa1103f4cf5723250",
+      "bytes": 21143
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.jsx",
-      "sha256": "d3162559dac508aab8565765cc71fd4642abc1587cb32355e9a0834a8e7abb63",
-      "bytes": 199427
+      "sha256": "0d0d7c7e3b01479c4d0756669317bb98d9e0ab394c2d7ee48224eae71397d74b",
+      "bytes": 199523
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.localDiscovery.test.jsx",

@@ -1,14 +1,14 @@
 {
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "f3e2a4ed09dedb47ac6fc0b672075abb1bd6168711f786b6d7c95e26df8fe8b7",
-  "source_tree_sha256": "cdbc71b2a01798a1fcc3f62c777cef10b9223eed03d8527f5d37f1e85f0113e1",
+  "source_manifest_sha256": "826c079777045882aa751651248ee07a88d8e0dc470fa16b79a02803dfa108ce",
+  "source_tree_sha256": "47c049529699cef7198d9f721dd0c77e29276e106181a8a52764336a0748840b",
   "source_file_count": 2649,
-  "source_revision": "2a2b95a30908f8db365ee52f1872d102a39ba370",
-  "comparison_public_revision": "9eef006b28a579cb74ade8c5966380f77e8d1ef6",
+  "source_revision": "3b5e8dc867fd0c9f207d76f50a77b61085825747",
+  "comparison_public_revision": "2aa4e5cb60a29dc3e49afed9e4e3076ad01a8f19",
   "changed_source_paths": [
-    "SOURCE/tests/public/test_source_contract.py",
-    "SOURCE/tools/release/verify_source_binding.py"
+    "SOURCE/ui/react-app/src/components/SettingsModal.desktopOnlyPanels.test.jsx",
+    "SOURCE/ui/react-app/src/components/SettingsModal.jsx"
   ],
   "retained_sboms": [
     {
@@ -70,19 +70,19 @@
     }
   ],
   "input_equivalence": {
-    "comparison_basis": "Protected #78 main9eef006b28a579cb74ade8c5966380f77e8d1ef6",
+    "comparison_basis": "Reviewed #79 correction candidate2aa4e5cb60a29dc3e49afed9e4e3076ad01a8f19",
     "all_unselected_export_leaf_bytes_and_modes_preserved": true,
     "all_six_sbom_bytes_and_status_objects_preserved": true,
     "dependency_and_workflow_inputs_unchanged": true,
-    "runtime_source_unchanged": true
+    "existing_save_scan_cancel_handlers_unchanged": true
   },
   "prior_binding": {
-    "public_revision": "9eef006b28a579cb74ade8c5966380f77e8d1ef6",
+    "public_revision": "2aa4e5cb60a29dc3e49afed9e4e3076ad01a8f19",
     "path": "PUBLIC_METADATA/source-binding.json",
-    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/9eef006b28a579cb74ade8c5966380f77e8d1ef6/PUBLIC_METADATA/source-binding.json",
-    "sha256": "546206c7bcee46e1b777b74a7b52412f8ecba45dbc9aeb413114bf011ff1830d",
-    "bytes": 99643,
-    "git_blob": "ec1342fea46528c48d8db0713166046e0ae542a2",
+    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/2aa4e5cb60a29dc3e49afed9e4e3076ad01a8f19/PUBLIC_METADATA/source-binding.json",
+    "sha256": "12100a7c71bc3dab87f8cb8bf466d52f480bb168be94ca5347333840477396f9",
+    "bytes": 73156,
+    "git_blob": "4aaae7b98db535737a9af229f94e3e71647c5c5f",
     "all_top_level_keys": [
       "schema_version",
       "source_manifest",
@@ -108,7 +108,8 @@
       "previous_reviewed_transport_binding",
       "retained_composition_component_bindings",
       "new_source_contract_qualification_performed",
-      "new_static_security_scan_performed"
+      "new_static_security_scan_performed",
+      "retained_source_qualification"
     ],
     "preserved_json_objects": {
       "schema_version": {
@@ -121,11 +122,11 @@
       },
       "source_manifest_sha256": {
         "pointer": "/source_manifest_sha256",
-        "canonical_json_sha256": "8ed2bed9f3ab6ac30296f8c6039f92be0f43405b7e20d03ad44a204e03678bda"
+        "canonical_json_sha256": "82c8c0a088c2041fcb98b5bc1725c677fe583984a63a6986e1dc400e2fdda0c9"
       },
       "source_tree_sha256": {
         "pointer": "/source_tree_sha256",
-        "canonical_json_sha256": "00039ab3dff8489f12a500ba794f4594d4248175393e64dbdbb724eb64b3c024"
+        "canonical_json_sha256": "28afe894f140c26a9d5957e95aff6a199dc9cbe2ccbe0371111239d60600789d"
       },
       "source_file_count": {
         "pointer": "/source_file_count",
@@ -133,15 +134,15 @@
       },
       "source_revision": {
         "pointer": "/source_revision",
-        "canonical_json_sha256": "d953e89dbfafe46dc39a7a7f425326c377628d6e98bf736315a54765a55f26b0"
+        "canonical_json_sha256": "fc9b4924de976acdfca700a04e182fc00ef6da8cb3c39ff3c659817baaaeef69"
       },
       "comparison_public_revision": {
         "pointer": "/comparison_public_revision",
-        "canonical_json_sha256": "25c85d6bbb60cdafeca038544c1e610b51fce95132e726778fd6abe507b58530"
+        "canonical_json_sha256": "bea449b62e2998799a7765ccf6e3e449c5fc1c238992c866c130cfd4585bb355"
       },
       "changed_source_paths": {
         "pointer": "/changed_source_paths",
-        "canonical_json_sha256": "81f207cb04970d1e7519d4c3c01c0cab44921b5f532092547a75db56435ba55e"
+        "canonical_json_sha256": "2e321533d441db102c55f86c07949eab73dde59a0380226886ae47a0d48082d3"
       },
       "retained_sboms": {
         "pointer": "/retained_sboms",
@@ -149,11 +150,11 @@
       },
       "input_equivalence": {
         "pointer": "/input_equivalence",
-        "canonical_json_sha256": "a44f9d462ed265be0f56ad081a87795c2ec82bc05913e0b0e365102613fde5ed"
+        "canonical_json_sha256": "b75db3eb5cc56d9a0eda0c3b39f1af670c93eb9e1acf22012977f72f18330c73"
       },
       "prior_binding": {
         "pointer": "/prior_binding",
-        "canonical_json_sha256": "2e8a2d48f06502f57c50251f80e3d3d0c36bfe4c4a3a864287d893796940f57f"
+        "canonical_json_sha256": "64bf3caf83f59a1058b1a5496743c9fd97e4f7cddff85a954d03621bbee34c26"
       },
       "new_resolution_performed": {
         "pointer": "/new_resolution_performed",
@@ -169,11 +170,11 @@
       },
       "qualification": {
         "pointer": "/qualification",
-        "canonical_json_sha256": "f752e32dcd8d41aa81da99b1059cb41b3a3098d7b51bb33adf342b489481b8e8"
+        "canonical_json_sha256": "2951318c260e7f4cb5bfe430a64ae00e2678eda3bfbf970233402ada1580f151"
       },
       "reviewed_source_patch": {
         "pointer": "/reviewed_source_patch",
-        "canonical_json_sha256": "c8427999d08b33676977a809edf195942ccbba942eec0f7f2a096b5fcf44641b"
+        "canonical_json_sha256": "4e6e57bed2089b42f3225207810e393f4f17d57d44e7aaf667c3960f68c270b1"
       },
       "native_volume_pre_rebase_evidence": {
         "pointer": "/native_volume_pre_rebase_evidence",
@@ -185,11 +186,11 @@
       },
       "new_resolution_scope": {
         "pointer": "/new_resolution_scope",
-        "canonical_json_sha256": "c35eb210135eb9e2e5af293e17997359c1a9c3b6abb3cfe75d877ca3f1f86fff"
+        "canonical_json_sha256": "3908ee280c958e288937f506ae635749e3ec8ad9d994adc5683170be9a3c2881"
       },
       "new_advisory_scan_scope": {
         "pointer": "/new_advisory_scan_scope",
-        "canonical_json_sha256": "13438c04cc20d92480f31324582b8789515d4cbf1edebb876e3aa347f5662bfb"
+        "canonical_json_sha256": "76173bebb522a925c5f65181cfb865365c7b7eb973d1f62278f3f6afb11969bd"
       },
       "retained_feature_binding": {
         "pointer": "/retained_feature_binding",
@@ -210,43 +211,47 @@
       "new_static_security_scan_performed": {
         "pointer": "/new_static_security_scan_performed",
         "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+      },
+      "retained_source_qualification": {
+        "pointer": "/retained_source_qualification",
+        "canonical_json_sha256": "60ef34000919b287709213d6e4a00e949a039bf37b05448a6bdd4080882a0d99"
       }
     },
-    "note": "Complete prior binding retained unchanged. Its aggregate checksums describe the correct #78 source, but active descriptive revision/tree/parents/changed paths still described #76. This correction replaces those active descriptions without rewriting historical observations."
+    "note": "Complete reviewed #79 provenance correction candidate retained unchanged; this separately scoped folder editor change must preserve its source and land after it."
   },
   "new_resolution_performed": false,
   "new_advisory_scan_performed": false,
   "new_runtime_qualification_performed": false,
   "qualification": {
-    "scope": "Active verifier/test source only; no application/runtime/source regression evidence is manufactured by metadata editing.",
-    "source_commit": "2a2b95a30908f8db365ee52f1872d102a39ba370",
-    "source_tree": "bbda054604c86a300a4d9dbe4a1ebfaaf7697340",
+    "scope": "Folder editor reachability and bounded regression source; no new playback or acoustic result.",
+    "source_commit": "3b5e8dc867fd0c9f207d76f50a77b61085825747",
+    "source_tree": "252b45b12de00ac3b4938986cda0113312bfe528",
     "ordered_source_parents": [
-      "9eef006b28a579cb74ade8c5966380f77e8d1ef6"
+      "2aa4e5cb60a29dc3e49afed9e4e3076ad01a8f19",
+      "fb0d8b6c8e88bf49e16dc1e63da525a6dc2c2992"
     ],
-    "local_revision_contract_methods_passed": 8,
-    "local_revision_contract_cli_cases": 30,
-    "original_verifier_expected_failing_assertions": 12,
-    "observed_protected_bad_binding_rejected": [
-      "source revision mismatch",
-      "qualification source commit mismatch"
-    ],
-    "independent_automated_source_review": "No blocking findings; active fields checked independently of nested historical evidence.",
-    "final_exact_candidate_hosted_checks": "Required source/frontend checks pending publication.",
+    "local_source_predicate_controls_passed": 7,
+    "source_predicate_mutations_detected": 3,
+    "source_predicate_limit": "Executes actual visibility predicates only; not React rendering.",
+    "prepared_react_regression_cases": 7,
+    "local_react_execution": "Not run: local runtime unavailable. Required hosted checks must run.",
+    "existing_settings_api_empty_folder_readback": "Actual ASGI settings save accepted empty folder and retained YouTube; new temporary SettingsManager reloaded both values.",
+    "independent_automated_review": "Three-line production delta and seven component cases independently reviewed; no blocking findings.",
+    "final_exact_candidate_checks": "Read exact-head hosted receipts; this binding does not claim their completion.",
     "limits": [
-      "Verifier cannot infer Git tree/parents from an exported folder",
-      "No runtime code changed",
-      "No new installed or physical qualification",
+      "Source-only repair",
+      "No native GUI rerun",
+      "No model/playback/quota diagnosis",
       "No deployment or release"
     ],
     "prior_complete_evidence": [
       {
-        "public_revision": "9eef006b28a579cb74ade8c5966380f77e8d1ef6",
+        "public_revision": "2aa4e5cb60a29dc3e49afed9e4e3076ad01a8f19",
         "path": "PUBLIC_METADATA/source-binding.json",
-        "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/9eef006b28a579cb74ade8c5966380f77e8d1ef6/PUBLIC_METADATA/source-binding.json",
-        "sha256": "546206c7bcee46e1b777b74a7b52412f8ecba45dbc9aeb413114bf011ff1830d",
-        "bytes": 99643,
-        "git_blob": "ec1342fea46528c48d8db0713166046e0ae542a2",
+        "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/2aa4e5cb60a29dc3e49afed9e4e3076ad01a8f19/PUBLIC_METADATA/source-binding.json",
+        "sha256": "12100a7c71bc3dab87f8cb8bf466d52f480bb168be94ca5347333840477396f9",
+        "bytes": 73156,
+        "git_blob": "4aaae7b98db535737a9af229f94e3e71647c5c5f",
         "all_top_level_keys": [
           "schema_version",
           "source_manifest",
@@ -272,7 +277,8 @@
           "previous_reviewed_transport_binding",
           "retained_composition_component_bindings",
           "new_source_contract_qualification_performed",
-          "new_static_security_scan_performed"
+          "new_static_security_scan_performed",
+          "retained_source_qualification"
         ],
         "preserved_json_objects": {
           "schema_version": {
@@ -285,11 +291,11 @@
           },
           "source_manifest_sha256": {
             "pointer": "/source_manifest_sha256",
-            "canonical_json_sha256": "8ed2bed9f3ab6ac30296f8c6039f92be0f43405b7e20d03ad44a204e03678bda"
+            "canonical_json_sha256": "82c8c0a088c2041fcb98b5bc1725c677fe583984a63a6986e1dc400e2fdda0c9"
           },
           "source_tree_sha256": {
             "pointer": "/source_tree_sha256",
-            "canonical_json_sha256": "00039ab3dff8489f12a500ba794f4594d4248175393e64dbdbb724eb64b3c024"
+            "canonical_json_sha256": "28afe894f140c26a9d5957e95aff6a199dc9cbe2ccbe0371111239d60600789d"
           },
           "source_file_count": {
             "pointer": "/source_file_count",
@@ -297,15 +303,15 @@
           },
           "source_revision": {
             "pointer": "/source_revision",
-            "canonical_json_sha256": "d953e89dbfafe46dc39a7a7f425326c377628d6e98bf736315a54765a55f26b0"
+            "canonical_json_sha256": "fc9b4924de976acdfca700a04e182fc00ef6da8cb3c39ff3c659817baaaeef69"
           },
           "comparison_public_revision": {
             "pointer": "/comparison_public_revision",
-            "canonical_json_sha256": "25c85d6bbb60cdafeca038544c1e610b51fce95132e726778fd6abe507b58530"
+            "canonical_json_sha256": "bea449b62e2998799a7765ccf6e3e449c5fc1c238992c866c130cfd4585bb355"
           },
           "changed_source_paths": {
             "pointer": "/changed_source_paths",
-            "canonical_json_sha256": "81f207cb04970d1e7519d4c3c01c0cab44921b5f532092547a75db56435ba55e"
+            "canonical_json_sha256": "2e321533d441db102c55f86c07949eab73dde59a0380226886ae47a0d48082d3"
           },
           "retained_sboms": {
             "pointer": "/retained_sboms",
@@ -313,11 +319,11 @@
           },
           "input_equivalence": {
             "pointer": "/input_equivalence",
-            "canonical_json_sha256": "a44f9d462ed265be0f56ad081a87795c2ec82bc05913e0b0e365102613fde5ed"
+            "canonical_json_sha256": "b75db3eb5cc56d9a0eda0c3b39f1af670c93eb9e1acf22012977f72f18330c73"
           },
           "prior_binding": {
             "pointer": "/prior_binding",
-            "canonical_json_sha256": "2e8a2d48f06502f57c50251f80e3d3d0c36bfe4c4a3a864287d893796940f57f"
+            "canonical_json_sha256": "64bf3caf83f59a1058b1a5496743c9fd97e4f7cddff85a954d03621bbee34c26"
           },
           "new_resolution_performed": {
             "pointer": "/new_resolution_performed",
@@ -333,11 +339,11 @@
           },
           "qualification": {
             "pointer": "/qualification",
-            "canonical_json_sha256": "f752e32dcd8d41aa81da99b1059cb41b3a3098d7b51bb33adf342b489481b8e8"
+            "canonical_json_sha256": "2951318c260e7f4cb5bfe430a64ae00e2678eda3bfbf970233402ada1580f151"
           },
           "reviewed_source_patch": {
             "pointer": "/reviewed_source_patch",
-            "canonical_json_sha256": "c8427999d08b33676977a809edf195942ccbba942eec0f7f2a096b5fcf44641b"
+            "canonical_json_sha256": "4e6e57bed2089b42f3225207810e393f4f17d57d44e7aaf667c3960f68c270b1"
           },
           "native_volume_pre_rebase_evidence": {
             "pointer": "/native_volume_pre_rebase_evidence",
@@ -349,11 +355,11 @@
           },
           "new_resolution_scope": {
             "pointer": "/new_resolution_scope",
-            "canonical_json_sha256": "c35eb210135eb9e2e5af293e17997359c1a9c3b6abb3cfe75d877ca3f1f86fff"
+            "canonical_json_sha256": "3908ee280c958e288937f506ae635749e3ec8ad9d994adc5683170be9a3c2881"
           },
           "new_advisory_scan_scope": {
             "pointer": "/new_advisory_scan_scope",
-            "canonical_json_sha256": "13438c04cc20d92480f31324582b8789515d4cbf1edebb876e3aa347f5662bfb"
+            "canonical_json_sha256": "76173bebb522a925c5f65181cfb865365c7b7eb973d1f62278f3f6afb11969bd"
           },
           "retained_feature_binding": {
             "pointer": "/retained_feature_binding",
@@ -374,19 +380,23 @@
           "new_static_security_scan_performed": {
             "pointer": "/new_static_security_scan_performed",
             "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+          },
+          "retained_source_qualification": {
+            "pointer": "/retained_source_qualification",
+            "canonical_json_sha256": "60ef34000919b287709213d6e4a00e949a039bf37b05448a6bdd4080882a0d99"
           }
         },
-        "note": "Complete prior binding retained unchanged. Its aggregate checksums describe the correct #78 source, but active descriptive revision/tree/parents/changed paths still described #76. This correction replaces those active descriptions without rewriting historical observations."
+        "note": "Complete reviewed #79 provenance correction candidate retained unchanged; this separately scoped folder editor change must preserve its source and land after it."
       }
     ]
   },
   "reviewed_source_patch": {
-    "scope": "Narrow active source-provenance coherence check and regression fixtures; #78 runtime source is unchanged.",
+    "scope": "Expose the existing Local Files folder editor after configuration; preserve save acknowledgement, cancellation and desktop-only controls.",
     "source_paths": [
-      "SOURCE/tests/public/test_source_contract.py",
-      "SOURCE/tools/release/verify_source_binding.py"
+      "SOURCE/ui/react-app/src/components/SettingsModal.desktopOnlyPanels.test.jsx",
+      "SOURCE/ui/react-app/src/components/SettingsModal.jsx"
     ],
-    "source_tree": "bbda054604c86a300a4d9dbe4a1ebfaaf7697340"
+    "source_tree": "252b45b12de00ac3b4938986cda0113312bfe528"
   },
   "native_volume_pre_rebase_evidence": {
     "public_revision": "476ad8bc5652ffbf1ace52de9793e7f2c1b5cf2b",
