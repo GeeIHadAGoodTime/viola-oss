@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "3b5e8dc867fd0c9f207d76f50a77b61085825747",
-  "sha256": "47c049529699cef7198d9f721dd0c77e29276e106181a8a52764336a0748840b",
+  "revision": "7e681e3489d2b863bd6e64ab55e72407a41e38d6",
+  "sha256": "e2c7ae09a07cd7d94204bd585f33e566196c2c6eb5e67ec9f8fc73884987341a",
   "files": [
     {
       "path": ".env.example",
@@ -6145,8 +6145,8 @@
     },
     {
       "path": "tests/public/test_source_contract.py",
-      "sha256": "4a9781cef5dd34087318de95e96090e2917286166a54bfc2cb04cf0cee1a461f",
-      "bytes": 52610
+      "sha256": "3ff34eb944b6a6f3562599cc82871a55497b8ae72731dbc0888d4a84ec57fcae",
+      "bytes": 52970
     },
     {
       "path": "tests/public/test_speech_volume_wiring.py",
@@ -10540,13 +10540,13 @@
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.desktopOnlyPanels.test.jsx",
-      "sha256": "32847dd1669408cc094cb61959e21d8454f2fa17b928ab7aa1103f4cf5723250",
-      "bytes": 21143
+      "sha256": "934f14bf7def3d80195425c7298005c15ce7ba2a68761437375ad0f50ab10c78",
+      "bytes": 12743
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.jsx",
-      "sha256": "0d0d7c7e3b01479c4d0756669317bb98d9e0ab394c2d7ee48224eae71397d74b",
-      "bytes": 199523
+      "sha256": "d3162559dac508aab8565765cc71fd4642abc1587cb32355e9a0834a8e7abb63",
+      "bytes": 199427
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.localDiscovery.test.jsx",

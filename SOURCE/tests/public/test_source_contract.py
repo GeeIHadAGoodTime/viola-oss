@@ -876,6 +876,7 @@ class SourceBindingRevisionContract(unittest.TestCase):
 
     def setUp(self):
         import importlib.util
+        import subprocess
         import tempfile
 
         self.temporary = tempfile.TemporaryDirectory()
@@ -885,6 +886,9 @@ class SourceBindingRevisionContract(unittest.TestCase):
         self.source.mkdir()
         self.metadata.mkdir()
         (self.source / "example.py").write_text("VALUE = 1\n", encoding="utf-8")
+        # An enclosing checkout must not hide this fixture's untracked source.
+        subprocess.run(["git", "init", "--quiet", self.temporary.name], check=True, capture_output=True, timeout=15)
+        subprocess.run(["git", "-C", self.temporary.name, "add", "--", "SOURCE/example.py"], check=True, capture_output=True, timeout=15)
         self.revision = "1" * 40
         specification = importlib.util.spec_from_file_location(
             "binding_manifest_fixture", ROOT / "tools/release/create_source_manifest.py"

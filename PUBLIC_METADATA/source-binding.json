@@ -1,14 +1,13 @@
 {
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "826c079777045882aa751651248ee07a88d8e0dc470fa16b79a02803dfa108ce",
-  "source_tree_sha256": "47c049529699cef7198d9f721dd0c77e29276e106181a8a52764336a0748840b",
+  "source_manifest_sha256": "d15c636eaf7c40b46d79f4f1f9b1b212cd7b846bf59c6dff40c6e68be9e78f51",
+  "source_tree_sha256": "e2c7ae09a07cd7d94204bd585f33e566196c2c6eb5e67ec9f8fc73884987341a",
   "source_file_count": 2649,
-  "source_revision": "3b5e8dc867fd0c9f207d76f50a77b61085825747",
+  "source_revision": "7e681e3489d2b863bd6e64ab55e72407a41e38d6",
   "comparison_public_revision": "2aa4e5cb60a29dc3e49afed9e4e3076ad01a8f19",
   "changed_source_paths": [
-    "SOURCE/ui/react-app/src/components/SettingsModal.desktopOnlyPanels.test.jsx",
-    "SOURCE/ui/react-app/src/components/SettingsModal.jsx"
+    "SOURCE/tests/public/test_source_contract.py"
   ],
   "retained_sboms": [
     {
@@ -70,11 +69,12 @@
     }
   ],
   "input_equivalence": {
-    "comparison_basis": "Reviewed #79 correction candidate2aa4e5cb60a29dc3e49afed9e4e3076ad01a8f19",
+    "comparison_basis": "Initial #79 candidate2aa4e5cb60a29dc3e49afed9e4e3076ad01a8f19",
+    "production_verifier_unchanged": true,
+    "runtime_source_unchanged": true,
     "all_unselected_export_leaf_bytes_and_modes_preserved": true,
     "all_six_sbom_bytes_and_status_objects_preserved": true,
-    "dependency_and_workflow_inputs_unchanged": true,
-    "existing_save_scan_cancel_handlers_unchanged": true
+    "dependency_and_workflow_inputs_unchanged": true
   },
   "prior_binding": {
     "public_revision": "2aa4e5cb60a29dc3e49afed9e4e3076ad01a8f19",
@@ -217,31 +217,32 @@
         "canonical_json_sha256": "60ef34000919b287709213d6e4a00e949a039bf37b05448a6bdd4080882a0d99"
       }
     },
-    "note": "Complete reviewed #79 provenance correction candidate retained unchanged; this separately scoped folder editor change must preserve its source and land after it."
+    "note": "Complete initial #79 binding retained unchanged, including previous production verifier review. Hosted Windows failure was an untracked temporary source fixture; this update changes only fixture setup, not production verification."
   },
   "new_resolution_performed": false,
   "new_advisory_scan_performed": false,
   "new_runtime_qualification_performed": false,
   "qualification": {
-    "scope": "Folder editor reachability and bounded regression source; no new playback or acoustic result.",
-    "source_commit": "3b5e8dc867fd0c9f207d76f50a77b61085825747",
-    "source_tree": "252b45b12de00ac3b4938986cda0113312bfe528",
+    "scope": "Narrow fixture-only correction after actual hosted failure; no production verification weakening.",
+    "source_commit": "7e681e3489d2b863bd6e64ab55e72407a41e38d6",
+    "source_tree": "91320574152709767977f0d68a493b9d814150e1",
     "ordered_source_parents": [
-      "2aa4e5cb60a29dc3e49afed9e4e3076ad01a8f19",
-      "fb0d8b6c8e88bf49e16dc1e63da525a6dc2c2992"
+      "2aa4e5cb60a29dc3e49afed9e4e3076ad01a8f19"
     ],
-    "local_source_predicate_controls_passed": 7,
-    "source_predicate_mutations_detected": 3,
-    "source_predicate_limit": "Executes actual visibility predicates only; not React rendering.",
-    "prepared_react_regression_cases": 7,
-    "local_react_execution": "Not run: local runtime unavailable. Required hosted checks must run.",
-    "existing_settings_api_empty_folder_readback": "Actual ASGI settings save accepted empty folder and retained YouTube; new temporary SettingsManager reloaded both values.",
-    "independent_automated_review": "Three-line production delta and seven component cases independently reviewed; no blocking findings.",
-    "final_exact_candidate_checks": "Read exact-head hosted receipts; this binding does not claim their completion.",
+    "focused_methods_passed": 8,
+    "cli_cases_per_run": 30,
+    "ordinary_temp_run": "passed",
+    "enclosing_checkout_temp_run": "passed",
+    "independent_reviewer_replay": "8 methods passed",
+    "prior_hosted_run": 37676379173,
+    "prior_failed_python_job": 112980842583,
+    "prior_failure": "extra file: example.py in the newly added manifest fixture; original run and exact assertions retained",
+    "source_manifest_generator": "Real canonical generator; source is explicitly tracked in owned temporary Git repo",
+    "source_verifier": "Unchanged eight-line active revision coherence correction",
+    "final_exact_candidate_checks": "Require actual exact-head source/frontend receipts; this binding does not claim their completion",
     "limits": [
-      "Source-only repair",
-      "No native GUI rerun",
-      "No model/playback/quota diagnosis",
+      "No app runtime/source behavior regression claim",
+      "No native/physical proof",
       "No deployment or release"
     ],
     "prior_complete_evidence": [
@@ -386,17 +387,16 @@
             "canonical_json_sha256": "60ef34000919b287709213d6e4a00e949a039bf37b05448a6bdd4080882a0d99"
           }
         },
-        "note": "Complete reviewed #79 provenance correction candidate retained unchanged; this separately scoped folder editor change must preserve its source and land after it."
+        "note": "Complete initial #79 binding retained unchanged, including previous production verifier review. Hosted Windows failure was an untracked temporary source fixture; this update changes only fixture setup, not production verification."
       }
     ]
   },
   "reviewed_source_patch": {
-    "scope": "Expose the existing Local Files folder editor after configuration; preserve save acknowledgement, cancellation and desktop-only controls.",
+    "scope": "Track synthetic source in an owned temporary Git repository before canonical manifest creation; retain every verifier assertion.",
     "source_paths": [
-      "SOURCE/ui/react-app/src/components/SettingsModal.desktopOnlyPanels.test.jsx",
-      "SOURCE/ui/react-app/src/components/SettingsModal.jsx"
+      "SOURCE/tests/public/test_source_contract.py"
     ],
-    "source_tree": "252b45b12de00ac3b4938986cda0113312bfe528"
+    "source_tree": "91320574152709767977f0d68a493b9d814150e1"
   },
   "native_volume_pre_rebase_evidence": {
     "public_revision": "476ad8bc5652ffbf1ace52de9793e7f2c1b5cf2b",
