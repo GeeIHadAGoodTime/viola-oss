@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "0cbc3716ae6e89fbe22c2df6dab82edbcf03c669",
-  "sha256": "6e7236a8bde534db8c78eb81d8110d58ebea64d93f684be38c1610224db1493c",
+  "revision": "7b6877d7d8b175fb55849502bdc964419c806abc",
+  "sha256": "e29637ef3f7a0ee811d92bd35eef477c181567ea1d848253a221aae9af0fff13",
   "files": [
     {
       "path": ".env.example",
@@ -40,8 +40,8 @@
     },
     {
       "path": "LICENSES/SPEECH_COMPONENT_NOTICES.md",
-      "sha256": "3013b761b4e4e845e1b1bd9858e6efcf5512bf094289be4ea1eeeb0d21c5d877",
-      "bytes": 3294
+      "sha256": "e894a28327eecbabbe7393e594c8e29cf83cd5bfd6f5001cc7a030053de25d0c",
+      "bytes": 2570
     },
     {
       "path": "LICENSES/Silero-MIT.txt",
@@ -1475,8 +1475,8 @@
     },
     {
       "path": "docs/CUSTOMER_SPEECH_QUALIFICATION.md",
-      "sha256": "df72b5da80d6aedb1035e8ddc94d342411ac9b43163bcdd428c22449c1fbcc95",
-      "bytes": 15286
+      "sha256": "8cb908e6584bff1b29a50a199d9af01ab484ef379037beb8c4176e922a207dac",
+      "bytes": 11357
     },
     {
       "path": "docs/INSTALLATION.md",
@@ -3825,7 +3825,7 @@
     },
     {
       "path": "scripts/dependencies/verify_customer_speech.py",
-      "sha256": "16b1f758123e97ff2b92ce29987b67e939af343523096aa6a3fef266871fc1b4",
+      "sha256": "dbd6f3bc420a9a3aaea55f13aa5a61d78bc94ecc9e54d86e22d1c1fb5b86025e",
       "bytes": 6335
     },
     {
@@ -6014,14 +6014,9 @@
       "bytes": 16090
     },
     {
-      "path": "tests/public/test_customer_romance_composition.py",
-      "sha256": "2c621d75808dc8def4b9967dc08ab94be23eb961999ea20fb10a926ffcc28c01",
-      "bytes": 1155
-    },
-    {
       "path": "tests/public/test_customer_speech_dependencies.py",
-      "sha256": "990a94fe15967118def1a9f3f6a47aaaa7450f596977a243ab6ec40a68c942b6",
-      "bytes": 12081
+      "sha256": "69077a63bc57b7571e15d94f68ac0cb4ac72cb763531b29f1e849a39ecb5345c",
+      "bytes": 11597
     },
     {
       "path": "tests/public/test_deferred_confirmation_cancellation.py",
@@ -6275,8 +6270,8 @@
     },
     {
       "path": "third_party/misaki_cjk_prototype.patch",
-      "sha256": "edf46ab7862e79710db5e00d4a14b01ec4182418df0a6702803f39274512d343",
-      "bytes": 36696
+      "sha256": "f12461ab0fea3e43723a40fdeb186d167bb8c5182a78258f06b7418177f2f7f6",
+      "bytes": 36389
     },
     {
       "path": "third_party/misaki_cjk_prototype/LICENSE",
@@ -6290,8 +6285,8 @@
     },
     {
       "path": "third_party/misaki_cjk_prototype/README.md",
-      "sha256": "39ea2f485196190513b195fb5d5b99ba0553aa6ebe429a654a841182f1ed4283",
-      "bytes": 2874
+      "sha256": "a89d38367145b787c5cd9f6f32b7f01ed7e783cee2c87353bcd3340fbddce87d",
+      "bytes": 2567
     },
     {
       "path": "third_party/misaki_cjk_prototype/misaki/_licenses/convert-numbers-to-japanese-MIT.txt",
@@ -6335,7 +6330,7 @@
     },
     {
       "path": "third_party/misaki_cjk_prototype/pyproject.toml",
-      "sha256": "97cb7fd95a081ab5db3d8ae1915d9cf785709265ace9526b869a37b79553c8ab",
+      "sha256": "cd88246eedf56422b2c12c97655fe597e171d2de64395b8cb5c15248fa419c13",
       "bytes": 927
     },
     {
@@ -9005,18 +9000,13 @@
     },
     {
       "path": "third_party/sources.toml",
-      "sha256": "9bdb264c8ca26935458a7ef880629fb70f44789c2cd762228741380ac926be18",
+      "sha256": "05c7e398f278d1e3a6d5d92ba64d99c46c4bbfb9671d1846315a7a3d5d7f8554",
       "bytes": 210783
     },
     {
       "path": "tools/qualification/cjk_runtime_replay.py",
-      "sha256": "b903fbfa0a0f5daf866dff663e20ecb3b9d6f4cc756ea116a27ff47206f33b83",
-      "bytes": 46144
-    },
-    {
-      "path": "tools/qualification/romance_runtime_replay.py",
-      "sha256": "dc3d55179d5a954764d800f8cf1dc72a6242ef79567e98b5ad54be84da46e2bf",
-      "bytes": 18522
+      "sha256": "fab4441920c30c90b625f4d5922e15e2fb6927de8857e05f5c3606f67b0d17d0",
+      "bytes": 45819
     },
     {
       "path": "tools/release/create_source_manifest.py",
@@ -10350,8 +10340,8 @@
     },
     {
       "path": "ui/react-app/src/components/HistoryModal.jsx",
-      "sha256": "c851cc6bd2c22959a4960943c3b9a2a8a2c791b6855759cdb2542d40566eeb64",
-      "bytes": 8105
+      "sha256": "4030489300635bb2180effa2b221cfbadc719aaa7d5d7875f03cdec0293d6250",
+      "bytes": 8243
     },
     {
       "path": "ui/react-app/src/components/HistoryModal.test.jsx",
@@ -10510,13 +10500,18 @@
     },
     {
       "path": "ui/react-app/src/components/SavedChatHistory.jsx",
-      "sha256": "cd0b6bd24e73951c9a1647a19bba20427ec98ce706d44722902aec4e14148bfd",
-      "bytes": 6300
+      "sha256": "0bdb7314271a4db534e9c2c2ec6cc9ebfbf2681a6d682cccbb528665a5c56a9a",
+      "bytes": 6476
     },
     {
       "path": "ui/react-app/src/components/SavedChatHistory.review.test.jsx",
       "sha256": "c0b9ede7d3582999e904a5347e758d566f17ae00c65f9498bb60706d11053797",
       "bytes": 2300
+    },
+    {
+      "path": "ui/react-app/src/components/SavedChatHistory.theme.test.jsx",
+      "sha256": "d7916921b95e0b7394ec82749eadaaa9ca119d6b91afc2798d5f96d36193d7b5",
+      "bytes": 6591
     },
     {
       "path": "ui/react-app/src/components/SavedChatHistory.timeout.test.jsx",
@@ -12770,73 +12765,13 @@
     },
     {
       "path": "voice/customer_composition.py",
-      "sha256": "27cf42c2bc61636666b82211704784826837e207a1f9e00b1a639fe36aca30e0",
-      "bytes": 9224
+      "sha256": "ef8cd557fa3fd1fe30b5142ff9562d71244f99b392e7d0540d6b4850f30ef3e7",
+      "bytes": 7407
     },
     {
       "path": "voice/customer_pronunciation.py",
       "sha256": "b333138ac21703a61d9e05e4f19967b4823df24133a55ed924a601c6598055eb",
       "bytes": 8443
-    },
-    {
-      "path": "voice/customer_romance/README.md",
-      "sha256": "dfca972f1bf93fb9c9dbb98c56ddd8ebd6cd95f474f2755b3dbc48a3661ce5bd",
-      "bytes": 2122
-    },
-    {
-      "path": "voice/customer_romance/__init__.py",
-      "sha256": "bc66584c097a3a38f3f0cc4d3849b232f198cb44802754dea8e1e2a29d6620b0",
-      "bytes": 86
-    },
-    {
-      "path": "voice/customer_romance/_romance_vendor/LICENSE",
-      "sha256": "f6fb33ef599022318fb3fe61e3db72fa6591c83269131c9245139aa1eb800e90",
-      "bytes": 1080
-    },
-    {
-      "path": "voice/customer_romance/_romance_vendor/__init__.py",
-      "sha256": "47e3e9b0ed6669ff4f0631c6c25cb322385f849697f91277bc4eb326df59112c",
-      "bytes": 213
-    },
-    {
-      "path": "voice/customer_romance/_romance_vendor/base.py",
-      "sha256": "de7cd41b7d7c932ffe7c8a23cd2fa8c9cafa037ab4d16f2180e5768d67de207a",
-      "bytes": 2894
-    },
-    {
-      "path": "voice/customer_romance/_romance_vendor/french.py",
-      "sha256": "f188040463369508218947a6e241bbb5a219b09c10515fa3e5bb996e192e73a9",
-      "bytes": 31085
-    },
-    {
-      "path": "voice/customer_romance/_romance_vendor/portuguese.py",
-      "sha256": "005304915518187a49f13a2ca3217d23abce9530d432b68d19a198bd0aa4db41",
-      "bytes": 32526
-    },
-    {
-      "path": "voice/customer_romance/_romance_vendor/spanish.py",
-      "sha256": "dd1506f6e1030c14ef1b9a4997e6155746cf5594ee47907d5282c14c20e97327",
-      "bytes": 25211
-    },
-    {
-      "path": "voice/customer_romance/coverage.py",
-      "sha256": "e6fd13745ca744c2e10096b0085ff0903e31da7683bde6e0a18ec59323ded302",
-      "bytes": 13962
-    },
-    {
-      "path": "voice/customer_romance/provenance.json",
-      "sha256": "80850d536f0ea560d0bfd1f0de630f972c27f77164a1168eb24bbd23739382ff",
-      "bytes": 5832
-    },
-    {
-      "path": "voice/customer_romance/upstream-fail-closed.patch",
-      "sha256": "75c33f87caed731c98912369a10db1e2a17a65620801c6a253388ef63b3d0d34",
-      "bytes": 1854
-    },
-    {
-      "path": "voice/customer_romance/upstream-modifications.json",
-      "sha256": "dcf1bd7850dcf5d1afd2c1edc39044830ce5161f2fa7e12ed99c4d8740f1a8c0",
-      "bytes": 995
     },
     {
       "path": "voice/dictation/__init__.py",
