@@ -102,7 +102,7 @@ export default function BillingCapacityPanel({ accountId, refreshUser, fallback 
 
   // The previous fixed-plan checkout is retained only while the new catalog is
   // disabled or unreachable, so established standalone/older deployments work.
-  if (!loading && !available && fallback && !pending) return fallback;
+  if (!loading && !available && fallback && !pending && !account?.billing_review_required) return fallback;
 
   return (
     <section className="billing-capacity" style={style} aria-label="Billing" data-testid="billing-capacity-panel">
@@ -117,6 +117,8 @@ export default function BillingCapacityPanel({ accountId, refreshUser, fallback 
             : 'Free'}</SummaryRow>
           {typeof account.usage_percent === 'number' && <SummaryRow label="Managed usage">{account.usage_percent}% used</SummaryRow>}
           <SummaryRow label="Usage resets">{capacityDate(account.usage_resets_at)}</SummaryRow>
+          {account.billing_review_required && typeof account.effective_capacity_multiplier === 'number'
+            && <SummaryRow label="Available managed capacity">{account.effective_capacity_multiplier}× Pro</SummaryRow>}
           {account.renews_at && <SummaryRow label="Renewal">{capacityDate(account.renews_at)}</SummaryRow>}
         </dl>
         {account.scheduled_change && <div className="billing-capacity-scheduled">
@@ -133,10 +135,13 @@ export default function BillingCapacityPanel({ accountId, refreshUser, fallback 
           </>}
         </div>}
         {account.cancel_at_period_end && <p>Your scheduled cancellation remains in place.</p>}
+        {account.billing_review_required && <p>Your managed capacity is under billing review following a payment adjustment.
+          {' '}Contact <a href="mailto:support@useviola.com">support@useviola.com</a> for help.</p>}
       </>}
 
       <button type="button" className="billing-capacity-primary" onClick={() => openSelector()}
-        disabled={!available || pending || changing} aria-expanded={expanded} aria-controls={`${id}-selector`}>Add more usage</button>
+        disabled={!available || !(account?.actions?.increase || account?.actions?.checkout) || pending || changing}
+        aria-expanded={expanded} aria-controls={`${id}-selector`}>Add more usage</button>
       {account?.actions?.lower && <button type="button" onClick={() => openSelector(true)} disabled={!available || pending || changing}>
         Lower my monthly capacity</button>}
       {!available && !loading && <p>Capacity changes are currently unavailable. You can keep using local models or your own provider key on their existing terms.</p>}
@@ -195,7 +200,11 @@ export default function BillingCapacityPanel({ accountId, refreshUser, fallback 
             <SummaryRow label="Charge today">{capacityMoney(quote.amount_due_now_cents, quote.currency)}{quote.tax_included_in_quote ? ' (tax included)' : ' + applicable tax'}</SummaryRow>
             {Array.isArray(quote.line_items) && quote.line_items.map((line, index) => <SummaryRow key={index} label={line.description}>{capacityMoney(line.amount_cents, quote.currency)}</SummaryRow>)}
             <SummaryRow label="Additional usage this cycle">+{quote.additional_current_cycle_multiplier}× Pro’s full monthly allowance</SummaryRow>
-            <SummaryRow label="Next full-cycle allowance">{quote.next_recurring_capacity_multiplier ?? quote.capacity_multiplier}× Pro</SummaryRow>
+            <SummaryRow label={quote.action === 'schedule' ? 'Full-cycle capacity after change' : 'Next full-cycle allowance'}>
+              {quote.next_capacity_multiplier ?? quote.capacity_multiplier}× Pro</SummaryRow>
+            {quote.next_recurring_capacity_multiplier !== undefined
+              && quote.next_recurring_capacity_multiplier !== (quote.next_capacity_multiplier ?? quote.capacity_multiplier)
+              && <SummaryRow label="Capacity at renewal">{quote.next_recurring_capacity_multiplier}× Pro</SummaryRow>}
             <SummaryRow label="Next renewal">{capacityMoney(quote.next_recurring_amount_cents, quote.currency)}{quote.tax_included_in_quote ? '' : ' + applicable tax'}, on {capacityDate(quote.renews_at)}</SummaryRow>
             <SummaryRow label="Effective date">{capacityDate(quote.effective_at)}</SummaryRow>
           </dl>

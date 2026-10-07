@@ -260,6 +260,18 @@ describe('in-app capacity billing', () => {
     expect(refresh).not.toHaveBeenCalled();
     expect(JSON.parse(localStorage.getItem('viola:billing-capacity:account-1')).operation_id).toBe('operation-review');
   });
+
+  it('shows refunded or disputed effective capacity and follows server action availability', async () => {
+    const original = handler;
+    handler = (path) => path === BASE ? { ...account, billing_review_required: true, effective_capacity_multiplier: 1,
+      actions: { increase: false, lower: false } } : original(path);
+    render(<BillingCapacityPanel accountId="account-1" />);
+    await screen.findByText(/capacity is under billing review/);
+    expect(screen.getByRole('button', { name: 'Add more usage' })).toBeDisabled();
+    expect(screen.getByText('Available managed capacity')).toBeInTheDocument();
+    expect(screen.getByText('1× Pro')).toBeInTheDocument();
+    expect(requests('/quote')).toHaveLength(0);
+  });
 });
 
 describe('payment handoff URL', () => {
