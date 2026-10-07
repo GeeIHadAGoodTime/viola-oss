@@ -916,5 +916,156 @@ class SimpleAudioPauseContract(unittest.TestCase):
                 self.assertEqual(len(pauses), 3)
 
 
+class DesktopPaymentMountBoundaryContract(unittest.TestCase):
+    """Exercise real mount/boundary code without private services or app startup."""
+
+    MOUNTS = (
+        ("_ensure_payment_cards_route", "ui.api.routes.payment_cards", "/api/payments/cards"),
+        ("_ensure_payment_confirm_route", "ui.api.routes.payment_confirm", "/confirm/{token}"),
+    )
+
+    def setUp(self):
+        import ast
+
+        logger = SimpleNamespace(info=lambda *_a: None, exception=lambda *_a: None)
+        boundary_path = SOURCE_ROOT / "services/company_service_boundary.py"
+        boundary_tree = ast.parse(boundary_path.read_text(encoding="utf-8"))
+        # Only logging is inert; the edition and import-discovery code is exact.
+        boundary_tree.body = [
+            node for node in boundary_tree.body
+            if not (isinstance(node, ast.ImportFrom) and node.module == "core.logging_config")
+        ]
+        self.boundary = types.ModuleType("services.company_service_boundary")
+        self.boundary.get_logger = lambda _name: logger
+        exec(compile(boundary_tree, str(boundary_path), "exec"), self.boundary.__dict__)
+
+        modules = {}
+        for name in ("services", "ui", "ui.api", "ui.api.routes", "config"):
+            package = types.ModuleType(name)
+            package.__path__ = []
+            modules[name] = package
+        modules["services.company_service_boundary"] = self.boundary
+        modules["services"].company_service_boundary = self.boundary
+        settings_module = types.ModuleType("config.settings")
+        self.settings = SimpleNamespace(app_surface="desktop", deployment_mode="desktop", build_profile="personal")
+        settings_module.settings = self.settings
+        modules["config.settings"] = settings_module
+        for _mount, module_name, path in self.MOUNTS:
+            module = types.ModuleType(module_name)
+            module.__spec__ = importlib.util.spec_from_loader(module_name, loader=None)
+            module.router = SimpleNamespace(routes=[SimpleNamespace(path=path, methods={"GET"})])
+            modules[module_name] = module
+        module_patch = patch.dict(sys.modules, modules)
+        module_patch.start()
+        self.addCleanup(module_patch.stop)
+
+        mount_path = SOURCE_ROOT / "backend/fastapi_app.py"
+        tree = ast.parse(mount_path.read_text(encoding="utf-8"))
+        names = {name for name, _module, _path in self.MOUNTS} | {"_has_route", "iter_effective_routes"}
+        tree.body = [node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name in names]
+        self.assertEqual({node.name for node in tree.body}, names)
+        self.mounts = {"logger": logger}
+        exec(compile(tree, str(mount_path), "exec"), self.mounts)
+
+    @staticmethod
+    def _app():
+        app = SimpleNamespace(router=SimpleNamespace(routes=[]))
+
+        def include_router(router):
+            # Model the lazy include shape as well as the concrete child routes.
+            app.router.routes.append(SimpleNamespace(effective_candidates=lambda: iter(router.routes)))
+
+        app.include_router = include_router
+        return app
+
+    def _routes(self, app, path):
+        return [route for route in self.mounts["iter_effective_routes"](app.router.routes) if route.path == path]
+
+    def test_personal_source_can_omit_payment_modules(self):
+        for mount, module, path in self.MOUNTS:
+            with self.subTest(module=module), patch.object(self.boundary, "find_spec", return_value=None):
+                sys.modules.pop(module, None)
+                app = self._app()
+                self.mounts[mount](app)
+                self.assertEqual(self._routes(app, path), [])
+
+    def test_company_required_source_cannot_omit_payment_modules(self):
+        for field, value in (("app_surface", "cloud"), ("deployment_mode", "cloud"), ("build_profile", "company")):
+            for mount, module, path in self.MOUNTS:
+                with self.subTest(field=field, module=module), patch.object(self.settings, field, value), patch.object(
+                    self.boundary, "find_spec", return_value=None
+                ):
+                    sys.modules.pop(module, None)
+                    app = self._app()
+                    with self.assertRaises(self.boundary.RequiredCompanyServiceUnavailableError):
+                        self.mounts[mount](app)
+                    self.assertEqual(self._routes(app, path), [])
+
+    def test_explicit_import_blocker_is_fatal(self):
+        for mount, module, path in self.MOUNTS:
+            with self.subTest(module=module), patch.dict(sys.modules, {module: None}):
+                app = self._app()
+                with self.assertRaises(ImportError):
+                    self.mounts[mount](app)
+                self.assertEqual(self._routes(app, path), [])
+
+    def test_installed_module_import_errors_are_fatal(self):
+        import builtins
+
+        original_import = builtins.__import__
+        for mount, module, path in self.MOUNTS:
+            failures = (
+                ImportError("synthetic installed module failure"),
+                ModuleNotFoundError("synthetic self-named failure", name=module),
+                ModuleNotFoundError("synthetic transitive failure", name="synthetic_payment_dependency"),
+            )
+            for failure in failures:
+                def failing_import(name, *args, **kwargs):
+                    if name == module:
+                        raise failure
+                    return original_import(name, *args, **kwargs)
+
+                with self.subTest(module=module, failure=str(failure)), patch.object(
+                    builtins, "__import__", side_effect=failing_import
+                ):
+                    app = self._app()
+                    with self.assertRaises(ImportError) as caught:
+                        self.mounts[mount](app)
+                    self.assertIs(caught.exception, failure)
+                    self.assertEqual(self._routes(app, path), [])
+
+    def test_present_routes_register_once(self):
+        for mount, _module, path in self.MOUNTS:
+            with self.subTest(path=path):
+                app = self._app()
+                self.mounts[mount](app)
+                self.mounts[mount](app)
+                routes = self._routes(app, path)
+                self.assertEqual(len(routes), 1)
+                self.assertIn("GET", routes[0].methods)
+
+    def test_router_registration_failure_is_fatal(self):
+        for mount, _module, path in self.MOUNTS:
+            with self.subTest(path=path):
+                app = self._app()
+                failure = RuntimeError("synthetic mount failure")
+                with patch.object(app, "include_router", side_effect=failure):
+                    with self.assertRaises(RuntimeError) as caught:
+                        self.mounts[mount](app)
+                self.assertIs(caught.exception, failure)
+                self.assertEqual(self._routes(app, path), [])
+
+    def test_discovery_failure_is_fatal(self):
+        for mount, _module, path in self.MOUNTS:
+            with self.subTest(path=path):
+                app = self._app()
+                failure = ModuleNotFoundError("synthetic discovery failure", name="synthetic_parent_dependency")
+                with patch.object(self.boundary, "find_spec", side_effect=failure):
+                    with self.assertRaises(ImportError) as caught:
+                        self.mounts[mount](app)
+                self.assertIs(caught.exception, failure)
+                self.assertEqual(self._routes(app, path), [])
+
+
 if __name__ == "__main__":
     unittest.main()

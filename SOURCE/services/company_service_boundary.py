@@ -9,6 +9,7 @@ fail-closed.
 
 from __future__ import annotations
 
+import sys
 from importlib.util import find_spec
 
 from core.logging_config import get_logger
@@ -22,6 +23,8 @@ _SHARED_PRIVATE_MODULES = frozenset(
         "diagnostics.diagnostic_ingest_handler",
         "services.calendar.cloud_caldav",
         "telephony.cloud_routes",
+        "ui.api.routes.payment_cards",
+        "ui.api.routes.payment_confirm",
     }
 )
 
@@ -83,6 +86,10 @@ def shared_company_service_available(module_name: str) -> bool:
     """
     if module_name not in _SHARED_PRIVATE_MODULES:
         raise ValueError("Not a declared optional company component: " + module_name)
+    # A None cache entry explicitly blocks an import; it is not evidence that
+    # the component was intentionally left out of this source distribution.
+    if module_name in sys.modules and sys.modules[module_name] is None:
+        raise ModuleNotFoundError("Import of %s is blocked in sys.modules" % module_name, name=module_name)
     if find_spec(module_name) is not None:
         return True
     if company_services_required():
