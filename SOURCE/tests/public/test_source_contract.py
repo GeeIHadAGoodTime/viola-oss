@@ -869,3 +869,136 @@ class ChatStreamRecoveryContract(unittest.IsolatedAsyncioTestCase):
         query, *parameters = connection.fetch.await_args.args
         self.assertIn("ORDER BY created_at DESC", query)
         self.assertEqual(parameters, ["owner-a", "thread-a", 200])
+
+
+class SourceBindingRevisionContract(unittest.TestCase):
+    """Exercise active provenance against real source and retained SBOM bytes."""
+
+    def setUp(self):
+        import importlib.util
+        import tempfile
+
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.source = Path(self.temporary.name) / "SOURCE"
+        self.metadata = Path(self.temporary.name) / "PUBLIC_METADATA"
+        self.source.mkdir()
+        self.metadata.mkdir()
+        (self.source / "example.py").write_text("VALUE = 1\n", encoding="utf-8")
+        self.revision = "1" * 40
+        specification = importlib.util.spec_from_file_location(
+            "binding_manifest_fixture", ROOT / "tools/release/create_source_manifest.py"
+        )
+        creator = importlib.util.module_from_spec(specification)
+        specification.loader.exec_module(creator)
+        self.manifest = creator.create(self.source, self.revision)
+        self.binding = {
+            "source_revision": self.revision,
+            "source_tree_sha256": self.manifest["sha256"],
+            "source_file_count": len(self.manifest["files"]),
+            "qualification": {"source_commit": self.revision},
+            "retained_qualification": {"source_commit": "2" * 40},
+            "retained_sboms": [],
+        }
+        for scope in (
+            "windows-desktop", "windows-kokoro", "windows-other-optional",
+            "windows-all-optional", "windows-deepfilter", "frontend",
+        ):
+            path = f"{scope}.sbom.json"
+            content = b'{"components": []}\n'
+            (self.metadata / path).write_bytes(content)
+            self.binding["retained_sboms"].append({
+                "path": path, "sha256": hashlib.sha256(content).hexdigest(),
+                "components": 0,
+            })
+
+    def _check(self):
+        import subprocess
+        import sys
+
+        content = (json.dumps(self.manifest) + "\n").encode()
+        (self.metadata / "source-manifest.json").write_bytes(content)
+        self.binding["source_manifest_sha256"] = hashlib.sha256(content).hexdigest()
+        (self.metadata / "source-binding.json").write_text(
+            json.dumps(self.binding), encoding="utf-8"
+        )
+        completed = subprocess.run(
+            [sys.executable, str(ROOT / "tools/release/verify_source_binding.py"),
+             "--source", str(self.source), "--metadata", str(self.metadata)],
+            capture_output=True, text=True, timeout=15, check=False,
+        )
+        self.assertIn(completed.returncode, (0, 1), completed.stderr)
+        result = json.loads(completed.stdout)
+        self.assertEqual(completed.returncode, int(bool(result["failures"])))
+        return result["failures"]
+
+    def test_coherent_revision_preserves_historical_evidence(self):
+        for revision in (self.revision, "working-tree"):
+            with self.subTest(revision=revision):
+                self.manifest["revision"] = revision
+                self.binding["source_revision"] = revision
+                self.binding["qualification"]["source_commit"] = revision
+                self.assertEqual(self._check(), [])
+                self.assertEqual(
+                    self.binding["retained_qualification"]["source_commit"], "2" * 40
+                )
+
+    def test_stale_active_revisions_fail_with_valid_payload_hashes(self):
+        for stale_binding, stale_qualification in ((True, True), (True, False), (False, True)):
+            with self.subTest(binding=stale_binding, qualification=stale_qualification):
+                self.binding["source_revision"] = "2" * 40 if stale_binding else self.revision
+                self.binding["qualification"]["source_commit"] = (
+                    "2" * 40 if stale_qualification else self.revision
+                )
+                expected = []
+                if stale_binding:
+                    expected.append("source revision mismatch")
+                if stale_qualification:
+                    expected.append("qualification source commit mismatch")
+                self.assertEqual(self._check(), expected)
+
+    def test_absent_active_revisions_cannot_agree_by_accident(self):
+        self.manifest.pop("revision")
+        self.binding.pop("source_revision")
+        self.binding["qualification"].pop("source_commit")
+        self.assertIn("source manifest revision missing or invalid", self._check())
+
+    def test_invalid_manifest_revisions_cannot_agree_by_accident(self):
+        for revision in ("", "   ", None, 1, True, []):
+            with self.subTest(revision=revision):
+                self.manifest["revision"] = revision
+                self.binding["source_revision"] = revision
+                self.binding["qualification"]["source_commit"] = revision
+                self.assertIn("source manifest revision missing or invalid", self._check())
+
+    def test_missing_or_invalid_binding_revision_fails(self):
+        self.binding.pop("source_revision")
+        self.assertEqual(self._check(), ["source revision mismatch"])
+        for revision in ("", "   ", None, 1, True, []):
+            with self.subTest(revision=revision):
+                self.binding["source_revision"] = revision
+                self.assertEqual(self._check(), ["source revision mismatch"])
+
+    def test_missing_or_invalid_active_qualification_fails(self):
+        self.binding.pop("qualification")
+        self.assertEqual(self._check(), ["qualification source commit mismatch"])
+        for qualification in (None, [], "", {}, {"source_commit": ""}, {"source_commit": None}):
+            with self.subTest(qualification=qualification):
+                self.binding["qualification"] = qualification
+                self.assertEqual(self._check(), ["qualification source commit mismatch"])
+
+    def test_real_source_content_validation_stays_active(self):
+        (self.source / "example.py").write_text("VALUE = 2\n", encoding="utf-8")
+        self.assertTrue(self._check())
+        (self.source / "example.py").write_text("VALUE = 1\n", encoding="utf-8")
+        (self.source / "extra.py").write_text("EXTRA = True\n", encoding="utf-8")
+        self.assertTrue(self._check())
+
+    def test_retained_sbom_validation_stays_active(self):
+        self.binding["retained_sboms"][0]["sha256"] = "0" * 64
+        self.assertIn("retained SBOM checksum mismatch: windows-desktop.sbom.json", self._check())
+        self.binding["retained_sboms"][0]["sha256"] = hashlib.sha256(
+            (self.metadata / "windows-desktop.sbom.json").read_bytes()
+        ).hexdigest()
+        self.binding["retained_sboms"][0]["components"] = 1
+        self.assertEqual(self._check(), ["retained SBOM component count mismatch: windows-desktop.sbom.json"])
