@@ -37,6 +37,16 @@ from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 from typing import Any, NoReturn
 
+from fastapi import (
+    APIRouter,
+    Depends,
+    Form,
+    HTTPException,
+    Query,
+    Request,
+    Response,
+    status,
+)
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from pydantic import BaseModel, EmailStr, Field
 
@@ -55,16 +65,6 @@ from auth.models import (
 )
 from contracts.api_response import failure_response, success_response
 from core.logging_config import get_logger
-from fastapi import (
-    APIRouter,
-    Depends,
-    Form,
-    HTTPException,
-    Query,
-    Request,
-    Response,
-    status,
-)
 
 logger = get_logger("viola.auth.routes")
 
@@ -872,6 +872,7 @@ class AuthUserPayload(BaseModel):
     current_period_end: datetime | None = None
     canceled_at: datetime | None = None
     payment_provider: str | None = None
+    subscription_source: str | None = None
 
 
 class RefreshSessionRequest(BaseModel):

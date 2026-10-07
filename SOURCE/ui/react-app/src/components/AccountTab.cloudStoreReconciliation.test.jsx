@@ -66,9 +66,10 @@ const FREE_METADATA = {
  * Stateful fake GoTrue. `appMetadata` is mutable so a test can simulate the
  * Stripe webhook writing the upgrade between two token grants.
  */
-function fakeGoTrue({ appMetadata = PAID_METADATA, expiresIn = 300 } = {}) {
+function fakeGoTrue({ appMetadata = PAID_METADATA, billingMetadata = appMetadata, expiresIn = 300 } = {}) {
   const state = {
     appMetadata,
+    billingMetadata,
     currentRefreshToken: null,
     revoked: false,
     seq: 0,
@@ -133,6 +134,19 @@ function fakeGoTrue({ appMetadata = PAID_METADATA, expiresIn = 300 } = {}) {
 
     if (path.endsWith('/auth/v1/user')) {
       return jsonResponse(user());
+    }
+    if (path.endsWith('/billing/status')) {
+      const billing = state.billingMetadata;
+      return jsonResponse({
+        user_id: 'cloud-user-1',
+        status: billing.subscription_status || 'free',
+        plan_id: billing.plan_id || 'free',
+        plan_family: billing.plan_family || billing.plan_tier || 'free',
+        has_paid_access: billing.has_paid_access === true,
+        payment_provider: billing.payment_provider || null,
+        current_period_end: billing.current_period_end || null,
+        subscription_source: billing.subscription_source || 'commercial',
+      });
     }
 
     if (path.endsWith('/auth/v1/logout')) {
@@ -238,6 +252,53 @@ afterEach(() => {
 });
 
 describe('C-400 - the app-wide store is reconciled for a cloud front-door sign-in', () => {
+  it('expires a complimentary grant through normal billing refresh without signing out', async () => {
+    vi.useFakeTimers();
+    const { state, fetchMock } = fakeGoTrue({
+      appMetadata: FREE_METADATA,
+      billingMetadata: {
+        ...PAID_METADATA, payment_provider: null, subscription_source: 'admin_grant',
+        current_period_end: new Date(Date.now() + 1000).toISOString(),
+      },
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    renderCloudApp();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+      await cloudAuth.signIn('paying@example.com', 'pw');
+      await vi.advanceTimersByTimeAsync(50);
+    });
+    expect(screen.getByText('Pro')).toBeInTheDocument();
+    await act(async () => { await vi.advanceTimersByTimeAsync(1200); });
+    expect(screen.queryByText('Pro')).not.toBeInTheDocument();
+    expect(screen.getByText('Free Plan')).toBeInTheDocument();
+    expect(state.refreshGrants).toHaveLength(0);
+    expect(state.revoked).toBe(false);
+    expect(screen.getByTestId('cloud-status').textContent).toBe('signedIn');
+  });
+  it('shows an audited complimentary grant from billing even when GoTrue still says Free', async () => {
+    const { state, fetchMock } = fakeGoTrue({
+      appMetadata: FREE_METADATA,
+      billingMetadata: {
+        ...PAID_METADATA,
+        payment_provider: null,
+        subscription_source: 'admin_grant',
+        current_period_end: new Date(Date.now() + 86400000).toISOString(),
+      },
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    renderCloudApp();
+    await signInThroughFrontDoor();
+    await screen.findByText('Pro');
+    expect(screen.getByText(/Complimentary access through/)).toBeInTheDocument();
+    expect(screen.getByText(/No automatic renewal or charge/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Manage Subscription/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Upgrade Plan/ })).not.toBeInTheDocument();
+    expect(state.appMetadata.plan_tier).toBe('free');
+    expect(appAuth.subscription.hasPaidAccess).toBe(true);
+    expect(state.refreshGrants).toHaveLength(0);
+    expect(state.revoked).toBe(false);
+  });
   it('a PAID cloud user has paid `subscription` in the app store, and sees the Pro pill + Manage Subscription', async () => {
     const { fetchMock } = fakeGoTrue({ appMetadata: PAID_METADATA });
     vi.stubGlobal('fetch', fetchMock);
@@ -290,6 +351,7 @@ describe('C-400 - the app-wide store is reconciled for a cloud front-door sign-i
 
     // Stripe's webhook writes the upgrade onto the GoTrue user.
     state.appMetadata = PAID_METADATA;
+    state.billingMetadata = PAID_METADATA;
 
     await act(async () => {
       await appAuth.refreshUser();
@@ -314,7 +376,7 @@ describe('C-400 - the app-wide store is reconciled for a cloud front-door sign-i
     expect(screen.getByTestId('cloud-status').textContent).toBe('signedIn');
   });
 
-  it('two concurrent entitlement refreshes collapse into ONE redemption of the shared token', async () => {
+  it('two concurrent billing refreshes preserve the token and read the canonical new plan', async () => {
     // Delegating to the owner is only half the invariant: the owner must also
     // redeem once at a time. Two askers arriving in the same tick both read the
     // owner's `refreshTokenRef.current` before either has committed a rotation,
@@ -331,14 +393,15 @@ describe('C-400 - the app-wide store is reconciled for a cloud front-door sign-i
     await waitFor(() => expect(screen.getByTestId('store-logged-in').textContent).toBe('true'));
 
     state.appMetadata = PAID_METADATA;
+    state.billingMetadata = PAID_METADATA;
     const grantsBefore = state.refreshGrants.length;
 
     await act(async () => {
       await Promise.all([appAuth.refreshUser(), appAuth.refreshUser()]);
     });
 
-    // ONE grant for two askers - and every presented token was the live one.
-    expect(state.refreshGrants.length - grantsBefore).toBe(1);
+    // Neither asker redeems a token; auth lifecycle keeps the existing sole owner.
+    expect(state.refreshGrants.length - grantsBefore).toBe(0);
     expect(state.revoked).toBe(false);
     expect(screen.getByTestId('cloud-status').textContent).toBe('signedIn');
 
@@ -349,7 +412,7 @@ describe('C-400 - the app-wide store is reconciled for a cloud front-door sign-i
     });
   });
 
-  it('one post-checkout tab return fires both listeners and still redeems the token once', async () => {
+  it('post-checkout tab return reads billing without redeeming the shared token', async () => {
     // The same invariant through the real product path rather than by calling
     // refreshUser twice by hand: UpgradePanel registers its return handler on
     // BOTH `document.visibilitychange` and `window.focus`, and a real return to
@@ -376,6 +439,7 @@ describe('C-400 - the app-wide store is reconciled for a cloud front-door sign-i
 
     // Stripe's webhook writes the upgrade while the customer is on Stripe.
     state.appMetadata = PAID_METADATA;
+    state.billingMetadata = PAID_METADATA;
     const grantsBefore = state.refreshGrants.length;
 
     await act(async () => {
@@ -384,7 +448,7 @@ describe('C-400 - the app-wide store is reconciled for a cloud front-door sign-i
       await vi.advanceTimersByTimeAsync(100);
     });
 
-    expect(state.refreshGrants.length - grantsBefore).toBe(1);
+    expect(state.refreshGrants.length - grantsBefore).toBe(0);
     expect(state.revoked).toBe(false);
     expect(screen.getByText('Pro')).toBeInTheDocument();
 
@@ -394,7 +458,7 @@ describe('C-400 - the app-wide store is reconciled for a cloud front-door sign-i
     expect(screen.getByTestId('cloud-status').textContent).toBe('signedIn');
   });
 
-  it('with no front door above it, the app store still refreshes for itself (desktop / ReviewPage path)', async () => {
+  it('a standalone store refreshes billing without redeeming its login token', async () => {
     // The delegation must not become a hard dependency: where no owner exists,
     // refreshUser keeps its own refresh path, so the desktop app and the
     // standalone ReviewPage/spoke trees are untouched by this change.
@@ -415,14 +479,15 @@ describe('C-400 - the app-wide store is reconciled for a cloud front-door sign-i
     await waitFor(() => expect(screen.getByTestId('store-logged-in').textContent).toBe('true'));
 
     state.appMetadata = PAID_METADATA;
+    state.billingMetadata = PAID_METADATA;
     await act(async () => { await appAuth.refreshUser(); });
 
     await waitFor(() => {
       const subscription = JSON.parse(screen.getByTestId('store-subscription').textContent);
       expect(subscription?.hasPaidAccess).toBe(true);
     });
-    // It really redeemed the token itself - there was no owner to ask.
-    expect(state.refreshGrants.length).toBeGreaterThanOrEqual(1);
+    // Billing refresh is a read; it must not create another token redeemer.
+    expect(state.refreshGrants.length).toBe(0);
     expect(state.revoked).toBe(false);
   });
 

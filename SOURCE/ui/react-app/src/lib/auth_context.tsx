@@ -16,11 +16,12 @@ import type {
   User,
 } from '@supabase/auth-js';
 import { ACCEPTED_PRIVACY_VERSION, ACCEPTED_TERMS_VERSION } from '../auth/legalVersions';
-import { AuthContext as CloudFrontDoorContext } from '../auth/AuthProvider';
 import { hydrateDesktopSessionFromCookie } from '../auth/authClient';
 import { completeDesktopOAuth } from '../auth/desktopOAuth';
 import { isDesktopApp } from '../utils/runtimeSurface';
 import { inMemorySessionStorage } from './sessionStore';
+import { readBillingSubscription } from './billingEntitlement';
+import { DEFAULTS } from '../config';
 import { externalOAuthAuthorizeUrl, gotrueClient, GOTRUE_STORAGE_KEY } from './gotrue_client';
 
 type AuthErrorDetails = {
@@ -56,6 +57,8 @@ type PlanState = {
   subscriptionStatus: string;
   hasPaidAccess: boolean;
   paymentProvider: string | null;
+  currentPeriodEnd?: string | null;
+  subscriptionSource?: string | null;
 };
 
 type ViolaUser = User & {
@@ -76,6 +79,8 @@ type AuthContextValue = {
     planFamily: string;
     hasPaidAccess: boolean;
     paymentProvider: string | null;
+    currentPeriodEnd?: string | null;
+    subscriptionSource?: string | null;
   } | null;
   plan: PlanState;
   planTier: string;
@@ -84,6 +89,7 @@ type AuthContextValue = {
   errorDetails: AuthErrorDetails | null;
   isLoggedIn: boolean;
   hasPaidAccess: boolean;
+  billingStatus: 'loading' | 'ready' | 'unavailable';
   passwordRecovery: boolean;
   mfaPending: boolean;
   mfaFactorId: string | null;
@@ -148,7 +154,7 @@ export function decodePlanFromUser(user: User | null): PlanState {
 
 function buildViolaUser(user: User | null): ViolaUser | null {
   if (!user) return null;
-  const plan = decodePlanFromUser(user);
+  const plan = DEFAULT_PLAN;
   return {
     ...user,
     email_verified: Boolean(user.email_confirmed_at || user.confirmed_at),
@@ -157,17 +163,6 @@ function buildViolaUser(user: User | null): ViolaUser | null {
     plan_family: plan.planFamily,
     has_paid_access: plan.hasPaidAccess,
     payment_provider: plan.paymentProvider,
-  };
-}
-
-function buildSubscription(user: ViolaUser | null) {
-  if (!user) return null;
-  return {
-    status: user.subscription_status || 'free',
-    planId: user.plan_id || 'free',
-    planFamily: user.plan_family || 'free',
-    hasPaidAccess: user.has_paid_access || false,
-    paymentProvider: user.payment_provider || null,
   };
 }
 
@@ -350,6 +345,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<ViolaUser | null>(null);
   const [plan, setPlan] = useState<PlanState>(DEFAULT_PLAN);
   const [subscription, setSubscription] = useState<AuthContextValue['subscription']>(null);
+  const [billingStatus, setBillingStatus] = useState<AuthContextValue['billingStatus']>('loading');
+  const sessionRef = useRef<Session | null>(null);
+  const billingEpoch = useRef(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [errorDetails, setErrorDetails] = useState<AuthErrorDetails | null>(null);
@@ -357,29 +355,59 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [mfaPending, setMfaPending] = useState(false);
   const [mfaFactorId, setMfaFactorId] = useState<string | null>(null);
 
-  // The cloud front door this store is nested inside on the cloud surface
-  // (App.jsx `Dashboard()`), or null in the trees that mount this provider on
-  // its own. Held in a ref so `refreshUser` keeps a stable identity across the
-  // front door's per-session context churn — UpgradePanel's post-checkout
-  // listener has it in an effect dependency list.
-  const frontDoor = useContext(CloudFrontDoorContext) as
-    { refreshSessionNow?: (() => Promise<void>) | null } | null;
-  const frontDoorRef = useRef(frontDoor);
-  useEffect(() => {
-    frontDoorRef.current = frontDoor;
-  }, [frontDoor]);
-
   const applySession = useCallback((nextSession: Session | null, allowPendingMfa = false) => {
     if (nextSession && !mayApplySdkSession() && !allowPendingMfa) nextSession = null;
+    const epoch = ++billingEpoch.current;
+    sessionRef.current = nextSession;
     const nextUser = buildViolaUser(nextSession?.user || null);
-    const nextPlan = decodePlanFromUser(nextSession?.user || null);
     const stepUp = mfaStepUpForSession(nextSession);
     setSession(nextSession);
-    setUser(nextUser);
-    setPlan(nextPlan);
-    setSubscription(buildSubscription(nextUser));
+    // Identity stays signed in while billing is read. Metadata is not the
+    // authority for complimentary grants, expiry, cancellation or upgrades.
+    setUser(nextUser && { ...nextUser, has_paid_access: false });
+    setPlan(DEFAULT_PLAN);
+    setSubscription(null);
+    setBillingStatus(nextSession ? 'loading' : 'ready');
     setMfaPending(stepUp.pending);
     setMfaFactorId(stepUp.factorId);
+    if (nextSession && nextUser) {
+      return readBillingSubscription(nextSession).then((billing) => {
+        if (billingEpoch.current !== epoch || sessionRef.current?.user.id !== nextSession.user.id) return;
+        const nextPlan: PlanState = {
+          planTier: billing.plan_family,
+          planId: billing.plan_id,
+          planFamily: billing.plan_family,
+          subscriptionStatus: billing.status,
+          hasPaidAccess: billing.has_paid_access,
+          paymentProvider: billing.payment_provider,
+          currentPeriodEnd: billing.current_period_end,
+          subscriptionSource: billing.subscription_source,
+        };
+        const canonicalUser = {
+          ...nextUser,
+          plan_id: billing.plan_id,
+          plan_family: billing.plan_family,
+          subscription_status: billing.status,
+          has_paid_access: billing.has_paid_access,
+          payment_provider: billing.payment_provider,
+        };
+        setUser(canonicalUser);
+        setPlan(nextPlan);
+        setSubscription({
+          status: billing.status,
+          planId: billing.plan_id,
+          planFamily: billing.plan_family,
+          hasPaidAccess: billing.has_paid_access,
+          paymentProvider: billing.payment_provider,
+          currentPeriodEnd: billing.current_period_end,
+          subscriptionSource: billing.subscription_source,
+        });
+        setBillingStatus('ready');
+      }).catch(() => {
+        if (billingEpoch.current !== epoch) return;
+        setBillingStatus('unavailable');
+      });
+    }
   }, []);
 
   const setAuthError = useCallback((err: unknown) => {
@@ -391,49 +419,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const refreshUser = useCallback(async () => {
-    // Force a GoTrue token refresh so server-side app_metadata changes are
-    // reflected. Plan/entitlement fields (plan_tier, has_paid_access, ...) live
-    // in the access token's app_metadata, which the Stripe webhook updates on
-    // the GoTrue user AFTER checkout completes. getSession() alone returns the
-    // CACHED JWT, so it keeps showing the stale (Free) plan until an unrelated
-    // refresh — a refresh mints a new access token whose app_metadata reflects
-    // the upgrade, which is what lets the account tab show the paid plan on
-    // return from checkout without re-login (#2609).
-    //
-    // On the cloud surface the front door (auth/AuthProvider) owns the single
-    // rotating refresh token and mirrors every rotation back into this store,
-    // so ASK IT to refresh rather than redeeming the same token here. Two
-    // independent redemptions of one rotating token is the shape GoTrue's
-    // reuse detection answers by revoking the whole family: the customer who
-    // just paid gets signed out at the front door's next scheduled refresh
-    // (candidate C-400). `refreshSessionNow` resolves only once this store has
-    // the rotated pair, so the new plan is live when it returns. Where no such
-    // owner exists (the desktop app, whose refreshes are serialized
-    // server-side by auth/desktop_gotrue_proxy.py, and the standalone
-    // ReviewPage/spoke trees) this store refreshes for itself, unchanged.
-    const delegateRefresh = frontDoorRef.current?.refreshSessionNow;
-    if (delegateRefresh) {
-      await delegateRefresh();
-      const { data: bridged } = await gotrueClient.getSession();
-      applySession(bridged.session || null);
-      return;
-    }
-
-    const { data, error: refreshError } = await gotrueClient.refreshSession();
-    if (refreshError) {
-      // A failed refresh (offline, or no/expired refresh token) must NOT sign
-      // the user out — fall back to the cached session rather than dropping to
-      // null and re-showing the sign-in form over a still-valid session.
-      const { data: cached } = await gotrueClient.getSession();
-      applySession(cached.session || null);
-      return;
-    }
-    applySession(data.session || null);
+    // Billing changes do not require session rotation. Re-read the canonical
+    // subscription with the current pair, preserving the sole token owner.
+    if (sessionRef.current) await applySession(sessionRef.current);
   }, [applySession]);
+
+  useEffect(() => {
+    const until = plan.currentPeriodEnd;
+    if (!until || !plan.hasPaidAccess) return undefined;
+    const delay = Date.parse(until) - Date.now();
+    // Long grants are checked again when auth lifecycle updates this store.
+    if (delay > DEFAULTS.MAX_TIMER_DELAY_MS) return undefined;
+    const timer = setTimeout(() => {
+      setPlan((value) => ({ ...value, hasPaidAccess: false }));
+      setSubscription((value) => value && { ...value, hasPaidAccess: false });
+      setUser((value) => value && { ...value, has_paid_access: false });
+      refreshUser();
+    }, Math.max(0, delay));
+    return () => clearTimeout(timer);
+  }, [plan.currentPeriodEnd, plan.hasPaidAccess, refreshUser]);
 
   useEffect(() => {
     let mounted = true;
     const restoration = captureSessionRestoration();
+    const initialEpoch = billingEpoch.current;
 
     // #2604 — persistent desktop sign-in. SEC-017 keeps the webview's GoTrue
     // tokens in memory only (never localStorage), so a fresh launch has no
@@ -488,7 +497,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     resolveInitialSession()
       .then((initialSession) => {
-        if (mounted && mayRestoreSession(restoration)) applySession(initialSession);
+        if (mounted && mayRestoreSession(restoration) && billingEpoch.current === initialEpoch) applySession(initialSession);
       })
       .catch((err) => {
         if (mounted) setAuthError(err);
@@ -510,6 +519,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     return () => {
       mounted = false;
+      billingEpoch.current += 1;
       data.subscription.unsubscribe();
     };
   }, [applySession, setAuthError]);
@@ -788,6 +798,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     errorDetails,
     isLoggedIn: !!session && !!user,
     hasPaidAccess: plan.hasPaidAccess,
+    billingStatus,
     passwordRecovery,
     mfaPending,
     mfaFactorId,
@@ -807,6 +818,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     session,
     subscription,
     plan,
+    billingStatus,
     loading,
     error,
     errorDetails,

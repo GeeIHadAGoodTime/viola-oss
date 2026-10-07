@@ -35,8 +35,10 @@ function cloudGotrueUser({ id, email, app_metadata = {} }) {
 }
 
 function cloudSession(user) {
+  const segment = (value) => btoa(JSON.stringify(value)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const token = `${segment({ alg: 'HS256' })}.${segment({ sub: user.id, exp: Math.floor(Date.now()/1000)+86400, aal: 'aal1' })}.c2ln`;
   return {
-    access_token: 'cloud-access-token',
+    access_token: token,
     refresh_token: 'cloud-refresh-token',
     token_type: 'bearer',
     expires_in: 86400,
@@ -49,11 +51,22 @@ function seedCloudOnlySession(user) {
   __setInMemorySessionForTest(cloudSession(user));
 }
 
-function buildFetchSpy(usagePayload) {
+function buildFetchSpy(usagePayload, user = CLOUD_FREE_USER) {
   return vi.fn(async (input) => {
     const url = typeof input === 'string' ? input : input?.url || '';
     if (url.endsWith('/billing/usage')) {
       return { ok: true, status: 200, json: () => Promise.resolve(usagePayload) };
+    }
+    if (url.endsWith('/auth/v1/user')) {
+      return { ok: true, status: 200, json: async () => user };
+    }
+    if (url.endsWith('/billing/status')) {
+      const billing = user.app_metadata;
+      return { ok: true, status: 200, json: async () => ({
+        user_id: user.id, status: billing.subscription_status || 'free',
+        plan_id: billing.plan_id || 'free', plan_family: billing.plan_family || billing.plan_tier || 'free',
+        has_paid_access: billing.has_paid_access === true, payment_provider: billing.payment_provider || null,
+      }) };
     }
     if (url.endsWith('/v1/calendar/status')) {
       return { ok: true, status: 200, json: () => Promise.resolve({ providers: [] }) };
@@ -115,13 +128,13 @@ describe('AccountTab — cloud-only-signed-in plan display (#2741)', () => {
       resets_monthly: '2026-08-01T00:00:00.000Z',
       resets_weekly: '2026-07-28T00:00:00.000Z',
       extra_usage_cents: 0,
-    }));
+    }, CLOUD_PRO_USER));
 
     renderCloudOnly(<AccountTab />);
 
     await screen.findByText('cloud-pro@example.com');
 
-    expect(screen.getByText(/Pro/)).toBeInTheDocument();
+    expect(await screen.findByText(/Pro/)).toBeInTheDocument();
     expect(screen.queryByText(/Free Plan/i)).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Upgrade/i })).not.toBeInTheDocument();
 
@@ -147,7 +160,7 @@ describe('AccountTab — cloud-only-signed-in plan display (#2741)', () => {
 
     await screen.findByText('cloud-free@example.com');
 
-    expect(screen.getByText(/Free Plan/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Free Plan/i)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Manage Subscription/i })).not.toBeInTheDocument();
 
     await waitFor(() => {

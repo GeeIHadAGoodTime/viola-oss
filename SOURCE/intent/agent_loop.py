@@ -1816,7 +1816,8 @@ async def run_agent_loop(
         try:
             await reservation.reserve()
         except LLMQuotaExceededError as exc:
-            if getattr(exc, "limit_type", "") != "managed_llm_spend_cap":
+            last_gate = getattr(reservation, "_last_gate", None)
+            if last_gate is None or last_gate.allowed:
                 await _settle_agent_turn_spend_failed(reservation)
                 raise
             await _handle_spend_reservation_denial(reservation, exc)
@@ -1838,6 +1839,20 @@ async def run_agent_loop(
         response: object,
         turn_kwargs: dict[str, Any],
     ) -> None:
+        nonlocal outcome
+        if isinstance(response, dict) and response.get("_policy_denial"):
+            await _settle_agent_turn_spend_failed(reservation)
+            _set_final_response(
+                executor,
+                str(response.get("answer") or "This request is temporarily unavailable."),
+                continue_listening=False,
+            )
+            from services.llm.managed_budget import public_managed_cap_state
+
+            executor._final_params["cap_state"] = public_managed_cap_state(response.get("cap_state"))
+            executor._final_params["stop_reason"] = str(response.get("error") or "managed_ai_policy_denial")
+            outcome = "cost_limit"
+            raise _AgentLoopCostLimitStop()
         if reservation is None:
             return
         if estimated_usage is None:

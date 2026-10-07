@@ -208,6 +208,7 @@ _GLOBAL_SETTINGS_KEYS = frozenset(
 _SYSTEM_KEY_PREFIXES = frozenset(
     {
         "billing_plan_id",
+        "billing_plan_snapshot",
         "user_plan",
         "app_surface",
         "deployment_mode",

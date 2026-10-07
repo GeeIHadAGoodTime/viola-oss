@@ -10,7 +10,7 @@ import { AccountTab } from './AccountTab';
 // GoTrue test scaffolding. Since the GoTrue migration (bce028c3c), auth flows
 // go through lib/auth_context -> gotrueClient (same-origin /auth/v1/*), not
 // the legacy /auth/login-/auth/register REST layer, and the signed-in user +
-// subscription derive from the GoTrue session's app_metadata — not /auth/me.
+// subscription comes from canonical /billing/status, not GoTrue metadata.
 // SEC-017 keeps sessions in the in-memory auth-js storage adapter, so
 // logged-in tests seed that store (not localStorage) before rendering.
 // ---------------------------------------------------------------------------
@@ -40,7 +40,10 @@ function gotrueSession(user) {
   };
 }
 
+let billingUser = null;
+
 function seedGoTrueSession(user) {
+  billingUser = user;
   inMemorySessionStorage.setItem(GOTRUE_STORAGE_KEY, JSON.stringify(gotrueSession(user)));
 }
 
@@ -56,6 +59,7 @@ function gotrueJsonResponse(body, status = 200) {
 
 afterEach(() => {
   inMemorySessionStorage.removeItem(GOTRUE_STORAGE_KEY);
+  billingUser = null;
 });
 
 // Default /auth/me response = logged-out (401). Most tests override fetch
@@ -74,6 +78,13 @@ function withAuthDefaults(extraImpl) {
     if (extraImpl) {
       const result = await extraImpl(url, init);
       if (result) return result;
+    }
+    if (url.endsWith('/billing/status')) {
+      const paid = billingUser?.id === 'u-pro';
+      return gotrueJsonResponse({ user_id: billingUser?.id, status: paid ? 'active' : 'free',
+        plan_id: paid ? 'pro_monthly' : 'free', plan_family: paid ? 'pro' : 'free',
+        has_paid_access: paid, payment_provider: paid ? 'stripe' : null,
+        subscription_source: paid ? 'stripe' : null, current_period_end: null });
     }
     return { ok: true, status: 200, json: () => Promise.resolve({}) };
   });

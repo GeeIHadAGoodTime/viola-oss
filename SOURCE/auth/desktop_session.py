@@ -1011,12 +1011,19 @@ def _row_from_sqlite(row: sqlite3.Row) -> _SessionRow:
 
 
 def _row_to_user(row: _SessionRow) -> User:
+    from core.request_context import read_desktop_entitlement_snapshot
+
+    try:
+        billing = read_desktop_entitlement_snapshot(row.user_id) or {}
+    except (OSError, RuntimeError, ValueError):
+        billing = {}
     return User(
         id=row.user_id,
         email=row.email,
         email_verified=row.email_verified,
-        subscription_status=SubscriptionStatus.FREE,
-        plan_id=PlanId.FREE,
+        subscription_status=billing.get("subscription_status", SubscriptionStatus.FREE),
+        plan_id=billing.get("plan_id", PlanId.FREE),
+        current_period_end=billing.get("current_period_end"),
         created_at=row.created_at,
         updated_at=row.last_used_at,
     )

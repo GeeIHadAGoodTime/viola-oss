@@ -17,7 +17,6 @@ import { enabledAuthProviders } from '../auth/authProviders';
 import { isDesktopApp } from '../utils/runtimeSurface';
 import { isCloudSurface } from './auth/cloudSurface';
 import { authErrorMessage } from './auth/authValidation';
-import { decodePlanFromUser } from '../lib/auth_context';
 import { useCalendarProviders } from '../hooks/useCalendarProviders';
 import { useUsage } from '../hooks/useUsage';
 import BillingCapacityPanel from './BillingCapacityPanel';
@@ -668,7 +667,7 @@ UpgradePanel.propTypes = {
 };
 
 // User Profile Card
-const ProfileCard = ({ user, subscription, onLogout, logoutPending = false, addToast, refreshUser }) => {
+const ProfileCard = ({ user, subscription, billingStatus = 'ready', onLogout, logoutPending = false, addToast, refreshUser }) => {
   const [portalLoading, setPortalLoading] = useState(false);
   const canManageSubscription = Boolean(
     subscription?.hasPaidAccess && subscription?.paymentProvider === 'stripe',
@@ -731,7 +730,7 @@ const ProfileCard = ({ user, subscription, onLogout, logoutPending = false, addT
                 <Icons.Crown /> {subscription?.planFamily === 'max' ? 'Max' : 'Pro'}
               </span>
             )}
-            {!subscription?.hasPaidAccess && (
+            {!subscription?.hasPaidAccess && billingStatus === 'ready' && (
               <span style={{
                 padding: '4px 10px',
                 borderRadius: '20px',
@@ -743,9 +742,22 @@ const ProfileCard = ({ user, subscription, onLogout, logoutPending = false, addT
                 Free Plan
               </span>
             )}
+            {billingStatus !== 'ready' && (
+              <span>{billingStatus === 'loading' ? 'Checking plan…' : 'Plan unavailable'}</span>
+            )}
           </div>
         </div>
       </div>
+
+      {subscription?.hasPaidAccess && subscription?.subscriptionSource?.startsWith('admin_') && (
+        <p style={{ color: theme.colors.textSecondary }}>
+          Complimentary access through {new Date(subscription.currentPeriodEnd).toLocaleString()}.
+          {' '}No automatic renewal or charge.
+        </p>
+      )}
+      {billingStatus === 'unavailable' && (
+        <Button variant="secondary" onClick={refreshUser}>Refresh plan</Button>
+      )}
 
       <UsageSummary />
 
@@ -765,7 +777,7 @@ const ProfileCard = ({ user, subscription, onLogout, logoutPending = false, addT
         key={user.id || user.email}
         accountId={user.id || user.email}
         refreshUser={refreshUser}
-        fallback={!subscription?.hasPaidAccess
+        fallback={billingStatus === 'ready' && !subscription?.hasPaidAccess
           ? <UpgradePanel addToast={addToast} refreshUser={refreshUser} /> : null}
       />
 
@@ -779,6 +791,7 @@ const ProfileCard = ({ user, subscription, onLogout, logoutPending = false, addT
 };
 
 ProfileCard.propTypes = {
+  billingStatus: PropTypes.string,
   user: PropTypes.shape({
     id: PropTypes.string,
     email: PropTypes.string,
@@ -788,6 +801,8 @@ ProfileCard.propTypes = {
     planFamily: PropTypes.string,
     hasPaidAccess: PropTypes.bool,
     paymentProvider: PropTypes.string,
+    currentPeriodEnd: PropTypes.string,
+    subscriptionSource: PropTypes.string,
   }),
   onLogout: PropTypes.func.isRequired,
   logoutPending: PropTypes.bool,
@@ -1942,7 +1957,7 @@ export function AccountTab({
   isDeletingCallData = false,
   callDataDeleteStatus = '',
 }) {
-  const { user, subscription, loading, isLoggedIn, logout, passwordRecovery, mfaPending, refreshUser } = useAuth();
+  const { user, subscription, billingStatus = 'ready', loading, isLoggedIn, logout, passwordRecovery, mfaPending, refreshUser } = useAuth();
   const { toasts, addToast, removeToast } = useToast();
 
   // Cloud surface (api.useviola.com/app) authenticates through TWO GoTrue
@@ -1986,26 +2001,13 @@ export function AccountTab({
   }, [logoutPrincipal]);
 
 
-  // Billing/plan display (issue #2741). `subscription` above is the source of
-  // truth and IS populated for a cloud sign-in — the front door's bridge is
-  // what delivers it, and AccountTab.cloudStoreReconciliation.test.jsx proves
-  // that against the real providers. This derivation covers only the first
-  // paint before that bridge resolves: without it a paying customer briefly
-  // sees "Free Plan", an upgrade prompt for the plan they already bought, and
-  // no "Manage Subscription" button (candidate C-400). It is a fallback, never
-  // the fix — a plan that renders right here while `subscription` stays null
-  // is still broken everywhere else that reads the store (SmartDisplay's
-  // gating, useUsage, Cloud Sync). Derived from the cloud user's OWN GoTrue
-  // app_metadata via decodePlanFromUser — the signed-in user's own per-account
-  // plan data (GoTrue scopes app_metadata per user), never a shared value.
-  const cloudPlan = !subscription && cloudUser ? decodePlanFromUser(cloudUser) : null;
-  const effectiveSubscription = subscription || (cloudPlan && {
-    status: cloudPlan.subscriptionStatus,
-    planId: cloudPlan.planId,
-    planFamily: cloudPlan.planFamily,
-    hasPaidAccess: cloudPlan.hasPaidAccess,
-    paymentProvider: cloudPlan.paymentProvider,
-  });
+  // Canonical billing truth is owned by the shared auth store. Metadata cannot
+  // override a grant, expiry or cancellation, even during its first read.
+  const effectiveSubscription = subscription;
+
+  useEffect(() => {
+    if (isLoggedIn) refreshUser();
+  }, [isLoggedIn, refreshUser]);
 
   // On cloud the front door owns the SDK bridge and its cleanup. A second
   // direct SDK logout would bypass that ownership queue. Desktop retains its
@@ -2074,7 +2076,7 @@ export function AccountTab({
       <>
         <Section title="Account">
           {logoutNotice}
-          <ProfileCard user={effectiveUser} subscription={effectiveSubscription} onLogout={handleLogout} logoutPending={logoutPending} addToast={addToast} refreshUser={refreshUser} />
+          <ProfileCard user={effectiveUser} subscription={effectiveSubscription} billingStatus={isLoggedIn ? billingStatus : 'loading'} onLogout={handleLogout} logoutPending={logoutPending} addToast={addToast} refreshUser={refreshUser} />
         </Section>
 
         <Section title="Phone">

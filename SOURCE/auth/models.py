@@ -565,6 +565,7 @@ def build_user_payload_with_entitlement(
             "plan_family": entitlement.plan_family.value,
             "subscription_status": entitlement.subscription_status.value,
             "has_paid_access": entitlement.has_paid_access,
+            "subscription_source": entitlement.subscription_source.value,
         }
     )
     if entitlement.current_period_end is not None:

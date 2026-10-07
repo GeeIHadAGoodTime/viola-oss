@@ -37,6 +37,7 @@ class LlmTokenUsage:
     cached_tokens: int = 0
     cache_write_tokens: int = 0
     web_search_requests: int = 0
+    reasoning_tokens: int = 0
 
     @property
     def total_tokens(self) -> int:
@@ -78,20 +79,30 @@ def estimate_openai_payload_usage(payload: dict[str, Any], *, default_output_tok
     return LlmTokenUsage(input_tokens=estimated_input, output_tokens=requested_output)
 
 
+def _reported_token_count(value: Any, names: tuple[str, ...], default: int) -> int:
+    for name in names:
+        raw = _get_mapping_or_attr(value, name)
+        if raw is not None:
+            if isinstance(raw, (int, float)) and raw < 0:
+                continue
+            count = _coerce_nonnegative_int(raw, default=-1)
+            if count >= 0:
+                return count
+    return default
+
+
+def usage_source_from_openai_usage(value: Any) -> str:
+    inputs = _reported_token_count(value, ("input_tokens", "prompt_tokens"), -1) >= 0
+    outputs = _reported_token_count(value, ("output_tokens", "completion_tokens"), -1) >= 0
+    return "provider" if inputs and outputs else "mixed" if inputs or outputs else "estimate"
+
+
 def usage_from_openai_usage(value: Any, fallback: LlmTokenUsage) -> LlmTokenUsage:
     if value is None:
         return fallback
 
-    input_tokens = (
-        _coerce_nonnegative_int(_get_mapping_or_attr(value, "input_tokens"))
-        or _coerce_nonnegative_int(_get_mapping_or_attr(value, "prompt_tokens"))
-        or fallback.input_tokens
-    )
-    output_tokens = (
-        _coerce_nonnegative_int(_get_mapping_or_attr(value, "output_tokens"))
-        or _coerce_nonnegative_int(_get_mapping_or_attr(value, "completion_tokens"))
-        or fallback.output_tokens
-    )
+    input_tokens = _reported_token_count(value, ("input_tokens", "prompt_tokens"), fallback.input_tokens)
+    output_tokens = _reported_token_count(value, ("output_tokens", "completion_tokens"), fallback.output_tokens)
     input_details = _get_mapping_or_attr(value, "input_tokens_details") or _get_mapping_or_attr(
         value,
         "prompt_tokens_details",
@@ -123,6 +134,14 @@ def usage_from_openai_usage(value: Any, fallback: LlmTokenUsage) -> LlmTokenUsag
         cached_tokens=cached_tokens,
         cache_write_tokens=cache_write_tokens,
         web_search_requests=web_search_requests,
+        reasoning_tokens=_coerce_nonnegative_int(
+            _get_mapping_or_attr(
+                _get_mapping_or_attr(value, "output_tokens_details")
+                or _get_mapping_or_attr(value, "completion_tokens_details"),
+                "reasoning_tokens",
+            )
+            or _get_mapping_or_attr(value, "reasoning_tokens")
+        ),
     )
 
 
@@ -186,6 +205,7 @@ class LlmSpendReservation:
     async def reserve(self) -> None:
         from core.exceptions import LLMQuotaExceededError
         from services.llm.managed_budget import (
+            managed_llm_budget_message,
             provider_managed_spend_accounted_remotely,
             reserve_managed_llm_spend_cap_async,
             user_uses_managed_llm,
@@ -204,10 +224,12 @@ class LlmSpendReservation:
         if not gate.allowed:
             raise LLMQuotaExceededError(
                 user_id=self.user_id or "<missing>",
-                limit_type="managed_llm_spend_cap",
+                limit_type=gate.denial_code,
                 current=gate.spent_cents,
                 limit=gate.budget_cents,
                 reset_at=gate.resets_at,
+                cap_state=gate.cap_state,
+                public_message=managed_llm_budget_message(gate),
             )
         self._spend_reservation = gate.reservation
 
@@ -316,4 +338,5 @@ __all__ = [
     "usage_from_chat_completion_payload",
     "usage_from_openai_response",
     "usage_from_openai_usage",
+    "usage_source_from_openai_usage",
 ]
