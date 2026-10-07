@@ -695,6 +695,9 @@ class LLMQuotaExceededError(LLMError):
         current: int,
         limit: int,
         reset_at: str = "",
+        *,
+        cap_state: dict[str, Any] | None = None,
+        public_message: str = "",
     ):
         msg = f"User {user_id} exceeded {limit_type}: {current}/{limit}"
         if reset_at:
@@ -710,7 +713,7 @@ class LLMQuotaExceededError(LLMError):
                     "current": current,
                     "limit": limit,
                 },
-                user_message="You've reached your usage limit for now.",
+                user_message=public_message or "You've reached your usage limit for now.",
                 recovery_hint=(f"Quota resets at {reset_at}." if reset_at else "Quota resets periodically."),
             ),
         )
@@ -719,6 +722,8 @@ class LLMQuotaExceededError(LLMError):
         self.current = current
         self.limit = limit
         self.reset_at = reset_at
+        self.cap_state = dict(cap_state or {})
+        self.public_message = public_message
 
 
 class InvalidResponseError(LLMError):

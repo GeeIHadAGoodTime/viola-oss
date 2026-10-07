@@ -40,6 +40,8 @@ function baseHooksAuth(overrides = {}) {
     loading: false,
     isLoggedIn: false,
     logout: vi.fn(async () => ({ success: true })),
+    refreshUser: vi.fn(async () => {}),
+    billingStatus: 'ready',
     passwordRecovery: false,
     ...overrides,
   };
