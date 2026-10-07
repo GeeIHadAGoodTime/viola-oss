@@ -494,6 +494,20 @@ class BootstrapFactory:
     ) -> None:
         """Sync persisted audio/STT settings into AppConfig before voice init."""
 
+        import os
+        import sys
+
+        if getattr(sys, "frozen", False) or os.getenv("VIOLA_KOKORO_PHONEMIZER") == "misaki-en":
+            from types import SimpleNamespace
+            from voice.customer_runtime import qualification_profile, resolve_selection
+
+            if qualification_profile() is not None:
+                language, voice = resolve_selection(SimpleNamespace(
+                    tts_language=settings_mgr.get("tts_language", "en-us", on_load_error="raise"),
+                    tts_voice=settings_mgr.get("tts_voice", "default", on_load_error="raise"),
+                ))
+                settings_obj.tts_language, settings_obj.tts_voice = language, voice
+
         stt_backend = settings_mgr.get("stt_engine", getattr(settings_obj, "stt_backend", "whisper_local"))
         settings_obj.stt_backend = str(stt_backend or "whisper_local")
 
@@ -570,6 +584,19 @@ class BootstrapFactory:
         Returns:
             TTS engine instance or None if unavailable
         """
+        # A normal qualification launch binds the shared composed engine before
+        # entering any legacy fallback handler.
+        import os
+        import sys
+
+        if getattr(sys, "frozen", False) or os.getenv("VIOLA_KOKORO_PHONEMIZER") == "misaki-en":
+            from voice.customer_runtime import qualification_profile
+
+            if qualification_profile() is not None:
+                from voice.synthesis.factory import get_shared_kokoro
+
+                return cast(TTSEngineType, get_shared_kokoro(cast(Any, config)))
+
         # Canonical path: delegate to TTSFactory when we have an AppConfig
         try:
             from config.settings import AppConfig

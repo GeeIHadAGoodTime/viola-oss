@@ -1,15 +1,14 @@
 {
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "04e6dd185910f75c6f374ed9a27ad80ef5837462f4fb9b2b926ee612ed166c0b",
-  "source_tree_sha256": "853c493c215e1d6adefd916fa5004cc314b7f177bfc9269e2bf54b57215d02d3",
-  "source_file_count": 2663,
-  "source_revision": "1cabf9a5013150207c2956f973de9f8e2dd8bfd5",
-  "comparison_public_revision": "f41824b382e0f7798e36d2befb12fa75b142687c",
+  "source_manifest_sha256": "ac7549d274fdb3aab2c53b0c208431ce0a838194324c80ecd7e6d3522fa6101b",
+  "source_tree_sha256": "083b5e398d2a7be906dc1d57b80425d54741251d520666d8f9d762f2a185693c",
+  "source_file_count": 2671,
+  "source_revision": "9707b59bc2a0988c459c813d181b612264d0a70c",
+  "comparison_public_revision": "d0818424b78669a8328676c11a4b0d5611fb2256",
   "changed_source_paths": [
-    "SOURCE/auth/desktop_session.py",
-    "SOURCE/tests/public/test_desktop_session_persistence.py",
-    "SOURCE/utils/enhancements/secrets.py"
+    "SOURCE/ui/api/models.py",
+    "SOURCE/tests/public/test_local_media_path_length.py"
   ],
   "retained_sboms": [
     {
@@ -71,29 +70,79 @@
     }
   ],
   "input_equivalence": {
-    "comparison_basis": "Protected public main a002401aae36786bbd9aeea8a1eacd0790b4192a",
+    "comparison_basis": "Protected public main d0818424b78669a8328676c11a4b0d5611fb2256",
     "all_unselected_export_leaf_bytes_and_modes_preserved": true,
     "all_six_sbom_bytes_and_status_objects_preserved": true,
     "dependency_and_workflow_inputs_unchanged": true,
-    "frontend_source_inputs_changed": true,
-    "speech_and_account_and_resize_and_pricing_source_preserved": true
+    "frontend_settings_speech_account_resize_and_pricing_source_preserved": true
   },
   "qualification": {
-    "source_commit": "1cabf9a5013150207c2956f973de9f8e2dd8bfd5",
-    "source_tree": "0aa5728f7982c2288a24900077666232189bd9ae",
-    "scope": "Desktop session encrypted-cache persistence failure handling; source and synthetic storage fixtures only.",
-    "independent_review": "Root reviewed exact patchdca547134b4162384a0811deb3c9d4efddc48b2566c10b9c79b693891c0b3abe and ran all five new controls.",
-    "durability_controls": 5,
-    "existing_session_ordering_controls": 11,
-    "focused_result": "16 passed",
-    "existing_secret_manager_regressions": "9 passed,2pre-existing skips",
-    "negative_control": "Installed75acc and accepteda002 source reproducibly acknowledge a local session after a forced cache write failure and lose it on fresh-store readback. Three new durability assertions fail on old source.",
-    "historical_incident_cause_established": false,
-    "power_loss_guarantee": false,
-    "real_credentials_or_provider_calls": false,
+    "source_commit": "9707b59bc2a0988c459c813d181b612264d0a70c",
+    "source_tree": "59eca3d3c62d5b1986d58bfb0ab7d4741037d4d9",
+    "scope": "Local media request-path validation only; no player, device, model or external service calls.",
+    "independent_automated_review": {
+      "result": "approved_for_narrow_local_path_validation_change",
+      "blocking_findings": [],
+      "files": [
+        {
+          "path": "SOURCE/ui/api/models.py",
+          "git_blob": "0817fd8326ffd366b5ae3b4c10b7baf851a81645",
+          "sha256": "598889477dc3c524827fc354a60d99869b82ec09e93d6c1238e09709479f502a",
+          "bytes": 5184
+        },
+        {
+          "path": "SOURCE/tests/public/test_local_media_path_length.py",
+          "git_blob": "715dfebfbdaf35196938eebf75c2e0224020ffdf",
+          "sha256": "ad444bbfec0676b1cd01fc41f1500c928126b17db2a6cbcabd08a965a2e3cc2d",
+          "bytes": 8205
+        }
+      ]
+    },
+    "source_controls": {
+      "focused_tests": 11,
+      "focused_passed": 11,
+      "negative_control_failures": 1,
+      "negative_control_errors": 7,
+      "candidate_full_methods": 715,
+      "baseline_full_methods": 704,
+      "full_suite_failures": 2,
+      "full_suite_errors": 5,
+      "full_suite_skipped": 1,
+      "baseline_failure_names_equal": true,
+      "failure_names": [
+        "setUpClass (test_customer_phone_routing.CustomerPhoneRouting)",
+        "test_real_bridge_preserves_deny_cancel_and_fresh_retry (test_deferred_confirmation_cancellation.DeferredCancellationTests.test_real_bridge_preserves_deny_cancel_and_fresh_retry)",
+        "setUpClass (test_phone_language_switch.PhoneLanguageSwitch)",
+        "test_pipecat_runner_security (unittest.loader._FailedTest.test_pipecat_runner_security)",
+        "test_ui_api_saved_volume_reaches_same_and_new_engine (test_speech_volume_wiring.SpeechVolumeWiring.test_ui_api_saved_volume_reaches_same_and_new_engine)",
+        "test_cached_openers_are_unity_on_disk_and_live_at_playback (test_speech_volume_wiring.SpeechVolumeWiring.test_cached_openers_are_unity_on_disk_and_live_at_playback)",
+        "test_per_user_values_reach_kokoro_and_do_not_leak (test_speech_volume_wiring.SpeechVolumeWiring.test_per_user_values_reach_kokoro_and_do_not_leak)"
+      ],
+      "python": "3.12.14",
+      "pydantic": "2.12.5",
+      "fastapi": "0.133.1",
+      "starlette": "1.3.1",
+      "hardware_model_network_calls": false,
+      "full_suite_scope": "Historical local comparison on original reviewed source d85ac81c9e7241ec2320ac9c01dd8d4611d52ef1 against base a002401aae36786bbd9aeea8a1eacd0790b4192a, before accepted speech composition; not final-head qualification.",
+      "composed_source_focused_tests_passed": 11,
+      "composed_source_base": "d0818424b78669a8328676c11a4b0d5611fb2256"
+    },
+    "source_only": true,
     "installed_acceptance": false,
     "production_deployment": false,
-    "prior_qualification_pointer": "desktop_session_persistence_previous_binding.qualification"
+    "normal_app_retest_required": [
+      "In the existing music itinerary, save and scan the approved folder using the shipped settings UI.",
+      "Ask the normal Music command to play the indexed test track by title, including a track whose full path exceeds200 characters.",
+      "Require the correct selected track, advancing position and physical audibility before continuing pause, resume, seek and EOF.",
+      "Require an honest missing-track failure followed by successful normal-app retry of the approved track."
+    ],
+    "limits": [
+      "The separate83/86-character customer failures remain unexplained; this repair does not establish their cause.",
+      "Historical local aggregate on the original source remained failed with the same2failures5errors1skip as its unchanged baseline. Focused tests pass on this composed source; final-head hosted Windows checks remain required.",
+      "OpenAPI query maxLength is32767; the200-character nonlocal limit is enforced by model validation.",
+      "Nonlocal overlength error location is model/body rather than query; no dependent client failure was found.",
+      "No source integration, deployment, release, installed playback or output acceptance is claimed."
+    ]
   },
   "historical_bindings": [
     {
@@ -7524,7 +7573,7 @@
                         "text": "Hello. This is a short test of the local speech system.",
                         "voice": "af_heart",
                         "locale": "en-us",
-                        "phonemes": "h\u0259l\u02c8O. \u00f0\u02cc\u026as \u026az \u0250 \u0283\u02c8\u0254\u0279t t\u02c8\u025bst \u028cv \u00f0\u0259 l\u02c8Ok\u0259l sp\u02c8i\u02a7 s\u02c8\u026ast\u0259m.",
+                        "phonemes": "həlˈO. ðˌɪs ɪz ɐ ʃˈɔɹt tˈɛst ʌv ðə lˈOkəl spˈiʧ sˈɪstəm.",
                         "duration_seconds": 2.986666666666667,
                         "wav_sha256": "aeaba330943123ff46d808be904e3cc47ec05291c1aee9efa78a21bb25d4fadd",
                         "float_pcm_sha256": "d27a02a2b366945758f9a7cb89ae4eaee46525807634dff9b7f295f400b8f622",
@@ -7537,7 +7586,7 @@
                         "text": "Hello. This is a short test of the local speech system.",
                         "voice": "af_heart",
                         "locale": "en-us",
-                        "phonemes": "h\u0259l\u02c8O. \u00f0\u02cc\u026as \u026az \u0250 \u0283\u02c8\u0254\u0279t t\u02c8\u025bst \u028cv \u00f0\u0259 l\u02c8Ok\u0259l sp\u02c8i\u02a7 s\u02c8\u026ast\u0259m.",
+                        "phonemes": "həlˈO. ðˌɪs ɪz ɐ ʃˈɔɹt tˈɛst ʌv ðə lˈOkəl spˈiʧ sˈɪstəm.",
                         "duration_seconds": 2.986666666666667,
                         "wav_sha256": "aeaba330943123ff46d808be904e3cc47ec05291c1aee9efa78a21bb25d4fadd",
                         "float_pcm_sha256": "d27a02a2b366945758f9a7cb89ae4eaee46525807634dff9b7f295f400b8f622",
@@ -7550,7 +7599,7 @@
                         "text": "The A P I costs $12.50, not $0.05.",
                         "voice": "af_heart",
                         "locale": "en-us",
-                        "phonemes": "\u00f0i \u02c8A p\u02c8i \u02ccI k\u02c8\u0254sts tw\u02c8\u025blv d\u02c8\u0251l\u0259\u0279z \u00e6nd f\u02c8\u026afti s\u02c8\u025bnts, n\u02cc\u0251t f\u02c8Iv s\u02c8\u025bnts.",
+                        "phonemes": "ði ˈA pˈi ˌI kˈɔsts twˈɛlv dˈɑləɹz ænd fˈɪfti sˈɛnts, nˌɑt fˈIv sˈɛnts.",
                         "duration_seconds": 3.7973333333333334,
                         "wav_sha256": "5310d8c6737e9eb874d30b15b70cd3a779d1a86904339b68831e29945307d4b6",
                         "float_pcm_sha256": "c7a016d0b527e759ba0e2ce06f0348371a99e1c9ce68e42ca38ee919cef63fa7",
@@ -7563,7 +7612,7 @@
                         "text": "The A P I costs $12.50, not $0.05.",
                         "voice": "af_heart",
                         "locale": "en-us",
-                        "phonemes": "\u00f0i \u02c8A p\u02c8i \u02ccI k\u02c8\u0254sts tw\u02c8\u025blv d\u02c8\u0251l\u0259\u0279z \u00e6nd f\u02c8\u026afti s\u02c8\u025bnts, n\u02cc\u0251t f\u02c8Iv s\u02c8\u025bnts.",
+                        "phonemes": "ði ˈA pˈi ˌI kˈɔsts twˈɛlv dˈɑləɹz ænd fˈɪfti sˈɛnts, nˌɑt fˈIv sˈɛnts.",
                         "duration_seconds": 3.7973333333333334,
                         "wav_sha256": "5310d8c6737e9eb874d30b15b70cd3a779d1a86904339b68831e29945307d4b6",
                         "float_pcm_sha256": "c7a016d0b527e759ba0e2ce06f0348371a99e1c9ce68e42ca38ee919cef63fa7",
@@ -7586,7 +7635,7 @@
                         "text": "'A P I'",
                         "voice": "af_heart",
                         "locale": "en-us",
-                        "phonemes": "\u201c\u0250 p\u02c8i \u02c8I",
+                        "phonemes": "“ɐ pˈi ˈI",
                         "duration_seconds": 0.9386666666666666,
                         "wav_sha256": "c14f9a31a8a71f2441e74ab4e64f24df25b9f018975fe46d1ab0ed2cb33519e3",
                         "float_pcm_sha256": "69d1f2d9c292aa645dd0b1ff590bb7c1cbf34b92bc382a7ae1d695b2540e18cb",
@@ -7599,7 +7648,7 @@
                         "text": "'A P I'",
                         "voice": "af_heart",
                         "locale": "en-us",
-                        "phonemes": "\u201c\u02c8A p\u02c8i \u02c8I",
+                        "phonemes": "“ˈA pˈi ˈI",
                         "duration_seconds": 0.9386666666666666,
                         "wav_sha256": "f5a871ccac419cc586ff16aaa6e9f42b4720c591d20a7752c09d01e89c299f3d",
                         "float_pcm_sha256": "b8b8573bf9058851c6aaee30fc328c01c89ba20e1413aa674bef4c1847b348f0",
@@ -7612,7 +7661,7 @@
                         "text": "'A P I'",
                         "voice": "bf_emma",
                         "locale": "en-gb",
-                        "phonemes": "\u201c\u0250 p\u02c8i\u02d0 \u02c8I",
+                        "phonemes": "“ɐ pˈiː ˈI",
                         "duration_seconds": 0.9386666666666666,
                         "wav_sha256": "fcb3326f8978423f25953f991282d759fbc0e9a1248a102054e236eb5a558ddb",
                         "float_pcm_sha256": "1612b0e9f197c238f2434d27da0024959ca5b3825db6a3ed79119491924568d0",
@@ -7625,7 +7674,7 @@
                         "text": "'A P I'",
                         "voice": "bf_emma",
                         "locale": "en-gb",
-                        "phonemes": "\u201c\u02c8A p\u02c8i\u02d0 \u02c8I",
+                        "phonemes": "“ˈA pˈiː ˈI",
                         "duration_seconds": 0.96,
                         "wav_sha256": "83dad5fbcd6fea44e2b35ecf0f1b19af8e946c56a5d5743af058ad6e92a7d909",
                         "float_pcm_sha256": "2f7c8c442737efd0ff9bf3ddb35e47e7ae90ed2bc23c7025a08d3ddf3552f78d",
@@ -7645,10 +7694,10 @@
                     "cases": [
                       {
                         "id": "ja-component",
-                        "text": "\u3053\u3093\u306b\u3061\u306f",
+                        "text": "こんにちは",
                         "voice": "jf_alpha",
                         "locale": "ja",
-                        "phonemes": "ko\u0272\u0272i\u02a8i\u03b2a",
+                        "phonemes": "koɲɲiʨiβa",
                         "duration_seconds": 0.9813333333333333,
                         "wav_sha256": "c9a9f75372afc19d7cb51732a481300a7fa5779d0f4411c35a9f7b788d693f51",
                         "float_pcm_sha256": "b6f3115fde5d46e829b4437b51c82ea366c8973731611ac665a21047bc3fb5fd",
@@ -7658,10 +7707,10 @@
                       },
                       {
                         "id": "ja-composed",
-                        "text": "\u3053\u3093\u306b\u3061\u306f",
+                        "text": "こんにちは",
                         "voice": "jf_alpha",
                         "locale": "ja",
-                        "phonemes": "ko\u0272\u0272i\u02a8i\u03b2a",
+                        "phonemes": "koɲɲiʨiβa",
                         "duration_seconds": 0.9813333333333333,
                         "wav_sha256": "c9a9f75372afc19d7cb51732a481300a7fa5779d0f4411c35a9f7b788d693f51",
                         "float_pcm_sha256": "b6f3115fde5d46e829b4437b51c82ea366c8973731611ac665a21047bc3fb5fd",
@@ -7681,10 +7730,10 @@
                     "cases": [
                       {
                         "id": "zh-component",
-                        "text": "\u4f60\u597d",
+                        "text": "你好",
                         "voice": "zf_xiaobei",
                         "locale": "zh",
-                        "phonemes": "ni\u2193xau\u2193",
+                        "phonemes": "ni↓xau↓",
                         "duration_seconds": 0.832,
                         "wav_sha256": "b8b6c6be5edbaff52bb114c753b04e6eaffebd190e5f78e64a535c8042cb92ae",
                         "float_pcm_sha256": "7ddddc03e104e990c42f5b070d4847906f3a10d19bd6809621a5f1cf0fa5ea0d",
@@ -7694,10 +7743,10 @@
                       },
                       {
                         "id": "zh-composed",
-                        "text": "\u4f60\u597d",
+                        "text": "你好",
                         "voice": "zf_xiaobei",
                         "locale": "zh",
-                        "phonemes": "ni\u2193xau\u2193",
+                        "phonemes": "ni↓xau↓",
                         "duration_seconds": 0.832,
                         "wav_sha256": "b8b6c6be5edbaff52bb114c753b04e6eaffebd190e5f78e64a535c8042cb92ae",
                         "float_pcm_sha256": "7ddddc03e104e990c42f5b070d4847906f3a10d19bd6809621a5f1cf0fa5ea0d",
@@ -7714,7 +7763,7 @@
                 ],
                 "owner_listening": {
                   "english": "Positive feedback on delivered neutral/currency and US/GB comparison clips; no chosen pair winner or broader coverage claim",
-                  "japanese": "Positive feedback on the exact jf_alpha \u3053\u3093\u306b\u3061\u306f 0.981333-second sample only",
+                  "japanese": "Positive feedback on the exact jf_alpha こんにちは 0.981333-second sample only",
                   "mandarin": "Delivered corrected-source sample; acknowledgment received, pronunciation-quality judgment still unverified",
                   "owner_replies_not_required_per_clip": true,
                   "assistant_audio_input_unavailable": true
@@ -8390,12 +8439,12 @@
     }
   ],
   "prior_binding": {
-    "public_revision": "a002401aae36786bbd9aeea8a1eacd0790b4192a",
+    "public_revision": "d0818424b78669a8328676c11a4b0d5611fb2256",
     "path": "PUBLIC_METADATA/source-binding.json",
-    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/a002401aae36786bbd9aeea8a1eacd0790b4192a/PUBLIC_METADATA/source-binding.json",
-    "sha256": "b848ca260eaf2e6f9de4d51c56723d9875cedfcacac66e42265dc102e7e4ff6c",
-    "bytes": 1121055,
-    "git_blob": "acacece0a99a2b912b96d3562735ab5a45b31de1",
+    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/d0818424b78669a8328676c11a4b0d5611fb2256/PUBLIC_METADATA/source-binding.json",
+    "sha256": "c64ff747e36020ed55ce40f2bf2b238cc8634380212200d2767f7400a81a48cb",
+    "bytes": 1166774,
+    "git_blob": "b602de49d11a1192c80e266b1d757982dd777f74",
     "all_top_level_keys": [
       "schema_version",
       "source_manifest",
@@ -8419,7 +8468,8 @@
       "new_static_security_scan_performed",
       "new_resolution_scope",
       "new_advisory_scan_scope",
-      "account_reconciliation_previous_binding"
+      "account_reconciliation_previous_binding",
+      "reviewed_speech_binding"
     ],
     "preserved_json_objects": {
       "schema_version": {
@@ -8432,27 +8482,27 @@
       },
       "source_manifest_sha256": {
         "pointer": "/source_manifest_sha256",
-        "canonical_json_sha256": "84851c1af91cb9e7c3e01c6ee5813dd6c03c63877a3aeb5090fb59bd65625d97"
+        "canonical_json_sha256": "879e6eee2f5260e09fada6c96116365a4dc68d56d98c4826e10a8dfbe8b2030c"
       },
       "source_tree_sha256": {
         "pointer": "/source_tree_sha256",
-        "canonical_json_sha256": "7ed7908c0b2be4efdc9fa83bb8260b94c3f0773ed675a8728f62767ebd182083"
+        "canonical_json_sha256": "3d2a4fa7da5d5ea97c6ff828e2a8e076081cd8deb0095ece6e7e0f005fdb159f"
       },
       "source_file_count": {
         "pointer": "/source_file_count",
-        "canonical_json_sha256": "61b1dbc91985561c5af9e6e341ffa92fa3524c1e2083f39f67cb8bd736fcce46"
+        "canonical_json_sha256": "363341185eb04b13db8d615140584368124fe057c7ba5d83bdd29667b1f9656a"
       },
       "source_revision": {
         "pointer": "/source_revision",
-        "canonical_json_sha256": "5be18285c66ac7a611d3ca2d4120e96471f55914c4ac8d038f58665dd231fb53"
+        "canonical_json_sha256": "2c816761a632476a29fae13af08f30e66a1def0e3ce5dbbef309e2b4616d5cee"
       },
       "comparison_public_revision": {
         "pointer": "/comparison_public_revision",
-        "canonical_json_sha256": "7659ce5a6574255a28a9ba9671d0a6b3b45b169c463c478152be8db9a678b348"
+        "canonical_json_sha256": "9504c0cf4c6e9476bf8c92da776d3756065a8cd62232dcded74e637b4733b1e0"
       },
       "changed_source_paths": {
         "pointer": "/changed_source_paths",
-        "canonical_json_sha256": "3e63cbd6a6d239ac2b6b246e7003eaabf5518a46b44939925a716e4c653d20da"
+        "canonical_json_sha256": "f26dc20edf3d91565b7f562b5a487131c868ff6f2e3f69e41eb0aa9ead428b77"
       },
       "retained_sboms": {
         "pointer": "/retained_sboms",
@@ -8460,11 +8510,11 @@
       },
       "input_equivalence": {
         "pointer": "/input_equivalence",
-        "canonical_json_sha256": "f22c003b4334e149905cd9e2b309b84bb7b86734657f68d8a8a49802615bb64d"
+        "canonical_json_sha256": "132b7da5f60e6a38632cbfb08258ad5deb3b4d691a9719df14542b093a7de70e"
       },
       "qualification": {
         "pointer": "/qualification",
-        "canonical_json_sha256": "cd94e62ea228a8ac3bbe479d8dc69abf894a6539b73ab797054681173880a80c"
+        "canonical_json_sha256": "8e7ab41cb4124e3f66227ccb783c741dc3dbfd6e87271d062821c33fdf134cce"
       },
       "historical_bindings": {
         "pointer": "/historical_bindings",
@@ -8472,15 +8522,15 @@
       },
       "prior_binding": {
         "pointer": "/prior_binding",
-        "canonical_json_sha256": "ff6e9fdafc77b189bcc9f060cb72c85ac06b39c01f04526f1edbebcc1978371e"
+        "canonical_json_sha256": "b9a05f0f75420e0dfbb800d099d7d084893e6bba4d0d9f1fdb05018430ed3659"
       },
       "retained_composition_component_bindings": {
         "pointer": "/retained_composition_component_bindings",
-        "canonical_json_sha256": "c2d09217a2bcfa84f8cb717b53382fb2681537d59e8760c23f3382ab629d1606"
+        "canonical_json_sha256": "3f7cc2d71ee26c4da8ba75cbf35e7344fd7ca092e3e1ea29c6573d3a3ea6eb84"
       },
       "reviewed_source_patch": {
         "pointer": "/reviewed_source_patch",
-        "canonical_json_sha256": "d1384782a958730b6bb21f8614917b4ea16ea1800491ba8d2db1fd928e0872ae"
+        "canonical_json_sha256": "677816346698090924fa870e130748f80b27e761175c2c6a5056b401d4c6654f"
       },
       "new_resolution_performed": {
         "pointer": "/new_resolution_performed",
@@ -8496,7 +8546,7 @@
       },
       "new_source_contract_qualification_performed": {
         "pointer": "/new_source_contract_qualification_performed",
-        "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+        "canonical_json_sha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b"
       },
       "new_static_security_scan_performed": {
         "pointer": "/new_static_security_scan_performed",
@@ -8504,25 +8554,570 @@
       },
       "new_resolution_scope": {
         "pointer": "/new_resolution_scope",
-        "canonical_json_sha256": "3908ee280c958e288937f506ae635749e3ec8ad9d994adc5683170be9a3c2881"
+        "canonical_json_sha256": "e30647563c02ab51cd3849a700648497a4e91c7a42d7084b0ce22dcd18e158d4"
       },
       "new_advisory_scan_scope": {
         "pointer": "/new_advisory_scan_scope",
-        "canonical_json_sha256": "76173bebb522a925c5f65181cfb865365c7b7eb973d1f62278f3f6afb11969bd"
+        "canonical_json_sha256": "f40781c12ee1d9778988d2559e2673bf3454a4d45538d0835773579246dea8e7"
       },
       "account_reconciliation_previous_binding": {
         "pointer": "/account_reconciliation_previous_binding",
         "canonical_json_sha256": "cfeffa86ef01cbbd530cda12a57b6c4eb3761063999ad3fae482a0c1d7482b51"
+      },
+      "reviewed_speech_binding": {
+        "pointer": "/reviewed_speech_binding",
+        "canonical_json_sha256": "88025408d951467d38a236d6fdedb10ad4a4112e6ce02b3577c5b906adec6305"
       }
     },
     "source_manifest": {
       "path": "PUBLIC_METADATA/source-manifest.json",
-      "sha256": "810712c2fe135f0dc91d5e727995ef42a9fc6353094f1d0d3b49011afb204d66",
-      "bytes": 467630,
-      "git_blob": "8c4562651d00dcaab292ef9bea76b33e90512299"
+      "sha256": "fa0e3a3da6e8250ac4420fec665dbe175048caf4610041dc4642a5c031f076e7",
+      "bytes": 469083,
+      "git_blob": "5335972825fd157417fd87f34578dc4a238554f4"
     }
   },
   "retained_composition_component_bindings": [
+    {
+      "public_revision": "d0818424b78669a8328676c11a4b0d5611fb2256",
+      "path": "PUBLIC_METADATA/source-binding.json",
+      "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/d0818424b78669a8328676c11a4b0d5611fb2256/PUBLIC_METADATA/source-binding.json",
+      "sha256": "c64ff747e36020ed55ce40f2bf2b238cc8634380212200d2767f7400a81a48cb",
+      "bytes": 1166774,
+      "git_blob": "b602de49d11a1192c80e266b1d757982dd777f74",
+      "all_top_level_keys": [
+        "schema_version",
+        "source_manifest",
+        "source_manifest_sha256",
+        "source_tree_sha256",
+        "source_file_count",
+        "source_revision",
+        "comparison_public_revision",
+        "changed_source_paths",
+        "retained_sboms",
+        "input_equivalence",
+        "qualification",
+        "historical_bindings",
+        "prior_binding",
+        "retained_composition_component_bindings",
+        "reviewed_source_patch",
+        "new_resolution_performed",
+        "new_advisory_scan_performed",
+        "new_runtime_qualification_performed",
+        "new_source_contract_qualification_performed",
+        "new_static_security_scan_performed",
+        "new_resolution_scope",
+        "new_advisory_scan_scope",
+        "account_reconciliation_previous_binding",
+        "reviewed_speech_binding"
+      ],
+      "preserved_json_objects": {
+        "schema_version": {
+          "pointer": "/schema_version",
+          "canonical_json_sha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+        },
+        "source_manifest": {
+          "pointer": "/source_manifest",
+          "canonical_json_sha256": "ace3c4cebde8c1e5207159e354ef46f1f9a13eb7b3185315a68b7cf8b71f212d"
+        },
+        "source_manifest_sha256": {
+          "pointer": "/source_manifest_sha256",
+          "canonical_json_sha256": "879e6eee2f5260e09fada6c96116365a4dc68d56d98c4826e10a8dfbe8b2030c"
+        },
+        "source_tree_sha256": {
+          "pointer": "/source_tree_sha256",
+          "canonical_json_sha256": "3d2a4fa7da5d5ea97c6ff828e2a8e076081cd8deb0095ece6e7e0f005fdb159f"
+        },
+        "source_file_count": {
+          "pointer": "/source_file_count",
+          "canonical_json_sha256": "363341185eb04b13db8d615140584368124fe057c7ba5d83bdd29667b1f9656a"
+        },
+        "source_revision": {
+          "pointer": "/source_revision",
+          "canonical_json_sha256": "2c816761a632476a29fae13af08f30e66a1def0e3ce5dbbef309e2b4616d5cee"
+        },
+        "comparison_public_revision": {
+          "pointer": "/comparison_public_revision",
+          "canonical_json_sha256": "9504c0cf4c6e9476bf8c92da776d3756065a8cd62232dcded74e637b4733b1e0"
+        },
+        "changed_source_paths": {
+          "pointer": "/changed_source_paths",
+          "canonical_json_sha256": "f26dc20edf3d91565b7f562b5a487131c868ff6f2e3f69e41eb0aa9ead428b77"
+        },
+        "retained_sboms": {
+          "pointer": "/retained_sboms",
+          "canonical_json_sha256": "0428d09c6e0e2b524877c2218b306c10da6c7536bcf6ed96524b581dafc85301"
+        },
+        "input_equivalence": {
+          "pointer": "/input_equivalence",
+          "canonical_json_sha256": "132b7da5f60e6a38632cbfb08258ad5deb3b4d691a9719df14542b093a7de70e"
+        },
+        "qualification": {
+          "pointer": "/qualification",
+          "canonical_json_sha256": "8e7ab41cb4124e3f66227ccb783c741dc3dbfd6e87271d062821c33fdf134cce"
+        },
+        "historical_bindings": {
+          "pointer": "/historical_bindings",
+          "canonical_json_sha256": "59ccb6141308771f32ec1e534f7a843cbdd8867afcd59e84944e03e6f9958c33"
+        },
+        "prior_binding": {
+          "pointer": "/prior_binding",
+          "canonical_json_sha256": "b9a05f0f75420e0dfbb800d099d7d084893e6bba4d0d9f1fdb05018430ed3659"
+        },
+        "retained_composition_component_bindings": {
+          "pointer": "/retained_composition_component_bindings",
+          "canonical_json_sha256": "3f7cc2d71ee26c4da8ba75cbf35e7344fd7ca092e3e1ea29c6573d3a3ea6eb84"
+        },
+        "reviewed_source_patch": {
+          "pointer": "/reviewed_source_patch",
+          "canonical_json_sha256": "677816346698090924fa870e130748f80b27e761175c2c6a5056b401d4c6654f"
+        },
+        "new_resolution_performed": {
+          "pointer": "/new_resolution_performed",
+          "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+        },
+        "new_advisory_scan_performed": {
+          "pointer": "/new_advisory_scan_performed",
+          "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+        },
+        "new_runtime_qualification_performed": {
+          "pointer": "/new_runtime_qualification_performed",
+          "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+        },
+        "new_source_contract_qualification_performed": {
+          "pointer": "/new_source_contract_qualification_performed",
+          "canonical_json_sha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b"
+        },
+        "new_static_security_scan_performed": {
+          "pointer": "/new_static_security_scan_performed",
+          "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+        },
+        "new_resolution_scope": {
+          "pointer": "/new_resolution_scope",
+          "canonical_json_sha256": "e30647563c02ab51cd3849a700648497a4e91c7a42d7084b0ce22dcd18e158d4"
+        },
+        "new_advisory_scan_scope": {
+          "pointer": "/new_advisory_scan_scope",
+          "canonical_json_sha256": "f40781c12ee1d9778988d2559e2673bf3454a4d45538d0835773579246dea8e7"
+        },
+        "account_reconciliation_previous_binding": {
+          "pointer": "/account_reconciliation_previous_binding",
+          "canonical_json_sha256": "cfeffa86ef01cbbd530cda12a57b6c4eb3761063999ad3fae482a0c1d7482b51"
+        },
+        "reviewed_speech_binding": {
+          "pointer": "/reviewed_speech_binding",
+          "canonical_json_sha256": "88025408d951467d38a236d6fdedb10ad4a4112e6ce02b3577c5b906adec6305"
+        }
+      },
+      "source_manifest": {
+        "path": "PUBLIC_METADATA/source-manifest.json",
+        "sha256": "fa0e3a3da6e8250ac4420fec665dbe175048caf4610041dc4642a5c031f076e7",
+        "bytes": 469083,
+        "git_blob": "5335972825fd157417fd87f34578dc4a238554f4"
+      }
+    },
+    {
+      "public_revision": "3c17c6ee21276762421d918d2e0da40606fd12bc",
+      "path": "PUBLIC_METADATA/source-binding.json",
+      "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/3c17c6ee21276762421d918d2e0da40606fd12bc/PUBLIC_METADATA/source-binding.json",
+      "sha256": "70ab67a6a5af1ee24cf12e837c52dfb4758a19ccdfd67ef989b2e026c6babf71",
+      "bytes": 1142852,
+      "git_blob": "4134f5d8ac9f1b7702611ccb971a6ea8a79d656a",
+      "all_top_level_keys": [
+        "schema_version",
+        "source_manifest",
+        "source_manifest_sha256",
+        "source_tree_sha256",
+        "source_file_count",
+        "source_revision",
+        "comparison_public_revision",
+        "changed_source_paths",
+        "retained_sboms",
+        "input_equivalence",
+        "qualification",
+        "historical_bindings",
+        "prior_binding",
+        "retained_composition_component_bindings",
+        "reviewed_source_patch",
+        "new_resolution_performed",
+        "new_advisory_scan_performed",
+        "new_runtime_qualification_performed",
+        "new_source_contract_qualification_performed",
+        "new_static_security_scan_performed",
+        "new_resolution_scope",
+        "new_advisory_scan_scope",
+        "account_reconciliation_previous_binding",
+        "local_media_path_previous_binding"
+      ],
+      "preserved_json_objects": {
+        "schema_version": {
+          "pointer": "/schema_version",
+          "canonical_json_sha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+        },
+        "source_manifest": {
+          "pointer": "/source_manifest",
+          "canonical_json_sha256": "ace3c4cebde8c1e5207159e354ef46f1f9a13eb7b3185315a68b7cf8b71f212d"
+        },
+        "source_manifest_sha256": {
+          "pointer": "/source_manifest_sha256",
+          "canonical_json_sha256": "3112c0edcf5d0a049f889071d3f336db47d3b2de1b7121fcc6952898b44d927a"
+        },
+        "source_tree_sha256": {
+          "pointer": "/source_tree_sha256",
+          "canonical_json_sha256": "58f42388773b5a6eaad405b4453998dd9d118658722d1f6e3792476705d0d4aa"
+        },
+        "source_file_count": {
+          "pointer": "/source_file_count",
+          "canonical_json_sha256": "352a4f750446467c7aa84dab0f0d6aa496e3f3e27a970b3011fc0027a41ffc1b"
+        },
+        "source_revision": {
+          "pointer": "/source_revision",
+          "canonical_json_sha256": "aa63005ea278fe4ea4e814bb886325bf2cdf34214bbe6745b8d6ba384c79771e"
+        },
+        "comparison_public_revision": {
+          "pointer": "/comparison_public_revision",
+          "canonical_json_sha256": "0bb9bf9aa62c5ed89e497eae9daf61ad8dc5e830887cc96e7c1c901ba80a6f9b"
+        },
+        "changed_source_paths": {
+          "pointer": "/changed_source_paths",
+          "canonical_json_sha256": "a0532d9ccb98ce5f1e37b5472b57c8f1f215a48fdeef389aa4f26495dea72d81"
+        },
+        "retained_sboms": {
+          "pointer": "/retained_sboms",
+          "canonical_json_sha256": "0428d09c6e0e2b524877c2218b306c10da6c7536bcf6ed96524b581dafc85301"
+        },
+        "input_equivalence": {
+          "pointer": "/input_equivalence",
+          "canonical_json_sha256": "b3c95d2d1b08549d71c562af5acea0552fe74a1211d00acf2a4ac130a5031f5a"
+        },
+        "qualification": {
+          "pointer": "/qualification",
+          "canonical_json_sha256": "43d85b2c2ab4574343332a16a7015fec1e8f73b544c26d782a55621b7ec2641c"
+        },
+        "historical_bindings": {
+          "pointer": "/historical_bindings",
+          "canonical_json_sha256": "59ccb6141308771f32ec1e534f7a843cbdd8867afcd59e84944e03e6f9958c33"
+        },
+        "prior_binding": {
+          "pointer": "/prior_binding",
+          "canonical_json_sha256": "f2aabb104cbc992f4704498987a59caabbd1c99f4f4d465229900579ecbc95c6"
+        },
+        "retained_composition_component_bindings": {
+          "pointer": "/retained_composition_component_bindings",
+          "canonical_json_sha256": "b3801db169020def4d578e755e3bd082592ab8694fec8c53022647b9ff0d738d"
+        },
+        "reviewed_source_patch": {
+          "pointer": "/reviewed_source_patch",
+          "canonical_json_sha256": "1fdf15fdc7e061a68d0f0ed17eed811247924efe0b786e6d13a4a5039bae39c8"
+        },
+        "new_resolution_performed": {
+          "pointer": "/new_resolution_performed",
+          "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+        },
+        "new_advisory_scan_performed": {
+          "pointer": "/new_advisory_scan_performed",
+          "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+        },
+        "new_runtime_qualification_performed": {
+          "pointer": "/new_runtime_qualification_performed",
+          "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+        },
+        "new_source_contract_qualification_performed": {
+          "pointer": "/new_source_contract_qualification_performed",
+          "canonical_json_sha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b"
+        },
+        "new_static_security_scan_performed": {
+          "pointer": "/new_static_security_scan_performed",
+          "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+        },
+        "new_resolution_scope": {
+          "pointer": "/new_resolution_scope",
+          "canonical_json_sha256": "fcf7362c088a3b12152d0fca4eb2cea69b1edb396d2f3e5713c783e955f5d979"
+        },
+        "new_advisory_scan_scope": {
+          "pointer": "/new_advisory_scan_scope",
+          "canonical_json_sha256": "a962c22ae3fd16301df85e58360f63758f351e57961226fa53cc57081dcc5c1c"
+        },
+        "account_reconciliation_previous_binding": {
+          "pointer": "/account_reconciliation_previous_binding",
+          "canonical_json_sha256": "cfeffa86ef01cbbd530cda12a57b6c4eb3761063999ad3fae482a0c1d7482b51"
+        },
+        "local_media_path_previous_binding": {
+          "pointer": "/local_media_path_previous_binding",
+          "canonical_json_sha256": "59cc524e1a91645fd9d12e4abf92da4e3d3245708d9da91aa1f51bf3269ac91e"
+        }
+      }
+    },
+    {
+      "public_revision": "f41824b382e0f7798e36d2befb12fa75b142687c",
+      "path": "PUBLIC_METADATA/source-binding.json",
+      "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/f41824b382e0f7798e36d2befb12fa75b142687c/PUBLIC_METADATA/source-binding.json",
+      "sha256": "b387fd8eb6622043b0d1de00ef65ad2f83e4361d973af42a948263e42bf866fe",
+      "bytes": 1144941,
+      "git_blob": "9f7c9edf617a7aa16015878f47431ded8feac5f8",
+      "all_top_level_keys": [
+        "schema_version",
+        "source_manifest",
+        "source_manifest_sha256",
+        "source_tree_sha256",
+        "source_file_count",
+        "source_revision",
+        "comparison_public_revision",
+        "changed_source_paths",
+        "retained_sboms",
+        "input_equivalence",
+        "qualification",
+        "historical_bindings",
+        "prior_binding",
+        "retained_composition_component_bindings",
+        "reviewed_source_patch",
+        "new_resolution_performed",
+        "new_advisory_scan_performed",
+        "new_runtime_qualification_performed",
+        "new_source_contract_qualification_performed",
+        "new_static_security_scan_performed",
+        "new_resolution_scope",
+        "new_advisory_scan_scope",
+        "account_reconciliation_previous_binding"
+      ],
+      "preserved_json_objects": {
+        "schema_version": {
+          "pointer": "/schema_version",
+          "canonical_json_sha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+        },
+        "source_manifest": {
+          "pointer": "/source_manifest",
+          "canonical_json_sha256": "ace3c4cebde8c1e5207159e354ef46f1f9a13eb7b3185315a68b7cf8b71f212d"
+        },
+        "source_manifest_sha256": {
+          "pointer": "/source_manifest_sha256",
+          "canonical_json_sha256": "2c0dffb5785f22dbf9862d05db4af4e2b08c67b9470f20b0bf6ff5623b1a8851"
+        },
+        "source_tree_sha256": {
+          "pointer": "/source_tree_sha256",
+          "canonical_json_sha256": "c07e62eddd8928a89b106125c6905b27c354e70039b440dcdfb286e0efee4734"
+        },
+        "source_file_count": {
+          "pointer": "/source_file_count",
+          "canonical_json_sha256": "61b1dbc91985561c5af9e6e341ffa92fa3524c1e2083f39f67cb8bd736fcce46"
+        },
+        "source_revision": {
+          "pointer": "/source_revision",
+          "canonical_json_sha256": "22e0f93ad87c8440714bec78546f537f95e0692aedbc841bf01a6b349c68ee34"
+        },
+        "comparison_public_revision": {
+          "pointer": "/comparison_public_revision",
+          "canonical_json_sha256": "0bb9bf9aa62c5ed89e497eae9daf61ad8dc5e830887cc96e7c1c901ba80a6f9b"
+        },
+        "changed_source_paths": {
+          "pointer": "/changed_source_paths",
+          "canonical_json_sha256": "8cc4c83ec9a92bc5f837dc465219531951c9cf66129ced3937c058f588796ee8"
+        },
+        "retained_sboms": {
+          "pointer": "/retained_sboms",
+          "canonical_json_sha256": "0428d09c6e0e2b524877c2218b306c10da6c7536bcf6ed96524b581dafc85301"
+        },
+        "input_equivalence": {
+          "pointer": "/input_equivalence",
+          "canonical_json_sha256": "40c64e163cdb0050db1232b7a575e78bf97db9a995b7ff801536772c92614074"
+        },
+        "qualification": {
+          "pointer": "/qualification",
+          "canonical_json_sha256": "a3380bbb8ec52cdf7a338668eaab8f05b95f6e4e1f5e2fcef42bc0d2631a7780"
+        },
+        "historical_bindings": {
+          "pointer": "/historical_bindings",
+          "canonical_json_sha256": "59ccb6141308771f32ec1e534f7a843cbdd8867afcd59e84944e03e6f9958c33"
+        },
+        "prior_binding": {
+          "pointer": "/prior_binding",
+          "canonical_json_sha256": "f2aabb104cbc992f4704498987a59caabbd1c99f4f4d465229900579ecbc95c6"
+        },
+        "retained_composition_component_bindings": {
+          "pointer": "/retained_composition_component_bindings",
+          "canonical_json_sha256": "aebf7a2fa89cb597e9b67e88356b633b0a3a0f0d60a0b0fc07892a77fcc5e5fe"
+        },
+        "reviewed_source_patch": {
+          "pointer": "/reviewed_source_patch",
+          "canonical_json_sha256": "42d81346aa8a9f55c6f74a047f5dccbcecee4249f547ea14a78f3debd1fbed62"
+        },
+        "new_resolution_performed": {
+          "pointer": "/new_resolution_performed",
+          "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+        },
+        "new_advisory_scan_performed": {
+          "pointer": "/new_advisory_scan_performed",
+          "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+        },
+        "new_runtime_qualification_performed": {
+          "pointer": "/new_runtime_qualification_performed",
+          "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+        },
+        "new_source_contract_qualification_performed": {
+          "pointer": "/new_source_contract_qualification_performed",
+          "canonical_json_sha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b"
+        },
+        "new_static_security_scan_performed": {
+          "pointer": "/new_static_security_scan_performed",
+          "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+        },
+        "new_resolution_scope": {
+          "pointer": "/new_resolution_scope",
+          "canonical_json_sha256": "f8f5e2e03d127740a088e33ae06809c8a5745b29ba35d6cfda4588455c6ac7b5"
+        },
+        "new_advisory_scan_scope": {
+          "pointer": "/new_advisory_scan_scope",
+          "canonical_json_sha256": "10498cd5e06f960054d6c8905a1e0ee71777731b4f4f9c087a5331564cba46bb"
+        },
+        "account_reconciliation_previous_binding": {
+          "pointer": "/account_reconciliation_previous_binding",
+          "canonical_json_sha256": "cfeffa86ef01cbbd530cda12a57b6c4eb3761063999ad3fae482a0c1d7482b51"
+        }
+      },
+      "source_manifest": {
+        "path": "PUBLIC_METADATA/source-manifest.json",
+        "sha256": "6d12726b76a817b300d6bf935419fa838529f8763e3007cd955cd08a5cc7db91",
+        "bytes": 467630,
+        "git_blob": "9a460be8599d3998d647566d4fd27f65cebfa3d2"
+      }
+    },
+    {
+      "public_revision": "6ba66d79a9137c9efb2e2e2934ad900eed57561a",
+      "path": "PUBLIC_METADATA/source-binding.json",
+      "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/6ba66d79a9137c9efb2e2e2934ad900eed57561a/PUBLIC_METADATA/source-binding.json",
+      "sha256": "1bb6429a05147eb2c58fd23fabe7ba533e38a4b7517ce64da351a09e50b9fb74",
+      "bytes": 1149812,
+      "git_blob": "0da84bfbfb8b179e57161aacb60d1b58064d22ef",
+      "all_top_level_keys": [
+        "schema_version",
+        "source_manifest",
+        "source_manifest_sha256",
+        "source_tree_sha256",
+        "source_file_count",
+        "source_revision",
+        "comparison_public_revision",
+        "changed_source_paths",
+        "retained_sboms",
+        "input_equivalence",
+        "qualification",
+        "historical_bindings",
+        "prior_binding",
+        "retained_composition_component_bindings",
+        "reviewed_source_patch",
+        "new_resolution_performed",
+        "new_advisory_scan_performed",
+        "new_runtime_qualification_performed",
+        "new_source_contract_qualification_performed",
+        "new_static_security_scan_performed",
+        "new_resolution_scope",
+        "new_advisory_scan_scope",
+        "account_reconciliation_previous_binding",
+        "reviewed_speech_binding"
+      ],
+      "preserved_json_objects": {
+        "schema_version": {
+          "pointer": "/schema_version",
+          "canonical_json_sha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+        },
+        "source_manifest": {
+          "pointer": "/source_manifest",
+          "canonical_json_sha256": "ace3c4cebde8c1e5207159e354ef46f1f9a13eb7b3185315a68b7cf8b71f212d"
+        },
+        "source_manifest_sha256": {
+          "pointer": "/source_manifest_sha256",
+          "canonical_json_sha256": "5bd008575282bfbf483c402f0217e2b205615288b6f275941b117f13e3b0dcfe"
+        },
+        "source_tree_sha256": {
+          "pointer": "/source_tree_sha256",
+          "canonical_json_sha256": "ee299f69d467facfd828a430d708661cf9a204525934d78287f02982d0ffc624"
+        },
+        "source_file_count": {
+          "pointer": "/source_file_count",
+          "canonical_json_sha256": "363341185eb04b13db8d615140584368124fe057c7ba5d83bdd29667b1f9656a"
+        },
+        "source_revision": {
+          "pointer": "/source_revision",
+          "canonical_json_sha256": "72e8ebe00ec3d4017aa9837ca3660d734409a46866ce399ba82cef2d38fdbb29"
+        },
+        "comparison_public_revision": {
+          "pointer": "/comparison_public_revision",
+          "canonical_json_sha256": "0bb9bf9aa62c5ed89e497eae9daf61ad8dc5e830887cc96e7c1c901ba80a6f9b"
+        },
+        "changed_source_paths": {
+          "pointer": "/changed_source_paths",
+          "canonical_json_sha256": "4543d098d4ed3d2b88a1339afb61d1acc80b94bea065526d3c8385509f46f27e"
+        },
+        "retained_sboms": {
+          "pointer": "/retained_sboms",
+          "canonical_json_sha256": "0428d09c6e0e2b524877c2218b306c10da6c7536bcf6ed96524b581dafc85301"
+        },
+        "input_equivalence": {
+          "pointer": "/input_equivalence",
+          "canonical_json_sha256": "a7e6d5af2148446d66f132bb1d62786324f708fd92238ea785245fe03cfad53d"
+        },
+        "qualification": {
+          "pointer": "/qualification",
+          "canonical_json_sha256": "7ae961b9d9cc25cab230311a3a261a5db1eb53dd6ad57d5bde469b20f9523e39"
+        },
+        "historical_bindings": {
+          "pointer": "/historical_bindings",
+          "canonical_json_sha256": "59ccb6141308771f32ec1e534f7a843cbdd8867afcd59e84944e03e6f9958c33"
+        },
+        "prior_binding": {
+          "pointer": "/prior_binding",
+          "canonical_json_sha256": "f2aabb104cbc992f4704498987a59caabbd1c99f4f4d465229900579ecbc95c6"
+        },
+        "retained_composition_component_bindings": {
+          "pointer": "/retained_composition_component_bindings",
+          "canonical_json_sha256": "bb8213bf98b79ed961e44d5aeeccec160fb5ac41447fca82c275abb038d8d882"
+        },
+        "reviewed_source_patch": {
+          "pointer": "/reviewed_source_patch",
+          "canonical_json_sha256": "6a08bb0b3765f5adc2f73e6940c47098199bb0e59be6c71cd7353c3010e0e01b"
+        },
+        "new_resolution_performed": {
+          "pointer": "/new_resolution_performed",
+          "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+        },
+        "new_advisory_scan_performed": {
+          "pointer": "/new_advisory_scan_performed",
+          "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+        },
+        "new_runtime_qualification_performed": {
+          "pointer": "/new_runtime_qualification_performed",
+          "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+        },
+        "new_source_contract_qualification_performed": {
+          "pointer": "/new_source_contract_qualification_performed",
+          "canonical_json_sha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b"
+        },
+        "new_static_security_scan_performed": {
+          "pointer": "/new_static_security_scan_performed",
+          "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+        },
+        "new_resolution_scope": {
+          "pointer": "/new_resolution_scope",
+          "canonical_json_sha256": "e30647563c02ab51cd3849a700648497a4e91c7a42d7084b0ce22dcd18e158d4"
+        },
+        "new_advisory_scan_scope": {
+          "pointer": "/new_advisory_scan_scope",
+          "canonical_json_sha256": "f40781c12ee1d9778988d2559e2673bf3454a4d45538d0835773579246dea8e7"
+        },
+        "account_reconciliation_previous_binding": {
+          "pointer": "/account_reconciliation_previous_binding",
+          "canonical_json_sha256": "cfeffa86ef01cbbd530cda12a57b6c4eb3761063999ad3fae482a0c1d7482b51"
+        },
+        "reviewed_speech_binding": {
+          "pointer": "/reviewed_speech_binding",
+          "canonical_json_sha256": "b60676c24d35b5e49b37b6ae5fda19d3f8bca6d61702c6b99a0f06b77feec8a8"
+        }
+      },
+      "source_manifest": {
+        "path": "PUBLIC_METADATA/source-manifest.json",
+        "sha256": "a3032e6ff1f07529f55867b0dd0727d65c54f0d4b5520959d32d71c789dacbd6",
+        "bytes": 469083,
+        "git_blob": "d9bb782c08bf4b8c1315bf308e46788f2f824631"
+      }
+    },
     {
       "public_revision": "a002401aae36786bbd9aeea8a1eacd0790b4192a",
       "path": "PUBLIC_METADATA/source-binding.json",
@@ -8858,19 +9453,19 @@
     }
   ],
   "reviewed_source_patch": {
-    "scope": "Weekly Review parsed-response handling and panel-owned request lifecycle; source/component support only, no installed acceptance.",
+    "scope": "Local media request-path validation only; no player, device, model or external service calls.",
     "source_paths": [
-      "SOURCE/ui/react-app/src/components/SettingsModal.desktopOnlyPanels.test.jsx",
-      "SOURCE/ui/react-app/src/components/SettingsModal.jsx"
+      "SOURCE/ui/api/models.py",
+      "SOURCE/tests/public/test_local_media_path_length.py"
     ],
-    "source_tree": "01659b93bcd3b1d61f22baf5a6055bb178871535",
+    "source_tree": "59eca3d3c62d5b1986d58bfb0ab7d4741037d4d9",
     "prior_binding": {
-      "public_revision": "a002401aae36786bbd9aeea8a1eacd0790b4192a",
+      "public_revision": "d0818424b78669a8328676c11a4b0d5611fb2256",
       "path": "PUBLIC_METADATA/source-binding.json",
-      "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/a002401aae36786bbd9aeea8a1eacd0790b4192a/PUBLIC_METADATA/source-binding.json",
-      "sha256": "b848ca260eaf2e6f9de4d51c56723d9875cedfcacac66e42265dc102e7e4ff6c",
-      "bytes": 1121055,
-      "git_blob": "acacece0a99a2b912b96d3562735ab5a45b31de1",
+      "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/d0818424b78669a8328676c11a4b0d5611fb2256/PUBLIC_METADATA/source-binding.json",
+      "sha256": "c64ff747e36020ed55ce40f2bf2b238cc8634380212200d2767f7400a81a48cb",
+      "bytes": 1166774,
+      "git_blob": "b602de49d11a1192c80e266b1d757982dd777f74",
       "all_top_level_keys": [
         "schema_version",
         "source_manifest",
@@ -8894,7 +9489,8 @@
         "new_static_security_scan_performed",
         "new_resolution_scope",
         "new_advisory_scan_scope",
-        "account_reconciliation_previous_binding"
+        "account_reconciliation_previous_binding",
+        "reviewed_speech_binding"
       ],
       "preserved_json_objects": {
         "schema_version": {
@@ -8907,27 +9503,27 @@
         },
         "source_manifest_sha256": {
           "pointer": "/source_manifest_sha256",
-          "canonical_json_sha256": "84851c1af91cb9e7c3e01c6ee5813dd6c03c63877a3aeb5090fb59bd65625d97"
+          "canonical_json_sha256": "879e6eee2f5260e09fada6c96116365a4dc68d56d98c4826e10a8dfbe8b2030c"
         },
         "source_tree_sha256": {
           "pointer": "/source_tree_sha256",
-          "canonical_json_sha256": "7ed7908c0b2be4efdc9fa83bb8260b94c3f0773ed675a8728f62767ebd182083"
+          "canonical_json_sha256": "3d2a4fa7da5d5ea97c6ff828e2a8e076081cd8deb0095ece6e7e0f005fdb159f"
         },
         "source_file_count": {
           "pointer": "/source_file_count",
-          "canonical_json_sha256": "61b1dbc91985561c5af9e6e341ffa92fa3524c1e2083f39f67cb8bd736fcce46"
+          "canonical_json_sha256": "363341185eb04b13db8d615140584368124fe057c7ba5d83bdd29667b1f9656a"
         },
         "source_revision": {
           "pointer": "/source_revision",
-          "canonical_json_sha256": "5be18285c66ac7a611d3ca2d4120e96471f55914c4ac8d038f58665dd231fb53"
+          "canonical_json_sha256": "2c816761a632476a29fae13af08f30e66a1def0e3ce5dbbef309e2b4616d5cee"
         },
         "comparison_public_revision": {
           "pointer": "/comparison_public_revision",
-          "canonical_json_sha256": "7659ce5a6574255a28a9ba9671d0a6b3b45b169c463c478152be8db9a678b348"
+          "canonical_json_sha256": "9504c0cf4c6e9476bf8c92da776d3756065a8cd62232dcded74e637b4733b1e0"
         },
         "changed_source_paths": {
           "pointer": "/changed_source_paths",
-          "canonical_json_sha256": "3e63cbd6a6d239ac2b6b246e7003eaabf5518a46b44939925a716e4c653d20da"
+          "canonical_json_sha256": "f26dc20edf3d91565b7f562b5a487131c868ff6f2e3f69e41eb0aa9ead428b77"
         },
         "retained_sboms": {
           "pointer": "/retained_sboms",
@@ -8935,11 +9531,11 @@
         },
         "input_equivalence": {
           "pointer": "/input_equivalence",
-          "canonical_json_sha256": "f22c003b4334e149905cd9e2b309b84bb7b86734657f68d8a8a49802615bb64d"
+          "canonical_json_sha256": "132b7da5f60e6a38632cbfb08258ad5deb3b4d691a9719df14542b093a7de70e"
         },
         "qualification": {
           "pointer": "/qualification",
-          "canonical_json_sha256": "cd94e62ea228a8ac3bbe479d8dc69abf894a6539b73ab797054681173880a80c"
+          "canonical_json_sha256": "8e7ab41cb4124e3f66227ccb783c741dc3dbfd6e87271d062821c33fdf134cce"
         },
         "historical_bindings": {
           "pointer": "/historical_bindings",
@@ -8947,147 +9543,15 @@
         },
         "prior_binding": {
           "pointer": "/prior_binding",
-          "canonical_json_sha256": "ff6e9fdafc77b189bcc9f060cb72c85ac06b39c01f04526f1edbebcc1978371e"
+          "canonical_json_sha256": "b9a05f0f75420e0dfbb800d099d7d084893e6bba4d0d9f1fdb05018430ed3659"
         },
         "retained_composition_component_bindings": {
           "pointer": "/retained_composition_component_bindings",
-          "canonical_json_sha256": "c2d09217a2bcfa84f8cb717b53382fb2681537d59e8760c23f3382ab629d1606"
+          "canonical_json_sha256": "3f7cc2d71ee26c4da8ba75cbf35e7344fd7ca092e3e1ea29c6573d3a3ea6eb84"
         },
         "reviewed_source_patch": {
           "pointer": "/reviewed_source_patch",
-          "canonical_json_sha256": "d1384782a958730b6bb21f8614917b4ea16ea1800491ba8d2db1fd928e0872ae"
-        },
-        "new_resolution_performed": {
-          "pointer": "/new_resolution_performed",
-          "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
-        },
-        "new_advisory_scan_performed": {
-          "pointer": "/new_advisory_scan_performed",
-          "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
-        },
-        "new_runtime_qualification_performed": {
-          "pointer": "/new_runtime_qualification_performed",
-          "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
-        },
-        "new_source_contract_qualification_performed": {
-          "pointer": "/new_source_contract_qualification_performed",
-          "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
-        },
-        "new_static_security_scan_performed": {
-          "pointer": "/new_static_security_scan_performed",
-          "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
-        },
-        "new_resolution_scope": {
-          "pointer": "/new_resolution_scope",
-          "canonical_json_sha256": "3908ee280c958e288937f506ae635749e3ec8ad9d994adc5683170be9a3c2881"
-        },
-        "new_advisory_scan_scope": {
-          "pointer": "/new_advisory_scan_scope",
-          "canonical_json_sha256": "76173bebb522a925c5f65181cfb865365c7b7eb973d1f62278f3f6afb11969bd"
-        },
-        "account_reconciliation_previous_binding": {
-          "pointer": "/account_reconciliation_previous_binding",
-          "canonical_json_sha256": "cfeffa86ef01cbbd530cda12a57b6c4eb3761063999ad3fae482a0c1d7482b51"
-        }
-      },
-      "source_manifest": {
-        "path": "PUBLIC_METADATA/source-manifest.json",
-        "sha256": "810712c2fe135f0dc91d5e727995ef42a9fc6353094f1d0d3b49011afb204d66",
-        "bytes": 467630,
-        "git_blob": "8c4562651d00dcaab292ef9bea76b33e90512299"
-      }
-    },
-    "original_weekly_review_binding": {
-      "public_revision": "006e41f62b0ce9fcc3e4c560ebee493bc312f6ac",
-      "path": "PUBLIC_METADATA/source-binding.json",
-      "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/006e41f62b0ce9fcc3e4c560ebee493bc312f6ac/PUBLIC_METADATA/source-binding.json",
-      "sha256": "58a04305dedf2ab27f987df2e9ff8e5b40d590aa336ee1cba9d05aa9ed5218ba",
-      "bytes": 1107930,
-      "git_blob": "98c83827c00687bd4230600b2fe65debf84d9b2e",
-      "all_top_level_keys": [
-        "schema_version",
-        "source_manifest",
-        "source_manifest_sha256",
-        "source_tree_sha256",
-        "source_file_count",
-        "source_revision",
-        "comparison_public_revision",
-        "changed_source_paths",
-        "retained_sboms",
-        "input_equivalence",
-        "qualification",
-        "historical_bindings",
-        "prior_binding",
-        "retained_composition_component_bindings",
-        "reviewed_source_patch",
-        "new_resolution_performed",
-        "new_advisory_scan_performed",
-        "new_runtime_qualification_performed",
-        "new_source_contract_qualification_performed",
-        "new_static_security_scan_performed",
-        "new_resolution_scope",
-        "new_advisory_scan_scope"
-      ],
-      "preserved_json_objects": {
-        "schema_version": {
-          "pointer": "/schema_version",
-          "canonical_json_sha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
-        },
-        "source_manifest": {
-          "pointer": "/source_manifest",
-          "canonical_json_sha256": "ace3c4cebde8c1e5207159e354ef46f1f9a13eb7b3185315a68b7cf8b71f212d"
-        },
-        "source_manifest_sha256": {
-          "pointer": "/source_manifest_sha256",
-          "canonical_json_sha256": "14ce173631066f4bef4120dfcb2fc6d4fd4c1218eb35bffc73a82843e44f9a2d"
-        },
-        "source_tree_sha256": {
-          "pointer": "/source_tree_sha256",
-          "canonical_json_sha256": "b404bb946fec1af1dff61558efc53f258abdc78a854b8aecf0f903907a78b228"
-        },
-        "source_file_count": {
-          "pointer": "/source_file_count",
-          "canonical_json_sha256": "a4167766b94bc710c11a88a4ef0f60e23c26499163dd18b2e43abf4a48bfd6f5"
-        },
-        "source_revision": {
-          "pointer": "/source_revision",
-          "canonical_json_sha256": "12c7e48aee5e0ff6a0d97aab5784efa875e894fbef03e17785bcf2cf9f419816"
-        },
-        "comparison_public_revision": {
-          "pointer": "/comparison_public_revision",
-          "canonical_json_sha256": "7659ce5a6574255a28a9ba9671d0a6b3b45b169c463c478152be8db9a678b348"
-        },
-        "changed_source_paths": {
-          "pointer": "/changed_source_paths",
-          "canonical_json_sha256": "8cc4c83ec9a92bc5f837dc465219531951c9cf66129ced3937c058f588796ee8"
-        },
-        "retained_sboms": {
-          "pointer": "/retained_sboms",
-          "canonical_json_sha256": "0428d09c6e0e2b524877c2218b306c10da6c7536bcf6ed96524b581dafc85301"
-        },
-        "input_equivalence": {
-          "pointer": "/input_equivalence",
-          "canonical_json_sha256": "bbb42b5d149520177c266021fad271adf141adba6c14b1c7070f1a452f8b9728"
-        },
-        "qualification": {
-          "pointer": "/qualification",
-          "canonical_json_sha256": "7b85d3f0789d7b1cd696408d5c74fa5546de58cee2a8d56b7df55edb668ea7b7"
-        },
-        "historical_bindings": {
-          "pointer": "/historical_bindings",
-          "canonical_json_sha256": "59ccb6141308771f32ec1e534f7a843cbdd8867afcd59e84944e03e6f9958c33"
-        },
-        "prior_binding": {
-          "pointer": "/prior_binding",
-          "canonical_json_sha256": "7dcb89939935e9a1247c92f0236131c7c359219cf0f4dbbf97dc659d89489558"
-        },
-        "retained_composition_component_bindings": {
-          "pointer": "/retained_composition_component_bindings",
-          "canonical_json_sha256": "a5bd9a5fdd4579a102c09ac26186e9065b468a5bddd5039317fcd2b072273da2"
-        },
-        "reviewed_source_patch": {
-          "pointer": "/reviewed_source_patch",
-          "canonical_json_sha256": "6b28a2d0848d096d8d8fd50c5d2b05487ae463a54bfe92e84078d11fb0867e8c"
+          "canonical_json_sha256": "677816346698090924fa870e130748f80b27e761175c2c6a5056b401d4c6654f"
         },
         "new_resolution_performed": {
           "pointer": "/new_resolution_performed",
@@ -9111,12 +9575,26 @@
         },
         "new_resolution_scope": {
           "pointer": "/new_resolution_scope",
-          "canonical_json_sha256": "f8f5e2e03d127740a088e33ae06809c8a5745b29ba35d6cfda4588455c6ac7b5"
+          "canonical_json_sha256": "e30647563c02ab51cd3849a700648497a4e91c7a42d7084b0ce22dcd18e158d4"
         },
         "new_advisory_scan_scope": {
           "pointer": "/new_advisory_scan_scope",
-          "canonical_json_sha256": "10498cd5e06f960054d6c8905a1e0ee71777731b4f4f9c087a5331564cba46bb"
+          "canonical_json_sha256": "f40781c12ee1d9778988d2559e2673bf3454a4d45538d0835773579246dea8e7"
+        },
+        "account_reconciliation_previous_binding": {
+          "pointer": "/account_reconciliation_previous_binding",
+          "canonical_json_sha256": "cfeffa86ef01cbbd530cda12a57b6c4eb3761063999ad3fae482a0c1d7482b51"
+        },
+        "reviewed_speech_binding": {
+          "pointer": "/reviewed_speech_binding",
+          "canonical_json_sha256": "88025408d951467d38a236d6fdedb10ad4a4112e6ce02b3577c5b906adec6305"
         }
+      },
+      "source_manifest": {
+        "path": "PUBLIC_METADATA/source-manifest.json",
+        "sha256": "fa0e3a3da6e8250ac4420fec665dbe175048caf4610041dc4642a5c031f076e7",
+        "bytes": 469083,
+        "git_blob": "5335972825fd157417fd87f34578dc4a238554f4"
       }
     }
   },
@@ -9125,8 +9603,8 @@
   "new_runtime_qualification_performed": false,
   "new_source_contract_qualification_performed": true,
   "new_static_security_scan_performed": false,
-  "new_resolution_scope": "No dependency change or resolution; retained inventories keep their original scope and provenance.",
-  "new_advisory_scan_scope": "No new advisory scan in local source preparation; final-head hosted gates remain required.",
+  "new_resolution_scope": "No dependency change or resolution; retained inventories preserve their original scope and provenance.",
+  "new_advisory_scan_scope": "No new advisory scan was performed; final-head hosted checks remain required.",
   "account_reconciliation_previous_binding": {
     "source_revision": "f864e61381ef9e10a09333fce05210427cf7d0f6",
     "source_manifest_sha256": "9cad8bcb2f98c34d95a11545e11a57d74dbe6b28cd5db7322b7746e102801acd",
@@ -9608,71 +10086,621 @@
       ]
     }
   },
-  "desktop_session_persistence_previous_binding": {
-    "source_revision": "1b15aa4fc968136f5512eff238556c244ec9759c",
-    "source_manifest_sha256": "6d12726b76a817b300d6bf935419fa838529f8763e3007cd955cd08a5cc7db91",
-    "source_tree_sha256": "6fa31c02d82881e28fd14c2698169eb8ec6296ebd78bd93928cfa9c0cae2fe16",
-    "source_file_count": 2662,
-    "comparison_public_revision": "a002401aae36786bbd9aeea8a1eacd0790b4192a",
-    "changed_source_paths": [
-      "SOURCE/ui/react-app/src/components/SettingsModal.desktopOnlyPanels.test.jsx",
-      "SOURCE/ui/react-app/src/components/SettingsModal.jsx"
+  "reviewed_speech_binding": {
+    "public_revision": "6ba66d79a9137c9efb2e2e2934ad900eed57561a",
+    "path": "PUBLIC_METADATA/source-binding.json",
+    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/6ba66d79a9137c9efb2e2e2934ad900eed57561a/PUBLIC_METADATA/source-binding.json",
+    "sha256": "1bb6429a05147eb2c58fd23fabe7ba533e38a4b7517ce64da351a09e50b9fb74",
+    "bytes": 1149812,
+    "git_blob": "0da84bfbfb8b179e57161aacb60d1b58064d22ef",
+    "all_top_level_keys": [
+      "schema_version",
+      "source_manifest",
+      "source_manifest_sha256",
+      "source_tree_sha256",
+      "source_file_count",
+      "source_revision",
+      "comparison_public_revision",
+      "changed_source_paths",
+      "retained_sboms",
+      "input_equivalence",
+      "qualification",
+      "historical_bindings",
+      "prior_binding",
+      "retained_composition_component_bindings",
+      "reviewed_source_patch",
+      "new_resolution_performed",
+      "new_advisory_scan_performed",
+      "new_runtime_qualification_performed",
+      "new_source_contract_qualification_performed",
+      "new_static_security_scan_performed",
+      "new_resolution_scope",
+      "new_advisory_scan_scope",
+      "account_reconciliation_previous_binding",
+      "reviewed_speech_binding"
     ],
-    "qualification": {
-      "scope": "Weekly Review parsed-response handling and panel-owned request lifecycle; source/component support only, no installed acceptance.",
-      "source_commit": "1b15aa4fc968136f5512eff238556c244ec9759c",
-      "source_tree": "01659b93bcd3b1d61f22baf5a6055bb178871535",
-      "ordered_source_parents": [
-        "006e41f62b0ce9fcc3e4c560ebee493bc312f6ac",
-        "a002401aae36786bbd9aeea8a1eacd0790b4192a"
+    "preserved_json_objects": {
+      "schema_version": {
+        "pointer": "/schema_version",
+        "canonical_json_sha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+      },
+      "source_manifest": {
+        "pointer": "/source_manifest",
+        "canonical_json_sha256": "ace3c4cebde8c1e5207159e354ef46f1f9a13eb7b3185315a68b7cf8b71f212d"
+      },
+      "source_manifest_sha256": {
+        "pointer": "/source_manifest_sha256",
+        "canonical_json_sha256": "5bd008575282bfbf483c402f0217e2b205615288b6f275941b117f13e3b0dcfe"
+      },
+      "source_tree_sha256": {
+        "pointer": "/source_tree_sha256",
+        "canonical_json_sha256": "ee299f69d467facfd828a430d708661cf9a204525934d78287f02982d0ffc624"
+      },
+      "source_file_count": {
+        "pointer": "/source_file_count",
+        "canonical_json_sha256": "363341185eb04b13db8d615140584368124fe057c7ba5d83bdd29667b1f9656a"
+      },
+      "source_revision": {
+        "pointer": "/source_revision",
+        "canonical_json_sha256": "72e8ebe00ec3d4017aa9837ca3660d734409a46866ce399ba82cef2d38fdbb29"
+      },
+      "comparison_public_revision": {
+        "pointer": "/comparison_public_revision",
+        "canonical_json_sha256": "0bb9bf9aa62c5ed89e497eae9daf61ad8dc5e830887cc96e7c1c901ba80a6f9b"
+      },
+      "changed_source_paths": {
+        "pointer": "/changed_source_paths",
+        "canonical_json_sha256": "4543d098d4ed3d2b88a1339afb61d1acc80b94bea065526d3c8385509f46f27e"
+      },
+      "retained_sboms": {
+        "pointer": "/retained_sboms",
+        "canonical_json_sha256": "0428d09c6e0e2b524877c2218b306c10da6c7536bcf6ed96524b581dafc85301"
+      },
+      "input_equivalence": {
+        "pointer": "/input_equivalence",
+        "canonical_json_sha256": "a7e6d5af2148446d66f132bb1d62786324f708fd92238ea785245fe03cfad53d"
+      },
+      "qualification": {
+        "pointer": "/qualification",
+        "canonical_json_sha256": "7ae961b9d9cc25cab230311a3a261a5db1eb53dd6ad57d5bde469b20f9523e39"
+      },
+      "historical_bindings": {
+        "pointer": "/historical_bindings",
+        "canonical_json_sha256": "59ccb6141308771f32ec1e534f7a843cbdd8867afcd59e84944e03e6f9958c33"
+      },
+      "prior_binding": {
+        "pointer": "/prior_binding",
+        "canonical_json_sha256": "f2aabb104cbc992f4704498987a59caabbd1c99f4f4d465229900579ecbc95c6"
+      },
+      "retained_composition_component_bindings": {
+        "pointer": "/retained_composition_component_bindings",
+        "canonical_json_sha256": "bb8213bf98b79ed961e44d5aeeccec160fb5ac41447fca82c275abb038d8d882"
+      },
+      "reviewed_source_patch": {
+        "pointer": "/reviewed_source_patch",
+        "canonical_json_sha256": "6a08bb0b3765f5adc2f73e6940c47098199bb0e59be6c71cd7353c3010e0e01b"
+      },
+      "new_resolution_performed": {
+        "pointer": "/new_resolution_performed",
+        "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+      },
+      "new_advisory_scan_performed": {
+        "pointer": "/new_advisory_scan_performed",
+        "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+      },
+      "new_runtime_qualification_performed": {
+        "pointer": "/new_runtime_qualification_performed",
+        "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+      },
+      "new_source_contract_qualification_performed": {
+        "pointer": "/new_source_contract_qualification_performed",
+        "canonical_json_sha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b"
+      },
+      "new_static_security_scan_performed": {
+        "pointer": "/new_static_security_scan_performed",
+        "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+      },
+      "new_resolution_scope": {
+        "pointer": "/new_resolution_scope",
+        "canonical_json_sha256": "e30647563c02ab51cd3849a700648497a4e91c7a42d7084b0ce22dcd18e158d4"
+      },
+      "new_advisory_scan_scope": {
+        "pointer": "/new_advisory_scan_scope",
+        "canonical_json_sha256": "f40781c12ee1d9778988d2559e2673bf3454a4d45538d0835773579246dea8e7"
+      },
+      "account_reconciliation_previous_binding": {
+        "pointer": "/account_reconciliation_previous_binding",
+        "canonical_json_sha256": "cfeffa86ef01cbbd530cda12a57b6c4eb3761063999ad3fae482a0c1d7482b51"
+      },
+      "reviewed_speech_binding": {
+        "pointer": "/reviewed_speech_binding",
+        "canonical_json_sha256": "b60676c24d35b5e49b37b6ae5fda19d3f8bca6d61702c6b99a0f06b77feec8a8"
+      }
+    },
+    "source_manifest": {
+      "path": "PUBLIC_METADATA/source-manifest.json",
+      "sha256": "a3032e6ff1f07529f55867b0dd0727d65c54f0d4b5520959d32d71c789dacbd6",
+      "bytes": 469083,
+      "git_blob": "d9bb782c08bf4b8c1315bf308e46788f2f824631"
+    }
+  },
+  "local_media_path_previous_binding": {
+    "reference": {
+      "public_revision": "d0818424b78669a8328676c11a4b0d5611fb2256",
+      "path": "PUBLIC_METADATA/source-binding.json",
+      "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/d0818424b78669a8328676c11a4b0d5611fb2256/PUBLIC_METADATA/source-binding.json",
+      "sha256": "c64ff747e36020ed55ce40f2bf2b238cc8634380212200d2767f7400a81a48cb",
+      "bytes": 1166774,
+      "git_blob": "b602de49d11a1192c80e266b1d757982dd777f74",
+      "all_top_level_keys": [
+        "schema_version",
+        "source_manifest",
+        "source_manifest_sha256",
+        "source_tree_sha256",
+        "source_file_count",
+        "source_revision",
+        "comparison_public_revision",
+        "changed_source_paths",
+        "retained_sboms",
+        "input_equivalence",
+        "qualification",
+        "historical_bindings",
+        "prior_binding",
+        "retained_composition_component_bindings",
+        "reviewed_source_patch",
+        "new_resolution_performed",
+        "new_advisory_scan_performed",
+        "new_runtime_qualification_performed",
+        "new_source_contract_qualification_performed",
+        "new_static_security_scan_performed",
+        "new_resolution_scope",
+        "new_advisory_scan_scope",
+        "account_reconciliation_previous_binding",
+        "reviewed_speech_binding"
       ],
+      "preserved_json_objects": {
+        "schema_version": {
+          "pointer": "/schema_version",
+          "canonical_json_sha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+        },
+        "source_manifest": {
+          "pointer": "/source_manifest",
+          "canonical_json_sha256": "ace3c4cebde8c1e5207159e354ef46f1f9a13eb7b3185315a68b7cf8b71f212d"
+        },
+        "source_manifest_sha256": {
+          "pointer": "/source_manifest_sha256",
+          "canonical_json_sha256": "879e6eee2f5260e09fada6c96116365a4dc68d56d98c4826e10a8dfbe8b2030c"
+        },
+        "source_tree_sha256": {
+          "pointer": "/source_tree_sha256",
+          "canonical_json_sha256": "3d2a4fa7da5d5ea97c6ff828e2a8e076081cd8deb0095ece6e7e0f005fdb159f"
+        },
+        "source_file_count": {
+          "pointer": "/source_file_count",
+          "canonical_json_sha256": "363341185eb04b13db8d615140584368124fe057c7ba5d83bdd29667b1f9656a"
+        },
+        "source_revision": {
+          "pointer": "/source_revision",
+          "canonical_json_sha256": "2c816761a632476a29fae13af08f30e66a1def0e3ce5dbbef309e2b4616d5cee"
+        },
+        "comparison_public_revision": {
+          "pointer": "/comparison_public_revision",
+          "canonical_json_sha256": "9504c0cf4c6e9476bf8c92da776d3756065a8cd62232dcded74e637b4733b1e0"
+        },
+        "changed_source_paths": {
+          "pointer": "/changed_source_paths",
+          "canonical_json_sha256": "f26dc20edf3d91565b7f562b5a487131c868ff6f2e3f69e41eb0aa9ead428b77"
+        },
+        "retained_sboms": {
+          "pointer": "/retained_sboms",
+          "canonical_json_sha256": "0428d09c6e0e2b524877c2218b306c10da6c7536bcf6ed96524b581dafc85301"
+        },
+        "input_equivalence": {
+          "pointer": "/input_equivalence",
+          "canonical_json_sha256": "132b7da5f60e6a38632cbfb08258ad5deb3b4d691a9719df14542b093a7de70e"
+        },
+        "qualification": {
+          "pointer": "/qualification",
+          "canonical_json_sha256": "8e7ab41cb4124e3f66227ccb783c741dc3dbfd6e87271d062821c33fdf134cce"
+        },
+        "historical_bindings": {
+          "pointer": "/historical_bindings",
+          "canonical_json_sha256": "59ccb6141308771f32ec1e534f7a843cbdd8867afcd59e84944e03e6f9958c33"
+        },
+        "prior_binding": {
+          "pointer": "/prior_binding",
+          "canonical_json_sha256": "b9a05f0f75420e0dfbb800d099d7d084893e6bba4d0d9f1fdb05018430ed3659"
+        },
+        "retained_composition_component_bindings": {
+          "pointer": "/retained_composition_component_bindings",
+          "canonical_json_sha256": "3f7cc2d71ee26c4da8ba75cbf35e7344fd7ca092e3e1ea29c6573d3a3ea6eb84"
+        },
+        "reviewed_source_patch": {
+          "pointer": "/reviewed_source_patch",
+          "canonical_json_sha256": "677816346698090924fa870e130748f80b27e761175c2c6a5056b401d4c6654f"
+        },
+        "new_resolution_performed": {
+          "pointer": "/new_resolution_performed",
+          "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+        },
+        "new_advisory_scan_performed": {
+          "pointer": "/new_advisory_scan_performed",
+          "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+        },
+        "new_runtime_qualification_performed": {
+          "pointer": "/new_runtime_qualification_performed",
+          "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+        },
+        "new_source_contract_qualification_performed": {
+          "pointer": "/new_source_contract_qualification_performed",
+          "canonical_json_sha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b"
+        },
+        "new_static_security_scan_performed": {
+          "pointer": "/new_static_security_scan_performed",
+          "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+        },
+        "new_resolution_scope": {
+          "pointer": "/new_resolution_scope",
+          "canonical_json_sha256": "e30647563c02ab51cd3849a700648497a4e91c7a42d7084b0ce22dcd18e158d4"
+        },
+        "new_advisory_scan_scope": {
+          "pointer": "/new_advisory_scan_scope",
+          "canonical_json_sha256": "f40781c12ee1d9778988d2559e2673bf3454a4d45538d0835773579246dea8e7"
+        },
+        "account_reconciliation_previous_binding": {
+          "pointer": "/account_reconciliation_previous_binding",
+          "canonical_json_sha256": "cfeffa86ef01cbbd530cda12a57b6c4eb3761063999ad3fae482a0c1d7482b51"
+        },
+        "reviewed_speech_binding": {
+          "pointer": "/reviewed_speech_binding",
+          "canonical_json_sha256": "88025408d951467d38a236d6fdedb10ad4a4112e6ce02b3577c5b906adec6305"
+        }
+      },
+      "source_manifest": {
+        "path": "PUBLIC_METADATA/source-manifest.json",
+        "sha256": "fa0e3a3da6e8250ac4420fec665dbe175048caf4610041dc4642a5c031f076e7",
+        "bytes": 469083,
+        "git_blob": "5335972825fd157417fd87f34578dc4a238554f4"
+      }
+    },
+    "qualification": {
+      "scope": "Normal desktop and phone startup plus saved language/voice selection for a separately marked English, Spanish and Mandarin qualification artifact.",
+      "source_commit": "0bc831ed2d3b2dcd7cdd758fa88c17b8de1421c3",
+      "source_tree": "e4071897cd11955089214866a4db112a863dae17",
+      "ordered_source_parents": [
+        "f41824b382e0f7798e36d2befb12fa75b142687c",
+        "6ba66d79a9137c9efb2e2e2934ad900eed57561a"
+      ],
+      "source_patch_sha256": "a9b889de219d3f727da507857976998690ffb37294b0bec4cf9a40585c36e1f4",
       "independent_automated_review": {
-        "result": "No blocking findings in the exact two-file repair.",
-        "reviewed_files": [
-          {
-            "path": "SOURCE/ui/react-app/src/components/SettingsModal.desktopOnlyPanels.test.jsx",
-            "sha256": "8454c64afb4fbb9b96b750d1489e884e2625e9d66b55d13caeab13dc62b6e52a",
-            "git_blob": "22e81008bb51d205f1834524ec62fb1bb3bb4e5a"
-          },
-          {
-            "path": "SOURCE/ui/react-app/src/components/SettingsModal.jsx",
-            "sha256": "ca93989249c9452b6358224e83ffe454f3c748186e5c02a5e302c82e3de13452",
-            "git_blob": "bbf9d383368ac8a6ce7e4755a108d18778fdda59"
-          }
-        ],
-        "scope": "Independent automated source review, not human review or installed acceptance."
+        "runtime_eleven_file_review_sha256": "7b83db3fb408dc954d6c143796b910cb14745a3fa689c59e64df364f3d086f7d",
+        "ui_fourteen_file_review_sha256": "771092cbc0cc7f37a2e8ef1f3b1456bd8b2d766ad526831f1c3537f03cd9c276",
+        "ui_optional_import_correction_patch_sha256": "10f6dd185dde080131f84e316e0941be1b9c16e53d29290768a60aa49ede927e",
+        "ui_optional_import_correction_independent_controls": 5,
+        "private_paired_startup_review_sha256": "b38ff623b82df45b6c968ea9025c9a27ab79475a93e77bb28c984c91dc1835e7",
+        "review_scope": "Source and inert boundaries; no human review or installed acceptance asserted."
       },
       "source_controls": {
-        "old_handler_negative_controls_failed": 4,
-        "old_panel_controls_still_passed": 21,
-        "repaired_panel_cases_passed": 41,
-        "actual_apiFetch_unwrap_cases": 2,
-        "full_frontend_files": 170,
-        "full_frontend_tests_passed": 1960,
-        "frontend_build": "passed",
-        "focused_lint_errors": 0,
-        "focused_lint_preexisting_warnings": 3,
-        "fixtures": "inert synthetic HTTP and settings receipts; no live model or service calls"
+        "normal_launch_runtime_methods": 18,
+        "ui_api_persistence_methods_after_guard_correction": 18,
+        "original_ui_and_volume_regression_combined_methods": 95,
+        "node_voice_selection_controls": 4,
+        "existing_voice_routing_methods": 18,
+        "cjk_inner_methods": 36,
+        "romance_inner_methods": 16,
+        "native_boundaries": "inert",
+        "initial_failures_preserved": true,
+        "react_interactions": "Prepared actual component and hook tests; final-head hosted frontend check required.",
+        "real_pipecat_integration": "Normal final-head Windows source check required; no repeat local dependency installation."
       },
-      "installed_source_comparison": {
-        "installed_public_revision": "75accae1e10e4532e37022f0be74fee0f7f16140",
-        "old_installed_bound_handlers_have_same_double_json_bug": true,
-        "installed_ui_observation_claimed": false
-      },
-      "normal_app_retest_required": [
-        "View Last Review returns an actual saved review or truthful empty/unavailable state.",
-        "Saved opt-in must precede an authorized Run Now; unsaved toggle explains Save Changes.",
-        "Authorized Run Now must visibly finish, display content, and read it back through View Last Review.",
-        "Failure and retry recover controls; repeated clicks cannot overlap inside one panel.",
-        "Close, cancel, tab navigation, opt-out, and account changes retire stale UI results.",
-        "Save disabled state, reopen, and verify future generation remains off."
+      "normal_launch_contract": [
+        "An exact private PyInstaller runtime hook admits a bounded local qualification marker before native imports.",
+        "Normal bootstrap, shared synthesis and direct factory calls select the existing composed tokenizer and named selected voice.",
+        "Phone startup and provider warmups remain on the selected local route; missing hook and remote bypass fail closed.",
+        "Authenticated settings save and user refresh validate a complete locale/voice pair, preserve failed state and require an explicit successful retry.",
+        "A changed route retires pending speech; an in-flight response is not spoken across old and new locales."
       ],
+      "paired_private_startup": {
+        "patch_sha256": "b2a2738e91128c967a25e10b953effc8e783f6d8630b7db6eeee19b7ab94f4b4",
+        "hook_sha256": "0950e2848fd0e93d4728cf3f5ccba39b7286d8934d3db7e877584251a0c5a396",
+        "public_helper_sha256": "43c20a0c0267c11487ea1ab937da7a1ba1d2823ad247a0ec6b5e5ba247a4fdae",
+        "source_tests": 65,
+        "subcases": 292,
+        "private_adoption": "Separate reviewed composition; not claimed by this public source commit."
+      },
+      "dependency_inputs_changed": false,
+      "component_wheels_rebuilt": false,
+      "native_runtime_repeated": false,
+      "profile_activated": false,
+      "customer_release_eligible": false,
+      "launch_languages": [
+        "English",
+        "Spanish",
+        "Mandarin"
+      ],
+      "canonical_assets_and_dormant_routes_preserved": true,
       "limits": [
-        "No live Run Now or model call was performed.",
-        "No installed customer acceptance, deployment, or release is claimed.",
-        "Retiring the panel does not cancel or globally deduplicate already-running server analysis.",
-        "Existing source gates and exact-head checks remain required before integration."
-      ]
+        "Source and inert controls do not establish installed normal-launch speech or acoustic quality.",
+        "Selected Windows native closure, notices, signing and the actual qualification artifact remain separate build/acceptance obligations.",
+        "Existing bounded pronunciation coverage remains; no all-language or all-voice qualification claim.",
+        "The owner observed wake nonresponse and account-gated held PTT on internal QA1482; capture and transcription remain unproved by that attempt.",
+        "Wake initialization and authenticated PTT must be retested separately on the coherent installed candidate."
+      ],
+      "reviewed_speech_head": "6ba66d79a9137c9efb2e2e2934ad900eed57561a",
+      "protected_account_delta_preserved": true,
+      "shared_settings_file_composition": {
+        "path": "SOURCE/ui/settings_manager.py",
+        "ancestor_git_blob": "bdad358a4ad64aec5dfd4fd043b34079eaa5000d",
+        "accepted_account_git_blob": "fa9426afb47610686ee6bbd2f731f78ae5f90d86",
+        "reviewed_speech_git_blob": "e0ea37c131438115016f583776f67680f642d2d1",
+        "composed_git_blob": "5228feac890a64dfc115d3bfe79b82c47f6912b5",
+        "composed_sha256": "fe16600afea58127773161bdcb1f6e8ad59a302f099792c29a8d51d2afe7be67",
+        "composed_bytes": 160519,
+        "exact_preserved_account_delta": "Add billing_plan_snapshot to _SYSTEM_KEY_PREFIXES; all reviewed speech bytes otherwise preserved"
+      },
+      "shared_settings_file_independent_review": "Root verified exact reviewed speech bytes plus only the protected billing_plan_snapshot key line; no other source delta.",
+      "protected_weekly_delta_preserved": true,
+      "shared_modal_composition": {
+        "path": "SOURCE/ui/react-app/src/components/SettingsModal.jsx",
+        "ancestor_git_blob": "c20229438d30dc67afd0cf0de346cad24d0954c2",
+        "reviewed_speech_git_blob": "ee5d1f922d9ea5b5c7d8fa855a717d6bd321b75e",
+        "accepted_weekly_git_blob": "bbf9d383368ac8a6ce7e4755a108d18778fdda59",
+        "merged_git_blob": "134e614b754975d7c2fd5ec49cf2c9974ba81cd0",
+        "merged_sha256": "ae52c6aba4c75afe75bd997d2e2c2666681ce0cacecd0c5669257c81f6bfcf07",
+        "merged_bytes": 202969,
+        "git_merge_file_exit": 0
+      },
+      "shared_modal_independent_review_sha256": "b3a72f5bbdaf6f83ae8f575a38b9c7c7e2a817ec60a06b3717d2c39e232019aa",
+      "fixture_dependency_repair": {
+        "scope": "Restore only real source dependencies omitted from existing AST-extracted test fixtures",
+        "patch_sha256": "c71f18a356419ed302c25beb068f56770a1a7ec8eb1753eeb084d1677b20543e",
+        "files": [
+          {
+            "path": "SOURCE/tests/public/test_disabled_tts_streaming.py",
+            "base_git_blob": "0be6f242ee654df86b053b47845134dd7de30e8d",
+            "git_blob": "31b9eccfe5e77be5759c4440edb4c49c47d8296b",
+            "sha256": "d66c9ca1f671e9b861aa8f05c580c3e80cda0559e51969ee987cb683fce2da45",
+            "bytes": 24889,
+            "mode": "100644"
+          },
+          {
+            "path": "SOURCE/tests/public/test_streaming_decimal_boundaries.py",
+            "base_git_blob": "d98a6f949f8b081bca67356470717f24caccf3dc",
+            "git_blob": "949c0f70fc98a2209ef5c52890f9fc2c70229d18",
+            "sha256": "2d3e3f6677e9c67c9a6aa59e95a3be1db74015d877df993a5cfb3aa7866cc0b2",
+            "bytes": 11365,
+            "mode": "100644"
+          },
+          {
+            "path": "SOURCE/tests/public/test_phone_language_switch.py",
+            "base_git_blob": "4605d1b05d916507ecf2f820d5bffc3ffa10240c",
+            "git_blob": "9e56c4584ec1ffa66b6d753390ae76a21c14389d",
+            "sha256": "4ca7f7589478cf0bb783a5164edf162b112d9fa0fad00a74ce24265e02660468",
+            "bytes": 22407,
+            "mode": "100644"
+          }
+        ],
+        "production_changes": false,
+        "assertions_removed_or_weakened": false,
+        "first_hosted_head": "6ba66d79a9137c9efb2e2e2934ad900eed57561a",
+        "first_hosted_source_job": 113058151316,
+        "retained_hosted_result": {
+          "methods_run": 778,
+          "errors": 190,
+          "existing_skip": 1,
+          "classification": {
+            "missing_prepare_route_text": 173,
+            "consequent_watchdog_timeout": 16,
+            "phone_fixture_missing_os": 1
+          }
+        },
+        "new_affected_fixture_test_result": {
+          "methods": 50,
+          "seconds": 2.211,
+          "result": "PASS",
+          "native_boundaries": "inert",
+          "log_sha256": "05345f2ca0e5d3b4252411c545e73b354c926f1160e0106aef33cb146122b180"
+        },
+        "real_pipecat_phone_fixture": "Existing hosted source check required; no additional local installation",
+        "review": "Root independently reviewed exact patchc71f18a3: only real helper/constant/os dependencies restored; production and assertions unchanged; PASS on 2026-10-07T23:08Z."
+      },
+      "prior_hosted_source_failure": {
+        "head": "6ba66d79a9137c9efb2e2e2934ad900eed57561a",
+        "run": 37699153751,
+        "methods": 778,
+        "errors": 190,
+        "existing_skip": 1,
+        "scope": "Missing extracted fixture dependencies; failure preserved. New final-head source qualification required."
+      },
+      "prior_real_frontend_pass": {
+        "head": "6ba66d79a9137c9efb2e2e2934ad900eed57561a",
+        "job": 113058151656,
+        "tests": 1950,
+        "files": 172,
+        "customer_component_and_hook_cases": 10,
+        "build_passed": true,
+        "audit_findings": 0,
+        "new_weekly_union_requires_fresh_final_frontend": true
+      }
+    },
+    "input_equivalence": {
+      "comparison_basis": "Protected public main f41824b382e0f7798e36d2befb12fa75b142687c",
+      "all_unselected_export_leaf_bytes_and_modes_preserved": true,
+      "all_six_sbom_bytes_and_status_objects_preserved": true,
+      "dependency_vendor_wheel_and_workflow_inputs_unchanged": true,
+      "frontend_source_inputs_changed": true,
+      "protected_resize_and_pricing_and_account_inputs_preserved": true,
+      "selected_customer_windows_closure_not_claimed": true
+    },
+    "reviewed_source_patch": {
+      "scope": "Normal desktop and phone startup plus saved language/voice selection for a separately marked English, Spanish and Mandarin qualification artifact.",
+      "source_paths": [
+        "SOURCE/bootstrap/factory.py",
+        "SOURCE/config/schema.py",
+        "SOURCE/config/settings.py",
+        "SOURCE/docs/CUSTOMER_SPEECH_QUALIFICATION.md",
+        "SOURCE/intent/command_executor.py",
+        "SOURCE/telephony/call_manager.py",
+        "SOURCE/telephony/remote_voice.py",
+        "SOURCE/tests/public/customer_speech_selection.node.mjs",
+        "SOURCE/tests/public/test_customer_launch_wiring.py",
+        "SOURCE/tests/public/test_customer_speech_settings.py",
+        "SOURCE/tests/public/test_disabled_tts_streaming.py",
+        "SOURCE/tests/public/test_phone_language_switch.py",
+        "SOURCE/tests/public/test_streaming_decimal_boundaries.py",
+        "SOURCE/tools/qualification/cjk_runtime_replay.py",
+        "SOURCE/ui/customer_speech_settings.py",
+        "SOURCE/ui/react-app/src/__tests__/hooks/useSettings.customerSpeech.test.jsx",
+        "SOURCE/ui/react-app/src/components/SettingsModal.customerSpeech.test.jsx",
+        "SOURCE/ui/react-app/src/components/SettingsModal.jsx",
+        "SOURCE/ui/react-app/src/hooks/useSettings.js",
+        "SOURCE/ui/react-app/src/utils/customerSpeechSelection.js",
+        "SOURCE/ui/settings_api.py",
+        "SOURCE/ui/settings_effects.py",
+        "SOURCE/ui/settings_manager.py",
+        "SOURCE/ui/settings_schema.py",
+        "SOURCE/viola_qt.py",
+        "SOURCE/voice/customer_runtime.py",
+        "SOURCE/voice/customer_voice_routing.py",
+        "SOURCE/voice/synthesis/factory.py",
+        "SOURCE/voice/synthesis/kokoro_engine.py",
+        "SOURCE/voice/synthesizer.py"
+      ],
+      "source_tree": "e4071897cd11955089214866a4db112a863dae17",
+      "patch_sha256": "a9b889de219d3f727da507857976998690ffb37294b0bec4cf9a40585c36e1f4",
+      "prior_binding": {
+        "public_revision": "f41824b382e0f7798e36d2befb12fa75b142687c",
+        "path": "PUBLIC_METADATA/source-binding.json",
+        "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/f41824b382e0f7798e36d2befb12fa75b142687c/PUBLIC_METADATA/source-binding.json",
+        "sha256": "b387fd8eb6622043b0d1de00ef65ad2f83e4361d973af42a948263e42bf866fe",
+        "bytes": 1144941,
+        "git_blob": "9f7c9edf617a7aa16015878f47431ded8feac5f8",
+        "all_top_level_keys": [
+          "schema_version",
+          "source_manifest",
+          "source_manifest_sha256",
+          "source_tree_sha256",
+          "source_file_count",
+          "source_revision",
+          "comparison_public_revision",
+          "changed_source_paths",
+          "retained_sboms",
+          "input_equivalence",
+          "qualification",
+          "historical_bindings",
+          "prior_binding",
+          "retained_composition_component_bindings",
+          "reviewed_source_patch",
+          "new_resolution_performed",
+          "new_advisory_scan_performed",
+          "new_runtime_qualification_performed",
+          "new_source_contract_qualification_performed",
+          "new_static_security_scan_performed",
+          "new_resolution_scope",
+          "new_advisory_scan_scope",
+          "account_reconciliation_previous_binding"
+        ],
+        "preserved_json_objects": {
+          "schema_version": {
+            "pointer": "/schema_version",
+            "canonical_json_sha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+          },
+          "source_manifest": {
+            "pointer": "/source_manifest",
+            "canonical_json_sha256": "ace3c4cebde8c1e5207159e354ef46f1f9a13eb7b3185315a68b7cf8b71f212d"
+          },
+          "source_manifest_sha256": {
+            "pointer": "/source_manifest_sha256",
+            "canonical_json_sha256": "2c0dffb5785f22dbf9862d05db4af4e2b08c67b9470f20b0bf6ff5623b1a8851"
+          },
+          "source_tree_sha256": {
+            "pointer": "/source_tree_sha256",
+            "canonical_json_sha256": "c07e62eddd8928a89b106125c6905b27c354e70039b440dcdfb286e0efee4734"
+          },
+          "source_file_count": {
+            "pointer": "/source_file_count",
+            "canonical_json_sha256": "61b1dbc91985561c5af9e6e341ffa92fa3524c1e2083f39f67cb8bd736fcce46"
+          },
+          "source_revision": {
+            "pointer": "/source_revision",
+            "canonical_json_sha256": "22e0f93ad87c8440714bec78546f537f95e0692aedbc841bf01a6b349c68ee34"
+          },
+          "comparison_public_revision": {
+            "pointer": "/comparison_public_revision",
+            "canonical_json_sha256": "0bb9bf9aa62c5ed89e497eae9daf61ad8dc5e830887cc96e7c1c901ba80a6f9b"
+          },
+          "changed_source_paths": {
+            "pointer": "/changed_source_paths",
+            "canonical_json_sha256": "8cc4c83ec9a92bc5f837dc465219531951c9cf66129ced3937c058f588796ee8"
+          },
+          "retained_sboms": {
+            "pointer": "/retained_sboms",
+            "canonical_json_sha256": "0428d09c6e0e2b524877c2218b306c10da6c7536bcf6ed96524b581dafc85301"
+          },
+          "input_equivalence": {
+            "pointer": "/input_equivalence",
+            "canonical_json_sha256": "40c64e163cdb0050db1232b7a575e78bf97db9a995b7ff801536772c92614074"
+          },
+          "qualification": {
+            "pointer": "/qualification",
+            "canonical_json_sha256": "a3380bbb8ec52cdf7a338668eaab8f05b95f6e4e1f5e2fcef42bc0d2631a7780"
+          },
+          "historical_bindings": {
+            "pointer": "/historical_bindings",
+            "canonical_json_sha256": "59ccb6141308771f32ec1e534f7a843cbdd8867afcd59e84944e03e6f9958c33"
+          },
+          "prior_binding": {
+            "pointer": "/prior_binding",
+            "canonical_json_sha256": "f2aabb104cbc992f4704498987a59caabbd1c99f4f4d465229900579ecbc95c6"
+          },
+          "retained_composition_component_bindings": {
+            "pointer": "/retained_composition_component_bindings",
+            "canonical_json_sha256": "aebf7a2fa89cb597e9b67e88356b633b0a3a0f0d60a0b0fc07892a77fcc5e5fe"
+          },
+          "reviewed_source_patch": {
+            "pointer": "/reviewed_source_patch",
+            "canonical_json_sha256": "42d81346aa8a9f55c6f74a047f5dccbcecee4249f547ea14a78f3debd1fbed62"
+          },
+          "new_resolution_performed": {
+            "pointer": "/new_resolution_performed",
+            "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+          },
+          "new_advisory_scan_performed": {
+            "pointer": "/new_advisory_scan_performed",
+            "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+          },
+          "new_runtime_qualification_performed": {
+            "pointer": "/new_runtime_qualification_performed",
+            "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+          },
+          "new_source_contract_qualification_performed": {
+            "pointer": "/new_source_contract_qualification_performed",
+            "canonical_json_sha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b"
+          },
+          "new_static_security_scan_performed": {
+            "pointer": "/new_static_security_scan_performed",
+            "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+          },
+          "new_resolution_scope": {
+            "pointer": "/new_resolution_scope",
+            "canonical_json_sha256": "f8f5e2e03d127740a088e33ae06809c8a5745b29ba35d6cfda4588455c6ac7b5"
+          },
+          "new_advisory_scan_scope": {
+            "pointer": "/new_advisory_scan_scope",
+            "canonical_json_sha256": "10498cd5e06f960054d6c8905a1e0ee71777731b4f4f9c087a5331564cba46bb"
+          },
+          "account_reconciliation_previous_binding": {
+            "pointer": "/account_reconciliation_previous_binding",
+            "canonical_json_sha256": "cfeffa86ef01cbbd530cda12a57b6c4eb3761063999ad3fae482a0c1d7482b51"
+          }
+        },
+        "source_manifest": {
+          "path": "PUBLIC_METADATA/source-manifest.json",
+          "sha256": "6d12726b76a817b300d6bf935419fa838529f8763e3007cd955cd08a5cc7db91",
+          "bytes": 467630,
+          "git_blob": "9a460be8599d3998d647566d4fd27f65cebfa3d2"
+        }
+      }
     }
   }
 }

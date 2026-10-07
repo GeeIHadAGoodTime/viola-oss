@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "1cabf9a5013150207c2956f973de9f8e2dd8bfd5",
-  "sha256": "853c493c215e1d6adefd916fa5004cc314b7f177bfc9269e2bf54b57215d02d3",
+  "revision": "9707b59bc2a0988c459c813d181b612264d0a70c",
+  "sha256": "083b5e398d2a7be906dc1d57b80425d54741251d520666d8f9d762f2a185693c",
   "files": [
     {
       "path": ".env.example",
@@ -515,8 +515,8 @@
     },
     {
       "path": "auth/desktop_session.py",
-      "sha256": "34b3344f1242e51f1a375d805d313c0c216ba09eb435d5b1e629b5951cf01025",
-      "bytes": 46311
+      "sha256": "acb0c0e18f82b0f30a4c1313dc2faaacb930dc194268f694577d8dcea0412e66",
+      "bytes": 46298
     },
     {
       "path": "auth/field_encryption.py",
@@ -750,8 +750,8 @@
     },
     {
       "path": "bootstrap/factory.py",
-      "sha256": "65d852a2845c156ee913993d60e1cd3273fe20f3d1e158cc58b61be49dd5ff44",
-      "bytes": 80648
+      "sha256": "094b90b3910911ab83807fd39222a094da53ba88d367e046b6bda2c1d9173525",
+      "bytes": 81875
     },
     {
       "path": "bootstrap/lazy_intent.py",
@@ -850,8 +850,8 @@
     },
     {
       "path": "config/schema.py",
-      "sha256": "97ce7d254ba39defdbe02e17745772200cf53964b2776c0737a2247bebad3514",
-      "bytes": 20547
+      "sha256": "fed7000b08a76fe12b3c0af342223017849a2675434a9b2cbc534784ec321057",
+      "bytes": 20661
     },
     {
       "path": "config/searxng/render-settings.sh",
@@ -865,8 +865,8 @@
     },
     {
       "path": "config/settings.py",
-      "sha256": "7cca342474b6820c6db567436c133d879d98328b73b38e66af0fdb3c51ca2da2",
-      "bytes": 71614
+      "sha256": "dbd9c3836e719afd994bfab9533183211430534617e586cb7a7f985e37dbc2bc",
+      "bytes": 71697
     },
     {
       "path": "config/settings_validation.py",
@@ -1475,8 +1475,8 @@
     },
     {
       "path": "docs/CUSTOMER_SPEECH_QUALIFICATION.md",
-      "sha256": "b76c278ff9f577ada57268f07db48bb161598c07daeef123ba0ee519b9585b29",
-      "bytes": 18740
+      "sha256": "359d79eb84f7239663e53d9ee0502baaf0316f9402e1f819a8fa7f6146bf8e5e",
+      "bytes": 19957
     },
     {
       "path": "docs/INSTALLATION.md",
@@ -1590,8 +1590,8 @@
     },
     {
       "path": "intent/command_executor.py",
-      "sha256": "5b5bfaba0aa8fbadc9d222fcf3b6a892f8f1565daac8e9df556367031d78aaff",
-      "bytes": 113252
+      "sha256": "4720942f5e0ee7cd4e8295d9e6ddd9fb741d831da7b707cd1579695d63a300fc",
+      "bytes": 114352
     },
     {
       "path": "intent/commands/__init__.py",
@@ -5660,8 +5660,8 @@
     },
     {
       "path": "telephony/call_manager.py",
-      "sha256": "2888bde2e3f1cb307f25741155148bab49288161bcf0f4785cf7622d5b7d3190",
-      "bytes": 376598
+      "sha256": "a42c6add2f0aedc81e1bdf849a2c236fe6785e8cb3bb150c45fe34a974874490",
+      "bytes": 378856
     },
     {
       "path": "telephony/call_queue.py",
@@ -5880,8 +5880,8 @@
     },
     {
       "path": "telephony/remote_voice.py",
-      "sha256": "578c410c0e0286e0f61b18c96ac5b50fd2091716c5381d81b06a97c08d7da9ea",
-      "bytes": 36530
+      "sha256": "0e51aa5c47a2c4e1647420d36240f54e1db9c1dbedd026e686c2bd3a5bac421a",
+      "bytes": 36945
     },
     {
       "path": "telephony/routes.py",
@@ -5979,6 +5979,11 @@
       "bytes": 2988
     },
     {
+      "path": "tests/public/customer_speech_selection.node.mjs",
+      "sha256": "bfef24c801055e04ef8e05c56f33fa4d66077157cb6a9ecc52e0fdc6bceab620",
+      "bytes": 1952
+    },
+    {
       "path": "tests/public/test_bandit_report_contract.py",
       "sha256": "59566553c4323224ad70e157fc7564db4d792ebcae1e9986de6d4a716edd0dde",
       "bytes": 5122
@@ -6024,6 +6029,11 @@
       "bytes": 19493
     },
     {
+      "path": "tests/public/test_customer_launch_wiring.py",
+      "sha256": "46cb4922e1111f2b359bd8fc2d04ad5c4af879ea1f21a15476220a52306010b2",
+      "bytes": 21784
+    },
+    {
       "path": "tests/public/test_customer_phone_routing.py",
       "sha256": "9e8a3aeb738f2d624501c6c37a511f89190af7451d82771f66b43501662c8556",
       "bytes": 18748
@@ -6044,6 +6054,11 @@
       "bytes": 16861
     },
     {
+      "path": "tests/public/test_customer_speech_settings.py",
+      "sha256": "1217d9b07107667bf5eb866d1ea146d1c12cbbcd1775d90785810a3ac1ac7aa9",
+      "bytes": 14988
+    },
+    {
       "path": "tests/public/test_deferred_confirmation_cancellation.py",
       "sha256": "4787e38288d184737e1e31db49ca23364901fb0a921f1c33ca8137519f4132d0",
       "bytes": 8622
@@ -6054,14 +6069,9 @@
       "bytes": 7131
     },
     {
-      "path": "tests/public/test_desktop_session_persistence.py",
-      "sha256": "753793befd8003e44945617e9238f1c4cb6de4c8755bd4d0dace24168212e136",
-      "bytes": 5728
-    },
-    {
       "path": "tests/public/test_disabled_tts_streaming.py",
-      "sha256": "b89aa53c72989086cf08b0617325c13018ebd9bd477dd13a1b0b61091713de66",
-      "bytes": 24850
+      "sha256": "d66c9ca1f671e9b861aa8f05c580c3e80cda0559e51969ee987cb683fce2da45",
+      "bytes": 24889
     },
     {
       "path": "tests/public/test_english_decimal_normalization.py",
@@ -6087,6 +6097,11 @@
       "path": "tests/public/test_linux_sandbox_opt_in.py",
       "sha256": "a02a49dbc341223a9b79c99fd8af6880763072155eaf6635d7b4f0ddc259f488",
       "bytes": 4396
+    },
+    {
+      "path": "tests/public/test_local_media_path_length.py",
+      "sha256": "ad444bbfec0676b1cd01fc41f1500c928126b17db2a6cbcabd08a965a2e3cc2d",
+      "bytes": 8205
     },
     {
       "path": "tests/public/test_loopback_media_stop.py",
@@ -6120,8 +6135,8 @@
     },
     {
       "path": "tests/public/test_phone_language_switch.py",
-      "sha256": "297c23b9a36e0533b29da8383602cc8db7d103599ee44c5844b249e2879942ad",
-      "bytes": 22387
+      "sha256": "4ca7f7589478cf0bb783a5164edf162b112d9fa0fad00a74ce24265e02660468",
+      "bytes": 22407
     },
     {
       "path": "tests/public/test_phone_locale_normalization.py",
@@ -6195,8 +6210,8 @@
     },
     {
       "path": "tests/public/test_streaming_decimal_boundaries.py",
-      "sha256": "d9338a597a68ccc651293e1921a74595372600593a7d71faf7b319dd9808ee7a",
-      "bytes": 11322
+      "sha256": "2d3e3f6677e9c67c9a6aa59e95a3be1db74015d877df993a5cfb3aa7866cc0b2",
+      "bytes": 11365
     },
     {
       "path": "tests/public/test_streaming_watchdog_ownership.py",
@@ -9045,8 +9060,8 @@
     },
     {
       "path": "tools/qualification/cjk_runtime_replay.py",
-      "sha256": "a70e7e4d42b2973fdb052b8754ffea1171d702f670320146001692f1e620e660",
-      "bytes": 49081
+      "sha256": "d13db365f6ddfd5f487865db3999b49599f836ef8e60cf559b77ce2cf26e4d3e",
+      "bytes": 49103
     },
     {
       "path": "tools/qualification/romance_runtime_replay.py",
@@ -9160,8 +9175,8 @@
     },
     {
       "path": "ui/api/models.py",
-      "sha256": "edea2ec6ecc1304e8ee64215f28dd01584c9d23a85854f82ae1d903bbbb84dc4",
-      "bytes": 4227
+      "sha256": "598889477dc3c524827fc354a60d99869b82ec09e93d6c1238e09709479f502a",
+      "bytes": 5184
     },
     {
       "path": "ui/api/routes/__init__.py",
@@ -9554,6 +9569,11 @@
       "bytes": 18647
     },
     {
+      "path": "ui/customer_speech_settings.py",
+      "sha256": "198cba30f6aa632a8a1a95dead521e9be5561734c903e3da42bbe428a16a2ce7",
+      "bytes": 7321
+    },
+    {
       "path": "ui/error_recovery.py",
       "sha256": "e96ee4fbee27671ee5d7e351685190107db032d76c783ff9c3b6c1b63cc576e3",
       "bytes": 31379
@@ -9877,6 +9897,11 @@
       "path": "ui/react-app/src/__tests__/hooks/useEventBus.test.jsx",
       "sha256": "fa7277156d93bf9f037c096c9c6296d94e58ace96c1a8c587567cd2336fc80d4",
       "bytes": 2209
+    },
+    {
+      "path": "ui/react-app/src/__tests__/hooks/useSettings.customerSpeech.test.jsx",
+      "sha256": "264ddc2055ae9d0887588ff48daf959c34fdd4e48d53b5b5a958875465cf0540",
+      "bytes": 3925
     },
     {
       "path": "ui/react-app/src/__tests__/hooks/useSettings.snapshotOrdering.test.jsx",
@@ -10584,6 +10609,11 @@
       "bytes": 5096
     },
     {
+      "path": "ui/react-app/src/components/SettingsModal.customerSpeech.test.jsx",
+      "sha256": "574c7fcef2e948bd0537b42df956614d94f9edce8ebfb425ee6750db43fff68a",
+      "bytes": 4534
+    },
+    {
       "path": "ui/react-app/src/components/SettingsModal.desktopAi.test.jsx",
       "sha256": "13622f3580f92c29cfa02d9cd5507cece7038c84fdf9359e078872633b14453c",
       "bytes": 7835
@@ -10595,8 +10625,8 @@
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.jsx",
-      "sha256": "ca93989249c9452b6358224e83ffe454f3c748186e5c02a5e302c82e3de13452",
-      "bytes": 201447
+      "sha256": "ae52c6aba4c75afe75bd997d2e2c2666681ce0cacecd0c5669257c81f6bfcf07",
+      "bytes": 202969
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.localDiscovery.test.jsx",
@@ -11635,8 +11665,8 @@
     },
     {
       "path": "ui/react-app/src/hooks/useSettings.js",
-      "sha256": "5fc5f838a4681ddf0a3f6c07ee284204611751f5eaf77cfc6d4eeb9542a90206",
-      "bytes": 11941
+      "sha256": "df209ec649ace923a2f31e24afa304153a689e6cb9163400acff4abc7fbad875",
+      "bytes": 13083
     },
     {
       "path": "ui/react-app/src/hooks/useSettingsDraft.js",
@@ -11984,6 +12014,11 @@
       "bytes": 5825
     },
     {
+      "path": "ui/react-app/src/utils/customerSpeechSelection.js",
+      "sha256": "0c5cbb8f12bd3c25ef816dd93a3b42a03776df8de0522d4d34feb4b662719261",
+      "bytes": 847
+    },
+    {
       "path": "ui/react-app/src/utils/describeError.js",
       "sha256": "30c5d511fe257770363f6bcdf6430e4f9455945802d3b11a423eef6c279a8882",
       "bytes": 7109
@@ -12245,23 +12280,23 @@
     },
     {
       "path": "ui/settings_api.py",
-      "sha256": "b69ac42038078cda0454e9549fa3fdf750487adf8367b532baeee28e6143f8b9",
-      "bytes": 82338
+      "sha256": "53c34b6464e991b098caa7208084d32682c2b0698b4003f8d87a6cdc29aae191",
+      "bytes": 84943
     },
     {
       "path": "ui/settings_effects.py",
-      "sha256": "9b7227374f0692c6f6993fb21e5d60e4bb5c95cedd352e331d8610f7dae63540",
-      "bytes": 21029
+      "sha256": "d198cbaed33158e08023f6a1cc3dd09ce5bb62fe810c4a84578d25b9e890d68b",
+      "bytes": 21761
     },
     {
       "path": "ui/settings_manager.py",
-      "sha256": "b60764ab759bcebe786c5d137e7f796a5da7cfd1d6924e5021aac50acdc1f637",
-      "bytes": 160290
+      "sha256": "fe16600afea58127773161bdcb1f6e8ad59a302f099792c29a8d51d2afe7be67",
+      "bytes": 160519
     },
     {
       "path": "ui/settings_schema.py",
-      "sha256": "409124bb94c0fc577652c5dc0415b852220c71270044fb9356b11075058edb36",
-      "bytes": 8664
+      "sha256": "15c0b2b54e7c7dcf4f795c6982601c7f4daaaa277031216f709a64b99c9ba5d9",
+      "bytes": 8688
     },
     {
       "path": "ui/static/README_WEB_UI.txt",
@@ -12505,8 +12540,8 @@
     },
     {
       "path": "utils/enhancements/secrets.py",
-      "sha256": "9377ce59d5f817d9d1b4fbd9e532455723ff7155874cd498f6797f4effc56c12",
-      "bytes": 24656
+      "sha256": "64350403844afde7fc5aade81183d30756e8ff567c716d02df31416291fec18e",
+      "bytes": 23343
     },
     {
       "path": "utils/failfast.py",
@@ -12705,8 +12740,8 @@
     },
     {
       "path": "viola_qt.py",
-      "sha256": "298a669bf966d45f2d329858dddff0372b0cd5452c2db92e90743b3ba6a97294",
-      "bytes": 82192
+      "sha256": "7fce32bffa126ff1c87be2b8dc673c3c9b4bb345b3c075a92ddfeaca6aeb1c85",
+      "bytes": 82310
     },
     {
       "path": "viola_spoke.py",
@@ -12909,9 +12944,14 @@
       "bytes": 995
     },
     {
+      "path": "voice/customer_runtime.py",
+      "sha256": "43c20a0c0267c11487ea1ab937da7a1ba1d2823ad247a0ec6b5e5ba247a4fdae",
+      "bytes": 7539
+    },
+    {
       "path": "voice/customer_voice_routing.py",
-      "sha256": "3c5e38520d158c41f6d0e34329a82f52f20891418c5c50dc769d1a28c419387b",
-      "bytes": 3911
+      "sha256": "41403a02848f8996ecffe244590a1b7d4b89ce729caccbbc5c7ce355f4345c56",
+      "bytes": 4444
     },
     {
       "path": "voice/dictation/__init__.py",
@@ -13055,13 +13095,13 @@
     },
     {
       "path": "voice/synthesis/factory.py",
-      "sha256": "19887e0dc15afcee830f5dd2aa81af9f24ef0366f254134d58904ad73d14539a",
-      "bytes": 13422
+      "sha256": "56dd400148819a38cd4e095263be7a5a8d7f9f2a87e6a70fe7540b3871cfab8b",
+      "bytes": 15711
     },
     {
       "path": "voice/synthesis/kokoro_engine.py",
-      "sha256": "233250928aa20e143eabb6045ddbfa010b720b90b8e5a548f116eb27119a3582",
-      "bytes": 73472
+      "sha256": "53f63e9ee5256124cef5dfcd918f94278a9888c7b8f5e663cf1ab12fa1e51d8b",
+      "bytes": 77737
     },
     {
       "path": "voice/synthesis/lazy_engine.py",
@@ -13090,8 +13130,8 @@
     },
     {
       "path": "voice/synthesizer.py",
-      "sha256": "a7b1cf0c08ee84d5a3cc467b0bafdbd6cde8563efc173b49da4c8f00f2f0a47a",
-      "bytes": 7475
+      "sha256": "72cca2c63d3aa1a1544bdb67d04d45bf70b0232f73a378a3677906a86fb58365",
+      "bytes": 7706
     },
     {
       "path": "voice/transcriber.py",

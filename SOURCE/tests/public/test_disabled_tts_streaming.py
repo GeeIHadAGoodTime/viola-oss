@@ -96,6 +96,7 @@ class DisabledTTSStreamingTests(unittest.IsolatedAsyncioTestCase):
                 "_run_synthesize_with_watchdog",
                 "_synthesize_chunked",
                 "_tts_is_enabled",
+                "_prepare_route_text",
                 "_play_pcm_if_enabled",
                 "_synthesize_locked",
                 "speak",

@@ -377,6 +377,7 @@ class AppConfig:
     tts_enabled: bool = True
     tts_backend: str = "kokoro"  # kokoro, pyttsx3
     tts_voice: str = "default"
+    tts_language: str = "en-us"  # Qualification output locale; separate from STT.
     tts_rate: int = 150  # WPM
     tts_volume: int = 80  # 0-100
     # Case-insensitive whole-word text respellings before phonemization,

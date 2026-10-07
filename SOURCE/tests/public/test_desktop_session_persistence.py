@@ -41,10 +41,14 @@ class DesktopSessionPersistence(unittest.TestCase):
 
         self.sessions = desktop_session
         self.secrets = secrets
-        self.store = desktop_session.DesktopSessionStore(root_dir=self.root / "profile")
-        self.store._secrets = self.manager()
+        self.connections = []
+        self.store = self.new_store()
 
     def tearDown(self):
+        # SQLite connection context managers commit/rollback but do not close.
+        # Close only connections opened by this fixture's own store instances.
+        for connection in self.connections:
+            connection.close()
         # Windows cannot remove a temporary profile with an open log handle.
         # Retire only handlers that this fixture's disposable root owns.
         loggers = [
@@ -84,9 +88,21 @@ class DesktopSessionPersistence(unittest.TestCase):
             "user": {"id": user_id, "email": "synthetic@example.com"},
         }
 
-    def fresh_store(self):
+    def new_store(self):
         store = self.sessions.DesktopSessionStore(root_dir=self.root / "profile")
         store._secrets = self.manager()
+        connect = store._connect
+
+        def tracked_connect():
+            connection = connect()
+            self.connections.append(connection)
+            return connection
+
+        store._connect = tracked_connect
+        return store
+
+    def fresh_store(self):
+        store = self.new_store()
         store._secrets.load_from_file(store.token_cache_path)
         return store
 

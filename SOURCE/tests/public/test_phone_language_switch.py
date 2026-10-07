@@ -5,6 +5,7 @@ from __future__ import annotations
 import ast
 import asyncio
 import importlib
+import os
 import sys
 import types
 import unittest
@@ -254,7 +255,7 @@ class PhoneLanguageSwitch(unittest.IsolatedAsyncioTestCase):
                     body=[ast.ImportFrom(module="__future__", names=[ast.alias(name="annotations")], level=0), node],
                     type_ignores=[],
                 )
-                namespace = {"maybe_remote_first_kokoro": lambda runtime: runtime, "LOOPBACK_SAMPLE_RATE": 16000}
+                namespace = {"os": os, "maybe_remote_first_kokoro": lambda runtime: runtime, "LOOPBACK_SAMPLE_RATE": 16000}
                 exec(compile(ast.fix_missing_locations(module), str(ROOT / filename), "exec"), namespace)
                 with patch.object(self.kokoro, "_ensure_model_files"):
                     service = (

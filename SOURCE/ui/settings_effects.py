@@ -189,6 +189,12 @@ def _apply_wake_sensitivity(key: str, value: object, **_: object) -> EffectResul
     return EffectResult(key, EffectOutcome.APPLIED, "wake threshold now %s" % value)
 
 
+def _apply_customer_speech(key: str, value: object, *, settings_mgr: Any, user_id=None, **_: object) -> EffectResult:
+    from ui.customer_speech_settings import apply_customer_speech_selection
+
+    return apply_customer_speech_selection(key, settings_mgr, user_id=user_id)
+
+
 def _apply_tts_rate(key: str, value: object, **_: object) -> EffectResult:
     """Re-speed the running speech engine.
 
@@ -315,6 +321,16 @@ SETTING_EFFECTS: dict[str, SettingEffect] = {
         kind=EffectKind.LIVE,
         controls="Loudness the speech engine renders Viola's replies at.",
     ),
+    "tts_language": SettingEffect(
+        kind=EffectKind.APPLY,
+        controls="Selects the output language and named voice in a speech qualification artifact.",
+        apply=_apply_customer_speech,
+    ),
+    "tts_voice": SettingEffect(
+        kind=EffectKind.APPLY,
+        controls="Selects the named voice in a speech qualification artifact.",
+        apply=_apply_customer_speech,
+    ),
     "tts_rate": SettingEffect(
         kind=EffectKind.APPLY,
         controls="Speaking rate the speech engine renders Viola's replies at.",
@@ -435,6 +451,7 @@ def apply_setting_effect(
     *,
     settings_mgr: Any,
     previous: object = None,
+    user_id: str | None = None,
     music_service: object | None = None,
 ) -> EffectResult:
     """Make one persisted setting real, and report what actually happened.
@@ -457,6 +474,7 @@ def apply_setting_effect(
         key,
         value,
         settings_mgr=settings_mgr,
+        user_id=user_id,
         previous=previous,
         music_service=music_service,
     )

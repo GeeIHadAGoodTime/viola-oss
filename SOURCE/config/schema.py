@@ -146,6 +146,9 @@ class SettingsSchema:
     tts_voice: str = "default"
     """TTS voice name (engine-specific; for Kokoro see tts_kokoro_voice)"""
 
+    tts_language: str = "en-us"
+    """Output locale in an explicitly selected speech qualification artifact."""
+
     tts_rate: int = field(default=150, metadata={"min": 50, "max": 300})
     """TTS speech rate (words per minute). Kokoro maps this to a speed multiplier."""
 
