@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "ff2e4c25254363bf214d33ac651a5393a445366a",
-  "sha256": "84912e8644c2dff66b6ef2c77a8f3303e3eb6ab39be329edb3cdb96a7f9f86f5",
+  "revision": "9e0a9f5b863c3880e0990f6bbdfcfa95ecf61c21",
+  "sha256": "d7883e25683cf84b89f1f92a0e9babcaa33059809211eb96926a851de85171c9",
   "files": [
     {
       "path": ".env.example",
@@ -10085,7 +10085,7 @@
     },
     {
       "path": "ui/react-app/src/auth/legalVersions.js",
-      "sha256": "93b246c158875d6efcb36ab89bd911b9b017518ccc6ccd7f4f7e514f6dd68fed",
+      "sha256": "c17436e49024b8474617a483f4ed2f6660b54b85c7591ec8237d17be9a2f13bb",
       "bytes": 237
     },
     {
