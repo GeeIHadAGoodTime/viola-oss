@@ -69,6 +69,10 @@ export function useBillingCapacity({ accountId, refreshUser }) {
     try {
       const [nextCatalog, nextAccount] = await Promise.all([request('/catalog'), request('')]);
       if (!mounted.current) return;
+      if (!Number.isSafeInteger(nextAccount.monthly_price_cents) || nextAccount.monthly_price_cents < 0
+        || !['month', 'year'].includes(nextAccount.interval)) {
+        throw new Error('Billing state is temporarily unavailable. Please retry.');
+      }
       setCatalog(nextCatalog);
       setAccount(nextAccount);
       const pendingId = nextAccount.pending_change?.operation_id || nextAccount.pending_change?.id;

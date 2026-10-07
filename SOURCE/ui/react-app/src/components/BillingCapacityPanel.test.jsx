@@ -272,6 +272,16 @@ describe('in-app capacity billing', () => {
     expect(screen.getByText('1× Pro')).toBeInTheDocument();
     expect(requests('/quote')).toHaveLength(0);
   });
+
+  it('does not invent a Free plan when the account response is incomplete', async () => {
+    const original = handler;
+    handler = (path) => path === BASE ? {} : original(path);
+    render(<BillingCapacityPanel accountId="account-1" />);
+    await screen.findByText('Billing state is temporarily unavailable. Please retry.');
+    expect(screen.queryByText('Free')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add more usage' })).toBeDisabled();
+    expect(requests('/change')).toHaveLength(0);
+  });
 });
 
 describe('payment handoff URL', () => {
