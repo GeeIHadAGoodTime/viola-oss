@@ -52,7 +52,7 @@ logger = get_logger(__name__)
 _KOKORO_PKG_PROBE_ERROR: str | None = None
 
 
-def _probe_kokoro_package() -> str:
+def _probe_kokoro_package(*, customer_tokenizer=None) -> str:
     """Probe everything the ``Kokoro()`` constructor needs beyond the model files.
 
     The constructor's hidden requirements (learned the hard way — 1.0.1
@@ -74,14 +74,17 @@ def _probe_kokoro_package() -> str:
     reinstall, and the import itself is cached by ``sys.modules`` anyway.
     """
     global _KOKORO_PKG_PROBE_ERROR
-    if _KOKORO_PKG_PROBE_ERROR is not None:
+    if customer_tokenizer is None and _KOKORO_PKG_PROBE_ERROR is not None:
         return _KOKORO_PKG_PROBE_ERROR
 
     error = ""
     try:
         from kokoro_onnx.tokenizer import Tokenizer
 
-        Tokenizer()
+        if customer_tokenizer is None:
+            Tokenizer()
+        else:
+            Tokenizer(customer_tokenizer=customer_tokenizer)
     except (ImportError, AttributeError, OSError, KeyError, ValueError, RuntimeError) as exc:
         # Import executes kokoro_onnx.config.get_vocab(): a frozen bundle
         # missing package data raises FileNotFoundError (OSError); corrupt
@@ -89,7 +92,8 @@ def _probe_kokoro_package() -> str:
         # deps raise ImportError/AttributeError/RuntimeError.
         error = "Kokoro runtime unavailable (package data or system eSpeak-NG dependency): %s" % exc
 
-    _KOKORO_PKG_PROBE_ERROR = error
+    if customer_tokenizer is None:
+        _KOKORO_PKG_PROBE_ERROR = error
     if error:
         logger.error("Kokoro TTS runtime probe failed -- TTS would be silent: %s", error)
     return error
@@ -237,7 +241,23 @@ class KokoroTTSEngine:
         speed: float | None = None,
         volume: float | None = None,
         config: object | None = None,
+        *,
+        customer_tokenizer=None,
+        language: str = "en-us",
     ) -> None:
+        if not isinstance(language, str):
+            raise ValueError("Speech language must be an explicit locale")
+        language = language.lower().replace("_", "-")
+        if customer_tokenizer is not None:
+            from voice.customer_composition import require_customer_composition
+
+            require_customer_composition(customer_tokenizer)
+            if not customer_tokenizer.supports_locale(language):
+                raise ValueError("The explicit customer locale is unavailable")
+        elif language != "en-us":
+            raise ValueError("A nondefault locale requires explicit customer composition")
+        self._customer_tokenizer = customer_tokenizer
+        self._speech_language = language
         self._config = config
         self._tts_disable_marker = object()
         self._synthesis_work_lock = threading.Lock()
@@ -274,7 +294,7 @@ class KokoroTTSEngine:
         self._lock = threading.Lock()
         self._load_error: str | None = None
         self._speak_lock: asyncio.Lock | None = None
-        self._opener_cache = self._create_opener_cache(cfg)
+        self._opener_cache = self._create_opener_cache(cfg) if customer_tokenizer is None else None
         self._opener_cache_build_thread: threading.Thread | None = None
         self._last_sample_rate = SAMPLE_RATE_24K
         self._post_fx_enabled = _cfg_bool(cfg, "tts_post_fx_enabled", True)
@@ -346,7 +366,9 @@ class KokoroTTSEngine:
                 model_p,
                 voices_p,
             )
-            self._kokoro = Kokoro(model_p, voices_p)
+            customer_tokenizer = getattr(self, "_customer_tokenizer", None)
+            pronunciation_kwargs = {} if customer_tokenizer is None else {"customer_tokenizer": customer_tokenizer}
+            self._kokoro = Kokoro(model_p, voices_p, **pronunciation_kwargs)
 
             # Suppress noisy but harmless "words count mismatch" warnings
             # from the phonemizer library used internally by kokoro-onnx.
@@ -669,7 +691,7 @@ class KokoroTTSEngine:
             text,
             voice=selected_voice,
             speed=speed,
-            lang="en-us",
+            lang=getattr(self, "_speech_language", "en-us"),
         )
 
         elapsed = time.perf_counter() - t0
@@ -953,7 +975,9 @@ class KokoroTTSEngine:
         policy_marker = getattr(self, "_tts_disable_marker", 0)
         from voice.synthesis.text_normalizer import normalize_for_speech
 
-        text = normalize_for_speech(text)
+        language = getattr(self, "_speech_language", "en-us")
+        normalization_kwargs = {} if language == "en-us" else {"language": language}
+        text = normalize_for_speech(text, **normalization_kwargs)
         if not text or not text.strip():
             return
 
@@ -1280,6 +1304,9 @@ class KokoroTTSEngine:
         """
         from voice.synthesis.text_normalizer import has_pending_decimal_point, normalize_for_speech
 
+        language = getattr(self, "_speech_language", "en-us")
+        normalization_kwargs = {} if language == "en-us" else {"language": language}
+
         # Lazy-create the asyncio lock
         if self._speak_lock is None:
             self._speak_lock = asyncio.Lock()
@@ -1353,7 +1380,7 @@ class KokoroTTSEngine:
                             for part in parts[:-1]:
                                 cleaned = _strip_emoji(part.strip())
                                 if cleaned:
-                                    cleaned = normalize_for_speech(cleaned)
+                                    cleaned = normalize_for_speech(cleaned, **normalization_kwargs)
                                     if cleaned:
                                         sentences_queue.append(cleaned)
                             buffer = parts[-1]
@@ -1361,7 +1388,7 @@ class KokoroTTSEngine:
                             # Buffer ends with sentence punctuation (no trailing space yet)
                             cleaned = _strip_emoji(buffer.strip())
                             if cleaned:
-                                cleaned = normalize_for_speech(cleaned)
+                                cleaned = normalize_for_speech(cleaned, **normalization_kwargs)
                                 if cleaned:
                                     sentences_queue.append(cleaned)
                             buffer = ""
@@ -1430,7 +1457,7 @@ class KokoroTTSEngine:
                     if buffer.strip():
                         cleaned = _strip_emoji(buffer.strip())
                         if cleaned:
-                            cleaned = normalize_for_speech(cleaned)
+                            cleaned = normalize_for_speech(cleaned, **normalization_kwargs)
                             if cleaned:
                                 sentences_queue.append(cleaned)
                                 buffer = ""
@@ -1556,6 +1583,9 @@ class KokoroTTSEngine:
         model_ok = Path(self._model_path).exists()
         voices_ok = Path(self._voices_path).exists()
         if model_ok and voices_ok:
+            customer_tokenizer = getattr(self, "_customer_tokenizer", None)
+            if customer_tokenizer is not None:
+                return not _probe_kokoro_package(customer_tokenizer=customer_tokenizer)
             return not _probe_kokoro_package()
 
         if not model_ok:

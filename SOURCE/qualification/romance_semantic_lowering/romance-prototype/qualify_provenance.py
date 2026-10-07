@@ -29,7 +29,11 @@ checked = []
 for row in records["files"]:
     original = Path(row["file"]).read_bytes()
     assert hashlib.sha256(original).hexdigest() == row["sha256"]
-    assert hashlib.sha1(b"blob " + str(len(original)).encode() + b"\0" + original).hexdigest() == row["git_sha"]
+    # SHA256 above checks integrity; SHA1 only reproduces the upstream Git object ID.
+    assert (
+        hashlib.sha1(b"blob " + str(len(original)).encode() + b"\0" + original, usedforsecurity=False).hexdigest()
+        == row["git_sha"]
+    )
     name = Path(row["path"]).name
     current = (ROOT / "_romance_vendor" / name).read_bytes()
     if name in {"base.py", "LICENSE"}:

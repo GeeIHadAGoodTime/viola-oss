@@ -22,6 +22,20 @@ REQUIRED = {
     "regex": "2024.11.6",
     "addict": "2.4.0",
 }
+# Additional identities for explicitly requested, inactive CJK evidence only.
+# Keep synchronized with the companion package and runtime admission map.
+# These are required pins, not a complete transitive graph or license allowlist.
+INACTIVE_CJK_REQUIRED = {
+    "viola-misaki-cjk-prototype": "0.9.4+viola.cjk.2",
+    "fugashi": "1.5.2",
+    "jaconv": "0.5.0",
+    "mojimoji": "0.0.13",
+    "pypinyin": "0.55.0",
+    "cn2an": "0.5.24",
+    "jieba": "0.42.1",
+    "ordered-set": "4.1.0",
+    "proces": "0.1.7",
+}
 FORBIDDEN = frozenset(
     {"phonemizer", "phonemizer-fork", "espeakng-loader", "espeak-ng", "espeak", "num2words", "misaki"}
 )
@@ -35,8 +49,14 @@ def canonical_name(value: str) -> str:
     return re.sub(r"[-_.]+", "-", value.lower())
 
 
-def validate_graph(report: dict) -> list[str]:
-    """Inspect a complete pip --dry-run --ignore-installed --report result."""
+def validate_graph(report: dict, *, include_cjk_prototype: bool = False) -> list[str]:
+    """Inspect a supplied pip report; never resolve, install or activate a profile.
+
+    The explicit CJK option adds its required exact identities to the existing
+    English checks. It does not certify completeness, licensing or release use.
+    """
+    if type(include_cjk_prototype) is not bool:
+        return ["inactive CJK evidence selection must be an explicit boolean"]
     rows = report.get("install")
     if not isinstance(rows, list) or not rows:
         return ["missing resolved distribution inventory"]
@@ -55,7 +75,8 @@ def validate_graph(report: dict) -> list[str]:
         observed[name] = version
         if name in FORBIDDEN:
             errors.append("forbidden customer speech dependency: " + name)
-    for name, version in REQUIRED.items():
+    required = {**REQUIRED, **INACTIVE_CJK_REQUIRED} if include_cjk_prototype else REQUIRED
+    for name, version in required.items():
         if observed.get(name) != version:
             errors.append("missing or unreviewed customer speech distribution: " + name)
     if "onnxruntime" not in observed:
@@ -93,9 +114,17 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--pip-report", required=True, type=Path)
     parser.add_argument("--frozen-inventory", type=Path)
+    parser.add_argument(
+        "--include-cjk-prototype",
+        action="store_true",
+        help="Also require inactive CJK prototype pins; does not activate or qualify a customer profile",
+    )
     args = parser.parse_args()
     try:
-        errors = validate_graph(json.loads(args.pip_report.read_text(encoding="utf-8")))
+        errors = validate_graph(
+            json.loads(args.pip_report.read_text(encoding="utf-8")),
+            include_cjk_prototype=args.include_cjk_prototype,
+        )
         if args.frozen_inventory:
             data = json.loads(args.frozen_inventory.read_text(encoding="utf-8"))
             if not isinstance(data, dict) or set(data) != {"files", "python_modules"}:
@@ -110,7 +139,13 @@ def main() -> int:
     for error in errors:
         print(error)
     if not errors:
-        print("Customer speech dependency separation passed; release and listening acceptance remain separate")
+        if args.include_cjk_prototype:
+            print(
+                "Inactive CJK prototype dependency separation and pins passed; "
+                "graph completeness, licensing and customer release remain unqualified"
+            )
+        else:
+            print("Customer speech dependency separation passed; release and listening acceptance remain separate")
     return int(bool(errors))
 
 

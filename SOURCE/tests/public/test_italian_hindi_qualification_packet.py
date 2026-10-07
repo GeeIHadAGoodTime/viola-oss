@@ -108,6 +108,46 @@ class ItalianHindiPacketTests(unittest.TestCase):
             self.wrapper.prepare_fixture(self.source, destination)
         self.assertFalse(destination.exists())
 
+    def test_all_git_identities_work_under_nonsecurity_only_sha1(self):
+        original_sha1 = hashlib.sha1
+        blobs = []
+
+        def identity_only(data=b"", *, usedforsecurity=True):
+            self.assertIs(usedforsecurity, False)
+            blobs.append(data)
+            return original_sha1(data, usedforsecurity=False)
+
+        with patch.object(self.wrapper.hashlib, "sha1", side_effect=identity_only):
+            self.wrapper.prepare_fixture(self.source, self.root / "fixture")
+        expected = []
+        for root, row in [
+            *((self.packet, row) for row in self.integrity["payloads"]),
+            (self.source, self.integrity["kokoro_config"]),
+        ]:
+            data = (root / row["path"]).read_bytes()
+            expected.append(b"blob " + str(len(data)).encode() + b"\0" + data)
+        self.assertEqual(blobs, expected)
+        self.assertEqual(len(blobs), 22)
+
+    def test_sha256_failure_rejects_before_a_matching_git_identity_can_be_used(self):
+        with patch.object(
+            self.wrapper.hashlib, "sha1", side_effect=AssertionError("Git identity used before integrity")
+        ):
+            for root, row in [
+                *((self.packet, row) for row in self.integrity["payloads"]),
+                (self.source, self.integrity["kokoro_config"]),
+            ]:
+                with self.subTest(path=row["path"]), self.assertRaisesRegex(ValueError, "Bound file differs"):
+                    self.wrapper._read_bound_file(root, dict(row, sha256="0" * 64))
+
+    def test_git_identity_drift_still_rejects_after_sha256(self):
+        for root, row in [
+            *((self.packet, row) for row in self.integrity["payloads"]),
+            (self.source, self.integrity["kokoro_config"]),
+        ]:
+            with self.subTest(path=row["path"]), self.assertRaisesRegex(ValueError, "Upstream Git blob differs"):
+                self.wrapper._read_bound_file(root, dict(row, git_sha="0" * 40))
+
     def test_unsafe_or_duplicate_manifest_paths_reject(self):
         for invalid in ("../outside", "/outside", "packet\\outside"):
             with self.subTest(path=invalid), self.assertRaises(ValueError):
