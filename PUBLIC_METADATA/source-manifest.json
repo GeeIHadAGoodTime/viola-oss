@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "9707b59bc2a0988c459c813d181b612264d0a70c",
-  "sha256": "083b5e398d2a7be906dc1d57b80425d54741251d520666d8f9d762f2a185693c",
+  "revision": "5071e162a861a2bb10105802863f6c84776e2975",
+  "sha256": "494255f66dae4604c09a5b4100d8519a21b0dc2ed6609e6447b1243dd03caa00",
   "files": [
     {
       "path": ".env.example",
@@ -515,8 +515,8 @@
     },
     {
       "path": "auth/desktop_session.py",
-      "sha256": "acb0c0e18f82b0f30a4c1313dc2faaacb930dc194268f694577d8dcea0412e66",
-      "bytes": 46298
+      "sha256": "34b3344f1242e51f1a375d805d313c0c216ba09eb435d5b1e629b5951cf01025",
+      "bytes": 46311
     },
     {
       "path": "auth/field_encryption.py",
@@ -6067,6 +6067,11 @@
       "path": "tests/public/test_desktop_session_ordering.py",
       "sha256": "8d5840f76fb1847c29856aec0be7e3353455881445ee2fd7b3a2aeafc4b8ba62",
       "bytes": 7131
+    },
+    {
+      "path": "tests/public/test_desktop_session_persistence.py",
+      "sha256": "c6f85614cb9559752817a3bb0f26ca387c45ab6d4183d0efa565b02d72a7971d",
+      "bytes": 6195
     },
     {
       "path": "tests/public/test_disabled_tts_streaming.py",
@@ -12540,8 +12545,8 @@
     },
     {
       "path": "utils/enhancements/secrets.py",
-      "sha256": "64350403844afde7fc5aade81183d30756e8ff567c716d02df31416291fec18e",
-      "bytes": 23343
+      "sha256": "9377ce59d5f817d9d1b4fbd9e532455723ff7155874cd498f6797f4effc56c12",
+      "bytes": 24656
     },
     {
       "path": "utils/failfast.py",
