@@ -1,14 +1,15 @@
 {
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "6d12726b76a817b300d6bf935419fa838529f8763e3007cd955cd08a5cc7db91",
-  "source_tree_sha256": "6fa31c02d82881e28fd14c2698169eb8ec6296ebd78bd93928cfa9c0cae2fe16",
-  "source_file_count": 2662,
-  "source_revision": "1b15aa4fc968136f5512eff238556c244ec9759c",
-  "comparison_public_revision": "a002401aae36786bbd9aeea8a1eacd0790b4192a",
+  "source_manifest_sha256": "04e6dd185910f75c6f374ed9a27ad80ef5837462f4fb9b2b926ee612ed166c0b",
+  "source_tree_sha256": "853c493c215e1d6adefd916fa5004cc314b7f177bfc9269e2bf54b57215d02d3",
+  "source_file_count": 2663,
+  "source_revision": "1cabf9a5013150207c2956f973de9f8e2dd8bfd5",
+  "comparison_public_revision": "f41824b382e0f7798e36d2befb12fa75b142687c",
   "changed_source_paths": [
-    "SOURCE/ui/react-app/src/components/SettingsModal.desktopOnlyPanels.test.jsx",
-    "SOURCE/ui/react-app/src/components/SettingsModal.jsx"
+    "SOURCE/auth/desktop_session.py",
+    "SOURCE/tests/public/test_desktop_session_persistence.py",
+    "SOURCE/utils/enhancements/secrets.py"
   ],
   "retained_sboms": [
     {
@@ -78,60 +79,21 @@
     "speech_and_account_and_resize_and_pricing_source_preserved": true
   },
   "qualification": {
-    "scope": "Weekly Review parsed-response handling and panel-owned request lifecycle; source/component support only, no installed acceptance.",
-    "source_commit": "1b15aa4fc968136f5512eff238556c244ec9759c",
-    "source_tree": "01659b93bcd3b1d61f22baf5a6055bb178871535",
-    "ordered_source_parents": [
-      "006e41f62b0ce9fcc3e4c560ebee493bc312f6ac",
-      "a002401aae36786bbd9aeea8a1eacd0790b4192a"
-    ],
-    "independent_automated_review": {
-      "result": "No blocking findings in the exact two-file repair.",
-      "reviewed_files": [
-        {
-          "path": "SOURCE/ui/react-app/src/components/SettingsModal.desktopOnlyPanels.test.jsx",
-          "sha256": "8454c64afb4fbb9b96b750d1489e884e2625e9d66b55d13caeab13dc62b6e52a",
-          "git_blob": "22e81008bb51d205f1834524ec62fb1bb3bb4e5a"
-        },
-        {
-          "path": "SOURCE/ui/react-app/src/components/SettingsModal.jsx",
-          "sha256": "ca93989249c9452b6358224e83ffe454f3c748186e5c02a5e302c82e3de13452",
-          "git_blob": "bbf9d383368ac8a6ce7e4755a108d18778fdda59"
-        }
-      ],
-      "scope": "Independent automated source review, not human review or installed acceptance."
-    },
-    "source_controls": {
-      "old_handler_negative_controls_failed": 4,
-      "old_panel_controls_still_passed": 21,
-      "repaired_panel_cases_passed": 41,
-      "actual_apiFetch_unwrap_cases": 2,
-      "full_frontend_files": 170,
-      "full_frontend_tests_passed": 1960,
-      "frontend_build": "passed",
-      "focused_lint_errors": 0,
-      "focused_lint_preexisting_warnings": 3,
-      "fixtures": "inert synthetic HTTP and settings receipts; no live model or service calls"
-    },
-    "installed_source_comparison": {
-      "installed_public_revision": "75accae1e10e4532e37022f0be74fee0f7f16140",
-      "old_installed_bound_handlers_have_same_double_json_bug": true,
-      "installed_ui_observation_claimed": false
-    },
-    "normal_app_retest_required": [
-      "View Last Review returns an actual saved review or truthful empty/unavailable state.",
-      "Saved opt-in must precede an authorized Run Now; unsaved toggle explains Save Changes.",
-      "Authorized Run Now must visibly finish, display content, and read it back through View Last Review.",
-      "Failure and retry recover controls; repeated clicks cannot overlap inside one panel.",
-      "Close, cancel, tab navigation, opt-out, and account changes retire stale UI results.",
-      "Save disabled state, reopen, and verify future generation remains off."
-    ],
-    "limits": [
-      "No live Run Now or model call was performed.",
-      "No installed customer acceptance, deployment, or release is claimed.",
-      "Retiring the panel does not cancel or globally deduplicate already-running server analysis.",
-      "Existing source gates and exact-head checks remain required before integration."
-    ]
+    "source_commit": "1cabf9a5013150207c2956f973de9f8e2dd8bfd5",
+    "source_tree": "0aa5728f7982c2288a24900077666232189bd9ae",
+    "scope": "Desktop session encrypted-cache persistence failure handling; source and synthetic storage fixtures only.",
+    "independent_review": "Root reviewed exact patchdca547134b4162384a0811deb3c9d4efddc48b2566c10b9c79b693891c0b3abe and ran all five new controls.",
+    "durability_controls": 5,
+    "existing_session_ordering_controls": 11,
+    "focused_result": "16 passed",
+    "existing_secret_manager_regressions": "9 passed,2pre-existing skips",
+    "negative_control": "Installed75acc and accepteda002 source reproducibly acknowledge a local session after a forced cache write failure and lose it on fresh-store readback. Three new durability assertions fail on old source.",
+    "historical_incident_cause_established": false,
+    "power_loss_guarantee": false,
+    "real_credentials_or_provider_calls": false,
+    "installed_acceptance": false,
+    "production_deployment": false,
+    "prior_qualification_pointer": "desktop_session_persistence_previous_binding.qualification"
   },
   "historical_bindings": [
     {
@@ -7562,7 +7524,7 @@
                         "text": "Hello. This is a short test of the local speech system.",
                         "voice": "af_heart",
                         "locale": "en-us",
-                        "phonemes": "həlˈO. ðˌɪs ɪz ɐ ʃˈɔɹt tˈɛst ʌv ðə lˈOkəl spˈiʧ sˈɪstəm.",
+                        "phonemes": "h\u0259l\u02c8O. \u00f0\u02cc\u026as \u026az \u0250 \u0283\u02c8\u0254\u0279t t\u02c8\u025bst \u028cv \u00f0\u0259 l\u02c8Ok\u0259l sp\u02c8i\u02a7 s\u02c8\u026ast\u0259m.",
                         "duration_seconds": 2.986666666666667,
                         "wav_sha256": "aeaba330943123ff46d808be904e3cc47ec05291c1aee9efa78a21bb25d4fadd",
                         "float_pcm_sha256": "d27a02a2b366945758f9a7cb89ae4eaee46525807634dff9b7f295f400b8f622",
@@ -7575,7 +7537,7 @@
                         "text": "Hello. This is a short test of the local speech system.",
                         "voice": "af_heart",
                         "locale": "en-us",
-                        "phonemes": "həlˈO. ðˌɪs ɪz ɐ ʃˈɔɹt tˈɛst ʌv ðə lˈOkəl spˈiʧ sˈɪstəm.",
+                        "phonemes": "h\u0259l\u02c8O. \u00f0\u02cc\u026as \u026az \u0250 \u0283\u02c8\u0254\u0279t t\u02c8\u025bst \u028cv \u00f0\u0259 l\u02c8Ok\u0259l sp\u02c8i\u02a7 s\u02c8\u026ast\u0259m.",
                         "duration_seconds": 2.986666666666667,
                         "wav_sha256": "aeaba330943123ff46d808be904e3cc47ec05291c1aee9efa78a21bb25d4fadd",
                         "float_pcm_sha256": "d27a02a2b366945758f9a7cb89ae4eaee46525807634dff9b7f295f400b8f622",
@@ -7588,7 +7550,7 @@
                         "text": "The A P I costs $12.50, not $0.05.",
                         "voice": "af_heart",
                         "locale": "en-us",
-                        "phonemes": "ði ˈA pˈi ˌI kˈɔsts twˈɛlv dˈɑləɹz ænd fˈɪfti sˈɛnts, nˌɑt fˈIv sˈɛnts.",
+                        "phonemes": "\u00f0i \u02c8A p\u02c8i \u02ccI k\u02c8\u0254sts tw\u02c8\u025blv d\u02c8\u0251l\u0259\u0279z \u00e6nd f\u02c8\u026afti s\u02c8\u025bnts, n\u02cc\u0251t f\u02c8Iv s\u02c8\u025bnts.",
                         "duration_seconds": 3.7973333333333334,
                         "wav_sha256": "5310d8c6737e9eb874d30b15b70cd3a779d1a86904339b68831e29945307d4b6",
                         "float_pcm_sha256": "c7a016d0b527e759ba0e2ce06f0348371a99e1c9ce68e42ca38ee919cef63fa7",
@@ -7601,7 +7563,7 @@
                         "text": "The A P I costs $12.50, not $0.05.",
                         "voice": "af_heart",
                         "locale": "en-us",
-                        "phonemes": "ði ˈA pˈi ˌI kˈɔsts twˈɛlv dˈɑləɹz ænd fˈɪfti sˈɛnts, nˌɑt fˈIv sˈɛnts.",
+                        "phonemes": "\u00f0i \u02c8A p\u02c8i \u02ccI k\u02c8\u0254sts tw\u02c8\u025blv d\u02c8\u0251l\u0259\u0279z \u00e6nd f\u02c8\u026afti s\u02c8\u025bnts, n\u02cc\u0251t f\u02c8Iv s\u02c8\u025bnts.",
                         "duration_seconds": 3.7973333333333334,
                         "wav_sha256": "5310d8c6737e9eb874d30b15b70cd3a779d1a86904339b68831e29945307d4b6",
                         "float_pcm_sha256": "c7a016d0b527e759ba0e2ce06f0348371a99e1c9ce68e42ca38ee919cef63fa7",
@@ -7624,7 +7586,7 @@
                         "text": "'A P I'",
                         "voice": "af_heart",
                         "locale": "en-us",
-                        "phonemes": "“ɐ pˈi ˈI",
+                        "phonemes": "\u201c\u0250 p\u02c8i \u02c8I",
                         "duration_seconds": 0.9386666666666666,
                         "wav_sha256": "c14f9a31a8a71f2441e74ab4e64f24df25b9f018975fe46d1ab0ed2cb33519e3",
                         "float_pcm_sha256": "69d1f2d9c292aa645dd0b1ff590bb7c1cbf34b92bc382a7ae1d695b2540e18cb",
@@ -7637,7 +7599,7 @@
                         "text": "'A P I'",
                         "voice": "af_heart",
                         "locale": "en-us",
-                        "phonemes": "“ˈA pˈi ˈI",
+                        "phonemes": "\u201c\u02c8A p\u02c8i \u02c8I",
                         "duration_seconds": 0.9386666666666666,
                         "wav_sha256": "f5a871ccac419cc586ff16aaa6e9f42b4720c591d20a7752c09d01e89c299f3d",
                         "float_pcm_sha256": "b8b8573bf9058851c6aaee30fc328c01c89ba20e1413aa674bef4c1847b348f0",
@@ -7650,7 +7612,7 @@
                         "text": "'A P I'",
                         "voice": "bf_emma",
                         "locale": "en-gb",
-                        "phonemes": "“ɐ pˈiː ˈI",
+                        "phonemes": "\u201c\u0250 p\u02c8i\u02d0 \u02c8I",
                         "duration_seconds": 0.9386666666666666,
                         "wav_sha256": "fcb3326f8978423f25953f991282d759fbc0e9a1248a102054e236eb5a558ddb",
                         "float_pcm_sha256": "1612b0e9f197c238f2434d27da0024959ca5b3825db6a3ed79119491924568d0",
@@ -7663,7 +7625,7 @@
                         "text": "'A P I'",
                         "voice": "bf_emma",
                         "locale": "en-gb",
-                        "phonemes": "“ˈA pˈiː ˈI",
+                        "phonemes": "\u201c\u02c8A p\u02c8i\u02d0 \u02c8I",
                         "duration_seconds": 0.96,
                         "wav_sha256": "83dad5fbcd6fea44e2b35ecf0f1b19af8e946c56a5d5743af058ad6e92a7d909",
                         "float_pcm_sha256": "2f7c8c442737efd0ff9bf3ddb35e47e7ae90ed2bc23c7025a08d3ddf3552f78d",
@@ -7683,10 +7645,10 @@
                     "cases": [
                       {
                         "id": "ja-component",
-                        "text": "こんにちは",
+                        "text": "\u3053\u3093\u306b\u3061\u306f",
                         "voice": "jf_alpha",
                         "locale": "ja",
-                        "phonemes": "koɲɲiʨiβa",
+                        "phonemes": "ko\u0272\u0272i\u02a8i\u03b2a",
                         "duration_seconds": 0.9813333333333333,
                         "wav_sha256": "c9a9f75372afc19d7cb51732a481300a7fa5779d0f4411c35a9f7b788d693f51",
                         "float_pcm_sha256": "b6f3115fde5d46e829b4437b51c82ea366c8973731611ac665a21047bc3fb5fd",
@@ -7696,10 +7658,10 @@
                       },
                       {
                         "id": "ja-composed",
-                        "text": "こんにちは",
+                        "text": "\u3053\u3093\u306b\u3061\u306f",
                         "voice": "jf_alpha",
                         "locale": "ja",
-                        "phonemes": "koɲɲiʨiβa",
+                        "phonemes": "ko\u0272\u0272i\u02a8i\u03b2a",
                         "duration_seconds": 0.9813333333333333,
                         "wav_sha256": "c9a9f75372afc19d7cb51732a481300a7fa5779d0f4411c35a9f7b788d693f51",
                         "float_pcm_sha256": "b6f3115fde5d46e829b4437b51c82ea366c8973731611ac665a21047bc3fb5fd",
@@ -7719,10 +7681,10 @@
                     "cases": [
                       {
                         "id": "zh-component",
-                        "text": "你好",
+                        "text": "\u4f60\u597d",
                         "voice": "zf_xiaobei",
                         "locale": "zh",
-                        "phonemes": "ni↓xau↓",
+                        "phonemes": "ni\u2193xau\u2193",
                         "duration_seconds": 0.832,
                         "wav_sha256": "b8b6c6be5edbaff52bb114c753b04e6eaffebd190e5f78e64a535c8042cb92ae",
                         "float_pcm_sha256": "7ddddc03e104e990c42f5b070d4847906f3a10d19bd6809621a5f1cf0fa5ea0d",
@@ -7732,10 +7694,10 @@
                       },
                       {
                         "id": "zh-composed",
-                        "text": "你好",
+                        "text": "\u4f60\u597d",
                         "voice": "zf_xiaobei",
                         "locale": "zh",
-                        "phonemes": "ni↓xau↓",
+                        "phonemes": "ni\u2193xau\u2193",
                         "duration_seconds": 0.832,
                         "wav_sha256": "b8b6c6be5edbaff52bb114c753b04e6eaffebd190e5f78e64a535c8042cb92ae",
                         "float_pcm_sha256": "7ddddc03e104e990c42f5b070d4847906f3a10d19bd6809621a5f1cf0fa5ea0d",
@@ -7752,7 +7714,7 @@
                 ],
                 "owner_listening": {
                   "english": "Positive feedback on delivered neutral/currency and US/GB comparison clips; no chosen pair winner or broader coverage claim",
-                  "japanese": "Positive feedback on the exact jf_alpha こんにちは 0.981333-second sample only",
+                  "japanese": "Positive feedback on the exact jf_alpha \u3053\u3093\u306b\u3061\u306f 0.981333-second sample only",
                   "mandarin": "Delivered corrected-source sample; acknowledgment received, pronunciation-quality judgment still unverified",
                   "owner_replies_not_required_per_clip": true,
                   "assistant_audio_input_unavailable": true
@@ -9643,6 +9605,73 @@
           },
           "scope": "Complete original independently reviewed titlebar candidate binding and prior evidence; qualification remains scoped to its original source and head."
         }
+      ]
+    }
+  },
+  "desktop_session_persistence_previous_binding": {
+    "source_revision": "1b15aa4fc968136f5512eff238556c244ec9759c",
+    "source_manifest_sha256": "6d12726b76a817b300d6bf935419fa838529f8763e3007cd955cd08a5cc7db91",
+    "source_tree_sha256": "6fa31c02d82881e28fd14c2698169eb8ec6296ebd78bd93928cfa9c0cae2fe16",
+    "source_file_count": 2662,
+    "comparison_public_revision": "a002401aae36786bbd9aeea8a1eacd0790b4192a",
+    "changed_source_paths": [
+      "SOURCE/ui/react-app/src/components/SettingsModal.desktopOnlyPanels.test.jsx",
+      "SOURCE/ui/react-app/src/components/SettingsModal.jsx"
+    ],
+    "qualification": {
+      "scope": "Weekly Review parsed-response handling and panel-owned request lifecycle; source/component support only, no installed acceptance.",
+      "source_commit": "1b15aa4fc968136f5512eff238556c244ec9759c",
+      "source_tree": "01659b93bcd3b1d61f22baf5a6055bb178871535",
+      "ordered_source_parents": [
+        "006e41f62b0ce9fcc3e4c560ebee493bc312f6ac",
+        "a002401aae36786bbd9aeea8a1eacd0790b4192a"
+      ],
+      "independent_automated_review": {
+        "result": "No blocking findings in the exact two-file repair.",
+        "reviewed_files": [
+          {
+            "path": "SOURCE/ui/react-app/src/components/SettingsModal.desktopOnlyPanels.test.jsx",
+            "sha256": "8454c64afb4fbb9b96b750d1489e884e2625e9d66b55d13caeab13dc62b6e52a",
+            "git_blob": "22e81008bb51d205f1834524ec62fb1bb3bb4e5a"
+          },
+          {
+            "path": "SOURCE/ui/react-app/src/components/SettingsModal.jsx",
+            "sha256": "ca93989249c9452b6358224e83ffe454f3c748186e5c02a5e302c82e3de13452",
+            "git_blob": "bbf9d383368ac8a6ce7e4755a108d18778fdda59"
+          }
+        ],
+        "scope": "Independent automated source review, not human review or installed acceptance."
+      },
+      "source_controls": {
+        "old_handler_negative_controls_failed": 4,
+        "old_panel_controls_still_passed": 21,
+        "repaired_panel_cases_passed": 41,
+        "actual_apiFetch_unwrap_cases": 2,
+        "full_frontend_files": 170,
+        "full_frontend_tests_passed": 1960,
+        "frontend_build": "passed",
+        "focused_lint_errors": 0,
+        "focused_lint_preexisting_warnings": 3,
+        "fixtures": "inert synthetic HTTP and settings receipts; no live model or service calls"
+      },
+      "installed_source_comparison": {
+        "installed_public_revision": "75accae1e10e4532e37022f0be74fee0f7f16140",
+        "old_installed_bound_handlers_have_same_double_json_bug": true,
+        "installed_ui_observation_claimed": false
+      },
+      "normal_app_retest_required": [
+        "View Last Review returns an actual saved review or truthful empty/unavailable state.",
+        "Saved opt-in must precede an authorized Run Now; unsaved toggle explains Save Changes.",
+        "Authorized Run Now must visibly finish, display content, and read it back through View Last Review.",
+        "Failure and retry recover controls; repeated clicks cannot overlap inside one panel.",
+        "Close, cancel, tab navigation, opt-out, and account changes retire stale UI results.",
+        "Save disabled state, reopen, and verify future generation remains off."
+      ],
+      "limits": [
+        "No live Run Now or model call was performed.",
+        "No installed customer acceptance, deployment, or release is claimed.",
+        "Retiring the panel does not cancel or globally deduplicate already-running server analysis.",
+        "Existing source gates and exact-head checks remain required before integration."
       ]
     }
   }
