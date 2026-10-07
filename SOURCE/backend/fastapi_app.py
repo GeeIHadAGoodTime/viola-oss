@@ -945,6 +945,27 @@ def _ensure_billing_checkout_route(app: FastAPI) -> None:
         raise
 
 
+def _ensure_billing_capacity_routes(app: FastAPI) -> None:
+    """Mount an installed company's authenticated capacity management router.
+
+    The public core contains only this optional integration seam. Account
+    billing, consent, cloud forwarding and provider validation belong to the
+    company extension. A standalone local/BYOK installation has no dependency
+    on that extension.
+    """
+    from services.company_service_boundary import company_service_module_available
+
+    if not company_service_module_available(
+        "billing.capacity_routes", component="Desktop capacity management"
+    ):
+        return
+    from billing.capacity_routes import capacity_router
+
+    paths = {getattr(route, "path", None) for route in getattr(app.router, "routes", [])}
+    if "/v1/billing/capacity/catalog" not in paths:
+        app.include_router(capacity_router, prefix="/v1/billing")
+
+
 def _ensure_billing_extra_usage_routes(app: FastAPI) -> None:
     """Register the extra-usage top-up endpoints on the desktop API surface.
 
@@ -1309,6 +1330,7 @@ def _register_synchronous_route_definitions(app: FastAPI, *, state: Any, music: 
         component="Desktop company billing routes",
     ):
         _ensure_billing_checkout_route(app)
+        _ensure_billing_capacity_routes(app)
         _ensure_billing_extra_usage_routes(app)
         _ensure_billing_portal_session_route(app)
         _ensure_billing_webhook_routes(app)

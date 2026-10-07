@@ -1,22 +1,6 @@
-/**
- * UsageCapNotice — the tappable way out of a managed-AI usage-cap denial.
- *
- * When the plan allowance runs out, Viola answers the turn with cap copy
- * instead of a real answer. That copy names upgrading, but until this notice
- * existed there was nothing to tap: the user was told to pay us and handed no
- * route to do it (candidate C-077).
- *
- * The affordances, in the order the Terms prioritise them:
- *   1. the extra-usage top-up — the Terms name this the PRIMARY option once a
- *      managed allowance is reached, so ExtraUsageTopUpButton renders first when
- *      the top-up is actually purchasable on this deployment (it renders nothing
- *      otherwise, so there is never a dead button) (#4215);
- *   2. "Upgrade your plan" — opens the account settings panel, where the plan
- *      upgrade / billing-portal machinery already lives (C-077).
- */
+/** Preserve capped work and open the existing account billing surface. */
 import PropTypes from 'prop-types';
 import { THEME } from '../config';
-import ExtraUsageTopUpButton from './ExtraUsageTopUpButton';
 
 /**
  * Render an allowance reset as a plain date, or '' when it cannot be read.
@@ -47,13 +31,14 @@ const UsageCapNotice = ({ capDenial, onUpgrade }) => {
         fontSize: '13px',
       }}
     >
-      <ExtraUsageTopUpButton />
+      <span>You’ve used your included managed usage. Add more to continue.</span>
       <button
         type="button"
         data-testid="usage-cap-upgrade"
         onClick={onUpgrade}
         style={{
-          padding: '7px 16px',
+          padding: '10px 16px',
+          minHeight: '44px',
           borderRadius: '18px',
           border: `1px solid ${THEME.colors.accentBorder}`,
           backgroundColor: THEME.colors.accentSubtle,
@@ -63,13 +48,16 @@ const UsageCapNotice = ({ capDenial, onUpgrade }) => {
           cursor: 'pointer',
         }}
       >
-        Upgrade your plan
+        Add more usage
       </button>
       {resetHint && (
         <span style={{ color: THEME.colors.textMuted }}>
           {`Your allowance resets ${resetHint}.`}
         </span>
       )}
+      <span style={{ color: THEME.colors.textSecondary }}>
+        You can also use local models or your own provider key on their existing terms. Your work is preserved.
+      </span>
     </div>
   );
 };
