@@ -2661,7 +2661,7 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
                     >
                       {isScanning ? 'Scanning...' : 'Rescan Library'}
                     </button>
-                    {!localFolder && (
+                    {!isEditingSource && (
                       <button
                         onClick={() => setIsEditingSource(true)}
                         style={{
@@ -2677,7 +2677,7 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
                           transition: 'all 0.15s ease',
                         }}
                       >
-                        Set Folder
+                        {localFolder ? 'Change Folder' : 'Set Folder'}
                       </button>
                     )}
                   </div>
@@ -2911,6 +2911,7 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
                         value={localSettings.local_music_folder || ''}
                         onChange={(e) => updateLocal('local_music_folder', e.target.value)}
                         placeholder="C:\Users\Music"
+                        aria-label="Local music folder"
                         style={{
                           flex: 1,
                           padding: '10px 14px',

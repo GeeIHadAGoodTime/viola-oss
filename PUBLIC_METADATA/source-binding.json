@@ -1,37 +1,14 @@
 {
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "d4eaeeee5ce9ae60da0fd1a54b0e2506d339fded99fd356059a00784fdd7a92d",
-  "source_tree_sha256": "da855d6646c8a6dbbf1fe159b008657de61f5c54870a9c1b371a295e34cfc559",
+  "source_manifest_sha256": "bb01b361c5ca493b6534f08af4153b325a6b03019f9b8cb1ffa0a5b1776222ba",
+  "source_tree_sha256": "417778161aab3002c49cb7e17f06a5f6780b2e8dcf0b199e1e8d036a9d8ce320",
   "source_file_count": 2649,
-  "source_revision": "36ab27c2fef2037b7848e11fd9176a20760b6d73",
-  "comparison_public_revision": "76c0b007e8e2a22bb2b12cbe79a98053a56fc84b",
+  "source_revision": "b7cb5337d0cb84b8256e9ce3ead2c979c158973f",
+  "comparison_public_revision": "a32dd90da471b309360e2e03474f36060137ac55",
   "changed_source_paths": [
-    "SOURCE/LICENSES/SPEECH_COMPONENT_NOTICES.md",
-    "SOURCE/docs/CUSTOMER_SPEECH_QUALIFICATION.md",
-    "SOURCE/scripts/dependencies/verify_customer_speech.py",
-    "SOURCE/tests/public/test_customer_romance_composition.py",
-    "SOURCE/tests/public/test_customer_speech_dependencies.py",
-    "SOURCE/third_party/misaki_cjk_prototype.patch",
-    "SOURCE/third_party/misaki_cjk_prototype/README.md",
-    "SOURCE/third_party/misaki_cjk_prototype/pyproject.toml",
-    "SOURCE/third_party/sources.toml",
-    "SOURCE/tools/qualification/cjk_runtime_replay.py",
-    "SOURCE/tools/qualification/romance_runtime_replay.py",
-    "SOURCE/ui/react-app/src/auth/legalVersions.js",
-    "SOURCE/voice/customer_composition.py",
-    "SOURCE/voice/customer_romance/README.md",
-    "SOURCE/voice/customer_romance/__init__.py",
-    "SOURCE/voice/customer_romance/_romance_vendor/LICENSE",
-    "SOURCE/voice/customer_romance/_romance_vendor/__init__.py",
-    "SOURCE/voice/customer_romance/_romance_vendor/base.py",
-    "SOURCE/voice/customer_romance/_romance_vendor/french.py",
-    "SOURCE/voice/customer_romance/_romance_vendor/portuguese.py",
-    "SOURCE/voice/customer_romance/_romance_vendor/spanish.py",
-    "SOURCE/voice/customer_romance/coverage.py",
-    "SOURCE/voice/customer_romance/provenance.json",
-    "SOURCE/voice/customer_romance/upstream-fail-closed.patch",
-    "SOURCE/voice/customer_romance/upstream-modifications.json"
+    "SOURCE/ui/react-app/src/components/SettingsModal.desktopOnlyPanels.test.jsx",
+    "SOURCE/ui/react-app/src/components/SettingsModal.jsx"
   ],
   "retained_sboms": [
     {
@@ -93,127 +70,19 @@
     }
   ],
   "input_equivalence": {
-    "comparison_basis": "Authenticated protected public main 76c0b007e8e2a22bb2b12cbe79a98053a56fc84b",
-    "speech_source_leaves_equal_reviewed_head": "e56ecc7f4dbd27db51d5a83e18aba55ce996eed0",
-    "history_source_leaves_equal_protected_main": "76c0b007e8e2a22bb2b12cbe79a98053a56fc84b",
-    "legal_source_leaf_equal_reviewed_head": "648328e299a4f23961eb30fd62917abe46c27a5e",
-    "selected_source_path_overlap": [],
+    "comparison_basis": "Protected #79 merge a32dd90da471b309360e2e03474f36060137ac55",
     "all_unselected_export_leaf_bytes_and_modes_preserved": true,
     "all_six_sbom_bytes_and_status_objects_preserved": true,
-    "dependency_and_workflow_inputs_unchanged_by_composition": true,
-    "frontend_source_changed_from_individual_heads": true,
-    "final_combined_head_requires_fresh_hosted_source_and_inventory_checks": true
+    "dependency_and_workflow_inputs_unchanged": true,
+    "existing_save_scan_cancel_handlers_unchanged": true
   },
   "prior_binding": {
-    "component": "speech",
-    "public_revision": "e56ecc7f4dbd27db51d5a83e18aba55ce996eed0",
+    "public_revision": "a32dd90da471b309360e2e03474f36060137ac55",
     "path": "PUBLIC_METADATA/source-binding.json",
-    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/e56ecc7f4dbd27db51d5a83e18aba55ce996eed0/PUBLIC_METADATA/source-binding.json",
-    "sha256": "82e98e99a6a42836f01aa487918832f0e707e9f7f92dea07dd0b98d0259ca0b8",
-    "bytes": 983731,
-    "git_blob": "046a932b98ae5f2dd37005d616b048a91cab2ebd",
-    "preserved_json_objects": {
-      "schema_version": {
-        "pointer": "/schema_version",
-        "canonical_json_sha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
-      },
-      "source_manifest": {
-        "pointer": "/source_manifest",
-        "canonical_json_sha256": "ace3c4cebde8c1e5207159e354ef46f1f9a13eb7b3185315a68b7cf8b71f212d"
-      },
-      "source_manifest_sha256": {
-        "pointer": "/source_manifest_sha256",
-        "canonical_json_sha256": "825c650512bbd3a9ddb7ff2bc80c0114931873b787b30e739b54b44fab253f67"
-      },
-      "source_tree_sha256": {
-        "pointer": "/source_tree_sha256",
-        "canonical_json_sha256": "5b4d0161daca783358759d1487dfed31f7d0a3ebf2a7cb7b7123a48b512808cf"
-      },
-      "source_file_count": {
-        "pointer": "/source_file_count",
-        "canonical_json_sha256": "3a3a99897cabe3d52773c5dc0aac8aaf0ed23acf5fbefc6addb399f934288a48"
-      },
-      "source_revision": {
-        "pointer": "/source_revision",
-        "canonical_json_sha256": "726cdaf26be73eb7414caa20d544712cb56d06e0140ab5ebc67698dcb263658a"
-      },
-      "comparison_public_revision": {
-        "pointer": "/comparison_public_revision",
-        "canonical_json_sha256": "13f84912a92eda3fb8b582ee894e5595db5974d41e8420b5de1a53744ee4b2b4"
-      },
-      "changed_source_paths": {
-        "pointer": "/changed_source_paths",
-        "canonical_json_sha256": "898efb06bcc7e91ab61013f4e9ddc8fb2ca67702ed7467d7f030d70a317b099d"
-      },
-      "retained_sboms": {
-        "pointer": "/retained_sboms",
-        "canonical_json_sha256": "0428d09c6e0e2b524877c2218b306c10da6c7536bcf6ed96524b581dafc85301"
-      },
-      "input_equivalence": {
-        "pointer": "/input_equivalence",
-        "canonical_json_sha256": "72c7bee355a3b9be3f200d4a866da764b8a34b8818a65b1cc8dc4ff7391f44c1"
-      },
-      "prior_binding": {
-        "pointer": "/prior_binding",
-        "canonical_json_sha256": "43272e2fff1ad1bfeae044b7ded35d1ac2009f9c431d79a6cbae02fad8d3aea8"
-      },
-      "new_resolution_performed": {
-        "pointer": "/new_resolution_performed",
-        "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
-      },
-      "new_advisory_scan_performed": {
-        "pointer": "/new_advisory_scan_performed",
-        "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
-      },
-      "new_runtime_qualification_performed": {
-        "pointer": "/new_runtime_qualification_performed",
-        "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
-      },
-      "qualification": {
-        "pointer": "/qualification",
-        "canonical_json_sha256": "de1c9ec8f9412ac341b78104dea44cd76e8b21a0495dbdc4e3f07df23ba1e36c"
-      },
-      "reviewed_source_patch": {
-        "pointer": "/reviewed_source_patch",
-        "canonical_json_sha256": "0ae273273083ac4743a2c6a34cea8466f09ce43fa4f583ca1f12b89d81f9273a"
-      },
-      "native_volume_pre_rebase_evidence": {
-        "pointer": "/native_volume_pre_rebase_evidence",
-        "canonical_json_sha256": "a8af88b09d2d84bdab84b0fd33c8b50934f1d58d496fea85359c941cfa4c9de0"
-      },
-      "previous_reviewed_speech_binding": {
-        "pointer": "/previous_reviewed_speech_binding",
-        "canonical_json_sha256": "9d5b9d11857ee7620683d3cb9a8e8b9c262e43a521acbfad10b177f30b30f435"
-      },
-      "new_resolution_scope": {
-        "pointer": "/new_resolution_scope",
-        "canonical_json_sha256": "ae1415626f7b6b4facbd4dca8fa7d745d74fbbd83811b70dd0abdd48d5c6626c"
-      },
-      "new_advisory_scan_scope": {
-        "pointer": "/new_advisory_scan_scope",
-        "canonical_json_sha256": "b3effd9352b3c6ffae8c76a3518e680955b7383c1e15890303811d873c45cb88"
-      },
-      "retained_feature_binding": {
-        "pointer": "/retained_feature_binding",
-        "canonical_json_sha256": "72ab24969d4dafbf545a15ff7298d4085dcad5c5626acd65351eaade96a54f49"
-      },
-      "previous_reviewed_transport_binding": {
-        "pointer": "/previous_reviewed_transport_binding",
-        "canonical_json_sha256": "d847790d56c82ee882f213f9cf81c29e99009370839779982e08ad8b6da6bd5a"
-      },
-      "retained_composition_component_bindings": {
-        "pointer": "/retained_composition_component_bindings",
-        "canonical_json_sha256": "02c5770e8dbc53493cd0f5084b454a9b2bff04608f00929fe33ea97d0aacf64b"
-      },
-      "new_source_contract_qualification_performed": {
-        "pointer": "/new_source_contract_qualification_performed",
-        "canonical_json_sha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b"
-      },
-      "new_static_security_scan_performed": {
-        "pointer": "/new_static_security_scan_performed",
-        "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
-      }
-    },
+    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/a32dd90da471b309360e2e03474f36060137ac55/PUBLIC_METADATA/source-binding.json",
+    "sha256": "de563025a85be6965c373f394659f6f7da29f1a7a78ec5143169b8c4faf73bbf",
+    "bytes": 73671,
+    "git_blob": "2160ea7ea2af89cc6a68411d168cbe50aae6110e",
     "all_top_level_keys": [
       "schema_version",
       "source_manifest",
@@ -239,138 +108,181 @@
       "previous_reviewed_transport_binding",
       "retained_composition_component_bindings",
       "new_source_contract_qualification_performed",
-      "new_static_security_scan_performed"
+      "new_static_security_scan_performed",
+      "retained_source_qualification"
     ],
-    "source_manifest": {
-      "path": "PUBLIC_METADATA/source-manifest.json",
-      "sha256": "8b54418a37760c0f5096cb32936a1c881fe27d67ad4c7248fc794f00a47d74f4",
-      "bytes": 465077,
-      "git_blob": "21862e7160d073a5447e509ef069e7a74596c0ac"
-    }
+    "preserved_json_objects": {
+      "schema_version": {
+        "pointer": "/schema_version",
+        "canonical_json_sha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+      },
+      "source_manifest": {
+        "pointer": "/source_manifest",
+        "canonical_json_sha256": "ace3c4cebde8c1e5207159e354ef46f1f9a13eb7b3185315a68b7cf8b71f212d"
+      },
+      "source_manifest_sha256": {
+        "pointer": "/source_manifest_sha256",
+        "canonical_json_sha256": "7c2f45e386704b496108a16f50b9b42e9a8a451e7c0000254c282aa2a05970bf"
+      },
+      "source_tree_sha256": {
+        "pointer": "/source_tree_sha256",
+        "canonical_json_sha256": "19b55d84546d27f678136580dc03bd8f294a94be55f73a0f32403102b097a77c"
+      },
+      "source_file_count": {
+        "pointer": "/source_file_count",
+        "canonical_json_sha256": "87557ad1d2f9c36266be01980669ed8ba1b5375d552385b12db8cacd04a8f8d0"
+      },
+      "source_revision": {
+        "pointer": "/source_revision",
+        "canonical_json_sha256": "e102ba3f0ba0ee6db37d0182314379dcceb3ae1db065a9b0a402e2a5a0cfa924"
+      },
+      "comparison_public_revision": {
+        "pointer": "/comparison_public_revision",
+        "canonical_json_sha256": "e3e057babb11af59ae7bacca4880f5c7e5685545a10611df8be30712dedfc623"
+      },
+      "changed_source_paths": {
+        "pointer": "/changed_source_paths",
+        "canonical_json_sha256": "25250e7ae258765943bf07234c86baf6817f05b92a11716de4ff9ab67b7e6c13"
+      },
+      "retained_sboms": {
+        "pointer": "/retained_sboms",
+        "canonical_json_sha256": "0428d09c6e0e2b524877c2218b306c10da6c7536bcf6ed96524b581dafc85301"
+      },
+      "input_equivalence": {
+        "pointer": "/input_equivalence",
+        "canonical_json_sha256": "fa27a5b5bff429fdde2a3f855dadfa594eb31b3df891bb2bb991fdd8f1d5f02e"
+      },
+      "prior_binding": {
+        "pointer": "/prior_binding",
+        "canonical_json_sha256": "4aa3f7ef868472fb775a246b7904d7bfb1666c1dd34e645981dcbb4b28ef5dd2"
+      },
+      "new_resolution_performed": {
+        "pointer": "/new_resolution_performed",
+        "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+      },
+      "new_advisory_scan_performed": {
+        "pointer": "/new_advisory_scan_performed",
+        "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+      },
+      "new_runtime_qualification_performed": {
+        "pointer": "/new_runtime_qualification_performed",
+        "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+      },
+      "qualification": {
+        "pointer": "/qualification",
+        "canonical_json_sha256": "928d6127e0d41cad05a7fa16297f90b3ac23499aa46bc289b20841b354027104"
+      },
+      "reviewed_source_patch": {
+        "pointer": "/reviewed_source_patch",
+        "canonical_json_sha256": "e7f614fde3f610e0a21550ae30836faf676a27d95576a813b63e34e1df4739a5"
+      },
+      "native_volume_pre_rebase_evidence": {
+        "pointer": "/native_volume_pre_rebase_evidence",
+        "canonical_json_sha256": "a8af88b09d2d84bdab84b0fd33c8b50934f1d58d496fea85359c941cfa4c9de0"
+      },
+      "previous_reviewed_speech_binding": {
+        "pointer": "/previous_reviewed_speech_binding",
+        "canonical_json_sha256": "9d5b9d11857ee7620683d3cb9a8e8b9c262e43a521acbfad10b177f30b30f435"
+      },
+      "new_resolution_scope": {
+        "pointer": "/new_resolution_scope",
+        "canonical_json_sha256": "3908ee280c958e288937f506ae635749e3ec8ad9d994adc5683170be9a3c2881"
+      },
+      "new_advisory_scan_scope": {
+        "pointer": "/new_advisory_scan_scope",
+        "canonical_json_sha256": "76173bebb522a925c5f65181cfb865365c7b7eb973d1f62278f3f6afb11969bd"
+      },
+      "retained_feature_binding": {
+        "pointer": "/retained_feature_binding",
+        "canonical_json_sha256": "72ab24969d4dafbf545a15ff7298d4085dcad5c5626acd65351eaade96a54f49"
+      },
+      "previous_reviewed_transport_binding": {
+        "pointer": "/previous_reviewed_transport_binding",
+        "canonical_json_sha256": "d847790d56c82ee882f213f9cf81c29e99009370839779982e08ad8b6da6bd5a"
+      },
+      "retained_composition_component_bindings": {
+        "pointer": "/retained_composition_component_bindings",
+        "canonical_json_sha256": "9e965d6f5afa5975d54b2003e66656f8b35c211f5e9610be813e1411fe2f3337"
+      },
+      "new_source_contract_qualification_performed": {
+        "pointer": "/new_source_contract_qualification_performed",
+        "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+      },
+      "new_static_security_scan_performed": {
+        "pointer": "/new_static_security_scan_performed",
+        "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+      },
+      "retained_source_qualification": {
+        "pointer": "/retained_source_qualification",
+        "canonical_json_sha256": "60ef34000919b287709213d6e4a00e949a039bf37b05448a6bdd4080882a0d99"
+      }
+    },
+    "note": "Complete protected #79 correction retained with its strict verifier and isolated tracked fixture. This folder repair changes only the two reviewed UI paths."
   },
   "new_resolution_performed": false,
   "new_advisory_scan_performed": false,
   "new_runtime_qualification_performed": false,
   "qualification": {
-    "scope": "Exact disjoint source composition of reviewed speech PR76, protected History PR75, and reviewed Privacy pin PR77; no profile activation or release qualification",
-    "source_commit": "36ab27c2fef2037b7848e11fd9176a20760b6d73",
-    "source_tree": "b37da68a8668ec3600821e20e17ef8d642986785",
+    "scope": "Folder editor reachability and bounded regression source; no new playback or acoustic result.",
+    "source_commit": "b7cb5337d0cb84b8256e9ce3ead2c979c158973f",
+    "source_tree": "998dd3be418cd687f9394a253adf9d5a3ea0e7cf",
     "ordered_source_parents": [
-      "e56ecc7f4dbd27db51d5a83e18aba55ce996eed0",
-      "76c0b007e8e2a22bb2b12cbe79a98053a56fc84b",
-      "648328e299a4f23961eb30fd62917abe46c27a5e"
+      "09b9f380c6b0e8849abd85c4cf20474e6fb2fd90",
+      "a32dd90da471b309360e2e03474f36060137ac55"
     ],
+    "local_source_predicate_controls_passed": 7,
+    "source_predicate_mutations_detected": 3,
+    "source_predicate_limit": "Executes actual visibility predicates only; not React rendering.",
+    "prepared_react_regression_cases": 7,
+    "local_react_execution": "Not run: local runtime unavailable. Required hosted checks must run.",
+    "existing_settings_api_empty_folder_readback": "Actual ASGI settings save accepted empty folder and retained YouTube; new temporary SettingsManager reloaded both values.",
+    "independent_automated_review": "Three-line production delta and seven component cases independently reviewed; no blocking findings.",
+    "final_exact_candidate_checks": "Read exact-head hosted receipts; this binding does not claim their completion.",
+    "limits": [
+      "Source-only repair",
+      "No native GUI rerun",
+      "No model/playback/quota diagnosis",
+      "No deployment or release"
+    ],
+    "prior_candidate_frontend": {
+      "head": "09b9f380c6b0e8849abd85c4cf20474e6fb2fd90",
+      "run": 37677052187,
+      "job": 112983144684,
+      "tests": 1914,
+      "files": 168,
+      "desktop_panel_cases": 21,
+      "new_folder_cases": 7,
+      "production_build_seconds": 6.33,
+      "audit_findings": 0,
+      "scope": "Actual hosted React/build proof of the identical two folder files on the earlier stacked candidate; final union requires its own checks."
+    },
+    "prior_candidate_python": {
+      "run": 37677052187,
+      "job": 112983144788,
+      "outcome": "691 methods, eight inherited temporary Git fixture assertion failures, one existing POSIX skip; exact failure retained. Corrected fixture is now preserved from protected #79."
+    },
+    "protected_base_required_checks": {
+      "head": "4a736f5f69846bfa240e3681139343055aa20871",
+      "run": 37678415199,
+      "python_job": 112987816529,
+      "python_methods": 691,
+      "passed": 690,
+      "skipped": 1,
+      "frontend_job": 112987816500,
+      "frontend_tests": 1907,
+      "frontend_files": 168,
+      "build_seconds": 5.56,
+      "audit_findings": 0,
+      "automated_review": "https://github.com/GeeIHadAGoodTime/viola-oss/pull/79#pullrequestreview-5447697142"
+    },
     "prior_complete_evidence": [
       {
-        "component": "speech",
-        "public_revision": "e56ecc7f4dbd27db51d5a83e18aba55ce996eed0",
+        "public_revision": "a32dd90da471b309360e2e03474f36060137ac55",
         "path": "PUBLIC_METADATA/source-binding.json",
-        "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/e56ecc7f4dbd27db51d5a83e18aba55ce996eed0/PUBLIC_METADATA/source-binding.json",
-        "sha256": "82e98e99a6a42836f01aa487918832f0e707e9f7f92dea07dd0b98d0259ca0b8",
-        "bytes": 983731,
-        "git_blob": "046a932b98ae5f2dd37005d616b048a91cab2ebd",
-        "preserved_json_objects": {
-          "schema_version": {
-            "pointer": "/schema_version",
-            "canonical_json_sha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
-          },
-          "source_manifest": {
-            "pointer": "/source_manifest",
-            "canonical_json_sha256": "ace3c4cebde8c1e5207159e354ef46f1f9a13eb7b3185315a68b7cf8b71f212d"
-          },
-          "source_manifest_sha256": {
-            "pointer": "/source_manifest_sha256",
-            "canonical_json_sha256": "825c650512bbd3a9ddb7ff2bc80c0114931873b787b30e739b54b44fab253f67"
-          },
-          "source_tree_sha256": {
-            "pointer": "/source_tree_sha256",
-            "canonical_json_sha256": "5b4d0161daca783358759d1487dfed31f7d0a3ebf2a7cb7b7123a48b512808cf"
-          },
-          "source_file_count": {
-            "pointer": "/source_file_count",
-            "canonical_json_sha256": "3a3a99897cabe3d52773c5dc0aac8aaf0ed23acf5fbefc6addb399f934288a48"
-          },
-          "source_revision": {
-            "pointer": "/source_revision",
-            "canonical_json_sha256": "726cdaf26be73eb7414caa20d544712cb56d06e0140ab5ebc67698dcb263658a"
-          },
-          "comparison_public_revision": {
-            "pointer": "/comparison_public_revision",
-            "canonical_json_sha256": "13f84912a92eda3fb8b582ee894e5595db5974d41e8420b5de1a53744ee4b2b4"
-          },
-          "changed_source_paths": {
-            "pointer": "/changed_source_paths",
-            "canonical_json_sha256": "898efb06bcc7e91ab61013f4e9ddc8fb2ca67702ed7467d7f030d70a317b099d"
-          },
-          "retained_sboms": {
-            "pointer": "/retained_sboms",
-            "canonical_json_sha256": "0428d09c6e0e2b524877c2218b306c10da6c7536bcf6ed96524b581dafc85301"
-          },
-          "input_equivalence": {
-            "pointer": "/input_equivalence",
-            "canonical_json_sha256": "72c7bee355a3b9be3f200d4a866da764b8a34b8818a65b1cc8dc4ff7391f44c1"
-          },
-          "prior_binding": {
-            "pointer": "/prior_binding",
-            "canonical_json_sha256": "43272e2fff1ad1bfeae044b7ded35d1ac2009f9c431d79a6cbae02fad8d3aea8"
-          },
-          "new_resolution_performed": {
-            "pointer": "/new_resolution_performed",
-            "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
-          },
-          "new_advisory_scan_performed": {
-            "pointer": "/new_advisory_scan_performed",
-            "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
-          },
-          "new_runtime_qualification_performed": {
-            "pointer": "/new_runtime_qualification_performed",
-            "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
-          },
-          "qualification": {
-            "pointer": "/qualification",
-            "canonical_json_sha256": "de1c9ec8f9412ac341b78104dea44cd76e8b21a0495dbdc4e3f07df23ba1e36c"
-          },
-          "reviewed_source_patch": {
-            "pointer": "/reviewed_source_patch",
-            "canonical_json_sha256": "0ae273273083ac4743a2c6a34cea8466f09ce43fa4f583ca1f12b89d81f9273a"
-          },
-          "native_volume_pre_rebase_evidence": {
-            "pointer": "/native_volume_pre_rebase_evidence",
-            "canonical_json_sha256": "a8af88b09d2d84bdab84b0fd33c8b50934f1d58d496fea85359c941cfa4c9de0"
-          },
-          "previous_reviewed_speech_binding": {
-            "pointer": "/previous_reviewed_speech_binding",
-            "canonical_json_sha256": "9d5b9d11857ee7620683d3cb9a8e8b9c262e43a521acbfad10b177f30b30f435"
-          },
-          "new_resolution_scope": {
-            "pointer": "/new_resolution_scope",
-            "canonical_json_sha256": "ae1415626f7b6b4facbd4dca8fa7d745d74fbbd83811b70dd0abdd48d5c6626c"
-          },
-          "new_advisory_scan_scope": {
-            "pointer": "/new_advisory_scan_scope",
-            "canonical_json_sha256": "b3effd9352b3c6ffae8c76a3518e680955b7383c1e15890303811d873c45cb88"
-          },
-          "retained_feature_binding": {
-            "pointer": "/retained_feature_binding",
-            "canonical_json_sha256": "72ab24969d4dafbf545a15ff7298d4085dcad5c5626acd65351eaade96a54f49"
-          },
-          "previous_reviewed_transport_binding": {
-            "pointer": "/previous_reviewed_transport_binding",
-            "canonical_json_sha256": "d847790d56c82ee882f213f9cf81c29e99009370839779982e08ad8b6da6bd5a"
-          },
-          "retained_composition_component_bindings": {
-            "pointer": "/retained_composition_component_bindings",
-            "canonical_json_sha256": "02c5770e8dbc53493cd0f5084b454a9b2bff04608f00929fe33ea97d0aacf64b"
-          },
-          "new_source_contract_qualification_performed": {
-            "pointer": "/new_source_contract_qualification_performed",
-            "canonical_json_sha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b"
-          },
-          "new_static_security_scan_performed": {
-            "pointer": "/new_static_security_scan_performed",
-            "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
-          }
-        },
+        "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/a32dd90da471b309360e2e03474f36060137ac55/PUBLIC_METADATA/source-binding.json",
+        "sha256": "de563025a85be6965c373f394659f6f7da29f1a7a78ec5143169b8c4faf73bbf",
+        "bytes": 73671,
+        "git_blob": "2160ea7ea2af89cc6a68411d168cbe50aae6110e",
         "all_top_level_keys": [
           "schema_version",
           "source_manifest",
@@ -396,23 +308,9 @@
           "previous_reviewed_transport_binding",
           "retained_composition_component_bindings",
           "new_source_contract_qualification_performed",
-          "new_static_security_scan_performed"
+          "new_static_security_scan_performed",
+          "retained_source_qualification"
         ],
-        "source_manifest": {
-          "path": "PUBLIC_METADATA/source-manifest.json",
-          "sha256": "8b54418a37760c0f5096cb32936a1c881fe27d67ad4c7248fc794f00a47d74f4",
-          "bytes": 465077,
-          "git_blob": "21862e7160d073a5447e509ef069e7a74596c0ac"
-        }
-      },
-      {
-        "component": "history",
-        "public_revision": "76c0b007e8e2a22bb2b12cbe79a98053a56fc84b",
-        "path": "PUBLIC_METADATA/source-binding.json",
-        "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/76c0b007e8e2a22bb2b12cbe79a98053a56fc84b/PUBLIC_METADATA/source-binding.json",
-        "sha256": "f9da58ece4328baf9a2d421dc6f04e05962dfab76ee1edc9b39c04ee68522a8c",
-        "bytes": 954660,
-        "git_blob": "a4881d7443765deee85dad1c1f5eea726bfb7a9a",
         "preserved_json_objects": {
           "schema_version": {
             "pointer": "/schema_version",
@@ -424,27 +322,27 @@
           },
           "source_manifest_sha256": {
             "pointer": "/source_manifest_sha256",
-            "canonical_json_sha256": "bc9bb00518a1a5e63bf9e09b4fc3dc398189b9e9302c330aabe8c16cbf8f7e05"
+            "canonical_json_sha256": "7c2f45e386704b496108a16f50b9b42e9a8a451e7c0000254c282aa2a05970bf"
           },
           "source_tree_sha256": {
             "pointer": "/source_tree_sha256",
-            "canonical_json_sha256": "fe25e7c515d0c3c5c9977f0bd382b35926a3ee0d8803c6c4850f6fd9b80e0eba"
+            "canonical_json_sha256": "19b55d84546d27f678136580dc03bd8f294a94be55f73a0f32403102b097a77c"
           },
           "source_file_count": {
             "pointer": "/source_file_count",
-            "canonical_json_sha256": "23d2c2e28f2dcbc3ffa0437156d70329f119c70f2f9a72479efe4e33111fc6d7"
+            "canonical_json_sha256": "87557ad1d2f9c36266be01980669ed8ba1b5375d552385b12db8cacd04a8f8d0"
           },
           "source_revision": {
             "pointer": "/source_revision",
-            "canonical_json_sha256": "75f61a11e3b57a6452b4e88c1da2f25b7ac26b98f5abf3fbb37c15193c2a76ae"
+            "canonical_json_sha256": "e102ba3f0ba0ee6db37d0182314379dcceb3ae1db065a9b0a402e2a5a0cfa924"
           },
           "comparison_public_revision": {
             "pointer": "/comparison_public_revision",
-            "canonical_json_sha256": "13f84912a92eda3fb8b582ee894e5595db5974d41e8420b5de1a53744ee4b2b4"
+            "canonical_json_sha256": "e3e057babb11af59ae7bacca4880f5c7e5685545a10611df8be30712dedfc623"
           },
           "changed_source_paths": {
             "pointer": "/changed_source_paths",
-            "canonical_json_sha256": "fd448e837c0c3ec8dafc986b023cbb3f99f62755b640056d0a2d2ec605c913c7"
+            "canonical_json_sha256": "25250e7ae258765943bf07234c86baf6817f05b92a11716de4ff9ab67b7e6c13"
           },
           "retained_sboms": {
             "pointer": "/retained_sboms",
@@ -452,11 +350,11 @@
           },
           "input_equivalence": {
             "pointer": "/input_equivalence",
-            "canonical_json_sha256": "ce4adddeb87e932ca5ed753cb49c6ee754e813916b06937b916b8e8363b05a14"
+            "canonical_json_sha256": "fa27a5b5bff429fdde2a3f855dadfa594eb31b3df891bb2bb991fdd8f1d5f02e"
           },
           "prior_binding": {
             "pointer": "/prior_binding",
-            "canonical_json_sha256": "0f14f1eb621d3667f572fa6b2bf03f4b2e40836910711aea07b7fc3676f9bc89"
+            "canonical_json_sha256": "4aa3f7ef868472fb775a246b7904d7bfb1666c1dd34e645981dcbb4b28ef5dd2"
           },
           "new_resolution_performed": {
             "pointer": "/new_resolution_performed",
@@ -472,11 +370,11 @@
           },
           "qualification": {
             "pointer": "/qualification",
-            "canonical_json_sha256": "781a8cb6a1db2e2a9aa12763947bd07919471c40f43933aa28e6aca18a8b99ff"
+            "canonical_json_sha256": "928d6127e0d41cad05a7fa16297f90b3ac23499aa46bc289b20841b354027104"
           },
           "reviewed_source_patch": {
             "pointer": "/reviewed_source_patch",
-            "canonical_json_sha256": "ec96570087676bdbe40877019f2cb9af871ca37aa594412fe4725f6f88b67998"
+            "canonical_json_sha256": "e7f614fde3f610e0a21550ae30836faf676a27d95576a813b63e34e1df4739a5"
           },
           "native_volume_pre_rebase_evidence": {
             "pointer": "/native_volume_pre_rebase_evidence",
@@ -488,11 +386,11 @@
           },
           "new_resolution_scope": {
             "pointer": "/new_resolution_scope",
-            "canonical_json_sha256": "bd696c1dd99b7582955e1692741340064db193eb679faa92c57a2207ba40cb08"
+            "canonical_json_sha256": "3908ee280c958e288937f506ae635749e3ec8ad9d994adc5683170be9a3c2881"
           },
           "new_advisory_scan_scope": {
             "pointer": "/new_advisory_scan_scope",
-            "canonical_json_sha256": "eb3fd6cf3981db7306708707c46588e32425d04ef81beb92c118f5d8d8fbc132"
+            "canonical_json_sha256": "76173bebb522a925c5f65181cfb865365c7b7eb973d1f62278f3f6afb11969bd"
           },
           "retained_feature_binding": {
             "pointer": "/retained_feature_binding",
@@ -504,7 +402,7 @@
           },
           "retained_composition_component_bindings": {
             "pointer": "/retained_composition_component_bindings",
-            "canonical_json_sha256": "02c5770e8dbc53493cd0f5084b454a9b2bff04608f00929fe33ea97d0aacf64b"
+            "canonical_json_sha256": "9e965d6f5afa5975d54b2003e66656f8b35c211f5e9610be813e1411fe2f3337"
           },
           "new_source_contract_qualification_performed": {
             "pointer": "/new_source_contract_qualification_performed",
@@ -513,669 +411,23 @@
           "new_static_security_scan_performed": {
             "pointer": "/new_static_security_scan_performed",
             "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+          },
+          "retained_source_qualification": {
+            "pointer": "/retained_source_qualification",
+            "canonical_json_sha256": "60ef34000919b287709213d6e4a00e949a039bf37b05448a6bdd4080882a0d99"
           }
         },
-        "all_top_level_keys": [
-          "schema_version",
-          "source_manifest",
-          "source_manifest_sha256",
-          "source_tree_sha256",
-          "source_file_count",
-          "source_revision",
-          "comparison_public_revision",
-          "changed_source_paths",
-          "retained_sboms",
-          "input_equivalence",
-          "prior_binding",
-          "new_resolution_performed",
-          "new_advisory_scan_performed",
-          "new_runtime_qualification_performed",
-          "qualification",
-          "reviewed_source_patch",
-          "native_volume_pre_rebase_evidence",
-          "previous_reviewed_speech_binding",
-          "new_resolution_scope",
-          "new_advisory_scan_scope",
-          "retained_feature_binding",
-          "previous_reviewed_transport_binding",
-          "retained_composition_component_bindings",
-          "new_source_contract_qualification_performed",
-          "new_static_security_scan_performed"
-        ],
-        "source_manifest": {
-          "path": "PUBLIC_METADATA/source-manifest.json",
-          "sha256": "c2b03430d739c71d9043b1756cd8e02f1829e9ffe8ecd22bd0297744ec9a5d8d",
-          "bytes": 462758,
-          "git_blob": "d72cbf0bc7006332be8726343cdc62f5b455e6ce"
-        }
-      },
-      {
-        "component": "legal",
-        "public_revision": "648328e299a4f23961eb30fd62917abe46c27a5e",
-        "path": "PUBLIC_METADATA/source-binding.json",
-        "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/648328e299a4f23961eb30fd62917abe46c27a5e/PUBLIC_METADATA/source-binding.json",
-        "sha256": "d05e01a696d4c6d1e993eb2da0f463cfa04cc75014313469a8871f409504b806",
-        "bytes": 955233,
-        "git_blob": "c5a5cdf75ca2b82fd1249d52f297612f38c5f08b",
-        "preserved_json_objects": {
-          "schema_version": {
-            "pointer": "/schema_version",
-            "canonical_json_sha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
-          },
-          "source_manifest": {
-            "pointer": "/source_manifest",
-            "canonical_json_sha256": "ace3c4cebde8c1e5207159e354ef46f1f9a13eb7b3185315a68b7cf8b71f212d"
-          },
-          "source_manifest_sha256": {
-            "pointer": "/source_manifest_sha256",
-            "canonical_json_sha256": "6fd3e7b5d8ec231e92e79cab0854abd957a0dd7e5b6631600d0bab995cb46ed4"
-          },
-          "source_tree_sha256": {
-            "pointer": "/source_tree_sha256",
-            "canonical_json_sha256": "3ec34a014619e36e8789e2d7c95839adc13c70bccad0bf8f780b5e88fe0d5c86"
-          },
-          "source_file_count": {
-            "pointer": "/source_file_count",
-            "canonical_json_sha256": "72dbc1d0c9905717d66ad6d89e2a6a32718f17abc8dcfea7b1664b61a0600197"
-          },
-          "source_revision": {
-            "pointer": "/source_revision",
-            "canonical_json_sha256": "367942c45d238e4559b942dc27379f5c0287aea5911fc4cc376b449811d206d9"
-          },
-          "comparison_public_revision": {
-            "pointer": "/comparison_public_revision",
-            "canonical_json_sha256": "13f84912a92eda3fb8b582ee894e5595db5974d41e8420b5de1a53744ee4b2b4"
-          },
-          "changed_source_paths": {
-            "pointer": "/changed_source_paths",
-            "canonical_json_sha256": "3514c9d942da2cc7de0045c551ae9847c16d19e7ff2dcf040b7c1dad42a4de3c"
-          },
-          "retained_sboms": {
-            "pointer": "/retained_sboms",
-            "canonical_json_sha256": "0428d09c6e0e2b524877c2218b306c10da6c7536bcf6ed96524b581dafc85301"
-          },
-          "input_equivalence": {
-            "pointer": "/input_equivalence",
-            "canonical_json_sha256": "9ddaf577fbf532fe1c71b43ab4bafdc8eb30485f4abb08673ebcd3cd4d4fcc2e"
-          },
-          "prior_binding": {
-            "pointer": "/prior_binding",
-            "canonical_json_sha256": "cb35187a69fad647f2a3b500ab408ffe8308cd64255b107a9070f6767c0113fe"
-          },
-          "new_resolution_performed": {
-            "pointer": "/new_resolution_performed",
-            "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
-          },
-          "new_advisory_scan_performed": {
-            "pointer": "/new_advisory_scan_performed",
-            "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
-          },
-          "new_runtime_qualification_performed": {
-            "pointer": "/new_runtime_qualification_performed",
-            "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
-          },
-          "qualification": {
-            "pointer": "/qualification",
-            "canonical_json_sha256": "7856839c2014030585ae75d44a11cd2142941a4552f8bcd56e232a48cae3c749"
-          },
-          "reviewed_source_patch": {
-            "pointer": "/reviewed_source_patch",
-            "canonical_json_sha256": "4d1a19ac16dd4a43ea974e34ce08230c4b3df161f72c9888315871f531740715"
-          },
-          "native_volume_pre_rebase_evidence": {
-            "pointer": "/native_volume_pre_rebase_evidence",
-            "canonical_json_sha256": "a8af88b09d2d84bdab84b0fd33c8b50934f1d58d496fea85359c941cfa4c9de0"
-          },
-          "previous_reviewed_speech_binding": {
-            "pointer": "/previous_reviewed_speech_binding",
-            "canonical_json_sha256": "9d5b9d11857ee7620683d3cb9a8e8b9c262e43a521acbfad10b177f30b30f435"
-          },
-          "new_resolution_scope": {
-            "pointer": "/new_resolution_scope",
-            "canonical_json_sha256": "7b37e4104b3d956c6b534df2b68af2e9070efeda997239bbae75b690cb1e15d8"
-          },
-          "new_advisory_scan_scope": {
-            "pointer": "/new_advisory_scan_scope",
-            "canonical_json_sha256": "01d874e4882f1d4fe5866891f4350faa10627f929efe9a3a869056abc64ab8ff"
-          },
-          "retained_feature_binding": {
-            "pointer": "/retained_feature_binding",
-            "canonical_json_sha256": "72ab24969d4dafbf545a15ff7298d4085dcad5c5626acd65351eaade96a54f49"
-          },
-          "previous_reviewed_transport_binding": {
-            "pointer": "/previous_reviewed_transport_binding",
-            "canonical_json_sha256": "d847790d56c82ee882f213f9cf81c29e99009370839779982e08ad8b6da6bd5a"
-          },
-          "retained_composition_component_bindings": {
-            "pointer": "/retained_composition_component_bindings",
-            "canonical_json_sha256": "02c5770e8dbc53493cd0f5084b454a9b2bff04608f00929fe33ea97d0aacf64b"
-          },
-          "new_source_contract_qualification_performed": {
-            "pointer": "/new_source_contract_qualification_performed",
-            "canonical_json_sha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b"
-          },
-          "new_static_security_scan_performed": {
-            "pointer": "/new_static_security_scan_performed",
-            "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
-          }
-        },
-        "all_top_level_keys": [
-          "schema_version",
-          "source_manifest",
-          "source_manifest_sha256",
-          "source_tree_sha256",
-          "source_file_count",
-          "source_revision",
-          "comparison_public_revision",
-          "changed_source_paths",
-          "retained_sboms",
-          "input_equivalence",
-          "prior_binding",
-          "new_resolution_performed",
-          "new_advisory_scan_performed",
-          "new_runtime_qualification_performed",
-          "qualification",
-          "reviewed_source_patch",
-          "native_volume_pre_rebase_evidence",
-          "previous_reviewed_speech_binding",
-          "new_resolution_scope",
-          "new_advisory_scan_scope",
-          "retained_feature_binding",
-          "previous_reviewed_transport_binding",
-          "retained_composition_component_bindings",
-          "new_source_contract_qualification_performed",
-          "new_static_security_scan_performed"
-        ],
-        "source_manifest": {
-          "path": "PUBLIC_METADATA/source-manifest.json",
-          "sha256": "bf5ed172d39cf812f9c40a93e52fbe89c4157c88a6c3cbeb213b7ac413103327",
-          "bytes": 462564,
-          "git_blob": "02148e1710e34a639e4277babd4d105ea64a9799"
-        }
-      }
-    ],
-    "component_source_deltas_repeated": false,
-    "native_runtime_or_archive_build_repeated": false,
-    "speech_prior_exact_head_checks": {
-      "head": "e56ecc7f4dbd27db51d5a83e18aba55ce996eed0",
-      "source_run": 37657974730,
-      "inventory_run": 37657974876,
-      "all_eight_passed": true,
-      "actual_six_inventory_payloads_verified": true
-    },
-    "history_protected_merge": "76c0b007e8e2a22bb2b12cbe79a98053a56fc84b",
-    "legal_prior_exact_head_checks": {
-      "head": "648328e299a4f23961eb30fd62917abe46c27a5e",
-      "source_run": 37662436407,
-      "all_eight_passed": true
-    },
-    "final_exact_candidate_hosted_checks": "Required on final combined head; not inferred from individual head results",
-    "limits": "Retained bounded component and source evidence does not establish all-language/all54-voice coverage, full application routing, complete redistribution obligations, Windows frozen or installed customer acceptance."
-  },
-  "reviewed_source_patch": {
-    "scope": "No new component code. Exact union of three independently reviewed disjoint source sets, preserving their commit ancestry and complete immutable binding references.",
-    "source_paths": [
-      "SOURCE/LICENSES/SPEECH_COMPONENT_NOTICES.md",
-      "SOURCE/docs/CUSTOMER_SPEECH_QUALIFICATION.md",
-      "SOURCE/scripts/dependencies/verify_customer_speech.py",
-      "SOURCE/tests/public/test_customer_romance_composition.py",
-      "SOURCE/tests/public/test_customer_speech_dependencies.py",
-      "SOURCE/third_party/misaki_cjk_prototype.patch",
-      "SOURCE/third_party/misaki_cjk_prototype/README.md",
-      "SOURCE/third_party/misaki_cjk_prototype/pyproject.toml",
-      "SOURCE/third_party/sources.toml",
-      "SOURCE/tools/qualification/cjk_runtime_replay.py",
-      "SOURCE/tools/qualification/romance_runtime_replay.py",
-      "SOURCE/ui/react-app/src/auth/legalVersions.js",
-      "SOURCE/voice/customer_composition.py",
-      "SOURCE/voice/customer_romance/README.md",
-      "SOURCE/voice/customer_romance/__init__.py",
-      "SOURCE/voice/customer_romance/_romance_vendor/LICENSE",
-      "SOURCE/voice/customer_romance/_romance_vendor/__init__.py",
-      "SOURCE/voice/customer_romance/_romance_vendor/base.py",
-      "SOURCE/voice/customer_romance/_romance_vendor/french.py",
-      "SOURCE/voice/customer_romance/_romance_vendor/portuguese.py",
-      "SOURCE/voice/customer_romance/_romance_vendor/spanish.py",
-      "SOURCE/voice/customer_romance/coverage.py",
-      "SOURCE/voice/customer_romance/provenance.json",
-      "SOURCE/voice/customer_romance/upstream-fail-closed.patch",
-      "SOURCE/voice/customer_romance/upstream-modifications.json"
-    ],
-    "source_tree": "b37da68a8668ec3600821e20e17ef8d642986785",
-    "component_bindings": [
-      {
-        "component": "speech",
-        "public_revision": "e56ecc7f4dbd27db51d5a83e18aba55ce996eed0",
-        "path": "PUBLIC_METADATA/source-binding.json",
-        "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/e56ecc7f4dbd27db51d5a83e18aba55ce996eed0/PUBLIC_METADATA/source-binding.json",
-        "sha256": "82e98e99a6a42836f01aa487918832f0e707e9f7f92dea07dd0b98d0259ca0b8",
-        "bytes": 983731,
-        "git_blob": "046a932b98ae5f2dd37005d616b048a91cab2ebd",
-        "preserved_json_objects": {
-          "schema_version": {
-            "pointer": "/schema_version",
-            "canonical_json_sha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
-          },
-          "source_manifest": {
-            "pointer": "/source_manifest",
-            "canonical_json_sha256": "ace3c4cebde8c1e5207159e354ef46f1f9a13eb7b3185315a68b7cf8b71f212d"
-          },
-          "source_manifest_sha256": {
-            "pointer": "/source_manifest_sha256",
-            "canonical_json_sha256": "825c650512bbd3a9ddb7ff2bc80c0114931873b787b30e739b54b44fab253f67"
-          },
-          "source_tree_sha256": {
-            "pointer": "/source_tree_sha256",
-            "canonical_json_sha256": "5b4d0161daca783358759d1487dfed31f7d0a3ebf2a7cb7b7123a48b512808cf"
-          },
-          "source_file_count": {
-            "pointer": "/source_file_count",
-            "canonical_json_sha256": "3a3a99897cabe3d52773c5dc0aac8aaf0ed23acf5fbefc6addb399f934288a48"
-          },
-          "source_revision": {
-            "pointer": "/source_revision",
-            "canonical_json_sha256": "726cdaf26be73eb7414caa20d544712cb56d06e0140ab5ebc67698dcb263658a"
-          },
-          "comparison_public_revision": {
-            "pointer": "/comparison_public_revision",
-            "canonical_json_sha256": "13f84912a92eda3fb8b582ee894e5595db5974d41e8420b5de1a53744ee4b2b4"
-          },
-          "changed_source_paths": {
-            "pointer": "/changed_source_paths",
-            "canonical_json_sha256": "898efb06bcc7e91ab61013f4e9ddc8fb2ca67702ed7467d7f030d70a317b099d"
-          },
-          "retained_sboms": {
-            "pointer": "/retained_sboms",
-            "canonical_json_sha256": "0428d09c6e0e2b524877c2218b306c10da6c7536bcf6ed96524b581dafc85301"
-          },
-          "input_equivalence": {
-            "pointer": "/input_equivalence",
-            "canonical_json_sha256": "72c7bee355a3b9be3f200d4a866da764b8a34b8818a65b1cc8dc4ff7391f44c1"
-          },
-          "prior_binding": {
-            "pointer": "/prior_binding",
-            "canonical_json_sha256": "43272e2fff1ad1bfeae044b7ded35d1ac2009f9c431d79a6cbae02fad8d3aea8"
-          },
-          "new_resolution_performed": {
-            "pointer": "/new_resolution_performed",
-            "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
-          },
-          "new_advisory_scan_performed": {
-            "pointer": "/new_advisory_scan_performed",
-            "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
-          },
-          "new_runtime_qualification_performed": {
-            "pointer": "/new_runtime_qualification_performed",
-            "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
-          },
-          "qualification": {
-            "pointer": "/qualification",
-            "canonical_json_sha256": "de1c9ec8f9412ac341b78104dea44cd76e8b21a0495dbdc4e3f07df23ba1e36c"
-          },
-          "reviewed_source_patch": {
-            "pointer": "/reviewed_source_patch",
-            "canonical_json_sha256": "0ae273273083ac4743a2c6a34cea8466f09ce43fa4f583ca1f12b89d81f9273a"
-          },
-          "native_volume_pre_rebase_evidence": {
-            "pointer": "/native_volume_pre_rebase_evidence",
-            "canonical_json_sha256": "a8af88b09d2d84bdab84b0fd33c8b50934f1d58d496fea85359c941cfa4c9de0"
-          },
-          "previous_reviewed_speech_binding": {
-            "pointer": "/previous_reviewed_speech_binding",
-            "canonical_json_sha256": "9d5b9d11857ee7620683d3cb9a8e8b9c262e43a521acbfad10b177f30b30f435"
-          },
-          "new_resolution_scope": {
-            "pointer": "/new_resolution_scope",
-            "canonical_json_sha256": "ae1415626f7b6b4facbd4dca8fa7d745d74fbbd83811b70dd0abdd48d5c6626c"
-          },
-          "new_advisory_scan_scope": {
-            "pointer": "/new_advisory_scan_scope",
-            "canonical_json_sha256": "b3effd9352b3c6ffae8c76a3518e680955b7383c1e15890303811d873c45cb88"
-          },
-          "retained_feature_binding": {
-            "pointer": "/retained_feature_binding",
-            "canonical_json_sha256": "72ab24969d4dafbf545a15ff7298d4085dcad5c5626acd65351eaade96a54f49"
-          },
-          "previous_reviewed_transport_binding": {
-            "pointer": "/previous_reviewed_transport_binding",
-            "canonical_json_sha256": "d847790d56c82ee882f213f9cf81c29e99009370839779982e08ad8b6da6bd5a"
-          },
-          "retained_composition_component_bindings": {
-            "pointer": "/retained_composition_component_bindings",
-            "canonical_json_sha256": "02c5770e8dbc53493cd0f5084b454a9b2bff04608f00929fe33ea97d0aacf64b"
-          },
-          "new_source_contract_qualification_performed": {
-            "pointer": "/new_source_contract_qualification_performed",
-            "canonical_json_sha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b"
-          },
-          "new_static_security_scan_performed": {
-            "pointer": "/new_static_security_scan_performed",
-            "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
-          }
-        },
-        "all_top_level_keys": [
-          "schema_version",
-          "source_manifest",
-          "source_manifest_sha256",
-          "source_tree_sha256",
-          "source_file_count",
-          "source_revision",
-          "comparison_public_revision",
-          "changed_source_paths",
-          "retained_sboms",
-          "input_equivalence",
-          "prior_binding",
-          "new_resolution_performed",
-          "new_advisory_scan_performed",
-          "new_runtime_qualification_performed",
-          "qualification",
-          "reviewed_source_patch",
-          "native_volume_pre_rebase_evidence",
-          "previous_reviewed_speech_binding",
-          "new_resolution_scope",
-          "new_advisory_scan_scope",
-          "retained_feature_binding",
-          "previous_reviewed_transport_binding",
-          "retained_composition_component_bindings",
-          "new_source_contract_qualification_performed",
-          "new_static_security_scan_performed"
-        ],
-        "source_manifest": {
-          "path": "PUBLIC_METADATA/source-manifest.json",
-          "sha256": "8b54418a37760c0f5096cb32936a1c881fe27d67ad4c7248fc794f00a47d74f4",
-          "bytes": 465077,
-          "git_blob": "21862e7160d073a5447e509ef069e7a74596c0ac"
-        }
-      },
-      {
-        "component": "history",
-        "public_revision": "76c0b007e8e2a22bb2b12cbe79a98053a56fc84b",
-        "path": "PUBLIC_METADATA/source-binding.json",
-        "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/76c0b007e8e2a22bb2b12cbe79a98053a56fc84b/PUBLIC_METADATA/source-binding.json",
-        "sha256": "f9da58ece4328baf9a2d421dc6f04e05962dfab76ee1edc9b39c04ee68522a8c",
-        "bytes": 954660,
-        "git_blob": "a4881d7443765deee85dad1c1f5eea726bfb7a9a",
-        "preserved_json_objects": {
-          "schema_version": {
-            "pointer": "/schema_version",
-            "canonical_json_sha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
-          },
-          "source_manifest": {
-            "pointer": "/source_manifest",
-            "canonical_json_sha256": "ace3c4cebde8c1e5207159e354ef46f1f9a13eb7b3185315a68b7cf8b71f212d"
-          },
-          "source_manifest_sha256": {
-            "pointer": "/source_manifest_sha256",
-            "canonical_json_sha256": "bc9bb00518a1a5e63bf9e09b4fc3dc398189b9e9302c330aabe8c16cbf8f7e05"
-          },
-          "source_tree_sha256": {
-            "pointer": "/source_tree_sha256",
-            "canonical_json_sha256": "fe25e7c515d0c3c5c9977f0bd382b35926a3ee0d8803c6c4850f6fd9b80e0eba"
-          },
-          "source_file_count": {
-            "pointer": "/source_file_count",
-            "canonical_json_sha256": "23d2c2e28f2dcbc3ffa0437156d70329f119c70f2f9a72479efe4e33111fc6d7"
-          },
-          "source_revision": {
-            "pointer": "/source_revision",
-            "canonical_json_sha256": "75f61a11e3b57a6452b4e88c1da2f25b7ac26b98f5abf3fbb37c15193c2a76ae"
-          },
-          "comparison_public_revision": {
-            "pointer": "/comparison_public_revision",
-            "canonical_json_sha256": "13f84912a92eda3fb8b582ee894e5595db5974d41e8420b5de1a53744ee4b2b4"
-          },
-          "changed_source_paths": {
-            "pointer": "/changed_source_paths",
-            "canonical_json_sha256": "fd448e837c0c3ec8dafc986b023cbb3f99f62755b640056d0a2d2ec605c913c7"
-          },
-          "retained_sboms": {
-            "pointer": "/retained_sboms",
-            "canonical_json_sha256": "0428d09c6e0e2b524877c2218b306c10da6c7536bcf6ed96524b581dafc85301"
-          },
-          "input_equivalence": {
-            "pointer": "/input_equivalence",
-            "canonical_json_sha256": "ce4adddeb87e932ca5ed753cb49c6ee754e813916b06937b916b8e8363b05a14"
-          },
-          "prior_binding": {
-            "pointer": "/prior_binding",
-            "canonical_json_sha256": "0f14f1eb621d3667f572fa6b2bf03f4b2e40836910711aea07b7fc3676f9bc89"
-          },
-          "new_resolution_performed": {
-            "pointer": "/new_resolution_performed",
-            "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
-          },
-          "new_advisory_scan_performed": {
-            "pointer": "/new_advisory_scan_performed",
-            "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
-          },
-          "new_runtime_qualification_performed": {
-            "pointer": "/new_runtime_qualification_performed",
-            "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
-          },
-          "qualification": {
-            "pointer": "/qualification",
-            "canonical_json_sha256": "781a8cb6a1db2e2a9aa12763947bd07919471c40f43933aa28e6aca18a8b99ff"
-          },
-          "reviewed_source_patch": {
-            "pointer": "/reviewed_source_patch",
-            "canonical_json_sha256": "ec96570087676bdbe40877019f2cb9af871ca37aa594412fe4725f6f88b67998"
-          },
-          "native_volume_pre_rebase_evidence": {
-            "pointer": "/native_volume_pre_rebase_evidence",
-            "canonical_json_sha256": "a8af88b09d2d84bdab84b0fd33c8b50934f1d58d496fea85359c941cfa4c9de0"
-          },
-          "previous_reviewed_speech_binding": {
-            "pointer": "/previous_reviewed_speech_binding",
-            "canonical_json_sha256": "9d5b9d11857ee7620683d3cb9a8e8b9c262e43a521acbfad10b177f30b30f435"
-          },
-          "new_resolution_scope": {
-            "pointer": "/new_resolution_scope",
-            "canonical_json_sha256": "bd696c1dd99b7582955e1692741340064db193eb679faa92c57a2207ba40cb08"
-          },
-          "new_advisory_scan_scope": {
-            "pointer": "/new_advisory_scan_scope",
-            "canonical_json_sha256": "eb3fd6cf3981db7306708707c46588e32425d04ef81beb92c118f5d8d8fbc132"
-          },
-          "retained_feature_binding": {
-            "pointer": "/retained_feature_binding",
-            "canonical_json_sha256": "72ab24969d4dafbf545a15ff7298d4085dcad5c5626acd65351eaade96a54f49"
-          },
-          "previous_reviewed_transport_binding": {
-            "pointer": "/previous_reviewed_transport_binding",
-            "canonical_json_sha256": "d847790d56c82ee882f213f9cf81c29e99009370839779982e08ad8b6da6bd5a"
-          },
-          "retained_composition_component_bindings": {
-            "pointer": "/retained_composition_component_bindings",
-            "canonical_json_sha256": "02c5770e8dbc53493cd0f5084b454a9b2bff04608f00929fe33ea97d0aacf64b"
-          },
-          "new_source_contract_qualification_performed": {
-            "pointer": "/new_source_contract_qualification_performed",
-            "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
-          },
-          "new_static_security_scan_performed": {
-            "pointer": "/new_static_security_scan_performed",
-            "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
-          }
-        },
-        "all_top_level_keys": [
-          "schema_version",
-          "source_manifest",
-          "source_manifest_sha256",
-          "source_tree_sha256",
-          "source_file_count",
-          "source_revision",
-          "comparison_public_revision",
-          "changed_source_paths",
-          "retained_sboms",
-          "input_equivalence",
-          "prior_binding",
-          "new_resolution_performed",
-          "new_advisory_scan_performed",
-          "new_runtime_qualification_performed",
-          "qualification",
-          "reviewed_source_patch",
-          "native_volume_pre_rebase_evidence",
-          "previous_reviewed_speech_binding",
-          "new_resolution_scope",
-          "new_advisory_scan_scope",
-          "retained_feature_binding",
-          "previous_reviewed_transport_binding",
-          "retained_composition_component_bindings",
-          "new_source_contract_qualification_performed",
-          "new_static_security_scan_performed"
-        ],
-        "source_manifest": {
-          "path": "PUBLIC_METADATA/source-manifest.json",
-          "sha256": "c2b03430d739c71d9043b1756cd8e02f1829e9ffe8ecd22bd0297744ec9a5d8d",
-          "bytes": 462758,
-          "git_blob": "d72cbf0bc7006332be8726343cdc62f5b455e6ce"
-        }
-      },
-      {
-        "component": "legal",
-        "public_revision": "648328e299a4f23961eb30fd62917abe46c27a5e",
-        "path": "PUBLIC_METADATA/source-binding.json",
-        "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/648328e299a4f23961eb30fd62917abe46c27a5e/PUBLIC_METADATA/source-binding.json",
-        "sha256": "d05e01a696d4c6d1e993eb2da0f463cfa04cc75014313469a8871f409504b806",
-        "bytes": 955233,
-        "git_blob": "c5a5cdf75ca2b82fd1249d52f297612f38c5f08b",
-        "preserved_json_objects": {
-          "schema_version": {
-            "pointer": "/schema_version",
-            "canonical_json_sha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
-          },
-          "source_manifest": {
-            "pointer": "/source_manifest",
-            "canonical_json_sha256": "ace3c4cebde8c1e5207159e354ef46f1f9a13eb7b3185315a68b7cf8b71f212d"
-          },
-          "source_manifest_sha256": {
-            "pointer": "/source_manifest_sha256",
-            "canonical_json_sha256": "6fd3e7b5d8ec231e92e79cab0854abd957a0dd7e5b6631600d0bab995cb46ed4"
-          },
-          "source_tree_sha256": {
-            "pointer": "/source_tree_sha256",
-            "canonical_json_sha256": "3ec34a014619e36e8789e2d7c95839adc13c70bccad0bf8f780b5e88fe0d5c86"
-          },
-          "source_file_count": {
-            "pointer": "/source_file_count",
-            "canonical_json_sha256": "72dbc1d0c9905717d66ad6d89e2a6a32718f17abc8dcfea7b1664b61a0600197"
-          },
-          "source_revision": {
-            "pointer": "/source_revision",
-            "canonical_json_sha256": "367942c45d238e4559b942dc27379f5c0287aea5911fc4cc376b449811d206d9"
-          },
-          "comparison_public_revision": {
-            "pointer": "/comparison_public_revision",
-            "canonical_json_sha256": "13f84912a92eda3fb8b582ee894e5595db5974d41e8420b5de1a53744ee4b2b4"
-          },
-          "changed_source_paths": {
-            "pointer": "/changed_source_paths",
-            "canonical_json_sha256": "3514c9d942da2cc7de0045c551ae9847c16d19e7ff2dcf040b7c1dad42a4de3c"
-          },
-          "retained_sboms": {
-            "pointer": "/retained_sboms",
-            "canonical_json_sha256": "0428d09c6e0e2b524877c2218b306c10da6c7536bcf6ed96524b581dafc85301"
-          },
-          "input_equivalence": {
-            "pointer": "/input_equivalence",
-            "canonical_json_sha256": "9ddaf577fbf532fe1c71b43ab4bafdc8eb30485f4abb08673ebcd3cd4d4fcc2e"
-          },
-          "prior_binding": {
-            "pointer": "/prior_binding",
-            "canonical_json_sha256": "cb35187a69fad647f2a3b500ab408ffe8308cd64255b107a9070f6767c0113fe"
-          },
-          "new_resolution_performed": {
-            "pointer": "/new_resolution_performed",
-            "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
-          },
-          "new_advisory_scan_performed": {
-            "pointer": "/new_advisory_scan_performed",
-            "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
-          },
-          "new_runtime_qualification_performed": {
-            "pointer": "/new_runtime_qualification_performed",
-            "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
-          },
-          "qualification": {
-            "pointer": "/qualification",
-            "canonical_json_sha256": "7856839c2014030585ae75d44a11cd2142941a4552f8bcd56e232a48cae3c749"
-          },
-          "reviewed_source_patch": {
-            "pointer": "/reviewed_source_patch",
-            "canonical_json_sha256": "4d1a19ac16dd4a43ea974e34ce08230c4b3df161f72c9888315871f531740715"
-          },
-          "native_volume_pre_rebase_evidence": {
-            "pointer": "/native_volume_pre_rebase_evidence",
-            "canonical_json_sha256": "a8af88b09d2d84bdab84b0fd33c8b50934f1d58d496fea85359c941cfa4c9de0"
-          },
-          "previous_reviewed_speech_binding": {
-            "pointer": "/previous_reviewed_speech_binding",
-            "canonical_json_sha256": "9d5b9d11857ee7620683d3cb9a8e8b9c262e43a521acbfad10b177f30b30f435"
-          },
-          "new_resolution_scope": {
-            "pointer": "/new_resolution_scope",
-            "canonical_json_sha256": "7b37e4104b3d956c6b534df2b68af2e9070efeda997239bbae75b690cb1e15d8"
-          },
-          "new_advisory_scan_scope": {
-            "pointer": "/new_advisory_scan_scope",
-            "canonical_json_sha256": "01d874e4882f1d4fe5866891f4350faa10627f929efe9a3a869056abc64ab8ff"
-          },
-          "retained_feature_binding": {
-            "pointer": "/retained_feature_binding",
-            "canonical_json_sha256": "72ab24969d4dafbf545a15ff7298d4085dcad5c5626acd65351eaade96a54f49"
-          },
-          "previous_reviewed_transport_binding": {
-            "pointer": "/previous_reviewed_transport_binding",
-            "canonical_json_sha256": "d847790d56c82ee882f213f9cf81c29e99009370839779982e08ad8b6da6bd5a"
-          },
-          "retained_composition_component_bindings": {
-            "pointer": "/retained_composition_component_bindings",
-            "canonical_json_sha256": "02c5770e8dbc53493cd0f5084b454a9b2bff04608f00929fe33ea97d0aacf64b"
-          },
-          "new_source_contract_qualification_performed": {
-            "pointer": "/new_source_contract_qualification_performed",
-            "canonical_json_sha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b"
-          },
-          "new_static_security_scan_performed": {
-            "pointer": "/new_static_security_scan_performed",
-            "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
-          }
-        },
-        "all_top_level_keys": [
-          "schema_version",
-          "source_manifest",
-          "source_manifest_sha256",
-          "source_tree_sha256",
-          "source_file_count",
-          "source_revision",
-          "comparison_public_revision",
-          "changed_source_paths",
-          "retained_sboms",
-          "input_equivalence",
-          "prior_binding",
-          "new_resolution_performed",
-          "new_advisory_scan_performed",
-          "new_runtime_qualification_performed",
-          "qualification",
-          "reviewed_source_patch",
-          "native_volume_pre_rebase_evidence",
-          "previous_reviewed_speech_binding",
-          "new_resolution_scope",
-          "new_advisory_scan_scope",
-          "retained_feature_binding",
-          "previous_reviewed_transport_binding",
-          "retained_composition_component_bindings",
-          "new_source_contract_qualification_performed",
-          "new_static_security_scan_performed"
-        ],
-        "source_manifest": {
-          "path": "PUBLIC_METADATA/source-manifest.json",
-          "sha256": "bf5ed172d39cf812f9c40a93e52fbe89c4157c88a6c3cbeb213b7ac413103327",
-          "bytes": 462564,
-          "git_blob": "02148e1710e34a639e4277babd4d105ea64a9799"
-        }
+        "note": "Complete protected #79 correction retained with its strict verifier and isolated tracked fixture. This folder repair changes only the two reviewed UI paths."
       }
     ]
+  },
+  "reviewed_source_patch": {
+    "scope": "Expose the existing Local Files folder editor after configuration; preserve save acknowledgement, cancellation and desktop-only controls.",
+    "source_paths": [
+      "SOURCE/ui/react-app/src/components/SettingsModal.desktopOnlyPanels.test.jsx",
+      "SOURCE/ui/react-app/src/components/SettingsModal.jsx"
+    ],
+    "source_tree": "998dd3be418cd687f9394a253adf9d5a3ea0e7cf"
   },
   "native_volume_pre_rebase_evidence": {
     "public_revision": "476ad8bc5652ffbf1ace52de9793e7f2c1b5cf2b",
@@ -1191,8 +443,8 @@
     "sha256": "e7380d33f4de1bc53c3707a550a14b777d72c6de68e1fc987c02a91f167f9abb",
     "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/cf37df7c72d977e981b943358b9f3f1aceffe659/PUBLIC_METADATA/source-binding.json"
   },
-  "new_resolution_scope": "No new dependency resolution or package download during source composition; final-head hosted inventory remains required.",
-  "new_advisory_scan_scope": "No new advisory scan during source composition; prior source and inventory evidence is preserved by exact immutable reference.",
+  "new_resolution_scope": "No dependency resolution is performed by this binding preparation; any retained candidate execution is explicitly scoped in qualification.",
+  "new_advisory_scan_scope": "No advisory scan is performed by this binding preparation; any retained audit result is explicitly scoped in qualification.",
   "retained_feature_binding": {
     "public_revision": "cc88476004f2a7b7ef443ef2e4ec4c85605690f6",
     "path": "PUBLIC_METADATA/source-binding.json",
@@ -2068,5 +1320,253 @@
     }
   ],
   "new_source_contract_qualification_performed": false,
-  "new_static_security_scan_performed": false
+  "new_static_security_scan_performed": false,
+  "retained_source_qualification": {
+    "source_revision": "3516d2bb376446b38c9e862e8928d5d2e39628b3",
+    "source_tree_sha256": "da855d6646c8a6dbbf1fe159b008657de61f5c54870a9c1b371a295e34cfc559",
+    "source_manifest_sha256": "d4eaeeee5ce9ae60da0fd1a54b0e2506d339fded99fd356059a00784fdd7a92d",
+    "comparison_public_revision": "3356ea418e84566614a9d95619ae47821f142d6c",
+    "changed_source_paths": [
+      "SOURCE/tests/public/test_speech_volume_wiring.py",
+      "SOURCE/ui/react-app/src/__tests__/hooks/useSettings.snapshotOrdering.test.jsx",
+      "SOURCE/ui/react-app/src/hooks/useSettings.js",
+      "SOURCE/ui/settings_api.py"
+    ],
+    "qualification": {
+      "scope": "Retained actual qualification of the unchanged shortcut-feedback source; this metadata-only correction does not repeat or relabel runtime evidence.",
+      "source_commit": "3516d2bb376446b38c9e862e8928d5d2e39628b3",
+      "source_tree": "eafe1919fd64e1635e39442a4b142c8338d27af4",
+      "ordered_source_parents": [
+        "e0cfc56929a276b63aa58ea31e39c25860ed28b1",
+        "3356ea418e84566614a9d95619ae47821f142d6c"
+      ],
+      "qualified_candidate_head": "a667ab9b4e3692a28c018d7e44fe256b9311decd",
+      "tested_merge_commit": "a034309f2b57a5c8b36c753219100425bf9f5fc5",
+      "tested_candidate_tree": "67cf5bc4ca5eac05fb4c93b31ae3ee711e727b88",
+      "protected_merge_commit": "9eef006b28a579cb74ade8c5966380f77e8d1ef6",
+      "independent_automated_review": "https://github.com/GeeIHadAGoodTime/viola-oss/pull/78#pullrequestreview-5447088375",
+      "source_checks": {
+        "run": 37671809013,
+        "python_job": 112965163804,
+        "python_methods": 683,
+        "python_passed": 682,
+        "python_skipped": 1,
+        "skip_scope": "Existing POSIX-only FIFO target test on Windows",
+        "frontend_job": 112965164472,
+        "frontend_tests_passed": 1907,
+        "frontend_files_passed": 168,
+        "production_build": "passed",
+        "frontend_lock_audit_findings": 0,
+        "url": "https://github.com/GeeIHadAGoodTime/viola-oss/actions/runs/37671809013"
+      },
+      "local_source_evidence": {
+        "backend_test_methods_passed": 78,
+        "new_backend_methods": 5,
+        "original_backend_failing_assertions": 8,
+        "actual_code_seam_cases_passed": 9,
+        "seam_limit": "React scheduling boundary inert; no native UI or physical-device proof",
+        "detected_negative_mutations": 6
+      },
+      "optional_inventory_run": 37671809125,
+      "optional_inventory_scope": "All six actual jobs completed successfully on the retained candidate; decoded payload sizes/hashes, source/manifest identity, dependency graphs and installed versions independently verified. Not a physical-runtime or customer-release pass.",
+      "limits": [
+        "Source integration only",
+        "No deployment or release",
+        "No corrected installed acceptance",
+        "No physical/global-hotkey qualification",
+        "No new source-regression pass claimed for metadata editing"
+      ],
+      "optional_inventory_jobs": [
+        {
+          "scope": "frontend",
+          "job": 112965165386,
+          "sha256": "5ca265e54ec3e1d668ad66cddea5cd1272a415c910f5391fc6716ac90679d524",
+          "bytes": 362676,
+          "components": 406,
+          "graph_and_source_verified": true
+        },
+        {
+          "scope": "windows-desktop",
+          "job": 112965165222,
+          "sha256": "e890cb914d4ec2f27acaa42b112513f760c28cf3a2aa3025624175ac6138ef2a",
+          "bytes": 375442,
+          "components": 208,
+          "graph_and_source_verified": true
+        },
+        {
+          "scope": "windows-kokoro",
+          "job": 112965165160,
+          "sha256": "78db8c85358c724c1d32d89924be38353aa0a6e02962490ef3d9d22aed7e30db",
+          "bytes": 391535,
+          "components": 219,
+          "graph_and_source_verified": true
+        },
+        {
+          "scope": "windows-other-optional",
+          "job": 112965164976,
+          "sha256": "a4d44ef40400e63fddf51944dca62cc41539412d5517c750223eef5d5c9c15f9",
+          "bytes": 388792,
+          "components": 216,
+          "graph_and_source_verified": true
+        },
+        {
+          "scope": "windows-all-optional",
+          "job": 112965165532,
+          "sha256": "139ce2448542aac42068f723fad2fd823d487c1dd8fda252b3bfd38ae1c71445",
+          "bytes": 404883,
+          "components": 227,
+          "graph_and_source_verified": true
+        },
+        {
+          "scope": "windows-deepfilter",
+          "job": 112965165340,
+          "sha256": "1a71593d6578393ffd22c1d04d70c2ded6e597076bd5380f820b9608f4bd4d88",
+          "bytes": 56794,
+          "components": 28,
+          "graph_and_source_verified": true
+        }
+      ],
+      "prior_complete_evidence": [
+        {
+          "public_revision": "9eef006b28a579cb74ade8c5966380f77e8d1ef6",
+          "path": "PUBLIC_METADATA/source-binding.json",
+          "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/9eef006b28a579cb74ade8c5966380f77e8d1ef6/PUBLIC_METADATA/source-binding.json",
+          "sha256": "546206c7bcee46e1b777b74a7b52412f8ecba45dbc9aeb413114bf011ff1830d",
+          "bytes": 99643,
+          "git_blob": "ec1342fea46528c48d8db0713166046e0ae542a2",
+          "all_top_level_keys": [
+            "schema_version",
+            "source_manifest",
+            "source_manifest_sha256",
+            "source_tree_sha256",
+            "source_file_count",
+            "source_revision",
+            "comparison_public_revision",
+            "changed_source_paths",
+            "retained_sboms",
+            "input_equivalence",
+            "prior_binding",
+            "new_resolution_performed",
+            "new_advisory_scan_performed",
+            "new_runtime_qualification_performed",
+            "qualification",
+            "reviewed_source_patch",
+            "native_volume_pre_rebase_evidence",
+            "previous_reviewed_speech_binding",
+            "new_resolution_scope",
+            "new_advisory_scan_scope",
+            "retained_feature_binding",
+            "previous_reviewed_transport_binding",
+            "retained_composition_component_bindings",
+            "new_source_contract_qualification_performed",
+            "new_static_security_scan_performed"
+          ],
+          "preserved_json_objects": {
+            "schema_version": {
+              "pointer": "/schema_version",
+              "canonical_json_sha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+            },
+            "source_manifest": {
+              "pointer": "/source_manifest",
+              "canonical_json_sha256": "ace3c4cebde8c1e5207159e354ef46f1f9a13eb7b3185315a68b7cf8b71f212d"
+            },
+            "source_manifest_sha256": {
+              "pointer": "/source_manifest_sha256",
+              "canonical_json_sha256": "8ed2bed9f3ab6ac30296f8c6039f92be0f43405b7e20d03ad44a204e03678bda"
+            },
+            "source_tree_sha256": {
+              "pointer": "/source_tree_sha256",
+              "canonical_json_sha256": "00039ab3dff8489f12a500ba794f4594d4248175393e64dbdbb724eb64b3c024"
+            },
+            "source_file_count": {
+              "pointer": "/source_file_count",
+              "canonical_json_sha256": "87557ad1d2f9c36266be01980669ed8ba1b5375d552385b12db8cacd04a8f8d0"
+            },
+            "source_revision": {
+              "pointer": "/source_revision",
+              "canonical_json_sha256": "d953e89dbfafe46dc39a7a7f425326c377628d6e98bf736315a54765a55f26b0"
+            },
+            "comparison_public_revision": {
+              "pointer": "/comparison_public_revision",
+              "canonical_json_sha256": "25c85d6bbb60cdafeca038544c1e610b51fce95132e726778fd6abe507b58530"
+            },
+            "changed_source_paths": {
+              "pointer": "/changed_source_paths",
+              "canonical_json_sha256": "81f207cb04970d1e7519d4c3c01c0cab44921b5f532092547a75db56435ba55e"
+            },
+            "retained_sboms": {
+              "pointer": "/retained_sboms",
+              "canonical_json_sha256": "0428d09c6e0e2b524877c2218b306c10da6c7536bcf6ed96524b581dafc85301"
+            },
+            "input_equivalence": {
+              "pointer": "/input_equivalence",
+              "canonical_json_sha256": "a44f9d462ed265be0f56ad081a87795c2ec82bc05913e0b0e365102613fde5ed"
+            },
+            "prior_binding": {
+              "pointer": "/prior_binding",
+              "canonical_json_sha256": "2e8a2d48f06502f57c50251f80e3d3d0c36bfe4c4a3a864287d893796940f57f"
+            },
+            "new_resolution_performed": {
+              "pointer": "/new_resolution_performed",
+              "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+            },
+            "new_advisory_scan_performed": {
+              "pointer": "/new_advisory_scan_performed",
+              "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+            },
+            "new_runtime_qualification_performed": {
+              "pointer": "/new_runtime_qualification_performed",
+              "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+            },
+            "qualification": {
+              "pointer": "/qualification",
+              "canonical_json_sha256": "f752e32dcd8d41aa81da99b1059cb41b3a3098d7b51bb33adf342b489481b8e8"
+            },
+            "reviewed_source_patch": {
+              "pointer": "/reviewed_source_patch",
+              "canonical_json_sha256": "c8427999d08b33676977a809edf195942ccbba942eec0f7f2a096b5fcf44641b"
+            },
+            "native_volume_pre_rebase_evidence": {
+              "pointer": "/native_volume_pre_rebase_evidence",
+              "canonical_json_sha256": "a8af88b09d2d84bdab84b0fd33c8b50934f1d58d496fea85359c941cfa4c9de0"
+            },
+            "previous_reviewed_speech_binding": {
+              "pointer": "/previous_reviewed_speech_binding",
+              "canonical_json_sha256": "9d5b9d11857ee7620683d3cb9a8e8b9c262e43a521acbfad10b177f30b30f435"
+            },
+            "new_resolution_scope": {
+              "pointer": "/new_resolution_scope",
+              "canonical_json_sha256": "c35eb210135eb9e2e5af293e17997359c1a9c3b6abb3cfe75d877ca3f1f86fff"
+            },
+            "new_advisory_scan_scope": {
+              "pointer": "/new_advisory_scan_scope",
+              "canonical_json_sha256": "13438c04cc20d92480f31324582b8789515d4cbf1edebb876e3aa347f5662bfb"
+            },
+            "retained_feature_binding": {
+              "pointer": "/retained_feature_binding",
+              "canonical_json_sha256": "72ab24969d4dafbf545a15ff7298d4085dcad5c5626acd65351eaade96a54f49"
+            },
+            "previous_reviewed_transport_binding": {
+              "pointer": "/previous_reviewed_transport_binding",
+              "canonical_json_sha256": "d847790d56c82ee882f213f9cf81c29e99009370839779982e08ad8b6da6bd5a"
+            },
+            "retained_composition_component_bindings": {
+              "pointer": "/retained_composition_component_bindings",
+              "canonical_json_sha256": "9e965d6f5afa5975d54b2003e66656f8b35c211f5e9610be813e1411fe2f3337"
+            },
+            "new_source_contract_qualification_performed": {
+              "pointer": "/new_source_contract_qualification_performed",
+              "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+            },
+            "new_static_security_scan_performed": {
+              "pointer": "/new_static_security_scan_performed",
+              "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+            }
+          },
+          "note": "Complete prior binding retained unchanged. Its aggregate checksums describe the correct #78 source, but active descriptive revision/tree/parents/changed paths still described #76. This correction replaces those active descriptions without rewriting historical observations."
+        }
+      ]
+    },
+    "scope": "Corrected historical description of already-qualified #78 source; no old receipt is rewritten or relabelled."
+  }
 }
