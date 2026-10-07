@@ -1,39 +1,32 @@
 {
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "ca697ae69cd2dbd9aa77f4a8e833dccd8083424d339c2468633794b0dff1bf82",
-  "source_tree_sha256": "e8c197adafff6d009cc8139504433608b8a9710032761ae14b0eaa52df6fb9cd",
-  "source_file_count": 2659,
-  "source_revision": "32e9f79b3a5443ddad46368e78f931626a68c534",
-  "comparison_public_revision": "e706c5af95cd9bae01c247b0fa884ec2ea8fddb5",
+  "source_manifest_sha256": "4859927d178ad2fe72533d94b8e1c992205e020635cd34aa27fba82776f535f4",
+  "source_tree_sha256": "7dfda1c853122dcc0bc92712d3a6f2b5a3003c00f73b3fd7fbab6361d9b4c673",
+  "source_file_count": 2661,
+  "source_revision": "9cd2c60a938edf92cab6d0496ce48ca83f1e40ca",
+  "comparison_public_revision": "fa417e4328fd72231df28ee94f3ba57baeff1139",
   "changed_source_paths": [
-    "SOURCE/docs/CUSTOMER_SPEECH_QUALIFICATION.md",
-    "SOURCE/requirements_customer_speech_mandarin.txt",
-    "SOURCE/requirements_desktop.txt",
-    "SOURCE/requirements_linux.txt",
-    "SOURCE/requirements_macos.txt",
-    "SOURCE/scripts/dependencies/verify_customer_speech.py",
-    "SOURCE/telephony/language_handler.py",
-    "SOURCE/tests/public/test_cjk_runtime_reconstruction.py",
-    "SOURCE/tests/public/test_customer_launch_voice_routes.py",
-    "SOURCE/tests/public/test_customer_phone_routing.py",
-    "SOURCE/tests/public/test_customer_speech_dependencies.py",
-    "SOURCE/third_party/kokoro_onnx.patch",
-    "SOURCE/third_party/kokoro_onnx/pyproject.toml",
-    "SOURCE/third_party/kokoro_onnx/src/kokoro_onnx/__init__.py",
-    "SOURCE/third_party/misaki_cjk_prototype.patch",
-    "SOURCE/third_party/misaki_cjk_prototype/README.md",
-    "SOURCE/third_party/misaki_cjk_prototype/pyproject.toml",
-    "SOURCE/third_party/pipecat.patch",
-    "SOURCE/third_party/pipecat/pyproject.toml",
-    "SOURCE/third_party/pipecat/src/pipecat/services/kokoro/tts.py",
-    "SOURCE/third_party/sources.toml",
-    "SOURCE/tools/qualification/cjk_runtime_replay.py",
-    "SOURCE/tools/qualification/romance_runtime_replay.py",
-    "SOURCE/voice/customer_composition.py",
-    "SOURCE/voice/customer_voice_routing.py",
-    "SOURCE/voice/synthesis/factory.py",
-    "SOURCE/voice/synthesis/kokoro_engine.py"
+    "SOURCE/auth/desktop_session.py",
+    "SOURCE/auth/models.py",
+    "SOURCE/auth/routes.py",
+    "SOURCE/core/exceptions.py",
+    "SOURCE/core/request_context.py",
+    "SOURCE/intent/agent_loop.py",
+    "SOURCE/services/llm/managed_budget.py",
+    "SOURCE/services/llm/spend_accounting.py",
+    "SOURCE/tests/public/test_remote_managed_accounting.py",
+    "SOURCE/ui/react-app/src/components/AccountTab.authSync.test.jsx",
+    "SOURCE/ui/react-app/src/components/AccountTab.cloudPlan.test.jsx",
+    "SOURCE/ui/react-app/src/components/AccountTab.cloudStoreReconciliation.test.jsx",
+    "SOURCE/ui/react-app/src/components/AccountTab.jsx",
+    "SOURCE/ui/react-app/src/components/AccountTab.test.jsx",
+    "SOURCE/ui/react-app/src/components/AccountTab.usageCloudAuth.test.jsx",
+    "SOURCE/ui/react-app/src/config.js",
+    "SOURCE/ui/react-app/src/lib/auth_context.tsx",
+    "SOURCE/ui/react-app/src/lib/billingEntitlement.test.ts",
+    "SOURCE/ui/react-app/src/lib/billingEntitlement.ts",
+    "SOURCE/ui/settings_manager.py"
   ],
   "retained_sboms": [
     {
@@ -104,62 +97,21 @@
     "selected_customer_windows_closure_not_claimed": true
   },
   "qualification": {
-    "scope": "Inactive selected English, Spanish and Mandarin routing and dependency-source composition; qualification artifacts are not customer release approval.",
-    "source_commit": "32e9f79b3a5443ddad46368e78f931626a68c534",
-    "source_tree": "1c59281d29ec4884586ff49f80e040505987857c",
-    "ordered_source_parents": [
-      "e706c5af95cd9bae01c247b0fa884ec2ea8fddb5",
-      "744eb84436fdf31a4e85135c7590801cac853ef7"
-    ],
-    "source_patch_sha256": "39d100b6053a53688b4c19f6840c2b429d0cbb8fa4e012b0ff8fffd82c31aa71",
-    "reviewed_speech_source": "744eb84436fdf31a4e85135c7590801cac853ef7",
-    "all_27_reviewed_speech_blobs_unchanged": true,
-    "protected_pricing_delta_preserved": true,
-    "independent_source_review": "Routing runtime, dependency separation and fork metadata/wheels independently reviewed; test-only fixture corrections preserve pronunciation controls after earlier voice admission.",
-    "source_controls": {
-      "basis": "Reviewed source744eb844 before the protected disjoint pricing composition; fresh final-head hosted checks required.",
-      "dependency_methods": 22,
-      "routing_methods": 18,
-      "cjk_inner_methods": 36,
-      "romance_inner_methods": 16,
-      "native_boundaries": "inert",
-      "initial_combined_fixture_failures_preserved": true,
-      "real_pipecat_integration": "Required hosted source job; local dependency stack unavailable"
-    },
-    "package_identities": {
-      "kokoro-onnx": {
-        "version": "0.4.9+viola.3",
-        "wheel_sha256": "2fedd09693672da46da0e2ee4dee3265bc24607774699bf6c68d8eec299f9b33",
-        "wheel_bytes": 18890
-      },
-      "pipecat-ai": {
-        "version": "0.0.108+viola.3",
-        "wheel_sha256": "a09f12dffc545ca0cac022fdb5ff441e9298556be8f26d23e7a40f5ac5a6fb80",
-        "wheel_bytes": 10752703
-      },
-      "viola-misaki-cjk-prototype": {
-        "version": "0.9.4+viola.cjk.4",
-        "wheel_sha256": "e9688b42b822455bf80a89a2dc2526add725867a2b0f5182bcf4f03a7f93284f",
-        "wheel_bytes": 511838
-      }
-    },
-    "reproducibility": "Two offline retained-backend builds per new wheel are byte-identical; aggregate source reconstruction and wheel RECORD/notices/data checked.",
-    "native_runtime_repeated": false,
-    "profile_activated": false,
-    "customer_release_eligible": false,
-    "launch_languages": [
-      "English",
-      "Spanish",
-      "Mandarin"
-    ],
-    "canonical_assets_and_dormant_routes_preserved": true,
-    "limits": [
-      "Existing bounded pronunciation coverage remains; named-voice and static graph controls do not prove general pronunciation quality.",
-      "Selected Windows install/native closure, redistribution completeness, signing, frozen execution and installed acceptance remain separate.",
-      "Retained SBOMs remain historical evidence; final-head hosted scopes must resolve changed fork inputs.",
-      "The source .4 Mandarin extra is not a claim of completed Windows customer dependency installation.",
-      "Unchanged Pipecat packaging omissions for frames.proto and AWS ready.wav remain outside this selected Kokoro change."
-    ]
+    "source_commit": "9cd2c60a938edf92cab6d0496ce48ca83f1e40ca",
+    "source_tree": "20dd5e19307006c6c4da20213e82d00e11965d1e",
+    "scope": "Account entitlement and typed managed-refusal source contracts. Local synthetic tests, not installed or production acceptance.",
+    "reviewed_original_source": "8ee475f3ec8c8511e8698e9e17efe81fb24378b3",
+    "original_author": "Test <test@example.com>",
+    "independent_source_review": "Reviewed source delta with hostile-cap-state projection and exact billing identity regressions.",
+    "frontend_tests": 1940,
+    "frontend_files": 170,
+    "managed_accounting_tests": 13,
+    "vite_build": "passed; no Sentry upload configured",
+    "python_broad_result": "Incomplete target environment: 2 failures and 4 errors across695 tests after dependency alignment; earlier same-environment candidate/base both2failures16errors (686/683 tests). Failures remain failures.",
+    "source_only": true,
+    "installed_acceptance": false,
+    "production_deployment": false,
+    "prior_qualification_pointer": "account_reconciliation_previous_binding.qualification"
   },
   "historical_bindings": [
     {
@@ -7590,7 +7542,7 @@
                         "text": "Hello. This is a short test of the local speech system.",
                         "voice": "af_heart",
                         "locale": "en-us",
-                        "phonemes": "həlˈO. ðˌɪs ɪz ɐ ʃˈɔɹt tˈɛst ʌv ðə lˈOkəl spˈiʧ sˈɪstəm.",
+                        "phonemes": "h\u0259l\u02c8O. \u00f0\u02cc\u026as \u026az \u0250 \u0283\u02c8\u0254\u0279t t\u02c8\u025bst \u028cv \u00f0\u0259 l\u02c8Ok\u0259l sp\u02c8i\u02a7 s\u02c8\u026ast\u0259m.",
                         "duration_seconds": 2.986666666666667,
                         "wav_sha256": "aeaba330943123ff46d808be904e3cc47ec05291c1aee9efa78a21bb25d4fadd",
                         "float_pcm_sha256": "d27a02a2b366945758f9a7cb89ae4eaee46525807634dff9b7f295f400b8f622",
@@ -7603,7 +7555,7 @@
                         "text": "Hello. This is a short test of the local speech system.",
                         "voice": "af_heart",
                         "locale": "en-us",
-                        "phonemes": "həlˈO. ðˌɪs ɪz ɐ ʃˈɔɹt tˈɛst ʌv ðə lˈOkəl spˈiʧ sˈɪstəm.",
+                        "phonemes": "h\u0259l\u02c8O. \u00f0\u02cc\u026as \u026az \u0250 \u0283\u02c8\u0254\u0279t t\u02c8\u025bst \u028cv \u00f0\u0259 l\u02c8Ok\u0259l sp\u02c8i\u02a7 s\u02c8\u026ast\u0259m.",
                         "duration_seconds": 2.986666666666667,
                         "wav_sha256": "aeaba330943123ff46d808be904e3cc47ec05291c1aee9efa78a21bb25d4fadd",
                         "float_pcm_sha256": "d27a02a2b366945758f9a7cb89ae4eaee46525807634dff9b7f295f400b8f622",
@@ -7616,7 +7568,7 @@
                         "text": "The A P I costs $12.50, not $0.05.",
                         "voice": "af_heart",
                         "locale": "en-us",
-                        "phonemes": "ði ˈA pˈi ˌI kˈɔsts twˈɛlv dˈɑləɹz ænd fˈɪfti sˈɛnts, nˌɑt fˈIv sˈɛnts.",
+                        "phonemes": "\u00f0i \u02c8A p\u02c8i \u02ccI k\u02c8\u0254sts tw\u02c8\u025blv d\u02c8\u0251l\u0259\u0279z \u00e6nd f\u02c8\u026afti s\u02c8\u025bnts, n\u02cc\u0251t f\u02c8Iv s\u02c8\u025bnts.",
                         "duration_seconds": 3.7973333333333334,
                         "wav_sha256": "5310d8c6737e9eb874d30b15b70cd3a779d1a86904339b68831e29945307d4b6",
                         "float_pcm_sha256": "c7a016d0b527e759ba0e2ce06f0348371a99e1c9ce68e42ca38ee919cef63fa7",
@@ -7629,7 +7581,7 @@
                         "text": "The A P I costs $12.50, not $0.05.",
                         "voice": "af_heart",
                         "locale": "en-us",
-                        "phonemes": "ði ˈA pˈi ˌI kˈɔsts twˈɛlv dˈɑləɹz ænd fˈɪfti sˈɛnts, nˌɑt fˈIv sˈɛnts.",
+                        "phonemes": "\u00f0i \u02c8A p\u02c8i \u02ccI k\u02c8\u0254sts tw\u02c8\u025blv d\u02c8\u0251l\u0259\u0279z \u00e6nd f\u02c8\u026afti s\u02c8\u025bnts, n\u02cc\u0251t f\u02c8Iv s\u02c8\u025bnts.",
                         "duration_seconds": 3.7973333333333334,
                         "wav_sha256": "5310d8c6737e9eb874d30b15b70cd3a779d1a86904339b68831e29945307d4b6",
                         "float_pcm_sha256": "c7a016d0b527e759ba0e2ce06f0348371a99e1c9ce68e42ca38ee919cef63fa7",
@@ -7652,7 +7604,7 @@
                         "text": "'A P I'",
                         "voice": "af_heart",
                         "locale": "en-us",
-                        "phonemes": "“ɐ pˈi ˈI",
+                        "phonemes": "\u201c\u0250 p\u02c8i \u02c8I",
                         "duration_seconds": 0.9386666666666666,
                         "wav_sha256": "c14f9a31a8a71f2441e74ab4e64f24df25b9f018975fe46d1ab0ed2cb33519e3",
                         "float_pcm_sha256": "69d1f2d9c292aa645dd0b1ff590bb7c1cbf34b92bc382a7ae1d695b2540e18cb",
@@ -7665,7 +7617,7 @@
                         "text": "'A P I'",
                         "voice": "af_heart",
                         "locale": "en-us",
-                        "phonemes": "“ˈA pˈi ˈI",
+                        "phonemes": "\u201c\u02c8A p\u02c8i \u02c8I",
                         "duration_seconds": 0.9386666666666666,
                         "wav_sha256": "f5a871ccac419cc586ff16aaa6e9f42b4720c591d20a7752c09d01e89c299f3d",
                         "float_pcm_sha256": "b8b8573bf9058851c6aaee30fc328c01c89ba20e1413aa674bef4c1847b348f0",
@@ -7678,7 +7630,7 @@
                         "text": "'A P I'",
                         "voice": "bf_emma",
                         "locale": "en-gb",
-                        "phonemes": "“ɐ pˈiː ˈI",
+                        "phonemes": "\u201c\u0250 p\u02c8i\u02d0 \u02c8I",
                         "duration_seconds": 0.9386666666666666,
                         "wav_sha256": "fcb3326f8978423f25953f991282d759fbc0e9a1248a102054e236eb5a558ddb",
                         "float_pcm_sha256": "1612b0e9f197c238f2434d27da0024959ca5b3825db6a3ed79119491924568d0",
@@ -7691,7 +7643,7 @@
                         "text": "'A P I'",
                         "voice": "bf_emma",
                         "locale": "en-gb",
-                        "phonemes": "“ˈA pˈiː ˈI",
+                        "phonemes": "\u201c\u02c8A p\u02c8i\u02d0 \u02c8I",
                         "duration_seconds": 0.96,
                         "wav_sha256": "83dad5fbcd6fea44e2b35ecf0f1b19af8e946c56a5d5743af058ad6e92a7d909",
                         "float_pcm_sha256": "2f7c8c442737efd0ff9bf3ddb35e47e7ae90ed2bc23c7025a08d3ddf3552f78d",
@@ -7711,10 +7663,10 @@
                     "cases": [
                       {
                         "id": "ja-component",
-                        "text": "こんにちは",
+                        "text": "\u3053\u3093\u306b\u3061\u306f",
                         "voice": "jf_alpha",
                         "locale": "ja",
-                        "phonemes": "koɲɲiʨiβa",
+                        "phonemes": "ko\u0272\u0272i\u02a8i\u03b2a",
                         "duration_seconds": 0.9813333333333333,
                         "wav_sha256": "c9a9f75372afc19d7cb51732a481300a7fa5779d0f4411c35a9f7b788d693f51",
                         "float_pcm_sha256": "b6f3115fde5d46e829b4437b51c82ea366c8973731611ac665a21047bc3fb5fd",
@@ -7724,10 +7676,10 @@
                       },
                       {
                         "id": "ja-composed",
-                        "text": "こんにちは",
+                        "text": "\u3053\u3093\u306b\u3061\u306f",
                         "voice": "jf_alpha",
                         "locale": "ja",
-                        "phonemes": "koɲɲiʨiβa",
+                        "phonemes": "ko\u0272\u0272i\u02a8i\u03b2a",
                         "duration_seconds": 0.9813333333333333,
                         "wav_sha256": "c9a9f75372afc19d7cb51732a481300a7fa5779d0f4411c35a9f7b788d693f51",
                         "float_pcm_sha256": "b6f3115fde5d46e829b4437b51c82ea366c8973731611ac665a21047bc3fb5fd",
@@ -7747,10 +7699,10 @@
                     "cases": [
                       {
                         "id": "zh-component",
-                        "text": "你好",
+                        "text": "\u4f60\u597d",
                         "voice": "zf_xiaobei",
                         "locale": "zh",
-                        "phonemes": "ni↓xau↓",
+                        "phonemes": "ni\u2193xau\u2193",
                         "duration_seconds": 0.832,
                         "wav_sha256": "b8b6c6be5edbaff52bb114c753b04e6eaffebd190e5f78e64a535c8042cb92ae",
                         "float_pcm_sha256": "7ddddc03e104e990c42f5b070d4847906f3a10d19bd6809621a5f1cf0fa5ea0d",
@@ -7760,10 +7712,10 @@
                       },
                       {
                         "id": "zh-composed",
-                        "text": "你好",
+                        "text": "\u4f60\u597d",
                         "voice": "zf_xiaobei",
                         "locale": "zh",
-                        "phonemes": "ni↓xau↓",
+                        "phonemes": "ni\u2193xau\u2193",
                         "duration_seconds": 0.832,
                         "wav_sha256": "b8b6c6be5edbaff52bb114c753b04e6eaffebd190e5f78e64a535c8042cb92ae",
                         "float_pcm_sha256": "7ddddc03e104e990c42f5b070d4847906f3a10d19bd6809621a5f1cf0fa5ea0d",
@@ -7780,7 +7732,7 @@
                 ],
                 "owner_listening": {
                   "english": "Positive feedback on delivered neutral/currency and US/GB comparison clips; no chosen pair winner or broader coverage claim",
-                  "japanese": "Positive feedback on the exact jf_alpha こんにちは 0.981333-second sample only",
+                  "japanese": "Positive feedback on the exact jf_alpha \u3053\u3093\u306b\u3061\u306f 0.981333-second sample only",
                   "mandarin": "Delivered corrected-source sample; acknowledgment received, pronunciation-quality judgment still unverified",
                   "owner_replies_not_required_per_clip": true,
                   "assistant_audio_input_unavailable": true
@@ -8731,5 +8683,99 @@
   "new_source_contract_qualification_performed": true,
   "new_static_security_scan_performed": false,
   "new_resolution_scope": "No new customer target dependency resolution in local source composition; normal exact-head hosted inventories cover their declared Windows scopes.",
-  "new_advisory_scan_scope": "No new advisory scan during local composition; final hosted checks provide their actual results."
+  "new_advisory_scan_scope": "No new advisory scan during local composition; final hosted checks provide their actual results.",
+  "account_reconciliation_previous_binding": {
+    "source_revision": "32e9f79b3a5443ddad46368e78f931626a68c534",
+    "source_manifest_sha256": "ca697ae69cd2dbd9aa77f4a8e833dccd8083424d339c2468633794b0dff1bf82",
+    "source_tree_sha256": "e8c197adafff6d009cc8139504433608b8a9710032761ae14b0eaa52df6fb9cd",
+    "source_file_count": 2659,
+    "comparison_public_revision": "e706c5af95cd9bae01c247b0fa884ec2ea8fddb5",
+    "changed_source_paths": [
+      "SOURCE/docs/CUSTOMER_SPEECH_QUALIFICATION.md",
+      "SOURCE/requirements_customer_speech_mandarin.txt",
+      "SOURCE/requirements_desktop.txt",
+      "SOURCE/requirements_linux.txt",
+      "SOURCE/requirements_macos.txt",
+      "SOURCE/scripts/dependencies/verify_customer_speech.py",
+      "SOURCE/telephony/language_handler.py",
+      "SOURCE/tests/public/test_cjk_runtime_reconstruction.py",
+      "SOURCE/tests/public/test_customer_launch_voice_routes.py",
+      "SOURCE/tests/public/test_customer_phone_routing.py",
+      "SOURCE/tests/public/test_customer_speech_dependencies.py",
+      "SOURCE/third_party/kokoro_onnx.patch",
+      "SOURCE/third_party/kokoro_onnx/pyproject.toml",
+      "SOURCE/third_party/kokoro_onnx/src/kokoro_onnx/__init__.py",
+      "SOURCE/third_party/misaki_cjk_prototype.patch",
+      "SOURCE/third_party/misaki_cjk_prototype/README.md",
+      "SOURCE/third_party/misaki_cjk_prototype/pyproject.toml",
+      "SOURCE/third_party/pipecat.patch",
+      "SOURCE/third_party/pipecat/pyproject.toml",
+      "SOURCE/third_party/pipecat/src/pipecat/services/kokoro/tts.py",
+      "SOURCE/third_party/sources.toml",
+      "SOURCE/tools/qualification/cjk_runtime_replay.py",
+      "SOURCE/tools/qualification/romance_runtime_replay.py",
+      "SOURCE/voice/customer_composition.py",
+      "SOURCE/voice/customer_voice_routing.py",
+      "SOURCE/voice/synthesis/factory.py",
+      "SOURCE/voice/synthesis/kokoro_engine.py"
+    ],
+    "qualification": {
+      "scope": "Inactive selected English, Spanish and Mandarin routing and dependency-source composition; qualification artifacts are not customer release approval.",
+      "source_commit": "32e9f79b3a5443ddad46368e78f931626a68c534",
+      "source_tree": "1c59281d29ec4884586ff49f80e040505987857c",
+      "ordered_source_parents": [
+        "e706c5af95cd9bae01c247b0fa884ec2ea8fddb5",
+        "744eb84436fdf31a4e85135c7590801cac853ef7"
+      ],
+      "source_patch_sha256": "39d100b6053a53688b4c19f6840c2b429d0cbb8fa4e012b0ff8fffd82c31aa71",
+      "reviewed_speech_source": "744eb84436fdf31a4e85135c7590801cac853ef7",
+      "all_27_reviewed_speech_blobs_unchanged": true,
+      "protected_pricing_delta_preserved": true,
+      "independent_source_review": "Routing runtime, dependency separation and fork metadata/wheels independently reviewed; test-only fixture corrections preserve pronunciation controls after earlier voice admission.",
+      "source_controls": {
+        "basis": "Reviewed source744eb844 before the protected disjoint pricing composition; fresh final-head hosted checks required.",
+        "dependency_methods": 22,
+        "routing_methods": 18,
+        "cjk_inner_methods": 36,
+        "romance_inner_methods": 16,
+        "native_boundaries": "inert",
+        "initial_combined_fixture_failures_preserved": true,
+        "real_pipecat_integration": "Required hosted source job; local dependency stack unavailable"
+      },
+      "package_identities": {
+        "kokoro-onnx": {
+          "version": "0.4.9+viola.3",
+          "wheel_sha256": "2fedd09693672da46da0e2ee4dee3265bc24607774699bf6c68d8eec299f9b33",
+          "wheel_bytes": 18890
+        },
+        "pipecat-ai": {
+          "version": "0.0.108+viola.3",
+          "wheel_sha256": "a09f12dffc545ca0cac022fdb5ff441e9298556be8f26d23e7a40f5ac5a6fb80",
+          "wheel_bytes": 10752703
+        },
+        "viola-misaki-cjk-prototype": {
+          "version": "0.9.4+viola.cjk.4",
+          "wheel_sha256": "e9688b42b822455bf80a89a2dc2526add725867a2b0f5182bcf4f03a7f93284f",
+          "wheel_bytes": 511838
+        }
+      },
+      "reproducibility": "Two offline retained-backend builds per new wheel are byte-identical; aggregate source reconstruction and wheel RECORD/notices/data checked.",
+      "native_runtime_repeated": false,
+      "profile_activated": false,
+      "customer_release_eligible": false,
+      "launch_languages": [
+        "English",
+        "Spanish",
+        "Mandarin"
+      ],
+      "canonical_assets_and_dormant_routes_preserved": true,
+      "limits": [
+        "Existing bounded pronunciation coverage remains; named-voice and static graph controls do not prove general pronunciation quality.",
+        "Selected Windows install/native closure, redistribution completeness, signing, frozen execution and installed acceptance remain separate.",
+        "Retained SBOMs remain historical evidence; final-head hosted scopes must resolve changed fork inputs.",
+        "The source .4 Mandarin extra is not a claim of completed Windows customer dependency installation.",
+        "Unchanged Pipecat packaging omissions for frames.proto and AWS ready.wav remain outside this selected Kokoro change."
+      ]
+    }
+  }
 }
