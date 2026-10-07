@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "59bbbd47b7dfefb1ba2321676aa14351ed628182",
-  "sha256": "9b9b3230cd5b6763c9811a4eea5b551439242679b2f05326482f625ba83c8450",
+  "revision": "d85ac81c9e7241ec2320ac9c01dd8d4611d52ef1",
+  "sha256": "6db01b1bc23c904f056cc91f8de51d7da0938944e49562a02223a7edfd2fa717",
   "files": [
     {
       "path": ".env.example",
@@ -6084,6 +6084,11 @@
       "bytes": 4396
     },
     {
+      "path": "tests/public/test_local_media_path_length.py",
+      "sha256": "ad444bbfec0676b1cd01fc41f1500c928126b17db2a6cbcabd08a965a2e3cc2d",
+      "bytes": 8205
+    },
+    {
       "path": "tests/public/test_loopback_media_stop.py",
       "sha256": "bb2258416579abd015192c3c0951841756b93571566464105b4cee1f488a81e1",
       "bytes": 17882
@@ -9155,8 +9160,8 @@
     },
     {
       "path": "ui/api/models.py",
-      "sha256": "edea2ec6ecc1304e8ee64215f28dd01584c9d23a85854f82ae1d903bbbb84dc4",
-      "bytes": 4227
+      "sha256": "598889477dc3c524827fc354a60d99869b82ec09e93d6c1238e09709479f502a",
+      "bytes": 5184
     },
     {
       "path": "ui/api/routes/__init__.py",
