@@ -1,32 +1,39 @@
 {
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "810712c2fe135f0dc91d5e727995ef42a9fc6353094f1d0d3b49011afb204d66",
-  "source_tree_sha256": "9b9b3230cd5b6763c9811a4eea5b551439242679b2f05326482f625ba83c8450",
-  "source_file_count": 2662,
-  "source_revision": "59bbbd47b7dfefb1ba2321676aa14351ed628182",
-  "comparison_public_revision": "96647ae35648a2bcd2ede3423b8954fbba6af924",
+  "source_manifest_sha256": "a3032e6ff1f07529f55867b0dd0727d65c54f0d4b5520959d32d71c789dacbd6",
+  "source_tree_sha256": "c7402f882a7cbf9a174a42bbe5861a4ec2df8902666207f9fb27fd7694462fe2",
+  "source_file_count": 2670,
+  "source_revision": "6286dfdb140f32683e827e52173c18355165a630",
+  "comparison_public_revision": "a002401aae36786bbd9aeea8a1eacd0790b4192a",
   "changed_source_paths": [
-    "SOURCE/auth/desktop_session.py",
-    "SOURCE/auth/models.py",
-    "SOURCE/auth/routes.py",
-    "SOURCE/core/exceptions.py",
-    "SOURCE/core/request_context.py",
-    "SOURCE/intent/agent_loop.py",
-    "SOURCE/services/llm/managed_budget.py",
-    "SOURCE/services/llm/spend_accounting.py",
-    "SOURCE/tests/public/test_remote_managed_accounting.py",
-    "SOURCE/ui/react-app/src/components/AccountTab.authSync.test.jsx",
-    "SOURCE/ui/react-app/src/components/AccountTab.cloudPlan.test.jsx",
-    "SOURCE/ui/react-app/src/components/AccountTab.cloudStoreReconciliation.test.jsx",
-    "SOURCE/ui/react-app/src/components/AccountTab.jsx",
-    "SOURCE/ui/react-app/src/components/AccountTab.test.jsx",
-    "SOURCE/ui/react-app/src/components/AccountTab.usageCloudAuth.test.jsx",
-    "SOURCE/ui/react-app/src/config.js",
-    "SOURCE/ui/react-app/src/lib/auth_context.tsx",
-    "SOURCE/ui/react-app/src/lib/billingEntitlement.test.ts",
-    "SOURCE/ui/react-app/src/lib/billingEntitlement.ts",
-    "SOURCE/ui/settings_manager.py"
+    "SOURCE/bootstrap/factory.py",
+    "SOURCE/config/schema.py",
+    "SOURCE/config/settings.py",
+    "SOURCE/docs/CUSTOMER_SPEECH_QUALIFICATION.md",
+    "SOURCE/intent/command_executor.py",
+    "SOURCE/telephony/call_manager.py",
+    "SOURCE/telephony/remote_voice.py",
+    "SOURCE/tests/public/customer_speech_selection.node.mjs",
+    "SOURCE/tests/public/test_customer_launch_wiring.py",
+    "SOURCE/tests/public/test_customer_speech_settings.py",
+    "SOURCE/tools/qualification/cjk_runtime_replay.py",
+    "SOURCE/ui/customer_speech_settings.py",
+    "SOURCE/ui/react-app/src/__tests__/hooks/useSettings.customerSpeech.test.jsx",
+    "SOURCE/ui/react-app/src/components/SettingsModal.customerSpeech.test.jsx",
+    "SOURCE/ui/react-app/src/components/SettingsModal.jsx",
+    "SOURCE/ui/react-app/src/hooks/useSettings.js",
+    "SOURCE/ui/react-app/src/utils/customerSpeechSelection.js",
+    "SOURCE/ui/settings_api.py",
+    "SOURCE/ui/settings_effects.py",
+    "SOURCE/ui/settings_manager.py",
+    "SOURCE/ui/settings_schema.py",
+    "SOURCE/viola_qt.py",
+    "SOURCE/voice/customer_runtime.py",
+    "SOURCE/voice/customer_voice_routing.py",
+    "SOURCE/voice/synthesis/factory.py",
+    "SOURCE/voice/synthesis/kokoro_engine.py",
+    "SOURCE/voice/synthesizer.py"
   ],
   "retained_sboms": [
     {
@@ -88,36 +95,90 @@
     }
   ],
   "input_equivalence": {
-    "comparison_basis": "Protected #83 merge fa417e4328fd72231df28ee94f3ba57baeff1139",
+    "comparison_basis": "Protected public main a002401aae36786bbd9aeea8a1eacd0790b4192a",
     "all_unselected_export_leaf_bytes_and_modes_preserved": true,
     "all_six_sbom_bytes_and_status_objects_preserved": true,
-    "dependency_and_workflow_inputs_unchanged": true,
-    "parent_resize_geometry_and_minimum_dimensions_unchanged": true
+    "dependency_vendor_wheel_and_workflow_inputs_unchanged": true,
+    "frontend_source_inputs_changed": true,
+    "protected_resize_and_pricing_and_account_inputs_preserved": true,
+    "selected_customer_windows_closure_not_claimed": true
   },
   "qualification": {
-    "source_commit": "59bbbd47b7dfefb1ba2321676aa14351ed628182",
-    "source_tree": "6bd195cf85ffc8d98e84dbc936b24fdeeeba5f34",
-    "scope": "Account entitlement and typed managed-refusal source contracts. Local synthetic tests, not installed or production acceptance.",
-    "reviewed_original_source": "8ee475f3ec8c8511e8698e9e17efe81fb24378b3",
-    "original_author": "Test <test@example.com>",
-    "independent_source_review": "Reviewed source delta with hostile-cap-state projection and exact billing identity regressions.",
-    "frontend_tests": 1940,
-    "frontend_files": 170,
-    "managed_accounting_tests": 13,
-    "vite_build": "passed; no Sentry upload configured",
-    "python_broad_result": "Incomplete target environment: 2 failures and 4 errors across695 tests after dependency alignment; earlier same-environment candidate/base both2failures16errors (686/683 tests). Failures remain failures.",
-    "source_only": true,
-    "installed_acceptance": false,
-    "production_deployment": false,
-    "prior_qualification_pointer": "account_reconciliation_previous_binding.qualification",
-    "protected_resize_source_preserved": true,
-    "historical_hosted_source_check": {
-      "head": "763f39becae401f3ad0444df363243cb7f089ab7",
-      "run": "https://github.com/GeeIHadAGoodTime/viola-oss/actions/runs/37696456348",
-      "python_contracts": "success",
-      "frontend": "success",
-      "scope": "Before union with disjoint protected resize source; current-head checks required"
-    }
+    "scope": "Normal desktop and phone startup plus saved language/voice selection for a separately marked English, Spanish and Mandarin qualification artifact.",
+    "source_commit": "6286dfdb140f32683e827e52173c18355165a630",
+    "source_tree": "ca2940d0b6e5efc75c5d90dc33ea252810b568a1",
+    "ordered_source_parents": [
+      "a002401aae36786bbd9aeea8a1eacd0790b4192a",
+      "9ec5deaa101b2bf21f594a31bfd57d1774184233"
+    ],
+    "source_patch_sha256": "831eaeae2367ca73160bc640351b408afa4b78decb1575e54c5a8cbd15149ed2",
+    "independent_automated_review": {
+      "runtime_eleven_file_review_sha256": "7b83db3fb408dc954d6c143796b910cb14745a3fa689c59e64df364f3d086f7d",
+      "ui_fourteen_file_review_sha256": "771092cbc0cc7f37a2e8ef1f3b1456bd8b2d766ad526831f1c3537f03cd9c276",
+      "ui_optional_import_correction_patch_sha256": "10f6dd185dde080131f84e316e0941be1b9c16e53d29290768a60aa49ede927e",
+      "ui_optional_import_correction_independent_controls": 5,
+      "private_paired_startup_review_sha256": "b38ff623b82df45b6c968ea9025c9a27ab79475a93e77bb28c984c91dc1835e7",
+      "review_scope": "Source and inert boundaries; no human review or installed acceptance asserted."
+    },
+    "source_controls": {
+      "normal_launch_runtime_methods": 18,
+      "ui_api_persistence_methods_after_guard_correction": 18,
+      "original_ui_and_volume_regression_combined_methods": 95,
+      "node_voice_selection_controls": 4,
+      "existing_voice_routing_methods": 18,
+      "cjk_inner_methods": 36,
+      "romance_inner_methods": 16,
+      "native_boundaries": "inert",
+      "initial_failures_preserved": true,
+      "react_interactions": "Prepared actual component and hook tests; final-head hosted frontend check required.",
+      "real_pipecat_integration": "Normal final-head Windows source check required; no repeat local dependency installation."
+    },
+    "normal_launch_contract": [
+      "An exact private PyInstaller runtime hook admits a bounded local qualification marker before native imports.",
+      "Normal bootstrap, shared synthesis and direct factory calls select the existing composed tokenizer and named selected voice.",
+      "Phone startup and provider warmups remain on the selected local route; missing hook and remote bypass fail closed.",
+      "Authenticated settings save and user refresh validate a complete locale/voice pair, preserve failed state and require an explicit successful retry.",
+      "A changed route retires pending speech; an in-flight response is not spoken across old and new locales."
+    ],
+    "paired_private_startup": {
+      "patch_sha256": "b2a2738e91128c967a25e10b953effc8e783f6d8630b7db6eeee19b7ab94f4b4",
+      "hook_sha256": "0950e2848fd0e93d4728cf3f5ccba39b7286d8934d3db7e877584251a0c5a396",
+      "public_helper_sha256": "43c20a0c0267c11487ea1ab937da7a1ba1d2823ad247a0ec6b5e5ba247a4fdae",
+      "source_tests": 65,
+      "subcases": 292,
+      "private_adoption": "Separate reviewed composition; not claimed by this public source commit."
+    },
+    "dependency_inputs_changed": false,
+    "component_wheels_rebuilt": false,
+    "native_runtime_repeated": false,
+    "profile_activated": false,
+    "customer_release_eligible": false,
+    "launch_languages": [
+      "English",
+      "Spanish",
+      "Mandarin"
+    ],
+    "canonical_assets_and_dormant_routes_preserved": true,
+    "limits": [
+      "Source and inert controls do not establish installed normal-launch speech or acoustic quality.",
+      "Selected Windows native closure, notices, signing and the actual qualification artifact remain separate build/acceptance obligations.",
+      "Existing bounded pronunciation coverage remains; no all-language or all-voice qualification claim.",
+      "The owner observed wake nonresponse and account-gated held PTT on internal QA1482; capture and transcription remain unproved by that attempt.",
+      "Wake initialization and authenticated PTT must be retested separately on the coherent installed candidate."
+    ],
+    "reviewed_speech_head": "9ec5deaa101b2bf21f594a31bfd57d1774184233",
+    "protected_account_delta_preserved": true,
+    "shared_settings_file_composition": {
+      "path": "SOURCE/ui/settings_manager.py",
+      "ancestor_git_blob": "bdad358a4ad64aec5dfd4fd043b34079eaa5000d",
+      "accepted_account_git_blob": "fa9426afb47610686ee6bbd2f731f78ae5f90d86",
+      "reviewed_speech_git_blob": "e0ea37c131438115016f583776f67680f642d2d1",
+      "composed_git_blob": "5228feac890a64dfc115d3bfe79b82c47f6912b5",
+      "composed_sha256": "fe16600afea58127773161bdcb1f6e8ad59a302f099792c29a8d51d2afe7be67",
+      "composed_bytes": 160519,
+      "exact_preserved_account_delta": "Add billing_plan_snapshot to _SYSTEM_KEY_PREFIXES; all reviewed speech bytes otherwise preserved"
+    },
+    "shared_settings_file_independent_review": "Root verified exact reviewed speech bytes plus only the protected billing_plan_snapshot key line; no other source delta."
   },
   "historical_bindings": [
     {
@@ -7548,7 +7609,7 @@
                         "text": "Hello. This is a short test of the local speech system.",
                         "voice": "af_heart",
                         "locale": "en-us",
-                        "phonemes": "h\u0259l\u02c8O. \u00f0\u02cc\u026as \u026az \u0250 \u0283\u02c8\u0254\u0279t t\u02c8\u025bst \u028cv \u00f0\u0259 l\u02c8Ok\u0259l sp\u02c8i\u02a7 s\u02c8\u026ast\u0259m.",
+                        "phonemes": "həlˈO. ðˌɪs ɪz ɐ ʃˈɔɹt tˈɛst ʌv ðə lˈOkəl spˈiʧ sˈɪstəm.",
                         "duration_seconds": 2.986666666666667,
                         "wav_sha256": "aeaba330943123ff46d808be904e3cc47ec05291c1aee9efa78a21bb25d4fadd",
                         "float_pcm_sha256": "d27a02a2b366945758f9a7cb89ae4eaee46525807634dff9b7f295f400b8f622",
@@ -7561,7 +7622,7 @@
                         "text": "Hello. This is a short test of the local speech system.",
                         "voice": "af_heart",
                         "locale": "en-us",
-                        "phonemes": "h\u0259l\u02c8O. \u00f0\u02cc\u026as \u026az \u0250 \u0283\u02c8\u0254\u0279t t\u02c8\u025bst \u028cv \u00f0\u0259 l\u02c8Ok\u0259l sp\u02c8i\u02a7 s\u02c8\u026ast\u0259m.",
+                        "phonemes": "həlˈO. ðˌɪs ɪz ɐ ʃˈɔɹt tˈɛst ʌv ðə lˈOkəl spˈiʧ sˈɪstəm.",
                         "duration_seconds": 2.986666666666667,
                         "wav_sha256": "aeaba330943123ff46d808be904e3cc47ec05291c1aee9efa78a21bb25d4fadd",
                         "float_pcm_sha256": "d27a02a2b366945758f9a7cb89ae4eaee46525807634dff9b7f295f400b8f622",
@@ -7574,7 +7635,7 @@
                         "text": "The A P I costs $12.50, not $0.05.",
                         "voice": "af_heart",
                         "locale": "en-us",
-                        "phonemes": "\u00f0i \u02c8A p\u02c8i \u02ccI k\u02c8\u0254sts tw\u02c8\u025blv d\u02c8\u0251l\u0259\u0279z \u00e6nd f\u02c8\u026afti s\u02c8\u025bnts, n\u02cc\u0251t f\u02c8Iv s\u02c8\u025bnts.",
+                        "phonemes": "ði ˈA pˈi ˌI kˈɔsts twˈɛlv dˈɑləɹz ænd fˈɪfti sˈɛnts, nˌɑt fˈIv sˈɛnts.",
                         "duration_seconds": 3.7973333333333334,
                         "wav_sha256": "5310d8c6737e9eb874d30b15b70cd3a779d1a86904339b68831e29945307d4b6",
                         "float_pcm_sha256": "c7a016d0b527e759ba0e2ce06f0348371a99e1c9ce68e42ca38ee919cef63fa7",
@@ -7587,7 +7648,7 @@
                         "text": "The A P I costs $12.50, not $0.05.",
                         "voice": "af_heart",
                         "locale": "en-us",
-                        "phonemes": "\u00f0i \u02c8A p\u02c8i \u02ccI k\u02c8\u0254sts tw\u02c8\u025blv d\u02c8\u0251l\u0259\u0279z \u00e6nd f\u02c8\u026afti s\u02c8\u025bnts, n\u02cc\u0251t f\u02c8Iv s\u02c8\u025bnts.",
+                        "phonemes": "ði ˈA pˈi ˌI kˈɔsts twˈɛlv dˈɑləɹz ænd fˈɪfti sˈɛnts, nˌɑt fˈIv sˈɛnts.",
                         "duration_seconds": 3.7973333333333334,
                         "wav_sha256": "5310d8c6737e9eb874d30b15b70cd3a779d1a86904339b68831e29945307d4b6",
                         "float_pcm_sha256": "c7a016d0b527e759ba0e2ce06f0348371a99e1c9ce68e42ca38ee919cef63fa7",
@@ -7610,7 +7671,7 @@
                         "text": "'A P I'",
                         "voice": "af_heart",
                         "locale": "en-us",
-                        "phonemes": "\u201c\u0250 p\u02c8i \u02c8I",
+                        "phonemes": "“ɐ pˈi ˈI",
                         "duration_seconds": 0.9386666666666666,
                         "wav_sha256": "c14f9a31a8a71f2441e74ab4e64f24df25b9f018975fe46d1ab0ed2cb33519e3",
                         "float_pcm_sha256": "69d1f2d9c292aa645dd0b1ff590bb7c1cbf34b92bc382a7ae1d695b2540e18cb",
@@ -7623,7 +7684,7 @@
                         "text": "'A P I'",
                         "voice": "af_heart",
                         "locale": "en-us",
-                        "phonemes": "\u201c\u02c8A p\u02c8i \u02c8I",
+                        "phonemes": "“ˈA pˈi ˈI",
                         "duration_seconds": 0.9386666666666666,
                         "wav_sha256": "f5a871ccac419cc586ff16aaa6e9f42b4720c591d20a7752c09d01e89c299f3d",
                         "float_pcm_sha256": "b8b8573bf9058851c6aaee30fc328c01c89ba20e1413aa674bef4c1847b348f0",
@@ -7636,7 +7697,7 @@
                         "text": "'A P I'",
                         "voice": "bf_emma",
                         "locale": "en-gb",
-                        "phonemes": "\u201c\u0250 p\u02c8i\u02d0 \u02c8I",
+                        "phonemes": "“ɐ pˈiː ˈI",
                         "duration_seconds": 0.9386666666666666,
                         "wav_sha256": "fcb3326f8978423f25953f991282d759fbc0e9a1248a102054e236eb5a558ddb",
                         "float_pcm_sha256": "1612b0e9f197c238f2434d27da0024959ca5b3825db6a3ed79119491924568d0",
@@ -7649,7 +7710,7 @@
                         "text": "'A P I'",
                         "voice": "bf_emma",
                         "locale": "en-gb",
-                        "phonemes": "\u201c\u02c8A p\u02c8i\u02d0 \u02c8I",
+                        "phonemes": "“ˈA pˈiː ˈI",
                         "duration_seconds": 0.96,
                         "wav_sha256": "83dad5fbcd6fea44e2b35ecf0f1b19af8e946c56a5d5743af058ad6e92a7d909",
                         "float_pcm_sha256": "2f7c8c442737efd0ff9bf3ddb35e47e7ae90ed2bc23c7025a08d3ddf3552f78d",
@@ -7669,10 +7730,10 @@
                     "cases": [
                       {
                         "id": "ja-component",
-                        "text": "\u3053\u3093\u306b\u3061\u306f",
+                        "text": "こんにちは",
                         "voice": "jf_alpha",
                         "locale": "ja",
-                        "phonemes": "ko\u0272\u0272i\u02a8i\u03b2a",
+                        "phonemes": "koɲɲiʨiβa",
                         "duration_seconds": 0.9813333333333333,
                         "wav_sha256": "c9a9f75372afc19d7cb51732a481300a7fa5779d0f4411c35a9f7b788d693f51",
                         "float_pcm_sha256": "b6f3115fde5d46e829b4437b51c82ea366c8973731611ac665a21047bc3fb5fd",
@@ -7682,10 +7743,10 @@
                       },
                       {
                         "id": "ja-composed",
-                        "text": "\u3053\u3093\u306b\u3061\u306f",
+                        "text": "こんにちは",
                         "voice": "jf_alpha",
                         "locale": "ja",
-                        "phonemes": "ko\u0272\u0272i\u02a8i\u03b2a",
+                        "phonemes": "koɲɲiʨiβa",
                         "duration_seconds": 0.9813333333333333,
                         "wav_sha256": "c9a9f75372afc19d7cb51732a481300a7fa5779d0f4411c35a9f7b788d693f51",
                         "float_pcm_sha256": "b6f3115fde5d46e829b4437b51c82ea366c8973731611ac665a21047bc3fb5fd",
@@ -7705,10 +7766,10 @@
                     "cases": [
                       {
                         "id": "zh-component",
-                        "text": "\u4f60\u597d",
+                        "text": "你好",
                         "voice": "zf_xiaobei",
                         "locale": "zh",
-                        "phonemes": "ni\u2193xau\u2193",
+                        "phonemes": "ni↓xau↓",
                         "duration_seconds": 0.832,
                         "wav_sha256": "b8b6c6be5edbaff52bb114c753b04e6eaffebd190e5f78e64a535c8042cb92ae",
                         "float_pcm_sha256": "7ddddc03e104e990c42f5b070d4847906f3a10d19bd6809621a5f1cf0fa5ea0d",
@@ -7718,10 +7779,10 @@
                       },
                       {
                         "id": "zh-composed",
-                        "text": "\u4f60\u597d",
+                        "text": "你好",
                         "voice": "zf_xiaobei",
                         "locale": "zh",
-                        "phonemes": "ni\u2193xau\u2193",
+                        "phonemes": "ni↓xau↓",
                         "duration_seconds": 0.832,
                         "wav_sha256": "b8b6c6be5edbaff52bb114c753b04e6eaffebd190e5f78e64a535c8042cb92ae",
                         "float_pcm_sha256": "7ddddc03e104e990c42f5b070d4847906f3a10d19bd6809621a5f1cf0fa5ea0d",
@@ -7738,7 +7799,7 @@
                 ],
                 "owner_listening": {
                   "english": "Positive feedback on delivered neutral/currency and US/GB comparison clips; no chosen pair winner or broader coverage claim",
-                  "japanese": "Positive feedback on the exact jf_alpha \u3053\u3093\u306b\u3061\u306f 0.981333-second sample only",
+                  "japanese": "Positive feedback on the exact jf_alpha こんにちは 0.981333-second sample only",
                   "mandarin": "Delivered corrected-source sample; acknowledgment received, pronunciation-quality judgment still unverified",
                   "owner_replies_not_required_per_clip": true,
                   "assistant_audio_input_unavailable": true
@@ -8414,12 +8475,12 @@
     }
   ],
   "prior_binding": {
-    "public_revision": "fa417e4328fd72231df28ee94f3ba57baeff1139",
+    "public_revision": "a002401aae36786bbd9aeea8a1eacd0790b4192a",
     "path": "PUBLIC_METADATA/source-binding.json",
-    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/fa417e4328fd72231df28ee94f3ba57baeff1139/PUBLIC_METADATA/source-binding.json",
-    "sha256": "5867594ca33d0d9351b1f5711f90c178b1d6c9ff2b090e2f2c1d82fca91565b0",
-    "bytes": 1100227,
-    "git_blob": "f60e30d0b9d9d57a3e3b4e3ca7e090fd0d993ff1",
+    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/a002401aae36786bbd9aeea8a1eacd0790b4192a/PUBLIC_METADATA/source-binding.json",
+    "sha256": "b848ca260eaf2e6f9de4d51c56723d9875cedfcacac66e42265dc102e7e4ff6c",
+    "bytes": 1121055,
+    "git_blob": "acacece0a99a2b912b96d3562735ab5a45b31de1",
     "all_top_level_keys": [
       "schema_version",
       "source_manifest",
@@ -8442,7 +8503,8 @@
       "new_source_contract_qualification_performed",
       "new_static_security_scan_performed",
       "new_resolution_scope",
-      "new_advisory_scan_scope"
+      "new_advisory_scan_scope",
+      "account_reconciliation_previous_binding"
     ],
     "preserved_json_objects": {
       "schema_version": {
@@ -8455,27 +8517,27 @@
       },
       "source_manifest_sha256": {
         "pointer": "/source_manifest_sha256",
-        "canonical_json_sha256": "aefbf528dc41a1707c2e35e620860af4015a059adee72859321fcb749e4534b0"
+        "canonical_json_sha256": "84851c1af91cb9e7c3e01c6ee5813dd6c03c63877a3aeb5090fb59bd65625d97"
       },
       "source_tree_sha256": {
         "pointer": "/source_tree_sha256",
-        "canonical_json_sha256": "d9f9f2af0832ed171d9d0506a7144fd8e79ba6614cb812b58003db0a8f3f160f"
+        "canonical_json_sha256": "7ed7908c0b2be4efdc9fa83bb8260b94c3f0773ed675a8728f62767ebd182083"
       },
       "source_file_count": {
         "pointer": "/source_file_count",
-        "canonical_json_sha256": "eb4ea223b35e735ca33a4d684bad98db1af36b218126cd3ab47c69c85735369c"
+        "canonical_json_sha256": "61b1dbc91985561c5af9e6e341ffa92fa3524c1e2083f39f67cb8bd736fcce46"
       },
       "source_revision": {
         "pointer": "/source_revision",
-        "canonical_json_sha256": "9f58edb0136992f3b448eacf8717c83438d58dd07ae2ed3c10d7110bb38d6f40"
+        "canonical_json_sha256": "5be18285c66ac7a611d3ca2d4120e96471f55914c4ac8d038f58665dd231fb53"
       },
       "comparison_public_revision": {
         "pointer": "/comparison_public_revision",
-        "canonical_json_sha256": "390bf9aef6ee5ef417a5e645e0f461f9ecf6944c4a34f974bd8622c53c428c0d"
+        "canonical_json_sha256": "7659ce5a6574255a28a9ba9671d0a6b3b45b169c463c478152be8db9a678b348"
       },
       "changed_source_paths": {
         "pointer": "/changed_source_paths",
-        "canonical_json_sha256": "a0c50b29a380753bad9e39c4f6763cfcc15258d79061c5001bbba1fba396bba8"
+        "canonical_json_sha256": "3e63cbd6a6d239ac2b6b246e7003eaabf5518a46b44939925a716e4c653d20da"
       },
       "retained_sboms": {
         "pointer": "/retained_sboms",
@@ -8483,19 +8545,19 @@
       },
       "input_equivalence": {
         "pointer": "/input_equivalence",
-        "canonical_json_sha256": "92ede1f3ccc1b026a86d2d72964efc2ec33bf0be428ae6f024c5f1860260c5eb"
+        "canonical_json_sha256": "f22c003b4334e149905cd9e2b309b84bb7b86734657f68d8a8a49802615bb64d"
       },
       "qualification": {
         "pointer": "/qualification",
-        "canonical_json_sha256": "3cd6ffa9fb76e25c9bd1574cb4559bc89b94e64192040d5d5ec5a37b08d2ccde"
+        "canonical_json_sha256": "cd94e62ea228a8ac3bbe479d8dc69abf894a6539b73ab797054681173880a80c"
       },
       "historical_bindings": {
         "pointer": "/historical_bindings",
-        "canonical_json_sha256": "aa2b04de1ccc1cd712f3b148bd2b29b5a1c3bb71ea8a12d7b50264a5dc864449"
+        "canonical_json_sha256": "59ccb6141308771f32ec1e534f7a843cbdd8867afcd59e84944e03e6f9958c33"
       },
       "prior_binding": {
         "pointer": "/prior_binding",
-        "canonical_json_sha256": "1b527727c19fa72424f7c5db4449e112caa1aca6566f8fc95071fe3ca59f5ca2"
+        "canonical_json_sha256": "ff6e9fdafc77b189bcc9f060cb72c85ac06b39c01f04526f1edbebcc1978371e"
       },
       "retained_composition_component_bindings": {
         "pointer": "/retained_composition_component_bindings",
@@ -8503,7 +8565,7 @@
       },
       "reviewed_source_patch": {
         "pointer": "/reviewed_source_patch",
-        "canonical_json_sha256": "a0fcfc874b0e64c56eb94c48a15be298ea7782422b8083c8692952ee61d2c0ad"
+        "canonical_json_sha256": "d1384782a958730b6bb21f8614917b4ea16ea1800491ba8d2db1fd928e0872ae"
       },
       "new_resolution_performed": {
         "pointer": "/new_resolution_performed",
@@ -8519,7 +8581,7 @@
       },
       "new_source_contract_qualification_performed": {
         "pointer": "/new_source_contract_qualification_performed",
-        "canonical_json_sha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b"
+        "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
       },
       "new_static_security_scan_performed": {
         "pointer": "/new_static_security_scan_performed",
@@ -8527,16 +8589,286 @@
       },
       "new_resolution_scope": {
         "pointer": "/new_resolution_scope",
-        "canonical_json_sha256": "5668719bbd5637f439945835049f176ad567c23388afb2a6fbf6d8a642fad957"
+        "canonical_json_sha256": "3908ee280c958e288937f506ae635749e3ec8ad9d994adc5683170be9a3c2881"
       },
       "new_advisory_scan_scope": {
         "pointer": "/new_advisory_scan_scope",
-        "canonical_json_sha256": "b9318e0971e4a66bebe4584a13b2a51a3dd6b09e5eed163a3b784680b723b8ca"
+        "canonical_json_sha256": "76173bebb522a925c5f65181cfb865365c7b7eb973d1f62278f3f6afb11969bd"
+      },
+      "account_reconciliation_previous_binding": {
+        "pointer": "/account_reconciliation_previous_binding",
+        "canonical_json_sha256": "cfeffa86ef01cbbd530cda12a57b6c4eb3761063999ad3fae482a0c1d7482b51"
       }
     },
-    "note": "Complete protected #83 binding retained by immutable reference and all top-level object digests. Every protected pricing and speech source leaf is preserved; only the two already-reviewed titlebar resize paths differ from protected main."
+    "source_manifest": {
+      "path": "PUBLIC_METADATA/source-manifest.json",
+      "sha256": "810712c2fe135f0dc91d5e727995ef42a9fc6353094f1d0d3b49011afb204d66",
+      "bytes": 467630,
+      "git_blob": "8c4562651d00dcaab292ef9bea76b33e90512299"
+    }
   },
   "retained_composition_component_bindings": [
+    {
+      "public_revision": "a002401aae36786bbd9aeea8a1eacd0790b4192a",
+      "path": "PUBLIC_METADATA/source-binding.json",
+      "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/a002401aae36786bbd9aeea8a1eacd0790b4192a/PUBLIC_METADATA/source-binding.json",
+      "sha256": "b848ca260eaf2e6f9de4d51c56723d9875cedfcacac66e42265dc102e7e4ff6c",
+      "bytes": 1121055,
+      "git_blob": "acacece0a99a2b912b96d3562735ab5a45b31de1",
+      "all_top_level_keys": [
+        "schema_version",
+        "source_manifest",
+        "source_manifest_sha256",
+        "source_tree_sha256",
+        "source_file_count",
+        "source_revision",
+        "comparison_public_revision",
+        "changed_source_paths",
+        "retained_sboms",
+        "input_equivalence",
+        "qualification",
+        "historical_bindings",
+        "prior_binding",
+        "retained_composition_component_bindings",
+        "reviewed_source_patch",
+        "new_resolution_performed",
+        "new_advisory_scan_performed",
+        "new_runtime_qualification_performed",
+        "new_source_contract_qualification_performed",
+        "new_static_security_scan_performed",
+        "new_resolution_scope",
+        "new_advisory_scan_scope",
+        "account_reconciliation_previous_binding"
+      ],
+      "preserved_json_objects": {
+        "schema_version": {
+          "pointer": "/schema_version",
+          "canonical_json_sha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+        },
+        "source_manifest": {
+          "pointer": "/source_manifest",
+          "canonical_json_sha256": "ace3c4cebde8c1e5207159e354ef46f1f9a13eb7b3185315a68b7cf8b71f212d"
+        },
+        "source_manifest_sha256": {
+          "pointer": "/source_manifest_sha256",
+          "canonical_json_sha256": "84851c1af91cb9e7c3e01c6ee5813dd6c03c63877a3aeb5090fb59bd65625d97"
+        },
+        "source_tree_sha256": {
+          "pointer": "/source_tree_sha256",
+          "canonical_json_sha256": "7ed7908c0b2be4efdc9fa83bb8260b94c3f0773ed675a8728f62767ebd182083"
+        },
+        "source_file_count": {
+          "pointer": "/source_file_count",
+          "canonical_json_sha256": "61b1dbc91985561c5af9e6e341ffa92fa3524c1e2083f39f67cb8bd736fcce46"
+        },
+        "source_revision": {
+          "pointer": "/source_revision",
+          "canonical_json_sha256": "5be18285c66ac7a611d3ca2d4120e96471f55914c4ac8d038f58665dd231fb53"
+        },
+        "comparison_public_revision": {
+          "pointer": "/comparison_public_revision",
+          "canonical_json_sha256": "7659ce5a6574255a28a9ba9671d0a6b3b45b169c463c478152be8db9a678b348"
+        },
+        "changed_source_paths": {
+          "pointer": "/changed_source_paths",
+          "canonical_json_sha256": "3e63cbd6a6d239ac2b6b246e7003eaabf5518a46b44939925a716e4c653d20da"
+        },
+        "retained_sboms": {
+          "pointer": "/retained_sboms",
+          "canonical_json_sha256": "0428d09c6e0e2b524877c2218b306c10da6c7536bcf6ed96524b581dafc85301"
+        },
+        "input_equivalence": {
+          "pointer": "/input_equivalence",
+          "canonical_json_sha256": "f22c003b4334e149905cd9e2b309b84bb7b86734657f68d8a8a49802615bb64d"
+        },
+        "qualification": {
+          "pointer": "/qualification",
+          "canonical_json_sha256": "cd94e62ea228a8ac3bbe479d8dc69abf894a6539b73ab797054681173880a80c"
+        },
+        "historical_bindings": {
+          "pointer": "/historical_bindings",
+          "canonical_json_sha256": "59ccb6141308771f32ec1e534f7a843cbdd8867afcd59e84944e03e6f9958c33"
+        },
+        "prior_binding": {
+          "pointer": "/prior_binding",
+          "canonical_json_sha256": "ff6e9fdafc77b189bcc9f060cb72c85ac06b39c01f04526f1edbebcc1978371e"
+        },
+        "retained_composition_component_bindings": {
+          "pointer": "/retained_composition_component_bindings",
+          "canonical_json_sha256": "c2d09217a2bcfa84f8cb717b53382fb2681537d59e8760c23f3382ab629d1606"
+        },
+        "reviewed_source_patch": {
+          "pointer": "/reviewed_source_patch",
+          "canonical_json_sha256": "d1384782a958730b6bb21f8614917b4ea16ea1800491ba8d2db1fd928e0872ae"
+        },
+        "new_resolution_performed": {
+          "pointer": "/new_resolution_performed",
+          "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+        },
+        "new_advisory_scan_performed": {
+          "pointer": "/new_advisory_scan_performed",
+          "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+        },
+        "new_runtime_qualification_performed": {
+          "pointer": "/new_runtime_qualification_performed",
+          "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+        },
+        "new_source_contract_qualification_performed": {
+          "pointer": "/new_source_contract_qualification_performed",
+          "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+        },
+        "new_static_security_scan_performed": {
+          "pointer": "/new_static_security_scan_performed",
+          "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+        },
+        "new_resolution_scope": {
+          "pointer": "/new_resolution_scope",
+          "canonical_json_sha256": "3908ee280c958e288937f506ae635749e3ec8ad9d994adc5683170be9a3c2881"
+        },
+        "new_advisory_scan_scope": {
+          "pointer": "/new_advisory_scan_scope",
+          "canonical_json_sha256": "76173bebb522a925c5f65181cfb865365c7b7eb973d1f62278f3f6afb11969bd"
+        },
+        "account_reconciliation_previous_binding": {
+          "pointer": "/account_reconciliation_previous_binding",
+          "canonical_json_sha256": "cfeffa86ef01cbbd530cda12a57b6c4eb3761063999ad3fae482a0c1d7482b51"
+        }
+      },
+      "source_manifest": {
+        "path": "PUBLIC_METADATA/source-manifest.json",
+        "sha256": "810712c2fe135f0dc91d5e727995ef42a9fc6353094f1d0d3b49011afb204d66",
+        "bytes": 467630,
+        "git_blob": "8c4562651d00dcaab292ef9bea76b33e90512299"
+      }
+    },
+    {
+      "public_revision": "9ec5deaa101b2bf21f594a31bfd57d1774184233",
+      "path": "PUBLIC_METADATA/source-binding.json",
+      "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/9ec5deaa101b2bf21f594a31bfd57d1774184233/PUBLIC_METADATA/source-binding.json",
+      "sha256": "60e1cb9b10511cecdbf1ef31019030f05b81c0f71d01274379d6932d7e4405c9",
+      "bytes": 1111584,
+      "git_blob": "a4190b541e86f71d529dd45154adb7352fcc4f32",
+      "all_top_level_keys": [
+        "schema_version",
+        "source_manifest",
+        "source_manifest_sha256",
+        "source_tree_sha256",
+        "source_file_count",
+        "source_revision",
+        "comparison_public_revision",
+        "changed_source_paths",
+        "retained_sboms",
+        "input_equivalence",
+        "qualification",
+        "historical_bindings",
+        "prior_binding",
+        "retained_composition_component_bindings",
+        "reviewed_source_patch",
+        "new_resolution_performed",
+        "new_advisory_scan_performed",
+        "new_runtime_qualification_performed",
+        "new_source_contract_qualification_performed",
+        "new_static_security_scan_performed",
+        "new_resolution_scope",
+        "new_advisory_scan_scope"
+      ],
+      "preserved_json_objects": {
+        "schema_version": {
+          "pointer": "/schema_version",
+          "canonical_json_sha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+        },
+        "source_manifest": {
+          "pointer": "/source_manifest",
+          "canonical_json_sha256": "ace3c4cebde8c1e5207159e354ef46f1f9a13eb7b3185315a68b7cf8b71f212d"
+        },
+        "source_manifest_sha256": {
+          "pointer": "/source_manifest_sha256",
+          "canonical_json_sha256": "5a6920c972a8aff0fd1dacb3da4ce1f68dd96e2491391fa193e38fd5d62a6678"
+        },
+        "source_tree_sha256": {
+          "pointer": "/source_tree_sha256",
+          "canonical_json_sha256": "925528202c59fb99f13d5d7be914cf219c2c1b457594b4572f1f0e3c376edb04"
+        },
+        "source_file_count": {
+          "pointer": "/source_file_count",
+          "canonical_json_sha256": "e6323c6f35f6487edd4e4cec846dca3ab03757bfe5ef5418136be0f2977ba22e"
+        },
+        "source_revision": {
+          "pointer": "/source_revision",
+          "canonical_json_sha256": "221e3e36aa0cc5991fdb454edf66f3e9ae8cb40eaaca5e9db020bc8541bf3326"
+        },
+        "comparison_public_revision": {
+          "pointer": "/comparison_public_revision",
+          "canonical_json_sha256": "7659ce5a6574255a28a9ba9671d0a6b3b45b169c463c478152be8db9a678b348"
+        },
+        "changed_source_paths": {
+          "pointer": "/changed_source_paths",
+          "canonical_json_sha256": "4543d098d4ed3d2b88a1339afb61d1acc80b94bea065526d3c8385509f46f27e"
+        },
+        "retained_sboms": {
+          "pointer": "/retained_sboms",
+          "canonical_json_sha256": "0428d09c6e0e2b524877c2218b306c10da6c7536bcf6ed96524b581dafc85301"
+        },
+        "input_equivalence": {
+          "pointer": "/input_equivalence",
+          "canonical_json_sha256": "7759990e93188b2887574d0028fdb066a85a846dba7cbc95ee8756f77f91cdd3"
+        },
+        "qualification": {
+          "pointer": "/qualification",
+          "canonical_json_sha256": "ae3e4ee117028f7bb43e3c2ee97b5f8c1c86326f770605f6deddb65b7ac3160f"
+        },
+        "historical_bindings": {
+          "pointer": "/historical_bindings",
+          "canonical_json_sha256": "59ccb6141308771f32ec1e534f7a843cbdd8867afcd59e84944e03e6f9958c33"
+        },
+        "prior_binding": {
+          "pointer": "/prior_binding",
+          "canonical_json_sha256": "7dcb89939935e9a1247c92f0236131c7c359219cf0f4dbbf97dc659d89489558"
+        },
+        "retained_composition_component_bindings": {
+          "pointer": "/retained_composition_component_bindings",
+          "canonical_json_sha256": "a5bd9a5fdd4579a102c09ac26186e9065b468a5bddd5039317fcd2b072273da2"
+        },
+        "reviewed_source_patch": {
+          "pointer": "/reviewed_source_patch",
+          "canonical_json_sha256": "58d97c5164ee6bb921f7bade334c911efcaf5d13c79b94c004226c0ddc9dfdbe"
+        },
+        "new_resolution_performed": {
+          "pointer": "/new_resolution_performed",
+          "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+        },
+        "new_advisory_scan_performed": {
+          "pointer": "/new_advisory_scan_performed",
+          "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+        },
+        "new_runtime_qualification_performed": {
+          "pointer": "/new_runtime_qualification_performed",
+          "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+        },
+        "new_source_contract_qualification_performed": {
+          "pointer": "/new_source_contract_qualification_performed",
+          "canonical_json_sha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b"
+        },
+        "new_static_security_scan_performed": {
+          "pointer": "/new_static_security_scan_performed",
+          "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+        },
+        "new_resolution_scope": {
+          "pointer": "/new_resolution_scope",
+          "canonical_json_sha256": "e30647563c02ab51cd3849a700648497a4e91c7a42d7084b0ce22dcd18e158d4"
+        },
+        "new_advisory_scan_scope": {
+          "pointer": "/new_advisory_scan_scope",
+          "canonical_json_sha256": "f40781c12ee1d9778988d2559e2673bf3454a4d45538d0835773579246dea8e7"
+        }
+      },
+      "source_manifest": {
+        "path": "PUBLIC_METADATA/source-manifest.json",
+        "sha256": "229e71adc1f9220fc9836889d0cba33dfdb7c9397ae2da5b75c3cf8f9a539e32",
+        "bytes": 468724,
+        "git_blob": "26ba5b23e472ace2f58e8fa5888a0e957d48c5a3"
+      }
+    },
     {
       "public_revision": "e706c5af95cd9bae01c247b0fa884ec2ea8fddb5",
       "path": "PUBLIC_METADATA/source-binding.json",
@@ -8617,20 +8949,179 @@
     }
   ],
   "reviewed_source_patch": {
-    "scope": "Defer titlebar edge press/move/release to unchanged parent resize handlers; keep ordinary move/maximize/fullscreen paths.",
+    "scope": "Normal desktop and phone startup plus saved language/voice selection for a separately marked English, Spanish and Mandarin qualification artifact.",
     "source_paths": [
-      "SOURCE/tests/public/test_native_titlebar_resize.py",
-      "SOURCE/ui/qt_native/webview_window.py"
+      "SOURCE/bootstrap/factory.py",
+      "SOURCE/config/schema.py",
+      "SOURCE/config/settings.py",
+      "SOURCE/docs/CUSTOMER_SPEECH_QUALIFICATION.md",
+      "SOURCE/intent/command_executor.py",
+      "SOURCE/telephony/call_manager.py",
+      "SOURCE/telephony/remote_voice.py",
+      "SOURCE/tests/public/customer_speech_selection.node.mjs",
+      "SOURCE/tests/public/test_customer_launch_wiring.py",
+      "SOURCE/tests/public/test_customer_speech_settings.py",
+      "SOURCE/tools/qualification/cjk_runtime_replay.py",
+      "SOURCE/ui/customer_speech_settings.py",
+      "SOURCE/ui/react-app/src/__tests__/hooks/useSettings.customerSpeech.test.jsx",
+      "SOURCE/ui/react-app/src/components/SettingsModal.customerSpeech.test.jsx",
+      "SOURCE/ui/react-app/src/components/SettingsModal.jsx",
+      "SOURCE/ui/react-app/src/hooks/useSettings.js",
+      "SOURCE/ui/react-app/src/utils/customerSpeechSelection.js",
+      "SOURCE/ui/settings_api.py",
+      "SOURCE/ui/settings_effects.py",
+      "SOURCE/ui/settings_manager.py",
+      "SOURCE/ui/settings_schema.py",
+      "SOURCE/viola_qt.py",
+      "SOURCE/voice/customer_runtime.py",
+      "SOURCE/voice/customer_voice_routing.py",
+      "SOURCE/voice/synthesis/factory.py",
+      "SOURCE/voice/synthesis/kokoro_engine.py",
+      "SOURCE/voice/synthesizer.py"
     ],
-    "source_tree": "71ef13f7983e00bddc6d457017e9d6ee6db2b7a3"
+    "source_tree": "ca2940d0b6e5efc75c5d90dc33ea252810b568a1",
+    "patch_sha256": "831eaeae2367ca73160bc640351b408afa4b78decb1575e54c5a8cbd15149ed2",
+    "prior_binding": {
+      "public_revision": "a002401aae36786bbd9aeea8a1eacd0790b4192a",
+      "path": "PUBLIC_METADATA/source-binding.json",
+      "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/a002401aae36786bbd9aeea8a1eacd0790b4192a/PUBLIC_METADATA/source-binding.json",
+      "sha256": "b848ca260eaf2e6f9de4d51c56723d9875cedfcacac66e42265dc102e7e4ff6c",
+      "bytes": 1121055,
+      "git_blob": "acacece0a99a2b912b96d3562735ab5a45b31de1",
+      "all_top_level_keys": [
+        "schema_version",
+        "source_manifest",
+        "source_manifest_sha256",
+        "source_tree_sha256",
+        "source_file_count",
+        "source_revision",
+        "comparison_public_revision",
+        "changed_source_paths",
+        "retained_sboms",
+        "input_equivalence",
+        "qualification",
+        "historical_bindings",
+        "prior_binding",
+        "retained_composition_component_bindings",
+        "reviewed_source_patch",
+        "new_resolution_performed",
+        "new_advisory_scan_performed",
+        "new_runtime_qualification_performed",
+        "new_source_contract_qualification_performed",
+        "new_static_security_scan_performed",
+        "new_resolution_scope",
+        "new_advisory_scan_scope",
+        "account_reconciliation_previous_binding"
+      ],
+      "preserved_json_objects": {
+        "schema_version": {
+          "pointer": "/schema_version",
+          "canonical_json_sha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+        },
+        "source_manifest": {
+          "pointer": "/source_manifest",
+          "canonical_json_sha256": "ace3c4cebde8c1e5207159e354ef46f1f9a13eb7b3185315a68b7cf8b71f212d"
+        },
+        "source_manifest_sha256": {
+          "pointer": "/source_manifest_sha256",
+          "canonical_json_sha256": "84851c1af91cb9e7c3e01c6ee5813dd6c03c63877a3aeb5090fb59bd65625d97"
+        },
+        "source_tree_sha256": {
+          "pointer": "/source_tree_sha256",
+          "canonical_json_sha256": "7ed7908c0b2be4efdc9fa83bb8260b94c3f0773ed675a8728f62767ebd182083"
+        },
+        "source_file_count": {
+          "pointer": "/source_file_count",
+          "canonical_json_sha256": "61b1dbc91985561c5af9e6e341ffa92fa3524c1e2083f39f67cb8bd736fcce46"
+        },
+        "source_revision": {
+          "pointer": "/source_revision",
+          "canonical_json_sha256": "5be18285c66ac7a611d3ca2d4120e96471f55914c4ac8d038f58665dd231fb53"
+        },
+        "comparison_public_revision": {
+          "pointer": "/comparison_public_revision",
+          "canonical_json_sha256": "7659ce5a6574255a28a9ba9671d0a6b3b45b169c463c478152be8db9a678b348"
+        },
+        "changed_source_paths": {
+          "pointer": "/changed_source_paths",
+          "canonical_json_sha256": "3e63cbd6a6d239ac2b6b246e7003eaabf5518a46b44939925a716e4c653d20da"
+        },
+        "retained_sboms": {
+          "pointer": "/retained_sboms",
+          "canonical_json_sha256": "0428d09c6e0e2b524877c2218b306c10da6c7536bcf6ed96524b581dafc85301"
+        },
+        "input_equivalence": {
+          "pointer": "/input_equivalence",
+          "canonical_json_sha256": "f22c003b4334e149905cd9e2b309b84bb7b86734657f68d8a8a49802615bb64d"
+        },
+        "qualification": {
+          "pointer": "/qualification",
+          "canonical_json_sha256": "cd94e62ea228a8ac3bbe479d8dc69abf894a6539b73ab797054681173880a80c"
+        },
+        "historical_bindings": {
+          "pointer": "/historical_bindings",
+          "canonical_json_sha256": "59ccb6141308771f32ec1e534f7a843cbdd8867afcd59e84944e03e6f9958c33"
+        },
+        "prior_binding": {
+          "pointer": "/prior_binding",
+          "canonical_json_sha256": "ff6e9fdafc77b189bcc9f060cb72c85ac06b39c01f04526f1edbebcc1978371e"
+        },
+        "retained_composition_component_bindings": {
+          "pointer": "/retained_composition_component_bindings",
+          "canonical_json_sha256": "c2d09217a2bcfa84f8cb717b53382fb2681537d59e8760c23f3382ab629d1606"
+        },
+        "reviewed_source_patch": {
+          "pointer": "/reviewed_source_patch",
+          "canonical_json_sha256": "d1384782a958730b6bb21f8614917b4ea16ea1800491ba8d2db1fd928e0872ae"
+        },
+        "new_resolution_performed": {
+          "pointer": "/new_resolution_performed",
+          "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+        },
+        "new_advisory_scan_performed": {
+          "pointer": "/new_advisory_scan_performed",
+          "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+        },
+        "new_runtime_qualification_performed": {
+          "pointer": "/new_runtime_qualification_performed",
+          "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+        },
+        "new_source_contract_qualification_performed": {
+          "pointer": "/new_source_contract_qualification_performed",
+          "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+        },
+        "new_static_security_scan_performed": {
+          "pointer": "/new_static_security_scan_performed",
+          "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+        },
+        "new_resolution_scope": {
+          "pointer": "/new_resolution_scope",
+          "canonical_json_sha256": "3908ee280c958e288937f506ae635749e3ec8ad9d994adc5683170be9a3c2881"
+        },
+        "new_advisory_scan_scope": {
+          "pointer": "/new_advisory_scan_scope",
+          "canonical_json_sha256": "76173bebb522a925c5f65181cfb865365c7b7eb973d1f62278f3f6afb11969bd"
+        },
+        "account_reconciliation_previous_binding": {
+          "pointer": "/account_reconciliation_previous_binding",
+          "canonical_json_sha256": "cfeffa86ef01cbbd530cda12a57b6c4eb3761063999ad3fae482a0c1d7482b51"
+        }
+      },
+      "source_manifest": {
+        "path": "PUBLIC_METADATA/source-manifest.json",
+        "sha256": "810712c2fe135f0dc91d5e727995ef42a9fc6353094f1d0d3b49011afb204d66",
+        "bytes": 467630,
+        "git_blob": "8c4562651d00dcaab292ef9bea76b33e90512299"
+      }
+    }
   },
   "new_resolution_performed": false,
   "new_advisory_scan_performed": false,
   "new_runtime_qualification_performed": false,
-  "new_source_contract_qualification_performed": false,
+  "new_source_contract_qualification_performed": true,
   "new_static_security_scan_performed": false,
-  "new_resolution_scope": "No dependency resolution is performed by this binding preparation; any retained candidate execution is explicitly scoped in qualification.",
-  "new_advisory_scan_scope": "No advisory scan is performed by this binding preparation; any retained audit result is explicitly scoped in qualification.",
+  "new_resolution_scope": "No dependency change or resolution in local source composition; retained inventories preserve their original scope and provenance.",
+  "new_advisory_scan_scope": "No new advisory scan during local composition; normal final-head hosted jobs retain their actual results.",
   "account_reconciliation_previous_binding": {
     "source_revision": "f864e61381ef9e10a09333fce05210427cf7d0f6",
     "source_manifest_sha256": "9cad8bcb2f98c34d95a11545e11a57d74dbe6b28cd5db7322b7746e102801acd",
@@ -9110,6 +9601,134 @@
           "scope": "Complete original independently reviewed titlebar candidate binding and prior evidence; qualification remains scoped to its original source and head."
         }
       ]
+    }
+  },
+  "reviewed_speech_binding": {
+    "public_revision": "9ec5deaa101b2bf21f594a31bfd57d1774184233",
+    "path": "PUBLIC_METADATA/source-binding.json",
+    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/9ec5deaa101b2bf21f594a31bfd57d1774184233/PUBLIC_METADATA/source-binding.json",
+    "sha256": "60e1cb9b10511cecdbf1ef31019030f05b81c0f71d01274379d6932d7e4405c9",
+    "bytes": 1111584,
+    "git_blob": "a4190b541e86f71d529dd45154adb7352fcc4f32",
+    "all_top_level_keys": [
+      "schema_version",
+      "source_manifest",
+      "source_manifest_sha256",
+      "source_tree_sha256",
+      "source_file_count",
+      "source_revision",
+      "comparison_public_revision",
+      "changed_source_paths",
+      "retained_sboms",
+      "input_equivalence",
+      "qualification",
+      "historical_bindings",
+      "prior_binding",
+      "retained_composition_component_bindings",
+      "reviewed_source_patch",
+      "new_resolution_performed",
+      "new_advisory_scan_performed",
+      "new_runtime_qualification_performed",
+      "new_source_contract_qualification_performed",
+      "new_static_security_scan_performed",
+      "new_resolution_scope",
+      "new_advisory_scan_scope"
+    ],
+    "preserved_json_objects": {
+      "schema_version": {
+        "pointer": "/schema_version",
+        "canonical_json_sha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+      },
+      "source_manifest": {
+        "pointer": "/source_manifest",
+        "canonical_json_sha256": "ace3c4cebde8c1e5207159e354ef46f1f9a13eb7b3185315a68b7cf8b71f212d"
+      },
+      "source_manifest_sha256": {
+        "pointer": "/source_manifest_sha256",
+        "canonical_json_sha256": "5a6920c972a8aff0fd1dacb3da4ce1f68dd96e2491391fa193e38fd5d62a6678"
+      },
+      "source_tree_sha256": {
+        "pointer": "/source_tree_sha256",
+        "canonical_json_sha256": "925528202c59fb99f13d5d7be914cf219c2c1b457594b4572f1f0e3c376edb04"
+      },
+      "source_file_count": {
+        "pointer": "/source_file_count",
+        "canonical_json_sha256": "e6323c6f35f6487edd4e4cec846dca3ab03757bfe5ef5418136be0f2977ba22e"
+      },
+      "source_revision": {
+        "pointer": "/source_revision",
+        "canonical_json_sha256": "221e3e36aa0cc5991fdb454edf66f3e9ae8cb40eaaca5e9db020bc8541bf3326"
+      },
+      "comparison_public_revision": {
+        "pointer": "/comparison_public_revision",
+        "canonical_json_sha256": "7659ce5a6574255a28a9ba9671d0a6b3b45b169c463c478152be8db9a678b348"
+      },
+      "changed_source_paths": {
+        "pointer": "/changed_source_paths",
+        "canonical_json_sha256": "4543d098d4ed3d2b88a1339afb61d1acc80b94bea065526d3c8385509f46f27e"
+      },
+      "retained_sboms": {
+        "pointer": "/retained_sboms",
+        "canonical_json_sha256": "0428d09c6e0e2b524877c2218b306c10da6c7536bcf6ed96524b581dafc85301"
+      },
+      "input_equivalence": {
+        "pointer": "/input_equivalence",
+        "canonical_json_sha256": "7759990e93188b2887574d0028fdb066a85a846dba7cbc95ee8756f77f91cdd3"
+      },
+      "qualification": {
+        "pointer": "/qualification",
+        "canonical_json_sha256": "ae3e4ee117028f7bb43e3c2ee97b5f8c1c86326f770605f6deddb65b7ac3160f"
+      },
+      "historical_bindings": {
+        "pointer": "/historical_bindings",
+        "canonical_json_sha256": "59ccb6141308771f32ec1e534f7a843cbdd8867afcd59e84944e03e6f9958c33"
+      },
+      "prior_binding": {
+        "pointer": "/prior_binding",
+        "canonical_json_sha256": "7dcb89939935e9a1247c92f0236131c7c359219cf0f4dbbf97dc659d89489558"
+      },
+      "retained_composition_component_bindings": {
+        "pointer": "/retained_composition_component_bindings",
+        "canonical_json_sha256": "a5bd9a5fdd4579a102c09ac26186e9065b468a5bddd5039317fcd2b072273da2"
+      },
+      "reviewed_source_patch": {
+        "pointer": "/reviewed_source_patch",
+        "canonical_json_sha256": "58d97c5164ee6bb921f7bade334c911efcaf5d13c79b94c004226c0ddc9dfdbe"
+      },
+      "new_resolution_performed": {
+        "pointer": "/new_resolution_performed",
+        "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+      },
+      "new_advisory_scan_performed": {
+        "pointer": "/new_advisory_scan_performed",
+        "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+      },
+      "new_runtime_qualification_performed": {
+        "pointer": "/new_runtime_qualification_performed",
+        "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+      },
+      "new_source_contract_qualification_performed": {
+        "pointer": "/new_source_contract_qualification_performed",
+        "canonical_json_sha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b"
+      },
+      "new_static_security_scan_performed": {
+        "pointer": "/new_static_security_scan_performed",
+        "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+      },
+      "new_resolution_scope": {
+        "pointer": "/new_resolution_scope",
+        "canonical_json_sha256": "e30647563c02ab51cd3849a700648497a4e91c7a42d7084b0ce22dcd18e158d4"
+      },
+      "new_advisory_scan_scope": {
+        "pointer": "/new_advisory_scan_scope",
+        "canonical_json_sha256": "f40781c12ee1d9778988d2559e2673bf3454a4d45538d0835773579246dea8e7"
+      }
+    },
+    "source_manifest": {
+      "path": "PUBLIC_METADATA/source-manifest.json",
+      "sha256": "229e71adc1f9220fc9836889d0cba33dfdb7c9397ae2da5b75c3cf8f9a539e32",
+      "bytes": 468724,
+      "git_blob": "26ba5b23e472ace2f58e8fa5888a0e957d48c5a3"
     }
   }
 }
