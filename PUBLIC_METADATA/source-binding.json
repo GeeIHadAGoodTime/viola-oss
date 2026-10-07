@@ -1,13 +1,14 @@
 {
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "d15c636eaf7c40b46d79f4f1f9b1b212cd7b846bf59c6dff40c6e68be9e78f51",
-  "source_tree_sha256": "e2c7ae09a07cd7d94204bd585f33e566196c2c6eb5e67ec9f8fc73884987341a",
+  "source_manifest_sha256": "bb01b361c5ca493b6534f08af4153b325a6b03019f9b8cb1ffa0a5b1776222ba",
+  "source_tree_sha256": "417778161aab3002c49cb7e17f06a5f6780b2e8dcf0b199e1e8d036a9d8ce320",
   "source_file_count": 2649,
-  "source_revision": "7e681e3489d2b863bd6e64ab55e72407a41e38d6",
-  "comparison_public_revision": "2aa4e5cb60a29dc3e49afed9e4e3076ad01a8f19",
+  "source_revision": "b7cb5337d0cb84b8256e9ce3ead2c979c158973f",
+  "comparison_public_revision": "a32dd90da471b309360e2e03474f36060137ac55",
   "changed_source_paths": [
-    "SOURCE/tests/public/test_source_contract.py"
+    "SOURCE/ui/react-app/src/components/SettingsModal.desktopOnlyPanels.test.jsx",
+    "SOURCE/ui/react-app/src/components/SettingsModal.jsx"
   ],
   "retained_sboms": [
     {
@@ -69,20 +70,19 @@
     }
   ],
   "input_equivalence": {
-    "comparison_basis": "Initial #79 candidate2aa4e5cb60a29dc3e49afed9e4e3076ad01a8f19",
-    "production_verifier_unchanged": true,
-    "runtime_source_unchanged": true,
+    "comparison_basis": "Protected #79 merge a32dd90da471b309360e2e03474f36060137ac55",
     "all_unselected_export_leaf_bytes_and_modes_preserved": true,
     "all_six_sbom_bytes_and_status_objects_preserved": true,
-    "dependency_and_workflow_inputs_unchanged": true
+    "dependency_and_workflow_inputs_unchanged": true,
+    "existing_save_scan_cancel_handlers_unchanged": true
   },
   "prior_binding": {
-    "public_revision": "2aa4e5cb60a29dc3e49afed9e4e3076ad01a8f19",
+    "public_revision": "a32dd90da471b309360e2e03474f36060137ac55",
     "path": "PUBLIC_METADATA/source-binding.json",
-    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/2aa4e5cb60a29dc3e49afed9e4e3076ad01a8f19/PUBLIC_METADATA/source-binding.json",
-    "sha256": "12100a7c71bc3dab87f8cb8bf466d52f480bb168be94ca5347333840477396f9",
-    "bytes": 73156,
-    "git_blob": "4aaae7b98db535737a9af229f94e3e71647c5c5f",
+    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/a32dd90da471b309360e2e03474f36060137ac55/PUBLIC_METADATA/source-binding.json",
+    "sha256": "de563025a85be6965c373f394659f6f7da29f1a7a78ec5143169b8c4faf73bbf",
+    "bytes": 73671,
+    "git_blob": "2160ea7ea2af89cc6a68411d168cbe50aae6110e",
     "all_top_level_keys": [
       "schema_version",
       "source_manifest",
@@ -122,11 +122,11 @@
       },
       "source_manifest_sha256": {
         "pointer": "/source_manifest_sha256",
-        "canonical_json_sha256": "82c8c0a088c2041fcb98b5bc1725c677fe583984a63a6986e1dc400e2fdda0c9"
+        "canonical_json_sha256": "7c2f45e386704b496108a16f50b9b42e9a8a451e7c0000254c282aa2a05970bf"
       },
       "source_tree_sha256": {
         "pointer": "/source_tree_sha256",
-        "canonical_json_sha256": "28afe894f140c26a9d5957e95aff6a199dc9cbe2ccbe0371111239d60600789d"
+        "canonical_json_sha256": "19b55d84546d27f678136580dc03bd8f294a94be55f73a0f32403102b097a77c"
       },
       "source_file_count": {
         "pointer": "/source_file_count",
@@ -134,15 +134,15 @@
       },
       "source_revision": {
         "pointer": "/source_revision",
-        "canonical_json_sha256": "fc9b4924de976acdfca700a04e182fc00ef6da8cb3c39ff3c659817baaaeef69"
+        "canonical_json_sha256": "e102ba3f0ba0ee6db37d0182314379dcceb3ae1db065a9b0a402e2a5a0cfa924"
       },
       "comparison_public_revision": {
         "pointer": "/comparison_public_revision",
-        "canonical_json_sha256": "bea449b62e2998799a7765ccf6e3e449c5fc1c238992c866c130cfd4585bb355"
+        "canonical_json_sha256": "e3e057babb11af59ae7bacca4880f5c7e5685545a10611df8be30712dedfc623"
       },
       "changed_source_paths": {
         "pointer": "/changed_source_paths",
-        "canonical_json_sha256": "2e321533d441db102c55f86c07949eab73dde59a0380226886ae47a0d48082d3"
+        "canonical_json_sha256": "25250e7ae258765943bf07234c86baf6817f05b92a11716de4ff9ab67b7e6c13"
       },
       "retained_sboms": {
         "pointer": "/retained_sboms",
@@ -150,11 +150,11 @@
       },
       "input_equivalence": {
         "pointer": "/input_equivalence",
-        "canonical_json_sha256": "b75db3eb5cc56d9a0eda0c3b39f1af670c93eb9e1acf22012977f72f18330c73"
+        "canonical_json_sha256": "fa27a5b5bff429fdde2a3f855dadfa594eb31b3df891bb2bb991fdd8f1d5f02e"
       },
       "prior_binding": {
         "pointer": "/prior_binding",
-        "canonical_json_sha256": "64bf3caf83f59a1058b1a5496743c9fd97e4f7cddff85a954d03621bbee34c26"
+        "canonical_json_sha256": "4aa3f7ef868472fb775a246b7904d7bfb1666c1dd34e645981dcbb4b28ef5dd2"
       },
       "new_resolution_performed": {
         "pointer": "/new_resolution_performed",
@@ -170,11 +170,11 @@
       },
       "qualification": {
         "pointer": "/qualification",
-        "canonical_json_sha256": "2951318c260e7f4cb5bfe430a64ae00e2678eda3bfbf970233402ada1580f151"
+        "canonical_json_sha256": "928d6127e0d41cad05a7fa16297f90b3ac23499aa46bc289b20841b354027104"
       },
       "reviewed_source_patch": {
         "pointer": "/reviewed_source_patch",
-        "canonical_json_sha256": "4e6e57bed2089b42f3225207810e393f4f17d57d44e7aaf667c3960f68c270b1"
+        "canonical_json_sha256": "e7f614fde3f610e0a21550ae30836faf676a27d95576a813b63e34e1df4739a5"
       },
       "native_volume_pre_rebase_evidence": {
         "pointer": "/native_volume_pre_rebase_evidence",
@@ -217,42 +217,72 @@
         "canonical_json_sha256": "60ef34000919b287709213d6e4a00e949a039bf37b05448a6bdd4080882a0d99"
       }
     },
-    "note": "Complete initial #79 binding retained unchanged, including previous production verifier review. Hosted Windows failure was an untracked temporary source fixture; this update changes only fixture setup, not production verification."
+    "note": "Complete protected #79 correction retained with its strict verifier and isolated tracked fixture. This folder repair changes only the two reviewed UI paths."
   },
   "new_resolution_performed": false,
   "new_advisory_scan_performed": false,
   "new_runtime_qualification_performed": false,
   "qualification": {
-    "scope": "Narrow fixture-only correction after actual hosted failure; no production verification weakening.",
-    "source_commit": "7e681e3489d2b863bd6e64ab55e72407a41e38d6",
-    "source_tree": "91320574152709767977f0d68a493b9d814150e1",
+    "scope": "Folder editor reachability and bounded regression source; no new playback or acoustic result.",
+    "source_commit": "b7cb5337d0cb84b8256e9ce3ead2c979c158973f",
+    "source_tree": "998dd3be418cd687f9394a253adf9d5a3ea0e7cf",
     "ordered_source_parents": [
-      "2aa4e5cb60a29dc3e49afed9e4e3076ad01a8f19"
+      "09b9f380c6b0e8849abd85c4cf20474e6fb2fd90",
+      "a32dd90da471b309360e2e03474f36060137ac55"
     ],
-    "focused_methods_passed": 8,
-    "cli_cases_per_run": 30,
-    "ordinary_temp_run": "passed",
-    "enclosing_checkout_temp_run": "passed",
-    "independent_reviewer_replay": "8 methods passed",
-    "prior_hosted_run": 37676379173,
-    "prior_failed_python_job": 112980842583,
-    "prior_failure": "extra file: example.py in the newly added manifest fixture; original run and exact assertions retained",
-    "source_manifest_generator": "Real canonical generator; source is explicitly tracked in owned temporary Git repo",
-    "source_verifier": "Unchanged eight-line active revision coherence correction",
-    "final_exact_candidate_checks": "Require actual exact-head source/frontend receipts; this binding does not claim their completion",
+    "local_source_predicate_controls_passed": 7,
+    "source_predicate_mutations_detected": 3,
+    "source_predicate_limit": "Executes actual visibility predicates only; not React rendering.",
+    "prepared_react_regression_cases": 7,
+    "local_react_execution": "Not run: local runtime unavailable. Required hosted checks must run.",
+    "existing_settings_api_empty_folder_readback": "Actual ASGI settings save accepted empty folder and retained YouTube; new temporary SettingsManager reloaded both values.",
+    "independent_automated_review": "Three-line production delta and seven component cases independently reviewed; no blocking findings.",
+    "final_exact_candidate_checks": "Read exact-head hosted receipts; this binding does not claim their completion.",
     "limits": [
-      "No app runtime/source behavior regression claim",
-      "No native/physical proof",
+      "Source-only repair",
+      "No native GUI rerun",
+      "No model/playback/quota diagnosis",
       "No deployment or release"
     ],
+    "prior_candidate_frontend": {
+      "head": "09b9f380c6b0e8849abd85c4cf20474e6fb2fd90",
+      "run": 37677052187,
+      "job": 112983144684,
+      "tests": 1914,
+      "files": 168,
+      "desktop_panel_cases": 21,
+      "new_folder_cases": 7,
+      "production_build_seconds": 6.33,
+      "audit_findings": 0,
+      "scope": "Actual hosted React/build proof of the identical two folder files on the earlier stacked candidate; final union requires its own checks."
+    },
+    "prior_candidate_python": {
+      "run": 37677052187,
+      "job": 112983144788,
+      "outcome": "691 methods, eight inherited temporary Git fixture assertion failures, one existing POSIX skip; exact failure retained. Corrected fixture is now preserved from protected #79."
+    },
+    "protected_base_required_checks": {
+      "head": "4a736f5f69846bfa240e3681139343055aa20871",
+      "run": 37678415199,
+      "python_job": 112987816529,
+      "python_methods": 691,
+      "passed": 690,
+      "skipped": 1,
+      "frontend_job": 112987816500,
+      "frontend_tests": 1907,
+      "frontend_files": 168,
+      "build_seconds": 5.56,
+      "audit_findings": 0,
+      "automated_review": "https://github.com/GeeIHadAGoodTime/viola-oss/pull/79#pullrequestreview-5447697142"
+    },
     "prior_complete_evidence": [
       {
-        "public_revision": "2aa4e5cb60a29dc3e49afed9e4e3076ad01a8f19",
+        "public_revision": "a32dd90da471b309360e2e03474f36060137ac55",
         "path": "PUBLIC_METADATA/source-binding.json",
-        "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/2aa4e5cb60a29dc3e49afed9e4e3076ad01a8f19/PUBLIC_METADATA/source-binding.json",
-        "sha256": "12100a7c71bc3dab87f8cb8bf466d52f480bb168be94ca5347333840477396f9",
-        "bytes": 73156,
-        "git_blob": "4aaae7b98db535737a9af229f94e3e71647c5c5f",
+        "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/a32dd90da471b309360e2e03474f36060137ac55/PUBLIC_METADATA/source-binding.json",
+        "sha256": "de563025a85be6965c373f394659f6f7da29f1a7a78ec5143169b8c4faf73bbf",
+        "bytes": 73671,
+        "git_blob": "2160ea7ea2af89cc6a68411d168cbe50aae6110e",
         "all_top_level_keys": [
           "schema_version",
           "source_manifest",
@@ -292,11 +322,11 @@
           },
           "source_manifest_sha256": {
             "pointer": "/source_manifest_sha256",
-            "canonical_json_sha256": "82c8c0a088c2041fcb98b5bc1725c677fe583984a63a6986e1dc400e2fdda0c9"
+            "canonical_json_sha256": "7c2f45e386704b496108a16f50b9b42e9a8a451e7c0000254c282aa2a05970bf"
           },
           "source_tree_sha256": {
             "pointer": "/source_tree_sha256",
-            "canonical_json_sha256": "28afe894f140c26a9d5957e95aff6a199dc9cbe2ccbe0371111239d60600789d"
+            "canonical_json_sha256": "19b55d84546d27f678136580dc03bd8f294a94be55f73a0f32403102b097a77c"
           },
           "source_file_count": {
             "pointer": "/source_file_count",
@@ -304,15 +334,15 @@
           },
           "source_revision": {
             "pointer": "/source_revision",
-            "canonical_json_sha256": "fc9b4924de976acdfca700a04e182fc00ef6da8cb3c39ff3c659817baaaeef69"
+            "canonical_json_sha256": "e102ba3f0ba0ee6db37d0182314379dcceb3ae1db065a9b0a402e2a5a0cfa924"
           },
           "comparison_public_revision": {
             "pointer": "/comparison_public_revision",
-            "canonical_json_sha256": "bea449b62e2998799a7765ccf6e3e449c5fc1c238992c866c130cfd4585bb355"
+            "canonical_json_sha256": "e3e057babb11af59ae7bacca4880f5c7e5685545a10611df8be30712dedfc623"
           },
           "changed_source_paths": {
             "pointer": "/changed_source_paths",
-            "canonical_json_sha256": "2e321533d441db102c55f86c07949eab73dde59a0380226886ae47a0d48082d3"
+            "canonical_json_sha256": "25250e7ae258765943bf07234c86baf6817f05b92a11716de4ff9ab67b7e6c13"
           },
           "retained_sboms": {
             "pointer": "/retained_sboms",
@@ -320,11 +350,11 @@
           },
           "input_equivalence": {
             "pointer": "/input_equivalence",
-            "canonical_json_sha256": "b75db3eb5cc56d9a0eda0c3b39f1af670c93eb9e1acf22012977f72f18330c73"
+            "canonical_json_sha256": "fa27a5b5bff429fdde2a3f855dadfa594eb31b3df891bb2bb991fdd8f1d5f02e"
           },
           "prior_binding": {
             "pointer": "/prior_binding",
-            "canonical_json_sha256": "64bf3caf83f59a1058b1a5496743c9fd97e4f7cddff85a954d03621bbee34c26"
+            "canonical_json_sha256": "4aa3f7ef868472fb775a246b7904d7bfb1666c1dd34e645981dcbb4b28ef5dd2"
           },
           "new_resolution_performed": {
             "pointer": "/new_resolution_performed",
@@ -340,11 +370,11 @@
           },
           "qualification": {
             "pointer": "/qualification",
-            "canonical_json_sha256": "2951318c260e7f4cb5bfe430a64ae00e2678eda3bfbf970233402ada1580f151"
+            "canonical_json_sha256": "928d6127e0d41cad05a7fa16297f90b3ac23499aa46bc289b20841b354027104"
           },
           "reviewed_source_patch": {
             "pointer": "/reviewed_source_patch",
-            "canonical_json_sha256": "4e6e57bed2089b42f3225207810e393f4f17d57d44e7aaf667c3960f68c270b1"
+            "canonical_json_sha256": "e7f614fde3f610e0a21550ae30836faf676a27d95576a813b63e34e1df4739a5"
           },
           "native_volume_pre_rebase_evidence": {
             "pointer": "/native_volume_pre_rebase_evidence",
@@ -387,16 +417,17 @@
             "canonical_json_sha256": "60ef34000919b287709213d6e4a00e949a039bf37b05448a6bdd4080882a0d99"
           }
         },
-        "note": "Complete initial #79 binding retained unchanged, including previous production verifier review. Hosted Windows failure was an untracked temporary source fixture; this update changes only fixture setup, not production verification."
+        "note": "Complete protected #79 correction retained with its strict verifier and isolated tracked fixture. This folder repair changes only the two reviewed UI paths."
       }
     ]
   },
   "reviewed_source_patch": {
-    "scope": "Track synthetic source in an owned temporary Git repository before canonical manifest creation; retain every verifier assertion.",
+    "scope": "Expose the existing Local Files folder editor after configuration; preserve save acknowledgement, cancellation and desktop-only controls.",
     "source_paths": [
-      "SOURCE/tests/public/test_source_contract.py"
+      "SOURCE/ui/react-app/src/components/SettingsModal.desktopOnlyPanels.test.jsx",
+      "SOURCE/ui/react-app/src/components/SettingsModal.jsx"
     ],
-    "source_tree": "91320574152709767977f0d68a493b9d814150e1"
+    "source_tree": "998dd3be418cd687f9394a253adf9d5a3ea0e7cf"
   },
   "native_volume_pre_rebase_evidence": {
     "public_revision": "476ad8bc5652ffbf1ace52de9793e7f2c1b5cf2b",
