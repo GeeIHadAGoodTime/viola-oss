@@ -26,7 +26,7 @@ def load_streaming_method(source: Path):
         node
         for node in ast.walk(tree)
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
-        and node.name in {"_tts_is_enabled", "_play_pcm_if_enabled", "_run_synthesize_with_watchdog"}
+        and node.name in {"_tts_is_enabled", "_play_pcm_if_enabled", "_run_synthesize_with_watchdog", "_prepare_route_text"}
     ]
     helpers = [
         node
@@ -34,7 +34,7 @@ def load_streaming_method(source: Path):
         if (
             isinstance(node, ast.Assign)
             and any(
-                isinstance(target, ast.Name) and target.id in {"_SENTENCE_RE", "_EMOJI_RE", "STREAM_TIMEOUT_SECONDS"}
+                isinstance(target, ast.Name) and target.id in {"_SENTENCE_RE", "_EMOJI_RE", "STREAM_TIMEOUT_SECONDS", "_MAX_TEXT_LENGTH"}
                 for target in node.targets
             )
         )

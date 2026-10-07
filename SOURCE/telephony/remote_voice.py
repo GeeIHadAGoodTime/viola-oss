@@ -122,6 +122,16 @@ def _env(name: str) -> str:
 
 
 def phone_voice_remote_enabled() -> bool:
+    import sys
+
+    if getattr(sys, "frozen", False):
+        from voice.customer_runtime import qualification_profile, require_qualification_bootstrap
+
+        require_qualification_bootstrap()
+        if qualification_profile() is not None:
+            # The marked artifact qualifies local speech. This common gate
+            # also covers pre-call warmup and keep-alive TTS inference.
+            return False
     return _env("VIOLA_PHONE_VOICE_REMOTE_ENABLED").lower() in _TRUE_VALUES
 
 
