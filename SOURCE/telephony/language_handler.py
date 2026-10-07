@@ -1,8 +1,10 @@
 """Automatic language detection and switching for phone calls.
 
 When a non-English speaker answers, Viola detects the language and switches
-both comprehension (LLM) and speech (TTS) to match. Supported TTS languages:
-English, Spanish, French, Italian, Portuguese, Japanese, Chinese, Hindi.
+both comprehension (LLM) and speech (TTS) to match. The retained asset inventory covers:
+English, Spanish, French, Italian, Portuguese, Japanese, Mandarin Chinese, Hindi.
+Customer capability comes only from the explicitly bound pronunciation component
+and a matching voice in its loaded asset, not from that inventory list.
 For unsupported TTS languages, Viola exits gracefully in English.
 """
 
@@ -22,7 +24,11 @@ LANGUAGE_NAMES = {
     "it": "Italian",
     "pt": "Portuguese",
     "ja": "Japanese",
-    "zh": "Chinese",
+    "zh": "Mandarin Chinese",
+    "cmn": "Mandarin Chinese",
+    "yue": "Cantonese",
+    "fil": "Filipino",
+    "tl": "Tagalog",
     "hi": "Hindi",
     "de": "German",
     "ko": "Korean",
@@ -130,6 +136,8 @@ class LanguageHandler:
 
         language = _parse_phone_language(lang_code)
         lang_code = language.value.split("-", 1)[0] if language is not None else "unknown"
+        if lang_code == "cmn":
+            lang_code = "zh"
         lang_name = LANGUAGE_NAMES.get(lang_code, lang_code)
 
         if lang_code in KOKORO_SUPPORTED:
@@ -148,11 +156,33 @@ class LanguageHandler:
                 logger.warning("Phone TTS cannot switch language to %s", lang_code)
                 return
 
+            runtime = getattr(self._tts, "_kokoro", None)
+            customer = getattr(getattr(runtime, "tokenizer", None), "_customer", None)
+            if customer is not None:
+                from voice.customer_voice_routing import customer_phone_locale_is_explicit
+
+                if not customer_phone_locale_is_explicit(language):
+                    await self._report_unsupported_language(
+                        language.value, "Chinese (regional variety)", selected_backend=True
+                    )
+                    return
             locale = self._tts.language_to_service_language(language)
             if not _selected_backend_supports_locale(self._tts, locale):
                 await self._report_unsupported_language(lang_code, lang_name, selected_backend=True)
                 return
             previous_language = self._tts._settings.language
+            previous_voice = self._tts._settings.voice
+            selected_voice = previous_voice
+            if customer is not None:
+                from voice.customer_voice_routing import select_customer_voice
+
+                try:
+                    selected_voice = select_customer_voice(locale, previous_voice, runtime.get_voices())
+                except Exception:
+                    await self._report_unsupported_language(
+                        lang_code, lang_name, selected_backend=True, voice_unavailable=True
+                    )
+                    return
             context = "\n".join(
                 [
                     "phone_event: language_detected",
@@ -166,12 +196,17 @@ class LanguageHandler:
 
             frame = LLMMessagesAppendFrame(messages=[{"role": "system", "content": context}], run_llm=False)
             try:
+                delta = {"language": language}
+                if customer is not None:
+                    delta["voice"] = selected_voice
                 await self._tts.process_frame(
-                    TTSUpdateSettingsFrame(delta=KokoroTTSService.Settings(language=language), service=self._tts),
+                    TTSUpdateSettingsFrame(delta=KokoroTTSService.Settings(**delta), service=self._tts),
                     FrameDirection.DOWNSTREAM,
                 )
                 if self._tts._settings.language != self._tts.language_to_service_language(language):
                     raise RuntimeError("Kokoro did not apply the requested language")
+                if self._tts._settings.voice != selected_voice:
+                    raise RuntimeError("Kokoro did not apply the matching voice")
                 await self._push_context_frame(frame)
             except (Exception, asyncio.CancelledError) as exc:
                 # A context target can fail/cancel after appending. Preserve a
@@ -182,6 +217,7 @@ class LanguageHandler:
                     self._switched = True
                 else:
                     self._tts._settings.language = previous_language
+                    self._tts._settings.voice = previous_voice
                 if isinstance(exc, asyncio.CancelledError):
                     raise
                 if self._switched:
@@ -197,7 +233,9 @@ class LanguageHandler:
         else:
             await self._report_unsupported_language(lang_code, lang_name)
 
-    async def _report_unsupported_language(self, lang_code: str, lang_name: str, *, selected_backend: bool = False):
+    async def _report_unsupported_language(
+        self, lang_code: str, lang_name: str, *, selected_backend: bool = False, voice_unavailable: bool = False
+    ):
         from pipecat.frames.frames import LLMMessagesAppendFrame
 
         context = "\n".join(
@@ -211,6 +249,8 @@ class LanguageHandler:
         )
         if selected_backend:
             context += "\ntts_language_scope: selected_pronunciation_backend"
+        if voice_unavailable:
+            context += "\ntts_voice_available: false"
         frame = LLMMessagesAppendFrame(messages=[{"role": "system", "content": context}], run_llm=False)
         try:
             await self._push_context_frame(frame)

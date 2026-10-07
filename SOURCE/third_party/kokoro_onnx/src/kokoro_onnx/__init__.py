@@ -211,6 +211,14 @@ class Kokoro:
         """
         assert speed >= 0.5 and speed <= 2.0, "Speed should be between 0.5 and 2.0"
 
+        customer = getattr(self.tokenizer, "_customer", None)
+        if customer is not None:
+            from voice.customer_voice_routing import require_customer_voice, uses_named_customer_voices
+
+            if uses_named_customer_voices(customer):
+                require_customer_voice(lang, voice)
+                if voice not in self.voices:
+                    raise ValueError("The selected customer voice is absent from the loaded asset")
         if isinstance(voice, str):
             assert voice in self.voices, f"Voice {voice} not found in available voices"
             voice = self.get_voice_style(voice)
@@ -252,6 +260,14 @@ class Kokoro:
         """
         assert speed >= 0.5 and speed <= 2.0, "Speed should be between 0.5 and 2.0"
 
+        customer = getattr(self.tokenizer, "_customer", None)
+        if customer is not None:
+            from voice.customer_voice_routing import require_customer_voice, uses_named_customer_voices
+
+            if uses_named_customer_voices(customer):
+                require_customer_voice(lang, voice)
+                if voice not in self.voices:
+                    raise ValueError("The selected customer voice is absent from the loaded asset")
         if isinstance(voice, str):
             assert voice in self.voices, f"Voice {voice} not found in available voices"
             voice = self.get_voice_style(voice)

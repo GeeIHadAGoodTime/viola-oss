@@ -12,7 +12,7 @@ import os
 from pathlib import Path
 from types import MappingProxyType
 
-_COMPANION_VERSION = "0.9.4+viola.cjk.3"
+_COMPANION_VERSION = "0.9.4+viola.cjk.4"
 _ROMANCE_LOCALES = frozenset({"es", "fr", "pt-br"})
 _CJK_DEPENDENCIES = {
     "fugashi": "1.5.2",
@@ -23,6 +23,10 @@ _CJK_DEPENDENCIES = {
     "jieba": "0.42.1",
     "ordered-set": "4.1.0",
     "proces": "0.1.7",
+}
+_CJK_ROUTE_DEPENDENCIES = {
+    "ja": ("fugashi", "jaconv", "mojimoji"),
+    "zh": ("pypinyin", "cn2an", "jieba", "ordered-set", "proces"),
 }
 
 
@@ -114,7 +118,7 @@ def compose_customer_tokenizer(
     no independent global-dictionary contract or custom lexicon is invented.
     Romance accepts an explicit tuple drawn from es/fr/pt-br, with the retained
     phrase/representation limits. No implicit Portuguese dialect is selected.
-    CJK dependencies are required only when a CJK route is requested. Failure
+    Only the explicitly requested CJK route's dependencies are required. Failure
     returns no partially ready composition. No voice is selected.
     """
     from voice.customer_pronunciation import CustomerTokenizer
@@ -140,7 +144,14 @@ def compose_customer_tokenizer(
 
     if importlib.metadata.version("viola-misaki-cjk-prototype") != _COMPANION_VERSION:
         raise RuntimeError("The reviewed inactive CJK companion distribution is required")
+    requested = set()
+    if mandarin:
+        requested.update(_CJK_ROUTE_DEPENDENCIES["zh"])
+    if japanese_dictionary_dir is not None:
+        requested.update(_CJK_ROUTE_DEPENDENCIES["ja"])
     for name, version in _CJK_DEPENDENCIES.items():
+        if name not in requested:
+            continue
         if importlib.metadata.version(name) != version:
             raise RuntimeError("The reviewed CJK dependency version is required: " + name)
 

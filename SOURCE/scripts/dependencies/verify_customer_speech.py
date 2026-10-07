@@ -14,7 +14,7 @@ import re
 from pathlib import Path, PurePosixPath
 
 REQUIRED = {
-    "kokoro-onnx": "0.4.9+viola.2",
+    "kokoro-onnx": "0.4.9+viola.3",
     "viola-misaki-en": "0.9.4+viola.1",
     "en-core-web-sm": "3.8.0",
     "spacy": "3.8.16",
@@ -26,7 +26,7 @@ REQUIRED = {
 # Keep synchronized with the companion package and runtime admission map.
 # These are required pins, not a complete transitive graph or license allowlist.
 INACTIVE_CJK_REQUIRED = {
-    "viola-misaki-cjk-prototype": "0.9.4+viola.cjk.3",
+    "viola-misaki-cjk-prototype": "0.9.4+viola.cjk.4",
     "fugashi": "1.5.2",
     "jaconv": "0.5.0",
     "mojimoji": "0.0.13",
@@ -35,6 +35,10 @@ INACTIVE_CJK_REQUIRED = {
     "jieba": "0.42.1",
     "ordered-set": "4.1.0",
     "proces": "0.1.7",
+}
+CJK_ROUTE_DEPENDENCIES = {
+    "ja": ("fugashi", "jaconv", "mojimoji"),
+    "zh": ("pypinyin", "cn2an", "jieba", "ordered-set", "proces"),
 }
 FORBIDDEN = frozenset(
     {"phonemizer", "phonemizer-fork", "espeakng-loader", "espeak-ng", "espeak", "num2words", "misaki"}
@@ -49,14 +53,25 @@ def canonical_name(value: str) -> str:
     return re.sub(r"[-_.]+", "-", value.lower())
 
 
-def validate_graph(report: dict, *, include_cjk_prototype: bool = False) -> list[str]:
+def validate_graph(
+    report: dict, *, include_cjk_prototype: bool = False, cjk_locales: tuple[str, ...] | None = None
+) -> list[str]:
     """Inspect a supplied pip report; never resolve, install or activate a profile.
 
-    The explicit CJK option adds its required exact identities to the existing
-    English checks. It does not certify completeness, licensing or release use.
+    The explicit CJK option defaults to both retained routes for compatibility.
+    A selected tuple checks only those routes' exact identities. It does not
+    certify completeness, licensing, native loading or release use.
     """
     if type(include_cjk_prototype) is not bool:
         return ["inactive CJK evidence selection must be an explicit boolean"]
+    if cjk_locales is not None and (
+        not include_cjk_prototype
+        or type(cjk_locales) is not tuple
+        or not cjk_locales
+        or any(type(locale) is not str or locale not in CJK_ROUTE_DEPENDENCIES for locale in cjk_locales)
+        or len(set(cjk_locales)) != len(cjk_locales)
+    ):
+        return ["CJK locales require an explicit nonempty distinct ja/zh tuple in CJK mode"]
     rows = report.get("install")
     if not isinstance(rows, list) or not rows:
         return ["missing resolved distribution inventory"]
@@ -75,7 +90,12 @@ def validate_graph(report: dict, *, include_cjk_prototype: bool = False) -> list
         observed[name] = version
         if name in FORBIDDEN:
             errors.append("forbidden customer speech dependency: " + name)
-    required = {**REQUIRED, **INACTIVE_CJK_REQUIRED} if include_cjk_prototype else REQUIRED
+    required = dict(REQUIRED)
+    if include_cjk_prototype:
+        selected = {"viola-misaki-cjk-prototype"}
+        for locale in cjk_locales if cjk_locales is not None else ("ja", "zh"):
+            selected.update(CJK_ROUTE_DEPENDENCIES[locale])
+        required.update({name: version for name, version in INACTIVE_CJK_REQUIRED.items() if name in selected})
     for name, version in required.items():
         if observed.get(name) != version:
             errors.append("missing or unreviewed customer speech distribution: " + name)
@@ -119,11 +139,13 @@ def main() -> int:
         action="store_true",
         help="Also require inactive CJK prototype pins; does not activate or qualify a customer profile",
     )
+    parser.add_argument("--cjk-locales", choices=("ja", "zh"), nargs="+", help="Explicit CJK routes; default is both")
     args = parser.parse_args()
     try:
         errors = validate_graph(
             json.loads(args.pip_report.read_text(encoding="utf-8")),
             include_cjk_prototype=args.include_cjk_prototype,
+            cjk_locales=tuple(args.cjk_locales) if args.cjk_locales is not None else None,
         )
         if args.frozen_inventory:
             data = json.loads(args.frozen_inventory.read_text(encoding="utf-8"))
