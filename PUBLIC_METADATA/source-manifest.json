@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "c131b561adb6e2da0124ef4d8a01cc0788d98b13",
-  "sha256": "4cde77d704ad1cef81fd87b34ccc7503e74cccd25f3be7b83fdb57f9ff598e0b",
+  "revision": "a0e2fe05d89a9e0b67c63403799655ae7c327ed2",
+  "sha256": "1c06d56c92abf02eac48a26679838aee9bf1da31564cc58c6c37145476408f4d",
   "files": [
     {
       "path": ".env.example",
@@ -3519,6 +3519,126 @@
       "bytes": 323
     },
     {
+      "path": "qualification/italian_hindi_subsets/README.md",
+      "sha256": "6e0da2894dc64a5da3b38a0d0d3076e47b8894f211c2082b8282d339585f74bb",
+      "bytes": 1843
+    },
+    {
+      "path": "qualification/italian_hindi_subsets/integrity.json",
+      "sha256": "440bc01f00842f3aa7c67552cfe5782741fd83c26d84217323fcd69d786403b3",
+      "bytes": 6884
+    },
+    {
+      "path": "qualification/italian_hindi_subsets/packet/README.md",
+      "sha256": "daed387f0c5aab9a0e694fb21b5ac5499a83a3bd6d9b8e69f07f15fa57e314b6",
+      "bytes": 1887
+    },
+    {
+      "path": "qualification/italian_hindi_subsets/packet/evidence/kokoro-config.json",
+      "sha256": "5abb01e2403b072bf03d04fde160443e209d7a0dad49a423be15196b9b43c17f",
+      "bytes": 2351
+    },
+    {
+      "path": "qualification/italian_hindi_subsets/packet/evidence/upstream-inputs.json",
+      "sha256": "cbce39bc8e0b57302c971f166e7ebfb6a6762b69aae1664df344c5929892613f",
+      "bytes": 2111
+    },
+    {
+      "path": "qualification/italian_hindi_subsets/packet/hindi-word-prototype/README.md",
+      "sha256": "8b9113e96d95361dad9de653ac8d5caea072cdd06ed564b709c835aa41b7d08c",
+      "bytes": 1811
+    },
+    {
+      "path": "qualification/italian_hindi_subsets/packet/hindi-word-prototype/data/map",
+      "sha256": "47fda9f103ed0b70b812e28cb7589b03e58f8c9025bae99c20a45d126d8e57bb",
+      "bytes": 833
+    },
+    {
+      "path": "qualification/italian_hindi_subsets/packet/hindi-word-prototype/data/post",
+      "sha256": "6f21a68256a0732c1d1019e895563bec66b82bea53b75947e0a1072a442ea3e4",
+      "bytes": 677
+    },
+    {
+      "path": "qualification/italian_hindi_subsets/packet/hindi-word-prototype/epitran-authors",
+      "sha256": "2b911411addd2de4081f4c037cb737d212d751b8175ee9c78145c599fcaaa342",
+      "bytes": 19
+    },
+    {
+      "path": "qualification/italian_hindi_subsets/packet/hindi-word-prototype/epitran-license",
+      "sha256": "bd46b34e5bc6a0b5042a7fb115058213b7ffa112a864124b0a67ecb92cf040d5",
+      "bytes": 1082
+    },
+    {
+      "path": "qualification/italian_hindi_subsets/packet/hindi-word-prototype/hindi_word.py",
+      "sha256": "9f1f192cb50864f49caeaf0ee609c4598859b64d342896662808192a658802fd",
+      "bytes": 8359
+    },
+    {
+      "path": "qualification/italian_hindi_subsets/packet/hindi-word-prototype/test_hindi_word.py",
+      "sha256": "04a1f1f5e2c3db7119053e71bf6db7566dc7e095b4ac7c08e2263a751eb78a23",
+      "bytes": 7795
+    },
+    {
+      "path": "qualification/italian_hindi_subsets/packet/italian-stress-prototype/README.md",
+      "sha256": "7e8a88b32b4a22238c62976c7168db49188c17aa021f7ad4d4a3ec95865104f8",
+      "bytes": 1982
+    },
+    {
+      "path": "qualification/italian_hindi_subsets/packet/italian-stress-prototype/data/map",
+      "sha256": "8207dbad4e96c104b25d23951be28e1e2eedfeaf73495b84938dbbbba60382ca",
+      "bytes": 363
+    },
+    {
+      "path": "qualification/italian_hindi_subsets/packet/italian-stress-prototype/data/post",
+      "sha256": "fd4104d79ff9896686e7b7e8075115445f733405939c29cc91e18a952b0d6593",
+      "bytes": 109
+    },
+    {
+      "path": "qualification/italian_hindi_subsets/packet/italian-stress-prototype/data/pre",
+      "sha256": "98e391381506cccf1ed489ff6dba9412be557924f2a0540fcaff32137bc39927",
+      "bytes": 189
+    },
+    {
+      "path": "qualification/italian_hindi_subsets/packet/italian-stress-prototype/data/strip",
+      "sha256": "ea73e40f19748cb5b516fb00adff366050ad9cd7b3df21cf3085c3a4c2b5c0fd",
+      "bytes": 3
+    },
+    {
+      "path": "qualification/italian_hindi_subsets/packet/italian-stress-prototype/epitran-authors",
+      "sha256": "2b911411addd2de4081f4c037cb737d212d751b8175ee9c78145c599fcaaa342",
+      "bytes": 19
+    },
+    {
+      "path": "qualification/italian_hindi_subsets/packet/italian-stress-prototype/epitran-license",
+      "sha256": "bd46b34e5bc6a0b5042a7fb115058213b7ffa112a864124b0a67ecb92cf040d5",
+      "bytes": 1082
+    },
+    {
+      "path": "qualification/italian_hindi_subsets/packet/italian-stress-prototype/italian_stress.py",
+      "sha256": "9dae920e97b519c08bbd1478e09c1333fa0e340f2ca8762cbfa1300d3f0bc0f2",
+      "bytes": 7824
+    },
+    {
+      "path": "qualification/italian_hindi_subsets/packet/italian-stress-prototype/test_italian_stress.py",
+      "sha256": "78f7b41aa94dc8aed5200e5ca38adc7b0738d6e5672f5db7867f6a4383dd7b9f",
+      "bytes": 6665
+    },
+    {
+      "path": "qualification/italian_hindi_subsets/packet/run_controls.py",
+      "sha256": "c9535cf260f104d6b10be1b7dbe942d460301c3879f9e0708aefaa9b16d3c0f5",
+      "bytes": 3568
+    },
+    {
+      "path": "qualification/italian_hindi_subsets/packet/run_mutations.py",
+      "sha256": "3d3d98886b06354f82f858afe454183b95839390f134b71932face3283da6b69",
+      "bytes": 5171
+    },
+    {
+      "path": "qualification/italian_hindi_subsets/run_qualification.py",
+      "sha256": "b04aebf098731313d8754fa04164b677c339e79f8dc25a379b17db8a8687d004",
+      "bytes": 8732
+    },
+    {
       "path": "qualification/romance_semantic_lowering/README.md",
       "sha256": "c175bce287d2460b8037ef6855203e74dd1750bd69088832942a44eb44bc4fdc",
       "bytes": 2452
@@ -5912,6 +6032,11 @@
       "path": "tests/public/test_execution_safety_contract.py",
       "sha256": "7129bfddb65c45e2e7a049018a40a6434614c952928ade88cccb95c2528ac7e8",
       "bytes": 41072
+    },
+    {
+      "path": "tests/public/test_italian_hindi_qualification_packet.py",
+      "sha256": "669785e09e44c290e92a54a6d44821bd943372244fbefcb6cd435a980d281483",
+      "bytes": 8502
     },
     {
       "path": "tests/public/test_kokoro_chunking.py",
@@ -10285,8 +10410,13 @@
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.jsx",
-      "sha256": "fd90d5d08efefef4c096cdc756e2f358da4a04f1eadd120ea2adfc9dd964a659",
-      "bytes": 198376
+      "sha256": "d3162559dac508aab8565765cc71fd4642abc1587cb32355e9a0834a8e7abb63",
+      "bytes": 199427
+    },
+    {
+      "path": "ui/react-app/src/components/SettingsModal.localDiscovery.test.jsx",
+      "sha256": "339856734ed4156ce8ab0d9d0ee6e1e319680d01504300baf67de68c50cc817d",
+      "bytes": 13452
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.outputDevice.test.jsx",
@@ -10465,8 +10595,13 @@
     },
     {
       "path": "ui/react-app/src/components/auth/SignUpScreen.jsx",
-      "sha256": "13ae7e49ca838f9ecee6aadc021dd0b5e6c40695b7aeaf68060800af45356876",
-      "bytes": 6374
+      "sha256": "06d62c8a8ec83e131662dc1068331a1ae5b3664f35c76658b08795f8d351a013",
+      "bytes": 6924
+    },
+    {
+      "path": "ui/react-app/src/components/auth/SignUpScreen.ownership.test.jsx",
+      "sha256": "566117662ab85d63ba26529e7d3fd4ea58001eeea7eeea4da82532442a7af5bc",
+      "bytes": 10791
     },
     {
       "path": "ui/react-app/src/components/auth/VerifyEmailScreen.jsx",
