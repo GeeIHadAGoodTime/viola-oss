@@ -356,7 +356,7 @@ class AdoptionProvenanceTests(unittest.TestCase):
                     row["upstream"]["git_blob"],
                 )
         actual = {
-            str(path.relative_to(package))
+            path.relative_to(package).as_posix()
             for path in package.rglob("*")
             if path.is_file() and "__pycache__" not in path.parts
         }
