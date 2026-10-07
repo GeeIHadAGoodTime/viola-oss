@@ -166,6 +166,7 @@ class LlmSpendReservation:
         settle_spend: bool = True,
         fail_closed_on_settle_error: bool = False,
         reserve_tokens: bool = True,
+        provider: object = None,
     ) -> None:
         self.user_id = user_id or ""
         self.model = model
@@ -174,6 +175,8 @@ class LlmSpendReservation:
         self.settle_spend = settle_spend
         self.fail_closed_on_settle_error = fail_closed_on_settle_error
         self.reserve_tokens = reserve_tokens
+        self.provider = provider
+        self.remotely_accounted = False
         self._reserved = False
         self._settled = False
         self._spend_reservation: Any | None = None
@@ -182,14 +185,20 @@ class LlmSpendReservation:
 
     async def reserve(self) -> None:
         from core.exceptions import LLMQuotaExceededError
-        from services.llm.managed_budget import reserve_managed_llm_spend_cap_async, user_uses_managed_llm
+        from services.llm.managed_budget import (
+            provider_managed_spend_accounted_remotely,
+            reserve_managed_llm_spend_cap_async,
+            user_uses_managed_llm,
+        )
 
         self._managed_llm = user_uses_managed_llm(self.user_id)
+        self.remotely_accounted = self._managed_llm and provider_managed_spend_accounted_remotely(self.provider)
 
         gate = await reserve_managed_llm_spend_cap_async(
             self.user_id,
             managed_llm=self._managed_llm,
             estimated_cents=estimated_spend_cents(self.model, self.estimated_usage),
+            provider=self.provider,
         )
         self._last_gate = gate
         if not gate.allowed:
@@ -243,7 +252,7 @@ class LlmSpendReservation:
             from services.llm.managed_budget import user_uses_managed_llm
 
             self._managed_llm = user_uses_managed_llm(self.user_id)
-        if not self.settle_spend or not self.user_id or not self._managed_llm:
+        if not self.settle_spend or not self.user_id or not self._managed_llm or self.remotely_accounted:
             return
 
         try:

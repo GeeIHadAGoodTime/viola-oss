@@ -1,0 +1,25 @@
+.billing-capacity { margin: 16px 0; padding: 16px; border: 1px solid var(--billing-border); border-radius: 16px; background: var(--billing-bg); color: var(--billing-text); font-size: 14px; line-height: 1.5; min-width: 0; }
+.billing-capacity h3, .billing-capacity h4 { margin: 0 0 12px; }
+.billing-capacity p { color: var(--billing-muted); overflow-wrap: anywhere; }
+.billing-capacity button, .billing-capacity-payment { min-height: 44px; padding: 10px 14px; border: 1px solid var(--billing-border); border-radius: 10px; background: transparent; color: var(--billing-text); font: inherit; cursor: pointer; }
+.billing-capacity button:disabled { opacity: .55; cursor: default; }
+.billing-capacity button[aria-pressed=true] { border-color: var(--billing-accent); box-shadow: inset 0 0 0 1px var(--billing-accent); }
+.billing-capacity .billing-capacity-primary { width: 100%; background: var(--billing-action); color: #fafafa; font-weight: 600; margin: 6px 0; }
+.billing-capacity :focus-visible { outline: 2px solid var(--billing-accent); outline-offset: 3px; }
+.billing-capacity a { color: var(--billing-accent); }
+.billing-capacity-summary { margin: 0 0 16px; }
+.billing-capacity-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; margin: 8px 0; }
+.billing-capacity-row dt { color: var(--billing-muted); }
+.billing-capacity-row dd { margin: 0; text-align: right; overflow-wrap: anywhere; }
+.billing-capacity-selector, .billing-capacity-quote, .billing-capacity-scheduled { border-top: 1px solid var(--billing-border); margin-top: 16px; padding-top: 16px; }
+.billing-capacity-interval, .billing-capacity-presets { display: flex; flex-wrap: wrap; gap: 8px; }
+.billing-capacity .billing-capacity-price { font-size: 26px; font-weight: 600; color: var(--billing-text); margin: 16px 0 0; }
+.billing-capacity input[type=range] { width: 100%; min-height: 44px; accent-color: var(--billing-accent); }
+.billing-capacity-input { display: flex; align-items: end; gap: 8px; margin: 8px 0 16px; }
+.billing-capacity-input label { flex: 1; min-width: 0; }
+.billing-capacity-input input { display: block; width: 100%; box-sizing: border-box; background: transparent; color: var(--billing-text); font: inherit; min-height: 44px; padding: 8px; border: 1px solid var(--billing-border); border-radius: 8px; }
+.billing-capacity-check { display: flex; align-items: flex-start; gap: 10px; min-height: 44px; margin: 16px 0; cursor: pointer; }
+.billing-capacity-check input { width: 20px; height: 20px; flex-shrink: 0; accent-color: var(--billing-accent); }
+.billing-capacity .billing-capacity-error { color: var(--billing-error); }
+.billing-capacity-payment { display: inline-flex; align-items: center; box-sizing: border-box; margin-right: 8px; }
+@media (max-width: 390px) { .billing-capacity { padding: 12px; } .billing-capacity-row { grid-template-columns: 1fr; gap: 0; } .billing-capacity-row dd { text-align: left; } }

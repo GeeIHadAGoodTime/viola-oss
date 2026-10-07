@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pipecat-ai"
-version = "0.0.108+viola.2"
+version = "0.0.108+viola.3"
 description = "An open source framework for voice (and multimodal) assistants"
 license = "BSD-2-Clause"
 license-files = ["LICENSE", "MODEL_LICENSES/*LICENSE", "MODEL_LICENSES/models.toml"]
@@ -79,7 +79,7 @@ heygen = [ "livekit>=1.0.13,<2", "pipecat-ai[websockets-base]" ]
 hume = [ "hume>=0.11.2,<1" ]
 inworld = []
 koala = [ "pvkoala~=2.0.3" ]
-kokoro = [ "kokoro-onnx>=0.5.0,<1", "requests>=2.32.5,<3" ]
+kokoro = [ "kokoro-onnx==0.4.9+viola.3", "requests>=2.32.5,<3" ]
 krisp = [ "pipecat-ai-krisp~=0.4.0" ]
 langchain = [ "langchain~=0.3.28", "langchain-community~=0.3.31", "langchain-openai~=0.3.29" ]
 lemonslice = [ "pipecat-ai[daily]" ]

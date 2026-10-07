@@ -1,0 +1,4 @@
+# Explicit English/Spanish/Mandarin candidate inputs; no profile activation.
+# Spanish uses the retained source component and needs no new distribution.
+-r requirements_customer_speech.txt
+./third_party/misaki_cjk_prototype[mandarin]

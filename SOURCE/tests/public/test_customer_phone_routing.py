@@ -52,7 +52,9 @@ class CustomerPhoneRouting(unittest.IsolatedAsyncioTestCase):
         call = call or self.t
         if customer is None:
             customer = self.customer.CustomerTokenizer.__new__(self.customer.CustomerTokenizer)
-        call.tts._kokoro = types.SimpleNamespace(tokenizer=types.SimpleNamespace(_customer=customer))
+        call.tts._kokoro = types.SimpleNamespace(
+            tokenizer=types.SimpleNamespace(_customer=customer), get_voices=lambda: list(REFERENCE_VOICES)
+        )
         return customer
 
     def last_context(self, call=None):
@@ -163,7 +165,7 @@ class CustomerPhoneRouting(unittest.IsolatedAsyncioTestCase):
                 await self.t.handler._switch_language(raw)
                 self.assertEqual(observed, [locale])
                 self.assertEqual(self.t.tts._settings.language, locale)
-                self.assertEqual(self.t.tts._settings.voice, "af_heart")
+                self.assertEqual(self.t.tts._settings.voice, "bf_emma" if locale == "en-gb" else "af_heart")
 
     async def test_unknown_or_throwing_customer_capability_fails_closed(self):
         def fail(locale):

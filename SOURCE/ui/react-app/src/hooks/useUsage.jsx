@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { apiFetch } from './useViolaApi';
 import { useAuth } from './useAuth';
 import { useAuth as useCloudAuth } from '../auth/useAuth';
+import { BILLING_ENTITLEMENT_EVENT } from './useBillingCapacity';
 
 const POLL_INTERVAL_MS = 60_000;
 
@@ -76,7 +77,11 @@ export function useUsage() {
     }
     fetchUsage();
     const id = setInterval(fetchUsage, POLL_INTERVAL_MS);
-    return () => clearInterval(id);
+    window.addEventListener(BILLING_ENTITLEMENT_EVENT, fetchUsage);
+    return () => {
+      clearInterval(id);
+      window.removeEventListener(BILLING_ENTITLEMENT_EVENT, fetchUsage);
+    };
   }, [isLoggedIn, fetchUsage]);
 
   return { usage, loading, error, refetch: fetchUsage };

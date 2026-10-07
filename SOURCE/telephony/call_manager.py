@@ -4113,10 +4113,11 @@ class CallManager:
         )
 
     def _user_has_outbound_capacity(self, user_id: str, user_tier: str) -> bool:
-        """Pre-check the per-plan concurrent limit before starting a queued call.
+        """Pre-check the account's concurrent limit before starting a queued call.
 
-        The billing gate enforces a per-user concurrent-call limit (FREE/PRO 1,
-        MAX 2 — ``PhoneBillingGate._RATE_LIMITS_BY_FAMILY``). Under the old
+        The billing gate enforces a per-user resource-family limit (legacy
+        FREE/PRO 1, MAX 2). Managed capacity increases preserve that limit.
+        Under the old
         global cap of 1 the pump only ever fired after the single live call
         ended, so a user's queued call always passed that gate. With the global
         cap raised, the pump fires while the user's own call is still live; if
@@ -4127,7 +4128,7 @@ class CallManager:
 
         Reads the limit from the live billing gate (``get_phone_billing()``,
         the same object ``_make_call_unqueued`` consults) via its public
-        ``concurrent_limit_for_tier``, so plan changes and the test-mode
+        ``concurrent_limit_for_tier`` with the actual owner, so account limits and the test-mode
         bypass apply identically to both checks. On any resolution failure —
         including a gate object without the method (unit-test mocks) — it
         returns True so the authoritative billing gate stays the decider. A
@@ -4137,7 +4138,7 @@ class CallManager:
         behavior).
         """
         try:
-            limit = int(get_phone_billing().concurrent_limit_for_tier(user_tier))
+            limit = int(get_phone_billing().concurrent_limit_for_tier(user_tier, user_id=user_id))
         except Exception:  # noqa: BLE001, RUF100 - any pre-check failure falls through to the authoritative gate
             logger.debug("Per-user concurrent-limit pre-check unavailable; deferring to billing gate")
             return True

@@ -1,6 +1,6 @@
 [project]
 name = "kokoro-onnx"
-version = "0.4.9+viola.2"
+version = "0.4.9+viola.3"
 description = "TTS with kokoro and onnx runtime"
 license = "MIT"
 license-files = ["LICENSE"]

@@ -67,21 +67,37 @@ class LocalTTS:
         return True
 
 
-def create_kokoro(config: AppConfig | None = None) -> KokoroTTSEngine | None:
+def create_kokoro(
+    config: AppConfig | None = None, *, customer_tokenizer=None, language: str = "en-us", voice: str | None = None
+) -> KokoroTTSEngine | None:
     """Create a Kokoro TTS engine instance.
 
     Returns None if the model files are not present on disk.
+    Explicit customer routes propagate construction failures without fallback.
     """
+    if customer_tokenizer is None and (language != "en-us" or voice is not None):
+        raise ValueError("Explicit customer routing requires its pronunciation composition")
     try:
         from voice.synthesis.kokoro_engine import KokoroTTSEngine
 
-        engine = KokoroTTSEngine(config=config)
+        explicit = (
+            {}
+            if customer_tokenizer is None
+            else {
+                "customer_tokenizer": customer_tokenizer,
+                "language": language,
+                "voice": voice,
+            }
+        )
+        engine = KokoroTTSEngine(config=config, **explicit)
         if engine.is_available():
             logger.info("Kokoro TTS engine created (model files present)")
             return engine
         logger.warning("Kokoro model files not found — skipping Kokoro backend")
         return None
     except Exception as exc:
+        if customer_tokenizer is not None:
+            raise
         logger.warning("Failed to create Kokoro TTS engine: %s", exc)
         return None
 
@@ -105,8 +121,10 @@ def _forward_generic_voice(config: AppConfig | None) -> None:
     generic_voice = getattr(config, "tts_voice", "default")
     kokoro_voice = getattr(config, "tts_kokoro_voice", "af_heart")
     if generic_voice != "default" and kokoro_voice == "af_heart":
+        from voice.customer_voice_routing import resolve_kokoro_voice_alias
+
         try:
-            config.tts_kokoro_voice = generic_voice
+            config.tts_kokoro_voice = resolve_kokoro_voice_alias(generic_voice)
         except AttributeError:
             pass
 
@@ -155,9 +173,29 @@ def reset_shared_kokoro_for_tests() -> None:
 class TTSFactory:
     """Factory for creating TTS components with fallback support."""
 
-    def __init__(self, config: AppConfig, policy: PolicyConfig | None = None):
+    def __init__(
+        self,
+        config: AppConfig,
+        policy: PolicyConfig | None = None,
+        *,
+        customer_tokenizer=None,
+        language: str = "en-us",
+        voice: str | None = None,
+    ):
         self.config = config
         self.policy = policy or self._create_default_policy()
+        self._customer_kwargs = None
+        if customer_tokenizer is not None:
+            from voice.customer_composition import require_customer_composition
+            from voice.customer_voice_routing import require_customer_voice
+
+            require_customer_composition(customer_tokenizer)
+            if not customer_tokenizer.supports_locale(language):
+                raise ValueError("The explicit customer locale is unavailable")
+            require_customer_voice(language, voice)
+            self._customer_kwargs = {"customer_tokenizer": customer_tokenizer, "language": language, "voice": voice}
+        elif language != "en-us" or voice is not None:
+            raise ValueError("Explicit customer routing requires its pronunciation composition")
         self._kokoro_tts: KokoroTTSEngine | None = None
         self._local_tts: LocalTTS | None = None
 
@@ -177,16 +215,21 @@ class TTSFactory:
             Primary TTS component.
         """
         backend = getattr(self.config, "tts_backend", "kokoro")
+        if self._customer_kwargs is not None and backend != "kokoro":
+            raise ValueError("The explicit customer speech route requires Kokoro")
 
         if backend == "kokoro":
             # If the user set a generic tts_voice and the Kokoro-specific
             # voice is still the default, forward the generic voice.
-            _forward_generic_voice(self.config)
+            if self._customer_kwargs is None:
+                _forward_generic_voice(self.config)
 
             kokoro = self.create_kokoro()
             if kokoro is not None:
                 logger.info("Using Kokoro TTS (neural, local)")
                 return kokoro
+            if self._customer_kwargs is not None:
+                raise RuntimeError("The explicit customer speech route is unavailable")
             logger.warning("Kokoro unavailable, falling back to pyttsx3")
             return self.create_local()
 
@@ -202,7 +245,12 @@ class TTSFactory:
         opener-cache build on the user's first minutes.
         """
         if self._kokoro_tts is None:
-            self._kokoro_tts = get_shared_kokoro(self.config)
+            if self._customer_kwargs is not None:
+                # An explicit composition owns its route and voice. Reusing the
+                # legacy singleton could substitute another request's locale.
+                self._kokoro_tts = create_kokoro(self.config, **self._customer_kwargs)
+            else:
+                self._kokoro_tts = get_shared_kokoro(self.config)
         return self._kokoro_tts
 
     def create_local(self) -> LocalTTS:
@@ -218,6 +266,10 @@ class TTSFactory:
         Fallback chain: configured primary → pyttsx3 local.
         """
         primary = self.create_primary()
+        if self._customer_kwargs is not None:
+            # The selected customer route must not turn an unsupported input or
+            # missing pronunciation asset into an unqualified system voice.
+            return primary
         fallback = self.create_local()
         return TTSFallbackChain(
             primary=primary,

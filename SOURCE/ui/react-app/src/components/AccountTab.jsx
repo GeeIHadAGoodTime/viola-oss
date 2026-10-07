@@ -20,6 +20,7 @@ import { authErrorMessage } from './auth/authValidation';
 import { decodePlanFromUser } from '../lib/auth_context';
 import { useCalendarProviders } from '../hooks/useCalendarProviders';
 import { useUsage } from '../hooks/useUsage';
+import BillingCapacityPanel from './BillingCapacityPanel';
 import { apiFetch } from '../hooks/useViolaApi';
 import { THEME as theme } from '../config';
 import { ACCEPTED_PRIVACY_VERSION, ACCEPTED_TERMS_VERSION } from '../auth/legalVersions';
@@ -760,9 +761,13 @@ const ProfileCard = ({ user, subscription, onLogout, logoutPending = false, addT
         </Button>
       )}
 
-      {!subscription?.hasPaidAccess && (
-        <UpgradePanel addToast={addToast} refreshUser={refreshUser} />
-      )}
+      <BillingCapacityPanel
+        key={user.id || user.email}
+        accountId={user.id || user.email}
+        refreshUser={refreshUser}
+        fallback={!subscription?.hasPaidAccess
+          ? <UpgradePanel addToast={addToast} refreshUser={refreshUser} /> : null}
+      />
 
       <div style={{ marginTop: '16px' }}>
         <Button variant="secondary" fullWidth onClick={onLogout} disabled={logoutPending}>
@@ -775,6 +780,7 @@ const ProfileCard = ({ user, subscription, onLogout, logoutPending = false, addT
 
 ProfileCard.propTypes = {
   user: PropTypes.shape({
+    id: PropTypes.string,
     email: PropTypes.string,
   }).isRequired,
   subscription: PropTypes.shape({

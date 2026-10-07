@@ -82,6 +82,9 @@ def language_to_kokoro_language(language: Language) -> str:
         Language.JA: "ja",
         Language.PT: "pt",
         Language.ZH: "zh",
+        # Kokoro's Chinese voices are Mandarin, including its explicit ISO code.
+        Language.CMN: "zh",
+        Language.CMN_CN: "zh",
     }
 
     return resolve_language(language, LANGUAGE_MAP, use_base_code=True)

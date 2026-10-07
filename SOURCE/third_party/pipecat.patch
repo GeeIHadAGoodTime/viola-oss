@@ -1,18 +1,44 @@
 --- a/pipecat/pyproject.toml
 +++ b/pipecat/pyproject.toml
-@@ -2 +2 @@
+@@ -1,13 +1,13 @@
+ [build-system]
 -requires = ["setuptools>=64", "setuptools_scm>=8"]
 +requires = ["setuptools==84.0.0"]
-@@ -7 +7 @@
+ build-backend = "setuptools.build_meta"
+ 
+ [project]
+ name = "pipecat-ai"
 -dynamic = ["version"]
-+version = "0.0.108+viola.2"
-@@ -10 +10 @@
++version = "0.0.108+viola.3"
+ description = "An open source framework for voice (and multimodal) assistants"
+ license = "BSD-2-Clause"
 -license-files = ["LICENSE"]
 +license-files = ["LICENSE", "MODEL_LICENSES/*LICENSE", "MODEL_LICENSES/models.toml"]
-@@ -29 +29 @@
+ readme = "README.md"
+ requires-python = ">=3.10"
+ keywords = ["webrtc", "audio", "video", "ai"]
+@@ -26,7 +26,7 @@
+     "docstring_parser>=0.16,<1",
+     "loguru~=0.7.3",
+     "Markdown>=3.7,<4",
 -    "nltk>=3.9.4,<4",
 +    "pysbd==0.3.4",
-@@ -163,16 +163,4 @@
+     "numpy>=1.26.4,<3",
+     "Pillow>=11.1.0,<13",
+     "protobuf>=6.31.1,<7",
+@@ -79,7 +79,7 @@
+ hume = [ "hume>=0.11.2,<1" ]
+ inworld = []
+ koala = [ "pvkoala~=2.0.3" ]
+-kokoro = [ "kokoro-onnx>=0.5.0,<1", "requests>=2.32.5,<3" ]
++kokoro = [ "kokoro-onnx==0.4.9+viola.3", "requests>=2.32.5,<3" ]
+ krisp = [ "pipecat-ai-krisp~=0.4.0" ]
+ langchain = [ "langchain~=0.3.28", "langchain-community~=0.3.31", "langchain-openai~=0.3.29" ]
+ lemonslice = [ "pipecat-ai[daily]" ]
+@@ -160,22 +160,10 @@
+ 
+ [tool.setuptools.package-data]
+ "pipecat" = ["py.typed"]
 -"pipecat.audio.dtmf" = [
 -    "src/pipecat/audio/dtmf/dtmf-0.wav",
 -    "src/pipecat/audio/dtmf/dtmf-1.wav",
@@ -33,6 +59,9 @@
 +"pipecat.services.aws_nova_sonic" = ["*.wav"]
 +"pipecat.audio.turn.smart_turn.data" = ["*.onnx"]
 +"pipecat.audio.vad.data" = ["*.onnx"]
+ 
+ [tool.pytest.ini_options]
+ addopts = "--verbose"
 --- a/pipecat/src/pipecat/services/camb/tts.py
 +++ b/pipecat/src/pipecat/services/camb/tts.py
 @@ -165 +165 @@
@@ -377,3 +406,15 @@ index 76c8704..582bbfc 100644
 +            "for authorized token issuance"
 +        )
 +
+--- a/pipecat/src/pipecat/services/kokoro/tts.py
++++ b/pipecat/src/pipecat/services/kokoro/tts.py
+@@ -82,6 +82,9 @@
+         Language.JA: "ja",
+         Language.PT: "pt",
+         Language.ZH: "zh",
++        # Kokoro's Chinese voices are Mandarin, including its explicit ISO code.
++        Language.CMN: "zh",
++        Language.CMN_CN: "zh",
+     }
+ 
+     return resolve_language(language, LANGUAGE_MAP, use_base_code=True)
