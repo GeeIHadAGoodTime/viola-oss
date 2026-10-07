@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "bf725ba738df7deebf49d0f1dd1e5960d847dd98",
-  "sha256": "fa52fef287a48cc0c4cdf5f50b0bd07d40c1d38e2d284e3a89df4ce203f2ab2a",
+  "revision": "a45d90d3acfaafc700b683ee14908b6f68899d77",
+  "sha256": "e3da1c95f02dcddca5cec1e12d106842b9d96e4cdd47ca31f5d46a3046b079f2",
   "files": [
     {
       "path": ".env.example",
@@ -10195,13 +10195,13 @@
     },
     {
       "path": "ui/react-app/src/components/BillingCapacityPanel.jsx",
-      "sha256": "48f8c6402794db5aa40d79f926252768da7a857b28616daa83364c3d3585737f",
-      "bytes": 17765
+      "sha256": "02aa111fa213473aec4bd746fe2617cb26dee49e749d047cb538c2ebf3fc69b7",
+      "bytes": 18711
     },
     {
       "path": "ui/react-app/src/components/BillingCapacityPanel.test.jsx",
-      "sha256": "c27e8320910958c200f54ae5e4957718925be18b7cb8cb078f2a4f652015151f",
-      "bytes": 15713
+      "sha256": "5d70ce3ef9c10cba0e7698a1a9fbc528d8b81a11d4f83165d1b46d6d6dc559a0",
+      "bytes": 16442
     },
     {
       "path": "ui/react-app/src/components/BugReportModal.jsx",
