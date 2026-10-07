@@ -1,0 +1,134 @@
+{
+  "identity": "new official candidate; historical per-file equality unknown",
+  "version": "3.1.0+2021-08-31",
+  "source_url": "https://cotonoha-dic.s3-ap-northeast-1.amazonaws.com/unidic-3.1.0.zip",
+  "archive_sha256": "638718c4c63625ab300de4c92c67925d54c0e9e3830009eaa992f29819d59c43",
+  "files": [
+    {
+      "path": "README",
+      "bytes": 4490,
+      "sha256": "8b9c0e67caf2b1e838d63dca5a2b7ff34fa8faafe461e942ca1469f90f126e9a"
+    },
+    {
+      "path": "char.bin",
+      "bytes": 262496,
+      "sha256": "dd31396563d8924645b80fd3c9aa7b13ca089d7748f25553a1d6bc3f9b511ae8"
+    },
+    {
+      "path": "char.def",
+      "bytes": 4292,
+      "sha256": "0790db12ab4f4d742b39b1737b9cce2a00c92220139a5bea9f0e8874898726e5"
+    },
+    {
+      "path": "dicrc",
+      "bytes": 1785,
+      "sha256": "9b7bd3dbfdb381a078375cdcccb1e69f60256d510a5c84a3e343ae20f98dc2ce"
+    },
+    {
+      "path": "feature.def",
+      "bytes": 8715,
+      "sha256": "b50a047e6caa8a7e4158fa736728e8de46cf009bbe575b239c33312e8b30cd14"
+    },
+    {
+      "path": "left-id.def",
+      "bytes": 1556924,
+      "sha256": "6e7fb23dda28ef49db733b56bc9217c39536df6ee5aa8c33d720e3d711a6baa6"
+    },
+    {
+      "path": "licenses/AUTHORS",
+      "bytes": 22,
+      "sha256": "a05bfdd3a9db36d9c64495f4a3d1824d05b95fbb4fc6dc07c660e91bc191c481"
+    },
+    {
+      "path": "licenses/BSD",
+      "bytes": 1515,
+      "sha256": "770a75de30705439084f869dbcb0bc4ebcffcb7c7124c0d74f5083170318a9bb"
+    },
+    {
+      "path": "licenses/COPYING",
+      "bytes": 210,
+      "sha256": "d44b49398a72590a675e55f8f7a7dbf57bb5b71a9e20ba250f09c0cc5986bef1"
+    },
+    {
+      "path": "licenses/GPL",
+      "bytes": 17991,
+      "sha256": "a137434196f5e39d8836de895866fcfea074ad1b28243174ca1c4a585a1229b0"
+    },
+    {
+      "path": "licenses/LGPL",
+      "bytes": 26428,
+      "sha256": "512d2d21b6b3384ba64781abb0208a1b87740bc31e2df48e2b206ddb7e4d5779"
+    },
+    {
+      "path": "matrix.bin",
+      "bytes": 480905780,
+      "sha256": "dd9ee6bc6bb137298cc88673e9c2143ddcf0808805c81becdd2ae5d08a869f90"
+    },
+    {
+      "path": "model.bin",
+      "bytes": 83718788,
+      "sha256": "409efa3e3de09d8822a3443d4f97c7fda77c4f8fc991f7abc064f685e346b1c9"
+    },
+    {
+      "path": "rewrite.def",
+      "bytes": 5076,
+      "sha256": "0ff0d86c7640997258ecce5468916f9eff3f2c5e5be5d43d372c0e62828deefe"
+    },
+    {
+      "path": "right-id.def",
+      "bytes": 1767025,
+      "sha256": "2ec747f614eb3e8a6378f42bfbc877dfeb37fe8a331f70d9f50e0c096d4b182d"
+    },
+    {
+      "path": "sys.dic",
+      "bytes": 243373840,
+      "sha256": "f019f95838242cd614953a25201ad0b623b9c1cbca90de2507df4510db1b192c"
+    },
+    {
+      "path": "unk.def",
+      "bytes": 1977,
+      "sha256": "4b40b5158f6bab29d3c0d3fd871055538241c7103406ba8e89e7d741ccf22dbc"
+    },
+    {
+      "path": "unk.dic",
+      "bytes": 5481,
+      "sha256": "a8e1067721cfd5cd7d4a17ddb53c77fb07f77fa20143b4589d7934c88f67d7e8"
+    }
+  ],
+  "feature_fields": [
+    "pos1",
+    "pos2",
+    "pos3",
+    "pos4",
+    "cType",
+    "cForm",
+    "lForm",
+    "lemma",
+    "orth",
+    "pron",
+    "orthBase",
+    "pronBase",
+    "goshu",
+    "iType",
+    "iForm",
+    "fType",
+    "fForm",
+    "iConType",
+    "fConType",
+    "type",
+    "kana",
+    "kanaBase",
+    "form",
+    "formBase",
+    "aType",
+    "aConType",
+    "aModType",
+    "lid",
+    "lemma_id"
+  ],
+  "system_dictionary": {
+    "version": 102,
+    "lexsize": 878989,
+    "charset": "utf8"
+  }
+}

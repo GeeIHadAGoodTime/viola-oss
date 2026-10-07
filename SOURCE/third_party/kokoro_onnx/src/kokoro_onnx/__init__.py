@@ -64,6 +64,8 @@ class Kokoro:
         voices_path: str,
         espeak_config: EspeakConfig | None = None,
         vocab_config: dict | str | None = None,
+        *,
+        customer_tokenizer=None,
     ):
         _require_customer_telemetry_opt_out()
         # Show useful information for bug reports
@@ -72,6 +74,9 @@ class Kokoro:
         )
         self.config = KoKoroConfig(model_path, voices_path, espeak_config)
         self.config.validate()
+        if customer_tokenizer is not None:
+            vocab = self._load_vocab(vocab_config)
+            self.tokenizer = Tokenizer(espeak_config, vocab=vocab, customer_tokenizer=customer_tokenizer)
 
         # See list of providers https://github.com/microsoft/onnxruntime/issues/22101#issuecomment-2357667377
         providers = ["CPUExecutionProvider"]
@@ -90,8 +95,9 @@ class Kokoro:
         self.sess = rt.InferenceSession(model_path, providers=providers)
         self.voices: np.ndarray = np.load(voices_path)
 
-        vocab = self._load_vocab(vocab_config)
-        self.tokenizer = Tokenizer(espeak_config, vocab=vocab)
+        if customer_tokenizer is None:
+            vocab = self._load_vocab(vocab_config)
+            self.tokenizer = Tokenizer(espeak_config, vocab=vocab)
 
     @classmethod
     def from_session(
@@ -100,16 +106,22 @@ class Kokoro:
         voices_path: str,
         espeak_config: EspeakConfig | None = None,
         vocab_config: dict | str | None = None,
+        *,
+        customer_tokenizer=None,
     ):
         _require_customer_telemetry_opt_out()
         instance = cls.__new__(cls)
         instance.sess = session
         instance.config = KoKoroConfig(session._model_path, voices_path, espeak_config)
         instance.config.validate()
+        if customer_tokenizer is not None:
+            vocab = instance._load_vocab(vocab_config)
+            instance.tokenizer = Tokenizer(espeak_config, vocab=vocab, customer_tokenizer=customer_tokenizer)
         instance.voices = np.load(voices_path)
 
-        vocab = instance._load_vocab(vocab_config)
-        instance.tokenizer = Tokenizer(espeak_config, vocab=vocab)
+        if customer_tokenizer is None:
+            vocab = instance._load_vocab(vocab_config)
+            instance.tokenizer = Tokenizer(espeak_config, vocab=vocab)
         return instance
 
     def _load_vocab(self, vocab_config: dict | str | None) -> dict:

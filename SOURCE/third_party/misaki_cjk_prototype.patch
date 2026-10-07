@@ -1,0 +1,799 @@
+--- /dev/null
++++ b/misaki_cjk_prototype/PROVENANCE.json
+@@ -0,0 +1,56 @@
++{
++  "status": "new reconstructed inactive source; old package acd08b18 not recovered as a whole",
++  "source_commit": "e820629b96334db28227df37f280e4836d46fadb",
++  "source_tree": "c5255b8adda62f2559f02d3a96329bc59759d468",
++  "upstream_files_recovered_identical": [
++    {
++      "path": "LICENSE",
++      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
++    },
++    {
++      "path": "misaki/num2kana.py",
++      "sha256": "26ca4b39ac7165104e53971bd2459df6466ff8140e1dac836a3bf1f9e811e2d2"
++    },
++    {
++      "path": "misaki/zh.py",
++      "sha256": "97d16aec581832845d2566cb24da2ba045d4552fb65a5017a6eac8feef654c81"
++    },
++    {
++      "path": "misaki/transcription.py",
++      "sha256": "14f0f1b5eb89c5b684229a30ae8b0c19c8266b537967786a2079ba887f5fbc32"
++    },
++    {
++      "path": "misaki/cutlet.py",
++      "sha256": "7695fc7d853ae4e99679dff4ca0c8404d4804a6fb1059a9d6ad02baeabc4d4de"
++    },
++    {
++      "path": "misaki/_licenses/pinyin-to-ipa-MIT.txt",
++      "sha256": "0bc847bdc29b0ba04afb7ef9660dc0ba9b8796a9a7a814d106db5aa373a8a86d"
++    },
++    {
++      "path": "misaki/_licenses/convert-numbers-to-japanese-MIT.txt",
++      "sha256": "a2d0e21948ca52f09926d17de411f1d989bf7b99ec05deb668c0358ce5196e57"
++    },
++    {
++      "path": "misaki/_licenses/cutlet-MIT.txt",
++      "sha256": "8736ad0d4636cb6dabae3e97e99c08f5c0c08b8c451f1d489b29a0d63bebf074"
++    },
++    {
++      "path": "misaki/data/ja_words.txt",
++      "sha256": "a93a8e8aee24db307a32becb8bf01c4c2908ecf37e6c91f7a705fafdfeba67ff"
++    }
++  ],
++  "authored_decimal_preparer_sha256": "ff9a4e3844fd948d42becda438d4e99927f3bc9afd11a08e044e800f964ca8bf",
++  "historical_authored_bridge_dispatcher_factory_bytes": "missing; replacement source needs fresh review",
++  "japanese_dictionary_receipt": {
++    "identity": "fresh official unidic-py 3.1.0+2021-08-31 candidate; old per-file equality unknown",
++    "archive_sha256": "638718c4c63625ab300de4c92c67925d54c0e9e3830009eaa992f29819d59c43",
++    "manifest_sha256": "5bdb8a6e9c5fbecd5b364cf284301f1dd44a715771ace8c6d19ccc6d31933cd7",
++    "required_files": 18,
++    "required_bytes": 811662835,
++    "original_notices_unchanged": true,
++    "native_execution": false
++  },
++  "dependency_versions": "same retained nine declarations; environments not restored or installed",
++  "old_wheel_identity_not_reused": true
++}
+--- /dev/null
++++ b/misaki_cjk_prototype/README.md
+@@ -0,0 +1,13 @@
++# Inactive reconstructed CJK companion
++
++This is new source after the 2026-10-06 workspace reset. It is not the old reviewed package or a new customer release. Version `0.9.4+viola.cjk.2` distinguishes the reconstruction from the lost `.1` wheel. No registry publication, profile activation or installed/native qualification is implied.
++
++The four required official Misaki modules, `ja_words.txt`, Apache license and three inherited MIT notices were recovered from authenticated Git objects and match the previously recorded hashes. The decimal preparer was reconstructed from retained source text and matches its original hash. The authored bridge, dispatcher and runtime forwarding are new source and require fresh tests/review.
++
++The old Japanese dictionary receipt was lost. A fresh official unidic-py 3.1.0+2021-08-31 candidate now supplies eighteen exact file identities, including its unchanged notices. The new factory hashes these files in 1 MiB chunks before imports, captures the canonical directory, supplies an explicit neutral configuration and the verified 29-field schema, and checks the dictionary actually selected. It never probes an ambient dictionary. This source/asset qualification does not establish native Japanese initialization, Windows loading or old per-file equality. Mandarin and English dependencies also need their deleted environments restored before real G2P replay. No original native/audio receipt is reused as current proof.
++
++These eight `misaki` payloads are additions to the existing `viola-misaki-en` files in one physical installed package directory. This distribution owns no `misaki/__init__.py`, `misaki/data/__init__.py`, English module or lexicon. Separate source roots do not automatically merge with the English regular package. Packaging must verify the combined physical layout and retain the English bytes exactly.
++
++The declared dependency versions are the same previously investigated versions; this reconstruction does not install them or assert complete transitive license/native-wheel qualification. Original Apache and MIT notices are retained. The existing Fugashi/MeCab, UniDic and other dependency attribution/terms remain separate final bundle obligations. No historical fork lineage or new license election is inferred.
++
++All eight language families and 54 voice arrays remain required. General Italian/Hindi, inactive Romance integration, acoustic quality, frozen/native compatibility, signed inclusion and installed proof stay open. Caller-selected voice identity and application defaults remain unchanged.
+--- /dev/null
++++ b/misaki_cjk_prototype/misaki/_licenses/convert-numbers-to-japanese-MIT.txt
+@@ -0,0 +1,20 @@
++The MIT License (MIT)
++Copyright (c) 2018 David Wilson, https://github.com/Greatdane
++
++Permission is hereby granted, free of charge, to any person obtaining a copy
++of this software and associated documentation files (the "Software"), to deal
++in the Software without restriction, including without limitation the rights
++to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
++copies of the Software, and to permit persons to whom the Software is
++furnished to do so, subject to the following conditions:
++
++The above copyright notice and this permission notice shall be included in
++all copies or substantial portions of the Software.
++
++THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
++IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
++FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
++AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
++LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
++OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
++THE SOFTWARE.
+--- /dev/null
++++ b/misaki_cjk_prototype/misaki/_licenses/cutlet-MIT.txt
+@@ -0,0 +1,21 @@
++MIT License
++
++Copyright (c) 2020 Paul O'Leary McCann
++
++Permission is hereby granted, free of charge, to any person obtaining a copy
++of this software and associated documentation files (the "Software"), to deal
++in the Software without restriction, including without limitation the rights
++to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
++copies of the Software, and to permit persons to whom the Software is
++furnished to do so, subject to the following conditions:
++
++The above copyright notice and this permission notice shall be included in all
++copies or substantial portions of the Software.
++
++THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
++IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
++FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
++AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
++LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
++OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
++SOFTWARE.
+--- /dev/null
++++ b/misaki_cjk_prototype/misaki/_licenses/pinyin-to-ipa-MIT.txt
+@@ -0,0 +1,21 @@
++MIT License
++
++Copyright (c) 2024 Stefan Taubert
++
++Permission is hereby granted, free of charge, to any person obtaining a copy
++of this software and associated documentation files (the "Software"), to deal
++in the Software without restriction, including without limitation the rights
++to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
++copies of the Software, and to permit persons to whom the Software is
++furnished to do so, subject to the following conditions:
++
++The above copyright notice and this permission notice shall be included in all
++copies or substantial portions of the Software.
++
++THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
++IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
++FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
++AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
++LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
++OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
++SOFTWARE.
+--- /dev/null
++++ b/misaki_cjk_prototype/pyproject.toml
+@@ -0,0 +1,32 @@
++[build-system]
++requires = ["hatchling==1.29.0"]
++build-backend = "hatchling.build"
++
++[project]
++name = "viola-misaki-cjk-prototype"
++version = "0.9.4+viola.cjk.2"
++description = "Inactive reconstructed CJK companion for the retained Viola English pronunciation fork"
++requires-python = ">=3.11"
++license = "Apache-2.0 AND MIT"
++license-files = ["LICENSE", "misaki/_licenses/*.txt"]
++readme = "README.md"
++dependencies = [
++  "viola-misaki-en==0.9.4+viola.1",
++  "fugashi==1.5.2",
++  "jaconv==0.5.0",
++  "mojimoji==0.0.13",
++  "pypinyin==0.55.0",
++  "cn2an==0.5.24",
++  "jieba==0.42.1",
++  "ordered-set==4.1.0",
++  "proces==0.1.7",
++]
++
++[tool.hatch.build.targets.wheel]
++packages = ["misaki", "viola_cjk"]
++
++[tool.hatch.build.targets.wheel.force-include]
++"misaki/data/ja_words.txt" = "misaki/data/ja_words.txt"
++"PROVENANCE.json" = "viola_cjk/PROVENANCE.json"
++"viola_cjk/unidic.json" = "viola_cjk/unidic.json"
++"viola_cjk/mecabrc" = "viola_cjk/mecabrc"
+--- /dev/null
++++ b/misaki_cjk_prototype/viola_cjk/__init__.py
+@@ -0,0 +1 @@
++"""Inactive explicit CJK pronunciation components; importing selects nothing."""
+--- /dev/null
++++ b/misaki_cjk_prototype/viola_cjk/coverage.py
+@@ -0,0 +1,243 @@
++"""Reconstructed explicit CJK/English dispatcher, inactive pending fresh review.
++
++Tracks complete source spans, validates selected pinyin before IPA conversion,
++and serializes temporary Cutlet observation across all route instances. This
++file is new source; historical missing receipts do not qualify these bytes.
++"""
++
++from __future__ import annotations
++
++import re
++import threading
++
++from .customer_english_span import CustomerEnglishBridge
++
++_CUTLET_LOCK = threading.RLock()
++_NUMBER = re.compile(r"[-−]?(?:[0-9]+(?:\.[0-9]+)?|\.[0-9]+)")
++_PINYIN = re.compile(r"[a-züv]+[1-5]\Z")
++_OVERRIDE = re.compile(r"\[[^\]]+\]\([^)]*\)")
++_ENGLISH = re.compile(r"[A-Za-z]+(?:['’-][A-Za-z]+)*")
++_PUNCTUATION = {
++    "。": ".",
++    "、": ",",
++    "，": ",",
++    "！": "!",
++    "？": "?",
++    "：": ":",
++    "；": ";",
++    "「": "“",
++    "」": "”",
++    "『": "“",
++    "』": "”",
++    "（": "(",
++    "）": ")",
++}
++_ASCII_PUNCTUATION = frozenset('.,!?;:()“”"')
++
++
++def _han(char):
++    return "\u3400" <= char <= "\u9fff" or "\U00020000" <= char <= "\U0002ebef"
++
++
++def _japanese(char):
++    return _han(char) or "\u3041" <= char <= "\u30ff" or "\uff66" <= char <= "\uff9f" or char in "々〆"
++
++
++class CoveredCJK:
++    def __init__(
++        self,
++        *,
++        locale,
++        vocab,
++        english,
++        chinese=None,
++        jieba=None,
++        pinyin=None,
++        pinyin_style=None,
++        cutlet=None,
++        number_preparer=None,
++    ):
++        if locale not in {"ja", "zh"} or type(english) is not CustomerEnglishBridge:
++            raise ValueError("Explicit CJK locale and bound English bridge are required")
++        if english.vocab != vocab:
++            raise ValueError("CJK and English vocabularies differ")
++        if locale == "ja" and cutlet is None:
++            raise ValueError("Japanese frontend is missing")
++        if locale == "zh" and any(v is None for v in (chinese, jieba, pinyin, pinyin_style)):
++            raise ValueError("Mandarin frontend components are missing")
++        self.locale, self.vocab, self.english = locale, dict(vocab), english
++        self.chinese, self.jieba, self.pinyin, self.pinyin_style = chinese, jieba, pinyin, pinyin_style
++        self.cutlet, self.number_preparer = cutlet, number_preparer
++
++    def _phones(self, phones):
++        if not isinstance(phones, str) or not phones.strip() or any(c not in self.vocab for c in phones):
++            raise ValueError("CJK phonemes are empty or unsupported")
++        return phones
++
++    def _native(self, source):
++        if self.locale == "zh":
++            words = list(self.jieba.lcut(source, cut_all=False))
++            if not words or any(not isinstance(w, str) or not w for w in words) or "".join(words) != source:
++                raise ValueError("Mandarin segmentation did not consume its exact source")
++            output, traces = [], []
++            for word in words:
++                readings = self.pinyin(
++                    word, style=self.pinyin_style, neutral_tone_with_five=True, errors=lambda unknown: [unknown]
++                )
++                if (
++                    not isinstance(readings, (list, tuple))
++                    or len(readings) != len(word)
++                    or any(not isinstance(p, str) or _PINYIN.fullmatch(p) is None for p in readings)
++                ):
++                    raise ValueError("Mandarin reading contains an unconsumed source syllable")
++                # Use the exact selected readings. Do not invoke a second global
++                # word segmenter or pinyin lookup through legacy_call/word2ipa.
++                phones = "".join(self.chinese.py2ipa(p) for p in readings)
++                output.append(self._phones(phones))
++                traces.append({"source": word, "readings": list(readings), "phonemes": phones})
++            return " ".join(output), traces
++        with _CUTLET_LOCK:
++            cutlet = self.cutlet
++            original = cutlet._romaji_word
++            had_instance = "_romaji_word" in vars(cutlet)
++            prior = vars(cutlet).get("_romaji_word")
++            records = []
++
++            def observed(word):
++                if not isinstance(word.surface, str) or not word.surface or word.char_type != 6:
++                    raise ValueError("Japanese source word was not consumed as a reading")
++                hira = word.hira
++                if not isinstance(hira, str) or not hira:
++                    raise ValueError("Japanese reading is missing")
++                for i, c in enumerate(hira):
++                    if c in "゙゚々〃ゝゞヽヾ" or (c not in cutlet.table and c not in "っんー"):
++                        raise ValueError("Japanese reading contains an unsupported or dropped character")
++                    if c in "ゃゅょぁぃぅぇぉ" and (i == 0 or hira[i - 1 : i + 1] not in cutlet.table):
++                        raise ValueError("Japanese small kana has no consumed predecessor")
++                    if c == "ー" and i == 0:
++                        raise ValueError("Japanese length marker has no consumed predecessor")
++                phones = self._phones(original(word))
++                records.append({"source": word.surface, "reading": hira, "phonemes": phones})
++                return phones
++
++            try:
++                cutlet._romaji_word = observed
++                expected = cutlet._normalize_text(source)
++                phones, _ = cutlet(source)
++            finally:
++                if had_instance:
++                    cutlet._romaji_word = prior
++                else:
++                    del cutlet._romaji_word
++            if not records or "".join(r["source"] for r in records) != expected:
++                raise ValueError("Japanese frontend did not consume its exact normalized source")
++            return self._phones(phones), records
++
++    def phonemize(self, source):
++        if not isinstance(source, str) or not source.strip() or len(source) > 5000:
++            raise ValueError("Expected 1 to 5000 source characters")
++        spans, output, cursor = [], [], 0
++        native = _han if self.locale == "zh" else _japanese
++        while cursor < len(source):
++            start = cursor
++            char = source[cursor]
++            trace = None
++            if char.isspace():
++                while cursor < len(source) and source[cursor].isspace():
++                    cursor += 1
++                phones, kind = " ", "space"
++            elif char in _PUNCTUATION or char in _ASCII_PUNCTUATION:
++                # Decimal points at the start of a numeric token are not punctuation.
++                if char == "." and cursor + 1 < len(source) and source[cursor + 1].isdigit():
++                    kind = "number"
++                else:
++                    cursor += 1
++                    phones, kind = _PUNCTUATION.get(char, char), "punctuation"
++            elif char.isascii() and char.isdigit() or char in "-−":
++                kind = "number"
++            elif native(char):
++                cursor += 1
++                while cursor < len(source) and native(source[cursor]):
++                    cursor += 1
++                phones, trace = self._native(source[start:cursor])
++                kind = "cjk"
++            else:
++                atom = _OVERRIDE.match(source, cursor) or _ENGLISH.match(source, cursor)
++                if atom is None:
++                    raise ValueError("Unknown source requires explicit pronunciation")
++                cursor = atom.end()
++                # Preserve contiguous English word context, including articles
++                # and existing explicit overrides, rather than isolating words.
++                while cursor < len(source):
++                    gap = re.match(r"[ \t]+", source[cursor:])
++                    if gap is None:
++                        break
++                    end = cursor + gap.end()
++                    following = _OVERRIDE.match(source, end) or _ENGLISH.match(source, end)
++                    if following is None:
++                        break
++                    cursor = following.end()
++                if cursor < len(source) and source[cursor].isascii() and source[cursor].isalnum():
++                    raise ValueError("Mixed identifier cannot be split into a number")
++                trace = CustomerEnglishBridge.phonemize(self.english, source[start:cursor])
++                phones, kind = trace["phonemes"], "english"
++            if kind == "number":
++                if self.number_preparer is None:
++                    raise ValueError("Locale number converter is missing")
++                match = _NUMBER.match(source, start)
++                if match is None or not any(c.isdigit() for c in match.group()):
++                    raise ValueError("Malformed numeric source")
++                cursor = match.end()
++                if (
++                    start
++                    and source[start - 1].isascii()
++                    and source[start - 1].isalnum()
++                    or cursor < len(source)
++                    and source[cursor] in ":+-−"
++                    or cursor + 1 < len(source)
++                    and source[cursor] in ".,"
++                    and source[cursor + 1].isdigit()
++                ):
++                    raise ValueError("Time, identifier or grouped number requires explicit disambiguation")
++                value = match.group()
++                unit_match = re.match(r"[ \t]+(USD|JPY|CNY)(?![A-Za-z0-9])", source[cursor:])
++                unit = unit_match.group(1) if unit_match else None
++                if unit_match:
++                    cursor += unit_match.end()
++                elif cursor < len(source) and source[cursor].isascii() and source[cursor].isalpha():
++                    raise ValueError("Unresolved unit or numeric identifier")
++                trace = self.number_preparer(value, self.locale, unit=unit)
++                if (
++                    not isinstance(trace, dict)
++                    or trace.get("source_value") != value
++                    or trace.get("locale") != self.locale
++                    or trace.get("unit") != unit
++                ):
++                    raise ValueError("Number preparation lost its source value or unit")
++                chunks = trace.get("spoken_tokens") if self.locale == "ja" else [trace.get("spoken_text")]
++                if (
++                    not isinstance(chunks, list)
++                    or not chunks
++                    or any(not isinstance(x, str) or not x or any(not native(c) for c in x) for x in chunks)
++                ):
++                    raise ValueError("Number preparation contains unconsumed characters")
++                converted = [self._native(chunk) for chunk in chunks]
++                phones = " ".join(part[0] for part in converted)
++                trace = dict(trace, converted_tokens=[part[1] for part in converted])
++            if cursor <= start:
++                raise ValueError("No source progress")
++            self._phones(phones) if kind != "space" else None
++            output.append(phones)
++            spans.append(
++                {
++                    "start": start,
++                    "end": cursor,
++                    "source": source[start:cursor],
++                    "kind": kind,
++                    "phonemes": phones,
++                    "trace": trace,
++                }
++            )
++        if "".join(span["source"] for span in spans) != source:
++            raise ValueError("Incomplete source coverage")
++        return {"source": source, "locale": self.locale, "phonemes": "".join(output), "spans": spans}
+--- /dev/null
++++ b/misaki_cjk_prototype/viola_cjk/customer_english_span.py
+@@ -0,0 +1,63 @@
++"""Reconstructed inactive bridge to the exact retained English customer source.
++
++New source after the workspace reset; historical bridge receipts do not qualify
++these bytes. No raw callback or equality-to-spelling heuristic is accepted.
++"""
++
++from __future__ import annotations
++
++import hashlib
++import inspect
++import sys
++from pathlib import Path
++from types import CodeType
++
++_ENGLISH_SHA256 = "b333138ac21703a61d9e05e4f19967b4823df24133a55ed924a601c6598055eb"
++
++
++def _find_code(code, qualname):
++    for value in code.co_consts:
++        if isinstance(value, CodeType):
++            if value.co_qualname == qualname:
++                return value
++            nested = _find_code(value, qualname)
++            if nested is not None:
++                return nested
++    return None
++
++
++class CustomerEnglishBridge:
++    def __init__(self, tokenizer, locale="en-us"):
++        from voice.customer_pronunciation import CustomerTokenizer
++
++        if type(tokenizer) is not CustomerTokenizer:
++            raise ValueError("English spans require the exact customer tokenizer")
++        if not isinstance(locale, str) or not CustomerTokenizer.supports_locale(locale):
++            raise ValueError("English span locale is unsupported")
++        path = Path(inspect.getfile(CustomerTokenizer))
++        raw = path.read_bytes()
++        if hashlib.sha256(raw).hexdigest() != _ENGLISH_SHA256:
++            raise ValueError("English source differs from the retained source binding")
++        # Compile for comparison only. Never execute a reconstructed code object.
++        module_code = compile(raw, str(path), "exec", dont_inherit=True, optimize=sys.flags.optimize)
++        expected = _find_code(module_code, "CustomerTokenizer.phonemize")
++        if expected is None or CustomerTokenizer.phonemize.__code__ != expected:
++            raise ValueError("English pronunciation implementation differs from its source")
++        self._method = CustomerTokenizer.phonemize
++        self._tokenizer = tokenizer
++        self.locale = locale.lower().replace("_", "-")
++        self.vocab = dict(tokenizer.vocab)
++
++    def phonemize(self, source):
++        from voice.customer_pronunciation import CustomerTokenizer
++
++        if (
++            type(self._tokenizer) is not CustomerTokenizer
++            or CustomerTokenizer.phonemize is not self._method
++            or self._tokenizer.vocab != self.vocab
++        ):
++            raise ValueError("English span ownership or vocabulary changed")
++        phones = self._method(self._tokenizer, source, lang=self.locale, norm=False)
++        if not isinstance(phones, str) or not phones or any(c not in self.vocab for c in phones):
++            raise ValueError("English span phonemes are incomplete")
++        return {"source": source, "locale": self.locale, "phonemes": phones}
+--- /dev/null
++++ b/misaki_cjk_prototype/viola_cjk/japanese_factory.py
+@@ -0,0 +1,92 @@
++"""New explicit Japanese factory bound to freshly recovered official dictionary.
++
++No ambient dictionary, default Tagger constructor, download or model inference.
++The source/API/schema has fresh static evidence; native behavior still needs its
++own qualification. Historical missing factory receipts are not reused.
++"""
++
++from __future__ import annotations
++
++from collections import namedtuple
++import hashlib
++import importlib.metadata
++import json
++from pathlib import Path
++import shlex
++
++_MANIFEST_SHA256 = "5bdb8a6e9c5fbecd5b364cf284301f1dd44a715771ace8c6d19ccc6d31933cd7"
++_MECABRC_SHA256 = "909a7044e39b38dbd39d0d44523ce3b9c14e41b11f7b55495621408633f3f779"
++
++
++def _manifest():
++    path = Path(__file__).with_name("unidic.json")
++    raw = path.read_bytes()
++    if hashlib.sha256(raw).hexdigest() != _MANIFEST_SHA256:
++        raise ValueError("Japanese dictionary manifest differs")
++    result = json.loads(raw)
++    if len(result["files"]) != 18 or len({row["path"] for row in result["files"]}) != 18:
++        raise ValueError("Japanese dictionary manifest is incomplete")
++    fields = result["feature_fields"]
++    if len(fields) != 29 or fields[9] != "pron" or fields[20] != "kana":
++        raise ValueError("Japanese dictionary feature schema differs")
++    return result
++
++
++def validate_dictionary(dictionary_dir):
++    # Capture the canonical identity before hashing; never return the movable
++    # caller alias and resolve it again only after native construction.
++    root = Path(dictionary_dir).resolve(strict=True)
++    if not root.is_dir():
++        raise ValueError("An explicit Japanese dictionary directory is required")
++    manifest = _manifest()
++    expected = {row["path"] for row in manifest["files"]}
++    actual = {p.relative_to(root).as_posix() for p in root.rglob("*") if p.is_file()}
++    if actual != expected:
++        raise ValueError("Japanese dictionary files are incomplete or unexpected")
++    for row in manifest["files"]:
++        path = root / row["path"]
++        if path.is_symlink() or path.resolve().parent != (root / Path(row["path"]).parent).resolve():
++            raise ValueError("Japanese dictionary leaf must be an owned regular file")
++        if path.stat().st_size != row["bytes"]:
++            raise ValueError("Japanese dictionary file size differs: " + row["path"])
++        digest = hashlib.sha256()
++        with path.open("rb") as stream:
++            for block in iter(lambda: stream.read(1024 * 1024), b""):
++                digest.update(block)
++        if digest.hexdigest() != row["sha256"]:
++            raise ValueError("Japanese dictionary file identity differs: " + row["path"])
++    return root
++
++
++def create_cutlet(dictionary_dir):
++    root = validate_dictionary(dictionary_dir)
++    manifest = _manifest()
++    rc = Path(__file__).with_name("mecabrc").resolve(strict=True)
++    if hashlib.sha256(rc.read_bytes()).hexdigest() != _MECABRC_SHA256:
++        raise ValueError("Explicit Japanese runtime configuration differs")
++    if importlib.metadata.version("fugashi") != "1.5.2":
++        raise RuntimeError("The pinned Fugashi version is required")
++    # Imports happen only after exact dictionary/notice/config validation.
++    from fugashi import GenericTagger
++    from misaki.cutlet import Cutlet, HEPBURN
++
++    features = namedtuple("ViolaUniDicFeatures29", manifest["feature_fields"], defaults=(None,) * 29)
++    arguments = "-r " + shlex.quote(str(rc)) + " -d " + shlex.quote(str(root))
++    tagger = GenericTagger(arguments, wrapper=features)
++    info = tagger.dictionary_info
++    expected = manifest["system_dictionary"]
++    if (
++        not isinstance(info, list)
++        or len(info) != 1
++        or Path(info[0].get("filename", "")).resolve() != root / "sys.dic"
++        or str(info[0].get("charset", "")).lower().replace("-", "") != expected["charset"]
++        or info[0].get("version") != expected["version"]
++        or info[0].get("size") != expected["lexsize"]
++    ):
++        raise ValueError("Native Japanese dictionary selection differs from the verified source")
++    # Bypass Cutlet.__init__: its default Tagger probes ambient unidic packages.
++    cutlet = Cutlet.__new__(Cutlet)
++    cutlet.tagger = tagger
++    cutlet.table = dict(HEPBURN)
++    cutlet.exceptions = {}
++    return cutlet
+--- /dev/null
++++ b/misaki_cjk_prototype/viola_cjk/locale_numbers.py
+@@ -0,0 +1,63 @@
++"""Unintegrated exact-decimal preparation for CJK qualification.
++
++Callers supply the already-disambiguated unit. This module does not infer a
++currency from a symbol, parse times/identifiers, change product settings, or
++claim locale/audio qualification. Fractions remain strings throughout.
++"""
++
++from __future__ import annotations
++
++import re
++from typing import Callable
++
++_NUMBER = re.compile(r"([-−]?)(0|[1-9][0-9]*)?(?:\.([0-9]{1,20}))?\Z")
++_DIGITS_ZH = tuple("零一二三四五六七八九")
++_DIGITS_JA = ("ゼロ", "いち", "に", "さん", "よん", "ご", "ろく", "なな", "はち", "きゅう")
++# Japanese CNY reading: https://www.smbcnikko.co.jp/terms/japan/o/J0859.html
++_UNITS = {
++    "zh": {"USD": "美元", "JPY": "日元", "CNY": "人民币元"},
++    "ja": {"USD": "米ドル", "JPY": "円", "CNY": "じんみんげん"},
++}
++
++
++def prepare_exact_number(
++    value: str, locale: str, *, integer_converter: Callable[[str], str], unit: str | None = None
++) -> dict:
++    if locale not in _UNITS or not isinstance(value, str):
++        raise ValueError("An explicit supported locale and exact decimal string are required")
++    match = _NUMBER.fullmatch(value)
++    if match is None or (match.group(2) is None and match.group(3) is None):
++        raise ValueError("Value is outside the bounded exact-decimal contract")
++    sign, integer, fraction = match.groups()
++    # Omitted whole digits mean exact zero, without changing the raw source trace.
++    integer = integer or "0"
++    if len(integer) > (9 if locale == "ja" else 16):
++        raise ValueError("Integer exceeds the pinned locale converter's supported range")
++    if unit is not None and unit not in _UNITS[locale]:
++        raise ValueError("Unit must already be resolved to a supported explicit currency code")
++    whole = integer_converter(integer)
++    if not isinstance(whole, str) or not whole or any(c.isdigit() for c in whole):
++        raise ValueError("Locale integer conversion is incomplete")
++    digits = _DIGITS_JA if locale == "ja" else _DIGITS_ZH
++    prefix = ("マイナス" if locale == "ja" else "负") if sign else ""
++    point = "てん" if locale == "ja" else "点"
++    tail = point + "".join(digits[int(c)] for c in fraction) if fraction is not None else ""
++    suffix = _UNITS[locale].get(unit, "")
++    # Keep numeric reading units apart in Japanese: joined kana can be
++    # retokenized as unrelated words and homographic currency kanji misread.
++    spoken_tokens = ([prefix] if prefix else []) + whole.split()
++    if fraction is not None:
++        spoken_tokens += [point] + [digits[int(c)] for c in fraction]
++    if suffix:
++        spoken_tokens.append(suffix)
++    spoken = " ".join(spoken_tokens) if locale == "ja" else prefix + whole + tail + suffix
++    return {
++        "source_value": value,
++        "locale": locale,
++        "unit": unit,
++        "spoken_text": spoken,
++        "spoken_tokens": spoken_tokens,
++        "fraction_digits": fraction,
++        "fraction_digit_names": [digits[int(c)] for c in fraction or ""],
++        "release_eligible": False,
++    }
+--- /dev/null
++++ b/misaki_cjk_prototype/viola_cjk/mecabrc
+@@ -0,0 +1 @@
++# Explicit empty runtime configuration. Dictionary selection is supplied with -d.
+--- /dev/null
++++ b/misaki_cjk_prototype/viola_cjk/unidic.json
+@@ -0,0 +1,134 @@
++{
++  "identity": "new official candidate; historical per-file equality unknown",
++  "version": "3.1.0+2021-08-31",
++  "source_url": "https://cotonoha-dic.s3-ap-northeast-1.amazonaws.com/unidic-3.1.0.zip",
++  "archive_sha256": "638718c4c63625ab300de4c92c67925d54c0e9e3830009eaa992f29819d59c43",
++  "files": [
++    {
++      "path": "README",
++      "bytes": 4490,
++      "sha256": "8b9c0e67caf2b1e838d63dca5a2b7ff34fa8faafe461e942ca1469f90f126e9a"
++    },
++    {
++      "path": "char.bin",
++      "bytes": 262496,
++      "sha256": "dd31396563d8924645b80fd3c9aa7b13ca089d7748f25553a1d6bc3f9b511ae8"
++    },
++    {
++      "path": "char.def",
++      "bytes": 4292,
++      "sha256": "0790db12ab4f4d742b39b1737b9cce2a00c92220139a5bea9f0e8874898726e5"
++    },
++    {
++      "path": "dicrc",
++      "bytes": 1785,
++      "sha256": "9b7bd3dbfdb381a078375cdcccb1e69f60256d510a5c84a3e343ae20f98dc2ce"
++    },
++    {
++      "path": "feature.def",
++      "bytes": 8715,
++      "sha256": "b50a047e6caa8a7e4158fa736728e8de46cf009bbe575b239c33312e8b30cd14"
++    },
++    {
++      "path": "left-id.def",
++      "bytes": 1556924,
++      "sha256": "6e7fb23dda28ef49db733b56bc9217c39536df6ee5aa8c33d720e3d711a6baa6"
++    },
++    {
++      "path": "licenses/AUTHORS",
++      "bytes": 22,
++      "sha256": "a05bfdd3a9db36d9c64495f4a3d1824d05b95fbb4fc6dc07c660e91bc191c481"
++    },
++    {
++      "path": "licenses/BSD",
++      "bytes": 1515,
++      "sha256": "770a75de30705439084f869dbcb0bc4ebcffcb7c7124c0d74f5083170318a9bb"
++    },
++    {
++      "path": "licenses/COPYING",
++      "bytes": 210,
++      "sha256": "d44b49398a72590a675e55f8f7a7dbf57bb5b71a9e20ba250f09c0cc5986bef1"
++    },
++    {
++      "path": "licenses/GPL",
++      "bytes": 17991,
++      "sha256": "a137434196f5e39d8836de895866fcfea074ad1b28243174ca1c4a585a1229b0"
++    },
++    {
++      "path": "licenses/LGPL",
++      "bytes": 26428,
++      "sha256": "512d2d21b6b3384ba64781abb0208a1b87740bc31e2df48e2b206ddb7e4d5779"
++    },
++    {
++      "path": "matrix.bin",
++      "bytes": 480905780,
++      "sha256": "dd9ee6bc6bb137298cc88673e9c2143ddcf0808805c81becdd2ae5d08a869f90"
++    },
++    {
++      "path": "model.bin",
++      "bytes": 83718788,
++      "sha256": "409efa3e3de09d8822a3443d4f97c7fda77c4f8fc991f7abc064f685e346b1c9"
++    },
++    {
++      "path": "rewrite.def",
++      "bytes": 5076,
++      "sha256": "0ff0d86c7640997258ecce5468916f9eff3f2c5e5be5d43d372c0e62828deefe"
++    },
++    {
++      "path": "right-id.def",
++      "bytes": 1767025,
++      "sha256": "2ec747f614eb3e8a6378f42bfbc877dfeb37fe8a331f70d9f50e0c096d4b182d"
++    },
++    {
++      "path": "sys.dic",
++      "bytes": 243373840,
++      "sha256": "f019f95838242cd614953a25201ad0b623b9c1cbca90de2507df4510db1b192c"
++    },
++    {
++      "path": "unk.def",
++      "bytes": 1977,
++      "sha256": "4b40b5158f6bab29d3c0d3fd871055538241c7103406ba8e89e7d741ccf22dbc"
++    },
++    {
++      "path": "unk.dic",
++      "bytes": 5481,
++      "sha256": "a8e1067721cfd5cd7d4a17ddb53c77fb07f77fa20143b4589d7934c88f67d7e8"
++    }
++  ],
++  "feature_fields": [
++    "pos1",
++    "pos2",
++    "pos3",
++    "pos4",
++    "cType",
++    "cForm",
++    "lForm",
++    "lemma",
++    "orth",
++    "pron",
++    "orthBase",
++    "pronBase",
++    "goshu",
++    "iType",
++    "iForm",
++    "fType",
++    "fForm",
++    "iConType",
++    "fConType",
++    "type",
++    "kana",
++    "kanaBase",
++    "form",
++    "formBase",
++    "aType",
++    "aConType",
++    "aModType",
++    "lid",
++    "lemma_id"
++  ],
++  "system_dictionary": {
++    "version": 102,
++    "lexsize": 878989,
++    "charset": "utf8"
++  }
++}

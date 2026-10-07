@@ -9,17 +9,24 @@ from .log import log
 
 
 class Tokenizer:
-    def __init__(self, espeak_config: EspeakConfig | None = None, vocab: dict = None):
+    def __init__(self, espeak_config: EspeakConfig | None = None, vocab: dict = None, *, customer_tokenizer=None):
         self.vocab = vocab or DEFAULT_VOCAB
         self._customer = None
         backend = os.getenv("VIOLA_KOKORO_PHONEMIZER", "espeak")
+        if customer_tokenizer is not None and backend != "misaki-en":
+            raise ValueError("Explicit customer pronunciation requires the existing customer profile")
         if backend == "misaki-en":
             from . import _require_customer_telemetry_opt_out
             _require_customer_telemetry_opt_out()
             if espeak_config is not None:
                 raise ValueError("Customer pronunciation cannot accept eSpeak configuration")
-            from voice.customer_pronunciation import CustomerTokenizer
-            self._customer = CustomerTokenizer(self.vocab)
+            if customer_tokenizer is None:
+                from voice.customer_pronunciation import CustomerTokenizer
+                self._customer = CustomerTokenizer(self.vocab)
+            else:
+                from voice.customer_composition import require_customer_composition
+                require_customer_composition(customer_tokenizer, vocab=self.vocab)
+                self._customer = customer_tokenizer
             return
         if backend != "espeak":
             raise ValueError("Unknown Kokoro pronunciation backend")

@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
 import os
+import shutil
 import subprocess
 import sys
-import shutil
 import tempfile
 import unittest
 from pathlib import Path
@@ -214,6 +215,103 @@ class RomanceQualificationPacketTests(unittest.TestCase):
                 RUNNER._read_bound_file(PACKET, dict(row, path=path))
         with self.assertRaisesRegex(ValueError, "Git blob differs"):
             RUNNER._read_bound_file(PACKET, dict(row, git_sha="0" * 40))
+
+    def test_git_identities_work_when_sha1_is_allowed_only_for_nonsecurity_use(self):
+        original_sha1 = hashlib.sha1
+        blobs = []
+
+        def identity_only(data=b"", *, usedforsecurity=True):
+            self.assertIs(usedforsecurity, False)
+            blobs.append(data)
+            return original_sha1(data, usedforsecurity=False)
+
+        upstream = [row for row in self.integrity["payloads"] if "git_sha" in row]
+        with patch.object(RUNNER.hashlib, "sha1", side_effect=identity_only):
+            for row in upstream:
+                with self.subTest(path=row["path"]):
+                    data = RUNNER._read_bound_file(PACKET, row)
+                    self.assertEqual(blobs[-1], b"blob " + str(len(data)).encode() + b"\0" + data)
+        self.assertEqual(len(blobs), 5)
+
+    def test_sha256_failure_rejects_before_a_matching_git_identity_can_be_used(self):
+        upstream = [row for row in self.integrity["payloads"] if "git_sha" in row]
+        with patch.object(RUNNER.hashlib, "sha1", side_effect=AssertionError("Git identity used before integrity")):
+            for row in upstream:
+                with self.subTest(path=row["path"]), self.assertRaisesRegex(ValueError, "Bound file differs"):
+                    RUNNER._read_bound_file(PACKET, dict(row, sha256="0" * 64))
+
+    def _run_guarded_provenance(self, fixture):
+        # Execute the qualifier's unmodified provenance block with stdlib only.
+        # The separate full packet replay also covers its pytest-based mutants.
+        script = """
+import ast, hashlib, json, sys
+from pathlib import Path
+path = Path(sys.argv[1])
+tree = ast.parse(path.read_text(encoding='utf-8'))
+def assignment(node, name):
+    return isinstance(node, ast.Assign) and any(isinstance(t, ast.Name) and t.id == name for t in node.targets)
+start = next(i for i, node in enumerate(tree.body) if assignment(node, 'records'))
+end = next(i for i, node in enumerate(tree.body) if assignment(node, 'source'))
+scope = dict(ast=ast, hashlib=hashlib, json=json, Path=Path, ROOT=path.parent)
+original_sha1 = hashlib.sha1
+calls = []
+def identity_only(data=b'', *, usedforsecurity=True):
+    if usedforsecurity is not False:
+        raise RuntimeError('SHA1 is allowed only for nonsecurity Git identity')
+    calls.append(data)
+    return original_sha1(data, usedforsecurity=False)
+hashlib.sha1 = identity_only
+try:
+    exec(compile(ast.Module(body=tree.body[start:end], type_ignores=[]), str(path), 'exec'), scope)
+    print(json.dumps(scope['checked']))
+finally:
+    print('git_identity_calls=' + str(len(calls)))
+"""
+        return subprocess.run(
+            [sys.executable, "-I", "-B", "-c", script, str(fixture / "romance-prototype/qualify_provenance.py")],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            timeout=30,
+            check=False,
+        )
+
+    def test_provenance_block_preserves_git_identities_under_nonsecurity_only_sha1(self):
+        fixture = self.root / "fixture"
+        RUNNER.prepare_fixture(SOURCE, fixture)
+        result = self._run_guarded_provenance(fixture)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("git_identity_calls=5", result.stdout)
+        checked = json.loads(result.stdout.splitlines()[0])
+        self.assertEqual(len(checked), 5)
+        self.assertEqual(sum(row.get("exact_original", False) for row in checked), 2)
+        self.assertEqual(sum(row.get("residual_ast_exact", False) for row in checked), 3)
+
+    def test_provenance_sha256_rejects_before_matching_git_identity(self):
+        fixture = self.root / "fixture"
+        RUNNER.prepare_fixture(SOURCE, fixture)
+        bindings_path = fixture / "romance-prototype/upstream-bindings.json"
+        bindings = json.loads(bindings_path.read_text(encoding="utf-8"))
+        bindings["files"][0]["sha256"] = "0" * 64
+        bindings_path.write_text(json.dumps(bindings), encoding="utf-8")
+        result = self._run_guarded_provenance(fixture)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("AssertionError", result.stderr)
+        self.assertIn("git_identity_calls=0", result.stdout)
+        self.assertFalse((fixture / "romance-prototype/provenance-and-mutants.json").exists())
+
+    def test_provenance_git_identity_drift_still_rejects_after_sha256(self):
+        fixture = self.root / "fixture"
+        RUNNER.prepare_fixture(SOURCE, fixture)
+        bindings_path = fixture / "romance-prototype/upstream-bindings.json"
+        bindings = json.loads(bindings_path.read_text(encoding="utf-8"))
+        bindings["files"][0]["git_sha"] = "0" * 40
+        bindings_path.write_text(json.dumps(bindings), encoding="utf-8")
+        result = self._run_guarded_provenance(fixture)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("AssertionError", result.stderr)
+        self.assertIn("git_identity_calls=1", result.stdout)
+        self.assertFalse((fixture / "romance-prototype/provenance-and-mutants.json").exists())
 
 
 if __name__ == "__main__":

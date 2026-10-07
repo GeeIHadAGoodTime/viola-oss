@@ -1,24 +1,51 @@
 --- a/kokoro_onnx/pyproject.toml
 +++ b/kokoro_onnx/pyproject.toml
-@@ -3 +3 @@
+@@ -1,7 +1,9 @@
+ [project]
+ name = "kokoro-onnx"
 -version = "0.4.9"
 +version = "0.4.9+viola.2"
-@@ -4,0 +5,2 @@
+ description = "TTS with kokoro and onnx runtime"
 +license = "MIT"
 +license-files = ["LICENSE"]
-@@ -13,2 +14,0 @@
+ readme = "README.md"
+ authors = [
+     { name = "thewh1teagle", email = "61390950+thewh1teagle@users.noreply.github.com" },
+@@ -10,8 +12,6 @@
+ dependencies = [
+     "onnxruntime>=1.20.1",
+     "colorlog>=6.9.0",
 -    "espeakng-loader>=0.2.4",
 -    "phonemizer-fork>=3.3.2",
-@@ -24,0 +25 @@
+     "numpy>=2.0.2",
+ ]
+ 
+@@ -22,6 +22,7 @@
+ 
+ 
+ [project.optional-dependencies]
 +espeak = ["phonemizer-fork>=3.3.2"]
-@@ -33 +34 @@
+ # Windows/Linux GPU feature
+ # Install with kokoro-onnx[gpu]
+ gpu = [
+@@ -30,7 +31,7 @@
+ ]
+ 
+ [build-system]
 -requires = ["hatchling"]
 +requires = ["hatchling==1.29.0"]
+ build-backend = "hatchling.build"
+ 
+ [dependency-groups]
 --- a/kokoro_onnx/src/kokoro_onnx/__init__.py
 +++ b/kokoro_onnx/src/kokoro_onnx/__init__.py
-@@ -8,0 +9 @@
+@@ -6,17 +6,55 @@
+ import os
+ import platform
+ import re
 +import sys
-@@ -11,9 +12,46 @@
+ import time
+ from collections.abc import AsyncGenerator
 -
 -import numpy as np
 -import onnxruntime as rt
@@ -74,17 +101,82 @@
 +from .log import log  # noqa: E402
 +from .tokenizer import Tokenizer  # noqa: E402
 +from .trim import trim as trim_audio  # noqa: E402
-@@ -29,0 +68 @@
+ 
+ 
+ class Kokoro:
+@@ -26,13 +64,19 @@
+         voices_path: str,
+         espeak_config: EspeakConfig | None = None,
+         vocab_config: dict | str | None = None,
++        *,
++        customer_tokenizer=None,
+     ):
 +        _require_customer_telemetry_opt_out()
-@@ -64,0 +104 @@
+         # Show useful information for bug reports
+         log.debug(
+             f"koko-onnx version {importlib.metadata.version('kokoro-onnx')} on {platform.platform()} {platform.version()}"
+         )
+         self.config = KoKoroConfig(model_path, voices_path, espeak_config)
+         self.config.validate()
++        if customer_tokenizer is not None:
++            vocab = self._load_vocab(vocab_config)
++            self.tokenizer = Tokenizer(espeak_config, vocab=vocab, customer_tokenizer=customer_tokenizer)
+ 
+         # See list of providers https://github.com/microsoft/onnxruntime/issues/22101#issuecomment-2357667377
+         providers = ["CPUExecutionProvider"]
+@@ -51,8 +95,9 @@
+         self.sess = rt.InferenceSession(model_path, providers=providers)
+         self.voices: np.ndarray = np.load(voices_path)
+ 
+-        vocab = self._load_vocab(vocab_config)
+-        self.tokenizer = Tokenizer(espeak_config, vocab=vocab)
++        if customer_tokenizer is None:
++            vocab = self._load_vocab(vocab_config)
++            self.tokenizer = Tokenizer(espeak_config, vocab=vocab)
+ 
+     @classmethod
+     def from_session(
+@@ -61,15 +106,22 @@
+         voices_path: str,
+         espeak_config: EspeakConfig | None = None,
+         vocab_config: dict | str | None = None,
++        *,
++        customer_tokenizer=None,
+     ):
 +        _require_customer_telemetry_opt_out()
-@@ -97,5 +136,0 @@
+         instance = cls.__new__(cls)
+         instance.sess = session
+         instance.config = KoKoroConfig(session._model_path, voices_path, espeak_config)
+         instance.config.validate()
++        if customer_tokenizer is not None:
++            vocab = instance._load_vocab(vocab_config)
++            instance.tokenizer = Tokenizer(espeak_config, vocab=vocab, customer_tokenizer=customer_tokenizer)
+         instance.voices = np.load(voices_path)
+ 
+-        vocab = instance._load_vocab(vocab_config)
+-        instance.tokenizer = Tokenizer(espeak_config, vocab=vocab)
++        if customer_tokenizer is None:
++            vocab = instance._load_vocab(vocab_config)
++            instance.tokenizer = Tokenizer(espeak_config, vocab=vocab)
+         return instance
+ 
+     def _load_vocab(self, vocab_config: dict | str | None) -> dict:
+@@ -94,11 +146,6 @@
+         self, phonemes: str, voice: NDArray[np.float32], speed: float
+     ) -> tuple[NDArray[np.float32], int]:
+         log.debug(f"Phonemes: {phonemes}")
 -        if len(phonemes) > MAX_PHONEME_LENGTH:
 -            log.warning(
 -                f"Phonemes are too long, truncating to {MAX_PHONEME_LENGTH} phonemes"
 -            )
 -        phonemes = phonemes[:MAX_PHONEME_LENGTH]
-@@ -137,32 +172,15 @@
+         start_t = time.time()
+         tokens = np.array(self.tokenizer.tokenize(phonemes), dtype=np.int64)
+         assert len(tokens) <= MAX_PHONEME_LENGTH, (
+@@ -134,38 +181,21 @@
+         return self.voices[name]
+ 
+     def _split_phonemes(self, phonemes: str) -> list[str]:
 -        """
 -        Split phonemes into batches of MAX_PHONEME_LENGTH
 -        Prefer splitting at punctuation marks.
@@ -132,10 +224,22 @@
 +            batches.append(phonemes[start:end])
 +            start = end
 +        return batches
-@@ -207 +225 @@
+ 
+     def create(
+         self,
+@@ -204,7 +234,7 @@
+                 # (initial ~2s, subsequent ~0.02s)
+                 audio_part, _ = trim_audio(audio_part)
+             audio.append(audio_part)
 -        audio = np.concatenate(audio)
 +        audio = np.concatenate(audio) if audio else np.empty(0, dtype=np.float32)
-@@ -239,22 +257,28 @@
+         log.debug(f"Created audio in {time.time() - start_t:.2f}s")
+         return audio, SAMPLE_RATE
+ 
+@@ -236,28 +266,34 @@
+ 
+         async def process_batches():
+             """Process phoneme batches in the background."""
 -            for i, phonemes in enumerate(batched_phonemes):
 -                loop = asyncio.get_event_loop()
 -                # Execute in separate thread since it's blocking operation
@@ -186,35 +290,59 @@
 +            task.cancel()
 +            with suppress(asyncio.CancelledError):
 +                await task  # Propagate inference failures instead of hanging.
+ 
+     def get_voices(self) -> list[str]:
+         return list(sorted(self.voices.keys()))
 --- a/kokoro_onnx/src/kokoro_onnx/tokenizer.py
 +++ b/kokoro_onnx/src/kokoro_onnx/tokenizer.py
-@@ -1,0 +2 @@
+@@ -1,26 +1,54 @@
+ import ctypes
 +import ctypes.util
-@@ -5,4 +5,0 @@
+ import os
+ import platform
+ import sys
 -
 -import espeakng_loader
 -import phonemizer
 -from phonemizer.backend.espeak.wrapper import EspeakWrapper
-@@ -16,0 +14,15 @@
+ 
+ from .config import DEFAULT_VOCAB, MAX_PHONEME_LENGTH, EspeakConfig
+ from .log import log
+ 
+ 
+ class Tokenizer:
+-    def __init__(self, espeak_config: EspeakConfig | None = None, vocab: dict = None):
++    def __init__(self, espeak_config: EspeakConfig | None = None, vocab: dict = None, *, customer_tokenizer=None):
+         self.vocab = vocab or DEFAULT_VOCAB
 +        self._customer = None
 +        backend = os.getenv("VIOLA_KOKORO_PHONEMIZER", "espeak")
++        if customer_tokenizer is not None and backend != "misaki-en":
++            raise ValueError("Explicit customer pronunciation requires the existing customer profile")
 +        if backend == "misaki-en":
 +            from . import _require_customer_telemetry_opt_out
 +            _require_customer_telemetry_opt_out()
 +            if espeak_config is not None:
 +                raise ValueError("Customer pronunciation cannot accept eSpeak configuration")
-+            from voice.customer_pronunciation import CustomerTokenizer
-+            self._customer = CustomerTokenizer(self.vocab)
++            if customer_tokenizer is None:
++                from voice.customer_pronunciation import CustomerTokenizer
++                self._customer = CustomerTokenizer(self.vocab)
++            else:
++                from voice.customer_composition import require_customer_composition
++                require_customer_composition(customer_tokenizer, vocab=self.vocab)
++                self._customer = customer_tokenizer
 +            return
 +        if backend != "espeak":
 +            raise ValueError("Unknown Kokoro pronunciation backend")
 +        import phonemizer
 +        from phonemizer.backend.espeak.wrapper import EspeakWrapper
 +        self._phonemizer = phonemizer
-@@ -21 +33 @@
+ 
+         if not espeak_config:
+             espeak_config = EspeakConfig()
+         if not espeak_config.data_path:
 -            espeak_config.data_path = espeakng_loader.get_data_path()
 +            espeak_config.data_path = os.getenv("PHONEMIZER_ESPEAK_DATA_PATH")
-@@ -23 +35,10 @@
+         if not espeak_config.lib_path:
 -            espeak_config.lib_path = espeakng_loader.get_library_path()
 +            espeak_config.lib_path = (
 +                os.getenv("PHONEMIZER_ESPEAK_LIBRARY")
@@ -226,17 +354,40 @@
 +                "Kokoro requires a separately installed system eSpeak-NG library. "
 +                "Set PHONEMIZER_ESPEAK_LIBRARY to its shared library path."
 +            )
-@@ -53 +74,3 @@
+ 
+         # Check if PHONEMIZER_ESPEAK_LIBRARY was set
+         if os.getenv("PHONEMIZER_ESPEAK_LIBRARY"):
+@@ -50,7 +78,9 @@
+             except Exception as e:
+                 raise RuntimeError(f"{e}: {error_info}")
+ 
 -        EspeakWrapper.set_data_path(espeak_config.data_path)
 +        # Use the system library data directory unless explicitly overridden.
 +        if espeak_config.data_path:
 +            EspeakWrapper.set_data_path(espeak_config.data_path)
-@@ -60,0 +84,2 @@
+         EspeakWrapper.set_library(espeak_config.lib_path)
+ 
+     @staticmethod
+@@ -58,6 +88,8 @@
+         return text.strip()
+ 
+     def tokenize(self, phonemes):
 +        if getattr(self, "_customer", None) is not None:
 +            return self._customer.tokenize(phonemes)
-@@ -70,0 +96,2 @@
+         if len(phonemes) > MAX_PHONEME_LENGTH:
+             raise ValueError(
+                 f"text is too long, must be less than {MAX_PHONEME_LENGTH} phonemes"
+@@ -68,10 +100,12 @@
+         """
+         lang can be 'en-us' or 'en-gb'
+         """
 +        if getattr(self, "_customer", None) is not None:
 +            return self._customer.phonemize(text, lang=lang, norm=norm)
-@@ -74 +101 @@
+         if norm:
+             text = Tokenizer.normalize_text(text)
+ 
 -        phonemes = phonemizer.phonemize(
 +        phonemes = self._phonemizer.phonemize(
+             text, lang, preserve_punctuation=True, with_stress=True
+         )
+         phonemes = "".join(filter(lambda p: p in self.vocab, phonemes))

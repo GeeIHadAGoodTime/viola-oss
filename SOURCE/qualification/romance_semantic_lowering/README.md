@@ -2,7 +2,9 @@
 
 This directory publishes the independently reviewed, bounded ES/FR/PT semantic-lowering prototype. It does not install, select, import or register a pronunciation backend in the application. No model or package download is involved.
 
-The 13 files under `romance-prototype/` retain the exact bytes of reviewed patch `ac1491f19a3295931bda9cf72cb1649235bf75be742dccbb12a32e89fa63a030`. That historical packet contains task-local fixture paths. Use the portable wrapper rather than running those historical entrypoints in place:
+The 13 files under `romance-prototype/` originate from reviewed patch `ac1491f19a3295931bda9cf72cb1649235bf75be742dccbb12a32e89fa63a030`. Twelve retain their exact historical bytes. The qualifier's Git SHA1 constructor now explicitly uses `usedforsecurity=False`; its independent SHA256 integrity check and exact Git blob identity comparison are unchanged. The original qualifier is retained at [public commit e8237555](https://github.com/GeeIHadAGoodTime/viola-oss/blob/e823755522c97580cffdee95a0d99965f8ac13a7/SOURCE/qualification/romance_semantic_lowering/romance-prototype/qualify_provenance.py), with SHA256 `7e42b415d374720d9a6e354122fa1bc9362caf8d2b01bb3e00a64194d7041a8a`. `integrity.json` binds the current replay payloads; the historical reviewed-patch identity remains unchanged.
+
+The historical packet contains task-local fixture paths. Use the portable wrapper rather than running those entrypoints in place:
 
     python SOURCE/qualification/romance_semantic_lowering/run_qualification.py --report /selected/romance-source-report.json
 

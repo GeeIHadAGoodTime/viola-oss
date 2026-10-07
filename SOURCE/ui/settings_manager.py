@@ -3095,10 +3095,15 @@ class SettingsManager:
             return True
 
     def export_settings(self, export_path: Path) -> bool:
-        """Export settings to a file (for backup)."""
+        """Export portable settings without server-controlled system fields."""
         try:
+            portable = {
+                key: value
+                for key, value in self.settings.items()
+                if not _is_system_key(self.canonicalize_setting_key(key))
+            }
             with open(export_path, "w", encoding="utf-8") as f:
-                json.dump(self.settings, f, indent=2, ensure_ascii=False)
+                json.dump(portable, f, indent=2, ensure_ascii=False)
             logger.info("Settings exported to %s", export_path)
             return True
         except Exception as e:

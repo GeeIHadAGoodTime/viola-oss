@@ -26,7 +26,8 @@ def _read_bound_file(root: Path, row: dict) -> bytes:
         raise ValueError(f"Bound file differs: {relative}")
     if "git_sha" in row:
         blob = b"blob " + str(len(data)).encode() + b"\0" + data
-        if hashlib.sha1(blob).hexdigest() != row["git_sha"]:
+        # SHA256 above checks integrity; SHA1 only reproduces the upstream Git object ID.
+        if hashlib.sha1(blob, usedforsecurity=False).hexdigest() != row["git_sha"]:
             raise ValueError(f"Upstream Git blob differs: {relative}")
     return data
 
