@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "7db5c429636e95b082643eef40989c4caeff6bf7",
-  "sha256": "c91603ef2eb1c1ea95ebee002fd7da10c25fdf2ead05c0ad8e4618c951692509",
+  "revision": "d1c06ca346de9beb20061cdae1ff4df6b71f6cc2",
+  "sha256": "ca59b94f8b2587dd0ab861e7c18eb371ade2d58eafc80656ef594ed10e19b1e4",
   "files": [
     {
       "path": ".env.example",
@@ -1475,8 +1475,8 @@
     },
     {
       "path": "docs/CUSTOMER_SPEECH_QUALIFICATION.md",
-      "sha256": "aa0d6a5b16d934956a4f472cc0698031b4be3d08295c3b3597d786f4bb277b42",
-      "bytes": 7383
+      "sha256": "8cb908e6584bff1b29a50a199d9af01ab484ef379037beb8c4176e922a207dac",
+      "bytes": 11357
     },
     {
       "path": "docs/INSTALLATION.md",
@@ -5959,6 +5959,11 @@
       "bytes": 27604
     },
     {
+      "path": "tests/customer_speech/test_real_cjk_pronunciation.py",
+      "sha256": "53113bfa571b4487861cec2fcf3d5e3d7f64021a7fdc3ac0dc35fe2dc942bd94",
+      "bytes": 3398
+    },
+    {
       "path": "tests/customer_speech/test_real_pronunciation.py",
       "sha256": "c4f0efd1322de6de47dfeed438ca722b6b8c83aed224d7d0e4c53eafdcea399a",
       "bytes": 5841
@@ -6265,8 +6270,8 @@
     },
     {
       "path": "third_party/misaki_cjk_prototype.patch",
-      "sha256": "5fe0ed15c335b4a6d33d1ee40524e61215399a49c5118a47547511f831b951ad",
-      "bytes": 36097
+      "sha256": "f12461ab0fea3e43723a40fdeb186d167bb8c5182a78258f06b7418177f2f7f6",
+      "bytes": 36389
     },
     {
       "path": "third_party/misaki_cjk_prototype/LICENSE",
@@ -6335,8 +6340,8 @@
     },
     {
       "path": "third_party/misaki_cjk_prototype/viola_cjk/coverage.py",
-      "sha256": "65f1d310d6ab32533f374186c42ae1c08c212655e386bef10911743935b81c56",
-      "bytes": 11503
+      "sha256": "f5ec0bc5611a74f93af0ac2e5fcb6a043268b4c0e5c88a5d6af440fee67914cf",
+      "bytes": 11791
     },
     {
       "path": "third_party/misaki_cjk_prototype/viola_cjk/customer_english_span.py",
@@ -8995,13 +9000,13 @@
     },
     {
       "path": "third_party/sources.toml",
-      "sha256": "c3c01e5702e24747f2cc6a47544bf3bf3fef4194f53baaa535d878e8750313cc",
+      "sha256": "05c7e398f278d1e3a6d5d92ba64d99c46c4bbfb9671d1846315a7a3d5d7f8554",
       "bytes": 210783
     },
     {
       "path": "tools/qualification/cjk_runtime_replay.py",
-      "sha256": "fa88b8eceb243b5da9438ebce5151973db39dd9ce848430d604b331a2828d7f6",
-      "bytes": 45020
+      "sha256": "fab4441920c30c90b625f4d5922e15e2fb6927de8857e05f5c3606f67b0d17d0",
+      "bytes": 45819
     },
     {
       "path": "tools/release/create_source_manifest.py",

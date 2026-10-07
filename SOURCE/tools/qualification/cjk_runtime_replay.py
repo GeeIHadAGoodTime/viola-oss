@@ -118,7 +118,7 @@ def composition():
         @staticmethod
         def py2ipa(reading):
             readings.append(reading)
-            return {"ni3": "ni↓", "hao3": "xau↓", "ling2": "liŋ↗", "yi1": "i→", "dian3": "tjɛn↓"}.get(reading, "a→")
+            return {"ni3": "ni↓", "hao3": "xau̯↓", "ling2": "liŋ↗", "yi1": "i→", "dian3": "tjɛn↓"}.get(reading, "a→")
 
     values = {"你": "ni3", "好": "hao3", "零": "ling2", "一": "yi1", "点": "dian3"}
 
@@ -248,6 +248,20 @@ class RuntimeTests(unittest.TestCase):
                 self.route.phonemize("你好")
         self.route.pinyin = original
         self.assertEqual(self.route.phonemize("你好")["phonemes"], "ni↓xau↓")
+        self.assertNotIn("❓", self.route.vocab)
+        convert = self.route.chinese.py2ipa
+        try:
+            # Only the established Mandarin U+032F stage may be normalized.
+            for phones in ("", "̯", " ̯ ", "xau❓↓", "xau̯❓↓", "xaú↓", "xau̩↓"):
+                self.route.chinese.py2ipa = lambda reading, value=phones: value
+                with self.subTest(phones=phones), self.assertRaises(ValueError):
+                    self.route.phonemize("好")
+            self.route.chinese.py2ipa = lambda reading: "kʰa↓"
+            self.assertEqual(self.route.phonemize("好")["phonemes"], "kʰa↓")
+            with self.assertRaises(ValueError):
+                self.route._phones("xau̯↓")
+        finally:
+            self.route.chinese.py2ipa = convert
         self.route.jieba.lcut = lambda *a, **k: ["你"]
         with self.assertRaises(ValueError):
             self.route.phonemize("你好")

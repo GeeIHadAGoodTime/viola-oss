@@ -2743,7 +2743,7 @@
 "misaki/zh.py" = "97d16aec581832845d2566cb24da2ba045d4552fb65a5017a6eac8feef654c81"
 "pyproject.toml" = "cd88246eedf56422b2c12c97655fe597e171d2de64395b8cb5c15248fa419c13"
 "viola_cjk/__init__.py" = "3eee7a3f5db5e15971fe61d0d8bafb7226466a9f296865d029f4a8451d5ef533"
-"viola_cjk/coverage.py" = "65f1d310d6ab32533f374186c42ae1c08c212655e386bef10911743935b81c56"
+"viola_cjk/coverage.py" = "f5ec0bc5611a74f93af0ac2e5fcb6a043268b4c0e5c88a5d6af440fee67914cf"
 "viola_cjk/customer_english_span.py" = "fc145197f88b4ec3194a3d34260e5957703cc061c025af132cf9228bd87c8983"
 "viola_cjk/japanese_factory.py" = "ab43b75415d134d2efa3d65885b87ff1cdcbe5d3e2484cad24dd887e7d716f3c"
 "viola_cjk/locale_numbers.py" = "ff9a4e3844fd948d42becda438d4e99927f3bc9afd11a08e044e800f964ca8bf"

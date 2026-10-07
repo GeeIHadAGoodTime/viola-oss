@@ -93,6 +93,10 @@ class CoveredCJK:
                 # Use the exact selected readings. Do not invoke a second global
                 # word segmenter or pinyin lookup through legacy_call/word2ipa.
                 phones = "".join(self.chinese.py2ipa(p) for p in readings)
+                # Preserve ZHG2P.legacy_call's existing Kokoro compatibility
+                # stage; py2ipa alone retains the U+032F non-syllabic marker.
+                # Every other unsupported character still fails _phones below.
+                phones = phones.replace(chr(815), "")
                 output.append(self._phones(phones))
                 traces.append({"source": word, "readings": list(readings), "phonemes": phones})
             return " ".join(output), traces

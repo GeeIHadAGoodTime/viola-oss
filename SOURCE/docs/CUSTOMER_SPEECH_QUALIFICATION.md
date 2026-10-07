@@ -1,6 +1,6 @@
 # Customer speech component qualification
 
-Status: English component candidate; not customer-release-qualified.
+Status: English and explicit Japanese/Mandarin source-QA candidates; not customer-release-qualified.
 
 ## Recovered decision and scope
 
@@ -9,12 +9,14 @@ records Kokoro ONNX with Misaki English and no eSpeak fallback. Its claim that
 all dependencies were permissive and the path was already complete was not
 supported by the actual tokenizer, which used phonemizer and eSpeak. The same
 historical document also describes 48 voices/eight offline languages. The
-current phone roadmap preserves eight locales. There is no recovered approval
-to reduce that product scope to English.
+current phone roadmap preserves eight locales. The current product requirement
+is all eight language families and all 54 canonical voices; the historical
+48-voice sentence is not the current acceptance target. There is no recovered
+approval to reduce that product scope to English.
 
-This profile implements and tests only the recovered English component. Do not
-activate it for a customer build until multilingual/voice-selection scope is
-reconciled. Desktop's existing hardcoded `en-us` call is implementation evidence,
+The default customer component is English. The explicitly constructed, inactive
+CJK companion now has the bounded source evidence below. Do not activate either
+for a customer build until the full multilingual/voice-selection scope is qualified. Desktop's existing hardcoded `en-us` call is implementation evidence,
 not permission to remove other promised capabilities. The environment selector
 would also affect local phone Kokoro, so its eight-language source forwarding
 tests alone cannot qualify a customer artifact using this profile.
@@ -32,14 +34,15 @@ tests alone cannot qualify a customer artifact using this profile.
   `ORT_DISABLE_TELEMETRY=1` is already set; application-wide startup ordering
   remains a separate gate. Late profile selection or preloaded ONNX Runtime is
   rejected conservatively, including `Tokenizer`, `Kokoro` and `from_session`
-  construction. The existing local phone loader imports ONNX before Kokoro;
-  its order needs a separately reviewed integration correction before selecting
-  the customer profile. Do not weaken the guard to accommodate that order.
+  construction. Current phone source runs the reviewed Kokoro startup guard
+  before application/Pipecat imports and again before the loader's ONNX import.
+  This guarded source ordering does not establish every application ingress,
+  frozen startup or Windows ETW/privacy behavior; those remain separate gates.
 - Misaki 0.9.4's English algorithm and four lexicons are retained with reviewed exact-decimal and
   currency-value preservation fixes. The caller
   supplies a local spaCy tagger and independently written English number
   converter. The fork has no runtime model downloader or pronunciation fallback.
-- The adapter accepts `en-us`/`en-gb`, adds exact fragments already used by Viola's
+- The English adapter accepts `en-us`/`en-gb`, adds exact fragments already used by Viola's
   pronunciation tables, and rejects unknown words, unsupported symbols and
   other locales before neural inference. Errors do not include utterance text.
 - Existing public number formatting now uses `voice/english_numbers.py` rather
@@ -84,11 +87,9 @@ Primary references:
 1. Implementation: explicit English source profile and negative controls exist.
 2. Focused qualification: public source tests; exact number-conversion controls;
    actual G2P decimal/currency/override controls with ONNX imports prohibited.
-   Historical Kokoro waveform/ASR samples exist, but predate the final fixes and
-   do not prove the final source bytes or absence of native telemetry egress.
-   ONNX testing is paused pending a verified no-egress initialization contract.
-   Objective audio statistics and ASR never replace human listening or installed
-   acceptance.
+   Historical Kokoro waveform/ASR samples predate the final fixes. The dated
+   real source-QA comparisons below establish narrower, current evidence.
+   Statistics, ASR and source tests do not replace listening or installed acceptance.
 3. Frozen/native packaging: outstanding. Verify both complete file inventory and
    Python archive/module inventory; preserve all model/code/notice identities.
    `scripts/dependencies/verify_customer_speech.py` rejects forbidden dependency
@@ -106,6 +107,56 @@ Official eSpeak-NG may be an internal test/reference route only. Neither that
 route, source prerequisites, nor a nonempty audio buffer is customer release
 or licensing acceptance. No Windows packaging workflow is enabled by this file.
 
+## Actual source-QA evidence, 2026-10-07
+
+These experiments reused the exact canonical model and 54-voice asset bytes in
+an owned Linux CPython 3.12.14 environment, with experimental ONNX Runtime 1.30.0.
+They do not change frozen Windows pins or activate an application profile.
+
+- English: 52 exact hash-bound wheel dependencies; eight real WAVs over two
+  runs. Neutral and currency/initialism `af_heart` component/adapter pairs were
+  phoneme- and audio-identical for those two texts only. Quoted standalone
+  `'A P I'` instead exposed article `/ɐ/` versus letter `/ˈA/` in both US
+  `af_heart` and British `bf_emma`, with distinct audio. British G2P/lexicons were
+  verified, not just the voice vector. The existing `in stuh gram` expansion
+  was unknown at `stuh` in the component and covered as `stə` by the adapter;
+  that comparison was G2P-only, with no dropped phones or fallback. Both routes
+  used the same maintained Misaki fork and number converter, not pristine upstream.
+- CJK preparation: seven small official wheels, the retained companion, and one
+  locally built Jieba 0.42.1 wheel extended the graph to 61 distributions without
+  changing the original 52 versions. Jieba's build-only LICENSE/setup.cfg overlay
+  restores the exact upstream MIT notice; all 54 original runtime/data files are
+  byte-identical, with no native payload or generated dependency edge. This is a
+  locally built, notice-restored wheel, not an upstream-published wheel. The
+  explicit retained 18-file UniDic dictionary is reused, not downloaded at speech.
+- Japanese: native dictionary identity and mixed `こんにちは Hello` G2P passed.
+  `こんにちは` with `jf_alpha` then produced component/composed WAVs with
+  identical phonemes `koɲɲiʨiβa` and bit-identical audio (0.981 seconds).
+- Mandarin: the original combined attempt failed before inference because
+  `hao3` became `xau̯↓`, containing U+032F outside the model vocabulary. The
+  reviewed Mandarin-only correction restores the U+032F normalization already
+  present in retained `ZHG2P.legacy_call`, before the unchanged vocabulary gate.
+  The real upstream-output regression fails against baseline; unknown phones,
+  other diacritics and empty output still fail. With that reviewed source overlay,
+  `你好` with `zf_xiaobei` produced component/composed `ni↓xau↓` and bit-identical
+  0.832-second WAVs. Mixed Mandarin/English G2P also passed. The original installed
+  companion wheel remained unchanged: corrected-wheel qualification is still open.
+
+All successful runs used one CPU session/thread, pre-import telemetry opt-out,
+offline/local assets and no provider credentials. Runs took 8.8–18.0 wall seconds
+and remained below 925 MiB peak RSS, inside the 120 CPU/180 wall-second,
+4 GiB address/3 GiB RSS/20 MiB output bounds. Python network/process attempts
+were guarded; native syscall capture and OS-level no-egress proof were not obtained.
+
+The owner gave positive listening feedback on the delivered English clips and
+the exact Japanese `こんにちは` sample. This does not select a winner within
+paired English clips or qualify other utterances, voices or languages. Mandarin
+listening is still pending. The assistant's own audio-input capability was unavailable.
+Four voices across English, Japanese and Mandarin have source-level synthesis
+samples; the full eight-family/54-voice matrix remains open. Frozen-app behavior,
+complete dependency/native-library notices and customer release eligibility are
+separate outstanding gates.
+
 ## Native telemetry gate
 
 ONNX Runtime 1.30.0 official privacy documentation states that non-Windows
@@ -116,6 +167,9 @@ events. Blocking Python sockets does not cover native C++ telemetry.
 See https://github.com/microsoft/onnxruntime/blob/v1.30.0/docs/Privacy.md .
 
 This observation is not permission to transmit telemetry or retry a blocked
-probe. Source/G2P work can proceed with ONNX imports prohibited; native inference
-requires separately verified safe initialization and execution permission. No
-actual transmission is asserted without network evidence.
+probe. The dated source-QA runs above used the required flags before Python and
+imported the maintained Kokoro guard before ONNX Runtime. Further native runs
+must preserve the approved local-file execution and resource conditions. These
+runs do not establish application-wide import ordering, OS-level isolation or
+frozen Windows acceptance. No actual transmission is asserted without network
+evidence.
