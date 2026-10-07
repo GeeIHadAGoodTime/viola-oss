@@ -120,6 +120,16 @@ class InactiveCJKDependencyTests(unittest.TestCase):
             with self.subTest(name=name):
                 self.assertTrue(validate_graph(report, include_cjk_prototype=True))
 
+    def test_old_reconstructed_companion_cannot_satisfy_corrected_identity(self):
+        report = self.graph()
+        for row in report["install"]:
+            if row["metadata"]["name"] == "viola-misaki-cjk-prototype":
+                row["metadata"]["version"] = "0.9.4+viola.cjk.2"
+        self.assertEqual(
+            validate_graph(report, include_cjk_prototype=True),
+            ["missing or unreviewed customer speech distribution: viola-misaki-cjk-prototype"],
+        )
+
     def test_conflicting_and_duplicate_normalized_pins_fail_in_both_orders(self):
         for name, version in INACTIVE_CJK_REQUIRED.items():
             for extra_version in (version, version + ".unreviewed"):

@@ -26,7 +26,7 @@ REQUIRED = {
 # Keep synchronized with the companion package and runtime admission map.
 # These are required pins, not a complete transitive graph or license allowlist.
 INACTIVE_CJK_REQUIRED = {
-    "viola-misaki-cjk-prototype": "0.9.4+viola.cjk.2",
+    "viola-misaki-cjk-prototype": "0.9.4+viola.cjk.3",
     "fugashi": "1.5.2",
     "jaconv": "0.5.0",
     "mojimoji": "0.0.13",
