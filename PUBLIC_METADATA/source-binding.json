@@ -1,14 +1,14 @@
 {
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "bb01b361c5ca493b6534f08af4153b325a6b03019f9b8cb1ffa0a5b1776222ba",
-  "source_tree_sha256": "417778161aab3002c49cb7e17f06a5f6780b2e8dcf0b199e1e8d036a9d8ce320",
-  "source_file_count": 2649,
-  "source_revision": "b7cb5337d0cb84b8256e9ce3ead2c979c158973f",
-  "comparison_public_revision": "a32dd90da471b309360e2e03474f36060137ac55",
+  "source_manifest_sha256": "48693e12830cf36cff3e12eafd15d3f50000310a9bb40d102ae4ff672bedaecc",
+  "source_tree_sha256": "58f8e8bc8f3af2b2469f9b7eaad4c1316917f1ecaa9c63118446f60bef5af280",
+  "source_file_count": 2650,
+  "source_revision": "05d04de13e7be4d3974556bb96c9ef209a4ced74",
+  "comparison_public_revision": "608e9bd49ccaede4228b1d6496e4dbcaa2114f87",
   "changed_source_paths": [
-    "SOURCE/ui/react-app/src/components/SettingsModal.desktopOnlyPanels.test.jsx",
-    "SOURCE/ui/react-app/src/components/SettingsModal.jsx"
+    "SOURCE/tests/public/test_native_titlebar_resize.py",
+    "SOURCE/ui/qt_native/webview_window.py"
   ],
   "retained_sboms": [
     {
@@ -70,19 +70,19 @@
     }
   ],
   "input_equivalence": {
-    "comparison_basis": "Protected #79 merge a32dd90da471b309360e2e03474f36060137ac55",
+    "comparison_basis": "Protected 608e9bd49ccaede4228b1d6496e4dbcaa2114f87",
     "all_unselected_export_leaf_bytes_and_modes_preserved": true,
     "all_six_sbom_bytes_and_status_objects_preserved": true,
     "dependency_and_workflow_inputs_unchanged": true,
-    "existing_save_scan_cancel_handlers_unchanged": true
+    "parent_resize_geometry_and_minimum_dimensions_unchanged": true
   },
   "prior_binding": {
-    "public_revision": "a32dd90da471b309360e2e03474f36060137ac55",
+    "public_revision": "608e9bd49ccaede4228b1d6496e4dbcaa2114f87",
     "path": "PUBLIC_METADATA/source-binding.json",
-    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/a32dd90da471b309360e2e03474f36060137ac55/PUBLIC_METADATA/source-binding.json",
-    "sha256": "de563025a85be6965c373f394659f6f7da29f1a7a78ec5143169b8c4faf73bbf",
-    "bytes": 73671,
-    "git_blob": "2160ea7ea2af89cc6a68411d168cbe50aae6110e",
+    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/608e9bd49ccaede4228b1d6496e4dbcaa2114f87/PUBLIC_METADATA/source-binding.json",
+    "sha256": "44323eb32970534852c25ae765b882cd5aad4414215aa085d83e506faa2ea03e",
+    "bytes": 75032,
+    "git_blob": "16bf358446f611f4b15ee60bee2ac89b17ee61f8",
     "all_top_level_keys": [
       "schema_version",
       "source_manifest",
@@ -122,11 +122,11 @@
       },
       "source_manifest_sha256": {
         "pointer": "/source_manifest_sha256",
-        "canonical_json_sha256": "7c2f45e386704b496108a16f50b9b42e9a8a451e7c0000254c282aa2a05970bf"
+        "canonical_json_sha256": "6d01563741753d6bacd0f19bfae1980c0c7ca167e97fce068a5a08bf615936d3"
       },
       "source_tree_sha256": {
         "pointer": "/source_tree_sha256",
-        "canonical_json_sha256": "19b55d84546d27f678136580dc03bd8f294a94be55f73a0f32403102b097a77c"
+        "canonical_json_sha256": "312037441db01e0514b3b961561ae71fe561abe764bb0829769ba802881cb44d"
       },
       "source_file_count": {
         "pointer": "/source_file_count",
@@ -134,15 +134,15 @@
       },
       "source_revision": {
         "pointer": "/source_revision",
-        "canonical_json_sha256": "e102ba3f0ba0ee6db37d0182314379dcceb3ae1db065a9b0a402e2a5a0cfa924"
+        "canonical_json_sha256": "2882cf27f298530d20cb206282b1f6775015cdc98658846eca0e55417d082ade"
       },
       "comparison_public_revision": {
         "pointer": "/comparison_public_revision",
-        "canonical_json_sha256": "e3e057babb11af59ae7bacca4880f5c7e5685545a10611df8be30712dedfc623"
+        "canonical_json_sha256": "5bae64d60bea847aa3eb5b5185bc30e4bed81356513ea73c876870d80773e99f"
       },
       "changed_source_paths": {
         "pointer": "/changed_source_paths",
-        "canonical_json_sha256": "25250e7ae258765943bf07234c86baf6817f05b92a11716de4ff9ab67b7e6c13"
+        "canonical_json_sha256": "8cc4c83ec9a92bc5f837dc465219531951c9cf66129ced3937c058f588796ee8"
       },
       "retained_sboms": {
         "pointer": "/retained_sboms",
@@ -150,11 +150,11 @@
       },
       "input_equivalence": {
         "pointer": "/input_equivalence",
-        "canonical_json_sha256": "fa27a5b5bff429fdde2a3f855dadfa594eb31b3df891bb2bb991fdd8f1d5f02e"
+        "canonical_json_sha256": "701c5ac6160321f1c8875e1fcbeed58d5cf934e3b74025cdd6a9e48e4a29b490"
       },
       "prior_binding": {
         "pointer": "/prior_binding",
-        "canonical_json_sha256": "4aa3f7ef868472fb775a246b7904d7bfb1666c1dd34e645981dcbb4b28ef5dd2"
+        "canonical_json_sha256": "a25e0e2016a9b8beac3b05ad10356018a2372a21b2d77c40c94ac7a175129a21"
       },
       "new_resolution_performed": {
         "pointer": "/new_resolution_performed",
@@ -170,11 +170,11 @@
       },
       "qualification": {
         "pointer": "/qualification",
-        "canonical_json_sha256": "928d6127e0d41cad05a7fa16297f90b3ac23499aa46bc289b20841b354027104"
+        "canonical_json_sha256": "1ac2621ed1d0c08e03669cc2acbdfd17f359b7df5946ee7d63f94b753d8c0d57"
       },
       "reviewed_source_patch": {
         "pointer": "/reviewed_source_patch",
-        "canonical_json_sha256": "e7f614fde3f610e0a21550ae30836faf676a27d95576a813b63e34e1df4739a5"
+        "canonical_json_sha256": "cb1ba9e7e0f766e3761f2dbaa85fa66b873d84d4ad9f74839aa2219d9e3cd7f5"
       },
       "native_volume_pre_rebase_evidence": {
         "pointer": "/native_volume_pre_rebase_evidence",
@@ -217,72 +217,55 @@
         "canonical_json_sha256": "60ef34000919b287709213d6e4a00e949a039bf37b05448a6bdd4080882a0d99"
       }
     },
-    "note": "Complete protected #79 correction retained with its strict verifier and isolated tracked fixture. This folder repair changes only the two reviewed UI paths."
+    "note": "Complete protected source binding including prior shortcut/provenance/folder evidence is retained unchanged. This candidate adds only scoped titlebar-to-window event deferral and its regression tests."
   },
   "new_resolution_performed": false,
   "new_advisory_scan_performed": false,
   "new_runtime_qualification_performed": false,
   "qualification": {
-    "scope": "Folder editor reachability and bounded regression source; no new playback or acoustic result.",
-    "source_commit": "b7cb5337d0cb84b8256e9ce3ead2c979c158973f",
-    "source_tree": "998dd3be418cd687f9394a253adf9d5a3ea0e7cf",
+    "scope": "Reproduced source-level titlebar/top-edge conflict only; original Surface content-edge observation is not attributed to this cause.",
+    "source_commit": "05d04de13e7be4d3974556bb96c9ef209a4ced74",
+    "source_tree": "aeb40868722f9e50733fb81336af3aedf2b18dbe",
     "ordered_source_parents": [
-      "09b9f380c6b0e8849abd85c4cf20474e6fb2fd90",
-      "a32dd90da471b309360e2e03474f36060137ac55"
+      "608e9bd49ccaede4228b1d6496e4dbcaa2114f87"
     ],
-    "local_source_predicate_controls_passed": 7,
-    "source_predicate_mutations_detected": 3,
-    "source_predicate_limit": "Executes actual visibility predicates only; not React rendering.",
-    "prepared_react_regression_cases": 7,
-    "local_react_execution": "Not run: local runtime unavailable. Required hosted checks must run.",
-    "existing_settings_api_empty_folder_readback": "Actual ASGI settings save accepted empty folder and retained YouTube; new temporary SettingsManager reloaded both values.",
-    "independent_automated_review": "Three-line production delta and seven component cases independently reviewed; no blocking findings.",
-    "final_exact_candidate_checks": "Read exact-head hosted receipts; this binding does not claim their completion.",
+    "source_method_tests_passed": 7,
+    "original_source_assertions_failed": 3,
+    "routing_mutations_detected": 3,
+    "independent_automated_review": "Exact production and test bytes independently reviewed; no blocking findings.",
+    "prepared_real_qt_check": "Isolated Windows Qt subprocess dispatches actual QWidget events to extracted unchanged production methods; checks smaller geometry, minimum size, ordinary drag, right button, maximize/restore, fullscreen and double click.",
+    "local_real_qt_execution": "Not run: PySide6 unavailable locally; no real Qt pass claimed.",
+    "final_exact_candidate_checks": "Require fresh hosted source/frontend checks, including actual real-Qt Windows worker.",
+    "previous_protected_candidate_checks": {
+      "head": "d3137140407b1df9578613c4d6e77c699f3ef66d",
+      "run": 37679873238,
+      "python_job": 112992820956,
+      "python_methods": 691,
+      "python_passed": 690,
+      "python_skipped": 1,
+      "frontend_job": 112992820634,
+      "frontend_tests": 1914,
+      "frontend_files": 168,
+      "build_seconds": 6.25,
+      "audit_findings": 0,
+      "review": "https://github.com/GeeIHadAGoodTime/viola-oss/pull/80#pullrequestreview-5447822340",
+      "tested_merge": "03311c9b4a881d6f5fccadd0e338919d527a8026",
+      "tested_tree": "f882f6f10b18aa5d0f2b84166ba6036c2adf651a"
+    },
     "limits": [
-      "Source-only repair",
-      "No native GUI rerun",
-      "No model/playback/quota diagnosis",
+      "No native installed or physical acceptance",
+      "Original content-edge cause remains unqualified",
+      "No broad WebEngine event filter or native hit-test redesign",
       "No deployment or release"
     ],
-    "prior_candidate_frontend": {
-      "head": "09b9f380c6b0e8849abd85c4cf20474e6fb2fd90",
-      "run": 37677052187,
-      "job": 112983144684,
-      "tests": 1914,
-      "files": 168,
-      "desktop_panel_cases": 21,
-      "new_folder_cases": 7,
-      "production_build_seconds": 6.33,
-      "audit_findings": 0,
-      "scope": "Actual hosted React/build proof of the identical two folder files on the earlier stacked candidate; final union requires its own checks."
-    },
-    "prior_candidate_python": {
-      "run": 37677052187,
-      "job": 112983144788,
-      "outcome": "691 methods, eight inherited temporary Git fixture assertion failures, one existing POSIX skip; exact failure retained. Corrected fixture is now preserved from protected #79."
-    },
-    "protected_base_required_checks": {
-      "head": "4a736f5f69846bfa240e3681139343055aa20871",
-      "run": 37678415199,
-      "python_job": 112987816529,
-      "python_methods": 691,
-      "passed": 690,
-      "skipped": 1,
-      "frontend_job": 112987816500,
-      "frontend_tests": 1907,
-      "frontend_files": 168,
-      "build_seconds": 5.56,
-      "audit_findings": 0,
-      "automated_review": "https://github.com/GeeIHadAGoodTime/viola-oss/pull/79#pullrequestreview-5447697142"
-    },
     "prior_complete_evidence": [
       {
-        "public_revision": "a32dd90da471b309360e2e03474f36060137ac55",
+        "public_revision": "608e9bd49ccaede4228b1d6496e4dbcaa2114f87",
         "path": "PUBLIC_METADATA/source-binding.json",
-        "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/a32dd90da471b309360e2e03474f36060137ac55/PUBLIC_METADATA/source-binding.json",
-        "sha256": "de563025a85be6965c373f394659f6f7da29f1a7a78ec5143169b8c4faf73bbf",
-        "bytes": 73671,
-        "git_blob": "2160ea7ea2af89cc6a68411d168cbe50aae6110e",
+        "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/608e9bd49ccaede4228b1d6496e4dbcaa2114f87/PUBLIC_METADATA/source-binding.json",
+        "sha256": "44323eb32970534852c25ae765b882cd5aad4414215aa085d83e506faa2ea03e",
+        "bytes": 75032,
+        "git_blob": "16bf358446f611f4b15ee60bee2ac89b17ee61f8",
         "all_top_level_keys": [
           "schema_version",
           "source_manifest",
@@ -322,11 +305,11 @@
           },
           "source_manifest_sha256": {
             "pointer": "/source_manifest_sha256",
-            "canonical_json_sha256": "7c2f45e386704b496108a16f50b9b42e9a8a451e7c0000254c282aa2a05970bf"
+            "canonical_json_sha256": "6d01563741753d6bacd0f19bfae1980c0c7ca167e97fce068a5a08bf615936d3"
           },
           "source_tree_sha256": {
             "pointer": "/source_tree_sha256",
-            "canonical_json_sha256": "19b55d84546d27f678136580dc03bd8f294a94be55f73a0f32403102b097a77c"
+            "canonical_json_sha256": "312037441db01e0514b3b961561ae71fe561abe764bb0829769ba802881cb44d"
           },
           "source_file_count": {
             "pointer": "/source_file_count",
@@ -334,15 +317,15 @@
           },
           "source_revision": {
             "pointer": "/source_revision",
-            "canonical_json_sha256": "e102ba3f0ba0ee6db37d0182314379dcceb3ae1db065a9b0a402e2a5a0cfa924"
+            "canonical_json_sha256": "2882cf27f298530d20cb206282b1f6775015cdc98658846eca0e55417d082ade"
           },
           "comparison_public_revision": {
             "pointer": "/comparison_public_revision",
-            "canonical_json_sha256": "e3e057babb11af59ae7bacca4880f5c7e5685545a10611df8be30712dedfc623"
+            "canonical_json_sha256": "5bae64d60bea847aa3eb5b5185bc30e4bed81356513ea73c876870d80773e99f"
           },
           "changed_source_paths": {
             "pointer": "/changed_source_paths",
-            "canonical_json_sha256": "25250e7ae258765943bf07234c86baf6817f05b92a11716de4ff9ab67b7e6c13"
+            "canonical_json_sha256": "8cc4c83ec9a92bc5f837dc465219531951c9cf66129ced3937c058f588796ee8"
           },
           "retained_sboms": {
             "pointer": "/retained_sboms",
@@ -350,11 +333,11 @@
           },
           "input_equivalence": {
             "pointer": "/input_equivalence",
-            "canonical_json_sha256": "fa27a5b5bff429fdde2a3f855dadfa594eb31b3df891bb2bb991fdd8f1d5f02e"
+            "canonical_json_sha256": "701c5ac6160321f1c8875e1fcbeed58d5cf934e3b74025cdd6a9e48e4a29b490"
           },
           "prior_binding": {
             "pointer": "/prior_binding",
-            "canonical_json_sha256": "4aa3f7ef868472fb775a246b7904d7bfb1666c1dd34e645981dcbb4b28ef5dd2"
+            "canonical_json_sha256": "a25e0e2016a9b8beac3b05ad10356018a2372a21b2d77c40c94ac7a175129a21"
           },
           "new_resolution_performed": {
             "pointer": "/new_resolution_performed",
@@ -370,11 +353,11 @@
           },
           "qualification": {
             "pointer": "/qualification",
-            "canonical_json_sha256": "928d6127e0d41cad05a7fa16297f90b3ac23499aa46bc289b20841b354027104"
+            "canonical_json_sha256": "1ac2621ed1d0c08e03669cc2acbdfd17f359b7df5946ee7d63f94b753d8c0d57"
           },
           "reviewed_source_patch": {
             "pointer": "/reviewed_source_patch",
-            "canonical_json_sha256": "e7f614fde3f610e0a21550ae30836faf676a27d95576a813b63e34e1df4739a5"
+            "canonical_json_sha256": "cb1ba9e7e0f766e3761f2dbaa85fa66b873d84d4ad9f74839aa2219d9e3cd7f5"
           },
           "native_volume_pre_rebase_evidence": {
             "pointer": "/native_volume_pre_rebase_evidence",
@@ -417,17 +400,17 @@
             "canonical_json_sha256": "60ef34000919b287709213d6e4a00e949a039bf37b05448a6bdd4080882a0d99"
           }
         },
-        "note": "Complete protected #79 correction retained with its strict verifier and isolated tracked fixture. This folder repair changes only the two reviewed UI paths."
+        "note": "Complete protected source binding including prior shortcut/provenance/folder evidence is retained unchanged. This candidate adds only scoped titlebar-to-window event deferral and its regression tests."
       }
     ]
   },
   "reviewed_source_patch": {
-    "scope": "Expose the existing Local Files folder editor after configuration; preserve save acknowledgement, cancellation and desktop-only controls.",
+    "scope": "Defer titlebar edge press/move/release to unchanged parent resize handlers; keep ordinary move/maximize/fullscreen paths.",
     "source_paths": [
-      "SOURCE/ui/react-app/src/components/SettingsModal.desktopOnlyPanels.test.jsx",
-      "SOURCE/ui/react-app/src/components/SettingsModal.jsx"
+      "SOURCE/tests/public/test_native_titlebar_resize.py",
+      "SOURCE/ui/qt_native/webview_window.py"
     ],
-    "source_tree": "998dd3be418cd687f9394a253adf9d5a3ea0e7cf"
+    "source_tree": "aeb40868722f9e50733fb81336af3aedf2b18dbe"
   },
   "native_volume_pre_rebase_evidence": {
     "public_revision": "476ad8bc5652ffbf1ace52de9793e7f2c1b5cf2b",

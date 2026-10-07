@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "b7cb5337d0cb84b8256e9ce3ead2c979c158973f",
-  "sha256": "417778161aab3002c49cb7e17f06a5f6780b2e8dcf0b199e1e8d036a9d8ce320",
+  "revision": "05d04de13e7be4d3974556bb96c9ef209a4ced74",
+  "sha256": "58f8e8bc8f3af2b2469f9b7eaad4c1316917f1ecaa9c63118446f60bef5af280",
   "files": [
     {
       "path": ".env.example",
@@ -6074,6 +6074,11 @@
       "bytes": 6965
     },
     {
+      "path": "tests/public/test_native_titlebar_resize.py",
+      "sha256": "e3e8a93b3e885331cf5b4a465fe98b649c7ed9390098f8c28bd59c849c0a5fbd",
+      "bytes": 10727
+    },
+    {
       "path": "tests/public/test_pause_response_contract.py",
       "sha256": "63a5fc99652782f8579b04cffa939c8e1207756235d29f2bd8b3b0ad2f188ed8",
       "bytes": 9635
@@ -9660,8 +9665,8 @@
     },
     {
       "path": "ui/qt_native/webview_window.py",
-      "sha256": "abd75a28c9ed4952149ba0aa1e194485fb22c4dcf8820f280a606f9d8caf2ead",
-      "bytes": 200399
+      "sha256": "5f240b12b14228652313a473e5a158a3ac0121276c5acb2b3bf3b6acb5fc3db8",
+      "bytes": 200930
     },
     {
       "path": "ui/qt_native/widgets/connectivity_status.py",
