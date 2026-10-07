@@ -699,6 +699,61 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
 
   // Weekly review (services/meta_analysis/weekly_review.py)
   const [weeklyReviewSummary, setWeeklyReviewSummary] = useState(null);
+  const [weeklyReviewBusy, setWeeklyReviewBusy] = useState(false);
+  const weeklyReviewRequestRef = useRef(null);
+  const retireWeeklyReview = useCallback(() => {
+    weeklyReviewRequestRef.current = null;
+    setWeeklyReviewBusy(false);
+    setWeeklyReviewSummary(null);
+  }, []);
+  useLayoutEffect(() => {
+    retireWeeklyReview();
+    // Closing the panel retires its result; it does not cancel server work.
+    return () => { weeklyReviewRequestRef.current = null; };
+  }, [isOpen, activeTab, localSettings.weekly_review_enabled, hasCloudAccount, cloudAccountAuth?.user?.id, retireWeeklyReview]);
+
+  const handleWeeklyReview = async (runNow = false) => {
+    if (!isOpen || activeTab !== 'ai_agents' || !localSettings.weekly_review_enabled
+      || isFeatureHidden('weekly_review') || weeklyReviewRequestRef.current) return;
+    if (runNow && !settings.weekly_review_enabled) {
+      setWeeklyReviewSummary('Save Changes to enable Weekly Review before running an analysis.');
+      return;
+    }
+    const request = {};
+    weeklyReviewRequestRef.current = request;
+    setWeeklyReviewBusy(true);
+    setWeeklyReviewSummary(runNow ? 'Running analysis…' : 'Loading review…');
+    try {
+      // apiFetch already parses JSON and unwraps a successful ResponseEnvelope.
+      const payload = runNow
+        ? await apiFetch('/v1/ai/weekly-review/trigger', { method: 'POST' })
+        : await apiFetch('/v1/ai/weekly-review/latest');
+      if (weeklyReviewRequestRef.current !== request) return;
+      if (!payload || typeof payload !== 'object' || payload.ok === false) {
+        throw new Error("We couldn't complete that request. Please try again.");
+      }
+      if (runNow) {
+        const summary = payload.analysis?.summary;
+        setWeeklyReviewSummary(payload.triggered === true && payload.analysis
+          ? (typeof summary === 'string' && summary.trim() ? summary : 'Analysis complete.')
+          : 'Analysis returned no result.');
+      } else {
+        const summary = payload.summary;
+        setWeeklyReviewSummary(typeof summary === 'string' && summary.trim() ? summary : 'No review yet.');
+      }
+    } catch (err) {
+      if (weeklyReviewRequestRef.current !== request) return;
+      const detail = err?.code === 'weekly_review_disabled'
+        ? 'Save Changes to enable Weekly Review before running an analysis.'
+        : (err?.message || String(err));
+      setWeeklyReviewSummary((runNow ? 'Trigger failed: ' : 'Failed to load review: ') + detail);
+    } finally {
+      if (weeklyReviewRequestRef.current === request) {
+        weeklyReviewRequestRef.current = null;
+        setWeeklyReviewBusy(false);
+      }
+    }
+  };
 
   // Music source / local library state
   const [isEditingSource, setIsEditingSource] = useState(false);
@@ -1244,6 +1299,7 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
   // Cancel - reset local changes and close
   const handleCancel = useCallback(() => {
     retireLocalAiRead();
+    retireWeeklyReview();
     if (saveSessionRef.current) saveSessionRef.current.saveGeneration += 1;
     // Customize previews update the live palette and theme cache immediately.
     // Resetting the draft alone leaves those effects behind after dismissal.
@@ -1252,7 +1308,7 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
     resetDraft();
     clearError();
     onClose();
-  }, [settings, resetDraft, clearError, onClose, retireLocalAiRead]);
+  }, [settings, resetDraft, clearError, onClose, retireLocalAiRead, retireWeeklyReview]);
 
   // Escape key closes the modal (a11y / keyboard parity with other modals)
   useEffect(() => {
@@ -1572,16 +1628,8 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
               {localSettings.weekly_review_enabled && (
                 <div style={{ padding: '4px 20px 16px', display: 'flex', gap: '10px', alignItems: 'center' }}>
                   <button
-                    onClick={async () => {
-                      try {
-                        const resp = await apiFetch('/v1/ai/weekly-review/latest');
-                        const data = await resp.json();
-                        const payload = data?.data || {};
-                        setWeeklyReviewSummary(payload.summary || 'No review yet.');
-                      } catch (err) {
-                        setWeeklyReviewSummary('Failed to load review: ' + (err?.message || err));
-                      }
-                    }}
+                    onClick={() => handleWeeklyReview()}
+                    disabled={weeklyReviewBusy}
                     style={{
                       padding: '6px 14px', minHeight: '44px', borderRadius: '8px', border: 'none',
                       backgroundColor: theme.colors.glassActive, color: theme.colors.textPrimary,
@@ -1591,21 +1639,8 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
                     View Last Review
                   </button>
                   <button
-                    onClick={async () => {
-                      setWeeklyReviewSummary('Running analysis…');
-                      try {
-                        const resp = await apiFetch('/v1/ai/weekly-review/trigger', { method: 'POST' });
-                        const data = await resp.json();
-                        const payload = data?.data || {};
-                        if (payload.triggered && payload.analysis) {
-                          setWeeklyReviewSummary(payload.analysis.summary || 'Analysis complete.');
-                        } else {
-                          setWeeklyReviewSummary('Analysis returned no result.');
-                        }
-                      } catch (err) {
-                        setWeeklyReviewSummary('Trigger failed: ' + (err?.message || err));
-                      }
-                    }}
+                    onClick={() => handleWeeklyReview(true)}
+                    disabled={weeklyReviewBusy || !settings.weekly_review_enabled}
                     style={{
                       padding: '6px 14px', minHeight: '44px', borderRadius: '8px', border: 'none',
                       backgroundColor: theme.colors.accent, color: '#fff',
@@ -1616,8 +1651,13 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
                   </button>
                 </div>
               )}
+              {localSettings.weekly_review_enabled && !settings.weekly_review_enabled && (
+                <div style={{ padding: '0 20px 16px', color: theme.colors.textSecondary, fontSize: '13px' }}>
+                  Save Changes to enable Weekly Review before running an analysis.
+                </div>
+              )}
               {weeklyReviewSummary && (
-                <div style={{
+                <div role="status" aria-live="polite" style={{
                   margin: '0 20px 16px', padding: '12px 14px', borderRadius: '10px',
                   backgroundColor: theme.colors.bgElevated,
                   border: `1px solid ${theme.colors.borderSubtle}`,

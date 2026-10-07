@@ -47,6 +47,7 @@ const settingsHarness = vi.hoisted(() => ({
 }));
 
 const apiFetchMock = vi.hoisted(() => vi.fn(() => Promise.resolve({})));
+const authHarness = vi.hoisted(() => ({ value: null }));
 
 // Preserve the boolean fixture while exposing the hook's exact save receipt.
 const saveSettingsWithSnapshot = async values => {
@@ -59,6 +60,13 @@ const saveSettingsWithSnapshot = async values => {
 
 vi.mock('../hooks/useSettings', () => ({
   useSettings: () => ({ ...settingsHarness, saveSettingsWithSnapshot }),
+}));
+
+vi.mock('../hooks/useAuth', () => ({
+  useOptionalAuth: () => authHarness.value,
+  useAuth: () => authHarness.value,
+  usePlan: () => ({}),
+  AuthProvider: ({ children }) => children,
 }));
 
 vi.mock('../hooks/useViolaApi', () => ({
@@ -108,6 +116,7 @@ const baseSettings = {
 describe('SettingsModal desktop-only panels (#4226)', () => {
   beforeEach(() => {
     settingsHarness.settings = { ...baseSettings };
+    authHarness.value = null;
     settingsHarness.updateSettings.mockReset().mockResolvedValue(true);
     settingsHarness.refreshDevices.mockClear();
     apiFetchMock.mockReset();
@@ -116,6 +125,8 @@ describe('SettingsModal desktop-only panels (#4226)', () => {
 
   afterEach(() => {
     delete window.viola;
+    delete window.__VIOLA_API_KEY__;
+    vi.unstubAllGlobals();
     window.history.replaceState({}, '', '/');
   });
 
@@ -421,6 +432,184 @@ describe('SettingsModal desktop-only panels (#4226)', () => {
       expect(await screen.findByText('Run Now')).toBeInTheDocument();
       expect(screen.getByText('View Last Review')).toBeInTheDocument();
       expect(screen.queryByText(UPSELL_REASON.weekly_review)).toBeNull();
+    });
+
+    it.each([
+      [{ has_analysis: true, summary: 'Saved synthetic weekly review.' }, 'Saved synthetic weekly review.'],
+      [{ has_analysis: false, analysis: null, summary: 'No meta-analysis has been run yet.' }, 'No meta-analysis has been run yet.'],
+      [{ has_analysis: false, analysis: null }, 'No review yet.'],
+    ])('reads the parsed latest weekly-review payload %j', async (payload, expected) => {
+      apiFetchMock.mockImplementation(path => Promise.resolve(path.endsWith('/weekly-review/latest') ? payload : {}));
+      render(<SettingsModal isOpen onClose={vi.fn()} />);
+      openTab('AI & Agents');
+      fireEvent.click(screen.getByRole('button', { name: 'View Last Review' }));
+      expect(await screen.findByText(expected)).toBeInTheDocument();
+      expect(requestedPaths().filter(path => path.includes('/weekly-review'))).toEqual(['/v1/ai/weekly-review/latest']);
+      expect(settingsHarness.updateSettings).not.toHaveBeenCalled();
+    });
+
+    it('displays the parsed manual weekly-review completion', async () => {
+      apiFetchMock.mockImplementation(path => Promise.resolve(path.endsWith('/weekly-review/trigger')
+        ? { triggered: true, analysis: { summary: 'Completed synthetic weekly review.' } } : {}));
+      render(<SettingsModal isOpen onClose={vi.fn()} />);
+      openTab('AI & Agents');
+      fireEvent.click(screen.getByRole('button', { name: 'Run Now' }));
+      expect(await screen.findByText('Completed synthetic weekly review.')).toBeInTheDocument();
+      expect(apiFetchMock).toHaveBeenCalledWith('/v1/ai/weekly-review/trigger', { method: 'POST' });
+      expect(settingsHarness.updateSettings).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['View Last Review', { ok: true, data: { summary: 'Saved through the real API helper.' } }, 'Saved through the real API helper.'],
+      ['Run Now', { ok: true, data: { triggered: true, analysis: { summary: 'Run through the real API helper.' } } }, 'Run through the real API helper.'],
+    ])('uses the real apiFetch unwrapping contract for %s', async (button, envelope, expected) => {
+      const { apiFetch } = await vi.importActual('../hooks/useViolaApi');
+      window.__VIOLA_API_KEY__ = 'synthetic-weekly-review-test';
+      const json = vi.fn().mockResolvedValue(envelope);
+      const fetch = vi.fn().mockResolvedValue({ ok: true, status: 200, json });
+      vi.stubGlobal('fetch', fetch);
+      apiFetchMock.mockImplementation((path, options) => path.includes('/weekly-review')
+        ? apiFetch(path, options) : Promise.resolve({}));
+      render(<SettingsModal isOpen onClose={vi.fn()} />);
+      openTab('AI & Agents');
+      fireEvent.click(screen.getByRole('button', { name: button }));
+      expect(await screen.findByText(expected)).toBeInTheDocument();
+      expect(json).toHaveBeenCalledTimes(1);
+      expect(fetch).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([
+      [{ triggered: false, analysis: null }, 'Analysis returned no result.'],
+      [{ triggered: true, analysis: { summary: '' } }, 'Analysis complete.'],
+      [{ ok: false, error: { code: 'review_failed' } }, "Trigger failed: We couldn't complete that request. Please try again."],
+    ])('reports the manual review outcome truthfully for %j', async (payload, expected) => {
+      apiFetchMock.mockImplementation(path => Promise.resolve(path.endsWith('/weekly-review/trigger') ? payload : {}));
+      render(<SettingsModal isOpen onClose={vi.fn()} />);
+      openTab('AI & Agents');
+      fireEvent.click(screen.getByRole('button', { name: 'Run Now' }));
+      expect(await screen.findByText(expected)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Run Now' })).toBeEnabled();
+    });
+
+    it.each([
+      ['View Last Review', '/latest', { summary: 'Saved after retry.' }, 'Saved after retry.', 'Failed to load review: Offline'],
+      ['Run Now', '/trigger', { triggered: true, analysis: { summary: 'Completed after retry.' } }, 'Completed after retry.', 'Trigger failed: Offline'],
+    ])('recovers from a %s error using the same control', async (button, suffix, payload, expected, error) => {
+      let attempt = 0;
+      apiFetchMock.mockImplementation(path => {
+        if (!path.endsWith('/weekly-review' + suffix)) return Promise.resolve({});
+        return ++attempt === 1 ? Promise.reject(new Error('Offline')) : Promise.resolve(payload);
+      });
+      render(<SettingsModal isOpen onClose={vi.fn()} />);
+      openTab('AI & Agents');
+      fireEvent.click(screen.getByRole('button', { name: button }));
+      expect(await screen.findByText(error)).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: button }));
+      expect(await screen.findByText(expected)).toBeInTheDocument();
+      expect(attempt).toBe(2);
+      expect(screen.queryByText(error)).toBeNull();
+    });
+
+    it.each(['View Last Review', 'Run Now'])('prevents overlapping requests while %s is pending', async button => {
+      let finish;
+      apiFetchMock.mockImplementation(path => path.includes('/weekly-review')
+        ? new Promise(resolve => { finish = resolve; }) : Promise.resolve({}));
+      render(<SettingsModal isOpen onClose={vi.fn()} />);
+      openTab('AI & Agents');
+      const read = screen.getByRole('button', { name: 'View Last Review' });
+      const run = screen.getByRole('button', { name: 'Run Now' });
+      fireEvent.click(screen.getByRole('button', { name: button }));
+      fireEvent.click(run);
+      fireEvent.click(read);
+      expect(run).toBeDisabled();
+      expect(read).toBeDisabled();
+      expect(requestedPaths().filter(path => path.includes('/weekly-review'))).toHaveLength(1);
+      await act(async () => finish({ triggered: true, analysis: { summary: 'Complete.' }, summary: 'Complete.' }));
+      expect(await screen.findByText('Complete.')).toBeInTheDocument();
+      expect(run).toBeEnabled();
+      expect(read).toBeEnabled();
+    });
+
+    it.each(['tab', 'close', 'cancel', 'disable', 'account'])('ignores a retired review completion after %s and permits a fresh read', async interruption => {
+      let finish;
+      let attempt = 0;
+      apiFetchMock.mockImplementation(path => {
+        if (!path.endsWith('/weekly-review/latest')) return Promise.resolve({});
+        return ++attempt === 1 ? new Promise(resolve => { finish = resolve; }) : Promise.resolve({ summary: 'Current review.' });
+      });
+      if (interruption === 'account') authHarness.value = { isLoggedIn: true, user: { id: 'synthetic-original-owner' } };
+      const onClose = vi.fn();
+      const view = render(<SettingsModal isOpen onClose={onClose} />);
+      openTab('AI & Agents');
+      fireEvent.click(screen.getByRole('button', { name: 'View Last Review' }));
+      if (interruption === 'tab') {
+        openTab('Music');
+        openTab('AI & Agents');
+      } else if (interruption === 'close') {
+        view.rerender(<SettingsModal isOpen={false} onClose={onClose} />);
+        view.rerender(<SettingsModal isOpen onClose={onClose} />);
+      } else if (interruption === 'cancel') {
+        fireEvent.keyDown(document, { key: 'Escape' });
+        expect(onClose).toHaveBeenCalledTimes(1);
+      } else if (interruption === 'disable') {
+        fireEvent.click(screen.getByRole('switch', { name: 'Enable weekly review' }));
+        fireEvent.click(screen.getByRole('switch', { name: 'Enable weekly review' }));
+      } else {
+        authHarness.value = { isLoggedIn: true, user: { id: 'synthetic-next-owner' } };
+        // Change a prop as well so React.memo re-renders the hook fixture.
+        view.rerender(<SettingsModal isOpen onClose={vi.fn()} />);
+      }
+      fireEvent.click(screen.getByRole('button', { name: 'View Last Review' }));
+      expect(await screen.findByText('Current review.')).toBeInTheDocument();
+      await act(async () => finish({ summary: 'Retired owner review.' }));
+      expect(screen.queryByText('Retired owner review.')).toBeNull();
+      expect(screen.getByText('Current review.')).toBeInTheDocument();
+    });
+
+    it('does not let a retired error replace a newer completion', async () => {
+      let fail;
+      let attempt = 0;
+      apiFetchMock.mockImplementation(path => {
+        if (!path.endsWith('/weekly-review/latest')) return Promise.resolve({});
+        return ++attempt === 1 ? new Promise((_, reject) => { fail = reject; }) : Promise.resolve({ summary: 'New review.' });
+      });
+      render(<SettingsModal isOpen onClose={vi.fn()} />);
+      openTab('AI & Agents');
+      fireEvent.click(screen.getByRole('button', { name: 'View Last Review' }));
+      openTab('Music');
+      openTab('AI & Agents');
+      fireEvent.click(screen.getByRole('button', { name: 'View Last Review' }));
+      expect(await screen.findByText('New review.')).toBeInTheDocument();
+      await act(async () => fail(new Error('Retired failure')));
+      expect(screen.queryByText(/Retired failure/)).toBeNull();
+      expect(screen.getByText('New review.')).toBeInTheDocument();
+    });
+
+    it('requires saving the opt-in before Run Now, preserves it on reopen, and can save opt-out', async () => {
+      settingsHarness.settings = { ...baseSettings, weekly_review_enabled: false };
+      const onClose = vi.fn();
+      const view = render(<SettingsModal isOpen onClose={onClose} />);
+      openTab('AI & Agents');
+      fireEvent.click(screen.getByRole('switch', { name: 'Enable weekly review' }));
+      expect(screen.getByRole('button', { name: 'Run Now' })).toBeDisabled();
+      expect(screen.getByText('Save Changes to enable Weekly Review before running an analysis.')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Run Now' }));
+      expect(requestedPaths().filter(path => path.endsWith('/weekly-review/trigger'))).toEqual([]);
+      expect(settingsHarness.updateSettings).not.toHaveBeenCalled();
+      fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
+      await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+      expect(settingsHarness.settings.weekly_review_enabled).toBe(true);
+      view.unmount();
+      render(<SettingsModal isOpen onClose={onClose} />);
+      openTab('AI & Agents');
+      expect(screen.getByRole('switch', { name: 'Enable weekly review' })).toBeChecked();
+      expect(screen.getByRole('button', { name: 'Run Now' })).toBeEnabled();
+      fireEvent.click(screen.getByRole('switch', { name: 'Enable weekly review' }));
+      expect(screen.queryByRole('button', { name: 'Run Now' })).toBeNull();
+      fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
+      await waitFor(() => expect(onClose).toHaveBeenCalledTimes(2));
+      expect(settingsHarness.settings.weekly_review_enabled).toBe(false);
+      expect(requestedPaths().filter(path => path.endsWith('/weekly-review/trigger'))).toEqual([]);
     });
 
     it('still renders the smart-home network scan', async () => {
