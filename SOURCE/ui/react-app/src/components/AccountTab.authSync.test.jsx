@@ -55,6 +55,8 @@ function baseHooksAuth(overrides = {}) {
     loading: false,
     isLoggedIn: false,
     logout: vi.fn(async () => ({ success: true })),
+    refreshUser: vi.fn(async () => {}),
+    billingStatus: 'ready',
     passwordRecovery: false,
     ...overrides,
   };
@@ -344,7 +346,8 @@ describe('AccountTab logout action ownership', () => {
     cloudAuthMock.value = baseCloudAuth({ status: 'signedIn', user: { id: 'synthetic-user' }, signOut: vi.fn(async () => ({ ok: false, error: { code: 'auth_session_changed' } })) });
     const { user } = render(<AccountTab />);
     await user.click(screen.getByRole('button', { name: 'Sign Out' }));
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.queryByText('Sign-out could not be completed. Please retry.')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Retry sign-out' })).not.toBeInTheDocument();
   });
 });
 

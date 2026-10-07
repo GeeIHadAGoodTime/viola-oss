@@ -13,7 +13,6 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock, patch
 
-
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
@@ -147,7 +146,11 @@ class RemoteManagedAccounting(unittest.IsolatedAsyncioTestCase):
                      "_agent_turn_model_name": lambda *args: "gpt-6-luna",
                      "_actual_agent_turn_usage": lambda *args: usage,
                      "_handle_agent_loop_billing_failure": lambda exc: False}
-        exec(compile(ast.fix_missing_locations(ast.Module(body=[method], type_ignores=[])), str(source), "exec"), namespace)
+        wrapper = ast.FunctionDef(name="bind_settlement", args=ast.arguments(posonlyargs=[], args=[], kwonlyargs=[],
+            kw_defaults=[], defaults=[]), body=[ast.Assign(targets=[ast.Name(id="outcome", ctx=ast.Store())],
+            value=ast.Constant("success")), method, ast.Return(value=ast.Name(id=method.name, ctx=ast.Load()))], decorator_list=[])
+        exec(compile(ast.fix_missing_locations(ast.Module(body=[wrapper], type_ignores=[])), str(source), "exec"), namespace)
+        namespace[method.name] = namespace["bind_settlement"]()
         reservation = SimpleNamespace(remotely_accounted=True, _spend_reservation=None, settle=AsyncMock())
         await namespace[method.name](reservation=reservation, estimated_usage=usage,
                                      response={"_usage": {"output_tokens": 6_000_000}}, turn_kwargs={})
@@ -162,11 +165,86 @@ class RemoteManagedAccounting(unittest.IsolatedAsyncioTestCase):
         error = budget.ManagedLlmSpendCapError("Included usage reached", {"plan": "max", "period": "monthly",
             "percent_used": 100, "resets_at": "2026-11-07T00:00:00Z", "spent_cents": 17,
             "limit_cents": 17, "extra_usage_cents": 3, "purchase_url": "https://untrusted.invalid"})
+        assert error.public_message == "Included usage reached"
         assert error.limit_type == "managed_llm_spend_cap"
         assert error.cap_state["percent_used"] == 100
         assert error.cap_state["purchase_url"] == "/billing/capacity"
         assert not {"spent_cents", "limit_cents", "extra_usage_cents"} & error.cap_state.keys()
         assert budget.cap_state_from_response({"data": {"cap_state": error.cap_state}}) == error.cap_state
+
+    async def test_policy_answer_projects_state_before_stopping_the_agent(self):
+        source = ROOT / "intent/agent_loop.py"
+        owner = next(node for node in ast.parse(source.read_text(encoding="utf-8")).body
+                     if isinstance(node, ast.AsyncFunctionDef) and node.name == "run_agent_loop")
+        method = next(node for node in owner.body if isinstance(node, ast.AsyncFunctionDef)
+                      and node.name == "_settle_agent_turn_spend_success")
+        wrapper = ast.FunctionDef(name="bind_settlement", args=ast.arguments(posonlyargs=[], args=[], kwonlyargs=[],
+            kw_defaults=[], defaults=[]), body=[ast.Assign(targets=[ast.Name(id="outcome", ctx=ast.Store())],
+            value=ast.Constant("success")), method, ast.Return(value=ast.Name(id=method.name, ctx=ast.Load()))], decorator_list=[])
+        stop = type("CostLimitStop", (Exception,), {})
+        executor = SimpleNamespace(_final_params={})
+        settle = AsyncMock()
+        namespace = {"Any": object, "executor": executor, "_AgentLoopCostLimitStop": stop,
+            "_settle_agent_turn_spend_failed": settle,
+            "_set_final_response": lambda owner, answer, **kwargs: setattr(owner, "answer", answer)}
+        exec(compile(ast.fix_missing_locations(ast.Module(body=[wrapper], type_ignores=[])), str(source), "exec"), namespace)
+        stopped = False
+        try:
+            await namespace["bind_settlement"]()(reservation=object(), estimated_usage=None, turn_kwargs={},
+                response={"_policy_denial": True, "error": "managed_llm_budget_unavailable", "answer": "Try again.",
+                    "cap_state": {"denial_code": "managed_llm_budget_unavailable", "remaining_cents": 99,
+                        "purchase_url": "https://untrusted.invalid", "diagnostic_id": "not-a-valid-id"}})
+        except stop:
+            stopped = True
+        assert stopped
+        state = executor._final_params["cap_state"]
+        assert state["denial_code"] == "managed_llm_budget_unavailable"
+        assert executor._final_params["stop_reason"] == "managed_llm_budget_unavailable"
+        assert state["purchase_url"] == "/billing/capacity"
+        assert "remaining_cents" not in state and "diagnostic_id" not in state
+        settle.assert_awaited_once()
+
+    def test_positive_balance_is_not_described_as_exhausted(self):
+        gate = budget.ManagedLlmBudgetGate(False, spent_cents=8, budget_cents=33, plan="free",
+            period="weekly", estimated_cents=26, reason="weekly managed spend cap reached")
+        message = budget.managed_llm_budget_message(gate)
+        assert "larger than your remaining" in message
+        assert "reached" not in message and "cents" not in message
+        assert gate.cap_state["denial_code"] == "managed_llm_spend_cap"
+        assert not {"spent_cents", "limit_cents", "estimated_cents", "remaining_cents"} & gate.cap_state.keys()
+
+    async def test_non_budget_denial_keeps_its_type_and_does_not_claim_exhaustion(self):
+        cases = [("budget counter unavailable", "managed_llm_budget_unavailable"),
+                 ("account capacity unavailable", "managed_llm_budget_unavailable"),
+                 ("authenticated managed-LLM user required", "authenticated_user_required"),
+                 ("owner safety control unavailable", "owner_safety_control_disabled")]
+        from core.exceptions import LLMQuotaExceededError
+        for reason, code in cases:
+            gate = budget.ManagedLlmBudgetGate(False, reason=reason)
+            reservation = LlmSpendReservation(user_id="synthetic", model="gpt-6-luna",
+                estimated_usage=LlmTokenUsage(100, 100), operation="synthetic-test", reserve_tokens=False)
+            with patch.object(budget, "user_uses_managed_llm", return_value=True), patch.object(
+                budget, "reserve_managed_llm_spend_cap_async", new=AsyncMock(return_value=gate)):
+                caught = None
+                try:
+                    await reservation.reserve()
+                except LLMQuotaExceededError as error:
+                    caught = error
+            assert caught is not None
+            assert caught.limit_type == code
+            assert caught.cap_state["denial_code"] == code
+            assert "reached" not in caught.public_message
+
+    def test_reported_zero_and_partial_usage_preserve_provider_truth(self):
+        from services.llm.spend_accounting import usage_from_openai_usage, usage_source_from_openai_usage
+        fallback = LlmTokenUsage(100, 200)
+        zero = usage_from_openai_usage({"input_tokens": 0, "output_tokens": 0}, fallback)
+        assert (zero.input_tokens, zero.output_tokens) == (0, 0)
+        result = usage_from_openai_usage({"input_tokens": 0, "output_tokens": None}, fallback)
+        assert (result.input_tokens, result.output_tokens) == (0, 200)
+        assert usage_source_from_openai_usage({"input_tokens": 0, "output_tokens": 0}) == "provider"
+        assert usage_source_from_openai_usage({"input_tokens": 0}) == "mixed"
+        assert usage_source_from_openai_usage({}) == "estimate"
 
     async def test_terminal_cloud_denial_preserves_work_and_reaches_the_cap_notice_contract(self):
         source = ROOT / "intent/agent_loop.py"

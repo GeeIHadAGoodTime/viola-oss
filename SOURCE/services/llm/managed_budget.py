@@ -9,6 +9,7 @@ standalone paths usable without weakening the hosted spend boundary.
 from __future__ import annotations
 
 import math
+import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
@@ -29,8 +30,14 @@ def public_managed_cap_state(value: object) -> dict[str, Any]:
     """Project a denial without exposing the company's provider-cost ledger."""
     if not isinstance(value, dict):
         return {}
-    result = {key: value[key] for key in ("plan", "period", "resets_at")
+    result = {key: value[key] for key in ("plan", "period", "resets_at", "denial_code")
               if isinstance(value.get(key), str)}
+    diagnostic_id = value.get("diagnostic_id")
+    if isinstance(diagnostic_id, str):
+        try:
+            result["diagnostic_id"] = str(uuid.UUID(diagnostic_id))
+        except ValueError:
+            pass
     for key in ("usage_percent", "percent_used", "retry_after_seconds"):
         number = value.get(key)
         if type(number) in {int, float} and math.isfinite(number) and number >= 0:
@@ -50,10 +57,10 @@ class ManagedLlmSpendCapError(LLMQuotaExceededError):
     """A terminal cloud allowance denial carrying its safe customer state."""
 
     def __init__(self, public_message: str, cap_state: dict[str, Any]) -> None:
-        self.cap_state = public_managed_cap_state(cap_state)
-        self.public_message = public_message or "You’ve used your included managed usage. Add more to continue."
+        state = public_managed_cap_state(cap_state)
+        message = public_message or "You’ve used your included managed usage. Add more to continue."
         super().__init__(user_id="<managed>", limit_type="managed_llm_spend_cap", current=0, limit=0,
-                         reset_at=self.cap_state.get("resets_at", ""))
+                         reset_at=state.get("resets_at", ""), cap_state=state, public_message=message)
 
 
 def provider_managed_spend_accounted_remotely(provider: object) -> bool:
@@ -90,15 +97,27 @@ class ManagedLlmBudgetGate:
     public_message: str = ""
     reservation: Any | None = None
     public_cap_state: dict[str, Any] | None = None
+    estimated_cents: int = 0
+
+    @property
+    def denial_code(self) -> str:
+        if self.reason == "authenticated managed-LLM user required":
+            return "authenticated_user_required"
+        if self.reason in {"budget counter unavailable", "account capacity unavailable"}:
+            return "managed_llm_budget_unavailable"
+        if self.reason.startswith("owner safety control"):
+            return "owner_safety_control_disabled"
+        return "managed_llm_spend_cap"
 
     @property
     def cap_state(self) -> dict[str, Any]:
         if self.public_cap_state is not None:
             return public_managed_cap_state(self.public_cap_state)
-        if self.allowed or not self.period:
+        if self.allowed:
             return {}
         state = {
             "plan": self.plan,
+            "denial_code": self.denial_code,
             "period": self.period,
             "resets_at": self.resets_at,
             "retry_after_seconds": self.retry_after_seconds,
@@ -118,6 +137,7 @@ def _public_budget_gate(gate: Any) -> ManagedLlmBudgetGate:
         plan=gate.plan, period=gate.period, resets_at=gate.resets_at,
         extra_usage_cents=gate.extra_usage_cents, retry_after_seconds=gate.retry_after_seconds,
         reason=gate.reason, public_message=gate.public_message, reservation=gate.reservation,
+        estimated_cents=getattr(gate, "estimated_cents", 0),
     )
 
 
@@ -166,6 +186,15 @@ def managed_llm_budget_message(gate: ManagedLlmBudgetGate) -> str:
     """Return user-facing copy for a managed-AI budget denial."""
     if gate.public_message:
         return gate.public_message
+    if gate.denial_code == "authenticated_user_required":
+        return "Sign in to use managed AI."
+    if gate.denial_code != "managed_llm_spend_cap" or gate.period not in {"weekly", "monthly"} or not gate.plan:
+        return "I can't verify your managed usage capacity right now. Please try again shortly."
+    if gate.budget_cents > gate.spent_cents:
+        return (
+            "This request is larger than your remaining managed usage capacity. "
+            "Try a shorter request or choose Add more usage in Billing."
+        )
     period = str(gate.period or "current").strip().lower()
     plan = str(gate.plan or "your").strip().replace("_", " ").title()
     plan_label = "%s plan" % plan if plan != "Your" else "your plan"

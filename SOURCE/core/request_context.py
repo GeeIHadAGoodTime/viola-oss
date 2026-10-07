@@ -32,12 +32,9 @@ class RequestContext:
 
     ``plan_id`` is frozen at context creation — that's intentional so that a
     single request's authorization decisions are stable. However billing
-    state can change mid-session (upgrade/cancel/past_due). When that
-    happens, ``billing.service`` calls
-    ``auth.privilege_rotation.rotate_sessions_on_privilege_change`` which
-    invalidates the session and forces re-authentication on the next
-    request; the new request then gets a fresh ``RequestContext`` with the
-    updated plan. AUTH-07: code that wants the *live* plan mid-request
+    state can change mid-session (upgrade/cancel/past_due). GoTrue owns
+    session lifecycle; a billing change does not require signing out.
+    AUTH-07: code that wants the *live* plan mid-request
     (billing gates, quota counters) should call ``live_plan_id()``, which
     bypasses the frozen field and re-resolves via
     ``resolve_runtime_plan_id``.
@@ -52,19 +49,17 @@ class RequestContext:
     def live_plan_id(self) -> str:
         """AUTH-07: re-resolve the plan id from canonical settings.
 
-        Use this when the caller needs the *current* plan and it's acceptable
-        to pay the SettingsManager read cost. Falls back to the frozen
-        ``plan_id`` on any resolution failure so callers don't have to
-        guard against exceptions.
+        Cloud billing reads the authoritative subscription, including expiry.
+        A read failure must not restore an old paid request context.
         """
         try:
             return resolve_runtime_plan_id(self.user_id)
         except Exception:  # pragma: no cover — defensive fallback
             logger.exception(
-                "live_plan_id fell back to frozen plan_id for user %s",
+                "live_plan_id lookup failed for user %s",
                 self.user_id,
             )
-            return self.plan_id
+            return PlanId.FREE.value
 
 
 _current_context: contextvars.ContextVar[RequestContext] = contextvars.ContextVar(
@@ -186,7 +181,7 @@ async def _fetch_postgres_subscription_row(dsn: str, user_id: str):
                 "PostgreSQL subscription table drift in request_context lookup; skipping DB plan resolution",
                 extra={"user_id": user_id, "table": "subscriptions"},
             )
-            return None
+            raise
     finally:
         await conn.close()
 
@@ -252,7 +247,7 @@ def _sync_billing_plan_mirror(user_id: str, plan_id: str) -> None:
         logger.debug("Failed to sync billing_plan_id mirror for user %s", user_id)
 
 
-def resolve_runtime_plan_id(user_id: str) -> str:
+def resolve_runtime_plan_id(user_id: str, *, require_authority: bool = False) -> str:
     """Resolve the active runtime plan id from live subscription state.
 
     The settings mirror is only a fallback. It is not entitlement-authoritative
@@ -260,10 +255,6 @@ def resolve_runtime_plan_id(user_id: str) -> str:
     """
     from config.settings import settings
     from ui.settings_manager import get_settings_manager
-
-    ctx = get_request_context()
-    if ctx is not None and ctx.user_id == user_id:
-        return coerce_plan_id(ctx.plan_id).value
 
     surface = coerce_app_surface(getattr(settings, "app_surface", AppSurface.DESKTOP.value))
 
@@ -291,16 +282,53 @@ def resolve_runtime_plan_id(user_id: str) -> str:
             "closed to free (billing_plan_id mirror not consulted)",
             user_id,
         )
+        if require_authority:
+            raise RuntimeError("Authoritative subscription read is unavailable")
         return PlanId.FREE.value
 
     # Desktop (one-user-per-install): the settings mirror is the entitlement authority.
     try:
+        snapshot = read_desktop_entitlement_snapshot(user_id)
+        if snapshot is not None:
+            return coerce_plan_id(snapshot["plan_id"]).value
         sm = get_settings_manager()
-        plan_raw = sm.get("billing_plan_id", PlanId.FREE.value)
+        plan_raw = sm.get("billing_plan_id", PlanId.FREE.value, user_id=user_id)
         return coerce_plan_id(plan_raw).value
     except Exception:
         logger.exception("Failed to resolve runtime plan for user %s - defaulting to free", user_id)
         return PlanId.FREE.value
+
+
+def read_desktop_entitlement_snapshot(user_id: str) -> dict[str, Any] | None:
+    """Read the protected cloud billing snapshot for this desktop account."""
+    from ui.settings_manager import get_settings_manager
+
+    snapshot = get_settings_manager().get("billing_plan_snapshot", None, user_id=user_id)
+    if snapshot is None:
+        return None
+    free = {"plan_id": "free", "subscription_status": "free", "current_period_end": None}
+    if not isinstance(snapshot, dict) or snapshot.get("user_id") != user_id:
+        return free
+    try:
+        until = _parse_subscription_datetime(snapshot.get("current_period_end"))
+        if until is not None and until <= datetime.now(UTC):
+            return free
+        if str(snapshot.get("subscription_source") or "").startswith("admin_") and until is None:
+            return free
+        if snapshot.get("has_paid_access") is not True:
+            return free
+        plan = coerce_plan_id(snapshot.get("plan_id"))
+        status = SubscriptionStatus(snapshot.get("status", "free"))
+        provider = parse_payment_provider(snapshot["payment_provider"]) if snapshot.get("payment_provider") else None
+        if not billing_state_has_paid_access(status, plan, provider, until):
+            return free
+        return {
+            "plan_id": plan.value,
+            "subscription_status": status.value,
+            "current_period_end": until,
+        }
+    except (TypeError, ValueError):
+        return free
 
 
 def create_context_for_user(user_id: str) -> RequestContext:
