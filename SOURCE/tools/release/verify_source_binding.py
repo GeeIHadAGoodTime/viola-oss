@@ -41,6 +41,14 @@ def check(source: Path, metadata: Path) -> list[str]:
         failures.append("source tree checksum mismatch")
     if binding.get("source_file_count") != len(manifest.get("files", [])):
         failures.append("source file count mismatch")
+    revision = manifest.get("revision")
+    if not isinstance(revision, str) or not revision.strip():
+        failures.append("source manifest revision missing or invalid")
+    elif binding.get("source_revision") != revision:
+        failures.append("source revision mismatch")
+    qualification = binding.get("qualification")
+    if not isinstance(qualification, dict) or qualification.get("source_commit") != revision:
+        failures.append("qualification source commit mismatch")
     failures.extend(verify(source, manifest))
 
     retained = binding.get("retained_sboms", [])
