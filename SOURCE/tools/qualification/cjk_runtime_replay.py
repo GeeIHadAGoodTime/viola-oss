@@ -615,7 +615,13 @@ class CompanionTests(unittest.TestCase):
                 patch("importlib.metadata.version", side_effect=lambda name: wrong[name]),
                 self.assertRaises(RuntimeError),
             ):
-                compose_customer_tokenizer(self.owner, mandarin=False)
+                compose_customer_tokenizer(self.owner, mandarin=True)
+        old_companion = dict(versions, **{"viola-misaki-cjk-prototype": "0.9.4+viola.cjk.2"})
+        with (
+            patch("importlib.metadata.version", side_effect=lambda name: old_companion[name]),
+            self.assertRaises(RuntimeError),
+        ):
+            compose_customer_tokenizer(self.owner, mandarin=True)
         with self.assertRaises(ValueError):
             compose_customer_tokenizer(self.owner, mandarin="yes")
         with self.assertRaises(ValueError):

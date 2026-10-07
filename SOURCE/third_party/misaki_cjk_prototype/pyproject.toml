@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "viola-misaki-cjk-prototype"
-version = "0.9.4+viola.cjk.2"
+version = "0.9.4+viola.cjk.3"
 description = "Inactive reconstructed CJK companion for the retained Viola English pronunciation fork"
 requires-python = ">=3.11"
 license = "Apache-2.0 AND MIT"
