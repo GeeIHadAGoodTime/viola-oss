@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "ff2e4c25254363bf214d33ac651a5393a445366a",
-  "sha256": "84912e8644c2dff66b6ef2c77a8f3303e3eb6ab39be329edb3cdb96a7f9f86f5",
+  "revision": "bf725ba738df7deebf49d0f1dd1e5960d847dd98",
+  "sha256": "fa52fef287a48cc0c4cdf5f50b0bd07d40c1d38e2d284e3a89df4ce203f2ab2a",
   "files": [
     {
       "path": ".env.example",
@@ -625,8 +625,8 @@
     },
     {
       "path": "backend/fastapi_app.py",
-      "sha256": "b6fb0b80d8d985e355c676d96ded158cc2b6ec466b5d3942d3e6b13f296b39df",
-      "bytes": 66736
+      "sha256": "99b29fe7a9349ab7f7a5b774e1117a558a269c7f923cb71e3e34fc791f31b234",
+      "bytes": 67672
     },
     {
       "path": "backend/instrumentation.py",
@@ -5655,8 +5655,8 @@
     },
     {
       "path": "telephony/call_manager.py",
-      "sha256": "b13091353108cbdcb379abb4b6dd688b897eff5cf472f3b1b0365e1d2f08b6f6",
-      "bytes": 376541
+      "sha256": "2888bde2e3f1cb307f25741155148bab49288161bcf0f4785cf7622d5b7d3190",
+      "bytes": 376598
     },
     {
       "path": "telephony/call_queue.py",
@@ -5945,8 +5945,8 @@
     },
     {
       "path": "telephony/usage.py",
-      "sha256": "cb2b27e83196f534ae96ce2246b935f17a5b0254a3378f8057cdf4b5126fd216",
-      "bytes": 6857
+      "sha256": "92672d4de5715278236f2e71d397256d2149cf848887e587283cb5f71de39f58",
+      "bytes": 6885
     },
     {
       "path": "telephony/user_settings_lookup.py",
@@ -5979,9 +5979,19 @@
       "bytes": 5122
     },
     {
+      "path": "tests/public/test_billing_capacity_mount.py",
+      "sha256": "9bfadb0951fc1a75919e89d5350d16b538fb81a95a37069fd620c8966959b72f",
+      "bytes": 3239
+    },
+    {
       "path": "tests/public/test_call_history_order_contract.py",
       "sha256": "0cc8b760badad62729d74d5a40f9963540cb9821afc8ea951582b7161538d32e",
       "bytes": 5503
+    },
+    {
+      "path": "tests/public/test_capacity_phone_resource_bridge.py",
+      "sha256": "8c5324a4cbb190a02e8c80be06f0f71b803dd6a1d81758c134f2a38c0bc7e099",
+      "bytes": 2356
     },
     {
       "path": "tests/public/test_carrier_event_adapter_contract.py",
@@ -10085,7 +10095,7 @@
     },
     {
       "path": "ui/react-app/src/auth/legalVersions.js",
-      "sha256": "93b246c158875d6efcb36ab89bd911b9b017518ccc6ccd7f4f7e514f6dd68fed",
+      "sha256": "7188e37eb03bd0b536e33256d963c54a16908106ea27cddc7afd22481f3923aa",
       "bytes": 237
     },
     {
@@ -10130,8 +10140,8 @@
     },
     {
       "path": "ui/react-app/src/components/AccountTab.jsx",
-      "sha256": "95b0de56b8b6851841e11939249d54743ad89f521526a0d2db98743d20b43476",
-      "bytes": 76064
+      "sha256": "145c44e25d65c6cac20785442deb6c53a3762509f1e6408faaa7692afc1c93a6",
+      "bytes": 76307
     },
     {
       "path": "ui/react-app/src/components/AccountTab.legacy.jsx",
@@ -10177,6 +10187,21 @@
       "path": "ui/react-app/src/components/AgentDrawer.jsx",
       "sha256": "98cfb9b61a53be567c24e963bc5fcf3280a2a00f8da957cb662291316d70ec87",
       "bytes": 5163
+    },
+    {
+      "path": "ui/react-app/src/components/BillingCapacityPanel.css",
+      "sha256": "f0b19d39b74ef6555bf80fef7572dd6b4db2c50320c8d4dec7c1da3c0847c29b",
+      "bytes": 2930
+    },
+    {
+      "path": "ui/react-app/src/components/BillingCapacityPanel.jsx",
+      "sha256": "48f8c6402794db5aa40d79f926252768da7a857b28616daa83364c3d3585737f",
+      "bytes": 17765
+    },
+    {
+      "path": "ui/react-app/src/components/BillingCapacityPanel.test.jsx",
+      "sha256": "c27e8320910958c200f54ae5e4957718925be18b7cb8cb078f2a4f652015151f",
+      "bytes": 15713
     },
     {
       "path": "ui/react-app/src/components/BugReportModal.jsx",
@@ -10590,13 +10615,13 @@
     },
     {
       "path": "ui/react-app/src/components/UsageCapNotice.jsx",
-      "sha256": "e0ada59fee1cdd01fa8e0524f15ff4b6d90e1a0ed04d7a4720adf90ccb7100bb",
-      "bytes": 2833
+      "sha256": "ed1f1bd549a72f07d2db668b3cd66518553e7498abd41f6ef976119c6c716220",
+      "bytes": 2239
     },
     {
       "path": "ui/react-app/src/components/UsageCapNotice.test.jsx",
-      "sha256": "877ba1b08805c3abab8edd3b6387161b8b19a0625e637da88f1b99a6f0ce19e8",
-      "bytes": 3797
+      "sha256": "661a5727f01abf1c16ff09affd4fae17f9b13a54fb369e1529bd013765ec9a2c",
+      "bytes": 3635
     },
     {
       "path": "ui/react-app/src/components/WakeWordSection.jsx",
@@ -11409,6 +11434,11 @@
       "bytes": 1939
     },
     {
+      "path": "ui/react-app/src/hooks/useBillingCapacity.js",
+      "sha256": "d1b883e26ca56d679382289d5446151d1df23f9ee2946fc0b7814d6c86354f6f",
+      "bytes": 8746
+    },
+    {
       "path": "ui/react-app/src/hooks/useBrowserAuth.js",
       "sha256": "7f7e6f1f114f15cdba391d36d6b63cdde2b2b331a4708e126928e215c3e7dd64",
       "bytes": 8365
@@ -11580,8 +11610,8 @@
     },
     {
       "path": "ui/react-app/src/hooks/useUsage.jsx",
-      "sha256": "e2ec7fa08e31b3e1cc9a9facc991ea484522d1d3ca8556ca189ef97c3115f2f1",
-      "bytes": 3100
+      "sha256": "c8406da62d89e944c566f260d659114110a61575e003fe41788215131d95cd88",
+      "bytes": 3322
     },
     {
       "path": "ui/react-app/src/hooks/useUsage.test.jsx",
