@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "ff2e4c25254363bf214d33ac651a5393a445366a",
-  "sha256": "84912e8644c2dff66b6ef2c77a8f3303e3eb6ab39be329edb3cdb96a7f9f86f5",
+  "revision": "92b03f69702bbbe43c3d585bcee9bc7a10c5ade4",
+  "sha256": "a0dcfe01526b3bee59b2395d22a8a828d6974c1561849b992531e1330325c552",
   "files": [
     {
       "path": ".env.example",
@@ -6145,8 +6145,8 @@
     },
     {
       "path": "tests/public/test_speech_volume_wiring.py",
-      "sha256": "61d07fab425c0a685ad51e34df88c6a639c0401c5a82dc74660c60b820330cf3",
-      "bytes": 79627
+      "sha256": "424bcc1942181963c7afed12d7f63da90be65d24af624293ef55cc2d65e250ea",
+      "bytes": 83191
     },
     {
       "path": "tests/public/test_step_logger_status.py",
@@ -9835,8 +9835,8 @@
     },
     {
       "path": "ui/react-app/src/__tests__/hooks/useSettings.snapshotOrdering.test.jsx",
-      "sha256": "e6fb77f9998d4a8df1e1bce9d6bd761ed764a8f8481ea27dd1ad8a705a3c0d91",
-      "bytes": 13578
+      "sha256": "0ced15b91babb7cd2a6d7d2b87154b7cef4df8db67bd8992afaa55a1e87e3f88",
+      "bytes": 15828
     },
     {
       "path": "ui/react-app/src/__tests__/hooks/useSpokeSurfaceGuards.test.jsx",
@@ -11565,8 +11565,8 @@
     },
     {
       "path": "ui/react-app/src/hooks/useSettings.js",
-      "sha256": "1d1c6a4fabd8bd4dfd1b33d2e85be2c3931987271bab559c79a379c6e0badbb8",
-      "bytes": 11615
+      "sha256": "5fc5f838a4681ddf0a3f6c07ee284204611751f5eaf77cfc6d4eeb9542a90206",
+      "bytes": 11941
     },
     {
       "path": "ui/react-app/src/hooks/useSettingsDraft.js",
@@ -12165,8 +12165,8 @@
     },
     {
       "path": "ui/settings_api.py",
-      "sha256": "f00c9be2b826c38bdbaf08afb267ff3abd55ac550e61a595ff32bef3c72787a2",
-      "bytes": 81780
+      "sha256": "b69ac42038078cda0454e9549fa3fdf750487adf8367b532baeee28e6143f8b9",
+      "bytes": 82338
     },
     {
       "path": "ui/settings_effects.py",
