@@ -257,6 +257,25 @@ Frozen-app behavior,
 complete dependency/native-library notices and customer release eligibility are
 separate outstanding gates.
 
+### Normal qualification launch and installed retest
+
+The marked Windows qualification artifact selects its local pronunciation route
+through a frozen startup hook before application/native imports. Normal desktop
+command and wake/PTT callers share the composed English/Spanish/Mandarin owner;
+normal phone callers use that composition with matching named voices. Output
+language and voice are separate from speech-recognition and answer-context
+settings. Failed selection or missing inputs leave speech unavailable rather
+than selecting eSpeak, system speech or remote TTS. These are source-wiring
+controls; they do not establish installed capture, synthesis or listening.
+
+An internal #1482 hardware observation on 2026-10-07 reported no wake-word
+response. A held microphone-button attempt appeared to listen, then returned
+an account-required message. This proves attempted input only; capture and
+transcription were not confirmed. The installed retest must separately check
+wake initialization and microphone/capture behavior, then repeat the authenticated
+PTT path. An account gate does not explain or qualify the wake initialization
+failure. Neither observation validates the customer pronunciation artifact.
+
 ## Native telemetry gate
 
 ONNX Runtime 1.30.0 official privacy documentation states that non-Windows

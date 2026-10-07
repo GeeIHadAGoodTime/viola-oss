@@ -315,6 +315,13 @@ class KokoroTTSEngine:
         # default blend. A caller relying on an unqualified blend must choose a
         # named voice before this instance can advertise readiness.
         self._voice_blend_spec = self._normalize_voice_blend(getattr(cfg, "tts_voice_blend", None))
+        if customer_tokenizer is not None:
+            from voice.customer_runtime import qualification_profile
+
+            if qualification_profile() is not None:
+                # The marked artifact explicitly selects a named voice. Keep
+                # persisted QA blend settings intact for ordinary builds.
+                self._voice_blend_spec = None
         if customer_tokenizer is not None and self._voice_blend_spec:
             if voice is None:
                 raise ValueError("Customer speech requires an explicit named voice when a blend is configured")
@@ -466,7 +473,7 @@ class KokoroTTSEngine:
         policy_marker = getattr(self, "_tts_disable_marker", 0)
 
         # Strip emoji before phonemisation
-        text = _strip_emoji(text)
+        text = self._prepare_route_text(text)
         if not text:
             return b""
 
@@ -661,7 +668,11 @@ class KokoroTTSEngine:
                 or policy_marker is not getattr(self, "_tts_disable_marker", 0)
             ):
                 return b""
+            if getattr(self, "_customer_route_error", None):
+                raise RuntimeError("The selected speech route is unavailable until settings apply successfully")
             if not self._ensure_loaded():
+                if getattr(self, "_customer_tokenizer", None) is not None:
+                    raise RuntimeError("The selected customer speech model inputs are unavailable")
                 logger.warning(
                     "Kokoro model not available, returning empty bytes text_length=%d",
                     len(text),
@@ -677,6 +688,8 @@ class KokoroTTSEngine:
             try:
                 return self._synthesize_internal(text, voice, speed, apply_volume=apply_volume)
             except Exception as exc:
+                if getattr(self, "_customer_tokenizer", None) is not None:
+                    raise
                 logger.error(
                     "Kokoro synthesis failed text_length=%d: %s",
                     len(text),
@@ -775,6 +788,51 @@ class KokoroTTSEngine:
             return blended, "blend(%s)" % label
 
         return self._voice, self._voice
+
+    def _prepare_route_text(self, text: str) -> str:
+        """Let an explicit customer component reject unsupported complete input."""
+        if getattr(self, "_customer_tokenizer", None) is not None:
+            if len(text) > _MAX_TEXT_LENGTH:
+                raise ValueError("Customer speech input exceeds the supported length")
+            return text
+        return _strip_emoji(text)
+
+    def set_customer_route(self, language: str, voice: str) -> None:
+        """Atomically apply a selected pair and retire audio from the old route."""
+        from voice.customer_voice_routing import require_customer_voice
+
+        with self._lock:
+            try:
+                component = getattr(self, "_customer_tokenizer", None)
+                if component is None or not component.supports_locale(language):
+                    raise ValueError("The selected customer pronunciation language is unavailable")
+                require_customer_voice(language, voice)
+                model = getattr(self, "_kokoro", None)
+                if model is not None and voice not in model.get_voices():
+                    raise ValueError("The selected customer voice asset is unavailable")
+            except Exception:
+                self._customer_route_error = "selected route could not be applied"
+                self._tts_disable_marker = object()
+                self._customer_route_epoch = object()
+                raise
+            changed = (self._speech_language, self._voice) != (language, voice)
+            self._speech_language, self._voice = language, voice
+            self._voice_blend_spec = None
+            self._voice_blend_style = None
+            self._voice_blend_key = None
+            if changed or getattr(self, "_customer_route_error", None):
+                self._tts_disable_marker = object()
+                self._customer_route_epoch = object()
+            self._customer_route_error = None
+
+    def invalidate_customer_route(self) -> None:
+        """A failed settings/user binding cannot keep speaking with a stale route."""
+        with self._lock:
+            if getattr(self, "_customer_tokenizer", None) is None:
+                raise RuntimeError("Only an explicit customer route can be invalidated")
+            self._customer_route_error = "selected route could not be applied"
+            self._tts_disable_marker = object()
+            self._customer_route_epoch = object()
 
     def _get_voice_blend_style(self) -> np.ndarray | None:
         """Build and cache a weighted Kokoro style tensor if configured."""
@@ -1030,7 +1088,7 @@ class KokoroTTSEngine:
             return
 
         # Determine whether to use streaming path
-        clean_text = _strip_emoji(text)
+        clean_text = self._prepare_route_text(text)
         if not clean_text:
             return
         if len(clean_text) > _MAX_TEXT_LENGTH:
@@ -1329,7 +1387,14 @@ class KokoroTTSEngine:
         """
         from voice.synthesis.text_normalizer import has_pending_decimal_point, normalize_for_speech
 
-        language = getattr(self, "_speech_language", "en-us")
+        customer_route = getattr(self, "_customer_tokenizer", None) is not None
+        if customer_route:
+            with self._lock:
+                language = self._speech_language
+                route_epoch = getattr(self, "_customer_route_epoch", 0)
+        else:
+            language = getattr(self, "_speech_language", "en-us")
+            route_epoch = None
         normalization_kwargs = {} if language == "en-us" else {"language": language}
 
         # Lazy-create the asyncio lock
@@ -1390,6 +1455,12 @@ class KokoroTTSEngine:
 
                     async for chunk in text_chunks:
                         full_text_parts.append(chunk)
+                        if customer_route and route_epoch is not getattr(self, "_customer_route_epoch", 0):
+                            # A new selection owns subsequent utterances. Drain
+                            # this response for history without normalizing its
+                            # remaining chunks under an old/new mixed route.
+                            await retire_pending()
+                            continue
                         enabled = self._tts_is_enabled()
                         if not enabled or policy_marker is not getattr(self, "_tts_disable_marker", 0):
                             await retire_pending()
@@ -1403,7 +1474,7 @@ class KokoroTTSEngine:
                         if len(parts) > 1:
                             # All but the last part are complete sentences
                             for part in parts[:-1]:
-                                cleaned = _strip_emoji(part.strip())
+                                cleaned = self._prepare_route_text(part.strip())
                                 if cleaned:
                                     cleaned = normalize_for_speech(cleaned, **normalization_kwargs)
                                     if cleaned:
@@ -1411,7 +1482,7 @@ class KokoroTTSEngine:
                             buffer = parts[-1]
                         elif buffer.rstrip()[-1:] in ".!?" and not has_pending_decimal_point(buffer.rstrip()):
                             # Buffer ends with sentence punctuation (no trailing space yet)
-                            cleaned = _strip_emoji(buffer.strip())
+                            cleaned = self._prepare_route_text(buffer.strip())
                             if cleaned:
                                 cleaned = normalize_for_speech(cleaned, **normalization_kwargs)
                                 if cleaned:
@@ -1480,7 +1551,7 @@ class KokoroTTSEngine:
 
                     # --- Flush remaining buffer ---
                     if buffer.strip():
-                        cleaned = _strip_emoji(buffer.strip())
+                        cleaned = self._prepare_route_text(buffer.strip())
                         if cleaned:
                             cleaned = normalize_for_speech(cleaned, **normalization_kwargs)
                             if cleaned:
@@ -1605,6 +1676,8 @@ class KokoroTTSEngine:
         When something is missing, an informative message is logged to guide
         the user through the first-run download / reinstall.
         """
+        if getattr(self, "_customer_route_error", None):
+            return False
         model_ok = Path(self._model_path).exists()
         voices_ok = Path(self._voices_path).exists()
         if model_ok and voices_ok:
@@ -1703,4 +1776,7 @@ class KokoroTTSEngine:
 
     @voice.setter
     def voice(self, value: str) -> None:
+        if getattr(self, "_customer_tokenizer", None) is not None:
+            self.set_customer_route(self._speech_language, value)
+            return
         self._voice = value

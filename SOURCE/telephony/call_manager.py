@@ -68,6 +68,12 @@ def _require_phone_customer_startup() -> None:
     alone does not qualify ETW/privacy behavior.
     """
     customer_selected = os.getenv("VIOLA_KOKORO_PHONEMIZER") == "misaki-en"
+    import sys
+
+    if getattr(sys, "frozen", False) or customer_selected:
+        from voice.customer_runtime import require_qualification_bootstrap
+
+        require_qualification_bootstrap()
     if customer_selected != _PHONE_CUSTOMER_PROFILE_AT_IMPORT:
         raise RuntimeError("Phone customer speech profile cannot change after startup")
     if not customer_selected:
@@ -1246,7 +1252,17 @@ def _phone_kokoro_from_session(session: Any, voices_path: Path, *, customer_toke
 
 def _warm_phone_kokoro_tts_runtime(kokoro: Any, *, voice: str) -> float:
     start = time.perf_counter()
-    samples, sample_rate = kokoro.create(_PHONE_TTS_WARMUP_TEXT, voice=voice)
+    qualification = None
+    if os.getenv("VIOLA_KOKORO_PHONEMIZER") == "misaki-en":
+        from voice.customer_runtime import qualification_profile, resolve_phone_voice
+
+        qualification = qualification_profile()
+    if qualification is not None:
+        locale, voice = resolve_phone_voice(voice)
+        text = {"en-us": "Hello.", "en-gb": "Hello.", "es": "hola", "zh": "你好"}[locale]
+        samples, sample_rate = kokoro.create(text, voice=voice, lang=locale)
+    else:
+        samples, sample_rate = kokoro.create(_PHONE_TTS_WARMUP_TEXT, voice=voice)
     if sample_rate <= 0 or len(samples) == 0:
         raise RuntimeError("Kokoro TTS warmup produced no audio")
     return time.perf_counter() - start
@@ -1309,6 +1325,15 @@ def _load_phone_kokoro_tts_runtime(
 def _ensure_phone_kokoro_tts_runtime(config: TelnyxConfig, *, customer_tokenizer=None) -> _PhoneKokoroTTSRuntime:
     """Load, warm, and retain one Kokoro ONNX runtime for phone TTS."""
     _require_phone_customer_startup()
+    if os.getenv("VIOLA_KOKORO_PHONEMIZER") == "misaki-en":
+        from voice.customer_runtime import get_qualification_composition, qualification_profile, resolve_phone_voice
+
+        if qualification_profile() is not None:
+            resolve_phone_voice(config.tts_voice)
+            if config.tts_provider != "local":
+                raise ValueError("The qualification artifact requires local phone speech")
+            if customer_tokenizer is None:
+                customer_tokenizer = get_qualification_composition()
     if customer_tokenizer is not None:
         from kokoro_onnx.tokenizer import Tokenizer
 
@@ -1421,12 +1446,22 @@ def _create_shared_phone_kokoro_tts_service(*, kokoro: Any, voice_id: str, **kwa
 
     from telephony.continuous_stream_resampler import create_continuous_stream_resampler
 
+    qualification = None
+    if os.getenv("VIOLA_KOKORO_PHONEMIZER") == "misaki-en":
+        from voice.customer_runtime import qualification_profile, resolve_phone_voice
+
+        qualification = qualification_profile()
+    language = Language.EN
+    if qualification is not None:
+        locale, voice_id = resolve_phone_voice(voice_id)
+        language = {"en-us": Language.EN_US, "en-gb": Language.EN_GB, "es": Language.ES, "zh": Language.ZH}[locale]
+
     class _SharedPhoneKokoroTTSService(KokoroTTSService):
         def __init__(self) -> None:
             settings = KokoroTTSService.Settings(
                 model=None,
                 voice=voice_id,
-                language=Language.EN,
+                language=language,
             )
             TTSService.__init__(
                 self,
@@ -1440,7 +1475,7 @@ def _create_shared_phone_kokoro_tts_service(*, kokoro: Any, voice_id: str, **kwa
             # remote-first proxy with the identical create/create_stream
             # surface. With the flag off this returns the local runtime
             # untouched; on any remote failure the proxy delegates to it.
-            self._kokoro = maybe_remote_first_kokoro(kokoro)
+            self._kokoro = kokoro if qualification is not None else maybe_remote_first_kokoro(kokoro)
             # Use a clear-resistant resampler for the 24kHz->pipeline-rate stage.
             # pipecat's default create_stream_resampler() auto-clears its SoX
             # filter delay-line after >0.2s idle, and that clear DROPS audio
@@ -4027,6 +4062,15 @@ class CallManager:
         carrier_event_adapter: CarrierEventAdapter | None = None,
         customer_tokenizer=None,
     ) -> None:
+        if os.getenv("VIOLA_KOKORO_PHONEMIZER") == "misaki-en":
+            from voice.customer_runtime import get_qualification_composition, qualification_profile, resolve_phone_voice
+
+            if qualification_profile() is not None:
+                resolve_phone_voice(config.tts_voice)
+                if config.tts_provider != "local":
+                    raise ValueError("The qualification artifact requires local phone speech")
+                if customer_tokenizer is None:
+                    customer_tokenizer = get_qualification_composition()
         if customer_tokenizer is not None:
             _require_phone_customer_startup()
             from voice.customer_composition import require_customer_composition
