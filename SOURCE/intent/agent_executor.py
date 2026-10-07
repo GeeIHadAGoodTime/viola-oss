@@ -3197,7 +3197,7 @@ class AgentExecutor:
         except RuntimeError:
             from services.llm.managed_budget import check_managed_llm_spend_cap
 
-            return check_managed_llm_spend_cap(self._user_id, managed_llm=self._user_uses_managed_llm())
+            return check_managed_llm_spend_cap(self._user_id, managed_llm=self._user_uses_managed_llm(), provider=getattr(self, "_llm", None))
         raise RuntimeError(
             "AgentExecutor._check_managed_llm_spend_cap() is sync-only; "
             "use _check_managed_llm_spend_cap_async() inside an event loop."
@@ -3206,7 +3206,7 @@ class AgentExecutor:
     async def _check_managed_llm_spend_cap_async(self) -> Any:
         from services.llm.managed_budget import check_managed_llm_spend_cap_async
 
-        return await check_managed_llm_spend_cap_async(self._user_id, managed_llm=self._user_uses_managed_llm())
+        return await check_managed_llm_spend_cap_async(self._user_id, managed_llm=self._user_uses_managed_llm(), provider=getattr(self, "_llm", None))
 
     @staticmethod
     def _managed_llm_budget_message(gate: Any) -> str:

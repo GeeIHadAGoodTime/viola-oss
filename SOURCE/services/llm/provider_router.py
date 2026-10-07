@@ -708,6 +708,13 @@ class ProviderAgnosticRouter:
         return "mcp"
 
     @property
+    def MANAGED_SPEND_ACCOUNTED_REMOTELY(self) -> bool:
+        """Use the same request-frozen transport selection as native routing."""
+        self._sync_runtime_provider_if_needed()
+        provider = self._provider_from_frozen_or_current()
+        return getattr(provider, "MANAGED_SPEND_ACCOUNTED_REMOTELY", False) is True
+
+    @property
     def _native_tools(self) -> list[dict[str, Any]] | None:
         """Proxy native tool schemas from the active provider."""
         self._sync_runtime_provider_if_needed()
@@ -960,6 +967,10 @@ class ProviderAgnosticRouter:
                         )
                     raise
                 except Exception as generic_exc:
+                    from services.llm.managed_budget import ManagedLlmSpendCapError
+
+                    if isinstance(generic_exc, ManagedLlmSpendCapError):
+                        raise
                     # Check if Haiku fallback should handle this
                     from services.llm.model_fallback import get_fallback_tracker
 
