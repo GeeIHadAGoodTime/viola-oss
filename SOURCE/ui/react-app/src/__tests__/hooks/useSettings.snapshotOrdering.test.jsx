@@ -213,6 +213,45 @@ describe('useSettings current snapshot acceptance', () => {
 
 
 describe('useSettings explicit acknowledgement receipts', () => {
+  it('explains a rejected shortcut collision without adopting the draft or exposing server prose', async () => {
+    const { result } = await load();
+    const refusal = Object.assign(new Error('synthetic private server diagnostic'), {
+      status: 422,
+      code: 'validation_error',
+      data: { validation_reason: 'hotkey_conflict' },
+    });
+    harness.api.mockRejectedValueOnce(refusal);
+    let receipt;
+    await act(async () => {
+      receipt = await result.current.saveSettingsWithSnapshot({ ptt_hotkey: 'Ctrl+KeyM', mute_hotkey: 'ctrl+m' });
+    });
+    expect(receipt).toEqual({ ok: false });
+    expect(result.current.settings).toEqual(oldSettings);
+    expect(result.current.error).toBe('Push-to-talk and Mute Microphone need different shortcuts. Choose a different key combination and save again. Nothing was saved.');
+    expect(result.current.error).not.toContain(refusal.message);
+    expect(result.current.saving).toBe(false);
+    harness.api.mockResolvedValueOnce(payload(savedSettings));
+    await act(async () => expect(await result.current.updateSettings(savedSettings)).toBe(true));
+    expect(result.current.error).toBeNull();
+    expect(result.current.settings).toEqual(savedSettings);
+  });
+
+  it.each([
+    { status: 500, code: 'validation_error', data: { validation_reason: 'hotkey_conflict' } },
+    { status: 422, code: 'settings_error', data: { validation_reason: 'hotkey_conflict' } },
+    { status: 422, code: 'validation_error', data: null },
+    { status: 422, code: 'validation_error', data: { validation_reason: 'future_reason' } },
+    { status: 422, code: 'validation_error', data: { validation_reason: ['hotkey_conflict'] } },
+    { status: 422, code: 'validation_error', data: 'hotkey_conflict' },
+  ])('keeps unrelated or malformed save errors generic: %j', async fields => {
+    const { result } = await load();
+    harness.api.mockRejectedValueOnce(Object.assign(new Error('synthetic private server diagnostic'), fields));
+    await act(async () => expect(await result.current.updateSetting('theme', 'dark')).toBe(false));
+    expect(result.current.error).toBe('Failed to save settings');
+    expect(result.current.settings).toEqual(oldSettings);
+    expect(result.current.saving).toBe(false);
+  });
+
   it('returns exact normalized and redacted values for the acknowledged request', async () => {
     const { result } = await load();
     const acknowledged = { ...savedSettings, tts_volume: 1, llm_api_key: '••••••' };
