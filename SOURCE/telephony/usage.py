@@ -58,7 +58,7 @@ class LocalPhoneUsage:
         if not user_id or not user_id.strip():
             raise ValueError("A call owner is required")
 
-    def concurrent_limit_for_tier(self, tier: str | None) -> int:
+    def concurrent_limit_for_tier(self, tier: str | None, user_id: str | None = None) -> int:
         return max(1, int(settings.phone_global_max_concurrent))
 
     def _check(self, db, user_id: str, phone_number: str) -> LocalCallDecision:

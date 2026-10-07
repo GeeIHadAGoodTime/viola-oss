@@ -1,12 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import UsageCapNotice, { formatResetHint } from './UsageCapNotice';
 import { apiFetch } from '../hooks/useViolaApi';
 
-// UsageCapNotice now embeds ExtraUsageTopUpButton, which reads the offer on
-// mount. Mock the API so the embedded button is deterministic (unavailable by
-// default, so these existing assertions about the upgrade route are unchanged).
+// The exhaustion notice must open Billing, never initiate a charge itself.
 vi.mock('../hooks/useViolaApi', () => ({
   apiFetch: vi.fn(),
 }));
@@ -19,20 +17,18 @@ describe('UsageCapNotice', () => {
     apiFetch.mockResolvedValue({ available: false, price_cents: 1000, currency: 'usd', purchase_url: '/billing/extra-usage/checkout' });
   });
 
-  // The Terms-primary option: when the top-up is purchasable it renders inside
-  // the cap notice alongside the upgrade route.
-  it('surfaces the extra-usage top-up when it is available', async () => {
+  it('opens billing for capacity instead of starting a legacy booster purchase', async () => {
     apiFetch.mockReset();
     apiFetch.mockResolvedValue({ available: true, price_cents: 1000, currency: 'usd', purchase_url: '/billing/extra-usage/checkout' });
     render(<UsageCapNotice capDenial={DENIAL} onUpgrade={() => {}} />);
-    expect(await screen.findByTestId('extra-usage-topup')).toBeInTheDocument();
-    // The plan-upgrade route is still present.
+    expect(screen.queryByTestId('extra-usage-topup')).not.toBeInTheDocument();
     expect(screen.getByTestId('usage-cap-upgrade')).toBeInTheDocument();
+    expect(apiFetch).not.toHaveBeenCalled();
   });
 
   it('shows only the upgrade route when the top-up is unavailable', async () => {
     render(<UsageCapNotice capDenial={DENIAL} onUpgrade={() => {}} />);
-    await waitFor(() => expect(apiFetch).toHaveBeenCalledWith('/billing/extra-usage'));
+    expect(apiFetch).not.toHaveBeenCalled();
     expect(screen.queryByTestId('extra-usage-topup')).not.toBeInTheDocument();
     expect(screen.getByTestId('usage-cap-upgrade')).toBeInTheDocument();
   });
@@ -46,9 +42,11 @@ describe('UsageCapNotice', () => {
     const onUpgrade = vi.fn();
     render(<UsageCapNotice capDenial={DENIAL} onUpgrade={onUpgrade} />);
     const button = screen.getByTestId('usage-cap-upgrade');
-    expect(button).toHaveTextContent('Upgrade your plan');
+    expect(button).toHaveTextContent('Add more usage');
     await userEvent.click(button);
     expect(onUpgrade).toHaveBeenCalledTimes(1);
+    expect(screen.getByText(/local models or your own provider key/)).toBeInTheDocument();
+    expect(screen.getByText(/Your work is preserved/)).toBeInTheDocument();
   });
 
   it('shows when the allowance resets', () => {

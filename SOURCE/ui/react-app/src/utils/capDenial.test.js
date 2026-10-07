@@ -17,6 +17,12 @@ const CAP_STATE = {
 };
 
 describe('extractCapDenial', () => {
+  it('recognises a cloud denial containing only safe percentage and reset data', () => {
+    expect(extractCapDenial({ ok: true, data: { cap_state: {
+      plan: 'max', period: 'monthly', percent_used: 100,
+      resets_at: '2026-11-01T00:00:00Z', purchase_url: '/billing/capacity',
+    } } })).toEqual({ plan: 'max', period: 'monthly', resetsAt: '2026-11-01T00:00:00Z' });
+  });
   it('reads the cloud /v1/command envelope ({ok, error, data})', () => {
     const denial = extractCapDenial({ ok: true, error: null, data: { message: 'capped', cap_state: CAP_STATE } });
     expect(denial).toEqual({ plan: 'free', period: 'weekly', resetsAt: '2026-08-01T00:00:00+00:00' });

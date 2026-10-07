@@ -886,8 +886,9 @@ class AIController:
                 return None
 
         try:
-            from intent.approval import ApprovalManager
             from mcp_hub import ApprovalBridge, MCPClientHub
+
+            from intent.approval import ApprovalManager
 
             # Create approval manager without a channel â€” the channel is
             # threaded per-call via hub.call_tool(channel=...).
@@ -1793,7 +1794,7 @@ class AIController:
                             )
 
                             with latency_spans.span("SPEND_PREFLIGHT"):
-                                _spend_check = await check_managed_llm_spend_cap_async(resolved_user_id)
+                                _spend_check = await check_managed_llm_spend_cap_async(resolved_user_id, provider=self.client)
                             if not _spend_check.allowed:
                                 logger.info(
                                     "Plan limit hit for %s: %s",
@@ -1869,6 +1870,13 @@ class AIController:
                     logger.warning("Native agent loop cancelled for: %s", text[:80])
                     raise
                 except Exception as e:
+                    from services.llm.managed_budget import ManagedLlmSpendCapError
+
+                    if isinstance(e, ManagedLlmSpendCapError):
+                        result.update(intent="answer", message=e.public_message, response=e.public_message,
+                                      continue_listening=False)
+                        result["data"].update(intent="answer", answer=e.public_message, cap_state=e.cap_state)
+                        return result
                     logger.error("Native agent loop failed: %s", e)
                     result["ok"] = False
                     # P3 fix: surface a specific user-friendly message for
@@ -1952,11 +1960,12 @@ class AIController:
         }
 
         from services.llm.managed_budget import (
+            ManagedLlmSpendCapError,
             check_managed_llm_spend_cap_async,
             managed_llm_budget_message,
         )
 
-        _managed_budget_gate = await check_managed_llm_spend_cap_async(resolved_user_id)
+        _managed_budget_gate = await check_managed_llm_spend_cap_async(resolved_user_id, provider=self.client)
         if not _managed_budget_gate.allowed:
             answer_text = managed_llm_budget_message(_managed_budget_gate)
             await queue.put(answer_text)
@@ -2048,6 +2057,13 @@ class AIController:
             result["spoken"] = True  # Signal TTS was handled during streaming
             return result
 
+        except ManagedLlmSpendCapError as exc:
+            await queue.put(exc.public_message)
+            await queue.put(None)
+            result.update(intent="answer", message=exc.public_message, response=exc.public_message,
+                          continue_listening=False, spoken=True)
+            result["data"].update(intent="answer", answer=exc.public_message, cap_state=exc.cap_state)
+            return result
         except Exception:
             logger.debug("stream_answer_tokens failed, falling back to batch", exc_info=True)
             # Ensure sentinel is pushed so TTS consumer doesn't hang
