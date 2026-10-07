@@ -408,6 +408,7 @@ class ApplicationTests(unittest.TestCase):
                 self.__dict__.update(kwargs)
 
         values = {
+            "os": os,
             "_phone_tts_runtime": None,
             "_phone_tts_preload_enabled": lambda: True,
             "_phone_tts_warm_key": None,

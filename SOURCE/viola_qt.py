@@ -472,6 +472,9 @@ def _require_desktop_customer_startup() -> None:
     Windows telemetry/ETW privacy or frozen-runtime-hook qualification.
     """
     try:
+        from voice.customer_runtime import require_qualification_bootstrap
+
+        require_qualification_bootstrap()
         customer_selected = os.getenv("VIOLA_KOKORO_PHONEMIZER") == "misaki-en"
         if customer_selected != _DESKTOP_CUSTOMER_PROFILE_AT_IMPORT:
             raise RuntimeError("Desktop customer speech profile cannot change after startup")

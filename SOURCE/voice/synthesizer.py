@@ -97,6 +97,12 @@ class Synthesizer:
 
         Tries Kokoro (default) then falls back to pyttsx3.
         """
+        from voice.customer_runtime import qualification_profile
+
+        if qualification_profile() is not None:
+            from voice.synthesis.factory import get_shared_kokoro
+
+            return get_shared_kokoro(self.config)
         # Try Kokoro first (default backend). This shares the ONE process-wide
         # engine with BootstrapFactory.create_tts rather than building a second
         # one: two engines meant two 325 MB ONNX loads and two concurrent

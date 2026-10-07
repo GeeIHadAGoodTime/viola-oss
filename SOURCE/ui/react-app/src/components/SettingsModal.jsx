@@ -9,6 +9,7 @@ import { apiFetch } from '../hooks/useViolaApi';
 import { THEME, applyTheme, setAccent } from '../config';
 import { isFeatureHidden } from '../utils/featureSurface';
 import { outputDeviceOptions as buildOutputDeviceOptions, outputDeviceValue } from '../utils/audioOutputSelection';
+import { customerSpeechSelection, customerSpeechLanguagePatch } from '../utils/customerSpeechSelection';
 import DesktopUpsell from './DesktopUpsell';
 import AccountTab, { CalendarSettings } from './AccountTab';
 import ICloudCalendarSettings from './ICloudCalendarSettings';
@@ -407,6 +408,7 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
 
   const {
     settings,
+    customerSpeech,
     loading,
     saving,
     error,
@@ -425,6 +427,7 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
     draft: localSettings, hasChanges, setDraft: setLocalSettings,
     beginSave: beginDraftSave, finishSave: finishDraftSave, resetDraft,
   } = useSettingsDraft(settings, isOpen);
+  const speechSelection = customerSpeechSelection(localSettings, customerSpeech);
   const currentAiSource = localSettings.ai_source || 'managed';
   const localAiModelOptions = useMemo(() => localAiServers.flatMap((server) => (
     server.models.map((model) => ({
@@ -3445,15 +3448,34 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
                     />
                   </SettingRow>
                   <SectionDivider />
-                  <TtsStatusIndicator />
+                  {!customerSpeech && <TtsStatusIndicator />}
                   <SectionDivider />
+                  {customerSpeech && (
+                    <div style={{ padding: '16px 20px' }}>
+                      <Select
+                        label="Speech Output Language"
+                        tooltip="Choose the language Viola uses to pronounce spoken responses."
+                        value={speechSelection.language}
+                        options={customerSpeech.locales}
+                        onChange={(language) => {
+                          const patch = customerSpeechLanguagePatch(language, speechSelection.voice, customerSpeech);
+                          if (patch) updateLocalSettings(prev => ({ ...prev, ...patch }));
+                        }}
+                      />
+                      <div style={{ color: theme.colors.textMuted, fontSize: '12px', marginTop: '8px' }}>
+                        Speech qualification build. Choose a language and matching voice, then save.
+                      </div>
+                    </div>
+                  )}
                   <div style={{ padding: '16px 20px' }}>
                     <Select
                       label="Assistant Voice"
                       tooltip="Choose the voice Viola uses when speaking responses aloud."
-                      value={localSettings.tts_voice || 'default'}
-                      onChange={(v) => updateLocal('tts_voice', v)}
-                      options={[
+                      value={customerSpeech ? speechSelection.voice : localSettings.tts_voice || 'default'}
+                      onChange={(voice) => customerSpeech
+                        ? updateLocalSettings(prev => ({ ...prev, tts_language: speechSelection.language, tts_voice: voice }))
+                        : updateLocal('tts_voice', voice)}
+                      options={customerSpeech ? speechSelection.voices.map(voice => ({ value: voice, label: voice })) : [
                         { value: 'default', label: 'Default' },
                         { value: 'alloy', label: 'Alloy' },
                         { value: 'echo', label: 'Echo' },
