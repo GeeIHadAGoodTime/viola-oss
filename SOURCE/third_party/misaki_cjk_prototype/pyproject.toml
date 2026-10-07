@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "viola-misaki-cjk-prototype"
-version = "0.9.4+viola.cjk.3"
+version = "0.9.4+viola.cjk.4"
 description = "Inactive reconstructed CJK companion for the retained Viola English pronunciation fork"
 requires-python = ">=3.11"
 license = "Apache-2.0 AND MIT"
@@ -12,9 +12,15 @@ license-files = ["LICENSE", "misaki/_licenses/*.txt"]
 readme = "README.md"
 dependencies = [
   "viola-misaki-en==0.9.4+viola.1",
+]
+
+[project.optional-dependencies]
+japanese = [
   "fugashi==1.5.2",
   "jaconv==0.5.0",
   "mojimoji==0.0.13",
+]
+mandarin = [
   "pypinyin==0.55.0",
   "cn2an==0.5.24",
   "jieba==0.42.1",

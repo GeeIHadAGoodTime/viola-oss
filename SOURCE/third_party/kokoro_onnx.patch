@@ -4,7 +4,7 @@
  [project]
  name = "kokoro-onnx"
 -version = "0.4.9"
-+version = "0.4.9+viola.2"
++version = "0.4.9+viola.3"
  description = "TTS with kokoro and onnx runtime"
 +license = "MIT"
 +license-files = ["LICENSE"]
@@ -227,7 +227,22 @@
  
      def create(
          self,
-@@ -204,7 +234,7 @@
+@@ -181,6 +211,14 @@
+         """
+         assert speed >= 0.5 and speed <= 2.0, "Speed should be between 0.5 and 2.0"
+ 
++        customer = getattr(self.tokenizer, "_customer", None)
++        if customer is not None:
++            from voice.customer_voice_routing import require_customer_voice, uses_named_customer_voices
++
++            if uses_named_customer_voices(customer):
++                require_customer_voice(lang, voice)
++                if voice not in self.voices:
++                    raise ValueError("The selected customer voice is absent from the loaded asset")
+         if isinstance(voice, str):
+             assert voice in self.voices, f"Voice {voice} not found in available voices"
+             voice = self.get_voice_style(voice)
+@@ -204,7 +242,7 @@
                  # (initial ~2s, subsequent ~0.02s)
                  audio_part, _ = trim_audio(audio_part)
              audio.append(audio_part)
@@ -236,7 +251,22 @@
          log.debug(f"Created audio in {time.time() - start_t:.2f}s")
          return audio, SAMPLE_RATE
  
-@@ -236,28 +266,34 @@
+@@ -222,6 +260,14 @@
+         """
+         assert speed >= 0.5 and speed <= 2.0, "Speed should be between 0.5 and 2.0"
+ 
++        customer = getattr(self.tokenizer, "_customer", None)
++        if customer is not None:
++            from voice.customer_voice_routing import require_customer_voice, uses_named_customer_voices
++
++            if uses_named_customer_voices(customer):
++                require_customer_voice(lang, voice)
++                if voice not in self.voices:
++                    raise ValueError("The selected customer voice is absent from the loaded asset")
+         if isinstance(voice, str):
+             assert voice in self.voices, f"Voice {voice} not found in available voices"
+             voice = self.get_voice_style(voice)
+@@ -236,28 +282,34 @@
  
          async def process_batches():
              """Process phoneme batches in the background."""

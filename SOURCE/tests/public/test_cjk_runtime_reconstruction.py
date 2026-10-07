@@ -29,7 +29,7 @@ class CJKRuntimeReconstructionTests(unittest.TestCase):
             timeout=30,
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("Ran 34 tests", result.stderr)
+        self.assertIn("Ran 36 tests", result.stderr)
         self.assertIn("\nOK\n", result.stderr)
 
 

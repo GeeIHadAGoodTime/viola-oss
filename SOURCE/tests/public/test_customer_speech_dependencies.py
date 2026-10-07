@@ -17,6 +17,7 @@ from unittest.mock import patch
 
 from scripts.dependencies import verify_customer_speech
 from scripts.dependencies.verify_customer_speech import (
+    CJK_ROUTE_DEPENDENCIES,
     INACTIVE_CJK_REQUIRED,
     REQUIRED,
     canonical_name,
@@ -181,7 +182,10 @@ class InactiveCJKDependencyTests(unittest.TestCase):
         self.assertIn(project["name"], INACTIVE_CJK_REQUIRED)
         self.assertEqual(project["version"], INACTIVE_CJK_REQUIRED[project["name"]])
         dependencies = {}
-        for requirement in project["dependencies"]:
+        extras = project["optional-dependencies"]
+        self.assertEqual(set(extras), {"japanese", "mandarin"})
+        self.assertEqual(project["dependencies"], ["viola-misaki-en==" + REQUIRED["viola-misaki-en"]])
+        for requirement in project["dependencies"] + extras["japanese"] + extras["mandarin"]:
             name, separator, version = requirement.partition("==")
             self.assertEqual(separator, "==", requirement)
             name = canonical_name(name)
@@ -199,11 +203,80 @@ class InactiveCJKDependencyTests(unittest.TestCase):
             for node in runtime.body
             if isinstance(node, ast.Assign)
             for target in node.targets
-            if isinstance(target, ast.Name) and target.id in {"_COMPANION_VERSION", "_CJK_DEPENDENCIES"}
+            if isinstance(target, ast.Name)
+            and target.id in {"_COMPANION_VERSION", "_CJK_DEPENDENCIES", "_CJK_ROUTE_DEPENDENCIES"}
         }
         self.assertEqual(assignments["_COMPANION_VERSION"], project["version"])
         del expected["viola-misaki-en"]
         self.assertEqual(assignments["_CJK_DEPENDENCIES"], expected)
+        expected_routes = {
+            "ja": ("fugashi", "jaconv", "mojimoji"),
+            "zh": ("pypinyin", "cn2an", "jieba", "ordered-set", "proces"),
+        }
+        self.assertEqual(CJK_ROUTE_DEPENDENCIES, expected_routes)
+        self.assertEqual(assignments["_CJK_ROUTE_DEPENDENCIES"], expected_routes)
+        for locale, extra in (("ja", "japanese"), ("zh", "mandarin")):
+            self.assertEqual(
+                {name.partition("==")[0] for name in extras[extra]}, set(expected_routes[locale])
+            )
+
+    def selected_graph(self, locale):
+        names = {"viola-misaki-cjk-prototype", *CJK_ROUTE_DEPENDENCIES[locale]}
+        rows = {**REQUIRED, "onnxruntime": "1.30.0"}
+        rows.update({name: INACTIVE_CJK_REQUIRED[name] for name in names})
+        return {"install": [{"metadata": {"name": name, "version": version}} for name, version in rows.items()]}
+
+    def test_selected_routes_do_not_require_the_other_language(self):
+        for locale in ("ja", "zh"):
+            report = self.selected_graph(locale)
+            with self.subTest(locale=locale):
+                self.assertEqual(validate_graph(report, include_cjk_prototype=True, cjk_locales=(locale,)), [])
+                self.assertTrue(validate_graph(report, include_cjk_prototype=True))
+                self.assertTrue(validate_graph(report, include_cjk_prototype=True, cjk_locales=("ja", "zh")))
+        names = {row["metadata"]["name"] for row in self.selected_graph("zh")["install"]}
+        self.assertFalse(names & {"fugashi", "jaconv", "mojimoji"})
+
+    def test_each_selected_pin_missing_changed_or_duplicated_fails(self):
+        for locale in ("ja", "zh"):
+            for name in ("viola-misaki-cjk-prototype", *CJK_ROUTE_DEPENDENCIES[locale]):
+                for damage in ("missing", "changed", "duplicate", "conflicting"):
+                    report = self.selected_graph(locale)
+                    row = next(r for r in report["install"] if r["metadata"]["name"] == name)
+                    if damage == "missing":
+                        report["install"].remove(row)
+                    elif damage == "changed":
+                        row["metadata"]["version"] = "unreviewed"
+                    else:
+                        extra = copy.deepcopy(row)
+                        extra["metadata"]["name"] = name.upper().replace("-", "_")
+                        if damage == "conflicting":
+                            extra["metadata"]["version"] = "unreviewed"
+                        report["install"].append(extra)
+                    with self.subTest(locale=locale, name=name, damage=damage):
+                        self.assertTrue(validate_graph(report, include_cjk_prototype=True, cjk_locales=(locale,)))
+
+    def test_route_selection_cannot_weaken_internal_qa_rejection(self):
+        for locale in ("ja", "zh"):
+            for name in ("phonemizer", "espeakng-loader", "num2words"):
+                report = self.selected_graph(locale)
+                report["install"].append({"metadata": {"name": name, "version": "1.0"}})
+                with self.subTest(locale=locale, name=name):
+                    self.assertTrue(validate_graph(report, include_cjk_prototype=True, cjk_locales=(locale,)))
+
+    def test_route_selection_is_explicit_and_nonempty(self):
+        for value in ((), [], "zh", ("zh", "zh"), ("zh", "hi"), (True,), (None,)):
+            with self.subTest(value=value):
+                self.assertTrue(validate_graph(self.graph(), include_cjk_prototype=True, cjk_locales=value))
+        self.assertTrue(validate_graph(self.graph(), cjk_locales=("zh",)))
+
+    def test_changed_dependency_metadata_requires_new_companion_identity(self):
+        for version in ("0.9.4+viola.cjk.2", "0.9.4+viola.cjk.3"):
+            report = self.selected_graph("zh")
+            next(r for r in report["install"] if r["metadata"]["name"] == "viola-misaki-cjk-prototype")[
+                "metadata"
+            ]["version"] = version
+            with self.subTest(version=version):
+                self.assertTrue(validate_graph(report, include_cjk_prototype=True, cjk_locales=("zh",)))
 
     def run_cli(self, report, *options, inventory=None):
         with tempfile.TemporaryDirectory() as folder:
@@ -250,6 +323,12 @@ class InactiveCJKDependencyTests(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("forbidden customer speech payload: num2words.lang_EN", output)
         self.assertNotIn("pins passed", output)
+
+    def test_cli_mandarin_only_selection_retains_explicit_mode(self):
+        code, _output = self.run_cli(self.selected_graph("zh"), "--include-cjk-prototype", "--cjk-locales", "zh")
+        self.assertEqual(code, 0)
+        code, _output = self.run_cli(self.selected_graph("zh"), "--cjk-locales", "zh")
+        self.assertEqual(code, 1)
 
 
 if __name__ == "__main__":
