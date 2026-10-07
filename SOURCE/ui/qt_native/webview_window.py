@@ -1964,11 +1964,20 @@ class CustomTitleBar(QWidget):
     def mousePressEvent(self, event: QMouseEvent):
         """Start window drag on left click."""
         if event.button() == Qt.MouseButton.LeftButton:
+            window_pos = self._parent.mapFromGlobal(event.globalPosition().toPoint())
+            if not self._parent.isMaximized() and self._parent._get_resize_edge(window_pos):
+                # Let Qt propagate edge events to the existing window resize handlers.
+                self._drag_pos = None
+                event.ignore()
+                return
             self._drag_pos = event.globalPosition().toPoint() - self._parent.frameGeometry().topLeft()
             event.accept()
 
     def mouseMoveEvent(self, event: QMouseEvent):
         """Drag window when mouse moves."""
+        if self._parent._resize_edge is not None:
+            event.ignore()
+            return
         if self._drag_pos is not None and event.buttons() == Qt.MouseButton.LeftButton:
             if self._parent.isFullScreen():
                 event.accept()
@@ -1985,6 +1994,8 @@ class CustomTitleBar(QWidget):
     def mouseReleaseEvent(self, event: QMouseEvent):
         """End window drag."""
         self._drag_pos = None
+        if self._parent._resize_edge is not None:
+            event.ignore()
 
     def mouseDoubleClickEvent(self, event: QMouseEvent):
         """Toggle maximize on double-click."""
