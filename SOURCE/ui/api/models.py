@@ -1,8 +1,11 @@
 from __future__ import annotations
 
-from typing import Any
+from collections.abc import Mapping
+from typing import Annotated, Any
 
-from pydantic import BaseModel, Field, ValidationInfo, field_validator
+from pydantic import BaseModel, Field, TypeAdapter, ValidationInfo, field_validator, model_validator
+
+_SEARCH_QUERY = TypeAdapter(Annotated[str, Field(max_length=200)])
 
 
 class CommandCtx(BaseModel):
@@ -82,9 +85,25 @@ class DebugEventIn(BaseModel):
 
 
 class PlayIn(BaseModel):
-    query: str = Field(..., min_length=1, max_length=200)
+    # Local media selection resolves a library ID to its complete file path.
+    # That path can exceed the short search-text limit without being invalid.
+    query: str = Field(..., min_length=1, max_length=32_767)
     source: str | None = Field(default=None, description="ytsearch1, url, local, spotify_cdp, youtube_music")
     target_room: str | None = Field(default=None, max_length=80, description="Optional in-house room target")
+
+    @model_validator(mode="before")
+    @classmethod
+    def limit_search_query(cls, value: Any) -> Any:
+        if isinstance(value, Mapping):
+            source, query = value.get("source"), value.get("query", "")
+        else:
+            # model_validate(..., from_attributes=True) also accepts objects.
+            source, query = getattr(value, "source", None), getattr(value, "query", "")
+        if source != "local":
+            # Reuse Pydantic's string coercion/length semantics for all accepted
+            # Python inputs as well as JSON, before the existing trim step.
+            _SEARCH_QUERY.validate_python(query)
+        return value
 
     @field_validator("source")
     @classmethod
