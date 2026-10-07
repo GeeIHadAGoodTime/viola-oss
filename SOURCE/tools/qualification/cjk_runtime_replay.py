@@ -219,7 +219,7 @@ class RuntimeTests(unittest.TestCase):
     def test_exact_model_batching_and_create_methods_use_bound_route(self):
         value = Kokoro.__new__(Kokoro)
         value.tokenizer = Tokenizer(customer_tokenizer=self.component)
-        value.voices = {"af_heart": object()}
+        value.voices = {"zf_xiaobei": object()}
         calls = []
 
         def fake_audio(phones, voice, speed):
@@ -227,8 +227,9 @@ class RuntimeTests(unittest.TestCase):
             return np.ones(5, dtype=np.float32), 24000
 
         value._create_audio = fake_audio
-        audio, rate = value.create("你好", voice="af_heart", lang="zh", trim=False)
+        audio, rate = value.create("你好", voice="zf_xiaobei", lang="zh", trim=False)
         self.assertEqual(calls[0][0], "ni↓xau↓")
+        self.assertIs(calls[0][1], value.voices["zf_xiaobei"])
         self.assertEqual(rate, 24000)
         self.assertEqual(len(audio), 5)
         self.assertEqual("".join(value._split_phonemes("a" * 1300)), "a" * 1300)
@@ -351,13 +352,13 @@ class ApplicationTests(unittest.TestCase):
         caches = []
         engine._create_opener_cache = lambda self, cfg: caches.append("default-cache") or object()
         engine._kick_off_opener_cache_build = lambda self: None
-        instance = engine(self.model, self.voices, customer_tokenizer=self.component, language="ZH")
+        instance = engine(self.model, self.voices, customer_tokenizer=self.component, language="ZH", voice="zf_xiaobei")
         self.assertIsNone(instance._opener_cache)
         self.assertEqual(caches, [])
         self.assertTrue(instance.is_available())
         self.assertEqual(ns["_KOKORO_PKG_PROBE_ERROR"], "prior default failure")
         with (
-            patch("numpy.load", return_value={"af_heart": object()}),
+            patch("numpy.load", return_value={"zf_xiaobei": object()}),
             patch("importlib.metadata.version", return_value="inert"),
         ):
             self.assertTrue(instance._ensure_loaded())
@@ -372,12 +373,12 @@ class ApplicationTests(unittest.TestCase):
             raise StopBeforeAudio()
 
         instance._kokoro.create = record_create
-        instance._resolve_voice_for_create = lambda voice: ("af_heart", "af_heart")
+        instance._resolve_voice_for_create = lambda voice: ("zf_xiaobei", "zf_xiaobei")
         instance._speed_with_jitter = lambda: 1.0
         with self.assertRaises(StopBeforeAudio):
             instance._synthesize_internal("你好", None)
         self.assertEqual(calls[0][1]["lang"], "zh")
-        self.assertEqual(calls[0][1]["voice"], "af_heart")
+        self.assertEqual(calls[0][1]["voice"], "zf_xiaobei")
         default = engine(self.model, self.voices)
         self.assertEqual(caches, ["default-cache"])
         self.assertFalse(default.is_available())
@@ -608,14 +609,23 @@ class CompanionTests(unittest.TestCase):
         from voice.customer_composition import compose_customer_tokenizer, _CJK_DEPENDENCIES, _COMPANION_VERSION
 
         versions = {"viola-misaki-cjk-prototype": _COMPANION_VERSION, **_CJK_DEPENDENCIES}
-        for dependency in versions:
-            wrong = dict(versions, **{dependency: "wrong"})
-            with (
-                self.subTest(dependency=dependency),
-                patch("importlib.metadata.version", side_effect=lambda name: wrong[name]),
-                self.assertRaises(RuntimeError),
-            ):
-                compose_customer_tokenizer(self.owner, mandarin=True)
+        from voice.customer_composition import _CJK_ROUTE_DEPENDENCIES
+
+        for locales in (("zh",), ("ja",), ("ja", "zh")):
+            required = {"viola-misaki-cjk-prototype"}
+            for locale in locales:
+                required.update(_CJK_ROUTE_DEPENDENCIES[locale])
+            for dependency in required:
+                wrong = dict(versions, **{dependency: "wrong"})
+                with (
+                    self.subTest(locales=locales, dependency=dependency),
+                    patch("importlib.metadata.version", side_effect=lambda name: wrong[name]),
+                    self.assertRaises(RuntimeError),
+                ):
+                    compose_customer_tokenizer(
+                        self.owner, mandarin="zh" in locales,
+                        japanese_dictionary_dir="/unopened" if "ja" in locales else None,
+                    )
         old_companion = dict(versions, **{"viola-misaki-cjk-prototype": "0.9.4+viola.cjk.2"})
         with (
             patch("importlib.metadata.version", side_effect=lambda name: old_companion[name]),
@@ -626,6 +636,54 @@ class CompanionTests(unittest.TestCase):
             compose_customer_tokenizer(self.owner, mandarin="yes")
         with self.assertRaises(ValueError):
             compose_customer_tokenizer(object())
+
+    def test_mandarin_does_not_query_or_initialize_japanese_dependencies(self):
+        from voice.customer_composition import compose_customer_tokenizer, _CJK_DEPENDENCIES, _COMPANION_VERSION
+
+        allowed = {"viola-misaki-cjk-prototype": _COMPANION_VERSION}
+        allowed.update({k: v for k, v in _CJK_DEPENDENCIES.items() if k not in {"fugashi", "jaconv", "mojimoji"}})
+        seen = []
+
+        def version(name):
+            seen.append(name)
+            self.assertIn(name, allowed, "Mandarin queried an unrelated Japanese dependency")
+            return allowed[name]
+
+        cn2an = types.ModuleType("cn2an")
+        jieba = types.ModuleType("jieba")
+        jieba.__file__ = "/deliberately-missing/jieba/__init__.py"
+        pypinyin = types.ModuleType("pypinyin")
+        zh = types.ModuleType("misaki.zh")
+        zh.ZHG2P = object
+        with (
+            patch.dict(sys.modules, {"cn2an": cn2an, "jieba": jieba, "pypinyin": pypinyin, "misaki.zh": zh}),
+            patch("importlib.metadata.version", side_effect=version),
+            patch("viola_cjk.japanese_factory.create_cutlet") as create,
+        ):
+            with self.assertRaisesRegex(RuntimeError, "dictionary is missing"):
+                compose_customer_tokenizer(self.owner, mandarin=True)
+            create.assert_not_called()
+        self.assertEqual(set(seen), set(allowed))
+
+    def test_japanese_does_not_query_mandarin_dependencies(self):
+        from voice.customer_composition import compose_customer_tokenizer, _CJK_DEPENDENCIES, _COMPANION_VERSION
+
+        allowed = {"viola-misaki-cjk-prototype": _COMPANION_VERSION}
+        allowed.update({k: _CJK_DEPENDENCIES[k] for k in ("fugashi", "jaconv", "mojimoji")})
+        seen = []
+
+        def version(name):
+            seen.append(name)
+            self.assertIn(name, allowed, "Japanese queried an unrelated Mandarin dependency")
+            return allowed[name]
+
+        with (
+            patch("importlib.metadata.version", side_effect=version),
+            patch("viola_cjk.japanese_factory.create_cutlet", side_effect=RuntimeError("explicit dictionary rejected")),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "explicit dictionary rejected"):
+                compose_customer_tokenizer(self.owner, japanese_dictionary_dir="/unopened")
+        self.assertEqual(set(seen), set(allowed))
 
     def test_factory_never_creates_japanese_after_missing_mandarin_data(self):
         from voice.customer_composition import compose_customer_tokenizer, _CJK_DEPENDENCIES, _COMPANION_VERSION

@@ -1,35 +1,39 @@
 {
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "8b50a77123928f991d87efaf45d2b3cbacb0de68a5486b9d8149d4c36ec6a4b6",
-  "source_tree_sha256": "4fa25851592b619f70ab99ff689b83c05ef2bc1d34597b8a122457d579e59b02",
-  "source_file_count": 2656,
-  "source_revision": "f4a3c0919d8f199b9f2e3c897040250feaca47e3",
-  "comparison_public_revision": "608e9bd49ccaede4228b1d6496e4dbcaa2114f87",
+  "source_manifest_sha256": "ca697ae69cd2dbd9aa77f4a8e833dccd8083424d339c2468633794b0dff1bf82",
+  "source_tree_sha256": "e8c197adafff6d009cc8139504433608b8a9710032761ae14b0eaa52df6fb9cd",
+  "source_file_count": 2659,
+  "source_revision": "32e9f79b3a5443ddad46368e78f931626a68c534",
+  "comparison_public_revision": "e706c5af95cd9bae01c247b0fa884ec2ea8fddb5",
   "changed_source_paths": [
-    "SOURCE/backend/fastapi_app.py",
-    "SOURCE/intent/agent_executor.py",
-    "SOURCE/intent/agent_loop.py",
-    "SOURCE/intent/ai_controller.py",
-    "SOURCE/services/llm/managed_budget.py",
-    "SOURCE/services/llm/provider_fallback.py",
-    "SOURCE/services/llm/provider_router.py",
-    "SOURCE/services/llm/spend_accounting.py",
-    "SOURCE/telephony/call_manager.py",
-    "SOURCE/telephony/usage.py",
-    "SOURCE/tests/public/test_billing_capacity_mount.py",
-    "SOURCE/tests/public/test_capacity_phone_resource_bridge.py",
-    "SOURCE/tests/public/test_remote_managed_accounting.py",
-    "SOURCE/ui/react-app/src/auth/legalVersions.js",
-    "SOURCE/ui/react-app/src/components/AccountTab.jsx",
-    "SOURCE/ui/react-app/src/components/BillingCapacityPanel.css",
-    "SOURCE/ui/react-app/src/components/BillingCapacityPanel.jsx",
-    "SOURCE/ui/react-app/src/components/BillingCapacityPanel.test.jsx",
-    "SOURCE/ui/react-app/src/components/UsageCapNotice.jsx",
-    "SOURCE/ui/react-app/src/components/UsageCapNotice.test.jsx",
-    "SOURCE/ui/react-app/src/hooks/useBillingCapacity.js",
-    "SOURCE/ui/react-app/src/hooks/useUsage.jsx",
-    "SOURCE/ui/react-app/src/utils/capDenial.test.js"
+    "SOURCE/docs/CUSTOMER_SPEECH_QUALIFICATION.md",
+    "SOURCE/requirements_customer_speech_mandarin.txt",
+    "SOURCE/requirements_desktop.txt",
+    "SOURCE/requirements_linux.txt",
+    "SOURCE/requirements_macos.txt",
+    "SOURCE/scripts/dependencies/verify_customer_speech.py",
+    "SOURCE/telephony/language_handler.py",
+    "SOURCE/tests/public/test_cjk_runtime_reconstruction.py",
+    "SOURCE/tests/public/test_customer_launch_voice_routes.py",
+    "SOURCE/tests/public/test_customer_phone_routing.py",
+    "SOURCE/tests/public/test_customer_speech_dependencies.py",
+    "SOURCE/third_party/kokoro_onnx.patch",
+    "SOURCE/third_party/kokoro_onnx/pyproject.toml",
+    "SOURCE/third_party/kokoro_onnx/src/kokoro_onnx/__init__.py",
+    "SOURCE/third_party/misaki_cjk_prototype.patch",
+    "SOURCE/third_party/misaki_cjk_prototype/README.md",
+    "SOURCE/third_party/misaki_cjk_prototype/pyproject.toml",
+    "SOURCE/third_party/pipecat.patch",
+    "SOURCE/third_party/pipecat/pyproject.toml",
+    "SOURCE/third_party/pipecat/src/pipecat/services/kokoro/tts.py",
+    "SOURCE/third_party/sources.toml",
+    "SOURCE/tools/qualification/cjk_runtime_replay.py",
+    "SOURCE/tools/qualification/romance_runtime_replay.py",
+    "SOURCE/voice/customer_composition.py",
+    "SOURCE/voice/customer_voice_routing.py",
+    "SOURCE/voice/synthesis/factory.py",
+    "SOURCE/voice/synthesis/kokoro_engine.py"
   ],
   "retained_sboms": [
     {
@@ -91,49 +95,70 @@
     }
   ],
   "input_equivalence": {
-    "comparison_basis": "Integrated owning source with protected public main 608e9bd49ccaede4228b1d6496e4dbcaa2114f87",
-    "all_unselected_source_leaves_preserved": true,
-    "dependency_inputs_unchanged": true,
-    "workflow_inputs_unchanged": true,
-    "all_six_retained_inventory_bytes_and_status_objects_preserved": true
+    "comparison_basis": "Protected public main e706c5af95cd9bae01c247b0fa884ec2ea8fddb5",
+    "all_unselected_export_leaf_bytes_and_modes_preserved": true,
+    "all_six_sbom_bytes_and_status_objects_preserved": true,
+    "frontend_and_workflow_inputs_unchanged": true,
+    "speech_dependency_inputs_changed": true,
+    "new_exact_head_windows_resolution_required": true,
+    "selected_customer_windows_closure_not_claimed": true
   },
   "qualification": {
-    "scope": "Flexible billing UI and desktop cloud-accounting integration; no deployment or installed acceptance",
-    "source_commit": "f4a3c0919d8f199b9f2e3c897040250feaca47e3",
-    "source_tree": "431af90f8e58df2e1a04df2bbd91c93f7907b749",
+    "scope": "Inactive selected English, Spanish and Mandarin routing and dependency-source composition; qualification artifacts are not customer release approval.",
+    "source_commit": "32e9f79b3a5443ddad46368e78f931626a68c534",
+    "source_tree": "1c59281d29ec4884586ff49f80e040505987857c",
     "ordered_source_parents": [
-      "4ccddd0a766b5da884cc0bee5757541a6cc812d9",
-      "608e9bd49ccaede4228b1d6496e4dbcaa2114f87"
+      "e706c5af95cd9bae01c247b0fa884ec2ea8fddb5",
+      "744eb84436fdf31a4e85135c7590801cac853ef7"
     ],
-    "changed_source_paths": [
-      "SOURCE/backend/fastapi_app.py",
-      "SOURCE/intent/agent_executor.py",
-      "SOURCE/intent/agent_loop.py",
-      "SOURCE/intent/ai_controller.py",
-      "SOURCE/services/llm/managed_budget.py",
-      "SOURCE/services/llm/provider_fallback.py",
-      "SOURCE/services/llm/provider_router.py",
-      "SOURCE/services/llm/spend_accounting.py",
-      "SOURCE/telephony/call_manager.py",
-      "SOURCE/telephony/usage.py",
-      "SOURCE/tests/public/test_billing_capacity_mount.py",
-      "SOURCE/tests/public/test_capacity_phone_resource_bridge.py",
-      "SOURCE/tests/public/test_remote_managed_accounting.py",
-      "SOURCE/ui/react-app/src/auth/legalVersions.js",
-      "SOURCE/ui/react-app/src/components/AccountTab.jsx",
-      "SOURCE/ui/react-app/src/components/BillingCapacityPanel.css",
-      "SOURCE/ui/react-app/src/components/BillingCapacityPanel.jsx",
-      "SOURCE/ui/react-app/src/components/BillingCapacityPanel.test.jsx",
-      "SOURCE/ui/react-app/src/components/UsageCapNotice.jsx",
-      "SOURCE/ui/react-app/src/components/UsageCapNotice.test.jsx",
-      "SOURCE/ui/react-app/src/hooks/useBillingCapacity.js",
-      "SOURCE/ui/react-app/src/hooks/useUsage.jsx",
-      "SOURCE/ui/react-app/src/utils/capDenial.test.js"
+    "source_patch_sha256": "39d100b6053a53688b4c19f6840c2b429d0cbb8fa4e012b0ff8fffd82c31aa71",
+    "reviewed_speech_source": "744eb84436fdf31a4e85135c7590801cac853ef7",
+    "all_27_reviewed_speech_blobs_unchanged": true,
+    "protected_pricing_delta_preserved": true,
+    "independent_source_review": "Routing runtime, dependency separation and fork metadata/wheels independently reviewed; test-only fixture corrections preserve pronunciation controls after earlier voice admission.",
+    "source_controls": {
+      "basis": "Reviewed source744eb844 before the protected disjoint pricing composition; fresh final-head hosted checks required.",
+      "dependency_methods": 22,
+      "routing_methods": 18,
+      "cjk_inner_methods": 36,
+      "romance_inner_methods": 16,
+      "native_boundaries": "inert",
+      "initial_combined_fixture_failures_preserved": true,
+      "real_pipecat_integration": "Required hosted source job; local dependency stack unavailable"
+    },
+    "package_identities": {
+      "kokoro-onnx": {
+        "version": "0.4.9+viola.3",
+        "wheel_sha256": "2fedd09693672da46da0e2ee4dee3265bc24607774699bf6c68d8eec299f9b33",
+        "wheel_bytes": 18890
+      },
+      "pipecat-ai": {
+        "version": "0.0.108+viola.3",
+        "wheel_sha256": "a09f12dffc545ca0cac022fdb5ff441e9298556be8f26d23e7a40f5ac5a6fb80",
+        "wheel_bytes": 10752703
+      },
+      "viola-misaki-cjk-prototype": {
+        "version": "0.9.4+viola.cjk.4",
+        "wheel_sha256": "e9688b42b822455bf80a89a2dc2526add725867a2b0f5182bcf4f03a7f93284f",
+        "wheel_bytes": 511838
+      }
+    },
+    "reproducibility": "Two offline retained-backend builds per new wheel are byte-identical; aggregate source reconstruction and wheel RECORD/notices/data checked.",
+    "native_runtime_repeated": false,
+    "profile_activated": false,
+    "customer_release_eligible": false,
+    "launch_languages": [
+      "English",
+      "Spanish",
+      "Mandarin"
     ],
-    "final_exact_candidate_hosted_checks": "pending",
+    "canonical_assets_and_dormant_routes_preserved": true,
     "limits": [
-      "No production deployment, Stripe funding, or installed-app acceptance is implied.",
-      "Historical component checks do not qualify the current source."
+      "Existing bounded pronunciation coverage remains; named-voice and static graph controls do not prove general pronunciation quality.",
+      "Selected Windows install/native closure, redistribution completeness, signing, frozen execution and installed acceptance remain separate.",
+      "Retained SBOMs remain historical evidence; final-head hosted scopes must resolve changed fork inputs.",
+      "The source .4 Mandarin extra is not a claim of completed Windows customer dependency installation.",
+      "Unchanged Pipecat packaging omissions for frames.proto and AWS ready.wav remain outside this selected Kokoro change."
     ]
   },
   "historical_bindings": [
@@ -7565,7 +7590,7 @@
                         "text": "Hello. This is a short test of the local speech system.",
                         "voice": "af_heart",
                         "locale": "en-us",
-                        "phonemes": "h\u0259l\u02c8O. \u00f0\u02cc\u026as \u026az \u0250 \u0283\u02c8\u0254\u0279t t\u02c8\u025bst \u028cv \u00f0\u0259 l\u02c8Ok\u0259l sp\u02c8i\u02a7 s\u02c8\u026ast\u0259m.",
+                        "phonemes": "həlˈO. ðˌɪs ɪz ɐ ʃˈɔɹt tˈɛst ʌv ðə lˈOkəl spˈiʧ sˈɪstəm.",
                         "duration_seconds": 2.986666666666667,
                         "wav_sha256": "aeaba330943123ff46d808be904e3cc47ec05291c1aee9efa78a21bb25d4fadd",
                         "float_pcm_sha256": "d27a02a2b366945758f9a7cb89ae4eaee46525807634dff9b7f295f400b8f622",
@@ -7578,7 +7603,7 @@
                         "text": "Hello. This is a short test of the local speech system.",
                         "voice": "af_heart",
                         "locale": "en-us",
-                        "phonemes": "h\u0259l\u02c8O. \u00f0\u02cc\u026as \u026az \u0250 \u0283\u02c8\u0254\u0279t t\u02c8\u025bst \u028cv \u00f0\u0259 l\u02c8Ok\u0259l sp\u02c8i\u02a7 s\u02c8\u026ast\u0259m.",
+                        "phonemes": "həlˈO. ðˌɪs ɪz ɐ ʃˈɔɹt tˈɛst ʌv ðə lˈOkəl spˈiʧ sˈɪstəm.",
                         "duration_seconds": 2.986666666666667,
                         "wav_sha256": "aeaba330943123ff46d808be904e3cc47ec05291c1aee9efa78a21bb25d4fadd",
                         "float_pcm_sha256": "d27a02a2b366945758f9a7cb89ae4eaee46525807634dff9b7f295f400b8f622",
@@ -7591,7 +7616,7 @@
                         "text": "The A P I costs $12.50, not $0.05.",
                         "voice": "af_heart",
                         "locale": "en-us",
-                        "phonemes": "\u00f0i \u02c8A p\u02c8i \u02ccI k\u02c8\u0254sts tw\u02c8\u025blv d\u02c8\u0251l\u0259\u0279z \u00e6nd f\u02c8\u026afti s\u02c8\u025bnts, n\u02cc\u0251t f\u02c8Iv s\u02c8\u025bnts.",
+                        "phonemes": "ði ˈA pˈi ˌI kˈɔsts twˈɛlv dˈɑləɹz ænd fˈɪfti sˈɛnts, nˌɑt fˈIv sˈɛnts.",
                         "duration_seconds": 3.7973333333333334,
                         "wav_sha256": "5310d8c6737e9eb874d30b15b70cd3a779d1a86904339b68831e29945307d4b6",
                         "float_pcm_sha256": "c7a016d0b527e759ba0e2ce06f0348371a99e1c9ce68e42ca38ee919cef63fa7",
@@ -7604,7 +7629,7 @@
                         "text": "The A P I costs $12.50, not $0.05.",
                         "voice": "af_heart",
                         "locale": "en-us",
-                        "phonemes": "\u00f0i \u02c8A p\u02c8i \u02ccI k\u02c8\u0254sts tw\u02c8\u025blv d\u02c8\u0251l\u0259\u0279z \u00e6nd f\u02c8\u026afti s\u02c8\u025bnts, n\u02cc\u0251t f\u02c8Iv s\u02c8\u025bnts.",
+                        "phonemes": "ði ˈA pˈi ˌI kˈɔsts twˈɛlv dˈɑləɹz ænd fˈɪfti sˈɛnts, nˌɑt fˈIv sˈɛnts.",
                         "duration_seconds": 3.7973333333333334,
                         "wav_sha256": "5310d8c6737e9eb874d30b15b70cd3a779d1a86904339b68831e29945307d4b6",
                         "float_pcm_sha256": "c7a016d0b527e759ba0e2ce06f0348371a99e1c9ce68e42ca38ee919cef63fa7",
@@ -7627,7 +7652,7 @@
                         "text": "'A P I'",
                         "voice": "af_heart",
                         "locale": "en-us",
-                        "phonemes": "\u201c\u0250 p\u02c8i \u02c8I",
+                        "phonemes": "“ɐ pˈi ˈI",
                         "duration_seconds": 0.9386666666666666,
                         "wav_sha256": "c14f9a31a8a71f2441e74ab4e64f24df25b9f018975fe46d1ab0ed2cb33519e3",
                         "float_pcm_sha256": "69d1f2d9c292aa645dd0b1ff590bb7c1cbf34b92bc382a7ae1d695b2540e18cb",
@@ -7640,7 +7665,7 @@
                         "text": "'A P I'",
                         "voice": "af_heart",
                         "locale": "en-us",
-                        "phonemes": "\u201c\u02c8A p\u02c8i \u02c8I",
+                        "phonemes": "“ˈA pˈi ˈI",
                         "duration_seconds": 0.9386666666666666,
                         "wav_sha256": "f5a871ccac419cc586ff16aaa6e9f42b4720c591d20a7752c09d01e89c299f3d",
                         "float_pcm_sha256": "b8b8573bf9058851c6aaee30fc328c01c89ba20e1413aa674bef4c1847b348f0",
@@ -7653,7 +7678,7 @@
                         "text": "'A P I'",
                         "voice": "bf_emma",
                         "locale": "en-gb",
-                        "phonemes": "\u201c\u0250 p\u02c8i\u02d0 \u02c8I",
+                        "phonemes": "“ɐ pˈiː ˈI",
                         "duration_seconds": 0.9386666666666666,
                         "wav_sha256": "fcb3326f8978423f25953f991282d759fbc0e9a1248a102054e236eb5a558ddb",
                         "float_pcm_sha256": "1612b0e9f197c238f2434d27da0024959ca5b3825db6a3ed79119491924568d0",
@@ -7666,7 +7691,7 @@
                         "text": "'A P I'",
                         "voice": "bf_emma",
                         "locale": "en-gb",
-                        "phonemes": "\u201c\u02c8A p\u02c8i\u02d0 \u02c8I",
+                        "phonemes": "“ˈA pˈiː ˈI",
                         "duration_seconds": 0.96,
                         "wav_sha256": "83dad5fbcd6fea44e2b35ecf0f1b19af8e946c56a5d5743af058ad6e92a7d909",
                         "float_pcm_sha256": "2f7c8c442737efd0ff9bf3ddb35e47e7ae90ed2bc23c7025a08d3ddf3552f78d",
@@ -7686,10 +7711,10 @@
                     "cases": [
                       {
                         "id": "ja-component",
-                        "text": "\u3053\u3093\u306b\u3061\u306f",
+                        "text": "こんにちは",
                         "voice": "jf_alpha",
                         "locale": "ja",
-                        "phonemes": "ko\u0272\u0272i\u02a8i\u03b2a",
+                        "phonemes": "koɲɲiʨiβa",
                         "duration_seconds": 0.9813333333333333,
                         "wav_sha256": "c9a9f75372afc19d7cb51732a481300a7fa5779d0f4411c35a9f7b788d693f51",
                         "float_pcm_sha256": "b6f3115fde5d46e829b4437b51c82ea366c8973731611ac665a21047bc3fb5fd",
@@ -7699,10 +7724,10 @@
                       },
                       {
                         "id": "ja-composed",
-                        "text": "\u3053\u3093\u306b\u3061\u306f",
+                        "text": "こんにちは",
                         "voice": "jf_alpha",
                         "locale": "ja",
-                        "phonemes": "ko\u0272\u0272i\u02a8i\u03b2a",
+                        "phonemes": "koɲɲiʨiβa",
                         "duration_seconds": 0.9813333333333333,
                         "wav_sha256": "c9a9f75372afc19d7cb51732a481300a7fa5779d0f4411c35a9f7b788d693f51",
                         "float_pcm_sha256": "b6f3115fde5d46e829b4437b51c82ea366c8973731611ac665a21047bc3fb5fd",
@@ -7722,10 +7747,10 @@
                     "cases": [
                       {
                         "id": "zh-component",
-                        "text": "\u4f60\u597d",
+                        "text": "你好",
                         "voice": "zf_xiaobei",
                         "locale": "zh",
-                        "phonemes": "ni\u2193xau\u2193",
+                        "phonemes": "ni↓xau↓",
                         "duration_seconds": 0.832,
                         "wav_sha256": "b8b6c6be5edbaff52bb114c753b04e6eaffebd190e5f78e64a535c8042cb92ae",
                         "float_pcm_sha256": "7ddddc03e104e990c42f5b070d4847906f3a10d19bd6809621a5f1cf0fa5ea0d",
@@ -7735,10 +7760,10 @@
                       },
                       {
                         "id": "zh-composed",
-                        "text": "\u4f60\u597d",
+                        "text": "你好",
                         "voice": "zf_xiaobei",
                         "locale": "zh",
-                        "phonemes": "ni\u2193xau\u2193",
+                        "phonemes": "ni↓xau↓",
                         "duration_seconds": 0.832,
                         "wav_sha256": "b8b6c6be5edbaff52bb114c753b04e6eaffebd190e5f78e64a535c8042cb92ae",
                         "float_pcm_sha256": "7ddddc03e104e990c42f5b070d4847906f3a10d19bd6809621a5f1cf0fa5ea0d",
@@ -7755,7 +7780,7 @@
                 ],
                 "owner_listening": {
                   "english": "Positive feedback on delivered neutral/currency and US/GB comparison clips; no chosen pair winner or broader coverage claim",
-                  "japanese": "Positive feedback on the exact jf_alpha \u3053\u3093\u306b\u3061\u306f 0.981333-second sample only",
+                  "japanese": "Positive feedback on the exact jf_alpha こんにちは 0.981333-second sample only",
                   "mandarin": "Delivered corrected-source sample; acknowledgment received, pronunciation-quality judgment still unverified",
                   "owner_replies_not_required_per_clip": true,
                   "assistant_audio_input_unavailable": true
@@ -8429,5 +8454,282 @@
         }
       }
     }
-  ]
+  ],
+  "prior_binding": {
+    "public_revision": "e706c5af95cd9bae01c247b0fa884ec2ea8fddb5",
+    "path": "PUBLIC_METADATA/source-binding.json",
+    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/e706c5af95cd9bae01c247b0fa884ec2ea8fddb5/PUBLIC_METADATA/source-binding.json",
+    "sha256": "d071eb4567c781f994b5d75eb5796c3489cf92b983aa7baa10428518882054b5",
+    "bytes": 1086747,
+    "git_blob": "31b60ac4e23f73853d20c5388e16ac22ae063715",
+    "all_top_level_keys": [
+      "schema_version",
+      "source_manifest",
+      "source_manifest_sha256",
+      "source_tree_sha256",
+      "source_file_count",
+      "source_revision",
+      "comparison_public_revision",
+      "changed_source_paths",
+      "retained_sboms",
+      "input_equivalence",
+      "qualification",
+      "historical_bindings"
+    ],
+    "preserved_json_objects": {
+      "schema_version": {
+        "pointer": "/schema_version",
+        "canonical_json_sha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+      },
+      "source_manifest": {
+        "pointer": "/source_manifest",
+        "canonical_json_sha256": "ace3c4cebde8c1e5207159e354ef46f1f9a13eb7b3185315a68b7cf8b71f212d"
+      },
+      "source_manifest_sha256": {
+        "pointer": "/source_manifest_sha256",
+        "canonical_json_sha256": "bb36b525564ad7f48be84cb24e1baab80729e17cd23b5c6732cadeb97521bf30"
+      },
+      "source_tree_sha256": {
+        "pointer": "/source_tree_sha256",
+        "canonical_json_sha256": "cbb7a844c0d2ea646dbe147f5cf126d6c1422d01d73e000f36a0cf04d529098e"
+      },
+      "source_file_count": {
+        "pointer": "/source_file_count",
+        "canonical_json_sha256": "cf3b763a62724306dca2a00ed53a7c0a19074286e40b8f0b96544ccbab4aaae2"
+      },
+      "source_revision": {
+        "pointer": "/source_revision",
+        "canonical_json_sha256": "a6ac2f95abd795060a5125653cd694de3b9adb736b601505c3d907b480ab31da"
+      },
+      "comparison_public_revision": {
+        "pointer": "/comparison_public_revision",
+        "canonical_json_sha256": "a0447afa845cb915f0f6b9af645c9a1f06ba8026d06e5a7681684c0ef4db68ac"
+      },
+      "changed_source_paths": {
+        "pointer": "/changed_source_paths",
+        "canonical_json_sha256": "76618f6218e1f3267cb758a9e7f7e4a8365119514fbe6d9dc27aaaf47ff0e372"
+      },
+      "retained_sboms": {
+        "pointer": "/retained_sboms",
+        "canonical_json_sha256": "0428d09c6e0e2b524877c2218b306c10da6c7536bcf6ed96524b581dafc85301"
+      },
+      "input_equivalence": {
+        "pointer": "/input_equivalence",
+        "canonical_json_sha256": "5895cd92b72c1d89acabdfa80505b71f289b7142f81bf797a907d1a6578d0fb5"
+      },
+      "qualification": {
+        "pointer": "/qualification",
+        "canonical_json_sha256": "965be2e1ee9ac2bf9a7db9e01c7d85ba0c426b6f40694aad1037d06c43531fa2"
+      },
+      "historical_bindings": {
+        "pointer": "/historical_bindings",
+        "canonical_json_sha256": "59ccb6141308771f32ec1e534f7a843cbdd8867afcd59e84944e03e6f9958c33"
+      }
+    },
+    "source_manifest": {
+      "path": "PUBLIC_METADATA/source-manifest.json",
+      "sha256": "8b50a77123928f991d87efaf45d2b3cbacb0de68a5486b9d8149d4c36ec6a4b6",
+      "bytes": 466565,
+      "git_blob": "9d49096323744831494c2655b6882d9e75832bbc"
+    }
+  },
+  "retained_composition_component_bindings": [
+    {
+      "public_revision": "e706c5af95cd9bae01c247b0fa884ec2ea8fddb5",
+      "path": "PUBLIC_METADATA/source-binding.json",
+      "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/e706c5af95cd9bae01c247b0fa884ec2ea8fddb5/PUBLIC_METADATA/source-binding.json",
+      "sha256": "d071eb4567c781f994b5d75eb5796c3489cf92b983aa7baa10428518882054b5",
+      "bytes": 1086747,
+      "git_blob": "31b60ac4e23f73853d20c5388e16ac22ae063715",
+      "all_top_level_keys": [
+        "schema_version",
+        "source_manifest",
+        "source_manifest_sha256",
+        "source_tree_sha256",
+        "source_file_count",
+        "source_revision",
+        "comparison_public_revision",
+        "changed_source_paths",
+        "retained_sboms",
+        "input_equivalence",
+        "qualification",
+        "historical_bindings"
+      ],
+      "preserved_json_objects": {
+        "schema_version": {
+          "pointer": "/schema_version",
+          "canonical_json_sha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+        },
+        "source_manifest": {
+          "pointer": "/source_manifest",
+          "canonical_json_sha256": "ace3c4cebde8c1e5207159e354ef46f1f9a13eb7b3185315a68b7cf8b71f212d"
+        },
+        "source_manifest_sha256": {
+          "pointer": "/source_manifest_sha256",
+          "canonical_json_sha256": "bb36b525564ad7f48be84cb24e1baab80729e17cd23b5c6732cadeb97521bf30"
+        },
+        "source_tree_sha256": {
+          "pointer": "/source_tree_sha256",
+          "canonical_json_sha256": "cbb7a844c0d2ea646dbe147f5cf126d6c1422d01d73e000f36a0cf04d529098e"
+        },
+        "source_file_count": {
+          "pointer": "/source_file_count",
+          "canonical_json_sha256": "cf3b763a62724306dca2a00ed53a7c0a19074286e40b8f0b96544ccbab4aaae2"
+        },
+        "source_revision": {
+          "pointer": "/source_revision",
+          "canonical_json_sha256": "a6ac2f95abd795060a5125653cd694de3b9adb736b601505c3d907b480ab31da"
+        },
+        "comparison_public_revision": {
+          "pointer": "/comparison_public_revision",
+          "canonical_json_sha256": "a0447afa845cb915f0f6b9af645c9a1f06ba8026d06e5a7681684c0ef4db68ac"
+        },
+        "changed_source_paths": {
+          "pointer": "/changed_source_paths",
+          "canonical_json_sha256": "76618f6218e1f3267cb758a9e7f7e4a8365119514fbe6d9dc27aaaf47ff0e372"
+        },
+        "retained_sboms": {
+          "pointer": "/retained_sboms",
+          "canonical_json_sha256": "0428d09c6e0e2b524877c2218b306c10da6c7536bcf6ed96524b581dafc85301"
+        },
+        "input_equivalence": {
+          "pointer": "/input_equivalence",
+          "canonical_json_sha256": "5895cd92b72c1d89acabdfa80505b71f289b7142f81bf797a907d1a6578d0fb5"
+        },
+        "qualification": {
+          "pointer": "/qualification",
+          "canonical_json_sha256": "965be2e1ee9ac2bf9a7db9e01c7d85ba0c426b6f40694aad1037d06c43531fa2"
+        },
+        "historical_bindings": {
+          "pointer": "/historical_bindings",
+          "canonical_json_sha256": "59ccb6141308771f32ec1e534f7a843cbdd8867afcd59e84944e03e6f9958c33"
+        }
+      },
+      "source_manifest": {
+        "path": "PUBLIC_METADATA/source-manifest.json",
+        "sha256": "8b50a77123928f991d87efaf45d2b3cbacb0de68a5486b9d8149d4c36ec6a4b6",
+        "bytes": 466565,
+        "git_blob": "9d49096323744831494c2655b6882d9e75832bbc"
+      }
+    }
+  ],
+  "reviewed_source_patch": {
+    "scope": "Inactive selected English, Spanish and Mandarin routing and dependency-source composition; qualification artifacts are not customer release approval.",
+    "source_paths": [
+      "SOURCE/docs/CUSTOMER_SPEECH_QUALIFICATION.md",
+      "SOURCE/requirements_customer_speech_mandarin.txt",
+      "SOURCE/requirements_desktop.txt",
+      "SOURCE/requirements_linux.txt",
+      "SOURCE/requirements_macos.txt",
+      "SOURCE/scripts/dependencies/verify_customer_speech.py",
+      "SOURCE/telephony/language_handler.py",
+      "SOURCE/tests/public/test_cjk_runtime_reconstruction.py",
+      "SOURCE/tests/public/test_customer_launch_voice_routes.py",
+      "SOURCE/tests/public/test_customer_phone_routing.py",
+      "SOURCE/tests/public/test_customer_speech_dependencies.py",
+      "SOURCE/third_party/kokoro_onnx.patch",
+      "SOURCE/third_party/kokoro_onnx/pyproject.toml",
+      "SOURCE/third_party/kokoro_onnx/src/kokoro_onnx/__init__.py",
+      "SOURCE/third_party/misaki_cjk_prototype.patch",
+      "SOURCE/third_party/misaki_cjk_prototype/README.md",
+      "SOURCE/third_party/misaki_cjk_prototype/pyproject.toml",
+      "SOURCE/third_party/pipecat.patch",
+      "SOURCE/third_party/pipecat/pyproject.toml",
+      "SOURCE/third_party/pipecat/src/pipecat/services/kokoro/tts.py",
+      "SOURCE/third_party/sources.toml",
+      "SOURCE/tools/qualification/cjk_runtime_replay.py",
+      "SOURCE/tools/qualification/romance_runtime_replay.py",
+      "SOURCE/voice/customer_composition.py",
+      "SOURCE/voice/customer_voice_routing.py",
+      "SOURCE/voice/synthesis/factory.py",
+      "SOURCE/voice/synthesis/kokoro_engine.py"
+    ],
+    "source_tree": "1c59281d29ec4884586ff49f80e040505987857c",
+    "patch_sha256": "39d100b6053a53688b4c19f6840c2b429d0cbb8fa4e012b0ff8fffd82c31aa71",
+    "prior_binding": {
+      "public_revision": "e706c5af95cd9bae01c247b0fa884ec2ea8fddb5",
+      "path": "PUBLIC_METADATA/source-binding.json",
+      "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/e706c5af95cd9bae01c247b0fa884ec2ea8fddb5/PUBLIC_METADATA/source-binding.json",
+      "sha256": "d071eb4567c781f994b5d75eb5796c3489cf92b983aa7baa10428518882054b5",
+      "bytes": 1086747,
+      "git_blob": "31b60ac4e23f73853d20c5388e16ac22ae063715",
+      "all_top_level_keys": [
+        "schema_version",
+        "source_manifest",
+        "source_manifest_sha256",
+        "source_tree_sha256",
+        "source_file_count",
+        "source_revision",
+        "comparison_public_revision",
+        "changed_source_paths",
+        "retained_sboms",
+        "input_equivalence",
+        "qualification",
+        "historical_bindings"
+      ],
+      "preserved_json_objects": {
+        "schema_version": {
+          "pointer": "/schema_version",
+          "canonical_json_sha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+        },
+        "source_manifest": {
+          "pointer": "/source_manifest",
+          "canonical_json_sha256": "ace3c4cebde8c1e5207159e354ef46f1f9a13eb7b3185315a68b7cf8b71f212d"
+        },
+        "source_manifest_sha256": {
+          "pointer": "/source_manifest_sha256",
+          "canonical_json_sha256": "bb36b525564ad7f48be84cb24e1baab80729e17cd23b5c6732cadeb97521bf30"
+        },
+        "source_tree_sha256": {
+          "pointer": "/source_tree_sha256",
+          "canonical_json_sha256": "cbb7a844c0d2ea646dbe147f5cf126d6c1422d01d73e000f36a0cf04d529098e"
+        },
+        "source_file_count": {
+          "pointer": "/source_file_count",
+          "canonical_json_sha256": "cf3b763a62724306dca2a00ed53a7c0a19074286e40b8f0b96544ccbab4aaae2"
+        },
+        "source_revision": {
+          "pointer": "/source_revision",
+          "canonical_json_sha256": "a6ac2f95abd795060a5125653cd694de3b9adb736b601505c3d907b480ab31da"
+        },
+        "comparison_public_revision": {
+          "pointer": "/comparison_public_revision",
+          "canonical_json_sha256": "a0447afa845cb915f0f6b9af645c9a1f06ba8026d06e5a7681684c0ef4db68ac"
+        },
+        "changed_source_paths": {
+          "pointer": "/changed_source_paths",
+          "canonical_json_sha256": "76618f6218e1f3267cb758a9e7f7e4a8365119514fbe6d9dc27aaaf47ff0e372"
+        },
+        "retained_sboms": {
+          "pointer": "/retained_sboms",
+          "canonical_json_sha256": "0428d09c6e0e2b524877c2218b306c10da6c7536bcf6ed96524b581dafc85301"
+        },
+        "input_equivalence": {
+          "pointer": "/input_equivalence",
+          "canonical_json_sha256": "5895cd92b72c1d89acabdfa80505b71f289b7142f81bf797a907d1a6578d0fb5"
+        },
+        "qualification": {
+          "pointer": "/qualification",
+          "canonical_json_sha256": "965be2e1ee9ac2bf9a7db9e01c7d85ba0c426b6f40694aad1037d06c43531fa2"
+        },
+        "historical_bindings": {
+          "pointer": "/historical_bindings",
+          "canonical_json_sha256": "59ccb6141308771f32ec1e534f7a843cbdd8867afcd59e84944e03e6f9958c33"
+        }
+      },
+      "source_manifest": {
+        "path": "PUBLIC_METADATA/source-manifest.json",
+        "sha256": "8b50a77123928f991d87efaf45d2b3cbacb0de68a5486b9d8149d4c36ec6a4b6",
+        "bytes": 466565,
+        "git_blob": "9d49096323744831494c2655b6882d9e75832bbc"
+      }
+    }
+  },
+  "new_resolution_performed": false,
+  "new_advisory_scan_performed": false,
+  "new_runtime_qualification_performed": false,
+  "new_source_contract_qualification_performed": true,
+  "new_static_security_scan_performed": false,
+  "new_resolution_scope": "No new customer target dependency resolution in local source composition; normal exact-head hosted inventories cover their declared Windows scopes.",
+  "new_advisory_scan_scope": "No new advisory scan during local composition; final hosted checks provide their actual results."
 }

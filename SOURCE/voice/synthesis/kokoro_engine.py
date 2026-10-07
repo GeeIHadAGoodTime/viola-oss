@@ -279,7 +279,13 @@ class KokoroTTSEngine:
         )
 
         # Voice / speed / volume
-        self._voice = voice or getattr(cfg, "tts_kokoro_voice", None) or _DEFAULT_VOICE
+        from voice.customer_voice_routing import resolve_kokoro_voice_alias
+
+        self._voice = resolve_kokoro_voice_alias(voice or getattr(cfg, "tts_kokoro_voice", None) or _DEFAULT_VOICE)
+        if customer_tokenizer is not None:
+            from voice.customer_voice_routing import require_customer_voice
+
+            require_customer_voice(language, self._voice)
         raw_speed = speed if speed is not None else getattr(cfg, "tts_rate", 150)
         # tts_rate is WPM (default 150).  Map to Kokoro speed multiplier:
         #   150 WPM → 1.0x,  200 WPM → 1.33x,  100 WPM → 0.67x
@@ -305,7 +311,14 @@ class KokoroTTSEngine:
             minimum=-30.0,
             maximum=-10.0,
         )
+        # An explicitly named customer voice is authoritative over the legacy
+        # default blend. A caller relying on an unqualified blend must choose a
+        # named voice before this instance can advertise readiness.
         self._voice_blend_spec = self._normalize_voice_blend(getattr(cfg, "tts_voice_blend", None))
+        if customer_tokenizer is not None and self._voice_blend_spec:
+            if voice is None:
+                raise ValueError("Customer speech requires an explicit named voice when a blend is configured")
+            self._voice_blend_spec = None
         self._voice_blend_key: tuple[tuple[str, float], ...] | None = None
         self._voice_blend_style: np.ndarray | None = None
         self._speed_jitter_pct = _cfg_float(
@@ -740,6 +753,18 @@ class KokoroTTSEngine:
 
     def _resolve_voice_for_create(self, requested_voice: str | None) -> tuple[str | np.ndarray, str]:
         """Return the Kokoro voice argument and a log-safe label."""
+        from voice.customer_voice_routing import resolve_kokoro_voice_alias
+
+        if requested_voice:
+            requested_voice = resolve_kokoro_voice_alias(requested_voice)
+        if getattr(self, "_customer_tokenizer", None) is not None:
+            from voice.customer_voice_routing import require_customer_voice
+
+            if not requested_voice and self._voice_blend_spec:
+                raise ValueError("Customer speech requires a named voice instead of an unqualified blend")
+            selected = requested_voice or self._voice
+            require_customer_voice(self._speech_language, selected)
+            return selected, selected
         if requested_voice:
             return requested_voice, requested_voice
 

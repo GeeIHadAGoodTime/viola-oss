@@ -223,6 +223,7 @@ class RomanceCompositionTests(unittest.TestCase):
 
     def test_normalizer_preserves_unsupported_values_for_whole_input_rejection(self):
         formatter = SpeechFormatter(summarize=False, config=types.SimpleNamespace())
+        voices = {locale: voice for locale, _, voice in CASES}
         for locale in LOCALES:
             for text in ("12.50", "hola €12.50", "hola $25", "hello 世界", "hello नमस्ते"):
                 normalized = formatter.format(text, language=locale)
@@ -231,14 +232,15 @@ class RomanceCompositionTests(unittest.TestCase):
                     with self.subTest(locale=locale, text=text, streaming=streaming):
                         with self.assertRaises(PronunciationError) as error:
                             if streaming:
-                                asyncio.run(collect_stream(self.engine, normalized, voice="af_heart", lang=locale))
+                                asyncio.run(collect_stream(self.engine, normalized, voice=voices[locale], lang=locale))
                             else:
-                                self.engine.create(normalized, voice="af_heart", lang=locale)
+                                self.engine.create(normalized, voice=voices[locale], lang=locale)
                         self.assertNotIn(text, str(error.exception))
                         self.assertIsNone(error.exception.__cause__)
         self.assertEqual(self.calls, [])
 
     def test_unsupported_words_controls_and_locales_never_reach_inference(self):
+        voices = {locale: voice for locale, _, voice in CASES}
         for locale, text in (
             ("fr", "ami qa"),
             ("pt-br", "piñata"),
@@ -251,7 +253,12 @@ class RomanceCompositionTests(unittest.TestCase):
             ("es", "a" * 5001),
         ):
             with self.subTest(locale=locale, text=text[:20]), self.assertRaises(PronunciationError):
-                self.engine.create(text, voice="af_heart", lang=locale)
+                if locale in voices:
+                    self.engine.create(text, voice=voices[locale], lang=locale)
+                else:
+                    # Exercise unsupported pronunciation capability directly;
+                    # named-voice admission has separate earlier-boundary tests.
+                    self.component.phonemize(text, lang=locale)
         self.assertEqual(self.calls, [])
 
     def test_empty_unknown_and_nonstring_component_output_rejects(self):

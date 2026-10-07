@@ -5,7 +5,7 @@
 "source_url" = "https://files.pythonhosted.org/packages/29/c6/121d4a6088051695eb382457a09fd8515cc6c37de23c359f9b16be18124f/pipecat_ai-0.0.108.tar.gz"
 "source_sha256" = "d6707333c9e1f909d654b329d2d85288b693a36a4e31e820e522df94e3308bb8" # pragma: allowlist secret (public artifact checksum)
 "source_filename" = "pipecat_ai-0.0.108.tar.gz"
-"fork_version" = "0.0.108+viola.2"
+"fork_version" = "0.0.108+viola.3"
 "patch" = "pipecat.patch"
 "normalization" = "UTF-8 text CRCRLF and CRLF to LF; binary unchanged"
 "security_backports" = [
@@ -2054,7 +2054,7 @@
 ["pipecat"."files"]
 "LICENSE" = "e31a733ecb79cbffafd5474e964e5eca15e0a0876a42b1d7253b51b198eb61aa" # pragma: allowlist secret (public artifact checksum)
 "README.md" = "2ff9ce448a80381edd352e2e3aeb3021b57f541e97ec1c7a76d7f867589eac94" # pragma: allowlist secret (public artifact checksum)
-"pyproject.toml" = "0fde019a97ecfc4c6d6a38e5ed175812f0b60afd7e665dedac74575b04d40c1f" # pragma: allowlist secret (public artifact checksum)
+"pyproject.toml" = "12ee166964aabbc499d0cd22b68d71cdb662a3ed503a9f460eb549a09607580b" # pragma: allowlist secret (public artifact checksum)
 "src/pipecat/__init__.py" = "228823520a5bffa30e54079d769ceb041c0ad3b40e85f676f30faa9c2642df91" # pragma: allowlist secret (public artifact checksum)
 "src/pipecat/adapters/__init__.py" = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" # pragma: allowlist secret (public artifact checksum)
 "src/pipecat/adapters/base_llm_adapter.py" = "b0796eb0f54a69bfc44627f7f1e8f555c6eaff8fa22ea27e1e555562d633d482" # pragma: allowlist secret (public artifact checksum)
@@ -2350,7 +2350,7 @@
 "src/pipecat/services/inworld/__init__.py" = "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b" # pragma: allowlist secret (public artifact checksum)
 "src/pipecat/services/inworld/tts.py" = "edd7efd30e26dc9bc7bd3f4da2bd208cb93e8fc3a4d625f032fee7b6853d03a1" # pragma: allowlist secret (public artifact checksum)
 "src/pipecat/services/kokoro/__init__.py" = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" # pragma: allowlist secret (public artifact checksum)
-"src/pipecat/services/kokoro/tts.py" = "fd359d8deb8321590fe11b3c50ca0cb6c2de8005fda7fab6860e09c3343535e5" # pragma: allowlist secret (public artifact checksum)
+"src/pipecat/services/kokoro/tts.py" = "20652bce60e26caab6432e550236fa62d9b707fa298599172a4bb206fe3236d6" # pragma: allowlist secret (public artifact checksum)
 "src/pipecat/services/llm_service.py" = "56e33708a08779ed4ca685d2f82365138326b7359fb0624f580d7b5acd49f1bc" # pragma: allowlist secret (public artifact checksum)
 "src/pipecat/services/lmnt/__init__.py" = "4eed1599e74394646416dff612f93441168dca8956af3fa9831a83134236362a" # pragma: allowlist secret (public artifact checksum)
 "src/pipecat/services/lmnt/tts.py" = "41baa4da19c5e3bfdcc067f1d18ce5b2647444d861f72c0f3da08d5a7bdca8d4" # pragma: allowlist secret (public artifact checksum)
@@ -2572,7 +2572,7 @@
 "source_url" = "https://files.pythonhosted.org/packages/36/7c/4d74f7243f546716003bd0cfaae8f562f5d75672142f23fa731f69069efd/kokoro_onnx-0.4.9.tar.gz"
 "source_sha256" = "08682138939f61548a7186ef5cdae79180a5dff6fa23781910eddb1583dcf30b" # pragma: allowlist secret (public artifact checksum)
 "source_filename" = "kokoro_onnx-0.4.9.tar.gz"
-"fork_version" = "0.4.9+viola.2"
+"fork_version" = "0.4.9+viola.3"
 "patch" = "kokoro_onnx.patch"
 "normalization" = "UTF-8 text CRCRLF and CRLF to LF; binary unchanged"
 
@@ -2619,8 +2619,8 @@
 ["kokoro_onnx"."files"]
 "LICENSE" = "f61fdd0217de9ece8fa699912848d91187d84879fc2e689f0906d0c1299e955e" # pragma: allowlist secret (public artifact checksum)
 "README.md" = "38e418ec238e3bcbf791c65fb499bac6a22a8e409756605f8c6a9e4507f1b5c1" # pragma: allowlist secret (public artifact checksum)
-"pyproject.toml" = "6d50678c37c7e4505a8bbf0086de0ebd3e42173dd86e84b65c5f358b4ebc317c" # pragma: allowlist secret (public artifact checksum)
-"src/kokoro_onnx/__init__.py" = "e750127065780f06d67d96ed53aaba7aedd23a884bf23e4a4d1e61e6c371d9cc" # pragma: allowlist secret (public artifact checksum)
+"pyproject.toml" = "b2e2372490e606a53820c8f1220158e7e6680b9ee248373bf88f12766068ee56" # pragma: allowlist secret (public artifact checksum)
+"src/kokoro_onnx/__init__.py" = "6763c9819a6a26f08e1f707b1e0f05aeba4e86a1ce15c50900af5f0c1c677051" # pragma: allowlist secret (public artifact checksum)
 "src/kokoro_onnx/config.json" = "5abb01e2403b072bf03d04fde160443e209d7a0dad49a423be15196b9b43c17f" # pragma: allowlist secret (public artifact checksum)
 "src/kokoro_onnx/config.py" = "0f50f15f7c362a04ec62345f6ec53535194136417cea39912d412fef70661f11" # pragma: allowlist secret (public artifact checksum)
 "src/kokoro_onnx/log.py" = "2c56e73146eac2aa3e47b144ec53ae28964b41c06095975a606a53466218863c" # pragma: allowlist secret (public artifact checksum)
@@ -2701,7 +2701,7 @@
 "source_url" = "https://files.pythonhosted.org/packages/1a/c7/fb01370a76585b46595a01b52f18e65c8ba6d7a313a05e5d9fff0a8e1c69/misaki-0.9.4.tar.gz"
 "source_sha256" = "3960fa3e6de179a90ee8e628446a4a4f6b8c730b6e3410999cf396189f4d9c40"
 "source_filename" = "misaki-0.9.4.tar.gz"
-"fork_version" = "0.9.4+viola.cjk.3"
+"fork_version" = "0.9.4+viola.cjk.4"
 "patch" = "misaki_cjk_prototype.patch"
 "normalization" = "UTF-8 text CRCRLF and CRLF to LF; binary unchanged"
 
@@ -2732,7 +2732,7 @@
 ["misaki_cjk_prototype"."files"]
 "LICENSE" = "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
 "PROVENANCE.json" = "186cdf9e1ad80213c63c67d47a477e4a8906084a20c7cb495243fc89ed56d0d2"
-"README.md" = "39ea2f485196190513b195fb5d5b99ba0553aa6ebe429a654a841182f1ed4283"
+"README.md" = "30b146c4a3f33f7905764ecc0db45c3f42c2ed6801bc12ea68a03206f5d598ba"
 "misaki/_licenses/convert-numbers-to-japanese-MIT.txt" = "a2d0e21948ca52f09926d17de411f1d989bf7b99ec05deb668c0358ce5196e57"
 "misaki/_licenses/cutlet-MIT.txt" = "8736ad0d4636cb6dabae3e97e99c08f5c0c08b8c451f1d489b29a0d63bebf074"
 "misaki/_licenses/pinyin-to-ipa-MIT.txt" = "0bc847bdc29b0ba04afb7ef9660dc0ba9b8796a9a7a814d106db5aa373a8a86d"
@@ -2741,7 +2741,7 @@
 "misaki/num2kana.py" = "26ca4b39ac7165104e53971bd2459df6466ff8140e1dac836a3bf1f9e811e2d2"
 "misaki/transcription.py" = "14f0f1b5eb89c5b684229a30ae8b0c19c8266b537967786a2079ba887f5fbc32"
 "misaki/zh.py" = "97d16aec581832845d2566cb24da2ba045d4552fb65a5017a6eac8feef654c81"
-"pyproject.toml" = "97cb7fd95a081ab5db3d8ae1915d9cf785709265ace9526b869a37b79553c8ab"
+"pyproject.toml" = "42deb51a09684d4cdd96e9f91ae5d4a5ffb3e6fd3db074a41804bccb0c3e4626"
 "viola_cjk/__init__.py" = "3eee7a3f5db5e15971fe61d0d8bafb7226466a9f296865d029f4a8451d5ef533"
 "viola_cjk/coverage.py" = "f5ec0bc5611a74f93af0ac2e5fcb6a043268b4c0e5c88a5d6af440fee67914cf"
 "viola_cjk/customer_english_span.py" = "fc145197f88b4ec3194a3d34260e5957703cc061c025af132cf9228bd87c8983"

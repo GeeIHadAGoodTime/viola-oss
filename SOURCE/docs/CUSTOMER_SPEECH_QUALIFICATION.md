@@ -1,6 +1,6 @@
 # Customer speech component qualification
 
-Status: bounded component synthesis in all eight language families; application composition, full 54-voice coverage and customer release remain under qualification.
+Status: first-release qualification targets English, Spanish and Mandarin. Existing language routes and the canonical 54-voice asset are retained; selected-voice application, frozen and installed acceptance remain open.
 
 ## Recovered decision and scope
 
@@ -9,15 +9,20 @@ records Kokoro ONNX with Misaki English and no eSpeak fallback. Its claim that
 all dependencies were permissive and the path was already complete was not
 supported by the actual tokenizer, which used phonemizer and eSpeak. The same
 historical document also describes 48 voices/eight offline languages. The
-current phone roadmap preserves eight locales. The current product requirement
-is all eight language families and all 54 canonical voices; the historical
-48-voice sentence is not the current acceptance target. There is no recovered
-approval to reduce that product scope to English.
+current phone source preserves eight language families. The owner's 2026-10-07
+launch decision prioritizes three to five languages used in the United States;
+the selected first-release set is **English, Spanish and Mandarin**. Mandarin
+does not imply Cantonese or every language grouped as Chinese. Other retained
+routes, including Japanese, Italian and Hindi, are deferred expansion work.
+The canonical 54-voice asset stays intact; the historical 48-voice sentence is
+not a current voice inventory or an acceptance claim.
 
 The default customer component is English. The explicitly constructed, inactive
-CJK companion now has the bounded source evidence below. Do not activate either
-for a customer build until the full multilingual/voice-selection scope is qualified. Desktop's existing hardcoded `en-us` call is implementation evidence,
-not permission to remove other promised capabilities. The environment selector
+CJK companion now has the bounded source evidence below. Customer activation
+requires qualification of the selected launch routes and voices, including
+their exact target dependencies, notices and installed behavior. Unselected
+languages and all 54 voices are not blanket release prerequisites. Desktop's
+existing hardcoded `en-us` call remains an application-routing gap. The environment selector
 would also affect local phone Kokoro, so its eight-language source forwarding
 tests alone cannot qualify a customer artifact using this profile.
 
@@ -57,6 +62,20 @@ tests alone cannot qualify a customer artifact using this profile.
 - Existing public number formatting now uses `voice/english_numbers.py` rather
   than importing LGPL num2words. Its bounded cardinal/ordinal/year contract is
   checked against the former implementation using a test-only reference.
+- `requirements_customer_speech_mandarin.txt` explicitly adds the `.4`
+  companion's Mandarin extra to the retained English input. Spanish uses the
+  maintained source component. Japanese has a separate extra and still requires
+  its explicit dictionary when selected; its native/dictionary dependencies
+  do not gate the three-language launch candidate. Pronunciation/data/notice
+  bytes are unchanged by this dependency split.
+
+Voice selection must be explicit and match the selected locale. The first
+bounded qualification pass uses `af_heart`, `ef_dora` and `zf_xiaobei`, reusing
+their retained samples. That is test sequencing, not a permanent product limit.
+Other existing English, Spanish and Mandarin voice choices remain eligible for
+qualification; their presence in the canonical asset alone does not make them
+advertised or accepted. Application voice/locale mismatch handling and frozen
+selected-voice proof remain separate requirements.
 
 Unknown words still require a pronunciation override. This is an explicit
 coverage limitation, not a reason to silently delete words or substitute a
@@ -166,6 +185,33 @@ They do not change frozen Windows pins or activate an application profile.
   passed through that installed `.3` package with ONNX unavailable and no CJK
   source overlay. This is a Linux source-QA
   packaging step, not a Windows/frozen bundle or registry publication.
+- Launch-subset dependency separation: companion `0.9.4+viola.cjk.4` gives the
+  changed dependency metadata a new identity. Its pure wheel is 511,838 bytes,
+  SHA-256 `e9688b42b822455bf80a89a2dc2526add725867a2b0f5182bcf4f03a7f93284f`.
+  Two offline builds match exactly. All 16 runtime/data/embedded-notice entries
+  match the retained `.3` source, and all seven notice paths and wheel RECORD
+  entries verify. Mandarin and Japanese extras retain their existing exact
+  pins; Mandarin installation/admission no longer requires Japanese inputs.
+  Twenty-two dependency controls and the updated 36-case inert source replay
+  pass. This establishes metadata/source behavior, not a new target-platform
+  installation, waveform, frozen artifact or customer release acceptance.
+- Selected application voice routing now checks named voices against their
+  pronunciation locale before tokenization or synthesis. Phone language changes
+  retain a compatible voice or choose the matching existing default, and failed
+  changes restore both fields. Explicit Mandarin aliases do not admit Cantonese
+  or unspecified regional Chinese variants. The implicit English adapter keeps
+  its previous style compatibility; dormant language routes and assets remain.
+  These source changes have new package identities: `kokoro-onnx 0.4.9+viola.3`
+  (18,890 bytes, SHA-256
+  `2fedd09693672da46da0e2ee4dee3265bc24607774699bf6c68d8eec299f9b33`)
+  and `pipecat-ai 0.0.108+viola.3` (10,752,703 bytes, SHA-256
+  `a09f12dffc545ca0cac022fdb5ff441e9298556be8f26d23e7a40f5ac5a6fb80`).
+  Both wheels reproduce exactly from the retained build backends. Pipecat's
+  Kokoro extra pins this maintained Kokoro identity; its existing
+  `onnxruntime~=1.23.2` dependency is unchanged. The separate Linux 1.30.0
+  investigation does not replace that Windows compatibility declaration.
+  Source checks and wheel contents do not establish installed application,
+  acoustic, native-library closure or customer release acceptance.
 - Romance: the retained ES `pero`/`perro`, FR `tu`/`tout`, and PT-BR
   `bom dia`/`noite` components produced six finite, non-silent WAVs using
   `ef_dora`, `ff_siwis` and `pf_dora`. These runs supplied precomputed phones
@@ -201,10 +247,12 @@ The owner gave positive listening feedback on the delivered English clips and
 the exact Japanese `こんにちは` sample. This does not select a winner within
 paired English clips or qualify other utterances, voices or languages. Mandarin
 listening is still pending. The assistant's own audio-input capability was unavailable.
-Nine distinct voices across all eight language families now have bounded
-component synthesis samples; the full language/input/54-voice matrix remains
-open. Romance and Italian/Hindi listening remain unverified. Italian/Hindi
-application text dispatch and complete desktop/phone integration remain open.
+Nine distinct voices across the retained eight families have bounded component
+synthesis samples. The wider matrix remains expansion evidence; first-release
+acceptance concerns the selected English/Spanish/Mandarin voices and input
+coverage. Spanish listening remains unverified. Other Romance and Italian/Hindi
+listening and general application text work are deferred. Complete desktop/phone
+integration remains open for the launch subset.
 Frozen-app behavior,
 complete dependency/native-library notices and customer release eligibility are
 separate outstanding gates.
