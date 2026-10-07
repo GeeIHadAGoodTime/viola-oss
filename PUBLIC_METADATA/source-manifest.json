@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "a45d90d3acfaafc700b683ee14908b6f68899d77",
-  "sha256": "e3da1c95f02dcddca5cec1e12d106842b9d96e4cdd47ca31f5d46a3046b079f2",
+  "revision": "114d470614af77687258db594fa5ff4d71a3ef90",
+  "sha256": "216d0e4352716e119f3ecf86d87f4fd1e818b65f2412fdcd0ee068eb36770388",
   "files": [
     {
       "path": ".env.example",
@@ -625,8 +625,8 @@
     },
     {
       "path": "backend/fastapi_app.py",
-      "sha256": "99b29fe7a9349ab7f7a5b774e1117a558a269c7f923cb71e3e34fc791f31b234",
-      "bytes": 67672
+      "sha256": "5bce7c7c72ac68059664e9295ec947c9ed3d87c770c448c268d799012bd342eb",
+      "bytes": 68462
     },
     {
       "path": "backend/instrumentation.py",
@@ -1540,13 +1540,13 @@
     },
     {
       "path": "intent/agent_executor.py",
-      "sha256": "dd1e72202342ad12ca7573e839e44046631e39e45bf8be7f5918944567b909d2",
-      "bytes": 564020
+      "sha256": "0607d00d98cce22efe47b7234e9d065fc4d034c9d48ad170a49d02d0209e7a29",
+      "bytes": 564096
     },
     {
       "path": "intent/agent_loop.py",
-      "sha256": "278a2d53b603cdf9d8efa7cea8887ebb4b469243f6df9fce07fa2ca90b50c9d1",
-      "bytes": 243975
+      "sha256": "57a0941c08fb0b491cf210799544137dbb2f4b9886167516822df991e2865b00",
+      "bytes": 245382
     },
     {
       "path": "intent/agent_message_manager.py",
@@ -1570,8 +1570,8 @@
     },
     {
       "path": "intent/ai_controller.py",
-      "sha256": "343fff506c94ec37c19b26d287d7b298e270a79987a32c94f99cc979cc5d72f9",
-      "bytes": 163417
+      "sha256": "f3ce8382a76ded6cc0ab756e8f6580af3de17e37f732a980c30447fe8a4d2f38",
+      "bytes": 164391
     },
     {
       "path": "intent/ai_interpreter.py",
@@ -4510,8 +4510,8 @@
     },
     {
       "path": "services/llm/managed_budget.py",
-      "sha256": "481b747591624740eb0967e1007be50c3191386447a18255711d3e22bebfc635",
-      "bytes": 8770
+      "sha256": "8763e0bb0a92aee906fe5fc2f0e5ea36f19f250c1d66e77a93361d859e2060b9",
+      "bytes": 12529
     },
     {
       "path": "services/llm/model_fallback.py",
@@ -4590,13 +4590,13 @@
     },
     {
       "path": "services/llm/provider_fallback.py",
-      "sha256": "cab1b29bfb0b31d9c57d24383997248e8709f64c4bbcc7d19adb25273e3af312",
-      "bytes": 22339
+      "sha256": "0a1558394dba84f22090dfa6db007be45f237b478adcc45980cee4d4a3995d31",
+      "bytes": 23014
     },
     {
       "path": "services/llm/provider_router.py",
-      "sha256": "f646e20d08277b994c7362f3d424d5b60bbe7b42eed3ab908e4f1d089ab8532a",
-      "bytes": 65540
+      "sha256": "336c04404791a07160b1b4d97e4b1910a89e682ebb1ed20601f90176acc56f4e",
+      "bytes": 66071
     },
     {
       "path": "services/llm/providers/__init__.py",
@@ -4660,8 +4660,8 @@
     },
     {
       "path": "services/llm/spend_accounting.py",
-      "sha256": "a55b64ab431e3441cdda3ea3e9441ebca4033dc8eadabc92880d2f497b407788",
-      "bytes": 12723
+      "sha256": "f22171f4bd78d6cb9cdb703a40332d2b5745602ac4bfb6b960d20ab1f7034f93",
+      "bytes": 13097
     },
     {
       "path": "services/llm/stream_bus.py",
@@ -5980,8 +5980,8 @@
     },
     {
       "path": "tests/public/test_billing_capacity_mount.py",
-      "sha256": "9bfadb0951fc1a75919e89d5350d16b538fb81a95a37069fd620c8966959b72f",
-      "bytes": 3239
+      "sha256": "558cb7f429c35275133a334c29d9fca77d83bc5b4b815fcaf275871fb9319cbc",
+      "bytes": 4204
     },
     {
       "path": "tests/public/test_call_history_order_contract.py",
@@ -6122,6 +6122,11 @@
       "path": "tests/public/test_rating_target.py",
       "sha256": "86a97bd4002f0aa1d1db0ec6505bfa5ca83d2d30d159d8584a95dcf244a6b938",
       "bytes": 10081
+    },
+    {
+      "path": "tests/public/test_remote_managed_accounting.py",
+      "sha256": "e8dfdf36dd8198de9d864ad3cd76b7d04ecb75defaff3d0ba0fa4f508b4bd7dd",
+      "bytes": 11726
     },
     {
       "path": "tests/public/test_request_tool_surface_boundary.py",
@@ -11915,8 +11920,8 @@
     },
     {
       "path": "ui/react-app/src/utils/capDenial.test.js",
-      "sha256": "f3fdfea010bfabebfdf128566c08cf04a507eb5010f41df8009abb126cfe3a1b",
-      "bytes": 3860
+      "sha256": "f7d7aef5afda114f282876f7693986047e86773c83448ab0c57903397b6ee321",
+      "bytes": 4240
     },
     {
       "path": "ui/react-app/src/utils/capDenial.voiceFrame.test.js",

@@ -1,17 +1,25 @@
 {
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "9f7d028d889efc1a4bed9c63385f9b914315e343948c810d534c5dd3442afed8",
-  "source_tree_sha256": "e3da1c95f02dcddca5cec1e12d106842b9d96e4cdd47ca31f5d46a3046b079f2",
-  "source_file_count": 2640,
-  "source_revision": "a45d90d3acfaafc700b683ee14908b6f68899d77",
+  "source_manifest_sha256": "5d63108b0f7483808c2ade045480e5244078881524494a6e7230a33940a72baf",
+  "source_tree_sha256": "216d0e4352716e119f3ecf86d87f4fd1e818b65f2412fdcd0ee068eb36770388",
+  "source_file_count": 2641,
+  "source_revision": "114d470614af77687258db594fa5ff4d71a3ef90",
   "comparison_public_revision": "e703b9d04b8623dd68d36a6996103eb6d8c7b731",
   "changed_source_paths": [
     "SOURCE/backend/fastapi_app.py",
+    "SOURCE/intent/agent_executor.py",
+    "SOURCE/intent/agent_loop.py",
+    "SOURCE/intent/ai_controller.py",
+    "SOURCE/services/llm/managed_budget.py",
+    "SOURCE/services/llm/provider_fallback.py",
+    "SOURCE/services/llm/provider_router.py",
+    "SOURCE/services/llm/spend_accounting.py",
     "SOURCE/telephony/call_manager.py",
     "SOURCE/telephony/usage.py",
     "SOURCE/tests/public/test_billing_capacity_mount.py",
     "SOURCE/tests/public/test_capacity_phone_resource_bridge.py",
+    "SOURCE/tests/public/test_remote_managed_accounting.py",
     "SOURCE/ui/react-app/src/auth/legalVersions.js",
     "SOURCE/ui/react-app/src/components/AccountTab.jsx",
     "SOURCE/ui/react-app/src/components/BillingCapacityPanel.css",
@@ -20,7 +28,8 @@
     "SOURCE/ui/react-app/src/components/UsageCapNotice.jsx",
     "SOURCE/ui/react-app/src/components/UsageCapNotice.test.jsx",
     "SOURCE/ui/react-app/src/hooks/useBillingCapacity.js",
-    "SOURCE/ui/react-app/src/hooks/useUsage.jsx"
+    "SOURCE/ui/react-app/src/hooks/useUsage.jsx",
+    "SOURCE/ui/react-app/src/utils/capDenial.test.js"
   ],
   "retained_sboms": [
     {
