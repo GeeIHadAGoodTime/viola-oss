@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "fb0545a14307f3816a6307f8c625fb5d5f869b2f",
-  "sha256": "dc23439fd0766e673f78cd6c9830c6a7769427324a257a35f7bff602c6807bbb",
+  "revision": "b21ae4d7d414d1c845ae954dd4b6ca50bd5691b7",
+  "sha256": "b4178f24136bc7e8558411fcd1146f16f6d098ccea96130ed91881a6e985e6a2",
   "files": [
     {
       "path": ".env.example",
@@ -11369,9 +11369,14 @@
       "bytes": 909
     },
     {
+      "path": "ui/react-app/src/components/stage/modes/chat/ChatMessage.clipboard.test.jsx",
+      "sha256": "b9554221a21f191e050274a3ef6b98c943dc893b89f81b7188260aa69749421f",
+      "bytes": 8567
+    },
+    {
       "path": "ui/react-app/src/components/stage/modes/chat/ChatMessage.jsx",
-      "sha256": "be3d69487867fb6f45637b3ded38a3f70a7dc84185abdbfbcae276bd2db0ba39",
-      "bytes": 4124
+      "sha256": "a3d3494b7eeef69f871f99cd13451e59e38bc6fb5dd2cdb72d8299d5c0594a43",
+      "bytes": 3817
     },
     {
       "path": "ui/react-app/src/components/stage/modes/chat/ChatMode.consentGate.test.jsx",
@@ -11419,6 +11424,11 @@
       "bytes": 2585
     },
     {
+      "path": "ui/react-app/src/components/stage/modes/chat/CopyButton.jsx",
+      "sha256": "97618f61a70c8a390a053db5bcd3df2d45348452b17bdb147091b831ba34c8cf",
+      "bytes": 1919
+    },
+    {
       "path": "ui/react-app/src/components/stage/modes/chat/ToolUseCard.jsx",
       "sha256": "f91304838197759d18d3e38ea21d11b596a7ffe12512c46fb2e6743ff2531652",
       "bytes": 2501
@@ -11430,8 +11440,8 @@
     },
     {
       "path": "ui/react-app/src/components/stage/modes/chat/markdown.jsx",
-      "sha256": "f942a99f3e9417841b7ad949a85f12caf0cd80f626a759f41100cedf5b5be4c5",
-      "bytes": 7301
+      "sha256": "8bcb591e681030238a50022b3ab06e55a8c215195e981f583c64e7b029ad1f7b",
+      "bytes": 6969
     },
     {
       "path": "ui/react-app/src/components/stage/stageCommandContributions.js",

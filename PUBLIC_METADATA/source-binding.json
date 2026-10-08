@@ -1,14 +1,16 @@
 {
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "fd42177f5b7b09a4b9ccbc66eb7a5f36daf34c189691b0e1b5a8dcee65b79e5b",
-  "source_tree_sha256": "dc23439fd0766e673f78cd6c9830c6a7769427324a257a35f7bff602c6807bbb",
-  "source_file_count": 2689,
-  "source_revision": "fb0545a14307f3816a6307f8c625fb5d5f869b2f",
-  "comparison_public_revision": "c074f92a31b74a20b8135a4996142eb18209de45",
+  "source_manifest_sha256": "1b22c3935b7105b0bd64c4a71a7c846dcc84aa31b84a26282468059492e83797",
+  "source_tree_sha256": "b4178f24136bc7e8558411fcd1146f16f6d098ccea96130ed91881a6e985e6a2",
+  "source_file_count": 2691,
+  "source_revision": "b21ae4d7d414d1c845ae954dd4b6ca50bd5691b7",
+  "comparison_public_revision": "88b56e198b2e712c8a1b2348689a2418070fb0fe",
   "changed_source_paths": [
-    "SOURCE/intent/ai_controller.py",
-    "SOURCE/tests/public/test_remote_managed_accounting.py"
+    "SOURCE/ui/react-app/src/components/stage/modes/chat/ChatMessage.jsx",
+    "SOURCE/ui/react-app/src/components/stage/modes/chat/markdown.jsx",
+    "SOURCE/ui/react-app/src/components/stage/modes/chat/CopyButton.jsx",
+    "SOURCE/ui/react-app/src/components/stage/modes/chat/ChatMessage.clipboard.test.jsx"
   ],
   "retained_sboms": [
     {
@@ -70,35 +72,75 @@
     }
   ],
   "input_equivalence": {
-    "comparison_basis": "Protected public main c074f92a31b74a20b8135a4996142eb18209de45",
+    "comparison_basis": "Protected public main 88b56e198b2e712c8a1b2348689a2418070fb0fe",
     "all_unselected_export_leaf_bytes_and_modes_preserved": true,
     "all_six_sbom_bytes_and_status_objects_preserved": true,
-    "all_dependency_frontend_workflow_model_voice_dictionary_and_notice_inputs_unchanged": true,
-    "source_change": "Preserve customer-facing managed-budget denial and cloud limiter-unavailable responses at controller preflight; add regressions to the existing remote managed accounting module."
+    "dependency_manifest_lock_workflow_notice_and_model_inputs_unchanged": true,
+    "scope": "Only Chat message/Markdown copy controls, the shared CopyButton component and its synthetic regression suite change. Source behavior intentionally changes; dependency inputs and inventory limitations remain unchanged."
   },
   "qualification": {
-    "scope": "The controller returns a terminal answer and safe cap state for managed-budget denial, and a terminal service-availability answer for a cloud limiter exception.",
-    "source_commit": "fb0545a14307f3816a6307f8c625fb5d5f869b2f",
-    "source_tree": "a35ef8a58d2afc09afc2eba42b01670d58d5d5a2",
+    "scope": "Truthful, retryable Chat message and code-block clipboard feedback with stale-owner and timer retirement.",
+    "source_commit": "b21ae4d7d414d1c845ae954dd4b6ca50bd5691b7",
+    "source_tree": "1e74e173e8c7749e8a73c08381f982f2bda0f5b6",
     "ordered_source_parents": [
-      "c074f92a31b74a20b8135a4996142eb18209de45"
+      "88b56e198b2e712c8a1b2348689a2418070fb0fe"
     ],
-    "reviewed_source_commit": "1264d7ee01d72559997b1c4433823769318fcb0c",
-    "source_patch_sha256": "5690dc2d216abf64234ff29db1f95e436c85e7617a6ae7315d4f233bf329e114",
-    "reviewed_patch_preserved_byte_exact": true,
-    "focused_validation": {
-      "runner": "Python 3.11 pytest with importlib mode and bytecode/cacheprovider disabled",
-      "module": "tests/public/test_remote_managed_accounting.py",
-      "passed": 16,
-      "skipped": 0,
-      "duration_seconds": 2.32,
-      "receipt": "preflight-denial-publication-focused.xml retained in the local task review evidence",
-      "provider_requests": 0
+    "source_patch_sha256": "9404c61f8204a18c2d2c1d903dcf508be73fc378cd73c771f46a8f0ca1996564",
+    "independent_automated_review": {
+      "result": "Approved for source integration; parent independently read complete four-file patch and reran 27 focused tests, all passed.",
+      "reviewed_files": [
+        {
+          "path": "SOURCE/ui/react-app/src/components/stage/modes/chat/ChatMessage.jsx",
+          "before_blob": "06dd2fcd6da6c6a9622bb5678fe2ba48cea4c900",
+          "new_blob": "5459650550518a03fdad95856fbfeefd495d2c98",
+          "sha256": "a3d3494b7eeef69f871f99cd13451e59e38bc6fb5dd2cdb72d8299d5c0594a43",
+          "bytes": 3817
+        },
+        {
+          "path": "SOURCE/ui/react-app/src/components/stage/modes/chat/markdown.jsx",
+          "before_blob": "bd32983383a46d7d6fcf82abfe99ca69938c312d",
+          "new_blob": "32ec43fac3ae0579b5a41994003f468617d4a027",
+          "sha256": "8bcb591e681030238a50022b3ab06e55a8c215195e981f583c64e7b029ad1f7b",
+          "bytes": 6969
+        },
+        {
+          "path": "SOURCE/ui/react-app/src/components/stage/modes/chat/CopyButton.jsx",
+          "before_blob": null,
+          "new_blob": "b963b2fc37c1fc9c2cde0342667d6514cb2c7c36",
+          "sha256": "97618f61a70c8a390a053db5bcd3df2d45348452b17bdb147091b831ba34c8cf",
+          "bytes": 1919
+        },
+        {
+          "path": "SOURCE/ui/react-app/src/components/stage/modes/chat/ChatMessage.clipboard.test.jsx",
+          "before_blob": null,
+          "new_blob": "8a2de99ecba9a5030ce4fbda679e5a7a041ce92b",
+          "sha256": "b9554221a21f191e050274a3ef6b98c943dc893b89f81b7188260aa69749421f",
+          "bytes": 8567
+        }
+      ],
+      "scope": "Independent automated source review and synthetic component controls; no human-review or installed-acceptance claim."
     },
-    "hosted_required_checks": "Pending exact final head; focused validation does not replace protected required CI.",
-    "installed_acceptance": "Pending qualified private adoption, deployment and Surface revalidation.",
-    "release_eligible": false,
-    "public_release_eligible": false
+    "source_controls": {
+      "author_focused_tests_passed": 27,
+      "author_chat_subsystem_tests_passed": 172,
+      "author_chat_subsystem_files": 7,
+      "independent_focused_tests_passed": 27,
+      "known_bad_original_source": {
+        "failed": 26,
+        "passed": 1,
+        "unhandled_errors": 6
+      },
+      "eslint_changed_frontend": "passed",
+      "full_frontend_or_build_run_locally": false,
+      "fixtures": "Actual ChatMessage and Markdown Copy buttons in React StrictMode with synthetic clipboard promises, API absence, rejection, synchronous throw, identity/content changes, repeat clicks and unmount. No real clipboard or personal data read."
+    },
+    "limits": [
+      "Source/component-only evidence; physical Windows and deployed cloud acceptance remain open.",
+      "Browser writes already dispatched cannot be cancelled when a message changes or unmounts; callbacks and timers are retired.",
+      "Final-head hosted checks and private exact-pin composed-source checks remain separate.",
+      "Historical SBOM/advisory status and current-input qualification limitations are retained unchanged.",
+      "No deployment, release, spending, credentials or access changes."
+    ]
   },
   "historical_bindings": [
     {
@@ -8395,12 +8437,12 @@
     }
   ],
   "prior_binding": {
-    "public_revision": "15a1c6e7668b20825ff4a516953f493f09f24fdb",
+    "public_revision": "88b56e198b2e712c8a1b2348689a2418070fb0fe",
     "path": "PUBLIC_METADATA/source-binding.json",
-    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/15a1c6e7668b20825ff4a516953f493f09f24fdb/PUBLIC_METADATA/source-binding.json",
-    "sha256": "3cd870f93c0c8af48d8b5b57cf938e55ddcde1e65e19e694d504c06af5357501",
-    "bytes": 1305023,
-    "git_blob": "b6a8e28a07a3418b0e3c24dd139bba3b564232e5",
+    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/88b56e198b2e712c8a1b2348689a2418070fb0fe/PUBLIC_METADATA/source-binding.json",
+    "sha256": "f9f73bf771a43906f636ccd3b1b262441e7f9b15aabd07ff7f6dc8a6b8ed0c31",
+    "bytes": 1319055,
+    "git_blob": "448bac5923b0252f6d6bfac8ab99f215d7de86c5",
     "all_top_level_keys": [
       "schema_version",
       "source_manifest",
@@ -8428,7 +8470,10 @@
       "reviewed_speech_binding",
       "local_media_path_previous_binding",
       "session_durability_previous_binding",
-      "media_identity_previous_binding"
+      "media_identity_previous_binding",
+      "speech_fixture_import_previous_binding",
+      "speech_fixture_import_original_pr_binding",
+      "managed_preflight_refusal_previous_binding"
     ],
     "preserved_json_objects": {
       "schema_version": {
@@ -8441,27 +8486,27 @@
       },
       "source_manifest_sha256": {
         "pointer": "/source_manifest_sha256",
-        "canonical_json_sha256": "2cb00d41878d840ab27913d0fcda1f256a3bc4b71fa8a05a2470abf7ecece1e8"
+        "canonical_json_sha256": "e105736d87e934d8e4e7c554429a3223e466a786f154a55027a46000d3c7a079"
       },
       "source_tree_sha256": {
         "pointer": "/source_tree_sha256",
-        "canonical_json_sha256": "e1dd298d0df7613e560149522b5bc8538554ca05e22412e79e335fbf8d3a5b7e"
+        "canonical_json_sha256": "41433e15b941bf35071ee9235d51dbc58220fcfdab3558734afadaa699b123f0"
       },
       "source_file_count": {
         "pointer": "/source_file_count",
-        "canonical_json_sha256": "3581b125128cab6e325316b96971bce7bac9402d5a817e64f2d56deb5cf23c4e"
+        "canonical_json_sha256": "60fb27b6df84e9fc873d3a2bda51e22fead7708c19a636d4650f75db7a590628"
       },
       "source_revision": {
         "pointer": "/source_revision",
-        "canonical_json_sha256": "9a19a9c1a475753a72af8608a7974c91698dec41727c5d447c8476072ece888e"
+        "canonical_json_sha256": "6d35c7cb1d827a0e2819acfea5a36a86e6c613b6eda03f9604fb31248ec32e93"
       },
       "comparison_public_revision": {
         "pointer": "/comparison_public_revision",
-        "canonical_json_sha256": "ed84c9d643b73c5aca7db3d058b8d77587abfb0d91c946a0fa03ea3002311afe"
+        "canonical_json_sha256": "b0bc16af02596cdc97e8a4044c833168fbac936ecc308cc939cd6068634ec0eb"
       },
       "changed_source_paths": {
         "pointer": "/changed_source_paths",
-        "canonical_json_sha256": "22807c6bb27f263e436b63416c5412dca5d9c3a75d67c9f27f5ba529b07ea363"
+        "canonical_json_sha256": "9caa297a2d7aeb510f5936d92271e4d9179640446deae570e399039e9b3e26c7"
       },
       "retained_sboms": {
         "pointer": "/retained_sboms",
@@ -8469,11 +8514,11 @@
       },
       "input_equivalence": {
         "pointer": "/input_equivalence",
-        "canonical_json_sha256": "ac97875527413a262538ed95c453f98d94abf586a85a5730b65f0c47427966c7"
+        "canonical_json_sha256": "f729498aab104ce91a97713da36d7c2c00e786457f76e6b1f5f797a290d3e889"
       },
       "qualification": {
         "pointer": "/qualification",
-        "canonical_json_sha256": "276258c039effd0814d13434f396bd9480a728ef748dd2aff558156a15e4ce87"
+        "canonical_json_sha256": "d140712af6d871cad8086b79559a33b0e595baac3eecf9d8ef138a936f5c0121"
       },
       "historical_bindings": {
         "pointer": "/historical_bindings",
@@ -8481,15 +8526,15 @@
       },
       "prior_binding": {
         "pointer": "/prior_binding",
-        "canonical_json_sha256": "f1e9a7bfecf088304f3766c5e6dac1bf6d1ebc18f5548927267d34756ff3b42c"
+        "canonical_json_sha256": "6034c617b39078469bfd9c2c653f563dad775b9bee6db15279fa34a3fa152808"
       },
       "retained_composition_component_bindings": {
         "pointer": "/retained_composition_component_bindings",
-        "canonical_json_sha256": "184e68cd8a40d35d4d24518cb416e07af94c0653ebac97aa8099e355811ef83d"
+        "canonical_json_sha256": "80391a271546de11ea6d384ab5f9357afd1d00f7895122f3dc4d636d6104e1d1"
       },
       "reviewed_source_patch": {
         "pointer": "/reviewed_source_patch",
-        "canonical_json_sha256": "45804fd1ea45d14020a10238c987dd27848a26bda8ef2854a72598498bdce802"
+        "canonical_json_sha256": "9f9df1044dd866dc783350f978da31f63191274ce74d09468cad46c24aba36aa"
       },
       "new_resolution_performed": {
         "pointer": "/new_resolution_performed",
@@ -8538,16 +8583,196 @@
       "media_identity_previous_binding": {
         "pointer": "/media_identity_previous_binding",
         "canonical_json_sha256": "775b630f1531f2b679dfb823a59f6d534e542a78fdf1dc3dc6013a74012468e3"
+      },
+      "speech_fixture_import_previous_binding": {
+        "pointer": "/speech_fixture_import_previous_binding",
+        "canonical_json_sha256": "df5e90ccb71afa3db0b0f386fe8575ce3fce043d63192aea6cf38b594a7d41b1"
+      },
+      "speech_fixture_import_original_pr_binding": {
+        "pointer": "/speech_fixture_import_original_pr_binding",
+        "canonical_json_sha256": "c8a9d20bb298d827ca44f1e0ce75e0d8340c4812a856c4a398a185a26126c3f7"
+      },
+      "managed_preflight_refusal_previous_binding": {
+        "pointer": "/managed_preflight_refusal_previous_binding",
+        "canonical_json_sha256": "37b62ef1767156d6f238dcb7b6e966e34f1d791aadb0e9128db89db0c40ebf2f"
       }
     },
     "source_manifest": {
       "path": "PUBLIC_METADATA/source-manifest.json",
-      "sha256": "6c00d575bb90a1f69954b653d7bb09116ddd4bf96825187194c69916c50a1422",
-      "bytes": 471929,
-      "git_blob": "d77c38a6bceb941409c42b7bcec5db6a0604535d"
+      "sha256": "fd42177f5b7b09a4b9ccbc66eb7a5f36daf34c189691b0e1b5a8dcee65b79e5b",
+      "bytes": 472514,
+      "git_blob": "4d4131a011b0a1073bcf193612e5f9cc6f720fc3"
     }
   },
   "retained_composition_component_bindings": [
+    {
+      "public_revision": "88b56e198b2e712c8a1b2348689a2418070fb0fe",
+      "path": "PUBLIC_METADATA/source-binding.json",
+      "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/88b56e198b2e712c8a1b2348689a2418070fb0fe/PUBLIC_METADATA/source-binding.json",
+      "sha256": "f9f73bf771a43906f636ccd3b1b262441e7f9b15aabd07ff7f6dc8a6b8ed0c31",
+      "bytes": 1319055,
+      "git_blob": "448bac5923b0252f6d6bfac8ab99f215d7de86c5",
+      "all_top_level_keys": [
+        "schema_version",
+        "source_manifest",
+        "source_manifest_sha256",
+        "source_tree_sha256",
+        "source_file_count",
+        "source_revision",
+        "comparison_public_revision",
+        "changed_source_paths",
+        "retained_sboms",
+        "input_equivalence",
+        "qualification",
+        "historical_bindings",
+        "prior_binding",
+        "retained_composition_component_bindings",
+        "reviewed_source_patch",
+        "new_resolution_performed",
+        "new_advisory_scan_performed",
+        "new_runtime_qualification_performed",
+        "new_source_contract_qualification_performed",
+        "new_static_security_scan_performed",
+        "new_resolution_scope",
+        "new_advisory_scan_scope",
+        "account_reconciliation_previous_binding",
+        "reviewed_speech_binding",
+        "local_media_path_previous_binding",
+        "session_durability_previous_binding",
+        "media_identity_previous_binding",
+        "speech_fixture_import_previous_binding",
+        "speech_fixture_import_original_pr_binding",
+        "managed_preflight_refusal_previous_binding"
+      ],
+      "preserved_json_objects": {
+        "schema_version": {
+          "pointer": "/schema_version",
+          "canonical_json_sha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+        },
+        "source_manifest": {
+          "pointer": "/source_manifest",
+          "canonical_json_sha256": "ace3c4cebde8c1e5207159e354ef46f1f9a13eb7b3185315a68b7cf8b71f212d"
+        },
+        "source_manifest_sha256": {
+          "pointer": "/source_manifest_sha256",
+          "canonical_json_sha256": "e105736d87e934d8e4e7c554429a3223e466a786f154a55027a46000d3c7a079"
+        },
+        "source_tree_sha256": {
+          "pointer": "/source_tree_sha256",
+          "canonical_json_sha256": "41433e15b941bf35071ee9235d51dbc58220fcfdab3558734afadaa699b123f0"
+        },
+        "source_file_count": {
+          "pointer": "/source_file_count",
+          "canonical_json_sha256": "60fb27b6df84e9fc873d3a2bda51e22fead7708c19a636d4650f75db7a590628"
+        },
+        "source_revision": {
+          "pointer": "/source_revision",
+          "canonical_json_sha256": "6d35c7cb1d827a0e2819acfea5a36a86e6c613b6eda03f9604fb31248ec32e93"
+        },
+        "comparison_public_revision": {
+          "pointer": "/comparison_public_revision",
+          "canonical_json_sha256": "b0bc16af02596cdc97e8a4044c833168fbac936ecc308cc939cd6068634ec0eb"
+        },
+        "changed_source_paths": {
+          "pointer": "/changed_source_paths",
+          "canonical_json_sha256": "9caa297a2d7aeb510f5936d92271e4d9179640446deae570e399039e9b3e26c7"
+        },
+        "retained_sboms": {
+          "pointer": "/retained_sboms",
+          "canonical_json_sha256": "0428d09c6e0e2b524877c2218b306c10da6c7536bcf6ed96524b581dafc85301"
+        },
+        "input_equivalence": {
+          "pointer": "/input_equivalence",
+          "canonical_json_sha256": "f729498aab104ce91a97713da36d7c2c00e786457f76e6b1f5f797a290d3e889"
+        },
+        "qualification": {
+          "pointer": "/qualification",
+          "canonical_json_sha256": "d140712af6d871cad8086b79559a33b0e595baac3eecf9d8ef138a936f5c0121"
+        },
+        "historical_bindings": {
+          "pointer": "/historical_bindings",
+          "canonical_json_sha256": "59ccb6141308771f32ec1e534f7a843cbdd8867afcd59e84944e03e6f9958c33"
+        },
+        "prior_binding": {
+          "pointer": "/prior_binding",
+          "canonical_json_sha256": "6034c617b39078469bfd9c2c653f563dad775b9bee6db15279fa34a3fa152808"
+        },
+        "retained_composition_component_bindings": {
+          "pointer": "/retained_composition_component_bindings",
+          "canonical_json_sha256": "80391a271546de11ea6d384ab5f9357afd1d00f7895122f3dc4d636d6104e1d1"
+        },
+        "reviewed_source_patch": {
+          "pointer": "/reviewed_source_patch",
+          "canonical_json_sha256": "9f9df1044dd866dc783350f978da31f63191274ce74d09468cad46c24aba36aa"
+        },
+        "new_resolution_performed": {
+          "pointer": "/new_resolution_performed",
+          "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+        },
+        "new_advisory_scan_performed": {
+          "pointer": "/new_advisory_scan_performed",
+          "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+        },
+        "new_runtime_qualification_performed": {
+          "pointer": "/new_runtime_qualification_performed",
+          "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+        },
+        "new_source_contract_qualification_performed": {
+          "pointer": "/new_source_contract_qualification_performed",
+          "canonical_json_sha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b"
+        },
+        "new_static_security_scan_performed": {
+          "pointer": "/new_static_security_scan_performed",
+          "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+        },
+        "new_resolution_scope": {
+          "pointer": "/new_resolution_scope",
+          "canonical_json_sha256": "04134bb916a194ed93909500148b34efdb44e74f25ab0d2625120fd8f5e07cd8"
+        },
+        "new_advisory_scan_scope": {
+          "pointer": "/new_advisory_scan_scope",
+          "canonical_json_sha256": "c39e237b344f9d365cf5946737adbf989ee87300801139690658507b3572309b"
+        },
+        "account_reconciliation_previous_binding": {
+          "pointer": "/account_reconciliation_previous_binding",
+          "canonical_json_sha256": "cfeffa86ef01cbbd530cda12a57b6c4eb3761063999ad3fae482a0c1d7482b51"
+        },
+        "reviewed_speech_binding": {
+          "pointer": "/reviewed_speech_binding",
+          "canonical_json_sha256": "88025408d951467d38a236d6fdedb10ad4a4112e6ce02b3577c5b906adec6305"
+        },
+        "local_media_path_previous_binding": {
+          "pointer": "/local_media_path_previous_binding",
+          "canonical_json_sha256": "220f4c5da0641cd8f51fb28add2f66e18e1dba3e64cca61d345ebd775b15bf1f"
+        },
+        "session_durability_previous_binding": {
+          "pointer": "/session_durability_previous_binding",
+          "canonical_json_sha256": "d1931a403fd80ce0a8ea40f23700b2e5a3be8c1b155c3511cbf4d6f72792f6b9"
+        },
+        "media_identity_previous_binding": {
+          "pointer": "/media_identity_previous_binding",
+          "canonical_json_sha256": "775b630f1531f2b679dfb823a59f6d534e542a78fdf1dc3dc6013a74012468e3"
+        },
+        "speech_fixture_import_previous_binding": {
+          "pointer": "/speech_fixture_import_previous_binding",
+          "canonical_json_sha256": "df5e90ccb71afa3db0b0f386fe8575ce3fce043d63192aea6cf38b594a7d41b1"
+        },
+        "speech_fixture_import_original_pr_binding": {
+          "pointer": "/speech_fixture_import_original_pr_binding",
+          "canonical_json_sha256": "c8a9d20bb298d827ca44f1e0ce75e0d8340c4812a856c4a398a185a26126c3f7"
+        },
+        "managed_preflight_refusal_previous_binding": {
+          "pointer": "/managed_preflight_refusal_previous_binding",
+          "canonical_json_sha256": "37b62ef1767156d6f238dcb7b6e966e34f1d791aadb0e9128db89db0c40ebf2f"
+        }
+      },
+      "source_manifest": {
+        "path": "PUBLIC_METADATA/source-manifest.json",
+        "sha256": "fd42177f5b7b09a4b9ccbc66eb7a5f36daf34c189691b0e1b5a8dcee65b79e5b",
+        "bytes": 472514,
+        "git_blob": "4d4131a011b0a1073bcf193612e5f9cc6f720fc3"
+      }
+    },
     {
       "public_revision": "15a1c6e7668b20825ff4a516953f493f09f24fdb",
       "path": "PUBLIC_METADATA/source-binding.json",
@@ -11065,13 +11290,183 @@
     }
   ],
   "reviewed_source_patch": {
-    "reviewed_source_commit": "1264d7ee01d72559997b1c4433823769318fcb0c",
-    "applied_source_commit": "fb0545a14307f3816a6307f8c625fb5d5f869b2f",
-    "paths": [
-      "SOURCE/intent/ai_controller.py",
-      "SOURCE/tests/public/test_remote_managed_accounting.py"
+    "scope": "Truthful, retryable Chat message and code-block clipboard feedback with stale-owner and timer retirement.",
+    "source_paths": [
+      "SOURCE/ui/react-app/src/components/stage/modes/chat/ChatMessage.jsx",
+      "SOURCE/ui/react-app/src/components/stage/modes/chat/markdown.jsx",
+      "SOURCE/ui/react-app/src/components/stage/modes/chat/CopyButton.jsx",
+      "SOURCE/ui/react-app/src/components/stage/modes/chat/ChatMessage.clipboard.test.jsx"
     ],
-    "sha256": "5690dc2d216abf64234ff29db1f95e436c85e7617a6ae7315d4f233bf329e114"
+    "source_tree": "1e74e173e8c7749e8a73c08381f982f2bda0f5b6",
+    "patch_sha256": "9404c61f8204a18c2d2c1d903dcf508be73fc378cd73c771f46a8f0ca1996564",
+    "prior_binding": {
+      "public_revision": "88b56e198b2e712c8a1b2348689a2418070fb0fe",
+      "path": "PUBLIC_METADATA/source-binding.json",
+      "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/88b56e198b2e712c8a1b2348689a2418070fb0fe/PUBLIC_METADATA/source-binding.json",
+      "sha256": "f9f73bf771a43906f636ccd3b1b262441e7f9b15aabd07ff7f6dc8a6b8ed0c31",
+      "bytes": 1319055,
+      "git_blob": "448bac5923b0252f6d6bfac8ab99f215d7de86c5",
+      "all_top_level_keys": [
+        "schema_version",
+        "source_manifest",
+        "source_manifest_sha256",
+        "source_tree_sha256",
+        "source_file_count",
+        "source_revision",
+        "comparison_public_revision",
+        "changed_source_paths",
+        "retained_sboms",
+        "input_equivalence",
+        "qualification",
+        "historical_bindings",
+        "prior_binding",
+        "retained_composition_component_bindings",
+        "reviewed_source_patch",
+        "new_resolution_performed",
+        "new_advisory_scan_performed",
+        "new_runtime_qualification_performed",
+        "new_source_contract_qualification_performed",
+        "new_static_security_scan_performed",
+        "new_resolution_scope",
+        "new_advisory_scan_scope",
+        "account_reconciliation_previous_binding",
+        "reviewed_speech_binding",
+        "local_media_path_previous_binding",
+        "session_durability_previous_binding",
+        "media_identity_previous_binding",
+        "speech_fixture_import_previous_binding",
+        "speech_fixture_import_original_pr_binding",
+        "managed_preflight_refusal_previous_binding"
+      ],
+      "preserved_json_objects": {
+        "schema_version": {
+          "pointer": "/schema_version",
+          "canonical_json_sha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+        },
+        "source_manifest": {
+          "pointer": "/source_manifest",
+          "canonical_json_sha256": "ace3c4cebde8c1e5207159e354ef46f1f9a13eb7b3185315a68b7cf8b71f212d"
+        },
+        "source_manifest_sha256": {
+          "pointer": "/source_manifest_sha256",
+          "canonical_json_sha256": "e105736d87e934d8e4e7c554429a3223e466a786f154a55027a46000d3c7a079"
+        },
+        "source_tree_sha256": {
+          "pointer": "/source_tree_sha256",
+          "canonical_json_sha256": "41433e15b941bf35071ee9235d51dbc58220fcfdab3558734afadaa699b123f0"
+        },
+        "source_file_count": {
+          "pointer": "/source_file_count",
+          "canonical_json_sha256": "60fb27b6df84e9fc873d3a2bda51e22fead7708c19a636d4650f75db7a590628"
+        },
+        "source_revision": {
+          "pointer": "/source_revision",
+          "canonical_json_sha256": "6d35c7cb1d827a0e2819acfea5a36a86e6c613b6eda03f9604fb31248ec32e93"
+        },
+        "comparison_public_revision": {
+          "pointer": "/comparison_public_revision",
+          "canonical_json_sha256": "b0bc16af02596cdc97e8a4044c833168fbac936ecc308cc939cd6068634ec0eb"
+        },
+        "changed_source_paths": {
+          "pointer": "/changed_source_paths",
+          "canonical_json_sha256": "9caa297a2d7aeb510f5936d92271e4d9179640446deae570e399039e9b3e26c7"
+        },
+        "retained_sboms": {
+          "pointer": "/retained_sboms",
+          "canonical_json_sha256": "0428d09c6e0e2b524877c2218b306c10da6c7536bcf6ed96524b581dafc85301"
+        },
+        "input_equivalence": {
+          "pointer": "/input_equivalence",
+          "canonical_json_sha256": "f729498aab104ce91a97713da36d7c2c00e786457f76e6b1f5f797a290d3e889"
+        },
+        "qualification": {
+          "pointer": "/qualification",
+          "canonical_json_sha256": "d140712af6d871cad8086b79559a33b0e595baac3eecf9d8ef138a936f5c0121"
+        },
+        "historical_bindings": {
+          "pointer": "/historical_bindings",
+          "canonical_json_sha256": "59ccb6141308771f32ec1e534f7a843cbdd8867afcd59e84944e03e6f9958c33"
+        },
+        "prior_binding": {
+          "pointer": "/prior_binding",
+          "canonical_json_sha256": "6034c617b39078469bfd9c2c653f563dad775b9bee6db15279fa34a3fa152808"
+        },
+        "retained_composition_component_bindings": {
+          "pointer": "/retained_composition_component_bindings",
+          "canonical_json_sha256": "80391a271546de11ea6d384ab5f9357afd1d00f7895122f3dc4d636d6104e1d1"
+        },
+        "reviewed_source_patch": {
+          "pointer": "/reviewed_source_patch",
+          "canonical_json_sha256": "9f9df1044dd866dc783350f978da31f63191274ce74d09468cad46c24aba36aa"
+        },
+        "new_resolution_performed": {
+          "pointer": "/new_resolution_performed",
+          "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+        },
+        "new_advisory_scan_performed": {
+          "pointer": "/new_advisory_scan_performed",
+          "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+        },
+        "new_runtime_qualification_performed": {
+          "pointer": "/new_runtime_qualification_performed",
+          "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+        },
+        "new_source_contract_qualification_performed": {
+          "pointer": "/new_source_contract_qualification_performed",
+          "canonical_json_sha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b"
+        },
+        "new_static_security_scan_performed": {
+          "pointer": "/new_static_security_scan_performed",
+          "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+        },
+        "new_resolution_scope": {
+          "pointer": "/new_resolution_scope",
+          "canonical_json_sha256": "04134bb916a194ed93909500148b34efdb44e74f25ab0d2625120fd8f5e07cd8"
+        },
+        "new_advisory_scan_scope": {
+          "pointer": "/new_advisory_scan_scope",
+          "canonical_json_sha256": "c39e237b344f9d365cf5946737adbf989ee87300801139690658507b3572309b"
+        },
+        "account_reconciliation_previous_binding": {
+          "pointer": "/account_reconciliation_previous_binding",
+          "canonical_json_sha256": "cfeffa86ef01cbbd530cda12a57b6c4eb3761063999ad3fae482a0c1d7482b51"
+        },
+        "reviewed_speech_binding": {
+          "pointer": "/reviewed_speech_binding",
+          "canonical_json_sha256": "88025408d951467d38a236d6fdedb10ad4a4112e6ce02b3577c5b906adec6305"
+        },
+        "local_media_path_previous_binding": {
+          "pointer": "/local_media_path_previous_binding",
+          "canonical_json_sha256": "220f4c5da0641cd8f51fb28add2f66e18e1dba3e64cca61d345ebd775b15bf1f"
+        },
+        "session_durability_previous_binding": {
+          "pointer": "/session_durability_previous_binding",
+          "canonical_json_sha256": "d1931a403fd80ce0a8ea40f23700b2e5a3be8c1b155c3511cbf4d6f72792f6b9"
+        },
+        "media_identity_previous_binding": {
+          "pointer": "/media_identity_previous_binding",
+          "canonical_json_sha256": "775b630f1531f2b679dfb823a59f6d534e542a78fdf1dc3dc6013a74012468e3"
+        },
+        "speech_fixture_import_previous_binding": {
+          "pointer": "/speech_fixture_import_previous_binding",
+          "canonical_json_sha256": "df5e90ccb71afa3db0b0f386fe8575ce3fce043d63192aea6cf38b594a7d41b1"
+        },
+        "speech_fixture_import_original_pr_binding": {
+          "pointer": "/speech_fixture_import_original_pr_binding",
+          "canonical_json_sha256": "c8a9d20bb298d827ca44f1e0ce75e0d8340c4812a856c4a398a185a26126c3f7"
+        },
+        "managed_preflight_refusal_previous_binding": {
+          "pointer": "/managed_preflight_refusal_previous_binding",
+          "canonical_json_sha256": "37b62ef1767156d6f238dcb7b6e966e34f1d791aadb0e9128db89db0c40ebf2f"
+        }
+      },
+      "source_manifest": {
+        "path": "PUBLIC_METADATA/source-manifest.json",
+        "sha256": "fd42177f5b7b09a4b9ccbc66eb7a5f36daf34c189691b0e1b5a8dcee65b79e5b",
+        "bytes": 472514,
+        "git_blob": "4d4131a011b0a1073bcf193612e5f9cc6f720fc3"
+      }
+    }
   },
   "new_resolution_performed": false,
   "new_advisory_scan_performed": false,
