@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "248a8dc31aa787ea1f869e5ca22baaa45e8b0343",
-  "sha256": "52ad7cb3c7fc0fee719c28493a05d6e9db0a1060adb78d5043e5756ce4c8e434",
+  "revision": "d2c8087d60038f8b10a45b918087d68eab579884",
+  "sha256": "9741fb0bf3542169b056e200861551ddb8daf5935189f0d317d209912b99e3b9",
   "files": [
     {
       "path": ".env.example",
@@ -10510,13 +10510,18 @@
     },
     {
       "path": "ui/react-app/src/components/MemoryPanel.jsx",
-      "bytes": 49894,
-      "sha256": "29eb1feed2b9319081544110feb32780c4bfadae0c7c11fb1d55f4f460bf907b"
+      "bytes": 50532,
+      "sha256": "aff4fe793a81b4f547025122ab3e2ae11e520250c87562a00a43bda66fa234a8"
     },
     {
       "path": "ui/react-app/src/components/MemoryPanel.test.jsx",
       "bytes": 6669,
       "sha256": "59c227b6f85affc1977c1f6e14a2ca0ffda14ccb1bd6b09cbf19e6a0318cf53e"
+    },
+    {
+      "path": "ui/react-app/src/components/MemoryPanel.workbench.test.jsx",
+      "bytes": 7946,
+      "sha256": "03b2f49af159dbccf45c4c0fda73ffcee9819d034a66e5d1519245f6645e9518"
     },
     {
       "path": "ui/react-app/src/components/MessagingTab.jsx",
