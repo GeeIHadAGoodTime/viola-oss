@@ -194,6 +194,27 @@ class PlaylistCursor:
                 return True
         return False
 
+    def select_current(self, item_id: str) -> bool:
+        """Select a queued row now, preserving the remaining queue and history.
+
+        Unlike ``move_to_next``, this replaces an existing current item. It is
+        an explicit selection, not a completion event: completion deduplication
+        must not suppress a user selecting a track again.
+        """
+        if self._current is not None and self._current.id == item_id:
+            return self.schedule_current()
+        for idx, item in enumerate(self._upcoming):
+            if item.id == item_id:
+                selected = self._upcoming.pop(idx)
+                if self._current is not None:
+                    self._history.append(self._current)
+                self._current = selected
+                self.pending = True
+                self.version += 1
+                self._sync_state()
+                return True
+        return False
+
     def rewind(self) -> QueueItem | None:
         if not self._history:
             return None

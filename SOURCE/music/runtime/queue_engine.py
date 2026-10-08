@@ -123,6 +123,11 @@ class PlaylistQueueEngine:
         self._invalidate()
         return result
 
+    def select_current(self, item_id: str) -> bool:
+        result = self._cursor.select_current(item_id)
+        self._invalidate()
+        return result
+
     def rewind(self) -> QueueItem | None:
         result = self._cursor.rewind()
         self._invalidate()

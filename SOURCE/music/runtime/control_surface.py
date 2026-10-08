@@ -292,6 +292,10 @@ class PlayerControlService(PlayerControlSurface):
             if hasattr(self._player, "_state") and self._player._state is not None:
                 self._player._state.is_playing = False
             _sm_transition(self._player, PlaybackPhase.PAUSED, user_initiated=True)
+            if getattr(self._player, "_queue_selection_stops_pending", 0):
+                # Keep the unstarted selection pending so ordinary Resume
+                # can claim it after the old transport has finished stopping.
+                self._backend_manager.clear_pending_start()
             backend = self._backend_manager.backend
             self._cv.notify_all()
         # Backend pause OUTSIDE lock — CDP engines may do network I/O
@@ -315,11 +319,16 @@ class PlayerControlService(PlayerControlSurface):
         with self._cv:
             self._player._user_paused = False
             self._player._paused = False
-            self._player._is_playing = True
+            pending_item = self._queue_engine.current() if self._queue_engine.pending else None
+            self._player._is_playing = pending_item is None
             if hasattr(self._player, "_state") and self._player._state is not None:
-                self._player._state.is_playing = True
-            _sm_transition(self._player, PlaybackPhase.PLAYING)
-            backend = self._backend_manager.backend
+                self._player._state.is_playing = pending_item is None
+            if pending_item is not None:
+                _sm_transition(self._player, PlaybackPhase.LOADING)
+                self._backend_manager.schedule_pending_start(pending_item.id)
+            else:
+                _sm_transition(self._player, PlaybackPhase.PLAYING)
+                backend = self._backend_manager.backend
             self._cv.notify_all()
         # Backend resume OUTSIDE lock — CDP engines may do network I/O
         if backend and hasattr(backend, "resume"):
@@ -341,6 +350,11 @@ class PlayerControlService(PlayerControlSurface):
         with self._cv:
             self._player._is_playing = False
             _sm_transition(self._player, PlaybackPhase.STOPPED)
+            if getattr(self._player, "_queue_selection_stops_pending", 0) or self._queue_engine.pending:
+                self._player._user_paused = True
+                # The selected item has not started. Keep its identity pending
+                # for an explicit Resume, without allowing an automatic start.
+                self._backend_manager.clear_pending_start()
             self._cv.notify_all()
         # Backend stop OUTSIDE lock — SpotifyCDPEngine.stop() joins its
         # poll thread, which may be waiting to acquire player._lock via _emit().
@@ -834,19 +848,37 @@ class PlayerControlService(PlayerControlSurface):
                     reason = get_youtube_unavailable_reason()
                     raise ConfigurationError(reason)
 
-            moved = self._player._controller.move_to_next(item_id)
-            if not moved:
-                raise ValueError(f"Failed to move item {item_id} to current")
+            if not self._queue_engine.select_current(item_id):
+                raise ValueError(f"Failed to select queue item {item_id}")
 
-            current = self._queue_engine.current()
-            if current and current.id == item_id:
-                self._queue_engine.schedule_current()
-            else:
-                self._queue_engine.schedule_current()
-                self._player._set_now_playing_locked(self._queue_engine.current())
-                # No _update_state_queue_locked() - mutations auto-invalidate
-
-            self._cv.notify_all()
+            player = self._player
+            player._pending_skip_tokens = 0
+            player._user_paused = False
+            player._paused_current = None
+            player._is_playing = False
+            player._state.is_playing = False
+            _sm_transition(player, PlaybackPhase.LOADING, user_initiated=True)
+            player._promote_current_locked(set_is_playing=False)
+            # A worker must not start the selected item while any overlapping
+            # selection is still stopping the previous transport outside _cv.
+            player._queue_selection_stops_pending = getattr(player, "_queue_selection_stops_pending", 0) + 1
+            self._backend_manager.clear_pending_start()
+        # Stop the previous transport outside the condition: CDP backends may
+        # join a poll thread which needs the player's lock to publish state.
+        try:
+            self._player._stop_backend_locked()
+        except (AttributeError, RuntimeError, TypeError, ValueError) as exc:
+            self._logger.warning("Backend stop during queue selection failed: %r", exc)
+        finally:
+            with self._cv:
+                player._queue_selection_stops_pending -= 1
+                if not player._queue_selection_stops_pending:
+                    # A newer selection may have replaced ours during stop.
+                    # Schedule only the canonical current, after all stops.
+                    current = self._queue_engine.current()
+                    if current is not None and self._queue_engine.pending and not player._user_paused:
+                        self._backend_manager.schedule_pending_start(current.id)
+                self._cv.notify_all()
         self._emit_callback()
 
     def enqueue_resolved_item(
