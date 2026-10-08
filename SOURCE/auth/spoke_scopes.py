@@ -93,6 +93,10 @@ SPOKE_SENSITIVE_DENIED_PREFIXES = (
     # under /v1/providers, not here.
     "/v1/consent",
     "/api/v1/consent",
+    # Only the hub owner may enable identifiable diagnostic collection,
+    # acknowledge its disclosure, or flush queued reports. A paired spoke's
+    # ordinary diagnostics access does not grant authority to change consent.
+    "/v1/diagnostics/consent",
 )
 
 # Additional denials that apply ONLY to untrusted (cloud) spokes. A paired LAN
