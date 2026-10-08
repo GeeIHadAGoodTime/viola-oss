@@ -524,6 +524,7 @@ class _SpokeVoiceSession:
         self.wake_engine = wake_engine
         self.wake_policy = wake_policy or WakeDecisionPolicy()
         self.listening = False
+        self.closed = False
         self.total_bytes = 0
         # Sample rate reported by client in start_listening.  Defaults to
         # 16000 Hz — the only rate we process.  Updated when client sends
@@ -769,6 +770,24 @@ async def _run_voice_stream_connection(
     from core.user_context import reset_current_user_id, set_current_user_id
 
     user_context_token = set_current_user_id(user_id)
+    command_tasks: set[asyncio.Task] = set()
+
+    def command_done(task: asyncio.Task) -> None:
+        command_tasks.discard(task)
+        if not task.cancelled():
+            error = task.exception()
+            if error is not None:
+                logger.error(
+                    "Voice stream command task failed (room=%s)",
+                    room,
+                    exc_info=(type(error), error, error.__traceback__),
+                )
+
+    def start_command() -> None:
+        task = asyncio.create_task(_handle_command(session, session.wake_engine))
+        command_tasks.add(task)
+        task.add_done_callback(command_done)
+
     try:
         while True:
             # CONFIRM-6 warm-keeping: this connection may now sit idle
@@ -806,7 +825,7 @@ async def _run_voice_stream_connection(
                         # arms its own response timeout.
                         await ws.send_text(json.dumps({"type": "capture_ended"}))
                         # Command capture finished — transcribe + execute
-                        asyncio.create_task(_handle_command(session, session.wake_engine))
+                        start_command()
                     continue
 
                 # PTT active but capture already ended — drop until ptt_stop
@@ -914,7 +933,7 @@ async def _run_voice_stream_connection(
                         session._command_handled = True
                         session.force_end_capture()
                         await ws.send_text(json.dumps({"type": "ptt_status", "active": False}))
-                        asyncio.create_task(_handle_command(session, session.wake_engine))
+                        start_command()
                         logger.info(
                             "Voice stream: PTT stopped, dispatching command (room=%s)",
                             room,
@@ -934,31 +953,43 @@ async def _run_voice_stream_connection(
     except Exception:
         logger.exception("Voice stream WebSocket error (room=%s)", room)
     finally:
-        # NOTE: the connection-limiter slot is released by the ENDPOINT's own
-        # finally (which wraps this whole function), never here — one owner,
-        # so a slot can neither leak on a pre-loop crash nor double-release.
-        reset_current_user_id(user_context_token)
-        if session.diag is not None:
-            stats = session.diag.get_cumulative_stats()
+        # Disabled/mute closes the browser transport without submitting audio.
+        # Retire work already transcribing too; transport closure must not leave
+        # a detached task able to dispatch a late command.
+        session.closed = True
+        for task in command_tasks:
+            task.cancel()
+        try:
+            await asyncio.gather(*command_tasks, return_exceptions=True)
+        finally:
+            # NOTE: the connection-limiter slot is released by the ENDPOINT's own
+            # finally (which wraps this whole function), never here — one owner,
+            # so a slot can neither leak on a pre-loop crash nor double-release.
+            reset_current_user_id(user_context_token)
+            if session.diag is not None:
+                stats = session.diag.get_cumulative_stats()
+                logger.info(
+                    "[SPOKE_DIAG] Session summary room=%s: inferences=%d triggers=%d near_misses=%d",
+                    room,
+                    stats["total_inferences"],
+                    stats["total_triggers"],
+                    stats["total_near_misses"],
+                )
             logger.info(
-                "[SPOKE_DIAG] Session summary room=%s: inferences=%d triggers=%d near_misses=%d",
+                "Voice stream: client disconnected (room=%s, user_id=%s, total_bytes=%d)",
                 room,
-                stats["total_inferences"],
-                stats["total_triggers"],
-                stats["total_near_misses"],
+                user_id,
+                session.total_bytes,
             )
-        logger.info(
-            "Voice stream: client disconnected (room=%s, user_id=%s, total_bytes=%d)",
-            room,
-            user_id,
-            session.total_bytes,
-        )
 
 
 async def _handle_command(session: _SpokeVoiceSession, _engine) -> None:
     """Transcribe captured command audio and execute via internal HTTP API."""
     import io
     import wave
+
+    if session.closed:
+        return
 
     try:
         user_id = _normalize_required_user_id(session.user_id)
@@ -1078,6 +1109,11 @@ async def _handle_command(session: _SpokeVoiceSession, _engine) -> None:
             transcription_broke = True
             logger.exception("Voice stream: transcription request failed (room=%s)", session.room)
 
+    # A provider may finish while cancellation is in flight or suppress it.
+    # Re-check connection ownership before any command/result can leave here.
+    if session.closed:
+        return
+
     if not transcript.strip():
         await _send_command_result(
             session,
@@ -1164,6 +1200,11 @@ async def _handle_command(session: _SpokeVoiceSession, _engine) -> None:
             session.room,
         )
         response_text = "I heard you, but I don't have an answer for that. Try again?"
+
+    # A dispatched action cannot be undone here, but retired connections must
+    # not play a late result if a dispatcher suppressed task cancellation.
+    if session.closed:
+        return
 
     # Send result back to spoke
     await _send_command_result(

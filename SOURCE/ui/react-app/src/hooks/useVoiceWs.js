@@ -46,7 +46,7 @@
  *     capture — it only does the network handshake, never touches the mic.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { describeError, describeMicError } from '../utils/describeError';
 import { decodeTtsFrame, isTtsFrame, playTtsPcm } from '../utils/ttsPlayback';
 import { getWebSocketAuthToken } from '../lib/ws_auth';
@@ -184,7 +184,10 @@ export function useVoiceWs(onCommandResult, options = {}) {
   const pingTimerRef = useRef(null);
   const idleCloseTimerRef = useRef(null);
   const batteryRef = useRef(null);
-  const connectingPromiseRef = useRef(null);
+  // Connection ownership lasts across warm-kept turns, unlike capture ownership.
+  // Retire it on cancellation so late auth/socket events cannot revive that owner.
+  const connectionGenerationRef = useRef(0);
+  const connectionAttemptRef = useRef(null);
 
   useEffect(() => { onCommandResultRef.current = onCommandResult; }, [onCommandResult]);
   useEffect(() => { executeCommandRef.current = executeCommand; }, [executeCommand]);
@@ -219,6 +222,21 @@ export function useVoiceWs(onCommandResult, options = {}) {
     }
   }, []);
 
+  // Every transport retirement must settle its pending waiter and invalidate
+  // queued events, including idle prewarms that never owned an audio capture.
+  const _retireConnection = useCallback(() => {
+    connectionGenerationRef.current += 1;
+    connectionAttemptRef.current?.cancel();
+    connectionAttemptRef.current = null;
+    _clearPingTimer();
+    _clearIdleCloseTimer();
+    const ws = wsRef.current;
+    wsRef.current = null;
+    if (ws) {
+      try { ws.close(); } catch { /* noop */ }
+    }
+  }, [_clearPingTimer, _clearIdleCloseTimer]);
+
   // True when it is worth keeping an idle connection warm: tab visible AND no
   // battery-saver-like signal. False suspends warm-keeping exactly like the
   // CONFIRM-6 guardrail requires (hidden tab / battery saver -> don't hold
@@ -243,23 +261,20 @@ export function useVoiceWs(onCommandResult, options = {}) {
     _clearIdleCloseTimer();
     idleCloseTimerRef.current = setTimeout(() => {
       if (sessionActiveRef.current) return; // a turn started in the meantime
-      _clearPingTimer();
-      const ws = wsRef.current;
-      wsRef.current = null;
-      if (ws) {
-        try { ws.close(); } catch { /* noop */ }
-      }
+      _retireConnection();
     }, IDLE_KEEPALIVE_CLOSE_MS);
-  }, [_clearIdleCloseTimer, _clearPingTimer]);
+  }, [_clearIdleCloseTimer, _retireConnection]);
 
   // Full teardown: audio graph AND the WebSocket. Used for a mid-turn drop,
   // explicit cancel, unmount, and the hidden-tab/battery-saver/idle-timeout
   // forced close — every case where warm-keeping is NOT appropriate.
   const _teardown = useCallback(() => {
+    // A socket drop ends the capture owner too, even if getUserMedia is still
+    // waiting. A late grant must release itself rather than revive that turn.
+    captureGenerationRef.current += 1;
+    _retireConnection();
     _clearResponseTimer();
     _clearTtsWaitTimer();
-    _clearPingTimer();
-    _clearIdleCloseTimer();
     awaitingTtsRef.current = false;
     sessionActiveRef.current = false;
     setIsBusy(false);
@@ -284,16 +299,12 @@ export function useVoiceWs(onCommandResult, options = {}) {
       streamRef.current = null;
       usingSharedStreamRef.current = false;
     }
-    if (wsRef.current) {
-      try { wsRef.current.close(); } catch { /* noop */ }
-      wsRef.current = null;
-    }
     if (navigator.audioSession) {
       navigator.audioSession.type = 'playback';
     }
     setIsRecording(false);
     setIsProcessing(false);
-  }, [_clearResponseTimer, _clearTtsWaitTimer, _clearPingTimer, _clearIdleCloseTimer]);
+  }, [_clearResponseTimer, _clearTtsWaitTimer, _retireConnection]);
 
   // End-of-turn teardown that keeps the WS warm: releases the mic/AudioContext
   // (privacy: no capture between turns) but leaves the authenticated
@@ -426,21 +437,29 @@ export function useVoiceWs(onCommandResult, options = {}) {
   // failure. Does NOT touch the mic — callers that also need audio capture
   // wire it up separately via _startAudioCapture once this resolves.
   const _connectSocket = useCallback(() => {
-    if (connectingPromiseRef.current) return connectingPromiseRef.current;
+    if (!enabledRef.current) return Promise.resolve(null);
+    if (connectionAttemptRef.current) return connectionAttemptRef.current.promise;
+    const generation = connectionGenerationRef.current;
+    const attempt = { promise: null, cancel: null };
 
-    const promise = new Promise((resolve) => {
+    const promise = new Promise((resolve, reject) => {
       let settled = false;
       const settle = (value) => {
         if (settled) return;
         settled = true;
         resolve(value);
       };
+      attempt.cancel = () => settle(null);
 
       (async () => {
         const base = (window.__VIOLA_BASE_URL__ || window.location.origin).replace(/^http/, 'ws');
         const params = new URLSearchParams();
         if (roomRef.current) params.set('room', roomRef.current);
         const wsAuthToken = await getWebSocketAuthToken();
+        if (!enabledRef.current || generation !== connectionGenerationRef.current) {
+          settle(null);
+          return;
+        }
         if (wsAuthToken) params.set('token', wsAuthToken);
         const currentParams = new URLSearchParams(window.location.search);
         const spokeToken = currentParams.get('spoke_token');
@@ -449,10 +468,19 @@ export function useVoiceWs(onCommandResult, options = {}) {
         const ws = new WebSocket(`${base}/ws/voice-stream${qs ? `?${qs}` : ''}`);
         ws.binaryType = 'arraybuffer';
         wsRef.current = ws;
+        const ownsSocket = () => generation === connectionGenerationRef.current && wsRef.current === ws;
 
-        ws.onopen = () => { settle(ws); };
+        ws.onopen = () => {
+          if (!enabledRef.current || !ownsSocket()) {
+            try { ws.close(); } catch { /* noop */ }
+            settle(null);
+            return;
+          }
+          settle(ws);
+        };
 
         ws.onmessage = (event) => {
+          if (!enabledRef.current || !ownsSocket() || !sessionActiveRef.current) return;
           const data = event.data;
           if (typeof data === 'string') {
             let msg;
@@ -512,6 +540,7 @@ export function useVoiceWs(onCommandResult, options = {}) {
         };
 
         ws.onerror = () => {
+          if (!enabledRef.current || !ownsSocket()) return;
           // A prewarm/reuse connect attempt that never turns into a real turn
           // should fail silently — the next real startRecording() falls back
           // to a fresh connect. Only surface an error when a turn is actually
@@ -520,6 +549,9 @@ export function useVoiceWs(onCommandResult, options = {}) {
         };
 
         ws.onclose = (event) => {
+          settle(null);
+          if (!ownsSocket()) return;
+          wsRef.current = null;
           if (sessionActiveRef.current) {
             // Dropped mid-turn without delivering a command_result. Surface
             // WHY via the server's close code instead of the mic just going
@@ -535,32 +567,40 @@ export function useVoiceWs(onCommandResult, options = {}) {
             // connection, or the connect attempt itself failed before
             // opening — either way, stop pinging and drop the stale ref so
             // the next startRecording()/prewarmConnection() reconnects.
-            _clearPingTimer();
-            _clearIdleCloseTimer();
-            if (wsRef.current === ws) wsRef.current = null;
+            _retireConnection();
           }
-          settle(null);
         };
-      })();
+      })().catch((err) => {
+        if (settled) return;
+        if (!enabledRef.current || generation !== connectionGenerationRef.current) {
+          settle(null);
+          return;
+        }
+        settled = true;
+        reject(err);
+      });
     }).finally(() => {
-      connectingPromiseRef.current = null;
+      if (connectionAttemptRef.current === attempt) connectionAttemptRef.current = null;
     });
 
-    connectingPromiseRef.current = promise;
+    attempt.promise = promise;
+    connectionAttemptRef.current = attempt;
     return promise;
-  }, [_finishWithResult, _teardown, _clearResponseTimer, _clearTtsWaitTimer, _clearPingTimer, _clearIdleCloseTimer, _endOfTurn, _handleCaptureEnded]);
+  }, [_finishWithResult, _teardown, _retireConnection, _clearResponseTimer, _clearTtsWaitTimer, _endOfTurn, _handleCaptureEnded]);
 
   // Wires the mic stream into the (already open) socket and starts sending
   // PCM. Shared by both the fresh-connect path and the warm-reuse path so
   // the two behave identically once a socket is available.
-  const _startAudioCapture = useCallback((ws, audioContext, mediaStream) => {
+  const _startAudioCapture = useCallback((ws, audioContext, mediaStream, generation) => {
     const source = audioContext.createMediaStreamSource(mediaStream);
     sourceRef.current = source;
     const processor = audioContext.createScriptProcessor(BUFFER_SIZE, 1, 1);
     processorRef.current = processor;
 
     processor.onaudioprocess = (e) => {
-      if (ws.readyState !== WebSocket.OPEN) return;
+      if (!enabledRef.current || generation !== captureGenerationRef.current
+          || !sessionActiveRef.current || processorRef.current !== processor
+          || wsRef.current !== ws || ws.readyState !== WebSocket.OPEN) return;
       const inputData = e.inputBuffer.getChannelData(0);
       const sampleData = resampleLinear(inputData, audioContext.sampleRate, SAMPLE_RATE);
       const int16 = new Int16Array(sampleData.length);
@@ -641,15 +681,16 @@ export function useVoiceWs(onCommandResult, options = {}) {
         ? wsRef.current
         : null;
       const ws = warmSocket || (await _connectSocket());
-      if (!ws) {
-        // A failed fresh connect already ran its own onerror (sets the error
-        // message) and onclose (full teardown, incl. the mic/AudioContext we
-        // just acquired above) before resolving null here — nothing left to
-        // do.
+      // A retired prewarm can settle null without ever owning this capture.
+      // Clean up only if this continuation still owns the current turn; an
+      // old waiter must never tear down a newer recording.
+      if (generation !== captureGenerationRef.current) return;
+      if (!enabledRef.current || !sessionActiveRef.current || !ws
+          || wsRef.current !== ws || ws.readyState !== WebSocket.OPEN) {
+        _teardown();
         return;
       }
-      if (!enabledRef.current || generation !== captureGenerationRef.current) return;
-      _startAudioCapture(ws, audioContext, mediaStream);
+      _startAudioCapture(ws, audioContext, mediaStream, generation);
     } catch (err) {
       if (!enabledRef.current || generation !== captureGenerationRef.current) return;
       // Was showing the browser's raw DOMException text ("Requested device not
@@ -693,7 +734,6 @@ export function useVoiceWs(onCommandResult, options = {}) {
   }, [_armResponseTimeout, isProcessing, isRecording]);
 
   const cancelRecording = useCallback(() => {
-    captureGenerationRef.current += 1;
     // ptt_stop submits buffered speech for command execution. Cancellation
     // must only close capture/transport, never submit the abandoned turn.
     // An explicit cancel always fully tears down (including the WS) rather
@@ -702,7 +742,7 @@ export function useVoiceWs(onCommandResult, options = {}) {
   }, [_teardown]);
 
   useEffect(() => {
-    if (!enabled && captureGenerationRef.current > 0) cancelRecording();
+    if (!enabled) cancelRecording();
   }, [enabled, cancelRecording]);
 
   // Speculative warm-up on an intent signal (mic-button hover/focus, mic
@@ -711,14 +751,14 @@ export function useVoiceWs(onCommandResult, options = {}) {
   // reuse. Never touches the mic and never runs when a real turn is already
   // starting/in-flight or when the tab is hidden / battery-saver-like.
   const prewarmConnection = useCallback(() => {
-    if (sessionActiveRef.current) return;
+    if (!enabledRef.current || sessionActiveRef.current) return;
     if (wsRef.current
         && (wsRef.current.readyState === WebSocket.OPEN || wsRef.current.readyState === WebSocket.CONNECTING)) {
       return;
     }
     if (!_shouldWarmKeep()) return;
     _connectSocket().then((ws) => {
-      if (ws && !sessionActiveRef.current) {
+      if (ws && wsRef.current === ws && enabledRef.current && !sessionActiveRef.current) {
         _armPingTimer();
         _armIdleCloseTimer();
       }
@@ -731,13 +771,7 @@ export function useVoiceWs(onCommandResult, options = {}) {
     const closeIfIdleAndUnfavorable = () => {
       if (sessionActiveRef.current) return;
       if (_shouldWarmKeep()) return;
-      _clearPingTimer();
-      _clearIdleCloseTimer();
-      const ws = wsRef.current;
-      wsRef.current = null;
-      if (ws) {
-        try { ws.close(); } catch { /* noop */ }
-      }
+      _retireConnection();
     };
 
     const handleVisibilityChange = () => {
@@ -773,9 +807,10 @@ export function useVoiceWs(onCommandResult, options = {}) {
         batteryHandle.removeEventListener('chargingchange', onBatteryChange);
       }
     };
-  }, [_shouldWarmKeep, _clearPingTimer, _clearIdleCloseTimer]);
+  }, [_shouldWarmKeep, _retireConnection]);
 
-  useEffect(() => () => _teardown(), [_teardown]);
+  // Permission/auth continuations must lose ownership synchronously on unmount.
+  useLayoutEffect(() => () => cancelRecording(), [cancelRecording]);
 
   return {
     isRecording,

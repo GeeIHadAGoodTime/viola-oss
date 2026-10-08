@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "0e9c99f3501500b5c62c57e091d9d5053be0e677",
-  "sha256": "8ae9aa68ae5d0dedd33bd818a0f13851550f60837b5f370346737dd870581449",
+  "revision": "5c0ba82c23a7342af6b5bb0fcb2d609217a74b02",
+  "sha256": "e1a55343754b3add2b3de4bbfec2af38af4115396145f0a2d2affed3df25594f",
   "files": [
     {
       "path": ".env.example",
@@ -3095,8 +3095,8 @@
     },
     {
       "path": "music/queue/playlist_cursor.py",
-      "sha256": "9221f5b891058f03fd3f8cf2412924755f5f61c863211954e3368a7f3261827d",
-      "bytes": 15073
+      "sha256": "a90dd7fe90b8028492e02584b770788a251b3c8cca6fd60293ad98ff65ab7938",
+      "bytes": 14162
     },
     {
       "path": "music/queue_config.py",
@@ -3175,13 +3175,13 @@
     },
     {
       "path": "music/runtime/contracts.py",
-      "sha256": "c2558b3ff1a94695a3a9f66251ce11cd55b6cf2ab6e194f0a3a62d1a43fc75dc",
-      "bytes": 9644
+      "sha256": "15580fbd4603dbb6b10b61a87e13309c171cb055bc96a164453ce885d56137f3",
+      "bytes": 9587
     },
     {
       "path": "music/runtime/control_surface.py",
-      "sha256": "5d32d3ae1e7dc6323c4d405f5326b774b0b88bc0def35198d1c7421d259dd1ce",
-      "bytes": 41196
+      "sha256": "753204b773102d48c96a6dee09a4ebd221ee787b155af1df76c28eb7630dd3d3",
+      "bytes": 38964
     },
     {
       "path": "music/runtime/embedded_playback.py",
@@ -3210,8 +3210,8 @@
     },
     {
       "path": "music/runtime/queue_engine.py",
-      "sha256": "143761f71c0ea38f72d0ddfa133caa169be5762cb1b64ba91f65a6e23c326f64",
-      "bytes": 13117
+      "sha256": "11a78179c8188797a7575fcb12fbf511328583d6d4063b0b84962c329b38496d",
+      "bytes": 12961
     },
     {
       "path": "music/runtime/queue_resolver.py",
@@ -3235,8 +3235,8 @@
     },
     {
       "path": "music/runtime/worker_manager.py",
-      "sha256": "defb5c4f3321a485808d5c78667226b4b97793c6ce2d33184e8ea49d2a1ccc2f",
-      "bytes": 55499
+      "sha256": "cbd1b57711b572b7b54a2499163c993e8d5682cd796172cf5d487052e33bd6bc",
+      "bytes": 54824
     },
     {
       "path": "music/shuffle_control.py",
@@ -6209,11 +6209,6 @@
       "bytes": 17545
     },
     {
-      "path": "tests/public/test_queue_play_selection.py",
-      "sha256": "efa32d40a28b950560fda6fa47068fb339fd55f51075b4706d2d0e4e34f24824",
-      "bytes": 25201
-    },
-    {
       "path": "tests/public/test_queue_wire_contract.py",
       "sha256": "34d64dcc21c1be272c49ec663aaa3e96e4ae4733aaa58e1695c452cb6780f735",
       "bytes": 7588
@@ -6292,6 +6287,11 @@
       "path": "tests/public/test_tts_profile_dependencies.py",
       "sha256": "336fdcb851a32fa536bb32ed4b16d9fb5db20ef653a60d4a3cbdd0457dc5843c",
       "bytes": 2598
+    },
+    {
+      "path": "tests/public/test_voice_stream_cancellation.py",
+      "sha256": "2950604ed7c5cf6eb6d755ebd527a835785d1fc008c874d0b6cc771e355c4d9d",
+      "bytes": 8856
     },
     {
       "path": "tests/public/test_wake_listener_lifecycle.py",
@@ -9555,8 +9555,8 @@
     },
     {
       "path": "ui/api/routes/voice_stream.py",
-      "sha256": "07c553d4540487dc0b34a4cc1fe65590f2a22fac67e0e1aafef2847618f23137",
-      "bytes": 49832
+      "sha256": "c64b475f0312dfcd1471d4bdf2d4cb21cc60d076446307297d7ba167908139ae",
+      "bytes": 51313
     },
     {
       "path": "ui/api/routes/wake_diagnostics.py",
@@ -11799,14 +11799,19 @@
       "bytes": 10961
     },
     {
+      "path": "ui/react-app/src/hooks/useVoiceWs.captureLifecycle.test.jsx",
+      "sha256": "ed3dd3c4146e1120e4a097da34f59590b69d38f7d9e1f51636d8b71d097b4b63",
+      "bytes": 19414
+    },
+    {
       "path": "ui/react-app/src/hooks/useVoiceWs.closeCodes.test.jsx",
       "sha256": "9750a0771ff4cdbcc35f2888097e1eb6ef392f4d3261b7139818421415203ca8",
       "bytes": 7534
     },
     {
       "path": "ui/react-app/src/hooks/useVoiceWs.js",
-      "sha256": "0da805c40ad26adbf43176557189df053b281ea5cd8d5c88ac29e1e66cfb879b",
-      "bytes": 34662
+      "sha256": "854e5f027b4c2a79f143550795befc0f51e950ff21b1198201e7fc62f7ab3019",
+      "bytes": 36619
     },
     {
       "path": "ui/react-app/src/hooks/useVoiceWs.rapidPress.test.jsx",
