@@ -1791,6 +1791,7 @@ class AIController:
                         try:
                             from services.llm.managed_budget import (
                                 check_managed_llm_spend_cap_async,
+                                managed_llm_budget_message,
                             )
 
                             with latency_spans.span("SPEND_PREFLIGHT"):
@@ -1801,9 +1802,16 @@ class AIController:
                                     resolved_user_id,
                                     _spend_check.reason,
                                 )
-                                result["data"]["intent"] = "answer"
-                                result["data"]["message"] = ""
-                                result["data"]["cap_state"] = _spend_check.cap_state
+                                answer_text = managed_llm_budget_message(_spend_check)
+                                result.update(
+                                    intent="answer",
+                                    message=answer_text,
+                                    response=answer_text,
+                                    continue_listening=False,
+                                )
+                                result["data"].update(
+                                    intent="answer", answer=answer_text, cap_state=_spend_check.cap_state
+                                )
                                 return result
                         except Exception:
                             # Fail-closed: deny if limiter is unavailable (except desktop mode)
@@ -1811,10 +1819,14 @@ class AIController:
 
                             if getattr(_cfg, "app_surface", "desktop") != "desktop":
                                 logger.exception("Plan limiter unavailable â€” denying request (fail-closed)")
-                                result["data"]["intent"] = "answer"
-                                result["data"][
-                                    "message"
-                                ] = "I can't verify your usage budget right now. Please try again shortly."
+                                answer_text = "I can't verify your usage budget right now. Please try again shortly."
+                                result.update(
+                                    intent="answer",
+                                    message=answer_text,
+                                    response=answer_text,
+                                    continue_listening=False,
+                                )
+                                result["data"].update(intent="answer", answer=answer_text)
                                 return result
                             logger.debug(
                                 "Plan limiter unavailable in desktop mode",

@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "a8c30508a8c336a29def33d91f470af8cd03a386",
-  "sha256": "48180df78e2e43704c1019c1477fbe357e83da32912fff58330c6be8d9cb7a23",
+  "revision": "fb0545a14307f3816a6307f8c625fb5d5f869b2f",
+  "sha256": "dc23439fd0766e673f78cd6c9830c6a7769427324a257a35f7bff602c6807bbb",
   "files": [
     {
       "path": ".env.example",
@@ -1595,8 +1595,8 @@
     },
     {
       "path": "intent/ai_controller.py",
-      "sha256": "f3ce8382a76ded6cc0ab756e8f6580af3de17e37f732a980c30447fe8a4d2f38",
-      "bytes": 164391
+      "sha256": "616351ba086ecc61278601e4bf0cd5c08d60973443c189baa94fd78e9ed18436",
+      "bytes": 165078
     },
     {
       "path": "intent/ai_interpreter.py",
@@ -3095,8 +3095,8 @@
     },
     {
       "path": "music/queue/playlist_cursor.py",
-      "sha256": "9221f5b891058f03fd3f8cf2412924755f5f61c863211954e3368a7f3261827d",
-      "bytes": 15073
+      "sha256": "a90dd7fe90b8028492e02584b770788a251b3c8cca6fd60293ad98ff65ab7938",
+      "bytes": 14162
     },
     {
       "path": "music/queue_config.py",
@@ -3175,13 +3175,13 @@
     },
     {
       "path": "music/runtime/contracts.py",
-      "sha256": "c2558b3ff1a94695a3a9f66251ce11cd55b6cf2ab6e194f0a3a62d1a43fc75dc",
-      "bytes": 9644
+      "sha256": "15580fbd4603dbb6b10b61a87e13309c171cb055bc96a164453ce885d56137f3",
+      "bytes": 9587
     },
     {
       "path": "music/runtime/control_surface.py",
-      "sha256": "5d32d3ae1e7dc6323c4d405f5326b774b0b88bc0def35198d1c7421d259dd1ce",
-      "bytes": 41196
+      "sha256": "753204b773102d48c96a6dee09a4ebd221ee787b155af1df76c28eb7630dd3d3",
+      "bytes": 38964
     },
     {
       "path": "music/runtime/embedded_playback.py",
@@ -3210,8 +3210,8 @@
     },
     {
       "path": "music/runtime/queue_engine.py",
-      "sha256": "143761f71c0ea38f72d0ddfa133caa169be5762cb1b64ba91f65a6e23c326f64",
-      "bytes": 13117
+      "sha256": "11a78179c8188797a7575fcb12fbf511328583d6d4063b0b84962c329b38496d",
+      "bytes": 12961
     },
     {
       "path": "music/runtime/queue_resolver.py",
@@ -3235,8 +3235,8 @@
     },
     {
       "path": "music/runtime/worker_manager.py",
-      "sha256": "defb5c4f3321a485808d5c78667226b4b97793c6ce2d33184e8ea49d2a1ccc2f",
-      "bytes": 55499
+      "sha256": "cbd1b57711b572b7b54a2499163c993e8d5682cd796172cf5d487052e33bd6bc",
+      "bytes": 54824
     },
     {
       "path": "music/shuffle_control.py",
@@ -6090,8 +6090,8 @@
     },
     {
       "path": "tests/public/test_customer_speech_settings.py",
-      "sha256": "1217d9b07107667bf5eb866d1ea146d1c12cbbcd1775d90785810a3ac1ac7aa9",
-      "bytes": 14988
+      "sha256": "11232b096c673b3e09a32fd44c453f02a475de6f3630909e00c186059e61acca",
+      "bytes": 15019
     },
     {
       "path": "tests/public/test_deferred_confirmation_cancellation.py",
@@ -6209,11 +6209,6 @@
       "bytes": 17545
     },
     {
-      "path": "tests/public/test_queue_play_selection.py",
-      "sha256": "efa32d40a28b950560fda6fa47068fb339fd55f51075b4706d2d0e4e34f24824",
-      "bytes": 25201
-    },
-    {
       "path": "tests/public/test_queue_wire_contract.py",
       "sha256": "34d64dcc21c1be272c49ec663aaa3e96e4ae4733aaa58e1695c452cb6780f735",
       "bytes": 7588
@@ -6225,8 +6220,8 @@
     },
     {
       "path": "tests/public/test_remote_managed_accounting.py",
-      "sha256": "2becc2e65696f60b4ebee82925a67b0e927a041498f418367568ff533f5c3a6c",
-      "bytes": 17345
+      "sha256": "672c74b4f4e49556cbdd65f7af409252a35529fdd1e4deaaf9b4e26ac69b888a",
+      "bytes": 24894
     },
     {
       "path": "tests/public/test_request_tool_surface_boundary.py",

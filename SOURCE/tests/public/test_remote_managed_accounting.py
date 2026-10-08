@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 import ast
+import asyncio
+from contextlib import nullcontext
+from contextvars import ContextVar
 import logging
 import os
 import sys
 import tempfile
+import time
 import types
 import unittest
 from pathlib import Path
@@ -59,6 +63,19 @@ def tearDownModule():
     _profile.cleanup()
 
 
+def _production_method(relative_path, owner_name, method_name, namespace):
+    """Run whole production methods while leaving app/device initialization inert."""
+    source = ROOT / relative_path
+    owner = next(node for node in ast.parse(source.read_text(encoding="utf-8")).body
+                 if isinstance(node, ast.ClassDef) and node.name == owner_name)
+    method = next(node for node in owner.body
+                  if isinstance(node, ast.AsyncFunctionDef) and node.name == method_name)
+    module = ast.Module(body=[ast.ImportFrom(module="__future__", names=[ast.alias(name="annotations")], level=0),
+                             method], type_ignores=[])
+    exec(compile(ast.fix_missing_locations(module), str(source), "exec"), namespace)
+    return namespace[method_name]
+
+
 class RemoteManagedAccounting(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         self.settings = types.ModuleType("config.settings")
@@ -74,6 +91,101 @@ class RemoteManagedAccounting(unittest.IsolatedAsyncioTestCase):
                                               "billing.managed_llm_budget": self.billing})
         self.patch.start()
         self.addCleanup(self.patch.stop)
+
+    async def exercise_controller_preflight(self, *, remote=False):
+        from core.exceptions import CostCircuitBreakerError, LLMQuotaExceededError
+        from intent.pipeline_contracts import PipelineResult
+        from intent.response_cleanup import strip_json_template
+        from services.llm.no_result import build_ai_no_result
+
+        provider = SimpleNamespace(SUPPORTS_NATIVE_TOOLS=True, MANAGED_SPEND_ACCOUNTED_REMOTELY=remote,
+                                   route_command_native=AsyncMock())
+        loop = AsyncMock(return_value={"ok": True, "message": "Allowed response", "data": {}})
+        controller = SimpleNamespace(
+            client=provider, _mcp_hub=object(), _channel=None,
+            _resolve_request_user_id=lambda user_key, **kwargs: user_key,
+            _context_builder=SimpleNamespace(prefetch_memory=Mock(), build_frames=Mock(return_value=object()),
+                                             get_context_components=lambda: {}),
+            _maybe_expire_history=AsyncMock(), _apply_voice_current_user_frame=lambda bundle, **kwargs: bundle,
+            _set_request_agent_surface=Mock(), _maybe_use_agent_prompt=AsyncMock(),
+            _get_request_agent_prompt_bundle=lambda: object(), _handle_agent_loop=loop,
+        )
+        controller_method = _production_method("intent/ai_controller.py", "AIController", "process_request", {
+            "asyncio": asyncio, "logger": logging.getLogger("controller-budget-contract"),
+            "_ctx_user_id": ContextVar("test_user"),
+            "_ctx_system_context_components": ContextVar("test_components", default={}),
+            "_ctx_ask_tier_active": ContextVar("test_ask_tier", default=False),
+            "_llm_error_to_user_message": lambda error: "Unexpected controller error: " + str(error),
+        })
+        controller.process_request = types.MethodType(controller_method, controller)
+        pipeline = SimpleNamespace(gpt_handler=provider, ai_controller=controller, node_id="synthetic-node",
+            _room_tracker=SimpleNamespace(check_intent_priority=lambda *args: (True, "", "")))
+        pipeline_method = _production_method("intent/pipeline_processors.py", "IntentPipelineProcessors", "try_ai", {
+            "time": time, "logger": logging.getLogger("pipeline-budget-contract"), "PipelineResult": PipelineResult,
+            "configured_llm_max_tokens_cap": lambda: 100, "_strip_json_template": strip_json_template,
+            "LLMQuotaExceededError": LLMQuotaExceededError, "CostCircuitBreakerError": CostCircuitBreakerError,
+            "build_ai_no_result": build_ai_no_result,
+        })
+        limiter = types.ModuleType("services.llm.rate_limiter")
+        limiter.get_rate_limiter = lambda: SimpleNamespace(reserve=AsyncMock())
+        instrumentation = types.ModuleType("admin.instrumentation")
+        instrumentation.record_latency = Mock()
+        spans = types.ModuleType("diagnostics.latency_spans")
+        spans.span = lambda *args, **kwargs: nullcontext()
+        with patch.dict(sys.modules, {"services.llm.rate_limiter": limiter,
+                                      "admin.instrumentation": instrumentation,
+                                      "diagnostics.latency_spans": spans}), patch.object(
+                budget, "user_uses_managed_llm", return_value=True):
+            result = await pipeline_method(SimpleNamespace(pipeline=pipeline), "A bounded useful request",
+                                           user_key="synthetic-budget-user")
+        provider.route_command_native.assert_not_awaited()
+        return result, loop
+
+    async def test_preflight_denials_reach_pipeline_as_actionable_answers_without_model_calls(self):
+        cases = [budget.ManagedLlmBudgetGate(False, spent_cents=33, budget_cents=33, plan="free", period="weekly"),
+                 budget.ManagedLlmBudgetGate(False, spent_cents=8, budget_cents=33, plan="free", period="weekly",
+                                             estimated_cents=26),
+                 budget.ManagedLlmBudgetGate(False, reason="budget counter unavailable")]
+        for gate in cases:
+            with self.subTest(reason=gate.reason, spent=gate.spent_cents):
+                self.billing.check_managed_llm_spend_cap_async.reset_mock(return_value=True)
+                self.billing.check_managed_llm_spend_cap_async.return_value = gate
+                result, loop = await self.exercise_controller_preflight()
+                self.assertEqual(result.intent, "answer")
+                self.assertTrue(result.ok)
+                self.assertIsNone(result.error)
+                self.assertFalse(result.requires_clarification)
+                envelope = result.to_dict()
+                self.assertEqual(envelope["data"]["message"], budget.managed_llm_budget_message(gate))
+                self.assertFalse(envelope["data"]["continue_listening"])
+                state = envelope["data"]["ai_data"]["cap_state"]
+                self.assertEqual(state, gate.cap_state)
+                self.assertEqual(state["denial_code"], gate.denial_code)
+                self.assertEqual(state["capacity_management_url"], "/billing/capacity")
+                self.assertFalse({"spent_cents", "limit_cents", "remaining_cents", "estimated_cents"} & state.keys())
+                self.assertNotIn("no_result", envelope["data"])
+                loop.assert_not_awaited()
+                self.billing.check_managed_llm_spend_cap_async.assert_awaited_once()
+                self.billing.reserve_managed_llm_spend_cap_async.assert_not_awaited()
+
+    async def test_preflight_service_failure_stays_a_terminal_answer_on_cloud(self):
+        self.settings.settings.app_surface = "cloud"
+        self.billing.check_managed_llm_spend_cap_async.side_effect = RuntimeError("synthetic unavailable meter")
+        result, loop = await self.exercise_controller_preflight()
+        self.assertEqual(result.intent, "answer")
+        self.assertIn("can't verify your usage budget", result.data["message"])
+        self.assertFalse(result.requires_clarification)
+        self.assertNotIn("cap_state", result.data["ai_data"])
+        loop.assert_not_awaited()
+        self.billing.check_managed_llm_spend_cap_async.assert_awaited_once()
+
+    async def test_controller_remote_relay_reaches_agent_despite_stale_local_denial(self):
+        result, loop = await self.exercise_controller_preflight(remote=True)
+        self.assertEqual(result.intent, "answer")
+        self.assertEqual(result.data["message"], "Allowed response")
+        self.assertNotIn("cap_state", result.data["ai_data"])
+        loop.assert_awaited_once()
+        self.billing.check_managed_llm_spend_cap_async.assert_not_awaited()
 
     async def test_remote_provider_is_not_blocked_by_an_exhausted_static_local_max_meter(self):
         assert budget.check_managed_llm_spend_cap("paid", managed_llm=True, provider=self.remote).allowed
