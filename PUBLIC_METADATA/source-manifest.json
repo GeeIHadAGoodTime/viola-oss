@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "585ed80ffb4120b3fafa18337c34aafc1723db7c",
-  "sha256": "eee7b76788ec15a9315833f32d114204cceed16c4befa51c65e780d4af129334",
+  "revision": "5c0ba82c23a7342af6b5bb0fcb2d609217a74b02",
+  "sha256": "e1a55343754b3add2b3de4bbfec2af38af4115396145f0a2d2affed3df25594f",
   "files": [
     {
       "path": ".env.example",
@@ -6289,6 +6289,11 @@
       "bytes": 2598
     },
     {
+      "path": "tests/public/test_voice_stream_cancellation.py",
+      "sha256": "2950604ed7c5cf6eb6d755ebd527a835785d1fc008c874d0b6cc771e355c4d9d",
+      "bytes": 8856
+    },
+    {
       "path": "tests/public/test_wake_listener_lifecycle.py",
       "sha256": "fcd8d847997d7a6f47796c53b6529f58d08e6c4177e1f6039c0904e80ad95cd3",
       "bytes": 47579
@@ -9550,8 +9555,8 @@
     },
     {
       "path": "ui/api/routes/voice_stream.py",
-      "sha256": "07c553d4540487dc0b34a4cc1fe65590f2a22fac67e0e1aafef2847618f23137",
-      "bytes": 49832
+      "sha256": "c64b475f0312dfcd1471d4bdf2d4cb21cc60d076446307297d7ba167908139ae",
+      "bytes": 51313
     },
     {
       "path": "ui/api/routes/wake_diagnostics.py",
@@ -9925,13 +9930,8 @@
     },
     {
       "path": "ui/react-app/src/SmartDisplay.jsx",
-      "sha256": "dab28734312bbbcab3038ae810ae73a0bd41a190194e1489d9234d0a839449ad",
-      "bytes": 173141
-    },
-    {
-      "path": "ui/react-app/src/SmartDisplay.spokePolicy.test.jsx",
-      "sha256": "e15f07073f7d9a3c568c77b88ecf085185185c65fb238d68108c8415118a16c6",
-      "bytes": 3782
+      "sha256": "08d3425d0a17f1013fd2f23111d3762ca049f7472cf7b44af351ca9ac9233c9f",
+      "bytes": 172585
     },
     {
       "path": "ui/react-app/src/SmartDisplay.stageRouting.test.jsx",
@@ -9945,8 +9945,8 @@
     },
     {
       "path": "ui/react-app/src/SmartDisplay.wakeStatus.test.jsx",
-      "sha256": "d2c487f320bf1b5efffd0545e59dcc60b7f33370e24d06c35ce7d4aa10ed5dcc",
-      "bytes": 11474
+      "sha256": "63109dbae7f42dd757d69640a84a4c11e7e42a41fc3326a41467e4f24aeb211a",
+      "bytes": 9898
     },
     {
       "path": "ui/react-app/src/__tests__/README.md",
@@ -9970,8 +9970,8 @@
     },
     {
       "path": "ui/react-app/src/__tests__/hooks/useSettings.snapshotOrdering.test.jsx",
-      "sha256": "004879f85559eee571b86264af179975a5b9b10c5064f8b36132d8994a00cb06",
-      "bytes": 18215
+      "sha256": "0ced15b91babb7cd2a6d7d2b87154b7cef4df8db67bd8992afaa55a1e87e3f88",
+      "bytes": 15828
     },
     {
       "path": "ui/react-app/src/__tests__/hooks/useSpokeSurfaceGuards.test.jsx",
@@ -9980,8 +9980,8 @@
     },
     {
       "path": "ui/react-app/src/__tests__/hooks/useVoiceOnboarding.micCaptureProbe.test.jsx",
-      "sha256": "c964b2a91d350e400aff8775301859b6f2c563c949de7de83417f4d605d063ab",
-      "bytes": 13363
+      "sha256": "f686f4b79b08488595f58f32403212bd21d32750b5f3713670e6ae127a4c20e6",
+      "bytes": 11830
     },
     {
       "path": "ui/react-app/src/__tests__/hooks/useVoiceOnboarding.micPermissionGuidance.test.jsx",
@@ -10734,14 +10734,9 @@
       "bytes": 4151
     },
     {
-      "path": "ui/react-app/src/components/SpokeWrapper.captureLifecycle.test.jsx",
-      "sha256": "1ef5e6a672cf8414a8ad3346b10dc37736c52890f18650a7f92b4415a6f43e39",
-      "bytes": 7688
-    },
-    {
       "path": "ui/react-app/src/components/SpokeWrapper.jsx",
-      "sha256": "b981b8e21e30be873774b8bf32f105ab8d2301c9e1bf5c2f2d42ea765b5cf540",
-      "bytes": 25009
+      "sha256": "f1778192ebcac6bea62a196d6267225d9f4ecede2f55700de2ea5a2437e7d4f5",
+      "bytes": 24013
     },
     {
       "path": "ui/react-app/src/components/TimerCountdown.jsx",
@@ -10775,8 +10770,8 @@
     },
     {
       "path": "ui/react-app/src/components/WakeWordSection.status.test.jsx",
-      "sha256": "18d1f4573080389917c290c119b503628210b24291ededfc9440d6d42abf2609",
-      "bytes": 3948
+      "sha256": "ab2f02f06a6656bdb68fdb0e15874ec8ccca561a7821c7f7bacee9d6a1f3dca9",
+      "bytes": 3082
     },
     {
       "path": "ui/react-app/src/components/WeatherDetailIcons.jsx",
@@ -11740,8 +11735,8 @@
     },
     {
       "path": "ui/react-app/src/hooks/useSettings.js",
-      "sha256": "5318bf449c903cd4eb852c66fad14545fd805b0d46d073270a6569fc8a508dcf",
-      "bytes": 13457
+      "sha256": "df209ec649ace923a2f31e24afa304153a689e6cb9163400acff4abc7fbad875",
+      "bytes": 13083
     },
     {
       "path": "ui/react-app/src/hooks/useSettingsDraft.js",
@@ -11795,18 +11790,18 @@
     },
     {
       "path": "ui/react-app/src/hooks/useVoiceOnboarding.js",
-      "sha256": "b4b2f20c61f1c0e850539453ce94a60021ff3c68775aed6a4e4a48a3e1397bc9",
-      "bytes": 36190
-    },
-    {
-      "path": "ui/react-app/src/hooks/useVoiceStream.captureLifecycle.test.jsx",
-      "sha256": "3f76adfc755db6bf322428d9017f7ef6976eea2fac88435681952164d8b78ac8",
-      "bytes": 12039
+      "sha256": "3f79f1575bce5c05089d5351d20cd8d18f90dd748367c8a2e1ffc903108f761c",
+      "bytes": 35423
     },
     {
       "path": "ui/react-app/src/hooks/useVoiceStream.js",
-      "sha256": "08dd2cc967e2f5dccfe855aae18714eeb47101571704f7a13769edd183d2ca53",
-      "bytes": 9295
+      "sha256": "f6a7ddd850f56ae78dca24374f9dc9de9b48ba664f21402bd3cd5e5c21196fbd",
+      "bytes": 10961
+    },
+    {
+      "path": "ui/react-app/src/hooks/useVoiceWs.captureLifecycle.test.jsx",
+      "sha256": "ed3dd3c4146e1120e4a097da34f59590b69d38f7d9e1f51636d8b71d097b4b63",
+      "bytes": 19414
     },
     {
       "path": "ui/react-app/src/hooks/useVoiceWs.closeCodes.test.jsx",
@@ -11815,8 +11810,8 @@
     },
     {
       "path": "ui/react-app/src/hooks/useVoiceWs.js",
-      "sha256": "0da805c40ad26adbf43176557189df053b281ea5cd8d5c88ac29e1e66cfb879b",
-      "bytes": 34662
+      "sha256": "854e5f027b4c2a79f143550795befc0f51e950ff21b1198201e7fc62f7ab3019",
+      "bytes": 36619
     },
     {
       "path": "ui/react-app/src/hooks/useVoiceWs.rapidPress.test.jsx",

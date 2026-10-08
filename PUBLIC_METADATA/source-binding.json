@@ -1,24 +1,16 @@
 {
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "28f5b1339cca8fc98a83e2f2e62180a069edd28844152ea33eb6e41c8f63b3b7",
-  "source_tree_sha256": "eee7b76788ec15a9315833f32d114204cceed16c4befa51c65e780d4af129334",
-  "source_file_count": 2687,
-  "source_revision": "585ed80ffb4120b3fafa18337c34aafc1723db7c",
+  "source_manifest_sha256": "6c00d575bb90a1f69954b653d7bb09116ddd4bf96825187194c69916c50a1422",
+  "source_tree_sha256": "e1a55343754b3add2b3de4bbfec2af38af4115396145f0a2d2affed3df25594f",
+  "source_file_count": 2686,
+  "source_revision": "5c0ba82c23a7342af6b5bb0fcb2d609217a74b02",
   "comparison_public_revision": "bb2419e8397e5a992f9982785c5a342ce65d6c23",
   "changed_source_paths": [
-    "SOURCE/ui/react-app/src/SmartDisplay.jsx",
-    "SOURCE/ui/react-app/src/SmartDisplay.spokePolicy.test.jsx",
-    "SOURCE/ui/react-app/src/SmartDisplay.wakeStatus.test.jsx",
-    "SOURCE/ui/react-app/src/__tests__/hooks/useSettings.snapshotOrdering.test.jsx",
-    "SOURCE/ui/react-app/src/__tests__/hooks/useVoiceOnboarding.micCaptureProbe.test.jsx",
-    "SOURCE/ui/react-app/src/components/SpokeWrapper.captureLifecycle.test.jsx",
-    "SOURCE/ui/react-app/src/components/SpokeWrapper.jsx",
-    "SOURCE/ui/react-app/src/components/WakeWordSection.status.test.jsx",
-    "SOURCE/ui/react-app/src/hooks/useSettings.js",
-    "SOURCE/ui/react-app/src/hooks/useVoiceOnboarding.js",
-    "SOURCE/ui/react-app/src/hooks/useVoiceStream.captureLifecycle.test.jsx",
-    "SOURCE/ui/react-app/src/hooks/useVoiceStream.js"
+    "SOURCE/ui/react-app/src/hooks/useVoiceWs.js",
+    "SOURCE/ui/react-app/src/hooks/useVoiceWs.captureLifecycle.test.jsx",
+    "SOURCE/ui/api/routes/voice_stream.py",
+    "SOURCE/tests/public/test_voice_stream_cancellation.py"
   ],
   "retained_sboms": [
     {
@@ -84,144 +76,84 @@
     "all_unselected_export_leaf_bytes_and_modes_preserved": true,
     "all_six_sbom_bytes_and_status_objects_preserved": true,
     "dependency_manifest_lock_workflow_notice_and_model_inputs_unchanged": true,
-    "scope": "Only the 12 reviewed frontend implementation/test files change. Five implementation files repair spoke/onboarding capture ownership and settings-policy readiness; seven test files cover these boundaries. All dependency inputs and inventory limitations remain unchanged."
+    "scope": "Only two voice lifecycle implementation files and their two synthetic regression suites change. Frontend application behavior intentionally changes; dependency inputs and inventory limitations remain unchanged."
   },
   "qualification": {
-    "scope": "Own continuous spoke microphone/transport capture across cancellation and principal changes, require an accepted Disabled/mute policy, and cancel onboarding microphone probes on phase exit while preserving manual diagnostics and unavailable wake training.",
-    "source_commit": "585ed80ffb4120b3fafa18337c34aafc1723db7c",
-    "source_tree": "3954887b65a685d2e25839e3e7af3f649981621d",
+    "scope": "Own browser voice microphone/auth/socket continuations across cancel, disable, reconnect and unmount; cancel pending server transcription dispatch when its WebSocket disconnects.",
+    "source_commit": "5c0ba82c23a7342af6b5bb0fcb2d609217a74b02",
+    "source_tree": "1a339163b4b1698355f73a20f7c0f48780dc1aad",
     "ordered_source_parents": [
       "bb2419e8397e5a992f9982785c5a342ce65d6c23"
     ],
-    "source_patch_sha256": "97e8260bbc05a9ba63d022411d3de78ddfa2e807f191d742f2cb5f19f8232378",
+    "source_patch_sha256": "b87c6cb665ed74379d90c8bde14c2b0b4f376cdb41ea913f3ab2f27cfe3f01dc",
     "independent_automated_review": {
-      "result": "Approved for source integration after revision 2; no remaining source-review blocker found.",
+      "result": "Approved for source integration after revision 2; no remaining source blockers found.",
       "reviewed_files": [
         {
-          "path": "SOURCE/ui/react-app/src/SmartDisplay.jsx",
-          "before_blob": "05b0e8d0dbeb645f474c6f86c2e59cacc9622e90",
-          "sha256": "dab28734312bbbcab3038ae810ae73a0bd41a190194e1489d9234d0a839449ad",
-          "bytes": 173141,
-          "new_blob": "a92c81d2a2bcd76cdb593d8b5885fb94003d5e01"
+          "path": "SOURCE/ui/react-app/src/hooks/useVoiceWs.js",
+          "before_blob": "602513f616fda1ca67862c17ac1c25e6bed5f8d5",
+          "sha256": "854e5f027b4c2a79f143550795befc0f51e950ff21b1198201e7fc62f7ab3019",
+          "bytes": 36619,
+          "new_blob": "402e38adf9f80b134c623b5de0073e9d4f1e6001"
         },
         {
-          "path": "SOURCE/ui/react-app/src/SmartDisplay.spokePolicy.test.jsx",
+          "path": "SOURCE/ui/react-app/src/hooks/useVoiceWs.captureLifecycle.test.jsx",
           "before_blob": null,
-          "sha256": "e15f07073f7d9a3c568c77b88ecf085185185c65fb238d68108c8415118a16c6",
-          "bytes": 3782,
-          "new_blob": "d3eb2a8cb8680dea470ce035178ab6fc242cd464"
+          "sha256": "ed3dd3c4146e1120e4a097da34f59590b69d38f7d9e1f51636d8b71d097b4b63",
+          "bytes": 19414,
+          "new_blob": "f25e6119fe1fed7316746d78ac854fbe0ce046a7"
         },
         {
-          "path": "SOURCE/ui/react-app/src/SmartDisplay.wakeStatus.test.jsx",
-          "before_blob": "5e7e0a0c77329014edad2bc95db4a367b44a89e2",
-          "sha256": "d2c487f320bf1b5efffd0545e59dcc60b7f33370e24d06c35ce7d4aa10ed5dcc",
-          "bytes": 11474,
-          "new_blob": "94576b1225ee905f96967726131406990c777bce"
+          "path": "SOURCE/ui/api/routes/voice_stream.py",
+          "before_blob": "7eca43cfb1b647143a0e27925b30453698649c81",
+          "sha256": "c64b475f0312dfcd1471d4bdf2d4cb21cc60d076446307297d7ba167908139ae",
+          "bytes": 51313,
+          "new_blob": "a881223bebb50659997a0893ec82b7af77c5a0f2"
         },
         {
-          "path": "SOURCE/ui/react-app/src/__tests__/hooks/useSettings.snapshotOrdering.test.jsx",
-          "before_blob": "fd885efd1c390990a62821e10bed8819ff7d79e5",
-          "sha256": "004879f85559eee571b86264af179975a5b9b10c5064f8b36132d8994a00cb06",
-          "bytes": 18215,
-          "new_blob": "516814ec92adbb10a0e7798970c1d3a59c197c60"
-        },
-        {
-          "path": "SOURCE/ui/react-app/src/__tests__/hooks/useVoiceOnboarding.micCaptureProbe.test.jsx",
-          "before_blob": "2cc8754eb63f0abed76ba8a4a8a9fec8756891ca",
-          "sha256": "c964b2a91d350e400aff8775301859b6f2c563c949de7de83417f4d605d063ab",
-          "bytes": 13363,
-          "new_blob": "cb5320fb86492ae755790bca6507edeb720f80b4"
-        },
-        {
-          "path": "SOURCE/ui/react-app/src/components/SpokeWrapper.captureLifecycle.test.jsx",
+          "path": "SOURCE/tests/public/test_voice_stream_cancellation.py",
           "before_blob": null,
-          "sha256": "1ef5e6a672cf8414a8ad3346b10dc37736c52890f18650a7f92b4415a6f43e39",
-          "bytes": 7688,
-          "new_blob": "929ad4101c04a718b879fd1df78d5e949e670ca3"
-        },
-        {
-          "path": "SOURCE/ui/react-app/src/components/SpokeWrapper.jsx",
-          "before_blob": "f3bdf5d568b28f6c4e0aaf6ecbf06608f26324c4",
-          "sha256": "b981b8e21e30be873774b8bf32f105ab8d2301c9e1bf5c2f2d42ea765b5cf540",
-          "bytes": 25009,
-          "new_blob": "6728d26e95f6a7923752c10cc2f75218c41b4c51"
-        },
-        {
-          "path": "SOURCE/ui/react-app/src/components/WakeWordSection.status.test.jsx",
-          "before_blob": "a414beee011ec55c1765521d26fbbf3ced2253dd",
-          "sha256": "18d1f4573080389917c290c119b503628210b24291ededfc9440d6d42abf2609",
-          "bytes": 3948,
-          "new_blob": "0bc558efb47454afbafc7ff09e5362038b0da408"
-        },
-        {
-          "path": "SOURCE/ui/react-app/src/hooks/useSettings.js",
-          "before_blob": "b4d48d2c25488f121a1a41794a533a34164dc4e0",
-          "sha256": "5318bf449c903cd4eb852c66fad14545fd805b0d46d073270a6569fc8a508dcf",
-          "bytes": 13457,
-          "new_blob": "bd9d9c62af8ba860cb7b25c68b6651585d0d0467"
-        },
-        {
-          "path": "SOURCE/ui/react-app/src/hooks/useVoiceOnboarding.js",
-          "before_blob": "e4642965257d2cc17790e064f02d50a70319f87f",
-          "sha256": "b4b2f20c61f1c0e850539453ce94a60021ff3c68775aed6a4e4a48a3e1397bc9",
-          "bytes": 36190,
-          "new_blob": "273c908c4468ea424abf527732a2bd2f5f4dd7f0"
-        },
-        {
-          "path": "SOURCE/ui/react-app/src/hooks/useVoiceStream.captureLifecycle.test.jsx",
-          "before_blob": null,
-          "sha256": "3f76adfc755db6bf322428d9017f7ef6976eea2fac88435681952164d8b78ac8",
-          "bytes": 12039,
-          "new_blob": "8bb8e1c31d388424add4666697cdb8dbf87138f3"
-        },
-        {
-          "path": "SOURCE/ui/react-app/src/hooks/useVoiceStream.js",
-          "before_blob": "280bafc82ee79008824a76272999287f04ba71d5",
-          "sha256": "08dd2cc967e2f5dccfe855aae18714eeb47101571704f7a13769edd183d2ca53",
-          "bytes": 9295,
-          "new_blob": "5c43e9c699862b04b866d501c62dd789dd86fc67"
+          "sha256": "2950604ed7c5cf6eb6d755ebd527a835785d1fc008c874d0b6cc771e355c4d9d",
+          "bytes": 8856,
+          "new_blob": "accbe7c710e7e8688c48faf5decb0b25ebfd53db"
         }
       ],
-      "scope": "Independent automated source review and lightweight synthetic controls; no human-review, hosted or installed acceptance claim.",
+      "scope": "Independent automated source review and lightweight synthetic controls; no human-review or installed-acceptance claim.",
       "resolved_findings": [
-        "P1: Require an accepted settings snapshot before continuous spoke capture; a failed first read does not establish privacy policy.",
-        "P2: A principal replacement during pending permission/auth/handshake retires the old owner and starts a fresh one even when false-to-true updates batch."
-      ],
-      "controls": {
-        "original_reproductions_passed": 2,
-        "additional_ownership_controls_passed": 2,
-        "principal_snapshot_control_passed": 1,
-        "all_12_file_hashes_and_patch_sha256_verified": true
-      }
+        "Retired connecting prewarm cannot retain microphone/context or block the next live connection.",
+        "Socket-drop teardown retires pending microphone permission and cannot disrupt a newer turn."
+      ]
     },
     "source_controls": {
       "revision": 2,
-      "author_related_frontend_tests_passed": 209,
-      "author_related_frontend_files": 23,
-      "author_related_frontend_tests_skipped": 0,
-      "exact_base_comparison": {
-        "test_files": 7,
-        "failed": 40,
-        "passed": 76,
-        "scope": "Original production sources with the retained regression/control suite; separate unchanged-base worktree."
+      "author_related_frontend_tests_passed": 95,
+      "author_related_frontend_files": 10,
+      "author_server_controls_passed": 6,
+      "independent_websocket_tests_passed": 55,
+      "independent_websocket_files": 7,
+      "independent_additional_server_controls_passed": 2,
+      "revision2_targeted_known_bad_control": "Five selected new client controls failed on retained revision-1 source.",
+      "original_known_bad_controls": {
+        "client_failed": 10,
+        "client_passed": 2,
+        "server_failed": 5,
+        "server_passed": 1
       },
-      "eslint_changed_frontend": {
-        "errors": 0,
-        "unchanged_base_warnings": 24
-      },
-      "full_frontend_or_build_run": false,
+      "eslint_changed_frontend": "passed",
+      "black_and_ruff_changed_python": "passed; Python source/test unchanged since original reviewed revision",
+      "earlier_revision1_full_frontend_tests_passed": 1992,
+      "earlier_revision1_frontend_build": "passed; not rerun as a revision2 build receipt",
+      "earlier_native_wake_controls_passed": 56,
+      "revision2_full_frontend_or_build_rerun": false,
       "full_public_python_suite_run": false,
-      "fixtures": "Real React hook, wrapper, settings snapshot and onboarding phase control flow with synthetic microphone, AudioContext, auth, WebSocket, TTS and API boundaries. No real microphone, provider, account or external command used.",
-      "original_review_reproductions": "Both unchanged reviewer failures now pass. Additional retired-callback, synchronous-cancel and principal-snapshot controls passed.",
-      "optional_final_independent_combined_rerun": "Did not start during a transient executor transport interruption; no receipt is claimed for that run."
+      "fixtures": "Actual React hook and complete server session/PCM/receive/command control flow; synthetic microphone, auth, socket, ASR, dispatcher and native-model boundaries. No microphone, provider, credential or network command executed."
     },
     "limits": [
-      "Source-only evidence; installed Windows, hardware and physical microphone acceptance remain open.",
-      "Wake training remains product-gated unavailable and was not re-enabled or edited. Manual onboarding diagnostics remain supported.",
-      "This packet does not modify HTTP/WS PTT startup timing, native wake/STT continuation, call audio, or the complementary WS/server cancellation repair.",
-      "Cancellation cannot undo actions already dispatched before capture retirement.",
+      "Source-only evidence; physical Windows and installed capture acceptance remain open.",
+      "Other capture ingresses, settings-loading timing, continuous server wake, training and onboarding probes, and call audio are not qualified by this narrow repair.",
+      "Cancellation cannot undo an external action dispatched before transport retirement.",
       "Final-head public hosted checks and private exact-pin composed-source checks remain separate.",
-      "Historical SBOM/advisory status and qualification limitations are retained unchanged.",
+      "Historical SBOM/advisory status and current-input qualification limitations are retained unchanged.",
       "No deployment, release, spending, credentials or access changes."
     ]
   },
@@ -11037,23 +10969,15 @@
     }
   ],
   "reviewed_source_patch": {
-    "scope": "Own continuous spoke microphone/transport capture across cancellation and principal changes, require an accepted Disabled/mute policy, and cancel onboarding microphone probes on phase exit while preserving manual diagnostics and unavailable wake training.",
+    "scope": "Own browser voice microphone/auth/socket continuations across cancel, disable, reconnect and unmount; cancel pending server transcription dispatch when its WebSocket disconnects.",
     "source_paths": [
-      "SOURCE/ui/react-app/src/SmartDisplay.jsx",
-      "SOURCE/ui/react-app/src/SmartDisplay.spokePolicy.test.jsx",
-      "SOURCE/ui/react-app/src/SmartDisplay.wakeStatus.test.jsx",
-      "SOURCE/ui/react-app/src/__tests__/hooks/useSettings.snapshotOrdering.test.jsx",
-      "SOURCE/ui/react-app/src/__tests__/hooks/useVoiceOnboarding.micCaptureProbe.test.jsx",
-      "SOURCE/ui/react-app/src/components/SpokeWrapper.captureLifecycle.test.jsx",
-      "SOURCE/ui/react-app/src/components/SpokeWrapper.jsx",
-      "SOURCE/ui/react-app/src/components/WakeWordSection.status.test.jsx",
-      "SOURCE/ui/react-app/src/hooks/useSettings.js",
-      "SOURCE/ui/react-app/src/hooks/useVoiceOnboarding.js",
-      "SOURCE/ui/react-app/src/hooks/useVoiceStream.captureLifecycle.test.jsx",
-      "SOURCE/ui/react-app/src/hooks/useVoiceStream.js"
+      "SOURCE/ui/react-app/src/hooks/useVoiceWs.js",
+      "SOURCE/ui/react-app/src/hooks/useVoiceWs.captureLifecycle.test.jsx",
+      "SOURCE/ui/api/routes/voice_stream.py",
+      "SOURCE/tests/public/test_voice_stream_cancellation.py"
     ],
-    "source_tree": "3954887b65a685d2e25839e3e7af3f649981621d",
-    "patch_sha256": "97e8260bbc05a9ba63d022411d3de78ddfa2e807f191d742f2cb5f19f8232378",
+    "source_tree": "1a339163b4b1698355f73a20f7c0f48780dc1aad",
+    "patch_sha256": "b87c6cb665ed74379d90c8bde14c2b0b4f376cdb41ea913f3ab2f27cfe3f01dc",
     "prior_binding": {
       "public_revision": "bb2419e8397e5a992f9982785c5a342ce65d6c23",
       "path": "PUBLIC_METADATA/source-binding.json",
