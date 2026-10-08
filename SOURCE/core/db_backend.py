@@ -309,6 +309,27 @@ async def _safe_pg_call(
         return _safe_table_fallback(method_name, args[0] if args else None, exc, logger_name)
 
 
+class _CleanupSafeTransaction:
+    """Delegate transaction behavior, but join context-exit cleanup safely."""
+
+    def __init__(self, transaction: Any) -> None:
+        self._transaction = transaction
+
+    async def __aenter__(self) -> Any:
+        return await self._transaction.__aenter__()
+
+    async def __aexit__(self, exc_type: Any, exc: Any, tb: Any) -> Any:
+        try:
+            return await _await_pool_cleanup(self._transaction.__aexit__(exc_type, exc, tb))
+        except BaseException as cleanup_exc:
+            if isinstance(exc, asyncio.CancelledError):
+                raise exc from cleanup_exc
+            raise
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._transaction, name)
+
+
 class _SafePgConnection:
     """Proxy around asyncpg connections that degrades gracefully on schema drift.
 
@@ -325,7 +346,7 @@ class _SafePgConnection:
         self._rls_context_set = rls_context_set
 
     def transaction(self, *args: Any, **kwargs: Any):
-        return self._conn.transaction(*args, **kwargs)
+        return _CleanupSafeTransaction(self._conn.transaction(*args, **kwargs))
 
     async def _guard_tenant_write(self, sql: Any) -> None:
         """Fail closed on a context-less tenant mutation (cloud surface only)."""
@@ -719,17 +740,49 @@ def _connection_db_user_id() -> str | None:
         raise ValueError("cloud database user_id must be a valid UUID") from exc
 
 
-async def _begin_user_scoped_transaction(conn: Any) -> Any | None:
+async def _await_pool_cleanup(awaitable: Any) -> Any:
+    """Finish connection cleanup before propagating caller cancellation.
+
+    A second cancellation must not interrupt rollback/reset and strand an
+    acquired handle. Keep a strong task reference, shield every wait, and join
+    the cleanup task before re-raising cancellation. Driver cleanup retains its
+    own timeout/error policy; this does not convert a failed request to success.
+    """
+    cleanup = asyncio.ensure_future(awaitable)
+    interrupted: asyncio.CancelledError | None = None
+    while True:
+        try:
+            result = await asyncio.shield(cleanup)
+            break
+        except asyncio.CancelledError as exc:
+            if cleanup.cancelled():
+                raise
+            interrupted = exc
+        except BaseException as exc:
+            if interrupted is not None:
+                raise interrupted from exc
+            raise
+    if interrupted is not None:
+        raise interrupted
+    return result
+
+
+async def _begin_user_scoped_transaction(conn: Any, *, transaction_options: dict[str, Any] | None = None) -> Any | None:
     user_id = _connection_db_user_id()
     if user_id is None:
         return None
 
-    transaction = conn.transaction()
+    transaction = conn.transaction(**transaction_options) if transaction_options else conn.transaction()
     await transaction.__aenter__()
     try:
         await conn.execute("SELECT set_config('app.user_id', $1, true)", user_id)
-    except Exception as exc:
-        await transaction.__aexit__(type(exc), exc, exc.__traceback__)
+    except BaseException as exc:
+        try:
+            await _await_pool_cleanup(transaction.__aexit__(type(exc), exc, exc.__traceback__))
+        except BaseException as cleanup_exc:
+            if isinstance(exc, asyncio.CancelledError):
+                raise exc from cleanup_exc
+            raise
         raise
     return transaction
 
@@ -780,10 +833,11 @@ async def assert_pg_columns(conn: Any, columns_by_relation: dict[str, set[str]],
 
 
 class _RetryingAcquire:
-    def __init__(self, pool: Any, *args: Any, **kwargs: Any) -> None:
+    def __init__(self, pool: Any, *args: Any, transaction_options: dict[str, Any] | None = None, **kwargs: Any) -> None:
         self._pool = pool
         self._args = args
         self._kwargs = kwargs
+        self._transaction_options = dict(transaction_options) if transaction_options else None
         self._manager: Any | None = None
         self._conn: Any | None = None
         self._transaction: Any | None = None
@@ -795,20 +849,32 @@ class _RetryingAcquire:
             self._manager = manager
             try:
                 self._conn = await manager.__aenter__()
-                self._transaction = await _begin_user_scoped_transaction(self._conn)
+                self._transaction = (
+                    await _begin_user_scoped_transaction(self._conn, transaction_options=self._transaction_options)
+                    if self._transaction_options is not None
+                    else await _begin_user_scoped_transaction(self._conn)
+                )
                 # When the ambient user-scoped transaction was opened it already
                 # ran set_config('app.user_id', ...) on this connection, so the
                 # tenant is wired; otherwise the connection carries no context and
                 # the guard fails closed on any tenant mutation.
                 return _SafePgConnection(self._conn, rls_context_set=self._transaction is not None)
-            except Exception as exc:
-                last_exc = exc
-                with suppress(Exception):
-                    await manager.__aexit__(type(exc), exc, exc.__traceback__)
-                self._manager = None
-                self._conn = None
-                if not _is_asyncpg_connection_error(exc) or attempt > 0:
+            except BaseException as exc:
+                try:
+                    # If raw acquisition itself failed, asyncpg owns releasing
+                    # that attempt. Once it returned a handle, setup failure or
+                    # cancellation is ours to release, even before __aenter__
+                    # has returned to the caller's async-with statement.
+                    if self._conn is not None:
+                        with suppress(Exception):
+                            await _await_pool_cleanup(manager.__aexit__(type(exc), exc, exc.__traceback__))
+                finally:
+                    self._manager = None
+                    self._conn = None
+                    self._transaction = None
+                if not isinstance(exc, Exception) or not _is_asyncpg_connection_error(exc) or attempt > 0:
                     raise
+                last_exc = exc
                 logger.warning(
                     "asyncpg pool acquire failed with %s; retrying once",
                     exc.__class__.__name__,
@@ -818,17 +884,29 @@ class _RetryingAcquire:
         raise RuntimeError("asyncpg pool acquire failed before returning a connection")
 
     async def __aexit__(self, exc_type: Any, exc: Any, tb: Any) -> Any:
-        if self._manager is None:
+        manager, transaction = self._manager, self._transaction
+        self._manager = self._conn = self._transaction = None
+        if manager is None:
             return None
-        if self._transaction is not None:
+
+        async def finish() -> Any:
             try:
-                await self._transaction.__aexit__(exc_type, exc, tb)
-            except Exception as tx_exc:
-                await self._manager.__aexit__(type(tx_exc), tx_exc, tx_exc.__traceback__)
+                if transaction is not None:
+                    await transaction.__aexit__(exc_type, exc, tb)
+            except BaseException as tx_exc:
+                await manager.__aexit__(type(tx_exc), tx_exc, tx_exc.__traceback__)
                 raise
-            finally:
-                self._transaction = None
-        return await self._manager.__aexit__(exc_type, exc, tb)
+            return await manager.__aexit__(exc_type, exc, tb)
+
+        try:
+            return await _await_pool_cleanup(finish())
+        except BaseException as cleanup_exc:
+            if isinstance(exc, asyncio.CancelledError):
+                # A request deadline is still cancellation if rollback/reset
+                # fails. Preserve it so the caller's timeout can translate it,
+                # while retaining the cleanup failure as its cause.
+                raise exc from cleanup_exc
+            raise
 
 
 def _get_pool_lock() -> asyncio.Lock:
@@ -900,8 +978,15 @@ class ResilientAsyncpgPool:
     def loop(self) -> asyncio.AbstractEventLoop | None:
         return self._loop
 
-    def acquire(self, *args: Any, **kwargs: Any) -> _RetryingAcquire:
-        return _RetryingAcquire(self._pool, *args, **kwargs)
+    def acquire(self, *args: Any, transaction_options: dict[str, Any] | None = None, **kwargs: Any) -> _RetryingAcquire:
+        """Acquire with optional isolation options for the ambient transaction.
+
+        Set these before RLS setup executes its first SQL statement. A caller
+        opening a nested snapshot must use the same isolation as this actual
+        outer transaction. Without an ambient owner, the caller still owns its
+        explicit transaction and RLS setup, as with ordinary acquire().
+        """
+        return _RetryingAcquire(self._pool, *args, transaction_options=transaction_options, **kwargs)
 
     async def close(self) -> None:
         await self._pool.close()
