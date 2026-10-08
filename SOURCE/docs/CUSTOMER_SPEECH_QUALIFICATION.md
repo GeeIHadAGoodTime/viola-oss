@@ -1,6 +1,6 @@
 # Customer speech component qualification
 
-Status: first-release qualification targets English, Spanish and Mandarin. Existing language routes and the canonical 54-voice asset are retained; selected-voice application, frozen and installed acceptance remain open.
+Status: first-release qualification targets English, Spanish and Mandarin. Existing language routes and the canonical 54-voice asset are retained. Selected-voice source wiring is integrated; frozen and installed acceptance remain open.
 
 ## Recovered decision and scope
 
@@ -21,10 +21,9 @@ The default customer component is English. The explicitly constructed, inactive
 CJK companion now has the bounded source evidence below. Customer activation
 requires qualification of the selected launch routes and voices, including
 their exact target dependencies, notices and installed behavior. Unselected
-languages and all 54 voices are not blanket release prerequisites. Desktop's
-existing hardcoded `en-us` call remains an application-routing gap. The environment selector
-would also affect local phone Kokoro, so its eight-language source forwarding
-tests alone cannot qualify a customer artifact using this profile.
+languages and all 54 voices are not blanket release prerequisites. Desktop and local phone source now share the explicitly selected
+English/Spanish/Mandarin composition in a marked qualification artifact.
+Source routing controls alone do not qualify its installed behavior.
 
 ## Implementation
 
@@ -292,3 +291,62 @@ must preserve the approved local-file execution and resource conditions. These
 runs do not establish application-wide import ordering, OS-level isolation or
 frozen Windows acceptance. No actual transmission is asserted without network
 evidence.
+
+## Selected Mandarin data and recovered notices, 2026-10-08
+
+The following are exact input identities, separate from Windows frozen inclusion.
+They were read from the selected official PyPI artifacts and checked against
+PyPI SHA-256 metadata; both wheel RECORD inventories were checked. No model,
+voice asset, pronunciation algorithm or dependency version changed.
+
+- `pypinyin-0.55.0-py2.py3-none-any.whl`: 840,203 bytes, SHA-256
+  `d53b1e8ad2cdb815fb2cb604ed3123372f5a28c6f447571244aca36fc62a286f`.
+  `pypinyin/pinyin_dict.json` is 788,780 bytes, SHA-256
+  `5f294c01e6c6c0a1c8e329c79335a3f8e0b27d06bf1de7a99244b765892d1e5b`;
+  `pypinyin/phrases_dict.json` is 2,545,585 bytes, SHA-256
+  `a45ff140a6b631ca9c82127b280a2f414e0aba6bb2824a0e9d1e77fff359c665`.
+  Its package MIT text is at `pypinyin-0.55.0.dist-info/licenses/LICENSE.txt`,
+  not directly in the dist-info root.
+- The [pypinyin v0.55.0 release](https://github.com/mozillazg/python-pinyin/tree/df101577145af2eb1abe5656e592e34e3bb56d23)
+  selects [pinyin-data fa9761ff](https://github.com/mozillazg/pinyin-data/tree/fa9761fff402f8560196b1ba085c437c52b56d7c)
+  and [phrase-pinyin-data cee0ed6e](https://github.com/mozillazg/phrase-pinyin-data/tree/cee0ed6e6e4898580cafd2bd5e3723e20b214aa0).
+  Replaying its documented transformations from those two exact `pinyin.txt`
+  files reproduces both packaged JSON dictionaries byte-for-byte: 41,923
+  character entries and 47,111 phrase entries. The two upstream MIT notices
+  are retained as `LICENSES/pinyin-data-MIT.txt` and
+  `LICENSES/phrase-pinyin-data-MIT.txt`. The selected phrase generator consumes
+  `pinyin.txt`; it does not consume the separately provided `large_pinyin.txt`
+  or `cc_cedict.txt`. The character source records Unicode 16.0.0 Unihan
+  inputs; final notices must preserve the applicable Unicode data attribution
+  as well as the immediate package notices. This record does not assert
+  upstream data licensing closure solely from package MIT metadata.
+- `jieba-0.42.1.tar.gz`: 19,214,172 bytes, SHA-256
+  `055ca12f62674fafed09427f176506079bc135638a14e23e25be909131928db2`.
+  `jieba/dict.txt` is 5,071,852 bytes, SHA-256
+  `7197c3211ddd98962b036cdf40324d1ea2bfaa12bd028e68faa70111a88e12a8`.
+  Its Git blob `fc6075f64943e1861c420db4da38063de9d8afc5` matches the
+  [official release source](https://github.com/fxsjy/jieba/tree/1e20c89b66f56c9301b0feed211733ffaa1bd72a).
+  The archive omits the release MIT text; that exact 1,075-byte text is now
+  retained as `LICENSES/jieba-0.42.1-MIT.txt` (SHA-256
+  `18ba0984839f85853b29fadaf992f7dba8fd0ca0fbeae34de2b8735222dc7a37`).
+  This does not claim a new built or installed Jieba wheel.
+- `ordered_set-4.1.0-py3-none-any.whl`: 7,634 bytes, SHA-256
+  `046e1132c71fcf3330438a539928932caf51ddbc582496833e23de611de14562`.
+  Its sole runtime module exactly matches
+  [release d921651b](https://github.com/rspeer/ordered-set/tree/d921651b2737f5cfe711868fab558a8ef79e26ca);
+  its omitted MIT text is retained in
+  `LICENSES/CUSTOMER_SPEECH_SUPPLEMENTAL_NOTICES.txt`. That supplement also
+  preserves previously reviewed FlatBuffers 25.12.19 and srsly 2.5.4 vendored
+  ruamel.yaml notices; those two historical Linux artifact associations do
+  not establish the final Windows versions or native inventory.
+
+These hashes and notice bytes can now be bound by the existing private
+qualification preparer. A nonempty dictionary check is insufficient to prove
+these identities. The current public-source addition does not modify that
+private preparer or assert that the notices are already collected into an
+installer. The remaining artifact work is exact Windows resolved-wheel and
+native-library closure, physical files plus embedded Python inventory,
+accessible notices and any applicable source obligations, signed publisher
+binding, and installed selected-language/voice listening and failure recovery.
+The existing qualification build must produce that evidence; it does not
+require installed proof before it may be built.

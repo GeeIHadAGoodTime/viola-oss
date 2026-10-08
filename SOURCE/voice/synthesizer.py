@@ -143,6 +143,12 @@ class Synthesizer:
             except (RuntimeError, OSError, ImportError, ValueError, AttributeError) as exc:
                 logger.debug("Synthesizer prewarm skipped: %s", exc)
 
+    def stop(self) -> None:
+        """Interrupt speech through the selected implementation, when supported."""
+        stop = getattr(self._impl, "stop", None)
+        if callable(stop):
+            stop()
+
     async def speak(self, text: str) -> None:
         """
         Speak text.

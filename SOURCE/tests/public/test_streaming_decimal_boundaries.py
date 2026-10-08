@@ -26,7 +26,7 @@ def load_streaming_method(source: Path):
         node
         for node in ast.walk(tree)
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
-        and node.name in {"_tts_is_enabled", "_play_pcm_if_enabled", "_run_synthesize_with_watchdog", "_prepare_route_text"}
+        and node.name in {"_tts_is_enabled", "_play_pcm_if_enabled", "_run_synthesize_with_watchdog", "_prepare_route_text", "stop"}
     ]
     helpers = [
         node
@@ -91,7 +91,7 @@ class StreamingDecimalBoundaryTests(unittest.IsolatedAsyncioTestCase):
             return b"\x00\x00" * 16
 
         self.engine._synthesize_locked = synthesize
-        self.engine._play_pcm_raw = lambda pcm, rate: self.played.append((pcm, rate))
+        self.engine._play_pcm_raw = lambda pcm, rate, **kwargs: self.played.append((pcm, rate))
         self.engine._sleep_sentence_gap = AsyncMock()
         self.engine._smooth_sentence_boundary = lambda previous, current: current
 

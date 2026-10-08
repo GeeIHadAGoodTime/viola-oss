@@ -57,6 +57,25 @@ class SelectedAudioOutput(unittest.TestCase):
         )
         self.notice = self.stack.enter_context(patch.object(KokoroTTSEngine, "_report_inaudible_reply"))
         self.pcm = np.array([0, 1000, -1000, 3000], dtype=np.int16).tobytes()
+        self.kokoro = KokoroTTSEngine(config=types.SimpleNamespace(tts_opener_cache_enabled=False))
+        self.rendered = []
+        self.stream = None
+        self.sd.CallbackStop = type("CallbackStop", (Exception,), {})
+        self.sd.CallbackAbort = type("CallbackAbort", (Exception,), {})
+        self.sd.OutputStream.side_effect = self.output_stream
+
+    def output_stream(self, **kwargs):
+        def start():
+            outdata = np.zeros((len(self.pcm) // 2, 1), dtype=np.float32)
+            try:
+                kwargs["callback"](outdata, len(outdata), None, None)
+            except self.sd.CallbackStop:
+                pass
+            self.rendered.append(outdata[:, 0].copy())
+            kwargs["finished_callback"]()
+
+        self.stream = types.SimpleNamespace(start=Mock(side_effect=start), close=Mock(), abort=Mock())
+        return self.stream
 
     def test_stable_token_matches_name_and_host(self):
         self.assertEqual(routing.resolve_output_device(self.sd), 1)
@@ -147,39 +166,50 @@ class SelectedAudioOutput(unittest.TestCase):
 
     def test_kokoro_routes_pcm_without_changing_gain_or_spoke_payload(self):
         self.broadcast.return_value = True
-        self.assertTrue(KokoroTTSEngine._play_pcm_raw(self.pcm, 16000))
-        args, kwargs = self.sd.play.call_args
-        np.testing.assert_array_equal(args[0], np.frombuffer(self.pcm, dtype=np.int16).astype(np.float32) / 32767)
-        self.assertEqual(kwargs, {"samplerate": 16000, "device": 1})
+        self.assertTrue(self.kokoro._play_pcm_raw(self.pcm, 16000))
+        kwargs = self.sd.OutputStream.call_args.kwargs
+        np.testing.assert_array_equal(
+            self.rendered[0], np.frombuffer(self.pcm, dtype=np.int16).astype(np.float32) / 32767
+        )
+        self.assertEqual(kwargs["samplerate"], 16000)
+        self.assertEqual(kwargs["device"], 1)
+        self.assertEqual(kwargs["channels"], 1)
+        self.assertEqual(kwargs["dtype"], "float32")
         self.broadcast.assert_called_once_with(self.pcm, 16000)
-        self.sd.wait.assert_called_once_with()
+        self.stream.start.assert_called_once_with()
+        self.stream.close.assert_called_once_with()
         self.notice.assert_not_called()
 
     def test_kokoro_missing_selected_device_uses_default(self):
         self.selection = routing.output_device_selection("Disconnected", "Host B")
-        self.assertTrue(KokoroTTSEngine._play_pcm_raw(self.pcm))
-        self.assertIsNone(self.sd.play.call_args.kwargs["device"])
+        self.assertTrue(self.kokoro._play_pcm_raw(self.pcm))
+        self.assertIsNone(self.sd.OutputStream.call_args.kwargs["device"])
 
     def test_kokoro_selected_open_failure_is_not_replayed_on_default(self):
-        self.sd.play.side_effect = OSError("device removed after lookup")
-        self.assertFalse(KokoroTTSEngine._play_pcm_raw(self.pcm))
-        self.sd.play.assert_called_once()
-        self.sd.wait.assert_not_called()
+        self.sd.OutputStream.side_effect = OSError("device removed after lookup")
+        self.assertFalse(self.kokoro._play_pcm_raw(self.pcm))
+        self.sd.OutputStream.assert_called_once()
+        self.assertIsNone(self.stream)
         self.broadcast.assert_called_once()
         self.notice.assert_called_once()
 
     def test_kokoro_midplay_failure_is_not_replayed(self):
-        self.sd.wait.side_effect = OSError("unplugged mid-play")
-        self.assertFalse(KokoroTTSEngine._play_pcm_raw(self.pcm))
-        self.sd.play.assert_called_once()
+        def failed_stream(**kwargs):
+            stream = self.output_stream(**kwargs)
+            stream.close.side_effect = OSError("unplugged mid-play")
+            return stream
+
+        self.sd.OutputStream.side_effect = failed_stream
+        self.assertFalse(self.kokoro._play_pcm_raw(self.pcm))
+        self.sd.OutputStream.assert_called_once()
         # Existing broadcaster retries only when it reported no successful delivery.
         self.assertEqual(self.broadcast.call_count, 2)
         self.notice.assert_called_once()
 
     def test_kokoro_spoke_success_survives_local_failure(self):
-        self.sd.play.side_effect = OSError("no local sink")
+        self.sd.OutputStream.side_effect = OSError("no local sink")
         self.broadcast.return_value = True
-        self.assertTrue(KokoroTTSEngine._play_pcm_raw(self.pcm))
+        self.assertTrue(self.kokoro._play_pcm_raw(self.pcm))
         self.notice.assert_not_called()
 
     def test_kokoro_guard_spans_play_and_wait(self):
@@ -195,10 +225,17 @@ class SelectedAudioOutput(unittest.TestCase):
             finally:
                 inside.pop()
 
-        self.sd.play.side_effect = lambda *a, **kw: self.assertTrue(inside)
-        self.sd.wait.side_effect = lambda: self.assertTrue(inside)
+        def guarded_stream(**kwargs):
+            self.assertTrue(inside)
+            stream = self.output_stream(**kwargs)
+            start = stream.start.side_effect
+            stream.start.side_effect = lambda: (self.assertTrue(inside), start())
+            stream.close.side_effect = lambda: self.assertTrue(inside)
+            return stream
+
+        self.sd.OutputStream.side_effect = guarded_stream
         with patch.object(portaudio_guard, "sounddevice_playback_guard", guard):
-            self.assertTrue(KokoroTTSEngine._play_pcm_raw(self.pcm))
+            self.assertTrue(self.kokoro._play_pcm_raw(self.pcm))
         self.assertFalse(inside)
 
     def backend(self, stream=None):
@@ -220,6 +257,7 @@ class SelectedAudioOutput(unittest.TestCase):
             _proc=None,
         )
         self.stream = stream or types.SimpleNamespace(start=Mock(), write=Mock(), abort=Mock(), close=Mock())
+        self.sd.OutputStream.side_effect = None
         self.sd.OutputStream.return_value = self.stream
         pipeline = types.ModuleType("audio_core.streaming.pipeline_wiring")
         self.stamper = types.SimpleNamespace(_bit_depth=16, on_capture_data=Mock())
