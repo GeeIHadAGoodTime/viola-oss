@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "5c0ba82c23a7342af6b5bb0fcb2d609217a74b02",
-  "sha256": "e1a55343754b3add2b3de4bbfec2af38af4115396145f0a2d2affed3df25594f",
+  "revision": "ebcea3222fbd4c5d4ec24f6ed20713e2f9c0dfd2",
+  "sha256": "0473af7dae87a1f309854e70540e58db99f5d6b91a0578d65aa4026eed56966e",
   "files": [
     {
       "path": ".env.example",
@@ -3095,8 +3095,8 @@
     },
     {
       "path": "music/queue/playlist_cursor.py",
-      "sha256": "a90dd7fe90b8028492e02584b770788a251b3c8cca6fd60293ad98ff65ab7938",
-      "bytes": 14162
+      "sha256": "9221f5b891058f03fd3f8cf2412924755f5f61c863211954e3368a7f3261827d",
+      "bytes": 15073
     },
     {
       "path": "music/queue_config.py",
@@ -3175,13 +3175,13 @@
     },
     {
       "path": "music/runtime/contracts.py",
-      "sha256": "15580fbd4603dbb6b10b61a87e13309c171cb055bc96a164453ce885d56137f3",
-      "bytes": 9587
+      "sha256": "c2558b3ff1a94695a3a9f66251ce11cd55b6cf2ab6e194f0a3a62d1a43fc75dc",
+      "bytes": 9644
     },
     {
       "path": "music/runtime/control_surface.py",
-      "sha256": "753204b773102d48c96a6dee09a4ebd221ee787b155af1df76c28eb7630dd3d3",
-      "bytes": 38964
+      "sha256": "5d32d3ae1e7dc6323c4d405f5326b774b0b88bc0def35198d1c7421d259dd1ce",
+      "bytes": 41196
     },
     {
       "path": "music/runtime/embedded_playback.py",
@@ -3210,8 +3210,8 @@
     },
     {
       "path": "music/runtime/queue_engine.py",
-      "sha256": "11a78179c8188797a7575fcb12fbf511328583d6d4063b0b84962c329b38496d",
-      "bytes": 12961
+      "sha256": "143761f71c0ea38f72d0ddfa133caa169be5762cb1b64ba91f65a6e23c326f64",
+      "bytes": 13117
     },
     {
       "path": "music/runtime/queue_resolver.py",
@@ -3235,8 +3235,8 @@
     },
     {
       "path": "music/runtime/worker_manager.py",
-      "sha256": "cbd1b57711b572b7b54a2499163c993e8d5682cd796172cf5d487052e33bd6bc",
-      "bytes": 54824
+      "sha256": "defb5c4f3321a485808d5c78667226b4b97793c6ce2d33184e8ea49d2a1ccc2f",
+      "bytes": 55499
     },
     {
       "path": "music/shuffle_control.py",
@@ -6207,6 +6207,11 @@
       "path": "tests/public/test_privacy_boundary_contract.py",
       "sha256": "60430b35b0fd62f68801d269e3c01e0208596744b2fc17d36035064fefbcfee9",
       "bytes": 17545
+    },
+    {
+      "path": "tests/public/test_queue_play_selection.py",
+      "sha256": "efa32d40a28b950560fda6fa47068fb339fd55f51075b4706d2d0e4e34f24824",
+      "bytes": 25201
     },
     {
       "path": "tests/public/test_queue_wire_contract.py",
