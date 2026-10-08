@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "06959256f9d72a8de9deeee1ad2a29fe92cd1868",
-  "sha256": "cf07bc98dcb31f1a4a6db7933b587dd2c67b998b43a401d9e36403d4f5461f17",
+  "revision": "fb0545a14307f3816a6307f8c625fb5d5f869b2f",
+  "sha256": "dc23439fd0766e673f78cd6c9830c6a7769427324a257a35f7bff602c6807bbb",
   "files": [
     {
       "path": ".env.example",
@@ -1595,8 +1595,8 @@
     },
     {
       "path": "intent/ai_controller.py",
-      "sha256": "f3ce8382a76ded6cc0ab756e8f6580af3de17e37f732a980c30447fe8a4d2f38",
-      "bytes": 164391
+      "sha256": "616351ba086ecc61278601e4bf0cd5c08d60973443c189baa94fd78e9ed18436",
+      "bytes": 165078
     },
     {
       "path": "intent/ai_interpreter.py",
@@ -6220,8 +6220,8 @@
     },
     {
       "path": "tests/public/test_remote_managed_accounting.py",
-      "sha256": "2becc2e65696f60b4ebee82925a67b0e927a041498f418367568ff533f5c3a6c",
-      "bytes": 17345
+      "sha256": "672c74b4f4e49556cbdd65f7af409252a35529fdd1e4deaaf9b4e26ac69b888a",
+      "bytes": 24894
     },
     {
       "path": "tests/public/test_request_tool_surface_boundary.py",
