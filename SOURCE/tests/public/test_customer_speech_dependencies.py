@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ast
 import copy
+import hashlib
 import io
 import json
 import os
@@ -33,6 +34,28 @@ class CustomerSpeechDependencyTests(unittest.TestCase):
 
     def test_exact_speech_graph(self):
         self.assertEqual(validate_graph(self.graph()), [])
+
+    def test_selected_mandarin_unicode_attribution_is_retained(self):
+        root = Path(__file__).resolve().parents[2]
+        name = "Unicode-Unihan-16.0.0-NOTICE.txt"
+        notice = (root / "LICENSES" / name).read_bytes()
+        # Public upstream-derived notice checksum, not a credential.
+        expected = "ddc087bd0e203e38820edd68fc07bf823b6460dbfd91aa56fbd4e2ab5df54380"  # pragma: allowlist secret
+        self.assertEqual(len(notice), 3653)
+        self.assertEqual(hashlib.sha256(notice).hexdigest(), expected)
+        entries = [line.split() for line in (root / "LICENSES/SHA256SUMS").read_text(encoding="utf-8").splitlines()]
+        self.assertEqual([row for row in entries if row[1] == name], [[expected, name]])
+        self.assertEqual(INACTIVE_CJK_REQUIRED["pypinyin"], "0.55.0")
+        self.assertIn("# © 2024 Unicode®, Inc.".encode(), notice)
+        marker = b"UNICODE LICENSE V3\n"
+        self.assertEqual(notice.count(marker), 1)
+        license_text = notice[notice.index(marker):]
+        self.assertEqual(len(license_text), 1995)
+        self.assertEqual(
+            hashlib.sha256(license_text).hexdigest(),
+            "e7a93b009565cfce55919a381437ac4db883e9da2126fa28b91d12732bc53d96",  # pragma: allowlist secret
+        )
+
 
     def test_forbidden_direct_and_transitive_packages(self):
         for name in ["phonemizer", "Phonemizer_Fork", "espeakng.loader", "espeak-ng", "num2words", "misaki"]:

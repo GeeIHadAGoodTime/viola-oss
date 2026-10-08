@@ -317,9 +317,13 @@ voice asset, pronunciation algorithm or dependency version changed.
   `LICENSES/phrase-pinyin-data-MIT.txt`. The selected phrase generator consumes
   `pinyin.txt`; it does not consume the separately provided `large_pinyin.txt`
   or `cc_cedict.txt`. The character source records Unicode 16.0.0 Unihan
-  inputs; final notices must preserve the applicable Unicode data attribution
-  as well as the immediate package notices. This record does not assert
-  upstream data licensing closure solely from package MIT metadata.
+  inputs. Their original 2024 attribution and the complete official Unicode
+  License V3 text are now retained in
+  `LICENSES/Unicode-Unihan-16.0.0-NOTICE.txt`, alongside the existing MIT notices.
+  The V3 text was fetched from the official site on 2026-10-08 and retains its
+  current 1991–2026 copyright range; it is not labelled as an archived 2024
+  download. This closes the missing source-attribution boundary, with frozen
+  collection and the wider dependency/native notice review still separate.
 - `jieba-0.42.1.tar.gz`: 19,214,172 bytes, SHA-256
   `055ca12f62674fafed09427f176506079bc135638a14e23e25be909131928db2`.
   `jieba/dict.txt` is 5,071,852 bytes, SHA-256
@@ -350,3 +354,28 @@ accessible notices and any applicable source obligations, signed publisher
 binding, and installed selected-language/voice listening and failure recovery.
 The existing qualification build must produce that evidence; it does not
 require installed proof before it may be built.
+
+### Unicode/Unihan attribution verification
+
+The [official Unicode 16.0.0 archive](https://www.unicode.org/Public/16.0.0/ucd/Unihan.zip)
+is 8,382,485 bytes, SHA-256
+`b8f000df69de7828d21326a2ffea462b04bc7560022989f7cc704f10521ef3e0`.
+Its `Unihan_Readings.txt` is 8,781,665 bytes, SHA-256
+`c307b7358c73ca9d17c75c6b75a462f1797067b0ab5eccf0d7bed724bcd86ce6`.
+Replaying the [pinned pinyin-data parser](https://github.com/mozillazg/pinyin-data/blob/fa9761fff402f8560196b1ba085c437c52b56d7c/unihan/parse_pinyin.py)
+reproduces all five retained field files exactly: `kHanyuPinlu` (3,799 rows),
+`kHanyuPinyin` (34,130), `kMandarin` (41,692), `kTGHZ2013` (8,105), and
+`kXHC1983` (11,072). These counts describe overlapping source tables, not
+additional distinct dictionary entries or new language coverage.
+
+[Unicode's terms](https://www.unicode.org/copyright.html), sections 2(b) and 3(c),
+identify the Public/ data files and their V3 license. The retained complete
+[official license](https://www.unicode.org/license.txt) is 1,995 bytes, SHA-256
+`e7a93b009565cfce55919a381437ac4db883e9da2126fa28b91d12732bc53d96`.
+Its body is byte-identical to the complete Unicode 16.0.0 V3 notice
+[preserved by OpenJDK in 2024](https://github.com/openjdk/jdk/blob/15ae8d02eeb9c80f5453b88d38081debf956cb65/src/java.base/share/legal/unicode.md)
+except for the copyright-year end changing from 2024 to 2026. The historical
+copy corroborates the unchanged V3 text; it is not described as an immutable
+unicode.org download. The new notice must be included in accessible customer
+artifact materials by the existing private preparer. No runtime, dictionary,
+model, voice, dependency version or release-eligibility flag changes here.
