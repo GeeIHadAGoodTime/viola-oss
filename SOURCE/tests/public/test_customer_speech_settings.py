@@ -8,8 +8,8 @@ import types
 import unittest
 from unittest.mock import Mock, patch
 
-import test_speech_volume_wiring as gain_fixture
-from test_speech_volume_wiring import _isolated_modules
+from tests.public import test_speech_volume_wiring as gain_fixture
+from tests.public.test_speech_volume_wiring import _isolated_modules
 
 
 class CustomerSpeechSettings(unittest.TestCase):

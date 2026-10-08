@@ -1,24 +1,13 @@
 {
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "e75a9e79618bcfb2bf07c8240f84b98e4515770e30410b0f7e085e6d4f0d72a2",
-  "source_tree_sha256": "b13005b320c108de4b706d32841ee0093fbfdcc6e11ce9d8e2bb1e6fc82ac4ad",
+  "source_manifest_sha256": "e8fb7f8343880c246d71bebd3e6b6fefcff55239934ec27762d5369151b6b522",
+  "source_tree_sha256": "cf07bc98dcb31f1a4a6db7933b587dd2c67b998b43a401d9e36403d4f5461f17",
   "source_file_count": 2689,
-  "source_revision": "65f43960161dc39fca6d05bf50d5d65cec1d68f6",
-  "comparison_public_revision": "15a1c6e7668b20825ff4a516953f493f09f24fdb",
+  "source_revision": "06959256f9d72a8de9deeee1ad2a29fe92cd1868",
+  "comparison_public_revision": "e35d613fbdfed6b29574fae61e8c61dbed748b7d",
   "changed_source_paths": [
-    "SOURCE/ui/react-app/src/SmartDisplay.jsx",
-    "SOURCE/ui/react-app/src/SmartDisplay.spokePolicy.test.jsx",
-    "SOURCE/ui/react-app/src/SmartDisplay.wakeStatus.test.jsx",
-    "SOURCE/ui/react-app/src/__tests__/hooks/useSettings.snapshotOrdering.test.jsx",
-    "SOURCE/ui/react-app/src/__tests__/hooks/useVoiceOnboarding.micCaptureProbe.test.jsx",
-    "SOURCE/ui/react-app/src/components/SpokeWrapper.captureLifecycle.test.jsx",
-    "SOURCE/ui/react-app/src/components/SpokeWrapper.jsx",
-    "SOURCE/ui/react-app/src/components/WakeWordSection.status.test.jsx",
-    "SOURCE/ui/react-app/src/hooks/useSettings.js",
-    "SOURCE/ui/react-app/src/hooks/useVoiceOnboarding.js",
-    "SOURCE/ui/react-app/src/hooks/useVoiceStream.captureLifecycle.test.jsx",
-    "SOURCE/ui/react-app/src/hooks/useVoiceStream.js"
+    "SOURCE/tests/public/test_customer_speech_settings.py"
   ],
   "retained_sboms": [
     {
@@ -80,161 +69,37 @@
     }
   ],
   "input_equivalence": {
-    "comparison_basis": "Protected public main 15a1c6e7668b20825ff4a516953f493f09f24fdb",
+    "comparison_basis": "Protected public main e35d613fbdfed6b29574fae61e8c61dbed748b7d",
     "all_unselected_export_leaf_bytes_and_modes_preserved": true,
     "all_six_sbom_bytes_and_status_objects_preserved": true,
-    "dependency_manifest_lock_workflow_notice_and_model_inputs_unchanged": true,
-    "scope": "Only the 12 reviewed frontend implementation/test files change. Five implementation files repair spoke/onboarding capture ownership and settings-policy readiness; seven test files cover these boundaries. All dependency inputs and inventory limitations remain unchanged."
+    "all_production_runtime_model_voice_dictionary_and_dependency_bytes_unchanged": true,
+    "frontend_and_workflow_inputs_unchanged": true,
+    "all_test_bodies_unchanged": true,
+    "source_change": "Only two package-qualified imports in the public speech settings test; both accepted voice and spoke capture repairs retained."
   },
   "qualification": {
-    "scope": "Own continuous spoke microphone/transport capture across cancellation and principal changes, require an accepted Disabled/mute policy, and cancel onboarding microphone probes on phase exit while preserving manual diagnostics and unavailable wake training.",
-    "source_commit": "65f43960161dc39fca6d05bf50d5d65cec1d68f6",
-    "source_tree": "cecd7f4c282067325eca4f9aa8ae86874468f685",
+    "scope": "Restore package-qualified public speech fixture imports after merging both accepted voice and spoke capture repairs; no runtime or assertion changes.",
+    "source_commit": "06959256f9d72a8de9deeee1ad2a29fe92cd1868",
+    "source_tree": "796477223f40842b3f26b4a2e4c841524ee359d4",
     "ordered_source_parents": [
-      "80f47b95922e33646da9a40b90bee44da69a74d3",
-      "15a1c6e7668b20825ff4a516953f493f09f24fdb"
+      "a06edd7aa23ee854e20e46542a5064e9b2decdef",
+      "e35d613fbdfed6b29574fae61e8c61dbed748b7d"
     ],
-    "source_patch_sha256": "97e8260bbc05a9ba63d022411d3de78ddfa2e807f191d742f2cb5f19f8232378",
-    "independent_automated_review": {
-      "result": "Approved for source integration after revision 2; no remaining source-review blocker found.",
-      "reviewed_files": [
-        {
-          "path": "SOURCE/ui/react-app/src/SmartDisplay.jsx",
-          "before_blob": "05b0e8d0dbeb645f474c6f86c2e59cacc9622e90",
-          "sha256": "dab28734312bbbcab3038ae810ae73a0bd41a190194e1489d9234d0a839449ad",
-          "bytes": 173141,
-          "new_blob": "a92c81d2a2bcd76cdb593d8b5885fb94003d5e01"
-        },
-        {
-          "path": "SOURCE/ui/react-app/src/SmartDisplay.spokePolicy.test.jsx",
-          "before_blob": null,
-          "sha256": "e15f07073f7d9a3c568c77b88ecf085185185c65fb238d68108c8415118a16c6",
-          "bytes": 3782,
-          "new_blob": "d3eb2a8cb8680dea470ce035178ab6fc242cd464"
-        },
-        {
-          "path": "SOURCE/ui/react-app/src/SmartDisplay.wakeStatus.test.jsx",
-          "before_blob": "5e7e0a0c77329014edad2bc95db4a367b44a89e2",
-          "sha256": "d2c487f320bf1b5efffd0545e59dcc60b7f33370e24d06c35ce7d4aa10ed5dcc",
-          "bytes": 11474,
-          "new_blob": "94576b1225ee905f96967726131406990c777bce"
-        },
-        {
-          "path": "SOURCE/ui/react-app/src/__tests__/hooks/useSettings.snapshotOrdering.test.jsx",
-          "before_blob": "fd885efd1c390990a62821e10bed8819ff7d79e5",
-          "sha256": "004879f85559eee571b86264af179975a5b9b10c5064f8b36132d8994a00cb06",
-          "bytes": 18215,
-          "new_blob": "516814ec92adbb10a0e7798970c1d3a59c197c60"
-        },
-        {
-          "path": "SOURCE/ui/react-app/src/__tests__/hooks/useVoiceOnboarding.micCaptureProbe.test.jsx",
-          "before_blob": "2cc8754eb63f0abed76ba8a4a8a9fec8756891ca",
-          "sha256": "c964b2a91d350e400aff8775301859b6f2c563c949de7de83417f4d605d063ab",
-          "bytes": 13363,
-          "new_blob": "cb5320fb86492ae755790bca6507edeb720f80b4"
-        },
-        {
-          "path": "SOURCE/ui/react-app/src/components/SpokeWrapper.captureLifecycle.test.jsx",
-          "before_blob": null,
-          "sha256": "1ef5e6a672cf8414a8ad3346b10dc37736c52890f18650a7f92b4415a6f43e39",
-          "bytes": 7688,
-          "new_blob": "929ad4101c04a718b879fd1df78d5e949e670ca3"
-        },
-        {
-          "path": "SOURCE/ui/react-app/src/components/SpokeWrapper.jsx",
-          "before_blob": "f3bdf5d568b28f6c4e0aaf6ecbf06608f26324c4",
-          "sha256": "b981b8e21e30be873774b8bf32f105ab8d2301c9e1bf5c2f2d42ea765b5cf540",
-          "bytes": 25009,
-          "new_blob": "6728d26e95f6a7923752c10cc2f75218c41b4c51"
-        },
-        {
-          "path": "SOURCE/ui/react-app/src/components/WakeWordSection.status.test.jsx",
-          "before_blob": "a414beee011ec55c1765521d26fbbf3ced2253dd",
-          "sha256": "18d1f4573080389917c290c119b503628210b24291ededfc9440d6d42abf2609",
-          "bytes": 3948,
-          "new_blob": "0bc558efb47454afbafc7ff09e5362038b0da408"
-        },
-        {
-          "path": "SOURCE/ui/react-app/src/hooks/useSettings.js",
-          "before_blob": "b4d48d2c25488f121a1a41794a533a34164dc4e0",
-          "sha256": "5318bf449c903cd4eb852c66fad14545fd805b0d46d073270a6569fc8a508dcf",
-          "bytes": 13457,
-          "new_blob": "bd9d9c62af8ba860cb7b25c68b6651585d0d0467"
-        },
-        {
-          "path": "SOURCE/ui/react-app/src/hooks/useVoiceOnboarding.js",
-          "before_blob": "e4642965257d2cc17790e064f02d50a70319f87f",
-          "sha256": "b4b2f20c61f1c0e850539453ce94a60021ff3c68775aed6a4e4a48a3e1397bc9",
-          "bytes": 36190,
-          "new_blob": "273c908c4468ea424abf527732a2bd2f5f4dd7f0"
-        },
-        {
-          "path": "SOURCE/ui/react-app/src/hooks/useVoiceStream.captureLifecycle.test.jsx",
-          "before_blob": null,
-          "sha256": "3f76adfc755db6bf322428d9017f7ef6976eea2fac88435681952164d8b78ac8",
-          "bytes": 12039,
-          "new_blob": "8bb8e1c31d388424add4666697cdb8dbf87138f3"
-        },
-        {
-          "path": "SOURCE/ui/react-app/src/hooks/useVoiceStream.js",
-          "before_blob": "280bafc82ee79008824a76272999287f04ba71d5",
-          "sha256": "08dd2cc967e2f5dccfe855aae18714eeb47101571704f7a13769edd183d2ca53",
-          "bytes": 9295,
-          "new_blob": "5c43e9c699862b04b866d501c62dd789dd86fc67"
-        }
+    "source_patch_sha256": "e809dc87a9cf4113beb45a3b237ab6504229b3470f8f20d594f73d1b3044be4d",
+    "focused_validation": {
+      "runner": "Python 3.11 pytest with importlib mode and bytecode/cacheprovider disabled",
+      "modules": [
+        "tests/public/test_customer_speech_settings.py",
+        "tests/public/test_speech_volume_wiring.py"
       ],
-      "scope": "Independent automated source review and lightweight synthetic controls; no human-review, hosted or installed acceptance claim.",
-      "resolved_findings": [
-        "P1: Require an accepted settings snapshot before continuous spoke capture; a failed first read does not establish privacy policy.",
-        "P2: A principal replacement during pending permission/auth/handshake retires the old owner and starts a fresh one even when false-to-true updates batch."
-      ],
-      "controls": {
-        "original_reproductions_passed": 2,
-        "additional_ownership_controls_passed": 2,
-        "principal_snapshot_control_passed": 1,
-        "all_12_file_hashes_and_patch_sha256_verified": true
-      }
+      "passed": 96,
+      "skipped": 0,
+      "evidence_scope": "Executed after integrating protected e35d613 into the original PR99 head; 96 passed, zero skipped in 12.02 seconds.",
+      "receipt": "oss99-integrated-focused.xml retained in the local task review evidence"
     },
-    "source_controls": {
-      "revision": 2,
-      "author_related_frontend_tests_passed": 209,
-      "author_related_frontend_files": 23,
-      "author_related_frontend_tests_skipped": 0,
-      "combined_96_97_frontend_files": 24,
-      "combined_96_97_frontend_tests_passed": 236,
-      "retained_96_server_controls_passed": 6,
-      "reconciliation": {
-        "protected_base": "15a1c6e7668b20825ff4a516953f493f09f24fdb",
-        "all_12_reviewed_source_hashes_unchanged": true,
-        "all_4_landed_96_source_hashes_preserved": true,
-        "source_path_overlap": [],
-        "ordinary_two_parent_source_integration": true
-      },
-      "exact_base_comparison": {
-        "test_files": 7,
-        "failed": 40,
-        "passed": 76,
-        "scope": "Original production sources with the retained regression/control suite; separate unchanged-base worktree."
-      },
-      "eslint_changed_frontend": {
-        "errors": 0,
-        "unchanged_base_warnings": 24
-      },
-      "full_frontend_or_build_run": false,
-      "full_public_python_suite_run": false,
-      "fixtures": "Real React hook, wrapper, settings snapshot and onboarding phase control flow with synthetic microphone, AudioContext, auth, WebSocket, TTS and API boundaries. No real microphone, provider, account or external command used.",
-      "original_review_reproductions": "Both unchanged reviewer failures now pass. Additional retired-callback, synchronous-cancel and principal-snapshot controls passed.",
-      "optional_final_independent_combined_rerun": "Did not start during a transient executor transport interruption; no receipt is claimed for that run."
-    },
-    "limits": [
-      "Source-only evidence; installed Windows, hardware and physical microphone acceptance remain open.",
-      "Wake training remains product-gated unavailable and was not re-enabled or edited. Manual onboarding diagnostics remain supported.",
-      "This packet does not modify HTTP/WS PTT startup timing, native wake/STT continuation, call audio, or the complementary WS/server cancellation repair.",
-      "Cancellation cannot undo actions already dispatched before capture retirement.",
-      "Final-head public hosted checks and private exact-pin composed-source checks remain separate.",
-      "Historical SBOM/advisory status and qualification limitations are retained unchanged.",
-      "No deployment, release, spending, credentials or access changes."
-    ]
+    "hosted_required_checks": "Pending exact final head; local checks do not replace required protected CI.",
+    "release_eligible": false,
+    "public_release_eligible": false
   },
   "historical_bindings": [
     {
@@ -13221,6 +13086,242 @@
             "canonical_json_sha256": "220f4c5da0641cd8f51fb28add2f66e18e1dba3e64cca61d345ebd775b15bf1f"
           }
         }
+      }
+    }
+  },
+  "speech_fixture_import_previous_binding": {
+    "public_revision": "e35d613fbdfed6b29574fae61e8c61dbed748b7d",
+    "path": "PUBLIC_METADATA/source-binding.json",
+    "git_blob": "5f243677967d1ea1a57fb39d1985710f547938e3",
+    "sha256": "369da368d93c2f22f60c75219fa73151bc7c60ddeaabeee24234bcd0ea078a70",
+    "bytes": 1317262,
+    "canonical_json_sha256": "a7a4abe3f7640141bc63ac89dd2aba58495a67eeda7115d8c43b9ffbd0946a22",
+    "top_level_objects": {
+      "schema_version": {
+        "pointer": "/schema_version",
+        "canonical_json_sha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+      },
+      "source_manifest": {
+        "pointer": "/source_manifest",
+        "canonical_json_sha256": "ace3c4cebde8c1e5207159e354ef46f1f9a13eb7b3185315a68b7cf8b71f212d"
+      },
+      "source_manifest_sha256": {
+        "pointer": "/source_manifest_sha256",
+        "canonical_json_sha256": "3c7393d44c9fea0070901e82ae528c8e9a16b87f133c7ab34b55e443d036502e"
+      },
+      "source_tree_sha256": {
+        "pointer": "/source_tree_sha256",
+        "canonical_json_sha256": "284c5f342b259bb638021450d33cddaf85cd1f1e7ae554270fabf9dce2ba548e"
+      },
+      "source_file_count": {
+        "pointer": "/source_file_count",
+        "canonical_json_sha256": "60fb27b6df84e9fc873d3a2bda51e22fead7708c19a636d4650f75db7a590628"
+      },
+      "source_revision": {
+        "pointer": "/source_revision",
+        "canonical_json_sha256": "909ff56002e823b6310d300df90371e66e812a70b9f32c91aaf41a4a2ce2e563"
+      },
+      "comparison_public_revision": {
+        "pointer": "/comparison_public_revision",
+        "canonical_json_sha256": "870739a36d237cf286a968dd19c2ae2e884fd487f841906549615e2a302c1000"
+      },
+      "changed_source_paths": {
+        "pointer": "/changed_source_paths",
+        "canonical_json_sha256": "e9c3df6da621f12c3b88a0729dfacdab458a12bd795936b5208e235fe8e7189e"
+      },
+      "retained_sboms": {
+        "pointer": "/retained_sboms",
+        "canonical_json_sha256": "0428d09c6e0e2b524877c2218b306c10da6c7536bcf6ed96524b581dafc85301"
+      },
+      "input_equivalence": {
+        "pointer": "/input_equivalence",
+        "canonical_json_sha256": "06dd6a25f86652cf2525310fab010f768b8bc175ce1803d46eb5de5c334db9ac"
+      },
+      "qualification": {
+        "pointer": "/qualification",
+        "canonical_json_sha256": "1fa939940760a22119ee597978fba4518ada3048d39819f0895875c318a14771"
+      },
+      "historical_bindings": {
+        "pointer": "/historical_bindings",
+        "canonical_json_sha256": "59ccb6141308771f32ec1e534f7a843cbdd8867afcd59e84944e03e6f9958c33"
+      },
+      "prior_binding": {
+        "pointer": "/prior_binding",
+        "canonical_json_sha256": "6034c617b39078469bfd9c2c653f563dad775b9bee6db15279fa34a3fa152808"
+      },
+      "retained_composition_component_bindings": {
+        "pointer": "/retained_composition_component_bindings",
+        "canonical_json_sha256": "80391a271546de11ea6d384ab5f9357afd1d00f7895122f3dc4d636d6104e1d1"
+      },
+      "reviewed_source_patch": {
+        "pointer": "/reviewed_source_patch",
+        "canonical_json_sha256": "0c8cda8fdda86b8c639a3cb7fab785b052afb4a900cd044cafb863427cd1d86a"
+      },
+      "new_resolution_performed": {
+        "pointer": "/new_resolution_performed",
+        "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+      },
+      "new_advisory_scan_performed": {
+        "pointer": "/new_advisory_scan_performed",
+        "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+      },
+      "new_runtime_qualification_performed": {
+        "pointer": "/new_runtime_qualification_performed",
+        "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+      },
+      "new_source_contract_qualification_performed": {
+        "pointer": "/new_source_contract_qualification_performed",
+        "canonical_json_sha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b"
+      },
+      "new_static_security_scan_performed": {
+        "pointer": "/new_static_security_scan_performed",
+        "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+      },
+      "new_resolution_scope": {
+        "pointer": "/new_resolution_scope",
+        "canonical_json_sha256": "04134bb916a194ed93909500148b34efdb44e74f25ab0d2625120fd8f5e07cd8"
+      },
+      "new_advisory_scan_scope": {
+        "pointer": "/new_advisory_scan_scope",
+        "canonical_json_sha256": "c39e237b344f9d365cf5946737adbf989ee87300801139690658507b3572309b"
+      },
+      "account_reconciliation_previous_binding": {
+        "pointer": "/account_reconciliation_previous_binding",
+        "canonical_json_sha256": "cfeffa86ef01cbbd530cda12a57b6c4eb3761063999ad3fae482a0c1d7482b51"
+      },
+      "reviewed_speech_binding": {
+        "pointer": "/reviewed_speech_binding",
+        "canonical_json_sha256": "88025408d951467d38a236d6fdedb10ad4a4112e6ce02b3577c5b906adec6305"
+      },
+      "local_media_path_previous_binding": {
+        "pointer": "/local_media_path_previous_binding",
+        "canonical_json_sha256": "220f4c5da0641cd8f51fb28add2f66e18e1dba3e64cca61d345ebd775b15bf1f"
+      },
+      "session_durability_previous_binding": {
+        "pointer": "/session_durability_previous_binding",
+        "canonical_json_sha256": "d1931a403fd80ce0a8ea40f23700b2e5a3be8c1b155c3511cbf4d6f72792f6b9"
+      },
+      "media_identity_previous_binding": {
+        "pointer": "/media_identity_previous_binding",
+        "canonical_json_sha256": "775b630f1531f2b679dfb823a59f6d534e542a78fdf1dc3dc6013a74012468e3"
+      }
+    }
+  },
+  "speech_fixture_import_original_pr_binding": {
+    "public_revision": "a06edd7aa23ee854e20e46542a5064e9b2decdef",
+    "path": "PUBLIC_METADATA/source-binding.json",
+    "git_blob": "68d7557b0666d10abb2de648b528e502d973f1bb",
+    "sha256": "c0bac68e521f02bf7485e957c956b9cc1294e76baa40d51c5ec7dc1e5c70e506",
+    "bytes": 1309501,
+    "canonical_json_sha256": "6e1c0ba2bfc4edddf4c359c43af42e44ffca1b00bad79138b895bb3e664a59c1",
+    "top_level_objects": {
+      "schema_version": {
+        "pointer": "/schema_version",
+        "canonical_json_sha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+      },
+      "source_manifest": {
+        "pointer": "/source_manifest",
+        "canonical_json_sha256": "ace3c4cebde8c1e5207159e354ef46f1f9a13eb7b3185315a68b7cf8b71f212d"
+      },
+      "source_manifest_sha256": {
+        "pointer": "/source_manifest_sha256",
+        "canonical_json_sha256": "ce85cfd18901fed54fc1af1acc09d0de1b276dfd2cd1e17b973b0b02d02034bc"
+      },
+      "source_tree_sha256": {
+        "pointer": "/source_tree_sha256",
+        "canonical_json_sha256": "89a5cc6f8cd20fcc1cb82d3fcaade23ed7cfab1fb053c63defbefa26ca7afa83"
+      },
+      "source_file_count": {
+        "pointer": "/source_file_count",
+        "canonical_json_sha256": "3581b125128cab6e325316b96971bce7bac9402d5a817e64f2d56deb5cf23c4e"
+      },
+      "source_revision": {
+        "pointer": "/source_revision",
+        "canonical_json_sha256": "15ba66d3252de04249a475ac6ff5aaa5d06ccf86643aac1d49399e92b22974ba"
+      },
+      "comparison_public_revision": {
+        "pointer": "/comparison_public_revision",
+        "canonical_json_sha256": "870739a36d237cf286a968dd19c2ae2e884fd487f841906549615e2a302c1000"
+      },
+      "changed_source_paths": {
+        "pointer": "/changed_source_paths",
+        "canonical_json_sha256": "e900699e060cefd7a1bf85794f6d929b1d204b2e93e5c3a4ee818a4221d47e74"
+      },
+      "retained_sboms": {
+        "pointer": "/retained_sboms",
+        "canonical_json_sha256": "0428d09c6e0e2b524877c2218b306c10da6c7536bcf6ed96524b581dafc85301"
+      },
+      "input_equivalence": {
+        "pointer": "/input_equivalence",
+        "canonical_json_sha256": "988c5618745b28d04576576df8f6614337f31a51b037629906d6d743cf58b462"
+      },
+      "qualification": {
+        "pointer": "/qualification",
+        "canonical_json_sha256": "04aaad207640aa100e6617158666e2805f7189b066737996a659e6bbaa6b1fed"
+      },
+      "historical_bindings": {
+        "pointer": "/historical_bindings",
+        "canonical_json_sha256": "59ccb6141308771f32ec1e534f7a843cbdd8867afcd59e84944e03e6f9958c33"
+      },
+      "prior_binding": {
+        "pointer": "/prior_binding",
+        "canonical_json_sha256": "6034c617b39078469bfd9c2c653f563dad775b9bee6db15279fa34a3fa152808"
+      },
+      "retained_composition_component_bindings": {
+        "pointer": "/retained_composition_component_bindings",
+        "canonical_json_sha256": "80391a271546de11ea6d384ab5f9357afd1d00f7895122f3dc4d636d6104e1d1"
+      },
+      "reviewed_source_patch": {
+        "pointer": "/reviewed_source_patch",
+        "canonical_json_sha256": "efd394e7f4cf61043a1c89bf3a64b7210b246f6e885764901ad67fc75392e069"
+      },
+      "new_resolution_performed": {
+        "pointer": "/new_resolution_performed",
+        "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+      },
+      "new_advisory_scan_performed": {
+        "pointer": "/new_advisory_scan_performed",
+        "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+      },
+      "new_runtime_qualification_performed": {
+        "pointer": "/new_runtime_qualification_performed",
+        "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+      },
+      "new_source_contract_qualification_performed": {
+        "pointer": "/new_source_contract_qualification_performed",
+        "canonical_json_sha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b"
+      },
+      "new_static_security_scan_performed": {
+        "pointer": "/new_static_security_scan_performed",
+        "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+      },
+      "new_resolution_scope": {
+        "pointer": "/new_resolution_scope",
+        "canonical_json_sha256": "bc0888ed7d790d66aa29318f1062106541d532a819fafed9658c1db1701962f6"
+      },
+      "new_advisory_scan_scope": {
+        "pointer": "/new_advisory_scan_scope",
+        "canonical_json_sha256": "4bcb3d40e3e46c9ae20e7792d2b09ece28e53e2e7991181542ffae1b836640ed"
+      },
+      "account_reconciliation_previous_binding": {
+        "pointer": "/account_reconciliation_previous_binding",
+        "canonical_json_sha256": "cfeffa86ef01cbbd530cda12a57b6c4eb3761063999ad3fae482a0c1d7482b51"
+      },
+      "reviewed_speech_binding": {
+        "pointer": "/reviewed_speech_binding",
+        "canonical_json_sha256": "88025408d951467d38a236d6fdedb10ad4a4112e6ce02b3577c5b906adec6305"
+      },
+      "local_media_path_previous_binding": {
+        "pointer": "/local_media_path_previous_binding",
+        "canonical_json_sha256": "220f4c5da0641cd8f51fb28add2f66e18e1dba3e64cca61d345ebd775b15bf1f"
+      },
+      "session_durability_previous_binding": {
+        "pointer": "/session_durability_previous_binding",
+        "canonical_json_sha256": "d1931a403fd80ce0a8ea40f23700b2e5a3be8c1b155c3511cbf4d6f72792f6b9"
+      },
+      "media_identity_previous_binding": {
+        "pointer": "/media_identity_previous_binding",
+        "canonical_json_sha256": "775b630f1531f2b679dfb823a59f6d534e542a78fdf1dc3dc6013a74012468e3"
       }
     }
   }
