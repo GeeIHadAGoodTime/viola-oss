@@ -1132,9 +1132,12 @@ function MemoryPanelContent({ isOpen, onClose }) {
 
   const uploadFiles = useCallback(async (fileList) => {
     const selected = Array.from(fileList || []);
-    if (!selected.length) return;
+    const session = documentSessionRef.current;
+    if (!selected.length || !session) return;
+    const isCurrent = () => documentSessionRef.current === session;
     setBusy(true);
     setError('');
+    let uploadError = '';
     try {
       for (const file of selected) {
         const form = new FormData();
@@ -1142,12 +1145,22 @@ function MemoryPanelContent({ isOpen, onClose }) {
         const resp = await authFetch('/api/workbench/files', { method: 'POST', body: form });
         await parseResponse(resp);
       }
-      await loadWorkbench();
     } catch (err) {
-      setError(err.message || 'Could not upload file.');
+      uploadError = err.message || 'Could not upload file.';
+    }
+    // A rejected later file does not roll back files already uploaded. Refresh
+    // durable state after either outcome without hiding the upload rejection.
+    try {
+      if (isCurrent()) await loadWorkbench(isCurrent);
+    } catch (err) {
+      const refreshError = err.message || 'Could not load Workbench files.';
+      uploadError = [uploadError, `File list could not be refreshed. ${refreshError}`].filter(Boolean).join(' ');
     } finally {
-      setBusy(false);
-      if (inputRef.current) inputRef.current.value = '';
+      if (isCurrent()) {
+        setError(uploadError);
+        setBusy(false);
+        if (inputRef.current) inputRef.current.value = '';
+      }
     }
   }, [loadWorkbench]);
 
