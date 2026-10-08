@@ -478,7 +478,7 @@ class SpeechVolumeWiring(unittest.TestCase):
         original = cache.cache_path.read_bytes()
         self.engine._opener_cache = cache
         played = []
-        with patch.object(self.engine, "_play_pcm_locally", side_effect=played.append):
+        with patch.object(self.engine, "_play_pcm_locally", side_effect=lambda pcm, **kwargs: played.append(pcm)):
             for volume in (1.0, 0.5, 0.0):
                 self.manager.set("tts_volume", volume)
                 asyncio.run(self.engine.speak("Okay!"))
@@ -491,7 +491,7 @@ class SpeechVolumeWiring(unittest.TestCase):
         self.assertTrue(cache.load())
         with patch.dict("os.environ", {self.quiet.QUIET_HOURS_TIME_OVERRIDE_ENV: "23:30"}):
             self.manager.set("tts_volume", 0.5)
-            with patch.object(self.engine, "_play_pcm_locally", side_effect=played.append):
+            with patch.object(self.engine, "_play_pcm_locally", side_effect=lambda pcm, **kwargs: played.append(pcm)):
                 asyncio.run(self.engine.speak("Okay!"))
         np.testing.assert_array_equal(np.frombuffer(played[-1], dtype=np.int16), self.expected(unity, 0.15))
         self.assertEqual(original, cache.cache_path.read_bytes())

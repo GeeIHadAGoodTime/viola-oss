@@ -1,15 +1,26 @@
 {
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "19b83a806a3f89ce845c997a1f075234d43359a866759cdcc4b59612599c8988",
-  "source_tree_sha256": "49eef8b849bbeddcb54b34d6263bb17fa58d9c49abd092b110e6ca623f439af0",
-  "source_file_count": 2675,
-  "source_revision": "6b4e161d7db95b1eb1e8bfb91d88b3659bcf8001",
-  "comparison_public_revision": "9c45de8ebd85eb1aa4e85f7ab36db6b13bbfc446",
+  "source_manifest_sha256": "e6f14c2e7b0d5a8ef908df4246b0c541a9c49180c7bfade4681424e5442b8fc7",
+  "source_tree_sha256": "52ad7cb3c7fc0fee719c28493a05d6e9db0a1060adb78d5043e5756ce4c8e434",
+  "source_file_count": 2680,
+  "source_revision": "248a8dc31aa787ea1f869e5ca22baaa45e8b0343",
+  "comparison_public_revision": "d59bc175de5786c0500aaa77d78882336c49fdfd",
   "changed_source_paths": [
-    "SOURCE/ui/api/routes/chat_mode.py",
-    "SOURCE/ui/api/routes/command.py",
-    "SOURCE/tests/public/test_saved_chat_speech_dispatch.py"
+    "SOURCE/LICENSES/CUSTOMER_SPEECH_SUPPLEMENTAL_NOTICES.txt",
+    "SOURCE/LICENSES/jieba-0.42.1-MIT.txt",
+    "SOURCE/LICENSES/phrase-pinyin-data-MIT.txt",
+    "SOURCE/LICENSES/pinyin-data-MIT.txt",
+    "SOURCE/core/voice_command_handler.py",
+    "SOURCE/docs/CUSTOMER_SPEECH_QUALIFICATION.md",
+    "SOURCE/tests/public/test_disabled_tts_streaming.py",
+    "SOURCE/tests/public/test_kokoro_stop.py",
+    "SOURCE/tests/public/test_selected_audio_output.py",
+    "SOURCE/tests/public/test_speech_volume_wiring.py",
+    "SOURCE/tests/public/test_streaming_decimal_boundaries.py",
+    "SOURCE/tests/public/test_streaming_watchdog_ownership.py",
+    "SOURCE/voice/synthesis/kokoro_engine.py",
+    "SOURCE/voice/synthesizer.py"
   ],
   "retained_sboms": [
     {
@@ -71,50 +82,77 @@
     }
   ],
   "input_equivalence": {
-    "comparison_basis": "Protected public main 9c45de8ebd85eb1aa4e85f7ab36db6b13bbfc446",
+    "comparison_basis": "Protected public main d59bc175de5786c0500aaa77d78882336c49fdfd",
     "all_unselected_export_leaf_bytes_and_modes_preserved": true,
     "all_six_sbom_bytes_and_status_objects_preserved": true,
     "frontend_dependency_vendor_and_workflow_inputs_unchanged": true,
+    "existing_speech_component_notice_bytes_unchanged": true,
     "protected_speech_account_session_and_music_repairs_preserved": true
   },
   "qualification": {
-    "scope": "Saved ChatMode completion reuses the existing typed-reply speech policy",
-    "source_commit": "6b4e161d7db95b1eb1e8bfb91d88b3659bcf8001",
-    "source_tree": "6af8e8c97de587cc8e3f3a28b288b7e550e2abc8",
+    "scope": "Immediate owned Kokoro speech stop/barge-in and exact selected Mandarin data/notice evidence",
+    "source_commit": "248a8dc31aa787ea1f869e5ca22baaa45e8b0343",
+    "source_tree": "fdcce5d0265b7c79466ef6998c4efac88fc61072",
     "ordered_source_parents": [
-      "9c45de8ebd85eb1aa4e85f7ab36db6b13bbfc446"
+      "d59bc175de5786c0500aaa77d78882336c49fdfd"
     ],
-    "source_patch_sha256": "f1583cb80a9ffc5b6febce093353dd90573cfbf53b29e744aec6a7a24a891949",
-    "installed_reference": {
-      "private_revision": "97713fdff3f4199f6a4cbaee809179ce6fd77697",
-      "public_revision": "75accae1e10e4532e37022f0be74fee0f7f16140",
-      "two_changed_production_inputs_identical_at_installed_and_current": true,
-      "observed_failure": "A saved-chat request returned text while the owner heard no sound. Existing scoped logs report typedChat and no synthesis/load event; physical root-cause attribution remains bounded."
-    },
-    "demonstrated_missing_boundary": "ChatMode invokes CommandService directly with chat_mode, bypassing the command endpoint completion speech hook. Its completed reply had no local speech dispatch even with both switches enabled.",
-    "source_fix": "Reuse the existing local typed-reply helper after persistence and stream finalization, adding chat_mode to its local channel set. Preserve all existing mute, cloud, explicit-user, already-spoken and failure/cancellation controls.",
-    "independent_automated_review": "Root reviewed the exact three-file source patch; final import ordering and test formatting are AST-equivalent apart from the required import reorder. No blocking source finding.",
+    "source_patch_sha256": "59c37da0d468241dd6e4c16ce4676ac56b8323233cadd8ed5b2597a74c0c751f",
+    "demonstrated_missing_boundaries": [
+      "Kokoro stop waited for native synthesis and unloaded the model without interrupting active local playback.",
+      "Synthesizer did not forward stop to its selected engine.",
+      "Capture-thread barge-in set asyncio.Event directly rather than scheduling its owning loop."
+    ],
+    "source_fix": "Retire synthesis and streaming generations; own the local OutputStream and serialize native start/abort/close in its playback worker; preserve active native inference ownership; forward facade stop and use call_soon_threadsafe for barge-in.",
     "source_controls": {
-      "methods": 13,
-      "baseline_failed_expectations": 6,
-      "baseline_errors": 0,
-      "corrected_passed": 13,
-      "scope": "Actual generation and speech functions with inert provider/storage/audio boundaries; no native synthesis."
-    },
-    "actual_composed_imports": {
-      "modules": [
-        "ui.api.routes.command",
-        "ui.api.routes.chat_mode"
+      "new_actual_module_stop_controls": 24,
+      "composed_speech_methods": 387,
+      "full_public_methods": 849,
+      "full_public_failures": 0,
+      "full_public_errors": 0,
+      "full_public_skipped": [
+        [
+          "test_actual_qt_event_propagation (test_native_titlebar_resize.RealQtTitlebarResizeTests.test_actual_qt_event_propagation)",
+          "PySide6 unavailable; source-method contracts still run"
+        ]
       ],
+      "socket_connect_attempts": 0,
+      "environment": "Owned Linux CPython3.12 test environment with source-pinned FastAPI, Starlette and Pydantic; native/model/audio boundaries synthetic."
+    },
+    "source_review": {
+      "kind": "independent automated source review",
       "result": "PASS",
-      "observed_socket_connect_attempts": 0,
-      "scope": "Retained dependencies, authenticated complete candidate and task-owned data directory."
+      "patch_sha256": "59c37da0d468241dd6e4c16ce4676ac56b8323233cadd8ed5b2597a74c0c751f",
+      "scope": [
+        "owned local playback and synthesis retirement",
+        "capture-thread barge-in handoff",
+        "preserved watchdog and audio routing controls",
+        "exact recovered notice bytes and selected dictionary provenance"
+      ],
+      "blocking_findings": []
+    },
+    "notice_data_evidence": {
+      "pypinyin_version": "0.55.0",
+      "pypinyin_character_entries_reproduced": 41923,
+      "pypinyin_phrase_entries_reproduced": 47111,
+      "dictionary_reproduction": "Exact byte reproduction from release-selected pinyin-data and phrase-pinyin-data submodule pinyin.txt files.",
+      "jieba_version": "0.42.1",
+      "jieba_dictionary_matches_release_git_blob": true,
+      "ordered_set_version": "4.1.0",
+      "ordered_set_runtime_matches_release_source": true,
+      "recovered_notices": [
+        "Jieba MIT",
+        "pinyin-data MIT",
+        "phrase-pinyin-data MIT",
+        "ordered-set MIT",
+        "historical FlatBuffers Apache-2.0",
+        "historical srsly vendored ruamel.yaml MIT"
+      ],
+      "existing_private_packaging_references_changed": false
     },
     "lint": {
-      "new_findings": 0,
-      "retained_baseline_F841": 1,
-      "retained_baseline_I001_blocks": 3,
-      "new_local_import_ordering": "PASS"
+      "tool": "Ruff0.14.6",
+      "changed_python_paths": 9,
+      "result": "PASS"
     },
     "frontend_rebuild_locally_repeated": false,
     "dependency_inputs_changed": false,
@@ -123,10 +161,11 @@
     "customer_release_eligible": false,
     "profile_activated": false,
     "limits": [
-      "This establishes the missing saved-chat dispatch boundary, not physical output or acoustic success.",
-      "The preferences-store cross-loop warning in the installed request is retained without asserting it caused the silence.",
-      "Normal installed saved-chat speech must be retested on the coherent updated artifact; source tests do not replace that observation.",
-      "Required exact-head hosted source/frontend checks remain separate; unchanged optional inventories preserve their own scopes."
+      "Owned local audio cancellation cannot retract PCM already sent to browser spokes.",
+      "Active speech-disable controls exercise tts_enabled. Per-user voice_muted is separately retained dispatch policy, not claimed as an active-stream interrupt.",
+      "The Qt native event test is skipped locally because PySide6 is unavailable; required hosted Windows checks remain separate.",
+      "Exact dictionary/notice source identities do not establish collection into the private frozen artifact.",
+      "Complete target Windows wheel/native inventories, applicable source obligations, signed publisher binding and installed selected-language listening/recovery remain open."
     ]
   },
   "historical_bindings": [
@@ -8424,12 +8463,12 @@
     }
   ],
   "prior_binding": {
-    "public_revision": "9c45de8ebd85eb1aa4e85f7ab36db6b13bbfc446",
+    "public_revision": "d59bc175de5786c0500aaa77d78882336c49fdfd",
     "path": "PUBLIC_METADATA/source-binding.json",
-    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/9c45de8ebd85eb1aa4e85f7ab36db6b13bbfc446/PUBLIC_METADATA/source-binding.json",
-    "sha256": "6d42574941a2ebf0a4de81a6d15a27de2dc58329a7ea101894b6a17db5919480",
-    "bytes": 1253867,
-    "git_blob": "31cd4c8e1150d983c202cb77dae13c9aade84951",
+    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/d59bc175de5786c0500aaa77d78882336c49fdfd/PUBLIC_METADATA/source-binding.json",
+    "sha256": "64423ba9a8615b1e0bb6db0be81c967b3aeb134363e84d8e57bfde69eb3784f8",
+    "bytes": 1260116,
+    "git_blob": "8a30dd9b6d121ddce1985374560f8e22ad654c2e",
     "all_top_level_keys": [
       "schema_version",
       "source_manifest",
@@ -8470,27 +8509,27 @@
       },
       "source_manifest_sha256": {
         "pointer": "/source_manifest_sha256",
-        "canonical_json_sha256": "97f6ee9c6f5b5a56fdc03a5045a822261d25d9b3cfc384f918ce5642eb050846"
+        "canonical_json_sha256": "28226ab18d380cd069fc2de61ed908075a3dfc75e93358c5348bf4abfb6c8612"
       },
       "source_tree_sha256": {
         "pointer": "/source_tree_sha256",
-        "canonical_json_sha256": "3b3654c01e39eb9947d4fa5e07574f50bedfc3646e7d1703b172f1f7676d42a1"
+        "canonical_json_sha256": "7637a6b7b37e575814a0c649a0da5b3c2949a51fab71d43aceac895f1b07dd18"
       },
       "source_file_count": {
         "pointer": "/source_file_count",
-        "canonical_json_sha256": "48edac0718a29c1157a2e5f12944c2b7205e6b7be4d80cb5b731255a756f8df4"
+        "canonical_json_sha256": "4d578fd7ecf82962ceb689769e59d6abb4599a638ec14ac8f96b1fdf948cb60d"
       },
       "source_revision": {
         "pointer": "/source_revision",
-        "canonical_json_sha256": "41e2420980208e11f07d17dd6d77a32750288f3966db867d49a0c9b484123121"
+        "canonical_json_sha256": "078addd535aba8087906f1748a4671997f23aa31355406761a29ed05fd364c18"
       },
       "comparison_public_revision": {
         "pointer": "/comparison_public_revision",
-        "canonical_json_sha256": "bf6671a8b2429794ded3b2d34c4e3637f32d168807d6bafc4f2f569dea5a8e90"
+        "canonical_json_sha256": "387b1dc2cd9057d3b3727ef07b5b06a0397dea05500c283627af10ba26fde7f1"
       },
       "changed_source_paths": {
         "pointer": "/changed_source_paths",
-        "canonical_json_sha256": "a6264479c165c041651cbb6cfcea59ccc67d27860f745e8d0265faddfdc0cd05"
+        "canonical_json_sha256": "9b2fcd855606427bc3b2d02e6c4124a2442b9eff347f35f0e477e6a9836a9693"
       },
       "retained_sboms": {
         "pointer": "/retained_sboms",
@@ -8498,11 +8537,11 @@
       },
       "input_equivalence": {
         "pointer": "/input_equivalence",
-        "canonical_json_sha256": "b7e3450e6211194b77036ba560a10eadeb9abdb8adefa9f36f09e4813bc9b446"
+        "canonical_json_sha256": "9f58d0ba07866c67d867ca3e155df765c489cbc3412b8bdb670e9ab8d609856d"
       },
       "qualification": {
         "pointer": "/qualification",
-        "canonical_json_sha256": "f3c762bbc0c21f26efbcc25153e41b611d97380bb7144ecebef2354758111c29"
+        "canonical_json_sha256": "47a3f0affb6a13a12c0b53d2d0a59f18f1b94f86ff89ab0edf0ba5ab411220dc"
       },
       "historical_bindings": {
         "pointer": "/historical_bindings",
@@ -8510,15 +8549,15 @@
       },
       "prior_binding": {
         "pointer": "/prior_binding",
-        "canonical_json_sha256": "a8561b1ececb600fb2ab5567370f414093b66162837150e83795e64809df5a1c"
+        "canonical_json_sha256": "d6f52aba0e5fe5692a943912f82363546fa4f8c2c5245d0525de3a204f503c19"
       },
       "retained_composition_component_bindings": {
         "pointer": "/retained_composition_component_bindings",
-        "canonical_json_sha256": "47040bd7a7e229ee6a20647acb209f0dc0da468e75a1e582994f8da08ba402b0"
+        "canonical_json_sha256": "ec0709db45a31c59c62655bd66b90a784e303fa5b2e1c9a877ba5f0a4dfe3c29"
       },
       "reviewed_source_patch": {
         "pointer": "/reviewed_source_patch",
-        "canonical_json_sha256": "49ac466095c40e2c4a4814277220d8e2eb9b71e09e5a16ed227d2e5b75678ef7"
+        "canonical_json_sha256": "0e16b2c9b363933e16175ca07659a1089d25e3fcc1495e498caee87be24f427e"
       },
       "new_resolution_performed": {
         "pointer": "/new_resolution_performed",
@@ -8542,11 +8581,11 @@
       },
       "new_resolution_scope": {
         "pointer": "/new_resolution_scope",
-        "canonical_json_sha256": "01a5b2be2d4ddbd2e114053edfee421310c5ffb370b0a9e42d930c5077ff09e9"
+        "canonical_json_sha256": "bc5b0708b5731a2b8534bb6eb2b76643ef4d9ba4a6ffd388553ac59633494fd7"
       },
       "new_advisory_scan_scope": {
         "pointer": "/new_advisory_scan_scope",
-        "canonical_json_sha256": "93371ccafc16dd7057987516b0954ebfcc467468770f7dee1c5664b7e2cb59aa"
+        "canonical_json_sha256": "e8d148be40352fb19d2062c407cd2943ebb70589d18113ed6bcd6200db1fe84f"
       },
       "account_reconciliation_previous_binding": {
         "pointer": "/account_reconciliation_previous_binding",
@@ -8571,12 +8610,165 @@
     },
     "source_manifest": {
       "path": "PUBLIC_METADATA/source-manifest.json",
-      "sha256": "602760438097a31209dabdd51a5de6b7a1735e26866f1c3534f55eaeede10af3",
-      "bytes": 469785,
-      "git_blob": "3dcbd3a568f7926df9d7b00868fe7d2203cdb59a"
+      "sha256": "19b83a806a3f89ce845c997a1f075234d43359a866759cdcc4b59612599c8988",
+      "bytes": 469968,
+      "git_blob": "aeca8108e5b2e66ad3c4e9d77d911539f555a0c3"
     }
   },
   "retained_composition_component_bindings": [
+    {
+      "public_revision": "d59bc175de5786c0500aaa77d78882336c49fdfd",
+      "path": "PUBLIC_METADATA/source-binding.json",
+      "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/d59bc175de5786c0500aaa77d78882336c49fdfd/PUBLIC_METADATA/source-binding.json",
+      "sha256": "64423ba9a8615b1e0bb6db0be81c967b3aeb134363e84d8e57bfde69eb3784f8",
+      "bytes": 1260116,
+      "git_blob": "8a30dd9b6d121ddce1985374560f8e22ad654c2e",
+      "all_top_level_keys": [
+        "schema_version",
+        "source_manifest",
+        "source_manifest_sha256",
+        "source_tree_sha256",
+        "source_file_count",
+        "source_revision",
+        "comparison_public_revision",
+        "changed_source_paths",
+        "retained_sboms",
+        "input_equivalence",
+        "qualification",
+        "historical_bindings",
+        "prior_binding",
+        "retained_composition_component_bindings",
+        "reviewed_source_patch",
+        "new_resolution_performed",
+        "new_advisory_scan_performed",
+        "new_runtime_qualification_performed",
+        "new_source_contract_qualification_performed",
+        "new_static_security_scan_performed",
+        "new_resolution_scope",
+        "new_advisory_scan_scope",
+        "account_reconciliation_previous_binding",
+        "reviewed_speech_binding",
+        "local_media_path_previous_binding",
+        "session_durability_previous_binding",
+        "media_identity_previous_binding"
+      ],
+      "preserved_json_objects": {
+        "schema_version": {
+          "pointer": "/schema_version",
+          "canonical_json_sha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+        },
+        "source_manifest": {
+          "pointer": "/source_manifest",
+          "canonical_json_sha256": "ace3c4cebde8c1e5207159e354ef46f1f9a13eb7b3185315a68b7cf8b71f212d"
+        },
+        "source_manifest_sha256": {
+          "pointer": "/source_manifest_sha256",
+          "canonical_json_sha256": "28226ab18d380cd069fc2de61ed908075a3dfc75e93358c5348bf4abfb6c8612"
+        },
+        "source_tree_sha256": {
+          "pointer": "/source_tree_sha256",
+          "canonical_json_sha256": "7637a6b7b37e575814a0c649a0da5b3c2949a51fab71d43aceac895f1b07dd18"
+        },
+        "source_file_count": {
+          "pointer": "/source_file_count",
+          "canonical_json_sha256": "4d578fd7ecf82962ceb689769e59d6abb4599a638ec14ac8f96b1fdf948cb60d"
+        },
+        "source_revision": {
+          "pointer": "/source_revision",
+          "canonical_json_sha256": "078addd535aba8087906f1748a4671997f23aa31355406761a29ed05fd364c18"
+        },
+        "comparison_public_revision": {
+          "pointer": "/comparison_public_revision",
+          "canonical_json_sha256": "387b1dc2cd9057d3b3727ef07b5b06a0397dea05500c283627af10ba26fde7f1"
+        },
+        "changed_source_paths": {
+          "pointer": "/changed_source_paths",
+          "canonical_json_sha256": "9b2fcd855606427bc3b2d02e6c4124a2442b9eff347f35f0e477e6a9836a9693"
+        },
+        "retained_sboms": {
+          "pointer": "/retained_sboms",
+          "canonical_json_sha256": "0428d09c6e0e2b524877c2218b306c10da6c7536bcf6ed96524b581dafc85301"
+        },
+        "input_equivalence": {
+          "pointer": "/input_equivalence",
+          "canonical_json_sha256": "9f58d0ba07866c67d867ca3e155df765c489cbc3412b8bdb670e9ab8d609856d"
+        },
+        "qualification": {
+          "pointer": "/qualification",
+          "canonical_json_sha256": "47a3f0affb6a13a12c0b53d2d0a59f18f1b94f86ff89ab0edf0ba5ab411220dc"
+        },
+        "historical_bindings": {
+          "pointer": "/historical_bindings",
+          "canonical_json_sha256": "59ccb6141308771f32ec1e534f7a843cbdd8867afcd59e84944e03e6f9958c33"
+        },
+        "prior_binding": {
+          "pointer": "/prior_binding",
+          "canonical_json_sha256": "d6f52aba0e5fe5692a943912f82363546fa4f8c2c5245d0525de3a204f503c19"
+        },
+        "retained_composition_component_bindings": {
+          "pointer": "/retained_composition_component_bindings",
+          "canonical_json_sha256": "ec0709db45a31c59c62655bd66b90a784e303fa5b2e1c9a877ba5f0a4dfe3c29"
+        },
+        "reviewed_source_patch": {
+          "pointer": "/reviewed_source_patch",
+          "canonical_json_sha256": "0e16b2c9b363933e16175ca07659a1089d25e3fcc1495e498caee87be24f427e"
+        },
+        "new_resolution_performed": {
+          "pointer": "/new_resolution_performed",
+          "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+        },
+        "new_advisory_scan_performed": {
+          "pointer": "/new_advisory_scan_performed",
+          "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+        },
+        "new_runtime_qualification_performed": {
+          "pointer": "/new_runtime_qualification_performed",
+          "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+        },
+        "new_source_contract_qualification_performed": {
+          "pointer": "/new_source_contract_qualification_performed",
+          "canonical_json_sha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b"
+        },
+        "new_static_security_scan_performed": {
+          "pointer": "/new_static_security_scan_performed",
+          "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+        },
+        "new_resolution_scope": {
+          "pointer": "/new_resolution_scope",
+          "canonical_json_sha256": "bc5b0708b5731a2b8534bb6eb2b76643ef4d9ba4a6ffd388553ac59633494fd7"
+        },
+        "new_advisory_scan_scope": {
+          "pointer": "/new_advisory_scan_scope",
+          "canonical_json_sha256": "e8d148be40352fb19d2062c407cd2943ebb70589d18113ed6bcd6200db1fe84f"
+        },
+        "account_reconciliation_previous_binding": {
+          "pointer": "/account_reconciliation_previous_binding",
+          "canonical_json_sha256": "cfeffa86ef01cbbd530cda12a57b6c4eb3761063999ad3fae482a0c1d7482b51"
+        },
+        "reviewed_speech_binding": {
+          "pointer": "/reviewed_speech_binding",
+          "canonical_json_sha256": "88025408d951467d38a236d6fdedb10ad4a4112e6ce02b3577c5b906adec6305"
+        },
+        "local_media_path_previous_binding": {
+          "pointer": "/local_media_path_previous_binding",
+          "canonical_json_sha256": "220f4c5da0641cd8f51fb28add2f66e18e1dba3e64cca61d345ebd775b15bf1f"
+        },
+        "session_durability_previous_binding": {
+          "pointer": "/session_durability_previous_binding",
+          "canonical_json_sha256": "d1931a403fd80ce0a8ea40f23700b2e5a3be8c1b155c3511cbf4d6f72792f6b9"
+        },
+        "media_identity_previous_binding": {
+          "pointer": "/media_identity_previous_binding",
+          "canonical_json_sha256": "775b630f1531f2b679dfb823a59f6d534e542a78fdf1dc3dc6013a74012468e3"
+        }
+      },
+      "source_manifest": {
+        "path": "PUBLIC_METADATA/source-manifest.json",
+        "sha256": "19b83a806a3f89ce845c997a1f075234d43359a866759cdcc4b59612599c8988",
+        "bytes": 469968,
+        "git_blob": "aeca8108e5b2e66ad3c4e9d77d911539f555a0c3"
+      }
+    },
     {
       "public_revision": "9c45de8ebd85eb1aa4e85f7ab36db6b13bbfc446",
       "path": "PUBLIC_METADATA/source-binding.json",
@@ -10023,21 +10215,32 @@
     }
   ],
   "reviewed_source_patch": {
-    "scope": "Saved ChatMode completion reuses the existing typed-reply speech policy",
+    "scope": "Immediate owned Kokoro speech stop/barge-in and exact selected Mandarin data/notice evidence",
     "source_paths": [
-      "SOURCE/ui/api/routes/chat_mode.py",
-      "SOURCE/ui/api/routes/command.py",
-      "SOURCE/tests/public/test_saved_chat_speech_dispatch.py"
+      "SOURCE/LICENSES/CUSTOMER_SPEECH_SUPPLEMENTAL_NOTICES.txt",
+      "SOURCE/LICENSES/jieba-0.42.1-MIT.txt",
+      "SOURCE/LICENSES/phrase-pinyin-data-MIT.txt",
+      "SOURCE/LICENSES/pinyin-data-MIT.txt",
+      "SOURCE/core/voice_command_handler.py",
+      "SOURCE/docs/CUSTOMER_SPEECH_QUALIFICATION.md",
+      "SOURCE/tests/public/test_disabled_tts_streaming.py",
+      "SOURCE/tests/public/test_kokoro_stop.py",
+      "SOURCE/tests/public/test_selected_audio_output.py",
+      "SOURCE/tests/public/test_speech_volume_wiring.py",
+      "SOURCE/tests/public/test_streaming_decimal_boundaries.py",
+      "SOURCE/tests/public/test_streaming_watchdog_ownership.py",
+      "SOURCE/voice/synthesis/kokoro_engine.py",
+      "SOURCE/voice/synthesizer.py"
     ],
-    "source_tree": "6af8e8c97de587cc8e3f3a28b288b7e550e2abc8",
-    "patch_sha256": "f1583cb80a9ffc5b6febce093353dd90573cfbf53b29e744aec6a7a24a891949",
+    "source_tree": "fdcce5d0265b7c79466ef6998c4efac88fc61072",
+    "patch_sha256": "59c37da0d468241dd6e4c16ce4676ac56b8323233cadd8ed5b2597a74c0c751f",
     "prior_binding": {
-      "public_revision": "9c45de8ebd85eb1aa4e85f7ab36db6b13bbfc446",
+      "public_revision": "d59bc175de5786c0500aaa77d78882336c49fdfd",
       "path": "PUBLIC_METADATA/source-binding.json",
-      "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/9c45de8ebd85eb1aa4e85f7ab36db6b13bbfc446/PUBLIC_METADATA/source-binding.json",
-      "sha256": "6d42574941a2ebf0a4de81a6d15a27de2dc58329a7ea101894b6a17db5919480",
-      "bytes": 1253867,
-      "git_blob": "31cd4c8e1150d983c202cb77dae13c9aade84951",
+      "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/d59bc175de5786c0500aaa77d78882336c49fdfd/PUBLIC_METADATA/source-binding.json",
+      "sha256": "64423ba9a8615b1e0bb6db0be81c967b3aeb134363e84d8e57bfde69eb3784f8",
+      "bytes": 1260116,
+      "git_blob": "8a30dd9b6d121ddce1985374560f8e22ad654c2e",
       "all_top_level_keys": [
         "schema_version",
         "source_manifest",
@@ -10078,27 +10281,27 @@
         },
         "source_manifest_sha256": {
           "pointer": "/source_manifest_sha256",
-          "canonical_json_sha256": "97f6ee9c6f5b5a56fdc03a5045a822261d25d9b3cfc384f918ce5642eb050846"
+          "canonical_json_sha256": "28226ab18d380cd069fc2de61ed908075a3dfc75e93358c5348bf4abfb6c8612"
         },
         "source_tree_sha256": {
           "pointer": "/source_tree_sha256",
-          "canonical_json_sha256": "3b3654c01e39eb9947d4fa5e07574f50bedfc3646e7d1703b172f1f7676d42a1"
+          "canonical_json_sha256": "7637a6b7b37e575814a0c649a0da5b3c2949a51fab71d43aceac895f1b07dd18"
         },
         "source_file_count": {
           "pointer": "/source_file_count",
-          "canonical_json_sha256": "48edac0718a29c1157a2e5f12944c2b7205e6b7be4d80cb5b731255a756f8df4"
+          "canonical_json_sha256": "4d578fd7ecf82962ceb689769e59d6abb4599a638ec14ac8f96b1fdf948cb60d"
         },
         "source_revision": {
           "pointer": "/source_revision",
-          "canonical_json_sha256": "41e2420980208e11f07d17dd6d77a32750288f3966db867d49a0c9b484123121"
+          "canonical_json_sha256": "078addd535aba8087906f1748a4671997f23aa31355406761a29ed05fd364c18"
         },
         "comparison_public_revision": {
           "pointer": "/comparison_public_revision",
-          "canonical_json_sha256": "bf6671a8b2429794ded3b2d34c4e3637f32d168807d6bafc4f2f569dea5a8e90"
+          "canonical_json_sha256": "387b1dc2cd9057d3b3727ef07b5b06a0397dea05500c283627af10ba26fde7f1"
         },
         "changed_source_paths": {
           "pointer": "/changed_source_paths",
-          "canonical_json_sha256": "a6264479c165c041651cbb6cfcea59ccc67d27860f745e8d0265faddfdc0cd05"
+          "canonical_json_sha256": "9b2fcd855606427bc3b2d02e6c4124a2442b9eff347f35f0e477e6a9836a9693"
         },
         "retained_sboms": {
           "pointer": "/retained_sboms",
@@ -10106,11 +10309,11 @@
         },
         "input_equivalence": {
           "pointer": "/input_equivalence",
-          "canonical_json_sha256": "b7e3450e6211194b77036ba560a10eadeb9abdb8adefa9f36f09e4813bc9b446"
+          "canonical_json_sha256": "9f58d0ba07866c67d867ca3e155df765c489cbc3412b8bdb670e9ab8d609856d"
         },
         "qualification": {
           "pointer": "/qualification",
-          "canonical_json_sha256": "f3c762bbc0c21f26efbcc25153e41b611d97380bb7144ecebef2354758111c29"
+          "canonical_json_sha256": "47a3f0affb6a13a12c0b53d2d0a59f18f1b94f86ff89ab0edf0ba5ab411220dc"
         },
         "historical_bindings": {
           "pointer": "/historical_bindings",
@@ -10118,15 +10321,15 @@
         },
         "prior_binding": {
           "pointer": "/prior_binding",
-          "canonical_json_sha256": "a8561b1ececb600fb2ab5567370f414093b66162837150e83795e64809df5a1c"
+          "canonical_json_sha256": "d6f52aba0e5fe5692a943912f82363546fa4f8c2c5245d0525de3a204f503c19"
         },
         "retained_composition_component_bindings": {
           "pointer": "/retained_composition_component_bindings",
-          "canonical_json_sha256": "47040bd7a7e229ee6a20647acb209f0dc0da468e75a1e582994f8da08ba402b0"
+          "canonical_json_sha256": "ec0709db45a31c59c62655bd66b90a784e303fa5b2e1c9a877ba5f0a4dfe3c29"
         },
         "reviewed_source_patch": {
           "pointer": "/reviewed_source_patch",
-          "canonical_json_sha256": "49ac466095c40e2c4a4814277220d8e2eb9b71e09e5a16ed227d2e5b75678ef7"
+          "canonical_json_sha256": "0e16b2c9b363933e16175ca07659a1089d25e3fcc1495e498caee87be24f427e"
         },
         "new_resolution_performed": {
           "pointer": "/new_resolution_performed",
@@ -10150,11 +10353,11 @@
         },
         "new_resolution_scope": {
           "pointer": "/new_resolution_scope",
-          "canonical_json_sha256": "01a5b2be2d4ddbd2e114053edfee421310c5ffb370b0a9e42d930c5077ff09e9"
+          "canonical_json_sha256": "bc5b0708b5731a2b8534bb6eb2b76643ef4d9ba4a6ffd388553ac59633494fd7"
         },
         "new_advisory_scan_scope": {
           "pointer": "/new_advisory_scan_scope",
-          "canonical_json_sha256": "93371ccafc16dd7057987516b0954ebfcc467468770f7dee1c5664b7e2cb59aa"
+          "canonical_json_sha256": "e8d148be40352fb19d2062c407cd2943ebb70589d18113ed6bcd6200db1fe84f"
         },
         "account_reconciliation_previous_binding": {
           "pointer": "/account_reconciliation_previous_binding",
@@ -10179,9 +10382,9 @@
       },
       "source_manifest": {
         "path": "PUBLIC_METADATA/source-manifest.json",
-        "sha256": "602760438097a31209dabdd51a5de6b7a1735e26866f1c3534f55eaeede10af3",
-        "bytes": 469785,
-        "git_blob": "3dcbd3a568f7926df9d7b00868fe7d2203cdb59a"
+        "sha256": "19b83a806a3f89ce845c997a1f075234d43359a866759cdcc4b59612599c8988",
+        "bytes": 469968,
+        "git_blob": "aeca8108e5b2e66ad3c4e9d77d911539f555a0c3"
       }
     }
   },
@@ -10190,8 +10393,8 @@
   "new_runtime_qualification_performed": false,
   "new_source_contract_qualification_performed": true,
   "new_static_security_scan_performed": false,
-  "new_resolution_scope": "No dependency change or new resolution in this source composition.",
-  "new_advisory_scan_scope": "No new advisory scan in local composition; normal hosted jobs retain their actual results.",
+  "new_resolution_scope": "No production dependency change or target customer-graph resolution. Fresh source-test dependencies and selected archive identities are scoped separately.",
+  "new_advisory_scan_scope": "No new advisory clearance in local composition; normal hosted jobs retain their results.",
   "account_reconciliation_previous_binding": {
     "source_revision": "f864e61381ef9e10a09333fce05210427cf7d0f6",
     "source_manifest_sha256": "9cad8bcb2f98c34d95a11545e11a57d74dbe6b28cd5db7322b7746e102801acd",

@@ -96,6 +96,7 @@ class DisabledTTSStreamingTests(unittest.IsolatedAsyncioTestCase):
                 "_run_synthesize_with_watchdog",
                 "_synthesize_chunked",
                 "_tts_is_enabled",
+                "stop",
                 "_prepare_route_text",
                 "_play_pcm_if_enabled",
                 "_synthesize_locked",
@@ -123,7 +124,7 @@ class DisabledTTSStreamingTests(unittest.IsolatedAsyncioTestCase):
             self.events.append(("synthesis", text))
             return self.pcm
 
-        def play(pcm, rate=24000):
+        def play(pcm, rate=24000, **kwargs):
             self.plays.append((pcm, rate))
             self.events.append(("playback", rate))
             return True
@@ -386,7 +387,7 @@ class DisabledTTSStreamingTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((self.calls, self.plays), ([], []))
         self.config.tts_enabled = True
         self.engine._lookup_opener_cache = lambda _: self.pcm
-        self.engine._play_pcm_locally = lambda pcm: self.plays.append(pcm) or True
+        self.engine._play_pcm_locally = lambda pcm, **kwargs: self.plays.append(pcm) or True
         await self.facade.speak("Hello.")
         self.assertEqual(self.plays, [self.pcm])
         self.assertEqual(self.calls, [])
@@ -519,7 +520,7 @@ class DisabledTTSStreamingTests(unittest.IsolatedAsyncioTestCase):
                 self.calls.clear()
                 self.plays.clear()
 
-                def callback(pcm, rate):
+                def callback(pcm, rate, **kwargs):
                     self.plays.append((pcm, rate))
                     return result
 

@@ -261,7 +261,7 @@ class StreamingWatchdogOwnershipTests(unittest.IsolatedAsyncioTestCase):
             self.release.set()
             return original(text, *args, **kwargs)
 
-        def playback(*args):
+        def playback(*args, **kwargs):
             playback_started.set()
             if not release_playback.wait(5):
                 raise AssertionError("Playback fixture was not released")
@@ -303,7 +303,7 @@ class StreamingWatchdogOwnershipTests(unittest.IsolatedAsyncioTestCase):
             self.release.set()
             return original(text, *args, **kwargs)
 
-        def playback(*args):
+        def playback(*args, **kwargs):
             playback_started.set()
             if not release_playback.wait(5):
                 raise AssertionError("Playback fixture was not released")

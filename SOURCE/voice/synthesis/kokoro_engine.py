@@ -30,8 +30,8 @@ from voice.synthesis.opener_cache import DEFAULT_VARIANTS, OpenerCache
 # potentially a stuck ONNX session. Bound the waiter without replacing a live worker.
 STREAM_TIMEOUT_SECONDS = 30.0
 
-# sounddevice.play()/wait() share a module-global convenience stream. Serialize
-# the pair across engine instances so one utterance cannot stop/wait on another.
+# Serialize local speech across engines. Each playback owns an explicit stream;
+# cancellation must never touch sounddevice's process-global convenience stream.
 _LOCAL_PLAYBACK_LOCK = threading.RLock()
 
 if TYPE_CHECKING:
@@ -260,6 +260,9 @@ class KokoroTTSEngine:
         self._speech_language = language
         self._config = config
         self._tts_disable_marker = object()
+        self._stop_marker = object()
+        self._playback_state_lock = threading.Lock()
+        self._playback_cancel: threading.Event | None = None
         self._synthesis_work_lock = threading.Lock()
         self._synthesis_work = None
         cfg = config or settings
@@ -515,7 +518,13 @@ class KokoroTTSEngine:
             with gate:
                 active = getattr(self, "_synthesis_work", None)
                 if active is None or active["done"]:
-                    work = {"done": False, "started": False, "cancelled": threading.Event(), "waiters": set()}
+                    work = {
+                        "done": False,
+                        "started": False,
+                        "cancelled": threading.Event(),
+                        "waiters": set(),
+                        "policy_marker": policy_marker,
+                    }
                     self._synthesis_work = work
                     break
                 waiter = loop.create_future()
@@ -611,6 +620,8 @@ class KokoroTTSEngine:
             chunk = await self._run_synthesize_with_watchdog(sentence, voice, policy_marker=policy_marker)
             if chunk:
                 chunks.append(chunk)
+        if not self._tts_is_enabled() or policy_marker is not getattr(self, "_tts_disable_marker", 0):
+            return b""
         return self._join_sentence_chunks(chunks, sentences)
 
     def _tts_is_enabled(self) -> bool:
@@ -632,7 +643,7 @@ class KokoroTTSEngine:
         if not self._tts_is_enabled() or policy_marker is not getattr(self, "_tts_disable_marker", 0):
             return False
         playback = self._play_pcm_locally if local else self._play_pcm_raw
-        return playback(pcm_bytes, sample_rate)
+        return playback(pcm_bytes, sample_rate, policy_marker=policy_marker)
 
     def _synthesize_locked(
         self,
@@ -972,8 +983,9 @@ class KokoroTTSEngine:
             return False
         return True
 
-    @staticmethod
-    def _play_pcm_raw(pcm_bytes: bytes, sample_rate: int = SAMPLE_RATE_24K) -> bool:
+    def _play_pcm_raw(
+        self, pcm_bytes: bytes, sample_rate: int = SAMPLE_RATE_24K, *, policy_marker: object | None = None
+    ) -> bool:
         """Play raw PCM bytes via sounddevice (no capture guard).
 
         Callers that need the hub-local capture guard must manage it
@@ -990,8 +1002,22 @@ class KokoroTTSEngine:
         simply never heard, with the only trace in a log file they will never
         open.
         """
+        if policy_marker is None:
+            policy_marker = getattr(self, "_tts_disable_marker", 0)
         played_locally = False
         broadcasted = False
+        cancelled = threading.Event()
+
+        def playback_retired() -> bool:
+            # Policy is an in-memory config flag/generation. Observe it at every
+            # output boundary, including callbacks that can finish before the
+            # playback worker's first wait, then latch retirement for this PCM.
+            if not cancelled.is_set() and (
+                not self._tts_is_enabled() or policy_marker is not getattr(self, "_tts_disable_marker", 0)
+            ):
+                cancelled.set()
+            return cancelled.is_set()
+
         try:
             from audio_core.device_validation import resolve_output_device
             from audio_core.portaudio_guard import sounddevice_guard, sounddevice_playback_guard
@@ -1001,22 +1027,74 @@ class KokoroTTSEngine:
 
             pcm = np.frombuffer(pcm_bytes, dtype=np.int16).astype(np.float32) / AUDIO_INT16_MAX
             with _LOCAL_PLAYBACK_LOCK, sounddevice_playback_guard():
-                sd.play(pcm, samplerate=sample_rate, device=resolve_output_device(sd))
-                broadcasted = KokoroTTSEngine._broadcast_pcm_to_spokes(pcm_bytes, sample_rate)
-                sd.wait()
-                played_locally = True
+                # Register cancellation only after admission. stop() never waits
+                # for inference, this playback lock, or a native stream call.
+                with self._playback_state_lock:
+                    if playback_retired():
+                        return False
+                    self._playback_cancel = cancelled
+                finished = threading.Event()
+                position = 0
+                stream = None
+
+                def callback(outdata, frames, time_info, status):
+                    nonlocal position
+                    outdata.fill(0)
+                    if playback_retired():
+                        raise sd.CallbackAbort
+                    count = min(frames, len(pcm) - position)
+                    outdata[:count, 0] = pcm[position : position + count]
+                    position += count
+                    if position == len(pcm):
+                        raise sd.CallbackStop
+
+                try:
+                    stream = sd.OutputStream(
+                        samplerate=sample_rate,
+                        device=resolve_output_device(sd),
+                        channels=1,
+                        dtype="float32",
+                        callback=callback,
+                        finished_callback=finished.set,
+                    )
+                    if not playback_retired():
+                        stream.start()
+                        if not playback_retired():
+                            broadcasted = self._broadcast_pcm_to_spokes(pcm_bytes, sample_rate)
+                        while not finished.wait(0.01):
+                            if playback_retired():
+                                # Only this worker aborts/closes its own stream;
+                                # never race close against another native call.
+                                stream.abort()
+                                break
+                        played_locally = not playback_retired() and position == len(pcm)
+                finally:
+                    try:
+                        if stream is not None:
+                            stream.close()
+                    finally:
+                        with self._playback_state_lock:
+                            if self._playback_cancel is cancelled:
+                                self._playback_cancel = None
         except ImportError:
             # No sounddevice at all: a headless/cloud process, where hub-local
             # playback was never the delivery path. Not a user-facing fault.
             logger.warning("sounddevice not available -- cannot play audio locally")
         except Exception:
+            played_locally = False
             logger.exception("Local audio playback failed")
         finally:
-            if not broadcasted:
-                broadcasted = KokoroTTSEngine._broadcast_pcm_to_spokes(pcm_bytes, sample_rate)
+            # Cancellation is intentional silence, never a reason to retry on
+            # spokes or show an inaudible-output warning.
+            retired = playback_retired()
+            if not broadcasted and not retired:
+                broadcasted = self._broadcast_pcm_to_spokes(pcm_bytes, sample_rate)
+                retired = playback_retired()
 
+        if retired:
+            return False
         if not played_locally and not broadcasted:
-            KokoroTTSEngine._report_inaudible_reply()
+            self._report_inaudible_reply()
         return played_locally or broadcasted
 
     @staticmethod
@@ -1029,8 +1107,9 @@ class KokoroTTSEngine:
         except (ImportError, RuntimeError, OSError, TypeError, ValueError, AttributeError, LookupError):
             logger.debug("Could not surface the inaudible-reply notice", exc_info=True)
 
-    @staticmethod
-    def _play_pcm_locally(pcm_bytes: bytes, sample_rate: int = SAMPLE_RATE_24K) -> bool:
+    def _play_pcm_locally(
+        self, pcm_bytes: bytes, sample_rate: int = SAMPLE_RATE_24K, *, policy_marker: object | None = None
+    ) -> bool:
         """Play TTS on the hub speaker.
 
         Thin wrapper retained so tests can patch ``_play_pcm_locally``
@@ -1043,7 +1122,7 @@ class KokoroTTSEngine:
 
         Returns whether the audio actually reached a speaker.
         """
-        return KokoroTTSEngine._play_pcm_raw(pcm_bytes, sample_rate)
+        return self._play_pcm_raw(pcm_bytes, sample_rate, policy_marker=policy_marker)
 
     async def speak(self, text: str) -> None:
         """Synthesize and play *text* on the configured audio output.
@@ -1080,11 +1159,15 @@ class KokoroTTSEngine:
             return
         if cached_opener_pcm:
             async with self._speak_lock:
-                # Worker thread: _speak_cached_pcm ends in a blocking sd.wait(),
+                # Worker thread: _speak_cached_pcm waits for owned-stream completion,
                 # so calling it inline froze the event loop (and with it every
                 # local API request) for the whole utterance. The streaming path
                 # below already offloads playback the same way.
-                await asyncio.to_thread(self._speak_cached_pcm, cached_opener_pcm, policy_marker=policy_marker)
+                try:
+                    await asyncio.to_thread(self._speak_cached_pcm, cached_opener_pcm, policy_marker=policy_marker)
+                except asyncio.CancelledError:
+                    self.stop()
+                    raise
             return
 
         # Determine whether to use streaming path
@@ -1103,10 +1186,14 @@ class KokoroTTSEngine:
         async with self._speak_lock:
             if not self._tts_is_enabled() or policy_marker is not getattr(self, "_tts_disable_marker", 0):
                 return
-            if use_streaming:
-                await self._speak_streaming(clean_text, sentences, policy_marker=policy_marker)
-            else:
-                await self._speak_single(text, policy_marker=policy_marker)
+            try:
+                if use_streaming:
+                    await self._speak_streaming(clean_text, sentences, policy_marker=policy_marker)
+                else:
+                    await self._speak_single(text, policy_marker=policy_marker)
+            except asyncio.CancelledError:
+                self.stop()
+                raise
 
     def _create_opener_cache(self, cfg: object) -> OpenerCache | None:
         if getattr(cfg, "tts_opener_cache_enabled", True) is False:
@@ -1178,7 +1265,7 @@ class KokoroTTSEngine:
         try:
             with duck_ctx:
                 if self._tts_is_enabled() and policy_marker is getattr(self, "_tts_disable_marker", 0):
-                    self._play_pcm_locally(pcm_bytes)
+                    self._play_pcm_locally(pcm_bytes, policy_marker=policy_marker)
         finally:
             if monitor is not None:
                 try:
@@ -1216,7 +1303,7 @@ class KokoroTTSEngine:
                 if not pcm_bytes:
                     return
                 # Worker thread for the same reason as the cached-opener and
-                # streaming paths: _play_pcm_locally blocks on sd.wait() until
+                # streaming paths: _play_pcm_locally waits for its owned stream until
                 # the audio finishes, which would otherwise stall the event loop
                 # serving the local API for the length of every spoken line.
                 await asyncio.to_thread(
@@ -1387,6 +1474,7 @@ class KokoroTTSEngine:
         """
         from voice.synthesis.text_normalizer import has_pending_decimal_point, normalize_for_speech
 
+        stop_marker = getattr(self, "_stop_marker", 0)
         customer_route = getattr(self, "_customer_tokenizer", None) is not None
         if customer_route:
             with self._lock:
@@ -1455,8 +1543,10 @@ class KokoroTTSEngine:
 
                     async for chunk in text_chunks:
                         full_text_parts.append(chunk)
-                        if customer_route and route_epoch is not getattr(self, "_customer_route_epoch", 0):
-                            # A new selection owns subsequent utterances. Drain
+                        if stop_marker is not getattr(self, "_stop_marker", 0) or (
+                            customer_route and route_epoch is not getattr(self, "_customer_route_epoch", 0)
+                        ):
+                            # A stop or new selection retires this response. Drain
                             # this response for history without normalizing its
                             # remaining chunks under an old/new mixed route.
                             await retire_pending()
@@ -1465,7 +1555,7 @@ class KokoroTTSEngine:
                         if not enabled or policy_marker is not getattr(self, "_tts_disable_marker", 0):
                             await retire_pending()
                             policy_marker = getattr(self, "_tts_disable_marker", 0)
-                        if not enabled:
+                        if not enabled or stop_marker is not getattr(self, "_stop_marker", 0):
                             continue
                         buffer += chunk
 
@@ -1603,6 +1693,9 @@ class KokoroTTSEngine:
                         elapsed,
                     )
 
+            except asyncio.CancelledError:
+                self.stop()
+                raise
             finally:
                 if prefetch_task is not None and not prefetch_task.done():
                     prefetch_task.cancel()
@@ -1759,10 +1852,26 @@ class KokoroTTSEngine:
         await self.speak(text)
 
     def stop(self) -> None:
-        """Release model resources."""
-        with self._lock:
-            self._kokoro = None
-            logger.info("Kokoro TTS engine stopped")
+        """Retire pending speech and interrupt only this engine's local audio.
+
+        Native inference keeps its worker/model ownership until it really ends.
+        Do not acquire its lock or unload the model on the caller/event loop.
+        """
+        # Construction-bypassing source-contract fixtures have no playback yet.
+        if not hasattr(self, "_playback_state_lock"):
+            self._playback_state_lock = threading.Lock()
+        with self._playback_state_lock:
+            self._stop_marker = object()
+            self._tts_disable_marker = object()
+            cancelled = getattr(self, "_playback_cancel", None)
+            if cancelled is not None:
+                cancelled.set()
+        gate = getattr(self, "_synthesis_work_lock", None)
+        if gate is not None:
+            with gate:
+                work = getattr(self, "_synthesis_work", None)
+                if work is not None and not work["done"] and work["policy_marker"] is not self._tts_disable_marker:
+                    work["cancelled"].set()
 
     @property
     def last_sample_rate(self) -> int:

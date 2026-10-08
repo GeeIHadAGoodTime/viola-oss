@@ -1603,14 +1603,17 @@ class VoiceCommandHandler:
         Returns:
             True if user interrupted, False if TTS completed normally.
         """
-        from voice.continuous_capture import MODE_RECORD
-
         interrupt_event = asyncio.Event()
+        loop = asyncio.get_running_loop()
 
         def _on_interrupt() -> None:
             """Called from capture thread when VAD detects sustained speech."""
-            # Thread-safe: asyncio.Event.set() is safe to call from any thread
-            interrupt_event.set()
+            # asyncio.Event belongs to this loop, never the capture thread.
+            try:
+                loop.call_soon_threadsafe(interrupt_event.set)
+            except RuntimeError:
+                # A late capture callback may outlive the caller's event loop.
+                logger.debug("Ignored TTS interrupt after event-loop shutdown")
 
         # Start VAD monitoring (also accumulates audio in buffer)
         capture.set_mode("vad_monitor", on_interrupt=_on_interrupt)
