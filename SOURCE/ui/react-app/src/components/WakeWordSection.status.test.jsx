@@ -51,3 +51,22 @@ describe('wake model selection is not detector liveness', () => {
     expect(screen.queryByText(/Currently listening|Now listening/)).not.toBeInTheDocument();
   });
 });
+
+
+it('keeps the unavailable training wizard unreachable without acquiring a microphone', async () => {
+  const getUserMedia = vi.fn();
+  const descriptor = Object.getOwnPropertyDescriptor(navigator, 'mediaDevices');
+  Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: { getUserMedia } });
+  try {
+    authFetch.mockResolvedValue(response({ models: [viola] }));
+    render(<WakeWordSection />);
+    const unavailable = await screen.findByRole('button', { name: 'Unavailable' });
+    expect(unavailable).toBeDisabled();
+    fireEvent.click(unavailable);
+    expect(screen.queryByRole('button', { name: 'Record Sample' })).not.toBeInTheDocument();
+    expect(getUserMedia).not.toHaveBeenCalled();
+  } finally {
+    if (descriptor) Object.defineProperty(navigator, 'mediaDevices', descriptor);
+    else delete navigator.mediaDevices;
+  }
+});
