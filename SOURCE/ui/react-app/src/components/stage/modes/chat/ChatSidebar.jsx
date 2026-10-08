@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
 import { ChevronLeftIcon, ChevronRightIcon } from '../../../icons';
 
@@ -30,6 +30,8 @@ export default function ChatSidebar({
   activeThreadId,
   search,
   collapsed,
+  searchError = '',
+  onRetrySearch = () => {},
   onSearch,
   onToggleCollapsed,
   onNewChat,
@@ -41,11 +43,12 @@ export default function ChatSidebar({
   profileName,
 }) {
   const [menuThreadId, setMenuThreadId] = useState(null);
+  const searchStatusId = useId();
   const grouped = useMemo(() => groupThreads(threads), [threads]);
 
   if (collapsed) {
     return (
-      <aside className="chat-sidebar is-collapsed">
+      <aside className="chat-sidebar is-collapsed" aria-label="Chat history">
         <button type="button" className="chat-collapse-edge" onClick={onToggleCollapsed} aria-label="Expand chat sidebar" title="Expand chat sidebar">
           <ChevronRightIcon />
         </button>
@@ -55,7 +58,7 @@ export default function ChatSidebar({
   }
 
   return (
-    <aside className="chat-sidebar">
+    <aside className="chat-sidebar" aria-label="Chat history">
       <div className="chat-sidebar-top">
         <button type="button" className="chat-new-button" onClick={onNewChat}>New chat</button>
         <button type="button" className="chat-collapse-button" onClick={onToggleCollapsed} aria-label="Collapse chat sidebar" title="Collapse chat sidebar">
@@ -68,7 +71,17 @@ export default function ChatSidebar({
         onChange={(event) => onSearch(event.target.value)}
         placeholder="Search chats"
         aria-label="Search chats"
+        aria-describedby={searchError ? searchStatusId : undefined}
       />
+      {searchError && (
+        <div id={searchStatusId} className="chat-search-status" role="alert" data-testid="chat-search-error">
+          <span>{searchError}</span>
+          <div className="chat-search-recovery">
+            <button type="button" onClick={onRetrySearch}>Retry chat search</button>
+            {search && <button type="button" onClick={() => onSearch('')}>Clear chat search</button>}
+          </div>
+        </div>
+      )}
       <div className="chat-thread-list">
         {Object.entries(grouped).map(([label, items]) => (
           items.length > 0 && (
@@ -124,6 +137,8 @@ ChatSidebar.propTypes = {
   activeThreadId: PropTypes.string,
   search: PropTypes.string.isRequired,
   collapsed: PropTypes.bool.isRequired,
+  searchError: PropTypes.string,
+  onRetrySearch: PropTypes.func,
   onSearch: PropTypes.func.isRequired,
   onToggleCollapsed: PropTypes.func.isRequired,
   onNewChat: PropTypes.func.isRequired,

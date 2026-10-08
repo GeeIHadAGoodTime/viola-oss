@@ -119,6 +119,37 @@
   outline: none;
 }
 
+.chat-search-status {
+  flex: 0 0 auto;
+  margin: 0 12px 10px;
+  padding: 8px;
+  border: 1px solid var(--chat-line);
+  border-radius: 8px;
+  color: var(--chat-text);
+  background: var(--chat-panel);
+  font-size: 12px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.chat-search-recovery {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.chat-search-recovery button {
+  flex: 1 1 100px;
+  min-height: 44px;
+  border: 1px solid var(--chat-line);
+  border-radius: 8px;
+  color: var(--chat-text);
+  background: var(--chat-panel-strong);
+  font: inherit;
+  cursor: pointer;
+}
+
 .chat-search:focus,
 .chat-title-input:focus,
 .chat-input-shell textarea:focus {
