@@ -613,10 +613,17 @@ async def _cdp_signature_gate_block_from_current_page_action(script: str) -> str
     )
 
 
-async def _cdp_key_action_gate_block(key_lower: str) -> str | None:
-    if key_lower not in {"enter", "return", "space"}:
+async def _cdp_key_action_gate_block(key: str) -> str | None:
+    key_lower = "space" if key == " " else key.lower()
+    inserts_text = len(key) == 1 or key_lower == "space"
+    if not inserts_text and key_lower not in {"enter", "return"}:
         return None
     info = await _cdp_active_element_info()
+    if not info:
+        return "Cannot safely inspect the focused element; the key was not pressed."
+    if inserts_text:
+        # A character must not bypass the same sensitive-field guards as type.
+        return await _cdp_fill_gate_block_from_info(info, key_lower)
     return await _cdp_action_gate_block_from_info(info, key_lower)
 
 
@@ -2255,8 +2262,9 @@ async def _do_select(selector: str, value: str) -> str:
 
 @server.tool(
     description=(
-        "Primary tool for clicking, typing, and selecting elements on the visible desktop web page. "  # nosec B608 - model-facing prose, not SQL.
-        "INPUT: action (required) + selector (CSS or visible text) + text (for 'type') or value (for 'select').\n"
+        "Primary tool for clicking, typing, selecting elements, and pressing keys on the visible desktop web page. "  # nosec B608 - model-facing prose, not SQL.
+        "INPUT: action (required), selector for element actions, text for 'type', value for 'select', "
+        "or key for 'press_key' on the currently focused element (no selector).\n"
         "SUCCESS: Returns JSON with action result, page title/URL. For clicks that change page state, "
         "includes navigated/refs_invalidated plus the fresh snapshot and selector_for_ref mapping.\n"
         "FAILURE: Element not found, multiple matches, or raw change-detection fields such as "
@@ -2267,7 +2275,8 @@ async def _do_select(selector: str, value: str) -> str:
         "- browser_interact(action='click', selector='Add to Cart') -> clicks element with text 'Add to Cart'\n"
         "- browser_interact(action='click', selector='#submit-btn') -> clicks element by CSS selector\n"
         "- browser_interact(action='type', selector='#search', text='laptop') -> types 'laptop' into #search input\n"
-        "- browser_interact(action='select', selector='#state', value='California') -> selects 'California' from dropdown"
+        "- browser_interact(action='select', selector='#state', value='California') -> selects 'California' from dropdown\n"
+        "- browser_interact(action='press_key', key='Enter') -> presses Enter on the focused element"
     ),
     annotations=_CONFIRM,
     meta={"risk": "confirm", "anthropic/alwaysLoad": True},
@@ -2280,7 +2289,8 @@ async def browser_interact(
                 "Interaction type. One of: "
                 "'click' (click element by CSS selector or visible text), "
                 "'type' (type text into input field by CSS selector), "
-                "'select' (select dropdown option by CSS selector)."
+                "'select' (select dropdown option by CSS selector), "
+                "'press_key' (press a key on the currently focused element)."
             )
         ),
     ],
@@ -2320,15 +2330,26 @@ async def browser_interact(
             description=("For 'type' action only: whether to clear existing field content before typing. Default True.")
         ),
     ] = True,
+    key: Annotated[
+        str,
+        Field(
+            description=(
+                "For 'press_key' only: a case-insensitive key name (Enter/Return, Tab, Escape, "
+                "Backspace, Delete, ArrowUp/Down/Left/Right, Home, End, PageUp, PageDown, Space) "
+                "or one printable character. Key combinations are not supported."
+            )
+        ),
+    ] = "",
 ) -> str:
     """Interact with browser elements using a single compound tool (CDP variant).
 
-    Consolidates click, type, and select operations for CSS selectors.
+    Consolidates click, type, select, and focused keyboard operations.
 
     Examples:
     - browser_interact(action="click", selector="Add to Cart")
     - browser_interact(action="type", selector="#search", text="laptop")
     - browser_interact(action="select", selector="#state", value="California")
+    - browser_interact(action="press_key", key="Enter")
     """
     if action == "click":
         if not selector:
@@ -2349,7 +2370,19 @@ async def browser_interact(
             return _json({"error": "value is required for action='select'"})
         return await _do_select(selector, value)
 
-    return _json({"error": "Unknown action '%s'. Use one of: click, type, select" % action})
+    if action == "press_key":
+        if not key:
+            return _json({"ok": False, "error": "key is required for action='press_key'"})
+        if selector or text or value:
+            return _json(
+                {
+                    "ok": False,
+                    "error": "press_key uses the currently focused element; omit selector, text, and value",
+                }
+            )
+        return await browser_press_key(key)
+
+    return _json({"error": "Unknown action '%s'. Use one of: click, type, select, press_key" % action})
 
 
 @server.tool(
@@ -2483,12 +2516,20 @@ async def browser_press_key(key: str) -> str:
     Args:
         key: Key name (e.g. 'Enter', 'Tab', 'Escape', 'ArrowDown').
     """
+    key_lower = "space" if key == " " else key.lower()
+    if key_lower not in _KEY_MAP and not (len(key) == 1 and key.isprintable()):
+        return _json(
+            {
+                "ok": False,
+                "error": "Unsupported key. Use a documented key name or one printable character; "
+                "key combinations are not supported.",
+            }
+        )
     try:
         await manager.ensure_connected()
         url_before = await manager.get_url()
 
-        key_lower = key.lower()
-        if gate_block := await _cdp_key_action_gate_block(key_lower):
+        if gate_block := await _cdp_key_action_gate_block(key):
             return _json({"ok": False, "error": gate_block})
         key_desc = _KEY_MAP.get(key_lower)
 
@@ -2511,6 +2552,7 @@ async def browser_press_key(key: str) -> str:
             # Same-tab navigation from a key press invalidates @eN refs.
             result["refs_invalidated"] = True
             result["ref_invalidation_reason"] = "key_navigated"
+            _clear_cdp_refs()
         return _json(result)
     except Exception as exc:
         return _json({"error": "Key press failed for '%s': %s" % (key, exc)})

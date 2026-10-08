@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "d31f78b5d37ca9ff83142962dfada1b8b0bf150b",
-  "sha256": "98caf60cacc1134f8e6c008acf508e45c664413f5cde8b00ec990f85edd533a1",
+  "revision": "9f8dfa1680e06757a1c951d064f18d41dd875f6d",
+  "sha256": "fc420b81ff3f8ff4822c787379df0e4ea532e61dfc2471350faa9426e21cecc8",
   "files": [
     {
       "path": ".env.example",
@@ -2325,8 +2325,8 @@
     },
     {
       "path": "mcp_servers/browser_cdp/server.py",
-      "bytes": 131041,
-      "sha256": "a87acef6aeb2e4d2210a83aa300eb3574848e31d6b717ff07530c508c7b1317a"
+      "bytes": 132968,
+      "sha256": "4b9600528ac01a7c92dffd1bcc6d647e8e30017c34753e8d9600f8932f71c4c8"
     },
     {
       "path": "mcp_servers/computer_use/__init__.py",
@@ -6022,6 +6022,11 @@
       "path": "tests/public/test_billing_capacity_mount.py",
       "bytes": 4317,
       "sha256": "f0b3bfa149c6c21acbe898b0f1978cb8d6183b00fbe2686423f64076bb537a2e"
+    },
+    {
+      "path": "tests/public/test_browser_cdp_key_action.py",
+      "bytes": 12905,
+      "sha256": "debc10a8ed822fde0b872c29d1247744ce74726cc6ece09549bdcafde174ce1a"
     },
     {
       "path": "tests/public/test_call_history_order_contract.py",
