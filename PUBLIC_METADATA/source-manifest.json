@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "5071e162a861a2bb10105802863f6c84776e2975",
-  "sha256": "494255f66dae4604c09a5b4100d8519a21b0dc2ed6609e6447b1243dd03caa00",
+  "revision": "7e36ee8e25b754edac4fe07f79ab8fe38d81e452",
+  "sha256": "d1b09ad624b078260c751f40bab597f30b0cbf373fb205ff1015f2fb698131ac",
   "files": [
     {
       "path": ".env.example",
@@ -1590,8 +1590,8 @@
     },
     {
       "path": "intent/command_executor.py",
-      "sha256": "4720942f5e0ee7cd4e8295d9e6ddd9fb741d831da7b707cd1579695d63a300fc",
-      "bytes": 114352
+      "sha256": "95e2952fc9a55da83158292af0c7b041c6d1eb9ed75d0328e6033a19a819d296",
+      "bytes": 114798
     },
     {
       "path": "intent/commands/__init__.py",
@@ -2070,8 +2070,8 @@
     },
     {
       "path": "intent/tools/music_tools.py",
-      "sha256": "d1894b959cbbc478ec39e5f34c7422561fde317af7123a49f0ddc9f85d5b9898",
-      "bytes": 59948
+      "sha256": "6b05196d18de9a5e3e434faaf80ed9a9666835397f24ff15a8762bbe32e18186",
+      "bytes": 60136
     },
     {
       "path": "intent/tools/notification_tools.py",
@@ -2742,6 +2742,11 @@
       "path": "music/freshness/manager.py",
       "sha256": "779b3c06d39890490f5b3c13059102ddb5a8269d65636616e14011dbf2d21765",
       "bytes": 11054
+    },
+    {
+      "path": "music/local_file_identity.py",
+      "sha256": "d2a24982a3bdab7453ee9a8df25048b5548b1d22d9258d426ab8ae3b2ae36a2f",
+      "bytes": 2654
     },
     {
       "path": "music/log_utils.py",
@@ -6102,6 +6107,11 @@
       "path": "tests/public/test_linux_sandbox_opt_in.py",
       "sha256": "a02a49dbc341223a9b79c99fd8af6880763072155eaf6635d7b4f0ddc259f488",
       "bytes": 4396
+    },
+    {
+      "path": "tests/public/test_local_media_identity.py",
+      "sha256": "94b707a73b570e503b57e5b62b036f7c466b0a77214d34063bdc1a0431d8f581",
+      "bytes": 11430
     },
     {
       "path": "tests/public/test_local_media_path_length.py",

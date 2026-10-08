@@ -596,7 +596,7 @@ class CommandExecutor:
         """Compare the user's request to the played track and label the match quality.
 
         Returns one of:
-          - ``exact``   - the request literally appears in title or artist
+          - ``exact``   - the file identity matches, or the request appears in title/artist
           - ``partial`` - the request shares one or more words with title/artist
           - ``unknown`` - the played track has no metadata to compare against
           - ``fallback_unrelated`` - request and track have no shared words
@@ -612,6 +612,14 @@ class CommandExecutor:
 
         np_obj = verified_data.get("now_playing")
         np = np_obj if isinstance(np_obj, dict) else {}
+        # Local selections arrive as full paths. Comparing that address with
+        # a display title rejects the selected file; compare reported identity
+        # first, without letting shared basenames admit a different file.
+        from music.local_file_identity import classify_local_file_match
+
+        local_match = classify_local_file_match(query, np)
+        if local_match is not None:
+            return local_match
         title = str(np.get("title") or "").strip().lower()
         artist = str(np.get("artist") or "").strip().lower()
         # An unverified title is a query-echo placeholder (e.g. the browser

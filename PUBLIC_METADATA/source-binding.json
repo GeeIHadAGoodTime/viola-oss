@@ -1,15 +1,16 @@
 {
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "963432f806a595f8fdfc157b3e3cfb6a723a2afd668217d62249df1e84059fd0",
-  "source_tree_sha256": "494255f66dae4604c09a5b4100d8519a21b0dc2ed6609e6447b1243dd03caa00",
-  "source_file_count": 2672,
-  "source_revision": "5071e162a861a2bb10105802863f6c84776e2975",
-  "comparison_public_revision": "a3b77223bd9d94b7cbba9029596b6f6ff5d5ffec",
+  "source_manifest_sha256": "602760438097a31209dabdd51a5de6b7a1735e26866f1c3534f55eaeede10af3",
+  "source_tree_sha256": "d1b09ad624b078260c751f40bab597f30b0cbf373fb205ff1015f2fb698131ac",
+  "source_file_count": 2674,
+  "source_revision": "7e36ee8e25b754edac4fe07f79ab8fe38d81e452",
+  "comparison_public_revision": "a594aa17a84f8fe295705b4d98ddddd8785b26f4",
   "changed_source_paths": [
-    "SOURCE/auth/desktop_session.py",
-    "SOURCE/tests/public/test_desktop_session_persistence.py",
-    "SOURCE/utils/enhancements/secrets.py"
+    "SOURCE/intent/command_executor.py",
+    "SOURCE/intent/tools/music_tools.py",
+    "SOURCE/music/local_file_identity.py",
+    "SOURCE/tests/public/test_local_media_identity.py"
   ],
   "retained_sboms": [
     {
@@ -71,41 +72,93 @@
     }
   ],
   "input_equivalence": {
-    "comparison_basis": "Protected public main a3b77223bd9d94b7cbba9029596b6f6ff5d5ffec",
-    "all_unselected_leaf_bytes_and_modes_preserved": true,
-    "six_retained_sbom_objects_and_bytes_preserved": true,
+    "comparison_basis": "Protected public main a594aa17a84f8fe295705b4d98ddddd8785b26f4",
+    "all_unselected_export_leaf_bytes_and_modes_preserved": true,
+    "all_six_sbom_bytes_and_status_objects_preserved": true,
     "dependency_and_workflow_inputs_unchanged": true,
-    "speech_music_account_pricing_resize_weekly_source_preserved": true
+    "frontend_settings_speech_account_session_resize_pricing_and_long_path_fixes_preserved": true
   },
   "qualification": {
-    "source_commit": "5071e162a861a2bb10105802863f6c84776e2975",
-    "scope": "Strict encrypted desktop-session cache persistence and fixture-owned SQLite cleanup only.",
-    "reviewed_production_patch_sha256": "dca547134b4162384a0811deb3c9d4efddc48b2566c10b9c79b693891c0b3abe",
-    "fixture_repair_patch_sha256": "907ef263dcf063a3787ceaa045bcc480067ccf8f6ef62b52bacdc9035a8aaabe",
-    "focused_session_controls": {
-      "passed": 16,
-      "all_fixture_owned_sqlite_connections_explicitly_closed": 17,
-      "temporary_profiles_removed": true
+    "source_commit": "7e36ee8e25b754edac4fe07f79ab8fe38d81e452",
+    "source_tree": "011eba25bb7f61e22f627af300fd5c6315982f28",
+    "scope": "Explicit local-file identity relevance and live-candidate propagation through the ordinary media selection/play handlers. Synthetic runtime boundaries, no live playback acceptance.",
+    "independent_automated_review": {
+      "result": "approved_for_source_integration",
+      "blocking_findings": [],
+      "files": [
+        {
+          "path": "SOURCE/intent/command_executor.py",
+          "git_blob": "ab513dc37a1a6fd26faf47bd236b2bd287a86fec",
+          "sha256": "95e2952fc9a55da83158292af0c7b041c6d1eb9ed75d0328e6033a19a819d296",
+          "bytes": 114798
+        },
+        {
+          "path": "SOURCE/intent/tools/music_tools.py",
+          "git_blob": "6435d233697882e95aa8a7cb27d9a9edd0d5b3ac",
+          "sha256": "6b05196d18de9a5e3e434faaf80ed9a9666835397f24ff15a8762bbe32e18186",
+          "bytes": 60136
+        },
+        {
+          "path": "SOURCE/music/local_file_identity.py",
+          "git_blob": "9a16455bdba4677a3c9ce80a185e41c882dc506a",
+          "sha256": "d2a24982a3bdab7453ee9a8df25048b5548b1d22d9258d426ab8ae3b2ae36a2f",
+          "bytes": 2654
+        },
+        {
+          "path": "SOURCE/tests/public/test_local_media_identity.py",
+          "git_blob": "74d6ef876d4cfefc1b6349aecfe07b04f7767921",
+          "sha256": "94b707a73b570e503b57e5b62b036f7c466b0a77214d34063bdc1a0431d8f581",
+          "bytes": 11430
+        }
+      ],
+      "additional_checks": 7
     },
-    "retained_private_secret_controls": {
-      "passed": 9,
-      "existing_skips": 2,
-      "scope": "Retained bounded private tests; not full private composition qualification"
+    "source_controls": {
+      "focused_tests": 18,
+      "focused_passed": 18,
+      "independent_additional_checks": 7,
+      "candidate_full_methods": 774,
+      "baseline_full_methods": 756,
+      "full_failures": 2,
+      "full_errors": 5,
+      "full_skipped": 1,
+      "baseline_failure_names_equal": true,
+      "failure_names": [
+        "setUpClass (test_customer_phone_routing.CustomerPhoneRouting)",
+        "test_real_bridge_preserves_deny_cancel_and_fresh_retry (test_deferred_confirmation_cancellation.DeferredCancellationTests.test_real_bridge_preserves_deny_cancel_and_fresh_retry)",
+        "setUpClass (test_phone_language_switch.PhoneLanguageSwitch)",
+        "test_pipecat_runner_security (unittest.loader._FailedTest.test_pipecat_runner_security)",
+        "test_ui_api_saved_volume_reaches_same_and_new_engine (test_speech_volume_wiring.SpeechVolumeWiring.test_ui_api_saved_volume_reaches_same_and_new_engine)",
+        "test_cached_openers_are_unity_on_disk_and_live_at_playback (test_speech_volume_wiring.SpeechVolumeWiring.test_cached_openers_are_unity_on_disk_and_live_at_playback)",
+        "test_per_user_values_reach_kokoro_and_do_not_leak (test_speech_volume_wiring.SpeechVolumeWiring.test_per_user_values_reach_kokoro_and_do_not_leak)"
+      ],
+      "old_installed_classifier_ast_matches_current_base": true,
+      "negative_original": {
+        "assertion_failures_including_subtests": 20,
+        "errors": 1
+      },
+      "negative_new_classifier_old_live_guards": {
+        "assertion_failures": 5,
+        "errors": 0
+      },
+      "source_only": true,
+      "playback_runtime": "synthetic HTTP and state/index only; no actual model/device/provider calls",
+      "lint": "focused correctness/imports and full new-file rules pass"
     },
-    "initial_hosted_python": {
-      "head": "b9845fc1860a70fb34419610589ab3a30d101687",
-      "run": 37701663460,
-      "job": 113066301592,
-      "tests_run": 747,
-      "cleanup_errors": 4,
-      "existing_skips": 1,
-      "outcome": "failed; preserved. Windows temporary-profile deletion exposed open fixture connections; not counted as a pass."
-    },
-    "final_head_hosted_qualification_required": true,
+    "source_only": true,
     "installed_acceptance": false,
     "production_deployment": false,
-    "historical_incident_cause_established": false,
-    "power_loss_guarantee": false
+    "normal_app_retest_required": [
+      "On a candidate containing this repair, use the already-saved short folder and indexed approved WAV.",
+      "Use the same ordinary play-by-title request. Require the intended file identity, advancing position and physical audibility without query-mismatch rejection.",
+      "Continue the existing MASTER_BETA_CHECKLIST Tier1 pause/resume/seek/EOF and missing-track recovery steps only after real playback."
+    ],
+    "limits": [
+      "The native report narrows the failure but is not raw runtime argument proof; the installed classifier defect is independently reproduced in source.",
+      "Local full aggregate remains failed with the same2failures5errors1skip as unchanged baseline; final-head hosted Windows checks remain required.",
+      "Lexical file identity is not inode identity, file existence, decoder success or audible playback.",
+      "No deployments, release, Surface activity, account changes or model calls were performed."
+    ]
   },
   "historical_bindings": [
     {
@@ -8402,12 +8455,12 @@
     }
   ],
   "prior_binding": {
-    "public_revision": "a3b77223bd9d94b7cbba9029596b6f6ff5d5ffec",
+    "public_revision": "a594aa17a84f8fe295705b4d98ddddd8785b26f4",
     "path": "PUBLIC_METADATA/source-binding.json",
-    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/a3b77223bd9d94b7cbba9029596b6f6ff5d5ffec/PUBLIC_METADATA/source-binding.json",
-    "sha256": "2e93a811fb3cd3456f1c8d8688dd732cf239a2a979c22766facaa6f31e09dd5d",
-    "bytes": 1196573,
-    "git_blob": "112e630fea47bb25a519423d2f6396b3f5fc4d5e",
+    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/a594aa17a84f8fe295705b4d98ddddd8785b26f4/PUBLIC_METADATA/source-binding.json",
+    "sha256": "334b22e757e5b40b2b331973655e33a325c713e820d0e75514c66619c43caf72",
+    "bytes": 1226692,
+    "git_blob": "29883f4256864202203993756bdd9ca005f0c545",
     "all_top_level_keys": [
       "schema_version",
       "source_manifest",
@@ -8433,7 +8486,8 @@
       "new_advisory_scan_scope",
       "account_reconciliation_previous_binding",
       "reviewed_speech_binding",
-      "local_media_path_previous_binding"
+      "local_media_path_previous_binding",
+      "session_durability_previous_binding"
     ],
     "preserved_json_objects": {
       "schema_version": {
@@ -8446,27 +8500,27 @@
       },
       "source_manifest_sha256": {
         "pointer": "/source_manifest_sha256",
-        "canonical_json_sha256": "6637e895b1fd3d34fa3d6101caed3f2383b3189adb3165a9f7ae9364124ce45d"
+        "canonical_json_sha256": "fc94b95f61af31619aa90fc4a08795b2f467e03fbd23625fed54a99dcc1d8493"
       },
       "source_tree_sha256": {
         "pointer": "/source_tree_sha256",
-        "canonical_json_sha256": "61f8873e30e0a7ad8ed7b3c200b6ef4a19ea995dae983e93acc92df9a84c60fb"
+        "canonical_json_sha256": "a98f7fdc35145e4caeb469d5abee7e6ddb1d44731c059640cda65ec1165394c5"
       },
       "source_file_count": {
         "pointer": "/source_file_count",
-        "canonical_json_sha256": "0e70a832cb7a415716c3ba42776f795a905691b043e81a23895c8588a6268653"
+        "canonical_json_sha256": "b11b916a54e9e274f044ff0ffa37651e9f024aa71f65d4205c3d0f446984bf5f"
       },
       "source_revision": {
         "pointer": "/source_revision",
-        "canonical_json_sha256": "77a3208176e2c02e7c67bd352f1b65f01ccffce69be3f4439970f4e467b5ec32"
+        "canonical_json_sha256": "39c71377ab69e01b410cf029202b746ac13bcef68167fc166af8c91193693b6b"
       },
       "comparison_public_revision": {
         "pointer": "/comparison_public_revision",
-        "canonical_json_sha256": "ff85a546fc96a9fe114853421c276428b032a5f701e2066c8d58a73b84e91dbe"
+        "canonical_json_sha256": "7557311972ae8b7b8e447cca64b4f2bc4f2eb61b843790eee297c81648e6ba58"
       },
       "changed_source_paths": {
         "pointer": "/changed_source_paths",
-        "canonical_json_sha256": "a0532d9ccb98ce5f1e37b5472b57c8f1f215a48fdeef389aa4f26495dea72d81"
+        "canonical_json_sha256": "0ef90df50d5b332cba66e8c09ce20e6d805d93f7697d974ad42d6ab526654329"
       },
       "retained_sboms": {
         "pointer": "/retained_sboms",
@@ -8474,11 +8528,11 @@
       },
       "input_equivalence": {
         "pointer": "/input_equivalence",
-        "canonical_json_sha256": "fc9a32319efda76cfca00e3cd671d6204597fa5eb6fc2851550424dd781196e6"
+        "canonical_json_sha256": "e4dac12d8f93e5f8014513a129bfe579b43733a45c26078cc7e71cb47737e547"
       },
       "qualification": {
         "pointer": "/qualification",
-        "canonical_json_sha256": "efe2a4fac32418e8677e75f1a4eca2ad3ea2324abd860b26163388dd864621db"
+        "canonical_json_sha256": "9870021bded2bf7ba72241919afeb0c09f4a433b77809e6e375b277018872a27"
       },
       "historical_bindings": {
         "pointer": "/historical_bindings",
@@ -8486,15 +8540,15 @@
       },
       "prior_binding": {
         "pointer": "/prior_binding",
-        "canonical_json_sha256": "5ba2c6c525c72e366ebb894a6d2be5a9f9270bf6aafe3f1cb51e507eed9dbb36"
+        "canonical_json_sha256": "803439526f12dfafacf3f3bc71fa909f6f80c757e11dcf7852ceb6872966943f"
       },
       "retained_composition_component_bindings": {
         "pointer": "/retained_composition_component_bindings",
-        "canonical_json_sha256": "c4c1906728363cffd98a7c23a1a3ecfb36d24d23e76d45247e720430017f01a9"
+        "canonical_json_sha256": "fee66950939ce4906e6021a47d6e17b303474d2d5e6dd98b9c2789530fc0bbe9"
       },
       "reviewed_source_patch": {
         "pointer": "/reviewed_source_patch",
-        "canonical_json_sha256": "dc487a34b1610c7771b92a894035ea4a043d315c936dd27a58f9309d8cdb135d"
+        "canonical_json_sha256": "6baf4a0cbf353c74243e5f55c99b221de0caedae919db4d568a2137171352e3e"
       },
       "new_resolution_performed": {
         "pointer": "/new_resolution_performed",
@@ -8518,11 +8572,11 @@
       },
       "new_resolution_scope": {
         "pointer": "/new_resolution_scope",
-        "canonical_json_sha256": "fcf7362c088a3b12152d0fca4eb2cea69b1edb396d2f3e5713c783e955f5d979"
+        "canonical_json_sha256": "9bf7f702e88f9add7cf3a9728cae0b916ee2b70be518e58d8925d631c1fae8df"
       },
       "new_advisory_scan_scope": {
         "pointer": "/new_advisory_scan_scope",
-        "canonical_json_sha256": "a962c22ae3fd16301df85e58360f63758f351e57961226fa53cc57081dcc5c1c"
+        "canonical_json_sha256": "11562e3316870de618b3233bdad08fd782bc5280cf6438a60425ffe94d2b214c"
       },
       "account_reconciliation_previous_binding": {
         "pointer": "/account_reconciliation_previous_binding",
@@ -8535,10 +8589,168 @@
       "local_media_path_previous_binding": {
         "pointer": "/local_media_path_previous_binding",
         "canonical_json_sha256": "220f4c5da0641cd8f51fb28add2f66e18e1dba3e64cca61d345ebd775b15bf1f"
+      },
+      "session_durability_previous_binding": {
+        "pointer": "/session_durability_previous_binding",
+        "canonical_json_sha256": "d1931a403fd80ce0a8ea40f23700b2e5a3be8c1b155c3511cbf4d6f72792f6b9"
       }
+    },
+    "source_manifest": {
+      "path": "PUBLIC_METADATA/source-manifest.json",
+      "sha256": "963432f806a595f8fdfc157b3e3cfb6a723a2afd668217d62249df1e84059fd0",
+      "bytes": 469445,
+      "git_blob": "c814905f8e863f43570febfb6d6f8ababa3dc216"
     }
   },
   "retained_composition_component_bindings": [
+    {
+      "public_revision": "a594aa17a84f8fe295705b4d98ddddd8785b26f4",
+      "path": "PUBLIC_METADATA/source-binding.json",
+      "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/a594aa17a84f8fe295705b4d98ddddd8785b26f4/PUBLIC_METADATA/source-binding.json",
+      "sha256": "334b22e757e5b40b2b331973655e33a325c713e820d0e75514c66619c43caf72",
+      "bytes": 1226692,
+      "git_blob": "29883f4256864202203993756bdd9ca005f0c545",
+      "all_top_level_keys": [
+        "schema_version",
+        "source_manifest",
+        "source_manifest_sha256",
+        "source_tree_sha256",
+        "source_file_count",
+        "source_revision",
+        "comparison_public_revision",
+        "changed_source_paths",
+        "retained_sboms",
+        "input_equivalence",
+        "qualification",
+        "historical_bindings",
+        "prior_binding",
+        "retained_composition_component_bindings",
+        "reviewed_source_patch",
+        "new_resolution_performed",
+        "new_advisory_scan_performed",
+        "new_runtime_qualification_performed",
+        "new_source_contract_qualification_performed",
+        "new_static_security_scan_performed",
+        "new_resolution_scope",
+        "new_advisory_scan_scope",
+        "account_reconciliation_previous_binding",
+        "reviewed_speech_binding",
+        "local_media_path_previous_binding",
+        "session_durability_previous_binding"
+      ],
+      "preserved_json_objects": {
+        "schema_version": {
+          "pointer": "/schema_version",
+          "canonical_json_sha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+        },
+        "source_manifest": {
+          "pointer": "/source_manifest",
+          "canonical_json_sha256": "ace3c4cebde8c1e5207159e354ef46f1f9a13eb7b3185315a68b7cf8b71f212d"
+        },
+        "source_manifest_sha256": {
+          "pointer": "/source_manifest_sha256",
+          "canonical_json_sha256": "fc94b95f61af31619aa90fc4a08795b2f467e03fbd23625fed54a99dcc1d8493"
+        },
+        "source_tree_sha256": {
+          "pointer": "/source_tree_sha256",
+          "canonical_json_sha256": "a98f7fdc35145e4caeb469d5abee7e6ddb1d44731c059640cda65ec1165394c5"
+        },
+        "source_file_count": {
+          "pointer": "/source_file_count",
+          "canonical_json_sha256": "b11b916a54e9e274f044ff0ffa37651e9f024aa71f65d4205c3d0f446984bf5f"
+        },
+        "source_revision": {
+          "pointer": "/source_revision",
+          "canonical_json_sha256": "39c71377ab69e01b410cf029202b746ac13bcef68167fc166af8c91193693b6b"
+        },
+        "comparison_public_revision": {
+          "pointer": "/comparison_public_revision",
+          "canonical_json_sha256": "7557311972ae8b7b8e447cca64b4f2bc4f2eb61b843790eee297c81648e6ba58"
+        },
+        "changed_source_paths": {
+          "pointer": "/changed_source_paths",
+          "canonical_json_sha256": "0ef90df50d5b332cba66e8c09ce20e6d805d93f7697d974ad42d6ab526654329"
+        },
+        "retained_sboms": {
+          "pointer": "/retained_sboms",
+          "canonical_json_sha256": "0428d09c6e0e2b524877c2218b306c10da6c7536bcf6ed96524b581dafc85301"
+        },
+        "input_equivalence": {
+          "pointer": "/input_equivalence",
+          "canonical_json_sha256": "e4dac12d8f93e5f8014513a129bfe579b43733a45c26078cc7e71cb47737e547"
+        },
+        "qualification": {
+          "pointer": "/qualification",
+          "canonical_json_sha256": "9870021bded2bf7ba72241919afeb0c09f4a433b77809e6e375b277018872a27"
+        },
+        "historical_bindings": {
+          "pointer": "/historical_bindings",
+          "canonical_json_sha256": "59ccb6141308771f32ec1e534f7a843cbdd8867afcd59e84944e03e6f9958c33"
+        },
+        "prior_binding": {
+          "pointer": "/prior_binding",
+          "canonical_json_sha256": "803439526f12dfafacf3f3bc71fa909f6f80c757e11dcf7852ceb6872966943f"
+        },
+        "retained_composition_component_bindings": {
+          "pointer": "/retained_composition_component_bindings",
+          "canonical_json_sha256": "fee66950939ce4906e6021a47d6e17b303474d2d5e6dd98b9c2789530fc0bbe9"
+        },
+        "reviewed_source_patch": {
+          "pointer": "/reviewed_source_patch",
+          "canonical_json_sha256": "6baf4a0cbf353c74243e5f55c99b221de0caedae919db4d568a2137171352e3e"
+        },
+        "new_resolution_performed": {
+          "pointer": "/new_resolution_performed",
+          "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+        },
+        "new_advisory_scan_performed": {
+          "pointer": "/new_advisory_scan_performed",
+          "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+        },
+        "new_runtime_qualification_performed": {
+          "pointer": "/new_runtime_qualification_performed",
+          "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+        },
+        "new_source_contract_qualification_performed": {
+          "pointer": "/new_source_contract_qualification_performed",
+          "canonical_json_sha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b"
+        },
+        "new_static_security_scan_performed": {
+          "pointer": "/new_static_security_scan_performed",
+          "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+        },
+        "new_resolution_scope": {
+          "pointer": "/new_resolution_scope",
+          "canonical_json_sha256": "9bf7f702e88f9add7cf3a9728cae0b916ee2b70be518e58d8925d631c1fae8df"
+        },
+        "new_advisory_scan_scope": {
+          "pointer": "/new_advisory_scan_scope",
+          "canonical_json_sha256": "11562e3316870de618b3233bdad08fd782bc5280cf6438a60425ffe94d2b214c"
+        },
+        "account_reconciliation_previous_binding": {
+          "pointer": "/account_reconciliation_previous_binding",
+          "canonical_json_sha256": "cfeffa86ef01cbbd530cda12a57b6c4eb3761063999ad3fae482a0c1d7482b51"
+        },
+        "reviewed_speech_binding": {
+          "pointer": "/reviewed_speech_binding",
+          "canonical_json_sha256": "88025408d951467d38a236d6fdedb10ad4a4112e6ce02b3577c5b906adec6305"
+        },
+        "local_media_path_previous_binding": {
+          "pointer": "/local_media_path_previous_binding",
+          "canonical_json_sha256": "220f4c5da0641cd8f51fb28add2f66e18e1dba3e64cca61d345ebd775b15bf1f"
+        },
+        "session_durability_previous_binding": {
+          "pointer": "/session_durability_previous_binding",
+          "canonical_json_sha256": "d1931a403fd80ce0a8ea40f23700b2e5a3be8c1b155c3511cbf4d6f72792f6b9"
+        }
+      },
+      "source_manifest": {
+        "path": "PUBLIC_METADATA/source-manifest.json",
+        "sha256": "963432f806a595f8fdfc157b3e3cfb6a723a2afd668217d62249df1e84059fd0",
+        "bytes": 469445,
+        "git_blob": "c814905f8e863f43570febfb6d6f8ababa3dc216"
+      }
+    },
     {
       "public_revision": "a3b77223bd9d94b7cbba9029596b6f6ff5d5ffec",
       "path": "PUBLIC_METADATA/source-binding.json",
@@ -9684,20 +9896,21 @@
     }
   ],
   "reviewed_source_patch": {
-    "scope": "Strict encrypted desktop-session cache persistence and fixture-owned SQLite cleanup only.",
+    "scope": "Explicit local-file identity relevance and live-candidate propagation through the ordinary media selection/play handlers. Synthetic runtime boundaries, no live playback acceptance.",
     "source_paths": [
-      "SOURCE/auth/desktop_session.py",
-      "SOURCE/tests/public/test_desktop_session_persistence.py",
-      "SOURCE/utils/enhancements/secrets.py"
+      "SOURCE/intent/command_executor.py",
+      "SOURCE/intent/tools/music_tools.py",
+      "SOURCE/music/local_file_identity.py",
+      "SOURCE/tests/public/test_local_media_identity.py"
     ],
-    "source_tree": "29a5eedf7a0d5d289f4ef956151c3f447f4ef1b0",
+    "source_tree": "011eba25bb7f61e22f627af300fd5c6315982f28",
     "prior_binding": {
-      "public_revision": "a3b77223bd9d94b7cbba9029596b6f6ff5d5ffec",
+      "public_revision": "a594aa17a84f8fe295705b4d98ddddd8785b26f4",
       "path": "PUBLIC_METADATA/source-binding.json",
-      "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/a3b77223bd9d94b7cbba9029596b6f6ff5d5ffec/PUBLIC_METADATA/source-binding.json",
-      "sha256": "2e93a811fb3cd3456f1c8d8688dd732cf239a2a979c22766facaa6f31e09dd5d",
-      "bytes": 1196573,
-      "git_blob": "112e630fea47bb25a519423d2f6396b3f5fc4d5e",
+      "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/a594aa17a84f8fe295705b4d98ddddd8785b26f4/PUBLIC_METADATA/source-binding.json",
+      "sha256": "334b22e757e5b40b2b331973655e33a325c713e820d0e75514c66619c43caf72",
+      "bytes": 1226692,
+      "git_blob": "29883f4256864202203993756bdd9ca005f0c545",
       "all_top_level_keys": [
         "schema_version",
         "source_manifest",
@@ -9723,7 +9936,8 @@
         "new_advisory_scan_scope",
         "account_reconciliation_previous_binding",
         "reviewed_speech_binding",
-        "local_media_path_previous_binding"
+        "local_media_path_previous_binding",
+        "session_durability_previous_binding"
       ],
       "preserved_json_objects": {
         "schema_version": {
@@ -9736,27 +9950,27 @@
         },
         "source_manifest_sha256": {
           "pointer": "/source_manifest_sha256",
-          "canonical_json_sha256": "6637e895b1fd3d34fa3d6101caed3f2383b3189adb3165a9f7ae9364124ce45d"
+          "canonical_json_sha256": "fc94b95f61af31619aa90fc4a08795b2f467e03fbd23625fed54a99dcc1d8493"
         },
         "source_tree_sha256": {
           "pointer": "/source_tree_sha256",
-          "canonical_json_sha256": "61f8873e30e0a7ad8ed7b3c200b6ef4a19ea995dae983e93acc92df9a84c60fb"
+          "canonical_json_sha256": "a98f7fdc35145e4caeb469d5abee7e6ddb1d44731c059640cda65ec1165394c5"
         },
         "source_file_count": {
           "pointer": "/source_file_count",
-          "canonical_json_sha256": "0e70a832cb7a415716c3ba42776f795a905691b043e81a23895c8588a6268653"
+          "canonical_json_sha256": "b11b916a54e9e274f044ff0ffa37651e9f024aa71f65d4205c3d0f446984bf5f"
         },
         "source_revision": {
           "pointer": "/source_revision",
-          "canonical_json_sha256": "77a3208176e2c02e7c67bd352f1b65f01ccffce69be3f4439970f4e467b5ec32"
+          "canonical_json_sha256": "39c71377ab69e01b410cf029202b746ac13bcef68167fc166af8c91193693b6b"
         },
         "comparison_public_revision": {
           "pointer": "/comparison_public_revision",
-          "canonical_json_sha256": "ff85a546fc96a9fe114853421c276428b032a5f701e2066c8d58a73b84e91dbe"
+          "canonical_json_sha256": "7557311972ae8b7b8e447cca64b4f2bc4f2eb61b843790eee297c81648e6ba58"
         },
         "changed_source_paths": {
           "pointer": "/changed_source_paths",
-          "canonical_json_sha256": "a0532d9ccb98ce5f1e37b5472b57c8f1f215a48fdeef389aa4f26495dea72d81"
+          "canonical_json_sha256": "0ef90df50d5b332cba66e8c09ce20e6d805d93f7697d974ad42d6ab526654329"
         },
         "retained_sboms": {
           "pointer": "/retained_sboms",
@@ -9764,11 +9978,11 @@
         },
         "input_equivalence": {
           "pointer": "/input_equivalence",
-          "canonical_json_sha256": "fc9a32319efda76cfca00e3cd671d6204597fa5eb6fc2851550424dd781196e6"
+          "canonical_json_sha256": "e4dac12d8f93e5f8014513a129bfe579b43733a45c26078cc7e71cb47737e547"
         },
         "qualification": {
           "pointer": "/qualification",
-          "canonical_json_sha256": "efe2a4fac32418e8677e75f1a4eca2ad3ea2324abd860b26163388dd864621db"
+          "canonical_json_sha256": "9870021bded2bf7ba72241919afeb0c09f4a433b77809e6e375b277018872a27"
         },
         "historical_bindings": {
           "pointer": "/historical_bindings",
@@ -9776,15 +9990,15 @@
         },
         "prior_binding": {
           "pointer": "/prior_binding",
-          "canonical_json_sha256": "5ba2c6c525c72e366ebb894a6d2be5a9f9270bf6aafe3f1cb51e507eed9dbb36"
+          "canonical_json_sha256": "803439526f12dfafacf3f3bc71fa909f6f80c757e11dcf7852ceb6872966943f"
         },
         "retained_composition_component_bindings": {
           "pointer": "/retained_composition_component_bindings",
-          "canonical_json_sha256": "c4c1906728363cffd98a7c23a1a3ecfb36d24d23e76d45247e720430017f01a9"
+          "canonical_json_sha256": "fee66950939ce4906e6021a47d6e17b303474d2d5e6dd98b9c2789530fc0bbe9"
         },
         "reviewed_source_patch": {
           "pointer": "/reviewed_source_patch",
-          "canonical_json_sha256": "dc487a34b1610c7771b92a894035ea4a043d315c936dd27a58f9309d8cdb135d"
+          "canonical_json_sha256": "6baf4a0cbf353c74243e5f55c99b221de0caedae919db4d568a2137171352e3e"
         },
         "new_resolution_performed": {
           "pointer": "/new_resolution_performed",
@@ -9808,11 +10022,11 @@
         },
         "new_resolution_scope": {
           "pointer": "/new_resolution_scope",
-          "canonical_json_sha256": "fcf7362c088a3b12152d0fca4eb2cea69b1edb396d2f3e5713c783e955f5d979"
+          "canonical_json_sha256": "9bf7f702e88f9add7cf3a9728cae0b916ee2b70be518e58d8925d631c1fae8df"
         },
         "new_advisory_scan_scope": {
           "pointer": "/new_advisory_scan_scope",
-          "canonical_json_sha256": "a962c22ae3fd16301df85e58360f63758f351e57961226fa53cc57081dcc5c1c"
+          "canonical_json_sha256": "11562e3316870de618b3233bdad08fd782bc5280cf6438a60425ffe94d2b214c"
         },
         "account_reconciliation_previous_binding": {
           "pointer": "/account_reconciliation_previous_binding",
@@ -9825,7 +10039,17 @@
         "local_media_path_previous_binding": {
           "pointer": "/local_media_path_previous_binding",
           "canonical_json_sha256": "220f4c5da0641cd8f51fb28add2f66e18e1dba3e64cca61d345ebd775b15bf1f"
+        },
+        "session_durability_previous_binding": {
+          "pointer": "/session_durability_previous_binding",
+          "canonical_json_sha256": "d1931a403fd80ce0a8ea40f23700b2e5a3be8c1b155c3511cbf4d6f72792f6b9"
         }
+      },
+      "source_manifest": {
+        "path": "PUBLIC_METADATA/source-manifest.json",
+        "sha256": "963432f806a595f8fdfc157b3e3cfb6a723a2afd668217d62249df1e84059fd0",
+        "bytes": 469445,
+        "git_blob": "c814905f8e863f43570febfb6d6f8ababa3dc216"
       }
     }
   },
@@ -9834,8 +10058,8 @@
   "new_runtime_qualification_performed": false,
   "new_source_contract_qualification_performed": true,
   "new_static_security_scan_performed": false,
-  "new_resolution_scope": "No new dependency resolution in local composition. Retained inventories preserve historical scope.",
-  "new_advisory_scan_scope": "No new local advisory scan; final-head hosted checks remain required.",
+  "new_resolution_scope": "No dependency change or resolution; retained inventories preserve original provenance and scope.",
+  "new_advisory_scan_scope": "No new advisory scan in source preparation; final-head hosted checks remain required.",
   "account_reconciliation_previous_binding": {
     "source_revision": "f864e61381ef9e10a09333fce05210427cf7d0f6",
     "source_manifest_sha256": "9cad8bcb2f98c34d95a11545e11a57d74dbe6b28cd5db7322b7746e102801acd",
@@ -11343,6 +11567,339 @@
           "new_advisory_scan_scope": {
             "pointer": "/new_advisory_scan_scope",
             "canonical_json_sha256": "10498cd5e06f960054d6c8905a1e0ee71777731b4f4f9c087a5331564cba46bb"
+          }
+        }
+      }
+    }
+  },
+  "media_identity_previous_binding": {
+    "reference": {
+      "public_revision": "a594aa17a84f8fe295705b4d98ddddd8785b26f4",
+      "path": "PUBLIC_METADATA/source-binding.json",
+      "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/a594aa17a84f8fe295705b4d98ddddd8785b26f4/PUBLIC_METADATA/source-binding.json",
+      "sha256": "334b22e757e5b40b2b331973655e33a325c713e820d0e75514c66619c43caf72",
+      "bytes": 1226692,
+      "git_blob": "29883f4256864202203993756bdd9ca005f0c545",
+      "all_top_level_keys": [
+        "schema_version",
+        "source_manifest",
+        "source_manifest_sha256",
+        "source_tree_sha256",
+        "source_file_count",
+        "source_revision",
+        "comparison_public_revision",
+        "changed_source_paths",
+        "retained_sboms",
+        "input_equivalence",
+        "qualification",
+        "historical_bindings",
+        "prior_binding",
+        "retained_composition_component_bindings",
+        "reviewed_source_patch",
+        "new_resolution_performed",
+        "new_advisory_scan_performed",
+        "new_runtime_qualification_performed",
+        "new_source_contract_qualification_performed",
+        "new_static_security_scan_performed",
+        "new_resolution_scope",
+        "new_advisory_scan_scope",
+        "account_reconciliation_previous_binding",
+        "reviewed_speech_binding",
+        "local_media_path_previous_binding",
+        "session_durability_previous_binding"
+      ],
+      "preserved_json_objects": {
+        "schema_version": {
+          "pointer": "/schema_version",
+          "canonical_json_sha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+        },
+        "source_manifest": {
+          "pointer": "/source_manifest",
+          "canonical_json_sha256": "ace3c4cebde8c1e5207159e354ef46f1f9a13eb7b3185315a68b7cf8b71f212d"
+        },
+        "source_manifest_sha256": {
+          "pointer": "/source_manifest_sha256",
+          "canonical_json_sha256": "fc94b95f61af31619aa90fc4a08795b2f467e03fbd23625fed54a99dcc1d8493"
+        },
+        "source_tree_sha256": {
+          "pointer": "/source_tree_sha256",
+          "canonical_json_sha256": "a98f7fdc35145e4caeb469d5abee7e6ddb1d44731c059640cda65ec1165394c5"
+        },
+        "source_file_count": {
+          "pointer": "/source_file_count",
+          "canonical_json_sha256": "b11b916a54e9e274f044ff0ffa37651e9f024aa71f65d4205c3d0f446984bf5f"
+        },
+        "source_revision": {
+          "pointer": "/source_revision",
+          "canonical_json_sha256": "39c71377ab69e01b410cf029202b746ac13bcef68167fc166af8c91193693b6b"
+        },
+        "comparison_public_revision": {
+          "pointer": "/comparison_public_revision",
+          "canonical_json_sha256": "7557311972ae8b7b8e447cca64b4f2bc4f2eb61b843790eee297c81648e6ba58"
+        },
+        "changed_source_paths": {
+          "pointer": "/changed_source_paths",
+          "canonical_json_sha256": "0ef90df50d5b332cba66e8c09ce20e6d805d93f7697d974ad42d6ab526654329"
+        },
+        "retained_sboms": {
+          "pointer": "/retained_sboms",
+          "canonical_json_sha256": "0428d09c6e0e2b524877c2218b306c10da6c7536bcf6ed96524b581dafc85301"
+        },
+        "input_equivalence": {
+          "pointer": "/input_equivalence",
+          "canonical_json_sha256": "e4dac12d8f93e5f8014513a129bfe579b43733a45c26078cc7e71cb47737e547"
+        },
+        "qualification": {
+          "pointer": "/qualification",
+          "canonical_json_sha256": "9870021bded2bf7ba72241919afeb0c09f4a433b77809e6e375b277018872a27"
+        },
+        "historical_bindings": {
+          "pointer": "/historical_bindings",
+          "canonical_json_sha256": "59ccb6141308771f32ec1e534f7a843cbdd8867afcd59e84944e03e6f9958c33"
+        },
+        "prior_binding": {
+          "pointer": "/prior_binding",
+          "canonical_json_sha256": "803439526f12dfafacf3f3bc71fa909f6f80c757e11dcf7852ceb6872966943f"
+        },
+        "retained_composition_component_bindings": {
+          "pointer": "/retained_composition_component_bindings",
+          "canonical_json_sha256": "fee66950939ce4906e6021a47d6e17b303474d2d5e6dd98b9c2789530fc0bbe9"
+        },
+        "reviewed_source_patch": {
+          "pointer": "/reviewed_source_patch",
+          "canonical_json_sha256": "6baf4a0cbf353c74243e5f55c99b221de0caedae919db4d568a2137171352e3e"
+        },
+        "new_resolution_performed": {
+          "pointer": "/new_resolution_performed",
+          "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+        },
+        "new_advisory_scan_performed": {
+          "pointer": "/new_advisory_scan_performed",
+          "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+        },
+        "new_runtime_qualification_performed": {
+          "pointer": "/new_runtime_qualification_performed",
+          "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+        },
+        "new_source_contract_qualification_performed": {
+          "pointer": "/new_source_contract_qualification_performed",
+          "canonical_json_sha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b"
+        },
+        "new_static_security_scan_performed": {
+          "pointer": "/new_static_security_scan_performed",
+          "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+        },
+        "new_resolution_scope": {
+          "pointer": "/new_resolution_scope",
+          "canonical_json_sha256": "9bf7f702e88f9add7cf3a9728cae0b916ee2b70be518e58d8925d631c1fae8df"
+        },
+        "new_advisory_scan_scope": {
+          "pointer": "/new_advisory_scan_scope",
+          "canonical_json_sha256": "11562e3316870de618b3233bdad08fd782bc5280cf6438a60425ffe94d2b214c"
+        },
+        "account_reconciliation_previous_binding": {
+          "pointer": "/account_reconciliation_previous_binding",
+          "canonical_json_sha256": "cfeffa86ef01cbbd530cda12a57b6c4eb3761063999ad3fae482a0c1d7482b51"
+        },
+        "reviewed_speech_binding": {
+          "pointer": "/reviewed_speech_binding",
+          "canonical_json_sha256": "88025408d951467d38a236d6fdedb10ad4a4112e6ce02b3577c5b906adec6305"
+        },
+        "local_media_path_previous_binding": {
+          "pointer": "/local_media_path_previous_binding",
+          "canonical_json_sha256": "220f4c5da0641cd8f51fb28add2f66e18e1dba3e64cca61d345ebd775b15bf1f"
+        },
+        "session_durability_previous_binding": {
+          "pointer": "/session_durability_previous_binding",
+          "canonical_json_sha256": "d1931a403fd80ce0a8ea40f23700b2e5a3be8c1b155c3511cbf4d6f72792f6b9"
+        }
+      },
+      "source_manifest": {
+        "path": "PUBLIC_METADATA/source-manifest.json",
+        "sha256": "963432f806a595f8fdfc157b3e3cfb6a723a2afd668217d62249df1e84059fd0",
+        "bytes": 469445,
+        "git_blob": "c814905f8e863f43570febfb6d6f8ababa3dc216"
+      }
+    },
+    "qualification": {
+      "source_commit": "5071e162a861a2bb10105802863f6c84776e2975",
+      "scope": "Strict encrypted desktop-session cache persistence and fixture-owned SQLite cleanup only.",
+      "reviewed_production_patch_sha256": "dca547134b4162384a0811deb3c9d4efddc48b2566c10b9c79b693891c0b3abe",
+      "fixture_repair_patch_sha256": "907ef263dcf063a3787ceaa045bcc480067ccf8f6ef62b52bacdc9035a8aaabe",
+      "focused_session_controls": {
+        "passed": 16,
+        "all_fixture_owned_sqlite_connections_explicitly_closed": 17,
+        "temporary_profiles_removed": true
+      },
+      "retained_private_secret_controls": {
+        "passed": 9,
+        "existing_skips": 2,
+        "scope": "Retained bounded private tests; not full private composition qualification"
+      },
+      "initial_hosted_python": {
+        "head": "b9845fc1860a70fb34419610589ab3a30d101687",
+        "run": 37701663460,
+        "job": 113066301592,
+        "tests_run": 747,
+        "cleanup_errors": 4,
+        "existing_skips": 1,
+        "outcome": "failed; preserved. Windows temporary-profile deletion exposed open fixture connections; not counted as a pass."
+      },
+      "final_head_hosted_qualification_required": true,
+      "installed_acceptance": false,
+      "production_deployment": false,
+      "historical_incident_cause_established": false,
+      "power_loss_guarantee": false
+    },
+    "input_equivalence": {
+      "comparison_basis": "Protected public main a3b77223bd9d94b7cbba9029596b6f6ff5d5ffec",
+      "all_unselected_leaf_bytes_and_modes_preserved": true,
+      "six_retained_sbom_objects_and_bytes_preserved": true,
+      "dependency_and_workflow_inputs_unchanged": true,
+      "speech_music_account_pricing_resize_weekly_source_preserved": true
+    },
+    "reviewed_source_patch": {
+      "scope": "Strict encrypted desktop-session cache persistence and fixture-owned SQLite cleanup only.",
+      "source_paths": [
+        "SOURCE/auth/desktop_session.py",
+        "SOURCE/tests/public/test_desktop_session_persistence.py",
+        "SOURCE/utils/enhancements/secrets.py"
+      ],
+      "source_tree": "29a5eedf7a0d5d289f4ef956151c3f447f4ef1b0",
+      "prior_binding": {
+        "public_revision": "a3b77223bd9d94b7cbba9029596b6f6ff5d5ffec",
+        "path": "PUBLIC_METADATA/source-binding.json",
+        "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/a3b77223bd9d94b7cbba9029596b6f6ff5d5ffec/PUBLIC_METADATA/source-binding.json",
+        "sha256": "2e93a811fb3cd3456f1c8d8688dd732cf239a2a979c22766facaa6f31e09dd5d",
+        "bytes": 1196573,
+        "git_blob": "112e630fea47bb25a519423d2f6396b3f5fc4d5e",
+        "all_top_level_keys": [
+          "schema_version",
+          "source_manifest",
+          "source_manifest_sha256",
+          "source_tree_sha256",
+          "source_file_count",
+          "source_revision",
+          "comparison_public_revision",
+          "changed_source_paths",
+          "retained_sboms",
+          "input_equivalence",
+          "qualification",
+          "historical_bindings",
+          "prior_binding",
+          "retained_composition_component_bindings",
+          "reviewed_source_patch",
+          "new_resolution_performed",
+          "new_advisory_scan_performed",
+          "new_runtime_qualification_performed",
+          "new_source_contract_qualification_performed",
+          "new_static_security_scan_performed",
+          "new_resolution_scope",
+          "new_advisory_scan_scope",
+          "account_reconciliation_previous_binding",
+          "reviewed_speech_binding",
+          "local_media_path_previous_binding"
+        ],
+        "preserved_json_objects": {
+          "schema_version": {
+            "pointer": "/schema_version",
+            "canonical_json_sha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+          },
+          "source_manifest": {
+            "pointer": "/source_manifest",
+            "canonical_json_sha256": "ace3c4cebde8c1e5207159e354ef46f1f9a13eb7b3185315a68b7cf8b71f212d"
+          },
+          "source_manifest_sha256": {
+            "pointer": "/source_manifest_sha256",
+            "canonical_json_sha256": "6637e895b1fd3d34fa3d6101caed3f2383b3189adb3165a9f7ae9364124ce45d"
+          },
+          "source_tree_sha256": {
+            "pointer": "/source_tree_sha256",
+            "canonical_json_sha256": "61f8873e30e0a7ad8ed7b3c200b6ef4a19ea995dae983e93acc92df9a84c60fb"
+          },
+          "source_file_count": {
+            "pointer": "/source_file_count",
+            "canonical_json_sha256": "0e70a832cb7a415716c3ba42776f795a905691b043e81a23895c8588a6268653"
+          },
+          "source_revision": {
+            "pointer": "/source_revision",
+            "canonical_json_sha256": "77a3208176e2c02e7c67bd352f1b65f01ccffce69be3f4439970f4e467b5ec32"
+          },
+          "comparison_public_revision": {
+            "pointer": "/comparison_public_revision",
+            "canonical_json_sha256": "ff85a546fc96a9fe114853421c276428b032a5f701e2066c8d58a73b84e91dbe"
+          },
+          "changed_source_paths": {
+            "pointer": "/changed_source_paths",
+            "canonical_json_sha256": "a0532d9ccb98ce5f1e37b5472b57c8f1f215a48fdeef389aa4f26495dea72d81"
+          },
+          "retained_sboms": {
+            "pointer": "/retained_sboms",
+            "canonical_json_sha256": "0428d09c6e0e2b524877c2218b306c10da6c7536bcf6ed96524b581dafc85301"
+          },
+          "input_equivalence": {
+            "pointer": "/input_equivalence",
+            "canonical_json_sha256": "fc9a32319efda76cfca00e3cd671d6204597fa5eb6fc2851550424dd781196e6"
+          },
+          "qualification": {
+            "pointer": "/qualification",
+            "canonical_json_sha256": "efe2a4fac32418e8677e75f1a4eca2ad3ea2324abd860b26163388dd864621db"
+          },
+          "historical_bindings": {
+            "pointer": "/historical_bindings",
+            "canonical_json_sha256": "59ccb6141308771f32ec1e534f7a843cbdd8867afcd59e84944e03e6f9958c33"
+          },
+          "prior_binding": {
+            "pointer": "/prior_binding",
+            "canonical_json_sha256": "5ba2c6c525c72e366ebb894a6d2be5a9f9270bf6aafe3f1cb51e507eed9dbb36"
+          },
+          "retained_composition_component_bindings": {
+            "pointer": "/retained_composition_component_bindings",
+            "canonical_json_sha256": "c4c1906728363cffd98a7c23a1a3ecfb36d24d23e76d45247e720430017f01a9"
+          },
+          "reviewed_source_patch": {
+            "pointer": "/reviewed_source_patch",
+            "canonical_json_sha256": "dc487a34b1610c7771b92a894035ea4a043d315c936dd27a58f9309d8cdb135d"
+          },
+          "new_resolution_performed": {
+            "pointer": "/new_resolution_performed",
+            "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+          },
+          "new_advisory_scan_performed": {
+            "pointer": "/new_advisory_scan_performed",
+            "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+          },
+          "new_runtime_qualification_performed": {
+            "pointer": "/new_runtime_qualification_performed",
+            "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+          },
+          "new_source_contract_qualification_performed": {
+            "pointer": "/new_source_contract_qualification_performed",
+            "canonical_json_sha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b"
+          },
+          "new_static_security_scan_performed": {
+            "pointer": "/new_static_security_scan_performed",
+            "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+          },
+          "new_resolution_scope": {
+            "pointer": "/new_resolution_scope",
+            "canonical_json_sha256": "fcf7362c088a3b12152d0fca4eb2cea69b1edb396d2f3e5713c783e955f5d979"
+          },
+          "new_advisory_scan_scope": {
+            "pointer": "/new_advisory_scan_scope",
+            "canonical_json_sha256": "a962c22ae3fd16301df85e58360f63758f351e57961226fa53cc57081dcc5c1c"
+          },
+          "account_reconciliation_previous_binding": {
+            "pointer": "/account_reconciliation_previous_binding",
+            "canonical_json_sha256": "cfeffa86ef01cbbd530cda12a57b6c4eb3761063999ad3fae482a0c1d7482b51"
+          },
+          "reviewed_speech_binding": {
+            "pointer": "/reviewed_speech_binding",
+            "canonical_json_sha256": "88025408d951467d38a236d6fdedb10ad4a4112e6ce02b3577c5b906adec6305"
+          },
+          "local_media_path_previous_binding": {
+            "pointer": "/local_media_path_previous_binding",
+            "canonical_json_sha256": "220f4c5da0641cd8f51fb28add2f66e18e1dba3e64cca61d345ebd775b15bf1f"
           }
         }
       }
