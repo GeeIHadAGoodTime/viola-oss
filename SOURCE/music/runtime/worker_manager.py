@@ -380,6 +380,8 @@ class RuntimeWorkerManager:
         Must be called with ``player._cv`` held.
         """
         player = self._player
+        if getattr(player, "_queue_selection_stops_pending", 0) or player._user_paused:
+            return None, None, None
         current_check = player._playlist.current()
         current_id, current_title = self._item_debug_fields(current_check)
         pending_deadline, pending_item_id = self._pending_start_debug_fields()
@@ -437,6 +439,8 @@ class RuntimeWorkerManager:
         Force the worker to claim the current track if pending playback stalls.
         """
         player = self._player
+        if getattr(player, "_queue_selection_stops_pending", 0) or player._user_paused:
+            return None, None, None
         current = player._playlist.current()
         if current is None:
             player._clear_pending_start_locked()
@@ -641,6 +645,12 @@ class RuntimeWorkerManager:
                         pending_deadline,
                         pending_item_id,
                     )
+
+                # Do not consume a skip or start the new selection until all
+                # outside-lock stops from overlapping Queue Play calls finish.
+                if getattr(player, "_queue_selection_stops_pending", 0):
+                    player._cv.wait(timeout=TIMEOUT_SHORT)
+                    continue
 
                 # Expire old failures
                 player._playlist.expire_failures(self._queue_failure_ttl)
@@ -975,11 +985,11 @@ class RuntimeWorkerManager:
             self._worker_heartbeat += 1
             player._cv.notify_all()
 
-            # Guard: If a new play request reset the playlist while this
-            # track was being monitored, the playlist's current track is
-            # now a DIFFERENT item.  Completing it would incorrectly
-            # advance past the new track.  Skip completion entirely and
-            # let the worker loop pick up the new pending track.
+            # A new request may select another track or re-arm the same row.
+            # The single playback worker clears pending when it claims a
+            # request, so a pending current belongs to a newer request even
+            # when its ID is unchanged. A newer user pause/stop also owns the
+            # current state. Do not complete or advance either intention.
             playlist_current = player._playlist.current()
             playlist_current_id, playlist_current_title = self._item_debug_fields(playlist_current)
             player._logger.info(
@@ -992,7 +1002,9 @@ class RuntimeWorkerManager:
                 result.success,
                 current_thread().name,
             )
-            if playlist_current is not None and playlist_current.id != current.id:
+            if playlist_current is not None and (
+                playlist_current.id != current.id or player._playlist.pending or player._user_paused
+            ):
                 self._logger.info(
                     "Skipping completion for interrupted track %s (playlist current is now %s)",
                     current.id,
