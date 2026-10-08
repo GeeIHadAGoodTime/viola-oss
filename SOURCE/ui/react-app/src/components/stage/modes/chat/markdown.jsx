@@ -1,5 +1,5 @@
-import { useState } from 'react';
 import PropTypes from 'prop-types';
+import CopyButton from './CopyButton.jsx';
 
 const KEYWORDS = new Set([
   'async',
@@ -19,11 +19,6 @@ const KEYWORDS = new Set([
   'try',
   'while',
 ]);
-
-function copyText(text) {
-  if (!navigator.clipboard) return;
-  navigator.clipboard.writeText(text).catch(() => {});
-}
 
 function isSafeHref(href) {
   return /^https?:\/\//i.test(href) || href.startsWith('/') || href.startsWith('#');
@@ -82,17 +77,11 @@ function highlightCode(code) {
 }
 
 function CodeBlock({ code, language }) {
-  const [copied, setCopied] = useState(false);
-  const onCopy = () => {
-    copyText(code);
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1100);
-  };
   return (
     <div className="chat-code-block">
       <div className="chat-code-bar">
         <span>{language || 'text'}</span>
-        <button type="button" onClick={onCopy}>{copied ? 'Copied' : 'Copy'}</button>
+        <CopyButton text={code} />
       </div>
       <pre><code>{highlightCode(code)}</code></pre>
     </div>
