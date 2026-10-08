@@ -1,14 +1,16 @@
 {
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "4349ec9ddc078a49064708fca9eae9e240638b7014d0091a5b4fb336cc2798ce",
-  "source_tree_sha256": "9741fb0bf3542169b056e200861551ddb8daf5935189f0d317d209912b99e3b9",
-  "source_file_count": 2681,
-  "source_revision": "d2c8087d60038f8b10a45b918087d68eab579884",
-  "comparison_public_revision": "19e37f97130b979650791d816787dd42474704fd",
+  "source_manifest_sha256": "c547626c0e45e09ef1128fbf587107e363cb246930cd8344a5b6dd606a9305da",
+  "source_tree_sha256": "932ad804431c27ca26e0aef8a295de7cb2924c8f1d602ba5e6064380259bae8b",
+  "source_file_count": 2682,
+  "source_revision": "b7476492c9df959b141e4b35ffa1358aeda228fb",
+  "comparison_public_revision": "c77b80c6f9154f557a3be0d2a0598f20bc23cfd7",
   "changed_source_paths": [
-    "SOURCE/ui/react-app/src/components/MemoryPanel.jsx",
-    "SOURCE/ui/react-app/src/components/MemoryPanel.workbench.test.jsx"
+    "SOURCE/LICENSES/Unicode-Unihan-16.0.0-NOTICE.txt",
+    "SOURCE/LICENSES/SHA256SUMS",
+    "SOURCE/docs/CUSTOMER_SPEECH_QUALIFICATION.md",
+    "SOURCE/tests/public/test_customer_speech_dependencies.py"
   ],
   "retained_sboms": [
     {
@@ -70,48 +72,126 @@
     }
   ],
   "input_equivalence": {
-    "comparison_basis": "Protected public main 19e37f97130b979650791d816787dd42474704fd",
+    "comparison_basis": "Protected public main c77b80c6f9154f557a3be0d2a0598f20bc23cfd7",
     "all_unselected_export_leaf_bytes_and_modes_preserved": true,
     "all_six_sbom_bytes_and_status_objects_preserved": true,
-    "frontend_dependency_vendor_and_workflow_inputs_unchanged": true,
-    "protected_speech_account_session_and_music_repairs_preserved": true
+    "all_production_runtime_model_voice_dictionary_and_dependency_bytes_unchanged": true,
+    "frontend_and_workflow_inputs_unchanged": true,
+    "existing_component_notice_bytes_unchanged": true,
+    "private_preparer_untouched": true
   },
   "qualification": {
-    "scope": "Workbench partial-upload recovery and retired-panel callback ownership",
-    "source_commit": "d2c8087d60038f8b10a45b918087d68eab579884",
-    "source_tree": "54179d23575903ceef1aa016974c293be48a2648",
+    "scope": "Retain exact Unicode V3 and original Unicode16 Unihan attribution for selected Mandarin source inputs",
+    "source_commit": "b7476492c9df959b141e4b35ffa1358aeda228fb",
+    "source_tree": "673f19c48ccdfe424669e9aad0fcc4818675b0ac",
     "ordered_source_parents": [
-      "19e37f97130b979650791d816787dd42474704fd"
+      "c77b80c6f9154f557a3be0d2a0598f20bc23cfd7"
     ],
-    "source_patch_sha256": "6a148d9b413d8febce7a70906f1bd52a6ec46f38efe760ab48b96fe105503b92",
-    "source_controls": {
-      "frontend_focused_tests": 53,
-      "failures": 0,
-      "skipped": 0,
-      "new_recovery_cases": 6,
-      "unchanged_main_negative_control": {
-        "passed": 1,
-        "failed": 5
-      },
-      "executed_base": "d59bc175de5786c0500aaa77d78882336c49fdfd",
-      "composition_base": "19e37f97130b979650791d816787dd42474704fd",
-      "relevant_component_and_test_dependency_inputs_unchanged_between_bases": true,
-      "environment": "Existing authorized Windows main-PC dependencies; synthetic API responses, no Surface interaction"
-    },
+    "source_patch_sha256": "62dba3b600dcb82912e6668646076bba530f67de4e3bd0c6baa462c6fee2f292",
     "source_review": {
+      "kind": "independent automated source attribution review",
       "result": "PASS",
-      "reviewer": "root independent exact-patch review",
-      "patch_sha256": "6a148d9b413d8febce7a70906f1bd52a6ec46f38efe760ab48b96fe105503b92",
+      "source_paths": 4,
+      "patch_sha256": "62dba3b600dcb82912e6668646076bba530f67de4e3bd0c6baa462c6fee2f292",
+      "findings_resolved": [
+        "Corrected official terms citation to sections 2(b) and 3(c)."
+      ],
       "blocking_findings": []
     },
-    "frontend_full_suite_locally_repeated": false,
-    "dependency_inputs_changed": false,
-    "installed_acceptance_passed": false,
+    "source_controls": {
+      "focused_methods": 23,
+      "new_notice_method": 1,
+      "original_missing_notice_rejected": true,
+      "notice_checksum_mutants_rejected": 5,
+      "full_public_methods": 850,
+      "full_public_failures": 0,
+      "full_public_errors": 0,
+      "full_public_skipped": [
+        [
+          "test_actual_qt_event_propagation (test_native_titlebar_resize.RealQtTitlebarResizeTests.test_actual_qt_event_propagation)",
+          "PySide6 unavailable; source-method contracts still run"
+        ]
+      ],
+      "socket_connect_attempts": 0,
+      "environment": "Owned Linux CPython3.12 environment with source-pinned FastAPI, Starlette and Pydantic."
+    },
+    "unicode_notice": {
+      "source_path": "SOURCE/LICENSES/Unicode-Unihan-16.0.0-NOTICE.txt",
+      "bytes": 3653,
+      "sha256": "ddc087bd0e203e38820edd68fc07bf823b6460dbfd91aa56fbd4e2ab5df54380",
+      "original_data": "Unicode 16.0.0 Unihan_Readings.txt, dated 2024-07-31, original copyright 2024 Unicode Inc.",
+      "original_header_bytes": 393,
+      "original_header_sha256": "9b22459d15c0df76c2f39cfe76acac355b1aafef9c7cfcdb1488ace260d4c36f",
+      "official_license_url": "https://www.unicode.org/license.txt",
+      "official_license_retrieved_on_utc": "2026-10-08",
+      "official_license_bytes": 1995,
+      "official_license_sha256": "e7a93b009565cfce55919a381437ac4db883e9da2126fa28b91d12732bc53d96",
+      "license_identity": "Unicode License V3",
+      "retained_license_copyright_range": "1991-2026",
+      "historical_copy_scope": "OpenJDK-preserved Unicode 16.0.0 complete V3 notice at 15ae8d02eeb9c80f5453b88d38081debf956cb65; exact text differs only in copyright end year 2024 versus 2026. Not claimed as an archived unicode.org download.",
+      "selected_data_derivation": [
+        {
+          "field": "kHanyuPinlu",
+          "rows": 3799,
+          "bytes": 78922,
+          "sha256": "260ef08aef066ae5e798ed9933e305094d03a87a5d0bcbced6d740cb9084f2f8",
+          "git_blob": "abc37486838a6bcb5b6a619b4a61fee1710dfd59",
+          "pinned_source_git_blob": "abc37486838a6bcb5b6a619b4a61fee1710dfd59",
+          "exact": true,
+          "source_bytes": 78922
+        },
+        {
+          "field": "kHanyuPinyin",
+          "rows": 34130,
+          "bytes": 766770,
+          "sha256": "2c4c24310caa91ff81e960ec674f2102664dbbd1e686c30c204cc78aaa27b9d9",
+          "git_blob": "b084ee9c719110a81459f165d0e82a001901b90d",
+          "pinned_source_git_blob": "b084ee9c719110a81459f165d0e82a001901b90d",
+          "exact": true,
+          "source_bytes": 766770
+        },
+        {
+          "field": "kMandarin",
+          "rows": 41692,
+          "bytes": 866878,
+          "sha256": "313ca5491f88ad2e1c934319e879ee1a35724f6cf838ca3ab660c488cd5ab7ff",
+          "git_blob": "3ff77dfabccbd9245e3c2c99006f344aee651a39",
+          "pinned_source_git_blob": "3ff77dfabccbd9245e3c2c99006f344aee651a39",
+          "exact": true,
+          "source_bytes": 866878
+        },
+        {
+          "field": "kTGHZ2013",
+          "rows": 8105,
+          "bytes": 166509,
+          "sha256": "83be5ecdfe0b8fcc1202ae45882a2f983c013db87ba68369d94a4dad775382bb",
+          "git_blob": "1bf2800594be92c886888895c44066ad4a815990",
+          "pinned_source_git_blob": "1bf2800594be92c886888895c44066ad4a815990",
+          "exact": true,
+          "source_bytes": 166509
+        },
+        {
+          "field": "kXHC1983",
+          "rows": 11072,
+          "bytes": 230280,
+          "sha256": "7ade5b5750c92d39dec2151075ebcca323afe6af452349f54438d950b1dd4eeb",
+          "git_blob": "8d73bdc840c59b0a16645491514464c1c275aa4b",
+          "pinned_source_git_blob": "8d73bdc840c59b0a16645491514464c1c275aa4b",
+          "exact": true,
+          "source_bytes": 230280
+        }
+      ]
+    },
+    "runtime_and_dependency_inputs_changed": false,
+    "private_collection_changed": false,
+    "native_synthesis_performed": false,
+    "installed_audibility_verified": false,
     "customer_release_eligible": false,
+    "profile_activated": false,
     "limits": [
-      "Focused source checks do not prove an installed upload journey.",
-      "Required full hosted frontend and source checks remain separate.",
-      "Prior speech, inventory and packaging results retain their original artifact scope."
+      "The missing Unicode source-attribution notice is retained; this is not blanket license clearance for every upstream input or transitive/native component.",
+      "The existing private preparer must collect this exact notice into accessible frozen-artifact materials; actual inclusion is not inferred from source presence.",
+      "Exact Windows native/redistribution inventories, signed publisher binding and installed selected-language listening/recovery remain separate."
     ]
   },
   "historical_bindings": [
@@ -8409,12 +8489,12 @@
     }
   ],
   "prior_binding": {
-    "public_revision": "19e37f97130b979650791d816787dd42474704fd",
+    "public_revision": "c77b80c6f9154f557a3be0d2a0598f20bc23cfd7",
     "path": "PUBLIC_METADATA/source-binding.json",
-    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/19e37f97130b979650791d816787dd42474704fd/PUBLIC_METADATA/source-binding.json",
-    "sha256": "9cc23963dd896bed38d0d12204838df640a2546f588f772d20eb2b817aa5e640",
-    "bytes": 1269609,
-    "git_blob": "9b4e81d23bc51a711458f4267a8f6ff766df602f",
+    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/c77b80c6f9154f557a3be0d2a0598f20bc23cfd7/PUBLIC_METADATA/source-binding.json",
+    "sha256": "04b25f66b920fba1d1e7c2fe21e120880a0d4236950689c51533eedc2cda6656",
+    "bytes": 1272988,
+    "git_blob": "fbe1a3755145086676df2aff07320a9d5a65d5f2",
     "all_top_level_keys": [
       "schema_version",
       "source_manifest",
@@ -8455,27 +8535,27 @@
       },
       "source_manifest_sha256": {
         "pointer": "/source_manifest_sha256",
-        "canonical_json_sha256": "d1ce64919a4e93632b170a2614632b95042adf80b3f292938c4dd67cd24928eb"
+        "canonical_json_sha256": "bdbfcbd68cab59424f0225e212059518741b0ccc0941b997703c17705511ab10"
       },
       "source_tree_sha256": {
         "pointer": "/source_tree_sha256",
-        "canonical_json_sha256": "646bb0096ad72429040d39c9c2bf97673f2fa34d5b05954ed07c327ad90aef9f"
+        "canonical_json_sha256": "2ca05f7e7965a2b00f071f60dcea077f3aa035a9d91e415053f0e7ddc5f5f788"
       },
       "source_file_count": {
         "pointer": "/source_file_count",
-        "canonical_json_sha256": "bda5459a0e2644a21da04c7aa147f30b2849ac296c7e92b69002f4172e0da20f"
+        "canonical_json_sha256": "45614290270f9909ee6ffe6f52ae5f8360be81fec6d3868d8022e2d200be3de4"
       },
       "source_revision": {
         "pointer": "/source_revision",
-        "canonical_json_sha256": "3be7020df6bf84babd5a66c611616a296bded4ee1cc91dc691b42f7d38171ee1"
+        "canonical_json_sha256": "ccbffc1f42405c35839a33854fe0dd3c63a3ade7dd6534e8e51881a3e8f6ac2b"
       },
       "comparison_public_revision": {
         "pointer": "/comparison_public_revision",
-        "canonical_json_sha256": "c71606d363ea6b7c8b998f0484b1d7d7847a95ce6b21b87f411b229fdd541220"
+        "canonical_json_sha256": "b447337b8fb8c5e9895f15becdcabd6239d6313f7b4b4611b189a335f4cc252b"
       },
       "changed_source_paths": {
         "pointer": "/changed_source_paths",
-        "canonical_json_sha256": "499a2d0a352e3c45e3ac9aa2302eaba830319deb315f38029ac8040da3eca285"
+        "canonical_json_sha256": "be7217bb52f3b294baddd0d83afc6b0fdeabe63d08d70fc6560aa02c0deb86df"
       },
       "retained_sboms": {
         "pointer": "/retained_sboms",
@@ -8483,11 +8563,11 @@
       },
       "input_equivalence": {
         "pointer": "/input_equivalence",
-        "canonical_json_sha256": "5f15777b2ca967603b2d641579b34b0dbac1d92cea46638ed39980b9aca4118c"
+        "canonical_json_sha256": "fda46b64b3fe07d55c9c88373eba411ad3efd4dfc27ae830797f57089eda5167"
       },
       "qualification": {
         "pointer": "/qualification",
-        "canonical_json_sha256": "0f7d9c0c7ed42d0097bd82e7510a8b15cc24c7c84e9673c77827c08c702a6aab"
+        "canonical_json_sha256": "766c5ccadfaa32d9995255f629ece58cd2a53ba511881f40c3c60f5226832c59"
       },
       "historical_bindings": {
         "pointer": "/historical_bindings",
@@ -8495,15 +8575,15 @@
       },
       "prior_binding": {
         "pointer": "/prior_binding",
-        "canonical_json_sha256": "86fc6425471aa6b6e28335327d15785688309e9e5722bb67182f150881b99335"
+        "canonical_json_sha256": "0f157a801da6d37b1d34d2c0e5f84e5f420a7b5bcc89fabd791d4b1a8d5a247c"
       },
       "retained_composition_component_bindings": {
         "pointer": "/retained_composition_component_bindings",
-        "canonical_json_sha256": "b9e54a4110cf81544037c5a751525e86ed77e5e90ffe598b424931e89cdf4e77"
+        "canonical_json_sha256": "251947a4911e7e80e91b0639452ffb4bc9296b4b9e5b7d4e5ca72c46458870bb"
       },
       "reviewed_source_patch": {
         "pointer": "/reviewed_source_patch",
-        "canonical_json_sha256": "c2a183778122befc72ee23803a81f4d3505a38edb677c079e10f1e14c520f79a"
+        "canonical_json_sha256": "6b78ea9ce410112960347bf91de56f47746f5f2cb131f70a10508cc04435fe06"
       },
       "new_resolution_performed": {
         "pointer": "/new_resolution_performed",
@@ -8527,11 +8607,11 @@
       },
       "new_resolution_scope": {
         "pointer": "/new_resolution_scope",
-        "canonical_json_sha256": "74335d2cdfb1e69be2307870111de0e7dbed4870ec16b1bc1de8106b01d4c966"
+        "canonical_json_sha256": "ef03ad125974bb483a9a86f3a3bacb3d4f27c2f81b325e42fd5c94672892a2bb"
       },
       "new_advisory_scan_scope": {
         "pointer": "/new_advisory_scan_scope",
-        "canonical_json_sha256": "9950c06b1168cdb3d4c58b08cf31af866448ecd5c2fb546a607d22772402b69c"
+        "canonical_json_sha256": "d40fbfa52f67dae7875dabeb6fab973f1792e4fa1c5805f61a7f14465d466b97"
       },
       "account_reconciliation_previous_binding": {
         "pointer": "/account_reconciliation_previous_binding",
@@ -8556,12 +8636,165 @@
     },
     "source_manifest": {
       "path": "PUBLIC_METADATA/source-manifest.json",
-      "sha256": "e6f14c2e7b0d5a8ef908df4246b0c541a9c49180c7bfade4681424e5442b8fc7",
-      "bytes": 470818,
-      "git_blob": "2ae7cf4537b7491d243d743af4a80807c4e570aa"
+      "sha256": "4349ec9ddc078a49064708fca9eae9e240638b7014d0091a5b4fb336cc2798ce",
+      "bytes": 471011,
+      "git_blob": "50417295a7a315e835c0f477e3c35c1d90d2df59"
     }
   },
   "retained_composition_component_bindings": [
+    {
+      "public_revision": "c77b80c6f9154f557a3be0d2a0598f20bc23cfd7",
+      "path": "PUBLIC_METADATA/source-binding.json",
+      "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/c77b80c6f9154f557a3be0d2a0598f20bc23cfd7/PUBLIC_METADATA/source-binding.json",
+      "sha256": "04b25f66b920fba1d1e7c2fe21e120880a0d4236950689c51533eedc2cda6656",
+      "bytes": 1272988,
+      "git_blob": "fbe1a3755145086676df2aff07320a9d5a65d5f2",
+      "all_top_level_keys": [
+        "schema_version",
+        "source_manifest",
+        "source_manifest_sha256",
+        "source_tree_sha256",
+        "source_file_count",
+        "source_revision",
+        "comparison_public_revision",
+        "changed_source_paths",
+        "retained_sboms",
+        "input_equivalence",
+        "qualification",
+        "historical_bindings",
+        "prior_binding",
+        "retained_composition_component_bindings",
+        "reviewed_source_patch",
+        "new_resolution_performed",
+        "new_advisory_scan_performed",
+        "new_runtime_qualification_performed",
+        "new_source_contract_qualification_performed",
+        "new_static_security_scan_performed",
+        "new_resolution_scope",
+        "new_advisory_scan_scope",
+        "account_reconciliation_previous_binding",
+        "reviewed_speech_binding",
+        "local_media_path_previous_binding",
+        "session_durability_previous_binding",
+        "media_identity_previous_binding"
+      ],
+      "preserved_json_objects": {
+        "schema_version": {
+          "pointer": "/schema_version",
+          "canonical_json_sha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+        },
+        "source_manifest": {
+          "pointer": "/source_manifest",
+          "canonical_json_sha256": "ace3c4cebde8c1e5207159e354ef46f1f9a13eb7b3185315a68b7cf8b71f212d"
+        },
+        "source_manifest_sha256": {
+          "pointer": "/source_manifest_sha256",
+          "canonical_json_sha256": "bdbfcbd68cab59424f0225e212059518741b0ccc0941b997703c17705511ab10"
+        },
+        "source_tree_sha256": {
+          "pointer": "/source_tree_sha256",
+          "canonical_json_sha256": "2ca05f7e7965a2b00f071f60dcea077f3aa035a9d91e415053f0e7ddc5f5f788"
+        },
+        "source_file_count": {
+          "pointer": "/source_file_count",
+          "canonical_json_sha256": "45614290270f9909ee6ffe6f52ae5f8360be81fec6d3868d8022e2d200be3de4"
+        },
+        "source_revision": {
+          "pointer": "/source_revision",
+          "canonical_json_sha256": "ccbffc1f42405c35839a33854fe0dd3c63a3ade7dd6534e8e51881a3e8f6ac2b"
+        },
+        "comparison_public_revision": {
+          "pointer": "/comparison_public_revision",
+          "canonical_json_sha256": "b447337b8fb8c5e9895f15becdcabd6239d6313f7b4b4611b189a335f4cc252b"
+        },
+        "changed_source_paths": {
+          "pointer": "/changed_source_paths",
+          "canonical_json_sha256": "be7217bb52f3b294baddd0d83afc6b0fdeabe63d08d70fc6560aa02c0deb86df"
+        },
+        "retained_sboms": {
+          "pointer": "/retained_sboms",
+          "canonical_json_sha256": "0428d09c6e0e2b524877c2218b306c10da6c7536bcf6ed96524b581dafc85301"
+        },
+        "input_equivalence": {
+          "pointer": "/input_equivalence",
+          "canonical_json_sha256": "fda46b64b3fe07d55c9c88373eba411ad3efd4dfc27ae830797f57089eda5167"
+        },
+        "qualification": {
+          "pointer": "/qualification",
+          "canonical_json_sha256": "766c5ccadfaa32d9995255f629ece58cd2a53ba511881f40c3c60f5226832c59"
+        },
+        "historical_bindings": {
+          "pointer": "/historical_bindings",
+          "canonical_json_sha256": "59ccb6141308771f32ec1e534f7a843cbdd8867afcd59e84944e03e6f9958c33"
+        },
+        "prior_binding": {
+          "pointer": "/prior_binding",
+          "canonical_json_sha256": "0f157a801da6d37b1d34d2c0e5f84e5f420a7b5bcc89fabd791d4b1a8d5a247c"
+        },
+        "retained_composition_component_bindings": {
+          "pointer": "/retained_composition_component_bindings",
+          "canonical_json_sha256": "251947a4911e7e80e91b0639452ffb4bc9296b4b9e5b7d4e5ca72c46458870bb"
+        },
+        "reviewed_source_patch": {
+          "pointer": "/reviewed_source_patch",
+          "canonical_json_sha256": "6b78ea9ce410112960347bf91de56f47746f5f2cb131f70a10508cc04435fe06"
+        },
+        "new_resolution_performed": {
+          "pointer": "/new_resolution_performed",
+          "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+        },
+        "new_advisory_scan_performed": {
+          "pointer": "/new_advisory_scan_performed",
+          "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+        },
+        "new_runtime_qualification_performed": {
+          "pointer": "/new_runtime_qualification_performed",
+          "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+        },
+        "new_source_contract_qualification_performed": {
+          "pointer": "/new_source_contract_qualification_performed",
+          "canonical_json_sha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b"
+        },
+        "new_static_security_scan_performed": {
+          "pointer": "/new_static_security_scan_performed",
+          "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+        },
+        "new_resolution_scope": {
+          "pointer": "/new_resolution_scope",
+          "canonical_json_sha256": "ef03ad125974bb483a9a86f3a3bacb3d4f27c2f81b325e42fd5c94672892a2bb"
+        },
+        "new_advisory_scan_scope": {
+          "pointer": "/new_advisory_scan_scope",
+          "canonical_json_sha256": "d40fbfa52f67dae7875dabeb6fab973f1792e4fa1c5805f61a7f14465d466b97"
+        },
+        "account_reconciliation_previous_binding": {
+          "pointer": "/account_reconciliation_previous_binding",
+          "canonical_json_sha256": "cfeffa86ef01cbbd530cda12a57b6c4eb3761063999ad3fae482a0c1d7482b51"
+        },
+        "reviewed_speech_binding": {
+          "pointer": "/reviewed_speech_binding",
+          "canonical_json_sha256": "88025408d951467d38a236d6fdedb10ad4a4112e6ce02b3577c5b906adec6305"
+        },
+        "local_media_path_previous_binding": {
+          "pointer": "/local_media_path_previous_binding",
+          "canonical_json_sha256": "220f4c5da0641cd8f51fb28add2f66e18e1dba3e64cca61d345ebd775b15bf1f"
+        },
+        "session_durability_previous_binding": {
+          "pointer": "/session_durability_previous_binding",
+          "canonical_json_sha256": "d1931a403fd80ce0a8ea40f23700b2e5a3be8c1b155c3511cbf4d6f72792f6b9"
+        },
+        "media_identity_previous_binding": {
+          "pointer": "/media_identity_previous_binding",
+          "canonical_json_sha256": "775b630f1531f2b679dfb823a59f6d534e542a78fdf1dc3dc6013a74012468e3"
+        }
+      },
+      "source_manifest": {
+        "path": "PUBLIC_METADATA/source-manifest.json",
+        "sha256": "4349ec9ddc078a49064708fca9eae9e240638b7014d0091a5b4fb336cc2798ce",
+        "bytes": 471011,
+        "git_blob": "50417295a7a315e835c0f477e3c35c1d90d2df59"
+      }
+    },
     {
       "public_revision": "19e37f97130b979650791d816787dd42474704fd",
       "path": "PUBLIC_METADATA/source-binding.json",
@@ -10314,20 +10547,22 @@
     }
   ],
   "reviewed_source_patch": {
-    "scope": "Workbench upload recovery",
+    "scope": "Retain exact Unicode V3 and original Unicode16 Unihan attribution for selected Mandarin source inputs",
     "source_paths": [
-      "SOURCE/ui/react-app/src/components/MemoryPanel.jsx",
-      "SOURCE/ui/react-app/src/components/MemoryPanel.workbench.test.jsx"
+      "SOURCE/LICENSES/Unicode-Unihan-16.0.0-NOTICE.txt",
+      "SOURCE/LICENSES/SHA256SUMS",
+      "SOURCE/docs/CUSTOMER_SPEECH_QUALIFICATION.md",
+      "SOURCE/tests/public/test_customer_speech_dependencies.py"
     ],
-    "source_tree": "54179d23575903ceef1aa016974c293be48a2648",
-    "patch_sha256": "6a148d9b413d8febce7a70906f1bd52a6ec46f38efe760ab48b96fe105503b92",
+    "source_tree": "673f19c48ccdfe424669e9aad0fcc4818675b0ac",
+    "patch_sha256": "62dba3b600dcb82912e6668646076bba530f67de4e3bd0c6baa462c6fee2f292",
     "prior_binding": {
-      "public_revision": "19e37f97130b979650791d816787dd42474704fd",
+      "public_revision": "c77b80c6f9154f557a3be0d2a0598f20bc23cfd7",
       "path": "PUBLIC_METADATA/source-binding.json",
-      "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/19e37f97130b979650791d816787dd42474704fd/PUBLIC_METADATA/source-binding.json",
-      "sha256": "9cc23963dd896bed38d0d12204838df640a2546f588f772d20eb2b817aa5e640",
-      "bytes": 1269609,
-      "git_blob": "9b4e81d23bc51a711458f4267a8f6ff766df602f",
+      "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/c77b80c6f9154f557a3be0d2a0598f20bc23cfd7/PUBLIC_METADATA/source-binding.json",
+      "sha256": "04b25f66b920fba1d1e7c2fe21e120880a0d4236950689c51533eedc2cda6656",
+      "bytes": 1272988,
+      "git_blob": "fbe1a3755145086676df2aff07320a9d5a65d5f2",
       "all_top_level_keys": [
         "schema_version",
         "source_manifest",
@@ -10368,27 +10603,27 @@
         },
         "source_manifest_sha256": {
           "pointer": "/source_manifest_sha256",
-          "canonical_json_sha256": "d1ce64919a4e93632b170a2614632b95042adf80b3f292938c4dd67cd24928eb"
+          "canonical_json_sha256": "bdbfcbd68cab59424f0225e212059518741b0ccc0941b997703c17705511ab10"
         },
         "source_tree_sha256": {
           "pointer": "/source_tree_sha256",
-          "canonical_json_sha256": "646bb0096ad72429040d39c9c2bf97673f2fa34d5b05954ed07c327ad90aef9f"
+          "canonical_json_sha256": "2ca05f7e7965a2b00f071f60dcea077f3aa035a9d91e415053f0e7ddc5f5f788"
         },
         "source_file_count": {
           "pointer": "/source_file_count",
-          "canonical_json_sha256": "bda5459a0e2644a21da04c7aa147f30b2849ac296c7e92b69002f4172e0da20f"
+          "canonical_json_sha256": "45614290270f9909ee6ffe6f52ae5f8360be81fec6d3868d8022e2d200be3de4"
         },
         "source_revision": {
           "pointer": "/source_revision",
-          "canonical_json_sha256": "3be7020df6bf84babd5a66c611616a296bded4ee1cc91dc691b42f7d38171ee1"
+          "canonical_json_sha256": "ccbffc1f42405c35839a33854fe0dd3c63a3ade7dd6534e8e51881a3e8f6ac2b"
         },
         "comparison_public_revision": {
           "pointer": "/comparison_public_revision",
-          "canonical_json_sha256": "c71606d363ea6b7c8b998f0484b1d7d7847a95ce6b21b87f411b229fdd541220"
+          "canonical_json_sha256": "b447337b8fb8c5e9895f15becdcabd6239d6313f7b4b4611b189a335f4cc252b"
         },
         "changed_source_paths": {
           "pointer": "/changed_source_paths",
-          "canonical_json_sha256": "499a2d0a352e3c45e3ac9aa2302eaba830319deb315f38029ac8040da3eca285"
+          "canonical_json_sha256": "be7217bb52f3b294baddd0d83afc6b0fdeabe63d08d70fc6560aa02c0deb86df"
         },
         "retained_sboms": {
           "pointer": "/retained_sboms",
@@ -10396,11 +10631,11 @@
         },
         "input_equivalence": {
           "pointer": "/input_equivalence",
-          "canonical_json_sha256": "5f15777b2ca967603b2d641579b34b0dbac1d92cea46638ed39980b9aca4118c"
+          "canonical_json_sha256": "fda46b64b3fe07d55c9c88373eba411ad3efd4dfc27ae830797f57089eda5167"
         },
         "qualification": {
           "pointer": "/qualification",
-          "canonical_json_sha256": "0f7d9c0c7ed42d0097bd82e7510a8b15cc24c7c84e9673c77827c08c702a6aab"
+          "canonical_json_sha256": "766c5ccadfaa32d9995255f629ece58cd2a53ba511881f40c3c60f5226832c59"
         },
         "historical_bindings": {
           "pointer": "/historical_bindings",
@@ -10408,15 +10643,15 @@
         },
         "prior_binding": {
           "pointer": "/prior_binding",
-          "canonical_json_sha256": "86fc6425471aa6b6e28335327d15785688309e9e5722bb67182f150881b99335"
+          "canonical_json_sha256": "0f157a801da6d37b1d34d2c0e5f84e5f420a7b5bcc89fabd791d4b1a8d5a247c"
         },
         "retained_composition_component_bindings": {
           "pointer": "/retained_composition_component_bindings",
-          "canonical_json_sha256": "b9e54a4110cf81544037c5a751525e86ed77e5e90ffe598b424931e89cdf4e77"
+          "canonical_json_sha256": "251947a4911e7e80e91b0639452ffb4bc9296b4b9e5b7d4e5ca72c46458870bb"
         },
         "reviewed_source_patch": {
           "pointer": "/reviewed_source_patch",
-          "canonical_json_sha256": "c2a183778122befc72ee23803a81f4d3505a38edb677c079e10f1e14c520f79a"
+          "canonical_json_sha256": "6b78ea9ce410112960347bf91de56f47746f5f2cb131f70a10508cc04435fe06"
         },
         "new_resolution_performed": {
           "pointer": "/new_resolution_performed",
@@ -10440,11 +10675,11 @@
         },
         "new_resolution_scope": {
           "pointer": "/new_resolution_scope",
-          "canonical_json_sha256": "74335d2cdfb1e69be2307870111de0e7dbed4870ec16b1bc1de8106b01d4c966"
+          "canonical_json_sha256": "ef03ad125974bb483a9a86f3a3bacb3d4f27c2f81b325e42fd5c94672892a2bb"
         },
         "new_advisory_scan_scope": {
           "pointer": "/new_advisory_scan_scope",
-          "canonical_json_sha256": "9950c06b1168cdb3d4c58b08cf31af866448ecd5c2fb546a607d22772402b69c"
+          "canonical_json_sha256": "d40fbfa52f67dae7875dabeb6fab973f1792e4fa1c5805f61a7f14465d466b97"
         },
         "account_reconciliation_previous_binding": {
           "pointer": "/account_reconciliation_previous_binding",
@@ -10469,9 +10704,9 @@
       },
       "source_manifest": {
         "path": "PUBLIC_METADATA/source-manifest.json",
-        "sha256": "e6f14c2e7b0d5a8ef908df4246b0c541a9c49180c7bfade4681424e5442b8fc7",
-        "bytes": 470818,
-        "git_blob": "2ae7cf4537b7491d243d743af4a80807c4e570aa"
+        "sha256": "4349ec9ddc078a49064708fca9eae9e240638b7014d0091a5b4fb336cc2798ce",
+        "bytes": 471011,
+        "git_blob": "50417295a7a315e835c0f477e3c35c1d90d2df59"
       }
     }
   },
@@ -10480,8 +10715,8 @@
   "new_runtime_qualification_performed": false,
   "new_source_contract_qualification_performed": true,
   "new_static_security_scan_performed": false,
-  "new_resolution_scope": "No dependency or target graph change; existing lockfile/dependency inputs retained.",
-  "new_advisory_scan_scope": "No new local advisory clearance; hosted checks retain their own result.",
+  "new_resolution_scope": "No production dependency change or target-graph resolution. Versioned Unicode data and current official license were read only to establish source attribution.",
+  "new_advisory_scan_scope": "No new advisory clearance in local composition; normal hosted jobs retain their own results.",
   "account_reconciliation_previous_binding": {
     "source_revision": "f864e61381ef9e10a09333fce05210427cf7d0f6",
     "source_manifest_sha256": "9cad8bcb2f98c34d95a11545e11a57d74dbe6b28cd5db7322b7746e102801acd",

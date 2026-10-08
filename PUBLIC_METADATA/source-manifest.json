@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "d2c8087d60038f8b10a45b918087d68eab579884",
-  "sha256": "9741fb0bf3542169b056e200861551ddb8daf5935189f0d317d209912b99e3b9",
+  "revision": "b7476492c9df959b141e4b35ffa1358aeda228fb",
+  "sha256": "932ad804431c27ca26e0aef8a295de7cb2924c8f1d602ba5e6064380259bae8b",
   "files": [
     {
       "path": ".env.example",
@@ -40,8 +40,8 @@
     },
     {
       "path": "LICENSES/SHA256SUMS",
-      "bytes": 554,
-      "sha256": "137410938418e6ff128f89acb4165e717afc7c1bd0794a8bc424088eb97bfb6c"
+      "bytes": 653,
+      "sha256": "cd11636e165750cb098c2ee853822062f553b50faaa67e53a4ceb8a185879d17"
     },
     {
       "path": "LICENSES/SPEECH_COMPONENT_NOTICES.md",
@@ -52,6 +52,11 @@
       "path": "LICENSES/Silero-MIT.txt",
       "bytes": 1076,
       "sha256": "51c19c8be941a3fb00ccf58f0bf9053de9f7237a0b37327896eabad32dffe873"
+    },
+    {
+      "path": "LICENSES/Unicode-Unihan-16.0.0-NOTICE.txt",
+      "bytes": 3653,
+      "sha256": "ddc087bd0e203e38820edd68fc07bf823b6460dbfd91aa56fbd4e2ab5df54380"
     },
     {
       "path": "LICENSES/asset_inventory.toml",
@@ -1495,8 +1500,8 @@
     },
     {
       "path": "docs/CUSTOMER_SPEECH_QUALIFICATION.md",
-      "bytes": 23917,
-      "sha256": "61c2cea1b8c735b4c58b2ca17a2398b9cb527ed26f376e16752f384d179346d4"
+      "bytes": 25908,
+      "sha256": "3d92dff891ea3e334e24c72552cab219c9e644f5eaa43c4f16af76bbdfa9d011"
     },
     {
       "path": "docs/INSTALLATION.md",
@@ -6075,8 +6080,8 @@
     },
     {
       "path": "tests/public/test_customer_speech_dependencies.py",
-      "bytes": 16861,
-      "sha256": "e9f0695a97867cb5a4a0c33aa3aa8f26fd5ee4f859ceedd97d5d00003959cc94"
+      "bytes": 18140,
+      "sha256": "eb4cabe520ec252a9b591fd06aae815552a6b76f8163ad834449f0aae321ce39"
     },
     {
       "path": "tests/public/test_customer_speech_settings.py",
