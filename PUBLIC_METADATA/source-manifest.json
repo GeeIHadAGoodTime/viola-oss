@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "b7476492c9df959b141e4b35ffa1358aeda228fb",
-  "sha256": "932ad804431c27ca26e0aef8a295de7cb2924c8f1d602ba5e6064380259bae8b",
+  "revision": "d31f78b5d37ca9ff83142962dfada1b8b0bf150b",
+  "sha256": "98caf60cacc1134f8e6c008acf508e45c664413f5cde8b00ec990f85edd533a1",
   "files": [
     {
       "path": ".env.example",
@@ -620,8 +620,8 @@
     },
     {
       "path": "auth/spoke_scopes.py",
-      "bytes": 7498,
-      "sha256": "58151e0d2d7e7e2bd0f85e1989c0f0da5a269d6ea595335eecf16f3012b24577"
+      "bytes": 7755,
+      "sha256": "feec1e4c8633b011fc1c6c8d4f3641e5efea785a6b7afc15a486446e00bf545f"
     },
     {
       "path": "auth/startup_validation.py",
@@ -6102,6 +6102,11 @@
       "path": "tests/public/test_desktop_session_persistence.py",
       "bytes": 6195,
       "sha256": "c6f85614cb9559752817a3bb0f26ca387c45ab6d4183d0efa565b02d72a7971d"
+    },
+    {
+      "path": "tests/public/test_diagnostics_consent_spoke_scope.py",
+      "bytes": 2448,
+      "sha256": "3b887df050beefb90fbc887bf60c3aac12c3e9fb5a02918f0545b3724c42b5d8"
     },
     {
       "path": "tests/public/test_disabled_tts_streaming.py",
