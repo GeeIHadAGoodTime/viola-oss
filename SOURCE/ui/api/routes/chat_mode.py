@@ -442,6 +442,7 @@ async def _run_chat_command(
         get_stream_token_count,
         get_stream_tool_events,
     )
+    from ui.api.routes.command import _speak_reply
 
     model_token = None
     try:
@@ -531,6 +532,11 @@ async def _run_chat_command(
             token_count=token_count,
             fallback=token_count == 0,
         )
+        # Saved chats bypass POST /v1/command. Reuse its local typed-reply
+        # policy only after the answer is persisted and delivered; cancellation
+        # and failed generation must not start speech. The helper owns its task
+        # and preserves mute, cloud-surface and already-spoken safeguards.
+        _speak_reply(context, envelope, channel_value=request.channel, user_id=user_id)
     except asyncio.CancelledError:
         with contextlib.suppress(Exception):
             if target_assistant_message_id:

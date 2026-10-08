@@ -31,8 +31,9 @@ log = get_logger(__name__)
 # would double it. What is left is exactly the local text surfaces: the desktop
 # UI's own command box (``ui/react-app/.../MusicCommandInput.jsx`` and
 # ``ui/qt_native/window_core.py`` both POST here with no channel, which the
-# route defaults to "http") and the web chat.
-_LOCALLY_SPOKEN_CHANNELS = frozenset({"http", "web"})
+# route defaults to "http") and the web chat. Saved ChatMode threads have
+# their own completion route, which invokes this same policy with "chat_mode".
+_LOCALLY_SPOKEN_CHANNELS = frozenset({"http", "web", "chat_mode"})
 
 # Upper bound on one spoken reply, so a wedged synthesizer leaks one task and
 # not one per command. Well above any real reply; this is a backstop, not a
