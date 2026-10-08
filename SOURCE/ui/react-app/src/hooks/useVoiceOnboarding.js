@@ -240,41 +240,54 @@ const MIC_PROBE_FRAME_MS = 50;
  * Constraints here are deliberately identical to useVoice.js's, so a probe
  * that passes means the real recorder will get a stream too.
  */
-async function probeMicrophoneCapture() {
+async function probeMicrophoneCapture(signal) {
+  if (signal?.aborted) return { ok: false, reason: 'cancelled' };
   if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
     return { ok: false, reason: 'unsupported' };
   }
 
   let stream = null;
   let audioCtx = null;
+  let wakeFrame = null;
+  const release = () => {
+    // Phase exit must release capture immediately, even while a silent probe
+    // waits for its next frame. A later permission grant is released below.
+    const ownedStream = stream;
+    stream = null;
+    try { ownedStream?.getTracks().forEach((track) => track.stop()); } catch { /* Already stopped. */ }
+    const ownedContext = audioCtx;
+    audioCtx = null;
+    let closing;
+    try { closing = ownedContext?.close().catch(() => {}); } catch { /* Already closed. */ }
+    wakeFrame?.();
+    return closing;
+  };
+  signal?.addEventListener('abort', release, { once: true });
   try {
-    stream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        channelCount: 1,
-        sampleRate: 16000,
-        echoCancellation: false,
-        noiseSuppression: true,
-      },
-    });
-  } catch (err) {
-    const name = err?.name || '';
-    if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
-      return { ok: false, reason: 'denied', errorName: name };
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          channelCount: 1,
+          sampleRate: 16000,
+          echoCancellation: false,
+          noiseSuppression: true,
+        },
+      });
+    } catch (err) {
+      if (signal?.aborted) return { ok: false, reason: 'cancelled' };
+      const name = err?.name || '';
+      if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
+        return { ok: false, reason: 'denied', errorName: name };
+      }
+      if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
+        return { ok: false, reason: 'no_device', errorName: name };
+      }
+      return { ok: false, reason: 'error', errorName: name };
     }
-    if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
-      return { ok: false, reason: 'no_device', errorName: name };
-    }
-    return { ok: false, reason: 'error', errorName: name };
-  }
+    if (signal?.aborted) return { ok: false, reason: 'cancelled' };
 
-  try {
     const Ctx = window.AudioContext || window.webkitAudioContext;
-    if (!Ctx) {
-      // No way to inspect the samples. The stream opened, which is already
-      // more than the old check could prove; treat that as good enough rather
-      // than inventing a denial.
-      return { ok: true, silenceChecked: false };
-    }
+    if (!Ctx) return { ok: true, silenceChecked: false };
     audioCtx = new Ctx();
     const source = audioCtx.createMediaStreamSource(stream);
     const analyser = audioCtx.createAnalyser();
@@ -282,33 +295,30 @@ async function probeMicrophoneCapture() {
     source.connect(analyser);
     const buf = new Float32Array(analyser.fftSize);
 
-    // A microphone denied at the OS privacy layer still yields a live track;
-    // it just carries pure digital zeroes. Real capture always carries a noise
-    // floor, so a single non-zero sample proves audio is genuinely flowing.
+    // One non-zero sample proves the granted stream is not digitally silent.
     const deadline = Date.now() + MIC_PROBE_LISTEN_MS;
     while (Date.now() < deadline) {
+      if (signal?.aborted) return { ok: false, reason: 'cancelled' };
       analyser.getFloatTimeDomainData(buf);
       for (let i = 0; i < buf.length; i += 1) {
         if (buf[i] !== 0) return { ok: true, silenceChecked: true };
       }
-      await new Promise((resolve) => setTimeout(resolve, MIC_PROBE_FRAME_MS));
+      await new Promise((resolve) => {
+        const timer = setTimeout(() => { wakeFrame = null; resolve(); }, MIC_PROBE_FRAME_MS);
+        wakeFrame = () => { clearTimeout(timer); wakeFrame = null; resolve(); };
+      });
     }
-    return { ok: false, reason: 'silent', silenceChecked: true };
+    return signal?.aborted
+      ? { ok: false, reason: 'cancelled' }
+      : { ok: false, reason: 'silent', silenceChecked: true };
   } catch {
-    // The stream opened; only the inspection failed. Do not manufacture a
-    // denial out of an analysis error.
-    return { ok: true, silenceChecked: false };
+    // Inspection errors do not manufacture a permission denial.
+    return signal?.aborted
+      ? { ok: false, reason: 'cancelled' }
+      : { ok: true, silenceChecked: false };
   } finally {
-    try {
-      stream?.getTracks().forEach((track) => track.stop());
-    } catch {
-      // Nothing actionable — the probe is over either way.
-    }
-    try {
-      await audioCtx?.close();
-    } catch {
-      // Same.
-    }
+    signal?.removeEventListener('abort', release);
+    await release();
   }
 }
 
@@ -546,6 +556,7 @@ export function useVoiceOnboarding() {
     if (!currentPhase) return undefined;
 
     let cancelled = false;
+    const probeController = new AbortController();
 
     const runPhase = async () => {
       clearTimers();
@@ -558,7 +569,7 @@ export function useVoiceOnboarding() {
           message: null,
         });
         // The verdict comes from the real recorder, not from a proxy.
-        const probe = await probeMicrophoneCapture();
+        const probe = await probeMicrophoneCapture(probeController.signal);
         if (cancelled || skipRef.current || phaseIdRef.current !== 'mic_try') return;
         if (probe.ok) {
           setMicPermission({
@@ -604,6 +615,7 @@ export function useVoiceOnboarding() {
 
     return () => {
       cancelled = true;
+      probeController.abort();
       clearTimers();
       setIsSpeaking(false);
     };

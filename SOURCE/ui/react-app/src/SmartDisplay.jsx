@@ -506,7 +506,7 @@ export default function SmartDisplay(props) {
   return <PrincipalSmartDisplay key={user?.id || 'device'} {...props} />;
 }
 
-function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null }) {
+function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null, onVoiceCaptureEnabledChange }) {
   const mountedRef = useRef(true);
   useLayoutEffect(() => {
     mountedRef.current = true;
@@ -520,6 +520,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null 
   const api = useViolaApi();
   const {
     settings: userSettings,
+    hasSettingsSnapshot,
     loading: settingsLoading,
     refreshSettings,
     voiceStatus,
@@ -1237,6 +1238,15 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null 
   const [handsFreeWake] = useHandsFreeWake();
   const [wakeStream, setWakeStream] = useState(null);
   const voiceCaptureEnabled = userSettings?.voice_mode !== 'disabled' && !userSettings?.mic_muted;
+  // The continuous spoke recorder lives outside this settings-owning display.
+  // Share the same disabled/mute policy only after an accepted settings snapshot.
+  useEffect(() => {
+    onVoiceCaptureEnabledChange?.(Boolean(hasSettingsSnapshot && voiceCaptureEnabled));
+  }, [onVoiceCaptureEnabledChange, hasSettingsSnapshot, voiceCaptureEnabled]);
+  useEffect(() => () => {
+    onVoiceCaptureEnabledChange?.(false);
+  }, [onVoiceCaptureEnabledChange]);
+
   const httpVoice = useVoice(handleCommandResult, {
     enabled: voiceCaptureEnabled,
     existingStream: micStream,
@@ -3856,6 +3866,7 @@ SmartDisplay.propTypes = {
   isSpoke: PropTypes.bool,
   micStream: PropTypes.object,
   room: PropTypes.string,
+  onVoiceCaptureEnabledChange: PropTypes.func,
 };
 
 PrincipalSmartDisplay.propTypes = SmartDisplay.propTypes;
