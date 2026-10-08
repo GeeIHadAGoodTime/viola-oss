@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "65f43960161dc39fca6d05bf50d5d65cec1d68f6",
-  "sha256": "b13005b320c108de4b706d32841ee0093fbfdcc6e11ce9d8e2bb1e6fc82ac4ad",
+  "revision": "06959256f9d72a8de9deeee1ad2a29fe92cd1868",
+  "sha256": "cf07bc98dcb31f1a4a6db7933b587dd2c67b998b43a401d9e36403d4f5461f17",
   "files": [
     {
       "path": ".env.example",
@@ -6090,8 +6090,8 @@
     },
     {
       "path": "tests/public/test_customer_speech_settings.py",
-      "sha256": "1217d9b07107667bf5eb866d1ea146d1c12cbbcd1775d90785810a3ac1ac7aa9",
-      "bytes": 14988
+      "sha256": "11232b096c673b3e09a32fd44c453f02a475de6f3630909e00c186059e61acca",
+      "bytes": 15019
     },
     {
       "path": "tests/public/test_deferred_confirmation_cancellation.py",
