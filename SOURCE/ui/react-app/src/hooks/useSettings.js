@@ -68,6 +68,7 @@ function playlistsToArray(playlistsObj, defaultPlaylist) {
 export function useSettings(options = {}) {
   const { initialFetchDelayMs = 0 } = options;
   const [settings, setSettings] = useState({});
+  const [hasSettingsSnapshot, setHasSettingsSnapshot] = useState(false);
   const [voiceStatus, setVoiceStatus] = useState(null);
   const [customerSpeech, setCustomerSpeech] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -100,6 +101,9 @@ export function useSettings(options = {}) {
     if (!mounted.current) return;
     snapshotGeneration.current += 1;
     setSettings(data.settings || {});
+    // Finishing a failed request does not establish the principal's privacy
+    // policy. Preserve accepted snapshots on errors; reject malformed data.
+    setHasSettingsSnapshot(Boolean(data.settings && typeof data.settings === 'object' && !Array.isArray(data.settings)));
     if (!preserveAbsentVoiceStatus || data.customer_speech !== undefined) {
       setCustomerSpeech(data.customer_speech ?? null);
     }
@@ -351,6 +355,7 @@ export function useSettings(options = {}) {
 
   return {
     settings,
+    hasSettingsSnapshot,
     voiceStatus,
     customerSpeech,
     loading,

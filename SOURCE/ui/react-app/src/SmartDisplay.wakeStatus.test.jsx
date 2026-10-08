@@ -3,12 +3,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import SmartDisplay from './SmartDisplay';
 
 const state = vi.hoisted(() => ({
-  settings: { voice_mode: 'wake_word' }, loading: false, voiceStatus: null,
+  settings: { voice_mode: 'wake_word' }, loading: false, hasSettingsSnapshot: true, voiceStatus: null,
   browserWake: { status: 'off' }, browserOptions: null, handsFree: false,
   user: null,
 }));
 vi.mock('./hooks/useSettings', () => ({ useSettings: () => ({
-  settings: state.settings, loading: state.loading, voiceStatus: state.voiceStatus,
+  settings: state.settings, loading: state.loading, hasSettingsSnapshot: state.hasSettingsSnapshot, voiceStatus: state.voiceStatus,
   updateSetting: vi.fn(), refreshSettings: vi.fn(),
 }) }));
 vi.mock('./components/auth/cloudSurface', () => ({ isCloudSurface: () => false, isSpokeRoute: () => false }));
@@ -30,6 +30,7 @@ let polls;
 beforeEach(() => {
   state.settings = { voice_mode: 'wake_word' };
   state.loading = false;
+  state.hasSettingsSnapshot = true;
   state.voiceStatus = null;
   state.browserWake = { status: 'off' };
   state.handsFree = false;
@@ -200,5 +201,34 @@ describe('real SmartDisplay wake status', () => {
     state.browserWake = { status: 'listening' };
     rerender(<SmartDisplay isSpoke />);
     expect(pttLabel()).toHaveTextContent('listening');
+  });
+});
+
+
+describe('spoke capture policy handoff', () => {
+  it.each([{ voice_mode: 'disabled' }, { voice_mode: 'wake_word', mic_muted: true }])(
+    'publishes the real settings gate %j to the spoke owner', (settings) => {
+      const onVoiceCaptureEnabledChange = vi.fn();
+      state.settings = settings;
+      const { rerender, unmount } = render(<SmartDisplay isSpoke onVoiceCaptureEnabledChange={onVoiceCaptureEnabledChange} />);
+      expect(onVoiceCaptureEnabledChange).toHaveBeenLastCalledWith(false);
+      state.settings = { voice_mode: 'wake_word', mic_muted: false };
+      rerender(<SmartDisplay isSpoke onVoiceCaptureEnabledChange={onVoiceCaptureEnabledChange} />);
+      expect(onVoiceCaptureEnabledChange).toHaveBeenLastCalledWith(true);
+      unmount();
+      expect(onVoiceCaptureEnabledChange).toHaveBeenLastCalledWith(false);
+    },
+  );
+
+  it('keeps the spoke gate closed until settings load', () => {
+    state.loading = true;
+    state.hasSettingsSnapshot = false;
+    const onVoiceCaptureEnabledChange = vi.fn();
+    const { rerender } = render(<SmartDisplay isSpoke onVoiceCaptureEnabledChange={onVoiceCaptureEnabledChange} />);
+    expect(onVoiceCaptureEnabledChange).toHaveBeenLastCalledWith(false);
+    state.loading = false;
+    state.hasSettingsSnapshot = true;
+    rerender(<SmartDisplay isSpoke onVoiceCaptureEnabledChange={onVoiceCaptureEnabledChange} />);
+    expect(onVoiceCaptureEnabledChange).toHaveBeenLastCalledWith(true);
   });
 });
