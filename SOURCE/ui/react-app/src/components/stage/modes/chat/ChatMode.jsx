@@ -142,6 +142,7 @@ function ChatModeInner({
   const [activeThread, setActiveThread] = useState(null);
   const [messages, setMessages] = useState([]);
   const [search, setSearch] = useState('');
+  const [threadListError, setThreadListError] = useState('');
   // On a phone the sidebar opens as a full-width overlay that buries the chat
   // pane (the founder's "sidebar squeezing the main pane" report). Default it
   // collapsed to a slim rail on narrow viewports; the user can still expand it.
@@ -224,6 +225,7 @@ function ChatModeInner({
       threadListReadRef.current?.retire();
       threadListReadRef.current = null;
     }
+    setThreadListError('');
     setSearch(query);
   }, []);
 
@@ -296,6 +298,7 @@ function ChatModeInner({
     const generation = requestGenerationRef.current;
     const queryScope = threadSearchRef.current;
     if (query !== queryScope.query) return [];
+    setThreadListError('');
     const read = createThreadListRead();
     const previous = threadListReadRef.current;
     threadListReadRef.current = read;
@@ -328,12 +331,20 @@ function ChatModeInner({
       if (!outcome) return [];
       if (outcome.error) {
         if (outcome.error.code === 'consent_required') {
+          setThreadListError('');
           setConsentRequired(true);
           setThreads([]);
           return [];
         }
+        const message = outcome.error.code === 'chat_search_incomplete'
+          ? "Chat search couldn't finish within its safety limits. Previous results are still shown. Retry, or clear the search to browse your chats."
+          : outcome.error.code === 'chat_search_busy'
+            ? 'Another chat search is still running. Previous results are still shown. Wait a moment and retry.'
+            : "Couldn't refresh the chat list. Previous results are still shown. Please retry.";
+        setThreadListError(message);
         throw outcome.error;
       }
+      setThreadListError('');
       const threads = outcome.data.threads || [];
       setConsentRequired(false);
       setThreads(threads);
@@ -491,6 +502,7 @@ function ChatModeInner({
         setDraft('');
         setTitleDraft('');
         setSearch('');
+        setThreadListError('');
         setModelOptions([]);
         setSelectedModel('');
         setModelError('');
@@ -1365,6 +1377,8 @@ function ChatModeInner({
         activeThreadId={activeThreadId}
         search={search}
         collapsed={sidebarCollapsed}
+        searchError={threadListError}
+        onRetrySearch={() => loadThreads().catch(() => {})}
         onSearch={updateSearch}
         onToggleCollapsed={() => setSidebarCollapsed((value) => !value)}
         onNewChat={createNewChat}

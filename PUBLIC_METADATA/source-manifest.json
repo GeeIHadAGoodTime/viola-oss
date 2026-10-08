@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "c3b69247741ac572d431c5ce98edfbff9ba497bb",
-  "sha256": "d12f4dc3bcaf2879097a47bc44b3ba5473ca9b4e2b87bf02d51b8f20034dd16d",
+  "revision": "414728cd6b66f5852e533cbe4460ecf0f87e5518",
+  "sha256": "aa5879590968d01268141b86fd2734d702d83044e26aca323c39ad5db1fd1df3",
   "files": [
     {
       "path": ".env.example",
@@ -11395,13 +11395,13 @@
     },
     {
       "path": "ui/react-app/src/components/stage/modes/chat/ChatMode.css",
-      "sha256": "930bf3c8bd59ab517817046be0e73caa18b8a6d505ad9e5bb49e703a3232806a",
-      "bytes": 17114
+      "sha256": "afbc2ff7c78f098cc71b4a065de32cbdb35299788f93927b53146255c45e5167",
+      "bytes": 17712
     },
     {
       "path": "ui/react-app/src/components/stage/modes/chat/ChatMode.jsx",
-      "sha256": "6c29eca8d67c3c823f7d1434dec04f14a16b9785bd89b376efce384109f5c93f",
-      "bytes": 64257
+      "sha256": "2afa4cc6d3c2171bfdca21c413f88dedfbe43f54755b335413d244419df7caad",
+      "bytes": 65093
     },
     {
       "path": "ui/react-app/src/components/stage/modes/chat/ChatMode.modelRecovery.test.jsx",
@@ -11415,8 +11415,8 @@
     },
     {
       "path": "ui/react-app/src/components/stage/modes/chat/ChatMode.searchOwnership.test.jsx",
-      "sha256": "92dfcc0131582e8d6a9c1217c0ed4098ec9ae3c150ef94febb22078d477150ab",
-      "bytes": 20148
+      "sha256": "315b80b5abb575b81a839553a4da32e84b513357c53c4e7cf5ad11c4d2a14e79",
+      "bytes": 26694
     },
     {
       "path": "ui/react-app/src/components/stage/modes/chat/ChatMode.test.jsx",
@@ -11425,8 +11425,8 @@
     },
     {
       "path": "ui/react-app/src/components/stage/modes/chat/ChatSidebar.jsx",
-      "sha256": "92f64dcf551dc8a4315c6d2e3a30f68fe4fa24cbdbf8d6121ae9ffaab2edc773",
-      "bytes": 5043
+      "sha256": "03f13e2f41e88e6acbb5131c1d82a108d0ee0cb7db9a34734e5deef35d1b0644",
+      "bytes": 5766
     },
     {
       "path": "ui/react-app/src/components/stage/modes/chat/ChatThread.jsx",

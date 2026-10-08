@@ -169,6 +169,90 @@ describe('Conversation search ownership through the actual adapter', () => {
     expect(screen.getByRole('button', { name: stored.title, exact: true })).toBeInTheDocument();
     expect(screen.queryByTestId('chat-consent-required')).not.toBeInTheDocument();
   });
+  it('shows incomplete search truthfully and retries without replacing the confirmed chat or draft', async () => {
+    await mount();
+    fireEvent.change(screen.getByRole('textbox', { name: 'Message Viola' }), { target: { value: 'Keep draft' } });
+    const current = await query('beta');
+    await act(async () => current.resolve(new Response(JSON.stringify({ ok: false, data: null,
+      error: { code: 'chat_search_incomplete', message: 'Safety budget exceeded' } }), { status: 503 })));
+    expect(screen.getByTestId('chat-search-error')).toHaveTextContent("couldn't finish within its safety limits");
+    expect(screen.getByTestId('chat-search-error')).toHaveTextContent('Previous results are still shown');
+    expect(screen.getByRole('button', { name: stored.title, exact: true })).toBeInTheDocument();
+    expect(screen.getByDisplayValue(stored.title)).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Message Viola' })).toHaveValue('Keep draft');
+    const retry = deferred();searches.set('beta', retry);
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Retry chat search' })));
+    await act(async () => retry.resolve(response({ threads: [beta] })));
+    expect(screen.queryByTestId('chat-search-error')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: beta.title, exact: true })).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Message Viola' })).toHaveValue('Keep draft');
+  });
+  it('shows busy admission and lets the user clear search to browse', async () => {
+    await mount();const current = await query('beta');
+    await act(async () => current.resolve(new Response(JSON.stringify({ ok: false, data: null,
+      error: { code: 'chat_search_busy', message: 'Owner search slot occupied' } }), { status: 429 })));
+    expect(screen.getByTestId('chat-search-error')).toHaveTextContent('Another chat search is still running');
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Clear chat search' })));
+    await act(async () => vi.advanceTimersByTimeAsync(180));
+    expect(screen.getByRole('textbox', { name: 'Search chats' })).toHaveValue('');
+    expect(screen.queryByTestId('chat-search-error')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: stored.title, exact: true })).toBeInTheDocument();
+  });
+  it('does not publish an incomplete error from a retired query', async () => {
+    await mount();const older = await query('alpha');const current = await query('beta');
+    await act(async () => current.resolve(response({ threads: [beta] })));
+    await act(async () => older.resolve(new Response(JSON.stringify({ ok: false, data: null,
+      error: { code: 'chat_search_incomplete', message: 'Old search budget' } }), { status: 503 })));
+    expect(screen.queryByTestId('chat-search-error')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: beta.title, exact: true })).toBeInTheDocument();
+  });
+  it.each([
+    [429, 'chat_search_busy', 'Another chat search is still running'],
+    [503, 'chat_search_incomplete', "couldn't finish within its safety limits"],
+  ])('keeps %s recovery beside mobile search results in the expanded drawer', async (status, code, explanation) => {
+    vi.stubGlobal('innerWidth', 390);
+    await mount();
+    expect(screen.queryByRole('textbox', { name: 'Search chats' })).not.toBeInTheDocument();
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Expand chat sidebar' })));
+    const current = await query('beta');
+    await act(async () => current.resolve(new Response(JSON.stringify({ ok: false, data: null,
+      error: { code, message: 'Synthetic raw server detail must not be displayed' } }), { status })));
+    const sidebar = screen.getByRole('complementary', { name: 'Chat history' });
+    const alert = screen.getByTestId('chat-search-error');
+    expect(sidebar).not.toHaveClass('is-collapsed');
+    expect(sidebar).toContainElement(alert);
+    expect(screen.getByRole('main')).not.toContainElement(alert);
+    expect(alert).toHaveTextContent(explanation);
+    expect(alert).toHaveTextContent('Previous results are still shown');
+    expect(alert).not.toHaveTextContent('Synthetic raw server detail');
+    expect(screen.getByRole('textbox', { name: 'Search chats' })).toHaveAttribute('aria-describedby', alert.id);
+    expect(sidebar).toContainElement(screen.getByRole('button', { name: stored.title, exact: true }));
+    expect(alert).toContainElement(screen.getByRole('button', { name: 'Retry chat search' }));
+    expect(alert).toContainElement(screen.getByRole('button', { name: 'Clear chat search' }));
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Collapse chat sidebar' })));
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Expand chat sidebar' })));
+    expect(screen.getByTestId('chat-search-error')).toHaveTextContent(explanation);
+    const retried = deferred();searches.set('beta', retried);
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Retry chat search' })));
+    await act(async () => retried.resolve(new Response(JSON.stringify({ ok: false, data: null,
+      error: { code, message: 'Still refused' } }), { status })));
+    expect(screen.getByTestId('chat-search-error')).toHaveTextContent(explanation);
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Clear chat search' })));
+    await act(async () => vi.advanceTimersByTimeAsync(180));
+    expect(screen.queryByTestId('chat-search-error')).not.toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Search chats' })).toHaveValue('');
+    expect(screen.getByRole('button', { name: stored.title, exact: true })).toBeInTheDocument();
+  });
+  it('clears a search error when the authenticated principal changes', async () => {
+    const view = await mount();const current = await query('beta');
+    await act(async () => current.resolve(new Response(JSON.stringify({ ok: false, data: null,
+      error: { code: 'chat_search_incomplete', message: 'Owner search budget' } }), { status: 503 })));
+    expect(screen.getByTestId('chat-search-error')).toBeInTheDocument();
+    await act(async () => view.rerender(<ChatMode principalKey="another-search-owner" />));
+    await act(async () => vi.advanceTimersByTimeAsync(180));
+    expect(screen.queryByTestId('chat-search-error')).not.toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Search chats' })).toHaveValue('');
+  });
   it('accepts a genuine empty result from the current search', async () => {
     await mount();const current = await query('beta');
     await act(async () => current.resolve(response({ threads: [] })));
