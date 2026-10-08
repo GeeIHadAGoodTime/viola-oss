@@ -298,3 +298,52 @@ describe('useSettings explicit acknowledgement receipts', () => {
     });
   });
 });
+
+
+describe('accepted settings snapshot readiness', () => {
+  it.each([false, true])('does not confuse a failed first read with known settings (cloud=%s)', async cloud => {
+    harness.cloud = cloud;
+    harness.api.mockRejectedValueOnce(new Error('initial offline'));
+    const { result } = await load();
+    expect(result.current.hasSettingsSnapshot).toBe(false);
+    harness.api.mockResolvedValueOnce(payload(savedSettings));
+    await act(async () => result.current.refreshSettings());
+    expect(result.current.hasSettingsSnapshot).toBe(true);
+    expect(result.current.settings).toEqual(savedSettings);
+  });
+
+  it('retains an accepted snapshot across refresh and save errors', async () => {
+    const { result } = await load();
+    expect(result.current.hasSettingsSnapshot).toBe(true);
+    harness.api.mockRejectedValueOnce(new Error('refresh offline'));
+    await act(async () => result.current.refreshSettings());
+    expect(result.current.hasSettingsSnapshot).toBe(true);
+    harness.api.mockRejectedValueOnce(new Error('save refused'));
+    await act(async () => result.current.updateSetting('theme', 'dark'));
+    expect(result.current.hasSettingsSnapshot).toBe(true);
+    expect(result.current.settings).toEqual(oldSettings);
+  });
+
+  it('accepts an explicit empty default settings snapshot', async () => {
+    harness.api.mockResolvedValueOnce(payload({}));
+    const { result } = await load();
+    expect(result.current.hasSettingsSnapshot).toBe(true);
+  });
+
+  it.each([undefined, null, [], 'invalid'])('does not declare malformed settings %j known', async settings => {
+    harness.api.mockResolvedValueOnce(payload(settings));
+    const { result } = await load();
+    expect(result.current.hasSettingsSnapshot).toBe(false);
+  });
+
+  it('accepts a pushed privacy snapshot while its initial read remains pending', async () => {
+    const read = deferred(); harness.api.mockReturnValueOnce(read.promise);
+    const { result } = renderHook(() => useSettings());
+    expect(result.current.hasSettingsSnapshot).toBe(false);
+    act(() => harness.receive({ type: 'settings_changed', payload: payload(savedSettings) }));
+    expect(result.current.hasSettingsSnapshot).toBe(true);
+    await act(async () => read.reject(new Error('obsolete read')));
+    expect(result.current.hasSettingsSnapshot).toBe(true);
+    expect(result.current.settings).toEqual(savedSettings);
+  });
+});

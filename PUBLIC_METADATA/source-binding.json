@@ -1,16 +1,24 @@
 {
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "6c00d575bb90a1f69954b653d7bb09116ddd4bf96825187194c69916c50a1422",
-  "source_tree_sha256": "e1a55343754b3add2b3de4bbfec2af38af4115396145f0a2d2affed3df25594f",
-  "source_file_count": 2686,
-  "source_revision": "5c0ba82c23a7342af6b5bb0fcb2d609217a74b02",
-  "comparison_public_revision": "bb2419e8397e5a992f9982785c5a342ce65d6c23",
+  "source_manifest_sha256": "e75a9e79618bcfb2bf07c8240f84b98e4515770e30410b0f7e085e6d4f0d72a2",
+  "source_tree_sha256": "b13005b320c108de4b706d32841ee0093fbfdcc6e11ce9d8e2bb1e6fc82ac4ad",
+  "source_file_count": 2689,
+  "source_revision": "65f43960161dc39fca6d05bf50d5d65cec1d68f6",
+  "comparison_public_revision": "15a1c6e7668b20825ff4a516953f493f09f24fdb",
   "changed_source_paths": [
-    "SOURCE/ui/react-app/src/hooks/useVoiceWs.js",
-    "SOURCE/ui/react-app/src/hooks/useVoiceWs.captureLifecycle.test.jsx",
-    "SOURCE/ui/api/routes/voice_stream.py",
-    "SOURCE/tests/public/test_voice_stream_cancellation.py"
+    "SOURCE/ui/react-app/src/SmartDisplay.jsx",
+    "SOURCE/ui/react-app/src/SmartDisplay.spokePolicy.test.jsx",
+    "SOURCE/ui/react-app/src/SmartDisplay.wakeStatus.test.jsx",
+    "SOURCE/ui/react-app/src/__tests__/hooks/useSettings.snapshotOrdering.test.jsx",
+    "SOURCE/ui/react-app/src/__tests__/hooks/useVoiceOnboarding.micCaptureProbe.test.jsx",
+    "SOURCE/ui/react-app/src/components/SpokeWrapper.captureLifecycle.test.jsx",
+    "SOURCE/ui/react-app/src/components/SpokeWrapper.jsx",
+    "SOURCE/ui/react-app/src/components/WakeWordSection.status.test.jsx",
+    "SOURCE/ui/react-app/src/hooks/useSettings.js",
+    "SOURCE/ui/react-app/src/hooks/useVoiceOnboarding.js",
+    "SOURCE/ui/react-app/src/hooks/useVoiceStream.captureLifecycle.test.jsx",
+    "SOURCE/ui/react-app/src/hooks/useVoiceStream.js"
   ],
   "retained_sboms": [
     {
@@ -72,88 +80,159 @@
     }
   ],
   "input_equivalence": {
-    "comparison_basis": "Protected public main bb2419e8397e5a992f9982785c5a342ce65d6c23",
+    "comparison_basis": "Protected public main 15a1c6e7668b20825ff4a516953f493f09f24fdb",
     "all_unselected_export_leaf_bytes_and_modes_preserved": true,
     "all_six_sbom_bytes_and_status_objects_preserved": true,
     "dependency_manifest_lock_workflow_notice_and_model_inputs_unchanged": true,
-    "scope": "Only two voice lifecycle implementation files and their two synthetic regression suites change. Frontend application behavior intentionally changes; dependency inputs and inventory limitations remain unchanged."
+    "scope": "Only the 12 reviewed frontend implementation/test files change. Five implementation files repair spoke/onboarding capture ownership and settings-policy readiness; seven test files cover these boundaries. All dependency inputs and inventory limitations remain unchanged."
   },
   "qualification": {
-    "scope": "Own browser voice microphone/auth/socket continuations across cancel, disable, reconnect and unmount; cancel pending server transcription dispatch when its WebSocket disconnects.",
-    "source_commit": "5c0ba82c23a7342af6b5bb0fcb2d609217a74b02",
-    "source_tree": "1a339163b4b1698355f73a20f7c0f48780dc1aad",
+    "scope": "Own continuous spoke microphone/transport capture across cancellation and principal changes, require an accepted Disabled/mute policy, and cancel onboarding microphone probes on phase exit while preserving manual diagnostics and unavailable wake training.",
+    "source_commit": "65f43960161dc39fca6d05bf50d5d65cec1d68f6",
+    "source_tree": "cecd7f4c282067325eca4f9aa8ae86874468f685",
     "ordered_source_parents": [
-      "bb2419e8397e5a992f9982785c5a342ce65d6c23"
+      "80f47b95922e33646da9a40b90bee44da69a74d3",
+      "15a1c6e7668b20825ff4a516953f493f09f24fdb"
     ],
-    "source_patch_sha256": "b87c6cb665ed74379d90c8bde14c2b0b4f376cdb41ea913f3ab2f27cfe3f01dc",
+    "source_patch_sha256": "97e8260bbc05a9ba63d022411d3de78ddfa2e807f191d742f2cb5f19f8232378",
     "independent_automated_review": {
-      "result": "Approved for source integration after revision 2; no remaining source blockers found.",
+      "result": "Approved for source integration after revision 2; no remaining source-review blocker found.",
       "reviewed_files": [
         {
-          "path": "SOURCE/ui/react-app/src/hooks/useVoiceWs.js",
-          "before_blob": "602513f616fda1ca67862c17ac1c25e6bed5f8d5",
-          "sha256": "854e5f027b4c2a79f143550795befc0f51e950ff21b1198201e7fc62f7ab3019",
-          "bytes": 36619,
-          "new_blob": "402e38adf9f80b134c623b5de0073e9d4f1e6001"
+          "path": "SOURCE/ui/react-app/src/SmartDisplay.jsx",
+          "before_blob": "05b0e8d0dbeb645f474c6f86c2e59cacc9622e90",
+          "sha256": "dab28734312bbbcab3038ae810ae73a0bd41a190194e1489d9234d0a839449ad",
+          "bytes": 173141,
+          "new_blob": "a92c81d2a2bcd76cdb593d8b5885fb94003d5e01"
         },
         {
-          "path": "SOURCE/ui/react-app/src/hooks/useVoiceWs.captureLifecycle.test.jsx",
+          "path": "SOURCE/ui/react-app/src/SmartDisplay.spokePolicy.test.jsx",
           "before_blob": null,
-          "sha256": "ed3dd3c4146e1120e4a097da34f59590b69d38f7d9e1f51636d8b71d097b4b63",
-          "bytes": 19414,
-          "new_blob": "f25e6119fe1fed7316746d78ac854fbe0ce046a7"
+          "sha256": "e15f07073f7d9a3c568c77b88ecf085185185c65fb238d68108c8415118a16c6",
+          "bytes": 3782,
+          "new_blob": "d3eb2a8cb8680dea470ce035178ab6fc242cd464"
         },
         {
-          "path": "SOURCE/ui/api/routes/voice_stream.py",
-          "before_blob": "7eca43cfb1b647143a0e27925b30453698649c81",
-          "sha256": "c64b475f0312dfcd1471d4bdf2d4cb21cc60d076446307297d7ba167908139ae",
-          "bytes": 51313,
-          "new_blob": "a881223bebb50659997a0893ec82b7af77c5a0f2"
+          "path": "SOURCE/ui/react-app/src/SmartDisplay.wakeStatus.test.jsx",
+          "before_blob": "5e7e0a0c77329014edad2bc95db4a367b44a89e2",
+          "sha256": "d2c487f320bf1b5efffd0545e59dcc60b7f33370e24d06c35ce7d4aa10ed5dcc",
+          "bytes": 11474,
+          "new_blob": "94576b1225ee905f96967726131406990c777bce"
         },
         {
-          "path": "SOURCE/tests/public/test_voice_stream_cancellation.py",
+          "path": "SOURCE/ui/react-app/src/__tests__/hooks/useSettings.snapshotOrdering.test.jsx",
+          "before_blob": "fd885efd1c390990a62821e10bed8819ff7d79e5",
+          "sha256": "004879f85559eee571b86264af179975a5b9b10c5064f8b36132d8994a00cb06",
+          "bytes": 18215,
+          "new_blob": "516814ec92adbb10a0e7798970c1d3a59c197c60"
+        },
+        {
+          "path": "SOURCE/ui/react-app/src/__tests__/hooks/useVoiceOnboarding.micCaptureProbe.test.jsx",
+          "before_blob": "2cc8754eb63f0abed76ba8a4a8a9fec8756891ca",
+          "sha256": "c964b2a91d350e400aff8775301859b6f2c563c949de7de83417f4d605d063ab",
+          "bytes": 13363,
+          "new_blob": "cb5320fb86492ae755790bca6507edeb720f80b4"
+        },
+        {
+          "path": "SOURCE/ui/react-app/src/components/SpokeWrapper.captureLifecycle.test.jsx",
           "before_blob": null,
-          "sha256": "2950604ed7c5cf6eb6d755ebd527a835785d1fc008c874d0b6cc771e355c4d9d",
-          "bytes": 8856,
-          "new_blob": "accbe7c710e7e8688c48faf5decb0b25ebfd53db"
+          "sha256": "1ef5e6a672cf8414a8ad3346b10dc37736c52890f18650a7f92b4415a6f43e39",
+          "bytes": 7688,
+          "new_blob": "929ad4101c04a718b879fd1df78d5e949e670ca3"
+        },
+        {
+          "path": "SOURCE/ui/react-app/src/components/SpokeWrapper.jsx",
+          "before_blob": "f3bdf5d568b28f6c4e0aaf6ecbf06608f26324c4",
+          "sha256": "b981b8e21e30be873774b8bf32f105ab8d2301c9e1bf5c2f2d42ea765b5cf540",
+          "bytes": 25009,
+          "new_blob": "6728d26e95f6a7923752c10cc2f75218c41b4c51"
+        },
+        {
+          "path": "SOURCE/ui/react-app/src/components/WakeWordSection.status.test.jsx",
+          "before_blob": "a414beee011ec55c1765521d26fbbf3ced2253dd",
+          "sha256": "18d1f4573080389917c290c119b503628210b24291ededfc9440d6d42abf2609",
+          "bytes": 3948,
+          "new_blob": "0bc558efb47454afbafc7ff09e5362038b0da408"
+        },
+        {
+          "path": "SOURCE/ui/react-app/src/hooks/useSettings.js",
+          "before_blob": "b4d48d2c25488f121a1a41794a533a34164dc4e0",
+          "sha256": "5318bf449c903cd4eb852c66fad14545fd805b0d46d073270a6569fc8a508dcf",
+          "bytes": 13457,
+          "new_blob": "bd9d9c62af8ba860cb7b25c68b6651585d0d0467"
+        },
+        {
+          "path": "SOURCE/ui/react-app/src/hooks/useVoiceOnboarding.js",
+          "before_blob": "e4642965257d2cc17790e064f02d50a70319f87f",
+          "sha256": "b4b2f20c61f1c0e850539453ce94a60021ff3c68775aed6a4e4a48a3e1397bc9",
+          "bytes": 36190,
+          "new_blob": "273c908c4468ea424abf527732a2bd2f5f4dd7f0"
+        },
+        {
+          "path": "SOURCE/ui/react-app/src/hooks/useVoiceStream.captureLifecycle.test.jsx",
+          "before_blob": null,
+          "sha256": "3f76adfc755db6bf322428d9017f7ef6976eea2fac88435681952164d8b78ac8",
+          "bytes": 12039,
+          "new_blob": "8bb8e1c31d388424add4666697cdb8dbf87138f3"
+        },
+        {
+          "path": "SOURCE/ui/react-app/src/hooks/useVoiceStream.js",
+          "before_blob": "280bafc82ee79008824a76272999287f04ba71d5",
+          "sha256": "08dd2cc967e2f5dccfe855aae18714eeb47101571704f7a13769edd183d2ca53",
+          "bytes": 9295,
+          "new_blob": "5c43e9c699862b04b866d501c62dd789dd86fc67"
         }
       ],
-      "scope": "Independent automated source review and lightweight synthetic controls; no human-review or installed-acceptance claim.",
+      "scope": "Independent automated source review and lightweight synthetic controls; no human-review, hosted or installed acceptance claim.",
       "resolved_findings": [
-        "Retired connecting prewarm cannot retain microphone/context or block the next live connection.",
-        "Socket-drop teardown retires pending microphone permission and cannot disrupt a newer turn."
-      ]
+        "P1: Require an accepted settings snapshot before continuous spoke capture; a failed first read does not establish privacy policy.",
+        "P2: A principal replacement during pending permission/auth/handshake retires the old owner and starts a fresh one even when false-to-true updates batch."
+      ],
+      "controls": {
+        "original_reproductions_passed": 2,
+        "additional_ownership_controls_passed": 2,
+        "principal_snapshot_control_passed": 1,
+        "all_12_file_hashes_and_patch_sha256_verified": true
+      }
     },
     "source_controls": {
       "revision": 2,
-      "author_related_frontend_tests_passed": 95,
-      "author_related_frontend_files": 10,
-      "author_server_controls_passed": 6,
-      "independent_websocket_tests_passed": 55,
-      "independent_websocket_files": 7,
-      "independent_additional_server_controls_passed": 2,
-      "revision2_targeted_known_bad_control": "Five selected new client controls failed on retained revision-1 source.",
-      "original_known_bad_controls": {
-        "client_failed": 10,
-        "client_passed": 2,
-        "server_failed": 5,
-        "server_passed": 1
+      "author_related_frontend_tests_passed": 209,
+      "author_related_frontend_files": 23,
+      "author_related_frontend_tests_skipped": 0,
+      "combined_96_97_frontend_files": 24,
+      "combined_96_97_frontend_tests_passed": 236,
+      "retained_96_server_controls_passed": 6,
+      "reconciliation": {
+        "protected_base": "15a1c6e7668b20825ff4a516953f493f09f24fdb",
+        "all_12_reviewed_source_hashes_unchanged": true,
+        "all_4_landed_96_source_hashes_preserved": true,
+        "source_path_overlap": [],
+        "ordinary_two_parent_source_integration": true
       },
-      "eslint_changed_frontend": "passed",
-      "black_and_ruff_changed_python": "passed; Python source/test unchanged since original reviewed revision",
-      "earlier_revision1_full_frontend_tests_passed": 1992,
-      "earlier_revision1_frontend_build": "passed; not rerun as a revision2 build receipt",
-      "earlier_native_wake_controls_passed": 56,
-      "revision2_full_frontend_or_build_rerun": false,
+      "exact_base_comparison": {
+        "test_files": 7,
+        "failed": 40,
+        "passed": 76,
+        "scope": "Original production sources with the retained regression/control suite; separate unchanged-base worktree."
+      },
+      "eslint_changed_frontend": {
+        "errors": 0,
+        "unchanged_base_warnings": 24
+      },
+      "full_frontend_or_build_run": false,
       "full_public_python_suite_run": false,
-      "fixtures": "Actual React hook and complete server session/PCM/receive/command control flow; synthetic microphone, auth, socket, ASR, dispatcher and native-model boundaries. No microphone, provider, credential or network command executed."
+      "fixtures": "Real React hook, wrapper, settings snapshot and onboarding phase control flow with synthetic microphone, AudioContext, auth, WebSocket, TTS and API boundaries. No real microphone, provider, account or external command used.",
+      "original_review_reproductions": "Both unchanged reviewer failures now pass. Additional retired-callback, synchronous-cancel and principal-snapshot controls passed.",
+      "optional_final_independent_combined_rerun": "Did not start during a transient executor transport interruption; no receipt is claimed for that run."
     },
     "limits": [
-      "Source-only evidence; physical Windows and installed capture acceptance remain open.",
-      "Other capture ingresses, settings-loading timing, continuous server wake, training and onboarding probes, and call audio are not qualified by this narrow repair.",
-      "Cancellation cannot undo an external action dispatched before transport retirement.",
+      "Source-only evidence; installed Windows, hardware and physical microphone acceptance remain open.",
+      "Wake training remains product-gated unavailable and was not re-enabled or edited. Manual onboarding diagnostics remain supported.",
+      "This packet does not modify HTTP/WS PTT startup timing, native wake/STT continuation, call audio, or the complementary WS/server cancellation repair.",
+      "Cancellation cannot undo actions already dispatched before capture retirement.",
       "Final-head public hosted checks and private exact-pin composed-source checks remain separate.",
-      "Historical SBOM/advisory status and current-input qualification limitations are retained unchanged.",
+      "Historical SBOM/advisory status and qualification limitations are retained unchanged.",
       "No deployment, release, spending, credentials or access changes."
     ]
   },
@@ -8452,12 +8531,12 @@
     }
   ],
   "prior_binding": {
-    "public_revision": "bb2419e8397e5a992f9982785c5a342ce65d6c23",
+    "public_revision": "15a1c6e7668b20825ff4a516953f493f09f24fdb",
     "path": "PUBLIC_METADATA/source-binding.json",
-    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/bb2419e8397e5a992f9982785c5a342ce65d6c23/PUBLIC_METADATA/source-binding.json",
-    "sha256": "5c1cae5a8e90bd0cc459f71a36763276bc48941c35280c7903f8b235ff830e48",
-    "bytes": 1296024,
-    "git_blob": "a8741928ce91cb93186668a390351a1638b3d146",
+    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/15a1c6e7668b20825ff4a516953f493f09f24fdb/PUBLIC_METADATA/source-binding.json",
+    "sha256": "3cd870f93c0c8af48d8b5b57cf938e55ddcde1e65e19e694d504c06af5357501",
+    "bytes": 1305023,
+    "git_blob": "b6a8e28a07a3418b0e3c24dd139bba3b564232e5",
     "all_top_level_keys": [
       "schema_version",
       "source_manifest",
@@ -8498,27 +8577,27 @@
       },
       "source_manifest_sha256": {
         "pointer": "/source_manifest_sha256",
-        "canonical_json_sha256": "c667bcb8531dc30a88981ce81c9209f150ab55cb132ba592eeae53b21600ea9d"
+        "canonical_json_sha256": "2cb00d41878d840ab27913d0fcda1f256a3bc4b71fa8a05a2470abf7ecece1e8"
       },
       "source_tree_sha256": {
         "pointer": "/source_tree_sha256",
-        "canonical_json_sha256": "767da2baced580d3a24d707394be817f6b551b5572f5dade020ee40e954b84ba"
+        "canonical_json_sha256": "e1dd298d0df7613e560149522b5bc8538554ca05e22412e79e335fbf8d3a5b7e"
       },
       "source_file_count": {
         "pointer": "/source_file_count",
-        "canonical_json_sha256": "85c7fe9319004e487cdde0f895d742b3be1b0b474708fd7162e404f32f373629"
+        "canonical_json_sha256": "3581b125128cab6e325316b96971bce7bac9402d5a817e64f2d56deb5cf23c4e"
       },
       "source_revision": {
         "pointer": "/source_revision",
-        "canonical_json_sha256": "c3beb2cf36c7ab1054b0a83d4c1a8544022638c3a423619e1953c87c47e0816b"
+        "canonical_json_sha256": "9a19a9c1a475753a72af8608a7974c91698dec41727c5d447c8476072ece888e"
       },
       "comparison_public_revision": {
         "pointer": "/comparison_public_revision",
-        "canonical_json_sha256": "71f2929e4eae0275bcc274e58d0270e5c3931e991968cbfce43254c4a130dab4"
+        "canonical_json_sha256": "ed84c9d643b73c5aca7db3d058b8d77587abfb0d91c946a0fa03ea3002311afe"
       },
       "changed_source_paths": {
         "pointer": "/changed_source_paths",
-        "canonical_json_sha256": "4b1c30e259b6dcc1ce8f4d3ec540404af0f2eff7146875c68bfb6eeb4d155340"
+        "canonical_json_sha256": "22807c6bb27f263e436b63416c5412dca5d9c3a75d67c9f27f5ba529b07ea363"
       },
       "retained_sboms": {
         "pointer": "/retained_sboms",
@@ -8526,11 +8605,11 @@
       },
       "input_equivalence": {
         "pointer": "/input_equivalence",
-        "canonical_json_sha256": "b8ac7f4a1834cd1069ac19402bc0516fc46eea15af0e1e1966aa88a21f7b5a19"
+        "canonical_json_sha256": "ac97875527413a262538ed95c453f98d94abf586a85a5730b65f0c47427966c7"
       },
       "qualification": {
         "pointer": "/qualification",
-        "canonical_json_sha256": "bf9ca2a37f1299afcff218619d9b3dea9f965733058d7f1e29611938a8c49264"
+        "canonical_json_sha256": "276258c039effd0814d13434f396bd9480a728ef748dd2aff558156a15e4ce87"
       },
       "historical_bindings": {
         "pointer": "/historical_bindings",
@@ -8538,15 +8617,15 @@
       },
       "prior_binding": {
         "pointer": "/prior_binding",
-        "canonical_json_sha256": "2f86837719a8798d4de5474a3fbe7c975fab749a33662c99fcc70e6e240333d0"
+        "canonical_json_sha256": "f1e9a7bfecf088304f3766c5e6dac1bf6d1ebc18f5548927267d34756ff3b42c"
       },
       "retained_composition_component_bindings": {
         "pointer": "/retained_composition_component_bindings",
-        "canonical_json_sha256": "77e5e151c5bb13af5cad26762ff10dd9a7e99c20bd141e240fe16d83b51e6036"
+        "canonical_json_sha256": "184e68cd8a40d35d4d24518cb416e07af94c0653ebac97aa8099e355811ef83d"
       },
       "reviewed_source_patch": {
         "pointer": "/reviewed_source_patch",
-        "canonical_json_sha256": "2fdb28d07cb2b82fd739464d2f5eacbc3cc90366c7775dd2de4f1fa341ac548d"
+        "canonical_json_sha256": "45804fd1ea45d14020a10238c987dd27848a26bda8ef2854a72598498bdce802"
       },
       "new_resolution_performed": {
         "pointer": "/new_resolution_performed",
@@ -8570,11 +8649,11 @@
       },
       "new_resolution_scope": {
         "pointer": "/new_resolution_scope",
-        "canonical_json_sha256": "31c9a5720709c234f9ae136b0c50861007b5a9ab5ca9b256ead6e1637e882491"
+        "canonical_json_sha256": "04134bb916a194ed93909500148b34efdb44e74f25ab0d2625120fd8f5e07cd8"
       },
       "new_advisory_scan_scope": {
         "pointer": "/new_advisory_scan_scope",
-        "canonical_json_sha256": "9d05e7eabcf9883145c896bd4a38de7363986cbcebd383c97da9b3b1972a984b"
+        "canonical_json_sha256": "c39e237b344f9d365cf5946737adbf989ee87300801139690658507b3572309b"
       },
       "account_reconciliation_previous_binding": {
         "pointer": "/account_reconciliation_previous_binding",
@@ -8599,12 +8678,165 @@
     },
     "source_manifest": {
       "path": "PUBLIC_METADATA/source-manifest.json",
-      "sha256": "b1042c716f80beb614fa155f5d3c419d24557081b4afdf11355cfd375672844f",
-      "bytes": 471553,
-      "git_blob": "884e4be0a9b8fd59251d2398a8919c3545f6ba93"
+      "sha256": "6c00d575bb90a1f69954b653d7bb09116ddd4bf96825187194c69916c50a1422",
+      "bytes": 471929,
+      "git_blob": "d77c38a6bceb941409c42b7bcec5db6a0604535d"
     }
   },
   "retained_composition_component_bindings": [
+    {
+      "public_revision": "15a1c6e7668b20825ff4a516953f493f09f24fdb",
+      "path": "PUBLIC_METADATA/source-binding.json",
+      "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/15a1c6e7668b20825ff4a516953f493f09f24fdb/PUBLIC_METADATA/source-binding.json",
+      "sha256": "3cd870f93c0c8af48d8b5b57cf938e55ddcde1e65e19e694d504c06af5357501",
+      "bytes": 1305023,
+      "git_blob": "b6a8e28a07a3418b0e3c24dd139bba3b564232e5",
+      "all_top_level_keys": [
+        "schema_version",
+        "source_manifest",
+        "source_manifest_sha256",
+        "source_tree_sha256",
+        "source_file_count",
+        "source_revision",
+        "comparison_public_revision",
+        "changed_source_paths",
+        "retained_sboms",
+        "input_equivalence",
+        "qualification",
+        "historical_bindings",
+        "prior_binding",
+        "retained_composition_component_bindings",
+        "reviewed_source_patch",
+        "new_resolution_performed",
+        "new_advisory_scan_performed",
+        "new_runtime_qualification_performed",
+        "new_source_contract_qualification_performed",
+        "new_static_security_scan_performed",
+        "new_resolution_scope",
+        "new_advisory_scan_scope",
+        "account_reconciliation_previous_binding",
+        "reviewed_speech_binding",
+        "local_media_path_previous_binding",
+        "session_durability_previous_binding",
+        "media_identity_previous_binding"
+      ],
+      "preserved_json_objects": {
+        "schema_version": {
+          "pointer": "/schema_version",
+          "canonical_json_sha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+        },
+        "source_manifest": {
+          "pointer": "/source_manifest",
+          "canonical_json_sha256": "ace3c4cebde8c1e5207159e354ef46f1f9a13eb7b3185315a68b7cf8b71f212d"
+        },
+        "source_manifest_sha256": {
+          "pointer": "/source_manifest_sha256",
+          "canonical_json_sha256": "2cb00d41878d840ab27913d0fcda1f256a3bc4b71fa8a05a2470abf7ecece1e8"
+        },
+        "source_tree_sha256": {
+          "pointer": "/source_tree_sha256",
+          "canonical_json_sha256": "e1dd298d0df7613e560149522b5bc8538554ca05e22412e79e335fbf8d3a5b7e"
+        },
+        "source_file_count": {
+          "pointer": "/source_file_count",
+          "canonical_json_sha256": "3581b125128cab6e325316b96971bce7bac9402d5a817e64f2d56deb5cf23c4e"
+        },
+        "source_revision": {
+          "pointer": "/source_revision",
+          "canonical_json_sha256": "9a19a9c1a475753a72af8608a7974c91698dec41727c5d447c8476072ece888e"
+        },
+        "comparison_public_revision": {
+          "pointer": "/comparison_public_revision",
+          "canonical_json_sha256": "ed84c9d643b73c5aca7db3d058b8d77587abfb0d91c946a0fa03ea3002311afe"
+        },
+        "changed_source_paths": {
+          "pointer": "/changed_source_paths",
+          "canonical_json_sha256": "22807c6bb27f263e436b63416c5412dca5d9c3a75d67c9f27f5ba529b07ea363"
+        },
+        "retained_sboms": {
+          "pointer": "/retained_sboms",
+          "canonical_json_sha256": "0428d09c6e0e2b524877c2218b306c10da6c7536bcf6ed96524b581dafc85301"
+        },
+        "input_equivalence": {
+          "pointer": "/input_equivalence",
+          "canonical_json_sha256": "ac97875527413a262538ed95c453f98d94abf586a85a5730b65f0c47427966c7"
+        },
+        "qualification": {
+          "pointer": "/qualification",
+          "canonical_json_sha256": "276258c039effd0814d13434f396bd9480a728ef748dd2aff558156a15e4ce87"
+        },
+        "historical_bindings": {
+          "pointer": "/historical_bindings",
+          "canonical_json_sha256": "59ccb6141308771f32ec1e534f7a843cbdd8867afcd59e84944e03e6f9958c33"
+        },
+        "prior_binding": {
+          "pointer": "/prior_binding",
+          "canonical_json_sha256": "f1e9a7bfecf088304f3766c5e6dac1bf6d1ebc18f5548927267d34756ff3b42c"
+        },
+        "retained_composition_component_bindings": {
+          "pointer": "/retained_composition_component_bindings",
+          "canonical_json_sha256": "184e68cd8a40d35d4d24518cb416e07af94c0653ebac97aa8099e355811ef83d"
+        },
+        "reviewed_source_patch": {
+          "pointer": "/reviewed_source_patch",
+          "canonical_json_sha256": "45804fd1ea45d14020a10238c987dd27848a26bda8ef2854a72598498bdce802"
+        },
+        "new_resolution_performed": {
+          "pointer": "/new_resolution_performed",
+          "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+        },
+        "new_advisory_scan_performed": {
+          "pointer": "/new_advisory_scan_performed",
+          "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+        },
+        "new_runtime_qualification_performed": {
+          "pointer": "/new_runtime_qualification_performed",
+          "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+        },
+        "new_source_contract_qualification_performed": {
+          "pointer": "/new_source_contract_qualification_performed",
+          "canonical_json_sha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b"
+        },
+        "new_static_security_scan_performed": {
+          "pointer": "/new_static_security_scan_performed",
+          "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+        },
+        "new_resolution_scope": {
+          "pointer": "/new_resolution_scope",
+          "canonical_json_sha256": "04134bb916a194ed93909500148b34efdb44e74f25ab0d2625120fd8f5e07cd8"
+        },
+        "new_advisory_scan_scope": {
+          "pointer": "/new_advisory_scan_scope",
+          "canonical_json_sha256": "c39e237b344f9d365cf5946737adbf989ee87300801139690658507b3572309b"
+        },
+        "account_reconciliation_previous_binding": {
+          "pointer": "/account_reconciliation_previous_binding",
+          "canonical_json_sha256": "cfeffa86ef01cbbd530cda12a57b6c4eb3761063999ad3fae482a0c1d7482b51"
+        },
+        "reviewed_speech_binding": {
+          "pointer": "/reviewed_speech_binding",
+          "canonical_json_sha256": "88025408d951467d38a236d6fdedb10ad4a4112e6ce02b3577c5b906adec6305"
+        },
+        "local_media_path_previous_binding": {
+          "pointer": "/local_media_path_previous_binding",
+          "canonical_json_sha256": "220f4c5da0641cd8f51fb28add2f66e18e1dba3e64cca61d345ebd775b15bf1f"
+        },
+        "session_durability_previous_binding": {
+          "pointer": "/session_durability_previous_binding",
+          "canonical_json_sha256": "d1931a403fd80ce0a8ea40f23700b2e5a3be8c1b155c3511cbf4d6f72792f6b9"
+        },
+        "media_identity_previous_binding": {
+          "pointer": "/media_identity_previous_binding",
+          "canonical_json_sha256": "775b630f1531f2b679dfb823a59f6d534e542a78fdf1dc3dc6013a74012468e3"
+        }
+      },
+      "source_manifest": {
+        "path": "PUBLIC_METADATA/source-manifest.json",
+        "sha256": "6c00d575bb90a1f69954b653d7bb09116ddd4bf96825187194c69916c50a1422",
+        "bytes": 471929,
+        "git_blob": "d77c38a6bceb941409c42b7bcec5db6a0604535d"
+      }
+    },
     {
       "public_revision": "bb2419e8397e5a992f9982785c5a342ce65d6c23",
       "path": "PUBLIC_METADATA/source-binding.json",
@@ -10969,22 +11201,30 @@
     }
   ],
   "reviewed_source_patch": {
-    "scope": "Own browser voice microphone/auth/socket continuations across cancel, disable, reconnect and unmount; cancel pending server transcription dispatch when its WebSocket disconnects.",
+    "scope": "Own continuous spoke microphone/transport capture across cancellation and principal changes, require an accepted Disabled/mute policy, and cancel onboarding microphone probes on phase exit while preserving manual diagnostics and unavailable wake training.",
     "source_paths": [
-      "SOURCE/ui/react-app/src/hooks/useVoiceWs.js",
-      "SOURCE/ui/react-app/src/hooks/useVoiceWs.captureLifecycle.test.jsx",
-      "SOURCE/ui/api/routes/voice_stream.py",
-      "SOURCE/tests/public/test_voice_stream_cancellation.py"
+      "SOURCE/ui/react-app/src/SmartDisplay.jsx",
+      "SOURCE/ui/react-app/src/SmartDisplay.spokePolicy.test.jsx",
+      "SOURCE/ui/react-app/src/SmartDisplay.wakeStatus.test.jsx",
+      "SOURCE/ui/react-app/src/__tests__/hooks/useSettings.snapshotOrdering.test.jsx",
+      "SOURCE/ui/react-app/src/__tests__/hooks/useVoiceOnboarding.micCaptureProbe.test.jsx",
+      "SOURCE/ui/react-app/src/components/SpokeWrapper.captureLifecycle.test.jsx",
+      "SOURCE/ui/react-app/src/components/SpokeWrapper.jsx",
+      "SOURCE/ui/react-app/src/components/WakeWordSection.status.test.jsx",
+      "SOURCE/ui/react-app/src/hooks/useSettings.js",
+      "SOURCE/ui/react-app/src/hooks/useVoiceOnboarding.js",
+      "SOURCE/ui/react-app/src/hooks/useVoiceStream.captureLifecycle.test.jsx",
+      "SOURCE/ui/react-app/src/hooks/useVoiceStream.js"
     ],
-    "source_tree": "1a339163b4b1698355f73a20f7c0f48780dc1aad",
-    "patch_sha256": "b87c6cb665ed74379d90c8bde14c2b0b4f376cdb41ea913f3ab2f27cfe3f01dc",
+    "source_tree": "cecd7f4c282067325eca4f9aa8ae86874468f685",
+    "patch_sha256": "97e8260bbc05a9ba63d022411d3de78ddfa2e807f191d742f2cb5f19f8232378",
     "prior_binding": {
-      "public_revision": "bb2419e8397e5a992f9982785c5a342ce65d6c23",
+      "public_revision": "15a1c6e7668b20825ff4a516953f493f09f24fdb",
       "path": "PUBLIC_METADATA/source-binding.json",
-      "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/bb2419e8397e5a992f9982785c5a342ce65d6c23/PUBLIC_METADATA/source-binding.json",
-      "sha256": "5c1cae5a8e90bd0cc459f71a36763276bc48941c35280c7903f8b235ff830e48",
-      "bytes": 1296024,
-      "git_blob": "a8741928ce91cb93186668a390351a1638b3d146",
+      "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/15a1c6e7668b20825ff4a516953f493f09f24fdb/PUBLIC_METADATA/source-binding.json",
+      "sha256": "3cd870f93c0c8af48d8b5b57cf938e55ddcde1e65e19e694d504c06af5357501",
+      "bytes": 1305023,
+      "git_blob": "b6a8e28a07a3418b0e3c24dd139bba3b564232e5",
       "all_top_level_keys": [
         "schema_version",
         "source_manifest",
@@ -11025,27 +11265,27 @@
         },
         "source_manifest_sha256": {
           "pointer": "/source_manifest_sha256",
-          "canonical_json_sha256": "c667bcb8531dc30a88981ce81c9209f150ab55cb132ba592eeae53b21600ea9d"
+          "canonical_json_sha256": "2cb00d41878d840ab27913d0fcda1f256a3bc4b71fa8a05a2470abf7ecece1e8"
         },
         "source_tree_sha256": {
           "pointer": "/source_tree_sha256",
-          "canonical_json_sha256": "767da2baced580d3a24d707394be817f6b551b5572f5dade020ee40e954b84ba"
+          "canonical_json_sha256": "e1dd298d0df7613e560149522b5bc8538554ca05e22412e79e335fbf8d3a5b7e"
         },
         "source_file_count": {
           "pointer": "/source_file_count",
-          "canonical_json_sha256": "85c7fe9319004e487cdde0f895d742b3be1b0b474708fd7162e404f32f373629"
+          "canonical_json_sha256": "3581b125128cab6e325316b96971bce7bac9402d5a817e64f2d56deb5cf23c4e"
         },
         "source_revision": {
           "pointer": "/source_revision",
-          "canonical_json_sha256": "c3beb2cf36c7ab1054b0a83d4c1a8544022638c3a423619e1953c87c47e0816b"
+          "canonical_json_sha256": "9a19a9c1a475753a72af8608a7974c91698dec41727c5d447c8476072ece888e"
         },
         "comparison_public_revision": {
           "pointer": "/comparison_public_revision",
-          "canonical_json_sha256": "71f2929e4eae0275bcc274e58d0270e5c3931e991968cbfce43254c4a130dab4"
+          "canonical_json_sha256": "ed84c9d643b73c5aca7db3d058b8d77587abfb0d91c946a0fa03ea3002311afe"
         },
         "changed_source_paths": {
           "pointer": "/changed_source_paths",
-          "canonical_json_sha256": "4b1c30e259b6dcc1ce8f4d3ec540404af0f2eff7146875c68bfb6eeb4d155340"
+          "canonical_json_sha256": "22807c6bb27f263e436b63416c5412dca5d9c3a75d67c9f27f5ba529b07ea363"
         },
         "retained_sboms": {
           "pointer": "/retained_sboms",
@@ -11053,11 +11293,11 @@
         },
         "input_equivalence": {
           "pointer": "/input_equivalence",
-          "canonical_json_sha256": "b8ac7f4a1834cd1069ac19402bc0516fc46eea15af0e1e1966aa88a21f7b5a19"
+          "canonical_json_sha256": "ac97875527413a262538ed95c453f98d94abf586a85a5730b65f0c47427966c7"
         },
         "qualification": {
           "pointer": "/qualification",
-          "canonical_json_sha256": "bf9ca2a37f1299afcff218619d9b3dea9f965733058d7f1e29611938a8c49264"
+          "canonical_json_sha256": "276258c039effd0814d13434f396bd9480a728ef748dd2aff558156a15e4ce87"
         },
         "historical_bindings": {
           "pointer": "/historical_bindings",
@@ -11065,15 +11305,15 @@
         },
         "prior_binding": {
           "pointer": "/prior_binding",
-          "canonical_json_sha256": "2f86837719a8798d4de5474a3fbe7c975fab749a33662c99fcc70e6e240333d0"
+          "canonical_json_sha256": "f1e9a7bfecf088304f3766c5e6dac1bf6d1ebc18f5548927267d34756ff3b42c"
         },
         "retained_composition_component_bindings": {
           "pointer": "/retained_composition_component_bindings",
-          "canonical_json_sha256": "77e5e151c5bb13af5cad26762ff10dd9a7e99c20bd141e240fe16d83b51e6036"
+          "canonical_json_sha256": "184e68cd8a40d35d4d24518cb416e07af94c0653ebac97aa8099e355811ef83d"
         },
         "reviewed_source_patch": {
           "pointer": "/reviewed_source_patch",
-          "canonical_json_sha256": "2fdb28d07cb2b82fd739464d2f5eacbc3cc90366c7775dd2de4f1fa341ac548d"
+          "canonical_json_sha256": "45804fd1ea45d14020a10238c987dd27848a26bda8ef2854a72598498bdce802"
         },
         "new_resolution_performed": {
           "pointer": "/new_resolution_performed",
@@ -11097,11 +11337,11 @@
         },
         "new_resolution_scope": {
           "pointer": "/new_resolution_scope",
-          "canonical_json_sha256": "31c9a5720709c234f9ae136b0c50861007b5a9ab5ca9b256ead6e1637e882491"
+          "canonical_json_sha256": "04134bb916a194ed93909500148b34efdb44e74f25ab0d2625120fd8f5e07cd8"
         },
         "new_advisory_scan_scope": {
           "pointer": "/new_advisory_scan_scope",
-          "canonical_json_sha256": "9d05e7eabcf9883145c896bd4a38de7363986cbcebd383c97da9b3b1972a984b"
+          "canonical_json_sha256": "c39e237b344f9d365cf5946737adbf989ee87300801139690658507b3572309b"
         },
         "account_reconciliation_previous_binding": {
           "pointer": "/account_reconciliation_previous_binding",
@@ -11126,9 +11366,9 @@
       },
       "source_manifest": {
         "path": "PUBLIC_METADATA/source-manifest.json",
-        "sha256": "b1042c716f80beb614fa155f5d3c419d24557081b4afdf11355cfd375672844f",
-        "bytes": 471553,
-        "git_blob": "884e4be0a9b8fd59251d2398a8919c3545f6ba93"
+        "sha256": "6c00d575bb90a1f69954b653d7bb09116ddd4bf96825187194c69916c50a1422",
+        "bytes": 471929,
+        "git_blob": "d77c38a6bceb941409c42b7bcec5db6a0604535d"
       }
     }
   },

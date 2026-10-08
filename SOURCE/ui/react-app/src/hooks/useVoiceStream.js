@@ -46,203 +46,148 @@ function resampleLinear(inputData, fromRate, toRate) {
  */
 export function useVoiceStream({
   room,
+  enabled = true,
   onWakeDetected,
   onTranscription,
   existingStream,
   onStreamAcquired,
 } = {}) {
   const [isStreaming, setIsStreaming] = useState(false);
-  const wsRef = useRef(null);
-  const audioContextRef = useRef(null);
-  const processorRef = useRef(null);
-  const streamRef = useRef(null);
-  const sourceRef = useRef(null);
-  const callbacksRef = useRef({ onWakeDetected, onTranscription });
+  const sessionRef = useRef(null);
+  const mountedRef = useRef(true);
+  const enabledRef = useRef(enabled);
+  const callbacksRef = useRef({});
   const existingStreamRef = useRef(existingStream);
-
-  // Keep callbacks ref up to date without retriggering effects
-  useEffect(() => {
-    callbacksRef.current = { onWakeDetected, onTranscription };
-  }, [onWakeDetected, onTranscription]);
-
-  useEffect(() => {
-    existingStreamRef.current = existingStream;
-  }, [existingStream]);
+  enabledRef.current = enabled;
+  callbacksRef.current = { onWakeDetected, onTranscription, onStreamAcquired };
+  existingStreamRef.current = existingStream;
 
   const isSupported = typeof navigator !== 'undefined'
-    && !!navigator.mediaDevices
-    && !!navigator.mediaDevices.getUserMedia
+    && !!navigator.mediaDevices?.getUserMedia
     && typeof AudioContext !== 'undefined';
 
-  /**
-   * Clean up all audio and WebSocket resources.
-   * @private
-   */
-  const cleanup = useCallback(() => {
-    // Disconnect ScriptProcessor
-    if (processorRef.current) {
-      processorRef.current.disconnect();
-      processorRef.current.onaudioprocess = null;
-      processorRef.current = null;
+  // Every asynchronous continuation belongs to one capture owner. Retire it
+  // before releasing resources: even synchronous close callbacks are stale.
+  const cleanup = useCallback((session = sessionRef.current) => {
+    if (!session) return;
+    const isCurrent = sessionRef.current === session;
+    if (isCurrent) sessionRef.current = null;
+    if (session.processor) {
+      session.processor.onaudioprocess = null;
+      session.processor.disconnect();
+      session.processor = null;
     }
-
-    // Disconnect source
-    if (sourceRef.current) {
-      sourceRef.current.disconnect();
-      sourceRef.current = null;
+    if (session.source) {
+      session.source.disconnect();
+      session.source = null;
     }
-
-    // Close AudioContext
-    if (audioContextRef.current) {
-      audioContextRef.current.close().catch(() => {});
-      audioContextRef.current = null;
+    if (session.audioContext) {
+      session.audioContext.close().catch(() => {});
+      session.audioContext = null;
     }
-
-    // Stop media stream tracks — but NOT if it's the shared stream (caller owns it)
-    if (streamRef.current) {
-      if (streamRef.current !== existingStreamRef.current) {
-        streamRef.current.getTracks().forEach((track) => track.stop());
-      }
-      streamRef.current = null;
+    // Ownership is decided when acquired. Echoing a hook-owned stream back
+    // through existingStream does not transfer its cleanup to the caller.
+    if (session.stream && session.ownsStream) {
+      session.stream.getTracks().forEach((track) => track.stop());
     }
-
-    // Close WebSocket
-    if (wsRef.current) {
+    session.stream = null;
+    if (session.ws) {
+      const ws = session.ws;
+      session.ws = null;
+      ws.onopen = ws.onmessage = ws.onerror = ws.onclose = null;
       try {
-        if (wsRef.current.readyState === WebSocket.OPEN) {
-          wsRef.current.send(JSON.stringify({ type: 'stop_listening' }));
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'stop_listening' }));
         }
-        wsRef.current.close();
-      } catch {
-        // Already closed
-      }
-      wsRef.current = null;
+        ws.close();
+      } catch { /* Already closed. */ }
     }
-
-    // Revert iOS audio session to playback-only.  This deactivates the
-    // VoiceProcessingIO unit and stops playback ducking.
-    if (navigator.audioSession) {
-      navigator.audioSession.type = 'playback';
+    if (isCurrent) {
+      if (navigator.audioSession) navigator.audioSession.type = 'playback';
+      if (mountedRef.current) setIsStreaming(false);
     }
-
-    setIsStreaming(false);
   }, []);
 
-  /**
-   * Start capturing audio and streaming PCM frames to the hub.
-   */
   const startStreaming = useCallback(async () => {
-    if (!isSupported || isStreaming) return;
+    if (!isSupported || !mountedRef.current || !enabledRef.current || sessionRef.current) return;
+    const session = { stream: null, ownsStream: false, ws: null, audioContext: null, source: null, processor: null };
+    sessionRef.current = session;
+    const isCurrent = () => mountedRef.current && enabledRef.current && sessionRef.current === session;
 
     try {
-      // Switch iOS audio session to allow simultaneous playback + mic.
-      // This MUST happen before getUserMedia — Safari rejects mic access
-      // when the session is set to 'playback'.  Reverted in cleanup().
-      if (navigator.audioSession) {
-        navigator.audioSession.type = 'play-and-record';
-      }
-
-      // 1. Get microphone access — reuse pre-acquired stream if available
-      let mediaStream;
-      if (existingStreamRef.current && existingStreamRef.current.active) {
-        mediaStream = existingStreamRef.current;
-      } else {
+      // Safari needs play-and-record before requesting microphone permission.
+      if (navigator.audioSession) navigator.audioSession.type = 'play-and-record';
+      let mediaStream = existingStreamRef.current;
+      if (!mediaStream?.active) {
+        session.ownsStream = true;
         mediaStream = await navigator.mediaDevices.getUserMedia({
           audio: {
             channelCount: 1,
             sampleRate: SAMPLE_RATE,
-            // echoCancellation OFF: on iOS, enabling it activates the
-            // VoiceProcessingIO (VPIO) hardware unit which aggressively
-            // ducks playback whenever the mic picks up ANY sound.  The
-            // hub's ViolaAEC handles echo cancellation on the raw PCM.
+            // Keep iOS VPIO ducking off; hub ViolaAEC handles echo.
             echoCancellation: false,
             noiseSuppression: true,
             autoGainControl: true,
           },
         });
       }
-      streamRef.current = mediaStream;
-      if (!existingStreamRef.current && typeof onStreamAcquired === 'function') {
-        onStreamAcquired(mediaStream);
+      if (!isCurrent()) {
+        if (session.ownsStream) mediaStream.getTracks().forEach((track) => track.stop());
+        return;
       }
+      session.stream = mediaStream;
+      if (session.ownsStream) callbacksRef.current.onStreamAcquired?.(mediaStream);
+      if (!isCurrent()) return;
 
-      // 2. Create AudioContext at 16kHz
       const audioContext = new AudioContext({ sampleRate: SAMPLE_RATE });
-      audioContextRef.current = audioContext;
-      // iOS Safari silently ignores the requested sampleRate and returns the
-      // hardware rate (44100 / 48000 Hz).  Log a warning so it's visible in
-      // remote console dumps; resampleLinear() handles the conversion below.
+      session.audioContext = audioContext;
       if (audioContext.sampleRate !== SAMPLE_RATE) {
         console.warn(
           '[useVoiceStream] AudioContext sampleRate mismatch: requested=%d actual=%d — resampling enabled',
-          SAMPLE_RATE,
-          audioContext.sampleRate,
+          SAMPLE_RATE, audioContext.sampleRate,
         );
       }
-
-      // 3. Connect source -> processor
       const source = audioContext.createMediaStreamSource(mediaStream);
-      sourceRef.current = source;
-
-      // ScriptProcessorNode is deprecated but widely supported.
-      // AudioWorklet would be preferred in a future iteration.
+      session.source = source;
       const processor = audioContext.createScriptProcessor(BUFFER_SIZE, 1, 1);
-      processorRef.current = processor;
+      session.processor = processor;
 
-      // 4. Open WebSocket to voice-stream endpoint
       const base = (window.__VIOLA_BASE_URL__ || window.location.origin).replace(/^http/, 'ws');
       const params = new URLSearchParams();
       if (room) params.set('room', room);
       const wsAuthToken = await getWebSocketAuthToken();
+      if (!isCurrent()) return;
       if (wsAuthToken) params.set('token', wsAuthToken);
-      const currentParams = new URLSearchParams(window.location.search);
-      const spokeToken = currentParams.get('spoke_token');
+      const spokeToken = new URLSearchParams(window.location.search).get('spoke_token');
       if (spokeToken) params.set('spoke_token', spokeToken);
       const qs = params.toString();
-      const wsUrl = `${base}/ws/voice-stream${qs ? `?${qs}` : ''}`;
-
-      const ws = new WebSocket(wsUrl);
-      wsRef.current = ws;
-
+      const ws = new WebSocket(`${base}/ws/voice-stream${qs ? `?${qs}` : ''}`);
+      session.ws = ws;
       ws.binaryType = 'arraybuffer';
+      const ownsSocket = () => isCurrent() && session.ws === ws;
 
       ws.onopen = () => {
-        // Always report SAMPLE_RATE (16000) — the rate of the PCM data
-        // actually sent.  resampleLinear() converts any iOS hardware rate
-        // (44100/48000) to SAMPLE_RATE before Int16 encoding, so the server
-        // always receives 16 kHz PCM regardless of the iOS device.
+        if (!ownsSocket() || ws.readyState !== WebSocket.OPEN) return;
+        // Actual wire PCM is 16 kHz, including resampled iOS hardware audio.
         ws.send(JSON.stringify({ type: 'start_listening', sample_rate: SAMPLE_RATE }));
         setIsStreaming(true);
-
-        // Wire up audio processing AFTER WebSocket is open
         processor.onaudioprocess = (e) => {
-          if (ws.readyState !== WebSocket.OPEN) return;
+          if (!ownsSocket() || ws.readyState !== WebSocket.OPEN) return;
           const inputData = e.inputBuffer.getChannelData(0);
-          // Resample to 16kHz if iOS gave us a different hardware rate.
-          // On desktop (Chrome/Firefox) fromRate === SAMPLE_RATE so this is
-          // a zero-cost identity pass-through.
           const sampleData = resampleLinear(inputData, audioContext.sampleRate, SAMPLE_RATE);
-          // Convert Float32 [-1, 1] to Int16 [-32768, 32767]
           const int16 = new Int16Array(sampleData.length);
           for (let i = 0; i < sampleData.length; i++) {
-            const s = Math.max(-1, Math.min(1, sampleData[i]));
-            int16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+            const value = Math.max(-1, Math.min(1, sampleData[i]));
+            int16[i] = value < 0 ? value * 0x8000 : value * 0x7FFF;
           }
           ws.send(int16.buffer);
         };
-
         source.connect(processor);
         processor.connect(audioContext.destination);
       };
-
       ws.onmessage = (event) => {
+        if (!ownsSocket()) return;
         const data = event.data;
-
-        // Binary frame: TTS PCM from the hub's _send_command_result.
-        // The wake-on-spoke flow synthesizes TTS server-side and pushes
-        // the PCM here; without this branch the audio response is
-        // silently dropped (JSON.parse on an ArrayBuffer throws into
-        // the swallowing catch below).
         if (data instanceof ArrayBuffer) {
           if (isTtsFrame(data)) {
             const { pcmBuffer, sampleRate } = decodeTtsFrame(data);
@@ -250,54 +195,37 @@ export function useVoiceStream({
           }
           return;
         }
-
         try {
           const msg = JSON.parse(data);
-          if (msg.type === 'wake_detected' && callbacksRef.current.onWakeDetected) {
-            callbacksRef.current.onWakeDetected(msg.payload || msg);
+          if (msg.type === 'wake_detected') callbacksRef.current.onWakeDetected?.(msg.payload || msg);
+          if (msg.type === 'transcription' || msg.type === 'command_result') {
+            callbacksRef.current.onTranscription?.(msg.payload || msg);
           }
-          if ((msg.type === 'transcription' || msg.type === 'command_result')
-            && callbacksRef.current.onTranscription) {
-            callbacksRef.current.onTranscription(msg.payload || msg);
-          }
-        } catch {
-          // Non-JSON text message — ignore
-        }
+        } catch { /* Non-JSON text message. */ }
       };
-
-      ws.onerror = () => {
-        cleanup();
-      };
-
-      ws.onclose = () => {
-        cleanup();
+      ws.onerror = ws.onclose = () => {
+        if (ownsSocket()) cleanup(session);
       };
     } catch (err) {
+      if (!isCurrent()) return;
       console.error('[useVoiceStream] Failed to start streaming:', err.name, err.message);
-      cleanup();
+      cleanup(session);
     }
-  }, [isSupported, isStreaming, room, cleanup, onStreamAcquired]);
+  }, [isSupported, room, cleanup]);
 
-  /**
-   * Stop capturing and streaming audio.
-   */
-  const stopStreaming = useCallback(() => {
-    cleanup();
-  }, [cleanup]);
-
-  // Clean up on unmount
+  const stopStreaming = useCallback(() => cleanup(), [cleanup]);
   useEffect(() => {
+    if (!enabled) cleanup();
+  }, [enabled, cleanup]);
+  useEffect(() => {
+    mountedRef.current = true;
     return () => {
+      mountedRef.current = false;
       cleanup();
     };
   }, [cleanup]);
 
-  return {
-    startStreaming,
-    stopStreaming,
-    isStreaming,
-    isSupported,
-  };
+  return { startStreaming, stopStreaming, isStreaming, isSupported };
 }
 
 export default useVoiceStream;

@@ -273,4 +273,33 @@ describe('useVoiceOnboarding microphone capture probe', () => {
     expect(result.current.cloudConsentError).toBeTruthy();
   });
 
+  it.each(['skip', 'pause', 'unmount'])('releases permission granted after onboarding %s without inspecting audio', async (action) => {
+    configureHappyTransport();
+    const { getUserMedia, stop } = installMicrophone({ result: 'resolve', silent: true });
+    let grant;
+    getUserMedia.mockReturnValue(new Promise(resolve => { grant = resolve; }));
+    const createSource = vi.spyOn(window.AudioContext.prototype, 'createMediaStreamSource');
+    const { result, unmount } = renderHook(() => useVoiceOnboarding());
+    await walkToMicPhase(result);
+    if (action === 'skip') act(() => result.current.onSkipMicStep());
+    if (action === 'pause') act(() => result.current.pauseOnboarding());
+    if (action === 'unmount') unmount();
+    await act(async () => { grant({ getTracks: () => [{ stop }] }); });
+    expect(stop).toHaveBeenCalledOnce();
+    expect(createSource).not.toHaveBeenCalled();
+  });
+
+  it('stops an active silent probe immediately when the user skips the microphone step', async () => {
+    configureHappyTransport();
+    const { stop } = installMicrophone({ result: 'resolve', silent: true });
+    const close = vi.spyOn(window.AudioContext.prototype, 'close');
+    const { result } = renderHook(() => useVoiceOnboarding());
+    await walkToMicPhase(result);
+    expect(result.current.micPermission.checking).toBe(true);
+    act(() => result.current.onSkipMicStep());
+    expect(stop).toHaveBeenCalledOnce();
+    expect(close).toHaveBeenCalledOnce();
+    expect(result.current.phase).toBe('hear_about');
+  });
+
 });

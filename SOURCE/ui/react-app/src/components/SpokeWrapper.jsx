@@ -157,14 +157,14 @@ IOSInstallBanner.propTypes = {
  * Controls continuous voice streaming to hub for wake word detection.
  * Default OFF (privacy opt-in). Preference persisted in localStorage.
  */
-function MicToggle({ isStreaming, isSupported, onToggle }) {
+function MicToggle({ isStreaming, isEnabled, isSupported, onToggle }) {
   if (!isSupported) return null;
 
   return (
     <button
       onClick={onToggle}
-      title={isStreaming ? 'Disable wake word mic' : 'Enable wake word mic'}
-      aria-label={isStreaming ? 'Disable wake word mic' : 'Enable wake word mic'}
+      title={isEnabled ? 'Disable wake word mic' : 'Enable wake word mic'}
+      aria-label={isEnabled ? 'Disable wake word mic' : 'Enable wake word mic'}
       style={{
         position: 'fixed',
         bottom: '16px',
@@ -202,6 +202,7 @@ function MicToggle({ isStreaming, isSupported, onToggle }) {
 
 MicToggle.propTypes = {
   isStreaming: PropTypes.bool.isRequired,
+  isEnabled: PropTypes.bool.isRequired,
   isSupported: PropTypes.bool.isRequired,
   onToggle: PropTypes.func.isRequired,
 };
@@ -300,6 +301,12 @@ export default function SpokeWrapper({ room }) {
   const [micStream, setMicStream] = useState(null);
   const [connected, setConnected] = useState(false);
   const [connecting, setConnecting] = useState(false);
+  const [voiceCaptureEnabled, setVoiceCaptureEnabled] = useState(false);
+  const [voiceOwnerRevision, setVoiceOwnerRevision] = useState(0);
+  // Saved opt-in remains subordinate to the current settings policy.
+  const [micEnabled, setMicEnabled] = useState(() => (
+    typeof localStorage !== 'undefined' && localStorage.getItem('viola_spoke_mic') === 'true'
+  ));
 
   // Speaker name — persisted to localStorage, pre-filled from ?room= param
   const [speakerName, setSpeakerName] = useState(() => {
@@ -495,37 +502,43 @@ export default function SpokeWrapper({ room }) {
     isSupported: voiceStreamSupported,
   } = useVoiceStream({
     room,
+    enabled: connected && micEnabled && voiceCaptureEnabled,
     onWakeDetected: handleWakeDetected,
     onTranscription: handleCommandResult,
     existingStream: micStream,
     onStreamAcquired: handleStreamAcquired,
   });
 
-  // Persist mic preference in localStorage
-  const [micEnabled, setMicEnabled] = useState(() => {
-    if (typeof localStorage !== 'undefined') {
-      return localStorage.getItem('viola_spoke_mic') === 'true';
+  const handleVoiceCaptureEnabledChange = useCallback((enabled) => {
+    // Retire immediately on principal cleanup too. A subsequent principal's
+    // enabled value can otherwise batch away the intermediate false state.
+    if (!enabled) {
+      stopStreaming();
+      // A pending session is already isStreaming=false. Keep retirement
+      // observable when a new principal batches false -> true in one render.
+      setVoiceOwnerRevision(revision => revision + 1);
     }
-    return false;
-  });
+    setVoiceCaptureEnabled(enabled);
+  }, [stopStreaming]);
 
   // Auto-start streaming when connected and mic is enabled
   useEffect(() => {
-    if (connected && micEnabled && voiceStreamSupported && !isStreaming) {
+    if (connected && micEnabled && voiceCaptureEnabled && voiceStreamSupported && !isStreaming) {
       startStreaming();
     }
-    if (!micEnabled && isStreaming) {
+    if (!connected || !micEnabled || !voiceCaptureEnabled) {
       stopStreaming();
     }
-  }, [connected, micEnabled, voiceStreamSupported, isStreaming, startStreaming, stopStreaming]);
+  }, [connected, micEnabled, voiceCaptureEnabled, voiceOwnerRevision, voiceStreamSupported, isStreaming, startStreaming, stopStreaming]);
 
   const handleMicToggle = useCallback(() => {
     const next = !micEnabled;
+    if (!next) stopStreaming();
     setMicEnabled(next);
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem('viola_spoke_mic', String(next));
     }
-  }, [micEnabled]);
+  }, [micEnabled, stopStreaming]);
 
   // ----- Pre-connect screen ----- //
   if (!connected) {
@@ -582,7 +595,7 @@ export default function SpokeWrapper({ room }) {
       alignItems: 'stretch',
     }}>
       <AuthProvider>
-        <SmartDisplay isSpoke micStream={micStream} room={room} />
+        <SmartDisplay isSpoke micStream={micStream} room={room} onVoiceCaptureEnabledChange={handleVoiceCaptureEnabledChange} />
       </AuthProvider>
 
       {/* Overlays live outside SmartDisplay so position:fixed stays viewport-relative. */}
@@ -635,6 +648,7 @@ export default function SpokeWrapper({ room }) {
       {/* Mic toggle for wake word streaming — bottom-left */}
       <MicToggle
         isStreaming={isStreaming}
+        isEnabled={micEnabled}
         isSupported={voiceStreamSupported}
         onToggle={handleMicToggle}
       />
