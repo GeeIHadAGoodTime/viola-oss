@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "414728cd6b66f5852e533cbe4460ecf0f87e5518",
-  "sha256": "aa5879590968d01268141b86fd2734d702d83044e26aca323c39ad5db1fd1df3",
+  "revision": "3c54baaad4181777602231cc43654d80d5384b9e",
+  "sha256": "2a804a324d7ea253c16f3b3abb33e2c1207bf613ac4672c1e3902ac2a4b138b6",
   "files": [
     {
       "path": ".env.example",
@@ -1067,6 +1067,11 @@
       "path": "core/json_types.py",
       "sha256": "5f89734be0fac672e249be0931bd070c82844cccd831fb0e0e144a884b92e0d0",
       "bytes": 1984
+    },
+    {
+      "path": "core/lan_exposure.py",
+      "sha256": "c4a03884f531ff9a352038587cab694ba062de981beec780839e3b148d1afe8a",
+      "bytes": 2078
     },
     {
       "path": "core/logging_config.py",
@@ -4805,8 +4810,8 @@
     },
     {
       "path": "services/multiroom/discovery.py",
-      "sha256": "8686f2681ed8c699516d7d8a7797fe0463969f62d26bf4d728593e4434bfe3bf",
-      "bytes": 32217
+      "sha256": "aafc9865675a255c80a8695057517fa9d45b132598b14e1c5257333e8390aec7",
+      "bytes": 32481
     },
     {
       "path": "services/multiroom/exceptions.py",
@@ -6147,6 +6152,11 @@
       "path": "tests/public/test_kokoro_stop.py",
       "sha256": "08d31a4bcffcccf6cf2916af5548babf42edf7234cf34c308503256989b57361",
       "bytes": 23289
+    },
+    {
+      "path": "tests/public/test_lan_discovery.py",
+      "sha256": "94444a1eed14812705fcd26d66a7522e0955bc596e65a822e3ed35706417feb7",
+      "bytes": 9440
     },
     {
       "path": "tests/public/test_linux_sandbox_opt_in.py",
