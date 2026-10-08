@@ -1,12 +1,7 @@
-import { useState } from 'react';
 import PropTypes from 'prop-types';
 import Markdown from './markdown.jsx';
 import ToolUseCard from './ToolUseCard.jsx';
-
-function copyText(text) {
-  if (!navigator.clipboard) return;
-  navigator.clipboard.writeText(text || '').catch(() => {});
-}
+import CopyButton from './CopyButton.jsx';
 
 export default function ChatMessage({
   message,
@@ -15,7 +10,6 @@ export default function ChatMessage({
   onFork,
   onFeedback,
 }) {
-  const [copied, setCopied] = useState(false);
   const role = message.role === 'assistant' ? 'assistant' : 'user';
   const rating = message.metadata?.rating || null;
   const metadataTools = Array.isArray(message.metadata?.tools) ? message.metadata.tools : [];
@@ -25,12 +19,6 @@ export default function ChatMessage({
     && !message.id.startsWith('local-user-')
     && !message.metadata?.optimistic;
   const serverActionsEnabled = serverBacked && !streaming;
-
-  const handleCopy = () => {
-    copyText(message.content);
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1100);
-  };
 
   return (
     <article className={`chat-message chat-message-${role}`} data-message-id={message.id}>
@@ -51,10 +39,10 @@ export default function ChatMessage({
             ))}
           </div>
         )}
-        <Markdown content={message.content || (streaming ? ' ' : '')} />
+        <Markdown key={message.id} content={message.content || (streaming ? ' ' : '')} />
         {streaming && message.status !== 'unknown' && <span className="chat-cursor" aria-hidden="true" />}
         <div className="chat-message-actions">
-          <button type="button" onClick={handleCopy}>{copied ? 'Copied' : 'Copy'}</button>
+          <CopyButton key={message.id} text={message.content || ''} />
           {role === 'assistant' && (
             <button type="button" onClick={() => onRegenerate(message)} disabled={!serverActionsEnabled}>
               Regenerate
