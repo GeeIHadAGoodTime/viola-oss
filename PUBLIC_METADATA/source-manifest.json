@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "def10f70b39c4965735f414081ae7baeccd82f91",
-  "sha256": "d975335d6bd3a357b5fc50eebe2451bcc41351a3b77fe05e34b0c9c8fc411cd7",
+  "revision": "c3b69247741ac572d431c5ce98edfbff9ba497bb",
+  "sha256": "d12f4dc3bcaf2879097a47bc44b3ba5473ca9b4e2b87bf02d51b8f20034dd16d",
   "files": [
     {
       "path": ".env.example",
@@ -1015,8 +1015,8 @@
     },
     {
       "path": "core/db_backend.py",
-      "sha256": "d16375d55152cf7a645edca6ccb17dbb053cb31be35af147ca01b4aa3446c1ff",
-      "bytes": 46332
+      "sha256": "6c290f55c891c31ad75dca9af970d7312992990f726a8ce9d976936f644159a6",
+      "bytes": 50347
     },
     {
       "path": "core/email_identity.py",
@@ -6092,6 +6092,11 @@
       "path": "tests/public/test_customer_speech_settings.py",
       "sha256": "11232b096c673b3e09a32fd44c453f02a475de6f3630909e00c186059e61acca",
       "bytes": 15019
+    },
+    {
+      "path": "tests/public/test_db_pool_cancellation.py",
+      "sha256": "a5109072ff1b6e1a4602426ff53755632cfe798954ca0a01e086ad42ac66c5c0",
+      "bytes": 17997
     },
     {
       "path": "tests/public/test_deferred_confirmation_cancellation.py",
