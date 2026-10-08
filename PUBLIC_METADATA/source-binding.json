@@ -1,16 +1,14 @@
 {
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "c547626c0e45e09ef1128fbf587107e363cb246930cd8344a5b6dd606a9305da",
-  "source_tree_sha256": "932ad804431c27ca26e0aef8a295de7cb2924c8f1d602ba5e6064380259bae8b",
-  "source_file_count": 2682,
-  "source_revision": "b7476492c9df959b141e4b35ffa1358aeda228fb",
-  "comparison_public_revision": "c77b80c6f9154f557a3be0d2a0598f20bc23cfd7",
+  "source_manifest_sha256": "1b29af4f7b631b3d27a86eb86e5875132068831fecc51f0600f9de09fb1171b0",
+  "source_tree_sha256": "98caf60cacc1134f8e6c008acf508e45c664413f5cde8b00ec990f85edd533a1",
+  "source_file_count": 2683,
+  "source_revision": "d31f78b5d37ca9ff83142962dfada1b8b0bf150b",
+  "comparison_public_revision": "307d0fc15a7656c4777cb9c40bf9038cbb507a6f",
   "changed_source_paths": [
-    "SOURCE/LICENSES/Unicode-Unihan-16.0.0-NOTICE.txt",
-    "SOURCE/LICENSES/SHA256SUMS",
-    "SOURCE/docs/CUSTOMER_SPEECH_QUALIFICATION.md",
-    "SOURCE/tests/public/test_customer_speech_dependencies.py"
+    "SOURCE/auth/spoke_scopes.py",
+    "SOURCE/tests/public/test_diagnostics_consent_spoke_scope.py"
   ],
   "retained_sboms": [
     {
@@ -72,126 +70,56 @@
     }
   ],
   "input_equivalence": {
-    "comparison_basis": "Protected public main c77b80c6f9154f557a3be0d2a0598f20bc23cfd7",
+    "comparison_basis": "Protected public main 307d0fc15a7656c4777cb9c40bf9038cbb507a6f",
     "all_unselected_export_leaf_bytes_and_modes_preserved": true,
     "all_six_sbom_bytes_and_status_objects_preserved": true,
-    "all_production_runtime_model_voice_dictionary_and_dependency_bytes_unchanged": true,
-    "frontend_and_workflow_inputs_unchanged": true,
-    "existing_component_notice_bytes_unchanged": true,
-    "private_preparer_untouched": true
+    "dependency_frontend_workflow_and_notice_inputs_unchanged": true,
+    "scope": "Only the exact diagnostics-consent spoke denial and its synthetic public regression tests change."
   },
   "qualification": {
-    "scope": "Retain exact Unicode V3 and original Unicode16 Unihan attribution for selected Mandarin source inputs",
-    "source_commit": "b7476492c9df959b141e4b35ffa1358aeda228fb",
-    "source_tree": "673f19c48ccdfe424669e9aad0fcc4818675b0ac",
+    "scope": "Deny diagnostic-consent changes and disclosure acknowledgments from paired/cloud spokes while preserving ordinary paired-spoke diagnostics.",
+    "source_commit": "d31f78b5d37ca9ff83142962dfada1b8b0bf150b",
+    "source_tree": "6bc586b7bc28df8ba2de699b8e16053175343ba5",
     "ordered_source_parents": [
-      "c77b80c6f9154f557a3be0d2a0598f20bc23cfd7"
+      "307d0fc15a7656c4777cb9c40bf9038cbb507a6f"
     ],
-    "source_patch_sha256": "62dba3b600dcb82912e6668646076bba530f67de4e3bd0c6baa462c6fee2f292",
-    "source_review": {
-      "kind": "independent automated source attribution review",
-      "result": "PASS",
-      "source_paths": 4,
-      "patch_sha256": "62dba3b600dcb82912e6668646076bba530f67de4e3bd0c6baa462c6fee2f292",
-      "findings_resolved": [
-        "Corrected official terms citation to sections 2(b) and 3(c)."
+    "source_patch_sha256": "a94df8d4cdac062d6a62d0d1b0924f7c1b6f4e245893b23e2b335b8c705d0bcc",
+    "independent_automated_review": {
+      "result": "No source blockers in the exact two-file repair.",
+      "reviewed_files": [
+        {
+          "path": "SOURCE/auth/spoke_scopes.py",
+          "old_blob": "95932d68e8bcc5ef739cd4f62886b9523514bb34",
+          "new_blob": "15efabe2cc7df6a2ccadd62daef7a28d486692ae",
+          "sha256": "feec1e4c8633b011fc1c6c8d4f3641e5efea785a6b7afc15a486446e00bf545f",
+          "bytes": 7755
+        },
+        {
+          "path": "SOURCE/tests/public/test_diagnostics_consent_spoke_scope.py",
+          "old_blob": null,
+          "new_blob": "f716976899e65582a032c2eee2a9c41d4da43862",
+          "sha256": "3b887df050beefb90fbc887bf60c3aac12c3e9fb5a02918f0545b3724c42b5d8",
+          "bytes": 2448
+        }
       ],
-      "blocking_findings": []
+      "scope": "Independent automated source review; no human-review or installed-acceptance claim."
     },
     "source_controls": {
-      "focused_methods": 23,
-      "new_notice_method": 1,
-      "original_missing_notice_rejected": true,
-      "notice_checksum_mutants_rejected": 5,
-      "full_public_methods": 850,
-      "full_public_failures": 0,
-      "full_public_errors": 0,
-      "full_public_skipped": [
-        [
-          "test_actual_qt_event_propagation (test_native_titlebar_resize.RealQtTitlebarResizeTests.test_actual_qt_event_propagation)",
-          "PySide6 unavailable; source-method contracts still run"
-        ]
-      ],
-      "socket_connect_attempts": 0,
-      "environment": "Owned Linux CPython3.12 environment with source-pinned FastAPI, Starlette and Pydantic."
+      "public_methods_passed": 3,
+      "old_denylist_negative_control_failed": true,
+      "ordinary_paired_spoke_diagnostics_preserved": true,
+      "existing_sensitive_route_tests_passed": 8,
+      "route_detector": "passed in local source qualification subset with exact repaired auth blob",
+      "enumerated_routes": 492,
+      "sensitive_routes_checked": 93,
+      "built_app_only_routes": 200,
+      "route_import_failures": 0,
+      "fixtures": "Synthetic source-only scope decisions and dummy app construction; no user consent state was changed."
     },
-    "unicode_notice": {
-      "source_path": "SOURCE/LICENSES/Unicode-Unihan-16.0.0-NOTICE.txt",
-      "bytes": 3653,
-      "sha256": "ddc087bd0e203e38820edd68fc07bf823b6460dbfd91aa56fbd4e2ab5df54380",
-      "original_data": "Unicode 16.0.0 Unihan_Readings.txt, dated 2024-07-31, original copyright 2024 Unicode Inc.",
-      "original_header_bytes": 393,
-      "original_header_sha256": "9b22459d15c0df76c2f39cfe76acac355b1aafef9c7cfcdb1488ace260d4c36f",
-      "official_license_url": "https://www.unicode.org/license.txt",
-      "official_license_retrieved_on_utc": "2026-10-08",
-      "official_license_bytes": 1995,
-      "official_license_sha256": "e7a93b009565cfce55919a381437ac4db883e9da2126fa28b91d12732bc53d96",
-      "license_identity": "Unicode License V3",
-      "retained_license_copyright_range": "1991-2026",
-      "historical_copy_scope": "OpenJDK-preserved Unicode 16.0.0 complete V3 notice at 15ae8d02eeb9c80f5453b88d38081debf956cb65; exact text differs only in copyright end year 2024 versus 2026. Not claimed as an archived unicode.org download.",
-      "selected_data_derivation": [
-        {
-          "field": "kHanyuPinlu",
-          "rows": 3799,
-          "bytes": 78922,
-          "sha256": "260ef08aef066ae5e798ed9933e305094d03a87a5d0bcbced6d740cb9084f2f8",
-          "git_blob": "abc37486838a6bcb5b6a619b4a61fee1710dfd59",
-          "pinned_source_git_blob": "abc37486838a6bcb5b6a619b4a61fee1710dfd59",
-          "exact": true,
-          "source_bytes": 78922
-        },
-        {
-          "field": "kHanyuPinyin",
-          "rows": 34130,
-          "bytes": 766770,
-          "sha256": "2c4c24310caa91ff81e960ec674f2102664dbbd1e686c30c204cc78aaa27b9d9",
-          "git_blob": "b084ee9c719110a81459f165d0e82a001901b90d",
-          "pinned_source_git_blob": "b084ee9c719110a81459f165d0e82a001901b90d",
-          "exact": true,
-          "source_bytes": 766770
-        },
-        {
-          "field": "kMandarin",
-          "rows": 41692,
-          "bytes": 866878,
-          "sha256": "313ca5491f88ad2e1c934319e879ee1a35724f6cf838ca3ab660c488cd5ab7ff",
-          "git_blob": "3ff77dfabccbd9245e3c2c99006f344aee651a39",
-          "pinned_source_git_blob": "3ff77dfabccbd9245e3c2c99006f344aee651a39",
-          "exact": true,
-          "source_bytes": 866878
-        },
-        {
-          "field": "kTGHZ2013",
-          "rows": 8105,
-          "bytes": 166509,
-          "sha256": "83be5ecdfe0b8fcc1202ae45882a2f983c013db87ba68369d94a4dad775382bb",
-          "git_blob": "1bf2800594be92c886888895c44066ad4a815990",
-          "pinned_source_git_blob": "1bf2800594be92c886888895c44066ad4a815990",
-          "exact": true,
-          "source_bytes": 166509
-        },
-        {
-          "field": "kXHC1983",
-          "rows": 11072,
-          "bytes": 230280,
-          "sha256": "7ade5b5750c92d39dec2151075ebcca323afe6af452349f54438d950b1dd4eeb",
-          "git_blob": "8d73bdc840c59b0a16645491514464c1c275aa4b",
-          "pinned_source_git_blob": "8d73bdc840c59b0a16645491514464c1c275aa4b",
-          "exact": true,
-          "source_bytes": 230280
-        }
-      ]
-    },
-    "runtime_and_dependency_inputs_changed": false,
-    "private_collection_changed": false,
-    "native_synthesis_performed": false,
-    "installed_audibility_verified": false,
-    "customer_release_eligible": false,
-    "profile_activated": false,
     "limits": [
-      "The missing Unicode source-attribution notice is retained; this is not blanket license clearance for every upstream input or transitive/native component.",
-      "The existing private preparer must collect this exact notice into accessible frozen-artifact materials; actual inclusion is not inferred from source presence.",
-      "Exact Windows native/redistribution inventories, signed publisher binding and installed selected-language listening/recovery remain separate."
+      "Local route qualification used an exact fetched source subset, not a complete composed-build receipt.",
+      "Required public hosted checks and private exact-pin composed-source checks remain separate.",
+      "No deployment, release, user-account mutation, installed customer acceptance or production qualification is claimed."
     ]
   },
   "historical_bindings": [
@@ -8489,12 +8417,12 @@
     }
   ],
   "prior_binding": {
-    "public_revision": "c77b80c6f9154f557a3be0d2a0598f20bc23cfd7",
+    "public_revision": "307d0fc15a7656c4777cb9c40bf9038cbb507a6f",
     "path": "PUBLIC_METADATA/source-binding.json",
-    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/c77b80c6f9154f557a3be0d2a0598f20bc23cfd7/PUBLIC_METADATA/source-binding.json",
-    "sha256": "04b25f66b920fba1d1e7c2fe21e120880a0d4236950689c51533eedc2cda6656",
-    "bytes": 1272988,
-    "git_blob": "fbe1a3755145086676df2aff07320a9d5a65d5f2",
+    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/307d0fc15a7656c4777cb9c40bf9038cbb507a6f/PUBLIC_METADATA/source-binding.json",
+    "sha256": "86d56adceb70b8f7a7567567c267ec161328eb8210c8b86983b088d78e8b6a52",
+    "bytes": 1284316,
+    "git_blob": "903b4329a7f715a62a78b648d1de248cb678b58d",
     "all_top_level_keys": [
       "schema_version",
       "source_manifest",
@@ -8535,27 +8463,27 @@
       },
       "source_manifest_sha256": {
         "pointer": "/source_manifest_sha256",
-        "canonical_json_sha256": "bdbfcbd68cab59424f0225e212059518741b0ccc0941b997703c17705511ab10"
+        "canonical_json_sha256": "90c5a1c58db443c1abf90db905611036c5f29f75a4095eb3a23c3c2cdc5da6f8"
       },
       "source_tree_sha256": {
         "pointer": "/source_tree_sha256",
-        "canonical_json_sha256": "2ca05f7e7965a2b00f071f60dcea077f3aa035a9d91e415053f0e7ddc5f5f788"
+        "canonical_json_sha256": "31eefc19e38d19c425c650d5a69c5521da9c033e7d0749b815c8e60962002c34"
       },
       "source_file_count": {
         "pointer": "/source_file_count",
-        "canonical_json_sha256": "45614290270f9909ee6ffe6f52ae5f8360be81fec6d3868d8022e2d200be3de4"
+        "canonical_json_sha256": "1861bbefef1842ede31f0eb399407bb95252cb2a1b093301895028f95e7e3840"
       },
       "source_revision": {
         "pointer": "/source_revision",
-        "canonical_json_sha256": "ccbffc1f42405c35839a33854fe0dd3c63a3ade7dd6534e8e51881a3e8f6ac2b"
+        "canonical_json_sha256": "fd2def8ffa3773d6545825fbcd4fefc924b2a03952d010cfe2191c0b06b8c461"
       },
       "comparison_public_revision": {
         "pointer": "/comparison_public_revision",
-        "canonical_json_sha256": "b447337b8fb8c5e9895f15becdcabd6239d6313f7b4b4611b189a335f4cc252b"
+        "canonical_json_sha256": "6d4d03e405a5a4c945b8f23639c3430c24096b908f38afebdc5a5914c556f9e5"
       },
       "changed_source_paths": {
         "pointer": "/changed_source_paths",
-        "canonical_json_sha256": "be7217bb52f3b294baddd0d83afc6b0fdeabe63d08d70fc6560aa02c0deb86df"
+        "canonical_json_sha256": "a48d44fa1dac1dab136cbbbf1ac2d334368a312b9f9947e7e750a9fb74e547cf"
       },
       "retained_sboms": {
         "pointer": "/retained_sboms",
@@ -8563,11 +8491,11 @@
       },
       "input_equivalence": {
         "pointer": "/input_equivalence",
-        "canonical_json_sha256": "fda46b64b3fe07d55c9c88373eba411ad3efd4dfc27ae830797f57089eda5167"
+        "canonical_json_sha256": "25d5225ac938bffa1a814342092ec64eb4413fe1105adb779bd3e5a7a0d7ec13"
       },
       "qualification": {
         "pointer": "/qualification",
-        "canonical_json_sha256": "766c5ccadfaa32d9995255f629ece58cd2a53ba511881f40c3c60f5226832c59"
+        "canonical_json_sha256": "b64decb07355f4cddf19e6090528dcfe23b357570d52e630e1d9bba4aeb512a5"
       },
       "historical_bindings": {
         "pointer": "/historical_bindings",
@@ -8575,15 +8503,15 @@
       },
       "prior_binding": {
         "pointer": "/prior_binding",
-        "canonical_json_sha256": "0f157a801da6d37b1d34d2c0e5f84e5f420a7b5bcc89fabd791d4b1a8d5a247c"
+        "canonical_json_sha256": "6b798c066828e542035c0d888d98fc539b9eacfd5b57445129bce4d28a626a6d"
       },
       "retained_composition_component_bindings": {
         "pointer": "/retained_composition_component_bindings",
-        "canonical_json_sha256": "251947a4911e7e80e91b0639452ffb4bc9296b4b9e5b7d4e5ca72c46458870bb"
+        "canonical_json_sha256": "5748486c1d9928102bd424d657518a31ce7dc34c63d05b470a8a6a5a556be284"
       },
       "reviewed_source_patch": {
         "pointer": "/reviewed_source_patch",
-        "canonical_json_sha256": "6b78ea9ce410112960347bf91de56f47746f5f2cb131f70a10508cc04435fe06"
+        "canonical_json_sha256": "ccbfea1ded38ff70bdb6d256940238d398bdb7066823e3756e196d493332234e"
       },
       "new_resolution_performed": {
         "pointer": "/new_resolution_performed",
@@ -8607,11 +8535,11 @@
       },
       "new_resolution_scope": {
         "pointer": "/new_resolution_scope",
-        "canonical_json_sha256": "ef03ad125974bb483a9a86f3a3bacb3d4f27c2f81b325e42fd5c94672892a2bb"
+        "canonical_json_sha256": "bf93ce42b926211cd62bf584c8b353adc4bef6eb8c8b0490b25f3122c812c0fd"
       },
       "new_advisory_scan_scope": {
         "pointer": "/new_advisory_scan_scope",
-        "canonical_json_sha256": "d40fbfa52f67dae7875dabeb6fab973f1792e4fa1c5805f61a7f14465d466b97"
+        "canonical_json_sha256": "301018000ed5873cb6d72712dd14ab3c07af8ef0556750d89f218ce3ad6ab805"
       },
       "account_reconciliation_previous_binding": {
         "pointer": "/account_reconciliation_previous_binding",
@@ -8636,12 +8564,165 @@
     },
     "source_manifest": {
       "path": "PUBLIC_METADATA/source-manifest.json",
-      "sha256": "4349ec9ddc078a49064708fca9eae9e240638b7014d0091a5b4fb336cc2798ce",
-      "bytes": 471011,
-      "git_blob": "50417295a7a315e835c0f477e3c35c1d90d2df59"
+      "sha256": "c547626c0e45e09ef1128fbf587107e363cb246930cd8344a5b6dd606a9305da",
+      "bytes": 471187,
+      "git_blob": "bc460db8b1bf16d5a333c0ad14ebe0cca110af61"
     }
   },
   "retained_composition_component_bindings": [
+    {
+      "public_revision": "307d0fc15a7656c4777cb9c40bf9038cbb507a6f",
+      "path": "PUBLIC_METADATA/source-binding.json",
+      "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/307d0fc15a7656c4777cb9c40bf9038cbb507a6f/PUBLIC_METADATA/source-binding.json",
+      "sha256": "86d56adceb70b8f7a7567567c267ec161328eb8210c8b86983b088d78e8b6a52",
+      "bytes": 1284316,
+      "git_blob": "903b4329a7f715a62a78b648d1de248cb678b58d",
+      "all_top_level_keys": [
+        "schema_version",
+        "source_manifest",
+        "source_manifest_sha256",
+        "source_tree_sha256",
+        "source_file_count",
+        "source_revision",
+        "comparison_public_revision",
+        "changed_source_paths",
+        "retained_sboms",
+        "input_equivalence",
+        "qualification",
+        "historical_bindings",
+        "prior_binding",
+        "retained_composition_component_bindings",
+        "reviewed_source_patch",
+        "new_resolution_performed",
+        "new_advisory_scan_performed",
+        "new_runtime_qualification_performed",
+        "new_source_contract_qualification_performed",
+        "new_static_security_scan_performed",
+        "new_resolution_scope",
+        "new_advisory_scan_scope",
+        "account_reconciliation_previous_binding",
+        "reviewed_speech_binding",
+        "local_media_path_previous_binding",
+        "session_durability_previous_binding",
+        "media_identity_previous_binding"
+      ],
+      "preserved_json_objects": {
+        "schema_version": {
+          "pointer": "/schema_version",
+          "canonical_json_sha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+        },
+        "source_manifest": {
+          "pointer": "/source_manifest",
+          "canonical_json_sha256": "ace3c4cebde8c1e5207159e354ef46f1f9a13eb7b3185315a68b7cf8b71f212d"
+        },
+        "source_manifest_sha256": {
+          "pointer": "/source_manifest_sha256",
+          "canonical_json_sha256": "90c5a1c58db443c1abf90db905611036c5f29f75a4095eb3a23c3c2cdc5da6f8"
+        },
+        "source_tree_sha256": {
+          "pointer": "/source_tree_sha256",
+          "canonical_json_sha256": "31eefc19e38d19c425c650d5a69c5521da9c033e7d0749b815c8e60962002c34"
+        },
+        "source_file_count": {
+          "pointer": "/source_file_count",
+          "canonical_json_sha256": "1861bbefef1842ede31f0eb399407bb95252cb2a1b093301895028f95e7e3840"
+        },
+        "source_revision": {
+          "pointer": "/source_revision",
+          "canonical_json_sha256": "fd2def8ffa3773d6545825fbcd4fefc924b2a03952d010cfe2191c0b06b8c461"
+        },
+        "comparison_public_revision": {
+          "pointer": "/comparison_public_revision",
+          "canonical_json_sha256": "6d4d03e405a5a4c945b8f23639c3430c24096b908f38afebdc5a5914c556f9e5"
+        },
+        "changed_source_paths": {
+          "pointer": "/changed_source_paths",
+          "canonical_json_sha256": "a48d44fa1dac1dab136cbbbf1ac2d334368a312b9f9947e7e750a9fb74e547cf"
+        },
+        "retained_sboms": {
+          "pointer": "/retained_sboms",
+          "canonical_json_sha256": "0428d09c6e0e2b524877c2218b306c10da6c7536bcf6ed96524b581dafc85301"
+        },
+        "input_equivalence": {
+          "pointer": "/input_equivalence",
+          "canonical_json_sha256": "25d5225ac938bffa1a814342092ec64eb4413fe1105adb779bd3e5a7a0d7ec13"
+        },
+        "qualification": {
+          "pointer": "/qualification",
+          "canonical_json_sha256": "b64decb07355f4cddf19e6090528dcfe23b357570d52e630e1d9bba4aeb512a5"
+        },
+        "historical_bindings": {
+          "pointer": "/historical_bindings",
+          "canonical_json_sha256": "59ccb6141308771f32ec1e534f7a843cbdd8867afcd59e84944e03e6f9958c33"
+        },
+        "prior_binding": {
+          "pointer": "/prior_binding",
+          "canonical_json_sha256": "6b798c066828e542035c0d888d98fc539b9eacfd5b57445129bce4d28a626a6d"
+        },
+        "retained_composition_component_bindings": {
+          "pointer": "/retained_composition_component_bindings",
+          "canonical_json_sha256": "5748486c1d9928102bd424d657518a31ce7dc34c63d05b470a8a6a5a556be284"
+        },
+        "reviewed_source_patch": {
+          "pointer": "/reviewed_source_patch",
+          "canonical_json_sha256": "ccbfea1ded38ff70bdb6d256940238d398bdb7066823e3756e196d493332234e"
+        },
+        "new_resolution_performed": {
+          "pointer": "/new_resolution_performed",
+          "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+        },
+        "new_advisory_scan_performed": {
+          "pointer": "/new_advisory_scan_performed",
+          "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+        },
+        "new_runtime_qualification_performed": {
+          "pointer": "/new_runtime_qualification_performed",
+          "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+        },
+        "new_source_contract_qualification_performed": {
+          "pointer": "/new_source_contract_qualification_performed",
+          "canonical_json_sha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b"
+        },
+        "new_static_security_scan_performed": {
+          "pointer": "/new_static_security_scan_performed",
+          "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+        },
+        "new_resolution_scope": {
+          "pointer": "/new_resolution_scope",
+          "canonical_json_sha256": "bf93ce42b926211cd62bf584c8b353adc4bef6eb8c8b0490b25f3122c812c0fd"
+        },
+        "new_advisory_scan_scope": {
+          "pointer": "/new_advisory_scan_scope",
+          "canonical_json_sha256": "301018000ed5873cb6d72712dd14ab3c07af8ef0556750d89f218ce3ad6ab805"
+        },
+        "account_reconciliation_previous_binding": {
+          "pointer": "/account_reconciliation_previous_binding",
+          "canonical_json_sha256": "cfeffa86ef01cbbd530cda12a57b6c4eb3761063999ad3fae482a0c1d7482b51"
+        },
+        "reviewed_speech_binding": {
+          "pointer": "/reviewed_speech_binding",
+          "canonical_json_sha256": "88025408d951467d38a236d6fdedb10ad4a4112e6ce02b3577c5b906adec6305"
+        },
+        "local_media_path_previous_binding": {
+          "pointer": "/local_media_path_previous_binding",
+          "canonical_json_sha256": "220f4c5da0641cd8f51fb28add2f66e18e1dba3e64cca61d345ebd775b15bf1f"
+        },
+        "session_durability_previous_binding": {
+          "pointer": "/session_durability_previous_binding",
+          "canonical_json_sha256": "d1931a403fd80ce0a8ea40f23700b2e5a3be8c1b155c3511cbf4d6f72792f6b9"
+        },
+        "media_identity_previous_binding": {
+          "pointer": "/media_identity_previous_binding",
+          "canonical_json_sha256": "775b630f1531f2b679dfb823a59f6d534e542a78fdf1dc3dc6013a74012468e3"
+        }
+      },
+      "source_manifest": {
+        "path": "PUBLIC_METADATA/source-manifest.json",
+        "sha256": "c547626c0e45e09ef1128fbf587107e363cb246930cd8344a5b6dd606a9305da",
+        "bytes": 471187,
+        "git_blob": "bc460db8b1bf16d5a333c0ad14ebe0cca110af61"
+      }
+    },
     {
       "public_revision": "c77b80c6f9154f557a3be0d2a0598f20bc23cfd7",
       "path": "PUBLIC_METADATA/source-binding.json",
@@ -10547,22 +10628,20 @@
     }
   ],
   "reviewed_source_patch": {
-    "scope": "Retain exact Unicode V3 and original Unicode16 Unihan attribution for selected Mandarin source inputs",
+    "scope": "Deny diagnostic-consent changes and disclosure acknowledgments from paired/cloud spokes while preserving ordinary paired-spoke diagnostics.",
     "source_paths": [
-      "SOURCE/LICENSES/Unicode-Unihan-16.0.0-NOTICE.txt",
-      "SOURCE/LICENSES/SHA256SUMS",
-      "SOURCE/docs/CUSTOMER_SPEECH_QUALIFICATION.md",
-      "SOURCE/tests/public/test_customer_speech_dependencies.py"
+      "SOURCE/auth/spoke_scopes.py",
+      "SOURCE/tests/public/test_diagnostics_consent_spoke_scope.py"
     ],
-    "source_tree": "673f19c48ccdfe424669e9aad0fcc4818675b0ac",
-    "patch_sha256": "62dba3b600dcb82912e6668646076bba530f67de4e3bd0c6baa462c6fee2f292",
+    "source_tree": "6bc586b7bc28df8ba2de699b8e16053175343ba5",
+    "patch_sha256": "a94df8d4cdac062d6a62d0d1b0924f7c1b6f4e245893b23e2b335b8c705d0bcc",
     "prior_binding": {
-      "public_revision": "c77b80c6f9154f557a3be0d2a0598f20bc23cfd7",
+      "public_revision": "307d0fc15a7656c4777cb9c40bf9038cbb507a6f",
       "path": "PUBLIC_METADATA/source-binding.json",
-      "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/c77b80c6f9154f557a3be0d2a0598f20bc23cfd7/PUBLIC_METADATA/source-binding.json",
-      "sha256": "04b25f66b920fba1d1e7c2fe21e120880a0d4236950689c51533eedc2cda6656",
-      "bytes": 1272988,
-      "git_blob": "fbe1a3755145086676df2aff07320a9d5a65d5f2",
+      "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/307d0fc15a7656c4777cb9c40bf9038cbb507a6f/PUBLIC_METADATA/source-binding.json",
+      "sha256": "86d56adceb70b8f7a7567567c267ec161328eb8210c8b86983b088d78e8b6a52",
+      "bytes": 1284316,
+      "git_blob": "903b4329a7f715a62a78b648d1de248cb678b58d",
       "all_top_level_keys": [
         "schema_version",
         "source_manifest",
@@ -10603,27 +10682,27 @@
         },
         "source_manifest_sha256": {
           "pointer": "/source_manifest_sha256",
-          "canonical_json_sha256": "bdbfcbd68cab59424f0225e212059518741b0ccc0941b997703c17705511ab10"
+          "canonical_json_sha256": "90c5a1c58db443c1abf90db905611036c5f29f75a4095eb3a23c3c2cdc5da6f8"
         },
         "source_tree_sha256": {
           "pointer": "/source_tree_sha256",
-          "canonical_json_sha256": "2ca05f7e7965a2b00f071f60dcea077f3aa035a9d91e415053f0e7ddc5f5f788"
+          "canonical_json_sha256": "31eefc19e38d19c425c650d5a69c5521da9c033e7d0749b815c8e60962002c34"
         },
         "source_file_count": {
           "pointer": "/source_file_count",
-          "canonical_json_sha256": "45614290270f9909ee6ffe6f52ae5f8360be81fec6d3868d8022e2d200be3de4"
+          "canonical_json_sha256": "1861bbefef1842ede31f0eb399407bb95252cb2a1b093301895028f95e7e3840"
         },
         "source_revision": {
           "pointer": "/source_revision",
-          "canonical_json_sha256": "ccbffc1f42405c35839a33854fe0dd3c63a3ade7dd6534e8e51881a3e8f6ac2b"
+          "canonical_json_sha256": "fd2def8ffa3773d6545825fbcd4fefc924b2a03952d010cfe2191c0b06b8c461"
         },
         "comparison_public_revision": {
           "pointer": "/comparison_public_revision",
-          "canonical_json_sha256": "b447337b8fb8c5e9895f15becdcabd6239d6313f7b4b4611b189a335f4cc252b"
+          "canonical_json_sha256": "6d4d03e405a5a4c945b8f23639c3430c24096b908f38afebdc5a5914c556f9e5"
         },
         "changed_source_paths": {
           "pointer": "/changed_source_paths",
-          "canonical_json_sha256": "be7217bb52f3b294baddd0d83afc6b0fdeabe63d08d70fc6560aa02c0deb86df"
+          "canonical_json_sha256": "a48d44fa1dac1dab136cbbbf1ac2d334368a312b9f9947e7e750a9fb74e547cf"
         },
         "retained_sboms": {
           "pointer": "/retained_sboms",
@@ -10631,11 +10710,11 @@
         },
         "input_equivalence": {
           "pointer": "/input_equivalence",
-          "canonical_json_sha256": "fda46b64b3fe07d55c9c88373eba411ad3efd4dfc27ae830797f57089eda5167"
+          "canonical_json_sha256": "25d5225ac938bffa1a814342092ec64eb4413fe1105adb779bd3e5a7a0d7ec13"
         },
         "qualification": {
           "pointer": "/qualification",
-          "canonical_json_sha256": "766c5ccadfaa32d9995255f629ece58cd2a53ba511881f40c3c60f5226832c59"
+          "canonical_json_sha256": "b64decb07355f4cddf19e6090528dcfe23b357570d52e630e1d9bba4aeb512a5"
         },
         "historical_bindings": {
           "pointer": "/historical_bindings",
@@ -10643,15 +10722,15 @@
         },
         "prior_binding": {
           "pointer": "/prior_binding",
-          "canonical_json_sha256": "0f157a801da6d37b1d34d2c0e5f84e5f420a7b5bcc89fabd791d4b1a8d5a247c"
+          "canonical_json_sha256": "6b798c066828e542035c0d888d98fc539b9eacfd5b57445129bce4d28a626a6d"
         },
         "retained_composition_component_bindings": {
           "pointer": "/retained_composition_component_bindings",
-          "canonical_json_sha256": "251947a4911e7e80e91b0639452ffb4bc9296b4b9e5b7d4e5ca72c46458870bb"
+          "canonical_json_sha256": "5748486c1d9928102bd424d657518a31ce7dc34c63d05b470a8a6a5a556be284"
         },
         "reviewed_source_patch": {
           "pointer": "/reviewed_source_patch",
-          "canonical_json_sha256": "6b78ea9ce410112960347bf91de56f47746f5f2cb131f70a10508cc04435fe06"
+          "canonical_json_sha256": "ccbfea1ded38ff70bdb6d256940238d398bdb7066823e3756e196d493332234e"
         },
         "new_resolution_performed": {
           "pointer": "/new_resolution_performed",
@@ -10675,11 +10754,11 @@
         },
         "new_resolution_scope": {
           "pointer": "/new_resolution_scope",
-          "canonical_json_sha256": "ef03ad125974bb483a9a86f3a3bacb3d4f27c2f81b325e42fd5c94672892a2bb"
+          "canonical_json_sha256": "bf93ce42b926211cd62bf584c8b353adc4bef6eb8c8b0490b25f3122c812c0fd"
         },
         "new_advisory_scan_scope": {
           "pointer": "/new_advisory_scan_scope",
-          "canonical_json_sha256": "d40fbfa52f67dae7875dabeb6fab973f1792e4fa1c5805f61a7f14465d466b97"
+          "canonical_json_sha256": "301018000ed5873cb6d72712dd14ab3c07af8ef0556750d89f218ce3ad6ab805"
         },
         "account_reconciliation_previous_binding": {
           "pointer": "/account_reconciliation_previous_binding",
@@ -10704,9 +10783,9 @@
       },
       "source_manifest": {
         "path": "PUBLIC_METADATA/source-manifest.json",
-        "sha256": "4349ec9ddc078a49064708fca9eae9e240638b7014d0091a5b4fb336cc2798ce",
-        "bytes": 471011,
-        "git_blob": "50417295a7a315e835c0f477e3c35c1d90d2df59"
+        "sha256": "c547626c0e45e09ef1128fbf587107e363cb246930cd8344a5b6dd606a9305da",
+        "bytes": 471187,
+        "git_blob": "bc460db8b1bf16d5a333c0ad14ebe0cca110af61"
       }
     }
   },
@@ -10715,8 +10794,8 @@
   "new_runtime_qualification_performed": false,
   "new_source_contract_qualification_performed": true,
   "new_static_security_scan_performed": false,
-  "new_resolution_scope": "No production dependency change or target-graph resolution. Versioned Unicode data and current official license were read only to establish source attribution.",
-  "new_advisory_scan_scope": "No new advisory clearance in local composition; normal hosted jobs retain their own results.",
+  "new_resolution_scope": "No dependency or target-graph changes; existing dependency inputs and inventories are retained.",
+  "new_advisory_scan_scope": "No new local advisory clearance; hosted checks retain their own results.",
   "account_reconciliation_previous_binding": {
     "source_revision": "f864e61381ef9e10a09333fce05210427cf7d0f6",
     "source_manifest_sha256": "9cad8bcb2f98c34d95a11545e11a57d74dbe6b28cd5db7322b7746e102801acd",
