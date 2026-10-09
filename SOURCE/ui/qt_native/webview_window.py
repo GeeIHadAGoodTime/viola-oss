@@ -3078,6 +3078,10 @@ class ViolaWebViewWindow(QMainWindow):
         if self._react_ui_loaded or self._react_ui_load_url is not None:
             return
         url = self._build_shell_url()
+        # Backend readiness can outlast the 30-second WS token minted for the
+        # loading page. Refresh before navigation so the first shell connection
+        # does not have to reject that stale token and recover on a retry.
+        self._install_or_refresh_credentials_script()
         self._react_ui_load_url = url
         logger.info("Backend verified ready; loading UI shell from: %s", url)
         self.webview.setUrl(QUrl(url))
