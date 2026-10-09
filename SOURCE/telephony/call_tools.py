@@ -1248,6 +1248,125 @@ def cancel_latched_end_call(call_record: Any, *, reason: str = "") -> bool:
     return True
 
 
+_SPOKEN_CLOSE_COURTESY = r"(?:ok|okay|alright|all right|thanks|thank you)(?: for your help)?"
+_SPOKEN_CLOSE_FAREWELL = (
+    r"(?:bye|goodbye|cheers|take care|talk soon|talk later|"
+    r"have a (?:good|great|nice) (?:day|one|evening|night|week|weekend))"
+)
+_ASSISTANT_SPOKEN_CLOSE_RE = re.compile(
+    rf"(?:{_SPOKEN_CLOSE_COURTESY} )*{_SPOKEN_CLOSE_FAREWELL}"
+)
+_RECIPIENT_SPOKEN_CLOSE_RE = re.compile(
+    rf"(?:{_SPOKEN_CLOSE_COURTESY} )*"
+    rf"(?:{_SPOKEN_CLOSE_FAREWELL}|that's all|that is all|all set|you can hang up(?: now)?)"
+)
+
+
+def _is_terminal_spoken_close(text: str, *, recipient: bool = False) -> bool:
+    """Recognize only complete, short closing utterances, never a suffix.
+
+    This conservative recovery is intentionally smaller than natural language:
+    unfamiliar closings still require the model's explicit end_call tool. Do not
+    discard quotes, question marks, or arbitrary words while normalizing. Those
+    distinguish a real farewell from negation, instructions, and quoted speech.
+    """
+    if not isinstance(text, str) or len(text) > 160:
+        return False
+    normalized = re.sub(r"[\s.!,:;]+", " ", text.casefold()).strip()
+    if not normalized or len(normalized.split()) > 16:
+        return False
+    matcher = _RECIPIENT_SPOKEN_CLOSE_RE if recipient else _ASSISTANT_SPOKEN_CLOSE_RE
+    return matcher.fullmatch(normalized) is not None
+
+
+def _has_adjacent_spoken_close(call_record: Any, assistant_text: str) -> bool:
+    """Bind a spoken completion to its entire, unchanged recipient input span.
+
+    Final STT frames are transcript chunks, not complete conversational turns.
+    Include every adjacent recipient chunk, using the boundary captured when
+    this assistant generation began. A new recipient chunk during generation,
+    interruption, or unspoken output invalidates the collector's boundary.
+    """
+    entries = getattr(call_record, "transcript", None)
+    if not isinstance(entries, (list, tuple)) or len(entries) < 2:
+        return False
+    boundary = getattr(call_record, "_completed_spoken_turn_recipient_end_index", None)
+    if type(boundary) is not int or boundary != len(entries) - 1:
+        return False
+    assistant = entries[-1]
+    if not isinstance(assistant, dict) or assistant.get("role") != "viola":
+        return False
+    if assistant.get("text") != assistant_text:
+        return False
+    recipient_chunks = []
+    for entry in reversed(entries[:boundary]):
+        if not isinstance(entry, dict):
+            return False
+        if entry.get("role") == "viola":
+            break
+        if entry.get("role") != "them" or not isinstance(entry.get("text"), str):
+            return False
+        recipient_chunks.append(entry["text"])
+    if not recipient_chunks:
+        return False
+    recipient_text = " ".join(reversed(recipient_chunks))
+    return _is_terminal_spoken_close(assistant_text) and _is_terminal_spoken_close(
+        recipient_text, recipient=True
+    )
+
+
+async def complete_spoken_goodbye_end_call_if_omitted(
+    call_record: Any,
+    *,
+    assistant_text: str,
+    telnyx_client: Any,
+    call_control_id: str = "",
+    push_frame: Any = None,
+    hangup_after_output_drain: bool = False,
+) -> bool:
+    """Complete an unambiguous two-party goodbye when no end_call was emitted.
+
+    The normal tool and its text-empty latch take precedence. The completed text
+    must be the last recorded assistant turn, bound by the transcript collector
+    to its complete recipient input. Old context, interrupted generations and
+    unspoken/payment-gate text cannot authorize a hangup. Reuse the normal
+    media-drain and confirmed-carrier dispatch path.
+    """
+    from telephony.call_manager import _is_terminal_call_status
+
+    if (
+        bool(getattr(call_record, "_end_call_committed", False))
+        or bool(getattr(call_record, "_telnyx_hangup_dispatched", False))
+        or getattr(call_record, "_pending_end_call", None) is not None
+        or not bool(getattr(call_record, "first_assistant_turn_complete", False))
+        or bool(getattr(call_record, "human_takeover_detected", False))
+        or _is_terminal_call_status(getattr(call_record, "status", None))
+        or not _has_adjacent_spoken_close(call_record, assistant_text)
+    ):
+        return False
+
+    # Commit before the first await so repeated callbacks cannot dispatch twice.
+    call_record._end_call_committed = True
+    call_id = str(getattr(call_record, "call_id", "") or "")
+    reason = "recipient and assistant completed a spoken goodbye"
+    logger.info("end_call: recovering omitted tool after spoken goodbye for %s", call_id)
+
+    if hangup_after_output_drain and callable(push_frame):
+        try:
+            await push_frame(EndCallHangupFrame(call_id=call_id, reason=reason))
+            return True
+        except (AttributeError, RuntimeError, TypeError, ValueError) as exc:
+            logger.warning("end_call: spoken-goodbye drain push failed for %s: %s", call_id, exc)
+
+    await dispatch_telnyx_end_call_hangup(
+        telnyx_client=telnyx_client,
+        call_control_id=call_control_id,
+        call_record=call_record,
+        reason_text=reason,
+    )
+    return True
+
+
 def make_end_call_handler(
     *,
     telnyx_client,

@@ -63,6 +63,9 @@ class TranscriptFrameCollector(FrameProcessor if PIPECAT_AVAILABLE else object):
         # True when an interruption cancelled the generation currently being
         # accumulated. Cleared at each generation start and consumed at its end.
         self._generation_interrupted: bool = False
+        # The new no-tool close recovery may only use the recipient input that
+        # belonged to this generation. None also marks cancelled/unspoken text.
+        self._spoken_turn_recipient_end_index: int | None = None
 
     async def process_frame(self, frame, direction):
         await super().process_frame(frame, direction)
@@ -75,6 +78,7 @@ class TranscriptFrameCollector(FrameProcessor if PIPECAT_AVAILABLE else object):
 
     async def _capture_frame(self, frame) -> None:
         if getattr(frame, "viola_skip_transcript", False) or self._payment_segment_active():
+            self._invalidate_spoken_close_boundary()
             return
 
         if self._capture_user and isinstance(frame, TranscriptionFrame):
@@ -106,6 +110,7 @@ class TranscriptFrameCollector(FrameProcessor if PIPECAT_AVAILABLE else object):
         # catches both (matching only the subclass would miss the live frame).
         if isinstance(frame, InterruptionFrame):
             self._assistant_chunks = []
+            self._invalidate_spoken_close_boundary()
             # Remember that THIS generation was cancelled. The voicemail response
             # gate needs the difference between "ended having spoken nothing
             # because it was cut off" (release what it is holding, or Viola's one
@@ -120,13 +125,29 @@ class TranscriptFrameCollector(FrameProcessor if PIPECAT_AVAILABLE else object):
         if isinstance(frame, LLMFullResponseStartFrame):
             self._assistant_chunks = []
             self._generation_interrupted = False
+            self._invalidate_spoken_close_boundary()
+            record = getattr(self._transcript, "_record", None)
+            entries = getattr(record, "transcript", None)
+            if isinstance(entries, (list, tuple)):
+                self._spoken_turn_recipient_end_index = len(entries)
         elif isinstance(frame, LLMTextFrame):
             self._assistant_chunks.append(frame.text)
+            if getattr(frame, "skip_tts", False):
+                self._invalidate_spoken_close_boundary()
         elif isinstance(frame, LLMFullResponseEndFrame):
+            # A skipped end frame does not flush the TTS sentence buffer. Its
+            # collected text is not evidence that a goodbye reached synthesis.
+            if getattr(frame, "skip_tts", False):
+                self._invalidate_spoken_close_boundary()
             text = "".join(self._assistant_chunks).strip()
             self._assistant_chunks = []
             if text:
                 self._transcript.add_assistant(text)
+                record = getattr(self._transcript, "_record", None)
+                if record is not None:
+                    record._completed_spoken_turn_recipient_end_index = (
+                        self._spoken_turn_recipient_end_index if not self._generation_interrupted else None
+                    )
                 # PHONE-15: mark first-turn-complete when a non-empty assistant
                 # turn finishes. The end_call tool's safety guard reads this to
                 # distinguish hallucinated early-end (no turn yet) from
@@ -176,6 +197,12 @@ class TranscriptFrameCollector(FrameProcessor if PIPECAT_AVAILABLE else object):
             record = getattr(self._transcript, "_record", None)
             if record is not None and not getattr(record, "first_assistant_turn_complete", False):
                 record.first_assistant_turn_complete = True
+
+    def _invalidate_spoken_close_boundary(self) -> None:
+        self._spoken_turn_recipient_end_index = None
+        record = getattr(self._transcript, "_record", None)
+        if record is not None:
+            record._completed_spoken_turn_recipient_end_index = None
 
     async def _notify_voicemail_gate(self, record, method_name: str) -> None:
         """Tell the voicemail response gate how the in-flight generation resolved.
