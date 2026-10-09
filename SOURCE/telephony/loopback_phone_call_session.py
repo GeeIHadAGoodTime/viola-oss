@@ -1949,21 +1949,32 @@ class LoopbackPhoneCallSession:
         return TranscriptFrameCollector(transcript_collector, **kwargs)
 
     def _make_loopback_assistant_complete(self, record: CallRecord, llm: Any) -> Callable[[str], Awaitable[None]]:
-        """Wire the PHONE-15 latched-end_call completion, mirroring production.
+        """Wire completed-turn end-call recovery, mirroring production.
 
         Production CallManager._run_call_pipeline passes an on_assistant_complete
         callback to the assistant TranscriptFrameCollector that calls
         fire_latched_end_call_if_pending on every non-empty spoken turn. Without
-        this, the loopback would REFUSE+LATCH a text-empty end_call (the guard runs)
-        but never COMPLETE the hangup on the following spoken close — so the fix
-        under test would be half-exercised. This closes that harness gap so rung-1/
-        rung-2 exercise the full path-drop -> latch -> hangup sequence.
+        this, the loopback would REFUSE+LATCH a text-empty end_call but never
+        complete it on the following spoken close. A turn with no pending latch
+        also exercises the separate omitted-tool, two-party goodbye recovery.
         """
 
         async def _on_assistant_complete(text: str) -> None:
-            from telephony.call_tools import fire_latched_end_call_if_pending
+            from telephony.call_tools import (
+                complete_spoken_goodbye_end_call_if_omitted,
+                fire_latched_end_call_if_pending,
+            )
 
-            fired = await fire_latched_end_call_if_pending(record, push_frame=getattr(llm, "push_frame", None))
+            push_frame = getattr(llm, "push_frame", None)
+            fired = await fire_latched_end_call_if_pending(record, push_frame=push_frame)
+            if not fired:
+                await complete_spoken_goodbye_end_call_if_omitted(
+                    record,
+                    assistant_text=text,
+                    telnyx_client=self._fake_telnyx,
+                    push_frame=push_frame,
+                    hangup_after_output_drain=True,
+                )
             self.latched_end_call_fires.append({"text": text, "fired": bool(fired)})
 
         return _on_assistant_complete

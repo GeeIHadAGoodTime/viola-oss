@@ -3542,6 +3542,11 @@ class CallRecord:
     # PHONE-15 guard refuses). The next spoken assistant turn completes the hangup
     # from this latch, so a forgotten re-emit no longer strands the call open.
     _pending_end_call: Any = field(default=None, repr=False)
+    # Published by TranscriptFrameCollector only after an uninterrupted,
+    # TTS-eligible generation. Identifies the exclusive recipient transcript
+    # boundary captured at generation start, so final STT chunks cannot be
+    # mistaken for standalone closing utterances or reassigned to another turn.
+    _completed_spoken_turn_recipient_end_index: int | None = field(default=None, repr=False)
     _llm_service: Any = field(default=None, repr=False)
     _pipeline_task: Any = field(default=None, repr=False)
     _telnyx_hangup_dispatched: bool = field(default=False, repr=False)
@@ -6573,10 +6578,22 @@ class CallManager:
                 # end_call. Complete the hangup now — the EndCallHangupFrame trails
                 # this turn's TTS media, so the goodbye is heard, THEN the line
                 # drops. No-op unless an end_call was actually latched.
-                from telephony.call_tools import fire_latched_end_call_if_pending
+                from telephony.call_tools import (
+                    complete_spoken_goodbye_end_call_if_omitted,
+                    fire_latched_end_call_if_pending,
+                )
 
                 llm_service = getattr(record, "_llm_service", None)
-                await fire_latched_end_call_if_pending(record, push_frame=getattr(llm_service, "push_frame", None))
+                push_frame = getattr(llm_service, "push_frame", None)
+                if await fire_latched_end_call_if_pending(record, push_frame=push_frame):
+                    return
+                await complete_spoken_goodbye_end_call_if_omitted(
+                    record,
+                    assistant_text=text,
+                    telnyx_client=telnyx_client,
+                    push_frame=push_frame,
+                    hangup_after_output_drain=True,
+                )
 
             assistant_transcript_collector = TranscriptFrameCollector(
                 transcript_collector,
