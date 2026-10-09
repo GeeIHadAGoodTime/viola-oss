@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "3c54baaad4181777602231cc43654d80d5384b9e",
-  "sha256": "2a804a324d7ea253c16f3b3abb33e2c1207bf613ac4672c1e3902ac2a4b138b6",
+  "revision": "6ce6dfe47a743163b13784b8338acf29cc700eaf",
+  "sha256": "de8062224b369f6009345eda20ac22ea0696456ef21333158f474b2e8871b766",
   "files": [
     {
       "path": ".env.example",
@@ -5695,8 +5695,8 @@
     },
     {
       "path": "telephony/call_manager.py",
-      "sha256": "a42c6add2f0aedc81e1bdf849a2c236fe6785e8cb3bb150c45fe34a974874490",
-      "bytes": 378856
+      "sha256": "2c587ad32b5c9b11115a2cc8f79f800bfd362284aacc4e3efb78508fa815d1fe",
+      "bytes": 379729
     },
     {
       "path": "telephony/call_queue.py",
@@ -5710,8 +5710,8 @@
     },
     {
       "path": "telephony/call_tools.py",
-      "sha256": "1a246b714a98054aefd974f56dc4e2bff450333d605341772632b78b82f25b15",
-      "bytes": 61515
+      "sha256": "bbf0f6f370b3c5570cb6a0ea46ddf97a29ac90dff0128678293faa5d32977468",
+      "bytes": 66691
     },
     {
       "path": "telephony/caller_validation.py",
@@ -5795,8 +5795,8 @@
     },
     {
       "path": "telephony/loopback_phone_call_session.py",
-      "sha256": "780d920f7f7972a5557ccbcdd25e8f6c395457cca1345573bafb8d001a474647",
-      "bytes": 124405
+      "sha256": "e5c8490c4379693b39b5e957d51b664590cd71133f31ae16b5a3cd57f1546578",
+      "bytes": 124767
     },
     {
       "path": "telephony/loopback_transport.py",
@@ -5965,8 +5965,8 @@
     },
     {
       "path": "telephony/transcription_observer.py",
-      "sha256": "3c1cd98b9da66dda0e9d9e9394468d0da8e0c5f9d86532754389495fc0ecdc36",
-      "bytes": 14572
+      "sha256": "8231f3f29dc921f4524c183ce3f93c9dde40fee5f1d137294a629d771df37fb1",
+      "bytes": 16150
     },
     {
       "path": "telephony/tts_corruption_guard.py",
@@ -6212,6 +6212,11 @@
       "path": "tests/public/test_phone_locale_normalization.py",
       "sha256": "8ee1af94237192d1349bcce8f77761ba59f58c6ecee449f9074c3edbb012d3f7",
       "bytes": 9729
+    },
+    {
+      "path": "tests/public/test_phone_spoken_goodbye_recovery.py",
+      "sha256": "29f7b6dbc9ea03780af852ded7718716559f9ed57fe84eb7746d43e7bd503eef",
+      "bytes": 23564
     },
     {
       "path": "tests/public/test_pipecat_runner_security.py",
