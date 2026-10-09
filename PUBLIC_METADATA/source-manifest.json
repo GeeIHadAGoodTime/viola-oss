@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "6050e87e0b72e1ae8a355d624260291b9868c907",
-  "sha256": "76701f36d78db52bc8f6d9a0b64d7a955376e8d07a06a53f522614aa768dffcc",
+  "revision": "0f4d8f8ba54e0f66736f2f8aa58e57b023ef5a4f",
+  "sha256": "f890b03d89d34a14584b4a10797f2767dd7a85d5ce0439889c977f402162f87c",
   "files": [
     {
       "path": ".env.example",
@@ -6289,6 +6289,11 @@
       "bytes": 83245
     },
     {
+      "path": "tests/public/test_startup_websocket_credentials.py",
+      "sha256": "c4cbb82a66fe86d70332da3dec95321345ee1151f1625e2ae1d301d8d7bff838",
+      "bytes": 7082
+    },
+    {
       "path": "tests/public/test_step_logger_status.py",
       "sha256": "f43a8f369828481307fc8031f767240eb0774a80b17b0f54e89fcaff7fdffdf7",
       "bytes": 7499
@@ -9805,8 +9810,8 @@
     },
     {
       "path": "ui/qt_native/webview_window.py",
-      "sha256": "5f240b12b14228652313a473e5a158a3ac0121276c5acb2b3bf3b6acb5fc3db8",
-      "bytes": 200930
+      "sha256": "755e7f33b4eacca89dfff9493bf25b5a3715128f3c68f1e366dfc950ced8ad86",
+      "bytes": 201217
     },
     {
       "path": "ui/qt_native/widgets/connectivity_status.py",
