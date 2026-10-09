@@ -48,6 +48,7 @@ from typing import TYPE_CHECKING, Any, Protocol, cast
 
 from config.settings import settings
 from core.constants import DEFAULT_API_PORT, LOCALHOST, TIMEOUT_DEFAULT
+from core.lan_exposure import lan_listeners_allowed
 from core.logging_config import get_logger
 from services.multiroom.exceptions import DeviceDiscoveryError
 
@@ -886,7 +887,9 @@ class DiscoveryService:
         if getattr(settings, "pytest_in_progress", False):
             return True
 
-        return False
+        # The feature remains enabled; only LAN discovery follows the API bind.
+        # A loopback-only first launch must not open mDNS sockets (#4867).
+        return not lan_listeners_allowed(getattr(settings, "api_host", None))
 
     @staticmethod
     def _get_default_room_name() -> str:
