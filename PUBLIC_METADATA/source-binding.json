@@ -1,14 +1,15 @@
 {
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "5deb96c782b6c3d6eb08dfb7b91d829d5a882e295842eb98d0114472c5064bc8",
-  "source_tree_sha256": "fcaf7d007ae6f6f1e285d950566e780072fd8854c45d10ec992ecc0087f938cc",
+  "source_manifest_sha256": "b87b98a62bd4084297597e59cfe821dd6a52a124f862d6091a83e8ed275eaa86",
+  "source_tree_sha256": "76701f36d78db52bc8f6d9a0b64d7a955376e8d07a06a53f522614aa768dffcc",
   "source_file_count": 2697,
-  "source_revision": "c41bf1a8c333d1f60c872dda62ba417d27372ad5",
+  "source_revision": "6050e87e0b72e1ae8a355d624260291b9868c907",
   "comparison_public_revision": "f6aaff229df483adad81390b19c196e5faffe52d",
   "changed_source_paths": [
-    "SOURCE/ui/qt_native/webview_window.py",
-    "SOURCE/tests/public/test_startup_websocket_credentials.py"
+    "SOURCE/ui/react-app/src/components/player/MusicCommandInput.jsx",
+    "SOURCE/ui/react-app/src/components/player/MusicCommandInput.module.css",
+    "SOURCE/ui/react-app/src/components/player/MusicCommandInput.test.jsx"
   ],
   "retained_sboms": [
     {
@@ -73,42 +74,61 @@
     "comparison_basis": "Protected public main f6aaff229df483adad81390b19c196e5faffe52d",
     "all_unselected_export_leaf_bytes_and_modes_preserved": true,
     "all_six_sbom_bytes_and_status_objects_preserved": true,
-    "dependency_frontend_workflow_notice_model_pricing_and_customer_speech_inputs_unchanged": true,
-    "scope": "One Qt navigation call and four synthetic startup-token contracts."
+    "dependency_workflow_notice_model_pricing_and_customer_speech_inputs_unchanged": true,
+    "scope": "Browser MusicCommandInput failure feedback, its CSS and six React/jsdom regression cases. Desktop ingress and successful request handling unchanged."
   },
   "qualification": {
-    "scope": "Refresh the existing desktop credential script immediately before ready-shell navigation.",
-    "source_commit": "c41bf1a8c333d1f60c872dda62ba417d27372ad5",
-    "source_tree": "3b21c8a7728e673c72f5b0640f99ef194967199e",
+    "scope": "Visible failure and explicit retry after rejected browser Music-command HTTP/network submissions.",
+    "source_commit": "6050e87e0b72e1ae8a355d624260291b9868c907",
+    "source_tree": "e473b282dc7444eee15780a25a964098be6999c1",
     "ordered_source_parents": [
       "f6aaff229df483adad81390b19c196e5faffe52d"
     ],
-    "reviewed_combined_patch_sha256": "c1b0e4313540ccf1d06dfb0a1f6f52e2efa9711b5334d735209ff5ccdeaaf5f1",
-    "publication_status": "Exact source commit created; draft PR pending.",
+    "reviewed_combined_patch_sha256": "ae96c086d878e0be240f884fc35baa7e69641f47a17b32fe16155865e7376f47",
+    "publication_status": "Reviewed source for draft PR; exact-head required checks and protected integration remain pending.",
     "independent_automated_review": {
-      "result": "No blocking findings; four final token tests independently rerun successfully."
+      "result": "PASS for the narrow source patch; no source blocker found.",
+      "review_time_utc": "2026-10-09T20:59:25Z",
+      "source_file_sha256": {
+        "SOURCE/ui/react-app/src/components/player/MusicCommandInput.jsx": "479adbd1d0eaa460e849834616a751be78a9f8695d0d785056dfc6d17e78b15d",
+        "SOURCE/ui/react-app/src/components/player/MusicCommandInput.module.css": "1ae41f1f2b7ee8a7f329a8e30ff1b680d6db799ed3b1cd7183d5c6f7b04b4d3f",
+        "SOURCE/ui/react-app/src/components/player/MusicCommandInput.test.jsx": "902dfca318bfad5d86a997a887b3d07f56e457034bdf2b567e86356e22b6948b"
+      },
+      "tests_passed": 9,
+      "scope": "Parent independently reviewed all three exact files and reran MusicCommandInput plus unchanged PlayerSection surface tests."
     },
     "source_controls": {
-      "commands": [
-        "python -m unittest discover -s tests/public -p test_startup_websocket_credentials.py -v",
-        "python -m unittest discover -s tests/public -p test_windows_native_startup_order.py -v"
-      ],
-      "tests_passed": 28,
-      "failed": 0,
-      "skipped": 0,
-      "known_bad_control": "Unmodified baseline fails delayed-ready and failed-load retry freshness; duplicate guards and isolation remain passing.",
-      "fixtures": "Actual source token mint/consume and Qt credential/navigation methods with synthetic configuration, clock and inert Qt seams; no connections or persistent credentials."
+      "focused-tests": {
+        "sha256": "1da45e9a42f13d519ddde9f9032ee7b7ee439ece59988f240b5b7aec22a9b7f7",
+        "tests_passed": 51,
+        "tests_failed": 0
+      },
+      "integration-tests": {
+        "sha256": "64ed577a4bd73ec61696ef402ca3c6bb51676d5d9883c10cf044d8ff24acf732",
+        "tests_passed": 203,
+        "tests_failed": 0
+      },
+      "original-red-control": {
+        "sha256": "022b8926e44c0d11076c74940c2b70088581303726ccb3ee34bcd07fcd7e1a47",
+        "tests_passed": 2,
+        "tests_failed": 4
+      }
     },
-    "normal_app_retest_required": [
-      "Slow native startup waits over 30 seconds before the ready shell, then opens its first local event socket without an expired-ticket rejection.",
-      "Native failed-load retry and repeated readiness preserve one shell navigation and same-origin isolation."
-    ],
-    "limits": [
-      "Synthetic methods do not qualify Qt renderer script propagation or a real WebSocket handshake.",
-      "Full public suite and hosted exact-head checks remain pending.",
-      "Ruff is unavailable locally; no dependency installation was performed.",
-      "No release, deployment, remote runtime change or new installed candidate was made."
-    ]
+    "frontend_build": {
+      "result": "PASS",
+      "command": "CI=1 SENTRY_AUTH_TOKEN= SENTRY_ORG= SENTRY_PROJECT= npm run build",
+      "log_sha256": "c8ed34bb99b61091b06b186e443a3b2208073ac3f3333208634a0640809c5a99",
+      "scope": "Linux source build using exact npm ci lockfile; no credentials or source-map upload."
+    },
+    "focused_lint": "PASS: MusicCommandInput.jsx and MusicCommandInput.test.jsx",
+    "runtime_qualification": {
+      "installed_windows": false,
+      "rendered_browser": false,
+      "physical_audio": false,
+      "real_provider": false,
+      "deployment_or_release": false
+    },
+    "preserved_limits": "Existing retained SBOM statuses remain unchanged. No fresh dependency inventory or audit claim. New source is not present in signed 1491."
   },
   "historical_bindings": [
     {
@@ -7539,7 +7559,7 @@
                         "text": "Hello. This is a short test of the local speech system.",
                         "voice": "af_heart",
                         "locale": "en-us",
-                        "phonemes": "həlˈO. ðˌɪs ɪz ɐ ʃˈɔɹt tˈɛst ʌv ðə lˈOkəl spˈiʧ sˈɪstəm.",
+                        "phonemes": "h\u0259l\u02c8O. \u00f0\u02cc\u026as \u026az \u0250 \u0283\u02c8\u0254\u0279t t\u02c8\u025bst \u028cv \u00f0\u0259 l\u02c8Ok\u0259l sp\u02c8i\u02a7 s\u02c8\u026ast\u0259m.",
                         "duration_seconds": 2.986666666666667,
                         "wav_sha256": "aeaba330943123ff46d808be904e3cc47ec05291c1aee9efa78a21bb25d4fadd",
                         "float_pcm_sha256": "d27a02a2b366945758f9a7cb89ae4eaee46525807634dff9b7f295f400b8f622",
@@ -7552,7 +7572,7 @@
                         "text": "Hello. This is a short test of the local speech system.",
                         "voice": "af_heart",
                         "locale": "en-us",
-                        "phonemes": "həlˈO. ðˌɪs ɪz ɐ ʃˈɔɹt tˈɛst ʌv ðə lˈOkəl spˈiʧ sˈɪstəm.",
+                        "phonemes": "h\u0259l\u02c8O. \u00f0\u02cc\u026as \u026az \u0250 \u0283\u02c8\u0254\u0279t t\u02c8\u025bst \u028cv \u00f0\u0259 l\u02c8Ok\u0259l sp\u02c8i\u02a7 s\u02c8\u026ast\u0259m.",
                         "duration_seconds": 2.986666666666667,
                         "wav_sha256": "aeaba330943123ff46d808be904e3cc47ec05291c1aee9efa78a21bb25d4fadd",
                         "float_pcm_sha256": "d27a02a2b366945758f9a7cb89ae4eaee46525807634dff9b7f295f400b8f622",
@@ -7565,7 +7585,7 @@
                         "text": "The A P I costs $12.50, not $0.05.",
                         "voice": "af_heart",
                         "locale": "en-us",
-                        "phonemes": "ði ˈA pˈi ˌI kˈɔsts twˈɛlv dˈɑləɹz ænd fˈɪfti sˈɛnts, nˌɑt fˈIv sˈɛnts.",
+                        "phonemes": "\u00f0i \u02c8A p\u02c8i \u02ccI k\u02c8\u0254sts tw\u02c8\u025blv d\u02c8\u0251l\u0259\u0279z \u00e6nd f\u02c8\u026afti s\u02c8\u025bnts, n\u02cc\u0251t f\u02c8Iv s\u02c8\u025bnts.",
                         "duration_seconds": 3.7973333333333334,
                         "wav_sha256": "5310d8c6737e9eb874d30b15b70cd3a779d1a86904339b68831e29945307d4b6",
                         "float_pcm_sha256": "c7a016d0b527e759ba0e2ce06f0348371a99e1c9ce68e42ca38ee919cef63fa7",
@@ -7578,7 +7598,7 @@
                         "text": "The A P I costs $12.50, not $0.05.",
                         "voice": "af_heart",
                         "locale": "en-us",
-                        "phonemes": "ði ˈA pˈi ˌI kˈɔsts twˈɛlv dˈɑləɹz ænd fˈɪfti sˈɛnts, nˌɑt fˈIv sˈɛnts.",
+                        "phonemes": "\u00f0i \u02c8A p\u02c8i \u02ccI k\u02c8\u0254sts tw\u02c8\u025blv d\u02c8\u0251l\u0259\u0279z \u00e6nd f\u02c8\u026afti s\u02c8\u025bnts, n\u02cc\u0251t f\u02c8Iv s\u02c8\u025bnts.",
                         "duration_seconds": 3.7973333333333334,
                         "wav_sha256": "5310d8c6737e9eb874d30b15b70cd3a779d1a86904339b68831e29945307d4b6",
                         "float_pcm_sha256": "c7a016d0b527e759ba0e2ce06f0348371a99e1c9ce68e42ca38ee919cef63fa7",
@@ -7601,7 +7621,7 @@
                         "text": "'A P I'",
                         "voice": "af_heart",
                         "locale": "en-us",
-                        "phonemes": "“ɐ pˈi ˈI",
+                        "phonemes": "\u201c\u0250 p\u02c8i \u02c8I",
                         "duration_seconds": 0.9386666666666666,
                         "wav_sha256": "c14f9a31a8a71f2441e74ab4e64f24df25b9f018975fe46d1ab0ed2cb33519e3",
                         "float_pcm_sha256": "69d1f2d9c292aa645dd0b1ff590bb7c1cbf34b92bc382a7ae1d695b2540e18cb",
@@ -7614,7 +7634,7 @@
                         "text": "'A P I'",
                         "voice": "af_heart",
                         "locale": "en-us",
-                        "phonemes": "“ˈA pˈi ˈI",
+                        "phonemes": "\u201c\u02c8A p\u02c8i \u02c8I",
                         "duration_seconds": 0.9386666666666666,
                         "wav_sha256": "f5a871ccac419cc586ff16aaa6e9f42b4720c591d20a7752c09d01e89c299f3d",
                         "float_pcm_sha256": "b8b8573bf9058851c6aaee30fc328c01c89ba20e1413aa674bef4c1847b348f0",
@@ -7627,7 +7647,7 @@
                         "text": "'A P I'",
                         "voice": "bf_emma",
                         "locale": "en-gb",
-                        "phonemes": "“ɐ pˈiː ˈI",
+                        "phonemes": "\u201c\u0250 p\u02c8i\u02d0 \u02c8I",
                         "duration_seconds": 0.9386666666666666,
                         "wav_sha256": "fcb3326f8978423f25953f991282d759fbc0e9a1248a102054e236eb5a558ddb",
                         "float_pcm_sha256": "1612b0e9f197c238f2434d27da0024959ca5b3825db6a3ed79119491924568d0",
@@ -7640,7 +7660,7 @@
                         "text": "'A P I'",
                         "voice": "bf_emma",
                         "locale": "en-gb",
-                        "phonemes": "“ˈA pˈiː ˈI",
+                        "phonemes": "\u201c\u02c8A p\u02c8i\u02d0 \u02c8I",
                         "duration_seconds": 0.96,
                         "wav_sha256": "83dad5fbcd6fea44e2b35ecf0f1b19af8e946c56a5d5743af058ad6e92a7d909",
                         "float_pcm_sha256": "2f7c8c442737efd0ff9bf3ddb35e47e7ae90ed2bc23c7025a08d3ddf3552f78d",
@@ -7660,10 +7680,10 @@
                     "cases": [
                       {
                         "id": "ja-component",
-                        "text": "こんにちは",
+                        "text": "\u3053\u3093\u306b\u3061\u306f",
                         "voice": "jf_alpha",
                         "locale": "ja",
-                        "phonemes": "koɲɲiʨiβa",
+                        "phonemes": "ko\u0272\u0272i\u02a8i\u03b2a",
                         "duration_seconds": 0.9813333333333333,
                         "wav_sha256": "c9a9f75372afc19d7cb51732a481300a7fa5779d0f4411c35a9f7b788d693f51",
                         "float_pcm_sha256": "b6f3115fde5d46e829b4437b51c82ea366c8973731611ac665a21047bc3fb5fd",
@@ -7673,10 +7693,10 @@
                       },
                       {
                         "id": "ja-composed",
-                        "text": "こんにちは",
+                        "text": "\u3053\u3093\u306b\u3061\u306f",
                         "voice": "jf_alpha",
                         "locale": "ja",
-                        "phonemes": "koɲɲiʨiβa",
+                        "phonemes": "ko\u0272\u0272i\u02a8i\u03b2a",
                         "duration_seconds": 0.9813333333333333,
                         "wav_sha256": "c9a9f75372afc19d7cb51732a481300a7fa5779d0f4411c35a9f7b788d693f51",
                         "float_pcm_sha256": "b6f3115fde5d46e829b4437b51c82ea366c8973731611ac665a21047bc3fb5fd",
@@ -7696,10 +7716,10 @@
                     "cases": [
                       {
                         "id": "zh-component",
-                        "text": "你好",
+                        "text": "\u4f60\u597d",
                         "voice": "zf_xiaobei",
                         "locale": "zh",
-                        "phonemes": "ni↓xau↓",
+                        "phonemes": "ni\u2193xau\u2193",
                         "duration_seconds": 0.832,
                         "wav_sha256": "b8b6c6be5edbaff52bb114c753b04e6eaffebd190e5f78e64a535c8042cb92ae",
                         "float_pcm_sha256": "7ddddc03e104e990c42f5b070d4847906f3a10d19bd6809621a5f1cf0fa5ea0d",
@@ -7709,10 +7729,10 @@
                       },
                       {
                         "id": "zh-composed",
-                        "text": "你好",
+                        "text": "\u4f60\u597d",
                         "voice": "zf_xiaobei",
                         "locale": "zh",
-                        "phonemes": "ni↓xau↓",
+                        "phonemes": "ni\u2193xau\u2193",
                         "duration_seconds": 0.832,
                         "wav_sha256": "b8b6c6be5edbaff52bb114c753b04e6eaffebd190e5f78e64a535c8042cb92ae",
                         "float_pcm_sha256": "7ddddc03e104e990c42f5b070d4847906f3a10d19bd6809621a5f1cf0fa5ea0d",
@@ -7729,7 +7749,7 @@
                 ],
                 "owner_listening": {
                   "english": "Positive feedback on delivered neutral/currency and US/GB comparison clips; no chosen pair winner or broader coverage claim",
-                  "japanese": "Positive feedback on the exact jf_alpha こんにちは 0.981333-second sample only",
+                  "japanese": "Positive feedback on the exact jf_alpha \u3053\u3093\u306b\u3061\u306f 0.981333-second sample only",
                   "mandarin": "Delivered corrected-source sample; acknowledgment received, pronunciation-quality judgment still unverified",
                   "owner_replies_not_required_per_clip": true,
                   "assistant_audio_input_unavailable": true
@@ -8405,12 +8425,12 @@
     }
   ],
   "prior_binding": {
-    "public_revision": "f6aaff229df483adad81390b19c196e5faffe52d",
+    "public_revision": "f43a64ddffb20c20a4471664848cc49a93bee9a6",
     "path": "PUBLIC_METADATA/source-binding.json",
-    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/f6aaff229df483adad81390b19c196e5faffe52d/PUBLIC_METADATA/source-binding.json",
-    "sha256": "cd2b0c70be7ad7db693661efb5ac4f1f02712df8ef50c22d74da92e26b176ebb",
-    "bytes": 1419013,
-    "git_blob": "cd594dd7960cae01da3b0a21fcf3348562c1464e",
+    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/f43a64ddffb20c20a4471664848cc49a93bee9a6/PUBLIC_METADATA/source-binding.json",
+    "sha256": "0014a9169a741598cc11bd944d2b034c116657459777a266a91a80da7828eb28",
+    "bytes": 1027292,
+    "git_blob": "bfa8102754d0ca0799ccd3ba3862ac629a528100",
     "all_top_level_keys": [
       "schema_version",
       "source_manifest",
@@ -8444,8 +8464,7 @@
       "managed_preflight_refusal_previous_binding",
       "cloud_pool_export_previous_binding",
       "pool_cleanup_previous_binding",
-      "bounded_search_ui_previous_binding",
-      "spoken_goodbye_previous_binding"
+      "bounded_search_ui_previous_binding"
     ],
     "preserved_json_objects": {
       "schema_version": {
@@ -8458,27 +8477,27 @@
       },
       "source_manifest_sha256": {
         "pointer": "/source_manifest_sha256",
-        "canonical_json_sha256": "4555001e1c0fb352db2ea094bc5c76ca5e1c2574ce6f6f13b5e606ce60830263"
+        "canonical_json_sha256": "37779dd2655a93e3875d573282f25c6c2700435d4d0937fa30aacdc46edcb90e"
       },
       "source_tree_sha256": {
         "pointer": "/source_tree_sha256",
-        "canonical_json_sha256": "ac58ce2153019756e32b37fb0aebc34c23ecf07991ee7b292c27f352c60aef56"
+        "canonical_json_sha256": "e99f88a594381380851628e0fd63954f1fb582b14f18acbfe120378c36381e05"
       },
       "source_file_count": {
         "pointer": "/source_file_count",
-        "canonical_json_sha256": "6bacb4f243d3b09e9baac7b6f7823282fc16f339e11cf939998d048d1eff4c08"
+        "canonical_json_sha256": "3c7f572560e6d2f14680d05690428dbedc48378a6b8015d86024428f36791dad"
       },
       "source_revision": {
         "pointer": "/source_revision",
-        "canonical_json_sha256": "9d9f361b9561e6a815362fe233a224d84387242fc59b5a506967648c2934a0ee"
+        "canonical_json_sha256": "b659979737b54daf9991e9a38a029497657b12157554bd83a96bc8f700847c76"
       },
       "comparison_public_revision": {
         "pointer": "/comparison_public_revision",
-        "canonical_json_sha256": "72b5298727d85ab0d50d5983a82da4eeb4d4974515576b62fdbac691955a6a38"
+        "canonical_json_sha256": "1f050547f0e22a15b45d5cd62f689e1196bd67c05820edb76ac97de12bbac8df"
       },
       "changed_source_paths": {
         "pointer": "/changed_source_paths",
-        "canonical_json_sha256": "c494eb93326586960fea5a95ff3b94e28b658c702c4dca372747d3d321352326"
+        "canonical_json_sha256": "889fe290345e18b65cdd02c688ceae16b5d453bd771843212f1e0c4189b03996"
       },
       "retained_sboms": {
         "pointer": "/retained_sboms",
@@ -8486,11 +8505,11 @@
       },
       "input_equivalence": {
         "pointer": "/input_equivalence",
-        "canonical_json_sha256": "a28273f499ffe4b63f923609b7ada06214317dd4b497422d26aa722728ee034b"
+        "canonical_json_sha256": "e16a6777f8f104212692279987657eb07e5391d2a10c4afc18de0b9e97af7d25"
       },
       "qualification": {
         "pointer": "/qualification",
-        "canonical_json_sha256": "699519cd00ba919fb204e5509191d1a6988bfdb9bbd3035f999715cb3103220e"
+        "canonical_json_sha256": "aa0134e912f2952b05147ac6f520d71bceed8150fe2d93cf293197a5fd062c76"
       },
       "historical_bindings": {
         "pointer": "/historical_bindings",
@@ -8498,7 +8517,7 @@
       },
       "prior_binding": {
         "pointer": "/prior_binding",
-        "canonical_json_sha256": "012e1ed45d9ca07fb9ea03f9ee6bceb8e121fe23fc2bc4b02435dce3bc826b18"
+        "canonical_json_sha256": "e97d42d9884ec772c93bf3db15faecfc70e20dcc030e287a73a56a45f52f6083"
       },
       "retained_composition_component_bindings": {
         "pointer": "/retained_composition_component_bindings",
@@ -8506,7 +8525,7 @@
       },
       "reviewed_source_patch": {
         "pointer": "/reviewed_source_patch",
-        "canonical_json_sha256": "c52c391e25b9de1576083bae0f787508d99ba8668cc5e2968c25317dcc19fec3"
+        "canonical_json_sha256": "5378e8555ef544609dc2a47045db1161e2465480a3436866f752461842811824"
       },
       "new_resolution_performed": {
         "pointer": "/new_resolution_performed",
@@ -8579,11 +8598,13 @@
       "bounded_search_ui_previous_binding": {
         "pointer": "/bounded_search_ui_previous_binding",
         "canonical_json_sha256": "2b842c33a6f1e0fb45c8202df37f99a81f1c5d5c39cc89a43d49c0a95eccbc70"
-      },
-      "spoken_goodbye_previous_binding": {
-        "pointer": "/spoken_goodbye_previous_binding",
-        "canonical_json_sha256": "012e1ed45d9ca07fb9ea03f9ee6bceb8e121fe23fc2bc4b02435dce3bc826b18"
       }
+    },
+    "source_manifest": {
+      "path": "PUBLIC_METADATA/source-manifest.json",
+      "sha256": "c47e25707ecf0220d921fc2848f59c746be8d7a90097daad5fb0eb600fe2a5a0",
+      "bytes": 473596,
+      "git_blob": "242fcb33604cea90b793378733cc1e0ce00dd65d"
     }
   },
   "retained_composition_component_bindings": [
@@ -12142,30 +12163,14 @@
     }
   ],
   "reviewed_source_patch": {
-    "scope": "Refresh startup credentials before ready-shell navigation.",
-    "source_paths": [
-      "SOURCE/ui/qt_native/webview_window.py",
-      "SOURCE/tests/public/test_startup_websocket_credentials.py"
+    "sha256": "ae96c086d878e0be240f884fc35baa7e69641f47a17b32fe16155865e7376f47",
+    "source_commit": "6050e87e0b72e1ae8a355d624260291b9868c907",
+    "paths": [
+      "SOURCE/ui/react-app/src/components/player/MusicCommandInput.jsx",
+      "SOURCE/ui/react-app/src/components/player/MusicCommandInput.module.css",
+      "SOURCE/ui/react-app/src/components/player/MusicCommandInput.test.jsx"
     ],
-    "source_tree": "3b21c8a7728e673c72f5b0640f99ef194967199e",
-    "reviewed_combined_patch_sha256": "c1b0e4313540ccf1d06dfb0a1f6f52e2efa9711b5334d735209ff5ccdeaaf5f1",
-    "files": [
-      {
-        "path": "SOURCE/ui/qt_native/webview_window.py",
-        "old_blob": "7adaef5eb5c2df21df9a5117465b770e91ef5091",
-        "new_blob": "70662f3bfee46011248f80c7a67cd955db03eb2e",
-        "sha256": "755e7f33b4eacca89dfff9493bf25b5a3715128f3c68f1e366dfc950ced8ad86",
-        "bytes": 201217
-      },
-      {
-        "path": "SOURCE/tests/public/test_startup_websocket_credentials.py",
-        "old_blob": null,
-        "new_blob": "9a7d2e32353a26d010a12c0757c0fba9303c46c2",
-        "sha256": "c4cbb82a66fe86d70332da3dec95321345ee1151f1625e2ae1d301d8d7bff838",
-        "bytes": 7082
-      }
-    ],
-    "review_status": "No blocking source-review findings."
+    "scope": "Three exact reviewed browser Music files only."
   },
   "new_resolution_performed": false,
   "new_advisory_scan_performed": false,
@@ -15083,185 +15088,426 @@
       "git_blob": "242fcb33604cea90b793378733cc1e0ce00dd65d"
     }
   },
-  "startup_credentials_previous_binding": {
-    "public_revision": "f6aaff229df483adad81390b19c196e5faffe52d",
+  "music_command_recovery_previous_binding": {
+    "repository_revision": "f6aaff229df483adad81390b19c196e5faffe52d",
     "path": "PUBLIC_METADATA/source-binding.json",
-    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/f6aaff229df483adad81390b19c196e5faffe52d/PUBLIC_METADATA/source-binding.json",
-    "sha256": "cd2b0c70be7ad7db693661efb5ac4f1f02712df8ef50c22d74da92e26b176ebb",
-    "bytes": 1419013,
     "git_blob": "cd594dd7960cae01da3b0a21fcf3348562c1464e",
-    "all_top_level_keys": [
-      "schema_version",
-      "source_manifest",
-      "source_manifest_sha256",
-      "source_tree_sha256",
-      "source_file_count",
-      "source_revision",
-      "comparison_public_revision",
-      "changed_source_paths",
-      "retained_sboms",
-      "input_equivalence",
-      "qualification",
-      "historical_bindings",
-      "prior_binding",
-      "retained_composition_component_bindings",
-      "reviewed_source_patch",
-      "new_resolution_performed",
-      "new_advisory_scan_performed",
-      "new_runtime_qualification_performed",
-      "new_source_contract_qualification_performed",
-      "new_static_security_scan_performed",
-      "new_resolution_scope",
-      "new_advisory_scan_scope",
-      "account_reconciliation_previous_binding",
-      "reviewed_speech_binding",
-      "local_media_path_previous_binding",
-      "session_durability_previous_binding",
-      "media_identity_previous_binding",
-      "speech_fixture_import_previous_binding",
-      "speech_fixture_import_original_pr_binding",
-      "managed_preflight_refusal_previous_binding",
-      "cloud_pool_export_previous_binding",
-      "pool_cleanup_previous_binding",
-      "bounded_search_ui_previous_binding",
-      "spoken_goodbye_previous_binding"
-    ],
-    "preserved_json_objects": {
-      "schema_version": {
-        "pointer": "/schema_version",
-        "canonical_json_sha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
-      },
-      "source_manifest": {
-        "pointer": "/source_manifest",
-        "canonical_json_sha256": "ace3c4cebde8c1e5207159e354ef46f1f9a13eb7b3185315a68b7cf8b71f212d"
-      },
-      "source_manifest_sha256": {
-        "pointer": "/source_manifest_sha256",
-        "canonical_json_sha256": "4555001e1c0fb352db2ea094bc5c76ca5e1c2574ce6f6f13b5e606ce60830263"
-      },
-      "source_tree_sha256": {
-        "pointer": "/source_tree_sha256",
-        "canonical_json_sha256": "ac58ce2153019756e32b37fb0aebc34c23ecf07991ee7b292c27f352c60aef56"
-      },
-      "source_file_count": {
-        "pointer": "/source_file_count",
-        "canonical_json_sha256": "6bacb4f243d3b09e9baac7b6f7823282fc16f339e11cf939998d048d1eff4c08"
-      },
-      "source_revision": {
-        "pointer": "/source_revision",
-        "canonical_json_sha256": "9d9f361b9561e6a815362fe233a224d84387242fc59b5a506967648c2934a0ee"
-      },
-      "comparison_public_revision": {
-        "pointer": "/comparison_public_revision",
-        "canonical_json_sha256": "72b5298727d85ab0d50d5983a82da4eeb4d4974515576b62fdbac691955a6a38"
-      },
-      "changed_source_paths": {
-        "pointer": "/changed_source_paths",
-        "canonical_json_sha256": "c494eb93326586960fea5a95ff3b94e28b658c702c4dca372747d3d321352326"
-      },
-      "retained_sboms": {
-        "pointer": "/retained_sboms",
-        "canonical_json_sha256": "0428d09c6e0e2b524877c2218b306c10da6c7536bcf6ed96524b581dafc85301"
-      },
+    "sha256": "cd2b0c70be7ad7db693661efb5ac4f1f02712df8ef50c22d74da92e26b176ebb",
+    "preserved_replaced_fields": {
+      "source_manifest_sha256": "534771995b7a32e35a81aa97ba4873ca2a1e58a258ba7f5782e7699b1568066a",
+      "source_tree_sha256": "de8062224b369f6009345eda20ac22ea0696456ef21333158f474b2e8871b766",
+      "source_file_count": 2696,
+      "source_revision": "6ce6dfe47a743163b13784b8338acf29cc700eaf",
+      "comparison_public_revision": "f43a64ddffb20c20a4471664848cc49a93bee9a6",
+      "changed_source_paths": [
+        "SOURCE/telephony/call_tools.py",
+        "SOURCE/telephony/call_manager.py",
+        "SOURCE/telephony/loopback_phone_call_session.py",
+        "SOURCE/telephony/transcription_observer.py",
+        "SOURCE/tests/public/test_phone_spoken_goodbye_recovery.py"
+      ],
       "input_equivalence": {
-        "pointer": "/input_equivalence",
-        "canonical_json_sha256": "a28273f499ffe4b63f923609b7ada06214317dd4b497422d26aa722728ee034b"
+        "comparison_basis": "Protected public main f43a64ddffb20c20a4471664848cc49a93bee9a6",
+        "all_unselected_export_leaf_bytes_and_modes_preserved": true,
+        "all_six_sbom_bytes_and_status_objects_preserved": true,
+        "dependency_frontend_workflow_notice_model_pricing_and_customer_speech_inputs_unchanged": true,
+        "scope": "Four phone source files and one synthetic public regression suite."
       },
       "qualification": {
-        "pointer": "/qualification",
-        "canonical_json_sha256": "699519cd00ba919fb204e5509191d1a6988bfdb9bbd3035f999715cb3103220e"
-      },
-      "historical_bindings": {
-        "pointer": "/historical_bindings",
-        "canonical_json_sha256": "59ccb6141308771f32ec1e534f7a843cbdd8867afcd59e84944e03e6f9958c33"
-      },
-      "prior_binding": {
-        "pointer": "/prior_binding",
-        "canonical_json_sha256": "012e1ed45d9ca07fb9ea03f9ee6bceb8e121fe23fc2bc4b02435dce3bc826b18"
-      },
-      "retained_composition_component_bindings": {
-        "pointer": "/retained_composition_component_bindings",
-        "canonical_json_sha256": "70e294ed12c452edb44e162d6bdd6a05b05812347270fe0f54ea02a6bd482630"
+        "scope": "Recover an omitted end_call only after adjacent, unambiguous recipient and assistant spoken closings.",
+        "source_commit": "6ce6dfe47a743163b13784b8338acf29cc700eaf",
+        "source_tree": "03a3e349f5d6a0a96f441682fb256b14ac3d6739",
+        "ordered_source_parents": [
+          "f43a64ddffb20c20a4471664848cc49a93bee9a6"
+        ],
+        "reviewed_combined_patch_sha256": "797ba7308adacba3d671c95d3dbaf62495d48a6e50ed096c2838d124b065febe",
+        "publication_status": "Reviewed source commit; metadata rebound for draft pull request publication.",
+        "independent_automated_review": {
+          "result": "PASS for source integration; no remaining source blockers.",
+          "review_time_utc": "2026-10-09T05:18:51Z",
+          "reviewed_source_patch_sha256": "797ba7308adacba3d671c95d3dbaf62495d48a6e50ed096c2838d124b065febe",
+          "reviewed_local_bundle_sha256": "0435d9ec6618c7bda2d7e294a483648f77dc909258cabc2ef9b49e94e95f8c7f",
+          "reviewed_files": [
+            {
+              "path": "SOURCE/telephony/call_tools.py",
+              "old_blob": "9ec995c81f214898d985d8d96df414b026f50991",
+              "new_blob": "dfeaabe2afdce8f8cd3ec42d37454d5134c67e49",
+              "sha256": "bbf0f6f370b3c5570cb6a0ea46ddf97a29ac90dff0128678293faa5d32977468",
+              "bytes": 66691
+            },
+            {
+              "path": "SOURCE/telephony/call_manager.py",
+              "old_blob": "106bbf18cd504f1738b405570705ed602d85123e",
+              "new_blob": "4bf07fd6447281b2dfc572f9cc6efb44e3ec6c1f",
+              "sha256": "2c587ad32b5c9b11115a2cc8f79f800bfd362284aacc4e3efb78508fa815d1fe",
+              "bytes": 379729
+            },
+            {
+              "path": "SOURCE/telephony/loopback_phone_call_session.py",
+              "old_blob": "fc19ec8aa7af34bf9b0019dd093c92c0eae3fb6e",
+              "new_blob": "726d85fea3b523073e7f29d75a725236ca8e827e",
+              "sha256": "e5c8490c4379693b39b5e957d51b664590cd71133f31ae16b5a3cd57f1546578",
+              "bytes": 124767
+            },
+            {
+              "path": "SOURCE/telephony/transcription_observer.py",
+              "old_blob": "b16d7c24e8f0eef1fe5f91a61cf0f9244d23df73",
+              "new_blob": "16823100921209f9b4b288fc426090bb19337e8a",
+              "sha256": "8231f3f29dc921f4524c183ce3f93c9dde40fee5f1d137294a629d771df37fb1",
+              "bytes": 16150
+            },
+            {
+              "path": "SOURCE/tests/public/test_phone_spoken_goodbye_recovery.py",
+              "old_blob": null,
+              "new_blob": "e2fc4b685a98259f5a5e5fcec14b531c8f93b358",
+              "sha256": "29f7b6dbc9ea03780af852ded7718716559f9ed57fe84eb7746d43e7bd503eef",
+              "bytes": 23564
+            }
+          ],
+          "focused_public_tests_passed": 24,
+          "unchanged_loopback_lifecycle_tests_passed": 16,
+          "mutation_controls_detected": 12,
+          "scope": "Independent exact-byte source review, synthetic component tests and metadata identities. Remote source commit preserves the reviewed tree and blobs. No human, installed-audio or carrier acceptance claim."
+        },
+        "source_controls": {
+          "command": "python -B -m unittest discover -s tests/public -p test_phone_spoken_goodbye_recovery.py -v",
+          "public_unittest_methods_passed": 24,
+          "failed": 0,
+          "errors": 0,
+          "skipped": 0,
+          "mutation_controls": [
+            {
+              "mutation": "production recovery edge removed",
+              "tests": 1,
+              "failures": 1,
+              "errors": 0,
+              "detected": true
+            },
+            {
+              "mutation": "loopback recovery edge removed",
+              "tests": 1,
+              "failures": 1,
+              "errors": 0,
+              "detected": true
+            },
+            {
+              "mutation": "suffix search replaces whole utterance",
+              "tests": 1,
+              "failures": 25,
+              "errors": 0,
+              "detected": true
+            },
+            {
+              "mutation": "callback ignores transcript correspondence",
+              "tests": 1,
+              "failures": 1,
+              "errors": 0,
+              "detected": true
+            },
+            {
+              "mutation": "helper omits commit latch",
+              "tests": 1,
+              "failures": 1,
+              "errors": 0,
+              "detected": true
+            },
+            {
+              "mutation": "carrier status marked terminal on failure",
+              "tests": 1,
+              "failures": 1,
+              "errors": 0,
+              "detected": true
+            },
+            {
+              "mutation": "only final STT chunk classified",
+              "tests": 1,
+              "failures": 8,
+              "errors": 0,
+              "detected": true
+            },
+            {
+              "mutation": "new recipient input ignored during generation",
+              "tests": 1,
+              "failures": 3,
+              "errors": 0,
+              "detected": true
+            },
+            {
+              "mutation": "late interrupted text qualified",
+              "tests": 1,
+              "failures": 2,
+              "errors": 0,
+              "detected": true
+            },
+            {
+              "mutation": "skip_tts text qualified",
+              "tests": 1,
+              "failures": 4,
+              "errors": 0,
+              "detected": true
+            },
+            {
+              "mutation": "skipped end flush qualified",
+              "tests": 1,
+              "failures": 2,
+              "errors": 0,
+              "detected": true
+            },
+            {
+              "mutation": "suppressed text keeps eligible boundary",
+              "tests": 1,
+              "failures": 3,
+              "errors": 0,
+              "detected": true
+            }
+          ],
+          "python_syntax": "All five changed files parse as Python 3.11 and compile in memory.",
+          "fixtures": "Unchanged source methods with inert frames, output-mark waiter and synthetic Telnyx client; no optional dependency installation."
+        },
+        "normal_app_retest_required": [
+          "On an authorized real call, recipient goodbye followed by assistant goodbye without a tool drains speech before carrier hangup.",
+          "Normal explicit end_call, interrupted speech and continued recipient conversation retain their existing behavior."
+        ],
+        "limits": [
+          "Synthetic component/source tests do not establish Pipecat scheduling, audible playout, or live carrier acceptance.",
+          "Full public suite, hosted exact-head checks and installed-product qualification have not been run in this sparse environment.",
+          "Ruff is unavailable in this fresh environment; no dependency install was performed.",
+          "Retained dependency inventories and prior qualification limits are unchanged.",
+          "No carrier calls, release, deployment, credentials or access changes. GitHub source publication is the only external change."
+        ]
       },
       "reviewed_source_patch": {
-        "pointer": "/reviewed_source_patch",
-        "canonical_json_sha256": "c52c391e25b9de1576083bae0f787508d99ba8668cc5e2968c25317dcc19fec3"
-      },
-      "new_resolution_performed": {
-        "pointer": "/new_resolution_performed",
-        "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
-      },
-      "new_advisory_scan_performed": {
-        "pointer": "/new_advisory_scan_performed",
-        "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
-      },
-      "new_runtime_qualification_performed": {
-        "pointer": "/new_runtime_qualification_performed",
-        "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
-      },
-      "new_source_contract_qualification_performed": {
-        "pointer": "/new_source_contract_qualification_performed",
-        "canonical_json_sha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b"
-      },
-      "new_static_security_scan_performed": {
-        "pointer": "/new_static_security_scan_performed",
-        "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
-      },
-      "new_resolution_scope": {
-        "pointer": "/new_resolution_scope",
-        "canonical_json_sha256": "86bfaefe58fd99721a900836f1acaf18f93de75c5f761072a935c0fb1cb69194"
-      },
-      "new_advisory_scan_scope": {
-        "pointer": "/new_advisory_scan_scope",
-        "canonical_json_sha256": "45deeb47b009cd231fa866ab82439106bd86d379e68230218be66b05a58c7726"
-      },
-      "account_reconciliation_previous_binding": {
-        "pointer": "/account_reconciliation_previous_binding",
-        "canonical_json_sha256": "cfeffa86ef01cbbd530cda12a57b6c4eb3761063999ad3fae482a0c1d7482b51"
-      },
-      "reviewed_speech_binding": {
-        "pointer": "/reviewed_speech_binding",
-        "canonical_json_sha256": "88025408d951467d38a236d6fdedb10ad4a4112e6ce02b3577c5b906adec6305"
-      },
-      "local_media_path_previous_binding": {
-        "pointer": "/local_media_path_previous_binding",
-        "canonical_json_sha256": "220f4c5da0641cd8f51fb28add2f66e18e1dba3e64cca61d345ebd775b15bf1f"
-      },
-      "session_durability_previous_binding": {
-        "pointer": "/session_durability_previous_binding",
-        "canonical_json_sha256": "d1931a403fd80ce0a8ea40f23700b2e5a3be8c1b155c3511cbf4d6f72792f6b9"
-      },
-      "media_identity_previous_binding": {
-        "pointer": "/media_identity_previous_binding",
-        "canonical_json_sha256": "775b630f1531f2b679dfb823a59f6d534e542a78fdf1dc3dc6013a74012468e3"
-      },
-      "speech_fixture_import_previous_binding": {
-        "pointer": "/speech_fixture_import_previous_binding",
-        "canonical_json_sha256": "df5e90ccb71afa3db0b0f386fe8575ce3fce043d63192aea6cf38b594a7d41b1"
-      },
-      "speech_fixture_import_original_pr_binding": {
-        "pointer": "/speech_fixture_import_original_pr_binding",
-        "canonical_json_sha256": "c8a9d20bb298d827ca44f1e0ce75e0d8340c4812a856c4a398a185a26126c3f7"
-      },
-      "managed_preflight_refusal_previous_binding": {
-        "pointer": "/managed_preflight_refusal_previous_binding",
-        "canonical_json_sha256": "37b62ef1767156d6f238dcb7b6e966e34f1d791aadb0e9128db89db0c40ebf2f"
-      },
-      "cloud_pool_export_previous_binding": {
-        "pointer": "/cloud_pool_export_previous_binding",
-        "canonical_json_sha256": "cc53548bb5cec6789dbe7d702f066f18db3d55f12aa5daae6d8ce370fc1d50c2"
-      },
-      "pool_cleanup_previous_binding": {
-        "pointer": "/pool_cleanup_previous_binding",
-        "canonical_json_sha256": "a481292e67dc7d5f75251fac8b1d3c593c4a50ea1c840eb355072c8608c69c8a"
-      },
-      "bounded_search_ui_previous_binding": {
-        "pointer": "/bounded_search_ui_previous_binding",
-        "canonical_json_sha256": "2b842c33a6f1e0fb45c8202df37f99a81f1c5d5c39cc89a43d49c0a95eccbc70"
-      },
-      "spoken_goodbye_previous_binding": {
-        "pointer": "/spoken_goodbye_previous_binding",
-        "canonical_json_sha256": "012e1ed45d9ca07fb9ea03f9ee6bceb8e121fe23fc2bc4b02435dce3bc826b18"
+        "scope": "Conservative two-party spoken-goodbye recovery; independently approved for source integration.",
+        "source_paths": [
+          "SOURCE/telephony/call_tools.py",
+          "SOURCE/telephony/call_manager.py",
+          "SOURCE/telephony/loopback_phone_call_session.py",
+          "SOURCE/telephony/transcription_observer.py",
+          "SOURCE/tests/public/test_phone_spoken_goodbye_recovery.py"
+        ],
+        "source_tree": "03a3e349f5d6a0a96f441682fb256b14ac3d6739",
+        "reviewed_combined_patch_sha256": "797ba7308adacba3d671c95d3dbaf62495d48a6e50ed096c2838d124b065febe",
+        "prior_binding": {
+          "public_revision": "f43a64ddffb20c20a4471664848cc49a93bee9a6",
+          "path": "PUBLIC_METADATA/source-binding.json",
+          "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/f43a64ddffb20c20a4471664848cc49a93bee9a6/PUBLIC_METADATA/source-binding.json",
+          "sha256": "0014a9169a741598cc11bd944d2b034c116657459777a266a91a80da7828eb28",
+          "bytes": 1027292,
+          "git_blob": "bfa8102754d0ca0799ccd3ba3862ac629a528100",
+          "all_top_level_keys": [
+            "schema_version",
+            "source_manifest",
+            "source_manifest_sha256",
+            "source_tree_sha256",
+            "source_file_count",
+            "source_revision",
+            "comparison_public_revision",
+            "changed_source_paths",
+            "retained_sboms",
+            "input_equivalence",
+            "qualification",
+            "historical_bindings",
+            "prior_binding",
+            "retained_composition_component_bindings",
+            "reviewed_source_patch",
+            "new_resolution_performed",
+            "new_advisory_scan_performed",
+            "new_runtime_qualification_performed",
+            "new_source_contract_qualification_performed",
+            "new_static_security_scan_performed",
+            "new_resolution_scope",
+            "new_advisory_scan_scope",
+            "account_reconciliation_previous_binding",
+            "reviewed_speech_binding",
+            "local_media_path_previous_binding",
+            "session_durability_previous_binding",
+            "media_identity_previous_binding",
+            "speech_fixture_import_previous_binding",
+            "speech_fixture_import_original_pr_binding",
+            "managed_preflight_refusal_previous_binding",
+            "cloud_pool_export_previous_binding",
+            "pool_cleanup_previous_binding",
+            "bounded_search_ui_previous_binding"
+          ],
+          "preserved_json_objects": {
+            "schema_version": {
+              "pointer": "/schema_version",
+              "canonical_json_sha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+            },
+            "source_manifest": {
+              "pointer": "/source_manifest",
+              "canonical_json_sha256": "ace3c4cebde8c1e5207159e354ef46f1f9a13eb7b3185315a68b7cf8b71f212d"
+            },
+            "source_manifest_sha256": {
+              "pointer": "/source_manifest_sha256",
+              "canonical_json_sha256": "37779dd2655a93e3875d573282f25c6c2700435d4d0937fa30aacdc46edcb90e"
+            },
+            "source_tree_sha256": {
+              "pointer": "/source_tree_sha256",
+              "canonical_json_sha256": "e99f88a594381380851628e0fd63954f1fb582b14f18acbfe120378c36381e05"
+            },
+            "source_file_count": {
+              "pointer": "/source_file_count",
+              "canonical_json_sha256": "3c7f572560e6d2f14680d05690428dbedc48378a6b8015d86024428f36791dad"
+            },
+            "source_revision": {
+              "pointer": "/source_revision",
+              "canonical_json_sha256": "b659979737b54daf9991e9a38a029497657b12157554bd83a96bc8f700847c76"
+            },
+            "comparison_public_revision": {
+              "pointer": "/comparison_public_revision",
+              "canonical_json_sha256": "1f050547f0e22a15b45d5cd62f689e1196bd67c05820edb76ac97de12bbac8df"
+            },
+            "changed_source_paths": {
+              "pointer": "/changed_source_paths",
+              "canonical_json_sha256": "889fe290345e18b65cdd02c688ceae16b5d453bd771843212f1e0c4189b03996"
+            },
+            "retained_sboms": {
+              "pointer": "/retained_sboms",
+              "canonical_json_sha256": "0428d09c6e0e2b524877c2218b306c10da6c7536bcf6ed96524b581dafc85301"
+            },
+            "input_equivalence": {
+              "pointer": "/input_equivalence",
+              "canonical_json_sha256": "e16a6777f8f104212692279987657eb07e5391d2a10c4afc18de0b9e97af7d25"
+            },
+            "qualification": {
+              "pointer": "/qualification",
+              "canonical_json_sha256": "aa0134e912f2952b05147ac6f520d71bceed8150fe2d93cf293197a5fd062c76"
+            },
+            "historical_bindings": {
+              "pointer": "/historical_bindings",
+              "canonical_json_sha256": "59ccb6141308771f32ec1e534f7a843cbdd8867afcd59e84944e03e6f9958c33"
+            },
+            "prior_binding": {
+              "pointer": "/prior_binding",
+              "canonical_json_sha256": "e97d42d9884ec772c93bf3db15faecfc70e20dcc030e287a73a56a45f52f6083"
+            },
+            "retained_composition_component_bindings": {
+              "pointer": "/retained_composition_component_bindings",
+              "canonical_json_sha256": "70e294ed12c452edb44e162d6bdd6a05b05812347270fe0f54ea02a6bd482630"
+            },
+            "reviewed_source_patch": {
+              "pointer": "/reviewed_source_patch",
+              "canonical_json_sha256": "5378e8555ef544609dc2a47045db1161e2465480a3436866f752461842811824"
+            },
+            "new_resolution_performed": {
+              "pointer": "/new_resolution_performed",
+              "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+            },
+            "new_advisory_scan_performed": {
+              "pointer": "/new_advisory_scan_performed",
+              "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+            },
+            "new_runtime_qualification_performed": {
+              "pointer": "/new_runtime_qualification_performed",
+              "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+            },
+            "new_source_contract_qualification_performed": {
+              "pointer": "/new_source_contract_qualification_performed",
+              "canonical_json_sha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b"
+            },
+            "new_static_security_scan_performed": {
+              "pointer": "/new_static_security_scan_performed",
+              "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+            },
+            "new_resolution_scope": {
+              "pointer": "/new_resolution_scope",
+              "canonical_json_sha256": "86bfaefe58fd99721a900836f1acaf18f93de75c5f761072a935c0fb1cb69194"
+            },
+            "new_advisory_scan_scope": {
+              "pointer": "/new_advisory_scan_scope",
+              "canonical_json_sha256": "45deeb47b009cd231fa866ab82439106bd86d379e68230218be66b05a58c7726"
+            },
+            "account_reconciliation_previous_binding": {
+              "pointer": "/account_reconciliation_previous_binding",
+              "canonical_json_sha256": "cfeffa86ef01cbbd530cda12a57b6c4eb3761063999ad3fae482a0c1d7482b51"
+            },
+            "reviewed_speech_binding": {
+              "pointer": "/reviewed_speech_binding",
+              "canonical_json_sha256": "88025408d951467d38a236d6fdedb10ad4a4112e6ce02b3577c5b906adec6305"
+            },
+            "local_media_path_previous_binding": {
+              "pointer": "/local_media_path_previous_binding",
+              "canonical_json_sha256": "220f4c5da0641cd8f51fb28add2f66e18e1dba3e64cca61d345ebd775b15bf1f"
+            },
+            "session_durability_previous_binding": {
+              "pointer": "/session_durability_previous_binding",
+              "canonical_json_sha256": "d1931a403fd80ce0a8ea40f23700b2e5a3be8c1b155c3511cbf4d6f72792f6b9"
+            },
+            "media_identity_previous_binding": {
+              "pointer": "/media_identity_previous_binding",
+              "canonical_json_sha256": "775b630f1531f2b679dfb823a59f6d534e542a78fdf1dc3dc6013a74012468e3"
+            },
+            "speech_fixture_import_previous_binding": {
+              "pointer": "/speech_fixture_import_previous_binding",
+              "canonical_json_sha256": "df5e90ccb71afa3db0b0f386fe8575ce3fce043d63192aea6cf38b594a7d41b1"
+            },
+            "speech_fixture_import_original_pr_binding": {
+              "pointer": "/speech_fixture_import_original_pr_binding",
+              "canonical_json_sha256": "c8a9d20bb298d827ca44f1e0ce75e0d8340c4812a856c4a398a185a26126c3f7"
+            },
+            "managed_preflight_refusal_previous_binding": {
+              "pointer": "/managed_preflight_refusal_previous_binding",
+              "canonical_json_sha256": "37b62ef1767156d6f238dcb7b6e966e34f1d791aadb0e9128db89db0c40ebf2f"
+            },
+            "cloud_pool_export_previous_binding": {
+              "pointer": "/cloud_pool_export_previous_binding",
+              "canonical_json_sha256": "cc53548bb5cec6789dbe7d702f066f18db3d55f12aa5daae6d8ce370fc1d50c2"
+            },
+            "pool_cleanup_previous_binding": {
+              "pointer": "/pool_cleanup_previous_binding",
+              "canonical_json_sha256": "a481292e67dc7d5f75251fac8b1d3c593c4a50ea1c840eb355072c8608c69c8a"
+            },
+            "bounded_search_ui_previous_binding": {
+              "pointer": "/bounded_search_ui_previous_binding",
+              "canonical_json_sha256": "2b842c33a6f1e0fb45c8202df37f99a81f1c5d5c39cc89a43d49c0a95eccbc70"
+            }
+          },
+          "source_manifest": {
+            "path": "PUBLIC_METADATA/source-manifest.json",
+            "sha256": "c47e25707ecf0220d921fc2848f59c746be8d7a90097daad5fb0eb600fe2a5a0",
+            "bytes": 473596,
+            "git_blob": "242fcb33604cea90b793378733cc1e0ce00dd65d"
+          }
+        },
+        "files": [
+          {
+            "path": "SOURCE/telephony/call_tools.py",
+            "old_blob": "9ec995c81f214898d985d8d96df414b026f50991",
+            "new_blob": "dfeaabe2afdce8f8cd3ec42d37454d5134c67e49",
+            "sha256": "bbf0f6f370b3c5570cb6a0ea46ddf97a29ac90dff0128678293faa5d32977468",
+            "bytes": 66691
+          },
+          {
+            "path": "SOURCE/telephony/call_manager.py",
+            "old_blob": "106bbf18cd504f1738b405570705ed602d85123e",
+            "new_blob": "4bf07fd6447281b2dfc572f9cc6efb44e3ec6c1f",
+            "sha256": "2c587ad32b5c9b11115a2cc8f79f800bfd362284aacc4e3efb78508fa815d1fe",
+            "bytes": 379729
+          },
+          {
+            "path": "SOURCE/telephony/loopback_phone_call_session.py",
+            "old_blob": "fc19ec8aa7af34bf9b0019dd093c92c0eae3fb6e",
+            "new_blob": "726d85fea3b523073e7f29d75a725236ca8e827e",
+            "sha256": "e5c8490c4379693b39b5e957d51b664590cd71133f31ae16b5a3cd57f1546578",
+            "bytes": 124767
+          },
+          {
+            "path": "SOURCE/telephony/transcription_observer.py",
+            "old_blob": "b16d7c24e8f0eef1fe5f91a61cf0f9244d23df73",
+            "new_blob": "16823100921209f9b4b288fc426090bb19337e8a",
+            "sha256": "8231f3f29dc921f4524c183ce3f93c9dde40fee5f1d137294a629d771df37fb1",
+            "bytes": 16150
+          },
+          {
+            "path": "SOURCE/tests/public/test_phone_spoken_goodbye_recovery.py",
+            "old_blob": null,
+            "new_blob": "e2fc4b685a98259f5a5e5fcec14b531c8f93b358",
+            "sha256": "29f7b6dbc9ea03780af852ded7718716559f9ed57fe84eb7746d43e7bd503eef",
+            "bytes": 23564
+          }
+        ],
+        "review_status": "passed_source_integration"
       }
     }
   }

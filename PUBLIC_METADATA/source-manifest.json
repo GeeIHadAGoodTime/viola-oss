@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "c41bf1a8c333d1f60c872dda62ba417d27372ad5",
-  "sha256": "fcaf7d007ae6f6f1e285d950566e780072fd8854c45d10ec992ecc0087f938cc",
+  "revision": "6050e87e0b72e1ae8a355d624260291b9868c907",
+  "sha256": "76701f36d78db52bc8f6d9a0b64d7a955376e8d07a06a53f522614aa768dffcc",
   "files": [
     {
       "path": ".env.example",
@@ -6289,11 +6289,6 @@
       "bytes": 83245
     },
     {
-      "path": "tests/public/test_startup_websocket_credentials.py",
-      "sha256": "c4cbb82a66fe86d70332da3dec95321345ee1151f1625e2ae1d301d8d7bff838",
-      "bytes": 7082
-    },
-    {
       "path": "tests/public/test_step_logger_status.py",
       "sha256": "f43a8f369828481307fc8031f767240eb0774a80b17b0f54e89fcaff7fdffdf7",
       "bytes": 7499
@@ -9810,8 +9805,8 @@
     },
     {
       "path": "ui/qt_native/webview_window.py",
-      "sha256": "755e7f33b4eacca89dfff9493bf25b5a3715128f3c68f1e366dfc950ced8ad86",
-      "bytes": 201217
+      "sha256": "5f240b12b14228652313a473e5a158a3ac0121276c5acb2b3bf3b6acb5fc3db8",
+      "bytes": 200930
     },
     {
       "path": "ui/qt_native/widgets/connectivity_status.py",
@@ -11065,13 +11060,18 @@
     },
     {
       "path": "ui/react-app/src/components/player/MusicCommandInput.jsx",
-      "sha256": "3ebdac6c79c239013bf8349f2ec15423fbe1ab22e177e6ee64f8c812fb794089",
-      "bytes": 2346
+      "sha256": "479adbd1d0eaa460e849834616a751be78a9f8695d0d785056dfc6d17e78b15d",
+      "bytes": 2889
     },
     {
       "path": "ui/react-app/src/components/player/MusicCommandInput.module.css",
-      "sha256": "d28a1c4a7b659ceb8cf16585f7e8901a92ba44585751a5cacaebe41d36586b65",
-      "bytes": 973
+      "sha256": "1ae41f1f2b7ee8a7f329a8e30ff1b680d6db799ed3b1cd7183d5c6f7b04b4d3f",
+      "bytes": 1088
+    },
+    {
+      "path": "ui/react-app/src/components/player/MusicCommandInput.test.jsx",
+      "sha256": "902dfca318bfad5d86a997a887b3d07f56e457034bdf2b567e86356e22b6948b",
+      "bytes": 5382
     },
     {
       "path": "ui/react-app/src/components/player/PlayerSection.jsx",
