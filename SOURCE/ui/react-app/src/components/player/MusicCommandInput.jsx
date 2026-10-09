@@ -15,7 +15,7 @@
  * that decides WHEN to render it — hidden on the desktop Qt shell (#1504),
  * where this box would duplicate type-anywhere and clutter the hero surface.
  */
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import PropTypes from 'prop-types';
 import { SendIcon } from '../icons';
 import styles from './MusicCommandInput.module.css';
@@ -23,14 +23,21 @@ import styles from './MusicCommandInput.module.css';
 const MusicCommandInput = ({ onSubmit, disabled }) => {
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const errorId = useId();
 
   const submit = async () => {
     const clean = text.trim();
     if (!clean || busy || disabled) return;
     setBusy(true);
+    setFailed(false);
     try {
       await onSubmit(clean);
       setText('');
+    } catch {
+      // HTTP/network failures reject before SmartDisplay receives a result.
+      // Keep the draft and announce the failure without exposing raw errors.
+      setFailed(true);
     } finally {
       setBusy(false);
     }
@@ -51,6 +58,7 @@ const MusicCommandInput = ({ onSubmit, disabled }) => {
         onChange={(event) => setText(event.target.value)}
         placeholder="Ask Viola to play something"
         aria-label="Ask Viola to play something"
+        aria-describedby={failed ? errorId : undefined}
         disabled={disabled}
         enterKeyHint="send"
       />
@@ -63,6 +71,11 @@ const MusicCommandInput = ({ onSubmit, disabled }) => {
       >
         <SendIcon />
       </button>
+      {failed && (
+        <p id={errorId} className={styles.error} role="alert">
+          We couldn't complete that request. Your text is still here; please try again.
+        </p>
+      )}
     </form>
   );
 };
