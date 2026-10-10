@@ -544,7 +544,11 @@ async def reply_to_phone_call_consultation(
     request: Request,
     user: User | None = Depends(get_current_user_optional),
 ) -> JSONResponse:
-    """Submit a web-chat answer for a pending mid-call consultation."""
+    """Submit a web-chat answer, optionally bound to its consultation_id.
+
+    Legacy bodies containing only answer still target the current call-level
+    wait. Updated clients echo the event's ID to reject delayed old replies.
+    """
     await _require_call_auth(request)
     user_id = _route_user_id(user)
     if not user_id:
@@ -563,13 +567,24 @@ async def reply_to_phone_call_consultation(
 
     from telephony.call_tools import submit_consult_user_reply
 
-    ok, reason = submit_consult_user_reply(call_id, answer, user_id=user_id)
+    consultation_id = body.get("consultation_id")
+    if "consultation_id" in body and (
+        not isinstance(consultation_id, str) or not consultation_id.strip()
+    ):
+        return JSONResponse({"ok": False, "error": "consultation_id must be a nonempty string."}, status_code=400)
+
+    ok, reason = submit_consult_user_reply(call_id, answer, user_id=user_id, consultation_id=consultation_id)
     if ok:
         return JSONResponse({"ok": True})
     if reason == "auth_required":
         return JSONResponse({"ok": False, "error": "Authentication required."}, status_code=401)
     if reason == "forbidden":
         return JSONResponse({"ok": False, "error": "Forbidden."}, status_code=403)
+    if reason == "stale_consultation":
+        return JSONResponse(
+            {"ok": False, "error": "This consultation is no longer pending."},
+            status_code=409,
+        )
     if reason == "not_found":
         return JSONResponse(
             {"ok": False, "error": "No pending consultation for this call."},

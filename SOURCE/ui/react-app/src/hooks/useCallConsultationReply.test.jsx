@@ -248,3 +248,84 @@ it('acknowledges one successful consultation only once, even if an old submit ca
   expect(clearMatching(NEXT_CALL)).toBe(NEXT_CALL);
   expect(clearMatching(null)).toBeNull();
 });
+
+describe('server question correlation', () => {
+  const question = { ...FIRST, consultation_id: 'synthetic-question-a' };
+  const nextQuestion = { ...FIRST, consultation_id: 'synthetic-question-b' };
+
+  it('echoes the captured server question ID alongside the answer', async () => {
+    authFetch.mockResolvedValue(replyResponse());
+    const { result } = renderHook(() => useCallConsultationReply(question, vi.fn()));
+    act(() => result.current.setAnswer('  Correlated answer  '));
+    await act(async () => { await result.current.submit(); });
+    expect(JSON.parse(authFetch.mock.calls[0][1].body)).toEqual({
+      answer: 'Correlated answer', consultation_id: question.consultation_id,
+    });
+  });
+
+  it('keeps the draft with an expired-question explanation after HTTP 409', async () => {
+    const setConsultation = vi.fn();
+    authFetch.mockResolvedValue(replyResponse(409, { ok: false }));
+    const { result } = renderHook(() => useCallConsultationReply(question, setConsultation));
+    act(() => result.current.setAnswer('  Preserve this answer  '));
+    await act(async () => { await result.current.submit(); });
+    expect(result.current.answer).toBe('  Preserve this answer  ');
+    expect(result.current.error).toMatch(/question is no longer pending/);
+    expect(result.current.pending).toBe(false);
+    expect(setConsultation).not.toHaveBeenCalled();
+  });
+
+  it('keeps distinct IDs for identical wording and ignores a stale 409 while a newer reply is pending', async () => {
+    const old = deferred();
+    const next = deferred();
+    authFetch.mockReturnValueOnce(old.promise).mockReturnValueOnce(next.promise);
+    const setConsultation = vi.fn();
+    const { result, rerender } = renderHook(({ value }) => useCallConsultationReply(value, setConsultation), {
+      initialProps: { value: question },
+    });
+    act(() => result.current.setAnswer('Old answer'));
+    act(() => { void result.current.submit(); });
+    rerender({ value: nextQuestion });
+    act(() => result.current.setAnswer('New answer'));
+    act(() => { void result.current.submit(); });
+    expect(authFetch.mock.calls.map(([, options]) => JSON.parse(options.body))).toEqual([
+      { answer: 'Old answer', consultation_id: question.consultation_id },
+      { answer: 'New answer', consultation_id: nextQuestion.consultation_id },
+    ]);
+    await settle(old, replyResponse(409, { ok: false }));
+    expect(result.current.answer).toBe('New answer');
+    expect(result.current.pending).toBe(true);
+    expect(result.current.error).toBe('');
+    expect(setConsultation).not.toHaveBeenCalled();
+    await settle(next, replyResponse());
+    const clearMatching = setConsultation.mock.calls[0][0];
+    expect(clearMatching(question)).toBe(question);
+    expect(clearMatching(nextQuestion)).toBeNull();
+  });
+
+  it('retries an unconfirmed answer with its original question ID', async () => {
+    authFetch.mockRejectedValueOnce(new Error('Synthetic lost response')).mockResolvedValueOnce(replyResponse(409));
+    const { result } = renderHook(() => useCallConsultationReply(question, vi.fn()));
+    act(() => result.current.setAnswer('Same answer'));
+    await act(async () => { await result.current.submit(); });
+    await act(async () => { await result.current.submit(); });
+    expect(authFetch.mock.calls.map(([, options]) => JSON.parse(options.body).consultation_id)).toEqual([
+      question.consultation_id, question.consultation_id,
+    ]);
+    expect(result.current.answer).toBe('Same answer');
+    expect(result.current.error).toMatch(/question is no longer pending/);
+  });
+
+  it('does not silently omit an explicitly malformed event ID', async () => {
+    authFetch.mockResolvedValue(replyResponse(400));
+    const invalid = { ...question, consultation_id: null };
+    const { result } = renderHook(() => useCallConsultationReply(invalid, vi.fn()));
+    act(() => result.current.setAnswer('Do not downgrade'));
+    await act(async () => { await result.current.submit(); });
+    expect(JSON.parse(authFetch.mock.calls[0][1].body)).toEqual({
+      answer: 'Do not downgrade', consultation_id: null,
+    });
+    expect(result.current.answer).toBe('Do not downgrade');
+    expect(result.current.error).toMatch(/Couldn.t confirm/);
+  });
+});
