@@ -1,14 +1,14 @@
 {
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "3c570808fa948c19b6491fbc55f76aa2b5d6ed8bb2bf86aee92fb5644cff883a",
-  "source_tree_sha256": "f890b03d89d34a14584b4a10797f2767dd7a85d5ce0439889c977f402162f87c",
+  "source_manifest_sha256": "6061f35d8a006bade3e1883556d846d2bdd57cdd9e3bbe2229b617b75788295c",
+  "source_tree_sha256": "8d613743994e8aaa4c57857b8f56190f1b0eaf96ea012e4ec04d9dd9509a9e44",
   "source_file_count": 2698,
-  "source_revision": "0f4d8f8ba54e0f66736f2f8aa58e57b023ef5a4f",
-  "comparison_public_revision": "d43b129becc28a0e51eac83dab02be5241b1accb",
+  "source_revision": "eb157ff45cf3f5ff41f126f284e486397d6e511e",
+  "comparison_public_revision": "50e1382aee7d26ad4e4eb826124ebbe1943b2338",
   "changed_source_paths": [
-    "SOURCE/ui/qt_native/webview_window.py",
-    "SOURCE/tests/public/test_startup_websocket_credentials.py"
+    "SOURCE/ui/react-app/src/components/PhoneToSModal.jsx",
+    "SOURCE/ui/react-app/src/components/PhoneToSModal.test.jsx"
   ],
   "retained_sboms": [
     {
@@ -70,46 +70,126 @@
     }
   ],
   "input_equivalence": {
-    "comparison_basis": "Protected public main d43b129becc28a0e51eac83dab02be5241b1accb",
+    "comparison_basis": "Protected public main 50e1382aee7d26ad4e4eb826124ebbe1943b2338",
     "all_unselected_export_leaf_bytes_and_modes_preserved": true,
     "all_six_sbom_bytes_and_status_objects_preserved": true,
-    "dependency_frontend_workflow_notice_model_pricing_and_customer_speech_inputs_unchanged": true,
-    "scope": "One Qt navigation call and four synthetic startup-token contracts."
+    "dependency_workflow_notice_model_pricing_and_customer_speech_inputs_unchanged": true,
+    "scope": "PhoneToSModal acknowledgment validation and synthetic component regressions only. Exact terms, recording/transcription defaults, server account scoping, and phone-call behavior are unchanged."
   },
   "qualification": {
-    "scope": "Refresh the existing desktop credential script immediately before ready-shell navigation.",
-    "source_commit": "0f4d8f8ba54e0f66736f2f8aa58e57b023ef5a4f",
-    "source_tree": "bca32750eecddfe5973ec35b3a75206659a950da",
+    "scope": "Require explicit successful Phone Terms acknowledgment before success notification or dismissal.",
+    "source_commit": "eb157ff45cf3f5ff41f126f284e486397d6e511e",
+    "source_tree": "cc86b6bd6c0bcad8c190b5ce061218d1f9868100",
     "ordered_source_parents": [
-      "2b752ef1eb88425fe90255574e205b20f43fa24e",
-      "d43b129becc28a0e51eac83dab02be5241b1accb"
+      "50e1382aee7d26ad4e4eb826124ebbe1943b2338"
     ],
-    "reviewed_combined_patch_sha256": "c1b0e4313540ccf1d06dfb0a1f6f52e2efa9711b5334d735209ff5ccdeaaf5f1",
-    "publication_status": "Exact source commit created; draft PR pending.",
+    "reviewed_combined_patch_sha256": "372ef9e35feb65ade7a057d3a31f7319b4072408cc2f5c14baeaf6a0d40349a3",
+    "publication_status": "Identical reviewed source tree published as a GitHub commit object; metadata, branch and draft PR publication pending.",
     "independent_automated_review": {
-      "result": "No blocking findings; four final token tests independently rerun successfully."
+      "result": "PASS: parent independently reviewed the two exact files, server response contract and existing flow; all 93 focused component/authFetch/CSRF tests independently passed."
     },
     "source_controls": {
-      "commands": [
-        "python -m unittest discover -s tests/public -p test_startup_websocket_credentials.py -v",
-        "python -m unittest discover -s tests/public -p test_windows_native_startup_order.py -v"
-      ],
-      "tests_passed": 28,
-      "failed": 0,
-      "skipped": 0,
-      "known_bad_control": "Unmodified baseline fails delayed-ready and failed-load retry freshness; duplicate guards and isolation remain passing.",
-      "fixtures": "Actual source token mint/consume and Qt credential/navigation methods with synthetic configuration, clock and inert Qt seams; no connections or persistent credentials."
+      "focused_frontend": {
+        "tests_passed": 93,
+        "tests_failed": 0,
+        "files": 3,
+        "log_sha256": "975b91a0f94faddd1db617986b421b725b6db76f56c9e298cbff93cfa1d59514"
+      },
+      "known_bad_control": {
+        "unmodified_source_tests_failed": 19,
+        "tests_passed": 15,
+        "tests_total": 34,
+        "log_sha256": "774f57c30f47ba98025615e46db1c98899a40c382ab138a894ca1f2cba28f11a"
+      },
+      "focused_lint": "PASS"
     },
-    "normal_app_retest_required": [
-      "Slow native startup waits over 30 seconds before the ready shell, then opens its first local event socket without an expired-ticket rejection.",
-      "Native failed-load retry and repeated readiness preserve one shell navigation and same-origin isolation."
-    ],
-    "limits": [
-      "Synthetic methods do not qualify Qt renderer script propagation or a real WebSocket handshake.",
-      "Full public suite and hosted exact-head checks remain pending.",
-      "Ruff is unavailable locally; no dependency installation was performed.",
-      "No release, deployment, remote runtime change or new installed candidate was made."
-    ]
+    "frontend_build": {
+      "result": "RESOURCE_BLOCKED_INCOMPLETE",
+      "command": "CI=1 SENTRY_AUTH_TOKEN= SENTRY_ORG= SENTRY_PROJECT= VITE_SENTRY_DSN= npm run build",
+      "attempts": [
+        {
+          "node_heap_mb": null,
+          "exit_code": 137,
+          "log_sha256": "2266d1f856743fde34786fe2d047772bd599596334b879eec338ee7539db4367"
+        },
+        {
+          "node_heap_mb": 768,
+          "exit_code": 137,
+          "log_sha256": "aa388e8adabefb9934c989ee3f2855f10f8e8ad82ecc5fbea2f9ac988e1fb4ee"
+        },
+        {
+          "node_heap_mb": 384,
+          "exit_code": 134,
+          "reason": "Node heap limit exhausted",
+          "log_sha256": "28390c9b2196850b8c8f541586238f01afbcd7cfc9804a1b57d18ea496c0826a"
+        },
+        {
+          "node_heap_mb": 512,
+          "exit_code": 137,
+          "log_sha256": "2266d1f856743fde34786fe2d047772bd599596334b879eec338ee7539db4367"
+        }
+      ],
+      "scope": "Full Vite production build did not complete in the constrained shared Linux environment. The isolated component bundle passed, which is not a full-build receipt. Hosted exact-head frontend build remains required."
+    },
+    "frontend_suite": {
+      "result": "RESOURCE_BLOCKED_INCOMPLETE",
+      "command": "CI=1 npm run test:run -- --maxWorkers=2",
+      "exit_code": 137,
+      "log_sha256": "68b919770f263bc9e9b60a955fd32178489f60918897a98649670cb266cd1403",
+      "scope": "The all-frontend run did not finish; only the separately completed 93 focused tests are claimed as passing. Hosted exact-head full frontend suite remains required."
+    },
+    "public_python_contracts": {
+      "result": "PASS_WITH_OPTIONAL_SKIP",
+      "command": "PYTHONDONTWRITEBYTECODE=1 python -B -m unittest discover -s tests/public -v",
+      "tests_run": 946,
+      "tests_passed": 945,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 1,
+      "skip_reason": "PySide6 unavailable; source-method contracts still run",
+      "log_sha256": "25418f50609c55213b627b4e9112595d2659b0fd1bd5420607c664f7106e4f4a",
+      "environment": {
+        "python": "3.12.14",
+        "source": "Exact local source commit e1676275ebb9ecd9dc1eafa6f16b2ab275e3243e",
+        "dependencies": "Reused read-only aligned temporary Linux venv/package target; unchanged vendored pipecat-ai 0.0.108+viola.3. No package installation performed by this task. Separate owned writable data/cache/temp/log directories.",
+        "scope": "Synthetic public source contracts; not a full desktop installation, retained Windows inventory, real agreement acceptance, device, provider or carrier qualification."
+      },
+      "earlier_attempts": [
+        {
+          "result": "INCOMPLETE",
+          "exit_code": 137,
+          "log_sha256": "74faecb85590ea12f0d74ca5e6d06e18ab483ebbb6a5f78bf3fd2fa2d51d5925"
+        },
+        {
+          "result": "ENVIRONMENT_SETUP_MISMATCH",
+          "tests_run": 946,
+          "failures": 1,
+          "errors": 1,
+          "skipped": 1,
+          "reason": "PYTHONPATH was overwritten by a test subprocess and default data path was read-only. Using the existing shared venv and owned writable Viola directories resolved both without source or dependency changes.",
+          "log_sha256": "0d234fe7113d248c3f2494e06f513f0485172a157e5330ca7546ee692d78b9e2"
+        }
+      ]
+    },
+    "runtime_qualification": {
+      "installed_windows": false,
+      "rendered_browser": false,
+      "real_agreement_acceptance": false,
+      "live_account_switch": false,
+      "real_provider_or_carrier": false,
+      "deployment_or_release": false
+    },
+    "preserved_limits": "Retained SBOM bytes and historical status objects unchanged. No fresh Windows dependency inventory, release qualification, or live agreement/account/call claim.",
+    "tested_local_source_commit": "e1676275ebb9ecd9dc1eafa6f16b2ab275e3243e",
+    "source_identity_verification": {
+      "source_commit": "eb157ff45cf3f5ff41f126f284e486397d6e511e",
+      "source_tree": "cc86b6bd6c0bcad8c190b5ce061218d1f9868100",
+      "parents": [
+        "50e1382aee7d26ad4e4eb826124ebbe1943b2338"
+      ],
+      "url": "https://github.com/GeeIHadAGoodTime/viola-oss/commit/eb157ff45cf3f5ff41f126f284e486397d6e511e",
+      "tested_local_source_commit": "e1676275ebb9ecd9dc1eafa6f16b2ab275e3243e"
+    }
   },
   "historical_bindings": [
     {
@@ -12148,38 +12228,31 @@
     }
   ],
   "reviewed_source_patch": {
-    "scope": "Refresh startup credentials before ready-shell navigation.",
-    "source_paths": [
-      "SOURCE/ui/qt_native/webview_window.py",
-      "SOURCE/tests/public/test_startup_websocket_credentials.py"
-    ],
-    "source_tree": "bca32750eecddfe5973ec35b3a75206659a950da",
-    "reviewed_combined_patch_sha256": "c1b0e4313540ccf1d06dfb0a1f6f52e2efa9711b5334d735209ff5ccdeaaf5f1",
+    "scope": "Two exact independently reviewed Phone Terms files only.",
+    "patch_sha256": "372ef9e35feb65ade7a057d3a31f7319b4072408cc2f5c14baeaf6a0d40349a3",
+    "base_revision": "50e1382aee7d26ad4e4eb826124ebbe1943b2338",
+    "source_revision": "eb157ff45cf3f5ff41f126f284e486397d6e511e",
     "files": [
       {
-        "path": "SOURCE/ui/qt_native/webview_window.py",
-        "old_blob": "7adaef5eb5c2df21df9a5117465b770e91ef5091",
-        "new_blob": "70662f3bfee46011248f80c7a67cd955db03eb2e",
-        "sha256": "755e7f33b4eacca89dfff9493bf25b5a3715128f3c68f1e366dfc950ced8ad86",
-        "bytes": 201217
+        "path": "SOURCE/ui/react-app/src/components/PhoneToSModal.jsx",
+        "base_sha256": "f7d18e6fe89ec3d746ca44f49a601d75b93619d26478d6e6a4ee1dab884494bd",
+        "final_sha256": "503980ff70aa5b8d46083c2e56dd075597866981e1ba2c0d4e5e34216a6e0c92"
       },
       {
-        "path": "SOURCE/tests/public/test_startup_websocket_credentials.py",
-        "old_blob": null,
-        "new_blob": "9a7d2e32353a26d010a12c0757c0fba9303c46c2",
-        "sha256": "c4cbb82a66fe86d70332da3dec95321345ee1151f1625e2ae1d301d8d7bff838",
-        "bytes": 7082
+        "path": "SOURCE/ui/react-app/src/components/PhoneToSModal.test.jsx",
+        "base_sha256": "42967c3e093d70a8b1c1989b7471e0cfe27312dabccadae60dc4a3f67a4450f7",
+        "final_sha256": "47df1fd3b5e57167ae73ef6c2549f017d0b3b6c2c9e2b53774015d5c8918029b"
       }
     ],
-    "review_status": "No blocking source-review findings."
+    "review_status": "PASS"
   },
   "new_resolution_performed": false,
   "new_advisory_scan_performed": false,
   "new_runtime_qualification_performed": false,
   "new_source_contract_qualification_performed": true,
   "new_static_security_scan_performed": false,
-  "new_resolution_scope": "No dependency or target-graph changes; all existing dependency inventories and their limitations retained.",
-  "new_advisory_scan_scope": "No new local advisory-clearance claim; required hosted checks retain their own results.",
+  "new_resolution_scope": "No fresh dependency resolution; existing isolated dependencies reused for source qualification.",
+  "new_advisory_scan_scope": "No fresh vulnerability audit or advisory assessment performed by this packet.",
   "account_reconciliation_previous_binding": {
     "source_revision": "f864e61381ef9e10a09333fce05210427cf7d0f6",
     "source_manifest_sha256": "9cad8bcb2f98c34d95a11545e11a57d74dbe6b28cd5db7322b7746e102801acd",
@@ -15697,6 +15770,100 @@
         "pointer": "/music_command_recovery_previous_binding",
         "canonical_json_sha256": "c8ae362e3bf515264325b5851ab172e9369cadf8fc93d89fd60a1bc922000396"
       }
+    }
+  },
+  "phone_tos_acknowledgment_previous_binding": {
+    "public_revision": "50e1382aee7d26ad4e4eb826124ebbe1943b2338",
+    "path": "PUBLIC_METADATA/source-binding.json",
+    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/50e1382aee7d26ad4e4eb826124ebbe1943b2338/PUBLIC_METADATA/source-binding.json",
+    "sha256": "7e804720c9cc0614b3a11a8fd3e693aba532a8f2b5e8b652bfbd0b240bb876c8",
+    "bytes": 1434170,
+    "git_blob": "b57af830d4a9ba7e3e877a1519c486fd81630117",
+    "overwritten_fields": {
+      "source_manifest_sha256": "3c570808fa948c19b6491fbc55f76aa2b5d6ed8bb2bf86aee92fb5644cff883a",
+      "source_tree_sha256": "f890b03d89d34a14584b4a10797f2767dd7a85d5ce0439889c977f402162f87c",
+      "source_file_count": 2698,
+      "source_revision": "0f4d8f8ba54e0f66736f2f8aa58e57b023ef5a4f",
+      "comparison_public_revision": "d43b129becc28a0e51eac83dab02be5241b1accb",
+      "changed_source_paths": [
+        "SOURCE/ui/qt_native/webview_window.py",
+        "SOURCE/tests/public/test_startup_websocket_credentials.py"
+      ],
+      "input_equivalence": {
+        "comparison_basis": "Protected public main d43b129becc28a0e51eac83dab02be5241b1accb",
+        "all_unselected_export_leaf_bytes_and_modes_preserved": true,
+        "all_six_sbom_bytes_and_status_objects_preserved": true,
+        "dependency_frontend_workflow_notice_model_pricing_and_customer_speech_inputs_unchanged": true,
+        "scope": "One Qt navigation call and four synthetic startup-token contracts."
+      },
+      "qualification": {
+        "scope": "Refresh the existing desktop credential script immediately before ready-shell navigation.",
+        "source_commit": "0f4d8f8ba54e0f66736f2f8aa58e57b023ef5a4f",
+        "source_tree": "bca32750eecddfe5973ec35b3a75206659a950da",
+        "ordered_source_parents": [
+          "2b752ef1eb88425fe90255574e205b20f43fa24e",
+          "d43b129becc28a0e51eac83dab02be5241b1accb"
+        ],
+        "reviewed_combined_patch_sha256": "c1b0e4313540ccf1d06dfb0a1f6f52e2efa9711b5334d735209ff5ccdeaaf5f1",
+        "publication_status": "Exact source commit created; draft PR pending.",
+        "independent_automated_review": {
+          "result": "No blocking findings; four final token tests independently rerun successfully."
+        },
+        "source_controls": {
+          "commands": [
+            "python -m unittest discover -s tests/public -p test_startup_websocket_credentials.py -v",
+            "python -m unittest discover -s tests/public -p test_windows_native_startup_order.py -v"
+          ],
+          "tests_passed": 28,
+          "failed": 0,
+          "skipped": 0,
+          "known_bad_control": "Unmodified baseline fails delayed-ready and failed-load retry freshness; duplicate guards and isolation remain passing.",
+          "fixtures": "Actual source token mint/consume and Qt credential/navigation methods with synthetic configuration, clock and inert Qt seams; no connections or persistent credentials."
+        },
+        "normal_app_retest_required": [
+          "Slow native startup waits over 30 seconds before the ready shell, then opens its first local event socket without an expired-ticket rejection.",
+          "Native failed-load retry and repeated readiness preserve one shell navigation and same-origin isolation."
+        ],
+        "limits": [
+          "Synthetic methods do not qualify Qt renderer script propagation or a real WebSocket handshake.",
+          "Full public suite and hosted exact-head checks remain pending.",
+          "Ruff is unavailable locally; no dependency installation was performed.",
+          "No release, deployment, remote runtime change or new installed candidate was made."
+        ]
+      },
+      "reviewed_source_patch": {
+        "scope": "Refresh startup credentials before ready-shell navigation.",
+        "source_paths": [
+          "SOURCE/ui/qt_native/webview_window.py",
+          "SOURCE/tests/public/test_startup_websocket_credentials.py"
+        ],
+        "source_tree": "bca32750eecddfe5973ec35b3a75206659a950da",
+        "reviewed_combined_patch_sha256": "c1b0e4313540ccf1d06dfb0a1f6f52e2efa9711b5334d735209ff5ccdeaaf5f1",
+        "files": [
+          {
+            "path": "SOURCE/ui/qt_native/webview_window.py",
+            "old_blob": "7adaef5eb5c2df21df9a5117465b770e91ef5091",
+            "new_blob": "70662f3bfee46011248f80c7a67cd955db03eb2e",
+            "sha256": "755e7f33b4eacca89dfff9493bf25b5a3715128f3c68f1e366dfc950ced8ad86",
+            "bytes": 201217
+          },
+          {
+            "path": "SOURCE/tests/public/test_startup_websocket_credentials.py",
+            "old_blob": null,
+            "new_blob": "9a7d2e32353a26d010a12c0757c0fba9303c46c2",
+            "sha256": "c4cbb82a66fe86d70332da3dec95321345ee1151f1625e2ae1d301d8d7bff838",
+            "bytes": 7082
+          }
+        ],
+        "review_status": "No blocking source-review findings."
+      },
+      "new_resolution_performed": false,
+      "new_advisory_scan_performed": false,
+      "new_runtime_qualification_performed": false,
+      "new_source_contract_qualification_performed": true,
+      "new_static_security_scan_performed": false,
+      "new_resolution_scope": "No dependency or target-graph changes; all existing dependency inventories and their limitations retained.",
+      "new_advisory_scan_scope": "No new local advisory-clearance claim; required hosted checks retain their own results."
     }
   }
 }
