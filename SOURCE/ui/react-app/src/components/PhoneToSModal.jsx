@@ -24,11 +24,13 @@ export default function PhoneToSModal({ isOpen, onClose, onAccepted = null, payl
     try {
       const response = await authFetch('/v1/phone/accept-tos', { method: 'POST' });
       const json = await response.json().catch(() => null);
-      if (!response.ok || json?.ok === false) {
+      // The endpoint returns a canonical success envelope after saving consent.
+      // HTTP success alone (including an empty or malformed body) is not acknowledgment.
+      if (!response.ok || json?.ok !== true || json?.error != null || json?.data?.accepted !== true) {
         const detail = json?.error?.message || json?.message || 'Could not save acceptance. Try again.';
         throw new Error(detail);
       }
-      if (onAccepted) onAccepted(json?.data || json || { accepted: true });
+      if (onAccepted) onAccepted(json.data);
       onClose();
     } catch (err) {
       setError(err?.message || 'Could not save acceptance. Try again.');
