@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "0f4d8f8ba54e0f66736f2f8aa58e57b023ef5a4f",
-  "sha256": "f890b03d89d34a14584b4a10797f2767dd7a85d5ce0439889c977f402162f87c",
+  "revision": "eb157ff45cf3f5ff41f126f284e486397d6e511e",
+  "sha256": "8d613743994e8aaa4c57857b8f56190f1b0eaf96ea012e4ec04d9dd9509a9e44",
   "files": [
     {
       "path": ".env.example",
@@ -10625,13 +10625,13 @@
     },
     {
       "path": "ui/react-app/src/components/PhoneToSModal.jsx",
-      "sha256": "f7d18e6fe89ec3d746ca44f49a601d75b93619d26478d6e6a4ee1dab884494bd",
-      "bytes": 6143
+      "sha256": "503980ff70aa5b8d46083c2e56dd075597866981e1ba2c0d4e5e34216a6e0c92",
+      "bytes": 6338
     },
     {
       "path": "ui/react-app/src/components/PhoneToSModal.test.jsx",
-      "sha256": "42967c3e093d70a8b1c1989b7471e0cfe27312dabccadae60dc4a3f67a4450f7",
-      "bytes": 9418
+      "sha256": "47df1fd3b5e57167ae73ef6c2549f017d0b3b6c2c9e2b53774015d5c8918029b",
+      "bytes": 16486
     },
     {
       "path": "ui/react-app/src/components/QueueModal.actions.test.jsx",
