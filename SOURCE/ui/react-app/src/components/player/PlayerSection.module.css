@@ -23,7 +23,10 @@
   display: flex;
   flex-direction: column;
   flex: 1;
-  justify-content: center;
+  /* Auto cross-axis margins center a fitting panel, but resolve to zero
+     when it is taller than the scrollport. justify-content alone centers
+     overflow above the scroll origin and makes the title unreachable. */
+  margin-block: auto;
   gap: clamp(16px, 2.5vh, 28px);
   min-width: 0;
 }
@@ -78,7 +81,7 @@
   width: 20px;
 }
 
-@media (max-width: 1023px) {
+@media (max-width: 1279px) {
   .section {
     gap: 26px;
   }

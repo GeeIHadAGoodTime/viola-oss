@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "ddf2d8ef58085fd8ae709c906f34306380a64193",
-  "sha256": "3e04f020c5867ce96841907edddb40135c9d6a0ff661b7c2ecbbf20f77e0e6da",
+  "revision": "071d81d251438a4208f54581757844dd63ea5c18",
+  "sha256": "4f70d65c2e5ea24c1c765fad385ae745b4ea9bd8b32b2cb1888f13f1da9b0c48",
   "files": [
     {
       "path": ".env.example",
@@ -5710,8 +5710,8 @@
     },
     {
       "path": "telephony/call_tools.py",
-      "sha256": "b6ece911781164e17deca223a424bbf0b34a11e714d8eac41ea00a0a4927deda",
-      "bytes": 67585
+      "sha256": "bbf0f6f370b3c5570cb6a0ea46ddf97a29ac90dff0128678293faa5d32977468",
+      "bytes": 66691
     },
     {
       "path": "telephony/caller_validation.py",
@@ -5920,8 +5920,8 @@
     },
     {
       "path": "telephony/routes.py",
-      "sha256": "276fa0261413671e76995cd91121c985c7d76cfceeed492f7c257e2025af5087",
-      "bytes": 48522
+      "sha256": "bcebc8727661ec59beaf7e306674c5b3d24e94421512afc9c17df87dd997841a",
+      "bytes": 47850
     },
     {
       "path": "telephony/streaming_stt_model.py",
@@ -6052,11 +6052,6 @@
       "path": "tests/public/test_cjk_runtime_reconstruction.py",
       "sha256": "fc833f571b5c126276f656e601533bca9e788bc55a520c368069bd6332de37b0",
       "bytes": 1123
-    },
-    {
-      "path": "tests/public/test_consultation_question_correlation.py",
-      "sha256": "baf95b194eb09ec80cb9161bac1d4f7466ffcd87c01e2af6524d3354d060c5c1",
-      "bytes": 17473
     },
     {
       "path": "tests/public/test_crash_forensics_targets.py",
@@ -11090,8 +11085,8 @@
     },
     {
       "path": "ui/react-app/src/components/player/PlayerSection.module.css",
-      "sha256": "e8d797240b79cad5b6298896d386485ee35a1bde5437eba58bfc616e6d35d46e",
-      "bytes": 2881
+      "sha256": "a3c5d78933da5cfcaba0c912fd110b75b887f6ee3548e895767f3022bb81e67a",
+      "bytes": 3097
     },
     {
       "path": "ui/react-app/src/components/player/PlayerSection.test.jsx",
@@ -11525,8 +11520,8 @@
     },
     {
       "path": "ui/react-app/src/components/topbar/TopBar.module.css",
-      "sha256": "5f81991d7724ec6882baf78fa69a373a8b7f8fc0fe357d0a6c1ecc1f22d0903b",
-      "bytes": 4849
+      "sha256": "3ce64d1edf182301b81f1692b6b23a3a17eb1b31b58be96acaee72f9dce72559",
+      "bytes": 4984
     },
     {
       "path": "ui/react-app/src/components/topbar/TopBar.test.jsx",
@@ -11555,7 +11550,7 @@
     },
     {
       "path": "ui/react-app/src/components/voice/BottomRow.module.css",
-      "sha256": "f8f5e7bc69790aae6e833239596dfff11292a55787ce319c3eac66d291db3cbb",
+      "sha256": "7b26289d3361b576544990672a701c8f08c4458e6818b050805b8d46a01e468c",
       "bytes": 3541
     },
     {
@@ -11685,13 +11680,13 @@
     },
     {
       "path": "ui/react-app/src/hooks/useCallConsultationReply.js",
-      "sha256": "03e54fcace57a8b719b65f6ca8449e15bce1743773c85d9078cdbc7d2ca294e4",
-      "bytes": 3083
+      "sha256": "faa00f93c09d7c621949e4c9ca0182c5fcae32db22a9496fcc5e55e7a125fd8f",
+      "bytes": 2928
     },
     {
       "path": "ui/react-app/src/hooks/useCallConsultationReply.test.jsx",
-      "sha256": "b03d3ba4eb0b4aff648b97ef5e5e9b996ca1e8c3a49c3744bd6920fa1083b310",
-      "bytes": 16229
+      "sha256": "c2df9d49b0fe7e2149e5b3a29d2d10aa5b62c477fe6c49a594952998a71f1a63",
+      "bytes": 11990
     },
     {
       "path": "ui/react-app/src/hooks/useCloudLlmConsent.js",
@@ -12322,6 +12317,11 @@
       "path": "ui/react-app/tests/minimatch_interop.test.js",
       "sha256": "13ea8afc1fedb7a0fd58733509fa56cfd7b658755c6919adcd910dd520be9254",
       "bytes": 1582
+    },
+    {
+      "path": "ui/react-app/tests/responsive_display.test.js",
+      "sha256": "4c6626743d58f963d637421bbd0f54263b7dbb35e28e1f33953f5fda65c59f7c",
+      "bytes": 2117
     },
     {
       "path": "ui/react-app/tests/source_map_advisory.test.js",
