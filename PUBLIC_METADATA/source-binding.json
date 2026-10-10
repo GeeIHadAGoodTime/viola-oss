@@ -1,16 +1,17 @@
 {
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "f8a778b148a823e047d70b315fbb68238b24bdbdcc5e734a93c79be223344296",
-  "source_tree_sha256": "4f70d65c2e5ea24c1c765fad385ae745b4ea9bd8b32b2cb1888f13f1da9b0c48",
-  "source_file_count": 2701,
-  "source_revision": "071d81d251438a4208f54581757844dd63ea5c18",
-  "comparison_public_revision": "e53a308cfabb61d38c619926c93e4bf5fd874c8f",
+  "source_manifest_sha256": "5badb844279441457c3c7310cf8f3df80766b5022d6e188689d60317cec933e7",
+  "source_tree_sha256": "f19c8d3b01ab11af7f959aa00504952b6b2e5766ed3064e792cf53de4be61688",
+  "source_file_count": 2702,
+  "source_revision": "81420e3a1359ce6354f5aa0e22b33589415f5505",
+  "comparison_public_revision": "d1e042d527dde01c447350ab09638d0cca521268",
   "changed_source_paths": [
-    "SOURCE/ui/react-app/src/components/topbar/TopBar.module.css",
-    "SOURCE/ui/react-app/src/components/player/PlayerSection.module.css",
-    "SOURCE/ui/react-app/src/components/voice/BottomRow.module.css",
-    "SOURCE/ui/react-app/tests/responsive_display.test.js"
+    "SOURCE/telephony/call_tools.py",
+    "SOURCE/telephony/routes.py",
+    "SOURCE/tests/public/test_consultation_question_correlation.py",
+    "SOURCE/ui/react-app/src/hooks/useCallConsultationReply.js",
+    "SOURCE/ui/react-app/src/hooks/useCallConsultationReply.test.jsx"
   ],
   "retained_sboms": [
     {
@@ -72,119 +73,316 @@
     }
   ],
   "input_equivalence": {
-    "comparison_basis": "Protected public main e53a308cfabb61d38c619926c93e4bf5fd874c8f",
-    "all_unselected_export_leaf_bytes_and_modes_preserved": true,
-    "all_six_sbom_bytes_and_status_objects_preserved": true,
-    "source_change_scope": "Three exact previously reviewed responsive CSS files and five regression cases. Preserve current Phone Terms and call-consultation behavior; no component behavior, workflow, dependency, account, audio or provider edits.",
-    "original_reviewed_source": "b3ea1878fff99cb3dc155e9cee527e1e274761d2",
-    "original_review_time_utc": "2026-10-10T03:35:00Z",
-    "original_four_source_bytes_unchanged": true
+    "comparison_basis": "Actual protected main after responsive PR #112: d1e042d527dde01c447350ab09638d0cca521268",
+    "all_five_reviewed_correlation_output_blobs_and_modes_identical": true,
+    "all_four_landed_responsive_output_blobs_and_modes_preserved": true,
+    "all_unselected_landed_leaf_blobs_and_modes_preserved": true,
+    "all_six_sbom_bytes_and_complete_status_objects_preserved": true,
+    "scope": "Mechanical composition of disjoint previously reviewed consultation-correlation and responsive source changes. No new product behavior, API, workflow or dependency edit."
   },
   "qualification": {
-    "scope": "Source-only supported-small-window responsive layout correction, reconciled onto current protected public main.",
-    "source_commit": "071d81d251438a4208f54581757844dd63ea5c18",
-    "source_tree": "9c66e131318562f52164cadfd5e3e12c3bbcdb24",
+    "scope": "Reviewed consultation correlation reconciled onto landed responsive layout; source integration only.",
+    "source_commit": "81420e3a1359ce6354f5aa0e22b33589415f5505",
+    "source_tree": "18a06396d27317f178d627d1a70ad1000e7b6e44",
     "ordered_source_parents": [
-      "e53a308cfabb61d38c619926c93e4bf5fd874c8f"
+      "c9e287ef56be55d72f0639201e148ea72573b6eb",
+      "d1e042d527dde01c447350ab09638d0cca521268"
     ],
-    "reviewed_combined_patch_sha256": "b68670ba9ca3ac057fd2710360d7aaac9296d852d663ebc793461b3d15d09dd4",
-    "publication_status": "Prepared for independent current-base metadata review and draft PR; exact-head hosted checks remain pending.",
-    "original_source_review": {
-      "result": "PASS for the exact unchanged three CSS files and five regression cases.",
-      "review_time_utc": "2026-10-10T03:35:00Z",
-      "source_commit": "b3ea1878fff99cb3dc155e9cee527e1e274761d2",
-      "source_file_sha256": {
-        "SOURCE/ui/react-app/src/components/topbar/TopBar.module.css": "3ce64d1edf182301b81f1692b6b23a3a17eb1b31b58be96acaee72f9dce72559",
-        "SOURCE/ui/react-app/src/components/player/PlayerSection.module.css": "a3c5d78933da5cfcaba0c912fd110b75b887f6ee3548e895767f3022bb81e67a",
-        "SOURCE/ui/react-app/src/components/voice/BottomRow.module.css": "7b26289d3361b576544990672a701c8f08c4458e6818b050805b8d46a01e468c",
-        "SOURCE/ui/react-app/tests/responsive_display.test.js": "4c6626743d58f963d637421bbd0f54263b7dbb35e28e1f33953f5fda65c59f7c"
+    "tested_local_source_commit": "5af5be1c37ae9e5c674c3fc71e3bc20ee3093648",
+    "tested_local_tree_equals_connector_tree": true,
+    "publication_status": "Current-base source composition and metadata prepared for independent review; fresh exact-head hosted checks required before normal expected-head-protected integration.",
+    "current_input_checks": {
+      "focused_frontend": {
+        "result": "PASS",
+        "tests_passed": 247,
+        "failed": 0,
+        "skipped": 0,
+        "files": [
+          "src/hooks/useCallConsultationReply.test.jsx",
+          "src/__tests__/SmartDisplay.test.jsx",
+          "tests/responsive_display.test.js"
+        ],
+        "counts": {
+          "reply_hook": 46,
+          "SmartDisplay": 196,
+          "responsive": 5
+        },
+        "report_sha256": "152f5cf2722e1b71f9939050c79ef0d22347236cbd3ec14e13042ebfe563688e",
+        "log_sha256": "42cae5a75f7424d0f933ad57edc7f309ad98cb3f5fd5892fcc065e57f8940b0c"
+      },
+      "production_frontend_build": {
+        "result": "PASS",
+        "modules_transformed": 1011,
+        "log_sha256": "52bddd27d98445a6309ae028fce79a7b99327f3b269810c520a6147ef04e1e10",
+        "scope": "Local Vite source build with Sentry upload credentials excluded; no installed runtime."
       }
     },
-    "current_source_qualification": {
+    "retained_correlation_exact_head_hosted_checks": {
+      "head": "c9e287ef56be55d72f0639201e148ea72573b6eb",
       "base": "e53a308cfabb61d38c619926c93e4bf5fd874c8f",
-      "base_source_files_byte_verified": 2700,
-      "focused_tests_passed": 40,
-      "focused_tests_failed": 0,
-      "focused_receipt_sha256": "8b96bf29f24fe0e9d1feabe36e2396ccd66267f37bca3ef51835e2cc97eb4d3c",
-      "known_bad_base_control": "Four intended CSS assertions fail; large/phone positive case passes. Exact candidate bytes restored afterward.",
-      "known_bad_receipt_sha256": "7da2d546e1ae3b408490ded02ba3a3779a2bbb84cba6eb406efd629bb89f85b9",
-      "frontend_build": "PASS: production Vite build using existing locked dependencies; no source-map upload.",
-      "build_log_sha256": "7350f75a432ff0ef4ec38277c47b7e1edda2431080b6702402332a72b484d791",
-      "full_frontend_suite": "Not rerun for this reconciliation. Required exact-head public frontend check remains pending."
-    },
-    "historical_frontend_qualification": {
-      "base": "50e1382aee7d26ad4e4eb826124ebbe1943b2338",
-      "all_listed_cases_passed_across_bounded_executions": 2093,
-      "monolithic_result": "512 MiB worker OOM after 2030 passes; all 192 SmartDisplay cases passed in four non-overlapping 48-case batches. No monolithic-pass or fixed-memory claim.",
-      "combined_receipt_sha256": "e9232b3c804be738819369486b908318b3707593ee1b834654ea926ec48c1885",
-      "evidence_availability": "Historical receipt and source hashes were verified again at 10:20 UTC. Original standalone local frontend logs are not present in the replacement workspace. These counts are historical, not fresh current-base qualification."
-    },
-    "rendered_source_diagnostic": {
-      "result": "Reuse exact browser-tested fixture bytes; fresh current-base browser execution blocked before tests by local socket permission.",
-      "run_url": "https://github.com/GeeIHadAGoodTime/Viola/actions/runs/38021404207",
-      "run_head": "16ba8b2230bbb2b620320437da40b63f920c2f2d",
-      "original_public_baseline": "50e1382aee7d26ad4e4eb826124ebbe1943b2338",
-      "original_result": "10 Chromium cases, 19 screenshots passed. Both original artifact ZIPs were recovered and their original hashes reverified.",
-      "artifact_id": 11658853175,
-      "artifact_zip_sha256": "06e5bf14a68de037bb332e3b2ed9a7db09d6b581f785aab6e3e41d1f387c5a5a",
-      "report_artifact_id": 11658049011,
-      "report_zip_sha256": "f515ff4982c8d5e544c1f548b8b683ffd45d58303e23e2f88309d42e00912008",
-      "current_baseline_inputs_verified": 502,
-      "current_fixture_equivalence": "All six baseline/candidate HTML, JS and CSS outputs are byte-identical to the successful original diagnostic. Extracted production shell fixture and base style hashes also match. Whole frontend input tree changed through Phone Terms and consultation work; no claim all original inputs are unchanged.",
-      "equivalence_receipt_sha256": "1efaa529048043279f9d6a2a9d0df30852a9f79e200fb360b03ba0a34b8e8ef8",
-      "current_fixture_receipt_sha256": "fbe6d4a81ccd779e793cfd37d96d001727e1a5b56ac96a6ec9027dcff14e873b",
-      "fresh_browser_result": "Two launch attempts, including the supported escalated retry, were blocked by socket() EPERM before any assertion; zero fresh browser cases passed.",
-      "fresh_attempt_log_sha256": "ef6800553ba1762193f38b72d4e92240718f377db09e48b3611c2067583fc0e1",
-      "viewports": [
-        [
-          1024,
-          696
-        ],
-        [
-          1024,
-          568
-        ],
-        [
-          1100,
-          696
-        ],
-        [
-          1279,
-          696
-        ],
-        [
-          1280,
-          688
-        ],
-        [
-          1400,
-          768
-        ],
-        [
-          1600,
-          900
-        ],
-        [
-          767,
-          700
-        ],
-        [
-          390,
-          844
-        ]
+      "result": "8 checks passed",
+      "frontend_tests_passed": 2160,
+      "frontend_files": 180,
+      "python_tests_run": 967,
+      "python_tests_passed": 966,
+      "python_tests_skipped": 1,
+      "checks": [
+        {
+          "name": "python-inventory (windows-all-optional)",
+          "url": "https://github.com/GeeIHadAGoodTime/viola-oss/actions/runs/38054892145/job/114221207535",
+          "conclusion": "success"
+        },
+        {
+          "name": "python-inventory (windows-deepfilter)",
+          "url": "https://github.com/GeeIHadAGoodTime/viola-oss/actions/runs/38054892145/job/114221207493",
+          "conclusion": "success"
+        },
+        {
+          "name": "python-inventory (windows-other-optional)",
+          "url": "https://github.com/GeeIHadAGoodTime/viola-oss/actions/runs/38054892145/job/114221207484",
+          "conclusion": "success"
+        },
+        {
+          "name": "python-inventory (windows-kokoro)",
+          "url": "https://github.com/GeeIHadAGoodTime/viola-oss/actions/runs/38054892145/job/114221207483",
+          "conclusion": "success"
+        },
+        {
+          "name": "python-inventory (windows-desktop)",
+          "url": "https://github.com/GeeIHadAGoodTime/viola-oss/actions/runs/38054892145/job/114221207470",
+          "conclusion": "success"
+        },
+        {
+          "name": "python-contracts",
+          "url": "https://github.com/GeeIHadAGoodTime/viola-oss/actions/runs/38054892103/job/114221207413",
+          "conclusion": "success"
+        },
+        {
+          "name": "frontend-inventory",
+          "url": "https://github.com/GeeIHadAGoodTime/viola-oss/actions/runs/38054892145/job/114221207362",
+          "conclusion": "success"
+        },
+        {
+          "name": "frontend",
+          "url": "https://github.com/GeeIHadAGoodTime/viola-oss/actions/runs/38054892103/job/114221207276",
+          "conclusion": "success"
+        }
       ],
-      "observed_result": "At 1024x696 clock/date/Music title and transport fit. At short 1024x568 and 1280x688 with long response text lower Music controls require existing contained scrolling; title, repeated Next, PTT, mode return, long content and keyboard command entry are reachable.",
-      "scope_limit": "Synthetic actual production components and extracted shell styles in Linux Chromium, not full SmartDisplay, native Qt, installed Windows, accounts, providers or physical audio."
+      "scope": "Historical constituent evidence, not a fresh aggregate on the reconciled responsive composition."
     },
+    "retained_focused_backend_and_mutation_controls": {
+      "source_commit": "759e4371a8c0f9cd2563f0ffe831abcd43696ec5",
+      "frontend_full": {
+        "result": "PASS",
+        "tests_passed": 2160,
+        "test_files_passed": 180,
+        "tests_failed": 0,
+        "tests_skipped": 0,
+        "smartdisplay_unique_passes": 196,
+        "reply_hook_passes": 46,
+        "command": "npm run test:run -- --maxWorkers=1 --reporter=json",
+        "node_heap_mb": 2048,
+        "report_sha256": "4831de49426587e30c2210f52ee588362e725038563c8796269894159ed90e26",
+        "log_sha256": "f5c8bcab50a64e64dfad4109249960d8fd646722bdb524cf2d66688334fc869b"
+      },
+      "production_build": {
+        "result": "PASS",
+        "modules_transformed": 1011,
+        "duration_seconds": 5.32,
+        "log_sha256": "755d96159afc3c9fef742c88982c57d92c9c7b43af3c40dd4669e76382ed1dba",
+        "scope": "Production Vite source build with Sentry uploads disabled and output outside the source export; not installed/runtime/provider acceptance."
+      },
+      "backend_focused": {
+        "result": "PASS",
+        "tests_passed": 21,
+        "tests_failed": 0,
+        "scope": "Production AST bodies, asyncio futures and local ASGI; synthetic authentication/event/Pipecat boundaries. No full public Python aggregate rerun.",
+        "python": "3.12.14",
+        "dependencies": {
+          "fastapi": "0.141.1",
+          "pydantic": "2.13.4",
+          "httpx": "0.28.1"
+        },
+        "environment_scope": "Existing replacement-host packages; not the original pinned Help/Phone environment or the full desktop dependency graph.",
+        "log_sha256": "1af81a0777fd173f2cacb7012adeddc775258b937bffad8a5fa8e389d528fae6"
+      },
+      "backend_mutations": {
+        "result": "PASS",
+        "mutations": [
+          {
+            "mutation": "remove_question_match",
+            "rejected": true,
+            "exit_code": 1,
+            "log_sha256": "f0e360d62789067fc3e492e52c5b859e918b1d181e7628ccd5ea3461f406d4f9"
+          },
+          {
+            "mutation": "constant_question_id",
+            "rejected": true,
+            "exit_code": 1,
+            "log_sha256": "7dc6889e34dc4040467ba8936064c3813caa40d7dd13503a382d36d621589ab9"
+          },
+          {
+            "mutation": "remove_owner_check",
+            "rejected": true,
+            "exit_code": 1,
+            "log_sha256": "55484a6a377c4ceb4d5cf352ccb0c146d4683a5bacbe1e159357e2ac707cd4fa"
+          },
+          {
+            "mutation": "drop_route_question_id",
+            "rejected": true,
+            "exit_code": 1,
+            "log_sha256": "91a268dff20707ec2721389bf323bea22c84f5ae23bee64740bbe35b2a64a4f7"
+          }
+        ]
+      },
+      "frontend_mutation": {
+        "result": "EXPECTED_REGRESSION_DETECTED",
+        "exit_code": 1,
+        "failed": 4,
+        "passed": 1,
+        "skipped": 41,
+        "log_sha256": "b62e926901ac80954904c30f4af0d5dbbfaf03e8a32025b4ef3586bddc6c6594",
+        "report_sha256": "76c56eea23bcc4bcef966571a9f2866e819b2b20d4415fbb329c8f9dbe373575",
+        "production_source_changed": false
+      },
+      "lint": {
+        "result": "PASS",
+        "errors": 0,
+        "warnings": 0,
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "frontend_environment": {
+        "node": "24.19.0",
+        "npm": "11.9.0",
+        "installation": "Existing adjacent Help exact-lockfile installation reused; package.json and package-lock.json compared byte-identical. No dependency installation or advisory scan performed by this packet."
+      },
+      "full_public_python": "Not rerun after workspace replacement; original raw correlation aggregate receipt is unavailable. New exact-head hosted full Python checks remain required."
+    },
+    "retained_responsive_qualification": {
+      "scope": "Source-only supported-small-window responsive layout correction, reconciled onto current protected public main.",
+      "source_commit": "071d81d251438a4208f54581757844dd63ea5c18",
+      "source_tree": "9c66e131318562f52164cadfd5e3e12c3bbcdb24",
+      "ordered_source_parents": [
+        "e53a308cfabb61d38c619926c93e4bf5fd874c8f"
+      ],
+      "reviewed_combined_patch_sha256": "b68670ba9ca3ac057fd2710360d7aaac9296d852d663ebc793461b3d15d09dd4",
+      "publication_status": "Prepared for independent current-base metadata review and draft PR; exact-head hosted checks remain pending.",
+      "original_source_review": {
+        "result": "PASS for the exact unchanged three CSS files and five regression cases.",
+        "review_time_utc": "2026-10-10T03:35:00Z",
+        "source_commit": "b3ea1878fff99cb3dc155e9cee527e1e274761d2",
+        "source_file_sha256": {
+          "SOURCE/ui/react-app/src/components/topbar/TopBar.module.css": "3ce64d1edf182301b81f1692b6b23a3a17eb1b31b58be96acaee72f9dce72559",
+          "SOURCE/ui/react-app/src/components/player/PlayerSection.module.css": "a3c5d78933da5cfcaba0c912fd110b75b887f6ee3548e895767f3022bb81e67a",
+          "SOURCE/ui/react-app/src/components/voice/BottomRow.module.css": "7b26289d3361b576544990672a701c8f08c4458e6818b050805b8d46a01e468c",
+          "SOURCE/ui/react-app/tests/responsive_display.test.js": "4c6626743d58f963d637421bbd0f54263b7dbb35e28e1f33953f5fda65c59f7c"
+        }
+      },
+      "current_source_qualification": {
+        "base": "e53a308cfabb61d38c619926c93e4bf5fd874c8f",
+        "base_source_files_byte_verified": 2700,
+        "focused_tests_passed": 40,
+        "focused_tests_failed": 0,
+        "focused_receipt_sha256": "8b96bf29f24fe0e9d1feabe36e2396ccd66267f37bca3ef51835e2cc97eb4d3c",
+        "known_bad_base_control": "Four intended CSS assertions fail; large/phone positive case passes. Exact candidate bytes restored afterward.",
+        "known_bad_receipt_sha256": "7da2d546e1ae3b408490ded02ba3a3779a2bbb84cba6eb406efd629bb89f85b9",
+        "frontend_build": "PASS: production Vite build using existing locked dependencies; no source-map upload.",
+        "build_log_sha256": "7350f75a432ff0ef4ec38277c47b7e1edda2431080b6702402332a72b484d791",
+        "full_frontend_suite": "Not rerun for this reconciliation. Required exact-head public frontend check remains pending."
+      },
+      "historical_frontend_qualification": {
+        "base": "50e1382aee7d26ad4e4eb826124ebbe1943b2338",
+        "all_listed_cases_passed_across_bounded_executions": 2093,
+        "monolithic_result": "512 MiB worker OOM after 2030 passes; all 192 SmartDisplay cases passed in four non-overlapping 48-case batches. No monolithic-pass or fixed-memory claim.",
+        "combined_receipt_sha256": "e9232b3c804be738819369486b908318b3707593ee1b834654ea926ec48c1885",
+        "evidence_availability": "Historical receipt and source hashes were verified again at 10:20 UTC. Original standalone local frontend logs are not present in the replacement workspace. These counts are historical, not fresh current-base qualification."
+      },
+      "rendered_source_diagnostic": {
+        "result": "Reuse exact browser-tested fixture bytes; fresh current-base browser execution blocked before tests by local socket permission.",
+        "run_url": "https://github.com/GeeIHadAGoodTime/Viola/actions/runs/38021404207",
+        "run_head": "16ba8b2230bbb2b620320437da40b63f920c2f2d",
+        "original_public_baseline": "50e1382aee7d26ad4e4eb826124ebbe1943b2338",
+        "original_result": "10 Chromium cases, 19 screenshots passed. Both original artifact ZIPs were recovered and their original hashes reverified.",
+        "artifact_id": 11658853175,
+        "artifact_zip_sha256": "06e5bf14a68de037bb332e3b2ed9a7db09d6b581f785aab6e3e41d1f387c5a5a",
+        "report_artifact_id": 11658049011,
+        "report_zip_sha256": "f515ff4982c8d5e544c1f548b8b683ffd45d58303e23e2f88309d42e00912008",
+        "current_baseline_inputs_verified": 502,
+        "current_fixture_equivalence": "All six baseline/candidate HTML, JS and CSS outputs are byte-identical to the successful original diagnostic. Extracted production shell fixture and base style hashes also match. Whole frontend input tree changed through Phone Terms and consultation work; no claim all original inputs are unchanged.",
+        "equivalence_receipt_sha256": "1efaa529048043279f9d6a2a9d0df30852a9f79e200fb360b03ba0a34b8e8ef8",
+        "current_fixture_receipt_sha256": "fbe6d4a81ccd779e793cfd37d96d001727e1a5b56ac96a6ec9027dcff14e873b",
+        "fresh_browser_result": "Two launch attempts, including the supported escalated retry, were blocked by socket() EPERM before any assertion; zero fresh browser cases passed.",
+        "fresh_attempt_log_sha256": "ef6800553ba1762193f38b72d4e92240718f377db09e48b3611c2067583fc0e1",
+        "viewports": [
+          [
+            1024,
+            696
+          ],
+          [
+            1024,
+            568
+          ],
+          [
+            1100,
+            696
+          ],
+          [
+            1279,
+            696
+          ],
+          [
+            1280,
+            688
+          ],
+          [
+            1400,
+            768
+          ],
+          [
+            1600,
+            900
+          ],
+          [
+            767,
+            700
+          ],
+          [
+            390,
+            844
+          ]
+        ],
+        "observed_result": "At 1024x696 clock/date/Music title and transport fit. At short 1024x568 and 1280x688 with long response text lower Music controls require existing contained scrolling; title, repeated Next, PTT, mode return, long content and keyboard command entry are reachable.",
+        "scope_limit": "Synthetic actual production components and extracted shell styles in Linux Chromium, not full SmartDisplay, native Qt, installed Windows, accounts, providers or physical audio."
+      },
+      "runtime_qualification": {
+        "fresh_rendered_browser": false,
+        "reused_exact_rendered_fixture_evidence": true,
+        "installed_windows": false,
+        "physical_audio": false,
+        "real_provider": false,
+        "deployment_or_release": false
+      },
+      "preserved_limits": "All historical binding objects and six retained SBOM byte/status records remain unchanged. No new dependency resolution, advisory audit, installed Windows, deployment or release qualification."
+    },
+    "full_current_composition_frontend_and_python_aggregates": "Not rerun locally. Exact revised-head hosted aggregates and inventories are mandatory before integration.",
     "runtime_qualification": {
-      "fresh_rendered_browser": false,
-      "reused_exact_rendered_fixture_evidence": true,
       "installed_windows": false,
+      "real_call_or_provider": false,
       "physical_audio": false,
-      "real_provider": false,
+      "hosted_proxy_and_relay": false,
       "deployment_or_release": false
     },
-    "preserved_limits": "All historical binding objects and six retained SBOM byte/status records remain unchanged. No new dependency resolution, advisory audit, installed Windows, deployment or release qualification."
+    "api_limit": "Only supplied matching consultation_id values gain stale-question protection. Omitted IDs and internal None retain legacy call-level behavior and remain unprotected. Old servers ignore the additive field. No reply-idempotency cache or network exactly-once guarantee is introduced.",
+    "auth_validation_order": "Route authentication and authenticated owner identity precede body handling. Malformed ID syntax returns 400 before pending-owner lookup; valid matching/stale string IDs require pending-owner authorization before matching or resolving a future. Question IDs are data identity, never authorization credentials.",
+    "hosted_relay_qualification": {
+      "result": "NOT_AVAILABLE_IN_PUBLIC_SOURCE_NOT_QUALIFIED",
+      "missing_public_files": [
+        "telephony/cloud_routes.py",
+        "telephony/phone_cloud_event_relay.py"
+      ],
+      "scope": "Deployed hosted forwarding, cross-process behavior and mixed-version rollout are not established by local source/test/build evidence."
+    },
+    "preserved_history": "Every distinct original correlation binding field and every replaced landed responsive binding field is preserved below. Earlier failures, missing original logs, interrupted uploads and runtime limits remain historical with their original scope. No attempt to resume old uncertain uploads."
   },
   "historical_bindings": [
     {
@@ -7615,7 +7813,7 @@
                         "text": "Hello. This is a short test of the local speech system.",
                         "voice": "af_heart",
                         "locale": "en-us",
-                        "phonemes": "h\u0259l\u02c8O. \u00f0\u02cc\u026as \u026az \u0250 \u0283\u02c8\u0254\u0279t t\u02c8\u025bst \u028cv \u00f0\u0259 l\u02c8Ok\u0259l sp\u02c8i\u02a7 s\u02c8\u026ast\u0259m.",
+                        "phonemes": "həlˈO. ðˌɪs ɪz ɐ ʃˈɔɹt tˈɛst ʌv ðə lˈOkəl spˈiʧ sˈɪstəm.",
                         "duration_seconds": 2.986666666666667,
                         "wav_sha256": "aeaba330943123ff46d808be904e3cc47ec05291c1aee9efa78a21bb25d4fadd",
                         "float_pcm_sha256": "d27a02a2b366945758f9a7cb89ae4eaee46525807634dff9b7f295f400b8f622",
@@ -7628,7 +7826,7 @@
                         "text": "Hello. This is a short test of the local speech system.",
                         "voice": "af_heart",
                         "locale": "en-us",
-                        "phonemes": "h\u0259l\u02c8O. \u00f0\u02cc\u026as \u026az \u0250 \u0283\u02c8\u0254\u0279t t\u02c8\u025bst \u028cv \u00f0\u0259 l\u02c8Ok\u0259l sp\u02c8i\u02a7 s\u02c8\u026ast\u0259m.",
+                        "phonemes": "həlˈO. ðˌɪs ɪz ɐ ʃˈɔɹt tˈɛst ʌv ðə lˈOkəl spˈiʧ sˈɪstəm.",
                         "duration_seconds": 2.986666666666667,
                         "wav_sha256": "aeaba330943123ff46d808be904e3cc47ec05291c1aee9efa78a21bb25d4fadd",
                         "float_pcm_sha256": "d27a02a2b366945758f9a7cb89ae4eaee46525807634dff9b7f295f400b8f622",
@@ -7641,7 +7839,7 @@
                         "text": "The A P I costs $12.50, not $0.05.",
                         "voice": "af_heart",
                         "locale": "en-us",
-                        "phonemes": "\u00f0i \u02c8A p\u02c8i \u02ccI k\u02c8\u0254sts tw\u02c8\u025blv d\u02c8\u0251l\u0259\u0279z \u00e6nd f\u02c8\u026afti s\u02c8\u025bnts, n\u02cc\u0251t f\u02c8Iv s\u02c8\u025bnts.",
+                        "phonemes": "ði ˈA pˈi ˌI kˈɔsts twˈɛlv dˈɑləɹz ænd fˈɪfti sˈɛnts, nˌɑt fˈIv sˈɛnts.",
                         "duration_seconds": 3.7973333333333334,
                         "wav_sha256": "5310d8c6737e9eb874d30b15b70cd3a779d1a86904339b68831e29945307d4b6",
                         "float_pcm_sha256": "c7a016d0b527e759ba0e2ce06f0348371a99e1c9ce68e42ca38ee919cef63fa7",
@@ -7654,7 +7852,7 @@
                         "text": "The A P I costs $12.50, not $0.05.",
                         "voice": "af_heart",
                         "locale": "en-us",
-                        "phonemes": "\u00f0i \u02c8A p\u02c8i \u02ccI k\u02c8\u0254sts tw\u02c8\u025blv d\u02c8\u0251l\u0259\u0279z \u00e6nd f\u02c8\u026afti s\u02c8\u025bnts, n\u02cc\u0251t f\u02c8Iv s\u02c8\u025bnts.",
+                        "phonemes": "ði ˈA pˈi ˌI kˈɔsts twˈɛlv dˈɑləɹz ænd fˈɪfti sˈɛnts, nˌɑt fˈIv sˈɛnts.",
                         "duration_seconds": 3.7973333333333334,
                         "wav_sha256": "5310d8c6737e9eb874d30b15b70cd3a779d1a86904339b68831e29945307d4b6",
                         "float_pcm_sha256": "c7a016d0b527e759ba0e2ce06f0348371a99e1c9ce68e42ca38ee919cef63fa7",
@@ -7677,7 +7875,7 @@
                         "text": "'A P I'",
                         "voice": "af_heart",
                         "locale": "en-us",
-                        "phonemes": "\u201c\u0250 p\u02c8i \u02c8I",
+                        "phonemes": "“ɐ pˈi ˈI",
                         "duration_seconds": 0.9386666666666666,
                         "wav_sha256": "c14f9a31a8a71f2441e74ab4e64f24df25b9f018975fe46d1ab0ed2cb33519e3",
                         "float_pcm_sha256": "69d1f2d9c292aa645dd0b1ff590bb7c1cbf34b92bc382a7ae1d695b2540e18cb",
@@ -7690,7 +7888,7 @@
                         "text": "'A P I'",
                         "voice": "af_heart",
                         "locale": "en-us",
-                        "phonemes": "\u201c\u02c8A p\u02c8i \u02c8I",
+                        "phonemes": "“ˈA pˈi ˈI",
                         "duration_seconds": 0.9386666666666666,
                         "wav_sha256": "f5a871ccac419cc586ff16aaa6e9f42b4720c591d20a7752c09d01e89c299f3d",
                         "float_pcm_sha256": "b8b8573bf9058851c6aaee30fc328c01c89ba20e1413aa674bef4c1847b348f0",
@@ -7703,7 +7901,7 @@
                         "text": "'A P I'",
                         "voice": "bf_emma",
                         "locale": "en-gb",
-                        "phonemes": "\u201c\u0250 p\u02c8i\u02d0 \u02c8I",
+                        "phonemes": "“ɐ pˈiː ˈI",
                         "duration_seconds": 0.9386666666666666,
                         "wav_sha256": "fcb3326f8978423f25953f991282d759fbc0e9a1248a102054e236eb5a558ddb",
                         "float_pcm_sha256": "1612b0e9f197c238f2434d27da0024959ca5b3825db6a3ed79119491924568d0",
@@ -7716,7 +7914,7 @@
                         "text": "'A P I'",
                         "voice": "bf_emma",
                         "locale": "en-gb",
-                        "phonemes": "\u201c\u02c8A p\u02c8i\u02d0 \u02c8I",
+                        "phonemes": "“ˈA pˈiː ˈI",
                         "duration_seconds": 0.96,
                         "wav_sha256": "83dad5fbcd6fea44e2b35ecf0f1b19af8e946c56a5d5743af058ad6e92a7d909",
                         "float_pcm_sha256": "2f7c8c442737efd0ff9bf3ddb35e47e7ae90ed2bc23c7025a08d3ddf3552f78d",
@@ -7736,10 +7934,10 @@
                     "cases": [
                       {
                         "id": "ja-component",
-                        "text": "\u3053\u3093\u306b\u3061\u306f",
+                        "text": "こんにちは",
                         "voice": "jf_alpha",
                         "locale": "ja",
-                        "phonemes": "ko\u0272\u0272i\u02a8i\u03b2a",
+                        "phonemes": "koɲɲiʨiβa",
                         "duration_seconds": 0.9813333333333333,
                         "wav_sha256": "c9a9f75372afc19d7cb51732a481300a7fa5779d0f4411c35a9f7b788d693f51",
                         "float_pcm_sha256": "b6f3115fde5d46e829b4437b51c82ea366c8973731611ac665a21047bc3fb5fd",
@@ -7749,10 +7947,10 @@
                       },
                       {
                         "id": "ja-composed",
-                        "text": "\u3053\u3093\u306b\u3061\u306f",
+                        "text": "こんにちは",
                         "voice": "jf_alpha",
                         "locale": "ja",
-                        "phonemes": "ko\u0272\u0272i\u02a8i\u03b2a",
+                        "phonemes": "koɲɲiʨiβa",
                         "duration_seconds": 0.9813333333333333,
                         "wav_sha256": "c9a9f75372afc19d7cb51732a481300a7fa5779d0f4411c35a9f7b788d693f51",
                         "float_pcm_sha256": "b6f3115fde5d46e829b4437b51c82ea366c8973731611ac665a21047bc3fb5fd",
@@ -7772,10 +7970,10 @@
                     "cases": [
                       {
                         "id": "zh-component",
-                        "text": "\u4f60\u597d",
+                        "text": "你好",
                         "voice": "zf_xiaobei",
                         "locale": "zh",
-                        "phonemes": "ni\u2193xau\u2193",
+                        "phonemes": "ni↓xau↓",
                         "duration_seconds": 0.832,
                         "wav_sha256": "b8b6c6be5edbaff52bb114c753b04e6eaffebd190e5f78e64a535c8042cb92ae",
                         "float_pcm_sha256": "7ddddc03e104e990c42f5b070d4847906f3a10d19bd6809621a5f1cf0fa5ea0d",
@@ -7785,10 +7983,10 @@
                       },
                       {
                         "id": "zh-composed",
-                        "text": "\u4f60\u597d",
+                        "text": "你好",
                         "voice": "zf_xiaobei",
                         "locale": "zh",
-                        "phonemes": "ni\u2193xau\u2193",
+                        "phonemes": "ni↓xau↓",
                         "duration_seconds": 0.832,
                         "wav_sha256": "b8b6c6be5edbaff52bb114c753b04e6eaffebd190e5f78e64a535c8042cb92ae",
                         "float_pcm_sha256": "7ddddc03e104e990c42f5b070d4847906f3a10d19bd6809621a5f1cf0fa5ea0d",
@@ -7805,7 +8003,7 @@
                 ],
                 "owner_listening": {
                   "english": "Positive feedback on delivered neutral/currency and US/GB comparison clips; no chosen pair winner or broader coverage claim",
-                  "japanese": "Positive feedback on the exact jf_alpha \u3053\u3093\u306b\u3061\u306f 0.981333-second sample only",
+                  "japanese": "Positive feedback on the exact jf_alpha こんにちは 0.981333-second sample only",
                   "mandarin": "Delivered corrected-source sample; acknowledgment received, pronunciation-quality judgment still unverified",
                   "owner_replies_not_required_per_clip": true,
                   "assistant_audio_input_unavailable": true
@@ -12223,25 +12421,57 @@
     }
   ],
   "reviewed_source_patch": {
-    "sha256": "b68670ba9ca3ac057fd2710360d7aaac9296d852d663ebc793461b3d15d09dd4",
-    "css_patch_sha256": "35d7a3b71617449fd93bcf59880f2d09493edaaa64b6f9091d3cd5faa5027859",
-    "source_commit": "071d81d251438a4208f54581757844dd63ea5c18",
-    "original_reviewed_source_commit": "b3ea1878fff99cb3dc155e9cee527e1e274761d2",
-    "paths": [
-      "SOURCE/ui/react-app/src/components/topbar/TopBar.module.css",
-      "SOURCE/ui/react-app/src/components/player/PlayerSection.module.css",
-      "SOURCE/ui/react-app/src/components/voice/BottomRow.module.css",
-      "SOURCE/ui/react-app/tests/responsive_display.test.js"
+    "scope": "Same five reviewed correlation outputs on current responsive main; exact source blob preservation, no source behavior edit.",
+    "original_head": "c9e287ef56be55d72f0639201e148ea72573b6eb",
+    "base_revision": "d1e042d527dde01c447350ab09638d0cca521268",
+    "source_revision": "81420e3a1359ce6354f5aa0e22b33589415f5505",
+    "source_tree": "18a06396d27317f178d627d1a70ad1000e7b6e44",
+    "files": [
+      {
+        "path": "SOURCE/telephony/call_tools.py",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "be841835a7e98d77491180c89ce49754a765246c",
+        "sha256": "b6ece911781164e17deca223a424bbf0b34a11e714d8eac41ea00a0a4927deda"
+      },
+      {
+        "path": "SOURCE/telephony/routes.py",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "7ef130b550b45cc5694129f52476b0b3de083238",
+        "sha256": "276fa0261413671e76995cd91121c985c7d76cfceeed492f7c257e2025af5087"
+      },
+      {
+        "path": "SOURCE/tests/public/test_consultation_question_correlation.py",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c2ea9db86b75d1ca44ec88eb8ef3ee82ba4355e7",
+        "sha256": "baf95b194eb09ec80cb9161bac1d4f7466ffcd87c01e2af6524d3354d060c5c1"
+      },
+      {
+        "path": "SOURCE/ui/react-app/src/hooks/useCallConsultationReply.js",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ee6550d16f1df68beb2b2a8046b722b0e9213086",
+        "sha256": "03e54fcace57a8b719b65f6ca8449e15bce1743773c85d9078cdbc7d2ca294e4"
+      },
+      {
+        "path": "SOURCE/ui/react-app/src/hooks/useCallConsultationReply.test.jsx",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "43a316ccdd6dddc4fc6dffa2bf6f83409c42fb23",
+        "sha256": "b03d3ba4eb0b4aff648b97ef5e5e9b996ca1e8c3a49c3744bd6920fa1083b310"
+      }
     ],
-    "scope": "Three exact reviewed CSS files and focused regression only."
+    "review_status": "Prior independent source review retained. Current-base mechanical composition and metadata awaiting root review."
   },
   "new_resolution_performed": false,
   "new_advisory_scan_performed": false,
   "new_runtime_qualification_performed": false,
   "new_source_contract_qualification_performed": true,
   "new_static_security_scan_performed": false,
-  "new_resolution_scope": "Existing exact frontend dependency installation reused; no fresh resolution.",
-  "new_advisory_scan_scope": "No fresh advisory scan; exact-head public CI pending.",
+  "new_resolution_scope": "Reuse existing exact-lockfile frontend dependencies. No new dependency resolution.",
+  "new_advisory_scan_scope": "No fresh advisory scan locally. New exact-head hosted checks remain required.",
   "account_reconciliation_previous_binding": {
     "source_revision": "f864e61381ef9e10a09333fce05210427cf7d0f6",
     "source_manifest_sha256": "9cad8bcb2f98c34d95a11545e11a57d74dbe6b28cd5db7322b7746e102801acd",
@@ -16471,6 +16701,626 @@
       "new_static_security_scan_performed": false
     }
   },
-  "new_runtime_qualification_scope": "Fresh browser startup blocked; reused exact prior rendered fixture bytes only. See qualification.rendered_source_diagnostic. No installed/native/provider/audio qualification.",
-  "new_source_contract_qualification_scope": "40 affected frontend tests plus unchanged-base negative control, current production frontend build and full source/SBOM binding verification."
+  "new_runtime_qualification_scope": "No device, installed app, provider, real account/call, hosted relay, release or deployment tested.",
+  "new_source_contract_qualification_scope": "247 composed frontend cases and local production source build. Previous exact-byte backend controls retained, not rerun.",
+  "consultation_responsive_previous_binding": {
+    "repository_revision": "d1e042d527dde01c447350ab09638d0cca521268",
+    "path": "PUBLIC_METADATA/source-binding.json",
+    "sha256": "b51c77ca4057077462a0fee8073274f7154d4b4bf37a5483d0a4c3762edc8303",
+    "git_blob": "84ea2b005ecb42b36dabe1bf3743cc80f7462b86",
+    "preserved_replaced_fields": {
+      "source_manifest_sha256": "f8a778b148a823e047d70b315fbb68238b24bdbdcc5e734a93c79be223344296",
+      "source_tree_sha256": "4f70d65c2e5ea24c1c765fad385ae745b4ea9bd8b32b2cb1888f13f1da9b0c48",
+      "source_file_count": 2701,
+      "source_revision": "071d81d251438a4208f54581757844dd63ea5c18",
+      "comparison_public_revision": "e53a308cfabb61d38c619926c93e4bf5fd874c8f",
+      "changed_source_paths": [
+        "SOURCE/ui/react-app/src/components/topbar/TopBar.module.css",
+        "SOURCE/ui/react-app/src/components/player/PlayerSection.module.css",
+        "SOURCE/ui/react-app/src/components/voice/BottomRow.module.css",
+        "SOURCE/ui/react-app/tests/responsive_display.test.js"
+      ],
+      "input_equivalence": {
+        "comparison_basis": "Protected public main e53a308cfabb61d38c619926c93e4bf5fd874c8f",
+        "all_unselected_export_leaf_bytes_and_modes_preserved": true,
+        "all_six_sbom_bytes_and_status_objects_preserved": true,
+        "source_change_scope": "Three exact previously reviewed responsive CSS files and five regression cases. Preserve current Phone Terms and call-consultation behavior; no component behavior, workflow, dependency, account, audio or provider edits.",
+        "original_reviewed_source": "b3ea1878fff99cb3dc155e9cee527e1e274761d2",
+        "original_review_time_utc": "2026-10-10T03:35:00Z",
+        "original_four_source_bytes_unchanged": true
+      },
+      "qualification": {
+        "scope": "Source-only supported-small-window responsive layout correction, reconciled onto current protected public main.",
+        "source_commit": "071d81d251438a4208f54581757844dd63ea5c18",
+        "source_tree": "9c66e131318562f52164cadfd5e3e12c3bbcdb24",
+        "ordered_source_parents": [
+          "e53a308cfabb61d38c619926c93e4bf5fd874c8f"
+        ],
+        "reviewed_combined_patch_sha256": "b68670ba9ca3ac057fd2710360d7aaac9296d852d663ebc793461b3d15d09dd4",
+        "publication_status": "Prepared for independent current-base metadata review and draft PR; exact-head hosted checks remain pending.",
+        "original_source_review": {
+          "result": "PASS for the exact unchanged three CSS files and five regression cases.",
+          "review_time_utc": "2026-10-10T03:35:00Z",
+          "source_commit": "b3ea1878fff99cb3dc155e9cee527e1e274761d2",
+          "source_file_sha256": {
+            "SOURCE/ui/react-app/src/components/topbar/TopBar.module.css": "3ce64d1edf182301b81f1692b6b23a3a17eb1b31b58be96acaee72f9dce72559",
+            "SOURCE/ui/react-app/src/components/player/PlayerSection.module.css": "a3c5d78933da5cfcaba0c912fd110b75b887f6ee3548e895767f3022bb81e67a",
+            "SOURCE/ui/react-app/src/components/voice/BottomRow.module.css": "7b26289d3361b576544990672a701c8f08c4458e6818b050805b8d46a01e468c",
+            "SOURCE/ui/react-app/tests/responsive_display.test.js": "4c6626743d58f963d637421bbd0f54263b7dbb35e28e1f33953f5fda65c59f7c"
+          }
+        },
+        "current_source_qualification": {
+          "base": "e53a308cfabb61d38c619926c93e4bf5fd874c8f",
+          "base_source_files_byte_verified": 2700,
+          "focused_tests_passed": 40,
+          "focused_tests_failed": 0,
+          "focused_receipt_sha256": "8b96bf29f24fe0e9d1feabe36e2396ccd66267f37bca3ef51835e2cc97eb4d3c",
+          "known_bad_base_control": "Four intended CSS assertions fail; large/phone positive case passes. Exact candidate bytes restored afterward.",
+          "known_bad_receipt_sha256": "7da2d546e1ae3b408490ded02ba3a3779a2bbb84cba6eb406efd629bb89f85b9",
+          "frontend_build": "PASS: production Vite build using existing locked dependencies; no source-map upload.",
+          "build_log_sha256": "7350f75a432ff0ef4ec38277c47b7e1edda2431080b6702402332a72b484d791",
+          "full_frontend_suite": "Not rerun for this reconciliation. Required exact-head public frontend check remains pending."
+        },
+        "historical_frontend_qualification": {
+          "base": "50e1382aee7d26ad4e4eb826124ebbe1943b2338",
+          "all_listed_cases_passed_across_bounded_executions": 2093,
+          "monolithic_result": "512 MiB worker OOM after 2030 passes; all 192 SmartDisplay cases passed in four non-overlapping 48-case batches. No monolithic-pass or fixed-memory claim.",
+          "combined_receipt_sha256": "e9232b3c804be738819369486b908318b3707593ee1b834654ea926ec48c1885",
+          "evidence_availability": "Historical receipt and source hashes were verified again at 10:20 UTC. Original standalone local frontend logs are not present in the replacement workspace. These counts are historical, not fresh current-base qualification."
+        },
+        "rendered_source_diagnostic": {
+          "result": "Reuse exact browser-tested fixture bytes; fresh current-base browser execution blocked before tests by local socket permission.",
+          "run_url": "https://github.com/GeeIHadAGoodTime/Viola/actions/runs/38021404207",
+          "run_head": "16ba8b2230bbb2b620320437da40b63f920c2f2d",
+          "original_public_baseline": "50e1382aee7d26ad4e4eb826124ebbe1943b2338",
+          "original_result": "10 Chromium cases, 19 screenshots passed. Both original artifact ZIPs were recovered and their original hashes reverified.",
+          "artifact_id": 11658853175,
+          "artifact_zip_sha256": "06e5bf14a68de037bb332e3b2ed9a7db09d6b581f785aab6e3e41d1f387c5a5a",
+          "report_artifact_id": 11658049011,
+          "report_zip_sha256": "f515ff4982c8d5e544c1f548b8b683ffd45d58303e23e2f88309d42e00912008",
+          "current_baseline_inputs_verified": 502,
+          "current_fixture_equivalence": "All six baseline/candidate HTML, JS and CSS outputs are byte-identical to the successful original diagnostic. Extracted production shell fixture and base style hashes also match. Whole frontend input tree changed through Phone Terms and consultation work; no claim all original inputs are unchanged.",
+          "equivalence_receipt_sha256": "1efaa529048043279f9d6a2a9d0df30852a9f79e200fb360b03ba0a34b8e8ef8",
+          "current_fixture_receipt_sha256": "fbe6d4a81ccd779e793cfd37d96d001727e1a5b56ac96a6ec9027dcff14e873b",
+          "fresh_browser_result": "Two launch attempts, including the supported escalated retry, were blocked by socket() EPERM before any assertion; zero fresh browser cases passed.",
+          "fresh_attempt_log_sha256": "ef6800553ba1762193f38b72d4e92240718f377db09e48b3611c2067583fc0e1",
+          "viewports": [
+            [
+              1024,
+              696
+            ],
+            [
+              1024,
+              568
+            ],
+            [
+              1100,
+              696
+            ],
+            [
+              1279,
+              696
+            ],
+            [
+              1280,
+              688
+            ],
+            [
+              1400,
+              768
+            ],
+            [
+              1600,
+              900
+            ],
+            [
+              767,
+              700
+            ],
+            [
+              390,
+              844
+            ]
+          ],
+          "observed_result": "At 1024x696 clock/date/Music title and transport fit. At short 1024x568 and 1280x688 with long response text lower Music controls require existing contained scrolling; title, repeated Next, PTT, mode return, long content and keyboard command entry are reachable.",
+          "scope_limit": "Synthetic actual production components and extracted shell styles in Linux Chromium, not full SmartDisplay, native Qt, installed Windows, accounts, providers or physical audio."
+        },
+        "runtime_qualification": {
+          "fresh_rendered_browser": false,
+          "reused_exact_rendered_fixture_evidence": true,
+          "installed_windows": false,
+          "physical_audio": false,
+          "real_provider": false,
+          "deployment_or_release": false
+        },
+        "preserved_limits": "All historical binding objects and six retained SBOM byte/status records remain unchanged. No new dependency resolution, advisory audit, installed Windows, deployment or release qualification."
+      },
+      "reviewed_source_patch": {
+        "sha256": "b68670ba9ca3ac057fd2710360d7aaac9296d852d663ebc793461b3d15d09dd4",
+        "css_patch_sha256": "35d7a3b71617449fd93bcf59880f2d09493edaaa64b6f9091d3cd5faa5027859",
+        "source_commit": "071d81d251438a4208f54581757844dd63ea5c18",
+        "original_reviewed_source_commit": "b3ea1878fff99cb3dc155e9cee527e1e274761d2",
+        "paths": [
+          "SOURCE/ui/react-app/src/components/topbar/TopBar.module.css",
+          "SOURCE/ui/react-app/src/components/player/PlayerSection.module.css",
+          "SOURCE/ui/react-app/src/components/voice/BottomRow.module.css",
+          "SOURCE/ui/react-app/tests/responsive_display.test.js"
+        ],
+        "scope": "Three exact reviewed CSS files and focused regression only."
+      },
+      "new_resolution_performed": false,
+      "new_advisory_scan_performed": false,
+      "new_runtime_qualification_performed": false,
+      "new_source_contract_qualification_performed": true,
+      "new_static_security_scan_performed": false,
+      "new_resolution_scope": "Existing exact frontend dependency installation reused; no fresh resolution.",
+      "new_advisory_scan_scope": "No fresh advisory scan; exact-head public CI pending.",
+      "new_runtime_qualification_scope": "Fresh browser startup blocked; reused exact prior rendered fixture bytes only. See qualification.rendered_source_diagnostic. No installed/native/provider/audio qualification.",
+      "new_source_contract_qualification_scope": "40 affected frontend tests plus unchanged-base negative control, current production frontend build and full source/SBOM binding verification."
+    }
+  },
+  "consultation_correlation_pre_reconciliation_binding": {
+    "repository_revision": "c9e287ef56be55d72f0639201e148ea72573b6eb",
+    "path": "PUBLIC_METADATA/source-binding.json",
+    "sha256": "db003a13f325240dcccbb9a16c5b93ee124d870ea7495c54e15c29b96c0206a6",
+    "git_blob": "0d4b7c3600b6679ce8fc6cb78eada34ccce8aaa0",
+    "preserved_distinct_fields": {
+      "source_manifest_sha256": "a7dfa89f2aceb430fb7f4d578fb59f0b05a25bd4afad15bcac19104a5bc66dd9",
+      "source_tree_sha256": "3e04f020c5867ce96841907edddb40135c9d6a0ff661b7c2ecbbf20f77e0e6da",
+      "source_revision": "ddf2d8ef58085fd8ae709c906f34306380a64193",
+      "changed_source_paths": [
+        "SOURCE/telephony/call_tools.py",
+        "SOURCE/telephony/routes.py",
+        "SOURCE/tests/public/test_consultation_question_correlation.py",
+        "SOURCE/ui/react-app/src/hooks/useCallConsultationReply.js",
+        "SOURCE/ui/react-app/src/hooks/useCallConsultationReply.test.jsx"
+      ],
+      "input_equivalence": {
+        "comparison_basis": "Verified landed #109 merge e53a308cfabb61d38c619926c93e4bf5fd874c8f",
+        "all_unselected_export_leaf_bytes_and_modes_preserved": true,
+        "all_six_sbom_bytes_and_status_objects_preserved": true,
+        "dependency_workflow_notice_model_pricing_and_customer_speech_inputs_unchanged": true,
+        "landed_phone_terms_and_consultation_recovery_preserved": true,
+        "all_five_previously_reviewed_correlation_outputs_byte_identical": true,
+        "scope": "Same five approved optional-question-correlation source/test outputs on the actual landed prerequisite; no new API/product behavior."
+      },
+      "qualification": {
+        "scope": "Optional per-question consultation reply correlation composed onto landed Phone Terms and consultation recovery.",
+        "source_commit": "ddf2d8ef58085fd8ae709c906f34306380a64193",
+        "source_tree": "4d1961560481c994a8a973586b44ae46c44df9ab",
+        "ordered_source_parents": [
+          "e53a308cfabb61d38c619926c93e4bf5fd874c8f"
+        ],
+        "reviewed_combined_patch_sha256": "8d28c0b2c70a84e8ec2cc3f22e941b2d2d0633c2aaabaca568f81ebf566ae0c6",
+        "original_reviewed_patch_sha256": "adec0faf6b59ca0a15d6fde34582f83e3019805c2cef01472f4b59c89d11f3d5",
+        "publication_status": "Immutable reviewed source commit published with the exact approved source tree and landed prerequisite as sole parent. Connector identity-only metadata rebind is frozen for root review before metadata, branch and draft PR publication. Required exact-head hosted checks and integration ordering remain mandatory.",
+        "source_controls": {
+          "source_commit": "759e4371a8c0f9cd2563f0ffe831abcd43696ec5",
+          "frontend_full": {
+            "result": "PASS",
+            "tests_passed": 2160,
+            "test_files_passed": 180,
+            "tests_failed": 0,
+            "tests_skipped": 0,
+            "smartdisplay_unique_passes": 196,
+            "reply_hook_passes": 46,
+            "command": "npm run test:run -- --maxWorkers=1 --reporter=json",
+            "node_heap_mb": 2048,
+            "report_sha256": "4831de49426587e30c2210f52ee588362e725038563c8796269894159ed90e26",
+            "log_sha256": "f5c8bcab50a64e64dfad4109249960d8fd646722bdb524cf2d66688334fc869b"
+          },
+          "production_build": {
+            "result": "PASS",
+            "modules_transformed": 1011,
+            "duration_seconds": 5.32,
+            "log_sha256": "755d96159afc3c9fef742c88982c57d92c9c7b43af3c40dd4669e76382ed1dba",
+            "scope": "Production Vite source build with Sentry uploads disabled and output outside the source export; not installed/runtime/provider acceptance."
+          },
+          "backend_focused": {
+            "result": "PASS",
+            "tests_passed": 21,
+            "tests_failed": 0,
+            "scope": "Production AST bodies, asyncio futures and local ASGI; synthetic authentication/event/Pipecat boundaries. No full public Python aggregate rerun.",
+            "python": "3.12.14",
+            "dependencies": {
+              "fastapi": "0.141.1",
+              "pydantic": "2.13.4",
+              "httpx": "0.28.1"
+            },
+            "environment_scope": "Existing replacement-host packages; not the original pinned Help/Phone environment or the full desktop dependency graph.",
+            "log_sha256": "1af81a0777fd173f2cacb7012adeddc775258b937bffad8a5fa8e389d528fae6"
+          },
+          "backend_mutations": {
+            "result": "PASS",
+            "mutations": [
+              {
+                "mutation": "remove_question_match",
+                "rejected": true,
+                "exit_code": 1,
+                "log_sha256": "f0e360d62789067fc3e492e52c5b859e918b1d181e7628ccd5ea3461f406d4f9"
+              },
+              {
+                "mutation": "constant_question_id",
+                "rejected": true,
+                "exit_code": 1,
+                "log_sha256": "7dc6889e34dc4040467ba8936064c3813caa40d7dd13503a382d36d621589ab9"
+              },
+              {
+                "mutation": "remove_owner_check",
+                "rejected": true,
+                "exit_code": 1,
+                "log_sha256": "55484a6a377c4ceb4d5cf352ccb0c146d4683a5bacbe1e159357e2ac707cd4fa"
+              },
+              {
+                "mutation": "drop_route_question_id",
+                "rejected": true,
+                "exit_code": 1,
+                "log_sha256": "91a268dff20707ec2721389bf323bea22c84f5ae23bee64740bbe35b2a64a4f7"
+              }
+            ]
+          },
+          "frontend_mutation": {
+            "result": "EXPECTED_REGRESSION_DETECTED",
+            "exit_code": 1,
+            "failed": 4,
+            "passed": 1,
+            "skipped": 41,
+            "log_sha256": "b62e926901ac80954904c30f4af0d5dbbfaf03e8a32025b4ef3586bddc6c6594",
+            "report_sha256": "76c56eea23bcc4bcef966571a9f2866e819b2b20d4415fbb329c8f9dbe373575",
+            "production_source_changed": false
+          },
+          "lint": {
+            "result": "PASS",
+            "errors": 0,
+            "warnings": 0,
+            "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "frontend_environment": {
+            "node": "24.19.0",
+            "npm": "11.9.0",
+            "installation": "Existing adjacent Help exact-lockfile installation reused; package.json and package-lock.json compared byte-identical. No dependency installation or advisory scan performed by this packet."
+          },
+          "full_public_python": "Not rerun after workspace replacement; original raw correlation aggregate receipt is unavailable. New exact-head hosted full Python checks remain required."
+        },
+        "frontend_build": {
+          "result": "PASS",
+          "modules_transformed": 1011,
+          "duration_seconds": 5.32,
+          "log_sha256": "755d96159afc3c9fef742c88982c57d92c9c7b43af3c40dd4669e76382ed1dba",
+          "scope": "Production Vite source build with Sentry uploads disabled and output outside the source export; not installed/runtime/provider acceptance."
+        },
+        "frontend_suite": {
+          "result": "PASS",
+          "tests_passed": 2160,
+          "test_files_passed": 180,
+          "tests_failed": 0,
+          "tests_skipped": 0,
+          "smartdisplay_unique_passes": 196,
+          "reply_hook_passes": 46,
+          "command": "npm run test:run -- --maxWorkers=1 --reporter=json",
+          "node_heap_mb": 2048,
+          "report_sha256": "4831de49426587e30c2210f52ee588362e725038563c8796269894159ed90e26",
+          "log_sha256": "f5c8bcab50a64e64dfad4109249960d8fd646722bdb524cf2d66688334fc869b"
+        },
+        "public_python_contracts": {
+          "result": "NOT_RERUN_IN_REPLACEMENT_ENVIRONMENT",
+          "focused_backend_tests_passed": 21,
+          "original_complete_public_python_raw_receipt_available": false,
+          "exact_head_hosted_full_suite_required": true,
+          "scope": "Fresh focused contracts use the replacement host versions disclosed in source_controls. Do not promote these to a full pinned desktop/Windows Python pass."
+        },
+        "original_correlation_qualification": {
+          "reviewed_source_commit": "b5ad11c2ebe38fa191b2dea1525897d07e5f7b21",
+          "reviewed_patch_sha256": "adec0faf6b59ca0a15d6fde34582f83e3019805c2cef01472f4b59c89d11f3d5",
+          "status": "Previously independently/root-reviewed source outputs recovered from immutable GitHub blobs and verified byte-identical here.",
+          "historical_selected_independent_cases_passed": 89,
+          "historical_public_python": {
+            "tests_run": 967,
+            "tests_passed": 966,
+            "tests_skipped": 1,
+            "log_sha256": "e9e061200e910cea44dce2ef5dcfb9ca815482b6681f1ca08b13741f5f019357"
+          },
+          "raw_receipts_available": false,
+          "scope": "Historical pre-reset claims, not fresh execution. Original local source-review/test logs were lost with the replaced execution workspace and were not recreated."
+        },
+        "prior_exact_head_hosted_checks": [
+          {
+            "head": "f786581c3ed19f28abf68a4b2954cd8771ecdfb7",
+            "source_run_id": 38044439082,
+            "inventory_run_id": 38044438998,
+            "checks_passed": 8,
+            "frontend_tests_passed": 2133,
+            "python_tests_run": 946,
+            "python_tests_passed": 945,
+            "python_tests_skipped": 1,
+            "scope": "Historical qualification of the previous consultation-only branch, not this combined commit."
+          },
+          {
+            "head": "10eccfa786d7eb1f7c927902e833f817baf4983d",
+            "landed_as": "d27264777c7e9ba1c356d626eedeb73ab5b16195",
+            "checks_passed": 8,
+            "frontend_tests_passed": 2110,
+            "python_tests_run": 946,
+            "python_tests_passed": 945,
+            "python_tests_skipped": 1,
+            "scope": "Historical qualification of the landed Phone Terms branch, not this combined commit."
+          },
+          {
+            "head": "16abc19167871635feb628b54346e39acd6a4ed8",
+            "landed_as": "e53a308cfabb61d38c619926c93e4bf5fd874c8f",
+            "checks_passed": 8,
+            "source_run_id": 38049314109,
+            "inventory_run_id": 38049314122,
+            "frontend_tests_passed": 2155,
+            "python_tests_run": 946,
+            "python_tests_passed": 945,
+            "python_tests_skipped": 1,
+            "frontend_job_url": "https://github.com/GeeIHadAGoodTime/viola-oss/actions/runs/38049314109/job/114205066618",
+            "python_job_url": "https://github.com/GeeIHadAGoodTime/viola-oss/actions/runs/38049314109/job/114205066398",
+            "scope": "Historical exact-head qualification of landed prerequisite #109, not this correlation candidate."
+          }
+        ],
+        "historical_receipt_availability": "Published inherited qualification/history remains intact. Original unpublished correlation raw logs and metadata packet were lost in workspace replacement. Fresh current-input logs and mutation controls are separate; unavailable originals are not represented as restored.",
+        "previous_unpublished_metadata": {
+          "expected_binding_sha256": "998bcab8a2cdb6517c2a07c21125f35bfde66b75517ddbb25559a114862b7916",
+          "expected_binding_git_blob": "5226c3f209ae08ff32adcb898fc05b2d30259edd",
+          "status": "Earlier interrupted binding upload remains unconfirmed; its immutable blob read returned 404. No retry or alteration was attempted. This is separately reviewed regenerated metadata for a different landed-base source identity."
+        },
+        "runtime_qualification": {
+          "installed_windows": false,
+          "rendered_browser": false,
+          "real_call_or_account": false,
+          "real_terms_acceptance": false,
+          "provider_or_carrier": false,
+          "deployment_or_release": false
+        },
+        "api_limit": "Only supplied matching consultation_id values gain stale-question protection. Omitted IDs and internal None retain legacy call-level behavior and remain unprotected. Old servers ignore the additive field. No reply-idempotency cache or network exactly-once guarantee is introduced.",
+        "auth_validation_order": "Route authentication and authenticated owner identity precede body handling. Malformed ID syntax returns 400 before pending-owner lookup; valid matching/stale string IDs require pending-owner authorization before matching or resolving a future. Question IDs are data identity, never authorization credentials.",
+        "hosted_relay_qualification": {
+          "result": "NOT_AVAILABLE_IN_PUBLIC_SOURCE_NOT_QUALIFIED",
+          "missing_public_files": [
+            "telephony/cloud_routes.py",
+            "telephony/phone_cloud_event_relay.py"
+          ],
+          "scope": "Deployed hosted forwarding, cross-process behavior and mixed-version rollout are not established by local source/test/build evidence."
+        },
+        "preserved_limits": "Historical failed/incomplete local build and aggregate attempts remain in inherited qualification. Current local frontend aggregate and source production build pass, but new exact-head hosted full Python/Windows/inventory checks remain mandatory. No fresh advisory scan, Windows inventory, installed runtime, account, real call, provider, deployment or release qualification.",
+        "connector_identity_rebind": {
+          "tested_local_source_commit": "759e4371a8c0f9cd2563f0ffe831abcd43696ec5",
+          "published_source_commit": "ddf2d8ef58085fd8ae709c906f34306380a64193",
+          "identical_source_tree": "4d1961560481c994a8a973586b44ae46c44df9ab",
+          "sole_parent": "e53a308cfabb61d38c619926c93e4bf5fd874c8f",
+          "source_files_or_modes_changed": false,
+          "qualification_receipts_reexecuted": false,
+          "scope": "Only connector source identity, manifest digest and publication/review stage changed. Original current-input test/build controls retain the actual local commit they executed against; their source tree exactly equals the published tree."
+        }
+      },
+      "reviewed_source_patch": {
+        "scope": "Same five approved source/test outputs for optional consultation question correlation, now based on landed prerequisite #109.",
+        "base_revision": "e53a308cfabb61d38c619926c93e4bf5fd874c8f",
+        "source_revision": "ddf2d8ef58085fd8ae709c906f34306380a64193",
+        "source_tree": "4d1961560481c994a8a973586b44ae46c44df9ab",
+        "original_reviewed_source_revision": "b5ad11c2ebe38fa191b2dea1525897d07e5f7b21",
+        "original_reviewed_patch_sha256": "adec0faf6b59ca0a15d6fde34582f83e3019805c2cef01472f4b59c89d11f3d5",
+        "reviewed_combined_patch_sha256": "8d28c0b2c70a84e8ec2cc3f22e941b2d2d0633c2aaabaca568f81ebf566ae0c6",
+        "files": [
+          {
+            "path": "SOURCE/telephony/call_tools.py",
+            "sha256": "b6ece911781164e17deca223a424bbf0b34a11e714d8eac41ea00a0a4927deda",
+            "base_sha256": "bbf0f6f370b3c5570cb6a0ea46ddf97a29ac90dff0128678293faa5d32977468",
+            "blob": "be841835a7e98d77491180c89ce49754a765246c"
+          },
+          {
+            "path": "SOURCE/telephony/routes.py",
+            "sha256": "276fa0261413671e76995cd91121c985c7d76cfceeed492f7c257e2025af5087",
+            "base_sha256": "bcebc8727661ec59beaf7e306674c5b3d24e94421512afc9c17df87dd997841a",
+            "blob": "7ef130b550b45cc5694129f52476b0b3de083238"
+          },
+          {
+            "path": "SOURCE/tests/public/test_consultation_question_correlation.py",
+            "sha256": "baf95b194eb09ec80cb9161bac1d4f7466ffcd87c01e2af6524d3354d060c5c1",
+            "base_sha256": null,
+            "blob": "c2ea9db86b75d1ca44ec88eb8ef3ee82ba4355e7"
+          },
+          {
+            "path": "SOURCE/ui/react-app/src/hooks/useCallConsultationReply.js",
+            "sha256": "03e54fcace57a8b719b65f6ca8449e15bce1743773c85d9078cdbc7d2ca294e4",
+            "base_sha256": "faa00f93c09d7c621949e4c9ca0182c5fcae32db22a9496fcc5e55e7a125fd8f",
+            "blob": "ee6550d16f1df68beb2b2a8046b722b0e9213086"
+          },
+          {
+            "path": "SOURCE/ui/react-app/src/hooks/useCallConsultationReply.test.jsx",
+            "sha256": "b03d3ba4eb0b4aff648b97ef5e5e9b996ca1e8c3a49c3744bd6920fa1083b310",
+            "base_sha256": "c2df9d49b0fe7e2149e5b3a29d2d10aa5b62c477fe6c49a594952998a71f1a63",
+            "blob": "43a316ccdd6dddc4fc6dffa2bf6f83409c42fb23"
+          }
+        ],
+        "review_status": "Original five outputs and landed-base source/metadata composition approved by independent/root review. Connector source identity-only metadata rebind frozen for root review."
+      },
+      "new_resolution_scope": "Reused existing replacement-host Python packages and adjacent exact-lockfile frontend dependencies without installation. Their scope/versions are disclosed; no fresh Windows or full desktop resolution.",
+      "new_advisory_scan_scope": "No fresh vulnerability or advisory assessment performed by this packet. Inherited historical scans remain separate.",
+      "consultation_correlation_landed_previous_binding": {
+        "public_revision": "e53a308cfabb61d38c619926c93e4bf5fd874c8f",
+        "path": "PUBLIC_METADATA/source-binding.json",
+        "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/e53a308cfabb61d38c619926c93e4bf5fd874c8f/PUBLIC_METADATA/source-binding.json",
+        "sha256": "a1a96ee322b9342b4c97d88d72f648da3e5cd766605c1c5bcee6a7e8a4b19493",
+        "bytes": 1468777,
+        "git_blob": "855be30fb996b461501b4f5dae52383a42a9d6ad",
+        "overwritten_fields": {
+          "source_manifest_sha256": "55ce7e7abc8ff435084087c5d1425ab9d7c2e51d96a5e0233099d7c9c1e4d879",
+          "source_tree_sha256": "4b5cb26a152ce2eb1f75a4154be85b8d5585c5e9a7cac9f01bc62b8629789cf8",
+          "source_file_count": 2700,
+          "source_revision": "426a76512c29ee19ed24981928a81dcfa793ac8b",
+          "comparison_public_revision": "d27264777c7e9ba1c356d626eedeb73ab5b16195",
+          "changed_source_paths": [
+            "SOURCE/ui/react-app/src/SmartDisplay.jsx",
+            "SOURCE/ui/react-app/src/__tests__/SmartDisplay.test.jsx",
+            "SOURCE/ui/react-app/src/components/CallConsultation.jsx",
+            "SOURCE/ui/react-app/src/components/CallConsultation.test.jsx",
+            "SOURCE/ui/react-app/src/components/PhoneCallPanel.jsx",
+            "SOURCE/ui/react-app/src/components/PhoneCallPanel.test.jsx",
+            "SOURCE/ui/react-app/src/hooks/useCallConsultationReply.js",
+            "SOURCE/ui/react-app/src/hooks/useCallConsultationReply.test.jsx"
+          ],
+          "input_equivalence": {
+            "comparison_basis": "Landed public Phone Terms merge d27264777c7e9ba1c356d626eedeb73ab5b16195",
+            "all_unselected_export_leaf_bytes_and_modes_preserved": true,
+            "all_six_sbom_bytes_and_status_objects_preserved": true,
+            "dependency_workflow_notice_model_pricing_and_customer_speech_inputs_unchanged": true,
+            "consultation_recovery_eight_files_identical_to_reviewed_public_head": "f786581c3ed19f28abf68a4b2954cd8771ecdfb7",
+            "landed_phone_terms_two_files_preserved_exactly": true,
+            "scope": "Reconcile two independently reviewed disjoint frontend source patches; no new behavior edits."
+          },
+          "qualification": {
+            "scope": "Combined Phone Terms acknowledgment and consultation reply recovery source inputs.",
+            "source_commit": "426a76512c29ee19ed24981928a81dcfa793ac8b",
+            "source_tree": "421c0cb3df969ca95ac5bcec28864047d67f6c0e",
+            "ordered_source_parents": [
+              "f786581c3ed19f28abf68a4b2954cd8771ecdfb7",
+              "d27264777c7e9ba1c356d626eedeb73ab5b16195"
+            ],
+            "reviewed_combined_patch_sha256": "f66f232f4536aa1fffd60861ab3221b903c3edacf0716d7dbddc725a2e2910c9",
+            "publication_status": "Combined source and metadata frozen for independent and parent review; no branch advancement yet. New exact-head hosted checks remain mandatory.",
+            "source_controls": {
+              "focused_frontend": {
+                "tests_passed": 143,
+                "tests_failed": 0,
+                "files": 6,
+                "path": "focused-tests.log",
+                "sha256": "376dabd5c3aeda96f32bf337af9c0074672f2e4567e7a6c6ae0828f5fa7496f1"
+              },
+              "smartdisplay_bounded_batches": {
+                "expected_cases": 196,
+                "unique_passed_cases": 196,
+                "tests_failed": 0,
+                "path": "display-batches-summary.json",
+                "sha256": "a8ae6fa23046615818f934825b30f5e8bb727ad7418a95a57d78a3ed13b15aed"
+              },
+              "total_bounded_frontend_passes": 339,
+              "changed_file_lint": {
+                "errors": 0,
+                "preexisting_smartdisplay_warnings": 11,
+                "path": "lint.log",
+                "sha256": "1448361c7e38fa865e95e87450e45b5bab91eaf023d94b2f58d59dc16e8ab70b"
+              },
+              "input_equivalence": {
+                "path": "source-freeze.json",
+                "sha256": "87e4e9d4f315501feee4ecd47125b2065571d07e58ad5c2b37f0b99cca5166dc"
+              }
+            },
+            "source_import_graph_bundle": {
+              "result": "PASS",
+              "path": "bundle.log",
+              "sha256": "9d43c3a2c11194f5956237fa0d01e181fafe53c98b1f4570f7edabf01150a5eb",
+              "scope": "Source/import-graph compilation with npm packages externalized; not a production build or runtime proof."
+            },
+            "frontend_build": {
+              "result": "PENDING_EXACT_HEAD_HOSTED",
+              "local_rerun": "Not repeated; prior constrained local exit137 and other incomplete attempts remain in historical qualification."
+            },
+            "frontend_suite": {
+              "result": "BOUNDED_CHANGED_SCOPE_PASS_FULL_AGGREGATE_PENDING_HOSTED",
+              "bounded_cases_passed": 339
+            },
+            "public_python_contracts": {
+              "result": "NOT_RERUN_LOCALLY_AFTER_DISJOINT_FRONTEND_RECONCILIATION",
+              "source_inputs_unchanged": true,
+              "exact_head_hosted_full_suite_required": true
+            },
+            "prior_exact_head_hosted_checks": [
+              {
+                "head": "f786581c3ed19f28abf68a4b2954cd8771ecdfb7",
+                "source_run_id": 38044439082,
+                "inventory_run_id": 38044438998,
+                "checks_passed": 8,
+                "frontend_tests_passed": 2133,
+                "python_tests_run": 946,
+                "python_tests_passed": 945,
+                "python_tests_skipped": 1,
+                "scope": "Historical qualification of the previous consultation-only branch, not this combined commit."
+              },
+              {
+                "head": "10eccfa786d7eb1f7c927902e833f817baf4983d",
+                "landed_as": "d27264777c7e9ba1c356d626eedeb73ab5b16195",
+                "checks_passed": 8,
+                "frontend_tests_passed": 2110,
+                "python_tests_run": 946,
+                "python_tests_passed": 945,
+                "python_tests_skipped": 1,
+                "scope": "Historical qualification of the landed Phone Terms branch, not this combined commit."
+              }
+            ],
+            "runtime_qualification": {
+              "installed_windows": false,
+              "rendered_browser": false,
+              "real_call_or_account": false,
+              "real_terms_acceptance": false,
+              "provider_or_carrier": false,
+              "deployment_or_release": false
+            },
+            "api_limit": "The existing backend identifies pending work by call ID only and has no question token. This patch protects local UI state; it does not establish server-side question correlation or network exactly-once delivery.",
+            "preserved_limits": "Historical local failures and prior hosted successes retained separately. Combined production build, full suites, dependency inventories and audit await normal exact-head hosted checks; no runtime or release qualification."
+          },
+          "reviewed_source_patch": {
+            "scope": "Eight exact independently reviewed consultation frontend files only.",
+            "patch_sha256": "ddcc5445c3dad8254051ac08bb4edd5a596ef2d6521858ab0a1eff79a1a0ea64",
+            "base_revision": "d27264777c7e9ba1c356d626eedeb73ab5b16195",
+            "source_revision": "426a76512c29ee19ed24981928a81dcfa793ac8b",
+            "files": [
+              {
+                "path": "SOURCE/ui/react-app/src/SmartDisplay.jsx",
+                "sha256": "ceb966e06b5042e83e603efe72bffeded6a1155fe24b6441d1646708329fa03d",
+                "baseline_sha256": "dab28734312bbbcab3038ae810ae73a0bd41a190194e1489d9234d0a839449ad"
+              },
+              {
+                "path": "SOURCE/ui/react-app/src/__tests__/SmartDisplay.test.jsx",
+                "sha256": "59c5e8beb018d9ba510c2108ebf35ed47acc9c00036187fde10363912f5a2ef5",
+                "baseline_sha256": "0795fa55996da366fa484650e118b1dcccae3d2bee352c8ac74d3f53411963d3"
+              },
+              {
+                "path": "SOURCE/ui/react-app/src/components/CallConsultation.jsx",
+                "sha256": "ad63f49dbcdc3a195b5eb3508269b0ba5fe4c8d3e3c193bdc7bf27a23271c65e",
+                "baseline_sha256": "21d4fbd44827b87b7079847add0aa28827fe85e7983a808fe644ef8735603d88"
+              },
+              {
+                "path": "SOURCE/ui/react-app/src/components/CallConsultation.test.jsx",
+                "sha256": "bea745d170a7605b5fa2d2a80818f06850fab12a8c0ad8c63cd628f806f388d1",
+                "baseline_sha256": "946e1ed38d079b4728ddf6fc2e29e89cda5c0cc3e3faec1e7141668a1fc76044"
+              },
+              {
+                "path": "SOURCE/ui/react-app/src/components/PhoneCallPanel.jsx",
+                "sha256": "d2dfc4fa1530c86eeb066755af882b862e300c4bd662424d429e369e7d63fc65",
+                "baseline_sha256": "4ddcafe352a7c790fcac5a49ac45ea04f5e40849c9d800b94ef747be2b41a4cf"
+              },
+              {
+                "path": "SOURCE/ui/react-app/src/components/PhoneCallPanel.test.jsx",
+                "sha256": "b25b5f643a51ca2ea6d637229314790814ff23609d8604bbdc1e4192a87b4141",
+                "baseline_sha256": "2792657b47fba390cb73a4253492a928c5548d50eaf51cbeb433437f8797a1f8"
+              },
+              {
+                "path": "SOURCE/ui/react-app/src/hooks/useCallConsultationReply.js",
+                "sha256": "faa00f93c09d7c621949e4c9ca0182c5fcae32db22a9496fcc5e55e7a125fd8f",
+                "baseline_sha256": null
+              },
+              {
+                "path": "SOURCE/ui/react-app/src/hooks/useCallConsultationReply.test.jsx",
+                "sha256": "c2df9d49b0fe7e2149e5b3a29d2d10aa5b62c477fe6c49a594952998a71f1a63",
+                "baseline_sha256": null
+              }
+            ],
+            "review_status": "Original eight-file behavior reviewed and byte-identical; reconciliation frozen for review.",
+            "original_base_revision": "50e1382aee7d26ad4e4eb826124ebbe1943b2338",
+            "source_delta_patch_sha256": "f66f232f4536aa1fffd60861ab3221b903c3edacf0716d7dbddc725a2e2910c9"
+          },
+          "new_resolution_performed": false,
+          "new_advisory_scan_performed": false,
+          "new_runtime_qualification_performed": false,
+          "new_source_contract_qualification_performed": false,
+          "new_static_security_scan_performed": false,
+          "new_resolution_scope": "Existing isolated frontend dependencies reused; no fresh selected-platform resolution by the local reconciliation.",
+          "new_advisory_scan_scope": "No fresh advisory scan by the local reconciliation; prior hosted scans remain historical."
+        }
+      }
+    }
+  }
 }

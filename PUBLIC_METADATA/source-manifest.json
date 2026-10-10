@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "071d81d251438a4208f54581757844dd63ea5c18",
-  "sha256": "4f70d65c2e5ea24c1c765fad385ae745b4ea9bd8b32b2cb1888f13f1da9b0c48",
+  "revision": "81420e3a1359ce6354f5aa0e22b33589415f5505",
+  "sha256": "f19c8d3b01ab11af7f959aa00504952b6b2e5766ed3064e792cf53de4be61688",
   "files": [
     {
       "path": ".env.example",
@@ -5710,8 +5710,8 @@
     },
     {
       "path": "telephony/call_tools.py",
-      "sha256": "bbf0f6f370b3c5570cb6a0ea46ddf97a29ac90dff0128678293faa5d32977468",
-      "bytes": 66691
+      "sha256": "b6ece911781164e17deca223a424bbf0b34a11e714d8eac41ea00a0a4927deda",
+      "bytes": 67585
     },
     {
       "path": "telephony/caller_validation.py",
@@ -5920,8 +5920,8 @@
     },
     {
       "path": "telephony/routes.py",
-      "sha256": "bcebc8727661ec59beaf7e306674c5b3d24e94421512afc9c17df87dd997841a",
-      "bytes": 47850
+      "sha256": "276fa0261413671e76995cd91121c985c7d76cfceeed492f7c257e2025af5087",
+      "bytes": 48522
     },
     {
       "path": "telephony/streaming_stt_model.py",
@@ -6052,6 +6052,11 @@
       "path": "tests/public/test_cjk_runtime_reconstruction.py",
       "sha256": "fc833f571b5c126276f656e601533bca9e788bc55a520c368069bd6332de37b0",
       "bytes": 1123
+    },
+    {
+      "path": "tests/public/test_consultation_question_correlation.py",
+      "sha256": "baf95b194eb09ec80cb9161bac1d4f7466ffcd87c01e2af6524d3354d060c5c1",
+      "bytes": 17473
     },
     {
       "path": "tests/public/test_crash_forensics_targets.py",
@@ -11680,13 +11685,13 @@
     },
     {
       "path": "ui/react-app/src/hooks/useCallConsultationReply.js",
-      "sha256": "faa00f93c09d7c621949e4c9ca0182c5fcae32db22a9496fcc5e55e7a125fd8f",
-      "bytes": 2928
+      "sha256": "03e54fcace57a8b719b65f6ca8449e15bce1743773c85d9078cdbc7d2ca294e4",
+      "bytes": 3083
     },
     {
       "path": "ui/react-app/src/hooks/useCallConsultationReply.test.jsx",
-      "sha256": "c2df9d49b0fe7e2149e5b3a29d2d10aa5b62c477fe6c49a594952998a71f1a63",
-      "bytes": 11990
+      "sha256": "b03d3ba4eb0b4aff648b97ef5e5e9b996ca1e8c3a49c3744bd6920fa1083b310",
+      "bytes": 16229
     },
     {
       "path": "ui/react-app/src/hooks/useCloudLlmConsent.js",
