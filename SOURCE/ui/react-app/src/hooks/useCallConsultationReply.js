@@ -15,7 +15,8 @@ export default function useCallConsultationReply(consultation, setConsultation) 
   }, []);
 
   // Each WS payload is a distinct consultation, even when a call asks the
-  // same question again. The reply API currently has no question/token field.
+  // same question again. The optional server ID also correlates the HTTP reply;
+  // events from legacy servers omit it and retain call-level reply behavior.
   const current = state?.consultation === consultation ? state : null;
   const answer = current?.answer || '';
   const pending = current?.pending || false;
@@ -38,12 +39,12 @@ export default function useCallConsultationReply(consultation, setConsultation) 
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'same-origin',
-        body: JSON.stringify({ answer: answer.trim() }),
+        body: JSON.stringify({ answer: answer.trim(), consultation_id: consultation?.consultation_id }),
       });
       if (response.ok) {
         const body = await response.json();
         accepted = body?.ok === true;
-      } else if (response.status === 404) {
+      } else if (response.status === 404 || response.status === 409) {
         message = 'This question is no longer pending. Your answer is saved here. You can dismiss it or take over.';
       } else if (response.status === 401 || response.status === 403) {
         message = 'Your reply was not authorized. Your answer is saved here. Check your sign-in before trying again.';

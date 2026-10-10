@@ -13,8 +13,9 @@ import asyncio
 import re
 from collections.abc import Callable
 from contextlib import suppress
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
+from uuid import uuid4
 
 from core.logging_config import get_logger
 from telephony.end_call_hangup import (
@@ -92,6 +93,7 @@ class _PendingConsultation:
     future: asyncio.Future[str]
     question: str
     user_id: str
+    consultation_id: str = field(default_factory=lambda: uuid4().hex)
 
 
 _PENDING_CONSULTATIONS: dict[str, _PendingConsultation] = {}
@@ -442,8 +444,19 @@ def _current_end_call_response_has_spoken_text(params: Any) -> bool:
     return True
 
 
-def submit_consult_user_reply(call_id: str, answer: str, user_id: str | None = None) -> tuple[bool, str]:
-    """Resolve a pending phone-call consultation from the issuer chat UI."""
+def submit_consult_user_reply(
+    call_id: str,
+    answer: str,
+    user_id: str | None = None,
+    *,
+    consultation_id: str | None = None,
+) -> tuple[bool, str]:
+    """Resolve a pending consultation, checking question identity when supplied.
+
+    Omitted IDs preserve legacy callers and call-level owner takeover. They do
+    not protect against a delayed reply resolving a later question on this call.
+    The correlation ID identifies a question; it never replaces owner auth.
+    """
     safe_call_id = str(call_id or "").strip()
     safe_answer = str(answer or "").strip()
     if not safe_call_id:
@@ -461,6 +474,12 @@ def submit_consult_user_reply(call_id: str, answer: str, user_id: str | None = N
         return False, "auth_required"
     if not pending_user_id or safe_user_id != pending_user_id:
         return False, "forbidden"
+
+    if consultation_id is not None:
+        if not isinstance(consultation_id, str) or not consultation_id.strip():
+            return False, "invalid_consultation_id"
+        if consultation_id != pending.consultation_id:
+            return False, "stale_consultation"
 
     pending.future.set_result(safe_answer)
     return True, "accepted"
@@ -543,6 +562,7 @@ async def _broadcast_call_consultation(
     call_record: Any | None,
     answer: str | None = None,
     pending: bool = False,
+    consultation_id: str | None = None,
 ) -> bool:
     try:
         from ui.websocket.event_hub import get_event_hub
@@ -569,6 +589,8 @@ async def _broadcast_call_consultation(
             payload["answer"] = answer
         if pending:
             payload["pending"] = True
+        if consultation_id is not None:
+            payload["consultation_id"] = consultation_id
 
         has_target = _event_hub_has_consult_target(hub, user_id)
         await hub.broadcast(
@@ -647,11 +669,12 @@ async def _ask_call_issuer_via_web_consult(question: str, call_record: Any | Non
     existing = _PENDING_CONSULTATIONS.get(call_id)
     if existing is not None and not existing.future.done():
         existing.future.set_result(CONSULT_USER_FALLBACK_ANSWER)
-    _PENDING_CONSULTATIONS[call_id] = _PendingConsultation(
+    pending = _PendingConsultation(
         future=future,
         question=question,
         user_id=_call_record_user_id(call_record),
     )
+    _PENDING_CONSULTATIONS[call_id] = pending
 
     try:
         delivered = await _broadcast_call_consultation(
@@ -659,6 +682,7 @@ async def _ask_call_issuer_via_web_consult(question: str, call_record: Any | Non
             urgency=urgency,
             call_record=call_record,
             pending=True,
+            consultation_id=pending.consultation_id,
         )
         if not delivered:
             logger.info("consult_user web issuer has no active chat target; using fallback response")
