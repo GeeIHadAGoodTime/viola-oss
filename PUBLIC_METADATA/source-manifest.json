@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "0f4d8f8ba54e0f66736f2f8aa58e57b023ef5a4f",
-  "sha256": "f890b03d89d34a14584b4a10797f2767dd7a85d5ce0439889c977f402162f87c",
+  "revision": "ddb3989930b69378c95dc52bec3c6df079d00346",
+  "sha256": "63d6201cb2ae440ac77d7fc1c94377708161db89089e686876cc16b7313f2c3d",
   "files": [
     {
       "path": ".env.example",
@@ -9960,8 +9960,8 @@
     },
     {
       "path": "ui/react-app/src/SmartDisplay.jsx",
-      "sha256": "dab28734312bbbcab3038ae810ae73a0bd41a190194e1489d9234d0a839449ad",
-      "bytes": 173141
+      "sha256": "ceb966e06b5042e83e603efe72bffeded6a1155fe24b6441d1646708329fa03d",
+      "bytes": 172628
     },
     {
       "path": "ui/react-app/src/SmartDisplay.spokePolicy.test.jsx",
@@ -9990,8 +9990,8 @@
     },
     {
       "path": "ui/react-app/src/__tests__/SmartDisplay.test.jsx",
-      "sha256": "0795fa55996da366fa484650e118b1dcccae3d2bee352c8ac74d3f53411963d3",
-      "bytes": 120438
+      "sha256": "59c5e8beb018d9ba510c2108ebf35ed47acc9c00036187fde10363912f5a2ef5",
+      "bytes": 123562
     },
     {
       "path": "ui/react-app/src/__tests__/hooks/useEventBus.test.jsx",
@@ -10390,13 +10390,13 @@
     },
     {
       "path": "ui/react-app/src/components/CallConsultation.jsx",
-      "sha256": "21d4fbd44827b87b7079847add0aa28827fe85e7983a808fe644ef8735603d88",
-      "bytes": 4967
+      "sha256": "ad63f49dbcdc3a195b5eb3508269b0ba5fe4c8d3e3c193bdc7bf27a23271c65e",
+      "bytes": 5263
     },
     {
       "path": "ui/react-app/src/components/CallConsultation.test.jsx",
-      "sha256": "946e1ed38d079b4728ddf6fc2e29e89cda5c0cc3e3faec1e7141668a1fc76044",
-      "bytes": 1495
+      "sha256": "bea745d170a7605b5fa2d2a80818f06850fab12a8c0ad8c63cd628f806f388d1",
+      "bytes": 1975
     },
     {
       "path": "ui/react-app/src/components/CallHistoryList.jsx",
@@ -10615,13 +10615,13 @@
     },
     {
       "path": "ui/react-app/src/components/PhoneCallPanel.jsx",
-      "sha256": "4ddcafe352a7c790fcac5a49ac45ea04f5e40849c9d800b94ef747be2b41a4cf",
-      "bytes": 26741
+      "sha256": "d2dfc4fa1530c86eeb066755af882b862e300c4bd662424d429e369e7d63fc65",
+      "bytes": 27159
     },
     {
       "path": "ui/react-app/src/components/PhoneCallPanel.test.jsx",
-      "sha256": "2792657b47fba390cb73a4253492a928c5548d50eaf51cbeb433437f8797a1f8",
-      "bytes": 9174
+      "sha256": "b25b5f643a51ca2ea6d637229314790814ff23609d8604bbdc1e4192a87b4141",
+      "bytes": 9735
     },
     {
       "path": "ui/react-app/src/components/PhoneToSModal.jsx",
@@ -11677,6 +11677,16 @@
       "path": "ui/react-app/src/hooks/useCallAudio.test.js",
       "sha256": "0b32d7127f5c68af896e8a24dee158b898706345f7a124c0ee001eeef6badc11",
       "bytes": 8687
+    },
+    {
+      "path": "ui/react-app/src/hooks/useCallConsultationReply.js",
+      "sha256": "faa00f93c09d7c621949e4c9ca0182c5fcae32db22a9496fcc5e55e7a125fd8f",
+      "bytes": 2928
+    },
+    {
+      "path": "ui/react-app/src/hooks/useCallConsultationReply.test.jsx",
+      "sha256": "c2df9d49b0fe7e2149e5b3a29d2d10aa5b62c477fe6c49a594952998a71f1a63",
+      "bytes": 11990
     },
     {
       "path": "ui/react-app/src/hooks/useCloudLlmConsent.js",

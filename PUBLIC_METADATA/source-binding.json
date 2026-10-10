@@ -1,14 +1,20 @@
 {
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "3c570808fa948c19b6491fbc55f76aa2b5d6ed8bb2bf86aee92fb5644cff883a",
-  "source_tree_sha256": "f890b03d89d34a14584b4a10797f2767dd7a85d5ce0439889c977f402162f87c",
-  "source_file_count": 2698,
-  "source_revision": "0f4d8f8ba54e0f66736f2f8aa58e57b023ef5a4f",
-  "comparison_public_revision": "d43b129becc28a0e51eac83dab02be5241b1accb",
+  "source_manifest_sha256": "38111c30c6f2206496aa183ce36c5be1f7ef73c1071e74f48286b3b189a449a8",
+  "source_tree_sha256": "63d6201cb2ae440ac77d7fc1c94377708161db89089e686876cc16b7313f2c3d",
+  "source_file_count": 2700,
+  "source_revision": "ddb3989930b69378c95dc52bec3c6df079d00346",
+  "comparison_public_revision": "50e1382aee7d26ad4e4eb826124ebbe1943b2338",
   "changed_source_paths": [
-    "SOURCE/ui/qt_native/webview_window.py",
-    "SOURCE/tests/public/test_startup_websocket_credentials.py"
+    "SOURCE/ui/react-app/src/SmartDisplay.jsx",
+    "SOURCE/ui/react-app/src/__tests__/SmartDisplay.test.jsx",
+    "SOURCE/ui/react-app/src/components/CallConsultation.jsx",
+    "SOURCE/ui/react-app/src/components/CallConsultation.test.jsx",
+    "SOURCE/ui/react-app/src/components/PhoneCallPanel.jsx",
+    "SOURCE/ui/react-app/src/components/PhoneCallPanel.test.jsx",
+    "SOURCE/ui/react-app/src/hooks/useCallConsultationReply.js",
+    "SOURCE/ui/react-app/src/hooks/useCallConsultationReply.test.jsx"
   ],
   "retained_sboms": [
     {
@@ -70,46 +76,98 @@
     }
   ],
   "input_equivalence": {
-    "comparison_basis": "Protected public main d43b129becc28a0e51eac83dab02be5241b1accb",
+    "comparison_basis": "Protected public source base 50e1382aee7d26ad4e4eb826124ebbe1943b2338",
     "all_unselected_export_leaf_bytes_and_modes_preserved": true,
     "all_six_sbom_bytes_and_status_objects_preserved": true,
-    "dependency_frontend_workflow_notice_model_pricing_and_customer_speech_inputs_unchanged": true,
-    "scope": "One Qt navigation call and four synthetic startup-token contracts."
+    "dependency_workflow_notice_model_pricing_and_customer_speech_inputs_unchanged": true,
+    "scope": "Eight reviewed frontend source/test files for consultation reply recovery only; no endpoint, backend, provider or deployment changes."
   },
   "qualification": {
-    "scope": "Refresh the existing desktop credential script immediately before ready-shell navigation.",
-    "source_commit": "0f4d8f8ba54e0f66736f2f8aa58e57b023ef5a4f",
-    "source_tree": "bca32750eecddfe5973ec35b3a75206659a950da",
+    "scope": "Retain unconfirmed consultation replies and correlate local acknowledgement to the captured question payload.",
+    "source_commit": "ddb3989930b69378c95dc52bec3c6df079d00346",
+    "source_tree": "885ec128dfb3e82e7e62613a0dd17e4e3e9610c6",
     "ordered_source_parents": [
-      "2b752ef1eb88425fe90255574e205b20f43fa24e",
-      "d43b129becc28a0e51eac83dab02be5241b1accb"
+      "50e1382aee7d26ad4e4eb826124ebbe1943b2338"
     ],
-    "reviewed_combined_patch_sha256": "c1b0e4313540ccf1d06dfb0a1f6f52e2efa9711b5334d735209ff5ccdeaaf5f1",
-    "publication_status": "Exact source commit created; draft PR pending.",
+    "reviewed_combined_patch_sha256": "ddcc5445c3dad8254051ac08bb4edd5a596ef2d6521858ab0a1eff79a1a0ea64",
+    "publication_status": "Exact source approved by independent and parent review; metadata frozen for parent review before publication. Required integration checks remain mandatory.",
     "independent_automated_review": {
-      "result": "No blocking findings; four final token tests independently rerun successfully."
+      "result": "PASS; independent source/contract review found no blocker and eight additional adversarial tests passed.",
+      "verification_sha256": "67cc8797e70d300d5833f774bc87ea924372ce313a5bddb3045e52e76ee01819",
+      "test_log_sha256": "44e8aa65d906eab0bb455210b8833d6e12f5e25f1ce90bf474512382e66f43c9",
+      "scope": "Eight additional synthetic tests and verification of author receipts; not an independent full frontend rerun."
     },
     "source_controls": {
-      "commands": [
-        "python -m unittest discover -s tests/public -p test_startup_websocket_credentials.py -v",
-        "python -m unittest discover -s tests/public -p test_windows_native_startup_order.py -v"
-      ],
-      "tests_passed": 28,
-      "failed": 0,
-      "skipped": 0,
-      "known_bad_control": "Unmodified baseline fails delayed-ready and failed-load retry freshness; duplicate guards and isolation remain passing.",
-      "fixtures": "Actual source token mint/consume and Qt credential/navigation methods with synthetic configuration, clock and inert Qt seams; no connections or persistent credentials."
+      "focused_frontend": {
+        "tests_passed": 50,
+        "tests_failed": 0,
+        "files": 3,
+        "log_sha256": "71a82b29b0d1644c1fd51b301c76c175fc8c8d4281f3ed862a0de2feff9fc26b"
+      },
+      "smartdisplay_bounded_batches": {
+        "expected_cases": 196,
+        "unique_passed_cases": 196,
+        "tests_failed": 0,
+        "summary_sha256": "65bf4481992dc0b2985ca5613b2bb7f8e24d7bab02ca97c6f04d553106cb0df2",
+        "scope": "Every expected SmartDisplay test passed in a successful bounded serial batch. Failed larger attempts remain recorded."
+      },
+      "total_bounded_frontend_passes": 246,
+      "mutation_controls": {
+        "regressions_rejected": 3,
+        "receipt_sha256": "bd39acd6e77cc129da04ba5afe80659e74ede281c6b4c0b4395226c8d590a3d0"
+      },
+      "changed_file_lint": {
+        "errors": 0,
+        "preexisting_smartdisplay_warnings": 11,
+        "log_sha256": "1e14e4a8487bf38317b1e862b6fe67a75167ba364a88b05c8ab14d15f6c49926",
+        "baseline_log_sha256": "c3e6862eb6613b6e3d6800c1a9fe3523f917d781e79aee3401a1b9968cf72c35"
+      }
     },
-    "normal_app_retest_required": [
-      "Slow native startup waits over 30 seconds before the ready shell, then opens its first local event socket without an expired-ticket rejection.",
-      "Native failed-load retry and repeated readiness preserve one shell navigation and same-origin isolation."
-    ],
-    "limits": [
-      "Synthetic methods do not qualify Qt renderer script propagation or a real WebSocket handshake.",
-      "Full public suite and hosted exact-head checks remain pending.",
-      "Ruff is unavailable locally; no dependency installation was performed.",
-      "No release, deployment, remote runtime change or new installed candidate was made."
-    ]
+    "frontend_build": {
+      "result": "BLOCKED_INCOMPLETE",
+      "exit_code": 137,
+      "phase": "Vite transformation",
+      "heap_cap_mb": 512,
+      "log_sha256": "daab63d39fd992a319ec5d16308939765f5572030a98fe2995f252cfad8ea24a",
+      "claim": "No production build qualification."
+    },
+    "frontend_suite": {
+      "result": "FULL_REPOSITORY_AGGREGATE_NOT_RUN",
+      "bounded_cases_passed": 246,
+      "unbatched_display_attempts": "Workers exited early; not passing aggregate receipts. All 196 SmartDisplay cases subsequently passed in bounded serial batches.",
+      "attempt_log_sha256": [
+        "ccf2ea9e7d2463be9a0495ba9e3bdcfa4fa59fa3ed37d44ca9cb1cf48353c296",
+        "6a699edd5596dada8a8d77a9b42eaa7dc18e07b86fc224d7d50783ae104da4ae"
+      ],
+      "incomplete_twenty_case_batch_log_sha256": "1b1aa184a4bc39a9fb1515d2a7c9d6fa69653b984e4cec13ef7e30222f203f77"
+    },
+    "source_import_graph_bundle": {
+      "result": "PASS",
+      "log_sha256": "077bc6044b5973c5c100fa98517855a7085433f64d5e975af19ea497f000a5bb",
+      "scope": "Source/import-graph compilation with npm packages externalized; not a production build or runtime proof."
+    },
+    "public_python_contracts": {
+      "result": "PASS",
+      "command": "python -B -m unittest discover -s tests/public -v",
+      "tests_run": 946,
+      "tests_passed": 945,
+      "tests_skipped": 1,
+      "tests_failed": 0,
+      "duration_seconds": 30.632,
+      "python_environment": "Existing isolated Help/Phone qualification environment reused unchanged; no packages installed.",
+      "scope": "Synthetic source-boundary and Python behavior tests; not provider, carrier, installed app or runtime acceptance.",
+      "log_sha256": "d665481d3b6ea58a92dfb552abb1f5740b360e30894871b0856364b92e5925f6"
+    },
+    "runtime_qualification": {
+      "installed_windows": false,
+      "rendered_browser": false,
+      "real_call_or_account": false,
+      "real_terms_acceptance": false,
+      "provider_or_carrier": false,
+      "deployment_or_release": false
+    },
+    "api_limit": "The existing backend identifies pending work by call ID only and has no question token. This patch protects local UI state; it does not establish server-side question correlation or network exactly-once delivery.",
+    "preserved_limits": "All six SBOM bytes and their historical status objects retained unchanged. No fresh Windows dependency inventory, advisory scan, production build, installed runtime, provider or release qualification."
   },
   "historical_bindings": [
     {
@@ -12148,38 +12206,61 @@
     }
   ],
   "reviewed_source_patch": {
-    "scope": "Refresh startup credentials before ready-shell navigation.",
-    "source_paths": [
-      "SOURCE/ui/qt_native/webview_window.py",
-      "SOURCE/tests/public/test_startup_websocket_credentials.py"
-    ],
-    "source_tree": "bca32750eecddfe5973ec35b3a75206659a950da",
-    "reviewed_combined_patch_sha256": "c1b0e4313540ccf1d06dfb0a1f6f52e2efa9711b5334d735209ff5ccdeaaf5f1",
+    "scope": "Eight exact independently reviewed consultation frontend files only.",
+    "patch_sha256": "ddcc5445c3dad8254051ac08bb4edd5a596ef2d6521858ab0a1eff79a1a0ea64",
+    "base_revision": "50e1382aee7d26ad4e4eb826124ebbe1943b2338",
+    "source_revision": "ddb3989930b69378c95dc52bec3c6df079d00346",
     "files": [
       {
-        "path": "SOURCE/ui/qt_native/webview_window.py",
-        "old_blob": "7adaef5eb5c2df21df9a5117465b770e91ef5091",
-        "new_blob": "70662f3bfee46011248f80c7a67cd955db03eb2e",
-        "sha256": "755e7f33b4eacca89dfff9493bf25b5a3715128f3c68f1e366dfc950ced8ad86",
-        "bytes": 201217
+        "path": "SOURCE/ui/react-app/src/SmartDisplay.jsx",
+        "sha256": "ceb966e06b5042e83e603efe72bffeded6a1155fe24b6441d1646708329fa03d",
+        "baseline_sha256": "dab28734312bbbcab3038ae810ae73a0bd41a190194e1489d9234d0a839449ad"
       },
       {
-        "path": "SOURCE/tests/public/test_startup_websocket_credentials.py",
-        "old_blob": null,
-        "new_blob": "9a7d2e32353a26d010a12c0757c0fba9303c46c2",
-        "sha256": "c4cbb82a66fe86d70332da3dec95321345ee1151f1625e2ae1d301d8d7bff838",
-        "bytes": 7082
+        "path": "SOURCE/ui/react-app/src/__tests__/SmartDisplay.test.jsx",
+        "sha256": "59c5e8beb018d9ba510c2108ebf35ed47acc9c00036187fde10363912f5a2ef5",
+        "baseline_sha256": "0795fa55996da366fa484650e118b1dcccae3d2bee352c8ac74d3f53411963d3"
+      },
+      {
+        "path": "SOURCE/ui/react-app/src/components/CallConsultation.jsx",
+        "sha256": "ad63f49dbcdc3a195b5eb3508269b0ba5fe4c8d3e3c193bdc7bf27a23271c65e",
+        "baseline_sha256": "21d4fbd44827b87b7079847add0aa28827fe85e7983a808fe644ef8735603d88"
+      },
+      {
+        "path": "SOURCE/ui/react-app/src/components/CallConsultation.test.jsx",
+        "sha256": "bea745d170a7605b5fa2d2a80818f06850fab12a8c0ad8c63cd628f806f388d1",
+        "baseline_sha256": "946e1ed38d079b4728ddf6fc2e29e89cda5c0cc3e3faec1e7141668a1fc76044"
+      },
+      {
+        "path": "SOURCE/ui/react-app/src/components/PhoneCallPanel.jsx",
+        "sha256": "d2dfc4fa1530c86eeb066755af882b862e300c4bd662424d429e369e7d63fc65",
+        "baseline_sha256": "4ddcafe352a7c790fcac5a49ac45ea04f5e40849c9d800b94ef747be2b41a4cf"
+      },
+      {
+        "path": "SOURCE/ui/react-app/src/components/PhoneCallPanel.test.jsx",
+        "sha256": "b25b5f643a51ca2ea6d637229314790814ff23609d8604bbdc1e4192a87b4141",
+        "baseline_sha256": "2792657b47fba390cb73a4253492a928c5548d50eaf51cbeb433437f8797a1f8"
+      },
+      {
+        "path": "SOURCE/ui/react-app/src/hooks/useCallConsultationReply.js",
+        "sha256": "faa00f93c09d7c621949e4c9ca0182c5fcae32db22a9496fcc5e55e7a125fd8f",
+        "baseline_sha256": null
+      },
+      {
+        "path": "SOURCE/ui/react-app/src/hooks/useCallConsultationReply.test.jsx",
+        "sha256": "c2df9d49b0fe7e2149e5b3a29d2d10aa5b62c477fe6c49a594952998a71f1a63",
+        "baseline_sha256": null
       }
     ],
-    "review_status": "No blocking source-review findings."
+    "review_status": "PASS"
   },
   "new_resolution_performed": false,
   "new_advisory_scan_performed": false,
   "new_runtime_qualification_performed": false,
   "new_source_contract_qualification_performed": true,
   "new_static_security_scan_performed": false,
-  "new_resolution_scope": "No dependency or target-graph changes; all existing dependency inventories and their limitations retained.",
-  "new_advisory_scan_scope": "No new local advisory-clearance claim; required hosted checks retain their own results.",
+  "new_resolution_scope": "Existing isolated frontend dependencies and qualified Help/Phone Python environment reused; no fresh selected-platform resolution.",
+  "new_advisory_scan_scope": "No fresh vulnerability or advisory assessment performed by this packet.",
   "account_reconciliation_previous_binding": {
     "source_revision": "f864e61381ef9e10a09333fce05210427cf7d0f6",
     "source_manifest_sha256": "9cad8bcb2f98c34d95a11545e11a57d74dbe6b28cd5db7322b7746e102801acd",
@@ -15697,6 +15778,100 @@
         "pointer": "/music_command_recovery_previous_binding",
         "canonical_json_sha256": "c8ae362e3bf515264325b5851ab172e9369cadf8fc93d89fd60a1bc922000396"
       }
+    }
+  },
+  "consultation_reply_previous_binding": {
+    "public_revision": "50e1382aee7d26ad4e4eb826124ebbe1943b2338",
+    "path": "PUBLIC_METADATA/source-binding.json",
+    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/50e1382aee7d26ad4e4eb826124ebbe1943b2338/PUBLIC_METADATA/source-binding.json",
+    "sha256": "7e804720c9cc0614b3a11a8fd3e693aba532a8f2b5e8b652bfbd0b240bb876c8",
+    "bytes": 1434170,
+    "git_blob": "b57af830d4a9ba7e3e877a1519c486fd81630117",
+    "overwritten_fields": {
+      "source_manifest_sha256": "3c570808fa948c19b6491fbc55f76aa2b5d6ed8bb2bf86aee92fb5644cff883a",
+      "source_tree_sha256": "f890b03d89d34a14584b4a10797f2767dd7a85d5ce0439889c977f402162f87c",
+      "source_file_count": 2698,
+      "source_revision": "0f4d8f8ba54e0f66736f2f8aa58e57b023ef5a4f",
+      "comparison_public_revision": "d43b129becc28a0e51eac83dab02be5241b1accb",
+      "changed_source_paths": [
+        "SOURCE/ui/qt_native/webview_window.py",
+        "SOURCE/tests/public/test_startup_websocket_credentials.py"
+      ],
+      "input_equivalence": {
+        "comparison_basis": "Protected public main d43b129becc28a0e51eac83dab02be5241b1accb",
+        "all_unselected_export_leaf_bytes_and_modes_preserved": true,
+        "all_six_sbom_bytes_and_status_objects_preserved": true,
+        "dependency_frontend_workflow_notice_model_pricing_and_customer_speech_inputs_unchanged": true,
+        "scope": "One Qt navigation call and four synthetic startup-token contracts."
+      },
+      "qualification": {
+        "scope": "Refresh the existing desktop credential script immediately before ready-shell navigation.",
+        "source_commit": "0f4d8f8ba54e0f66736f2f8aa58e57b023ef5a4f",
+        "source_tree": "bca32750eecddfe5973ec35b3a75206659a950da",
+        "ordered_source_parents": [
+          "2b752ef1eb88425fe90255574e205b20f43fa24e",
+          "d43b129becc28a0e51eac83dab02be5241b1accb"
+        ],
+        "reviewed_combined_patch_sha256": "c1b0e4313540ccf1d06dfb0a1f6f52e2efa9711b5334d735209ff5ccdeaaf5f1",
+        "publication_status": "Exact source commit created; draft PR pending.",
+        "independent_automated_review": {
+          "result": "No blocking findings; four final token tests independently rerun successfully."
+        },
+        "source_controls": {
+          "commands": [
+            "python -m unittest discover -s tests/public -p test_startup_websocket_credentials.py -v",
+            "python -m unittest discover -s tests/public -p test_windows_native_startup_order.py -v"
+          ],
+          "tests_passed": 28,
+          "failed": 0,
+          "skipped": 0,
+          "known_bad_control": "Unmodified baseline fails delayed-ready and failed-load retry freshness; duplicate guards and isolation remain passing.",
+          "fixtures": "Actual source token mint/consume and Qt credential/navigation methods with synthetic configuration, clock and inert Qt seams; no connections or persistent credentials."
+        },
+        "normal_app_retest_required": [
+          "Slow native startup waits over 30 seconds before the ready shell, then opens its first local event socket without an expired-ticket rejection.",
+          "Native failed-load retry and repeated readiness preserve one shell navigation and same-origin isolation."
+        ],
+        "limits": [
+          "Synthetic methods do not qualify Qt renderer script propagation or a real WebSocket handshake.",
+          "Full public suite and hosted exact-head checks remain pending.",
+          "Ruff is unavailable locally; no dependency installation was performed.",
+          "No release, deployment, remote runtime change or new installed candidate was made."
+        ]
+      },
+      "reviewed_source_patch": {
+        "scope": "Refresh startup credentials before ready-shell navigation.",
+        "source_paths": [
+          "SOURCE/ui/qt_native/webview_window.py",
+          "SOURCE/tests/public/test_startup_websocket_credentials.py"
+        ],
+        "source_tree": "bca32750eecddfe5973ec35b3a75206659a950da",
+        "reviewed_combined_patch_sha256": "c1b0e4313540ccf1d06dfb0a1f6f52e2efa9711b5334d735209ff5ccdeaaf5f1",
+        "files": [
+          {
+            "path": "SOURCE/ui/qt_native/webview_window.py",
+            "old_blob": "7adaef5eb5c2df21df9a5117465b770e91ef5091",
+            "new_blob": "70662f3bfee46011248f80c7a67cd955db03eb2e",
+            "sha256": "755e7f33b4eacca89dfff9493bf25b5a3715128f3c68f1e366dfc950ced8ad86",
+            "bytes": 201217
+          },
+          {
+            "path": "SOURCE/tests/public/test_startup_websocket_credentials.py",
+            "old_blob": null,
+            "new_blob": "9a7d2e32353a26d010a12c0757c0fba9303c46c2",
+            "sha256": "c4cbb82a66fe86d70332da3dec95321345ee1151f1625e2ae1d301d8d7bff838",
+            "bytes": 7082
+          }
+        ],
+        "review_status": "No blocking source-review findings."
+      },
+      "new_resolution_performed": false,
+      "new_advisory_scan_performed": false,
+      "new_runtime_qualification_performed": false,
+      "new_source_contract_qualification_performed": true,
+      "new_static_security_scan_performed": false,
+      "new_resolution_scope": "No dependency or target-graph changes; all existing dependency inventories and their limitations retained.",
+      "new_advisory_scan_scope": "No new local advisory-clearance claim; required hosted checks retain their own results."
     }
   }
 }
