@@ -1009,7 +1009,10 @@ const AuthForm = ({ onSuccess }) => {
   const handleOAuth = async (provider) => {
     setSubmitting(true);
     setLocalError(null);
-    setMessage('Finish signing in with your browser, then come back here.');
+    setMessage({
+      type: 'info',
+      text: 'Finish signing in with your browser, then come back here.',
+    });
     clearError();
     const result = await startOAuthFlow(provider);
     setSubmitting(false);
@@ -1025,6 +1028,8 @@ const AuthForm = ({ onSuccess }) => {
 
   const visibleError = error || localError;
   const visibleErrorDetails = errorDetails;
+  const messageColor = message?.type === 'success' ? theme.colors.statusGreen
+    : message?.type === 'info' ? theme.colors.accent : theme.colors.statusRed;
 
   return (
     <div style={{ padding: '24px' }}>
@@ -1298,11 +1303,11 @@ const AuthForm = ({ onSuccess }) => {
           )}
 
           {message && (
-            <div style={{
+            <div role={message.type === 'info' ? 'status' : undefined} style={{
               padding: '12px',
               borderRadius: '8px',
-              backgroundColor: message.type === 'success' ? `${theme.colors.statusGreen}1A` : `${theme.colors.statusRed}1A`,
-              color: message.type === 'success' ? theme.colors.statusGreen : theme.colors.statusRed,
+              backgroundColor: `${messageColor}1A`,
+              color: messageColor,
               fontSize: '13px',
             }}>
               {message.text}

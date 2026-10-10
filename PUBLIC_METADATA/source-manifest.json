@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "81420e3a1359ce6354f5aa0e22b33589415f5505",
-  "sha256": "f19c8d3b01ab11af7f959aa00504952b6b2e5766ed3064e792cf53de4be61688",
+  "revision": "2612de85dad2632141cf5713aad29ceb42a3b279",
+  "sha256": "6c1dc6686ba6127a1c3053c114b8425f8ca641c3bf85ccaaaff6d1205b6593c2",
   "files": [
     {
       "path": ".env.example",
@@ -9965,8 +9965,8 @@
     },
     {
       "path": "ui/react-app/src/SmartDisplay.jsx",
-      "sha256": "ceb966e06b5042e83e603efe72bffeded6a1155fe24b6441d1646708329fa03d",
-      "bytes": 172628
+      "sha256": "b0fe2adab2fdd2b1b6de1e24b7c22055f7d1ae7aac72733a6df9b2e90f673536",
+      "bytes": 172672
     },
     {
       "path": "ui/react-app/src/SmartDisplay.spokePolicy.test.jsx",
@@ -9995,8 +9995,8 @@
     },
     {
       "path": "ui/react-app/src/__tests__/SmartDisplay.test.jsx",
-      "sha256": "59c5e8beb018d9ba510c2108ebf35ed47acc9c00036187fde10363912f5a2ef5",
-      "bytes": 123562
+      "sha256": "512f45286fb722fc0f231343dd5ba15e1d366af282d3df391d49de610becb20b",
+      "bytes": 130256
     },
     {
       "path": "ui/react-app/src/__tests__/hooks/useEventBus.test.jsx",
@@ -10305,8 +10305,8 @@
     },
     {
       "path": "ui/react-app/src/components/AccountTab.jsx",
-      "sha256": "4c756041fa2e5e996f1f1197c26ef64089924e3c7b6d44d0a0b673daf6b83c01",
-      "bytes": 76138
+      "sha256": "d2a7e18313b21c4f2f509831d0493a7d1c0cc4e7f041128cd4acef6bc8b2fd4c",
+      "bytes": 76251
     },
     {
       "path": "ui/react-app/src/components/AccountTab.legacy.jsx",
@@ -10322,6 +10322,11 @@
       "path": "ui/react-app/src/components/AccountTab.mfa.test.jsx",
       "sha256": "75c89966e0cb2a141367fff1b87b5237cb2259616c42f594349f09ff05f89e3b",
       "bytes": 9606
+    },
+    {
+      "path": "ui/react-app/src/components/AccountTab.oauthPending.test.jsx",
+      "sha256": "565d2222256b46f3e88c50e22dc4d62034b21f0074704d53f288c6039cbde598",
+      "bytes": 8437
     },
     {
       "path": "ui/react-app/src/components/AccountTab.providerButtons.test.jsx",

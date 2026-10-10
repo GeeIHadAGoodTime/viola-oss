@@ -8,6 +8,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 const { default: QueueModal } = await vi.importActual('../components/QueueModal');
 const { default: HistoryModal } = await vi.importActual('../components/HistoryModal');
+const { default: HelpModal } = await vi.importActual('../components/HelpModal');
 import { act, fireEvent, render, renderHook, screen, waitFor, within } from '../test/test-utils';
 
 const wsHarness = vi.hoisted(() => ({
@@ -36,6 +37,7 @@ const apiHarness = vi.hoisted(() => ({
   account: null,
   realHistory: false,
   realQueue: false,
+  realHelp: false,
   sendCommandStreaming: vi.fn(() => Promise.resolve(null)),
   getQueue: vi.fn(() => Promise.resolve({ok: true, queue: []})),
   playQueueItem: vi.fn(() => Promise.resolve({ok: true})),
@@ -342,7 +344,7 @@ vi.mock('../components/RoomGroupsModal', () => ({
   ),
 }));
 vi.mock('../components/HelpModal', () => ({
-  default: () => <div data-testid="help-modal">Help</div>,
+  default: (props) => apiHarness.realHelp ? <HelpModal {...props} /> : <div data-testid="help-modal">Help</div>,
 }));
 vi.mock('../components/CalendarView', () => ({
   default: ({ onModalOpenChange }) => <div data-testid="calendar-view">
@@ -363,6 +365,7 @@ beforeEach(async () => {
   apiHarness.account = null;
   apiHarness.realHistory = false;
   apiHarness.realQueue = false;
+  apiHarness.realHelp = false;
   apiHarness.sendCommandStreaming.mockReset().mockResolvedValue(null);
   wsHarness.handler = null;
   wsHarness.handlers = [];
@@ -399,6 +402,157 @@ beforeEach(async () => {
   const mod = await import('../SmartDisplay');
   SmartDisplay = mod.default;
   agentContextPillCooldownMs = mod.AGENT_CONTEXT_PILL_COOLDOWN_MS;
+});
+
+describe('Help keyboard isolation', () => {
+  beforeEach(() => {
+    // Exercise the desktop Music entry points without a separate cloud-consent gate.
+    vi.stubGlobal('viola', { isDesktop: true });
+    apiHarness.realHelp = true;
+    voiceHarness.startRecording.mockClear();
+    voiceHarness.stopRecording.mockClear();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  async function openHelp(user) {
+    const opener = screen.getByRole('button', { name: 'Open menu' });
+    await user.click(opener);
+    await user.click(screen.getByRole('menuitem', { name: 'Help & Guide' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Help' });
+    await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Close modal' })).toHaveFocus());
+    return { dialog, opener };
+  }
+
+  function responseArea() {
+    // This status is deliberately hidden/inert while Help is open. Inspect its
+    // text directly to catch background draft changes, not only visible sends.
+    return document.querySelector('.viola-bottom-row [role="status"]');
+  }
+
+  it('does not start a hidden Music draft from typing inside Help', async () => {
+    const { user } = render(<SmartDisplay />);
+    const initialResponse = responseArea().textContent;
+    const { dialog } = await openHelp(user);
+    const commands = within(dialog).getByRole('button', { name: 'Commands' });
+    commands.focus();
+
+    await user.keyboard('abc');
+
+    expect(responseArea().textContent).toBe(initialResponse);
+    expect(apiHarness.sendCommandStreaming).not.toHaveBeenCalled();
+    expect(commands).toHaveFocus();
+  });
+
+  it.each([
+    ['ordinary typing', 'x'],
+    ['Backspace', '{Backspace}'],
+    ['Enter', '{Enter}'],
+    ['Escape', '{Escape}'],
+  ])('preserves an existing Music draft on %s in Help', async (_name, keys) => {
+    const { user } = render(<SmartDisplay />);
+    await user.keyboard('draft');
+    expect(responseArea()).toHaveTextContent(/^draft$/);
+    const { dialog, opener } = await openHelp(user);
+    within(dialog).getByRole('button', { name: 'Commands' }).focus();
+
+    await user.keyboard(keys);
+
+    expect(apiHarness.sendCommandStreaming).not.toHaveBeenCalled();
+    expect(responseArea()).toHaveTextContent(/^draft$/);
+    if (keys !== '{Escape}') await user.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog', { name: 'Help' })).not.toBeInTheDocument();
+    expect(responseArea()).toHaveTextContent(/^draft$/);
+    expect(opener).toHaveFocus();
+
+    // Once dismissed, the same document listener must resume editing/sending.
+    await user.keyboard('x{Backspace}!{Enter}');
+    expect(apiHarness.sendCommandStreaming).toHaveBeenCalledTimes(1);
+    expect(apiHarness.sendCommandStreaming.mock.calls[0][0]).toBe('draft!');
+  });
+
+  it.each([
+    ['Ctrl+K', { key: 'k', code: 'KeyK', ctrlKey: true }],
+    ['Meta+K', { key: 'k', code: 'KeyK', metaKey: true }],
+    ['mute', { key: 'm', code: 'KeyM', ctrlKey: true }],
+    ['push-to-talk', { key: ' ', code: 'Space' }],
+  ])('ignores the global %s shortcut in Help and restores it after close', async (name, shortcut) => {
+    const { user } = render(<SmartDisplay />);
+    const { dialog } = await openHelp(user);
+    const commands = within(dialog).getByRole('button', { name: 'Commands' });
+    commands.focus();
+    const initialResponse = responseArea().textContent;
+
+    // A real focusable Help control bubbles to SmartDisplay's document handlers.
+    const allowedDefault = fireEvent.keyDown(commands, shortcut);
+    fireEvent.keyUp(commands, shortcut);
+
+    expect(screen.queryByTestId('command-palette')).not.toBeInTheDocument();
+    expect(settingsHarness.updateSetting).not.toHaveBeenCalled();
+    expect(voiceHarness.startRecording).not.toHaveBeenCalled();
+    expect(voiceHarness.stopRecording).not.toHaveBeenCalled();
+    expect(responseArea().textContent).toBe(initialResponse);
+    expect(apiHarness.sendCommandStreaming).not.toHaveBeenCalled();
+    expect(commands).toHaveFocus();
+    expect(allowedDefault).toBe(true);
+
+    await user.keyboard('{Escape}');
+    fireEvent.keyDown(document.body, shortcut);
+    if (name === 'mute') {
+      expect(settingsHarness.updateSetting).toHaveBeenCalledWith('mic_muted', true);
+    } else if (name === 'push-to-talk') {
+      expect(voiceHarness.startRecording).toHaveBeenCalledTimes(1);
+      fireEvent.keyUp(document.body, shortcut);
+    } else {
+      expect(await screen.findByTestId('command-palette')).toBeInTheDocument();
+    }
+  });
+
+  it('preserves Help tab navigation, button activation, focus wrapping and repeated Escape dismissal', async () => {
+    const { user } = render(<SmartDisplay />);
+    const { dialog, opener } = await openHelp(user);
+    const close = within(dialog).getByRole('button', { name: 'Close modal' });
+    const footerClose = within(dialog).getByRole('button', { name: 'Close', exact: true });
+
+    await user.tab({ shift: true });
+    expect(footerClose).toHaveFocus();
+    await user.tab();
+    expect(close).toHaveFocus();
+    await user.tab();
+    expect(within(dialog).getByRole('button', { name: 'Commands' })).toHaveFocus();
+    await user.tab();
+    expect(within(dialog).getByRole('button', { name: 'Troubleshooting' })).toHaveFocus();
+    await user.keyboard('{Enter}');
+    const topic = within(dialog).getByRole('button', { name: /^Music won't play/ });
+    topic.focus();
+    await user.keyboard(' ');
+    expect(within(dialog).getByText(/Verify your music provider/)).toBeInTheDocument();
+    expect(voiceHarness.startRecording).not.toHaveBeenCalled();
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog', { name: 'Help' })).not.toBeInTheDocument();
+    expect(opener).toHaveFocus();
+
+    await openHelp(user);
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog', { name: 'Help' })).not.toBeInTheDocument();
+    expect(opener).toHaveFocus();
+  });
+
+  it('still releases a PTT hotkey held before Help opens', async () => {
+    const { user } = render(<SmartDisplay />);
+    const now = vi.spyOn(performance, 'now').mockReturnValue(1000);
+    fireEvent.keyDown(document.body, { key: ' ', code: 'Space' });
+    expect(voiceHarness.startRecording).toHaveBeenCalledTimes(1);
+    const { dialog } = await openHelp(user);
+    now.mockReturnValue(2000);
+
+    fireEvent.keyUp(within(dialog).getByRole('button', { name: 'Commands' }), { key: ' ', code: 'Space' });
+
+    expect(voiceHarness.stopRecording).toHaveBeenCalledTimes(1);
+    expect(dialog).toBeInTheDocument();
+  });
 });
 
 describe('SmartDisplay', () => {
