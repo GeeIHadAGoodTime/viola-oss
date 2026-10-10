@@ -30,7 +30,7 @@ function acceptedResponse() {
   return {
     ok: true,
     status: 200,
-    json: async () => ({ ok: true, data: { accepted: true } }),
+    json: async () => ({ ok: true, error: null, data: { accepted: true } }),
   };
 }
 
@@ -74,6 +74,146 @@ describe('PhoneToSModal', () => {
     expect(Object.keys(headers).some((name) => name.toLowerCase() === 'authorization')).toBe(false);
     expect(onAccepted).toHaveBeenCalledWith({ accepted: true });
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ['null JSON', null],
+    ['empty object', {}],
+    ['array', []],
+    ['string', 'accepted'],
+    ['boolean', true],
+    ['missing data', { ok: true }],
+    ['null data', { ok: true, data: null }],
+    ['missing acceptance', { ok: true, data: {} }],
+    ['rejected acceptance', { ok: true, data: { accepted: false } }],
+    ['truthy string acceptance', { ok: true, data: { accepted: 'true' } }],
+    ['truthy numeric acceptance', { ok: true, data: { accepted: 1 } }],
+    ['missing success flag', { data: { accepted: true } }],
+    ['truthy success flag', { ok: 'true', data: { accepted: true } }],
+    ['unwrapped acceptance', { accepted: true }],
+    ['top-level acceptance', { ok: true, accepted: true }],
+  ])('requires explicit server acknowledgment for HTTP-success with %s', async (_label, body) => {
+    const fetchSpy = vi.fn()
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => body })
+      .mockResolvedValueOnce(acceptedResponse());
+    vi.stubGlobal('fetch', fetchSpy);
+    const { user, onClose, onAccepted } = renderOpenModal();
+
+    await user.click(screen.getByRole('button', { name: /i agree/i }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not save acceptance. Try again.');
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /i agree/i })).toBeEnabled();
+    expect(screen.getByRole('button', { name: /cancel/i })).toBeEnabled();
+    expect(onAccepted).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+    await user.click(screen.getByRole('button', { name: /i agree/i }));
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    expect(onAccepted).toHaveBeenCalledExactlyOnceWith({ accepted: true });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ['undecodable body', 200],
+    ['empty body', 204],
+  ])('keeps HTTP-success with an %s open and lets the user cancel', async (_label, status) => {
+    const fetchSpy = vi.fn().mockResolvedValue({
+      ok: true,
+      status,
+      json: async () => { throw new SyntaxError('Unexpected end of JSON input'); },
+    });
+    vi.stubGlobal('fetch', fetchSpy);
+    const { user, onClose, onAccepted } = renderOpenModal();
+
+    await user.click(screen.getByRole('button', { name: /i agree/i }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not save acceptance. Try again.');
+    expect(onAccepted).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: /cancel/i }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(onAccepted).not.toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ['HTTP rejection', false, { ok: true, error: null, data: { accepted: true } }, 'Could not save acceptance. Try again.'],
+    ['envelope rejection', true, { ok: false, error: { message: 'Acceptance rejected' }, data: { accepted: true } }, 'Acceptance rejected'],
+    ['contradictory error', true, { ok: true, error: { message: 'Acceptance not saved' }, data: { accepted: true } }, 'Acceptance not saved'],
+  ])('does not accept an explicit accepted flag with %s', async (_label, ok, body, message) => {
+    const fetchSpy = vi.fn().mockResolvedValue({ ok, status: ok ? 200 : 503, json: async () => body });
+    vi.stubGlobal('fetch', fetchSpy);
+    const { user, onClose, onAccepted } = renderOpenModal();
+
+    await user.click(screen.getByRole('button', { name: /i agree/i }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(message);
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /i agree/i })).toBeEnabled();
+    expect(onAccepted).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('releases the pending state after a network failure and accepts a subsequent acknowledgment', async () => {
+    const fetchSpy = vi.fn()
+      .mockRejectedValueOnce(new TypeError('Network unavailable'))
+      .mockResolvedValueOnce(acceptedResponse());
+    vi.stubGlobal('fetch', fetchSpy);
+    const { user, onClose, onAccepted } = renderOpenModal();
+
+    await user.click(screen.getByRole('button', { name: /i agree/i }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Network unavailable');
+    expect(screen.getByRole('button', { name: /i agree/i })).toBeEnabled();
+    expect(onAccepted).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: /i agree/i }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    expect(onAccepted).toHaveBeenCalledExactlyOnceWith({ accepted: true });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('requires a fresh acknowledgment for each synthetic cloud session', async () => {
+    vi.stubGlobal('__VIOLA_API_KEY__', '');
+    clearCachedClientApiKey();
+    setCloudSession({ access_token: 'synthetic-cloud-account-a' });
+    const fetchSpy = vi.fn()
+      .mockResolvedValueOnce(acceptedResponse())
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ ok: true, data: { accepted: false } }) })
+      .mockResolvedValueOnce(acceptedResponse());
+    vi.stubGlobal('fetch', fetchSpy);
+    const first = renderOpenModal();
+
+    await first.user.click(screen.getByRole('button', { name: /i agree/i }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(first.onAccepted).toHaveBeenCalledExactlyOnceWith({ accepted: true });
+    first.unmount();
+
+    setCloudSession({ access_token: 'synthetic-cloud-account-b' });
+    const second = renderOpenModal();
+    expect(second.onAccepted).not.toHaveBeenCalled();
+    await second.user.click(screen.getByRole('button', { name: /i agree/i }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not save acceptance. Try again.');
+    expect(second.onAccepted).not.toHaveBeenCalled();
+    expect(second.onClose).not.toHaveBeenCalled();
+    await second.user.click(screen.getByRole('button', { name: /i agree/i }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+
+    expect(fetchSpy.mock.calls.map(([url, options]) => [url, options.method, options.headers.Authorization]))
+      .toEqual([
+        ['/v1/phone/accept-tos', 'POST', 'Bearer synthetic-cloud-account-a'],
+        ['/v1/phone/accept-tos', 'POST', 'Bearer synthetic-cloud-account-b'],
+        ['/v1/phone/accept-tos', 'POST', 'Bearer synthetic-cloud-account-b'],
+      ]);
+    expect(second.onAccepted).toHaveBeenCalledExactlyOnceWith({ accepted: true });
+    expect(second.onClose).toHaveBeenCalledTimes(1);
   });
 
   it('keeps the dialog open on a backend rejection and retries with a rotated cookie', async () => {

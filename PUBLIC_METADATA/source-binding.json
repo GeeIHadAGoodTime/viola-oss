@@ -1,20 +1,14 @@
 {
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "38111c30c6f2206496aa183ce36c5be1f7ef73c1071e74f48286b3b189a449a8",
-  "source_tree_sha256": "63d6201cb2ae440ac77d7fc1c94377708161db89089e686876cc16b7313f2c3d",
-  "source_file_count": 2700,
-  "source_revision": "ddb3989930b69378c95dc52bec3c6df079d00346",
+  "source_manifest_sha256": "6061f35d8a006bade3e1883556d846d2bdd57cdd9e3bbe2229b617b75788295c",
+  "source_tree_sha256": "8d613743994e8aaa4c57857b8f56190f1b0eaf96ea012e4ec04d9dd9509a9e44",
+  "source_file_count": 2698,
+  "source_revision": "eb157ff45cf3f5ff41f126f284e486397d6e511e",
   "comparison_public_revision": "50e1382aee7d26ad4e4eb826124ebbe1943b2338",
   "changed_source_paths": [
-    "SOURCE/ui/react-app/src/SmartDisplay.jsx",
-    "SOURCE/ui/react-app/src/__tests__/SmartDisplay.test.jsx",
-    "SOURCE/ui/react-app/src/components/CallConsultation.jsx",
-    "SOURCE/ui/react-app/src/components/CallConsultation.test.jsx",
-    "SOURCE/ui/react-app/src/components/PhoneCallPanel.jsx",
-    "SOURCE/ui/react-app/src/components/PhoneCallPanel.test.jsx",
-    "SOURCE/ui/react-app/src/hooks/useCallConsultationReply.js",
-    "SOURCE/ui/react-app/src/hooks/useCallConsultationReply.test.jsx"
+    "SOURCE/ui/react-app/src/components/PhoneToSModal.jsx",
+    "SOURCE/ui/react-app/src/components/PhoneToSModal.test.jsx"
   ],
   "retained_sboms": [
     {
@@ -76,98 +70,126 @@
     }
   ],
   "input_equivalence": {
-    "comparison_basis": "Protected public source base 50e1382aee7d26ad4e4eb826124ebbe1943b2338",
+    "comparison_basis": "Protected public main 50e1382aee7d26ad4e4eb826124ebbe1943b2338",
     "all_unselected_export_leaf_bytes_and_modes_preserved": true,
     "all_six_sbom_bytes_and_status_objects_preserved": true,
     "dependency_workflow_notice_model_pricing_and_customer_speech_inputs_unchanged": true,
-    "scope": "Eight reviewed frontend source/test files for consultation reply recovery only; no endpoint, backend, provider or deployment changes."
+    "scope": "PhoneToSModal acknowledgment validation and synthetic component regressions only. Exact terms, recording/transcription defaults, server account scoping, and phone-call behavior are unchanged."
   },
   "qualification": {
-    "scope": "Retain unconfirmed consultation replies and correlate local acknowledgement to the captured question payload.",
-    "source_commit": "ddb3989930b69378c95dc52bec3c6df079d00346",
-    "source_tree": "885ec128dfb3e82e7e62613a0dd17e4e3e9610c6",
+    "scope": "Require explicit successful Phone Terms acknowledgment before success notification or dismissal.",
+    "source_commit": "eb157ff45cf3f5ff41f126f284e486397d6e511e",
+    "source_tree": "cc86b6bd6c0bcad8c190b5ce061218d1f9868100",
     "ordered_source_parents": [
       "50e1382aee7d26ad4e4eb826124ebbe1943b2338"
     ],
-    "reviewed_combined_patch_sha256": "ddcc5445c3dad8254051ac08bb4edd5a596ef2d6521858ab0a1eff79a1a0ea64",
-    "publication_status": "Exact source approved by independent and parent review; metadata frozen for parent review before publication. Required integration checks remain mandatory.",
+    "reviewed_combined_patch_sha256": "372ef9e35feb65ade7a057d3a31f7319b4072408cc2f5c14baeaf6a0d40349a3",
+    "publication_status": "Identical reviewed source tree published as a GitHub commit object; metadata, branch and draft PR publication pending.",
     "independent_automated_review": {
-      "result": "PASS; independent source/contract review found no blocker and eight additional adversarial tests passed.",
-      "verification_sha256": "67cc8797e70d300d5833f774bc87ea924372ce313a5bddb3045e52e76ee01819",
-      "test_log_sha256": "44e8aa65d906eab0bb455210b8833d6e12f5e25f1ce90bf474512382e66f43c9",
-      "scope": "Eight additional synthetic tests and verification of author receipts; not an independent full frontend rerun."
+      "result": "PASS: parent independently reviewed the two exact files, server response contract and existing flow; all 93 focused component/authFetch/CSRF tests independently passed."
     },
     "source_controls": {
       "focused_frontend": {
-        "tests_passed": 50,
+        "tests_passed": 93,
         "tests_failed": 0,
         "files": 3,
-        "log_sha256": "71a82b29b0d1644c1fd51b301c76c175fc8c8d4281f3ed862a0de2feff9fc26b"
+        "log_sha256": "975b91a0f94faddd1db617986b421b725b6db76f56c9e298cbff93cfa1d59514"
       },
-      "smartdisplay_bounded_batches": {
-        "expected_cases": 196,
-        "unique_passed_cases": 196,
-        "tests_failed": 0,
-        "summary_sha256": "65bf4481992dc0b2985ca5613b2bb7f8e24d7bab02ca97c6f04d553106cb0df2",
-        "scope": "Every expected SmartDisplay test passed in a successful bounded serial batch. Failed larger attempts remain recorded."
+      "known_bad_control": {
+        "unmodified_source_tests_failed": 19,
+        "tests_passed": 15,
+        "tests_total": 34,
+        "log_sha256": "774f57c30f47ba98025615e46db1c98899a40c382ab138a894ca1f2cba28f11a"
       },
-      "total_bounded_frontend_passes": 246,
-      "mutation_controls": {
-        "regressions_rejected": 3,
-        "receipt_sha256": "bd39acd6e77cc129da04ba5afe80659e74ede281c6b4c0b4395226c8d590a3d0"
-      },
-      "changed_file_lint": {
-        "errors": 0,
-        "preexisting_smartdisplay_warnings": 11,
-        "log_sha256": "1e14e4a8487bf38317b1e862b6fe67a75167ba364a88b05c8ab14d15f6c49926",
-        "baseline_log_sha256": "c3e6862eb6613b6e3d6800c1a9fe3523f917d781e79aee3401a1b9968cf72c35"
-      }
+      "focused_lint": "PASS"
     },
     "frontend_build": {
-      "result": "BLOCKED_INCOMPLETE",
-      "exit_code": 137,
-      "phase": "Vite transformation",
-      "heap_cap_mb": 512,
-      "log_sha256": "daab63d39fd992a319ec5d16308939765f5572030a98fe2995f252cfad8ea24a",
-      "claim": "No production build qualification."
+      "result": "RESOURCE_BLOCKED_INCOMPLETE",
+      "command": "CI=1 SENTRY_AUTH_TOKEN= SENTRY_ORG= SENTRY_PROJECT= VITE_SENTRY_DSN= npm run build",
+      "attempts": [
+        {
+          "node_heap_mb": null,
+          "exit_code": 137,
+          "log_sha256": "2266d1f856743fde34786fe2d047772bd599596334b879eec338ee7539db4367"
+        },
+        {
+          "node_heap_mb": 768,
+          "exit_code": 137,
+          "log_sha256": "aa388e8adabefb9934c989ee3f2855f10f8e8ad82ecc5fbea2f9ac988e1fb4ee"
+        },
+        {
+          "node_heap_mb": 384,
+          "exit_code": 134,
+          "reason": "Node heap limit exhausted",
+          "log_sha256": "28390c9b2196850b8c8f541586238f01afbcd7cfc9804a1b57d18ea496c0826a"
+        },
+        {
+          "node_heap_mb": 512,
+          "exit_code": 137,
+          "log_sha256": "2266d1f856743fde34786fe2d047772bd599596334b879eec338ee7539db4367"
+        }
+      ],
+      "scope": "Full Vite production build did not complete in the constrained shared Linux environment. The isolated component bundle passed, which is not a full-build receipt. Hosted exact-head frontend build remains required."
     },
     "frontend_suite": {
-      "result": "FULL_REPOSITORY_AGGREGATE_NOT_RUN",
-      "bounded_cases_passed": 246,
-      "unbatched_display_attempts": "Workers exited early; not passing aggregate receipts. All 196 SmartDisplay cases subsequently passed in bounded serial batches.",
-      "attempt_log_sha256": [
-        "ccf2ea9e7d2463be9a0495ba9e3bdcfa4fa59fa3ed37d44ca9cb1cf48353c296",
-        "6a699edd5596dada8a8d77a9b42eaa7dc18e07b86fc224d7d50783ae104da4ae"
-      ],
-      "incomplete_twenty_case_batch_log_sha256": "1b1aa184a4bc39a9fb1515d2a7c9d6fa69653b984e4cec13ef7e30222f203f77"
-    },
-    "source_import_graph_bundle": {
-      "result": "PASS",
-      "log_sha256": "077bc6044b5973c5c100fa98517855a7085433f64d5e975af19ea497f000a5bb",
-      "scope": "Source/import-graph compilation with npm packages externalized; not a production build or runtime proof."
+      "result": "RESOURCE_BLOCKED_INCOMPLETE",
+      "command": "CI=1 npm run test:run -- --maxWorkers=2",
+      "exit_code": 137,
+      "log_sha256": "68b919770f263bc9e9b60a955fd32178489f60918897a98649670cb266cd1403",
+      "scope": "The all-frontend run did not finish; only the separately completed 93 focused tests are claimed as passing. Hosted exact-head full frontend suite remains required."
     },
     "public_python_contracts": {
-      "result": "PASS",
-      "command": "python -B -m unittest discover -s tests/public -v",
+      "result": "PASS_WITH_OPTIONAL_SKIP",
+      "command": "PYTHONDONTWRITEBYTECODE=1 python -B -m unittest discover -s tests/public -v",
       "tests_run": 946,
       "tests_passed": 945,
-      "tests_skipped": 1,
-      "tests_failed": 0,
-      "duration_seconds": 30.632,
-      "python_environment": "Existing isolated Help/Phone qualification environment reused unchanged; no packages installed.",
-      "scope": "Synthetic source-boundary and Python behavior tests; not provider, carrier, installed app or runtime acceptance.",
-      "log_sha256": "d665481d3b6ea58a92dfb552abb1f5740b360e30894871b0856364b92e5925f6"
+      "failures": 0,
+      "errors": 0,
+      "skipped": 1,
+      "skip_reason": "PySide6 unavailable; source-method contracts still run",
+      "log_sha256": "25418f50609c55213b627b4e9112595d2659b0fd1bd5420607c664f7106e4f4a",
+      "environment": {
+        "python": "3.12.14",
+        "source": "Exact local source commit e1676275ebb9ecd9dc1eafa6f16b2ab275e3243e",
+        "dependencies": "Reused read-only aligned temporary Linux venv/package target; unchanged vendored pipecat-ai 0.0.108+viola.3. No package installation performed by this task. Separate owned writable data/cache/temp/log directories.",
+        "scope": "Synthetic public source contracts; not a full desktop installation, retained Windows inventory, real agreement acceptance, device, provider or carrier qualification."
+      },
+      "earlier_attempts": [
+        {
+          "result": "INCOMPLETE",
+          "exit_code": 137,
+          "log_sha256": "74faecb85590ea12f0d74ca5e6d06e18ab483ebbb6a5f78bf3fd2fa2d51d5925"
+        },
+        {
+          "result": "ENVIRONMENT_SETUP_MISMATCH",
+          "tests_run": 946,
+          "failures": 1,
+          "errors": 1,
+          "skipped": 1,
+          "reason": "PYTHONPATH was overwritten by a test subprocess and default data path was read-only. Using the existing shared venv and owned writable Viola directories resolved both without source or dependency changes.",
+          "log_sha256": "0d234fe7113d248c3f2494e06f513f0485172a157e5330ca7546ee692d78b9e2"
+        }
+      ]
     },
     "runtime_qualification": {
       "installed_windows": false,
       "rendered_browser": false,
-      "real_call_or_account": false,
-      "real_terms_acceptance": false,
-      "provider_or_carrier": false,
+      "real_agreement_acceptance": false,
+      "live_account_switch": false,
+      "real_provider_or_carrier": false,
       "deployment_or_release": false
     },
-    "api_limit": "The existing backend identifies pending work by call ID only and has no question token. This patch protects local UI state; it does not establish server-side question correlation or network exactly-once delivery.",
-    "preserved_limits": "All six SBOM bytes and their historical status objects retained unchanged. No fresh Windows dependency inventory, advisory scan, production build, installed runtime, provider or release qualification."
+    "preserved_limits": "Retained SBOM bytes and historical status objects unchanged. No fresh Windows dependency inventory, release qualification, or live agreement/account/call claim.",
+    "tested_local_source_commit": "e1676275ebb9ecd9dc1eafa6f16b2ab275e3243e",
+    "source_identity_verification": {
+      "source_commit": "eb157ff45cf3f5ff41f126f284e486397d6e511e",
+      "source_tree": "cc86b6bd6c0bcad8c190b5ce061218d1f9868100",
+      "parents": [
+        "50e1382aee7d26ad4e4eb826124ebbe1943b2338"
+      ],
+      "url": "https://github.com/GeeIHadAGoodTime/viola-oss/commit/eb157ff45cf3f5ff41f126f284e486397d6e511e",
+      "tested_local_source_commit": "e1676275ebb9ecd9dc1eafa6f16b2ab275e3243e"
+    }
   },
   "historical_bindings": [
     {
@@ -12206,50 +12228,20 @@
     }
   ],
   "reviewed_source_patch": {
-    "scope": "Eight exact independently reviewed consultation frontend files only.",
-    "patch_sha256": "ddcc5445c3dad8254051ac08bb4edd5a596ef2d6521858ab0a1eff79a1a0ea64",
+    "scope": "Two exact independently reviewed Phone Terms files only.",
+    "patch_sha256": "372ef9e35feb65ade7a057d3a31f7319b4072408cc2f5c14baeaf6a0d40349a3",
     "base_revision": "50e1382aee7d26ad4e4eb826124ebbe1943b2338",
-    "source_revision": "ddb3989930b69378c95dc52bec3c6df079d00346",
+    "source_revision": "eb157ff45cf3f5ff41f126f284e486397d6e511e",
     "files": [
       {
-        "path": "SOURCE/ui/react-app/src/SmartDisplay.jsx",
-        "sha256": "ceb966e06b5042e83e603efe72bffeded6a1155fe24b6441d1646708329fa03d",
-        "baseline_sha256": "dab28734312bbbcab3038ae810ae73a0bd41a190194e1489d9234d0a839449ad"
+        "path": "SOURCE/ui/react-app/src/components/PhoneToSModal.jsx",
+        "base_sha256": "f7d18e6fe89ec3d746ca44f49a601d75b93619d26478d6e6a4ee1dab884494bd",
+        "final_sha256": "503980ff70aa5b8d46083c2e56dd075597866981e1ba2c0d4e5e34216a6e0c92"
       },
       {
-        "path": "SOURCE/ui/react-app/src/__tests__/SmartDisplay.test.jsx",
-        "sha256": "59c5e8beb018d9ba510c2108ebf35ed47acc9c00036187fde10363912f5a2ef5",
-        "baseline_sha256": "0795fa55996da366fa484650e118b1dcccae3d2bee352c8ac74d3f53411963d3"
-      },
-      {
-        "path": "SOURCE/ui/react-app/src/components/CallConsultation.jsx",
-        "sha256": "ad63f49dbcdc3a195b5eb3508269b0ba5fe4c8d3e3c193bdc7bf27a23271c65e",
-        "baseline_sha256": "21d4fbd44827b87b7079847add0aa28827fe85e7983a808fe644ef8735603d88"
-      },
-      {
-        "path": "SOURCE/ui/react-app/src/components/CallConsultation.test.jsx",
-        "sha256": "bea745d170a7605b5fa2d2a80818f06850fab12a8c0ad8c63cd628f806f388d1",
-        "baseline_sha256": "946e1ed38d079b4728ddf6fc2e29e89cda5c0cc3e3faec1e7141668a1fc76044"
-      },
-      {
-        "path": "SOURCE/ui/react-app/src/components/PhoneCallPanel.jsx",
-        "sha256": "d2dfc4fa1530c86eeb066755af882b862e300c4bd662424d429e369e7d63fc65",
-        "baseline_sha256": "4ddcafe352a7c790fcac5a49ac45ea04f5e40849c9d800b94ef747be2b41a4cf"
-      },
-      {
-        "path": "SOURCE/ui/react-app/src/components/PhoneCallPanel.test.jsx",
-        "sha256": "b25b5f643a51ca2ea6d637229314790814ff23609d8604bbdc1e4192a87b4141",
-        "baseline_sha256": "2792657b47fba390cb73a4253492a928c5548d50eaf51cbeb433437f8797a1f8"
-      },
-      {
-        "path": "SOURCE/ui/react-app/src/hooks/useCallConsultationReply.js",
-        "sha256": "faa00f93c09d7c621949e4c9ca0182c5fcae32db22a9496fcc5e55e7a125fd8f",
-        "baseline_sha256": null
-      },
-      {
-        "path": "SOURCE/ui/react-app/src/hooks/useCallConsultationReply.test.jsx",
-        "sha256": "c2df9d49b0fe7e2149e5b3a29d2d10aa5b62c477fe6c49a594952998a71f1a63",
-        "baseline_sha256": null
+        "path": "SOURCE/ui/react-app/src/components/PhoneToSModal.test.jsx",
+        "base_sha256": "42967c3e093d70a8b1c1989b7471e0cfe27312dabccadae60dc4a3f67a4450f7",
+        "final_sha256": "47df1fd3b5e57167ae73ef6c2549f017d0b3b6c2c9e2b53774015d5c8918029b"
       }
     ],
     "review_status": "PASS"
@@ -12259,8 +12251,8 @@
   "new_runtime_qualification_performed": false,
   "new_source_contract_qualification_performed": true,
   "new_static_security_scan_performed": false,
-  "new_resolution_scope": "Existing isolated frontend dependencies and qualified Help/Phone Python environment reused; no fresh selected-platform resolution.",
-  "new_advisory_scan_scope": "No fresh vulnerability or advisory assessment performed by this packet.",
+  "new_resolution_scope": "No fresh dependency resolution; existing isolated dependencies reused for source qualification.",
+  "new_advisory_scan_scope": "No fresh vulnerability audit or advisory assessment performed by this packet.",
   "account_reconciliation_previous_binding": {
     "source_revision": "f864e61381ef9e10a09333fce05210427cf7d0f6",
     "source_manifest_sha256": "9cad8bcb2f98c34d95a11545e11a57d74dbe6b28cd5db7322b7746e102801acd",
@@ -15780,7 +15772,7 @@
       }
     }
   },
-  "consultation_reply_previous_binding": {
+  "phone_tos_acknowledgment_previous_binding": {
     "public_revision": "50e1382aee7d26ad4e4eb826124ebbe1943b2338",
     "path": "PUBLIC_METADATA/source-binding.json",
     "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/50e1382aee7d26ad4e4eb826124ebbe1943b2338/PUBLIC_METADATA/source-binding.json",
