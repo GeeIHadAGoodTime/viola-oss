@@ -1,7 +1,19 @@
+import PropTypes from 'prop-types';
+import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '../test/test-utils';
 import { THEME } from '../config';
 import CallConsultation from './CallConsultation';
+
+function ReplyHarness({ onReply, ...props }) {
+  const [answer, setAnswer] = useState('');
+  return <CallConsultation {...props} reply={{ answer, setAnswer, pending: false, error: '', submit: () => onReply(props.consultation.call_id, answer.trim()) }} />;
+}
+
+ReplyHarness.propTypes = {
+  onReply: PropTypes.func.isRequired,
+  consultation: PropTypes.shape({ call_id: PropTypes.string.isRequired }).isRequired,
+};
 
 describe('CallConsultation', () => {
   it('uses the phone theme and keeps reply/takeover actions button-driven', async () => {
@@ -9,7 +21,7 @@ describe('CallConsultation', () => {
     const onTakeover = vi.fn();
     const onDismiss = vi.fn();
     const { user } = render(
-      <CallConsultation
+      <ReplyHarness
         consultation={{
           call_id: 'call-123',
           question: 'Should Viola confirm the held appointment slot?',

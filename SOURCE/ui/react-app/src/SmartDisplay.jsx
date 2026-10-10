@@ -16,6 +16,7 @@ import { useBrowserWakeWord } from './hooks/useBrowserWakeWord';
 import HandsFreeMicIndicator from './components/voice/HandsFreeMicIndicator';
 import useCallAudio, { fetchActiveCall, fetchCallQueue, removeQueuedCall } from './hooks/useCallAudio';
 import useCloudPhoneEvents from './hooks/useCloudPhoneEvents';
+import useCallConsultationReply from './hooks/useCallConsultationReply';
 import ToastContainer, { useToast } from './components/Toast';
 import TimerCountdown from './components/TimerCountdown';
 import { useSettings } from './hooks/useSettings';
@@ -671,6 +672,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
   // clears either on dismiss or when a new event of the same type arrives.
   const [callBriefing, setCallBriefing] = useState(null);
   const [callConsultation, setCallConsultation] = useState(null);
+  const consultationReply = useCallConsultationReply(callConsultation, setCallConsultation);
   const [lastEndedCall, setLastEndedCall] = useState(null);
   const [phoneHistoryFocusCallId, setPhoneHistoryFocusCallId] = useState(null);
   // Track the current active phone call and the metadata needed for the
@@ -904,22 +906,6 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
       }
     }
   }, [activateMusicMode, browserModeActive, browserUrl, displayMode, handleTogglePhoneMode]);
-  const handleConsultationReply = useCallback(async (callId, answer) => {
-    // Best-effort reply — the backend's primary input path is `ask_user`
-    // (voice), so this only lands if a `/v1/phone/call/{id}/reply` endpoint
-    // is wired.  Errors are swallowed so the toast still dismisses cleanly.
-    try {
-      await authFetch(`/v1/phone/call/${encodeURIComponent(callId)}/reply`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'same-origin',
-        body: JSON.stringify({ answer }),
-      });
-    } catch {
-      /* silent — see comment above */
-    }
-    setCallConsultation(null);
-  }, []);
   const handleConsultationTakeover = useCallback(async (callId) => {
     if (!callId || callOwnerTakeoverPending) return;
     setCallOwnerTakeoverPending(true);
@@ -3311,7 +3297,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
       onSendOperatorMessage={sendCallOperatorMessage}
       onOpenHistory={handleOpenPhoneHistory}
       activeConsultation={activeInlineConsultation}
-      onConsultationReply={handleConsultationReply}
+      consultationReply={consultationReply}
       onConsultationTakeover={handleConsultationTakeover}
       queuedCalls={phoneCallQueue}
       onRemoveQueuedCall={handleRemoveQueuedCall}
@@ -3816,7 +3802,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
       {!activeInlineConsultation && (
         <CallConsultation
           consultation={callConsultation}
-          onReply={handleConsultationReply}
+          reply={consultationReply}
           onTakeover={handleConsultationTakeover}
           onDismiss={() => setCallConsultation(null)}
         />
