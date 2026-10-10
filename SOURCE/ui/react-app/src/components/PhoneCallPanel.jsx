@@ -115,7 +115,7 @@ export default function PhoneCallPanel({
   onSendOperatorMessage,
   onOpenHistory = () => {},
   activeConsultation = null,
-  onConsultationReply = () => {},
+  consultationReply = null,
   onConsultationTakeover = () => {},
   queuedCalls = [],
   onRemoveQueuedCall = () => {},
@@ -125,7 +125,8 @@ export default function PhoneCallPanel({
   const fallbackStartRef = useRef(Date.now());
   const [nowMs, setNowMs] = useState(Date.now());
   const [operatorText, setOperatorText] = useState('');
-  const [consultAnswer, setConsultAnswer] = useState('');
+  const consultAnswer = consultationReply?.answer || '';
+  const consultPending = consultationReply?.pending || false;
   const startedMs = useMemo(
     () => parseStartedAt(callMeta.started_at, fallbackStartRef.current),
     [callMeta.started_at]
@@ -153,10 +154,6 @@ export default function PhoneCallPanel({
     }
   }, [transcripts]);
 
-  useEffect(() => {
-    setConsultAnswer('');
-  }, [activeConsultation?.call_id, activeConsultation?.question]);
-
   const handleOperatorSubmit = (event) => {
     event.preventDefault();
     const message = operatorText.trim();
@@ -179,10 +176,7 @@ export default function PhoneCallPanel({
 
   const handleConsultSubmit = (event) => {
     event.preventDefault();
-    const answer = consultAnswer.trim();
-    if (!answer || !activeConsultation) return;
-    onConsultationReply(activeConsultation.call_id || callId, answer);
-    setConsultAnswer('');
+    if (activeConsultation) void consultationReply?.submit();
   };
 
   return (
@@ -491,6 +485,7 @@ export default function PhoneCallPanel({
       {activeConsultation && (
         <form
           data-testid="phone-call-consult-inline"
+          aria-busy={consultPending}
           onSubmit={handleConsultSubmit}
           style={{
             marginTop: 10,
@@ -507,11 +502,15 @@ export default function PhoneCallPanel({
           <div style={{ color: THEME.colors.textPrimary, fontSize: 13, lineHeight: 1.4, marginBottom: 10 }}>
             {activeConsultation.question}
           </div>
+          {consultationReply?.error && (
+            <p role="alert" style={{ color: THEME.colors.statusYellow, fontSize: 13 }}>{consultationReply.error}</p>
+          )}
           <div style={{ display: 'flex', gap: 8, minWidth: 0 }}>
             <input
               type="text"
               value={consultAnswer}
-              onChange={(event) => setConsultAnswer(event.target.value)}
+              onChange={(event) => consultationReply?.setAnswer(event.target.value)}
+              disabled={consultPending || !consultationReply}
               placeholder="Reply to the call agent..."
               data-testid="phone-call-consult-input"
               style={{
@@ -527,20 +526,20 @@ export default function PhoneCallPanel({
             />
             <button
               type="submit"
-              disabled={!consultAnswer.trim()}
+              disabled={consultPending || !consultAnswer.trim()}
               style={{
                 flexShrink: 0,
                 padding: '9px 13px',
                 borderRadius: 8,
                 border: 'none',
-                backgroundColor: consultAnswer.trim() ? THEME.colors.statusYellow : THEME.colors.borderSubtle,
-                color: consultAnswer.trim() ? THEME.colors.bgVoid : THEME.colors.textMuted,
+                backgroundColor: !consultPending && consultAnswer.trim() ? THEME.colors.statusYellow : THEME.colors.borderSubtle,
+                color: !consultPending && consultAnswer.trim() ? THEME.colors.bgVoid : THEME.colors.textMuted,
                 fontSize: 13,
                 fontWeight: 700,
-                cursor: consultAnswer.trim() ? 'pointer' : 'default',
+                cursor: !consultPending && consultAnswer.trim() ? 'pointer' : 'default',
               }}
             >
-              Reply
+              {consultPending ? 'Sending...' : 'Reply'}
             </button>
             <button
               type="button"
@@ -778,7 +777,13 @@ PhoneCallPanel.propTypes = {
     question: PropTypes.string,
     urgency: PropTypes.string,
   }),
-  onConsultationReply: PropTypes.func,
+  consultationReply: PropTypes.shape({
+    answer: PropTypes.string.isRequired,
+    setAnswer: PropTypes.func.isRequired,
+    pending: PropTypes.bool.isRequired,
+    error: PropTypes.string.isRequired,
+    submit: PropTypes.func.isRequired,
+  }),
   onConsultationTakeover: PropTypes.func,
   queuedCalls: PropTypes.arrayOf(PropTypes.shape({
     queue_id: PropTypes.string,

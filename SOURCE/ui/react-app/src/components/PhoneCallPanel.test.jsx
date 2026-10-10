@@ -1,6 +1,18 @@
+import PropTypes from 'prop-types';
+import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '../test/test-utils';
 import PhoneCallPanel from './PhoneCallPanel';
+
+function ConsultationHarness({ onConsultationReply, ...props }) {
+  const [answer, setAnswer] = useState('');
+  return <PhoneCallPanel {...props} consultationReply={{ answer, setAnswer, pending: false, error: '', submit: () => onConsultationReply(props.activeConsultation.call_id, answer.trim()) }} />;
+}
+
+ConsultationHarness.propTypes = {
+  onConsultationReply: PropTypes.func.isRequired,
+  activeConsultation: PropTypes.shape({ call_id: PropTypes.string.isRequired }).isRequired,
+};
 
 describe('PhoneCallPanel', () => {
   it('renders mixed final and partial transcripts and fires End call', async () => {
@@ -181,7 +193,7 @@ describe('PhoneCallPanel', () => {
     const onConsultationReply = vi.fn();
     const onConsultationTakeover = vi.fn();
     const { user } = render(
-      <PhoneCallPanel
+      <ConsultationHarness
         callId="call-123"
         callMeta={{ phone_number: '+1 555 0100' }}
         onEndCall={vi.fn()}

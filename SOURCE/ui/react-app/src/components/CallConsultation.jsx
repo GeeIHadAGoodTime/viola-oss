@@ -4,23 +4,16 @@
  * Shows when Viola's phone AI needs user guidance during a call.
  * Displays the question and lets the user type an answer.
  */
-import { useCallback, useState } from 'react';
+import { useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { THEME } from '../config';
 
-export default function CallConsultation({ consultation, onReply, onTakeover = () => {}, onDismiss }) {
-  const [answer, setAnswer] = useState('');
-
-  const handleSubmit = useCallback(
-    (e) => {
-      e.preventDefault();
-      if (answer.trim()) {
-        onReply(consultation.call_id, answer.trim());
-        setAnswer('');
-      }
-    },
-    [answer, consultation, onReply]
-  );
+export default function CallConsultation({ consultation, reply, onTakeover = () => {}, onDismiss }) {
+  const { answer, setAnswer, pending, error, submit } = reply;
+  const handleSubmit = (event) => {
+    event.preventDefault();
+    void submit();
+  };
 
   const handleTakeover = useCallback(() => {
     if (consultation?.call_id) {
@@ -97,10 +90,12 @@ export default function CallConsultation({ consultation, onReply, onTakeover = (
         </div>
       )}
 
-      <form onSubmit={handleSubmit} style={{ display: 'flex', gap: 8, alignItems: 'stretch' }}>
+      {error && <p role="alert" style={{ color: THEME.colors.statusYellow, fontSize: 13 }}>{error}</p>}
+      <form aria-busy={pending} onSubmit={handleSubmit} style={{ display: 'flex', gap: 8, alignItems: 'stretch' }}>
         <input
           type="text"
           value={answer}
+          disabled={pending}
           onChange={(e) => setAnswer(e.target.value)}
           placeholder="Type what Viola should say..."
           autoFocus
@@ -119,19 +114,19 @@ export default function CallConsultation({ consultation, onReply, onTakeover = (
         />
         <button
           type="submit"
-          disabled={!answer.trim()}
+          disabled={pending || !answer.trim()}
           style={{
             flexShrink: 0,
             padding: '9px 16px',
             borderRadius: 8,
             border: 'none',
-            backgroundColor: answer.trim() ? THEME.colors.accent : THEME.colors.glassBase,
-            color: answer.trim() ? '#fff' : THEME.colors.textMuted,
+            backgroundColor: !pending && answer.trim() ? THEME.colors.accent : THEME.colors.glassBase,
+            color: !pending && answer.trim() ? '#fff' : THEME.colors.textMuted,
             fontWeight: 700,
-            cursor: answer.trim() ? 'pointer' : 'default',
+            cursor: !pending && answer.trim() ? 'pointer' : 'default',
           }}
         >
-          Send
+          {pending ? 'Sending...' : 'Send'}
         </button>
         <button
           type="button"
@@ -160,7 +155,13 @@ CallConsultation.propTypes = {
     question: PropTypes.string,
     urgency: PropTypes.string,
   }),
-  onReply: PropTypes.func.isRequired,
+  reply: PropTypes.shape({
+    answer: PropTypes.string.isRequired,
+    setAnswer: PropTypes.func.isRequired,
+    pending: PropTypes.bool.isRequired,
+    error: PropTypes.string.isRequired,
+    submit: PropTypes.func.isRequired,
+  }).isRequired,
   onTakeover: PropTypes.func,
   onDismiss: PropTypes.func.isRequired,
 };

@@ -2833,3 +2833,62 @@ describe('SmartDisplay bounded Next recovery through the actual API adapter', ()
   });
 
 });
+
+describe('SmartDisplay consultation reply recovery', () => {
+  const consultation = { call_id: 'synthetic-call-A', question: 'Approve synthetic option A?' };
+  const emit = (payload) => act(() => wsHarness.handler({ type: 'call_consultation', payload }));
+  let replyRequest;
+  let authFetch;
+
+  beforeEach(async () => {
+    ({ authFetch } = await import('../hooks/useViolaApi'));
+    replyRequest = vi.fn();
+    authFetch.mockImplementation((url) => url.endsWith('/reply')
+      ? replyRequest()
+      : Promise.resolve({ ok: true, json: async () => ({}) }));
+  });
+  afterEach(() => authFetch.mockReset().mockResolvedValue({ ok: true, json: async () => ({}) }));
+
+  it('retains a failed popup answer and retries successfully from the inline form', async () => {
+    replyRequest.mockResolvedValueOnce({ ok: false, status: 500 })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true }) });
+    const { user } = render(<SmartDisplay />);
+    emit(consultation);
+    const popupInput = screen.getByPlaceholderText('Type what Viola should say...');
+    fireEvent.change(popupInput, { target: { value: 'Keep this exact draft' } });
+    fireEvent.submit(popupInput.closest('form'));
+    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't confirm your reply");
+    expect(popupInput).toHaveValue('Keep this exact draft');
+    expect(document.title).toContain('Viola needs you');
+    await user.click(screen.getByTestId('stage-pill-phone'));
+    const inlineInput = await screen.findByTestId('phone-call-consult-input');
+    expect(inlineInput).toHaveValue('Keep this exact draft');
+    expect(screen.getByRole('alert')).toHaveTextContent("Couldn't confirm your reply");
+    fireEvent.submit(inlineInput.closest('form'));
+    await waitFor(() => expect(screen.queryByTestId('phone-call-consult-input')).not.toBeInTheDocument());
+    expect(screen.getByTestId('phone-call-panel')).toBeInTheDocument();
+    expect(document.title).not.toContain('Viola needs you');
+    expect(replyRequest).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([
+    ['next question', { ...consultation, question: 'Approve synthetic option B?' }],
+    ['next call', { call_id: 'synthetic-call-B', question: 'Approve synthetic option C?' }],
+    ['same wording in a new event', { ...consultation }],
+  ])('keeps the %s and its draft after an old reply succeeds', async (_label, next) => {
+    let finish;
+    replyRequest.mockReturnValue(new Promise(resolve => { finish = resolve; }));
+    render(<SmartDisplay />);
+    emit(consultation);
+    const getInput = () => screen.getByPlaceholderText('Type what Viola should say...');
+    fireEvent.change(getInput(), { target: { value: 'Old draft' } });
+    fireEvent.submit(getInput().closest('form'));
+    emit(next);
+    expect(getInput()).toHaveValue('');
+    fireEvent.change(getInput(), { target: { value: 'New draft' } });
+    await act(async () => finish({ ok: true, json: async () => ({ ok: true }) }));
+    expect(getInput()).toHaveValue('New draft');
+    expect(document.title).toContain('Viola needs you');
+    expect(replyRequest).toHaveBeenCalledTimes(1);
+  });
+});
