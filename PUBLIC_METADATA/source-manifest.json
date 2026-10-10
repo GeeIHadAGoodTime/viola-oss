@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "0f4d8f8ba54e0f66736f2f8aa58e57b023ef5a4f",
-  "sha256": "f890b03d89d34a14584b4a10797f2767dd7a85d5ce0439889c977f402162f87c",
+  "revision": "218ab5377b68c07df0a82c48b156b3ddebcb06c1",
+  "sha256": "7c5c4948f9ffc5b25450a76bc494cb4ad39f79d0a2dbb7f8ba3a1b90a40c2712",
   "files": [
     {
       "path": ".env.example",
@@ -9960,8 +9960,8 @@
     },
     {
       "path": "ui/react-app/src/SmartDisplay.jsx",
-      "sha256": "dab28734312bbbcab3038ae810ae73a0bd41a190194e1489d9234d0a839449ad",
-      "bytes": 173141
+      "sha256": "5ea9a825ed8dfa182f7026f1797b0de649ba31a4e052b3c1e7bd33e6d39b5a18",
+      "bytes": 173185
     },
     {
       "path": "ui/react-app/src/SmartDisplay.spokePolicy.test.jsx",
@@ -9990,8 +9990,8 @@
     },
     {
       "path": "ui/react-app/src/__tests__/SmartDisplay.test.jsx",
-      "sha256": "0795fa55996da366fa484650e118b1dcccae3d2bee352c8ac74d3f53411963d3",
-      "bytes": 120438
+      "sha256": "41846621ccb48cd1913f2e9c8419ce26c8544716847932d31761502bb53e691c",
+      "bytes": 127132
     },
     {
       "path": "ui/react-app/src/__tests__/hooks/useEventBus.test.jsx",

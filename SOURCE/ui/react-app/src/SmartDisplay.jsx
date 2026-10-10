@@ -2869,7 +2869,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
       if (!isCommandPaletteShortcut(event)) return;
       if (shouldIgnoreCommandPaletteShortcut(event, {
         commandPaletteOpen,
-        modalOpen: settingsOpen || queueOpen || historyOpen || roomsOpen || bugReportOpen || workbenchPanelOpen,
+        modalOpen: settingsOpen || queueOpen || historyOpen || roomsOpen || helpOpen || bugReportOpen || workbenchPanelOpen,
       })) {
         return;
       }
@@ -2878,7 +2878,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
     };
     document.addEventListener('keydown', handleCommandPaletteShortcut);
     return () => document.removeEventListener('keydown', handleCommandPaletteShortcut);
-  }, [bugReportOpen, commandPaletteOpen, historyOpen, queueOpen, roomsOpen, settingsOpen, workbenchPanelOpen]);
+  }, [bugReportOpen, commandPaletteOpen, helpOpen, historyOpen, queueOpen, roomsOpen, settingsOpen, workbenchPanelOpen]);
 
   // Keyboard input handling
   const pttHotkeyHeldRef = React.useRef('');
@@ -2948,7 +2948,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
   }, [micMuted, updateSetting, userSettings?.show_notifications, addToast, removeToast, finishMicMuteChange]);
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (settingsOpen || queueOpen || historyOpen || roomsOpen || bugReportOpen || workbenchPanelOpen || commandPaletteOpen) return;
+      if (settingsOpen || queueOpen || historyOpen || roomsOpen || helpOpen || bugReportOpen || workbenchPanelOpen || commandPaletteOpen) return;
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
       if (isHotkeyEvent(e, muteHotkey) && !isTyping && !e.repeat) {
         e.preventDefault();
@@ -3004,7 +3004,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
     document.addEventListener('keydown', handleKeyDown);
     document.addEventListener('keyup', handleKeyUp);
     return () => { document.removeEventListener('keydown', handleKeyDown); document.removeEventListener('keyup', handleKeyUp); };
-  }, [isTyping, typingInput, settingsOpen, queueOpen, historyOpen, roomsOpen, bugReportOpen, workbenchPanelOpen, commandPaletteOpen, pttHotkey, muteHotkey, toggleMicMuted, api, handlePTTStart, handlePTTEnd, handleCommandResult, interceptCloudConsent]);
+  }, [isTyping, typingInput, settingsOpen, queueOpen, historyOpen, roomsOpen, helpOpen, bugReportOpen, workbenchPanelOpen, commandPaletteOpen, pttHotkey, muteHotkey, toggleMicMuted, api, handlePTTStart, handlePTTEnd, handleCommandResult, interceptCloudConsent]);
 
   const formatTime = (date) => formatTimeDisplay(date, userSettings.time_display_format || 'auto');
   const formatDate = (date) => date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
