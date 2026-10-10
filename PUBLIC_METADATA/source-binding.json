@@ -1,20 +1,16 @@
 {
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "55ce7e7abc8ff435084087c5d1425ab9d7c2e51d96a5e0233099d7c9c1e4d879",
-  "source_tree_sha256": "4b5cb26a152ce2eb1f75a4154be85b8d5585c5e9a7cac9f01bc62b8629789cf8",
-  "source_file_count": 2700,
-  "source_revision": "426a76512c29ee19ed24981928a81dcfa793ac8b",
-  "comparison_public_revision": "d27264777c7e9ba1c356d626eedeb73ab5b16195",
+  "source_manifest_sha256": "f8a778b148a823e047d70b315fbb68238b24bdbdcc5e734a93c79be223344296",
+  "source_tree_sha256": "4f70d65c2e5ea24c1c765fad385ae745b4ea9bd8b32b2cb1888f13f1da9b0c48",
+  "source_file_count": 2701,
+  "source_revision": "071d81d251438a4208f54581757844dd63ea5c18",
+  "comparison_public_revision": "e53a308cfabb61d38c619926c93e4bf5fd874c8f",
   "changed_source_paths": [
-    "SOURCE/ui/react-app/src/SmartDisplay.jsx",
-    "SOURCE/ui/react-app/src/__tests__/SmartDisplay.test.jsx",
-    "SOURCE/ui/react-app/src/components/CallConsultation.jsx",
-    "SOURCE/ui/react-app/src/components/CallConsultation.test.jsx",
-    "SOURCE/ui/react-app/src/components/PhoneCallPanel.jsx",
-    "SOURCE/ui/react-app/src/components/PhoneCallPanel.test.jsx",
-    "SOURCE/ui/react-app/src/hooks/useCallConsultationReply.js",
-    "SOURCE/ui/react-app/src/hooks/useCallConsultationReply.test.jsx"
+    "SOURCE/ui/react-app/src/components/topbar/TopBar.module.css",
+    "SOURCE/ui/react-app/src/components/player/PlayerSection.module.css",
+    "SOURCE/ui/react-app/src/components/voice/BottomRow.module.css",
+    "SOURCE/ui/react-app/tests/responsive_display.test.js"
   ],
   "retained_sboms": [
     {
@@ -76,103 +72,119 @@
     }
   ],
   "input_equivalence": {
-    "comparison_basis": "Landed public Phone Terms merge d27264777c7e9ba1c356d626eedeb73ab5b16195",
+    "comparison_basis": "Protected public main e53a308cfabb61d38c619926c93e4bf5fd874c8f",
     "all_unselected_export_leaf_bytes_and_modes_preserved": true,
     "all_six_sbom_bytes_and_status_objects_preserved": true,
-    "dependency_workflow_notice_model_pricing_and_customer_speech_inputs_unchanged": true,
-    "consultation_recovery_eight_files_identical_to_reviewed_public_head": "f786581c3ed19f28abf68a4b2954cd8771ecdfb7",
-    "landed_phone_terms_two_files_preserved_exactly": true,
-    "scope": "Reconcile two independently reviewed disjoint frontend source patches; no new behavior edits."
+    "source_change_scope": "Three exact previously reviewed responsive CSS files and five regression cases. Preserve current Phone Terms and call-consultation behavior; no component behavior, workflow, dependency, account, audio or provider edits.",
+    "original_reviewed_source": "b3ea1878fff99cb3dc155e9cee527e1e274761d2",
+    "original_review_time_utc": "2026-10-10T03:35:00Z",
+    "original_four_source_bytes_unchanged": true
   },
   "qualification": {
-    "scope": "Combined Phone Terms acknowledgment and consultation reply recovery source inputs.",
-    "source_commit": "426a76512c29ee19ed24981928a81dcfa793ac8b",
-    "source_tree": "421c0cb3df969ca95ac5bcec28864047d67f6c0e",
+    "scope": "Source-only supported-small-window responsive layout correction, reconciled onto current protected public main.",
+    "source_commit": "071d81d251438a4208f54581757844dd63ea5c18",
+    "source_tree": "9c66e131318562f52164cadfd5e3e12c3bbcdb24",
     "ordered_source_parents": [
-      "f786581c3ed19f28abf68a4b2954cd8771ecdfb7",
-      "d27264777c7e9ba1c356d626eedeb73ab5b16195"
+      "e53a308cfabb61d38c619926c93e4bf5fd874c8f"
     ],
-    "reviewed_combined_patch_sha256": "f66f232f4536aa1fffd60861ab3221b903c3edacf0716d7dbddc725a2e2910c9",
-    "publication_status": "Combined source and metadata frozen for independent and parent review; no branch advancement yet. New exact-head hosted checks remain mandatory.",
-    "source_controls": {
-      "focused_frontend": {
-        "tests_passed": 143,
-        "tests_failed": 0,
-        "files": 6,
-        "path": "focused-tests.log",
-        "sha256": "376dabd5c3aeda96f32bf337af9c0074672f2e4567e7a6c6ae0828f5fa7496f1"
-      },
-      "smartdisplay_bounded_batches": {
-        "expected_cases": 196,
-        "unique_passed_cases": 196,
-        "tests_failed": 0,
-        "path": "display-batches-summary.json",
-        "sha256": "a8ae6fa23046615818f934825b30f5e8bb727ad7418a95a57d78a3ed13b15aed"
-      },
-      "total_bounded_frontend_passes": 339,
-      "changed_file_lint": {
-        "errors": 0,
-        "preexisting_smartdisplay_warnings": 11,
-        "path": "lint.log",
-        "sha256": "1448361c7e38fa865e95e87450e45b5bab91eaf023d94b2f58d59dc16e8ab70b"
-      },
-      "input_equivalence": {
-        "path": "source-freeze.json",
-        "sha256": "87e4e9d4f315501feee4ecd47125b2065571d07e58ad5c2b37f0b99cca5166dc"
+    "reviewed_combined_patch_sha256": "b68670ba9ca3ac057fd2710360d7aaac9296d852d663ebc793461b3d15d09dd4",
+    "publication_status": "Prepared for independent current-base metadata review and draft PR; exact-head hosted checks remain pending.",
+    "original_source_review": {
+      "result": "PASS for the exact unchanged three CSS files and five regression cases.",
+      "review_time_utc": "2026-10-10T03:35:00Z",
+      "source_commit": "b3ea1878fff99cb3dc155e9cee527e1e274761d2",
+      "source_file_sha256": {
+        "SOURCE/ui/react-app/src/components/topbar/TopBar.module.css": "3ce64d1edf182301b81f1692b6b23a3a17eb1b31b58be96acaee72f9dce72559",
+        "SOURCE/ui/react-app/src/components/player/PlayerSection.module.css": "a3c5d78933da5cfcaba0c912fd110b75b887f6ee3548e895767f3022bb81e67a",
+        "SOURCE/ui/react-app/src/components/voice/BottomRow.module.css": "7b26289d3361b576544990672a701c8f08c4458e6818b050805b8d46a01e468c",
+        "SOURCE/ui/react-app/tests/responsive_display.test.js": "4c6626743d58f963d637421bbd0f54263b7dbb35e28e1f33953f5fda65c59f7c"
       }
     },
-    "source_import_graph_bundle": {
-      "result": "PASS",
-      "path": "bundle.log",
-      "sha256": "9d43c3a2c11194f5956237fa0d01e181fafe53c98b1f4570f7edabf01150a5eb",
-      "scope": "Source/import-graph compilation with npm packages externalized; not a production build or runtime proof."
+    "current_source_qualification": {
+      "base": "e53a308cfabb61d38c619926c93e4bf5fd874c8f",
+      "base_source_files_byte_verified": 2700,
+      "focused_tests_passed": 40,
+      "focused_tests_failed": 0,
+      "focused_receipt_sha256": "8b96bf29f24fe0e9d1feabe36e2396ccd66267f37bca3ef51835e2cc97eb4d3c",
+      "known_bad_base_control": "Four intended CSS assertions fail; large/phone positive case passes. Exact candidate bytes restored afterward.",
+      "known_bad_receipt_sha256": "7da2d546e1ae3b408490ded02ba3a3779a2bbb84cba6eb406efd629bb89f85b9",
+      "frontend_build": "PASS: production Vite build using existing locked dependencies; no source-map upload.",
+      "build_log_sha256": "7350f75a432ff0ef4ec38277c47b7e1edda2431080b6702402332a72b484d791",
+      "full_frontend_suite": "Not rerun for this reconciliation. Required exact-head public frontend check remains pending."
     },
-    "frontend_build": {
-      "result": "PENDING_EXACT_HEAD_HOSTED",
-      "local_rerun": "Not repeated; prior constrained local exit137 and other incomplete attempts remain in historical qualification."
+    "historical_frontend_qualification": {
+      "base": "50e1382aee7d26ad4e4eb826124ebbe1943b2338",
+      "all_listed_cases_passed_across_bounded_executions": 2093,
+      "monolithic_result": "512 MiB worker OOM after 2030 passes; all 192 SmartDisplay cases passed in four non-overlapping 48-case batches. No monolithic-pass or fixed-memory claim.",
+      "combined_receipt_sha256": "e9232b3c804be738819369486b908318b3707593ee1b834654ea926ec48c1885",
+      "evidence_availability": "Historical receipt and source hashes were verified again at 10:20 UTC. Original standalone local frontend logs are not present in the replacement workspace. These counts are historical, not fresh current-base qualification."
     },
-    "frontend_suite": {
-      "result": "BOUNDED_CHANGED_SCOPE_PASS_FULL_AGGREGATE_PENDING_HOSTED",
-      "bounded_cases_passed": 339
+    "rendered_source_diagnostic": {
+      "result": "Reuse exact browser-tested fixture bytes; fresh current-base browser execution blocked before tests by local socket permission.",
+      "run_url": "https://github.com/GeeIHadAGoodTime/Viola/actions/runs/38021404207",
+      "run_head": "16ba8b2230bbb2b620320437da40b63f920c2f2d",
+      "original_public_baseline": "50e1382aee7d26ad4e4eb826124ebbe1943b2338",
+      "original_result": "10 Chromium cases, 19 screenshots passed. Both original artifact ZIPs were recovered and their original hashes reverified.",
+      "artifact_id": 11658853175,
+      "artifact_zip_sha256": "06e5bf14a68de037bb332e3b2ed9a7db09d6b581f785aab6e3e41d1f387c5a5a",
+      "report_artifact_id": 11658049011,
+      "report_zip_sha256": "f515ff4982c8d5e544c1f548b8b683ffd45d58303e23e2f88309d42e00912008",
+      "current_baseline_inputs_verified": 502,
+      "current_fixture_equivalence": "All six baseline/candidate HTML, JS and CSS outputs are byte-identical to the successful original diagnostic. Extracted production shell fixture and base style hashes also match. Whole frontend input tree changed through Phone Terms and consultation work; no claim all original inputs are unchanged.",
+      "equivalence_receipt_sha256": "1efaa529048043279f9d6a2a9d0df30852a9f79e200fb360b03ba0a34b8e8ef8",
+      "current_fixture_receipt_sha256": "fbe6d4a81ccd779e793cfd37d96d001727e1a5b56ac96a6ec9027dcff14e873b",
+      "fresh_browser_result": "Two launch attempts, including the supported escalated retry, were blocked by socket() EPERM before any assertion; zero fresh browser cases passed.",
+      "fresh_attempt_log_sha256": "ef6800553ba1762193f38b72d4e92240718f377db09e48b3611c2067583fc0e1",
+      "viewports": [
+        [
+          1024,
+          696
+        ],
+        [
+          1024,
+          568
+        ],
+        [
+          1100,
+          696
+        ],
+        [
+          1279,
+          696
+        ],
+        [
+          1280,
+          688
+        ],
+        [
+          1400,
+          768
+        ],
+        [
+          1600,
+          900
+        ],
+        [
+          767,
+          700
+        ],
+        [
+          390,
+          844
+        ]
+      ],
+      "observed_result": "At 1024x696 clock/date/Music title and transport fit. At short 1024x568 and 1280x688 with long response text lower Music controls require existing contained scrolling; title, repeated Next, PTT, mode return, long content and keyboard command entry are reachable.",
+      "scope_limit": "Synthetic actual production components and extracted shell styles in Linux Chromium, not full SmartDisplay, native Qt, installed Windows, accounts, providers or physical audio."
     },
-    "public_python_contracts": {
-      "result": "NOT_RERUN_LOCALLY_AFTER_DISJOINT_FRONTEND_RECONCILIATION",
-      "source_inputs_unchanged": true,
-      "exact_head_hosted_full_suite_required": true
-    },
-    "prior_exact_head_hosted_checks": [
-      {
-        "head": "f786581c3ed19f28abf68a4b2954cd8771ecdfb7",
-        "source_run_id": 38044439082,
-        "inventory_run_id": 38044438998,
-        "checks_passed": 8,
-        "frontend_tests_passed": 2133,
-        "python_tests_run": 946,
-        "python_tests_passed": 945,
-        "python_tests_skipped": 1,
-        "scope": "Historical qualification of the previous consultation-only branch, not this combined commit."
-      },
-      {
-        "head": "10eccfa786d7eb1f7c927902e833f817baf4983d",
-        "landed_as": "d27264777c7e9ba1c356d626eedeb73ab5b16195",
-        "checks_passed": 8,
-        "frontend_tests_passed": 2110,
-        "python_tests_run": 946,
-        "python_tests_passed": 945,
-        "python_tests_skipped": 1,
-        "scope": "Historical qualification of the landed Phone Terms branch, not this combined commit."
-      }
-    ],
     "runtime_qualification": {
+      "fresh_rendered_browser": false,
+      "reused_exact_rendered_fixture_evidence": true,
       "installed_windows": false,
-      "rendered_browser": false,
-      "real_call_or_account": false,
-      "real_terms_acceptance": false,
-      "provider_or_carrier": false,
+      "physical_audio": false,
+      "real_provider": false,
       "deployment_or_release": false
     },
-    "api_limit": "The existing backend identifies pending work by call ID only and has no question token. This patch protects local UI state; it does not establish server-side question correlation or network exactly-once delivery.",
-    "preserved_limits": "Historical local failures and prior hosted successes retained separately. Combined production build, full suites, dependency inventories and audit await normal exact-head hosted checks; no runtime or release qualification."
+    "preserved_limits": "All historical binding objects and six retained SBOM byte/status records remain unchanged. No new dependency resolution, advisory audit, installed Windows, deployment or release qualification."
   },
   "historical_bindings": [
     {
@@ -7603,7 +7615,7 @@
                         "text": "Hello. This is a short test of the local speech system.",
                         "voice": "af_heart",
                         "locale": "en-us",
-                        "phonemes": "həlˈO. ðˌɪs ɪz ɐ ʃˈɔɹt tˈɛst ʌv ðə lˈOkəl spˈiʧ sˈɪstəm.",
+                        "phonemes": "h\u0259l\u02c8O. \u00f0\u02cc\u026as \u026az \u0250 \u0283\u02c8\u0254\u0279t t\u02c8\u025bst \u028cv \u00f0\u0259 l\u02c8Ok\u0259l sp\u02c8i\u02a7 s\u02c8\u026ast\u0259m.",
                         "duration_seconds": 2.986666666666667,
                         "wav_sha256": "aeaba330943123ff46d808be904e3cc47ec05291c1aee9efa78a21bb25d4fadd",
                         "float_pcm_sha256": "d27a02a2b366945758f9a7cb89ae4eaee46525807634dff9b7f295f400b8f622",
@@ -7616,7 +7628,7 @@
                         "text": "Hello. This is a short test of the local speech system.",
                         "voice": "af_heart",
                         "locale": "en-us",
-                        "phonemes": "həlˈO. ðˌɪs ɪz ɐ ʃˈɔɹt tˈɛst ʌv ðə lˈOkəl spˈiʧ sˈɪstəm.",
+                        "phonemes": "h\u0259l\u02c8O. \u00f0\u02cc\u026as \u026az \u0250 \u0283\u02c8\u0254\u0279t t\u02c8\u025bst \u028cv \u00f0\u0259 l\u02c8Ok\u0259l sp\u02c8i\u02a7 s\u02c8\u026ast\u0259m.",
                         "duration_seconds": 2.986666666666667,
                         "wav_sha256": "aeaba330943123ff46d808be904e3cc47ec05291c1aee9efa78a21bb25d4fadd",
                         "float_pcm_sha256": "d27a02a2b366945758f9a7cb89ae4eaee46525807634dff9b7f295f400b8f622",
@@ -7629,7 +7641,7 @@
                         "text": "The A P I costs $12.50, not $0.05.",
                         "voice": "af_heart",
                         "locale": "en-us",
-                        "phonemes": "ði ˈA pˈi ˌI kˈɔsts twˈɛlv dˈɑləɹz ænd fˈɪfti sˈɛnts, nˌɑt fˈIv sˈɛnts.",
+                        "phonemes": "\u00f0i \u02c8A p\u02c8i \u02ccI k\u02c8\u0254sts tw\u02c8\u025blv d\u02c8\u0251l\u0259\u0279z \u00e6nd f\u02c8\u026afti s\u02c8\u025bnts, n\u02cc\u0251t f\u02c8Iv s\u02c8\u025bnts.",
                         "duration_seconds": 3.7973333333333334,
                         "wav_sha256": "5310d8c6737e9eb874d30b15b70cd3a779d1a86904339b68831e29945307d4b6",
                         "float_pcm_sha256": "c7a016d0b527e759ba0e2ce06f0348371a99e1c9ce68e42ca38ee919cef63fa7",
@@ -7642,7 +7654,7 @@
                         "text": "The A P I costs $12.50, not $0.05.",
                         "voice": "af_heart",
                         "locale": "en-us",
-                        "phonemes": "ði ˈA pˈi ˌI kˈɔsts twˈɛlv dˈɑləɹz ænd fˈɪfti sˈɛnts, nˌɑt fˈIv sˈɛnts.",
+                        "phonemes": "\u00f0i \u02c8A p\u02c8i \u02ccI k\u02c8\u0254sts tw\u02c8\u025blv d\u02c8\u0251l\u0259\u0279z \u00e6nd f\u02c8\u026afti s\u02c8\u025bnts, n\u02cc\u0251t f\u02c8Iv s\u02c8\u025bnts.",
                         "duration_seconds": 3.7973333333333334,
                         "wav_sha256": "5310d8c6737e9eb874d30b15b70cd3a779d1a86904339b68831e29945307d4b6",
                         "float_pcm_sha256": "c7a016d0b527e759ba0e2ce06f0348371a99e1c9ce68e42ca38ee919cef63fa7",
@@ -7665,7 +7677,7 @@
                         "text": "'A P I'",
                         "voice": "af_heart",
                         "locale": "en-us",
-                        "phonemes": "“ɐ pˈi ˈI",
+                        "phonemes": "\u201c\u0250 p\u02c8i \u02c8I",
                         "duration_seconds": 0.9386666666666666,
                         "wav_sha256": "c14f9a31a8a71f2441e74ab4e64f24df25b9f018975fe46d1ab0ed2cb33519e3",
                         "float_pcm_sha256": "69d1f2d9c292aa645dd0b1ff590bb7c1cbf34b92bc382a7ae1d695b2540e18cb",
@@ -7678,7 +7690,7 @@
                         "text": "'A P I'",
                         "voice": "af_heart",
                         "locale": "en-us",
-                        "phonemes": "“ˈA pˈi ˈI",
+                        "phonemes": "\u201c\u02c8A p\u02c8i \u02c8I",
                         "duration_seconds": 0.9386666666666666,
                         "wav_sha256": "f5a871ccac419cc586ff16aaa6e9f42b4720c591d20a7752c09d01e89c299f3d",
                         "float_pcm_sha256": "b8b8573bf9058851c6aaee30fc328c01c89ba20e1413aa674bef4c1847b348f0",
@@ -7691,7 +7703,7 @@
                         "text": "'A P I'",
                         "voice": "bf_emma",
                         "locale": "en-gb",
-                        "phonemes": "“ɐ pˈiː ˈI",
+                        "phonemes": "\u201c\u0250 p\u02c8i\u02d0 \u02c8I",
                         "duration_seconds": 0.9386666666666666,
                         "wav_sha256": "fcb3326f8978423f25953f991282d759fbc0e9a1248a102054e236eb5a558ddb",
                         "float_pcm_sha256": "1612b0e9f197c238f2434d27da0024959ca5b3825db6a3ed79119491924568d0",
@@ -7704,7 +7716,7 @@
                         "text": "'A P I'",
                         "voice": "bf_emma",
                         "locale": "en-gb",
-                        "phonemes": "“ˈA pˈiː ˈI",
+                        "phonemes": "\u201c\u02c8A p\u02c8i\u02d0 \u02c8I",
                         "duration_seconds": 0.96,
                         "wav_sha256": "83dad5fbcd6fea44e2b35ecf0f1b19af8e946c56a5d5743af058ad6e92a7d909",
                         "float_pcm_sha256": "2f7c8c442737efd0ff9bf3ddb35e47e7ae90ed2bc23c7025a08d3ddf3552f78d",
@@ -7724,10 +7736,10 @@
                     "cases": [
                       {
                         "id": "ja-component",
-                        "text": "こんにちは",
+                        "text": "\u3053\u3093\u306b\u3061\u306f",
                         "voice": "jf_alpha",
                         "locale": "ja",
-                        "phonemes": "koɲɲiʨiβa",
+                        "phonemes": "ko\u0272\u0272i\u02a8i\u03b2a",
                         "duration_seconds": 0.9813333333333333,
                         "wav_sha256": "c9a9f75372afc19d7cb51732a481300a7fa5779d0f4411c35a9f7b788d693f51",
                         "float_pcm_sha256": "b6f3115fde5d46e829b4437b51c82ea366c8973731611ac665a21047bc3fb5fd",
@@ -7737,10 +7749,10 @@
                       },
                       {
                         "id": "ja-composed",
-                        "text": "こんにちは",
+                        "text": "\u3053\u3093\u306b\u3061\u306f",
                         "voice": "jf_alpha",
                         "locale": "ja",
-                        "phonemes": "koɲɲiʨiβa",
+                        "phonemes": "ko\u0272\u0272i\u02a8i\u03b2a",
                         "duration_seconds": 0.9813333333333333,
                         "wav_sha256": "c9a9f75372afc19d7cb51732a481300a7fa5779d0f4411c35a9f7b788d693f51",
                         "float_pcm_sha256": "b6f3115fde5d46e829b4437b51c82ea366c8973731611ac665a21047bc3fb5fd",
@@ -7760,10 +7772,10 @@
                     "cases": [
                       {
                         "id": "zh-component",
-                        "text": "你好",
+                        "text": "\u4f60\u597d",
                         "voice": "zf_xiaobei",
                         "locale": "zh",
-                        "phonemes": "ni↓xau↓",
+                        "phonemes": "ni\u2193xau\u2193",
                         "duration_seconds": 0.832,
                         "wav_sha256": "b8b6c6be5edbaff52bb114c753b04e6eaffebd190e5f78e64a535c8042cb92ae",
                         "float_pcm_sha256": "7ddddc03e104e990c42f5b070d4847906f3a10d19bd6809621a5f1cf0fa5ea0d",
@@ -7773,10 +7785,10 @@
                       },
                       {
                         "id": "zh-composed",
-                        "text": "你好",
+                        "text": "\u4f60\u597d",
                         "voice": "zf_xiaobei",
                         "locale": "zh",
-                        "phonemes": "ni↓xau↓",
+                        "phonemes": "ni\u2193xau\u2193",
                         "duration_seconds": 0.832,
                         "wav_sha256": "b8b6c6be5edbaff52bb114c753b04e6eaffebd190e5f78e64a535c8042cb92ae",
                         "float_pcm_sha256": "7ddddc03e104e990c42f5b070d4847906f3a10d19bd6809621a5f1cf0fa5ea0d",
@@ -7793,7 +7805,7 @@
                 ],
                 "owner_listening": {
                   "english": "Positive feedback on delivered neutral/currency and US/GB comparison clips; no chosen pair winner or broader coverage claim",
-                  "japanese": "Positive feedback on the exact jf_alpha こんにちは 0.981333-second sample only",
+                  "japanese": "Positive feedback on the exact jf_alpha \u3053\u3093\u306b\u3061\u306f 0.981333-second sample only",
                   "mandarin": "Delivered corrected-source sample; acknowledgment received, pronunciation-quality judgment still unverified",
                   "owner_replies_not_required_per_clip": true,
                   "assistant_audio_input_unavailable": true
@@ -12211,63 +12223,25 @@
     }
   ],
   "reviewed_source_patch": {
-    "scope": "Eight exact independently reviewed consultation frontend files only.",
-    "patch_sha256": "ddcc5445c3dad8254051ac08bb4edd5a596ef2d6521858ab0a1eff79a1a0ea64",
-    "base_revision": "d27264777c7e9ba1c356d626eedeb73ab5b16195",
-    "source_revision": "426a76512c29ee19ed24981928a81dcfa793ac8b",
-    "files": [
-      {
-        "path": "SOURCE/ui/react-app/src/SmartDisplay.jsx",
-        "sha256": "ceb966e06b5042e83e603efe72bffeded6a1155fe24b6441d1646708329fa03d",
-        "baseline_sha256": "dab28734312bbbcab3038ae810ae73a0bd41a190194e1489d9234d0a839449ad"
-      },
-      {
-        "path": "SOURCE/ui/react-app/src/__tests__/SmartDisplay.test.jsx",
-        "sha256": "59c5e8beb018d9ba510c2108ebf35ed47acc9c00036187fde10363912f5a2ef5",
-        "baseline_sha256": "0795fa55996da366fa484650e118b1dcccae3d2bee352c8ac74d3f53411963d3"
-      },
-      {
-        "path": "SOURCE/ui/react-app/src/components/CallConsultation.jsx",
-        "sha256": "ad63f49dbcdc3a195b5eb3508269b0ba5fe4c8d3e3c193bdc7bf27a23271c65e",
-        "baseline_sha256": "21d4fbd44827b87b7079847add0aa28827fe85e7983a808fe644ef8735603d88"
-      },
-      {
-        "path": "SOURCE/ui/react-app/src/components/CallConsultation.test.jsx",
-        "sha256": "bea745d170a7605b5fa2d2a80818f06850fab12a8c0ad8c63cd628f806f388d1",
-        "baseline_sha256": "946e1ed38d079b4728ddf6fc2e29e89cda5c0cc3e3faec1e7141668a1fc76044"
-      },
-      {
-        "path": "SOURCE/ui/react-app/src/components/PhoneCallPanel.jsx",
-        "sha256": "d2dfc4fa1530c86eeb066755af882b862e300c4bd662424d429e369e7d63fc65",
-        "baseline_sha256": "4ddcafe352a7c790fcac5a49ac45ea04f5e40849c9d800b94ef747be2b41a4cf"
-      },
-      {
-        "path": "SOURCE/ui/react-app/src/components/PhoneCallPanel.test.jsx",
-        "sha256": "b25b5f643a51ca2ea6d637229314790814ff23609d8604bbdc1e4192a87b4141",
-        "baseline_sha256": "2792657b47fba390cb73a4253492a928c5548d50eaf51cbeb433437f8797a1f8"
-      },
-      {
-        "path": "SOURCE/ui/react-app/src/hooks/useCallConsultationReply.js",
-        "sha256": "faa00f93c09d7c621949e4c9ca0182c5fcae32db22a9496fcc5e55e7a125fd8f",
-        "baseline_sha256": null
-      },
-      {
-        "path": "SOURCE/ui/react-app/src/hooks/useCallConsultationReply.test.jsx",
-        "sha256": "c2df9d49b0fe7e2149e5b3a29d2d10aa5b62c477fe6c49a594952998a71f1a63",
-        "baseline_sha256": null
-      }
+    "sha256": "b68670ba9ca3ac057fd2710360d7aaac9296d852d663ebc793461b3d15d09dd4",
+    "css_patch_sha256": "35d7a3b71617449fd93bcf59880f2d09493edaaa64b6f9091d3cd5faa5027859",
+    "source_commit": "071d81d251438a4208f54581757844dd63ea5c18",
+    "original_reviewed_source_commit": "b3ea1878fff99cb3dc155e9cee527e1e274761d2",
+    "paths": [
+      "SOURCE/ui/react-app/src/components/topbar/TopBar.module.css",
+      "SOURCE/ui/react-app/src/components/player/PlayerSection.module.css",
+      "SOURCE/ui/react-app/src/components/voice/BottomRow.module.css",
+      "SOURCE/ui/react-app/tests/responsive_display.test.js"
     ],
-    "review_status": "Original eight-file behavior reviewed and byte-identical; reconciliation frozen for review.",
-    "original_base_revision": "50e1382aee7d26ad4e4eb826124ebbe1943b2338",
-    "source_delta_patch_sha256": "f66f232f4536aa1fffd60861ab3221b903c3edacf0716d7dbddc725a2e2910c9"
+    "scope": "Three exact reviewed CSS files and focused regression only."
   },
   "new_resolution_performed": false,
   "new_advisory_scan_performed": false,
   "new_runtime_qualification_performed": false,
-  "new_source_contract_qualification_performed": false,
+  "new_source_contract_qualification_performed": true,
   "new_static_security_scan_performed": false,
-  "new_resolution_scope": "Existing isolated frontend dependencies reused; no fresh selected-platform resolution by the local reconciliation.",
-  "new_advisory_scan_scope": "No fresh advisory scan by the local reconciliation; prior hosted scans remain historical.",
+  "new_resolution_scope": "Existing exact frontend dependency installation reused; no fresh resolution.",
+  "new_advisory_scan_scope": "No fresh advisory scan; exact-head public CI pending.",
   "account_reconciliation_previous_binding": {
     "source_revision": "f864e61381ef9e10a09333fce05210427cf7d0f6",
     "source_manifest_sha256": "9cad8bcb2f98c34d95a11545e11a57d74dbe6b28cd5db7322b7746e102801acd",
@@ -16316,5 +16290,187 @@
       "new_resolution_scope": "Existing isolated frontend dependencies and qualified Help/Phone Python environment reused; no fresh selected-platform resolution.",
       "new_advisory_scan_scope": "No fresh vulnerability or advisory assessment performed by this packet."
     }
-  }
+  },
+  "responsive_display_previous_binding": {
+    "repository_revision": "e53a308cfabb61d38c619926c93e4bf5fd874c8f",
+    "path": "PUBLIC_METADATA/source-binding.json",
+    "git_blob": "855be30fb996b461501b4f5dae52383a42a9d6ad",
+    "sha256": "a1a96ee322b9342b4c97d88d72f648da3e5cd766605c1c5bcee6a7e8a4b19493",
+    "preserved_replaced_fields": {
+      "source_manifest_sha256": "55ce7e7abc8ff435084087c5d1425ab9d7c2e51d96a5e0233099d7c9c1e4d879",
+      "source_tree_sha256": "4b5cb26a152ce2eb1f75a4154be85b8d5585c5e9a7cac9f01bc62b8629789cf8",
+      "source_file_count": 2700,
+      "source_revision": "426a76512c29ee19ed24981928a81dcfa793ac8b",
+      "comparison_public_revision": "d27264777c7e9ba1c356d626eedeb73ab5b16195",
+      "changed_source_paths": [
+        "SOURCE/ui/react-app/src/SmartDisplay.jsx",
+        "SOURCE/ui/react-app/src/__tests__/SmartDisplay.test.jsx",
+        "SOURCE/ui/react-app/src/components/CallConsultation.jsx",
+        "SOURCE/ui/react-app/src/components/CallConsultation.test.jsx",
+        "SOURCE/ui/react-app/src/components/PhoneCallPanel.jsx",
+        "SOURCE/ui/react-app/src/components/PhoneCallPanel.test.jsx",
+        "SOURCE/ui/react-app/src/hooks/useCallConsultationReply.js",
+        "SOURCE/ui/react-app/src/hooks/useCallConsultationReply.test.jsx"
+      ],
+      "input_equivalence": {
+        "comparison_basis": "Landed public Phone Terms merge d27264777c7e9ba1c356d626eedeb73ab5b16195",
+        "all_unselected_export_leaf_bytes_and_modes_preserved": true,
+        "all_six_sbom_bytes_and_status_objects_preserved": true,
+        "dependency_workflow_notice_model_pricing_and_customer_speech_inputs_unchanged": true,
+        "consultation_recovery_eight_files_identical_to_reviewed_public_head": "f786581c3ed19f28abf68a4b2954cd8771ecdfb7",
+        "landed_phone_terms_two_files_preserved_exactly": true,
+        "scope": "Reconcile two independently reviewed disjoint frontend source patches; no new behavior edits."
+      },
+      "qualification": {
+        "scope": "Combined Phone Terms acknowledgment and consultation reply recovery source inputs.",
+        "source_commit": "426a76512c29ee19ed24981928a81dcfa793ac8b",
+        "source_tree": "421c0cb3df969ca95ac5bcec28864047d67f6c0e",
+        "ordered_source_parents": [
+          "f786581c3ed19f28abf68a4b2954cd8771ecdfb7",
+          "d27264777c7e9ba1c356d626eedeb73ab5b16195"
+        ],
+        "reviewed_combined_patch_sha256": "f66f232f4536aa1fffd60861ab3221b903c3edacf0716d7dbddc725a2e2910c9",
+        "publication_status": "Combined source and metadata frozen for independent and parent review; no branch advancement yet. New exact-head hosted checks remain mandatory.",
+        "source_controls": {
+          "focused_frontend": {
+            "tests_passed": 143,
+            "tests_failed": 0,
+            "files": 6,
+            "path": "focused-tests.log",
+            "sha256": "376dabd5c3aeda96f32bf337af9c0074672f2e4567e7a6c6ae0828f5fa7496f1"
+          },
+          "smartdisplay_bounded_batches": {
+            "expected_cases": 196,
+            "unique_passed_cases": 196,
+            "tests_failed": 0,
+            "path": "display-batches-summary.json",
+            "sha256": "a8ae6fa23046615818f934825b30f5e8bb727ad7418a95a57d78a3ed13b15aed"
+          },
+          "total_bounded_frontend_passes": 339,
+          "changed_file_lint": {
+            "errors": 0,
+            "preexisting_smartdisplay_warnings": 11,
+            "path": "lint.log",
+            "sha256": "1448361c7e38fa865e95e87450e45b5bab91eaf023d94b2f58d59dc16e8ab70b"
+          },
+          "input_equivalence": {
+            "path": "source-freeze.json",
+            "sha256": "87e4e9d4f315501feee4ecd47125b2065571d07e58ad5c2b37f0b99cca5166dc"
+          }
+        },
+        "source_import_graph_bundle": {
+          "result": "PASS",
+          "path": "bundle.log",
+          "sha256": "9d43c3a2c11194f5956237fa0d01e181fafe53c98b1f4570f7edabf01150a5eb",
+          "scope": "Source/import-graph compilation with npm packages externalized; not a production build or runtime proof."
+        },
+        "frontend_build": {
+          "result": "PENDING_EXACT_HEAD_HOSTED",
+          "local_rerun": "Not repeated; prior constrained local exit137 and other incomplete attempts remain in historical qualification."
+        },
+        "frontend_suite": {
+          "result": "BOUNDED_CHANGED_SCOPE_PASS_FULL_AGGREGATE_PENDING_HOSTED",
+          "bounded_cases_passed": 339
+        },
+        "public_python_contracts": {
+          "result": "NOT_RERUN_LOCALLY_AFTER_DISJOINT_FRONTEND_RECONCILIATION",
+          "source_inputs_unchanged": true,
+          "exact_head_hosted_full_suite_required": true
+        },
+        "prior_exact_head_hosted_checks": [
+          {
+            "head": "f786581c3ed19f28abf68a4b2954cd8771ecdfb7",
+            "source_run_id": 38044439082,
+            "inventory_run_id": 38044438998,
+            "checks_passed": 8,
+            "frontend_tests_passed": 2133,
+            "python_tests_run": 946,
+            "python_tests_passed": 945,
+            "python_tests_skipped": 1,
+            "scope": "Historical qualification of the previous consultation-only branch, not this combined commit."
+          },
+          {
+            "head": "10eccfa786d7eb1f7c927902e833f817baf4983d",
+            "landed_as": "d27264777c7e9ba1c356d626eedeb73ab5b16195",
+            "checks_passed": 8,
+            "frontend_tests_passed": 2110,
+            "python_tests_run": 946,
+            "python_tests_passed": 945,
+            "python_tests_skipped": 1,
+            "scope": "Historical qualification of the landed Phone Terms branch, not this combined commit."
+          }
+        ],
+        "runtime_qualification": {
+          "installed_windows": false,
+          "rendered_browser": false,
+          "real_call_or_account": false,
+          "real_terms_acceptance": false,
+          "provider_or_carrier": false,
+          "deployment_or_release": false
+        },
+        "api_limit": "The existing backend identifies pending work by call ID only and has no question token. This patch protects local UI state; it does not establish server-side question correlation or network exactly-once delivery.",
+        "preserved_limits": "Historical local failures and prior hosted successes retained separately. Combined production build, full suites, dependency inventories and audit await normal exact-head hosted checks; no runtime or release qualification."
+      },
+      "reviewed_source_patch": {
+        "scope": "Eight exact independently reviewed consultation frontend files only.",
+        "patch_sha256": "ddcc5445c3dad8254051ac08bb4edd5a596ef2d6521858ab0a1eff79a1a0ea64",
+        "base_revision": "d27264777c7e9ba1c356d626eedeb73ab5b16195",
+        "source_revision": "426a76512c29ee19ed24981928a81dcfa793ac8b",
+        "files": [
+          {
+            "path": "SOURCE/ui/react-app/src/SmartDisplay.jsx",
+            "sha256": "ceb966e06b5042e83e603efe72bffeded6a1155fe24b6441d1646708329fa03d",
+            "baseline_sha256": "dab28734312bbbcab3038ae810ae73a0bd41a190194e1489d9234d0a839449ad"
+          },
+          {
+            "path": "SOURCE/ui/react-app/src/__tests__/SmartDisplay.test.jsx",
+            "sha256": "59c5e8beb018d9ba510c2108ebf35ed47acc9c00036187fde10363912f5a2ef5",
+            "baseline_sha256": "0795fa55996da366fa484650e118b1dcccae3d2bee352c8ac74d3f53411963d3"
+          },
+          {
+            "path": "SOURCE/ui/react-app/src/components/CallConsultation.jsx",
+            "sha256": "ad63f49dbcdc3a195b5eb3508269b0ba5fe4c8d3e3c193bdc7bf27a23271c65e",
+            "baseline_sha256": "21d4fbd44827b87b7079847add0aa28827fe85e7983a808fe644ef8735603d88"
+          },
+          {
+            "path": "SOURCE/ui/react-app/src/components/CallConsultation.test.jsx",
+            "sha256": "bea745d170a7605b5fa2d2a80818f06850fab12a8c0ad8c63cd628f806f388d1",
+            "baseline_sha256": "946e1ed38d079b4728ddf6fc2e29e89cda5c0cc3e3faec1e7141668a1fc76044"
+          },
+          {
+            "path": "SOURCE/ui/react-app/src/components/PhoneCallPanel.jsx",
+            "sha256": "d2dfc4fa1530c86eeb066755af882b862e300c4bd662424d429e369e7d63fc65",
+            "baseline_sha256": "4ddcafe352a7c790fcac5a49ac45ea04f5e40849c9d800b94ef747be2b41a4cf"
+          },
+          {
+            "path": "SOURCE/ui/react-app/src/components/PhoneCallPanel.test.jsx",
+            "sha256": "b25b5f643a51ca2ea6d637229314790814ff23609d8604bbdc1e4192a87b4141",
+            "baseline_sha256": "2792657b47fba390cb73a4253492a928c5548d50eaf51cbeb433437f8797a1f8"
+          },
+          {
+            "path": "SOURCE/ui/react-app/src/hooks/useCallConsultationReply.js",
+            "sha256": "faa00f93c09d7c621949e4c9ca0182c5fcae32db22a9496fcc5e55e7a125fd8f",
+            "baseline_sha256": null
+          },
+          {
+            "path": "SOURCE/ui/react-app/src/hooks/useCallConsultationReply.test.jsx",
+            "sha256": "c2df9d49b0fe7e2149e5b3a29d2d10aa5b62c477fe6c49a594952998a71f1a63",
+            "baseline_sha256": null
+          }
+        ],
+        "review_status": "Original eight-file behavior reviewed and byte-identical; reconciliation frozen for review.",
+        "original_base_revision": "50e1382aee7d26ad4e4eb826124ebbe1943b2338",
+        "source_delta_patch_sha256": "f66f232f4536aa1fffd60861ab3221b903c3edacf0716d7dbddc725a2e2910c9"
+      },
+      "new_runtime_qualification_performed": false,
+      "new_source_contract_qualification_performed": false,
+      "new_resolution_performed": false,
+      "new_resolution_scope": "Existing isolated frontend dependencies reused; no fresh selected-platform resolution by the local reconciliation.",
+      "new_advisory_scan_performed": false,
+      "new_advisory_scan_scope": "No fresh advisory scan by the local reconciliation; prior hosted scans remain historical.",
+      "new_static_security_scan_performed": false
+    }
+  },
+  "new_runtime_qualification_scope": "Fresh browser startup blocked; reused exact prior rendered fixture bytes only. See qualification.rendered_source_diagnostic. No installed/native/provider/audio qualification.",
+  "new_source_contract_qualification_scope": "40 affected frontend tests plus unchanged-base negative control, current production frontend build and full source/SBOM binding verification."
 }
