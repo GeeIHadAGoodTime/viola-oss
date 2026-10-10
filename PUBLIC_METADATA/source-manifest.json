@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "426a76512c29ee19ed24981928a81dcfa793ac8b",
-  "sha256": "4b5cb26a152ce2eb1f75a4154be85b8d5585c5e9a7cac9f01bc62b8629789cf8",
+  "revision": "071d81d251438a4208f54581757844dd63ea5c18",
+  "sha256": "4f70d65c2e5ea24c1c765fad385ae745b4ea9bd8b32b2cb1888f13f1da9b0c48",
   "files": [
     {
       "path": ".env.example",
@@ -11085,8 +11085,8 @@
     },
     {
       "path": "ui/react-app/src/components/player/PlayerSection.module.css",
-      "sha256": "e8d797240b79cad5b6298896d386485ee35a1bde5437eba58bfc616e6d35d46e",
-      "bytes": 2881
+      "sha256": "a3c5d78933da5cfcaba0c912fd110b75b887f6ee3548e895767f3022bb81e67a",
+      "bytes": 3097
     },
     {
       "path": "ui/react-app/src/components/player/PlayerSection.test.jsx",
@@ -11520,8 +11520,8 @@
     },
     {
       "path": "ui/react-app/src/components/topbar/TopBar.module.css",
-      "sha256": "5f81991d7724ec6882baf78fa69a373a8b7f8fc0fe357d0a6c1ecc1f22d0903b",
-      "bytes": 4849
+      "sha256": "3ce64d1edf182301b81f1692b6b23a3a17eb1b31b58be96acaee72f9dce72559",
+      "bytes": 4984
     },
     {
       "path": "ui/react-app/src/components/topbar/TopBar.test.jsx",
@@ -11550,7 +11550,7 @@
     },
     {
       "path": "ui/react-app/src/components/voice/BottomRow.module.css",
-      "sha256": "f8f5e7bc69790aae6e833239596dfff11292a55787ce319c3eac66d291db3cbb",
+      "sha256": "7b26289d3361b576544990672a701c8f08c4458e6818b050805b8d46a01e468c",
       "bytes": 3541
     },
     {
@@ -12317,6 +12317,11 @@
       "path": "ui/react-app/tests/minimatch_interop.test.js",
       "sha256": "13ea8afc1fedb7a0fd58733509fa56cfd7b658755c6919adcd910dd520be9254",
       "bytes": 1582
+    },
+    {
+      "path": "ui/react-app/tests/responsive_display.test.js",
+      "sha256": "4c6626743d58f963d637421bbd0f54263b7dbb35e28e1f33953f5fda65c59f7c",
+      "bytes": 2117
     },
     {
       "path": "ui/react-app/tests/source_map_advisory.test.js",

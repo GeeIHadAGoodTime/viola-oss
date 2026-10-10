@@ -161,7 +161,7 @@
   white-space: nowrap;
 }
 
-@media (max-width: 1023px) {
+@media (max-width: 1279px) {
   .container {
     gap: 18px;
     padding-top: 22px;
