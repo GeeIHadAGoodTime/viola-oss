@@ -13,7 +13,7 @@ import contextvars
 import time
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, Callable
 
 from auth.models import (
     SubscriptionStatus,
@@ -24,6 +24,28 @@ from core.logging_config import get_logger
 from core.product import AppSurface, PlanId, coerce_app_surface, coerce_plan_id
 
 logger = get_logger(__name__)
+
+_runtime_entitlement_resolver: Callable[[str, str], str | PlanId | None] | None = None
+
+
+def register_runtime_entitlement_resolver(
+    resolver: Callable[[str, str], str | PlanId | None] | None,
+) -> None:
+    """Register an optional cloud-only resolver without importing its store."""
+    global _runtime_entitlement_resolver
+    _runtime_entitlement_resolver = resolver
+
+
+def _project_runtime_entitlement(user_id: str, base_plan_id: str) -> str:
+    resolver = _runtime_entitlement_resolver
+    if resolver is None:
+        return base_plan_id
+    try:
+        effective = resolver(user_id, base_plan_id)
+        return base_plan_id if effective is None else coerce_plan_id(effective).value
+    except Exception:
+        logger.exception("Cloud effective entitlement read failed for user %s", user_id)
+        return PlanId.FREE.value
 
 
 @dataclass(frozen=True, slots=True)
@@ -112,7 +134,7 @@ def _resolve_sqlite_subscription_plan_id(user_id: str) -> str | None:
             return None
         row = conn.execute(
             """
-            SELECT status, plan, payment_provider, current_period_end, activation_pending
+            SELECT status, plan, payment_provider, current_period_start, current_period_end, activation_pending
             FROM subscriptions
             WHERE user_id = ?
             """,
@@ -135,6 +157,7 @@ def _resolve_sqlite_subscription_plan_id(user_id: str) -> str | None:
         provider,
         current_period_end,
         bool(row["activation_pending"]),
+        current_period_start=_parse_subscription_datetime(row["current_period_start"]),
     )
     resolved = plan_id.value if has_paid_access else PlanId.FREE.value
     if not has_paid_access:
@@ -170,7 +193,7 @@ async def _fetch_postgres_subscription_row(dsn: str, user_id: str):
                 await set_rls_context(conn, user_id)
                 return await conn.fetchrow(
                     """
-                    SELECT status, plan, payment_provider, current_period_end, activation_pending
+                    SELECT status, plan, payment_provider, current_period_start, current_period_end, activation_pending
                     FROM subscriptions
                     WHERE user_id = $1
                     """,
@@ -194,12 +217,17 @@ def _subscription_row_plan_id(row: Any | None) -> str:
     plan_id = coerce_plan_id(row["plan"])
     provider = parse_payment_provider(row["payment_provider"]) if row["payment_provider"] else None
     current_period_end = _parse_subscription_datetime(row["current_period_end"])
+    try:
+        current_period_start = _parse_subscription_datetime(row["current_period_start"])
+    except (KeyError, IndexError):
+        current_period_start = None
     has_paid_access = billing_state_has_paid_access(
         status,
         plan_id,
         provider,
         current_period_end,
         bool(row["activation_pending"]),
+        current_period_start=current_period_start,
     )
     return plan_id.value if has_paid_access else PlanId.FREE.value
 
@@ -273,10 +301,10 @@ def resolve_runtime_plan_id(user_id: str, *, require_authority: bool = False) ->
         # paid-only surfaces during the outage. (#2738)
         live_plan = _resolve_sqlite_subscription_plan_id(user_id)
         if live_plan is not None:
-            return live_plan
+            return _project_runtime_entitlement(user_id, live_plan)
         live_plan = _resolve_postgres_subscription_plan_id(user_id)
         if live_plan is not None:
-            return live_plan
+            return _project_runtime_entitlement(user_id, live_plan)
         logger.warning(
             "Cloud authoritative subscription read unavailable for user %s - failing "
             "closed to free (billing_plan_id mirror not consulted)",
@@ -313,7 +341,10 @@ def read_desktop_entitlement_snapshot(user_id: str) -> dict[str, Any] | None:
         until = _parse_subscription_datetime(snapshot.get("current_period_end"))
         if until is not None and until <= datetime.now(UTC):
             return free
-        if str(snapshot.get("subscription_source") or "").startswith("admin_") and until is None:
+        if (
+            str(snapshot.get("subscription_source") or "").startswith("admin_")
+            or snapshot.get("subscription_source") == "owner_month_gift"
+        ) and until is None:
             return free
         if snapshot.get("has_paid_access") is not True:
             return free

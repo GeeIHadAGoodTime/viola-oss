@@ -31,6 +31,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, TypeAlias, TypedDict, cast
 
+from auth.entitlement_projection import EntitlementResolverSupport
 from auth.models import (
     MagicLink,
     MagicLinkInDB,
@@ -395,7 +396,7 @@ def _resolve_user_email_from_row(row: dict[str, Any]) -> str:
         return ""
 
 
-class SQLiteAuthDatabase:
+class SQLiteAuthDatabase(EntitlementResolverSupport):
     """
     SQLite-based auth database for local/development use.
 
@@ -1822,17 +1823,20 @@ class SQLiteUserRepository(UserRepository):
         """
         subscription_status = SubscriptionStatus.FREE
         plan_id = PlanId.FREE
+        current_period_start = None
         current_period_end = None
         activation_pending = False
         conn = self.db.connection
         sub_row = conn.execute(
-            "SELECT status, plan, current_period_end, activation_pending FROM subscriptions WHERE user_id = ?",
+            "SELECT status, plan, current_period_start, current_period_end, activation_pending FROM subscriptions WHERE user_id = ?",
             (row["id"],),
         ).fetchone()
 
         if sub_row is not None:
             subscription_status = SubscriptionStatus(sub_row["status"])
             plan_id = coerce_plan_id(sub_row["plan"])
+            if sub_row["current_period_start"]:
+                current_period_start = datetime.fromisoformat(sub_row["current_period_start"])
             if sub_row["current_period_end"]:
                 current_period_end = datetime.fromisoformat(sub_row["current_period_end"])
             activation_pending = bool(sub_row["activation_pending"])
@@ -1844,6 +1848,7 @@ class SQLiteUserRepository(UserRepository):
             email_verified=bool(data["email_verified"]),
             subscription_status=subscription_status,
             plan_id=plan_id,
+            current_period_start=current_period_start,
             current_period_end=current_period_end,
             activation_pending=activation_pending,
             phone=data.get("phone"),

@@ -22,7 +22,7 @@ import contextvars
 import os
 import re
 import uuid
-from contextlib import contextmanager, suppress
+from contextlib import asynccontextmanager, contextmanager, suppress
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -328,6 +328,105 @@ class _CleanupSafeTransaction:
 
     def __getattr__(self, name: str) -> Any:
         return getattr(self._transaction, name)
+
+
+class _OperatorControlSystemConnection:
+    """Restricted SQL facade for the explicitly selected operator-system role.
+
+    This is not a tenant-guard bypass: only the two control-plane relations
+    and their required verbs are admitted, and PostgreSQL still enforces RLS.
+    """
+
+    def __init__(self, conn: Any) -> None:
+        self.__conn = conn
+
+    def transaction(self):
+        return _CleanupSafeTransaction(self.__conn.transaction())
+
+    def _check(self, sql: str) -> None:
+        normalized = " ".join(sql.split())
+        if ";" in normalized or "--" in normalized or "/*" in normalized:
+            raise RlsContextRequiredError("Operator-system SQL must be a single control-plane statement")
+        mutation, target = sql_mutation_target(sql)
+        verb = normalized.split(" ", 1)[0].upper()
+        if mutation and (verb, target) in {
+            ("UPDATE", "operator_controls"),
+            ("UPDATE", "public.operator_controls"),
+            ("INSERT", "operator_control_audit"),
+            ("INSERT", "public.operator_control_audit"),
+        }:
+            return
+        if re.match(r"^SELECT \* FROM (?:public\.)?operator_controls(?:\s|$)", normalized, re.IGNORECASE):
+            return
+        if re.match(r"^SELECT \* FROM (?:public\.)?operator_control_audit(?:\s|$)", normalized, re.IGNORECASE):
+            return
+        raise RlsContextRequiredError("Operator-system capability does not admit this SQL")
+
+    async def execute(self, sql: str, *args: Any) -> Any:
+        self._check(sql)
+        return await self.__conn.execute(sql, *args)
+
+    async def fetchrow(self, sql: str, *args: Any) -> Any:
+        self._check(sql)
+        return await self.__conn.fetchrow(sql, *args)
+
+    async def fetch(self, sql: str, *args: Any) -> Any:
+        self._check(sql)
+        return await self.__conn.fetch(sql, *args)
+
+
+@asynccontextmanager
+async def operator_control_system_connection(pool: Any):
+    """Select the narrow server role for one transaction, then restore context.
+
+    Only a trusted server adapter should supply this capability to a store.
+    Actor labels and ambient system_db_scope do not authorize it. Role
+    membership is explicit SET-only; ordinary application queries retain RLS.
+    """
+    async with pool.acquire() as connection:
+        raw = connection._conn if isinstance(connection, _SafePgConnection) else connection
+        async with _CleanupSafeTransaction(raw.transaction()):
+            prior_role = await raw.fetchval("SELECT current_user")
+            prior_subject = await raw.fetchval("SELECT current_setting('app.user_id', true)")
+            application_role = await raw.fetchrow(
+                "SELECT current_user AS name, rolsuper, rolbypassrls FROM pg_roles WHERE rolname=current_user"
+            )
+            if (
+                prior_role != "viola_app"
+                or application_role is None
+                or application_role["rolsuper"]
+                or application_role["rolbypassrls"]
+            ):
+                raise RlsContextRequiredError("Operator-system capability requires the nonbypass application pool")
+            await raw.execute("SET LOCAL ROLE viola_operator_system")
+            identity = await raw.fetchrow(
+                "SELECT current_user AS name, rolsuper, rolbypassrls, rolcanlogin, rolinherit, "
+                "rolcreatedb, rolcreaterole, rolreplication "
+                "FROM pg_roles WHERE rolname = current_user"
+            )
+            if (
+                identity is None
+                or identity["name"] != "viola_operator_system"
+                or any(
+                    identity[key]
+                    for key in (
+                        "rolsuper",
+                        "rolbypassrls",
+                        "rolcanlogin",
+                        "rolinherit",
+                        "rolcreatedb",
+                        "rolcreaterole",
+                        "rolreplication",
+                    )
+                )
+            ):
+                raise RlsContextRequiredError("Operator-system role does not satisfy least privilege")
+            await raw.execute("SELECT set_config('app.user_id', '', true)")
+            yield _OperatorControlSystemConnection(raw)
+            # On errors/cancellation the transaction rollback restores these
+            # settings. On success restore before releasing an outer savepoint.
+            await raw.execute('SET LOCAL ROLE "%s"' % prior_role)
+            await raw.execute("SELECT set_config('app.user_id', $1, true)", prior_subject or "")
 
 
 class _SafePgConnection:

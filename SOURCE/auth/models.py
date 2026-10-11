@@ -12,6 +12,7 @@ from email_validator.exceptions import EmailSyntaxError
 from email_validator.syntax import split_email, validate_email_domain_literal, validate_email_local_part
 from pydantic import BaseModel, EmailStr, Field, computed_field, field_validator
 
+from auth.entitlement_projection import EntitlementProjection
 from config import env as config_env
 from core.product import PlanFamily, PlanId, is_paid_plan, plan_family_for_id
 
@@ -108,6 +109,7 @@ class SubscriptionSource(str, Enum):
     COMMERCIAL = "commercial"
     ADMIN_GRANT = "admin_grant"
     ADMIN_EXTENSION = "admin_extension"
+    OWNER_MONTH_GIFT = "owner_month_gift"
 
 
 class OAuthProvider(str, Enum):
@@ -165,7 +167,9 @@ class User(UserBase):
     subscription_status: SubscriptionStatus = SubscriptionStatus.FREE
     plan_id: PlanId = PlanId.FREE
     current_period_end: datetime | None = Field(default=None, exclude=True)
+    current_period_start: datetime | None = Field(default=None, exclude=True)
     activation_pending: bool = Field(default=False, exclude=True)
+    entitlement_projection: EntitlementProjection | None = Field(default=None, exclude=True)
     phone: str | None = None
     phone_verified: bool = False
     sms_consent: bool = False
@@ -195,6 +199,7 @@ class User(UserBase):
             self.plan_id,
             current_period_end=self.current_period_end,
             activation_pending=self.activation_pending,
+            current_period_start=self.current_period_start,
         )
 
     def compute_display_name(self) -> str:
@@ -452,6 +457,57 @@ class ResolvedEntitlement:
     canceled_at: datetime | None = None
     payment_provider: PaymentProvider | None = None
     subscription_source: SubscriptionSource = SubscriptionSource.COMMERCIAL
+    entitlement_projection: EntitlementProjection | None = None
+
+
+def current_entitlement_projection(
+    projection: EntitlementProjection,
+    *,
+    at: datetime | None = None,
+) -> EntitlementProjection:
+    """Drop expired gift access without activating queued/pending windows."""
+    instant = at or datetime.now(UTC)
+    gift = projection.active_gift
+    active = gift is not None and gift.is_active(instant)
+    facts = projection.effective if active else projection.base_subscription
+    paid_until = facts.current_period_end
+    if not active and facts.funded_paid_through_at is not None:
+        paid_until = facts.funded_paid_through_at
+    paid = (
+        facts.has_paid_access
+        and not facts.activation_pending
+        and (facts.current_period_start is None or facts.current_period_start <= instant)
+        and (paid_until is None or paid_until > instant)
+    )
+    updates: dict[str, Any] = {"has_paid_access": paid}
+    if not paid:
+        updates.update(plan_id=PlanId.FREE, plan_family=PlanFamily.FREE, status="free")
+    effective = facts.model_copy(update=updates)
+    return projection.model_copy(update={"effective": effective, "active_gift": gift if active else None})
+
+
+def apply_user_entitlement_projection(
+    user: User,
+    projection: EntitlementProjection | dict[str, Any],
+    *,
+    at: datetime | None = None,
+) -> User:
+    """Apply verified server facts to runtime access without changing billing."""
+    parsed = EntitlementProjection.model_validate(projection)
+    if parsed.user_id != user.id:
+        raise ValueError("Entitlement projection belongs to another account")
+    current = current_entitlement_projection(parsed, at=at)
+    facts = current.effective
+    return user.model_copy(
+        update={
+            "plan_id": facts.plan_id,
+            "subscription_status": SubscriptionStatus(facts.status),
+            "current_period_end": facts.current_period_end,
+            "current_period_start": facts.current_period_start,
+            "activation_pending": facts.activation_pending,
+            "entitlement_projection": current,
+        }
+    )
 
 
 def billing_state_has_paid_access(
@@ -460,6 +516,9 @@ def billing_state_has_paid_access(
     payment_provider: PaymentProvider | None = None,
     current_period_end: datetime | None = None,
     activation_pending: bool = False,
+    current_period_start: datetime | None = None,
+    *,
+    at: datetime | None = None,
 ) -> bool:
     """Return whether a billing state grants paid access.
 
@@ -475,7 +534,9 @@ def billing_state_has_paid_access(
     if activation_pending:
         return False
 
-    now = datetime.now(UTC)
+    now = at or datetime.now(UTC)
+    if current_period_start is not None and current_period_start > now:
+        return False
     if subscription_status in (SubscriptionStatus.ACTIVE, SubscriptionStatus.TRIALING):
         if current_period_end is not None and current_period_end <= now:
             return False
@@ -494,7 +555,7 @@ def billing_state_has_paid_access(
     return False
 
 
-def subscription_has_paid_access(subscription: Subscription | None) -> bool:
+def subscription_has_paid_access(subscription: Subscription | None, *, at: datetime | None = None) -> bool:
     """Return whether a subscription grants paid access."""
     if subscription is None:
         return False
@@ -504,19 +565,54 @@ def subscription_has_paid_access(subscription: Subscription | None) -> bool:
         subscription.payment_provider,
         subscription.current_period_end,
         getattr(subscription, "activation_pending", False),
+        current_period_start=subscription.current_period_start,
+        at=at,
     )
 
 
 def resolve_user_entitlement(
     user: User | None,
     subscription: Subscription | None = None,
+    *,
+    at: datetime | None = None,
 ) -> ResolvedEntitlement:
     """Resolve canonical entitlement truth for a user and optional subscription."""
+    if user is not None and user.entitlement_projection is not None:
+        projection = user.entitlement_projection
+        if subscription is not None:
+            base = projection.base_subscription.model_copy(
+                update={
+                    "plan_id": subscription.plan_id,
+                    "plan_family": subscription.plan_family,
+                    "status": subscription.status.value,
+                    "has_paid_access": subscription_has_paid_access(subscription, at=at),
+                    "current_period_start": subscription.current_period_start,
+                    "current_period_end": subscription.current_period_end,
+                    "canceled_at": subscription.canceled_at,
+                    "payment_provider": subscription.payment_provider.value if subscription.payment_provider else None,
+                    "subscription_source": subscription.subscription_source.value,
+                    "activation_pending": subscription.activation_pending,
+                }
+            )
+            projection = projection.model_copy(update={"base_subscription": base})
+        projection = current_entitlement_projection(projection, at=at)
+        facts = projection.effective
+        return ResolvedEntitlement(
+            plan_id=facts.plan_id,
+            plan_family=facts.plan_family,
+            has_paid_access=facts.has_paid_access,
+            subscription_status=SubscriptionStatus(facts.status),
+            current_period_end=facts.current_period_end,
+            canceled_at=facts.canceled_at,
+            payment_provider=PaymentProvider(facts.payment_provider) if facts.payment_provider else None,
+            subscription_source=SubscriptionSource(facts.subscription_source),
+            entitlement_projection=projection,
+        )
     if subscription is not None:
         return ResolvedEntitlement(
             plan_id=subscription.plan_id,
             plan_family=subscription.plan_family,
-            has_paid_access=subscription_has_paid_access(subscription),
+            has_paid_access=subscription_has_paid_access(subscription, at=at),
             subscription_status=subscription.status,
             current_period_end=subscription.current_period_end,
             canceled_at=subscription.canceled_at,
@@ -546,6 +642,7 @@ def build_user_payload_with_entitlement(
     subscription: Subscription | None = None,
     *,
     include_display_name: bool = True,
+    at: datetime | None = None,
 ) -> dict[str, Any]:
     """Build a JSON-ready user payload with canonical entitlement fields.
 
@@ -555,7 +652,7 @@ def build_user_payload_with_entitlement(
     logs and audit exports. Auth routes default to including it (legacy
     behavior); other callers should pass ``include_display_name=False``.
     """
-    entitlement = resolve_user_entitlement(user, subscription)
+    entitlement = resolve_user_entitlement(user, subscription, at=at)
     payload = user.model_dump(mode="json")
     if include_display_name:
         payload["display_name"] = user.compute_display_name()
@@ -568,6 +665,19 @@ def build_user_payload_with_entitlement(
             "subscription_source": entitlement.subscription_source.value,
         }
     )
+    if entitlement.entitlement_projection is not None:
+        projection = entitlement.entitlement_projection
+        payload.update(
+            {
+                "commercial_plan_id": projection.base_subscription.plan_id.value,
+                "commercial_subscription_status": projection.base_subscription.status,
+                "effective_capacity_multiplier": projection.effective.capacity_multiplier,
+                "base_subscription": projection.base_subscription.model_dump(mode="json"),
+                "active_gift": projection.active_gift.model_dump(mode="json") if projection.active_gift else None,
+                "queued_gifts": [gift.model_dump(mode="json") for gift in projection.queued_gifts],
+                "entitlement": projection.model_dump(mode="json"),
+            }
+        )
     if entitlement.current_period_end is not None:
         payload["current_period_end"] = entitlement.current_period_end.isoformat()
     if entitlement.canceled_at is not None:
