@@ -4335,6 +4335,24 @@ async def run_agent_loop(
                 tool_result = _cap_tool_result_data(tool_result, MAX_TOOL_RESULT_CHARS)
                 result_text = tool_result.to_llm_text()
 
+                if not tool_result.ok and (
+                    str(tool_result.error_category or "").upper() == "CONFIRMATION_REQUIRED"
+                    or tool_result.error == "confirmation_required"
+                ):
+                    # Approval has not happened and the action was not executed.
+                    # End this turn before model prose can claim it succeeded;
+                    # the existing approval store binds the next user's turn.
+                    confirmation = tool_result.data if isinstance(tool_result.data, dict) else {}
+                    action = str(confirmation.get("action_description") or "").strip() or "run the requested action"
+                    _set_final_response(
+                        executor,
+                        "Please confirm or cancel before I %s." % action,
+                        continue_listening=True,
+                        params=dict(confirmation),
+                    )
+                    executor._forced_tool_failure_error = "confirmation_required"
+                    executor._forced_tool_failure_outcome = "tool_error"
+
                 _calendar_failure_message = _calendar_add_failure_user_message(tc_name, tc_args, tool_result)
                 if _calendar_failure_message is not None:
                     # R5-P0-A (2026-05-30): no longer mutates tool_result.recovery_hint
@@ -4806,7 +4824,7 @@ async def run_agent_loop(
                 if terminal_hook_name == "SubagentStop":
                     executor._subagent_stop_dispatched = True
                 _queue_hook_context(terminal_hook_name, terminal_hook, defer_until_tool_result=False)
-                if _hook_requests_model_continuation(terminal_hook):
+                if _hook_requests_model_continuation(terminal_hook) and executor._forced_tool_failure_error is None:
                     _flush_pending_hook_context()
                     _record_subagent_transcript()
                     _prepare_terminal_hook_continuation(executor)
