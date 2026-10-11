@@ -30,9 +30,8 @@ Endpoints:
 
 from __future__ import annotations
 
-import asyncio
+import inspect
 import os
-import secrets
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 from typing import Any, NoReturn
@@ -47,7 +46,7 @@ from fastapi import (
     Response,
     status,
 )
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel, EmailStr, Field
 
 from auth.csrf import clear_csrf_cookie, csrf_required
@@ -55,23 +54,23 @@ from auth.dependencies import (
     get_current_session,
     get_current_user,
     require_auth_token,
-    require_real_user,
 )
+from auth.entitlement_projection import EntitlementProjection, GiftWindowFacts, SubscriptionFacts
 from auth.middleware import clear_refresh_cookie, clear_session_cookie
 from auth.models import (
     Session,
     User,
+    apply_user_entitlement_projection,
     build_user_payload_with_entitlement,
+    subscription_has_paid_access,
 )
+from auth.utils import mask_email as _mask_email
 from contracts.api_response import failure_response, success_response
 from core.logging_config import get_logger
 
 logger = get_logger("viola.auth.routes")
 
 log = logger  # Alias for consistency with validation helper
-
-
-from auth.utils import mask_email as _mask_email
 
 
 def _raise_messaging_channel_unavailable(channel: str) -> NoReturn:
@@ -873,6 +872,13 @@ class AuthUserPayload(BaseModel):
     canceled_at: datetime | None = None
     payment_provider: str | None = None
     subscription_source: str | None = None
+    commercial_plan_id: str | None = None
+    commercial_subscription_status: str | None = None
+    effective_capacity_multiplier: float | None = None
+    base_subscription: SubscriptionFacts | None = None
+    active_gift: GiftWindowFacts | None = None
+    queued_gifts: list[GiftWindowFacts] | None = None
+    entitlement: EntitlementProjection | None = None
 
 
 class RefreshSessionRequest(BaseModel):
@@ -1004,6 +1010,22 @@ async def _build_user_payload(db, user: User | Any) -> AuthUserPayload | dict[st
         return {"id": _presentation_user_id_or_500(user, context="auth user payload")}
 
     subscription = await db.subscriptions.get_subscription(user.id)
+    resolver = getattr(db, "resolve_entitlement_projection", None)
+    if inspect.iscoroutinefunction(resolver):
+        base_snapshot = (
+            subscription.model_dump(mode="json")
+            if subscription
+            else {
+                "user_id": user.id,
+                "plan_id": "free",
+                "plan_family": "free",
+                "status": "free",
+            }
+        )
+        base_snapshot["has_paid_access"] = subscription_has_paid_access(subscription)
+        projection = await resolver(user.id, base_snapshot)
+        if projection is not None:
+            user = apply_user_entitlement_projection(user, projection)
     return AuthUserPayload.model_validate(build_user_payload_with_entitlement(user, subscription))
 
 

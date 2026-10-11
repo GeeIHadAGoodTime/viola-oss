@@ -1,14 +1,29 @@
 {
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "b96e08fe4ae8f38696808e31d025f815a902de361889219ce69765f15c47d763",
-  "source_tree_sha256": "04c729662cf17d7e66469494f325a751582c12b8821aab4e4a24917df6335989",
-  "source_file_count": 2704,
-  "source_revision": "47cdacdff228ed48e357d4d53699ca558c298f3e",
-  "comparison_public_revision": "214cbda6c85ad2b952373c109992bc28ab90636e",
+  "source_manifest_sha256": "56f488e346b340ae4e127d12e1ce18938d05427119b96568d6381789f7a35f74",
+  "source_tree_sha256": "06eee2fc533f5266e45d8c47e448fa97ce529f6fa4455b6df67c5d304898d8f7",
+  "source_file_count": 2709,
+  "source_revision": "1bfa4e75db0f1c9bec7e57ff2b7a8cab64e0b2e2",
+  "comparison_public_revision": "345c9dc69c6ea3c5863956b0e863d6caa72c9288",
   "changed_source_paths": [
-    "SOURCE/intent/agent_loop.py",
-    "SOURCE/tests/public/test_deferred_confirmation_contract.py"
+    "SOURCE/auth/database.py",
+    "SOURCE/auth/entitlement_projection.py",
+    "SOURCE/auth/models.py",
+    "SOURCE/auth/routes.py",
+    "SOURCE/core/db_backend.py",
+    "SOURCE/core/request_context.py",
+    "SOURCE/services/operator_controls.py",
+    "SOURCE/tests/public/test_month_gift_entitlement.py",
+    "SOURCE/ui/react-app/src/components/AccountTab.jsx",
+    "SOURCE/ui/react-app/src/components/BillingCapacityPanel.jsx",
+    "SOURCE/ui/react-app/src/components/MonthGiftSummary.jsx",
+    "SOURCE/ui/react-app/src/components/MonthGiftSummary.test.jsx",
+    "SOURCE/ui/react-app/src/hooks/useAuth.legacy.jsx",
+    "SOURCE/ui/react-app/src/lib/auth_context.monthGift.test.jsx",
+    "SOURCE/ui/react-app/src/lib/auth_context.tsx",
+    "SOURCE/ui/react-app/src/lib/billingEntitlement.test.ts",
+    "SOURCE/ui/react-app/src/lib/billingEntitlement.ts"
   ],
   "retained_sboms": [
     {
@@ -79,89 +94,23 @@
     "base_full_tree": "9afc0c8d7d88b028104969e7f14c84f6e1dc76b3"
   },
   "qualification": {
-    "scope": "Scoped actual-executor deferred-confirmation and calendar-failure correction; exact reviewed runtime and public regression bytes carried without rerunning unchanged tests.",
-    "source_commit": "47cdacdff228ed48e357d4d53699ca558c298f3e",
-    "source_tree": "44860e0757149d5495fb1f81ec4e813a7ff7afd0",
-    "ordered_source_parents": [
-      "214cbda6c85ad2b952373c109992bc28ab90636e"
-    ],
-    "reviewed_combined_patch_sha256": "89c01a2d74b90e53644c0c3d440fe5003e8f56d7ccaf5600a3adc26f33b5ec37",
-    "publication_status": "Semantic source review complete; independent metadata composition review and exact-head hosted checks remain required before protected integration.",
-    "current_source_qualification": {
-      "manifest_helper": "SOURCE/tools/release/create_source_manifest.py",
-      "manifest_helper_git_blob": "92700d7b20d04fe9def322ada514bdb78b74c653",
-      "source_binding_verifier": "SOURCE/tools/release/verify_source_binding.py",
-      "source_binding_verifier_git_blob": "4a73911069d35ff3f2dbda5c582805ad3ee5a02b",
-      "source_files": 2704,
-      "unchanged_sboms": 6,
-      "exact_public_source_change_count": 2,
-      "source_manifest_changed_rows": [
-        "intent/agent_loop.py",
-        "tests/public/test_deferred_confirmation_contract.py"
-      ]
+    "source_commit": "1bfa4e75db0f1c9bec7e57ff2b7a8cab64e0b2e2",
+    "kind": "source inventory and scoped local development checks",
+    "shared_month_entitlement_unittest_methods": 13,
+    "react_tests": 36,
+    "website_tests": 7,
+    "frontend_build": "passed with output outside source",
+    "full_public_unittest": {
+      "methods": 986,
+      "failures": 1,
+      "skipped": 2,
+      "limit": "Local Windows symbolic-link privilege failure in existing CJK fresh-process harness; no full-suite pass claimed."
     },
-    "retained_semantic_review": {
-      "scope": "Actual production AgentExecutor, agent loop, and ApprovalManager with synthetic provider/hub/channel. Exact runtime/public-test bytes reused from semantic review. Private fixture and independent review-only controls are constituent evidence, not added public files.",
-      "review_verdict": "No blocking semantic finding in the three-file final candidate.",
-      "public_runtime_git_blob": "625c68fadfd525a8e2f420966ef004d13bb0237b",
-      "public_unittest_git_blob": "ee0dbf6059164ef88f865b389214b63c134003b6",
-      "private_fixture_git_blob": "e8a742150906ea22b024d5914f8dc5a38cb00c83",
-      "independent_aggregate": {
-        "passed": 17,
-        "failed": 0,
-        "errors": 0,
-        "skipped": 0,
-        "public_tests": 7,
-        "private_fixture_tests": 2,
-        "review_only_controls": 8
-      },
-      "public_unittest_discovery": {
-        "passed": 7,
-        "failed": 0,
-        "errors": 0,
-        "skipped": 0,
-        "command": "python -m unittest discover -s tests/public -p test_deferred_confirmation_contract.py -v"
-      },
-      "negative_controls": {
-        "count": 4,
-        "outcomes": "All four deliberately bad variants rejected without collection/execution errors.",
-        "mutations": [
-          "remove authorized calendar-failure termination",
-          "reopen forced-failure turn through Stop hook",
-          "bypass irreversible approval",
-          "drop pending-confirmation envelope"
-        ]
-      },
-      "public_test_setup_failure_cleanup": "Injected setup failure restored environment and Path.home and removed temporary profile.",
-      "receipt_sha256": {
-        "final-public-private.json": "3fc06365688e70be92e888fd65cc260d8e4222d43d508ca7d635f5547f6790e6",
-        "final-public-private.xml": "4604ff4d28b96ab31066fb2663bcc71d67f1d192453e2e07ed1cdab7fb2dbd80",
-        "public-unittest-discovery.log": "5d5216b4668bb1cf851100bf5adad43ebfa61edceaa8ba8d4eb24903625ac49e",
-        "public-negative-controls.json": "a44a17b377ff7a3d8df10ca560eb76bf6154ab2b738610ec3db9eb9b23380672",
-        "public-setup-cleanup-after.json": "5e8d49161718bda7202f39fd894ee00c48d9e197bf5426304633aead2fdb273d"
-      },
-      "limitations": [
-        "Python 3.12.14 scratch; hosted CI uses Python 3.11.",
-        "Smart runner with --noconftest and synthetic runtime storage; focused, not full composed aggregate.",
-        "Synthetic trace-key initialization diagnostics occurred; final JUnit reports no test errors.",
-        "No real calendar, provider, installed application, build, deployment, or release qualification."
-      ]
-    },
-    "runtime_qualification": {
-      "new_installer_build": false,
-      "signing": false,
-      "installed_windows": false,
-      "physical_audio": false,
-      "real_provider": false,
-      "deployment_or_release": false
-    },
-    "limits": [
-      "Scoped synthetic-provider and synthetic-calendar execution is not a full final-head runtime or composed-suite qualification.",
-      "Scratch Python 3.12 evidence does not replace required hosted Python 3.11 checks.",
-      "Existing retained binaries are unchanged and do not contain this repair.",
-      "No new dependency resolution, advisory scan, installed acceptance, physical voice qualification, deployment, or release.",
-      "Previous SBOM status objects and all historical qualification are preserved without upgrading their claims."
-    ]
+    "canonical_private_public_composition": "pending separate exact candidate qualification",
+    "image_qualification": false,
+    "provider_sandbox_acceptance": false,
+    "production_deployment": false,
+    "installed_customer_acceptance": false
   },
   "historical_bindings": [
     {
@@ -12216,8 +12165,8 @@
   "new_runtime_qualification_performed": false,
   "new_source_contract_qualification_performed": true,
   "new_static_security_scan_performed": false,
-  "new_resolution_scope": "No product dependency input or resolution change; no additional dependencies installed for this composition.",
-  "new_advisory_scan_scope": "No new advisory scan; all six retained inventory status objects remain unchanged.",
+  "new_resolution_scope": "No dependency or lockfile input change; retained SBOM hashes/statuses remain unchanged.",
+  "new_advisory_scan_scope": "No new advisory scan in local preparation; required repository workflows remain authoritative for their executions.",
   "account_reconciliation_previous_binding": {
     "source_revision": "f864e61381ef9e10a09333fce05210427cf7d0f6",
     "source_manifest_sha256": "9cad8bcb2f98c34d95a11545e11a57d74dbe6b28cd5db7322b7746e102801acd",
@@ -16447,8 +16396,8 @@
       "new_static_security_scan_performed": false
     }
   },
-  "new_runtime_qualification_scope": "Scoped synthetic actual-executor semantic tests only; no new installer, signing, native/installed, real-provider, physical, deployment, or release qualification.",
-  "new_source_contract_qualification_scope": "Exact source inventory and source-binding helper verification, with independently reviewed actual-executor tests carried by exact runtime and regression bytes.",
+  "new_runtime_qualification_scope": "No candidate OCI/installer qualification, actual provider sandbox, production or installed-customer acceptance.",
+  "new_source_contract_qualification_scope": "Fresh inventory/source binding and scoped shared entitlement/customer checks; full local Windows suite has its recorded platform failure.",
   "consultation_responsive_previous_binding": {
     "repository_revision": "d1e042d527dde01c447350ab09638d0cca521268",
     "path": "PUBLIC_METADATA/source-binding.json",
@@ -17842,5 +17791,12 @@
       "new_advisory_scan_scope": "No new advisory scan; retained inventory status objects remain unchanged.",
       "new_static_security_scan_performed": false
     }
+  },
+  "owner_month_gifts_previous_binding": {
+    "public_revision": "345c9dc69c6ea3c5863956b0e863d6caa72c9288",
+    "source_revision": "47cdacdff228ed48e357d4d53699ca558c298f3e",
+    "source_binding_sha256": "f70d4a91b8d9b00c7a70049198e13e004770444de3c3e3eea3bb4d16e82ebf8d",
+    "source_manifest_sha256": "b96e08fe4ae8f38696808e31d025f815a902de361889219ce69765f15c47d763",
+    "retention": "Original complete metadata remains in the named Git revision; its qualification is historical."
   }
 }

@@ -20,7 +20,7 @@ import { hydrateDesktopSessionFromCookie } from '../auth/authClient';
 import { completeDesktopOAuth } from '../auth/desktopOAuth';
 import { isDesktopApp } from '../utils/runtimeSurface';
 import { inMemorySessionStorage } from './sessionStore';
-import { readBillingSubscription } from './billingEntitlement';
+import { readBillingSubscription, type EntitlementProjection } from './billingEntitlement';
 import { DEFAULTS } from '../config';
 import { externalOAuthAuthorizeUrl, gotrueClient, GOTRUE_STORAGE_KEY } from './gotrue_client';
 
@@ -59,6 +59,7 @@ type PlanState = {
   paymentProvider: string | null;
   currentPeriodEnd?: string | null;
   subscriptionSource?: string | null;
+  entitlement?: EntitlementProjection;
 };
 
 type ViolaUser = User & {
@@ -81,6 +82,7 @@ type AuthContextValue = {
     paymentProvider: string | null;
     currentPeriodEnd?: string | null;
     subscriptionSource?: string | null;
+    entitlement?: EntitlementProjection;
   } | null;
   plan: PlanState;
   planTier: string;
@@ -382,6 +384,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           paymentProvider: billing.payment_provider,
           currentPeriodEnd: billing.current_period_end,
           subscriptionSource: billing.subscription_source,
+          entitlement: billing.entitlement,
         };
         const canonicalUser = {
           ...nextUser,
@@ -401,6 +404,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           paymentProvider: billing.payment_provider,
           currentPeriodEnd: billing.current_period_end,
           subscriptionSource: billing.subscription_source,
+          entitlement: billing.entitlement,
         });
         setBillingStatus('ready');
       }).catch(() => {
@@ -425,19 +429,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [applySession]);
 
   useEffect(() => {
-    const until = plan.currentPeriodEnd;
-    if (!until || !plan.hasPaidAccess) return undefined;
-    const delay = Date.parse(until) - Date.now();
-    // Long grants are checked again when auth lifecycle updates this store.
-    if (delay > DEFAULTS.MAX_TIMER_DELAY_MS) return undefined;
-    const timer = setTimeout(() => {
-      setPlan((value) => ({ ...value, hasPaidAccess: false }));
-      setSubscription((value) => value && { ...value, hasPaidAccess: false });
-      setUser((value) => value && { ...value, has_paid_access: false });
+    const boundaries = [plan.currentPeriodEnd, plan.entitlement?.base_subscription.current_period_start,
+      ...(plan.entitlement?.queued_gifts || []).map((gift) => gift.start_at)]
+      .filter((value): value is string => Boolean(value))
+      .map((value) => Date.parse(value))
+      .filter((value) => Number.isFinite(value) && value > Date.now());
+    if (!boundaries.length) return undefined;
+    const nextBoundary = Math.min(...boundaries);
+    let timer: ReturnType<typeof setTimeout>;
+    const refreshAtBoundary = () => {
+      const remaining = nextBoundary - Date.now();
+      if (remaining > 0) {
+        // Browser timers accept signed 32-bit delays. Keep the finite deadline
+        // for a full calendar month without reading billing before it arrives.
+        timer = setTimeout(refreshAtBoundary, Math.min(remaining, DEFAULTS.MAX_TIMER_DELAY_MS));
+        return;
+      }
+      const expiry = Date.parse(plan.currentPeriodEnd || '');
+      if (Number.isFinite(expiry) && expiry <= Date.now()) {
+        setPlan((value) => ({ ...value, hasPaidAccess: false }));
+        setSubscription((value) => value && { ...value, hasPaidAccess: false });
+        setUser((value) => value && { ...value, has_paid_access: false });
+      }
       refreshUser();
-    }, Math.max(0, delay));
+    };
+    refreshAtBoundary();
     return () => clearTimeout(timer);
-  }, [plan.currentPeriodEnd, plan.hasPaidAccess, refreshUser]);
+  }, [plan.currentPeriodEnd, plan.hasPaidAccess, plan.entitlement, refreshUser]);
 
   useEffect(() => {
     let mounted = true;

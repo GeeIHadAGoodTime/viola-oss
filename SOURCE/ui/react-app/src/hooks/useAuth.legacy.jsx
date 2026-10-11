@@ -173,6 +173,9 @@ function buildSubscription(user) {
     planFamily: user?.plan_family || 'free',
     hasPaidAccess: user?.has_paid_access || false,
     paymentProvider: user?.payment_provider || null,
+    currentPeriodEnd: user?.current_period_end || null,
+    subscriptionSource: user?.subscription_source || null,
+    ...(user?.entitlement ? { entitlement: user.entitlement } : {}),
   };
 }
 

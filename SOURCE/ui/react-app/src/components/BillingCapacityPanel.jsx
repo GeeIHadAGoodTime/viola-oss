@@ -26,7 +26,7 @@ function SummaryRow({ label, children }) {
 }
 SummaryRow.propTypes = { label: PropTypes.string.isRequired, children: PropTypes.node.isRequired };
 
-export default function BillingCapacityPanel({ accountId, refreshUser, fallback = null }) {
+export default function BillingCapacityPanel({ accountId, refreshUser, fallback = null, entitlement = null }) {
   const billing = useBillingCapacity({ accountId, refreshUser });
   const { catalog, account, quote, attempt, operation, loading, quoting, changing, error } = billing;
   const id = useId();
@@ -110,11 +110,14 @@ export default function BillingCapacityPanel({ accountId, refreshUser, fallback 
       {loading && !account && <p role="status">Loading billing…</p>}
       {account && <>
         <dl className="billing-capacity-summary">
-          <SummaryRow label="Current plan">{account.monthly_price_cents > 0
+          <SummaryRow label={entitlement?.active_gift ? 'Base paid plan' : 'Current plan'}>{account.monthly_price_cents > 0
             ? `${capacityMoney(account.recurring_amount_cents ?? (account.interval === 'year'
               ? catalog?.selections?.find((row) => row.monthly_price_cents === account.monthly_price_cents)?.annual_price_cents
               : account.monthly_price_cents))}/${account.interval === 'year' ? 'year' : 'month'} · ${account.capacity_multiplier}× Pro`
             : 'Free'}</SummaryRow>
+          {entitlement?.active_gift && <SummaryRow label="Effective complimentary capacity">
+            {entitlement.active_gift.capacity_multiplier}× Pro through {capacityDate(entitlement.active_gift.end_at)}
+          </SummaryRow>}
           {typeof account.usage_percent === 'number' && <SummaryRow label="Managed usage">{account.usage_percent}% used</SummaryRow>}
           <SummaryRow label="Usage resets">{capacityDate(account.usage_resets_at)}</SummaryRow>
           {account.billing_review_required && typeof account.effective_capacity_multiplier === 'number'
@@ -245,4 +248,5 @@ BillingCapacityPanel.propTypes = {
   accountId: PropTypes.string.isRequired,
   refreshUser: PropTypes.func,
   fallback: PropTypes.node,
+  entitlement: PropTypes.object,
 };

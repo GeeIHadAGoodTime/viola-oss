@@ -14,6 +14,14 @@ from core.logging_config import get_logger
 
 logger = get_logger(__name__)
 
+_operator_system_connection_factory: Callable[..., Any] | None = None
+
+
+def register_operator_system_connection_factory(factory: Callable[..., Any]) -> None:
+    """Install the private server's constrained database capability at boot."""
+    global _operator_system_connection_factory
+    _operator_system_connection_factory = factory
+
 
 class ControlState(StrEnum):
     ENABLED = "enabled"
@@ -357,11 +365,13 @@ class PostgresOperatorControlStore:
         *,
         async_runner: Callable[..., Any] | None = None,
         pool_getter: Callable[..., Any] | None = None,
+        system_connection_factory: Callable[..., Any] | None = None,
     ) -> None:
         self._initialized = False
         self._init_lock = threading.RLock()
         self._async_runner = async_runner
         self._pool_getter = pool_getter
+        self._system_connection_factory = system_connection_factory
 
     def get_control(self, key: str) -> ControlRecord:
         return self._run(self.aget_control(key))
@@ -444,6 +454,57 @@ class PostgresOperatorControlStore:
         await self._aensure_initialized()
         rows = await self._fetch_audit_rows()
         return [_audit_record_from_pg_row(row) for row in rows]
+
+    def set_system_control(self, key: str, state: ControlState, **options: Any) -> ControlRecord:
+        """Explicit server-only mutation; normal set_control never elevates."""
+        return self._run(self.aset_system_control(key, state, **options))
+
+    async def aset_system_control(
+        self,
+        key: str,
+        state: ControlState,
+        *,
+        actor: str,
+        reason: str,
+        source: ControlSource = ControlSource.CLI,
+        ttl_seconds: int | None = None,
+        request_id: str | None = None,
+    ) -> ControlRecord:
+        _validate_mutation(actor=actor, reason=reason, user_id=None)
+        await self._aensure_initialized()
+        expires_at = datetime.now(UTC) + timedelta(seconds=ttl_seconds) if ttl_seconds is not None else None
+        row = await self._set_control_row(
+            key=key,
+            state=state,
+            actor=actor.strip(),
+            reason=reason.strip(),
+            source=source,
+            expires_at=expires_at,
+            user_id=None,
+            request_id=request_id,
+            system=True,
+        )
+        return _control_record_from_pg_row(row)
+
+    def system_audit_records(self) -> list[ControlAuditRecord]:
+        """Server-only system events; browser audit_records remains owner-RLS."""
+        return self._run(self.asystem_audit_records())
+
+    async def asystem_audit_records(self) -> list[ControlAuditRecord]:
+        await self._aensure_initialized()
+        pool = await self._pool()
+        async with self._system_connection(pool) as conn:
+            rows = await conn.fetch(
+                "SELECT * FROM operator_control_audit WHERE user_id IS NULL "
+                "ORDER BY timestamp ASC, revision ASC, audit_id ASC"
+            )
+        return [_audit_record_from_pg_row(row) for row in rows]
+
+    def _system_connection(self, pool: Any) -> Any:
+        factory = self._system_connection_factory or _operator_system_connection_factory
+        if factory is None:
+            raise ControlReadError("Operator-system database capability is not registered")
+        return factory(pool)
 
     def mark_checked(self, key: str, *, checked_at: datetime) -> ControlRecord:
         return self._run(self.amark_checked(key, checked_at=checked_at))
@@ -578,15 +639,21 @@ class PostgresOperatorControlStore:
         expires_at: datetime | None,
         user_id: str | None,
         request_id: str | None,
+        system: bool = False,
+        expire_only: bool = False,
     ) -> Any:
         pool = await self._pool()
-        async with pool.acquire() as conn:
+        async with self._system_connection(pool) if system else pool.acquire() as conn:
             async with conn.transaction():
                 previous = await conn.fetchrow("SELECT * FROM operator_controls WHERE key = $1 FOR UPDATE", key)
                 if previous is None:
                     raise KeyError(key)
                 previous_record = _control_record_from_pg_row(previous)
                 updated_at = datetime.now(UTC)
+                if expire_only and (previous_record.expires_at is None or previous_record.expires_at > updated_at):
+                    # The locked value wins over a stale worker snapshot. A
+                    # concurrent manual override or another expiry is retained.
+                    return previous
                 updated = await conn.fetchrow(
                     """
                     UPDATE operator_controls
@@ -634,28 +701,25 @@ class PostgresOperatorControlStore:
                 return updated
 
     def _expire_if_needed(self, record: ControlRecord) -> ControlRecord:
-        if record.expires_at is None or record.expires_at > datetime.now(UTC):
-            return record
-        definition = DEFAULT_CONTROLS_BY_KEY[record.key]
-        return self.set_control(
-            record.key,
-            definition.default_state,
-            actor="system",
-            reason="temporary control expired",
-            source=ControlSource.AUTO_DISABLE,
-        )
+        return self._run(self._aexpire_if_needed(record))
 
     async def _aexpire_if_needed(self, record: ControlRecord) -> ControlRecord:
         if record.expires_at is None or record.expires_at > datetime.now(UTC):
             return record
         definition = DEFAULT_CONTROLS_BY_KEY[record.key]
-        return await self.aset_control(
-            record.key,
-            definition.default_state,
+        row = await self._set_control_row(
+            key=record.key,
+            state=definition.default_state,
             actor="system",
             reason="temporary control expired",
             source=ControlSource.AUTO_DISABLE,
+            expires_at=None,
+            user_id=None,
+            request_id=None,
+            system=True,
+            expire_only=True,
         )
+        return _control_record_from_pg_row(row)
 
 
 _CONTROL_READ_TIMEOUT = object()

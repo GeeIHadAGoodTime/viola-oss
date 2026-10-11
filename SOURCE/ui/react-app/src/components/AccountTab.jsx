@@ -20,6 +20,7 @@ import { authErrorMessage } from './auth/authValidation';
 import { useCalendarProviders } from '../hooks/useCalendarProviders';
 import { useUsage } from '../hooks/useUsage';
 import BillingCapacityPanel from './BillingCapacityPanel';
+import MonthGiftSummary from './MonthGiftSummary';
 import { apiFetch } from '../hooks/useViolaApi';
 import { THEME as theme } from '../config';
 import { ACCEPTED_PRIVACY_VERSION, ACCEPTED_TERMS_VERSION } from '../auth/legalVersions';
@@ -669,9 +670,10 @@ UpgradePanel.propTypes = {
 // User Profile Card
 const ProfileCard = ({ user, subscription, billingStatus = 'ready', onLogout, logoutPending = false, addToast, refreshUser }) => {
   const [portalLoading, setPortalLoading] = useState(false);
-  const canManageSubscription = Boolean(
-    subscription?.hasPaidAccess && subscription?.paymentProvider === 'stripe',
-  );
+  const baseSubscription = subscription?.entitlement?.base_subscription;
+  const canManageSubscription = Boolean(baseSubscription
+    ? baseSubscription.payment_provider === 'stripe' && baseSubscription.plan_id !== 'free'
+    : subscription?.hasPaidAccess && subscription?.paymentProvider === 'stripe');
 
   const handleManageSubscription = async () => {
     setPortalLoading(true);
@@ -727,7 +729,8 @@ const ProfileCard = ({ user, subscription, billingStatus = 'ready', onLogout, lo
                 fontSize: '12px',
                 fontWeight: 600,
               }}>
-                <Icons.Crown /> {subscription?.planFamily === 'max' ? 'Max' : 'Pro'}
+                <Icons.Crown /> {subscription?.entitlement?.active_gift?.selected_level === 'flexible'
+                  ? 'Flexible' : subscription?.planFamily === 'max' ? 'Max' : 'Pro'}
               </span>
             )}
             {!subscription?.hasPaidAccess && billingStatus === 'ready' && (
@@ -759,6 +762,8 @@ const ProfileCard = ({ user, subscription, billingStatus = 'ready', onLogout, lo
         <Button variant="secondary" onClick={refreshUser}>Refresh plan</Button>
       )}
 
+      <MonthGiftSummary entitlement={subscription?.entitlement} />
+
       <UsageSummary />
 
       {canManageSubscription && (
@@ -777,6 +782,7 @@ const ProfileCard = ({ user, subscription, billingStatus = 'ready', onLogout, lo
         key={user.id || user.email}
         accountId={user.id || user.email}
         refreshUser={refreshUser}
+        entitlement={subscription?.entitlement}
         fallback={billingStatus === 'ready' && !subscription?.hasPaidAccess
           ? <UpgradePanel addToast={addToast} refreshUser={refreshUser} /> : null}
       />
@@ -803,6 +809,7 @@ ProfileCard.propTypes = {
     paymentProvider: PropTypes.string,
     currentPeriodEnd: PropTypes.string,
     subscriptionSource: PropTypes.string,
+    entitlement: PropTypes.object,
   }),
   onLogout: PropTypes.func.isRequired,
   logoutPending: PropTypes.bool,
