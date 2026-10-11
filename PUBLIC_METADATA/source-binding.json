@@ -1,13 +1,14 @@
 {
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "653008e6341f02bf089e1aad53943d607ad8c6b59e4a6efc8a6edacf511d7172",
-  "source_tree_sha256": "5505f9676e416051941115eb762dfeae001c8ec3991dc9857da6890af95682f7",
-  "source_file_count": 2703,
-  "source_revision": "9a9af78e480fabe46c07070205015e6386b06fb6",
-  "comparison_public_revision": "2c7ed869257e422c3f3e40eaa7691470b6614a34",
+  "source_manifest_sha256": "b96e08fe4ae8f38696808e31d025f815a902de361889219ce69765f15c47d763",
+  "source_tree_sha256": "04c729662cf17d7e66469494f325a751582c12b8821aab4e4a24917df6335989",
+  "source_file_count": 2704,
+  "source_revision": "47cdacdff228ed48e357d4d53699ca558c298f3e",
+  "comparison_public_revision": "214cbda6c85ad2b952373c109992bc28ab90636e",
   "changed_source_paths": [
-    "SOURCE/LICENSES/CUSTOMER_SPEECH_SUPPLEMENTAL_NOTICES.txt"
+    "SOURCE/intent/agent_loop.py",
+    "SOURCE/tests/public/test_deferred_confirmation_contract.py"
   ],
   "retained_sboms": [
     {
@@ -69,65 +70,82 @@
     }
   ],
   "input_equivalence": {
-    "comparison_basis": "Protected public main 2c7ed869257e422c3f3e40eaa7691470b6614a34; exact full-tree equality with retained candidate source b6d4d5f5809bc45be9cdebcbfa5ae5c6821fc47d.",
+    "comparison_basis": "Protected public main 214cbda6c85ad2b952373c109992bc28ab90636e; exact full-tree equality with retained private source pin 51a0be2f4f2ef6845eb648d7c1c2669c9a7264a2.",
     "all_unselected_export_leaf_bytes_and_modes_preserved": true,
     "unselected_source_files_preserved": 2702,
     "all_six_sbom_bytes_and_status_objects_preserved": true,
-    "source_change_scope": "Only the existing customer speech supplemental notice: complete upstream srsly/ujson attribution and a clarifying introduction. The three prior notice sections remain byte-identical. No runtime, dependency, workflow, eligibility, or source ownership changes.",
-    "source_only_tree": "01ce024e953c48bc88b3334d1993501d204fd237",
-    "base_full_tree": "2f4fe562b7494b5d2f33900657884b3bc05da381"
+    "source_change_scope": "Only agent-loop deferred-confirmation failure propagation and its executable public unittest regression. Approval policy, executor, dependency inputs, workflows, and source ownership of existing files are unchanged.",
+    "source_only_tree": "44860e0757149d5495fb1f81ec4e813a7ff7afd0",
+    "base_full_tree": "9afc0c8d7d88b028104969e7f14c84f6e1dc76b3"
   },
   "qualification": {
-    "scope": "Source-only srsly/ujson supplemental attribution correction, with existing package guard qualification retained as scoped constituent evidence.",
-    "source_commit": "9a9af78e480fabe46c07070205015e6386b06fb6",
-    "source_tree": "01ce024e953c48bc88b3334d1993501d204fd237",
+    "scope": "Scoped actual-executor deferred-confirmation and calendar-failure correction; exact reviewed runtime and public regression bytes carried without rerunning unchanged tests.",
+    "source_commit": "47cdacdff228ed48e357d4d53699ca558c298f3e",
+    "source_tree": "44860e0757149d5495fb1f81ec4e813a7ff7afd0",
     "ordered_source_parents": [
-      "2c7ed869257e422c3f3e40eaa7691470b6614a34"
+      "214cbda6c85ad2b952373c109992bc28ab90636e"
     ],
-    "reviewed_combined_patch_sha256": "353727febe30ebe4babde20e6cdda7d84b51a56e2339b6d3c0bd583acb961b41",
-    "publication_status": "Independently reviewed notice bytes; metadata review and exact-head hosted checks remain required before protected integration.",
+    "reviewed_combined_patch_sha256": "89c01a2d74b90e53644c0c3d440fe5003e8f56d7ccaf5600a3adc26f33b5ec37",
+    "publication_status": "Semantic source review complete; independent metadata composition review and exact-head hosted checks remain required before protected integration.",
     "current_source_qualification": {
       "manifest_helper": "SOURCE/tools/release/create_source_manifest.py",
       "manifest_helper_git_blob": "92700d7b20d04fe9def322ada514bdb78b74c653",
-      "source_files": 2703,
       "source_binding_verifier": "SOURCE/tools/release/verify_source_binding.py",
+      "source_binding_verifier_git_blob": "4a73911069d35ff3f2dbda5c582805ad3ee5a02b",
+      "source_files": 2704,
       "unchanged_sboms": 6,
-      "exact_public_source_change_count": 1,
-      "public_speech_dependency_tests_passed": 23,
-      "public_speech_dependency_tests_receipt_sha256": "5d30e2582a9b69fd00ad17dcd863cf7128c93732f6c04c677e715229d34991ef",
-      "source_binding_negative_controls": "Old notice and same-length attribution corruption rejected; restored exact source accepted.",
-      "source_binding_negative_controls_sha256": "2ff0aead658f6757edf6c449af344f279feed97213e1dfd8c2813889a349ca70",
-      "additional_source_contract_tests": {
-        "distinct_test_methods": 47,
-        "passed": 47,
-        "previously_passing_methods_reused": 46,
-        "blocked_method_rerun_passed": 1,
-        "unresolved_errors": 0,
-        "scope": "The initial missing-filelock import also occurred on the untouched base. Installed local test-only filelock 4.0.8 outside source, using the version recorded by the retained desktop SBOM, and reran only the previously blocked test. No product source, dependency input, or gate changes. The other 46 passing methods are reused, not rerun.",
-        "original_candidate_receipt_sha256": "c7a75227f835f1e0d843765180874d63ff0bbf44c3d7ff795dc75a25401cd14b",
-        "baseline_receipt_sha256": "4fa1bccc86f20efab378fd86830248a8282cf918e0b68b79c20f9683d9db0a45",
-        "test_prerequisite_install_receipt_sha256": "1f69a2113b4c73d21daa424908524c5deed144ab2c681a4d9245394a447ffa67",
-        "blocked_method_rerun_receipt_sha256": "79291dfa47cae5681d9470cbf7daf39f5b6854659761a8c9f59af96f85b42ed0"
-      }
+      "exact_public_source_change_count": 2,
+      "source_manifest_changed_rows": [
+        "intent/agent_loop.py",
+        "tests/public/test_deferred_confirmation_contract.py"
+      ]
     },
-    "retained_notice_review": {
-      "scope": "Exact notice and companion private size/hash guard only; not a full final-head runtime qualification.",
-      "author_test_methods_passed": 106,
-      "independent_test_methods_passed": 136,
-      "independent_subtests_passed": 614,
-      "independent_failures": 0,
-      "independent_errors": 0,
-      "independent_skips": 0,
-      "independent_aggregate_receipt_sha256": "0dda7108d9a85e7975e082f5d05867b8f70dde705e8b7971b8062ce4558e884f",
-      "independent_patch_identity_receipt_sha256": "1b7d2373abbaf972a58f56b0efdbebc323dffef134abdfcdbdc1723690d984c3",
-      "negative_controls": "Actual corrected notice accepted; old 15090-byte notice and same-length attribution corruption rejected; exact restoration accepted.",
-      "negative_control_receipt_sha256": "19ff96e5533ca38daff53c0ae83d35cc0cecfc29c67117e4c7ff55333ff0f43b",
-      "upstream_commit": "fe0b8039891998047c4c9da568b253eb003f834b",
-      "upstream_notice_url": "https://github.com/explosion/srsly/blob/fe0b8039891998047c4c9da568b253eb003f834b/srsly/ujson/ujson.c#L2-L36",
-      "upstream_notice_bytes": 1961,
-      "upstream_notice_sha256": "70b40d0102aae92b75b1eb93e07a81eb3809936255dec29af3735ea10f685d60",
-      "supplemental_notice_bytes": 17850,
-      "supplemental_notice_sha256": "05f1434470e44a72c82ab4544743543f3bbc4e764cb48f8c5f93a30566b43912"
+    "retained_semantic_review": {
+      "scope": "Actual production AgentExecutor, agent loop, and ApprovalManager with synthetic provider/hub/channel. Exact runtime/public-test bytes reused from semantic review. Private fixture and independent review-only controls are constituent evidence, not added public files.",
+      "review_verdict": "No blocking semantic finding in the three-file final candidate.",
+      "public_runtime_git_blob": "625c68fadfd525a8e2f420966ef004d13bb0237b",
+      "public_unittest_git_blob": "ee0dbf6059164ef88f865b389214b63c134003b6",
+      "private_fixture_git_blob": "e8a742150906ea22b024d5914f8dc5a38cb00c83",
+      "independent_aggregate": {
+        "passed": 17,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0,
+        "public_tests": 7,
+        "private_fixture_tests": 2,
+        "review_only_controls": 8
+      },
+      "public_unittest_discovery": {
+        "passed": 7,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0,
+        "command": "python -m unittest discover -s tests/public -p test_deferred_confirmation_contract.py -v"
+      },
+      "negative_controls": {
+        "count": 4,
+        "outcomes": "All four deliberately bad variants rejected without collection/execution errors.",
+        "mutations": [
+          "remove authorized calendar-failure termination",
+          "reopen forced-failure turn through Stop hook",
+          "bypass irreversible approval",
+          "drop pending-confirmation envelope"
+        ]
+      },
+      "public_test_setup_failure_cleanup": "Injected setup failure restored environment and Path.home and removed temporary profile.",
+      "receipt_sha256": {
+        "final-public-private.json": "3fc06365688e70be92e888fd65cc260d8e4222d43d508ca7d635f5547f6790e6",
+        "final-public-private.xml": "4604ff4d28b96ab31066fb2663bcc71d67f1d192453e2e07ed1cdab7fb2dbd80",
+        "public-unittest-discovery.log": "5d5216b4668bb1cf851100bf5adad43ebfa61edceaa8ba8d4eb24903625ac49e",
+        "public-negative-controls.json": "a44a17b377ff7a3d8df10ca560eb76bf6154ab2b738610ec3db9eb9b23380672",
+        "public-setup-cleanup-after.json": "5e8d49161718bda7202f39fd894ee00c48d9e197bf5426304633aead2fdb273d"
+      },
+      "limitations": [
+        "Python 3.12.14 scratch; hosted CI uses Python 3.11.",
+        "Smart runner with --noconftest and synthetic runtime storage; focused, not full composed aggregate.",
+        "Synthetic trace-key initialization diagnostics occurred; final JUnit reports no test errors.",
+        "No real calendar, provider, installed application, build, deployment, or release qualification."
+      ]
     },
     "runtime_qualification": {
       "new_installer_build": false,
@@ -138,9 +156,11 @@
       "deployment_or_release": false
     },
     "limits": [
-      "Existing retained binaries are not changed by this source correction and continue to lack the corrected supplemental notice.",
-      "No new dependency resolution, advisory scan, installed acceptance, or physical voice qualification.",
-      "Previous SBOM status objects and historical qualification are preserved without upgrading their claims."
+      "Scoped synthetic-provider and synthetic-calendar execution is not a full final-head runtime or composed-suite qualification.",
+      "Scratch Python 3.12 evidence does not replace required hosted Python 3.11 checks.",
+      "Existing retained binaries are unchanged and do not contain this repair.",
+      "No new dependency resolution, advisory scan, installed acceptance, physical voice qualification, deployment, or release.",
+      "Previous SBOM status objects and all historical qualification are preserved without upgrading their claims."
     ]
   },
   "historical_bindings": [
@@ -12180,20 +12200,24 @@
     }
   ],
   "reviewed_source_patch": {
-    "sha256": "353727febe30ebe4babde20e6cdda7d84b51a56e2339b6d3c0bd583acb961b41",
-    "source_commit": "9a9af78e480fabe46c07070205015e6386b06fb6",
+    "sha256": "89c01a2d74b90e53644c0c3d440fe5003e8f56d7ccaf5600a3adc26f33b5ec37",
+    "source_commit": "47cdacdff228ed48e357d4d53699ca558c298f3e",
     "paths": [
-      "SOURCE/LICENSES/CUSTOMER_SPEECH_SUPPLEMENTAL_NOTICES.txt"
+      "SOURCE/intent/agent_loop.py",
+      "SOURCE/tests/public/test_deferred_confirmation_contract.py"
     ],
-    "notice_git_blob": "33889bcaf30c60f76e5bdc197a8f89b25069b503"
+    "git_blobs": {
+      "SOURCE/intent/agent_loop.py": "625c68fadfd525a8e2f420966ef004d13bb0237b",
+      "SOURCE/tests/public/test_deferred_confirmation_contract.py": "ee0dbf6059164ef88f865b389214b63c134003b6"
+    }
   },
   "new_resolution_performed": false,
   "new_advisory_scan_performed": false,
   "new_runtime_qualification_performed": false,
   "new_source_contract_qualification_performed": true,
   "new_static_security_scan_performed": false,
-  "new_resolution_scope": "No product dependency input or resolution change. Local test-only filelock 4.0.8 was installed separately without dependencies using the retained desktop SBOM version.",
-  "new_advisory_scan_scope": "No new advisory scan; retained inventory status objects remain unchanged.",
+  "new_resolution_scope": "No product dependency input or resolution change; no additional dependencies installed for this composition.",
+  "new_advisory_scan_scope": "No new advisory scan; all six retained inventory status objects remain unchanged.",
   "account_reconciliation_previous_binding": {
     "source_revision": "f864e61381ef9e10a09333fce05210427cf7d0f6",
     "source_manifest_sha256": "9cad8bcb2f98c34d95a11545e11a57d74dbe6b28cd5db7322b7746e102801acd",
@@ -16423,8 +16447,8 @@
       "new_static_security_scan_performed": false
     }
   },
-  "new_runtime_qualification_scope": "No new installer build, signing, installed/native, provider, physical, deployment or release qualification.",
-  "new_source_contract_qualification_scope": "Exact source inventory and source-binding verification; previously reviewed notice and package guard controls are retained as constituent evidence.",
+  "new_runtime_qualification_scope": "Scoped synthetic actual-executor semantic tests only; no new installer, signing, native/installed, real-provider, physical, deployment, or release qualification.",
+  "new_source_contract_qualification_scope": "Exact source inventory and source-binding helper verification, with independently reviewed actual-executor tests carried by exact runtime and regression bytes.",
   "consultation_responsive_previous_binding": {
     "repository_revision": "d1e042d527dde01c447350ab09638d0cca521268",
     "path": "PUBLIC_METADATA/source-binding.json",
@@ -17707,6 +17731,115 @@
       "new_resolution_scope": "Existing exact-lockfile dependency installation reused; no fresh resolution.",
       "new_advisory_scan_performed": false,
       "new_advisory_scan_scope": "No new local advisory audit; required publication-hosted checks remain separate.",
+      "new_static_security_scan_performed": false
+    }
+  },
+  "deferred_confirmation_previous_binding": {
+    "repository_revision": "214cbda6c85ad2b952373c109992bc28ab90636e",
+    "equivalent_retained_public_pin": "51a0be2f4f2ef6845eb648d7c1c2669c9a7264a2",
+    "path": "PUBLIC_METADATA/source-binding.json",
+    "git_blob": "76c8e13c490acb79011878249b66dde898f57f5d",
+    "sha256": "a73d247ba0299df5824c3817a91d17f620dd61d2723e5e93c740d6787b686600",
+    "preserved_replaced_fields": {
+      "source_manifest_sha256": "653008e6341f02bf089e1aad53943d607ad8c6b59e4a6efc8a6edacf511d7172",
+      "source_tree_sha256": "5505f9676e416051941115eb762dfeae001c8ec3991dc9857da6890af95682f7",
+      "source_file_count": 2703,
+      "source_revision": "9a9af78e480fabe46c07070205015e6386b06fb6",
+      "comparison_public_revision": "2c7ed869257e422c3f3e40eaa7691470b6614a34",
+      "changed_source_paths": [
+        "SOURCE/LICENSES/CUSTOMER_SPEECH_SUPPLEMENTAL_NOTICES.txt"
+      ],
+      "input_equivalence": {
+        "comparison_basis": "Protected public main 2c7ed869257e422c3f3e40eaa7691470b6614a34; exact full-tree equality with retained candidate source b6d4d5f5809bc45be9cdebcbfa5ae5c6821fc47d.",
+        "all_unselected_export_leaf_bytes_and_modes_preserved": true,
+        "unselected_source_files_preserved": 2702,
+        "all_six_sbom_bytes_and_status_objects_preserved": true,
+        "source_change_scope": "Only the existing customer speech supplemental notice: complete upstream srsly/ujson attribution and a clarifying introduction. The three prior notice sections remain byte-identical. No runtime, dependency, workflow, eligibility, or source ownership changes.",
+        "source_only_tree": "01ce024e953c48bc88b3334d1993501d204fd237",
+        "base_full_tree": "2f4fe562b7494b5d2f33900657884b3bc05da381"
+      },
+      "qualification": {
+        "scope": "Source-only srsly/ujson supplemental attribution correction, with existing package guard qualification retained as scoped constituent evidence.",
+        "source_commit": "9a9af78e480fabe46c07070205015e6386b06fb6",
+        "source_tree": "01ce024e953c48bc88b3334d1993501d204fd237",
+        "ordered_source_parents": [
+          "2c7ed869257e422c3f3e40eaa7691470b6614a34"
+        ],
+        "reviewed_combined_patch_sha256": "353727febe30ebe4babde20e6cdda7d84b51a56e2339b6d3c0bd583acb961b41",
+        "publication_status": "Independently reviewed notice bytes; metadata review and exact-head hosted checks remain required before protected integration.",
+        "current_source_qualification": {
+          "manifest_helper": "SOURCE/tools/release/create_source_manifest.py",
+          "manifest_helper_git_blob": "92700d7b20d04fe9def322ada514bdb78b74c653",
+          "source_files": 2703,
+          "source_binding_verifier": "SOURCE/tools/release/verify_source_binding.py",
+          "unchanged_sboms": 6,
+          "exact_public_source_change_count": 1,
+          "public_speech_dependency_tests_passed": 23,
+          "public_speech_dependency_tests_receipt_sha256": "5d30e2582a9b69fd00ad17dcd863cf7128c93732f6c04c677e715229d34991ef",
+          "source_binding_negative_controls": "Old notice and same-length attribution corruption rejected; restored exact source accepted.",
+          "source_binding_negative_controls_sha256": "2ff0aead658f6757edf6c449af344f279feed97213e1dfd8c2813889a349ca70",
+          "additional_source_contract_tests": {
+            "distinct_test_methods": 47,
+            "passed": 47,
+            "previously_passing_methods_reused": 46,
+            "blocked_method_rerun_passed": 1,
+            "unresolved_errors": 0,
+            "scope": "The initial missing-filelock import also occurred on the untouched base. Installed local test-only filelock 4.0.8 outside source, using the version recorded by the retained desktop SBOM, and reran only the previously blocked test. No product source, dependency input, or gate changes. The other 46 passing methods are reused, not rerun.",
+            "original_candidate_receipt_sha256": "c7a75227f835f1e0d843765180874d63ff0bbf44c3d7ff795dc75a25401cd14b",
+            "baseline_receipt_sha256": "4fa1bccc86f20efab378fd86830248a8282cf918e0b68b79c20f9683d9db0a45",
+            "test_prerequisite_install_receipt_sha256": "1f69a2113b4c73d21daa424908524c5deed144ab2c681a4d9245394a447ffa67",
+            "blocked_method_rerun_receipt_sha256": "79291dfa47cae5681d9470cbf7daf39f5b6854659761a8c9f59af96f85b42ed0"
+          }
+        },
+        "retained_notice_review": {
+          "scope": "Exact notice and companion private size/hash guard only; not a full final-head runtime qualification.",
+          "author_test_methods_passed": 106,
+          "independent_test_methods_passed": 136,
+          "independent_subtests_passed": 614,
+          "independent_failures": 0,
+          "independent_errors": 0,
+          "independent_skips": 0,
+          "independent_aggregate_receipt_sha256": "0dda7108d9a85e7975e082f5d05867b8f70dde705e8b7971b8062ce4558e884f",
+          "independent_patch_identity_receipt_sha256": "1b7d2373abbaf972a58f56b0efdbebc323dffef134abdfcdbdc1723690d984c3",
+          "negative_controls": "Actual corrected notice accepted; old 15090-byte notice and same-length attribution corruption rejected; exact restoration accepted.",
+          "negative_control_receipt_sha256": "19ff96e5533ca38daff53c0ae83d35cc0cecfc29c67117e4c7ff55333ff0f43b",
+          "upstream_commit": "fe0b8039891998047c4c9da568b253eb003f834b",
+          "upstream_notice_url": "https://github.com/explosion/srsly/blob/fe0b8039891998047c4c9da568b253eb003f834b/srsly/ujson/ujson.c#L2-L36",
+          "upstream_notice_bytes": 1961,
+          "upstream_notice_sha256": "70b40d0102aae92b75b1eb93e07a81eb3809936255dec29af3735ea10f685d60",
+          "supplemental_notice_bytes": 17850,
+          "supplemental_notice_sha256": "05f1434470e44a72c82ab4544743543f3bbc4e764cb48f8c5f93a30566b43912"
+        },
+        "runtime_qualification": {
+          "new_installer_build": false,
+          "signing": false,
+          "installed_windows": false,
+          "physical_audio": false,
+          "real_provider": false,
+          "deployment_or_release": false
+        },
+        "limits": [
+          "Existing retained binaries are not changed by this source correction and continue to lack the corrected supplemental notice.",
+          "No new dependency resolution, advisory scan, installed acceptance, or physical voice qualification.",
+          "Previous SBOM status objects and historical qualification are preserved without upgrading their claims."
+        ]
+      },
+      "reviewed_source_patch": {
+        "sha256": "353727febe30ebe4babde20e6cdda7d84b51a56e2339b6d3c0bd583acb961b41",
+        "source_commit": "9a9af78e480fabe46c07070205015e6386b06fb6",
+        "paths": [
+          "SOURCE/LICENSES/CUSTOMER_SPEECH_SUPPLEMENTAL_NOTICES.txt"
+        ],
+        "notice_git_blob": "33889bcaf30c60f76e5bdc197a8f89b25069b503"
+      },
+      "new_runtime_qualification_performed": false,
+      "new_runtime_qualification_scope": "No new installer build, signing, installed/native, provider, physical, deployment or release qualification.",
+      "new_source_contract_qualification_performed": true,
+      "new_source_contract_qualification_scope": "Exact source inventory and source-binding verification; previously reviewed notice and package guard controls are retained as constituent evidence.",
+      "new_resolution_performed": false,
+      "new_resolution_scope": "No product dependency input or resolution change. Local test-only filelock 4.0.8 was installed separately without dependencies using the retained desktop SBOM version.",
+      "new_advisory_scan_performed": false,
+      "new_advisory_scan_scope": "No new advisory scan; retained inventory status objects remain unchanged.",
       "new_static_security_scan_performed": false
     }
   }

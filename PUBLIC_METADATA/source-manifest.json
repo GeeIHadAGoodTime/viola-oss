@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "9a9af78e480fabe46c07070205015e6386b06fb6",
-  "sha256": "5505f9676e416051941115eb762dfeae001c8ec3991dc9857da6890af95682f7",
+  "revision": "47cdacdff228ed48e357d4d53699ca558c298f3e",
+  "sha256": "04c729662cf17d7e66469494f325a751582c12b8821aab4e4a24917df6335989",
   "files": [
     {
       "path": ".env.example",
@@ -1575,8 +1575,8 @@
     },
     {
       "path": "intent/agent_loop.py",
-      "sha256": "5be50a07ad8a3dd478dfc11a35b63c2ed65de82aeb26b4b55cf6e1e96684a996",
-      "bytes": 246164
+      "sha256": "a7e844a57cb79fbaa422264dd956fb1eb69301565f06cbcc3601f81781cdbf6c",
+      "bytes": 247316
     },
     {
       "path": "intent/agent_message_manager.py",
@@ -6112,6 +6112,11 @@
       "path": "tests/public/test_deferred_confirmation_cancellation.py",
       "sha256": "4787e38288d184737e1e31db49ca23364901fb0a921f1c33ca8137519f4132d0",
       "bytes": 8622
+    },
+    {
+      "path": "tests/public/test_deferred_confirmation_contract.py",
+      "sha256": "afc3a642497fb2d1f25270b756048336a3d422ca109d56632e5bcc54f68a3d25",
+      "bytes": 12061
     },
     {
       "path": "tests/public/test_desktop_session_ordering.py",
