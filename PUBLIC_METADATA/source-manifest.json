@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "2612de85dad2632141cf5713aad29ceb42a3b279",
-  "sha256": "6c1dc6686ba6127a1c3053c114b8425f8ca641c3bf85ccaaaff6d1205b6593c2",
+  "revision": "9a9af78e480fabe46c07070205015e6386b06fb6",
+  "sha256": "5505f9676e416051941115eb762dfeae001c8ec3991dc9857da6890af95682f7",
   "files": [
     {
       "path": ".env.example",
@@ -20,8 +20,8 @@
     },
     {
       "path": "LICENSES/CUSTOMER_SPEECH_SUPPLEMENTAL_NOTICES.txt",
-      "sha256": "613799702e65e58bb78fda4ad09e4ff5488081c4f4dd9787f40a3cd9f143b821",
-      "bytes": 15090
+      "sha256": "05f1434470e44a72c82ab4544743543f3bbc4e764cb48f8c5f93a30566b43912",
+      "bytes": 17850
     },
     {
       "path": "LICENSES/GNU-GPL-3.0.txt",

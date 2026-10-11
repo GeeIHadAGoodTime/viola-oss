@@ -1,16 +1,13 @@
 {
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "43a0a294dcf7565ce121a9156de95be4f83f2c6d4e87fb56ee02ac8fb0b06349",
-  "source_tree_sha256": "6c1dc6686ba6127a1c3053c114b8425f8ca641c3bf85ccaaaff6d1205b6593c2",
+  "source_manifest_sha256": "653008e6341f02bf089e1aad53943d607ad8c6b59e4a6efc8a6edacf511d7172",
+  "source_tree_sha256": "5505f9676e416051941115eb762dfeae001c8ec3991dc9857da6890af95682f7",
   "source_file_count": 2703,
-  "source_revision": "2612de85dad2632141cf5713aad29ceb42a3b279",
-  "comparison_public_revision": "515f81e96a9c59a19686f4f87fb5c19a8f1687f7",
+  "source_revision": "9a9af78e480fabe46c07070205015e6386b06fb6",
+  "comparison_public_revision": "2c7ed869257e422c3f3e40eaa7691470b6614a34",
   "changed_source_paths": [
-    "SOURCE/ui/react-app/src/SmartDisplay.jsx",
-    "SOURCE/ui/react-app/src/__tests__/SmartDisplay.test.jsx",
-    "SOURCE/ui/react-app/src/components/AccountTab.jsx",
-    "SOURCE/ui/react-app/src/components/AccountTab.oauthPending.test.jsx"
+    "SOURCE/LICENSES/CUSTOMER_SPEECH_SUPPLEMENTAL_NOTICES.txt"
   ],
   "retained_sboms": [
     {
@@ -72,240 +69,78 @@
     }
   ],
   "input_equivalence": {
-    "comparison_basis": "Protected public main 515f81e96a9c59a19686f4f87fb5c19a8f1687f7, following responsive112 and correlation111.",
+    "comparison_basis": "Protected public main 2c7ed869257e422c3f3e40eaa7691470b6614a34; exact full-tree equality with retained candidate source b6d4d5f5809bc45be9cdebcbfa5ae5c6821fc47d.",
     "all_unselected_export_leaf_bytes_and_modes_preserved": true,
-    "unselected_source_files_preserved": 2699,
+    "unselected_source_files_preserved": 2702,
     "all_six_sbom_bytes_and_status_objects_preserved": true,
-    "source_change_scope": "Exact reviewed Help keyboard guards and recovered original OAuth waiting-message repair, with original eight OAuth cases plus draft-preservation assertions. No dependency, workflow, auth protocol, consent, telephony or audio implementation changes.",
-    "help_reviewed_source": "197536e02acfcb0174c54ce9569d681905d8e255",
-    "oauth_reviewed_source": "6b3b7251bce5e7f994f8862e5fdf3fe3a492c5d7",
-    "oauth_original_production_blob": "eaba0c4394ed4186e2c215a142174d9bb8cf9f7a",
-    "oauth_original_review_age": "Review recorded as completed by the October10 03:45\u201303:46UTC handoff; exact approval timestamp unavailable. Source commit created03:43:19UTC is not substituted for approval time."
+    "source_change_scope": "Only the existing customer speech supplemental notice: complete upstream srsly/ujson attribution and a clarifying introduction. The three prior notice sections remain byte-identical. No runtime, dependency, workflow, eligibility, or source ownership changes.",
+    "source_only_tree": "01ce024e953c48bc88b3334d1993501d204fd237",
+    "base_full_tree": "2f4fe562b7494b5d2f33900657884b3bc05da381"
   },
   "qualification": {
-    "scope": "Help modal keyboard isolation/draft preservation and visible desktop OAuth waiting feedback, composed onto integrated responsive and consultation source.",
-    "source_commit": "2612de85dad2632141cf5713aad29ceb42a3b279",
-    "source_tree": "406bfe0c707032c3089f956db042201979e2df0e",
+    "scope": "Source-only srsly/ujson supplemental attribution correction, with existing package guard qualification retained as scoped constituent evidence.",
+    "source_commit": "9a9af78e480fabe46c07070205015e6386b06fb6",
+    "source_tree": "01ce024e953c48bc88b3334d1993501d204fd237",
     "ordered_source_parents": [
-      "515f81e96a9c59a19686f4f87fb5c19a8f1687f7"
+      "2c7ed869257e422c3f3e40eaa7691470b6614a34"
     ],
-    "reviewed_combined_patch_sha256": "a4af66a357fe9efbe9017426c5345df5855dcb2853631cdc3c4d6b0f7cee5e8c",
-    "publication_status": "Independently reviewed source; final metadata review and exact-head hosted checks required before protected integration.",
+    "reviewed_combined_patch_sha256": "353727febe30ebe4babde20e6cdda7d84b51a56e2339b6d3c0bd583acb961b41",
+    "publication_status": "Independently reviewed notice bytes; metadata review and exact-head hosted checks remain required before protected integration.",
     "current_source_qualification": {
+      "manifest_helper": "SOURCE/tools/release/create_source_manifest.py",
+      "manifest_helper_git_blob": "92700d7b20d04fe9def322ada514bdb78b74c653",
       "source_files": 2703,
-      "oauth_auth_focused_passed": 120,
-      "oauth_auth_focused_failed": 0,
-      "focused_receipt_sha256": "efc4b5ecdbfe9a041407b07cdb9b35abee0daadd1d9a03c761b323e355d201c2",
-      "independent_oauth_boundary_passed": 85,
-      "independent_oauth_receipt_sha256": "1cb41953aca841fc285c9a5e04fdd8474ff3ce92f91600225d23d39eb9c0f07d",
-      "final_composition_boundary_passed": 28,
-      "final_composition_boundary_groups": {
-        "Help_keyboard_and_draft": 11,
-        "mounted_consultation_recovery": 4,
-        "responsive_CSS": 5,
-        "OAuth_waiting": 8
-      },
-      "independent_composition_review_sha256": "87d9e6cec8568b396a91269e7e4b55e07cde4545bbe62c7e8a03134c5bdea968",
-      "known_bad_control": "Original AccountTab production against final OAuth/provider tests: six intended waiting-feedback failures, eight other cases pass. Isolated copied application; final source not mutated.",
-      "known_bad_receipt_sha256": "9792a77c93a5e022f6e26d080463cc74d9f530f408d5c45642fe9d8cb7959ca1",
-      "production_build": "PASS on final source with existing locked dependencies and source-map upload disabled; output outside source export.",
-      "build_log_sha256": "3257b4ba6968f28850abe8d40c4178e98c43336861b1478cb8daa7f2570275ce",
-      "targeted_lint": "PASS",
-      "lint_log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-    },
-    "retained_help_qualification": {
-      "scope": "Historical exact two Help output bytes, reconciled on e53a; constituent evidence, not a full final-head run.",
-      "qualification": {
-        "scope": "Actual combined Help keyboard, consultation reply recovery and Phone Terms source inputs.",
-        "source_commit": "197536e02acfcb0174c54ce9569d681905d8e255",
-        "source_tree": "9e47e42234c97d9f0f061ef33ea96805fd5aeb19",
-        "ordered_source_parents": [
-          "1b435fa969ba8243fe701ce90fed3db57e10dc8d",
-          "e53a308cfabb61d38c619926c93e4bf5fd874c8f"
-        ],
-        "reviewed_combined_patch_sha256": "23967abebf08a0872bcf9090afc0b97551b554aa881258e15f3865d12554bc85",
-        "publication_status": "Local reconciliation proposal frozen for independent/root review; no branch advancement. New exact-head hosted checks remain mandatory.",
-        "source_controls": {
-          "frontend_full": {
-            "result": "PASS",
-            "tests_passed": 2166,
-            "test_files_passed": 180,
-            "failed": 0,
-            "skipped": 0,
-            "smartdisplay_unique_passes": 207,
-            "help_cases_passed": 11,
-            "consultation_display_cases_passed": 4,
-            "exact_collected_names_match": true,
-            "report_sha256": "65d71e5db337f051ecf7afb10ae7ecaa0f625518c575ca17da01f00cbd22ea80",
-            "log_sha256": "876f663ee771607646168c548f7d4f3c9c62ddb22c077206fc41205ca9123238",
-            "command": "npm run test:run -- --maxWorkers=1 --reporter=json",
-            "node_heap_mb": 2048
-          },
-          "build": {
-            "result": "PASS",
-            "modules_transformed": 1011,
-            "duration_seconds": 5.05,
-            "log_sha256": "6060b05299bb3cff8c03340ae0ee09457732a0f8c823d262418f3bb3386a6f72",
-            "scope": "Vite production frontend source build with Sentry uploads disabled; no installed app/provider/runtime qualification."
-          },
-          "known_bad_control": {
-            "result": "EXPECTED_REGRESSIONS_DETECTED",
-            "exit_code": 1,
-            "passed": 1,
-            "failed": 10,
-            "report_sha256": "6ab5a3c7a4546b44d42e830bb23448d28131590aeb638bbcb0d9cda87c56fd33",
-            "log_sha256": "d517c096c8e439e7501ee2a82eb1662dfd23978054270ba39f3bfb53325a0722",
-            "scope": "Current landed consultation/Phone Terms SmartDisplay without the Help guards, with the same 11 Help tests."
-          },
-          "restored_help_control": {
-            "result": "PASS",
-            "exit_code": 0,
-            "passed": 11,
-            "failed": 0,
-            "report_sha256": "fdd08f02e164de45eb22f3177a8a02a0af2595ea25253310ae0d6a8932024af0",
-            "log_sha256": "0467f81037715b934247c835d7eca33d4f3b40f72023589118e4ac3b3c887754",
-            "source_restored_exactly": true,
-            "receipt_sha256": "c58e844b5dd46aa06b3a1676e0a6e4d99374fa95b18efcac84cbffdd8ccfdd7c"
-          },
-          "lint": {
-            "errors": 0,
-            "preexisting_smartdisplay_warnings": 11,
-            "log_sha256": "e79003c9771b55036b79bbb441294220a08dd41399f2caba01813307786a5efb"
-          },
-          "composition_equivalence": {
-            "result": "PASS",
-            "receipt_sha256": "5498a734b3b836448664ec5850ef6c280b76e2c0c53bf56c140b419bf262d9ad"
-          },
-          "frontend_dependencies": {
-            "node": "24.19.0",
-            "npm": "11.9.0",
-            "fresh_install": "npm ci against the unchanged committed package-lock.json, with an isolated cache/home",
-            "log_sha256": "42360ae61cbda41e812b47291e1b2a06c0fb6aad3bb98bbcdf217a9907ff473d",
-            "initial_failed_attempt": {
-              "cause": "Default npm cache parent /home/agent was absent after workspace reset; succeeded with task-local cache/home.",
-              "log_sha256": "6224afad6b521708f0cc94daca71afeb0497fe752f78ba026a07bb16eceaae65"
-            }
-          },
-          "npm_audit": {
-            "result": "PASS",
-            "vulnerabilities": 0,
-            "report_sha256": "3baa9f9bd230edbe4394c9cb2364ac0572e257a407638a355eb24a39ff915091"
-          },
-          "public_python": "Not rerun locally; all Python source bytes unchanged. New exact-head hosted aggregate remains required.",
-          "source_binding": {
-            "result": "PASS",
-            "source_leaves": 2700,
-            "retained_sboms": 6,
-            "log_sha256": "ea9b80f7df201bd318ec470fad6638e53517dcfb752a199cae58c88adf8e6d42",
-            "initial_export_layout_failure": {
-              "first_binding_check": "Failed because generated dependencies and Vite output were inside the source export directory.",
-              "extra_file_counts": {
-                "node_modules": 21487,
-                "build_output": 46,
-                "other": 0
-              },
-              "log_sha256": "2ac77069a93363cb5ef3a87d4450389cc22f0becf89fd9ce03ff2c05f7b7ac67",
-              "resolution": "Moved generated dependencies and build output to sibling task artifact directories; preserved all bytes and source files; dependency symlink retained for later focused testing. No verifier changes or deletions."
-            },
-            "artifact_layout_receipt_sha256": "dc70254fdaa73c75025c3b41b148c098cbf504c612e7f4a0da30de4cb2538062"
-          },
-          "tested_local_source_commit": "e0fd20a1fcf70ffb208a530131a6fe92753235a0"
-        },
-        "frontend_build": {
-          "result": "PASS",
-          "modules_transformed": 1011,
-          "duration_seconds": 5.05,
-          "log_sha256": "6060b05299bb3cff8c03340ae0ee09457732a0f8c823d262418f3bb3386a6f72",
-          "scope": "Vite production frontend source build with Sentry uploads disabled; no installed app/provider/runtime qualification."
-        },
-        "frontend_suite": {
-          "result": "PASS",
-          "tests_passed": 2166,
-          "test_files_passed": 180,
-          "failed": 0,
-          "skipped": 0,
-          "smartdisplay_unique_passes": 207,
-          "help_cases_passed": 11,
-          "consultation_display_cases_passed": 4,
-          "exact_collected_names_match": true,
-          "report_sha256": "65d71e5db337f051ecf7afb10ae7ecaa0f625518c575ca17da01f00cbd22ea80",
-          "log_sha256": "876f663ee771607646168c548f7d4f3c9c62ddb22c077206fc41205ca9123238",
-          "command": "npm run test:run -- --maxWorkers=1 --reporter=json",
-          "node_heap_mb": 2048
-        },
-        "public_python_contracts": {
-          "result": "NOT_RERUN_LOCALLY_AFTER_FRONTEND_ONLY_RECONCILIATION",
-          "all_python_source_bytes_unchanged_from_landed_base": true,
-          "exact_head_hosted_full_suite_required": true
-        },
-        "historical_receipt_availability": "Original local Help and consultation raw receipts were lost in an execution workspace reset. Historical qualification values and hashes remain preserved from published bindings; recovered original hosted logs and fresh combined-input receipts are separate. Missing local originals have not been recreated.",
-        "prior_exact_head_hosted_checks": [
-          {
-            "head": "16abc19167871635feb628b54346e39acd6a4ed8",
-            "landed_as": "e53a308cfabb61d38c619926c93e4bf5fd874c8f",
-            "checks_passed": 8,
-            "source_run_id": 38049314109,
-            "inventory_run_id": 38049314122,
-            "frontend_tests_passed": 2155,
-            "python_tests_passed": 945,
-            "python_tests_skipped": 1,
-            "scope": "Historical qualification of the landed dependency, not this new combined head."
-          },
-          {
-            "head": "1b435fa969ba8243fe701ce90fed3db57e10dc8d",
-            "checks_passed": 8,
-            "source_run_id": 38044460709,
-            "inventory_run_id": 38044460697,
-            "frontend_tests_passed": 2099,
-            "python_tests_passed": 945,
-            "python_tests_skipped": 1,
-            "scope": "Historical qualification of the original Help branch, not this new combined head."
-          }
-        ],
-        "runtime_qualification": {
-          "installed_windows": false,
-          "rendered_browser": false,
-          "real_call_or_account": false,
-          "real_terms_acceptance": false,
-          "provider_or_carrier": false,
-          "deployment_or_release": false
-        },
-        "limits": [
-          "Local Linux source/test/build evidence only; new exact-head hosted Windows checks remain mandatory.",
-          "All six retained SBOM bytes and status objects are historical and unchanged; no Windows inventory regeneration is claimed.",
-          "Consultation backend question correlation and the separate Music IME candidate are not included."
-        ]
+      "source_binding_verifier": "SOURCE/tools/release/verify_source_binding.py",
+      "unchanged_sboms": 6,
+      "exact_public_source_change_count": 1,
+      "public_speech_dependency_tests_passed": 23,
+      "public_speech_dependency_tests_receipt_sha256": "5d30e2582a9b69fd00ad17dcd863cf7128c93732f6c04c677e715229d34991ef",
+      "source_binding_negative_controls": "Old notice and same-length attribution corruption rejected; restored exact source accepted.",
+      "source_binding_negative_controls_sha256": "2ff0aead658f6757edf6c449af344f279feed97213e1dfd8c2813889a349ca70",
+      "additional_source_contract_tests": {
+        "distinct_test_methods": 47,
+        "passed": 47,
+        "previously_passing_methods_reused": 46,
+        "blocked_method_rerun_passed": 1,
+        "unresolved_errors": 0,
+        "scope": "The initial missing-filelock import also occurred on the untouched base. Installed local test-only filelock 4.0.8 outside source, using the version recorded by the retained desktop SBOM, and reran only the previously blocked test. No product source, dependency input, or gate changes. The other 46 passing methods are reused, not rerun.",
+        "original_candidate_receipt_sha256": "c7a75227f835f1e0d843765180874d63ff0bbf44c3d7ff795dc75a25401cd14b",
+        "baseline_receipt_sha256": "4fa1bccc86f20efab378fd86830248a8282cf918e0b68b79c20f9683d9db0a45",
+        "test_prerequisite_install_receipt_sha256": "1f69a2113b4c73d21daa424908524c5deed144ab2c681a4d9245394a447ffa67",
+        "blocked_method_rerun_receipt_sha256": "79291dfa47cae5681d9470cbf7daf39f5b6854659761a8c9f59af96f85b42ed0"
       }
     },
-    "retained_previous_composition_frontend": {
-      "tests_passed": 2180,
-      "test_files": 181,
-      "failed": 0,
-      "report_sha256": "ed902f3b78a309178d7f9725d911a30052f5c507d47810cee5f7878fc3d65d5b",
-      "source_aggregate_sha256": "9e204c45e84d5deeb18c8dc927c17313219dabefaf88f08bfcfbc8b3dba9639e",
-      "scope": "First local coherent composition before original OAuth source recovery. Final production uses original reviewed info accent styling; duplicate four-case pending suite replaced by original eight-case suite with draft assertions. Not claimed as full final-source qualification."
+    "retained_notice_review": {
+      "scope": "Exact notice and companion private size/hash guard only; not a full final-head runtime qualification.",
+      "author_test_methods_passed": 106,
+      "independent_test_methods_passed": 136,
+      "independent_subtests_passed": 614,
+      "independent_failures": 0,
+      "independent_errors": 0,
+      "independent_skips": 0,
+      "independent_aggregate_receipt_sha256": "0dda7108d9a85e7975e082f5d05867b8f70dde705e8b7971b8062ce4558e884f",
+      "independent_patch_identity_receipt_sha256": "1b7d2373abbaf972a58f56b0efdbebc323dffef134abdfcdbdc1723690d984c3",
+      "negative_controls": "Actual corrected notice accepted; old 15090-byte notice and same-length attribution corruption rejected; exact restoration accepted.",
+      "negative_control_receipt_sha256": "19ff96e5533ca38daff53c0ae83d35cc0cecfc29c67117e4c7ff55333ff0f43b",
+      "upstream_commit": "fe0b8039891998047c4c9da568b253eb003f834b",
+      "upstream_notice_url": "https://github.com/explosion/srsly/blob/fe0b8039891998047c4c9da568b253eb003f834b/srsly/ujson/ujson.c#L2-L36",
+      "upstream_notice_bytes": 1961,
+      "upstream_notice_sha256": "70b40d0102aae92b75b1eb93e07a81eb3809936255dec29af3735ea10f685d60",
+      "supplemental_notice_bytes": 17850,
+      "supplemental_notice_sha256": "05f1434470e44a72c82ab4544743543f3bbc4e764cb48f8c5f93a30566b43912"
     },
-    "retained_base_hosted_qualification": {
-      "pull_request": 111,
-      "head": "526a1ffc9788d3d8a8ea6eca2494e3df6a3f9df1",
-      "source_run": 38068658019,
-      "inventory_run": 38068657966,
-      "checks_passed": 8,
-      "unchanged_retry": "First frontend attempt had one unchanged cloudPlan detached-node assertion; one unchanged-job retry passed. Prior failed receipt retained by111 integration packet. No source/test or gate changes."
-    },
-    "full_final_frontend_and_python": "Not rerun locally as full final aggregates. Fresh exact-head hosted checks are required. All Python source is byte-identical to integrated111.",
     "runtime_qualification": {
-      "fresh_real_browser": false,
+      "new_installer_build": false,
+      "signing": false,
       "installed_windows": false,
       "physical_audio": false,
       "real_provider": false,
       "deployment_or_release": false
     },
     "limits": [
-      "OAuth cancellation/timeout UI outcomes are mocked; protocol tests separately exercise synthetic outcomes.",
-      "Dismissed-form tests prove component-local isolation, not a real shared-store or provider-browser race.",
-      "No real provider login, browser-close, visual or screen-reader validation.",
-      "Original responsive rendered-fixture evidence remains preserved in previous bindings; no new full-app browser claim."
+      "Existing retained binaries are not changed by this source correction and continue to lack the corrected supplemental notice.",
+      "No new dependency resolution, advisory scan, installed acceptance, or physical voice qualification.",
+      "Previous SBOM status objects and historical qualification are preserved without upgrading their claims."
     ]
   },
   "historical_bindings": [
@@ -12345,25 +12180,20 @@
     }
   ],
   "reviewed_source_patch": {
-    "sha256": "a4af66a357fe9efbe9017426c5345df5855dcb2853631cdc3c4d6b0f7cee5e8c",
-    "source_commit": "2612de85dad2632141cf5713aad29ceb42a3b279",
+    "sha256": "353727febe30ebe4babde20e6cdda7d84b51a56e2339b6d3c0bd583acb961b41",
+    "source_commit": "9a9af78e480fabe46c07070205015e6386b06fb6",
     "paths": [
-      "SOURCE/ui/react-app/src/SmartDisplay.jsx",
-      "SOURCE/ui/react-app/src/__tests__/SmartDisplay.test.jsx",
-      "SOURCE/ui/react-app/src/components/AccountTab.jsx",
-      "SOURCE/ui/react-app/src/components/AccountTab.oauthPending.test.jsx"
+      "SOURCE/LICENSES/CUSTOMER_SPEECH_SUPPLEMENTAL_NOTICES.txt"
     ],
-    "original_help_source": "197536e02acfcb0174c54ce9569d681905d8e255",
-    "original_oauth_source": "6b3b7251bce5e7f994f8862e5fdf3fe3a492c5d7",
-    "final_oauth_patch_sha256": "e631719217bac65f450819eb7b251d33054f26917437698ca3bb672c8fc9d8dd"
+    "notice_git_blob": "33889bcaf30c60f76e5bdc197a8f89b25069b503"
   },
   "new_resolution_performed": false,
   "new_advisory_scan_performed": false,
   "new_runtime_qualification_performed": false,
   "new_source_contract_qualification_performed": true,
   "new_static_security_scan_performed": false,
-  "new_resolution_scope": "Existing exact-lockfile dependency installation reused; no fresh resolution.",
-  "new_advisory_scan_scope": "No new local advisory audit; required publication-hosted checks remain separate.",
+  "new_resolution_scope": "No product dependency input or resolution change. Local test-only filelock 4.0.8 was installed separately without dependencies using the retained desktop SBOM version.",
+  "new_advisory_scan_scope": "No new advisory scan; retained inventory status objects remain unchanged.",
   "account_reconciliation_previous_binding": {
     "source_revision": "f864e61381ef9e10a09333fce05210427cf7d0f6",
     "source_manifest_sha256": "9cad8bcb2f98c34d95a11545e11a57d74dbe6b28cd5db7322b7746e102801acd",
@@ -16593,8 +16423,8 @@
       "new_static_security_scan_performed": false
     }
   },
-  "new_runtime_qualification_scope": "Synthetic component and source tests only; no fresh real browser, installed, account/provider or physical qualification.",
-  "new_source_contract_qualification_scope": "120 affected auth tests, 85 independent boundary checks, 28 final composed interaction cases, isolated unchanged-source negative control, production build and binding verification.",
+  "new_runtime_qualification_scope": "No new installer build, signing, installed/native, provider, physical, deployment or release qualification.",
+  "new_source_contract_qualification_scope": "Exact source inventory and source-binding verification; previously reviewed notice and package guard controls are retained as constituent evidence.",
   "consultation_responsive_previous_binding": {
     "repository_revision": "d1e042d527dde01c447350ab09638d0cca521268",
     "path": "PUBLIC_METADATA/source-binding.json",
@@ -17598,6 +17428,285 @@
       "new_resolution_scope": "Reuse existing exact-lockfile frontend dependencies. No new dependency resolution.",
       "new_advisory_scan_performed": false,
       "new_advisory_scan_scope": "No fresh advisory scan locally. New exact-head hosted checks remain required.",
+      "new_static_security_scan_performed": false
+    }
+  },
+  "srsly_notice_previous_binding": {
+    "repository_revision": "2c7ed869257e422c3f3e40eaa7691470b6614a34",
+    "equivalent_retained_public_pin": "b6d4d5f5809bc45be9cdebcbfa5ae5c6821fc47d",
+    "path": "PUBLIC_METADATA/source-binding.json",
+    "git_blob": "471fc7b5ed42a396bf320ccc067efb97bdada23a",
+    "sha256": "d9e69856b58d65b4791615b453ec6d0a89475a737e6ee7b6aa2edf3f2eacac32",
+    "preserved_replaced_fields": {
+      "source_manifest_sha256": "43a0a294dcf7565ce121a9156de95be4f83f2c6d4e87fb56ee02ac8fb0b06349",
+      "source_tree_sha256": "6c1dc6686ba6127a1c3053c114b8425f8ca641c3bf85ccaaaff6d1205b6593c2",
+      "source_file_count": 2703,
+      "source_revision": "2612de85dad2632141cf5713aad29ceb42a3b279",
+      "comparison_public_revision": "515f81e96a9c59a19686f4f87fb5c19a8f1687f7",
+      "changed_source_paths": [
+        "SOURCE/ui/react-app/src/SmartDisplay.jsx",
+        "SOURCE/ui/react-app/src/__tests__/SmartDisplay.test.jsx",
+        "SOURCE/ui/react-app/src/components/AccountTab.jsx",
+        "SOURCE/ui/react-app/src/components/AccountTab.oauthPending.test.jsx"
+      ],
+      "input_equivalence": {
+        "comparison_basis": "Protected public main 515f81e96a9c59a19686f4f87fb5c19a8f1687f7, following responsive112 and correlation111.",
+        "all_unselected_export_leaf_bytes_and_modes_preserved": true,
+        "unselected_source_files_preserved": 2699,
+        "all_six_sbom_bytes_and_status_objects_preserved": true,
+        "source_change_scope": "Exact reviewed Help keyboard guards and recovered original OAuth waiting-message repair, with original eight OAuth cases plus draft-preservation assertions. No dependency, workflow, auth protocol, consent, telephony or audio implementation changes.",
+        "help_reviewed_source": "197536e02acfcb0174c54ce9569d681905d8e255",
+        "oauth_reviewed_source": "6b3b7251bce5e7f994f8862e5fdf3fe3a492c5d7",
+        "oauth_original_production_blob": "eaba0c4394ed4186e2c215a142174d9bb8cf9f7a",
+        "oauth_original_review_age": "Review recorded as completed by the October10 03:45\u201303:46UTC handoff; exact approval timestamp unavailable. Source commit created03:43:19UTC is not substituted for approval time."
+      },
+      "qualification": {
+        "scope": "Help modal keyboard isolation/draft preservation and visible desktop OAuth waiting feedback, composed onto integrated responsive and consultation source.",
+        "source_commit": "2612de85dad2632141cf5713aad29ceb42a3b279",
+        "source_tree": "406bfe0c707032c3089f956db042201979e2df0e",
+        "ordered_source_parents": [
+          "515f81e96a9c59a19686f4f87fb5c19a8f1687f7"
+        ],
+        "reviewed_combined_patch_sha256": "a4af66a357fe9efbe9017426c5345df5855dcb2853631cdc3c4d6b0f7cee5e8c",
+        "publication_status": "Independently reviewed source; final metadata review and exact-head hosted checks required before protected integration.",
+        "current_source_qualification": {
+          "source_files": 2703,
+          "oauth_auth_focused_passed": 120,
+          "oauth_auth_focused_failed": 0,
+          "focused_receipt_sha256": "efc4b5ecdbfe9a041407b07cdb9b35abee0daadd1d9a03c761b323e355d201c2",
+          "independent_oauth_boundary_passed": 85,
+          "independent_oauth_receipt_sha256": "1cb41953aca841fc285c9a5e04fdd8474ff3ce92f91600225d23d39eb9c0f07d",
+          "final_composition_boundary_passed": 28,
+          "final_composition_boundary_groups": {
+            "Help_keyboard_and_draft": 11,
+            "mounted_consultation_recovery": 4,
+            "responsive_CSS": 5,
+            "OAuth_waiting": 8
+          },
+          "independent_composition_review_sha256": "87d9e6cec8568b396a91269e7e4b55e07cde4545bbe62c7e8a03134c5bdea968",
+          "known_bad_control": "Original AccountTab production against final OAuth/provider tests: six intended waiting-feedback failures, eight other cases pass. Isolated copied application; final source not mutated.",
+          "known_bad_receipt_sha256": "9792a77c93a5e022f6e26d080463cc74d9f530f408d5c45642fe9d8cb7959ca1",
+          "production_build": "PASS on final source with existing locked dependencies and source-map upload disabled; output outside source export.",
+          "build_log_sha256": "3257b4ba6968f28850abe8d40c4178e98c43336861b1478cb8daa7f2570275ce",
+          "targeted_lint": "PASS",
+          "lint_log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "retained_help_qualification": {
+          "scope": "Historical exact two Help output bytes, reconciled on e53a; constituent evidence, not a full final-head run.",
+          "qualification": {
+            "scope": "Actual combined Help keyboard, consultation reply recovery and Phone Terms source inputs.",
+            "source_commit": "197536e02acfcb0174c54ce9569d681905d8e255",
+            "source_tree": "9e47e42234c97d9f0f061ef33ea96805fd5aeb19",
+            "ordered_source_parents": [
+              "1b435fa969ba8243fe701ce90fed3db57e10dc8d",
+              "e53a308cfabb61d38c619926c93e4bf5fd874c8f"
+            ],
+            "reviewed_combined_patch_sha256": "23967abebf08a0872bcf9090afc0b97551b554aa881258e15f3865d12554bc85",
+            "publication_status": "Local reconciliation proposal frozen for independent/root review; no branch advancement. New exact-head hosted checks remain mandatory.",
+            "source_controls": {
+              "frontend_full": {
+                "result": "PASS",
+                "tests_passed": 2166,
+                "test_files_passed": 180,
+                "failed": 0,
+                "skipped": 0,
+                "smartdisplay_unique_passes": 207,
+                "help_cases_passed": 11,
+                "consultation_display_cases_passed": 4,
+                "exact_collected_names_match": true,
+                "report_sha256": "65d71e5db337f051ecf7afb10ae7ecaa0f625518c575ca17da01f00cbd22ea80",
+                "log_sha256": "876f663ee771607646168c548f7d4f3c9c62ddb22c077206fc41205ca9123238",
+                "command": "npm run test:run -- --maxWorkers=1 --reporter=json",
+                "node_heap_mb": 2048
+              },
+              "build": {
+                "result": "PASS",
+                "modules_transformed": 1011,
+                "duration_seconds": 5.05,
+                "log_sha256": "6060b05299bb3cff8c03340ae0ee09457732a0f8c823d262418f3bb3386a6f72",
+                "scope": "Vite production frontend source build with Sentry uploads disabled; no installed app/provider/runtime qualification."
+              },
+              "known_bad_control": {
+                "result": "EXPECTED_REGRESSIONS_DETECTED",
+                "exit_code": 1,
+                "passed": 1,
+                "failed": 10,
+                "report_sha256": "6ab5a3c7a4546b44d42e830bb23448d28131590aeb638bbcb0d9cda87c56fd33",
+                "log_sha256": "d517c096c8e439e7501ee2a82eb1662dfd23978054270ba39f3bfb53325a0722",
+                "scope": "Current landed consultation/Phone Terms SmartDisplay without the Help guards, with the same 11 Help tests."
+              },
+              "restored_help_control": {
+                "result": "PASS",
+                "exit_code": 0,
+                "passed": 11,
+                "failed": 0,
+                "report_sha256": "fdd08f02e164de45eb22f3177a8a02a0af2595ea25253310ae0d6a8932024af0",
+                "log_sha256": "0467f81037715b934247c835d7eca33d4f3b40f72023589118e4ac3b3c887754",
+                "source_restored_exactly": true,
+                "receipt_sha256": "c58e844b5dd46aa06b3a1676e0a6e4d99374fa95b18efcac84cbffdd8ccfdd7c"
+              },
+              "lint": {
+                "errors": 0,
+                "preexisting_smartdisplay_warnings": 11,
+                "log_sha256": "e79003c9771b55036b79bbb441294220a08dd41399f2caba01813307786a5efb"
+              },
+              "composition_equivalence": {
+                "result": "PASS",
+                "receipt_sha256": "5498a734b3b836448664ec5850ef6c280b76e2c0c53bf56c140b419bf262d9ad"
+              },
+              "frontend_dependencies": {
+                "node": "24.19.0",
+                "npm": "11.9.0",
+                "fresh_install": "npm ci against the unchanged committed package-lock.json, with an isolated cache/home",
+                "log_sha256": "42360ae61cbda41e812b47291e1b2a06c0fb6aad3bb98bbcdf217a9907ff473d",
+                "initial_failed_attempt": {
+                  "cause": "Default npm cache parent /home/agent was absent after workspace reset; succeeded with task-local cache/home.",
+                  "log_sha256": "6224afad6b521708f0cc94daca71afeb0497fe752f78ba026a07bb16eceaae65"
+                }
+              },
+              "npm_audit": {
+                "result": "PASS",
+                "vulnerabilities": 0,
+                "report_sha256": "3baa9f9bd230edbe4394c9cb2364ac0572e257a407638a355eb24a39ff915091"
+              },
+              "public_python": "Not rerun locally; all Python source bytes unchanged. New exact-head hosted aggregate remains required.",
+              "source_binding": {
+                "result": "PASS",
+                "source_leaves": 2700,
+                "retained_sboms": 6,
+                "log_sha256": "ea9b80f7df201bd318ec470fad6638e53517dcfb752a199cae58c88adf8e6d42",
+                "initial_export_layout_failure": {
+                  "first_binding_check": "Failed because generated dependencies and Vite output were inside the source export directory.",
+                  "extra_file_counts": {
+                    "node_modules": 21487,
+                    "build_output": 46,
+                    "other": 0
+                  },
+                  "log_sha256": "2ac77069a93363cb5ef3a87d4450389cc22f0becf89fd9ce03ff2c05f7b7ac67",
+                  "resolution": "Moved generated dependencies and build output to sibling task artifact directories; preserved all bytes and source files; dependency symlink retained for later focused testing. No verifier changes or deletions."
+                },
+                "artifact_layout_receipt_sha256": "dc70254fdaa73c75025c3b41b148c098cbf504c612e7f4a0da30de4cb2538062"
+              },
+              "tested_local_source_commit": "e0fd20a1fcf70ffb208a530131a6fe92753235a0"
+            },
+            "frontend_build": {
+              "result": "PASS",
+              "modules_transformed": 1011,
+              "duration_seconds": 5.05,
+              "log_sha256": "6060b05299bb3cff8c03340ae0ee09457732a0f8c823d262418f3bb3386a6f72",
+              "scope": "Vite production frontend source build with Sentry uploads disabled; no installed app/provider/runtime qualification."
+            },
+            "frontend_suite": {
+              "result": "PASS",
+              "tests_passed": 2166,
+              "test_files_passed": 180,
+              "failed": 0,
+              "skipped": 0,
+              "smartdisplay_unique_passes": 207,
+              "help_cases_passed": 11,
+              "consultation_display_cases_passed": 4,
+              "exact_collected_names_match": true,
+              "report_sha256": "65d71e5db337f051ecf7afb10ae7ecaa0f625518c575ca17da01f00cbd22ea80",
+              "log_sha256": "876f663ee771607646168c548f7d4f3c9c62ddb22c077206fc41205ca9123238",
+              "command": "npm run test:run -- --maxWorkers=1 --reporter=json",
+              "node_heap_mb": 2048
+            },
+            "public_python_contracts": {
+              "result": "NOT_RERUN_LOCALLY_AFTER_FRONTEND_ONLY_RECONCILIATION",
+              "all_python_source_bytes_unchanged_from_landed_base": true,
+              "exact_head_hosted_full_suite_required": true
+            },
+            "historical_receipt_availability": "Original local Help and consultation raw receipts were lost in an execution workspace reset. Historical qualification values and hashes remain preserved from published bindings; recovered original hosted logs and fresh combined-input receipts are separate. Missing local originals have not been recreated.",
+            "prior_exact_head_hosted_checks": [
+              {
+                "head": "16abc19167871635feb628b54346e39acd6a4ed8",
+                "landed_as": "e53a308cfabb61d38c619926c93e4bf5fd874c8f",
+                "checks_passed": 8,
+                "source_run_id": 38049314109,
+                "inventory_run_id": 38049314122,
+                "frontend_tests_passed": 2155,
+                "python_tests_passed": 945,
+                "python_tests_skipped": 1,
+                "scope": "Historical qualification of the landed dependency, not this new combined head."
+              },
+              {
+                "head": "1b435fa969ba8243fe701ce90fed3db57e10dc8d",
+                "checks_passed": 8,
+                "source_run_id": 38044460709,
+                "inventory_run_id": 38044460697,
+                "frontend_tests_passed": 2099,
+                "python_tests_passed": 945,
+                "python_tests_skipped": 1,
+                "scope": "Historical qualification of the original Help branch, not this new combined head."
+              }
+            ],
+            "runtime_qualification": {
+              "installed_windows": false,
+              "rendered_browser": false,
+              "real_call_or_account": false,
+              "real_terms_acceptance": false,
+              "provider_or_carrier": false,
+              "deployment_or_release": false
+            },
+            "limits": [
+              "Local Linux source/test/build evidence only; new exact-head hosted Windows checks remain mandatory.",
+              "All six retained SBOM bytes and status objects are historical and unchanged; no Windows inventory regeneration is claimed.",
+              "Consultation backend question correlation and the separate Music IME candidate are not included."
+            ]
+          }
+        },
+        "retained_previous_composition_frontend": {
+          "tests_passed": 2180,
+          "test_files": 181,
+          "failed": 0,
+          "report_sha256": "ed902f3b78a309178d7f9725d911a30052f5c507d47810cee5f7878fc3d65d5b",
+          "source_aggregate_sha256": "9e204c45e84d5deeb18c8dc927c17313219dabefaf88f08bfcfbc8b3dba9639e",
+          "scope": "First local coherent composition before original OAuth source recovery. Final production uses original reviewed info accent styling; duplicate four-case pending suite replaced by original eight-case suite with draft assertions. Not claimed as full final-source qualification."
+        },
+        "retained_base_hosted_qualification": {
+          "pull_request": 111,
+          "head": "526a1ffc9788d3d8a8ea6eca2494e3df6a3f9df1",
+          "source_run": 38068658019,
+          "inventory_run": 38068657966,
+          "checks_passed": 8,
+          "unchanged_retry": "First frontend attempt had one unchanged cloudPlan detached-node assertion; one unchanged-job retry passed. Prior failed receipt retained by111 integration packet. No source/test or gate changes."
+        },
+        "full_final_frontend_and_python": "Not rerun locally as full final aggregates. Fresh exact-head hosted checks are required. All Python source is byte-identical to integrated111.",
+        "runtime_qualification": {
+          "fresh_real_browser": false,
+          "installed_windows": false,
+          "physical_audio": false,
+          "real_provider": false,
+          "deployment_or_release": false
+        },
+        "limits": [
+          "OAuth cancellation/timeout UI outcomes are mocked; protocol tests separately exercise synthetic outcomes.",
+          "Dismissed-form tests prove component-local isolation, not a real shared-store or provider-browser race.",
+          "No real provider login, browser-close, visual or screen-reader validation.",
+          "Original responsive rendered-fixture evidence remains preserved in previous bindings; no new full-app browser claim."
+        ]
+      },
+      "reviewed_source_patch": {
+        "sha256": "a4af66a357fe9efbe9017426c5345df5855dcb2853631cdc3c4d6b0f7cee5e8c",
+        "source_commit": "2612de85dad2632141cf5713aad29ceb42a3b279",
+        "paths": [
+          "SOURCE/ui/react-app/src/SmartDisplay.jsx",
+          "SOURCE/ui/react-app/src/__tests__/SmartDisplay.test.jsx",
+          "SOURCE/ui/react-app/src/components/AccountTab.jsx",
+          "SOURCE/ui/react-app/src/components/AccountTab.oauthPending.test.jsx"
+        ],
+        "original_help_source": "197536e02acfcb0174c54ce9569d681905d8e255",
+        "original_oauth_source": "6b3b7251bce5e7f994f8862e5fdf3fe3a492c5d7",
+        "final_oauth_patch_sha256": "e631719217bac65f450819eb7b251d33054f26917437698ca3bb672c8fc9d8dd"
+      },
+      "new_runtime_qualification_performed": false,
+      "new_runtime_qualification_scope": "Synthetic component and source tests only; no fresh real browser, installed, account/provider or physical qualification.",
+      "new_source_contract_qualification_performed": true,
+      "new_source_contract_qualification_scope": "120 affected auth tests, 85 independent boundary checks, 28 final composed interaction cases, isolated unchanged-source negative control, production build and binding verification.",
+      "new_resolution_performed": false,
+      "new_resolution_scope": "Existing exact-lockfile dependency installation reused; no fresh resolution.",
+      "new_advisory_scan_performed": false,
+      "new_advisory_scan_scope": "No new local advisory audit; required publication-hosted checks remain separate.",
       "new_static_security_scan_performed": false
     }
   }
