@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "47cdacdff228ed48e357d4d53699ca558c298f3e",
-  "sha256": "04c729662cf17d7e66469494f325a751582c12b8821aab4e4a24917df6335989",
+  "revision": "1bfa4e75db0f1c9bec7e57ff2b7a8cab64e0b2e2",
+  "sha256": "06eee2fc533f5266e45d8c47e448fa97ce529f6fa4455b6df67c5d304898d8f7",
   "files": [
     {
       "path": ".env.example",
@@ -530,8 +530,8 @@
     },
     {
       "path": "auth/database.py",
-      "sha256": "978e9bf71a60742a7577ee522c4bff3ae3afaf66dc115f306dc2b35c189b0367",
-      "bytes": 146980
+      "sha256": "74ae4c3a51df610133bbe9c0e51352b571f7476a9db9a2d08e3e149bf5de31a2",
+      "bytes": 147331
     },
     {
       "path": "auth/dependencies.py",
@@ -542,6 +542,11 @@
       "path": "auth/desktop_session.py",
       "sha256": "34b3344f1242e51f1a375d805d313c0c216ba09eb435d5b1e629b5951cf01025",
       "bytes": 46311
+    },
+    {
+      "path": "auth/entitlement_projection.py",
+      "sha256": "a81ad6884161a570f2141c8da9fad03ac3ec1cdc2704161a41a130038780fca1",
+      "bytes": 6457
     },
     {
       "path": "auth/field_encryption.py",
@@ -585,8 +590,8 @@
     },
     {
       "path": "auth/models.py",
-      "sha256": "105fea6db196af5ae2d833c1fc82b17a1339d382257d588c960dfba7aea4e5fc",
-      "bytes": 20417
+      "sha256": "eb3e7f0e072706c4724e44b14c11a5c5c894d5f250e1bb367abecb9117ddf50d",
+      "bytes": 25842
     },
     {
       "path": "auth/per_user_rate_limit.py",
@@ -605,8 +610,8 @@
     },
     {
       "path": "auth/routes.py",
-      "sha256": "d4abc74d940ce74a52439cea8f45ae7cf5881d0f21f23cddbf5e9d8b96b9e569",
-      "bytes": 83530
+      "sha256": "12e633eab751803146ae003a1324d3ebb03252608eb88b0027116fa91a596e62",
+      "bytes": 84658
     },
     {
       "path": "auth/secret_rotation.py",
@@ -1015,8 +1020,8 @@
     },
     {
       "path": "core/db_backend.py",
-      "sha256": "6c290f55c891c31ad75dca9af970d7312992990f726a8ce9d976936f644159a6",
-      "bytes": 50347
+      "sha256": "aff90c03445a8bab3f24af01f0098cd722b2dabb6ffe37404ef89863f32ee0f6",
+      "bytes": 54921
     },
     {
       "path": "core/email_identity.py",
@@ -1115,8 +1120,8 @@
     },
     {
       "path": "core/request_context.py",
-      "sha256": "394a3ce1f6bb136156ba3e39446c5a59dc9a5dad77a0c91a25e99efb688ce9d5",
-      "bytes": 13751
+      "sha256": "5307bd7dd6a8bc6993d772bbc9d71d7118d51531f8ebe7c7eb926314c30a3236",
+      "bytes": 15127
     },
     {
       "path": "core/room_registry.py",
@@ -4995,8 +5000,8 @@
     },
     {
       "path": "services/operator_controls.py",
-      "sha256": "9276a9333f7f543054ad5e682b67461efbf2b32eed2857e332ba73b6a676aae7",
-      "bytes": 34310
+      "sha256": "75dccdf48a0c667bd6683e1448a3cf75e3e207febf5346a35d9df0f0311e4a65",
+      "bytes": 37169
     },
     {
       "path": "services/orchestration/__init__.py",
@@ -6187,6 +6192,11 @@
       "path": "tests/public/test_loopback_media_stop.py",
       "sha256": "bb2258416579abd015192c3c0951841756b93571566464105b4cee1f488a81e1",
       "bytes": 17882
+    },
+    {
+      "path": "tests/public/test_month_gift_entitlement.py",
+      "sha256": "7af10ef2c1115dc2ae19b02646c664e6178c1293a1f566e0dbca2d455e1ef6ce",
+      "bytes": 13536
     },
     {
       "path": "tests/public/test_music_state_identity.py",
@@ -10310,8 +10320,8 @@
     },
     {
       "path": "ui/react-app/src/components/AccountTab.jsx",
-      "sha256": "d2a7e18313b21c4f2f509831d0493a7d1c0cc4e7f041128cd4acef6bc8b2fd4c",
-      "bytes": 76251
+      "sha256": "f9f60a99b05900e2fe30214bc3905dacac7269831b050867c127e2348e524e1d",
+      "bytes": 76735
     },
     {
       "path": "ui/react-app/src/components/AccountTab.legacy.jsx",
@@ -10370,8 +10380,8 @@
     },
     {
       "path": "ui/react-app/src/components/BillingCapacityPanel.jsx",
-      "sha256": "02aa111fa213473aec4bd746fe2617cb26dee49e749d047cb538c2ebf3fc69b7",
-      "bytes": 18711
+      "sha256": "c28320e4bb0cb672b54944bd63132fd18a27c4afa036ff40f0d00090a0c3858a",
+      "bytes": 19049
     },
     {
       "path": "ui/react-app/src/components/BillingCapacityPanel.test.jsx",
@@ -10602,6 +10612,16 @@
       "path": "ui/react-app/src/components/Modal.jsx",
       "sha256": "33795335893edbfe584e15c6417735daa32cc63bb1d479f18bd716593a9f4d4a",
       "bytes": 8098
+    },
+    {
+      "path": "ui/react-app/src/components/MonthGiftSummary.jsx",
+      "sha256": "f1415036265860a25119dd89b8af534f2e7439563e4407a348c72c296f64aae5",
+      "bytes": 2588
+    },
+    {
+      "path": "ui/react-app/src/components/MonthGiftSummary.test.jsx",
+      "sha256": "9b505a6117de9082e7935150c11d4123eb01fb1f741d64bc7b84293bc0d08c46",
+      "bytes": 1849
     },
     {
       "path": "ui/react-app/src/components/MusicServicesTab.jsx",
@@ -11635,8 +11655,8 @@
     },
     {
       "path": "ui/react-app/src/hooks/useAuth.legacy.jsx",
-      "sha256": "c95fcd9bacb0cbeb20d27f41bb3a093c33e53e3adff9bfee9ffa218372bf2953",
-      "bytes": 19026
+      "sha256": "3801f4e9858bda5a818d7108e8d2ba6d543a246b1ca9384ae954d5637b200ae7",
+      "bytes": 19210
     },
     {
       "path": "ui/react-app/src/hooks/useAvailableRooms.js",
@@ -11944,24 +11964,29 @@
       "bytes": 630
     },
     {
+      "path": "ui/react-app/src/lib/auth_context.monthGift.test.jsx",
+      "sha256": "44685aacb253deec3828a4a8f5eb588f5f1b1a382260e47147f27fe4dd8bc919",
+      "bytes": 3255
+    },
+    {
       "path": "ui/react-app/src/lib/auth_context.test.ts",
       "sha256": "bd855c5011d60a3f70bee81ef66faea2eeffbe4f36e8da14ba337ba3511e9cb5",
       "bytes": 559
     },
     {
       "path": "ui/react-app/src/lib/auth_context.tsx",
-      "sha256": "04aa84454c2433a07b5009027d441915d778710ebd4974891a0ae3253d006a35",
-      "bytes": 35135
+      "sha256": "6800ef874e370b2f07caac258c9b469fe5e94bd4cbd296a11eb4499869e84aae",
+      "bytes": 36058
     },
     {
       "path": "ui/react-app/src/lib/billingEntitlement.test.ts",
-      "sha256": "eaa44ce79a51545f12f00c09f0984d1225b42a4bc932e462a973a4de07a74cbe",
-      "bytes": 2306
+      "sha256": "0d613038c7140215190d65d84b50ea05783466968334ae698936606d411bbb65",
+      "bytes": 4962
     },
     {
       "path": "ui/react-app/src/lib/billingEntitlement.ts",
-      "sha256": "037c4ac47fb99d76a59d2863b2a98157d6a40da5bb2e6083771c15c34c435e33",
-      "bytes": 2303
+      "sha256": "31a71728a6a58da148fb212ca8808e20aa973ee3d0af42a6ec01759d01631bbd",
+      "bytes": 6195
     },
     {
       "path": "ui/react-app/src/lib/csrf.js",

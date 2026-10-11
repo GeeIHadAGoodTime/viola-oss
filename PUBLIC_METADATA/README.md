@@ -1,15 +1,9 @@
 # Source snapshot binding
 
-Source revision: `f389fb7d98e0166382f0ceb1029334715d105e64`.
+Source revision: `1bfa4e75db0f1c9bec7e57ff2b7a8cab64e0b2e2`.
 
-Retain the original minimatch compatibility patch as a reference so the existing
-immutable private/public source ownership mapping remains valid. npm postinstall
-continues to invoke only the bounded native script. patch-package and its
-vulnerable transitive graph remain absent. No executable code or dependency
-resolution changes here.
+This source adds an injected, identity-bound month-gift entitlement projection, customer access/billing display, finite boundary refresh, and the explicit server capability seam for atomic Safety expiry. Shared code imports no private gift/provider store. Global system audit access remains server-only.
 
-The paired private mapping change adds only the two newly published script/test
-paths. The original Windows composition failure is preserved as the negative
-control; neither the mapping verifier nor immutable-ownership guard is weakened.
-The preceding chat/calendar/appearance source passed all Windows checks, but
-installed-candidate and public-delivery qualification remain pending.
+The fresh manifest binds every source file. Retained dependency inventories keep their original hashes and status; this change adds no dependency resolution. The prior complete binding is retained at the named comparison revision.
+
+Scoped local shared Python checks, React/website tests and frontend build passed. The full local Windows public suite has one recorded CJK symbolic-link privilege failure and two baseline skips; it is not presented as passing. Required source PR checks and the paired private/public candidate qualification remain separate. No candidate image, actual provider, production or installed-customer acceptance is claimed.
