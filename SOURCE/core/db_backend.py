@@ -344,23 +344,24 @@ class _OperatorControlSystemConnection:
         return _CleanupSafeTransaction(self.__conn.transaction())
 
     def _check(self, sql: str) -> None:
-        normalized = " ".join(sql.split())
-        if ";" in normalized or "--" in normalized or "/*" in normalized:
-            raise RlsContextRequiredError("Operator-system SQL must be a single control-plane statement")
-        mutation, target = sql_mutation_target(sql)
-        verb = normalized.split(" ", 1)[0].upper()
-        if mutation and (verb, target) in {
-            ("UPDATE", "operator_controls"),
-            ("UPDATE", "public.operator_controls"),
-            ("INSERT", "operator_control_audit"),
-            ("INSERT", "public.operator_control_audit"),
+        # Prefix/target checks also admit JOINs, UNIONs, subqueries and SQL
+        # functions such as set_config(). This capability is intentionally not
+        # a general SQL interface: admit only the parameterized statements used
+        # by the control store. Values stay in asyncpg parameters, never SQL.
+        normalized = re.sub(r"\s*([,=()+])\s*", r"\1", " ".join(sql.split()).upper())
+        normalized = re.sub(r"\bPUBLIC\.(OPERATOR_CONTROLS|OPERATOR_CONTROL_AUDIT)\b", r"\1", normalized)
+        if normalized not in {
+            "SELECT * FROM OPERATOR_CONTROLS WHERE KEY=$1 FOR UPDATE",
+            "SELECT * FROM OPERATOR_CONTROL_AUDIT WHERE USER_ID IS NULL",
+            "SELECT * FROM OPERATOR_CONTROL_AUDIT WHERE USER_ID IS NULL "
+            "ORDER BY TIMESTAMP ASC,REVISION ASC,AUDIT_ID ASC",
+            "UPDATE OPERATOR_CONTROLS SET STATE=$2,REASON=$3,ACTOR=$4,SOURCE=$5,"
+            "UPDATED_AT=$6,REVISION=REVISION+1,EXPIRES_AT=$7 WHERE KEY=$1 RETURNING *",
+            "INSERT INTO OPERATOR_CONTROL_AUDIT(AUDIT_ID,CONTROL_KEY,ACTOR,REASON,SOURCE,PREVIOUS_STATE,"
+            "NEW_STATE,TIMESTAMP,REVISION,USER_ID,REQUEST_ID,EXPIRES_AT)"
+            "VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)",
         }:
-            return
-        if re.match(r"^SELECT \* FROM (?:public\.)?operator_controls(?:\s|$)", normalized, re.IGNORECASE):
-            return
-        if re.match(r"^SELECT \* FROM (?:public\.)?operator_control_audit(?:\s|$)", normalized, re.IGNORECASE):
-            return
-        raise RlsContextRequiredError("Operator-system capability does not admit this SQL")
+            raise RlsContextRequiredError("Operator-system capability does not admit this SQL")
 
     async def execute(self, sql: str, *args: Any) -> Any:
         self._check(sql)
