@@ -1,29 +1,19 @@
 {
+  "phone_queue_lifecycle_previous_binding": {
+    "public_revision": "55a895b160cd9db5831f020f9d69d0ebee8ec431",
+    "source_binding_sha256": "757bcf9a02c999dacb290bc192d9af7a48bfb8c1c18c70a0bd2500fe1fa52100",
+    "retention": "Complete original binding and qualification remain at this Git revision; their claims are historical."
+  },
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "56f488e346b340ae4e127d12e1ce18938d05427119b96568d6381789f7a35f74",
-  "source_tree_sha256": "06eee2fc533f5266e45d8c47e448fa97ce529f6fa4455b6df67c5d304898d8f7",
-  "source_file_count": 2709,
-  "source_revision": "1bfa4e75db0f1c9bec7e57ff2b7a8cab64e0b2e2",
-  "comparison_public_revision": "345c9dc69c6ea3c5863956b0e863d6caa72c9288",
+  "source_manifest_sha256": "80768eb519389ef544b86bff79f563d7a68fed19d1a95199ee5d4f942be357a2",
+  "source_tree_sha256": "237e7f2336e13821f6090624b643ef687a4658c109aebfb2176224396386aab7",
+  "source_file_count": 2710,
+  "source_revision": "5772d6840a520ac324f34f5888c5e9648e5cd79b",
+  "comparison_public_revision": "55a895b160cd9db5831f020f9d69d0ebee8ec431",
   "changed_source_paths": [
-    "SOURCE/auth/database.py",
-    "SOURCE/auth/entitlement_projection.py",
-    "SOURCE/auth/models.py",
-    "SOURCE/auth/routes.py",
-    "SOURCE/core/db_backend.py",
-    "SOURCE/core/request_context.py",
-    "SOURCE/services/operator_controls.py",
-    "SOURCE/tests/public/test_month_gift_entitlement.py",
-    "SOURCE/ui/react-app/src/components/AccountTab.jsx",
-    "SOURCE/ui/react-app/src/components/BillingCapacityPanel.jsx",
-    "SOURCE/ui/react-app/src/components/MonthGiftSummary.jsx",
-    "SOURCE/ui/react-app/src/components/MonthGiftSummary.test.jsx",
-    "SOURCE/ui/react-app/src/hooks/useAuth.legacy.jsx",
-    "SOURCE/ui/react-app/src/lib/auth_context.monthGift.test.jsx",
-    "SOURCE/ui/react-app/src/lib/auth_context.tsx",
-    "SOURCE/ui/react-app/src/lib/billingEntitlement.test.ts",
-    "SOURCE/ui/react-app/src/lib/billingEntitlement.ts"
+    "SOURCE/telephony/call_manager.py",
+    "SOURCE/tests/public/test_phone_queue_lifecycle.py"
   ],
   "retained_sboms": [
     {
@@ -85,32 +75,26 @@
     }
   ],
   "input_equivalence": {
-    "comparison_basis": "Protected public main 214cbda6c85ad2b952373c109992bc28ab90636e; exact full-tree equality with retained private source pin 51a0be2f4f2ef6845eb648d7c1c2669c9a7264a2.",
-    "all_unselected_export_leaf_bytes_and_modes_preserved": true,
-    "unselected_source_files_preserved": 2702,
-    "all_six_sbom_bytes_and_status_objects_preserved": true,
-    "source_change_scope": "Only agent-loop deferred-confirmation failure propagation and its executable public unittest regression. Approval policy, executor, dependency inputs, workflows, and source ownership of existing files are unchanged.",
-    "source_only_tree": "44860e0757149d5495fb1f81ec4e813a7ff7afd0",
-    "base_full_tree": "9afc0c8d7d88b028104969e7f14c84f6e1dc76b3"
+    "comparison_basis": "Exact protected public55a895b160cd9db5831f020f9d69d0ebee8ec431 source tree",
+    "unselected_source_files_preserved": 2708,
+    "source_change_scope": "One public manager lifecycle seam and its five behavioral regressions; no product dependency inputs changed.",
+    "all_six_sbom_bytes_and_status_objects_preserved": true
   },
   "qualification": {
-    "source_commit": "1bfa4e75db0f1c9bec7e57ff2b7a8cab64e0b2e2",
-    "kind": "source inventory and scoped local development checks",
-    "shared_month_entitlement_unittest_methods": 13,
-    "react_tests": 36,
-    "website_tests": 7,
-    "frontend_build": "passed with output outside source",
-    "full_public_unittest": {
-      "methods": 986,
-      "failures": 1,
-      "skipped": 2,
-      "limit": "Local Windows symbolic-link privilege failure in existing CJK fresh-process harness; no full-suite pass claimed."
+    "source_commit": "5772d6840a520ac324f34f5888c5e9648e5cd79b",
+    "kind": "source inventory and focused public lifecycle behavior",
+    "phone_queue_lifecycle_tests": {
+      "passed": 5,
+      "failures": 0,
+      "skipped": 0,
+      "environment": "isolated native Linux fixture, synthetic carrier and queue IO"
     },
-    "canonical_private_public_composition": "pending separate exact candidate qualification",
+    "canonical_private_public_composition": "pending combined candidate qualification",
     "image_qualification": false,
-    "provider_sandbox_acceptance": false,
     "production_deployment": false,
-    "installed_customer_acceptance": false
+    "installed_customer_acceptance": false,
+    "provider_sandbox_acceptance": false,
+    "limits": "These five tests execute shipped manager method bodies with synthetic IO. Earlier full-suite/frontend/provider results remain scoped to their recorded inputs."
   },
   "historical_bindings": [
     {

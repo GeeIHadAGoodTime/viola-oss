@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "1bfa4e75db0f1c9bec7e57ff2b7a8cab64e0b2e2",
-  "sha256": "06eee2fc533f5266e45d8c47e448fa97ce529f6fa4455b6df67c5d304898d8f7",
+  "revision": "5772d6840a520ac324f34f5888c5e9648e5cd79b",
+  "sha256": "237e7f2336e13821f6090624b643ef687a4658c109aebfb2176224396386aab7",
   "files": [
     {
       "path": ".env.example",
@@ -5700,8 +5700,8 @@
     },
     {
       "path": "telephony/call_manager.py",
-      "sha256": "2c587ad32b5c9b11115a2cc8f79f800bfd362284aacc4e3efb78508fa815d1fe",
-      "bytes": 379729
+      "sha256": "5867fc346d073f598807aaad19f84b3c366aa3c19a47a074c62c9091d07168bb",
+      "bytes": 380962
     },
     {
       "path": "telephony/call_queue.py",
@@ -6232,6 +6232,11 @@
       "path": "tests/public/test_phone_locale_normalization.py",
       "sha256": "8ee1af94237192d1349bcce8f77761ba59f58c6ecee449f9074c3edbb012d3f7",
       "bytes": 9729
+    },
+    {
+      "path": "tests/public/test_phone_queue_lifecycle.py",
+      "sha256": "b49afc888c85dc37a9c85e5af2f22950ffedd5e155b0bf9b6496d3e61539415b",
+      "bytes": 6966
     },
     {
       "path": "tests/public/test_phone_spoken_goodbye_recovery.py",

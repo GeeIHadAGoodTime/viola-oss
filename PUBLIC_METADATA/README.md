@@ -1,9 +1,9 @@
 # Source snapshot binding
 
-Source revision: `1bfa4e75db0f1c9bec7e57ff2b7a8cab64e0b2e2`.
+Source revision: `5772d6840a520ac324f34f5888c5e9648e5cd79b`.
 
-This source adds an injected, identity-bound month-gift entitlement projection, customer access/billing display, finite boundary refresh, and the explicit server capability seam for atomic Safety expiry. Shared code imports no private gift/provider store. Global system audit access remains server-only.
+The public phone-manager lifecycle exposes an observer before first queue scheduling and honors a queue pause before every new claim. An already claimed call finishes normally. Five native Linux behavioral checks passed with synthetic carrier/queue IO.
 
-The fresh manifest binds every source file. Retained dependency inventories keep their original hashes and status; this change adds no dependency resolution. The prior complete binding is retained at the named comparison revision.
+The updated manifest binds all 2710 source files. All six retained dependency inventories and their status objects remain unchanged; product dependency inputs are unchanged. The preceding complete source binding and qualification remain in public revision `55a895b160cd9db5831f020f9d69d0ebee8ec431`.
 
-Scoped local shared Python checks, React/website tests and frontend build passed. The full local Windows public suite has one recorded CJK symbolic-link privilege failure and two baseline skips; it is not presented as passing. Required source PR checks and the paired private/public candidate qualification remain separate. No candidate image, actual provider, production or installed-customer acceptance is claimed.
+Protected source checks, combined private/public composition, immutable image qualification, production cutover and installed-customer acceptance are separate required stages. This source-only check does not claim those stages.
