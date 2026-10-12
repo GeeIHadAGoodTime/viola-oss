@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "5772d6840a520ac324f34f5888c5e9648e5cd79b",
-  "sha256": "237e7f2336e13821f6090624b643ef687a4658c109aebfb2176224396386aab7",
+  "revision": "9cf2a5695076471b71663884672e14493203d80c",
+  "sha256": "519f893ffa2716c84c0d75d6be3876a0c1247b27a88b4129eab416473ecc5c75",
   "files": [
     {
       "path": ".env.example",
@@ -1020,8 +1020,8 @@
     },
     {
       "path": "core/db_backend.py",
-      "sha256": "aff90c03445a8bab3f24af01f0098cd722b2dabb6ffe37404ef89863f32ee0f6",
-      "bytes": 54921
+      "sha256": "e22018285278784c7fe347a15680dce2301f9dc30b1c3f7f01dff878db8aa062",
+      "bytes": 55306
     },
     {
       "path": "core/email_identity.py",
@@ -5135,8 +5135,8 @@
     },
     {
       "path": "services/scheduler/service.py",
-      "sha256": "bcc62d83f8b0af628e5e230e1726fa33bfb8c46ba061d11330345a8511dbbb66",
-      "bytes": 43463
+      "sha256": "31b8ff57a303f38f0cf0ac56ecfbe96476101ee5673ec6c1d4bf4ad3b63daadc",
+      "bytes": 44176
     },
     {
       "path": "services/scheduler/store.py",
@@ -6209,6 +6209,11 @@
       "bytes": 10727
     },
     {
+      "path": "tests/public/test_operator_system_sql_boundary.py",
+      "sha256": "899ece2d0debcef79fa85ae259d92d3a73049dba35fe80c57a30db31c9e8b455",
+      "bytes": 4273
+    },
+    {
       "path": "tests/public/test_pause_response_contract.py",
       "sha256": "63a5fc99652782f8579b04cffa939c8e1207756235d29f2bd8b3b0ad2f188ed8",
       "bytes": 9635
@@ -6292,6 +6297,11 @@
       "path": "tests/public/test_saved_chat_speech_dispatch.py",
       "sha256": "a824628fdd6e8143921186ca46cdcd703816b012794b9b40a84ff183a586d48f",
       "bytes": 12341
+    },
+    {
+      "path": "tests/public/test_scheduler_poll_admission.py",
+      "sha256": "8a8b39fc8b782cdacf7915306a494bb90228deec7803629915d58dc05e3829ce",
+      "bytes": 4114
     },
     {
       "path": "tests/public/test_selected_audio_output.py",

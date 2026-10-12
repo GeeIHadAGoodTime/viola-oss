@@ -1,4 +1,20 @@
 {
+  "phone_poll_integration_previous_bindings": [
+    {
+      "public_revision": "ef50a78210dd6fbe0b00e58b710e8d196c9d4f1a",
+      "path": "PUBLIC_METADATA/source-binding.json",
+      "sha256": "6579a854acabc2da1722f5633c12816024aecb1498a4af1bf471d982bab50691",
+      "git_blob": "63b67fa2a69a9854bd09838e65051af29a218fc0",
+      "status": "Original phone lifecycle binding; complete raw bytes and qualification remain at this immutable revision, not new combined qualification."
+    },
+    {
+      "public_revision": "cc42cb6a2d56c1ce07676e2dcf35c06dd59f71b2",
+      "path": "PUBLIC_METADATA/source-binding.json",
+      "sha256": "97c93b406f86977ae512d2915c1726d39dcbd7bcaa5c6d2e9772a62f68e0973f",
+      "git_blob": "54a9146566e3a7e0dbf80db5bca2eb36585393ba",
+      "status": "Protected main SQL-boundary binding; complete raw bytes and qualification remain at this immutable revision, not new combined qualification."
+    }
+  ],
   "phone_queue_lifecycle_previous_binding": {
     "public_revision": "55a895b160cd9db5831f020f9d69d0ebee8ec431",
     "source_binding_sha256": "757bcf9a02c999dacb290bc192d9af7a48bfb8c1c18c70a0bd2500fe1fa52100",
@@ -6,14 +22,16 @@
   },
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "80768eb519389ef544b86bff79f563d7a68fed19d1a95199ee5d4f942be357a2",
-  "source_tree_sha256": "237e7f2336e13821f6090624b643ef687a4658c109aebfb2176224396386aab7",
-  "source_file_count": 2710,
-  "source_revision": "5772d6840a520ac324f34f5888c5e9648e5cd79b",
-  "comparison_public_revision": "55a895b160cd9db5831f020f9d69d0ebee8ec431",
+  "source_manifest_sha256": "707308cdc64b92c69fe2d721adacdfb09d8fbadd72d809677d3be37fd7258680",
+  "source_tree_sha256": "519f893ffa2716c84c0d75d6be3876a0c1247b27a88b4129eab416473ecc5c75",
+  "source_file_count": 2712,
+  "source_revision": "9cf2a5695076471b71663884672e14493203d80c",
+  "comparison_public_revision": "cc42cb6a2d56c1ce07676e2dcf35c06dd59f71b2",
   "changed_source_paths": [
+    "SOURCE/services/scheduler/service.py",
     "SOURCE/telephony/call_manager.py",
-    "SOURCE/tests/public/test_phone_queue_lifecycle.py"
+    "SOURCE/tests/public/test_phone_queue_lifecycle.py",
+    "SOURCE/tests/public/test_scheduler_poll_admission.py"
   ],
   "retained_sboms": [
     {
@@ -75,26 +93,32 @@
     }
   ],
   "input_equivalence": {
-    "comparison_basis": "Exact protected public55a895b160cd9db5831f020f9d69d0ebee8ec431 source tree",
+    "comparison_basis": "Exact protected public main cc42cb6a2d56c1ce07676e2dcf35c06dd59f71b2",
     "unselected_source_files_preserved": 2708,
-    "source_change_scope": "One public manager lifecycle seam and its five behavioral regressions; no product dependency inputs changed.",
+    "source_change_scope": "Only the four listed phone queue and scheduler poll source/test paths differ from current main; its SQL-boundary source/test, product dependency inputs and workflows are preserved.",
     "all_six_sbom_bytes_and_status_objects_preserved": true
   },
   "qualification": {
-    "source_commit": "5772d6840a520ac324f34f5888c5e9648e5cd79b",
-    "kind": "source inventory and focused public lifecycle behavior",
+    "source_commit": "9cf2a5695076471b71663884672e14493203d80c",
+    "kind": "Source inventory and focused public phone queue and scheduler poll behavior",
     "phone_queue_lifecycle_tests": {
       "passed": 5,
       "failures": 0,
       "skipped": 0,
-      "environment": "isolated native Linux fixture, synthetic carrier and queue IO"
+      "environment": "Native Windows Python 3.11; shipped method bodies with synthetic carrier and queue IO"
     },
     "canonical_private_public_composition": "pending combined candidate qualification",
     "image_qualification": false,
     "production_deployment": false,
     "installed_customer_acceptance": false,
     "provider_sandbox_acceptance": false,
-    "limits": "These five tests execute shipped manager method bodies with synthetic IO. Earlier full-suite/frontend/provider results remain scoped to their recorded inputs."
+    "limits": "Ten focused phone/scheduler tests passed on the combined source. Prior broader results remain scoped to their recorded inputs; exact-head required CI and combined private qualification remain separate.",
+    "scheduler_poll_admission_tests": {
+      "passed": 5,
+      "failures": 0,
+      "skipped": 0,
+      "environment": "Native Windows Python 3.11; shipped method bodies with synthetic due-work IO"
+    }
   },
   "historical_bindings": [
     {
