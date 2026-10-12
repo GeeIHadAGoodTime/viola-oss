@@ -1,29 +1,14 @@
 {
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "56f488e346b340ae4e127d12e1ce18938d05427119b96568d6381789f7a35f74",
-  "source_tree_sha256": "06eee2fc533f5266e45d8c47e448fa97ce529f6fa4455b6df67c5d304898d8f7",
-  "source_file_count": 2709,
-  "source_revision": "1bfa4e75db0f1c9bec7e57ff2b7a8cab64e0b2e2",
-  "comparison_public_revision": "345c9dc69c6ea3c5863956b0e863d6caa72c9288",
+  "source_manifest_sha256": "352e276ee864c613c3b05b03ac122a044ec4b00a22c43519a7cdd147700dddc7",
+  "source_tree_sha256": "0e9601205ee8b45cdc5beccb710d4870d868019b042dd64a269db3e32bd8b634",
+  "source_file_count": 2710,
+  "source_revision": "9ed0a73d6a78e327aacc24ed5fd0729e3866d361",
+  "comparison_public_revision": "55a895b160cd9db5831f020f9d69d0ebee8ec431",
   "changed_source_paths": [
-    "SOURCE/auth/database.py",
-    "SOURCE/auth/entitlement_projection.py",
-    "SOURCE/auth/models.py",
-    "SOURCE/auth/routes.py",
     "SOURCE/core/db_backend.py",
-    "SOURCE/core/request_context.py",
-    "SOURCE/services/operator_controls.py",
-    "SOURCE/tests/public/test_month_gift_entitlement.py",
-    "SOURCE/ui/react-app/src/components/AccountTab.jsx",
-    "SOURCE/ui/react-app/src/components/BillingCapacityPanel.jsx",
-    "SOURCE/ui/react-app/src/components/MonthGiftSummary.jsx",
-    "SOURCE/ui/react-app/src/components/MonthGiftSummary.test.jsx",
-    "SOURCE/ui/react-app/src/hooks/useAuth.legacy.jsx",
-    "SOURCE/ui/react-app/src/lib/auth_context.monthGift.test.jsx",
-    "SOURCE/ui/react-app/src/lib/auth_context.tsx",
-    "SOURCE/ui/react-app/src/lib/billingEntitlement.test.ts",
-    "SOURCE/ui/react-app/src/lib/billingEntitlement.ts"
+    "SOURCE/tests/public/test_operator_system_sql_boundary.py"
   ],
   "retained_sboms": [
     {
@@ -85,28 +70,41 @@
     }
   ],
   "input_equivalence": {
-    "comparison_basis": "Protected public main 214cbda6c85ad2b952373c109992bc28ab90636e; exact full-tree equality with retained private source pin 51a0be2f4f2ef6845eb648d7c1c2669c9a7264a2.",
+    "comparison_basis": "Protected public main 55a895b160cd9db5831f020f9d69d0ebee8ec431",
     "all_unselected_export_leaf_bytes_and_modes_preserved": true,
-    "unselected_source_files_preserved": 2702,
+    "unselected_source_files_preserved": 2708,
     "all_six_sbom_bytes_and_status_objects_preserved": true,
-    "source_change_scope": "Only agent-loop deferred-confirmation failure propagation and its executable public unittest regression. Approval policy, executor, dependency inputs, workflows, and source ownership of existing files are unchanged.",
-    "source_only_tree": "44860e0757149d5495fb1f81ec4e813a7ff7afd0",
-    "base_full_tree": "9afc0c8d7d88b028104969e7f14c84f6e1dc76b3"
+    "dependency_and_workflow_inputs_unchanged": true,
+    "source_change_scope": "Only operator-system SQL admission and its standalone public regression contracts.",
+    "source_only_tree": "194266762c2f8fa13bf96ace248b34f6fc3e4b72",
+    "source_subtree": "c35795c60c0d921f214d79d4465d7953bfa39292",
+    "base_full_tree": "ed1dbd012ee1ca38c326b2c3b7b6fc132e7a11cc"
   },
   "qualification": {
-    "source_commit": "1bfa4e75db0f1c9bec7e57ff2b7a8cab64e0b2e2",
-    "kind": "source inventory and scoped local development checks",
-    "shared_month_entitlement_unittest_methods": 13,
-    "react_tests": 36,
-    "website_tests": 7,
-    "frontend_build": "passed with output outside source",
-    "full_public_unittest": {
-      "methods": 986,
-      "failures": 1,
-      "skipped": 2,
-      "limit": "Local Windows symbolic-link privilege failure in existing CJK fresh-process harness; no full-suite pass claimed."
+    "source_commit": "9ed0a73d6a78e327aacc24ed5fd0729e3866d361",
+    "kind": "Source inventory, independently reviewed SQL-boundary correction, and scoped local Python contracts",
+    "public_unittest_methods": 5,
+    "public_unittest_subtests": 36,
+    "public_test_failures": 0,
+    "public_test_errors": 0,
+    "public_test_skips": 0,
+    "private_companion_test_cases": 153,
+    "private_companion_source": {
+      "base_commit": "5b97d99bd742396621aab66638eeccd8c35c6aad",
+      "reviewed_patch_sha256": "b65d743d3113767dcbc2f7f5ec8c52dc68272ad88ef1fcf50ad470ee2cc5411b",
+      "status": "Uncommitted reviewed source candidate; no private candidate commit or commit-qualified private acceptance is claimed.",
+      "combined_test_json_sha256": "ee8006caa41974c85bca25a4b22ffa9f7fd43c9a59ece8e0b83595e25ea99ec7",
+      "combined_test_junit_sha256": "8c6a49647db20a326a678d547e1e385760d663706bb4a464b4791b1d977a9a91",
+      "combined_test_scope": "153 private cases plus five public methods; 36 public unittest subtests are additional JUnit entries, not additional methods."
     },
-    "canonical_private_public_composition": "pending separate exact candidate qualification",
+    "negative_old_public_source_failing_subtests": 20,
+    "negative_old_private_sql_facade_failing_cases": 11,
+    "source_test_scope": "Real SQL admission and store statements; recording connection exercises role/subject cleanup. No database execution.",
+    "local_environment": "Python 3.12.14; import-only logging seam; external identity/audit seams for private route unit tests; --noconftest for sparse local source subset.",
+    "public_source_tests": "python -m unittest discover -s tests/public -p test_operator_system_sql_boundary.py -v",
+    "full_public_suite": "Not run locally; exact-head repository checks remain required.",
+    "canonical_private_public_composition": "Pending private adoption of the exact protected public merge and its composed checks.",
+    "real_migrated_postgresql_acceptance": "Pending existing nonbypass role, tenant-isolation and atomicity gates. Prior author-reported results are not substituted for an observed receipt.",
     "image_qualification": false,
     "provider_sandbox_acceptance": false,
     "production_deployment": false,
@@ -8407,191 +8405,13 @@
     }
   ],
   "prior_binding": {
-    "public_revision": "d43b129becc28a0e51eac83dab02be5241b1accb",
+    "public_revision": "55a895b160cd9db5831f020f9d69d0ebee8ec431",
     "path": "PUBLIC_METADATA/source-binding.json",
-    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/d43b129becc28a0e51eac83dab02be5241b1accb/PUBLIC_METADATA/source-binding.json",
-    "sha256": "ec530291e842d95f8466a2516b9bf08372a515b137b6dcbd594a4f71405ad27c",
-    "bytes": 1425921,
-    "git_blob": "c155d526985477582384a57b65b7335235c6eb16",
-    "all_top_level_keys": [
-      "schema_version",
-      "source_manifest",
-      "source_manifest_sha256",
-      "source_tree_sha256",
-      "source_file_count",
-      "source_revision",
-      "comparison_public_revision",
-      "changed_source_paths",
-      "retained_sboms",
-      "input_equivalence",
-      "qualification",
-      "historical_bindings",
-      "prior_binding",
-      "retained_composition_component_bindings",
-      "reviewed_source_patch",
-      "new_resolution_performed",
-      "new_advisory_scan_performed",
-      "new_runtime_qualification_performed",
-      "new_source_contract_qualification_performed",
-      "new_static_security_scan_performed",
-      "new_resolution_scope",
-      "new_advisory_scan_scope",
-      "account_reconciliation_previous_binding",
-      "reviewed_speech_binding",
-      "local_media_path_previous_binding",
-      "session_durability_previous_binding",
-      "media_identity_previous_binding",
-      "speech_fixture_import_previous_binding",
-      "speech_fixture_import_original_pr_binding",
-      "managed_preflight_refusal_previous_binding",
-      "cloud_pool_export_previous_binding",
-      "pool_cleanup_previous_binding",
-      "bounded_search_ui_previous_binding",
-      "spoken_goodbye_previous_binding",
-      "music_command_recovery_previous_binding"
-    ],
-    "preserved_json_objects": {
-      "schema_version": {
-        "pointer": "/schema_version",
-        "canonical_json_sha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
-      },
-      "source_manifest": {
-        "pointer": "/source_manifest",
-        "canonical_json_sha256": "ace3c4cebde8c1e5207159e354ef46f1f9a13eb7b3185315a68b7cf8b71f212d"
-      },
-      "source_manifest_sha256": {
-        "pointer": "/source_manifest_sha256",
-        "canonical_json_sha256": "5d2a4306604b2f072ea8264220a29a7d746f3838a3920f2abfad34e49b691e82"
-      },
-      "source_tree_sha256": {
-        "pointer": "/source_tree_sha256",
-        "canonical_json_sha256": "3e5a0a679a185d8205f7b4ed12996982bb0e3a66a879cb96a1d9a52fb87adccf"
-      },
-      "source_file_count": {
-        "pointer": "/source_file_count",
-        "canonical_json_sha256": "1498172a195a73ec4ac7550b66f0a5e639e9c19d6b51787a4b1a93aa374dea44"
-      },
-      "source_revision": {
-        "pointer": "/source_revision",
-        "canonical_json_sha256": "21be604696f4ea7abb4f8282ea0efa33cef5d32eff9047d3bdf52d88ca594cae"
-      },
-      "comparison_public_revision": {
-        "pointer": "/comparison_public_revision",
-        "canonical_json_sha256": "e2bf28eae594247d06f428a9cf139f178599b236cfb3ab6006d637219085b40e"
-      },
-      "changed_source_paths": {
-        "pointer": "/changed_source_paths",
-        "canonical_json_sha256": "250d34d6cb60244f62509f73df8d5bd84c91d5f0ea98cda0fb648e7dab62c4f9"
-      },
-      "retained_sboms": {
-        "pointer": "/retained_sboms",
-        "canonical_json_sha256": "0428d09c6e0e2b524877c2218b306c10da6c7536bcf6ed96524b581dafc85301"
-      },
-      "input_equivalence": {
-        "pointer": "/input_equivalence",
-        "canonical_json_sha256": "817b0aaf6f0c0c31f3f8fb220f1767deaf3bb716553cd1105bc5215d826e8f2c"
-      },
-      "qualification": {
-        "pointer": "/qualification",
-        "canonical_json_sha256": "1661eb1ea4a662db7f863f56ed09d1a9a430b33655c7f71e9b95bf8ca29ec793"
-      },
-      "historical_bindings": {
-        "pointer": "/historical_bindings",
-        "canonical_json_sha256": "59ccb6141308771f32ec1e534f7a843cbdd8867afcd59e84944e03e6f9958c33"
-      },
-      "prior_binding": {
-        "pointer": "/prior_binding",
-        "canonical_json_sha256": "012e1ed45d9ca07fb9ea03f9ee6bceb8e121fe23fc2bc4b02435dce3bc826b18"
-      },
-      "retained_composition_component_bindings": {
-        "pointer": "/retained_composition_component_bindings",
-        "canonical_json_sha256": "70e294ed12c452edb44e162d6bdd6a05b05812347270fe0f54ea02a6bd482630"
-      },
-      "reviewed_source_patch": {
-        "pointer": "/reviewed_source_patch",
-        "canonical_json_sha256": "70dda01392e01ce20fca664aacbcc29378735cd97c5fe8617c97b777b3a10e8d"
-      },
-      "new_resolution_performed": {
-        "pointer": "/new_resolution_performed",
-        "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
-      },
-      "new_advisory_scan_performed": {
-        "pointer": "/new_advisory_scan_performed",
-        "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
-      },
-      "new_runtime_qualification_performed": {
-        "pointer": "/new_runtime_qualification_performed",
-        "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
-      },
-      "new_source_contract_qualification_performed": {
-        "pointer": "/new_source_contract_qualification_performed",
-        "canonical_json_sha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b"
-      },
-      "new_static_security_scan_performed": {
-        "pointer": "/new_static_security_scan_performed",
-        "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
-      },
-      "new_resolution_scope": {
-        "pointer": "/new_resolution_scope",
-        "canonical_json_sha256": "86bfaefe58fd99721a900836f1acaf18f93de75c5f761072a935c0fb1cb69194"
-      },
-      "new_advisory_scan_scope": {
-        "pointer": "/new_advisory_scan_scope",
-        "canonical_json_sha256": "45deeb47b009cd231fa866ab82439106bd86d379e68230218be66b05a58c7726"
-      },
-      "account_reconciliation_previous_binding": {
-        "pointer": "/account_reconciliation_previous_binding",
-        "canonical_json_sha256": "cfeffa86ef01cbbd530cda12a57b6c4eb3761063999ad3fae482a0c1d7482b51"
-      },
-      "reviewed_speech_binding": {
-        "pointer": "/reviewed_speech_binding",
-        "canonical_json_sha256": "88025408d951467d38a236d6fdedb10ad4a4112e6ce02b3577c5b906adec6305"
-      },
-      "local_media_path_previous_binding": {
-        "pointer": "/local_media_path_previous_binding",
-        "canonical_json_sha256": "220f4c5da0641cd8f51fb28add2f66e18e1dba3e64cca61d345ebd775b15bf1f"
-      },
-      "session_durability_previous_binding": {
-        "pointer": "/session_durability_previous_binding",
-        "canonical_json_sha256": "d1931a403fd80ce0a8ea40f23700b2e5a3be8c1b155c3511cbf4d6f72792f6b9"
-      },
-      "media_identity_previous_binding": {
-        "pointer": "/media_identity_previous_binding",
-        "canonical_json_sha256": "775b630f1531f2b679dfb823a59f6d534e542a78fdf1dc3dc6013a74012468e3"
-      },
-      "speech_fixture_import_previous_binding": {
-        "pointer": "/speech_fixture_import_previous_binding",
-        "canonical_json_sha256": "df5e90ccb71afa3db0b0f386fe8575ce3fce043d63192aea6cf38b594a7d41b1"
-      },
-      "speech_fixture_import_original_pr_binding": {
-        "pointer": "/speech_fixture_import_original_pr_binding",
-        "canonical_json_sha256": "c8a9d20bb298d827ca44f1e0ce75e0d8340c4812a856c4a398a185a26126c3f7"
-      },
-      "managed_preflight_refusal_previous_binding": {
-        "pointer": "/managed_preflight_refusal_previous_binding",
-        "canonical_json_sha256": "37b62ef1767156d6f238dcb7b6e966e34f1d791aadb0e9128db89db0c40ebf2f"
-      },
-      "cloud_pool_export_previous_binding": {
-        "pointer": "/cloud_pool_export_previous_binding",
-        "canonical_json_sha256": "cc53548bb5cec6789dbe7d702f066f18db3d55f12aa5daae6d8ce370fc1d50c2"
-      },
-      "pool_cleanup_previous_binding": {
-        "pointer": "/pool_cleanup_previous_binding",
-        "canonical_json_sha256": "a481292e67dc7d5f75251fac8b1d3c593c4a50ea1c840eb355072c8608c69c8a"
-      },
-      "bounded_search_ui_previous_binding": {
-        "pointer": "/bounded_search_ui_previous_binding",
-        "canonical_json_sha256": "2b842c33a6f1e0fb45c8202df37f99a81f1c5d5c39cc89a43d49c0a95eccbc70"
-      },
-      "spoken_goodbye_previous_binding": {
-        "pointer": "/spoken_goodbye_previous_binding",
-        "canonical_json_sha256": "012e1ed45d9ca07fb9ea03f9ee6bceb8e121fe23fc2bc4b02435dce3bc826b18"
-      },
-      "music_command_recovery_previous_binding": {
-        "pointer": "/music_command_recovery_previous_binding",
-        "canonical_json_sha256": "c8ae362e3bf515264325b5851ab172e9369cadf8fc93d89fd60a1bc922000396"
-      }
-    }
+    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/55a895b160cd9db5831f020f9d69d0ebee8ec431/PUBLIC_METADATA/source-binding.json",
+    "sha256": "757bcf9a02c999dacb290bc192d9af7a48bfb8c1c18c70a0bd2500fe1fa52100",
+    "bytes": 1577930,
+    "git_blob": "c9a5e56400a04147c70021b84e07542bac32db17",
+    "note": "Complete previous binding retained at this immutable revision; replaced active fields are also preserved in operator_sql_boundary_previous_binding."
   },
   "retained_composition_component_bindings": [
     {
@@ -12149,15 +11969,15 @@
     }
   ],
   "reviewed_source_patch": {
-    "sha256": "89c01a2d74b90e53644c0c3d440fe5003e8f56d7ccaf5600a3adc26f33b5ec37",
-    "source_commit": "47cdacdff228ed48e357d4d53699ca558c298f3e",
+    "sha256": "6621d3d280bf2b90df0a71c440b89ae540d40dd8fc038295820b0e79fce03e12",
+    "source_commit": "9ed0a73d6a78e327aacc24ed5fd0729e3866d361",
     "paths": [
-      "SOURCE/intent/agent_loop.py",
-      "SOURCE/tests/public/test_deferred_confirmation_contract.py"
+      "SOURCE/core/db_backend.py",
+      "SOURCE/tests/public/test_operator_system_sql_boundary.py"
     ],
     "git_blobs": {
-      "SOURCE/intent/agent_loop.py": "625c68fadfd525a8e2f420966ef004d13bb0237b",
-      "SOURCE/tests/public/test_deferred_confirmation_contract.py": "ee0dbf6059164ef88f865b389214b63c134003b6"
+      "SOURCE/core/db_backend.py": "5fafc72e3e228c68f80555499dd60f45fe28c960",
+      "SOURCE/tests/public/test_operator_system_sql_boundary.py": "d3ad218e35e68ec1c617c99f799ff68b46b89e4c"
     }
   },
   "new_resolution_performed": false,
@@ -12165,8 +11985,8 @@
   "new_runtime_qualification_performed": false,
   "new_source_contract_qualification_performed": true,
   "new_static_security_scan_performed": false,
-  "new_resolution_scope": "No dependency or lockfile input change; retained SBOM hashes/statuses remain unchanged.",
-  "new_advisory_scan_scope": "No new advisory scan in local preparation; required repository workflows remain authoritative for their executions.",
+  "new_resolution_scope": "No new dependency resolution. All dependency files and retained SBOM records are unchanged.",
+  "new_advisory_scan_scope": "No new advisory scan. Required exact-head repository workflows remain authoritative for their executions.",
   "account_reconciliation_previous_binding": {
     "source_revision": "f864e61381ef9e10a09333fce05210427cf7d0f6",
     "source_manifest_sha256": "9cad8bcb2f98c34d95a11545e11a57d74dbe6b28cd5db7322b7746e102801acd",
@@ -16396,8 +16216,8 @@
       "new_static_security_scan_performed": false
     }
   },
-  "new_runtime_qualification_scope": "No candidate OCI/installer qualification, actual provider sandbox, production or installed-customer acceptance.",
-  "new_source_contract_qualification_scope": "Fresh inventory/source binding and scoped shared entitlement/customer checks; full local Windows suite has its recorded platform failure.",
+  "new_runtime_qualification_scope": "No real PostgreSQL, provider, image, production or installed-customer acceptance; source and unit checks only.",
+  "new_source_contract_qualification_scope": "Five public unittest methods/36 subtests and 153 private companion cases passed; known-bad SQL, migration and auth variants remain failing. Source inventory is derived from the unchanged pinned rows plus two authenticated Git source changes.",
   "consultation_responsive_previous_binding": {
     "repository_revision": "d1e042d527dde01c447350ab09638d0cca521268",
     "path": "PUBLIC_METADATA/source-binding.json",
@@ -17798,5 +17618,272 @@
     "source_binding_sha256": "f70d4a91b8d9b00c7a70049198e13e004770444de3c3e3eea3bb4d16e82ebf8d",
     "source_manifest_sha256": "b96e08fe4ae8f38696808e31d025f815a902de361889219ce69765f15c47d763",
     "retention": "Original complete metadata remains in the named Git revision; its qualification is historical."
+  },
+  "operator_sql_boundary_previous_binding": {
+    "public_revision": "55a895b160cd9db5831f020f9d69d0ebee8ec431",
+    "git_blob": "c9a5e56400a04147c70021b84e07542bac32db17",
+    "status": "Historical prior active fields; not qualification of the hardened source.",
+    "replaced_fields": {
+      "source_manifest_sha256": "56f488e346b340ae4e127d12e1ce18938d05427119b96568d6381789f7a35f74",
+      "source_tree_sha256": "06eee2fc533f5266e45d8c47e448fa97ce529f6fa4455b6df67c5d304898d8f7",
+      "source_file_count": 2709,
+      "source_revision": "1bfa4e75db0f1c9bec7e57ff2b7a8cab64e0b2e2",
+      "comparison_public_revision": "345c9dc69c6ea3c5863956b0e863d6caa72c9288",
+      "changed_source_paths": [
+        "SOURCE/auth/database.py",
+        "SOURCE/auth/entitlement_projection.py",
+        "SOURCE/auth/models.py",
+        "SOURCE/auth/routes.py",
+        "SOURCE/core/db_backend.py",
+        "SOURCE/core/request_context.py",
+        "SOURCE/services/operator_controls.py",
+        "SOURCE/tests/public/test_month_gift_entitlement.py",
+        "SOURCE/ui/react-app/src/components/AccountTab.jsx",
+        "SOURCE/ui/react-app/src/components/BillingCapacityPanel.jsx",
+        "SOURCE/ui/react-app/src/components/MonthGiftSummary.jsx",
+        "SOURCE/ui/react-app/src/components/MonthGiftSummary.test.jsx",
+        "SOURCE/ui/react-app/src/hooks/useAuth.legacy.jsx",
+        "SOURCE/ui/react-app/src/lib/auth_context.monthGift.test.jsx",
+        "SOURCE/ui/react-app/src/lib/auth_context.tsx",
+        "SOURCE/ui/react-app/src/lib/billingEntitlement.test.ts",
+        "SOURCE/ui/react-app/src/lib/billingEntitlement.ts"
+      ],
+      "input_equivalence": {
+        "comparison_basis": "Protected public main 214cbda6c85ad2b952373c109992bc28ab90636e; exact full-tree equality with retained private source pin 51a0be2f4f2ef6845eb648d7c1c2669c9a7264a2.",
+        "all_unselected_export_leaf_bytes_and_modes_preserved": true,
+        "unselected_source_files_preserved": 2702,
+        "all_six_sbom_bytes_and_status_objects_preserved": true,
+        "source_change_scope": "Only agent-loop deferred-confirmation failure propagation and its executable public unittest regression. Approval policy, executor, dependency inputs, workflows, and source ownership of existing files are unchanged.",
+        "source_only_tree": "44860e0757149d5495fb1f81ec4e813a7ff7afd0",
+        "base_full_tree": "9afc0c8d7d88b028104969e7f14c84f6e1dc76b3"
+      },
+      "qualification": {
+        "source_commit": "1bfa4e75db0f1c9bec7e57ff2b7a8cab64e0b2e2",
+        "kind": "source inventory and scoped local development checks",
+        "shared_month_entitlement_unittest_methods": 13,
+        "react_tests": 36,
+        "website_tests": 7,
+        "frontend_build": "passed with output outside source",
+        "full_public_unittest": {
+          "methods": 986,
+          "failures": 1,
+          "skipped": 2,
+          "limit": "Local Windows symbolic-link privilege failure in existing CJK fresh-process harness; no full-suite pass claimed."
+        },
+        "canonical_private_public_composition": "pending separate exact candidate qualification",
+        "image_qualification": false,
+        "provider_sandbox_acceptance": false,
+        "production_deployment": false,
+        "installed_customer_acceptance": false
+      },
+      "reviewed_source_patch": {
+        "sha256": "89c01a2d74b90e53644c0c3d440fe5003e8f56d7ccaf5600a3adc26f33b5ec37",
+        "source_commit": "47cdacdff228ed48e357d4d53699ca558c298f3e",
+        "paths": [
+          "SOURCE/intent/agent_loop.py",
+          "SOURCE/tests/public/test_deferred_confirmation_contract.py"
+        ],
+        "git_blobs": {
+          "SOURCE/intent/agent_loop.py": "625c68fadfd525a8e2f420966ef004d13bb0237b",
+          "SOURCE/tests/public/test_deferred_confirmation_contract.py": "ee0dbf6059164ef88f865b389214b63c134003b6"
+        }
+      },
+      "prior_binding": {
+        "public_revision": "d43b129becc28a0e51eac83dab02be5241b1accb",
+        "path": "PUBLIC_METADATA/source-binding.json",
+        "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/d43b129becc28a0e51eac83dab02be5241b1accb/PUBLIC_METADATA/source-binding.json",
+        "sha256": "ec530291e842d95f8466a2516b9bf08372a515b137b6dcbd594a4f71405ad27c",
+        "bytes": 1425921,
+        "git_blob": "c155d526985477582384a57b65b7335235c6eb16",
+        "all_top_level_keys": [
+          "schema_version",
+          "source_manifest",
+          "source_manifest_sha256",
+          "source_tree_sha256",
+          "source_file_count",
+          "source_revision",
+          "comparison_public_revision",
+          "changed_source_paths",
+          "retained_sboms",
+          "input_equivalence",
+          "qualification",
+          "historical_bindings",
+          "prior_binding",
+          "retained_composition_component_bindings",
+          "reviewed_source_patch",
+          "new_resolution_performed",
+          "new_advisory_scan_performed",
+          "new_runtime_qualification_performed",
+          "new_source_contract_qualification_performed",
+          "new_static_security_scan_performed",
+          "new_resolution_scope",
+          "new_advisory_scan_scope",
+          "account_reconciliation_previous_binding",
+          "reviewed_speech_binding",
+          "local_media_path_previous_binding",
+          "session_durability_previous_binding",
+          "media_identity_previous_binding",
+          "speech_fixture_import_previous_binding",
+          "speech_fixture_import_original_pr_binding",
+          "managed_preflight_refusal_previous_binding",
+          "cloud_pool_export_previous_binding",
+          "pool_cleanup_previous_binding",
+          "bounded_search_ui_previous_binding",
+          "spoken_goodbye_previous_binding",
+          "music_command_recovery_previous_binding"
+        ],
+        "preserved_json_objects": {
+          "schema_version": {
+            "pointer": "/schema_version",
+            "canonical_json_sha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+          },
+          "source_manifest": {
+            "pointer": "/source_manifest",
+            "canonical_json_sha256": "ace3c4cebde8c1e5207159e354ef46f1f9a13eb7b3185315a68b7cf8b71f212d"
+          },
+          "source_manifest_sha256": {
+            "pointer": "/source_manifest_sha256",
+            "canonical_json_sha256": "5d2a4306604b2f072ea8264220a29a7d746f3838a3920f2abfad34e49b691e82"
+          },
+          "source_tree_sha256": {
+            "pointer": "/source_tree_sha256",
+            "canonical_json_sha256": "3e5a0a679a185d8205f7b4ed12996982bb0e3a66a879cb96a1d9a52fb87adccf"
+          },
+          "source_file_count": {
+            "pointer": "/source_file_count",
+            "canonical_json_sha256": "1498172a195a73ec4ac7550b66f0a5e639e9c19d6b51787a4b1a93aa374dea44"
+          },
+          "source_revision": {
+            "pointer": "/source_revision",
+            "canonical_json_sha256": "21be604696f4ea7abb4f8282ea0efa33cef5d32eff9047d3bdf52d88ca594cae"
+          },
+          "comparison_public_revision": {
+            "pointer": "/comparison_public_revision",
+            "canonical_json_sha256": "e2bf28eae594247d06f428a9cf139f178599b236cfb3ab6006d637219085b40e"
+          },
+          "changed_source_paths": {
+            "pointer": "/changed_source_paths",
+            "canonical_json_sha256": "250d34d6cb60244f62509f73df8d5bd84c91d5f0ea98cda0fb648e7dab62c4f9"
+          },
+          "retained_sboms": {
+            "pointer": "/retained_sboms",
+            "canonical_json_sha256": "0428d09c6e0e2b524877c2218b306c10da6c7536bcf6ed96524b581dafc85301"
+          },
+          "input_equivalence": {
+            "pointer": "/input_equivalence",
+            "canonical_json_sha256": "817b0aaf6f0c0c31f3f8fb220f1767deaf3bb716553cd1105bc5215d826e8f2c"
+          },
+          "qualification": {
+            "pointer": "/qualification",
+            "canonical_json_sha256": "1661eb1ea4a662db7f863f56ed09d1a9a430b33655c7f71e9b95bf8ca29ec793"
+          },
+          "historical_bindings": {
+            "pointer": "/historical_bindings",
+            "canonical_json_sha256": "59ccb6141308771f32ec1e534f7a843cbdd8867afcd59e84944e03e6f9958c33"
+          },
+          "prior_binding": {
+            "pointer": "/prior_binding",
+            "canonical_json_sha256": "012e1ed45d9ca07fb9ea03f9ee6bceb8e121fe23fc2bc4b02435dce3bc826b18"
+          },
+          "retained_composition_component_bindings": {
+            "pointer": "/retained_composition_component_bindings",
+            "canonical_json_sha256": "70e294ed12c452edb44e162d6bdd6a05b05812347270fe0f54ea02a6bd482630"
+          },
+          "reviewed_source_patch": {
+            "pointer": "/reviewed_source_patch",
+            "canonical_json_sha256": "70dda01392e01ce20fca664aacbcc29378735cd97c5fe8617c97b777b3a10e8d"
+          },
+          "new_resolution_performed": {
+            "pointer": "/new_resolution_performed",
+            "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+          },
+          "new_advisory_scan_performed": {
+            "pointer": "/new_advisory_scan_performed",
+            "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+          },
+          "new_runtime_qualification_performed": {
+            "pointer": "/new_runtime_qualification_performed",
+            "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+          },
+          "new_source_contract_qualification_performed": {
+            "pointer": "/new_source_contract_qualification_performed",
+            "canonical_json_sha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b"
+          },
+          "new_static_security_scan_performed": {
+            "pointer": "/new_static_security_scan_performed",
+            "canonical_json_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+          },
+          "new_resolution_scope": {
+            "pointer": "/new_resolution_scope",
+            "canonical_json_sha256": "86bfaefe58fd99721a900836f1acaf18f93de75c5f761072a935c0fb1cb69194"
+          },
+          "new_advisory_scan_scope": {
+            "pointer": "/new_advisory_scan_scope",
+            "canonical_json_sha256": "45deeb47b009cd231fa866ab82439106bd86d379e68230218be66b05a58c7726"
+          },
+          "account_reconciliation_previous_binding": {
+            "pointer": "/account_reconciliation_previous_binding",
+            "canonical_json_sha256": "cfeffa86ef01cbbd530cda12a57b6c4eb3761063999ad3fae482a0c1d7482b51"
+          },
+          "reviewed_speech_binding": {
+            "pointer": "/reviewed_speech_binding",
+            "canonical_json_sha256": "88025408d951467d38a236d6fdedb10ad4a4112e6ce02b3577c5b906adec6305"
+          },
+          "local_media_path_previous_binding": {
+            "pointer": "/local_media_path_previous_binding",
+            "canonical_json_sha256": "220f4c5da0641cd8f51fb28add2f66e18e1dba3e64cca61d345ebd775b15bf1f"
+          },
+          "session_durability_previous_binding": {
+            "pointer": "/session_durability_previous_binding",
+            "canonical_json_sha256": "d1931a403fd80ce0a8ea40f23700b2e5a3be8c1b155c3511cbf4d6f72792f6b9"
+          },
+          "media_identity_previous_binding": {
+            "pointer": "/media_identity_previous_binding",
+            "canonical_json_sha256": "775b630f1531f2b679dfb823a59f6d534e542a78fdf1dc3dc6013a74012468e3"
+          },
+          "speech_fixture_import_previous_binding": {
+            "pointer": "/speech_fixture_import_previous_binding",
+            "canonical_json_sha256": "df5e90ccb71afa3db0b0f386fe8575ce3fce043d63192aea6cf38b594a7d41b1"
+          },
+          "speech_fixture_import_original_pr_binding": {
+            "pointer": "/speech_fixture_import_original_pr_binding",
+            "canonical_json_sha256": "c8a9d20bb298d827ca44f1e0ce75e0d8340c4812a856c4a398a185a26126c3f7"
+          },
+          "managed_preflight_refusal_previous_binding": {
+            "pointer": "/managed_preflight_refusal_previous_binding",
+            "canonical_json_sha256": "37b62ef1767156d6f238dcb7b6e966e34f1d791aadb0e9128db89db0c40ebf2f"
+          },
+          "cloud_pool_export_previous_binding": {
+            "pointer": "/cloud_pool_export_previous_binding",
+            "canonical_json_sha256": "cc53548bb5cec6789dbe7d702f066f18db3d55f12aa5daae6d8ce370fc1d50c2"
+          },
+          "pool_cleanup_previous_binding": {
+            "pointer": "/pool_cleanup_previous_binding",
+            "canonical_json_sha256": "a481292e67dc7d5f75251fac8b1d3c593c4a50ea1c840eb355072c8608c69c8a"
+          },
+          "bounded_search_ui_previous_binding": {
+            "pointer": "/bounded_search_ui_previous_binding",
+            "canonical_json_sha256": "2b842c33a6f1e0fb45c8202df37f99a81f1c5d5c39cc89a43d49c0a95eccbc70"
+          },
+          "spoken_goodbye_previous_binding": {
+            "pointer": "/spoken_goodbye_previous_binding",
+            "canonical_json_sha256": "012e1ed45d9ca07fb9ea03f9ee6bceb8e121fe23fc2bc4b02435dce3bc826b18"
+          },
+          "music_command_recovery_previous_binding": {
+            "pointer": "/music_command_recovery_previous_binding",
+            "canonical_json_sha256": "c8ae362e3bf515264325b5851ab172e9369cadf8fc93d89fd60a1bc922000396"
+          }
+        }
+      },
+      "new_resolution_performed": false,
+      "new_advisory_scan_performed": false,
+      "new_runtime_qualification_performed": false,
+      "new_source_contract_qualification_performed": true,
+      "new_static_security_scan_performed": false,
+      "new_resolution_scope": "No dependency or lockfile input change; retained SBOM hashes/statuses remain unchanged.",
+      "new_advisory_scan_scope": "No new advisory scan in local preparation; required repository workflows remain authoritative for their executions.",
+      "new_runtime_qualification_scope": "No candidate OCI/installer qualification, actual provider sandbox, production or installed-customer acceptance.",
+      "new_source_contract_qualification_scope": "Fresh inventory/source binding and scoped shared entitlement/customer checks; full local Windows suite has its recorded platform failure."
+    }
   }
 }
