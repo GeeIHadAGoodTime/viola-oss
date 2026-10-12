@@ -1228,15 +1228,15 @@ def _initial_clock_sync(source_host: str, source_port: int) -> float:
             midpoint = (local_before + local_after) / 2.0
             data = response.json()
 
-            # Extract source_time from response: check both data.source_time
-            # and top-level source_time for compatibility.
+            # The clock endpoint publishes hub_time. Retain source_time as
+            # a compatibility alias in both enveloped and flat responses.
             hub_data = data
             if isinstance(data, dict) and "data" in data:
                 hub_data = data["data"]
-            source_time = hub_data.get("source_time") if isinstance(hub_data, dict) else None
+            source_time = hub_data.get("hub_time", hub_data.get("source_time")) if isinstance(hub_data, dict) else None
 
             if source_time is None:
-                logger.warning("Clock probe %d: response missing source_time", i + 1)
+                logger.warning("Clock probe %d: response missing hub_time/source_time", i + 1)
                 failed += 1
                 continue
 
