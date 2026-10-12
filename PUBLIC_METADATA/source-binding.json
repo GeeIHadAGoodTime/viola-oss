@@ -1,4 +1,12 @@
 {
+  "initial_clock_contract_previous_binding": {
+    "public_revision": "49599a37dc02ab0db194c76a5a328c3770df743f",
+    "path": "PUBLIC_METADATA/source-binding.json",
+    "sha256": "881633cd34b974a074681b8eb199ba7168ea657141c316a1815b3ebcf056cf14",
+    "git_blob": "596b4ca181998b04c3f8275c840fcb468bb4a801",
+    "original_source_revision": "e7e2fea19dd47e5631e09f07ff3ecd854e64dec6",
+    "status": "Complete original raw binding, all historical records and native process-runner qualification remain at this immutable revision; their source identity and scope are not changed by this clock correction."
+  },
   "phone_poll_integration_previous_bindings": [
     {
       "public_revision": "ef50a78210dd6fbe0b00e58b710e8d196c9d4f1a",
@@ -22,14 +30,13 @@
   },
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "a50323eb18fc694591ed066780372d623f006f68a54f6ce85a276fb1f4986cc3",
-  "source_tree_sha256": "5feedf3cc869866604b865d5e70ebd8e09dad33fd05fa752de4cb07790fa0143",
+  "source_manifest_sha256": "e77a08237a60d48a8aa2fb09c61ef6fc9e13c6cafb1cde19e6363846571ef2d6",
+  "source_tree_sha256": "bfba830380cb3e66081291b9f27903f7a36f15dbe234a646bafe432c22049f26",
   "source_file_count": 2713,
-  "source_revision": "e7e2fea19dd47e5631e09f07ff3ecd854e64dec6",
-  "comparison_public_revision": "3ca6550500de0d78f756729cf42b6dd6953be99a",
+  "source_revision": "0b2b61373ca8fdceb859eaac4aa059be2bc3a482",
+  "comparison_public_revision": "49599a37dc02ab0db194c76a5a328c3770df743f",
   "changed_source_paths": [
-    "scripts/proc_tree.py",
-    "tests/public/test_proc_tree_stdin.py"
+    "audio_core/streaming/pipeline_wiring.py"
   ],
   "retained_sboms": [
     {
@@ -91,42 +98,25 @@
     }
   ],
   "input_equivalence": {
-    "basis": "Only the maintained process runner and additive behavioral tests changed. Product dependency inputs, all other source files and six retained SBOM byte/status records are unchanged. No new product dependency resolution is claimed."
+    "basis": "Exact protected public 49599a37dc02ab0db194c76a5a328c3770df743f",
+    "changed_source_paths": [
+      "audio_core/streaming/pipeline_wiring.py"
+    ],
+    "unselected_source_files_preserved": 2712,
+    "all_six_sbom_bytes_and_status_objects_preserved": true,
+    "dependency_and_workflow_inputs_unchanged": true
   },
   "qualification": {
-    "source_commit": "e7e2fea19dd47e5631e09f07ff3ecd854e64dec6",
-    "kind": "focused-native-process-runner-source-behavior",
-    "command": "python -B -m unittest discover -s tests/public -p test_proc_tree_stdin.py -v",
-    "windows": {
-      "tests": 10,
-      "failures": 0,
-      "errors": 0,
-      "skips": 0,
-      "native_path": "actual Win32 Job Object plus portable fallback",
-      "receipt_sha256": "df25e0c165cb560e797a1781184a02b57e8a8a9186dd60654254e7b4eb8ebc1c"
-    },
-    "linux": {
-      "tests": 10,
-      "failures": 0,
-      "errors": 0,
-      "skips": 0,
-      "native_path": "POSIX session/tree termination, read-only source and declared psutil7.1.3, init reaper",
-      "receipt_sha256": "c1e7c2cfe720cca5d9115f70c501bd7ecff0087cf4d275aa537c4985f54d9364"
-    },
-    "retained_failed_linux_attempt": {
-      "receipt_sha256": "f74f117b3c11752c2362aa6fbd381ac25e3f9d3f5cfed13792225f28d79277b8",
-      "scope": "Initial cached test carrier omitted declared psutil and an init reaper.8cases passed;2grandchild liveness assertions failed. Corrected isolated tooling only, no product-source or assertion change."
-    },
-    "format_and_lint": "black and ruff check --no-cache passed for both changed Python files",
-    "protected_public_checks": "Required source-binding, Windows Python contracts and frontend checks will run on the exact review head.",
-    "canonical_private_public_composition": "Not performed for this source successor; required separately.",
-    "image_qualification": "Not performed for this source successor; required separately.",
-    "production_deployment": "Not performed.",
-    "installed_customer_acceptance": "Not performed.",
-    "limits": [
-      "Native child-process stdin and tree cleanup proof only; no application/provider/customer acceptance.",
-      "All previous qualifications remain scoped to their recorded source and retained status objects."
-    ]
+    "source_commit": "0b2b61373ca8fdceb859eaac4aa059be2bc3a482",
+    "kind": "prepared-source-inventory-and-clock-wire-contract-correction",
+    "behavioral_tests": "Not yet executed for this source commit.",
+    "protected_public_checks": "Not yet observed for the exact review head.",
+    "canonical_private_public_composition": "Not yet performed for this successor.",
+    "image_qualification": false,
+    "production_deployment": false,
+    "installed_customer_acceptance": false,
+    "provider_sandbox_acceptance": false,
+    "limits": "The prior native process-runner proof remains scoped to its original source and immutable previous binding; no successor behavioral, image, provider, production or customer qualification is claimed."
   },
   "historical_bindings": [
     {
@@ -12179,9 +12169,9 @@
   "new_resolution_performed": false,
   "new_advisory_scan_performed": false,
   "new_runtime_qualification_performed": false,
-  "new_source_contract_qualification_performed": true,
+  "new_source_contract_qualification_performed": false,
   "new_static_security_scan_performed": false,
-  "new_resolution_scope": "No product dependency input or resolution change. One declared psutil7.1.3 test wheel supplied to the isolated Linux tooling.",
+  "new_resolution_scope": "Product dependency inputs are unchanged. No new dependency resolution was performed for this clock correction.",
   "new_advisory_scan_scope": "Not performed.",
   "account_reconciliation_previous_binding": {
     "source_revision": "f864e61381ef9e10a09333fce05210427cf7d0f6",
@@ -16413,7 +16403,7 @@
     }
   },
   "new_runtime_qualification_scope": "No application, provider, installed-customer or image qualification performed.",
-  "new_source_contract_qualification_scope": "Ten Windows and ten Linux process-runner stdin/tree-cleanup cases passed against exact source bytes.",
+  "new_source_contract_qualification_scope": "Only source inventory/binding preparation has been verified. Behavioral clock tests have not yet been executed for this revision; previous process-runner tests remain scoped to their original source and immutable previous binding.",
   "consultation_responsive_previous_binding": {
     "repository_revision": "d1e042d527dde01c447350ab09638d0cca521268",
     "path": "PUBLIC_METADATA/source-binding.json",

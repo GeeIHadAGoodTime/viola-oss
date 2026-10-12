@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "e7e2fea19dd47e5631e09f07ff3ecd854e64dec6",
-  "sha256": "5feedf3cc869866604b865d5e70ebd8e09dad33fd05fa752de4cb07790fa0143",
+  "revision": "0b2b61373ca8fdceb859eaac4aa059be2bc3a482",
+  "sha256": "bfba830380cb3e66081291b9f27903f7a36f15dbe234a646bafe432c22049f26",
   "files": [
     {
       "path": ".env.example",
@@ -460,8 +460,8 @@
     },
     {
       "path": "audio_core/streaming/pipeline_wiring.py",
-      "sha256": "24e617478202cd25721868cc8273c73df689250505336593b7c6a83071bc0095",
-      "bytes": 90323
+      "sha256": "8248b7c92c600eb6bcc3f3e1120b7f2cafe6b74a13360923d998607b8c8d87a5",
+      "bytes": 90371
     },
     {
       "path": "audio_core/streaming/playback_scheduler.py",
