@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "9ed0a73d6a78e327aacc24ed5fd0729e3866d361",
-  "sha256": "0e9601205ee8b45cdc5beccb710d4870d868019b042dd64a269db3e32bd8b634",
+  "revision": "9cf2a5695076471b71663884672e14493203d80c",
+  "sha256": "519f893ffa2716c84c0d75d6be3876a0c1247b27a88b4129eab416473ecc5c75",
   "files": [
     {
       "path": ".env.example",
@@ -5135,8 +5135,8 @@
     },
     {
       "path": "services/scheduler/service.py",
-      "sha256": "bcc62d83f8b0af628e5e230e1726fa33bfb8c46ba061d11330345a8511dbbb66",
-      "bytes": 43463
+      "sha256": "31b8ff57a303f38f0cf0ac56ecfbe96476101ee5673ec6c1d4bf4ad3b63daadc",
+      "bytes": 44176
     },
     {
       "path": "services/scheduler/store.py",
@@ -5700,8 +5700,8 @@
     },
     {
       "path": "telephony/call_manager.py",
-      "sha256": "2c587ad32b5c9b11115a2cc8f79f800bfd362284aacc4e3efb78508fa815d1fe",
-      "bytes": 379729
+      "sha256": "5867fc346d073f598807aaad19f84b3c366aa3c19a47a074c62c9091d07168bb",
+      "bytes": 380962
     },
     {
       "path": "telephony/call_queue.py",
@@ -6239,6 +6239,11 @@
       "bytes": 9729
     },
     {
+      "path": "tests/public/test_phone_queue_lifecycle.py",
+      "sha256": "b49afc888c85dc37a9c85e5af2f22950ffedd5e155b0bf9b6496d3e61539415b",
+      "bytes": 6966
+    },
+    {
       "path": "tests/public/test_phone_spoken_goodbye_recovery.py",
       "sha256": "29f7b6dbc9ea03780af852ded7718716559f9ed57fe84eb7746d43e7bd503eef",
       "bytes": 23564
@@ -6292,6 +6297,11 @@
       "path": "tests/public/test_saved_chat_speech_dispatch.py",
       "sha256": "a824628fdd6e8143921186ca46cdcd703816b012794b9b40a84ff183a586d48f",
       "bytes": 12341
+    },
+    {
+      "path": "tests/public/test_scheduler_poll_admission.py",
+      "sha256": "8a8b39fc8b782cdacf7915306a494bb90228deec7803629915d58dc05e3829ce",
+      "bytes": 4114
     },
     {
       "path": "tests/public/test_selected_audio_output.py",

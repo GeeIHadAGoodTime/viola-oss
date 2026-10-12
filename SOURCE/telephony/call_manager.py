@@ -729,9 +729,29 @@ async def _require_owner_safety_control(key: str, *, user_id: str, action: str) 
 _phone_stt_warm_key: tuple[str, str, str] | None = None
 _phone_tts_warm_key: tuple[Any, ...] | None = None
 _shutdown_call_managers: weakref.WeakSet[Any] = weakref.WeakSet()
+_call_manager_observers: list[Any] = []
 _shutdown_atexit_installed = False
 _shutdown_signal_hooks_installed = False
 _previous_signal_handlers: dict[int, Any] = {}
+
+
+def register_call_manager_observer(observer: Any) -> None:
+    """Observe complete manager construction before its first queue pump."""
+    if not callable(observer):
+        raise TypeError("Call manager observer must be callable")
+    if observer not in _call_manager_observers:
+        _call_manager_observers.append(observer)
+
+
+def unregister_call_manager_observer(observer: Any) -> None:
+    """Remove only this observer; existing queue pauses remain owner-controlled."""
+    if observer in _call_manager_observers:
+        _call_manager_observers.remove(observer)
+
+
+def _notify_call_manager_observers(manager: Any) -> None:
+    for observer in tuple(_call_manager_observers):
+        observer(manager)
 
 _PHONE_CONTROL_TOOL_NAMES: frozenset[str] = frozenset(
     {
@@ -4097,6 +4117,7 @@ class CallManager:
         self._queued_issuer_channels: dict[str, Any] = {}
         self._queue_pump_lock = asyncio.Lock()
         self._queue_pump_task: asyncio.Task[None] | None = None
+        self._accounting_cutover_queue_paused = False
         self._phone_tool_runtimes: dict[str, _PhoneToolRuntime] = {}
         self._phone_tool_runtime_lock = asyncio.Lock()
         self._number_pool_heartbeat_tasks: dict[str, asyncio.Task[None]] = {}
@@ -4122,6 +4143,7 @@ class CallManager:
             s3_secret_key=recording_secrets.get("secret_key", ""),
             s3_key_hash_secret=recording_secrets.get("key_hash_secret", ""),
         )
+        _notify_call_manager_observers(self)
         self._schedule_queue_pump()
 
     @property
@@ -4197,6 +4219,8 @@ class CallManager:
 
     def _schedule_queue_pump(self) -> None:
         """Start the next queued call soon, if an event loop is available."""
+        if getattr(self, "_accounting_cutover_queue_paused", False):
+            return
         try:
             loop = asyncio.get_running_loop()
         except RuntimeError:
@@ -5185,7 +5209,11 @@ class CallManager:
             raise
 
     async def _start_next_queued_call_if_idle(self) -> None:
+        if getattr(self, "_accounting_cutover_queue_paused", False):
+            return
         async with self._queue_pump_lock:
+            if getattr(self, "_accounting_cutover_queue_paused", False):
+                return
             # Items whose owner is at their per-plan concurrent limit are held
             # aside during this pass and restored afterwards. Restoring via
             # enqueue keeps each item's original queued_at, and the backend
@@ -5201,6 +5229,8 @@ class CallManager:
                 # until a live call ended, silently re-imposing the old
                 # 1-at-a-time limit even with the cap raised to 25.
                 while self._active_outbound_call_count() < self._max_active_outbound_calls():
+                    if getattr(self, "_accounting_cutover_queue_paused", False):
+                        return
                     item = await self._call_queue.pop_next()
                     if item is None:
                         return
