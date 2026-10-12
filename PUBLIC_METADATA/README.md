@@ -1,9 +1,9 @@
 # Source snapshot binding
 
-Source revision: `5772d6840a520ac324f34f5888c5e9648e5cd79b`.
+Source revision: `e7e2fea19dd47e5631e09f07ff3ecd854e64dec6`.
 
-The public phone-manager lifecycle exposes an observer before first queue scheduling and honors a queue pause before every new claim. An already claimed call finishes normally. Five native Linux behavioral checks passed with synthetic carrier/queue IO.
+The maintained process runner accepts optional bytes or text through private file-backed stdin. Existing no-input calls retain their default behavior. Ten native Windows and ten native Linux checks passed, including exact binary/text delivery, fallback cleanup, timeout and normal-exit descendant termination.
 
-The updated manifest binds all 2710 source files. All six retained dependency inventories and their status objects remain unchanged; product dependency inputs are unchanged. The preceding complete source binding and qualification remain in public revision `55a895b160cd9db5831f020f9d69d0ebee8ec431`.
+The updated manifest binds all 2713 source files. All six retained dependency inventories and their original status objects remain unchanged; product dependency inputs are unchanged. The complete previous source binding remains at protected public revision `3ca6550500de0d78f756729cf42b6dd6953be99a`. The initial underprovisioned Linux tooling failure is retained and accurately scoped in the binding.
 
-Protected source checks, combined private/public composition, immutable image qualification, production cutover and installed-customer acceptance are separate required stages. This source-only check does not claim those stages.
+Protected source checks, combined private/public composition, image qualification, production deployment and installed-customer acceptance remain separate stages.
