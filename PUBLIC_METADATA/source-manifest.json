@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "9cf2a5695076471b71663884672e14493203d80c",
-  "sha256": "519f893ffa2716c84c0d75d6be3876a0c1247b27a88b4129eab416473ecc5c75",
+  "revision": "e7e2fea19dd47e5631e09f07ff3ecd854e64dec6",
+  "sha256": "5feedf3cc869866604b865d5e70ebd8e09dad33fd05fa752de4cb07790fa0143",
   "files": [
     {
       "path": ".env.example",
@@ -3885,8 +3885,8 @@
     },
     {
       "path": "scripts/proc_tree.py",
-      "sha256": "d13040b240ee61bdfb2a6e68930156a84a88ee95e66d3b97421eb9e4f24a99f2",
-      "bytes": 25834
+      "sha256": "842a2071b7c2e2cadd2bb082f8b09352f8e62a484979335711be590e91996710",
+      "bytes": 27153
     },
     {
       "path": "server/__init__.py",
@@ -6257,6 +6257,11 @@
       "path": "tests/public/test_privacy_boundary_contract.py",
       "sha256": "60430b35b0fd62f68801d269e3c01e0208596744b2fc17d36035064fefbcfee9",
       "bytes": 17545
+    },
+    {
+      "path": "tests/public/test_proc_tree_stdin.py",
+      "sha256": "eed541ed83ed76f9ad6e50a355c0ef83b03cbee0160d3862816ebf18a43e33ea",
+      "bytes": 8064
     },
     {
       "path": "tests/public/test_queue_play_selection.py",

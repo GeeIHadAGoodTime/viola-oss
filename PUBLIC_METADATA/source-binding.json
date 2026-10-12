@@ -22,16 +22,14 @@
   },
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "707308cdc64b92c69fe2d721adacdfb09d8fbadd72d809677d3be37fd7258680",
-  "source_tree_sha256": "519f893ffa2716c84c0d75d6be3876a0c1247b27a88b4129eab416473ecc5c75",
-  "source_file_count": 2712,
-  "source_revision": "9cf2a5695076471b71663884672e14493203d80c",
-  "comparison_public_revision": "cc42cb6a2d56c1ce07676e2dcf35c06dd59f71b2",
+  "source_manifest_sha256": "a50323eb18fc694591ed066780372d623f006f68a54f6ce85a276fb1f4986cc3",
+  "source_tree_sha256": "5feedf3cc869866604b865d5e70ebd8e09dad33fd05fa752de4cb07790fa0143",
+  "source_file_count": 2713,
+  "source_revision": "e7e2fea19dd47e5631e09f07ff3ecd854e64dec6",
+  "comparison_public_revision": "3ca6550500de0d78f756729cf42b6dd6953be99a",
   "changed_source_paths": [
-    "SOURCE/services/scheduler/service.py",
-    "SOURCE/telephony/call_manager.py",
-    "SOURCE/tests/public/test_phone_queue_lifecycle.py",
-    "SOURCE/tests/public/test_scheduler_poll_admission.py"
+    "scripts/proc_tree.py",
+    "tests/public/test_proc_tree_stdin.py"
   ],
   "retained_sboms": [
     {
@@ -93,32 +91,42 @@
     }
   ],
   "input_equivalence": {
-    "comparison_basis": "Exact protected public main cc42cb6a2d56c1ce07676e2dcf35c06dd59f71b2",
-    "unselected_source_files_preserved": 2708,
-    "source_change_scope": "Only the four listed phone queue and scheduler poll source/test paths differ from current main; its SQL-boundary source/test, product dependency inputs and workflows are preserved.",
-    "all_six_sbom_bytes_and_status_objects_preserved": true
+    "basis": "Only the maintained process runner and additive behavioral tests changed. Product dependency inputs, all other source files and six retained SBOM byte/status records are unchanged. No new product dependency resolution is claimed."
   },
   "qualification": {
-    "source_commit": "9cf2a5695076471b71663884672e14493203d80c",
-    "kind": "Source inventory and focused public phone queue and scheduler poll behavior",
-    "phone_queue_lifecycle_tests": {
-      "passed": 5,
+    "source_commit": "e7e2fea19dd47e5631e09f07ff3ecd854e64dec6",
+    "kind": "focused-native-process-runner-source-behavior",
+    "command": "python -B -m unittest discover -s tests/public -p test_proc_tree_stdin.py -v",
+    "windows": {
+      "tests": 10,
       "failures": 0,
-      "skipped": 0,
-      "environment": "Native Windows Python 3.11; shipped method bodies with synthetic carrier and queue IO"
+      "errors": 0,
+      "skips": 0,
+      "native_path": "actual Win32 Job Object plus portable fallback",
+      "receipt_sha256": "df25e0c165cb560e797a1781184a02b57e8a8a9186dd60654254e7b4eb8ebc1c"
     },
-    "canonical_private_public_composition": "pending combined candidate qualification",
-    "image_qualification": false,
-    "production_deployment": false,
-    "installed_customer_acceptance": false,
-    "provider_sandbox_acceptance": false,
-    "limits": "Ten focused phone/scheduler tests passed on the combined source. Prior broader results remain scoped to their recorded inputs; exact-head required CI and combined private qualification remain separate.",
-    "scheduler_poll_admission_tests": {
-      "passed": 5,
+    "linux": {
+      "tests": 10,
       "failures": 0,
-      "skipped": 0,
-      "environment": "Native Windows Python 3.11; shipped method bodies with synthetic due-work IO"
-    }
+      "errors": 0,
+      "skips": 0,
+      "native_path": "POSIX session/tree termination, read-only source and declared psutil7.1.3, init reaper",
+      "receipt_sha256": "c1e7c2cfe720cca5d9115f70c501bd7ecff0087cf4d275aa537c4985f54d9364"
+    },
+    "retained_failed_linux_attempt": {
+      "receipt_sha256": "f74f117b3c11752c2362aa6fbd381ac25e3f9d3f5cfed13792225f28d79277b8",
+      "scope": "Initial cached test carrier omitted declared psutil and an init reaper.8cases passed;2grandchild liveness assertions failed. Corrected isolated tooling only, no product-source or assertion change."
+    },
+    "format_and_lint": "black and ruff check --no-cache passed for both changed Python files",
+    "protected_public_checks": "Required source-binding, Windows Python contracts and frontend checks will run on the exact review head.",
+    "canonical_private_public_composition": "Not performed for this source successor; required separately.",
+    "image_qualification": "Not performed for this source successor; required separately.",
+    "production_deployment": "Not performed.",
+    "installed_customer_acceptance": "Not performed.",
+    "limits": [
+      "Native child-process stdin and tree cleanup proof only; no application/provider/customer acceptance.",
+      "All previous qualifications remain scoped to their recorded source and retained status objects."
+    ]
   },
   "historical_bindings": [
     {
@@ -12173,8 +12181,8 @@
   "new_runtime_qualification_performed": false,
   "new_source_contract_qualification_performed": true,
   "new_static_security_scan_performed": false,
-  "new_resolution_scope": "No dependency or lockfile input change; retained SBOM hashes/statuses remain unchanged.",
-  "new_advisory_scan_scope": "No new advisory scan in local preparation; required repository workflows remain authoritative for their executions.",
+  "new_resolution_scope": "No product dependency input or resolution change. One declared psutil7.1.3 test wheel supplied to the isolated Linux tooling.",
+  "new_advisory_scan_scope": "Not performed.",
   "account_reconciliation_previous_binding": {
     "source_revision": "f864e61381ef9e10a09333fce05210427cf7d0f6",
     "source_manifest_sha256": "9cad8bcb2f98c34d95a11545e11a57d74dbe6b28cd5db7322b7746e102801acd",
@@ -16404,8 +16412,8 @@
       "new_static_security_scan_performed": false
     }
   },
-  "new_runtime_qualification_scope": "No candidate OCI/installer qualification, actual provider sandbox, production or installed-customer acceptance.",
-  "new_source_contract_qualification_scope": "Fresh inventory/source binding and scoped shared entitlement/customer checks; full local Windows suite has its recorded platform failure.",
+  "new_runtime_qualification_scope": "No application, provider, installed-customer or image qualification performed.",
+  "new_source_contract_qualification_scope": "Ten Windows and ten Linux process-runner stdin/tree-cleanup cases passed against exact source bytes.",
   "consultation_responsive_previous_binding": {
     "repository_revision": "d1e042d527dde01c447350ab09638d0cca521268",
     "path": "PUBLIC_METADATA/source-binding.json",
@@ -17806,5 +17814,51 @@
     "source_binding_sha256": "f70d4a91b8d9b00c7a70049198e13e004770444de3c3e3eea3bb4d16e82ebf8d",
     "source_manifest_sha256": "b96e08fe4ae8f38696808e31d025f815a902de361889219ce69765f15c47d763",
     "retention": "Original complete metadata remains in the named Git revision; its qualification is historical."
+  },
+  "proc_tree_stdin_previous_binding": {
+    "protected_public_revision": "3ca6550500de0d78f756729cf42b6dd6953be99a",
+    "source_binding_sha256": "602aa45d439652368a8a120a6b76d9cf36b07ec0ff2c7254d027c0ab94a7bbac",
+    "source_revision": "9cf2a5695076471b71663884672e14493203d80c",
+    "source_manifest_sha256": "707308cdc64b92c69fe2d721adacdfb09d8fbadd72d809677d3be37fd7258680",
+    "qualification": {
+      "source_commit": "9cf2a5695076471b71663884672e14493203d80c",
+      "kind": "Source inventory and focused public phone queue and scheduler poll behavior",
+      "phone_queue_lifecycle_tests": {
+        "passed": 5,
+        "failures": 0,
+        "skipped": 0,
+        "environment": "Native Windows Python 3.11; shipped method bodies with synthetic carrier and queue IO"
+      },
+      "canonical_private_public_composition": "pending combined candidate qualification",
+      "image_qualification": false,
+      "production_deployment": false,
+      "installed_customer_acceptance": false,
+      "provider_sandbox_acceptance": false,
+      "limits": "Ten focused phone/scheduler tests passed on the combined source. Prior broader results remain scoped to their recorded inputs; exact-head required CI and combined private qualification remain separate.",
+      "scheduler_poll_admission_tests": {
+        "passed": 5,
+        "failures": 0,
+        "skipped": 0,
+        "environment": "Native Windows Python 3.11; shipped method bodies with synthetic due-work IO"
+      }
+    },
+    "input_equivalence": {
+      "comparison_basis": "Exact protected public main cc42cb6a2d56c1ce07676e2dcf35c06dd59f71b2",
+      "unselected_source_files_preserved": 2708,
+      "source_change_scope": "Only the four listed phone queue and scheduler poll source/test paths differ from current main; its SQL-boundary source/test, product dependency inputs and workflows are preserved.",
+      "all_six_sbom_bytes_and_status_objects_preserved": true
+    },
+    "previous_new_evidence_statuses": {
+      "new_resolution_performed": false,
+      "new_advisory_scan_performed": false,
+      "new_runtime_qualification_performed": false,
+      "new_source_contract_qualification_performed": true,
+      "new_static_security_scan_performed": false,
+      "new_resolution_scope": "No dependency or lockfile input change; retained SBOM hashes/statuses remain unchanged.",
+      "new_advisory_scan_scope": "No new advisory scan in local preparation; required repository workflows remain authoritative for their executions.",
+      "new_runtime_qualification_scope": "No candidate OCI/installer qualification, actual provider sandbox, production or installed-customer acceptance.",
+      "new_source_contract_qualification_scope": "Fresh inventory/source binding and scoped shared entitlement/customer checks; full local Windows suite has its recorded platform failure."
+    },
+    "preservation": "Complete prior binding remains at the protected parent revision; all six SBOM bytes and status objects remain unchanged here."
   }
 }
