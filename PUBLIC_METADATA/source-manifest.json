@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "1bfa4e75db0f1c9bec7e57ff2b7a8cab64e0b2e2",
-  "sha256": "06eee2fc533f5266e45d8c47e448fa97ce529f6fa4455b6df67c5d304898d8f7",
+  "revision": "9ed0a73d6a78e327aacc24ed5fd0729e3866d361",
+  "sha256": "0e9601205ee8b45cdc5beccb710d4870d868019b042dd64a269db3e32bd8b634",
   "files": [
     {
       "path": ".env.example",
@@ -1020,8 +1020,8 @@
     },
     {
       "path": "core/db_backend.py",
-      "sha256": "aff90c03445a8bab3f24af01f0098cd722b2dabb6ffe37404ef89863f32ee0f6",
-      "bytes": 54921
+      "sha256": "e22018285278784c7fe347a15680dce2301f9dc30b1c3f7f01dff878db8aa062",
+      "bytes": 55306
     },
     {
       "path": "core/email_identity.py",
@@ -6207,6 +6207,11 @@
       "path": "tests/public/test_native_titlebar_resize.py",
       "sha256": "e3e8a93b3e885331cf5b4a465fe98b649c7ed9390098f8c28bd59c849c0a5fbd",
       "bytes": 10727
+    },
+    {
+      "path": "tests/public/test_operator_system_sql_boundary.py",
+      "sha256": "899ece2d0debcef79fa85ae259d92d3a73049dba35fe80c57a30db31c9e8b455",
+      "bytes": 4273
     },
     {
       "path": "tests/public/test_pause_response_contract.py",
