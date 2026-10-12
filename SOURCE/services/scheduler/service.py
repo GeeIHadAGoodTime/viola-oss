@@ -237,6 +237,7 @@ class SchedulerService:
         self._store = store or get_schedule_store()
         self._running = False
         self._check_task: asyncio.Task[None] | None = None
+        self._poll_admission_factory: Any = None
         # Lazy init (b2/HEAD pattern): supports constructing the service without
         # an active event loop (e.g. during early bootstrap or unit-test fixture
         # creation). start() and stop() handle the lifecycle. b1's eager init
@@ -488,6 +489,14 @@ class SchedulerService:
 
     # ------------------------------------------------------------------ lifecycle
 
+    def set_poll_admission_factory(self, factory: Any) -> None:
+        """Configure trusted poll admission before this service starts."""
+        if self._running or self._check_task is not None:
+            raise RuntimeError("Poll admission must be configured before scheduler start")
+        if factory is not None and not callable(factory):
+            raise TypeError("Poll admission factory must be callable")
+        self._poll_admission_factory = factory
+
     async def start(self) -> None:
         """Begin the background check loop."""
         if self._running:
@@ -545,7 +554,11 @@ class SchedulerService:
         """Background loop that checks for due schedules every 30 seconds."""
         while self._running:
             try:
-                await self._check_and_fire()
+                if self._poll_admission_factory is None:
+                    await self._check_and_fire()
+                else:
+                    async with self._poll_admission_factory():
+                        await self._check_and_fire()
             except asyncio.CancelledError:
                 break
             except Exception as exc:
