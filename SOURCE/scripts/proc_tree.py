@@ -110,15 +110,21 @@ class TreeResult:
 
     def check_returncode(self) -> None:
         if self.timed_out:
-            raise subprocess.TimeoutExpired(self.args, self.duration_s, self.stdout, self.stderr)
+            raise subprocess.TimeoutExpired(
+                self.args, self.duration_s, self.stdout, self.stderr
+            )
         if self.returncode not in (0, None):
-            raise subprocess.CalledProcessError(self.returncode, self.args, self.stdout, self.stderr)
+            raise subprocess.CalledProcessError(
+                self.returncode, self.args, self.stdout, self.stderr
+            )
 
 
 # --------------------------------------------------------------------------- #
 # PID liveness (holder-validated locking, #1824 leg 3)
 # --------------------------------------------------------------------------- #
-def pid_alive(pid: int | None, *, create_time: float | None = None, create_time_tol_s: float = 2.0) -> bool:
+def pid_alive(
+    pid: int | None, *, create_time: float | None = None, create_time_tol_s: float = 2.0
+) -> bool:
     """True iff ``pid`` names a live, non-zombie process.
 
     PID-REUSE SAFE when ``create_time`` (a ``psutil.Process.create_time()`` epoch
@@ -177,7 +183,9 @@ def process_create_time(pid: int | None) -> float | None:
 # --------------------------------------------------------------------------- #
 # Tree termination for a bare PID (stale-lock reclaim, wedged-holder kill)
 # --------------------------------------------------------------------------- #
-def terminate_tree(pid: int, *, grace_s: float = DEFAULT_KILL_GRACE_S) -> tuple[list[int], list[int]]:
+def terminate_tree(
+    pid: int, *, grace_s: float = DEFAULT_KILL_GRACE_S
+) -> tuple[list[int], list[int]]:
     """Terminate ``pid`` and every descendant. Returns ``(reaped, still_alive)`` pids.
 
     Cross-platform, snapshot-based (``psutil`` recursive children). For a live-tree
@@ -235,9 +243,12 @@ class _TempCapture:
     err_path: str | None
     _out = None
     _err = None
+    _stdin = None
     _handles: list = field(default_factory=list)
 
-    def read_text(self, encoding: str | None, errors: str) -> tuple[str | bytes, str | bytes]:
+    def read_text(
+        self, encoding: str | None, errors: str
+    ) -> tuple[str | bytes, str | bytes]:
         """``encoding=None`` returns raw ``bytes`` (no decode) -- for a command whose
         output encoding is caller-determined after the fact (e.g. ``wsl.exe``'s
         UTF-16LE-vs-raw-UTF-8 split, picked by a null-byte heuristic)."""
@@ -246,7 +257,11 @@ class _TempCapture:
             err = b"" if self.err_path is None else _read_file_bytes(self.err_path)
             return out, err
         out = _read_file_text(self.out_path, encoding, errors)
-        err = "" if self.err_path is None else _read_file_text(self.err_path, encoding, errors)
+        err = (
+            ""
+            if self.err_path is None
+            else _read_file_text(self.err_path, encoding, errors)
+        )
         return out, err
 
     def cleanup(self) -> None:
@@ -278,6 +293,7 @@ def run(
     env: dict | None = None,
     timeout: float | None = None,
     encoding: str | None = "utf-8",
+    input_data: bytes | str | None = None,
     errors: str = "replace",
     combine_stderr: bool = False,
     kill_grace_s: float = DEFAULT_KILL_GRACE_S,
@@ -304,13 +320,29 @@ def run(
     ``bytes`` -- for a command whose encoding isn't uniform/knowable up front (#1826:
     ``wsl.exe`` emits UTF-16LE for its own text but raw UTF-8 for a piped Linux
     program's stdout; the caller picks by a null-byte heuristic after the fact).
+    ``input_data`` supplies stdin through a private temporary FILE, never a pipe.
+    Bytes are passed unchanged; text is encoded strictly with ``encoding`` or UTF-8
+    when ``encoding=None``. Omitting it retains the existing DEVNULL stdin behavior.
     """
     argv = [str(a) for a in argv]
     cwd = None if cwd is None else str(cwd)
+    if input_data is not None and not isinstance(input_data, (bytes, str)):
+        raise TypeError("input_data must be bytes, str or None")
+    input_bytes = (
+        input_data.encode(encoding or "utf-8")
+        if isinstance(input_data, str)
+        else input_data
+    )
     started = time.monotonic()
 
     cap = _make_temp_capture(combine_stderr)
     try:
+        if input_bytes is not None:
+            cap._stdin = tempfile.TemporaryFile(mode="w+b", prefix="proctree-stdin-")
+            cap._handles.append(cap._stdin)
+            cap._stdin.write(input_bytes)
+            cap._stdin.flush()
+            cap._stdin.seek(0)
         if _IS_WINDOWS and _HAVE_WIN32JOB:
             try:
                 rc, timed_out, method = _run_windows_job(
@@ -375,7 +407,9 @@ def run(
         duration_s=duration,
     )
     if timed_out and raise_on_timeout:
-        raise subprocess.TimeoutExpired(argv, timeout or duration, out, None if combine_stderr else err)
+        raise subprocess.TimeoutExpired(
+            argv, timeout or duration, out, None if combine_stderr else err
+        )
     if check:
         result.check_returncode()
     return result
@@ -391,13 +425,18 @@ def _make_temp_capture(combine: bool) -> _TempCapture:
     return _TempCapture(out_path=out_path, err_path=err_path)
 
 
-def _run_windows_job(argv, cwd, env, timeout, cap, kill_grace_s, terminate_on_exit, creationflags=0):
+def _run_windows_job(
+    argv, cwd, env, timeout, cap, kill_grace_s, terminate_on_exit, creationflags=0
+):
     """Race-free Windows path: CREATE_SUSPENDED -> assign to Job Object -> resume."""
     of = open(cap.out_path, "wb")
     ef = of if cap.err_path is None else open(cap.err_path, "wb")
-    devnull_in = open(os.devnull, "rb")
+    devnull_in = cap._stdin if cap._stdin is not None else open(os.devnull, "rb")
+    if cap._stdin is not None:
+        devnull_in.seek(0)
     cap._handles.extend([of] if ef is of else [of, ef])
-    cap._handles.append(devnull_in)
+    if cap._stdin is None:
+        cap._handles.append(devnull_in)
 
     for handle_file in {id(of): of, id(ef): ef, id(devnull_in): devnull_in}.values():
         os.set_handle_inheritable(msvcrt.get_osfhandle(handle_file.fileno()), True)
@@ -428,9 +467,15 @@ def _run_windows_job(argv, cwd, env, timeout, cap, kill_grace_s, terminate_on_ex
         # Timeout tree-kill does NOT depend on this flag: the timeout path below calls
         # TerminateJobObject explicitly while the handle is still open, so a wedged
         # tree is still reaped whole either way.
-        info = win32job.QueryInformationJobObject(job, win32job.JobObjectExtendedLimitInformation)
-        info["BasicLimitInformation"]["LimitFlags"] |= win32job.JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
-        win32job.SetInformationJobObject(job, win32job.JobObjectExtendedLimitInformation, info)
+        info = win32job.QueryInformationJobObject(
+            job, win32job.JobObjectExtendedLimitInformation
+        )
+        info["BasicLimitInformation"][
+            "LimitFlags"
+        ] |= win32job.JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+        win32job.SetInformationJobObject(
+            job, win32job.JobObjectExtendedLimitInformation, info
+        )
 
     si = win32process.STARTUPINFO()
     si.dwFlags |= win32con.STARTF_USESTDHANDLES
@@ -444,10 +489,14 @@ def _run_windows_job(argv, cwd, env, timeout, cap, kill_grace_s, terminate_on_ex
     cmdline = subprocess.list2cmdline(argv)
 
     h_proc = h_thread = None
-    assigned = False  # True once the child is inside the job (KILL_ON_JOB_CLOSE can reap it)
+    assigned = (
+        False  # True once the child is inside the job (KILL_ON_JOB_CLOSE can reap it)
+    )
     method = "win32job"
     try:
-        h_proc, h_thread, _pid, _tid = win32process.CreateProcess(None, cmdline, None, None, True, flags, env, cwd, si)
+        h_proc, h_thread, _pid, _tid = win32process.CreateProcess(
+            None, cmdline, None, None, True, flags, env, cwd, si
+        )
         win32job.AssignProcessToJobObject(job, h_proc)  # while suspended -> race-free
         assigned = True
         win32process.ResumeThread(h_thread)
@@ -488,19 +537,23 @@ def _run_windows_job(argv, cwd, env, timeout, cap, kill_grace_s, terminate_on_ex
             win32api.CloseHandle(job)
 
 
-def _run_popen(argv, cwd, env, timeout, cap, kill_grace_s, terminate_on_exit, creationflags=0):
+def _run_popen(
+    argv, cwd, env, timeout, cap, kill_grace_s, terminate_on_exit, creationflags=0
+):
     """Portable path (POSIX, or Windows without pywin32): temp-file output + tree
     kill via new-session killpg / taskkill / psutil. No pipe -> no drain wedge."""
     of = open(cap.out_path, "wb")
     ef = of if cap.err_path is None else open(cap.err_path, "wb")
     cap._handles.extend([of] if ef is of else [of, ef])
+    if cap._stdin is not None:
+        cap._stdin.seek(0)
 
     kwargs: dict = {
         "cwd": cwd,
         "env": env,
         "stdout": of,
         "stderr": ef,
-        "stdin": subprocess.DEVNULL,
+        "stdin": subprocess.DEVNULL if cap._stdin is None else cap._stdin,
     }
     if not _IS_WINDOWS:
         kwargs["start_new_session"] = True  # own process group for killpg
@@ -508,7 +561,6 @@ def _run_popen(argv, cwd, env, timeout, cap, kill_grace_s, terminate_on_exit, cr
         kwargs["creationflags"] = int(creationflags)
 
     proc = subprocess.Popen(argv, **kwargs)  # trusted argv list, shell=False
-    timed_out = False
     method = "killpg" if not _IS_WINDOWS else "taskkill"
     try:
         proc.wait(timeout=timeout)
@@ -517,7 +569,6 @@ def _run_popen(argv, cwd, env, timeout, cap, kill_grace_s, terminate_on_exit, cr
             _kill_process_tree(proc, kill_grace_s)  # reap leaked grandchildren
         return rc, False, method
     except subprocess.TimeoutExpired:
-        timed_out = True
         _kill_process_tree(proc, kill_grace_s)
         with contextlib.suppress(subprocess.TimeoutExpired):
             proc.wait(timeout=kill_grace_s)
@@ -565,7 +616,9 @@ def run_tuple(argv: list[str], **kwargs) -> tuple[int, str, str]:
     return rc, res.stdout, res.stderr
 
 
-if __name__ == "__main__":  # tiny CLI: python -m scripts.proc_tree -- <argv...> [--timeout N]
+if (
+    __name__ == "__main__"
+):  # tiny CLI: python -m scripts.proc_tree -- <argv...> [--timeout N]
     import argparse
 
     ap = argparse.ArgumentParser(description="tree-killing pipe-safe runner (#1824)")
