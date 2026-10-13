@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "0b2b61373ca8fdceb859eaac4aa059be2bc3a482",
-  "sha256": "bfba830380cb3e66081291b9f27903f7a36f15dbe234a646bafe432c22049f26",
+  "revision": "70464ede2323dea7a4474f7e545b119bdb068f4e",
+  "sha256": "6f307456bae43c052b803f32ac9491cc73bb67b1e5ec41c865c6bf66b99766ea",
   "files": [
     {
       "path": ".env.example",
@@ -4640,8 +4640,8 @@
     },
     {
       "path": "services/llm/provider_router.py",
-      "sha256": "336c04404791a07160b1b4d97e4b1910a89e682ebb1ed20601f90176acc56f4e",
-      "bytes": 66071
+      "sha256": "29f62d7ae1455a879cdbaf4a39c2efcd31cc7644cb6c14b7d1f24424951e47c2",
+      "bytes": 65979
     },
     {
       "path": "services/llm/providers/__init__.py",
@@ -6207,6 +6207,11 @@
       "path": "tests/public/test_native_titlebar_resize.py",
       "sha256": "e3e8a93b3e885331cf5b4a465fe98b649c7ed9390098f8c28bd59c849c0a5fbd",
       "bytes": 10727
+    },
+    {
+      "path": "tests/public/test_ollama_openai_fallback_model.py",
+      "sha256": "3d158577b6c9b5c8bbf21b67bdd43fb0841a27339be32732d4d5b94fc511040d",
+      "bytes": 4503
     },
     {
       "path": "tests/public/test_operator_system_sql_boundary.py",

@@ -642,18 +642,15 @@ class ProviderAgnosticRouter:
             elif primary_provider == "ollama":
                 api_key = settings.get("llm_api_key", "")
                 if api_key and api_key != "***ENCRYPTED***":
-                    from config.defaults import (
-                        DEFAULT_AI_SOURCE,
-                        resolve_effective_model,
-                    )
+                    from config.defaults import resolve_effective_model
 
                     fallback_config = LLMConfig(
                         provider="openai",
                         api_key=api_key,
                         model=resolve_effective_model(
                             # This is an OpenAI API-key fallback, not the user's
-                            # active Codex subscription route.
-                            ai_source=DEFAULT_AI_SOURCE,
+                            # active Codex or managed subscription route.
+                            ai_source="byok",
                             provider="openai",
                             agent=False,
                             candidates=(settings.get("llm_model", ""),),

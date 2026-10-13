@@ -30,13 +30,14 @@
   },
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "e77a08237a60d48a8aa2fb09c61ef6fc9e13c6cafb1cde19e6363846571ef2d6",
-  "source_tree_sha256": "bfba830380cb3e66081291b9f27903f7a36f15dbe234a646bafe432c22049f26",
-  "source_file_count": 2713,
-  "source_revision": "0b2b61373ca8fdceb859eaac4aa059be2bc3a482",
-  "comparison_public_revision": "49599a37dc02ab0db194c76a5a328c3770df743f",
+  "source_manifest_sha256": "96b397e941ce4b541b19b57bbeca488f45eff43af8432837cd082f6b0a98fc22",
+  "source_tree_sha256": "6f307456bae43c052b803f32ac9491cc73bb67b1e5ec41c865c6bf66b99766ea",
+  "source_file_count": 2714,
+  "source_revision": "70464ede2323dea7a4474f7e545b119bdb068f4e",
+  "comparison_public_revision": "b4440c395237cc70e8a0ddae30171c49c4e3377f",
   "changed_source_paths": [
-    "audio_core/streaming/pipeline_wiring.py"
+    "services/llm/provider_router.py",
+    "tests/public/test_ollama_openai_fallback_model.py"
   ],
   "retained_sboms": [
     {
@@ -98,25 +99,33 @@
     }
   ],
   "input_equivalence": {
-    "basis": "Exact protected public 49599a37dc02ab0db194c76a5a328c3770df743f",
+    "basis": "Exact protected public b4440c395237cc70e8a0ddae30171c49c4e3377f",
     "changed_source_paths": [
-      "audio_core/streaming/pipeline_wiring.py"
+      "services/llm/provider_router.py",
+      "tests/public/test_ollama_openai_fallback_model.py"
     ],
     "unselected_source_files_preserved": 2712,
     "all_six_sbom_bytes_and_status_objects_preserved": true,
     "dependency_and_workflow_inputs_unchanged": true
   },
   "qualification": {
-    "source_commit": "0b2b61373ca8fdceb859eaac4aa059be2bc3a482",
-    "kind": "prepared-source-inventory-and-clock-wire-contract-correction",
-    "behavioral_tests": "Not yet executed for this source commit.",
+    "source_commit": "70464ede2323dea7a4474f7e545b119bdb068f4e",
+    "kind": "Scoped synthetic BYOK fallback behavior and incremental source binding",
+    "behavioral_tests": {
+      "passed": 6,
+      "failures": 0,
+      "skipped": 0,
+      "environment": "Linux Python 3.12; complete production method with synthetic provider IO; actual model-default module"
+    },
+    "negative_control": "The pinned original router fails both blank-model and historical-explicit-model cases; four other cases still pass.",
+    "independent_review": "Approved source and regression-test review.",
     "protected_public_checks": "Not yet observed for the exact review head.",
-    "canonical_private_public_composition": "Not yet performed for this successor.",
+    "canonical_private_public_composition": "Pending adoption and combined qualification.",
     "image_qualification": false,
     "production_deployment": false,
     "installed_customer_acceptance": false,
     "provider_sandbox_acceptance": false,
-    "limits": "The prior native process-runner proof remains scoped to its original source and immutable previous binding; no successor behavioral, image, provider, production or customer qualification is claimed."
+    "limits": "Focused synthetic cloud proof only. Full source-binding verification and required public checks remain CI work. No native Windows, provider, image, deployment, or installed-customer acceptance is claimed."
   },
   "historical_bindings": [
     {
@@ -12155,24 +12164,23 @@
     }
   ],
   "reviewed_source_patch": {
-    "sha256": "89c01a2d74b90e53644c0c3d440fe5003e8f56d7ccaf5600a3adc26f33b5ec37",
-    "source_commit": "47cdacdff228ed48e357d4d53699ca558c298f3e",
+    "source_commit": "70464ede2323dea7a4474f7e545b119bdb068f4e",
     "paths": [
-      "SOURCE/intent/agent_loop.py",
-      "SOURCE/tests/public/test_deferred_confirmation_contract.py"
+      "SOURCE/services/llm/provider_router.py",
+      "SOURCE/tests/public/test_ollama_openai_fallback_model.py"
     ],
     "git_blobs": {
-      "SOURCE/intent/agent_loop.py": "625c68fadfd525a8e2f420966ef004d13bb0237b",
-      "SOURCE/tests/public/test_deferred_confirmation_contract.py": "ee0dbf6059164ef88f865b389214b63c134003b6"
+      "SOURCE/services/llm/provider_router.py": "97b05b7c8cc94e24c07bbc833142fe1b48304ad7",
+      "SOURCE/tests/public/test_ollama_openai_fallback_model.py": "db089598528e2f72e9ed531fcd6df515afcc13f6"
     }
   },
   "new_resolution_performed": false,
   "new_advisory_scan_performed": false,
   "new_runtime_qualification_performed": false,
-  "new_source_contract_qualification_performed": false,
+  "new_source_contract_qualification_performed": true,
   "new_static_security_scan_performed": false,
-  "new_resolution_scope": "Product dependency inputs are unchanged. No new dependency resolution was performed for this clock correction.",
-  "new_advisory_scan_scope": "Not performed.",
+  "new_resolution_scope": "No dependency input changed; prior SBOM bytes and status objects remain unchanged.",
+  "new_advisory_scan_scope": "No new advisory scan; prior retained statuses remain unchanged.",
   "account_reconciliation_previous_binding": {
     "source_revision": "f864e61381ef9e10a09333fce05210427cf7d0f6",
     "source_manifest_sha256": "9cad8bcb2f98c34d95a11545e11a57d74dbe6b28cd5db7322b7746e102801acd",
@@ -16402,8 +16410,8 @@
       "new_static_security_scan_performed": false
     }
   },
-  "new_runtime_qualification_scope": "No application, provider, installed-customer or image qualification performed.",
-  "new_source_contract_qualification_scope": "Only source inventory/binding preparation has been verified. Behavioral clock tests have not yet been executed for this revision; previous process-runner tests remain scoped to their original source and immutable previous binding.",
+  "new_runtime_qualification_scope": "No native Windows, image, provider, deployment or installed-customer acceptance.",
+  "new_source_contract_qualification_scope": "Six synthetic source-method cases passed on Linux; old source fails two meaningful negative controls. Incremental changed-file/manifest metadata checks only; full source-binding check awaits CI.",
   "consultation_responsive_previous_binding": {
     "repository_revision": "d1e042d527dde01c447350ab09638d0cca521268",
     "path": "PUBLIC_METADATA/source-binding.json",
@@ -17850,5 +17858,64 @@
       "new_source_contract_qualification_scope": "Fresh inventory/source binding and scoped shared entitlement/customer checks; full local Windows suite has its recorded platform failure."
     },
     "preservation": "Complete prior binding remains at the protected parent revision; all six SBOM bytes and status objects remain unchanged here."
+  },
+  "windows_safety_previous_binding": {
+    "protected_public_revision": "b4440c395237cc70e8a0ddae30171c49c4e3377f",
+    "path": "PUBLIC_METADATA/source-binding.json",
+    "sha256": "2d209eaee22c616f181f53bca192ada91e558a695b9c98d3d0d8aa20e35ad07c",
+    "git_blob": "ed0793d549d0a2e73edce93ba719dd5b88468d75",
+    "previous_values": {
+      "source_manifest_sha256": "e77a08237a60d48a8aa2fb09c61ef6fc9e13c6cafb1cde19e6363846571ef2d6",
+      "source_tree_sha256": "bfba830380cb3e66081291b9f27903f7a36f15dbe234a646bafe432c22049f26",
+      "source_file_count": 2713,
+      "source_revision": "0b2b61373ca8fdceb859eaac4aa059be2bc3a482",
+      "comparison_public_revision": "49599a37dc02ab0db194c76a5a328c3770df743f",
+      "changed_source_paths": [
+        "audio_core/streaming/pipeline_wiring.py"
+      ],
+      "input_equivalence": {
+        "basis": "Exact protected public 49599a37dc02ab0db194c76a5a328c3770df743f",
+        "changed_source_paths": [
+          "audio_core/streaming/pipeline_wiring.py"
+        ],
+        "unselected_source_files_preserved": 2712,
+        "all_six_sbom_bytes_and_status_objects_preserved": true,
+        "dependency_and_workflow_inputs_unchanged": true
+      },
+      "qualification": {
+        "source_commit": "0b2b61373ca8fdceb859eaac4aa059be2bc3a482",
+        "kind": "prepared-source-inventory-and-clock-wire-contract-correction",
+        "behavioral_tests": "Not yet executed for this source commit.",
+        "protected_public_checks": "Not yet observed for the exact review head.",
+        "canonical_private_public_composition": "Not yet performed for this successor.",
+        "image_qualification": false,
+        "production_deployment": false,
+        "installed_customer_acceptance": false,
+        "provider_sandbox_acceptance": false,
+        "limits": "The prior native process-runner proof remains scoped to its original source and immutable previous binding; no successor behavioral, image, provider, production or customer qualification is claimed."
+      },
+      "reviewed_source_patch": {
+        "sha256": "89c01a2d74b90e53644c0c3d440fe5003e8f56d7ccaf5600a3adc26f33b5ec37",
+        "source_commit": "47cdacdff228ed48e357d4d53699ca558c298f3e",
+        "paths": [
+          "SOURCE/intent/agent_loop.py",
+          "SOURCE/tests/public/test_deferred_confirmation_contract.py"
+        ],
+        "git_blobs": {
+          "SOURCE/intent/agent_loop.py": "625c68fadfd525a8e2f420966ef004d13bb0237b",
+          "SOURCE/tests/public/test_deferred_confirmation_contract.py": "ee0dbf6059164ef88f865b389214b63c134003b6"
+        }
+      },
+      "new_resolution_performed": false,
+      "new_advisory_scan_performed": false,
+      "new_runtime_qualification_performed": false,
+      "new_source_contract_qualification_performed": false,
+      "new_static_security_scan_performed": false,
+      "new_resolution_scope": "Product dependency inputs are unchanged. No new dependency resolution was performed for this clock correction.",
+      "new_advisory_scan_scope": "Not performed.",
+      "new_runtime_qualification_scope": "No application, provider, installed-customer or image qualification performed.",
+      "new_source_contract_qualification_scope": "Only source inventory/binding preparation has been verified. Behavioral clock tests have not yet been executed for this revision; previous process-runner tests remain scoped to their original source and immutable previous binding."
+    },
+    "preservation": "The complete original binding remains at the immutable parent revision. All unrelated fields, historical records, and retained SBOM entries are preserved byte-for-byte."
   }
 }
