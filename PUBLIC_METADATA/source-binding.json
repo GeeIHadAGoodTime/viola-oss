@@ -30,14 +30,15 @@
   },
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "96b397e941ce4b541b19b57bbeca488f45eff43af8432837cd082f6b0a98fc22",
-  "source_tree_sha256": "6f307456bae43c052b803f32ac9491cc73bb67b1e5ec41c865c6bf66b99766ea",
+  "source_manifest_sha256": "b2085db25a7bff6d078f9a0c74666741bcb839e6fb7ddc5e66953643a970838f",
+  "source_tree_sha256": "5d44ba4bcb2b5640cd789f3abc0e5d88fc0c98a1c73d065658e37fe45d017130",
   "source_file_count": 2714,
-  "source_revision": "70464ede2323dea7a4474f7e545b119bdb068f4e",
-  "comparison_public_revision": "b4440c395237cc70e8a0ddae30171c49c4e3377f",
+  "source_revision": "22f800df5090705d797cbe2b2e84a500cbe4e1d5",
+  "comparison_public_revision": "ee1f1a55158a24f1e422934968235b6c4ac5da98",
   "changed_source_paths": [
-    "services/llm/provider_router.py",
-    "tests/public/test_ollama_openai_fallback_model.py"
+    "intent/agent_executor.py",
+    "intent/agent_loop.py",
+    "intent/tool_types.py"
   ],
   "retained_sboms": [
     {
@@ -99,33 +100,30 @@
     }
   ],
   "input_equivalence": {
-    "basis": "Exact protected public b4440c395237cc70e8a0ddae30171c49c4e3377f",
+    "basis": "Exact protected public ee1f1a55158a24f1e422934968235b6c4ac5da98",
     "changed_source_paths": [
-      "services/llm/provider_router.py",
-      "tests/public/test_ollama_openai_fallback_model.py"
+      "intent/agent_executor.py",
+      "intent/agent_loop.py",
+      "intent/tool_types.py"
     ],
-    "unselected_source_files_preserved": 2712,
+    "unselected_source_files_preserved": 2711,
     "all_six_sbom_bytes_and_status_objects_preserved": true,
     "dependency_and_workflow_inputs_unchanged": true
   },
   "qualification": {
-    "source_commit": "70464ede2323dea7a4474f7e545b119bdb068f4e",
-    "kind": "Scoped synthetic BYOK fallback behavior and incremental source binding",
+    "source_commit": "22f800df5090705d797cbe2b2e84a500cbe4e1d5",
+    "kind": "Incremental child-provider error source binding",
     "behavioral_tests": {
-      "passed": 6,
-      "failures": 0,
-      "skipped": 0,
-      "environment": "Linux Python 3.12; complete production method with synthetic provider IO; actual model-default module"
+      "status": "Pending canonical private/public composition qualification; no new runtime result claimed"
     },
-    "negative_control": "The pinned original router fails both blank-model and historical-explicit-model cases; four other cases still pass.",
-    "independent_review": "Approved source and regression-test review.",
+    "independent_review": "Pending exact candidate review",
     "protected_public_checks": "Not yet observed for the exact review head.",
     "canonical_private_public_composition": "Pending adoption and combined qualification.",
     "image_qualification": false,
     "production_deployment": false,
     "installed_customer_acceptance": false,
     "provider_sandbox_acceptance": false,
-    "limits": "Focused synthetic cloud proof only. Full source-binding verification and required public checks remain CI work. No native Windows, provider, image, deployment, or installed-customer acceptance is claimed."
+    "limits": "Source checksum and retained SBOM verification only. No runtime, native Windows, provider, image, deployment or installed-customer acceptance is claimed."
   },
   "historical_bindings": [
     {
@@ -12164,14 +12162,16 @@
     }
   ],
   "reviewed_source_patch": {
-    "source_commit": "70464ede2323dea7a4474f7e545b119bdb068f4e",
+    "source_commit": "22f800df5090705d797cbe2b2e84a500cbe4e1d5",
     "paths": [
-      "SOURCE/services/llm/provider_router.py",
-      "SOURCE/tests/public/test_ollama_openai_fallback_model.py"
+      "SOURCE/intent/agent_executor.py",
+      "SOURCE/intent/agent_loop.py",
+      "SOURCE/intent/tool_types.py"
     ],
     "git_blobs": {
-      "SOURCE/services/llm/provider_router.py": "97b05b7c8cc94e24c07bbc833142fe1b48304ad7",
-      "SOURCE/tests/public/test_ollama_openai_fallback_model.py": "db089598528e2f72e9ed531fcd6df515afcc13f6"
+      "SOURCE/intent/agent_executor.py": "ab5df7b5af7a5bb54f59d5d2442af1493f84a557",
+      "SOURCE/intent/agent_loop.py": "4f1811f20f120e3a999baaebd5f073fe430116f3",
+      "SOURCE/intent/tool_types.py": "d839de15e9053712f68d81e2f87446a67dfed334"
     }
   },
   "new_resolution_performed": false,
@@ -16410,8 +16410,8 @@
       "new_static_security_scan_performed": false
     }
   },
-  "new_runtime_qualification_scope": "No native Windows, image, provider, deployment or installed-customer acceptance.",
-  "new_source_contract_qualification_scope": "Six synthetic source-method cases passed on Linux; old source fails two meaningful negative controls. Incremental changed-file/manifest metadata checks only; full source-binding check awaits CI.",
+  "new_runtime_qualification_scope": "Pending canonical private/public composition qualification; no new runtime result claimed.",
+  "new_source_contract_qualification_scope": "Existing source generator and binding verifier passed locally: 2,714 source files and six retained SBOMs; exactly three source rows changed. Behavioral and protected CI checks remain pending.",
   "consultation_responsive_previous_binding": {
     "repository_revision": "d1e042d527dde01c447350ab09638d0cca521268",
     "path": "PUBLIC_METADATA/source-binding.json",
@@ -17917,5 +17917,66 @@
       "new_source_contract_qualification_scope": "Only source inventory/binding preparation has been verified. Behavioral clock tests have not yet been executed for this revision; previous process-runner tests remain scoped to their original source and immutable previous binding."
     },
     "preservation": "The complete original binding remains at the immutable parent revision. All unrelated fields, historical records, and retained SBOM entries are preserved byte-for-byte."
+  },
+  "child_provider_error_previous_binding": {
+    "public_revision": "ee1f1a55158a24f1e422934968235b6c4ac5da98",
+    "path": "PUBLIC_METADATA/source-binding.json",
+    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/ee1f1a55158a24f1e422934968235b6c4ac5da98/PUBLIC_METADATA/source-binding.json",
+    "sha256": "cba6d241928a0a747107255da62b05e2c651111b295162e19b40163a8e6125c1",
+    "bytes": 1585703,
+    "git_blob": "f7cb4044487da1918a6e2b1f3c6809339c6eea23",
+    "preserved_replaced_fields": {
+      "source_manifest_sha256": "96b397e941ce4b541b19b57bbeca488f45eff43af8432837cd082f6b0a98fc22",
+      "source_tree_sha256": "6f307456bae43c052b803f32ac9491cc73bb67b1e5ec41c865c6bf66b99766ea",
+      "source_revision": "70464ede2323dea7a4474f7e545b119bdb068f4e",
+      "comparison_public_revision": "b4440c395237cc70e8a0ddae30171c49c4e3377f",
+      "changed_source_paths": [
+        "services/llm/provider_router.py",
+        "tests/public/test_ollama_openai_fallback_model.py"
+      ],
+      "input_equivalence": {
+        "basis": "Exact protected public b4440c395237cc70e8a0ddae30171c49c4e3377f",
+        "changed_source_paths": [
+          "services/llm/provider_router.py",
+          "tests/public/test_ollama_openai_fallback_model.py"
+        ],
+        "unselected_source_files_preserved": 2712,
+        "all_six_sbom_bytes_and_status_objects_preserved": true,
+        "dependency_and_workflow_inputs_unchanged": true
+      },
+      "qualification": {
+        "source_commit": "70464ede2323dea7a4474f7e545b119bdb068f4e",
+        "kind": "Scoped synthetic BYOK fallback behavior and incremental source binding",
+        "behavioral_tests": {
+          "passed": 6,
+          "failures": 0,
+          "skipped": 0,
+          "environment": "Linux Python 3.12; complete production method with synthetic provider IO; actual model-default module"
+        },
+        "negative_control": "The pinned original router fails both blank-model and historical-explicit-model cases; four other cases still pass.",
+        "independent_review": "Approved source and regression-test review.",
+        "protected_public_checks": "Not yet observed for the exact review head.",
+        "canonical_private_public_composition": "Pending adoption and combined qualification.",
+        "image_qualification": false,
+        "production_deployment": false,
+        "installed_customer_acceptance": false,
+        "provider_sandbox_acceptance": false,
+        "limits": "Focused synthetic cloud proof only. Full source-binding verification and required public checks remain CI work. No native Windows, provider, image, deployment, or installed-customer acceptance is claimed."
+      },
+      "reviewed_source_patch": {
+        "source_commit": "70464ede2323dea7a4474f7e545b119bdb068f4e",
+        "paths": [
+          "SOURCE/services/llm/provider_router.py",
+          "SOURCE/tests/public/test_ollama_openai_fallback_model.py"
+        ],
+        "git_blobs": {
+          "SOURCE/services/llm/provider_router.py": "97b05b7c8cc94e24c07bbc833142fe1b48304ad7",
+          "SOURCE/tests/public/test_ollama_openai_fallback_model.py": "db089598528e2f72e9ed531fcd6df515afcc13f6"
+        }
+      },
+      "new_runtime_qualification_scope": "No native Windows, image, provider, deployment or installed-customer acceptance.",
+      "new_source_contract_qualification_scope": "Six synthetic source-method cases passed on Linux; old source fails two meaningful negative controls. Incremental changed-file/manifest metadata checks only; full source-binding check awaits CI."
+    },
+    "status": "Complete original binding and all historical qualifications remain at this immutable revision; historical claims are not current qualification."
   }
 }

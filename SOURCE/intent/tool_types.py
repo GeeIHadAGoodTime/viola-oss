@@ -214,3 +214,4 @@ class AgentResult:
     origin_channel: str | None = None
     confirmation_link_delivery: dict[str, Any] | None = None
     continue_listening: bool | None = None  # Propagated from LLM's final response
+    error_category: str | None = None  # Structured terminal failure for callers.

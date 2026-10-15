@@ -3197,7 +3197,9 @@ class AgentExecutor:
         except RuntimeError:
             from services.llm.managed_budget import check_managed_llm_spend_cap
 
-            return check_managed_llm_spend_cap(self._user_id, managed_llm=self._user_uses_managed_llm(), provider=getattr(self, "_llm", None))
+            return check_managed_llm_spend_cap(
+                self._user_id, managed_llm=self._user_uses_managed_llm(), provider=getattr(self, "_llm", None)
+            )
         raise RuntimeError(
             "AgentExecutor._check_managed_llm_spend_cap() is sync-only; "
             "use _check_managed_llm_spend_cap_async() inside an event loop."
@@ -3206,7 +3208,9 @@ class AgentExecutor:
     async def _check_managed_llm_spend_cap_async(self) -> Any:
         from services.llm.managed_budget import check_managed_llm_spend_cap_async
 
-        return await check_managed_llm_spend_cap_async(self._user_id, managed_llm=self._user_uses_managed_llm(), provider=getattr(self, "_llm", None))
+        return await check_managed_llm_spend_cap_async(
+            self._user_id, managed_llm=self._user_uses_managed_llm(), provider=getattr(self, "_llm", None)
+        )
 
     @staticmethod
     def _managed_llm_budget_message(gate: Any) -> str:
@@ -7664,6 +7668,13 @@ class AgentExecutor:
                         child_agent_id,
                         exc_info=True,
                     )
+                if child_result.error_category == "PROVIDER_UNSUPPORTED":
+                    return ToolResult(
+                        ok=False,
+                        error=_NATIVE_TOOL_CALLING_UNSUPPORTED_TEXT,
+                        error_category="SUBAGENT_PROVIDER_UNSUPPORTED",
+                        retryable=False,
+                    )
                 return ToolResult(
                     ok=False,
                     error="Subtask failed: %s" % child_error[:200],
@@ -8329,9 +8340,7 @@ class AgentExecutor:
                         logger.exception("Signature session rollback failed after gate binding error")
                     finally:
                         _sg_token = None
-                logger.exception(
-                    "Payment/signature session binding failed; browser-capable tool dispatch blocked"
-                )
+                logger.exception("Payment/signature session binding failed; browser-capable tool dispatch blocked")
                 return ToolResult(
                     ok=False,
                     error="Browser safety context could not be bound to this tool call",
