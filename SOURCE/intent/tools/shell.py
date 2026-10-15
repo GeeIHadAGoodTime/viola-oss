@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Literal
 
 from core.logging_config import get_logger
+from core.platform import get_logs_dir
 from core.subprocess_env import is_code_injection_env_key
 from intent.log_redaction import redact_diagnostic_payload
 from intent.permissions.shell_safety import (
@@ -221,7 +222,9 @@ def sanitized_env() -> dict[str, str]:
     return env
 
 
-_SHELL_LOG_DIR = _PROJECT_ROOT / "logs"
+# Keep audit output in the configured runtime boundary, including composed CI
+# lanes and read-only installs. The canonical resolver retains local-dev defaults.
+_SHELL_LOG_DIR = get_logs_dir()
 _SHELL_LOG_FILE = _SHELL_LOG_DIR / "shell_commands.log"
 
 
