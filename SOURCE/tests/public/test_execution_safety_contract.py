@@ -303,6 +303,38 @@ class PermissionAndIrreversibilityContract(unittest.TestCase):
 
 
 class ShellSubprocessContract(unittest.IsolatedAsyncioTestCase):
+    def test_shell_audit_honors_runtime_directory_without_writing_source(self):
+        # Load the real producer from an isolated source tree, so this exercises
+        # its import-time path selection rather than patching the audit globals.
+        for explicit_logs in (True, False):
+            with (
+                self.subTest(explicit_logs=explicit_logs),
+                tempfile.TemporaryDirectory(dir=_TEST_PROFILE_ROOT) as directory,
+            ):
+                base = Path(directory)
+                source = base / "source"
+                shell_path = source / "intent" / "tools" / "shell.py"
+                shell_path.parent.mkdir(parents=True)
+                shell_path.write_bytes((SOURCE_ROOT / "intent" / "tools" / "shell.py").read_bytes())
+                data = base / "runtime" / "data"
+                logs = base / "runtime" / "logs" if explicit_logs else data / "logs"
+                with patch.dict(os.environ, {"VIOLA_DATA_DIR": str(data)}, clear=False):
+                    if explicit_logs:
+                        os.environ["VIOLA_LOG_DIR"] = str(logs)
+                    else:
+                        os.environ.pop("VIOLA_LOG_DIR", None)
+                    spec = importlib.util.spec_from_file_location("_shell_audit_location_contract", shell_path)
+                    shell_module = importlib.util.module_from_spec(spec)
+                    spec.loader.exec_module(shell_module)
+                    self.assertEqual(shell_module._SHELL_LOG_FILE, logs / "shell_commands.log")
+                    self.assertTrue(shell_module._audit_log("echo synthetic-audit", str(source), exit_code=0))
+                    self.assertTrue(shell_module._audit_log("rm -rf /", str(source), exit_code=None, blocked=True))
+                content = (logs / "shell_commands.log").read_text(encoding="utf-8")
+                self.assertIn("OK", content)
+                self.assertIn("echo synthetic-audit", content)
+                self.assertIn("BLOCKED", content)
+                self.assertFalse((source / "logs").exists())
+
     def test_sanitized_environment_strips_secrets_and_code_injection_case_insensitively(self):
         from intent.tools.shell import sanitized_env
 
