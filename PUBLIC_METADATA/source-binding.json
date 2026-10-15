@@ -30,15 +30,14 @@
   },
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "b2085db25a7bff6d078f9a0c74666741bcb839e6fb7ddc5e66953643a970838f",
-  "source_tree_sha256": "5d44ba4bcb2b5640cd789f3abc0e5d88fc0c98a1c73d065658e37fe45d017130",
+  "source_manifest_sha256": "22c4561c11c2c2043fb4e100836faf7d51e09001f85bb8795e935882b975fa02",
+  "source_tree_sha256": "9f6409ae6feccd33339f671066385f3d478d91e0d3fad7b8ff91a0ad06b0bb3b",
   "source_file_count": 2714,
-  "source_revision": "22f800df5090705d797cbe2b2e84a500cbe4e1d5",
-  "comparison_public_revision": "ee1f1a55158a24f1e422934968235b6c4ac5da98",
+  "source_revision": "440dd8f59511c36921d0e6c674a705ea6d42894c",
+  "comparison_public_revision": "03e7eb83e8bd9d818ecc998f1fef281b5d5c686f",
   "changed_source_paths": [
-    "intent/agent_executor.py",
-    "intent/agent_loop.py",
-    "intent/tool_types.py"
+    "intent/tools/shell.py",
+    "tests/public/test_execution_safety_contract.py"
   ],
   "retained_sboms": [
     {
@@ -100,30 +99,44 @@
     }
   ],
   "input_equivalence": {
-    "basis": "Exact protected public ee1f1a55158a24f1e422934968235b6c4ac5da98",
+    "basis": "Exact protected public 03e7eb83e8bd9d818ecc998f1fef281b5d5c686f",
     "changed_source_paths": [
-      "intent/agent_executor.py",
-      "intent/agent_loop.py",
-      "intent/tool_types.py"
+      "intent/tools/shell.py",
+      "tests/public/test_execution_safety_contract.py"
     ],
-    "unselected_source_files_preserved": 2711,
+    "unselected_source_files_preserved": 2712,
     "all_six_sbom_bytes_and_status_objects_preserved": true,
-    "dependency_and_workflow_inputs_unchanged": true
+    "dependency_and_workflow_inputs_unchanged": true,
+    "metadata_repair_source_basis": "Exact PR123 head 440dd8f59511c36921d0e6c674a705ea6d42894c; this repair changes no SOURCE file, manifest file row, or aggregate source hash."
   },
   "qualification": {
-    "source_commit": "22f800df5090705d797cbe2b2e84a500cbe4e1d5",
-    "kind": "Incremental child-provider error source binding",
-    "behavioral_tests": {
-      "status": "Pending canonical private/public composition qualification; no new runtime result claimed"
+    "source_commit": "440dd8f59511c36921d0e6c674a705ea6d42894c",
+    "kind": "Exact-source binding repair and focused synthetic shell runtime-directory contracts",
+    "source_binding_verification": {
+      "files_checked": 2714,
+      "retained_sboms_checked": 6,
+      "failures": 0,
+      "tool": "SOURCE/tools/release/verify_source_binding.py"
     },
-    "independent_review": "Pending exact candidate review",
-    "protected_public_checks": "Not yet observed for the exact review head.",
+    "source_binding_revision_contract_tests": {
+      "passed": 8,
+      "failures": 0,
+      "skipped": 0
+    },
+    "shell_subprocess_contract_tests": {
+      "passed": 3,
+      "failures": 0,
+      "skipped": 0
+    },
+    "environment": "Linux Python 3.12.14; existing public unittest contracts, synthetic process IO, and real source/SBOM checksum verifier",
+    "independent_review": "Shell source patch previously reviewed; this metadata repair awaits exact candidate review.",
+    "protected_public_checks": "PR123 head 440dd8f59511c36921d0e6c674a705ea6d42894c failed source-binding admission. Exact metadata-successor hosted checks are pending.",
     "canonical_private_public_composition": "Pending adoption and combined qualification.",
     "image_qualification": false,
     "production_deployment": false,
     "installed_customer_acceptance": false,
     "provider_sandbox_acceptance": false,
-    "limits": "Source checksum and retained SBOM verification only. No runtime, native Windows, provider, image, deployment or installed-customer acceptance is claimed."
+    "limits": "Focused local source-contract and checksum evidence only. No full public suite, native Windows, combined aggregate, provider, image, deployment or installed-customer acceptance is claimed."
   },
   "historical_bindings": [
     {
@@ -12162,16 +12175,14 @@
     }
   ],
   "reviewed_source_patch": {
-    "source_commit": "22f800df5090705d797cbe2b2e84a500cbe4e1d5",
+    "source_commit": "440dd8f59511c36921d0e6c674a705ea6d42894c",
     "paths": [
-      "SOURCE/intent/agent_executor.py",
-      "SOURCE/intent/agent_loop.py",
-      "SOURCE/intent/tool_types.py"
+      "SOURCE/intent/tools/shell.py",
+      "SOURCE/tests/public/test_execution_safety_contract.py"
     ],
     "git_blobs": {
-      "SOURCE/intent/agent_executor.py": "ab5df7b5af7a5bb54f59d5d2442af1493f84a557",
-      "SOURCE/intent/agent_loop.py": "4f1811f20f120e3a999baaebd5f073fe430116f3",
-      "SOURCE/intent/tool_types.py": "d839de15e9053712f68d81e2f87446a67dfed334"
+      "SOURCE/intent/tools/shell.py": "a304150d63cf2d82fef8b8cdb371f675e3b5bc04",
+      "SOURCE/tests/public/test_execution_safety_contract.py": "620be9ae02662f27b805dc2147d2b88e7554d5d7"
     }
   },
   "new_resolution_performed": false,
@@ -12179,7 +12190,7 @@
   "new_runtime_qualification_performed": false,
   "new_source_contract_qualification_performed": true,
   "new_static_security_scan_performed": false,
-  "new_resolution_scope": "No dependency input changed; prior SBOM bytes and status objects remain unchanged.",
+  "new_resolution_scope": "No dependency input changed; all six prior SBOM bytes and complete status objects remain unchanged.",
   "new_advisory_scan_scope": "No new advisory scan; prior retained statuses remain unchanged.",
   "account_reconciliation_previous_binding": {
     "source_revision": "f864e61381ef9e10a09333fce05210427cf7d0f6",
@@ -16410,8 +16421,8 @@
       "new_static_security_scan_performed": false
     }
   },
-  "new_runtime_qualification_scope": "Pending canonical private/public composition qualification; no new runtime result claimed.",
-  "new_source_contract_qualification_scope": "Existing source generator and binding verifier passed locally: 2,714 source files and six retained SBOMs; exactly three source rows changed. Behavioral and protected CI checks remain pending.",
+  "new_runtime_qualification_scope": "No native Windows, combined aggregate, provider, image, deployment or installed-customer qualification.",
+  "new_source_contract_qualification_scope": "Existing exact-source binding verifier checked 2,714 source files and six retained SBOMs. Eight revision-binding contracts and three shell subprocess contracts passed on Linux Python 3.12.14. Exact metadata-successor hosted checks remain pending.",
   "consultation_responsive_previous_binding": {
     "repository_revision": "d1e042d527dde01c447350ab09638d0cca521268",
     "path": "PUBLIC_METADATA/source-binding.json",
@@ -17978,5 +17989,73 @@
       "new_source_contract_qualification_scope": "Six synthetic source-method cases passed on Linux; old source fails two meaningful negative controls. Incremental changed-file/manifest metadata checks only; full source-binding check awaits CI."
     },
     "status": "Complete original binding and all historical qualifications remain at this immutable revision; historical claims are not current qualification."
+  },
+  "shell_audit_previous_binding": {
+    "protected_public_revision": "03e7eb83e8bd9d818ecc998f1fef281b5d5c686f",
+    "path": "PUBLIC_METADATA/source-binding.json",
+    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/03e7eb83e8bd9d818ecc998f1fef281b5d5c686f/PUBLIC_METADATA/source-binding.json",
+    "sha256": "d03432067c5b11ea6de42fa54dcf769ab1e2d25d94d1d629d6f824324d8061eb",
+    "git_blob": "e1e2f2d95cbd1623e0db6069d62bf37fa6fb384e",
+    "previous_values": {
+      "source_manifest_sha256": "b2085db25a7bff6d078f9a0c74666741bcb839e6fb7ddc5e66953643a970838f",
+      "source_tree_sha256": "5d44ba4bcb2b5640cd789f3abc0e5d88fc0c98a1c73d065658e37fe45d017130",
+      "source_file_count": 2714,
+      "source_revision": "22f800df5090705d797cbe2b2e84a500cbe4e1d5",
+      "comparison_public_revision": "ee1f1a55158a24f1e422934968235b6c4ac5da98",
+      "changed_source_paths": [
+        "intent/agent_executor.py",
+        "intent/agent_loop.py",
+        "intent/tool_types.py"
+      ],
+      "input_equivalence": {
+        "basis": "Exact protected public ee1f1a55158a24f1e422934968235b6c4ac5da98",
+        "changed_source_paths": [
+          "intent/agent_executor.py",
+          "intent/agent_loop.py",
+          "intent/tool_types.py"
+        ],
+        "unselected_source_files_preserved": 2711,
+        "all_six_sbom_bytes_and_status_objects_preserved": true,
+        "dependency_and_workflow_inputs_unchanged": true
+      },
+      "qualification": {
+        "source_commit": "22f800df5090705d797cbe2b2e84a500cbe4e1d5",
+        "kind": "Incremental child-provider error source binding",
+        "behavioral_tests": {
+          "status": "Pending canonical private/public composition qualification; no new runtime result claimed"
+        },
+        "independent_review": "Pending exact candidate review",
+        "protected_public_checks": "Not yet observed for the exact review head.",
+        "canonical_private_public_composition": "Pending adoption and combined qualification.",
+        "image_qualification": false,
+        "production_deployment": false,
+        "installed_customer_acceptance": false,
+        "provider_sandbox_acceptance": false,
+        "limits": "Source checksum and retained SBOM verification only. No runtime, native Windows, provider, image, deployment or installed-customer acceptance is claimed."
+      },
+      "reviewed_source_patch": {
+        "source_commit": "22f800df5090705d797cbe2b2e84a500cbe4e1d5",
+        "paths": [
+          "SOURCE/intent/agent_executor.py",
+          "SOURCE/intent/agent_loop.py",
+          "SOURCE/intent/tool_types.py"
+        ],
+        "git_blobs": {
+          "SOURCE/intent/agent_executor.py": "ab5df7b5af7a5bb54f59d5d2442af1493f84a557",
+          "SOURCE/intent/agent_loop.py": "4f1811f20f120e3a999baaebd5f073fe430116f3",
+          "SOURCE/intent/tool_types.py": "d839de15e9053712f68d81e2f87446a67dfed334"
+        }
+      },
+      "new_resolution_performed": false,
+      "new_advisory_scan_performed": false,
+      "new_runtime_qualification_performed": false,
+      "new_source_contract_qualification_performed": true,
+      "new_static_security_scan_performed": false,
+      "new_resolution_scope": "No dependency input changed; prior SBOM bytes and status objects remain unchanged.",
+      "new_advisory_scan_scope": "No new advisory scan; prior retained statuses remain unchanged.",
+      "new_runtime_qualification_scope": "Pending canonical private/public composition qualification; no new runtime result claimed.",
+      "new_source_contract_qualification_scope": "Existing source generator and binding verifier passed locally: 2,714 source files and six retained SBOMs; exactly three source rows changed. Behavioral and protected CI checks remain pending."
+    },
+    "retention": "The complete predecessor binding remains at this immutable protected revision. Its child-provider and earlier qualification records retain their original source identities and scopes; none is relabeled as shell-audit successor qualification."
   }
 }
