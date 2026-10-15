@@ -1502,6 +1502,7 @@ async def run_agent_loop(
     # Import executor internals we need
     from intent.agent_executor import (
         _DEFAULT_MAX_ITERATIONS,
+        _NATIVE_TOOL_CALLING_UNSUPPORTED_TEXT,
         MAX_TOOL_RESULT_CHARS,
         _build_agent_final_answer_fallback,
         _calendar_add_failure_user_message,
@@ -1509,6 +1510,7 @@ async def run_agent_loop(
         _dispatch_hook,
         _estimated_tokens_for_messages,
         _extract_reasoning,
+        _is_native_tool_calling_unsupported,
         _nested_gate_from_resume_tool_result,
         _normalize_usage,
         _PaymentConfirmationGateRefused,
@@ -1557,6 +1559,7 @@ async def run_agent_loop(
         logger.debug("Agent loop SessionMemory disabled without executor user_id")
 
     # State
+    terminal_provider_error: str | None = None
     iterations = 0
     tools_called: list[str] = []
     outcome = "success"
@@ -3456,7 +3459,16 @@ async def run_agent_loop(
                     call_kind="agent_loop",
                     exc=exc,
                 )
-                logger.exception("Agent turn %d failed: %s", iterations, exc)
+                if isinstance(exc, RuntimeError) and _is_native_tool_calling_unsupported(exc):
+                    logger.exception("Native tool calling not supported by active provider")
+                    terminal_provider_error = "PROVIDER_UNSUPPORTED"
+                    _set_final_response(
+                        executor,
+                        _NATIVE_TOOL_CALLING_UNSUPPORTED_TEXT,
+                        continue_listening=False,
+                    )
+                else:
+                    logger.exception("Agent turn %d failed: %s", iterations, exc)
                 executor._llm_error_occurred = True
                 outcome = "llm_error"
                 break
@@ -5130,7 +5142,7 @@ async def run_agent_loop(
             and not terminal_incomplete
         )
         if terminal_llm_error:
-            final_error = "LLM call failed"
+            final_error = _NATIVE_TOOL_CALLING_UNSUPPORTED_TEXT if terminal_provider_error else "LLM call failed"
         elif terminal_cost_limit:
             final_error = "managed LLM spend governance unavailable"
         elif terminal_incomplete:
@@ -5145,6 +5157,7 @@ async def run_agent_loop(
             iterations_used=iterations,
             tools_called=tools_called,
             error=final_error,
+            error_category=terminal_provider_error if terminal_llm_error else None,
             continue_listening=(True if signature_gate else executor._final_continue_listening),
             cap_state=executor._final_params.get("cap_state"),
         )
