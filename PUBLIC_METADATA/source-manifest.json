@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "e279cd0dccc1a8069b6b25eea280a5a64ef95766",
-  "sha256": "9fd5acc53bd4c0aaf8a11ea8d64cd06012b9e7057a75e730c17abb133946a6f2",
+  "revision": "0dde535123fac2515fd0e1824093a6fc3ebdc98a",
+  "sha256": "2a55803054ddab2c826904ffa2b2b04c7186141005e875139e4196c20942fd4a",
   "files": [
     {
       "path": ".env.example",
@@ -3820,8 +3820,8 @@
     },
     {
       "path": "requirements_desktop.txt",
-      "sha256": "9fb84803920f3e47231a9c26f495c1516fbbaaf21e24f2f215acf36b3e72b2a6",
-      "bytes": 8505
+      "sha256": "1a04d10c6a07d653ded69e920901284074a81aea65bdf8707443da057ddddc35",
+      "bytes": 8515
     },
     {
       "path": "requirements_kokoro.txt",
@@ -3830,13 +3830,13 @@
     },
     {
       "path": "requirements_linux.txt",
-      "sha256": "cdfb968e45305485b6781837dbb80b50fb007187717054e3f26d04a76d5ca0c8",
-      "bytes": 11662
+      "sha256": "a1af6f6f4ee4aec9fc6d86e9bf1c9201213a088cba02db02c325a13f652f0f89",
+      "bytes": 11672
     },
     {
       "path": "requirements_macos.txt",
-      "sha256": "f4ce489405174ef9f6e8a13c82089ddd6b96f6715bfcfc97c234a5d8d092b8f6",
-      "bytes": 13137
+      "sha256": "28771fea50894d30750e6c28345476ced71a5602a58a278845ab069ca1ff72f8",
+      "bytes": 13147
     },
     {
       "path": "requirements_optional.txt",
@@ -6255,8 +6255,8 @@
     },
     {
       "path": "tests/public/test_pipecat_runner_security.py",
-      "sha256": "63b22cb3ae7702a45d800d5a9b2f46fe546a29ecdc41a85960222d3148862373",
-      "bytes": 7273
+      "sha256": "a9639539b060f99d640dd2bc0361f4c8d68e1d9d2d354c64578e39b7c797a6f4",
+      "bytes": 10557
     },
     {
       "path": "tests/public/test_privacy_boundary_contract.py",
@@ -6625,8 +6625,8 @@
     },
     {
       "path": "third_party/pipecat.patch",
-      "sha256": "f879122db972b7882ac338e59164db2cd9a82131115f4c28290356f8e33f8153",
-      "bytes": 19837
+      "sha256": "51dde48e75f302b3ab4397a22f8e9c95fae75dea064e7e650e64804bfb169a5e",
+      "bytes": 23056
     },
     {
       "path": "third_party/pipecat/LICENSE",
@@ -6655,12 +6655,12 @@
     },
     {
       "path": "third_party/pipecat/README.md",
-      "sha256": "2ff9ce448a80381edd352e2e3aeb3021b57f541e97ec1c7a76d7f867589eac94",
-      "bytes": 31755
+      "sha256": "f0c37fcaeab2a569fe88a1ff4b73f9257dfd7c4f98c5815fbe711605b2654422",
+      "bytes": 33331
     },
     {
       "path": "third_party/pipecat/pyproject.toml",
-      "sha256": "12ee166964aabbc499d0cd22b68d71cdb662a3ed503a9f460eb549a09607580b",
+      "sha256": "c823e14dbfbc615eab81246932d904802e54708d7551cd0f0ac197810818eb4b",
       "bytes": 8082
     },
     {
@@ -7485,8 +7485,8 @@
     },
     {
       "path": "third_party/pipecat/src/pipecat/runner/run.py",
-      "sha256": "34c0f2ed2ed9de5970bf0e5fc75d187539387e65f029b0c9db554fa5a49b9685",
-      "bytes": 41946
+      "sha256": "a293d77446193514cb5da7c6549e617ded905af8f886323de6355ff264ebc989",
+      "bytes": 43288
     },
     {
       "path": "third_party/pipecat/src/pipecat/runner/types.py",
@@ -9195,8 +9195,8 @@
     },
     {
       "path": "third_party/sources.toml",
-      "sha256": "7ab7a4750c561200e39576dc0fe673e7a1afeebaa3e6cc1f122254947324cc69",
-      "bytes": 210783
+      "sha256": "5412dce5ca31d31e281c953c10c0bc82f3c64353f7c77ad128301c7d1b6ac408",
+      "bytes": 211050
     },
     {
       "path": "tools/qualification/cjk_runtime_replay.py",
