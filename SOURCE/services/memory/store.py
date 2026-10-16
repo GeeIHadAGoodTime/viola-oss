@@ -18,7 +18,8 @@ from typing import Any, cast
 import core.db_backend as db_backend
 from core.asyncio_safe import is_event_loop_closed_error, run_async_synchronously
 from core.logging_config import get_logger
-from services.memory.dir import MemoryDir, get_memory_dir
+from services.memory.dir import MemoryDecryptionError, MemoryDir, get_memory_dir
+from services.memory.hygiene import validate_entry_content, validate_semantic_content
 
 logger = get_logger(__name__)
 
@@ -384,7 +385,7 @@ class _MemoryEncryption:
             )
         return self._fernet.encrypt(plaintext.encode()).decode()
 
-    def _decrypt_impl(self, ciphertext: str) -> str:
+    def _decrypt_impl(self, ciphertext: str, allow_plaintext: bool = True) -> str | None:
         if self._fernet is None:
             return ciphertext
 
@@ -408,7 +409,7 @@ class _MemoryEncryption:
             plaintext = _try_decrypt(candidate)
             if plaintext is not None:
                 return plaintext
-        if ciphertext.startswith("gAAAAA"):
+        if not allow_plaintext or ciphertext.startswith("gAAAAA"):
             self._key_mismatch_count += 1
             now = time.monotonic()
             if self._key_mismatch_count == 1 or now - self._key_mismatch_last_log >= 60.0:
@@ -417,14 +418,21 @@ class _MemoryEncryption:
                     "Memory decryption failed; possible encryption key change (count=%d)",
                     self._key_mismatch_count,
                 )
-            return _KEY_MISMATCH_MARKER
+            return _KEY_MISMATCH_MARKER if allow_plaintext else None
         return ciphertext
 
-    def decrypt(self, ciphertext: str) -> str:
+    def decrypt(self, ciphertext: str, *, allow_plaintext: bool = True) -> str:
+        """Read legacy values, or require authenticated plaintext for an encrypted envelope."""
+        if not allow_plaintext and not self.encryption_available:
+            raise MemoryDecryptionError("Cannot decrypt encrypted memory: encryption is unavailable")
         cached = getattr(self, "_decrypt_cached", None)
         if cached is not None:
-            return cached(ciphertext)
-        return self._decrypt_impl(ciphertext)
+            plaintext = cached(ciphertext, allow_plaintext)
+        else:
+            plaintext = self._decrypt_impl(ciphertext, allow_plaintext)
+        if plaintext is None:
+            raise MemoryDecryptionError("Cannot decrypt encrypted memory: key mismatch or invalid ciphertext")
+        return plaintext
 
     @property
     def key_mismatch_count(self) -> int:
@@ -488,6 +496,18 @@ def _map_category(category: str) -> str:
     if value not in _VALID_CATEGORIES:
         raise ValueError("Invalid memory category %r" % category)
     return value
+
+
+def _validate_memory_content(content: str) -> str:
+    clean = content.strip()
+    if len(clean) < 5:
+        raise ValueError("Memory content too short (min 5 chars)")
+    if _SENSITIVE_CONTENT_RE.search(clean):
+        raise ValueError("Cannot store sensitive credentials or payment data in memory")
+    if _CRISIS_CONTENT_RE.search(clean):
+        raise ValueError("Crisis or self-harm statements should not be stored in memory")
+    validate_semantic_content(clean)
+    return clean
 
 
 def _category_from_path(path: str) -> str:
@@ -623,7 +643,10 @@ class MemoryStore:
             path = str(info["path"])
             if not path.startswith("memory/topics/"):
                 continue
-            text = directory.read(path)
+            try:
+                text = directory.read(path)
+            except MemoryDecryptionError:
+                continue
             category = _category_from_path(path)
             frontmatter_end = 0
             lines = text.splitlines()
@@ -671,13 +694,7 @@ class MemoryStore:
         critical: bool = False,
     ) -> int:
         del source, confidence, critical
-        clean = content.strip()
-        if len(clean) < 5:
-            raise ValueError("Memory content too short (min 5 chars)")
-        if _SENSITIVE_CONTENT_RE.search(clean):
-            raise ValueError("Cannot store sensitive credentials or payment data in memory")
-        if _CRISIS_CONTENT_RE.search(clean):
-            raise ValueError("Crisis or self-harm statements should not be stored in memory")
+        clean = _validate_memory_content(content)
         category = _map_category(category)
         result = self._dir(user_id).store_semantic_memory(clean, category=category, agent_initiated=True)
         files = self._dir(user_id).list()
@@ -806,11 +823,7 @@ class MemoryStore:
             return False
         if content is None:
             return True
-        clean = content.strip()
-        if len(clean) < 5:
-            raise ValueError("Memory content too short (min 5 chars)")
-        if _SENSITIVE_CONTENT_RE.search(clean):
-            raise ValueError("Cannot store sensitive credentials or payment data in memory")
+        clean = _validate_memory_content(content)
         replacement = clean if clean.startswith(("-", "#")) else "- %s" % clean
         directory = self._dir(user_id)
         lines = directory.read(memory.path).splitlines()
@@ -831,8 +844,21 @@ class MemoryStore:
         return await asyncio.to_thread(self.deactivate, user_id, memory_id)
 
     def supersede(self, user_id: str, old_id: int, new_content: str, category: str = "fact") -> int:
-        self.deactivate(user_id, old_id)
-        return self.add(user_id, new_content, category=category)
+        clean = _validate_memory_content(new_content)
+        category = _map_category(category)
+        directory = self._dir(user_id)
+        payload = clean if re.match(r"^[-*]\s+|\d+\.\s+", clean) else "- " + clean
+        validate_entry_content(payload, directory.hygiene_policy)
+        with self._lock:
+            original = self.get_by_id(user_id, old_id)
+            if original is None:
+                return self.add(user_id, clean, category=category)
+            result = directory.supersede_semantic_memory(original.path, original.line_number, clean, category=category)
+            # Deletion/pruning and category changes can shift positional IDs.
+            # Resolve the committed physical location only after both steps.
+            files = directory.list()
+            file_index = next(index for index, info in enumerate(files, start=1) if info["path"] == result["path"])
+            return self._memory_id(file_index, int(result["line_number"]))
 
     def touch(self, user_id: str, memory_id: int) -> None:
         del user_id, memory_id

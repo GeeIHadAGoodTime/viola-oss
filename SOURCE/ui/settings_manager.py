@@ -2823,11 +2823,11 @@ class SettingsManager:
             settings["_settings_version"] = 4
             needs_save = True
 
-        # Migration: v4 -> v5 (legacy-pinned wake_sensitivity 0.80 -> 0.90)
-        # v3->v4 intentionally wrote 0.80 for existing installs that did not
-        # already save a wake_sensitivity value. Founder direction on
-        # 2026-04-28 makes 0.90 the default, so only the exact numeric legacy
-        # pin catches up; any other saved value remains user tuning.
+        # Migration: v4 -> v5 (unsaved wake_sensitivity default 0.80 -> 0.90)
+        # v3->v4 wrote 0.80 without recording whether it was a default or a
+        # user choice. A persisted 0.80 is therefore ambiguous and must be
+        # preserved, including through the legacy alias. Only the 0.80 pin
+        # synthesized above from an absent loaded key can safely catch up.
         if loaded_version < 5:
             prior_wake_default = 0.80
             wake_sensitivity_value = settings.get("wake_sensitivity", _MISSING)

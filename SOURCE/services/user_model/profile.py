@@ -78,8 +78,7 @@ def _run_async(coro, *, timeout: float = 3.0):
             timeout=timeout,
             timeout_result=None,
             timeout_log_message=(
-                "Profile async call timed out after %.1fs (likely Postgres "
-                "pool bound to another loop); returning None."
+                "Profile async call timed out after %.1fs (likely Postgres pool bound to another loop); returning None."
             ),
             logger=logger,
         )
@@ -150,7 +149,9 @@ def _load_user_model_payload(user_id: str) -> dict[str, Any] | None:
         from services.sync_surfaces import user_models as models_surface
 
         async def _read():
-            async with db.connection() as conn:
+            # The consent helper binds transaction-local RLS; keep that
+            # identity alive through the canonical model read.
+            async with db.transaction() as conn:
                 from services.sync.consent import (
                     has_cloud_sync_consent,
                 )  # consent-read-only-ok
@@ -202,7 +203,10 @@ def _save_user_model_payload(user_id: str, payload: dict[str, Any]) -> bool:
 
         async def _write() -> bool:
             try:
-                async with db.connection() as conn:
+                # Keep RLS and the consent row lock through the mutation.
+                # The producer may reuse a caller transaction, so a savepoint
+                # must roll back this write before its error is caught below.
+                async with db.transaction() as conn, conn.transaction():
                     from services.sync.consent import has_cloud_sync_consent_locked
 
                     if not await has_cloud_sync_consent_locked(conn, user_id):

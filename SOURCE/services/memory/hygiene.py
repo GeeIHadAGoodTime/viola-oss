@@ -25,6 +25,24 @@ _DEFAULT_DEDUP_WORD_OVERLAP = 0.92
 _WORD_RE = re.compile(r"[a-z0-9][a-z0-9']*")
 _BULLET_RE = re.compile(r"^(?:[-*]\s+|\d+\.\s+)")
 
+# Full-entry matches only: incidental greeting words inside useful memories
+# must not discard durable facts or feedback. This guard belongs to semantic
+# memory writes, never general markdown documents or existing retained files.
+_EPHEMERAL_CONTENT_RE = re.compile(
+    r"(?:(?:user (?:said|says) )?"
+    r"(?:hi|hello|hey|good morning|good afternoon|good evening|goodnight|good night|"
+    r"goodbye|bye|thanks|thank you|sounds good|okay|ok)"
+    r"|(?:user thinks )?viola is (?:awesome|great|amazing|helpful)"
+    r"|user is feeling (?:happy|sad|tired|good|bad) (?:today|right now))"
+)
+
+
+def validate_semantic_content(content: str) -> None:
+    """Reject obvious conversational filler without retaining its text."""
+    normalized = " ".join(_BULLET_RE.sub("", content.strip()).casefold().split()).strip(".!?")
+    if _EPHEMERAL_CONTENT_RE.fullmatch(normalized):
+        raise ValueError("Cannot store ephemeral conversation filler in memory")
+
 
 @dataclass
 class MemoryHygienePolicy:

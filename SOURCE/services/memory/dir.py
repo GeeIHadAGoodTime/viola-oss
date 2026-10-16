@@ -9,6 +9,7 @@ import re
 import shutil
 import sqlite3
 import subprocess
+import threading
 import time
 import uuid
 from dataclasses import dataclass, replace
@@ -26,6 +27,7 @@ from services.memory.hygiene import (
     canonical_memory_text,
     validate_entry_content,
     validate_file_content,
+    validate_semantic_content,
     word_overlap,
 )
 
@@ -69,11 +71,13 @@ _RECENT_MEMORY_LINES: dict[str, list[tuple[float, str]]] = {}
 # notification. MemoryDir is synchronous and the messaging hub is async; routing
 # through self_knowledge avoids that mismatch entirely and keeps the UX subtle —
 # Viola sees the state and can mention it organically if relevant.
-import threading
-
 _ARCHIVE_NOTICE_TTL_SECONDS = 300.0  # 5 minutes — long enough to span a conversation
 _archive_notices_lock = threading.Lock()
 _archive_notices: dict[str, dict[str, Any]] = {}
+
+
+class MemoryDecryptionError(ValueError):
+    """An encrypted memory file could not be authenticated for reading."""
 
 
 def record_archive_notice(user_id: str, file_rel: str, bytes_moved: int) -> None:
@@ -807,10 +811,22 @@ class MemoryDir:
         return "%s%s\n" % (_ENCRYPTED_MARKDOWN_PREFIX, encrypted)
 
     def _read_memory_file(self, path: Path, *, errors: str = "strict") -> str:
-        raw = path.read_text(encoding="utf-8", errors=errors)
-        if raw.startswith(_ENCRYPTED_MARKDOWN_PREFIX):
+        payload = path.read_bytes()
+        encrypted = payload.startswith(_ENCRYPTED_MARKDOWN_PREFIX.encode("ascii"))
+        try:
+            raw = payload.decode("utf-8", errors="strict" if encrypted else errors)
+        except UnicodeDecodeError as exc:
+            if not encrypted:
+                raise
+            raise MemoryDecryptionError("Cannot decrypt encrypted memory") from exc
+        # Match read_text's universal-newline handling for legacy markdown.
+        raw = raw.replace("\r\n", "\n").replace("\r", "\n")
+        if encrypted:
             token = raw[len(_ENCRYPTED_MARKDOWN_PREFIX) :].strip()
-            return self._memory_encryption().decrypt(token)
+            # The envelope positively identifies encrypted content. Legacy
+            # plaintext fallback here would turn a missing key or damaged token
+            # into recalled user data, or overwrite it during an append.
+            return self._memory_encryption().decrypt(token, allow_plaintext=False)
         return raw
 
     def _scratch_sibling(self, path: Path, suffix: str) -> Path:
@@ -854,8 +870,8 @@ class MemoryDir:
         # Atomic write. A memory file is a single Fernet token when encryption
         # is on (see _encode_memory_text): a torn write — crash, power loss,
         # disk-full, or a concurrent overwrite — leaves a truncated token, and
-        # _read_memory_file then returns the key-mismatch marker for the ENTIRE
-        # file, silently losing every memory in it. Write to a scratch file in
+        # _read_memory_file then rejects the ENTIRE file as unreadable, making
+        # every memory in it unavailable. Write to a scratch file in
         # the same directory, fsync, then os.replace (atomic on POSIX and
         # Windows), so a reader/crash never observes a half-written file.
         tmp = self._scratch_sibling(path, "tmp")
@@ -1018,7 +1034,6 @@ class MemoryDir:
         target.parent.mkdir(parents=True, exist_ok=True)
         plan.archive_path.parent.mkdir(parents=True, exist_ok=True)
         live_tmp = self._scratch_sibling(target, "tmp")
-        live_backup = self._scratch_sibling(target, "bak")
         archive_tmp = self._scratch_sibling(plan.archive_path, "tmp")
         archive_backup = self._scratch_sibling(plan.archive_path, "bak")
 
@@ -1061,28 +1076,27 @@ class MemoryDir:
                     logger.debug("Could not remove temporary memory archive file: %s", scratch)
             raise
 
-        live_backed_up = False
-        archive_backed_up = False
+        archive_existed = plan.archive_path.exists()
+        rollback_failed = False
         try:
-            if target.exists():
-                target.replace(live_backup)
-                live_backed_up = True
-            if plan.archive_path.exists():
+            # Keep the original live file in place until the final atomic
+            # replacement. Nothing after that rename needs rollback. Moving it
+            # aside first made a failed commit + failed restore lose the only
+            # original when scratch cleanup removed the backup.
+            if archive_existed:
                 plan.archive_path.replace(archive_backup)
-                archive_backed_up = True
             archive_tmp.replace(plan.archive_path)
             live_tmp.replace(target)
         except Exception as exc:
             try:
-                if live_backed_up and live_backup.exists():
-                    live_backup.replace(target)
-                elif not live_backed_up and target.exists():
-                    target.unlink()
-                if archive_backed_up and archive_backup.exists():
+                # A failed rename can leave the original untouched. Only
+                # restore an actual backup; never unlink a pre-existing archive.
+                if archive_backup.exists():
                     archive_backup.replace(plan.archive_path)
-                elif not archive_backed_up and plan.archive_path.exists():
+                elif not archive_existed and plan.archive_path.exists():
                     plan.archive_path.unlink()
             except Exception:
+                rollback_failed = True
                 logger.exception("Memory archive rollback failed for %s", target)
                 self._audit(
                     "hygiene:archive_failed",
@@ -1093,7 +1107,9 @@ class MemoryDir:
                 )
             raise
         finally:
-            for temp_path in (live_tmp, archive_tmp, live_backup, archive_backup):
+            for temp_path in (live_tmp, archive_tmp, archive_backup):
+                if rollback_failed and temp_path == archive_backup:
+                    continue  # Keep the encrypted recovery copy if restoration failed.
                 try:
                     if temp_path.exists():
                         temp_path.unlink()
@@ -1104,7 +1120,7 @@ class MemoryDir:
         audit_id = self._audit(
             "hygiene:archive_cap",
             self._relative(target),
-            ("cap_bytes=%d target_bytes=%d projected_bytes=%d live_bytes=%d " "archived_bytes=%d archive=%s")
+            ("cap_bytes=%d target_bytes=%d projected_bytes=%d live_bytes=%d archived_bytes=%d archive=%s")
             % (
                 plan.cap_bytes,
                 plan.target_bytes,
@@ -1234,15 +1250,24 @@ class MemoryDir:
             self._audit_hygiene_rejection(target, str(exc), agent_initiated=agent_initiated)
             raise
 
-    def _find_duplicate_entry(self, content: str) -> dict[str, Any] | None:
+    def _find_duplicate_entry(
+        self, content: str, *, exclude: tuple[str, int] | None = None, topics_only: bool = False
+    ) -> dict[str, Any] | None:
         if not self.hygiene_policy.dedup_enabled:
             return None
         incoming = canonical_memory_text(content)
         if not incoming:
             return None
         for item in self._markdown_files(include_viola=False):
-            text = self._read_memory_file(item)
+            if topics_only and item.parent.resolve() != self.topics_dir.resolve():
+                continue
+            try:
+                text = self._read_memory_file(item)
+            except MemoryDecryptionError:
+                continue
             for entry in _parse_markdown_entries(text):
+                if exclude == (self._relative(item), int(entry["line_number"])):
+                    continue
                 if entry.get("kind") == "section":
                     continue
                 existing = canonical_memory_text(str(entry.get("text") or ""))
@@ -1343,12 +1368,10 @@ class MemoryDir:
 
     @staticmethod
     def _semantic_frontmatter(name: str, description: str, memory_type: str) -> str:
-        return (
-            "---\n"
-            "name: %s\n"
-            "description: %s\n"
-            "type: %s\n"
-            "---\n" % (_yaml_quoted(name), _yaml_quoted(description), (memory_type or "user").strip())
+        return "---\nname: %s\ndescription: %s\ntype: %s\n---\n" % (
+            _yaml_quoted(name),
+            _yaml_quoted(description),
+            (memory_type or "user").strip(),
         )
 
     def _ensure_semantic_frontmatter(
@@ -1386,6 +1409,7 @@ class MemoryDir:
         clean = (content or "").strip()
         if not clean:
             raise ValueError("content is required")
+        validate_semantic_content(clean)
         topic, title, memory_type, description = _semantic_memory_topic(category)
         target = self._path_for_where("topic:%s" % topic)
         self._ensure_semantic_frontmatter(
@@ -1412,6 +1436,79 @@ class MemoryDir:
         )
         return result
 
+    def supersede_semantic_memory(
+        self,
+        path: str,
+        line_number: int,
+        content: str,
+        *,
+        category: str = "fact",
+    ) -> dict[str, Any]:
+        """Commit replacement content before retiring its original markdown line.
+
+        A same-topic replacement is one atomic encrypted file rewrite. Across
+        topics, the old file is untouched until the new topic and index succeed;
+        interruption can leave both copies, never delete the only durable copy.
+        """
+        clean = content.strip()
+        if not clean:
+            raise ValueError("content is required")
+        validate_semantic_content(clean)
+        payload = clean if re.match(r"^[-*]\s+|\d+\.\s+", clean) else "- " + clean
+        source = self._normalize_memory_path(path, allow_viola=False)
+        if source.parent.resolve() != self.topics_dir.resolve():
+            raise ValueError("Only topic memories can be superseded")
+        source_bytes = source.read_bytes()
+        source_text = self._read_memory_file(source)
+        source_lines = source_text.splitlines(keepends=True)
+        if line_number < 1 or line_number > len(source_lines):
+            raise ValueError("Memory line is no longer available")
+        topic, title, memory_type, description = _semantic_memory_topic(category)
+        target = self._path_for_where("topic:%s" % topic)
+        self._validate_entry_or_audit(target, payload, agent_initiated=True)
+        duplicate = self._find_duplicate_entry(payload, exclude=(self._relative(source), line_number), topics_only=True)
+        if duplicate is not None:
+            # The dedup target is already a readable durable replacement. Do not
+            # let the original itself swallow a correction as a near-duplicate.
+            result = {"path": duplicate["path"], "line_number": duplicate["line_number"], "deduped": True}
+            if source.read_bytes() != source_bytes:
+                raise ValueError("Original memory changed during replacement")
+            self.delete_line(path, line_number, agent_initiated=True)
+            if result["path"] == self._relative(source) and result["line_number"] > line_number:
+                result["line_number"] -= 1
+            return result
+
+        same_topic = source.resolve() == target.resolve()
+        if same_topic:
+            # Remove only in the prepared plaintext, not from the live file.
+            source_lines.pop(line_number - 1)
+            current = "".join(source_lines)
+        else:
+            current = self._read_memory_file(target) if target.exists() else ""
+        body = self._strip_frontmatter(current)
+        prepared = self._semantic_frontmatter(title.lower(), description, memory_type)
+        prepared += body.rstrip("\n") + "\n" if body.strip() else ""
+
+        def append_replacement(text: str) -> str:
+            separator = "" if not text or text.endswith("\n") else "\n"
+            return text + separator + payload.rstrip("\n") + "\n"
+
+        live, archive_plan = self._archive_plan_for_write(target, prepared, append_replacement)
+        replacement = append_replacement(live)
+        self._validate_file_or_audit(target, replacement, agent_initiated=True)
+        # Index failure must also leave a same-topic original untouched.
+        self.add_index_pointer(title, "topics/%s.md" % topic, hook=description, agent_initiated=True)
+        if source.read_bytes() != source_bytes:
+            raise ValueError("Original memory changed during replacement")
+        self._write_text_with_archive(target, replacement, archive_plan, agent_initiated=True)
+        self._record_recent_memory_lines(target, payload)
+        if not same_topic:
+            if source.read_bytes() != source_bytes:
+                raise ValueError("Original memory changed during replacement")
+            self.delete_line(path, line_number, agent_initiated=True)
+        self._audit("supersede", self._relative(target), "replaced memory from %s" % path, agent_initiated=True)
+        return {"path": self._relative(target), "line_number": len(live.splitlines()) + 1}
+
     def _search_scope_path(self, path: str | None) -> Path | None:
         raw = (path or "").strip().replace("\\", "/")
         if not raw or raw in {"memory", "memory/", MEMORY_INDEX, VIOLA_MEMORY, "memory/%s" % MEMORY_INDEX}:
@@ -1430,7 +1527,10 @@ class MemoryDir:
         if scope_path is not None and not scope_path.exists():
             items = []
         for item in items:
-            text = self._read_memory_file(item)
+            try:
+                text = self._read_memory_file(item)
+            except MemoryDecryptionError:
+                continue
             for line_number, line in enumerate(text.splitlines(), start=1):
                 lower = line.lower()
                 if needle in lower or (tokens and any(token in lower for token in tokens)):
@@ -1754,7 +1854,10 @@ class MemoryDir:
     def _entry_rows(self, *, include_viola: bool) -> list[dict[str, Any]]:
         rows: list[dict[str, Any]] = []
         for path in self._markdown_files(include_viola=include_viola):
-            content = self._read_memory_file(path)
+            try:
+                content = self._read_memory_file(path)
+            except MemoryDecryptionError:
+                continue
             for entry in _parse_markdown_entries(content):
                 if entry.get("kind") == "section":
                     continue
@@ -1851,13 +1954,18 @@ class MemoryDir:
     def _list_files(self, *, include_viola: bool) -> list[MemoryFile]:
         rows: list[MemoryFile] = []
         for path in self._markdown_files(include_viola=include_viola):
-            text = self._read_memory_file(path)
+            try:
+                lines = len(self._read_memory_file(path).splitlines())
+            except MemoryDecryptionError:
+                # Keep file metadata and ordering stable for the legacy facade's
+                # positional IDs, without treating failure text as memory lines.
+                lines = 0
             stat = path.stat()
             rows.append(
                 MemoryFile(
                     path=self._relative(path),
                     bytes=stat.st_size,
-                    lines=len(text.splitlines()),
+                    lines=lines,
                     modified_at=datetime.fromtimestamp(stat.st_mtime, UTC).isoformat(),
                 )
             )
@@ -1890,7 +1998,7 @@ class MemoryDir:
                 raw = self._read_memory_file(path, errors="replace")
                 head = "\n".join(raw.splitlines()[: _FRONTMATTER_MAX_LINES + 2])
                 frontmatter = _parse_frontmatter(head)
-            except OSError:
+            except (OSError, MemoryDecryptionError):
                 continue
             relative = path.relative_to(self.topics_dir).as_posix()
             headers.append(
