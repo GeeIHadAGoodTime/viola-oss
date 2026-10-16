@@ -104,6 +104,31 @@ Catch new features, interviews, and how-tos on our [Pipecat TV](https://www.yout
 
 ## ⚡ Getting started
 
+### Development runner security boundary
+
+The built-in `pipecat.runner.run` runner is for local development only. It is
+not a production server. Its Daily session-creation endpoints, including `GET /`, `POST /start`, and
+`POST /daily-dialin-webhook` when enabled, do not authenticate callers
+or rate-limit requests. A request can create a bot session or Daily room,
+consume local resources and third-party quotas, and may return a room URL and
+join token. The telephony WebSocket backport does not authenticate these Daily
+development endpoints.
+
+The default bind address is `localhost`. Do not expose the runner directly to
+untrusted networks with `--host 0.0.0.0`, a published port, or an unprotected
+tunnel. Production deployments require an authenticated dispatcher or managed
+runtime. See the upstream guidance for
+[running locally](https://docs.pipecat.ai/pipecat/deployment/running-bots-locally)
+and [production](https://docs.pipecat.ai/pipecat/deployment/running-bots-in-production).
+
+This maintained fork backports the development-only startup banner from
+[upstream commit acaac3e](https://github.com/pipecat-ai/pipecat/commit/acaac3e49f50968f3ffb645a42ecc48d71c4e723)
+for [GHSA-hqm2-cfx2-2vgh / CVE-2026-102682](https://github.com/pipecat-ai/pipecat/security/advisories/GHSA-hqm2-cfx2-2vgh),
+with an explicit network-exposure warning. As in upstream 1.6.0, this surfaces
+and documents the development boundary; it does not add authentication or rate
+limiting to those endpoints. The earlier path-containment and telephony
+WebSocket security backports are retained.
+
 You can get started with Pipecat running on your local machine, then move your agent processes to the cloud when you're ready.
 
 1. Install uv

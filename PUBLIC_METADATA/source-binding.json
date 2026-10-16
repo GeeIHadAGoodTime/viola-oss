@@ -30,13 +30,21 @@
   },
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "fef00bcc0fc2edb28799ad8ff536f3876075f95008af376de40b13642160c18d",
-  "source_tree_sha256": "9fd5acc53bd4c0aaf8a11ea8d64cd06012b9e7057a75e730c17abb133946a6f2",
+  "source_manifest_sha256": "6d40c6bbd22013b2c6f5fd2a93e4f707dc3b671455484b622f08c75a699b8f01",
+  "source_tree_sha256": "2a55803054ddab2c826904ffa2b2b04c7186141005e875139e4196c20942fd4a",
   "source_file_count": 2714,
-  "source_revision": "e279cd0dccc1a8069b6b25eea280a5a64ef95766",
-  "comparison_public_revision": "97678cdb81020ac1dbecbba6ce09bd8e598d2219",
+  "source_revision": "0dde535123fac2515fd0e1824093a6fc3ebdc98a",
+  "comparison_public_revision": "da53d19e96b5e1be7b95ec77356aba12e8fe976b",
   "changed_source_paths": [
-    "services/llm/route_tool_schemas.py"
+    "requirements_desktop.txt",
+    "requirements_linux.txt",
+    "requirements_macos.txt",
+    "tests/public/test_pipecat_runner_security.py",
+    "third_party/pipecat.patch",
+    "third_party/pipecat/README.md",
+    "third_party/pipecat/pyproject.toml",
+    "third_party/pipecat/src/pipecat/runner/run.py",
+    "third_party/sources.toml"
   ],
   "retained_sboms": [
     {
@@ -98,19 +106,44 @@
     }
   ],
   "input_equivalence": {
-    "basis": "Exact protected public 97678cdb81020ac1dbecbba6ce09bd8e598d2219",
+    "basis": "Exact protected public da53d19e96b5e1be7b95ec77356aba12e8fe976b",
     "changed_source_paths": [
-      "services/llm/route_tool_schemas.py"
+      "requirements_desktop.txt",
+      "requirements_linux.txt",
+      "requirements_macos.txt",
+      "tests/public/test_pipecat_runner_security.py",
+      "third_party/pipecat.patch",
+      "third_party/pipecat/README.md",
+      "third_party/pipecat/pyproject.toml",
+      "third_party/pipecat/src/pipecat/runner/run.py",
+      "third_party/sources.toml"
     ],
-    "unselected_source_files_preserved": 2713,
+    "unselected_source_files_preserved": 2705,
     "all_six_sbom_bytes_and_status_objects_preserved": true,
-    "dependency_and_workflow_inputs_unchanged": true,
-    "source_basis": "Actual source-only commit e279cd0dccc1a8069b6b25eea280a5a64ef95766, tree 4ebd44d4de44cc703bc894854dcdcfa48de889d6, parent protected public 97678cdb81020ac1dbecbba6ce09bd8e598d2219; exactly one route-schema source manifest row changed. All prior six reviewed source blobs remain identical. Reused 14/22/22 route receipts retain their original partial-overlay baselines and imported-source identities; they do not establish current complete-composition qualification. The retained 141 receipt remains confined to its original four memory/profile blobs.",
-    "historical_inventory_limits": "Unchanged dependency inputs for this repair do not upgrade any retained SBOM resolution or inventory status."
+    "dependency_and_workflow_inputs_unchanged": false,
+    "source_basis": "Actual source-only commit 0dde535123fac2515fd0e1824093a6fc3ebdc98a, tree 9406382a4846153fcd88397b93b2b9b8b39abd4f, parent da53d19e96b5e1be7b95ec77356aba12e8fe976b; all 2,741 tracked remote blobs verified before metadata refresh. This successor changes only two metadata files. The nine reviewed SOURCE bytes are not edited by metadata preparation.",
+    "historical_inventory_limits": "Dependency inputs changed. All six prior inventories retain their bytes, component counts, identities and existing historical/unqualified status objects. Four retained Windows desktop-derived inventories contain TinyTag 2.2.1 and Pipecat 0.0.108+viola.2, so they cannot qualify the new TinyTag 2.3.0 or Pipecat 0.0.108+viola.4 source inputs. DeepFilter and frontend have no changed input in this nine-file delta; their earlier historical limits remain unchanged.",
+    "workflow_inputs_unchanged": true,
+    "dependency_evidence_boundary": {
+      "new_installed_inventory_claimed": false,
+      "new_dependency_versions": {
+        "tinytag": "2.3.0",
+        "pipecat-ai": "0.0.108+viola.4"
+      },
+      "affected_existing_windows_inventory_scopes": [
+        "windows-desktop",
+        "windows-kokoro",
+        "windows-other-optional",
+        "windows-all-optional"
+      ],
+      "required_before_current_windows_inventory_qualification": "Run the existing clean Windows CPython 3.11 inventory consumer at the metadata-successor source: real pip install/report, pip check, installed package list and generated CycloneDX inventory must agree and be source-bound by .github/scripts/inventory_evidence.py. Rewriting retained SBOM versions or labels is not a substitute.",
+      "existing_consumer": ".github/scripts/run_windows_inventory.py",
+      "other_platform_boundary": "Changed Linux/macOS requirements have no installed platform evidence from this metadata repair; Windows receipts do not qualify those environments."
+    }
   },
   "qualification": {
-    "source_commit": "e279cd0dccc1a8069b6b25eea280a5a64ef95766",
-    "kind": "Exact one-source successor inventory binding with separately scoped reviewed constituent evidence",
+    "source_commit": "0dde535123fac2515fd0e1824093a6fc3ebdc98a",
+    "kind": "Exact nine-source security-successor checksum binding; historical dependency inventories retained without promotion",
     "source_binding_verification": {
       "files_checked": 2714,
       "retained_sboms_checked": 6,
@@ -437,17 +470,17 @@
       "scope": "Private fixture only: synthetic key, previous/shared-key isolation, real temporary SQLite salt storage. 11 unchanged class cases and 2 independent controls. PostgreSQL-specific/native proof remains explicit in the combined 141 receipt.",
       "environment": "Independent fixture proof: Linux Python 3.11.17. Combined final proof: Linux Python 3.12.14 and native PostgreSQL 18.1."
     },
-    "receipt_relationship": "Twelve distinct, potentially overlapping focused receipts; never sum their counts into aggregate coverage. All nine protected predecessor receipt objects and their source identities remain unchanged. Historical 141 proves only its four original memory/profile blobs. New 14 proves the original obligations in its final-source partial overlay. Author and independent 22 cover the same focused route-consumer cases, not 44 separate cases. None establishes a complete current protected or source-only composition.",
-    "independent_review": "Existing protected reviews are retained. The exact new route source has independent scoped approval with 22 native/MCP/UI consumer and strict-schema cases, plus verified author 14 and 22 receipts. This metadata successor awaits independent exact-candidate metadata review.",
-    "protected_public_checks": "Exact metadata-successor hosted checks pending; no branch publication was performed by metadata preparation.",
-    "canonical_private_public_composition": "No complete current-composition runtime qualification is claimed or rerun. The historical 141 receipt remains a four-source memory/profile partial overlay; the new 14/22/22 receipts retain their older public/private overlay and exact scoped source identities. Current protected-pin adoption and complete canonical aggregate qualification remain pending.",
+    "receipt_relationship": "All twelve predecessor focused receipt objects and exact source identities are retained unchanged as historical/scoped evidence. Their overlapping counts must not be summed or promoted to qualification of this complete security successor. This metadata repair adds checksum and revision-contract evidence only.",
+    "independent_review": "The nine source bytes are the root-published reviewed security packet. This two-file metadata repair awaits independent exact-candidate metadata review.",
+    "protected_public_checks": "Source-only PR126 head 0dde535123fac2515fd0e1824093a6fc3ebdc98a failed source binding in job 117060740397 with exactly nine content mismatches plus the aggregate hash. Metadata-successor hosted source checks and real dependency inventories remain pending.",
+    "canonical_private_public_composition": "No complete current-composition runtime qualification is claimed or rerun. All historical focused and partial-overlay receipt source identities remain unchanged. Exact protected-pin adoption and complete canonical aggregate qualification are separate work.",
     "full_public_suite": false,
     "native_windows_qualification": false,
     "image_qualification": false,
     "production_deployment": false,
     "installed_customer_acceptance": false,
     "provider_sandbox_acceptance": false,
-    "limits": "Complete source/SBOM checksum verification plus reused, independently reviewed focused constituent evidence only. No current combined runtime, full public or private aggregate, native Windows, image, live provider, hardware, deployment, release or installed-customer acceptance."
+    "limits": "Source/SBOM checksum verification and existing revision-contract checks only. No fresh resolution, current installed dependency inventory, advisory scan, full public/private aggregate, native Windows, image, live provider, hardware, release, deployment or installed-customer acceptance."
   },
   "historical_bindings": [
     {
@@ -12486,12 +12519,28 @@
     }
   ],
   "reviewed_source_patch": {
-    "source_commit": "e279cd0dccc1a8069b6b25eea280a5a64ef95766",
+    "source_commit": "0dde535123fac2515fd0e1824093a6fc3ebdc98a",
     "paths": [
-      "SOURCE/services/llm/route_tool_schemas.py"
+      "SOURCE/requirements_desktop.txt",
+      "SOURCE/requirements_linux.txt",
+      "SOURCE/requirements_macos.txt",
+      "SOURCE/tests/public/test_pipecat_runner_security.py",
+      "SOURCE/third_party/pipecat.patch",
+      "SOURCE/third_party/pipecat/README.md",
+      "SOURCE/third_party/pipecat/pyproject.toml",
+      "SOURCE/third_party/pipecat/src/pipecat/runner/run.py",
+      "SOURCE/third_party/sources.toml"
     ],
     "git_blobs": {
-      "SOURCE/services/llm/route_tool_schemas.py": "75507a7aa08e75317a33c78471f4cbdbf83b2eab"
+      "SOURCE/requirements_desktop.txt": "eaa52ac4994bf0b7e2e560f5cd4e4b40d9c0b0d3",
+      "SOURCE/requirements_linux.txt": "537b9fc08de0fde586f705e6d18b386b98de0848",
+      "SOURCE/requirements_macos.txt": "6412dd8c88578f3898b0ac1f73d1cdf9d83849d0",
+      "SOURCE/tests/public/test_pipecat_runner_security.py": "4529e407dcc6c4134a0555b2508b47fb66fe3079",
+      "SOURCE/third_party/pipecat.patch": "a91e5374d24b4913371c62e85ba68d549d2446df",
+      "SOURCE/third_party/pipecat/README.md": "fc51d149d9a7508cc01766df865dc75656cfaf19",
+      "SOURCE/third_party/pipecat/pyproject.toml": "5836ffdb2316c6db75ff19a2c696e829598cfc3b",
+      "SOURCE/third_party/pipecat/src/pipecat/runner/run.py": "190dc8b3c9f010f6d5c3c0c523cd7ce0d79cb68f",
+      "SOURCE/third_party/sources.toml": "16adcea4ea933de8c4dacaf00871f287e7602579"
     }
   },
   "new_resolution_performed": false,
@@ -12499,8 +12548,8 @@
   "new_runtime_qualification_performed": false,
   "new_source_contract_qualification_performed": true,
   "new_static_security_scan_performed": false,
-  "new_resolution_scope": "No dependency inputs changed or new dependency resolution performed. All six prior SBOM bytes and complete status objects remain unchanged.",
-  "new_advisory_scan_scope": "No new advisory scan; inherited statuses remain unchanged.",
+  "new_resolution_scope": "This repair performs no dependency resolution. The source-only predecessor changes TinyTag from 2.2.1 to 2.3.0 in desktop/Linux/macOS requirements and vendored Pipecat from 0.0.108+viola.3 to 0.0.108+viola.4. All six retained SBOM bytes and complete status objects remain historical and unchanged; none attests installation of these new versions.",
+  "new_advisory_scan_scope": "No advisory scan performed by this metadata repair; all prior advisory findings retain their original scopes and source identities.",
   "account_reconciliation_previous_binding": {
     "source_revision": "f864e61381ef9e10a09333fce05210427cf7d0f6",
     "source_manifest_sha256": "9cad8bcb2f98c34d95a11545e11a57d74dbe6b28cd5db7322b7746e102801acd",
@@ -16730,8 +16779,8 @@
       "new_static_security_scan_performed": false
     }
   },
-  "new_runtime_qualification_scope": "Focused Linux runtime contracts are listed separately under qualification.focused_source_contract_receipts. No full-application, native-Windows, image, live-provider, deployment or installed-customer runtime qualification.",
-  "new_source_contract_qualification_scope": "Complete inventory binding: 2,714 source files and six unchanged retained SBOMs. Eight unchanged revision contracts and focused metadata/new-route-source negative controls run locally. All nine protected receipts are preserved exactly: memory 191/208, profile 46/22, original four-source combined 141, plugin 65/115, wake 16/16; separate private fixture review 13. Reuse final-source route partial-overlay receipts 14/22/22 with exact import identities and independent approval. No runtime reruns, current combined or full aggregate qualification; overlapping counts must not be added. Earlier 84/20/75 remain predecessor evidence.",
+  "new_runtime_qualification_scope": "No application runtime suite, dependency installation, native Windows, full aggregate, image, provider, hardware, release, deployment or installed-customer qualification performed by this metadata repair. Earlier focused receipts retain their original evidence boundaries.",
+  "new_source_contract_qualification_scope": "The unchanged source manifest generator and source-binding consumer bind exactly 2,714 source files and six historical SBOMs. Exactly nine source manifest rows change; 2,705 rows and the complete path inventory are preserved. Eight existing source-binding revision contracts and wrong-source/tamper controls run locally. No dependency inventory or installed acceptance is promoted by checksum verification.",
   "consultation_responsive_previous_binding": {
     "repository_revision": "d1e042d527dde01c447350ab09638d0cca521268",
     "path": "PUBLIC_METADATA/source-binding.json",
@@ -18909,5 +18958,391 @@
       "new_source_contract_qualification_scope": "Complete inventory binding: 2,714 source files and six unchanged retained SBOMs. Eight existing revision contracts and focused metadata/new-source negative controls run locally. Existing focused receipts reused without rerunning green suites: memory 191/208, profile 46/22, original four-source combined memory/profile/native PostgreSQL 141, plugin 65/115 and wake 16/16. Separate private fixture review 13. Earlier 84/20/75 remain predecessor evidence. These counts overlap, are not additive and do not establish six-source combined or full aggregate qualification."
     },
     "retention": "Every replaced protected predecessor field is retained verbatim as a JSON value. All other inherited history, nine receipt objects, source identities, and retained SBOM statuses remain unchanged. Historical partial-overlay receipts are not promoted to current complete-composition qualification."
+  },
+  "security_dependency_previous_binding": {
+    "public_revision": "da53d19e96b5e1be7b95ec77356aba12e8fe976b",
+    "source_revision": "e279cd0dccc1a8069b6b25eea280a5a64ef95766",
+    "path": "PUBLIC_METADATA/source-binding.json",
+    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/da53d19e96b5e1be7b95ec77356aba12e8fe976b/PUBLIC_METADATA/source-binding.json",
+    "sha256": "88badef21f1ae5977fa95caeb94e35f4171172794994faa63a5f2bb067b0cb85",
+    "git_blob": "762f07c700ae975de26b404c605d5452665f73e6",
+    "bytes": 1659419,
+    "previous_source_manifest_sha256": "fef00bcc0fc2edb28799ad8ff536f3876075f95008af376de40b13642160c18d",
+    "previous_source_manifest_git_blob": "336cb97783db037e277ee24ad096ec59a7868fb1",
+    "previous_values": {
+      "source_manifest_sha256": "fef00bcc0fc2edb28799ad8ff536f3876075f95008af376de40b13642160c18d",
+      "source_tree_sha256": "9fd5acc53bd4c0aaf8a11ea8d64cd06012b9e7057a75e730c17abb133946a6f2",
+      "source_revision": "e279cd0dccc1a8069b6b25eea280a5a64ef95766",
+      "comparison_public_revision": "97678cdb81020ac1dbecbba6ce09bd8e598d2219",
+      "changed_source_paths": [
+        "services/llm/route_tool_schemas.py"
+      ],
+      "input_equivalence": {
+        "basis": "Exact protected public 97678cdb81020ac1dbecbba6ce09bd8e598d2219",
+        "changed_source_paths": [
+          "services/llm/route_tool_schemas.py"
+        ],
+        "unselected_source_files_preserved": 2713,
+        "all_six_sbom_bytes_and_status_objects_preserved": true,
+        "dependency_and_workflow_inputs_unchanged": true,
+        "source_basis": "Actual source-only commit e279cd0dccc1a8069b6b25eea280a5a64ef95766, tree 4ebd44d4de44cc703bc894854dcdcfa48de889d6, parent protected public 97678cdb81020ac1dbecbba6ce09bd8e598d2219; exactly one route-schema source manifest row changed. All prior six reviewed source blobs remain identical. Reused 14/22/22 route receipts retain their original partial-overlay baselines and imported-source identities; they do not establish current complete-composition qualification. The retained 141 receipt remains confined to its original four memory/profile blobs.",
+        "historical_inventory_limits": "Unchanged dependency inputs for this repair do not upgrade any retained SBOM resolution or inventory status."
+      },
+      "qualification": {
+        "source_commit": "e279cd0dccc1a8069b6b25eea280a5a64ef95766",
+        "kind": "Exact one-source successor inventory binding with separately scoped reviewed constituent evidence",
+        "source_binding_verification": {
+          "files_checked": 2714,
+          "retained_sboms_checked": 6,
+          "failures": 0,
+          "tool": "SOURCE/tools/release/verify_source_binding.py"
+        },
+        "source_binding_revision_contract_tests": {
+          "passed": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "focused_source_contract_receipts": {
+          "memory_supersede_author": {
+            "passed": 191,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "junit_sha256": "0dc938744d1092ee42b4b168377626858f3e23ea47d8a74fe1cdb745c9253fe1",
+            "environment": "Linux Python 3.11.17; existing full-dependency-closure runtime",
+            "scope": "Focused memory privacy, tiered semantic categories, supersede preservation and archive recovery contracts on the final three memory source blobs.",
+            "source_git_blobs": {
+              "SOURCE/services/memory/dir.py": "07dbdea3c37d6597241a6aad83956763e3ec6f26",
+              "SOURCE/services/memory/store.py": "bcc8a21856a74b50ec4e14d2dc70503af86860db",
+              "SOURCE/services/memory/hygiene.py": "bb31563f5ab69e0e30ecdfd8aa5a32f84ef8876e"
+            },
+            "evidence_kind": "Executed focused receipt; exact listed source-blob identity. Not a full public/private aggregate or complete final-head application run.",
+            "source_binding_receipt_sha256": "8c329c06aa0356ad63cabdace0a73831f1f5d5d8d6b2ca5db27c74e27e5524df"
+          },
+          "memory_supersede_independent": {
+            "passed": 208,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "junit_sha256": "e81b032a50323ede84519d249b5a3d1aacd2e897642753fe32832f63d1da77f1",
+            "environment": "Linux Python 3.11.17; existing full-dependency-closure runtime",
+            "scope": "191 author cases plus 17 independent controls; existing-archive backup failure, rollback failure recovery copy, real rename failures, source-change protection, positional IDs, tenant isolation and encrypted retention.",
+            "source_git_blobs": {
+              "SOURCE/services/memory/dir.py": "07dbdea3c37d6597241a6aad83956763e3ec6f26",
+              "SOURCE/services/memory/store.py": "bcc8a21856a74b50ec4e14d2dc70503af86860db",
+              "SOURCE/services/memory/hygiene.py": "bb31563f5ab69e0e30ecdfd8aa5a32f84ef8876e"
+            },
+            "evidence_kind": "Executed focused receipt; exact listed source-blob identity. Not a full public/private aggregate or complete final-head application run.",
+            "independent_review_sha256": "5eb3102e2b465c313452a9e54068c87ed0e798028bf5a606aa27f4a3464bc97d",
+            "source_binding_receipt_sha256": "98b8783a4f482dff15e447dae27df776ebd233fec45366d6f95361d3b10a4bbe"
+          },
+          "profile_author": {
+            "passed": 46,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "junit_sha256": "4f39c70762a2eedac19690e633276ebbbee4c9f06325bcc8c020298bc67f3cea",
+            "environment": "Linux Python 3.12.14; existing PostgreSQL 18.1 native fixture",
+            "scope": "38 affected unit cases plus 8 real PostgreSQL controls for RLS, consent-lock lifetime, nested savepoints, model/journal rollback and outer transaction preservation. Reused by unchanged exact profile blob identity.",
+            "source_git_blobs": {
+              "SOURCE/services/user_model/profile.py": "1bce9b347d252c49eeb2e70f0f26efcfd6d30c00"
+            },
+            "evidence_kind": "Executed focused receipt; exact listed source-blob identity. Not a full public/private aggregate or complete final-head application run.",
+            "source_binding_receipt_sha256": "1ad195e50344d253621997e06a44e86c3aa2806b54ab129c8c8be7e406d6b6ea"
+          },
+          "profile_independent": {
+            "passed": 22,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "junit_sha256": "b189a1cca080e09d288e6439f4d1db7c8f3d1fbff90eec1eba8db9413a613105",
+            "environment": "Linux Python 3.12.14; existing PostgreSQL 18.1 native fixture",
+            "scope": "Independent focused profile controls, including caught nested failures, SQL-error recovery, unrelated tenant writes, outer commit/rollback and lock lifetime. Reused by unchanged exact profile blob identity.",
+            "source_git_blobs": {
+              "SOURCE/services/user_model/profile.py": "1bce9b347d252c49eeb2e70f0f26efcfd6d30c00"
+            },
+            "evidence_kind": "Executed focused receipt; exact listed source-blob identity. Not a full public/private aggregate or complete final-head application run.",
+            "independent_review_sha256": "f9cd5a2ef13ea2d314e2268783f0c4261a952f9d99d5afae75774f7c3bec5252",
+            "source_binding_receipt_sha256": "d0038ece69189a72cad3e43113e8f44ca3df78a786c5abc317c24d25c567beab"
+          },
+          "combined_final_memory_profile": {
+            "passed": 141,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "junit_sha256": "f9a4dffc7a2bb20af3e85d97c78733a95e7c3713ec27f82b5e7fd65736f0cec7",
+            "environment": "Linux Python 3.12.14; existing PostgreSQL 18.1 native fixture",
+            "scope": "Focused combined final memory/profile and native SQL proofs on a partial private/public overlay, with the isolated private encryption fixture. Actual imported identities match the complete final four-source tuple. Not the complete canonical aggregate or a full exact private checkout.",
+            "source_git_blobs": {
+              "SOURCE/services/memory/dir.py": "07dbdea3c37d6597241a6aad83956763e3ec6f26",
+              "SOURCE/services/memory/store.py": "bcc8a21856a74b50ec4e14d2dc70503af86860db",
+              "SOURCE/services/memory/hygiene.py": "bb31563f5ab69e0e30ecdfd8aa5a32f84ef8876e",
+              "SOURCE/services/user_model/profile.py": "1bce9b347d252c49eeb2e70f0f26efcfd6d30c00"
+            },
+            "evidence_kind": "Executed focused receipt; exact listed source-blob identity. Not a full public/private aggregate or complete final-head application run.",
+            "source_binding_receipt_sha256": "824ebd3c669282195f4da0f0fe634425977a1d86e8b59f802a9fb3da29e8f81f"
+          },
+          "plugin_sandbox_author": {
+            "passed": 65,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "junit_sha256": "7691bf23f793cd3db181c683c5b911170850eafdc85e1fbe8c9abd2111889a89",
+            "environment": "Linux Python 3.11.17; existing full-dependency-closure runtime",
+            "scope": "Corrected ordinary plugin exception isolation at sync/async and lifecycle callback boundaries; consecutive crash/reset behavior, payload-free diagnostics and explicit concurrent.futures cancellation propagation. One public source blob; reviewed private test fixture and runner remain separate.",
+            "source_git_blobs": {
+              "SOURCE/plugins/sandbox.py": "dc9cb3300eaf2ee7e6a0754dc9964ea4575db9d2"
+            },
+            "source_binding_receipt_sha256": "d60e3f339ac1ab0fe68867ed1ba639901608991dce3dbf8e26c1ce784569a90e",
+            "evidence_kind": "Previously executed focused receipt reused by exact listed source-blob identity. No six-source combined, full public/private aggregate or complete final-head application qualification."
+          },
+          "plugin_sandbox_independent": {
+            "passed": 115,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "junit_sha256": "3aa4a38f16850a34e6f9582d165dc9957e91faa9aec249e566b9edcce70be19d",
+            "environment": "Linux Python 3.11.17; existing full-dependency-closure runtime",
+            "scope": "65 author cases, 10 existing isolation cases and 40 independent controls. Cancellation and BaseException propagation, crash threshold/reset semantics, cleanup and payload-free diagnostics. The 65 author cases overlap this receipt. No plugin feature or resource-enforcement expansion.",
+            "source_git_blobs": {
+              "SOURCE/plugins/sandbox.py": "dc9cb3300eaf2ee7e6a0754dc9964ea4575db9d2"
+            },
+            "source_binding_receipt_sha256": "6d465e60b0f85caced36fbfe52a78a9c1eb1140c8b8226f4fcc877b1b2b51e03",
+            "evidence_kind": "Previously executed focused receipt reused by exact listed source-blob identity. No six-source combined, full public/private aggregate or complete final-head application qualification.",
+            "independent_review_sha256": "8b20b9ec640ca3b26afb1a777274142a69fc5028eb09a2e366df7afd869eca9a"
+          },
+          "wake_sensitivity_author": {
+            "passed": 16,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "junit_sha256": "b4726136638b27e09601100ce6951a32c27dbbdd68f153ad3aabeab1b46915e4",
+            "environment": "Linux CPython 3.11.17 native-venv; isolated focused composition",
+            "scope": "Public source comment only; production AST unchanged. Saved sensitivities, including 0.80, remain preserved; absent-key defaults reach 0.90. Focused private migration, persistence, reload, canonical/legacy alias and generic settings regressions. No new runtime behavior, broad wake/audio/device campaign or combined composition qualification.",
+            "source_git_blobs": {
+              "SOURCE/ui/settings_manager.py": "4cf8e70270df565ac02a654889fdb223d0fbdaf7"
+            },
+            "source_binding_receipt_sha256": "a5c818cfb1bbd8a64a5f7453d933e46154a846db930833c219da9c991dc45e87",
+            "evidence_kind": "Previously executed focused receipt reused by exact listed source-blob identity. No six-source combined, full public/private aggregate or complete final-head application qualification."
+          },
+          "wake_sensitivity_independent": {
+            "passed": 16,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "junit_sha256": "46af20353fec06d8629f61ea4ff5cf9a7c8415fac06e06f365d16bf92f67f463",
+            "environment": "Linux CPython 3.11.17 native-venv; isolated focused composition",
+            "scope": "Public source comment only; production AST unchanged. Saved sensitivities, including 0.80, remain preserved; absent-key defaults reach 0.90. Focused private migration, persistence, reload, canonical/legacy alias and generic settings regressions. No new runtime behavior, broad wake/audio/device campaign or combined composition qualification. Independent rerun of the same 16 cases, not 16 additional cases.",
+            "source_git_blobs": {
+              "SOURCE/ui/settings_manager.py": "4cf8e70270df565ac02a654889fdb223d0fbdaf7"
+            },
+            "source_binding_receipt_sha256": "a2d6384e23d3d9584dce4ef47b21ded6335ea180ee14b91742336ce3d4467af3",
+            "evidence_kind": "Previously executed focused receipt reused by exact listed source-blob identity. No six-source combined, full public/private aggregate or complete final-head application qualification.",
+            "independent_review_sha256": "8fbf5ea803bb5b2f74366dcbb15d4b852ae72f87bf212b896a9d1b21ec9dc337"
+          },
+          "strict_route_original_fourteen_author": {
+            "passed": 14,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "junit_sha256": "3051222b17f9885d27e13d9ca3bad9921dc9546488b7cb6e42129df45f228300",
+            "environment": "Linux CPython 3.11.17; existing full-dependency-closure runtime and partial private/public overlay",
+            "scope": "Final-source execution of the original 14 previously unexecuted private obligations: two GPT model fixtures, seven routing parameter cases, one local TTS boundary and four NumPy/scalar Silero cases. Reuses one reviewed route catalog/decoder source and owned mock-provider/PCM boundaries; only a partial overlay, not a current full aggregate.",
+            "source_git_blobs": {
+              "SOURCE/services/llm/route_tool_schemas.py": "75507a7aa08e75317a33c78471f4cbdbf83b2eab"
+            },
+            "source_binding_receipt_sha256": "22327f88988d42e7cb732caf75cef10bbb3f8e0a80f0639bd417abfecafeff95",
+            "independent_review_sha256": "05c3a8d315374ed2300fab9443c9bb4f680a755c5a74ade629e87d2c38ea4e9e",
+            "runner_invocation_sha256": "20a05c08e5624084a9946a9c44dfd7d222542a2a4d505e5e0e0a19203fc170ed",
+            "runner_summary_sha256": "724b663a0d301eed2e04f0e3cc686024cdf5b26a051800f4395041331cc6ffe8",
+            "frozen_repair_manifest_sha256": "906ec4a13750cfa497ce98378549de10fa3bfd38c8e1e3e67bdd5faf35aa8735",
+            "private_fixture_git_blobs": {
+              "tests/unit/test_gpt_handler.py": "ef0dc939e8ad18eb07d5e99ec2fc9527202d984b",
+              "tests/unit/test_model_routing.py": "fd9fcfd4dcebbdcbb2ff30ff9e2a4f2471a3f9c0",
+              "tests/unit/test_tts_pipeline_injection.py": "a8749acad9b28614f1b11f8117cdd68377195e0c",
+              "tests/unit/voice/test_silero_vad_endpoint.py": "222e286b0c55eaa1c80f987d8e4fdabd6261ff96",
+              "tests/unit/services/llm/test_assistant_capability_route_schemas.py": "ad78427adb15ce2f3e6ba9b62de767d61fc2b493"
+            },
+            "receipt_public_baseline": "2186ca5cc6f1b1eacc8299a2c5f9704cefef5cbc",
+            "receipt_private_baseline": "2bdf1c9d52793a6e8aca80274c9e73ba92bff69a",
+            "evidence_kind": "Previously executed focused receipt reused by exact final route-schema blob and frozen fixture identities. This partial overlay is not the complete protected 97678cdb or e279cd0d composition; no current full aggregate or final-head application qualification.",
+            "current_source_import_identity_comparison": {
+              "name": "strict_route_original_fourteen_author",
+              "unique_imported_public_files": 190,
+              "matching_current_source_files": 188,
+              "different_current_source_files": [
+                {
+                  "path": "SOURCE/plugins/sandbox.py",
+                  "receipt_git_blob": "c94210fffb6174bd88d7989a9839909ff685c5d0",
+                  "current_git_blob": "dc9cb3300eaf2ee7e6a0754dc9964ea4575db9d2"
+                },
+                {
+                  "path": "SOURCE/ui/settings_manager.py",
+                  "receipt_git_blob": "5228feac890a64dfc115d3bfe79b82c47f6912b5",
+                  "current_git_blob": "4cf8e70270df565ac02a654889fdb223d0fbdaf7"
+                }
+              ],
+              "interpretation": "Partial-overlay source receipt only. Imported files outside the scoped reviewed route and consumer tuple do not establish complete current-source qualification."
+            }
+          },
+          "strict_route_consumers_author": {
+            "passed": 22,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "junit_sha256": "9694e653328f836c790261d1a86258c0ea984078385ebfd1fda3dd30bcb7969f",
+            "environment": "Linux CPython 3.11.17; existing full-dependency-closure runtime and partial private/public overlay",
+            "scope": "Closed nullable MCP-compatible room_name prefill and OpenAI JSON-string card transport decoded losslessly into actual native/MCP/UI consumers. Existing neutral/Anthropic extensible objects and legacy dicts preserved. Strict converter remains unchanged and rejects reopened schemas. Missing/null/empty/malformed/scalar/array/deep/oversized-number/nonfinite controls retain the answer without an unusable card. No tenant/auth/dispatch changes.",
+            "source_git_blobs": {
+              "SOURCE/services/llm/route_tool_schemas.py": "75507a7aa08e75317a33c78471f4cbdbf83b2eab"
+            },
+            "source_binding_receipt_sha256": "2f0481896ddcc02fa033fa447fa45cb22ffc201e7b5244530060d41ee0db6791",
+            "independent_review_sha256": "05c3a8d315374ed2300fab9443c9bb4f680a755c5a74ade629e87d2c38ea4e9e",
+            "runner_invocation_sha256": "561dcc3c787a632f478ac5d52ab7c25a125904051a1e5520f81ca033fab58e6a",
+            "runner_summary_sha256": "5afcd2e9ca0081986cd1fab09bedb6146a34625fdb2c3350336de9af3ed76416",
+            "frozen_repair_manifest_sha256": "906ec4a13750cfa497ce98378549de10fa3bfd38c8e1e3e67bdd5faf35aa8735",
+            "private_fixture_git_blobs": {
+              "tests/unit/test_gpt_handler.py": "ef0dc939e8ad18eb07d5e99ec2fc9527202d984b",
+              "tests/unit/test_model_routing.py": "fd9fcfd4dcebbdcbb2ff30ff9e2a4f2471a3f9c0",
+              "tests/unit/test_tts_pipeline_injection.py": "a8749acad9b28614f1b11f8117cdd68377195e0c",
+              "tests/unit/voice/test_silero_vad_endpoint.py": "222e286b0c55eaa1c80f987d8e4fdabd6261ff96",
+              "tests/unit/services/llm/test_assistant_capability_route_schemas.py": "ad78427adb15ce2f3e6ba9b62de767d61fc2b493"
+            },
+            "receipt_public_baseline": "2186ca5cc6f1b1eacc8299a2c5f9704cefef5cbc",
+            "receipt_private_baseline": "2bdf1c9d52793a6e8aca80274c9e73ba92bff69a",
+            "evidence_kind": "Previously executed focused receipt reused by exact final route-schema blob and frozen fixture identities. This partial overlay is not the complete protected 97678cdb or e279cd0d composition; no current full aggregate or final-head application qualification.",
+            "current_source_import_identity_comparison": {
+              "name": "strict_route_consumers_author",
+              "unique_imported_public_files": 270,
+              "matching_current_source_files": 265,
+              "different_current_source_files": [
+                {
+                  "path": "SOURCE/plugins/sandbox.py",
+                  "receipt_git_blob": "c94210fffb6174bd88d7989a9839909ff685c5d0",
+                  "current_git_blob": "dc9cb3300eaf2ee7e6a0754dc9964ea4575db9d2"
+                },
+                {
+                  "path": "SOURCE/services/memory/dir.py",
+                  "receipt_git_blob": "10791377ca9ef1e00161bc9fa3a44aad3a40d727",
+                  "current_git_blob": "07dbdea3c37d6597241a6aad83956763e3ec6f26"
+                },
+                {
+                  "path": "SOURCE/services/memory/hygiene.py",
+                  "receipt_git_blob": "7689eb6b9c4f61acc72d1212d34fd3df1cadb097",
+                  "current_git_blob": "bb31563f5ab69e0e30ecdfd8aa5a32f84ef8876e"
+                },
+                {
+                  "path": "SOURCE/services/memory/store.py",
+                  "receipt_git_blob": "8ac31de2996cb9a424fcbf2c994949e1300d840b",
+                  "current_git_blob": "bcc8a21856a74b50ec4e14d2dc70503af86860db"
+                },
+                {
+                  "path": "SOURCE/ui/settings_manager.py",
+                  "receipt_git_blob": "5228feac890a64dfc115d3bfe79b82c47f6912b5",
+                  "current_git_blob": "4cf8e70270df565ac02a654889fdb223d0fbdaf7"
+                }
+              ],
+              "interpretation": "Partial-overlay source receipt only. Imported files outside the scoped reviewed route and consumer tuple do not establish complete current-source qualification."
+            }
+          },
+          "strict_route_consumers_independent": {
+            "passed": 22,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "junit_sha256": "28c82f4e180212816a6bca76c788c04c5924bba2318212bbb66302ffd77f77c7",
+            "environment": "Linux CPython 3.11.17; existing full-dependency-closure runtime and partial private/public overlay",
+            "scope": "Closed nullable MCP-compatible room_name prefill and OpenAI JSON-string card transport decoded losslessly into actual native/MCP/UI consumers. Existing neutral/Anthropic extensible objects and legacy dicts preserved. Strict converter remains unchanged and rejects reopened schemas. Missing/null/empty/malformed/scalar/array/deep/oversized-number/nonfinite controls retain the answer without an unusable card. No tenant/auth/dispatch changes. Independent rerun of the same 22 cases, not 22 additional cases; no live provider or hardware execution.",
+            "source_git_blobs": {
+              "SOURCE/services/llm/route_tool_schemas.py": "75507a7aa08e75317a33c78471f4cbdbf83b2eab"
+            },
+            "source_binding_receipt_sha256": "2f0481896ddcc02fa033fa447fa45cb22ffc201e7b5244530060d41ee0db6791",
+            "independent_review_sha256": "05c3a8d315374ed2300fab9443c9bb4f680a755c5a74ade629e87d2c38ea4e9e",
+            "runner_invocation_sha256": "af69cd7253d63b9d38c3a542c9fbe11068d9501d7a074824c9a939088f07bf60",
+            "runner_summary_sha256": "62ff0654183bd66a4400748eae05805773f2c98c0d701cd7cb553beb96518707",
+            "frozen_repair_manifest_sha256": "906ec4a13750cfa497ce98378549de10fa3bfd38c8e1e3e67bdd5faf35aa8735",
+            "private_fixture_git_blobs": {
+              "tests/unit/test_gpt_handler.py": "ef0dc939e8ad18eb07d5e99ec2fc9527202d984b",
+              "tests/unit/test_model_routing.py": "fd9fcfd4dcebbdcbb2ff30ff9e2a4f2471a3f9c0",
+              "tests/unit/test_tts_pipeline_injection.py": "a8749acad9b28614f1b11f8117cdd68377195e0c",
+              "tests/unit/voice/test_silero_vad_endpoint.py": "222e286b0c55eaa1c80f987d8e4fdabd6261ff96",
+              "tests/unit/services/llm/test_assistant_capability_route_schemas.py": "ad78427adb15ce2f3e6ba9b62de767d61fc2b493"
+            },
+            "receipt_public_baseline": "2186ca5cc6f1b1eacc8299a2c5f9704cefef5cbc",
+            "receipt_private_baseline": "2bdf1c9d52793a6e8aca80274c9e73ba92bff69a",
+            "evidence_kind": "Previously executed focused receipt reused by exact final route-schema blob and frozen fixture identities. This partial overlay is not the complete protected 97678cdb or e279cd0d composition; no current full aggregate or final-head application qualification.",
+            "current_source_import_identity_comparison": {
+              "name": "strict_route_consumers_independent",
+              "unique_imported_public_files": 270,
+              "matching_current_source_files": 265,
+              "different_current_source_files": [
+                {
+                  "path": "SOURCE/plugins/sandbox.py",
+                  "receipt_git_blob": "c94210fffb6174bd88d7989a9839909ff685c5d0",
+                  "current_git_blob": "dc9cb3300eaf2ee7e6a0754dc9964ea4575db9d2"
+                },
+                {
+                  "path": "SOURCE/services/memory/dir.py",
+                  "receipt_git_blob": "10791377ca9ef1e00161bc9fa3a44aad3a40d727",
+                  "current_git_blob": "07dbdea3c37d6597241a6aad83956763e3ec6f26"
+                },
+                {
+                  "path": "SOURCE/services/memory/hygiene.py",
+                  "receipt_git_blob": "7689eb6b9c4f61acc72d1212d34fd3df1cadb097",
+                  "current_git_blob": "bb31563f5ab69e0e30ecdfd8aa5a32f84ef8876e"
+                },
+                {
+                  "path": "SOURCE/services/memory/store.py",
+                  "receipt_git_blob": "8ac31de2996cb9a424fcbf2c994949e1300d840b",
+                  "current_git_blob": "bcc8a21856a74b50ec4e14d2dc70503af86860db"
+                },
+                {
+                  "path": "SOURCE/ui/settings_manager.py",
+                  "receipt_git_blob": "5228feac890a64dfc115d3bfe79b82c47f6912b5",
+                  "current_git_blob": "4cf8e70270df565ac02a654889fdb223d0fbdaf7"
+                }
+              ],
+              "interpretation": "Partial-overlay source receipt only. Imported files outside the scoped reviewed route and consumer tuple do not establish complete current-source qualification."
+            }
+          }
+        },
+        "private_encryption_fixture_review": {
+          "path": "tests/unit/test_memory_encryption.py",
+          "sha256": "5129d202bd1056663e819832b9a7b4d335180e8cca842419ffdac6d4fe7b434b",
+          "git_blob": "c7384e78b0d3a7e20ab38da00191dbec59b6acfd",
+          "independent_review_sha256": "1ecb924a2cd0f513723c57b02f1cab7d567e05133d416cf05a7ec45ec6500984",
+          "independent_test_count": 13,
+          "independent_junit_sha256": "a87b60566c8eced39b7744f528a284eefd9de7aa2c25726faa500ba89c2e7165",
+          "scope": "Private fixture only: synthetic key, previous/shared-key isolation, real temporary SQLite salt storage. 11 unchanged class cases and 2 independent controls. PostgreSQL-specific/native proof remains explicit in the combined 141 receipt.",
+          "environment": "Independent fixture proof: Linux Python 3.11.17. Combined final proof: Linux Python 3.12.14 and native PostgreSQL 18.1."
+        },
+        "receipt_relationship": "Twelve distinct, potentially overlapping focused receipts; never sum their counts into aggregate coverage. All nine protected predecessor receipt objects and their source identities remain unchanged. Historical 141 proves only its four original memory/profile blobs. New 14 proves the original obligations in its final-source partial overlay. Author and independent 22 cover the same focused route-consumer cases, not 44 separate cases. None establishes a complete current protected or source-only composition.",
+        "independent_review": "Existing protected reviews are retained. The exact new route source has independent scoped approval with 22 native/MCP/UI consumer and strict-schema cases, plus verified author 14 and 22 receipts. This metadata successor awaits independent exact-candidate metadata review.",
+        "protected_public_checks": "Exact metadata-successor hosted checks pending; no branch publication was performed by metadata preparation.",
+        "canonical_private_public_composition": "No complete current-composition runtime qualification is claimed or rerun. The historical 141 receipt remains a four-source memory/profile partial overlay; the new 14/22/22 receipts retain their older public/private overlay and exact scoped source identities. Current protected-pin adoption and complete canonical aggregate qualification remain pending.",
+        "full_public_suite": false,
+        "native_windows_qualification": false,
+        "image_qualification": false,
+        "production_deployment": false,
+        "installed_customer_acceptance": false,
+        "provider_sandbox_acceptance": false,
+        "limits": "Complete source/SBOM checksum verification plus reused, independently reviewed focused constituent evidence only. No current combined runtime, full public or private aggregate, native Windows, image, live provider, hardware, deployment, release or installed-customer acceptance."
+      },
+      "reviewed_source_patch": {
+        "source_commit": "e279cd0dccc1a8069b6b25eea280a5a64ef95766",
+        "paths": [
+          "SOURCE/services/llm/route_tool_schemas.py"
+        ],
+        "git_blobs": {
+          "SOURCE/services/llm/route_tool_schemas.py": "75507a7aa08e75317a33c78471f4cbdbf83b2eab"
+        }
+      },
+      "new_resolution_scope": "No dependency inputs changed or new dependency resolution performed. All six prior SBOM bytes and complete status objects remain unchanged.",
+      "new_advisory_scan_scope": "No new advisory scan; inherited statuses remain unchanged.",
+      "new_runtime_qualification_scope": "Focused Linux runtime contracts are listed separately under qualification.focused_source_contract_receipts. No full-application, native-Windows, image, live-provider, deployment or installed-customer runtime qualification.",
+      "new_source_contract_qualification_scope": "Complete inventory binding: 2,714 source files and six unchanged retained SBOMs. Eight unchanged revision contracts and focused metadata/new-route-source negative controls run locally. All nine protected receipts are preserved exactly: memory 191/208, profile 46/22, original four-source combined 141, plugin 65/115, wake 16/16; separate private fixture review 13. Reuse final-source route partial-overlay receipts 14/22/22 with exact import identities and independent approval. No runtime reruns, current combined or full aggregate qualification; overlapping counts must not be added. Earlier 84/20/75 remain predecessor evidence."
+    },
+    "retention": "Every replaced predecessor field is retained verbatim as a JSON value. All other history, twelve focused receipt objects, source identities and six complete retained SBOM status objects are unchanged. Historical installed inventories are not relabeled for the TinyTag/Pipecat source successor."
   }
 }
