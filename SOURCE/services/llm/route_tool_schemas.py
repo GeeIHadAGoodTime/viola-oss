@@ -12,6 +12,8 @@ Source of truth: docs/LLM_CAPABILITY_MAP.md
 
 from __future__ import annotations
 
+import copy
+import json
 from typing import Any
 
 # ---------------------------------------------------------------------------
@@ -163,16 +165,22 @@ ROUTE_TOOL_SCHEMAS: list[dict[str, Any]] = [
                     "description": "Panel to open.",
                 },
                 "sub_tab": {
-                    "type": "string",
+                    "type": ["string", "null"],
                     "description": (
                         "Optional Settings tab such as account, ai_agents, music_voice, "
                         "messaging, services, payment, or preferences."
                     ),
                 },
                 "prefill": {
-                    "type": "object",
+                    "type": ["object", "null"],
                     "description": "Optional UI prefill, for example {'room_name': 'kitchen'}.",
-                    "additionalProperties": True,
+                    "properties": {
+                        "room_name": {
+                            "type": ["string", "null"],
+                            "description": "Room or speaker name to prefill in the Add Room flow.",
+                        },
+                    },
+                    "additionalProperties": False,
                 },
             },
             "required": ["panel_id"],
@@ -799,13 +807,23 @@ def get_openai_route_tools() -> list[dict[str, Any]]:
     """
     result: list[dict[str, Any]] = []
     for schema in ROUTE_TOOL_SCHEMAS:
+        parameters = copy.deepcopy(schema["parameters"])
+        if schema["name"] == "answer":
+            # OpenAI strict objects cannot express extensible display envelopes.
+            # Preserve every card field as JSON on this wire, then restore the
+            # object in convert_route_tool_response before existing UI consumers.
+            card = parameters["properties"]["card"]
+            parameters["properties"]["card"] = {
+                "type": ["string", "null"],
+                "description": "JSON-encoded object. " + card["description"],
+            }
         result.append(
             {
                 "type": "function",
                 "function": {
                     "name": schema["name"],
                     "description": schema["description"],
-                    "parameters": schema["parameters"],
+                    "parameters": parameters,
                 },
             }
         )
@@ -914,6 +932,14 @@ def convert_route_tool_response(
         }
         # Pass through content card if provided
         card = tool_args.get("card")
+        if isinstance(card, str):
+            try:
+                card = json.loads(card)
+                # Python accepts NaN/Infinity and overflowing exponents, but
+                # the UI transport requires finite JSON values throughout.
+                json.dumps(card, allow_nan=False)
+            except (ValueError, RecursionError):
+                card = None
         if card and isinstance(card, dict):
             result["card"] = card
         # Pass through voice summary for TTS

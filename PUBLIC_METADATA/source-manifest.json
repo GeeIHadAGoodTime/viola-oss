@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "afe1e0a94527b4a9f0d9ab87a92f00dd6b5dadae",
-  "sha256": "b387c9095b0f316ac0f249fdd62be4829a2b3159ef315301faa36dfe277763d6",
+  "revision": "e279cd0dccc1a8069b6b25eea280a5a64ef95766",
+  "sha256": "9fd5acc53bd4c0aaf8a11ea8d64cd06012b9e7057a75e730c17abb133946a6f2",
   "files": [
     {
       "path": ".env.example",
@@ -4695,8 +4695,8 @@
     },
     {
       "path": "services/llm/route_tool_schemas.py",
-      "sha256": "d68044d3c35ac5ba8381ea8e6eabfb7ac4b28fc44c841f3dac3c63c9ddd1f8e1",
-      "bytes": 41692
+      "sha256": "70e4fb3b4ce10cd8a781f4a98d53f1c1088759cb0a0c5ec3fdfa45b67784f0fd",
+      "bytes": 42953
     },
     {
       "path": "services/llm/session_cost_tracker.py",
