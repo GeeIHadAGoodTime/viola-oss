@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import io
 import re
 import sys
 import tempfile
@@ -146,9 +147,10 @@ class PipecatRunnerWebSocketSecurity(unittest.TestCase):
     def test_provider_webhook_issues_a_tokenized_working_websocket_url(self):
         app = self._app()
         bootstrap = "synthetic-bootstrap-value"
-        with patch("pipecat.runner.run._WS_AUTH_BOOTSTRAP_SECRET", bootstrap), TestClient(
-            app
-        ) as client:
+        with (
+            patch("pipecat.runner.run._WS_AUTH_BOOTSTRAP_SECRET", bootstrap),
+            TestClient(app) as client,
+        ):
             self.assertEqual(client.post("/").status_code, 403)
             response = client.post(f"/?auth={bootstrap}")
             self.assertEqual(response.status_code, 200)
@@ -173,6 +175,79 @@ class PipecatRunnerWebSocketSecurity(unittest.TestCase):
         ):
             main()
         self.assertEqual(stopped.exception.code, 2)
+
+
+class PipecatRunnerDevelopmentBoundary(unittest.TestCase):
+    """Exercise the real CLI before any server or direct bot can be started."""
+
+    def assert_development_warning(self, output):
+        text = output.getvalue()
+        self.assertEqual(text.count("PIPECAT DEVELOPMENT RUNNER"), 1)
+        self.assertIn("For development purposes only.", text)
+        self.assertIn("Unauthenticated endpoints can create real resources.", text)
+        self.assertIn("Do not expose directly to untrusted networks.", text)
+        self.assertIn("https://docs.pipecat.ai/pipecat/deployment/overview", text)
+
+    def test_all_server_modes_warn_before_creating_app_and_listening(self):
+        modes = [
+            [],
+            ["-t", "daily"],
+            ["-t", "daily", "--dialin"],
+            ["--esp32", "--host", "127.0.0.1"],
+            ["--whatsapp"],
+            *[["-t", transport] for transport in ("twilio", "telnyx", "plivo", "exotel")],
+            ["--host", "0.0.0.0"],
+        ]
+        for options in modes:
+            with self.subTest(options=options):
+                output = io.StringIO()
+                app = object()
+
+                def create_app(args):
+                    self.assert_development_warning(output)
+                    return app
+
+                with (
+                    patch.object(sys, "argv", ["bot.py", *options]),
+                    patch("sys.stdout", output),
+                    patch("pipecat.runner.run.RUNNER_HOST", "localhost"),
+                    patch("pipecat.runner.run.RUNNER_PORT", 7860),
+                    patch("pipecat.runner.run.RUNNER_DOWNLOADS_FOLDER", None),
+                    patch("pipecat.runner.run._WS_AUTH_BOOTSTRAP_CONFIGURED", True),
+                    patch(
+                        "pipecat.runner.run._create_server_app", side_effect=create_app
+                    ) as create,
+                    patch("pipecat.runner.run.uvicorn.run") as serve,
+                ):
+                    main()
+                create.assert_called_once()
+                host = options[options.index("--host") + 1] if "--host" in options else "localhost"
+                serve.assert_called_once_with(app, host=host, port=7860)
+
+    def test_direct_daily_warns_before_running_bot_without_starting_server(self):
+        for options in (["--direct"], ["-t", "daily", "--direct"]):
+            with self.subTest(options=options):
+                output = io.StringIO()
+
+                async def run_direct(args):
+                    self.assert_development_warning(output)
+                    self.assertEqual(args.transport, "daily")
+
+                with (
+                    patch.object(sys, "argv", ["bot.py", *options]),
+                    patch("sys.stdout", output),
+                    patch(
+                        "pipecat.runner.run._run_daily_direct",
+                        new=AsyncMock(side_effect=run_direct),
+                    ) as direct,
+                    patch("pipecat.runner.run._create_server_app") as create,
+                    patch("pipecat.runner.run.uvicorn.run") as serve,
+                ):
+                    main()
+                direct.assert_awaited_once()
+                create.assert_not_called()
+                serve.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()

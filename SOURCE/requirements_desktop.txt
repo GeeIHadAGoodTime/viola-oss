@@ -57,7 +57,7 @@ python-vlc==3.0.21203  # Updated VLC bindings with HTTPS header fixes
 sounddevice==0.5.3  # PortAudio bindings for streaming backend playback
 
 # Phone calling (Telnyx + Pipecat)
-./third_party/pipecat  # Maintained 0.0.108+viola.3 fork; tokenizer and runner security backports
+./third_party/pipecat  # Maintained 0.0.108+viola.4 fork; tokenizer and runner security backports
 telnyx[webhooks]==4.86.0
 PyNaCl==1.6.2  # Required by Telnyx Ed25519 webhook signature verification
 phonenumbers==9.0.33
@@ -125,7 +125,7 @@ av>=11.0.0,<18.0.0
 # Local music provider - fuzzy search for local file library
 rapidfuzz==3.14.3
 # Audio metadata extraction for local library scanner
-tinytag==2.2.1  # SECURITY: 2.2.1 fixes CVE-2026-32889 (DoS via unterminated SYLT frame)
+tinytag==2.3.0  # SECURITY: fixes CVE-2026-104266 (M4A atom loop); retains CVE-2026-32889 SYLT fix
 
 # Desktop automation (agent desktop tools — window control, UI interaction)
 pywinauto>=0.6.8,<0.7.0; sys_platform == "win32"  # Windows UI automation via accessibility APIs (Windows-only)

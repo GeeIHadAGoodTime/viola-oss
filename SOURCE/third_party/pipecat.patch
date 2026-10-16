@@ -9,7 +9,7 @@
  [project]
  name = "pipecat-ai"
 -dynamic = ["version"]
-+version = "0.0.108+viola.3"
++version = "0.0.108+viola.4"
  description = "An open source framework for voice (and multimodal) assistants"
  license = "BSD-2-Clause"
 -license-files = ["LICENSE"]
@@ -210,30 +210,35 @@
 -            # Mark that we need lookahead (don't call NLTK yet)
 +            # Mark that we need lookahead (don't call pySBD yet)
 +
-diff --git a/pipecat/src/pipecat/runner/run.py b/pipecat/src/pipecat/runner/run.py
-index 76c8704..582bbfc 100644
 --- a/pipecat/src/pipecat/runner/run.py
 +++ b/pipecat/src/pipecat/runner/run.py
-@@ -69,0 +70,4 @@ import asyncio
+@@ -13,0 +14,6 @@ supports multiple transport types with a unified interface.
++This is a local development tool, not a production server. Some session-creation
++endpoints are unauthenticated and are not rate limited. Do not expose the runner
++directly to untrusted networks, including through public ports or tunnels.
++Production deployments require an authenticated dispatcher or managed runtime.
++See https://docs.pipecat.ai/pipecat/deployment/overview.
++
+@@ -69,0 +76,4 @@ import asyncio
 +import base64
 +import hashlib
 +import hmac
 +import json
-@@ -71,0 +76 @@ import os
+@@ -71,0 +82 @@ import os
 +import secrets
-@@ -72,0 +78 @@ import sys
+@@ -72,0 +84 @@ import sys
 +import time
-@@ -112,0 +119,6 @@ RUNNER_PORT: int = 7860
+@@ -112,0 +125,6 @@ RUNNER_PORT: int = 7860
 +# Tokens are scoped to one runner process, so restarting the development runner
 +# also invalidates every token it issued.
 +_WS_AUTH_SECRET: bytes = secrets.token_bytes(32)
 +_WS_AUTH_BOOTSTRAP_CONFIGURED = bool(os.getenv("PIPECAT_WEBSOCKET_AUTH_BOOTSTRAP"))
 +_WS_AUTH_BOOTSTRAP_SECRET = os.getenv("PIPECAT_WEBSOCKET_AUTH_BOOTSTRAP") or secrets.token_urlsafe(32)
 +
-@@ -187 +199 @@ def _create_server_app(args: argparse.Namespace):
+@@ -187 +205 @@ def _create_server_app(args: argparse.Namespace):
 -        _setup_telephony_routes(app, args)
 +        _setup_telephony_routes(app, args, set())
-@@ -193,0 +206,68 @@ def _create_server_app(args: argparse.Namespace):
+@@ -193,0 +212,68 @@ def _create_server_app(args: argparse.Namespace):
 +def _generate_ws_token(ttl: int = 300) -> str:
 +    """Return a signed, self-expiring, one-time WebSocket session token."""
 +    payload = (
@@ -302,18 +307,18 @@ index 76c8704..582bbfc 100644
 +    return file_path
 +
 +
-@@ -236 +316 @@ def _setup_webrtc_routes(app: FastAPI, args: argparse.Namespace):
+@@ -236 +322 @@ def _setup_webrtc_routes(app: FastAPI, args: argparse.Namespace):
 -            return
 +            raise HTTPException(404)
-@@ -238,2 +318,2 @@ def _setup_webrtc_routes(app: FastAPI, args: argparse.Namespace):
+@@ -238,2 +324,2 @@ def _setup_webrtc_routes(app: FastAPI, args: argparse.Namespace):
 -        file_path = Path(args.folder) / filename
 -        if not os.path.exists(file_path):
 +        file_path = _resolve_download_path(args.folder, filename)
 +        if not file_path.exists():
-@@ -244 +324 @@ def _setup_webrtc_routes(app: FastAPI, args: argparse.Namespace):
+@@ -244 +330 @@ def _setup_webrtc_routes(app: FastAPI, args: argparse.Namespace):
 -        return FileResponse(path=file_path, media_type=media_type, filename=filename)
 +        return FileResponse(path=file_path, media_type=media_type, filename=file_path.name)
-@@ -746,5 +826,18 @@ def _setup_daily_routes(app: FastAPI, args: argparse.Namespace):
+@@ -746,5 +832,18 @@ def _setup_daily_routes(app: FastAPI, args: argparse.Namespace):
 -def _setup_telephony_routes(app: FastAPI, args: argparse.Namespace):
 -    """Set up telephony-specific routes."""
 -    # XML response templates (Exotel doesn't use XML webhooks)
@@ -337,37 +342,37 @@ index 76c8704..582bbfc 100644
 +        # Exotel doesn't use XML webhooks.
 +        templates = {
 +            "twilio": f"""<?xml version="1.0" encoding="UTF-8"?>
-@@ -753 +846 @@ def _setup_telephony_routes(app: FastAPI, args: argparse.Namespace):
+@@ -753 +852 @@ def _setup_telephony_routes(app: FastAPI, args: argparse.Namespace):
 -    <Stream url="wss://{args.proxy}/ws"></Stream>
 +    <Stream url="{url}"></Stream>
-@@ -757 +850 @@ def _setup_telephony_routes(app: FastAPI, args: argparse.Namespace):
+@@ -757 +856 @@ def _setup_telephony_routes(app: FastAPI, args: argparse.Namespace):
 -        "telnyx": f"""<?xml version="1.0" encoding="UTF-8"?>
 +            "telnyx": f"""<?xml version="1.0" encoding="UTF-8"?>
-@@ -760 +853 @@ def _setup_telephony_routes(app: FastAPI, args: argparse.Namespace):
+@@ -760 +859 @@ def _setup_telephony_routes(app: FastAPI, args: argparse.Namespace):
 -    <Stream url="wss://{args.proxy}/ws" bidirectionalMode="rtp"></Stream>
 +    <Stream url="{url}" bidirectionalMode="rtp"></Stream>
-@@ -764 +857 @@ def _setup_telephony_routes(app: FastAPI, args: argparse.Namespace):
+@@ -764 +863 @@ def _setup_telephony_routes(app: FastAPI, args: argparse.Namespace):
 -        "plivo": f"""<?xml version="1.0" encoding="UTF-8"?>
 +            "plivo": f"""<?xml version="1.0" encoding="UTF-8"?>
-@@ -766 +859 @@ def _setup_telephony_routes(app: FastAPI, args: argparse.Namespace):
+@@ -766 +865 @@ def _setup_telephony_routes(app: FastAPI, args: argparse.Namespace):
 -  <Stream bidirectional="true" keepCallAlive="true" contentType="audio/x-mulaw;rate=8000">wss://{args.proxy}/ws</Stream>
 +  <Stream bidirectional="true" keepCallAlive="true" contentType="audio/x-mulaw;rate=8000">{url}</Stream>
-@@ -768 +861,2 @@ def _setup_telephony_routes(app: FastAPI, args: argparse.Namespace):
+@@ -768 +867,2 @@ def _setup_telephony_routes(app: FastAPI, args: argparse.Namespace):
 -    }
 +        }
 +        return templates.get(args.transport, "<Response></Response>")
-@@ -771 +865 @@ def _setup_telephony_routes(app: FastAPI, args: argparse.Namespace):
+@@ -771 +871 @@ def _setup_telephony_routes(app: FastAPI, args: argparse.Namespace):
 -    async def start_call():
 +    async def start_call(request: Request):
-@@ -772,0 +867 @@ def _setup_telephony_routes(app: FastAPI, args: argparse.Namespace):
+@@ -772,0 +873 @@ def _setup_telephony_routes(app: FastAPI, args: argparse.Namespace):
 +        _authorize_token_issuance(request)
-@@ -778 +873 @@ def _setup_telephony_routes(app: FastAPI, args: argparse.Namespace):
+@@ -778 +879 @@ def _setup_telephony_routes(app: FastAPI, args: argparse.Namespace):
 -                "websocket_url": f"wss://{args.proxy}/ws",
 +                "websocket_url": websocket_url(issue_token=True),
-@@ -783 +878 @@ def _setup_telephony_routes(app: FastAPI, args: argparse.Namespace):
+@@ -783 +884 @@ def _setup_telephony_routes(app: FastAPI, args: argparse.Namespace):
 -            xml_content = XML_TEMPLATES.get(args.transport, "<Response></Response>")
 +            xml_content = xml_template(websocket_url(issue_token=True))
-@@ -786,3 +881,14 @@ def _setup_telephony_routes(app: FastAPI, args: argparse.Namespace):
+@@ -786,3 +887,14 @@ def _setup_telephony_routes(app: FastAPI, args: argparse.Namespace):
 -    @app.websocket("/ws")
 -    async def websocket_endpoint(websocket: WebSocket):
 -        """Handle WebSocket connections for telephony."""
@@ -385,7 +390,7 @@ index 76c8704..582bbfc 100644
 +            logger.warning("WebSocket connection rejected: invalid or missing token")
 +            await websocket.close(code=4003)
 +            return
-@@ -792,0 +899,10 @@ def _setup_telephony_routes(app: FastAPI, args: argparse.Namespace):
+@@ -792,0 +905,10 @@ def _setup_telephony_routes(app: FastAPI, args: argparse.Namespace):
 +    @app.websocket("/ws")
 +    async def websocket_endpoint(websocket: WebSocket):
 +        """Handle WebSocket connections for telephony."""
@@ -396,15 +401,44 @@ index 76c8704..582bbfc 100644
 +        """Handle authenticated WebSocket connections for telephony."""
 +        await handle_websocket(websocket, token)
 +
-@@ -794 +910 @@ def _setup_telephony_routes(app: FastAPI, args: argparse.Namespace):
+@@ -794 +916 @@ def _setup_telephony_routes(app: FastAPI, args: argparse.Namespace):
 -    async def start_agent():
 +    async def status():
-@@ -941,0 +1058,6 @@ def main(parser: Optional[argparse.ArgumentParser] = None):
+@@ -862,0 +985,24 @@ def runner_port() -> int:
++def _print_dev_runner_banner():
++    """Identify the development-only boundary before starting any run mode.
++
++    Backported from upstream acaac3e49f50968f3ffb645a42ecc48d71c4e723,
++    with the unauthenticated-network boundary stated directly in the banner.
++    """
++    lines = [
++        "PIPECAT DEVELOPMENT RUNNER",
++        "",
++        "For development purposes only.",
++        "Unauthenticated endpoints can create real resources.",
++        "Do not expose directly to untrusted networks.",
++        "",
++        "Learn about running bots locally and in production:",
++        "https://docs.pipecat.ai/pipecat/deployment/overview",
++    ]
++    width = max(len(line) for line in lines)
++    print()
++    print("╭" + "─" * (width + 2) + "╮")
++    for line in lines:
++        print(f"│ {line.ljust(width)} │")
++    print("╰" + "─" * (width + 2) + "╯")
++
++
+@@ -941,0 +1088,6 @@ def main(parser: Optional[argparse.ArgumentParser] = None):
 +    if args.transport in TELEPHONY_TRANSPORTS and not _WS_AUTH_BOOTSTRAP_CONFIGURED:
 +        parser.error(
 +            "telephony runner requires PIPECAT_WEBSOCKET_AUTH_BOOTSTRAP "
 +            "for authorized token issuance"
 +        )
++
+@@ -962,0 +1115,3 @@ def main(parser: Optional[argparse.ArgumentParser] = None):
++    # Cover server transports and the direct Daily mode before either starts.
++    _print_dev_runner_banner()
 +
 --- a/pipecat/src/pipecat/services/kokoro/tts.py
 +++ b/pipecat/src/pipecat/services/kokoro/tts.py
@@ -418,3 +452,31 @@ index 76c8704..582bbfc 100644
      }
  
      return resolve_language(language, LANGUAGE_MAP, use_base_code=True)
+--- a/pipecat/README.md
++++ b/pipecat/README.md
+@@ -106,0 +107,25 @@ Catch new features, interviews, and how-tos on our [Pipecat TV](https://www.yout
++### Development runner security boundary
++
++The built-in `pipecat.runner.run` runner is for local development only. It is
++not a production server. Its Daily session-creation endpoints, including `GET /`, `POST /start`, and
++`POST /daily-dialin-webhook` when enabled, do not authenticate callers
++or rate-limit requests. A request can create a bot session or Daily room,
++consume local resources and third-party quotas, and may return a room URL and
++join token. The telephony WebSocket backport does not authenticate these Daily
++development endpoints.
++
++The default bind address is `localhost`. Do not expose the runner directly to
++untrusted networks with `--host 0.0.0.0`, a published port, or an unprotected
++tunnel. Production deployments require an authenticated dispatcher or managed
++runtime. See the upstream guidance for
++[running locally](https://docs.pipecat.ai/pipecat/deployment/running-bots-locally)
++and [production](https://docs.pipecat.ai/pipecat/deployment/running-bots-in-production).
++
++This maintained fork backports the development-only startup banner from
++[upstream commit acaac3e](https://github.com/pipecat-ai/pipecat/commit/acaac3e49f50968f3ffb645a42ecc48d71c4e723)
++for [GHSA-hqm2-cfx2-2vgh / CVE-2026-102682](https://github.com/pipecat-ai/pipecat/security/advisories/GHSA-hqm2-cfx2-2vgh),
++with an explicit network-exposure warning. As in upstream 1.6.0, this surfaces
++and documents the development boundary; it does not add authentication or rate
++limiting to those endpoints. The earlier path-containment and telephony
++WebSocket security backports are retained.
++

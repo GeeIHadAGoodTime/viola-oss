@@ -11,6 +11,12 @@ infrastructure they need - creating Daily rooms and tokens, managing WebRTC
 connections, and setting up telephony webhook/WebSocket infrastructure. It
 supports multiple transport types with a unified interface.
 
+This is a local development tool, not a production server. Some session-creation
+endpoints are unauthenticated and are not rate limited. Do not expose the runner
+directly to untrusted networks, including through public ports or tunnels.
+Production deployments require an authenticated dispatcher or managed runtime.
+See https://docs.pipecat.ai/pipecat/deployment/overview.
+
 Install with::
 
     pip install pipecat-ai[runner]
@@ -976,6 +982,30 @@ def runner_port() -> int:
     return RUNNER_PORT
 
 
+def _print_dev_runner_banner():
+    """Identify the development-only boundary before starting any run mode.
+
+    Backported from upstream acaac3e49f50968f3ffb645a42ecc48d71c4e723,
+    with the unauthenticated-network boundary stated directly in the banner.
+    """
+    lines = [
+        "PIPECAT DEVELOPMENT RUNNER",
+        "",
+        "For development purposes only.",
+        "Unauthenticated endpoints can create real resources.",
+        "Do not expose directly to untrusted networks.",
+        "",
+        "Learn about running bots locally and in production:",
+        "https://docs.pipecat.ai/pipecat/deployment/overview",
+    ]
+    width = max(len(line) for line in lines)
+    print()
+    print("╭" + "─" * (width + 2) + "╮")
+    for line in lines:
+        print(f"│ {line.ljust(width)} │")
+    print("╰" + "─" * (width + 2) + "╯")
+
+
 def main(parser: Optional[argparse.ArgumentParser] = None):
     """Start the Pipecat development runner.
 
@@ -1081,6 +1111,9 @@ def main(parser: Optional[argparse.ArgumentParser] = None):
     # Log level
     logger.remove()
     logger.add(sys.stderr, level="TRACE" if args.verbose else "DEBUG")
+
+    # Cover server transports and the direct Daily mode before either starts.
+    _print_dev_runner_banner()
 
     # Handle direct Daily connection (no FastAPI server)
     if args.direct:
