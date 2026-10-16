@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "440dd8f59511c36921d0e6c674a705ea6d42894c",
-  "sha256": "9f6409ae6feccd33339f671066385f3d478d91e0d3fad7b8ff91a0ad06b0bb3b",
+  "revision": "afe1e0a94527b4a9f0d9ab87a92f00dd6b5dadae",
+  "sha256": "b387c9095b0f316ac0f249fdd62be4829a2b3159ef315301faa36dfe277763d6",
   "files": [
     {
       "path": ".env.example",
@@ -3535,8 +3535,8 @@
     },
     {
       "path": "plugins/sandbox.py",
-      "sha256": "ce7284def292630d423ddd6c1cb2a3aeefb198eeb6ecd9e1c858b145ddcae5bc",
-      "bytes": 5110
+      "sha256": "bfbfeeef66dd1712fa2ec14f0b0f8e56b822c162208c6de07f73f10f491ae546",
+      "bytes": 6070
     },
     {
       "path": "plugins/singleton.py",
@@ -4750,8 +4750,8 @@
     },
     {
       "path": "services/memory/dir.py",
-      "sha256": "138422928dd564c86ab8f16112ae4738f4257f8e61eb5cd9b2990a5c4056ae9e",
-      "bytes": 86979
+      "sha256": "44c090964e0946efe4f06cfb2a8d80b1ef7973203f339b80990bea98da235139",
+      "bytes": 92935
     },
     {
       "path": "services/memory/extract_memories.py",
@@ -4760,8 +4760,8 @@
     },
     {
       "path": "services/memory/hygiene.py",
-      "sha256": "56da88cc457fa94e1aa9f9e9c919681964f90a0f20add11a8e3c5761cbfdec5c",
-      "bytes": 6207
+      "sha256": "831d89fccc7dab41184a97ae84725d1652b9ebd18ae9b69869ec56c118b1652d",
+      "bytes": 7155
     },
     {
       "path": "services/memory/key_provider.py",
@@ -4775,8 +4775,8 @@
     },
     {
       "path": "services/memory/store.py",
-      "sha256": "836a7b4e78ed0840e82be50a13c09b4ef161c5dbbcd989212113b01ec8d60766",
-      "bytes": 37372
+      "sha256": "f474eab360b698463bb72cd97871895da0daf9a54ad4bb1c11ddd34bdb60bc78",
+      "bytes": 38953
     },
     {
       "path": "services/meta_analysis/__init__.py",
@@ -5395,8 +5395,8 @@
     },
     {
       "path": "services/user_model/profile.py",
-      "sha256": "d26354be6ebf7ac8e8a7531334b7a8d8c22b89f943efe46f8e20c5cd4970c37c",
-      "bytes": 24790
+      "sha256": "7191c67bb4ac8e55dab2a2cf11ec901a6d6a0207395b9fce4f51760b86fccc41",
+      "bytes": 25158
     },
     {
       "path": "services/user_profile.py",
@@ -12505,8 +12505,8 @@
     },
     {
       "path": "ui/settings_manager.py",
-      "sha256": "fe16600afea58127773161bdcb1f6e8ad59a302f099792c29a8d51d2afe7be67",
-      "bytes": 160519
+      "sha256": "be145bc4cdd5e9af4534a58c8301953d817ea60b83a8c63edec50e4c25ac5b28",
+      "bytes": 160528
     },
     {
       "path": "ui/settings_schema.py",

@@ -7,8 +7,8 @@ Prevents plugin crashes from affecting the core system.
 
 from __future__ import annotations
 
-import asyncio
 from collections.abc import Callable
+from concurrent.futures import CancelledError as FutureCancelledError
 from dataclasses import dataclass
 from typing import Any
 
@@ -57,6 +57,9 @@ class PluginSandbox:
 
         Returns function result or None if crashed.
         Disables plugin after max_crashes consecutive failures.
+        Ordinary plugin exceptions are isolated; BaseException control signals
+        (including task cancellation and process exit) keep propagating, as
+        does concurrent.futures cancellation despite its Exception base.
         """
         if self._disabled and not allow_disabled:
             return None
@@ -67,31 +70,42 @@ class PluginSandbox:
             self._crash_count = 0
             self._crashed = False
             return result
-        except (AttributeError, OSError, RuntimeError, TypeError, ValueError):
+        except FutureCancelledError:
+            raise
+        except Exception as exc:  # plugin callback isolation boundary.
             self._crashed = True
             self._crash_count += 1
-            logger.exception("Plugin %s crashed", self.plugin.name)
+            # Plugin error text and tracebacks can contain private arguments.
+            logger.error("Plugin %s crashed (%s)", self.plugin.name, type(exc).__name__)
 
             if self._crash_count >= self._max_crashes:
                 self._disabled = True
                 logger.error("Disabling plugin %s (too many crashes)", self.plugin.name)
                 try:
                     self.plugin.on_stop()
-                except (AttributeError, OSError, RuntimeError, TypeError, ValueError) as exc:
-                    logger.debug("Plugin %s stop hook failed after sandbox crash: %s", self.plugin.name, exc)
+                except FutureCancelledError:
+                    raise
+                except Exception as exc:  # failure callbacks must also be isolated.
+                    logger.debug(
+                        "Plugin %s stop hook failed after sandbox crash (%s)", self.plugin.name, type(exc).__name__
+                    )
                 if self._tts_callback:
                     try:
                         self._tts_callback(
                             "I've temporarily disabled the %s plugin due to repeated errors. "
                             "Say 'reload plugins' to try again." % self.plugin.name
                         )
-                    except (AttributeError, OSError, RuntimeError, TypeError, ValueError) as exc:
-                        logger.debug("Plugin crash TTS notification failed: %s", exc)
+                    except FutureCancelledError:
+                        raise
+                    except Exception as exc:  # failure callbacks must also be isolated.
+                        logger.debug("Plugin crash TTS notification failed (%s)", type(exc).__name__)
             elif self._tts_callback:
                 try:
                     self._tts_callback("The %s plugin encountered an error and could not complete." % self.plugin.name)
-                except (AttributeError, OSError, RuntimeError, TypeError, ValueError) as exc:
-                    logger.debug("Plugin crash TTS notification failed: %s", exc)
+                except FutureCancelledError:
+                    raise
+                except Exception as exc:  # failure callbacks must also be isolated.
+                    logger.debug("Plugin crash TTS notification failed (%s)", type(exc).__name__)
 
             return None
 
@@ -110,18 +124,26 @@ class PluginSandbox:
             self._crash_count = 0
             self._crashed = False
             return result
-        except (AttributeError, OSError, RuntimeError, TypeError, ValueError):
+        except FutureCancelledError:
+            raise
+        except Exception as exc:  # plugin callback isolation boundary.
             self._crashed = True
             self._crash_count += 1
-            logger.exception("Plugin %s async crashed", self.plugin.name)
+            logger.error("Plugin %s async crashed (%s)", self.plugin.name, type(exc).__name__)
 
             if self._crash_count >= self._max_crashes:
                 self._disabled = True
                 logger.error("Disabling plugin %s (too many crashes)", self.plugin.name)
                 try:
                     self.plugin.on_stop()
-                except (AttributeError, OSError, RuntimeError, TypeError, ValueError) as exc:
-                    logger.debug("Plugin %s stop hook failed after async sandbox crash: %s", self.plugin.name, exc)
+                except FutureCancelledError:
+                    raise
+                except Exception as exc:  # failure callbacks must also be isolated.
+                    logger.debug(
+                        "Plugin %s stop hook failed after async sandbox crash (%s)",
+                        self.plugin.name,
+                        type(exc).__name__,
+                    )
 
             return None
 
