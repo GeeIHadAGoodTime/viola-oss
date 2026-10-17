@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "0dde535123fac2515fd0e1824093a6fc3ebdc98a",
-  "sha256": "2a55803054ddab2c826904ffa2b2b04c7186141005e875139e4196c20942fd4a",
+  "revision": "8acc56a7992e8b0efc5958da84e87202bff23c77",
+  "sha256": "f3b5e852d3150f4f253467ed04fbc48d02b1c6ac2d3c4f1c039f0187af5b7adb",
   "files": [
     {
       "path": ".env.example",
@@ -1420,8 +1420,8 @@
     },
     {
       "path": "diagnostics/sinks.py",
-      "sha256": "e3f58922e6c4fb5c03f8087bb5356f19576b4ed4d2857b0d6a6b45d23f12e791",
-      "bytes": 6982
+      "sha256": "6c45fe48f1165f9b1b51e9e9d2f174a827534eafbc7eba18f73a1df907c96691",
+      "bytes": 7141
     },
     {
       "path": "diagnostics/startup_telemetry.py",
