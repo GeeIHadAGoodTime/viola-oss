@@ -31,7 +31,7 @@ class _SignalProtocol(Protocol):
 class _QtEmitterProtocol(Protocol):
     record_emitted: _SignalProtocol
 
-    def receivers(self, signal: _SignalProtocol) -> int: ...
+    def receivers(self, signal: str) -> int: ...
 
 
 # Runtime Qt imports - store actual types for dynamic class creation
@@ -157,10 +157,13 @@ class QtDiagnosticsSink:
         This is a small compatibility shim for tests/diagnostics checks that
         expect `QObject.receivers(signal)` to be available.
         """
-        if signal is None or self._qt_obj is None:  # pragma: no cover
+        if signal is None or self._qt_obj is None or signal is not self._record_signal:
             return 0
         try:
-            return int(self._qt_obj.receivers(signal))
+            from PySide6.QtCore import SIGNAL
+
+            # PySide6 expects an encoded signal signature, not SignalInstance.
+            return int(self._qt_obj.receivers(SIGNAL("record_emitted(PyObject)")))
         except Exception:  # pragma: no cover
             return 0
 
