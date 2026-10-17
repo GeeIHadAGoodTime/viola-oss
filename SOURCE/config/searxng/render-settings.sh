@@ -29,6 +29,9 @@ marker = "${SEARXNG_SECRET_KEY}"
 if not secret.strip():
     raise SystemExit("SEARXNG_SECRET_KEY must not be blank")
 
+if secret in (marker, "CHANGE_ME_GENERATE_WITH_OPENSSL_RAND_HEX_32"):
+    raise SystemExit("SEARXNG_SECRET_KEY must not be a template or example placeholder")
+
 text = template.read_text(encoding="utf-8")
 if marker not in text:
     raise SystemExit("SearXNG settings template is missing ${SEARXNG_SECRET_KEY}")

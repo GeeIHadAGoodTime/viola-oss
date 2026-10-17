@@ -30,13 +30,13 @@
   },
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "410ded4aa5693e1e7810e575c5a7b9f5ebae2554cb0a4094129680c0c7b84b4e",
-  "source_tree_sha256": "f3b5e852d3150f4f253467ed04fbc48d02b1c6ac2d3c4f1c039f0187af5b7adb",
+  "source_manifest_sha256": "4cbd58c104dfef8ebebc2e53ad71b24b00b52ed44adab6c8b99a7634311cd99a",
+  "source_tree_sha256": "9dc71cf7801d2b49f2bb353a73653c507c098b41a034e19c3f83bb87e9f79477",
   "source_file_count": 2714,
-  "source_revision": "8acc56a7992e8b0efc5958da84e87202bff23c77",
-  "comparison_public_revision": "28d918eb64ad3d9eea5252544f84135812f9c431",
+  "source_revision": "4c70b74db8a0860f4c1fe24bacb2f6e199755ff4",
+  "comparison_public_revision": "ecab2772465fcc89ae6645b028af1c2273b9199f",
   "changed_source_paths": [
-    "diagnostics/sinks.py"
+    "config/searxng/render-settings.sh"
   ],
   "retained_sboms": [
     {
@@ -98,20 +98,20 @@
     }
   ],
   "input_equivalence": {
-    "basis": "Exact protected public 28d918eb64ad3d9eea5252544f84135812f9c431",
+    "basis": "Exact reviewed public PR head ecab2772465fcc89ae6645b028af1c2273b9199f",
     "changed_source_paths": [
-      "diagnostics/sinks.py"
+      "config/searxng/render-settings.sh"
     ],
     "unselected_source_files_preserved": 2713,
     "all_six_sbom_bytes_and_status_objects_preserved": true,
     "dependency_and_workflow_inputs_unchanged": true,
     "workflow_inputs_unchanged": true,
-    "source_basis": "Actual source-only commit 8acc56a7992e8b0efc5958da84e87202bff23c77, tree 58055f0e1ec867e33fa6212911d5fb23caf558bb, parent 28d918eb64ad3d9eea5252544f84135812f9c431. Only SOURCE/diagnostics/sinks.py differs from that parent. The metadata successor changes only source-manifest.json and source-binding.json; no SOURCE bytes are edited by metadata preparation.",
-    "historical_inventory_limits": "No dependency or workflow input changes in this one-source correction. This does not remove inherited dependency-input changes or inventory limitations: all six prior SBOM bytes and complete status objects remain unchanged and historical; no current native inventory qualification is claimed."
+    "source_basis": "Actual source-only commit 4c70b74db8a0860f4c1fe24bacb2f6e199755ff4, tree 3555d5d9421ad26ffb499dd699a92ad1cf34720a, parent ecab2772465fcc89ae6645b028af1c2273b9199f. Only SOURCE/config/searxng/render-settings.sh changes. The metadata successor changes only source-manifest.json and source-binding.json. The predecessor is a reviewed PR head, not a protected adoption.",
+    "historical_inventory_limits": "This renderer correction changes no dependency or workflow inputs. All six retained SBOMs and their complete status objects stay historical and unchanged; no current installed inventory qualification is claimed."
   },
   "qualification": {
-    "source_commit": "8acc56a7992e8b0efc5958da84e87202bff23c77",
-    "kind": "Exact one-source Qt diagnostics correction checksum binding; prior qualification and dependency inventories retained without promotion",
+    "source_commit": "4c70b74db8a0860f4c1fe24bacb2f6e199755ff4",
+    "kind": "Exact one-source authoritative SearXNG renderer correction checksum binding; prior evidence retained without promotion",
     "source_binding_verification": {
       "files_checked": 2714,
       "retained_sboms_checked": 6,
@@ -438,17 +438,17 @@
       "scope": "Private fixture only: synthetic key, previous/shared-key isolation, real temporary SQLite salt storage. 11 unchanged class cases and 2 independent controls. PostgreSQL-specific/native proof remains explicit in the combined 141 receipt.",
       "environment": "Independent fixture proof: Linux Python 3.11.17. Combined final proof: Linux Python 3.12.14 and native PostgreSQL 18.1."
     },
-    "receipt_relationship": "All twelve predecessor focused receipt objects and exact source identities remain unchanged as historical/scoped evidence. The new real-Qt 10-case receipt is included in the bounded 64-case receipt, not additional aggregate coverage. Neither the predecessor nor new focused receipts establish full current-composition or native Windows qualification.",
-    "independent_review": "The exact diagnostics source and four accompanying private fixture corrections have independent scoped PASS review, identified under diagnostics_correction_review. This two-file metadata successor remains subject to independent exact-candidate review.",
-    "protected_public_checks": "Exact metadata-successor hosted source checks remain pending; no hosted check result is claimed by metadata preparation.",
-    "canonical_private_public_composition": "The bounded 64-case receipt uses the original private/public bases plus exactly four private fixture corrections and the public diagnostics correction. It does not qualify a complete current protected composition or a canonical aggregate run; historical records keep their original source identities.",
+    "receipt_relationship": "All predecessor focused, diagnostics and memory-overlap receipt objects retain their exact identities and scopes. New renderer evidence is scoped to this mapped-source correction; overlapping selections must not be summed or treated as complete application qualification.",
+    "independent_review": "The exact three-line renderer correction has independent scoped PASS review recorded under authoritative_searxng_renderer_evidence. This two-file metadata successor remains subject to independent exact-candidate review.",
+    "protected_public_checks": "Exact metadata-successor hosted source checks remain pending; local metadata preparation claims no hosted result, ready transition or protected integration.",
+    "canonical_private_public_composition": "The preintegration composition showed the private renderer fix was overwritten by the public mapping. This successor corrects the authoritative mapped source. Any proposed private pin and combined verification must use the actual new public head; no protected adoption or complete qualification is claimed.",
     "full_public_suite": false,
     "native_windows_qualification": false,
     "image_qualification": false,
     "production_deployment": false,
     "installed_customer_acceptance": false,
     "provider_sandbox_acceptance": false,
-    "limits": "Complete source/SBOM checksum verification, eight existing revision contracts and negative metadata controls; separately retained focused Linux QtCore/private-overlay evidence. No fresh dependency resolution or installed inventory, advisory scan, full public/private aggregate, native Windows, image, live provider, hardware, release, deployment or installed-customer qualification.",
+    "limits": "Scoped local source/checksum and synthetic renderer evidence only. No full public/private suite, native Windows, dependency inventory refresh, image, live provider, deployed key replacement, retained-data migration, historical-secret remediation, release, deployment or installed-customer qualification.",
     "diagnostics_correction_receipts": {
       "qt-positive": {
         "summary": {
@@ -516,6 +516,138 @@
       },
       "scope": "Independent review of the frozen one-public-source/four-private-fixture correction and author receipt hashes, plus actual Linux PySide6 receiver counts 1 -> 2 -> 1 -> 0 -> 1, DiagnosticsBus dispatch/buffer effects, unrelated-signal and optional-no-Qt controls. No additional full or focused green suite was rerun by the reviewer.",
       "limits": "Source-scoped code review and independent diagnostic probe only. No metadata-successor review, hosted checks, full composition, native Windows, GUI or installed acceptance is established."
+    },
+    "call_history_memory_overlap_evidence": {
+      "public_baseline": "da27e7ac918ae1aa75f24908418586767ed8b702",
+      "source_git_blobs": {
+        "SOURCE/telephony/call_history.py": "183fabf4fe1be6be489ea0018ca47045a7951a56",
+        "SOURCE/tests/public/test_call_history_order_contract.py": "8ed5ea1709468910149d99aa96db1ddb85e9e87c"
+      },
+      "source_patch_sha256": "4ed9cbd53cea474a743bfbd60bf7a29a58f154b39dc49b7d3ef114364bccd21d",
+      "frozen_evidence_sha256": "29016a16d9fd150d510d52adfe276868d8caa4eedab2287913af258295255735",
+      "test_receipts": {
+        "author_composed_selection": {
+          "passed": 17,
+          "failed": 0,
+          "errors": 0,
+          "skipped": 0,
+          "selectors": [
+            "tests/public/test_call_history_order_contract.py",
+            "tests/unit/telephony/test_call_history_user_scoping.py",
+            "tests/unit/telephony/test_call_history_unconnected_call_timestamp.py"
+          ],
+          "receipt_sha256": "80cc3d65ed5b4354dfe781b053ba5d377d36169dfab5f0228571e6fe0f29d4ff",
+          "junit_sha256": "e870069c99d293ec4698aeda8fb201df9a69adc2bed7cf706603e68a600e9abc"
+        },
+        "independent_composed_selection": {
+          "passed": 17,
+          "failed": 0,
+          "errors": 0,
+          "skipped": 0,
+          "selectors": [
+            "tests/public/test_call_history_order_contract.py",
+            "tests/unit/telephony/test_call_history_user_scoping.py",
+            "tests/unit/telephony/test_call_history_unconnected_call_timestamp.py"
+          ],
+          "receipt_sha256": "6ea4ffe11ff4cbfeaf1a3f599aa82ca3eaee113c8c1ac7d250fb79bb7af5660c",
+          "junit_sha256": "efe10d40771778ca9cc892205ff44d0ca73a9178deafe2dc9ce1d68b90b9d6e1"
+        },
+        "independent_standalone_public": {
+          "passed": 12,
+          "failed": 0,
+          "errors": 0,
+          "skipped": 0,
+          "receipt_sha256": "a7ab7bda801fdecd0f9bc7aa23e991b9b27914490991624cabc27b5eb1058130",
+          "scope": "The two existing persistence contracts plus ten added synthetic rotation cases; included in each 17-case selection."
+        },
+        "unchanged_public_runtime_negative_control": {
+          "passed": 7,
+          "failures": 4,
+          "errors": 1,
+          "expected": true,
+          "receipt_sha256": "8d1f2ff59caf544cadc3ba9104d293291816f79f6cc933326c4a83897ca7532c",
+          "scope": "Final public tests reproduce missing overlap behavior and the unsupported previous-key selector against the original runtime."
+        },
+        "environment": "Linux CPython 3.11.17; packet-owned interpreter with declared phonenumbers 9.0.33, cryptography 50.0.2 and filelock 3.32.0. The alternate original interpreter lacks phonenumbers and did not pass the expanded timestamp selection.",
+        "relationship": "The author and reviewer repeat the same 17-case selection; standalone 12 cases are included in it. Counts must not be summed. No complete current protected private/public composition or full-suite claim."
+      },
+      "independent_review": {
+        "result": "PASS",
+        "review_sha256": "8889fc29d8aa832f6ac2df73cfc9412a2fb05691041b82822bc99e17791c09cf",
+        "probe_sha256": "93a34aa6624c60548ed75b6c4dd2d9378388d3e3bfc28eb68751dad0d792094c",
+        "probe_script_sha256": "0c3888d51ccf42d2e6ee168014b168686d0a659e8c0499a75b0b795df3a5e5d4",
+        "identity_and_synthetic_runtime_checks": 185,
+        "strict_changed_line_gate": {
+          "result": "PASS",
+          "rules": [
+            "BLE001",
+            "S110",
+            "S112",
+            "E722"
+          ],
+          "receipt_sha256": "8727280e8ca79e4a6344ff8434b9aa4b38883579e01fbbb8d6c48f067071c52b"
+        },
+        "actual_public_layout_import_style": {
+          "result": "PASS",
+          "rules": [
+            "I",
+            "E",
+            "F"
+          ],
+          "ruff_version": "0.14.6",
+          "receipt_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+        },
+        "scope": "Independent exact patch reconstruction, file identity and mapped ownership checks, 17-case composed selection, overlapping 12-case standalone public test, original-runtime negative control, and 185 mixed identity/runtime assertions. Expected failures are limited to InvalidToken, UnicodeError and ValueError; current-write KDF/precedence and retained data remain unchanged.",
+        "limits": "The 185 assertions are not 185 service tests. Full-ruleset whole-file Ruff under the composed configuration retains 11 pre-existing PT009/PT027 findings in the unchanged original public class. No complete application, native Windows, deployed key replacement, actual retained-data migration, historical-secret remediation, release, deployment or installed acceptance qualification."
+      },
+      "behavior_scope": "Previous memory key is a decrypt-only fallback for retained call-history envelopes. Current-write precedence and existing KDF/envelope remain unchanged. Synthetic tests cover old-read/current-write, previous-key removal, restart and existing ownership/no-key behavior. Reads do not rewrite retained ciphertext.",
+      "limits": "Scoped local source/checksum and synthetic call-history evidence only. No full public/private suite, native Windows, dependency inventory refresh, image, live provider, deployed key replacement, retained-data migration, historical-secret remediation, release, deployment or installed-customer qualification."
+    },
+    "authoritative_searxng_renderer_evidence": {
+      "public_baseline": "ecab2772465fcc89ae6645b028af1c2273b9199f",
+      "source_git_blobs": {
+        "SOURCE/config/searxng/render-settings.sh": "8d2c695126c9349eeae9c6a90c09e12b2bf8c035"
+      },
+      "source_patch_sha256": "204b270a6f34cfb4f6bb2e179529a3a549db58d9ad322f4e9c01cbd842f31715",
+      "frozen_evidence_sha256": "1cfd5607807c28b31814d0e73137ec8c34e4af83ae4cbd9e1ca4e2a9dd50ea56",
+      "test_receipts": {
+        "two_previously_failed_cases": {
+          "passed": 2,
+          "failed": 0,
+          "errors": 0,
+          "skipped": 0,
+          "receipt_sha256": "1c6dc236798a10498223eea6adb0bc7079d5a1cc4ee5e11d17835bdd7e0c2653",
+          "junit_sha256": "ceb2d39d7247c80e69d03341b8286dee1f93543803766913b5962407e32cb256",
+          "scope": "Only the two exact existing marker/example rejection cases were rerun with the corrected renderer in an isolated fixture using unchanged test/helper/template/config/runner inputs. Both require a nonzero subprocess exit and no output target. This is not exact composed-source qualification."
+        },
+        "shell_syntax": {
+          "result": "PASS",
+          "receipt_sha256": "dabe018a5a805ccd9f7f8efffaf0ee00a3d3a9b9344658fc1b6a888e6a410cd6",
+          "command": "sh -n SOURCE/config/searxng/render-settings.sh"
+        },
+        "preintegration_baseline": {
+          "public_head": "ecab2772465fcc89ae6645b028af1c2273b9199f",
+          "private_proposal": "70da4a3718b056d6bb0093b79e24e5176214f210",
+          "passed": 48,
+          "failed": 2,
+          "errors": 0,
+          "skipped": 0,
+          "receipt_sha256": "974d0767a3c319f5f4d50241a6aa20d1575b344a3a28ffd35c03b07f011c1ba6",
+          "junit_sha256": "92cd8174e764bfbcfe0dd224d4080d1e3ebec39494a497d6c2caa52eab8340d3",
+          "scope": "Historical non-adopted composition exposed two real failures because the private renderer correction was overwritten by public mapping. This failing receipt remains unchanged."
+        },
+        "relationship": "The two corrected-case results do not convert the earlier 48-pass/2-fail composition into a 50-pass run. Positive synthetic-key cases and older negative cases were reviewed from prior evidence and source equivalence, not rerun. A new actual-public-head/private-proposal composition and combined verification remain required."
+      },
+      "independent_review": {
+        "result": "PASS",
+        "review_sha256": "1efd595b29f03e1226ad70a6db4277cfed14eb2d17483945a992c77f551cacff",
+        "written_review_sha256": "bbed370009467c7edab7452a263222ceeb976b9d121458ef6b1ae187e82df88b",
+        "inventory_receipt_sha256": "66dce33f5dc1fcadb77fa4f089b71b9d013c263795fa971516a417c64d46666a",
+        "scope": "Exactly three added renderer lines; all other 2,740 repository files, full paths and modes unchanged. Corrected authoritative public renderer exactly matches the already-reviewed private source bytes. Exact marker/example values fail before template reading or output writing; error text contains no configured secret. Other renderer source remains byte-for-byte unchanged.",
+        "limits": "Source-only correction review and two synthetic negative-case tests. No new full combined pass, actual successor composition, protected adoption, readiness/merge authorization, deployment, effective-key replacement or historical-secret retirement is established. Case/whitespace variants are unchanged and outside this exact-placeholder correction."
+      },
+      "behavior_scope": "Reject the exact unresolved secret marker and documented example placeholder before rendering settings. The public mapped renderer now contains the same reviewed three-line guard as the private patch. Existing quoting, input handling, valid-secret rendering and destination permissions remain unchanged.",
+      "limits": "Scoped local source/checksum and synthetic renderer evidence only. No full public/private suite, native Windows, dependency inventory refresh, image, live provider, deployed key replacement, retained-data migration, historical-secret remediation, release, deployment or installed-customer qualification."
     }
   },
   "historical_bindings": [
@@ -12555,12 +12687,12 @@
     }
   ],
   "reviewed_source_patch": {
-    "source_commit": "8acc56a7992e8b0efc5958da84e87202bff23c77",
+    "source_commit": "4c70b74db8a0860f4c1fe24bacb2f6e199755ff4",
     "paths": [
-      "SOURCE/diagnostics/sinks.py"
+      "SOURCE/config/searxng/render-settings.sh"
     ],
     "git_blobs": {
-      "SOURCE/diagnostics/sinks.py": "a84018df229279a9abf8782a48924177ba9c54b3"
+      "SOURCE/config/searxng/render-settings.sh": "8d2c695126c9349eeae9c6a90c09e12b2bf8c035"
     }
   },
   "new_resolution_performed": false,
@@ -12568,8 +12700,8 @@
   "new_runtime_qualification_performed": false,
   "new_source_contract_qualification_performed": true,
   "new_static_security_scan_performed": false,
-  "new_resolution_scope": "No dependency resolution is performed for this diagnostics-only metadata repair. All six retained SBOM byte sequences, component counts and complete existing historical/unqualified status objects are unchanged.",
-  "new_advisory_scan_scope": "No advisory scan is performed; prior findings retain their original source scope and status.",
+  "new_resolution_scope": "No dependency resolution in metadata preparation. Six historical SBOM byte sequences, component counts and complete status objects remain unchanged.",
+  "new_advisory_scan_scope": "No advisory scan; inherited findings keep their original scope and status.",
   "account_reconciliation_previous_binding": {
     "source_revision": "f864e61381ef9e10a09333fce05210427cf7d0f6",
     "source_manifest_sha256": "9cad8bcb2f98c34d95a11545e11a57d74dbe6b28cd5db7322b7746e102801acd",
@@ -16799,8 +16931,8 @@
       "new_static_security_scan_performed": false
     }
   },
-  "new_runtime_qualification_scope": "Metadata preparation performs no application runtime suite or dependency installation. Separately retained author receipts prove ten actual Linux QtCore diagnostics cases and an overlapping bounded 64-case private/public overlay; no native Windows, full aggregate, image, provider, hardware, release, deployment or installed-customer qualification.",
-  "new_source_contract_qualification_scope": "The unchanged manifest generator and binding consumer bind exactly 2,714 source files and six historical SBOMs. Only diagnostics/sinks.py changes; all 2,713 other rows and the entire path inventory remain identical. Eight existing revision contracts and old-source, manifest-integrity, revision and SBOM negative controls are verified locally. Checksum verification does not promote any historical runtime or installed inventory claim.",
+  "new_runtime_qualification_scope": "Metadata preparation runs no application runtime suite or dependency installation. Separately retained synthetic source receipts have their exact scope in qualification.authoritative_searxng_renderer_evidence. Scoped local source/checksum and synthetic renderer evidence only. No full public/private suite, native Windows, dependency inventory refresh, image, live provider, deployed key replacement, retained-data migration, historical-secret remediation, release, deployment or installed-customer qualification.",
+  "new_source_contract_qualification_scope": "The unchanged generator and binding verifier cover 2,714 source files and six historical SBOMs. Exactly one existing source row changes; all other 2,713 rows and the full file inventory are identical. Eight revision contracts and five negative controls are verified locally.",
   "consultation_responsive_previous_binding": {
     "repository_revision": "d1e042d527dde01c447350ab09638d0cca521268",
     "path": "PUBLIC_METADATA/source-binding.json",
@@ -19799,5 +19931,1003 @@
       "new_source_contract_qualification_scope": "The unchanged source manifest generator and source-binding consumer bind exactly 2,714 source files and six historical SBOMs. Exactly nine source manifest rows change; 2,705 rows and the complete path inventory are preserved. Eight existing source-binding revision contracts and wrong-source/tamper controls run locally. No dependency inventory or installed acceptance is promoted by checksum verification."
     },
     "retention": "Every replaced predecessor value is retained verbatim as JSON. All other historical records, twelve focused receipt objects, source identities and six complete retained SBOM status objects are unchanged. Historical qualification never becomes a pass for this diagnostics successor."
+  },
+  "call_history_memory_overlap_previous_binding": {
+    "public_revision": "da27e7ac918ae1aa75f24908418586767ed8b702",
+    "source_revision": "8acc56a7992e8b0efc5958da84e87202bff23c77",
+    "path": "PUBLIC_METADATA/source-binding.json",
+    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/da27e7ac918ae1aa75f24908418586767ed8b702/PUBLIC_METADATA/source-binding.json",
+    "sha256": "5617ef1cf3dcf3a65a25afa6afff9e3f2d859ade475051c50447cb9e542b8b9f",
+    "git_blob": "59350095c118fb2f0e365eb4bb7cede489b6a1f1",
+    "bytes": 1729062,
+    "previous_source_manifest_sha256": "410ded4aa5693e1e7810e575c5a7b9f5ebae2554cb0a4094129680c0c7b84b4e",
+    "previous_source_manifest_git_blob": "8471087e61c399e672ce83adff781acdf4c73f8f",
+    "previous_values": {
+      "source_manifest_sha256": "410ded4aa5693e1e7810e575c5a7b9f5ebae2554cb0a4094129680c0c7b84b4e",
+      "source_tree_sha256": "f3b5e852d3150f4f253467ed04fbc48d02b1c6ac2d3c4f1c039f0187af5b7adb",
+      "source_revision": "8acc56a7992e8b0efc5958da84e87202bff23c77",
+      "comparison_public_revision": "28d918eb64ad3d9eea5252544f84135812f9c431",
+      "changed_source_paths": [
+        "diagnostics/sinks.py"
+      ],
+      "input_equivalence": {
+        "basis": "Exact protected public 28d918eb64ad3d9eea5252544f84135812f9c431",
+        "changed_source_paths": [
+          "diagnostics/sinks.py"
+        ],
+        "unselected_source_files_preserved": 2713,
+        "all_six_sbom_bytes_and_status_objects_preserved": true,
+        "dependency_and_workflow_inputs_unchanged": true,
+        "workflow_inputs_unchanged": true,
+        "source_basis": "Actual source-only commit 8acc56a7992e8b0efc5958da84e87202bff23c77, tree 58055f0e1ec867e33fa6212911d5fb23caf558bb, parent 28d918eb64ad3d9eea5252544f84135812f9c431. Only SOURCE/diagnostics/sinks.py differs from that parent. The metadata successor changes only source-manifest.json and source-binding.json; no SOURCE bytes are edited by metadata preparation.",
+        "historical_inventory_limits": "No dependency or workflow input changes in this one-source correction. This does not remove inherited dependency-input changes or inventory limitations: all six prior SBOM bytes and complete status objects remain unchanged and historical; no current native inventory qualification is claimed."
+      },
+      "qualification": {
+        "source_commit": "8acc56a7992e8b0efc5958da84e87202bff23c77",
+        "kind": "Exact one-source Qt diagnostics correction checksum binding; prior qualification and dependency inventories retained without promotion",
+        "source_binding_verification": {
+          "files_checked": 2714,
+          "retained_sboms_checked": 6,
+          "failures": 0,
+          "tool": "SOURCE/tools/release/verify_source_binding.py"
+        },
+        "source_binding_revision_contract_tests": {
+          "passed": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "focused_source_contract_receipts": {
+          "memory_supersede_author": {
+            "passed": 191,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "junit_sha256": "0dc938744d1092ee42b4b168377626858f3e23ea47d8a74fe1cdb745c9253fe1",
+            "environment": "Linux Python 3.11.17; existing full-dependency-closure runtime",
+            "scope": "Focused memory privacy, tiered semantic categories, supersede preservation and archive recovery contracts on the final three memory source blobs.",
+            "source_git_blobs": {
+              "SOURCE/services/memory/dir.py": "07dbdea3c37d6597241a6aad83956763e3ec6f26",
+              "SOURCE/services/memory/store.py": "bcc8a21856a74b50ec4e14d2dc70503af86860db",
+              "SOURCE/services/memory/hygiene.py": "bb31563f5ab69e0e30ecdfd8aa5a32f84ef8876e"
+            },
+            "evidence_kind": "Executed focused receipt; exact listed source-blob identity. Not a full public/private aggregate or complete final-head application run.",
+            "source_binding_receipt_sha256": "8c329c06aa0356ad63cabdace0a73831f1f5d5d8d6b2ca5db27c74e27e5524df"
+          },
+          "memory_supersede_independent": {
+            "passed": 208,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "junit_sha256": "e81b032a50323ede84519d249b5a3d1aacd2e897642753fe32832f63d1da77f1",
+            "environment": "Linux Python 3.11.17; existing full-dependency-closure runtime",
+            "scope": "191 author cases plus 17 independent controls; existing-archive backup failure, rollback failure recovery copy, real rename failures, source-change protection, positional IDs, tenant isolation and encrypted retention.",
+            "source_git_blobs": {
+              "SOURCE/services/memory/dir.py": "07dbdea3c37d6597241a6aad83956763e3ec6f26",
+              "SOURCE/services/memory/store.py": "bcc8a21856a74b50ec4e14d2dc70503af86860db",
+              "SOURCE/services/memory/hygiene.py": "bb31563f5ab69e0e30ecdfd8aa5a32f84ef8876e"
+            },
+            "evidence_kind": "Executed focused receipt; exact listed source-blob identity. Not a full public/private aggregate or complete final-head application run.",
+            "independent_review_sha256": "5eb3102e2b465c313452a9e54068c87ed0e798028bf5a606aa27f4a3464bc97d",
+            "source_binding_receipt_sha256": "98b8783a4f482dff15e447dae27df776ebd233fec45366d6f95361d3b10a4bbe"
+          },
+          "profile_author": {
+            "passed": 46,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "junit_sha256": "4f39c70762a2eedac19690e633276ebbbee4c9f06325bcc8c020298bc67f3cea",
+            "environment": "Linux Python 3.12.14; existing PostgreSQL 18.1 native fixture",
+            "scope": "38 affected unit cases plus 8 real PostgreSQL controls for RLS, consent-lock lifetime, nested savepoints, model/journal rollback and outer transaction preservation. Reused by unchanged exact profile blob identity.",
+            "source_git_blobs": {
+              "SOURCE/services/user_model/profile.py": "1bce9b347d252c49eeb2e70f0f26efcfd6d30c00"
+            },
+            "evidence_kind": "Executed focused receipt; exact listed source-blob identity. Not a full public/private aggregate or complete final-head application run.",
+            "source_binding_receipt_sha256": "1ad195e50344d253621997e06a44e86c3aa2806b54ab129c8c8be7e406d6b6ea"
+          },
+          "profile_independent": {
+            "passed": 22,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "junit_sha256": "b189a1cca080e09d288e6439f4d1db7c8f3d1fbff90eec1eba8db9413a613105",
+            "environment": "Linux Python 3.12.14; existing PostgreSQL 18.1 native fixture",
+            "scope": "Independent focused profile controls, including caught nested failures, SQL-error recovery, unrelated tenant writes, outer commit/rollback and lock lifetime. Reused by unchanged exact profile blob identity.",
+            "source_git_blobs": {
+              "SOURCE/services/user_model/profile.py": "1bce9b347d252c49eeb2e70f0f26efcfd6d30c00"
+            },
+            "evidence_kind": "Executed focused receipt; exact listed source-blob identity. Not a full public/private aggregate or complete final-head application run.",
+            "independent_review_sha256": "f9cd5a2ef13ea2d314e2268783f0c4261a952f9d99d5afae75774f7c3bec5252",
+            "source_binding_receipt_sha256": "d0038ece69189a72cad3e43113e8f44ca3df78a786c5abc317c24d25c567beab"
+          },
+          "combined_final_memory_profile": {
+            "passed": 141,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "junit_sha256": "f9a4dffc7a2bb20af3e85d97c78733a95e7c3713ec27f82b5e7fd65736f0cec7",
+            "environment": "Linux Python 3.12.14; existing PostgreSQL 18.1 native fixture",
+            "scope": "Focused combined final memory/profile and native SQL proofs on a partial private/public overlay, with the isolated private encryption fixture. Actual imported identities match the complete final four-source tuple. Not the complete canonical aggregate or a full exact private checkout.",
+            "source_git_blobs": {
+              "SOURCE/services/memory/dir.py": "07dbdea3c37d6597241a6aad83956763e3ec6f26",
+              "SOURCE/services/memory/store.py": "bcc8a21856a74b50ec4e14d2dc70503af86860db",
+              "SOURCE/services/memory/hygiene.py": "bb31563f5ab69e0e30ecdfd8aa5a32f84ef8876e",
+              "SOURCE/services/user_model/profile.py": "1bce9b347d252c49eeb2e70f0f26efcfd6d30c00"
+            },
+            "evidence_kind": "Executed focused receipt; exact listed source-blob identity. Not a full public/private aggregate or complete final-head application run.",
+            "source_binding_receipt_sha256": "824ebd3c669282195f4da0f0fe634425977a1d86e8b59f802a9fb3da29e8f81f"
+          },
+          "plugin_sandbox_author": {
+            "passed": 65,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "junit_sha256": "7691bf23f793cd3db181c683c5b911170850eafdc85e1fbe8c9abd2111889a89",
+            "environment": "Linux Python 3.11.17; existing full-dependency-closure runtime",
+            "scope": "Corrected ordinary plugin exception isolation at sync/async and lifecycle callback boundaries; consecutive crash/reset behavior, payload-free diagnostics and explicit concurrent.futures cancellation propagation. One public source blob; reviewed private test fixture and runner remain separate.",
+            "source_git_blobs": {
+              "SOURCE/plugins/sandbox.py": "dc9cb3300eaf2ee7e6a0754dc9964ea4575db9d2"
+            },
+            "source_binding_receipt_sha256": "d60e3f339ac1ab0fe68867ed1ba639901608991dce3dbf8e26c1ce784569a90e",
+            "evidence_kind": "Previously executed focused receipt reused by exact listed source-blob identity. No six-source combined, full public/private aggregate or complete final-head application qualification."
+          },
+          "plugin_sandbox_independent": {
+            "passed": 115,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "junit_sha256": "3aa4a38f16850a34e6f9582d165dc9957e91faa9aec249e566b9edcce70be19d",
+            "environment": "Linux Python 3.11.17; existing full-dependency-closure runtime",
+            "scope": "65 author cases, 10 existing isolation cases and 40 independent controls. Cancellation and BaseException propagation, crash threshold/reset semantics, cleanup and payload-free diagnostics. The 65 author cases overlap this receipt. No plugin feature or resource-enforcement expansion.",
+            "source_git_blobs": {
+              "SOURCE/plugins/sandbox.py": "dc9cb3300eaf2ee7e6a0754dc9964ea4575db9d2"
+            },
+            "source_binding_receipt_sha256": "6d465e60b0f85caced36fbfe52a78a9c1eb1140c8b8226f4fcc877b1b2b51e03",
+            "evidence_kind": "Previously executed focused receipt reused by exact listed source-blob identity. No six-source combined, full public/private aggregate or complete final-head application qualification.",
+            "independent_review_sha256": "8b20b9ec640ca3b26afb1a777274142a69fc5028eb09a2e366df7afd869eca9a"
+          },
+          "wake_sensitivity_author": {
+            "passed": 16,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "junit_sha256": "b4726136638b27e09601100ce6951a32c27dbbdd68f153ad3aabeab1b46915e4",
+            "environment": "Linux CPython 3.11.17 native-venv; isolated focused composition",
+            "scope": "Public source comment only; production AST unchanged. Saved sensitivities, including 0.80, remain preserved; absent-key defaults reach 0.90. Focused private migration, persistence, reload, canonical/legacy alias and generic settings regressions. No new runtime behavior, broad wake/audio/device campaign or combined composition qualification.",
+            "source_git_blobs": {
+              "SOURCE/ui/settings_manager.py": "4cf8e70270df565ac02a654889fdb223d0fbdaf7"
+            },
+            "source_binding_receipt_sha256": "a5c818cfb1bbd8a64a5f7453d933e46154a846db930833c219da9c991dc45e87",
+            "evidence_kind": "Previously executed focused receipt reused by exact listed source-blob identity. No six-source combined, full public/private aggregate or complete final-head application qualification."
+          },
+          "wake_sensitivity_independent": {
+            "passed": 16,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "junit_sha256": "46af20353fec06d8629f61ea4ff5cf9a7c8415fac06e06f365d16bf92f67f463",
+            "environment": "Linux CPython 3.11.17 native-venv; isolated focused composition",
+            "scope": "Public source comment only; production AST unchanged. Saved sensitivities, including 0.80, remain preserved; absent-key defaults reach 0.90. Focused private migration, persistence, reload, canonical/legacy alias and generic settings regressions. No new runtime behavior, broad wake/audio/device campaign or combined composition qualification. Independent rerun of the same 16 cases, not 16 additional cases.",
+            "source_git_blobs": {
+              "SOURCE/ui/settings_manager.py": "4cf8e70270df565ac02a654889fdb223d0fbdaf7"
+            },
+            "source_binding_receipt_sha256": "a2d6384e23d3d9584dce4ef47b21ded6335ea180ee14b91742336ce3d4467af3",
+            "evidence_kind": "Previously executed focused receipt reused by exact listed source-blob identity. No six-source combined, full public/private aggregate or complete final-head application qualification.",
+            "independent_review_sha256": "8fbf5ea803bb5b2f74366dcbb15d4b852ae72f87bf212b896a9d1b21ec9dc337"
+          },
+          "strict_route_original_fourteen_author": {
+            "passed": 14,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "junit_sha256": "3051222b17f9885d27e13d9ca3bad9921dc9546488b7cb6e42129df45f228300",
+            "environment": "Linux CPython 3.11.17; existing full-dependency-closure runtime and partial private/public overlay",
+            "scope": "Final-source execution of the original 14 previously unexecuted private obligations: two GPT model fixtures, seven routing parameter cases, one local TTS boundary and four NumPy/scalar Silero cases. Reuses one reviewed route catalog/decoder source and owned mock-provider/PCM boundaries; only a partial overlay, not a current full aggregate.",
+            "source_git_blobs": {
+              "SOURCE/services/llm/route_tool_schemas.py": "75507a7aa08e75317a33c78471f4cbdbf83b2eab"
+            },
+            "source_binding_receipt_sha256": "22327f88988d42e7cb732caf75cef10bbb3f8e0a80f0639bd417abfecafeff95",
+            "independent_review_sha256": "05c3a8d315374ed2300fab9443c9bb4f680a755c5a74ade629e87d2c38ea4e9e",
+            "runner_invocation_sha256": "20a05c08e5624084a9946a9c44dfd7d222542a2a4d505e5e0e0a19203fc170ed",
+            "runner_summary_sha256": "724b663a0d301eed2e04f0e3cc686024cdf5b26a051800f4395041331cc6ffe8",
+            "frozen_repair_manifest_sha256": "906ec4a13750cfa497ce98378549de10fa3bfd38c8e1e3e67bdd5faf35aa8735",
+            "private_fixture_git_blobs": {
+              "tests/unit/test_gpt_handler.py": "ef0dc939e8ad18eb07d5e99ec2fc9527202d984b",
+              "tests/unit/test_model_routing.py": "fd9fcfd4dcebbdcbb2ff30ff9e2a4f2471a3f9c0",
+              "tests/unit/test_tts_pipeline_injection.py": "a8749acad9b28614f1b11f8117cdd68377195e0c",
+              "tests/unit/voice/test_silero_vad_endpoint.py": "222e286b0c55eaa1c80f987d8e4fdabd6261ff96",
+              "tests/unit/services/llm/test_assistant_capability_route_schemas.py": "ad78427adb15ce2f3e6ba9b62de767d61fc2b493"
+            },
+            "receipt_public_baseline": "2186ca5cc6f1b1eacc8299a2c5f9704cefef5cbc",
+            "receipt_private_baseline": "2bdf1c9d52793a6e8aca80274c9e73ba92bff69a",
+            "evidence_kind": "Previously executed focused receipt reused by exact final route-schema blob and frozen fixture identities. This partial overlay is not the complete protected 97678cdb or e279cd0d composition; no current full aggregate or final-head application qualification.",
+            "current_source_import_identity_comparison": {
+              "name": "strict_route_original_fourteen_author",
+              "unique_imported_public_files": 190,
+              "matching_current_source_files": 188,
+              "different_current_source_files": [
+                {
+                  "path": "SOURCE/plugins/sandbox.py",
+                  "receipt_git_blob": "c94210fffb6174bd88d7989a9839909ff685c5d0",
+                  "current_git_blob": "dc9cb3300eaf2ee7e6a0754dc9964ea4575db9d2"
+                },
+                {
+                  "path": "SOURCE/ui/settings_manager.py",
+                  "receipt_git_blob": "5228feac890a64dfc115d3bfe79b82c47f6912b5",
+                  "current_git_blob": "4cf8e70270df565ac02a654889fdb223d0fbdaf7"
+                }
+              ],
+              "interpretation": "Partial-overlay source receipt only. Imported files outside the scoped reviewed route and consumer tuple do not establish complete current-source qualification."
+            }
+          },
+          "strict_route_consumers_author": {
+            "passed": 22,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "junit_sha256": "9694e653328f836c790261d1a86258c0ea984078385ebfd1fda3dd30bcb7969f",
+            "environment": "Linux CPython 3.11.17; existing full-dependency-closure runtime and partial private/public overlay",
+            "scope": "Closed nullable MCP-compatible room_name prefill and OpenAI JSON-string card transport decoded losslessly into actual native/MCP/UI consumers. Existing neutral/Anthropic extensible objects and legacy dicts preserved. Strict converter remains unchanged and rejects reopened schemas. Missing/null/empty/malformed/scalar/array/deep/oversized-number/nonfinite controls retain the answer without an unusable card. No tenant/auth/dispatch changes.",
+            "source_git_blobs": {
+              "SOURCE/services/llm/route_tool_schemas.py": "75507a7aa08e75317a33c78471f4cbdbf83b2eab"
+            },
+            "source_binding_receipt_sha256": "2f0481896ddcc02fa033fa447fa45cb22ffc201e7b5244530060d41ee0db6791",
+            "independent_review_sha256": "05c3a8d315374ed2300fab9443c9bb4f680a755c5a74ade629e87d2c38ea4e9e",
+            "runner_invocation_sha256": "561dcc3c787a632f478ac5d52ab7c25a125904051a1e5520f81ca033fab58e6a",
+            "runner_summary_sha256": "5afcd2e9ca0081986cd1fab09bedb6146a34625fdb2c3350336de9af3ed76416",
+            "frozen_repair_manifest_sha256": "906ec4a13750cfa497ce98378549de10fa3bfd38c8e1e3e67bdd5faf35aa8735",
+            "private_fixture_git_blobs": {
+              "tests/unit/test_gpt_handler.py": "ef0dc939e8ad18eb07d5e99ec2fc9527202d984b",
+              "tests/unit/test_model_routing.py": "fd9fcfd4dcebbdcbb2ff30ff9e2a4f2471a3f9c0",
+              "tests/unit/test_tts_pipeline_injection.py": "a8749acad9b28614f1b11f8117cdd68377195e0c",
+              "tests/unit/voice/test_silero_vad_endpoint.py": "222e286b0c55eaa1c80f987d8e4fdabd6261ff96",
+              "tests/unit/services/llm/test_assistant_capability_route_schemas.py": "ad78427adb15ce2f3e6ba9b62de767d61fc2b493"
+            },
+            "receipt_public_baseline": "2186ca5cc6f1b1eacc8299a2c5f9704cefef5cbc",
+            "receipt_private_baseline": "2bdf1c9d52793a6e8aca80274c9e73ba92bff69a",
+            "evidence_kind": "Previously executed focused receipt reused by exact final route-schema blob and frozen fixture identities. This partial overlay is not the complete protected 97678cdb or e279cd0d composition; no current full aggregate or final-head application qualification.",
+            "current_source_import_identity_comparison": {
+              "name": "strict_route_consumers_author",
+              "unique_imported_public_files": 270,
+              "matching_current_source_files": 265,
+              "different_current_source_files": [
+                {
+                  "path": "SOURCE/plugins/sandbox.py",
+                  "receipt_git_blob": "c94210fffb6174bd88d7989a9839909ff685c5d0",
+                  "current_git_blob": "dc9cb3300eaf2ee7e6a0754dc9964ea4575db9d2"
+                },
+                {
+                  "path": "SOURCE/services/memory/dir.py",
+                  "receipt_git_blob": "10791377ca9ef1e00161bc9fa3a44aad3a40d727",
+                  "current_git_blob": "07dbdea3c37d6597241a6aad83956763e3ec6f26"
+                },
+                {
+                  "path": "SOURCE/services/memory/hygiene.py",
+                  "receipt_git_blob": "7689eb6b9c4f61acc72d1212d34fd3df1cadb097",
+                  "current_git_blob": "bb31563f5ab69e0e30ecdfd8aa5a32f84ef8876e"
+                },
+                {
+                  "path": "SOURCE/services/memory/store.py",
+                  "receipt_git_blob": "8ac31de2996cb9a424fcbf2c994949e1300d840b",
+                  "current_git_blob": "bcc8a21856a74b50ec4e14d2dc70503af86860db"
+                },
+                {
+                  "path": "SOURCE/ui/settings_manager.py",
+                  "receipt_git_blob": "5228feac890a64dfc115d3bfe79b82c47f6912b5",
+                  "current_git_blob": "4cf8e70270df565ac02a654889fdb223d0fbdaf7"
+                }
+              ],
+              "interpretation": "Partial-overlay source receipt only. Imported files outside the scoped reviewed route and consumer tuple do not establish complete current-source qualification."
+            }
+          },
+          "strict_route_consumers_independent": {
+            "passed": 22,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "junit_sha256": "28c82f4e180212816a6bca76c788c04c5924bba2318212bbb66302ffd77f77c7",
+            "environment": "Linux CPython 3.11.17; existing full-dependency-closure runtime and partial private/public overlay",
+            "scope": "Closed nullable MCP-compatible room_name prefill and OpenAI JSON-string card transport decoded losslessly into actual native/MCP/UI consumers. Existing neutral/Anthropic extensible objects and legacy dicts preserved. Strict converter remains unchanged and rejects reopened schemas. Missing/null/empty/malformed/scalar/array/deep/oversized-number/nonfinite controls retain the answer without an unusable card. No tenant/auth/dispatch changes. Independent rerun of the same 22 cases, not 22 additional cases; no live provider or hardware execution.",
+            "source_git_blobs": {
+              "SOURCE/services/llm/route_tool_schemas.py": "75507a7aa08e75317a33c78471f4cbdbf83b2eab"
+            },
+            "source_binding_receipt_sha256": "2f0481896ddcc02fa033fa447fa45cb22ffc201e7b5244530060d41ee0db6791",
+            "independent_review_sha256": "05c3a8d315374ed2300fab9443c9bb4f680a755c5a74ade629e87d2c38ea4e9e",
+            "runner_invocation_sha256": "af69cd7253d63b9d38c3a542c9fbe11068d9501d7a074824c9a939088f07bf60",
+            "runner_summary_sha256": "62ff0654183bd66a4400748eae05805773f2c98c0d701cd7cb553beb96518707",
+            "frozen_repair_manifest_sha256": "906ec4a13750cfa497ce98378549de10fa3bfd38c8e1e3e67bdd5faf35aa8735",
+            "private_fixture_git_blobs": {
+              "tests/unit/test_gpt_handler.py": "ef0dc939e8ad18eb07d5e99ec2fc9527202d984b",
+              "tests/unit/test_model_routing.py": "fd9fcfd4dcebbdcbb2ff30ff9e2a4f2471a3f9c0",
+              "tests/unit/test_tts_pipeline_injection.py": "a8749acad9b28614f1b11f8117cdd68377195e0c",
+              "tests/unit/voice/test_silero_vad_endpoint.py": "222e286b0c55eaa1c80f987d8e4fdabd6261ff96",
+              "tests/unit/services/llm/test_assistant_capability_route_schemas.py": "ad78427adb15ce2f3e6ba9b62de767d61fc2b493"
+            },
+            "receipt_public_baseline": "2186ca5cc6f1b1eacc8299a2c5f9704cefef5cbc",
+            "receipt_private_baseline": "2bdf1c9d52793a6e8aca80274c9e73ba92bff69a",
+            "evidence_kind": "Previously executed focused receipt reused by exact final route-schema blob and frozen fixture identities. This partial overlay is not the complete protected 97678cdb or e279cd0d composition; no current full aggregate or final-head application qualification.",
+            "current_source_import_identity_comparison": {
+              "name": "strict_route_consumers_independent",
+              "unique_imported_public_files": 270,
+              "matching_current_source_files": 265,
+              "different_current_source_files": [
+                {
+                  "path": "SOURCE/plugins/sandbox.py",
+                  "receipt_git_blob": "c94210fffb6174bd88d7989a9839909ff685c5d0",
+                  "current_git_blob": "dc9cb3300eaf2ee7e6a0754dc9964ea4575db9d2"
+                },
+                {
+                  "path": "SOURCE/services/memory/dir.py",
+                  "receipt_git_blob": "10791377ca9ef1e00161bc9fa3a44aad3a40d727",
+                  "current_git_blob": "07dbdea3c37d6597241a6aad83956763e3ec6f26"
+                },
+                {
+                  "path": "SOURCE/services/memory/hygiene.py",
+                  "receipt_git_blob": "7689eb6b9c4f61acc72d1212d34fd3df1cadb097",
+                  "current_git_blob": "bb31563f5ab69e0e30ecdfd8aa5a32f84ef8876e"
+                },
+                {
+                  "path": "SOURCE/services/memory/store.py",
+                  "receipt_git_blob": "8ac31de2996cb9a424fcbf2c994949e1300d840b",
+                  "current_git_blob": "bcc8a21856a74b50ec4e14d2dc70503af86860db"
+                },
+                {
+                  "path": "SOURCE/ui/settings_manager.py",
+                  "receipt_git_blob": "5228feac890a64dfc115d3bfe79b82c47f6912b5",
+                  "current_git_blob": "4cf8e70270df565ac02a654889fdb223d0fbdaf7"
+                }
+              ],
+              "interpretation": "Partial-overlay source receipt only. Imported files outside the scoped reviewed route and consumer tuple do not establish complete current-source qualification."
+            }
+          }
+        },
+        "private_encryption_fixture_review": {
+          "path": "tests/unit/test_memory_encryption.py",
+          "sha256": "5129d202bd1056663e819832b9a7b4d335180e8cca842419ffdac6d4fe7b434b",
+          "git_blob": "c7384e78b0d3a7e20ab38da00191dbec59b6acfd",
+          "independent_review_sha256": "1ecb924a2cd0f513723c57b02f1cab7d567e05133d416cf05a7ec45ec6500984",
+          "independent_test_count": 13,
+          "independent_junit_sha256": "a87b60566c8eced39b7744f528a284eefd9de7aa2c25726faa500ba89c2e7165",
+          "scope": "Private fixture only: synthetic key, previous/shared-key isolation, real temporary SQLite salt storage. 11 unchanged class cases and 2 independent controls. PostgreSQL-specific/native proof remains explicit in the combined 141 receipt.",
+          "environment": "Independent fixture proof: Linux Python 3.11.17. Combined final proof: Linux Python 3.12.14 and native PostgreSQL 18.1."
+        },
+        "receipt_relationship": "All twelve predecessor focused receipt objects and exact source identities remain unchanged as historical/scoped evidence. The new real-Qt 10-case receipt is included in the bounded 64-case receipt, not additional aggregate coverage. Neither the predecessor nor new focused receipts establish full current-composition or native Windows qualification.",
+        "independent_review": "The exact diagnostics source and four accompanying private fixture corrections have independent scoped PASS review, identified under diagnostics_correction_review. This two-file metadata successor remains subject to independent exact-candidate review.",
+        "protected_public_checks": "Exact metadata-successor hosted source checks remain pending; no hosted check result is claimed by metadata preparation.",
+        "canonical_private_public_composition": "The bounded 64-case receipt uses the original private/public bases plus exactly four private fixture corrections and the public diagnostics correction. It does not qualify a complete current protected composition or a canonical aggregate run; historical records keep their original source identities.",
+        "full_public_suite": false,
+        "native_windows_qualification": false,
+        "image_qualification": false,
+        "production_deployment": false,
+        "installed_customer_acceptance": false,
+        "provider_sandbox_acceptance": false,
+        "limits": "Complete source/SBOM checksum verification, eight existing revision contracts and negative metadata controls; separately retained focused Linux QtCore/private-overlay evidence. No fresh dependency resolution or installed inventory, advisory scan, full public/private aggregate, native Windows, image, live provider, hardware, release, deployment or installed-customer qualification.",
+        "diagnostics_correction_receipts": {
+          "qt-positive": {
+            "summary": {
+              "passed": 10,
+              "failed": 0,
+              "skipped": 0,
+              "errors": 0,
+              "duration_seconds": 1.24
+            },
+            "exit_code": 0,
+            "pytest_args": [
+              "tests/unit/test_diagnostics_bus.py"
+            ],
+            "sha256": "3733216750615c4fb22d0b4b5963acebf1fa11423d65c7a29d53e586811eba5a",
+            "raw_sha256": "6ca53f1d1d50035dc68b29f37f789730e101b424aea7f247ead92b06630d6cac",
+            "source_git_blobs": {
+              "SOURCE/diagnostics/sinks.py": "a84018df229279a9abf8782a48924177ba9c54b3"
+            },
+            "public_baseline": "28d918eb64ad3d9eea5252544f84135812f9c431",
+            "private_baseline": "4bc876e9c22413b760354a062734644eb99fb7f8",
+            "source_and_test_receipt_sha256": "cae0e6a15f1705aaf03c49c0fbaf227275885090fa74c39fee8341727bdbda02",
+            "environment": "Linux CPython 3.11.17; actual PySide6-Essentials 6.11.1 and shiboken6 6.11.1; unchanged repository custom runner and pytest.ini",
+            "scope": "Ten real QtCore diagnostics cases, including the existing handler/emission obligations and actual receiver disconnect/reconnect counts.",
+            "limits": "Scoped local source evidence only. The ten Qt cases are included in the 64-case selection; counts must not be summed. No full suite, complete current private/public composition, native Windows, GUI launch, QtWebEngine, hardware, provider, image, deployment, release or installed-customer qualification."
+          },
+          "final-all-six": {
+            "summary": {
+              "passed": 64,
+              "failed": 0,
+              "skipped": 0,
+              "errors": 0,
+              "duration_seconds": 5.45
+            },
+            "exit_code": 0,
+            "pytest_args": [
+              "tests/unit/step_log_analysis/test_step_log_analysis_stack.py",
+              "tests/unit/test_agent_mcp_wiring.py::TestAgentMCPWiring::test_empty_native_tool_surface_blocks_hub_routing",
+              "tests/unit/test_device_discovery.py",
+              "tests/unit/test_ui_state.py",
+              "tests/unit/music/test_player_control_service.py",
+              "tests/unit/test_youtube_iframe_backend.py",
+              "tests/unit/voice/test_silero_vad_endpoint.py",
+              "tests/unit/test_diagnostics_bus.py"
+            ],
+            "sha256": "78d8a02cd04efee42312b103bcc3170bcc5ba202393cf2916c12095722c19de6",
+            "raw_sha256": "0f94e35fa25902b32412ec4a37d64c374bc21277288f2df539c52ae803b029bc",
+            "source_git_blobs": {
+              "SOURCE/diagnostics/sinks.py": "a84018df229279a9abf8782a48924177ba9c54b3"
+            },
+            "public_baseline": "28d918eb64ad3d9eea5252544f84135812f9c431",
+            "private_baseline": "4bc876e9c22413b760354a062734644eb99fb7f8",
+            "source_and_test_receipt_sha256": "cae0e6a15f1705aaf03c49c0fbaf227275885090fa74c39fee8341727bdbda02",
+            "environment": "Linux CPython 3.11.17; actual PySide6-Essentials 6.11.1 and shiboken6 6.11.1; unchanged repository custom runner and pytest.ini",
+            "scope": "Bounded 64-case selection across diagnostics and seven other selectors, on the original private/public composition plus the four exact private fixture corrections and this public source correction.",
+            "limits": "Scoped local source evidence only. The ten Qt cases are included in the 64-case selection; counts must not be summed. No full suite, complete current private/public composition, native Windows, GUI launch, QtWebEngine, hardware, provider, image, deployment, release or installed-customer qualification."
+          }
+        },
+        "diagnostics_correction_review": {
+          "result": "PASS",
+          "independent_review_sha256": "502192865afdc70111395794358bd7009f7085bdc8271a9ad78ffcb85cb10005",
+          "independent_probe_sha256": "566823644f5f477e1c304b0135e1dc4f9a03b217f90eed3ed35f0194765abcaf",
+          "public_patch_sha256": "7d31ce9cfc03d99f3512c8038c1e89063c896f692ae68d625d1a9739a6dc96c5",
+          "source_git_blobs": {
+            "SOURCE/diagnostics/sinks.py": "a84018df229279a9abf8782a48924177ba9c54b3"
+          },
+          "scope": "Independent review of the frozen one-public-source/four-private-fixture correction and author receipt hashes, plus actual Linux PySide6 receiver counts 1 -> 2 -> 1 -> 0 -> 1, DiagnosticsBus dispatch/buffer effects, unrelated-signal and optional-no-Qt controls. No additional full or focused green suite was rerun by the reviewer.",
+          "limits": "Source-scoped code review and independent diagnostic probe only. No metadata-successor review, hosted checks, full composition, native Windows, GUI or installed acceptance is established."
+        }
+      },
+      "reviewed_source_patch": {
+        "source_commit": "8acc56a7992e8b0efc5958da84e87202bff23c77",
+        "paths": [
+          "SOURCE/diagnostics/sinks.py"
+        ],
+        "git_blobs": {
+          "SOURCE/diagnostics/sinks.py": "a84018df229279a9abf8782a48924177ba9c54b3"
+        }
+      },
+      "new_resolution_scope": "No dependency resolution is performed for this diagnostics-only metadata repair. All six retained SBOM byte sequences, component counts and complete existing historical/unqualified status objects are unchanged.",
+      "new_advisory_scan_scope": "No advisory scan is performed; prior findings retain their original source scope and status.",
+      "new_runtime_qualification_scope": "Metadata preparation performs no application runtime suite or dependency installation. Separately retained author receipts prove ten actual Linux QtCore diagnostics cases and an overlapping bounded 64-case private/public overlay; no native Windows, full aggregate, image, provider, hardware, release, deployment or installed-customer qualification.",
+      "new_source_contract_qualification_scope": "The unchanged manifest generator and binding consumer bind exactly 2,714 source files and six historical SBOMs. Only diagnostics/sinks.py changes; all 2,713 other rows and the entire path inventory remain identical. Eight existing revision contracts and old-source, manifest-integrity, revision and SBOM negative controls are verified locally. Checksum verification does not promote any historical runtime or installed inventory claim."
+    },
+    "retention": "Every replaced predecessor value is retained verbatim as JSON. Unreplaced historical fields and all six complete SBOM status objects are unchanged. Original binding/manifest raw bytes remain addressable at the immutable predecessor; historical signatures and inventories are not regenerated."
+  },
+  "authoritative_searxng_renderer_previous_binding": {
+    "public_revision": "ecab2772465fcc89ae6645b028af1c2273b9199f",
+    "source_revision": "e787cf89f03a213524b06331b91a28177cd4c0c1",
+    "path": "PUBLIC_METADATA/source-binding.json",
+    "url": "https://github.com/GeeIHadAGoodTime/viola-oss/blob/ecab2772465fcc89ae6645b028af1c2273b9199f/PUBLIC_METADATA/source-binding.json",
+    "sha256": "c71bb07192e204b6e9c5416435096690725c8bdf9f89378d7f4c65c5c81697ad",
+    "git_blob": "51540ddd76735e32d0e9447b03cf9fae4501472b",
+    "bytes": 1770633,
+    "previous_source_manifest_sha256": "b0e5655a566fe8b1b1a85f41cfe0d615276581511b769f12dd6d326869fde71d",
+    "previous_source_manifest_git_blob": "107d51429094d0d64488ca3cf93529bc83686245",
+    "previous_values": {
+      "source_manifest_sha256": "b0e5655a566fe8b1b1a85f41cfe0d615276581511b769f12dd6d326869fde71d",
+      "source_tree_sha256": "d7c517f072e0ced7f45a61ae9d7f497454b8391626132a2cf104c5cacd55da4d",
+      "source_revision": "e787cf89f03a213524b06331b91a28177cd4c0c1",
+      "comparison_public_revision": "da27e7ac918ae1aa75f24908418586767ed8b702",
+      "changed_source_paths": [
+        "telephony/call_history.py",
+        "tests/public/test_call_history_order_contract.py"
+      ],
+      "input_equivalence": {
+        "basis": "Exact protected public da27e7ac918ae1aa75f24908418586767ed8b702",
+        "changed_source_paths": [
+          "telephony/call_history.py",
+          "tests/public/test_call_history_order_contract.py"
+        ],
+        "unselected_source_files_preserved": 2712,
+        "all_six_sbom_bytes_and_status_objects_preserved": true,
+        "dependency_and_workflow_inputs_unchanged": true,
+        "workflow_inputs_unchanged": true,
+        "source_basis": "Actual source-only commit e787cf89f03a213524b06331b91a28177cd4c0c1, tree acdd1081f2ca697104efebe128668e9bb6d130f2, parent da27e7ac918ae1aa75f24908418586767ed8b702. Only the two named existing SOURCE paths change. The metadata successor changes only source-manifest.json and source-binding.json.",
+        "historical_inventory_limits": "This runtime/test correction changes no dependency or workflow inputs. All six retained SBOMs and their complete status objects stay historical and unchanged; no current installed inventory qualification is claimed."
+      },
+      "qualification": {
+        "source_commit": "e787cf89f03a213524b06331b91a28177cd4c0c1",
+        "kind": "Exact two-source call-history memory-key overlap correction checksum binding; historical evidence retained without promotion",
+        "source_binding_verification": {
+          "files_checked": 2714,
+          "retained_sboms_checked": 6,
+          "failures": 0,
+          "tool": "SOURCE/tools/release/verify_source_binding.py"
+        },
+        "source_binding_revision_contract_tests": {
+          "passed": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "focused_source_contract_receipts": {
+          "memory_supersede_author": {
+            "passed": 191,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "junit_sha256": "0dc938744d1092ee42b4b168377626858f3e23ea47d8a74fe1cdb745c9253fe1",
+            "environment": "Linux Python 3.11.17; existing full-dependency-closure runtime",
+            "scope": "Focused memory privacy, tiered semantic categories, supersede preservation and archive recovery contracts on the final three memory source blobs.",
+            "source_git_blobs": {
+              "SOURCE/services/memory/dir.py": "07dbdea3c37d6597241a6aad83956763e3ec6f26",
+              "SOURCE/services/memory/store.py": "bcc8a21856a74b50ec4e14d2dc70503af86860db",
+              "SOURCE/services/memory/hygiene.py": "bb31563f5ab69e0e30ecdfd8aa5a32f84ef8876e"
+            },
+            "evidence_kind": "Executed focused receipt; exact listed source-blob identity. Not a full public/private aggregate or complete final-head application run.",
+            "source_binding_receipt_sha256": "8c329c06aa0356ad63cabdace0a73831f1f5d5d8d6b2ca5db27c74e27e5524df"
+          },
+          "memory_supersede_independent": {
+            "passed": 208,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "junit_sha256": "e81b032a50323ede84519d249b5a3d1aacd2e897642753fe32832f63d1da77f1",
+            "environment": "Linux Python 3.11.17; existing full-dependency-closure runtime",
+            "scope": "191 author cases plus 17 independent controls; existing-archive backup failure, rollback failure recovery copy, real rename failures, source-change protection, positional IDs, tenant isolation and encrypted retention.",
+            "source_git_blobs": {
+              "SOURCE/services/memory/dir.py": "07dbdea3c37d6597241a6aad83956763e3ec6f26",
+              "SOURCE/services/memory/store.py": "bcc8a21856a74b50ec4e14d2dc70503af86860db",
+              "SOURCE/services/memory/hygiene.py": "bb31563f5ab69e0e30ecdfd8aa5a32f84ef8876e"
+            },
+            "evidence_kind": "Executed focused receipt; exact listed source-blob identity. Not a full public/private aggregate or complete final-head application run.",
+            "independent_review_sha256": "5eb3102e2b465c313452a9e54068c87ed0e798028bf5a606aa27f4a3464bc97d",
+            "source_binding_receipt_sha256": "98b8783a4f482dff15e447dae27df776ebd233fec45366d6f95361d3b10a4bbe"
+          },
+          "profile_author": {
+            "passed": 46,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "junit_sha256": "4f39c70762a2eedac19690e633276ebbbee4c9f06325bcc8c020298bc67f3cea",
+            "environment": "Linux Python 3.12.14; existing PostgreSQL 18.1 native fixture",
+            "scope": "38 affected unit cases plus 8 real PostgreSQL controls for RLS, consent-lock lifetime, nested savepoints, model/journal rollback and outer transaction preservation. Reused by unchanged exact profile blob identity.",
+            "source_git_blobs": {
+              "SOURCE/services/user_model/profile.py": "1bce9b347d252c49eeb2e70f0f26efcfd6d30c00"
+            },
+            "evidence_kind": "Executed focused receipt; exact listed source-blob identity. Not a full public/private aggregate or complete final-head application run.",
+            "source_binding_receipt_sha256": "1ad195e50344d253621997e06a44e86c3aa2806b54ab129c8c8be7e406d6b6ea"
+          },
+          "profile_independent": {
+            "passed": 22,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "junit_sha256": "b189a1cca080e09d288e6439f4d1db7c8f3d1fbff90eec1eba8db9413a613105",
+            "environment": "Linux Python 3.12.14; existing PostgreSQL 18.1 native fixture",
+            "scope": "Independent focused profile controls, including caught nested failures, SQL-error recovery, unrelated tenant writes, outer commit/rollback and lock lifetime. Reused by unchanged exact profile blob identity.",
+            "source_git_blobs": {
+              "SOURCE/services/user_model/profile.py": "1bce9b347d252c49eeb2e70f0f26efcfd6d30c00"
+            },
+            "evidence_kind": "Executed focused receipt; exact listed source-blob identity. Not a full public/private aggregate or complete final-head application run.",
+            "independent_review_sha256": "f9cd5a2ef13ea2d314e2268783f0c4261a952f9d99d5afae75774f7c3bec5252",
+            "source_binding_receipt_sha256": "d0038ece69189a72cad3e43113e8f44ca3df78a786c5abc317c24d25c567beab"
+          },
+          "combined_final_memory_profile": {
+            "passed": 141,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "junit_sha256": "f9a4dffc7a2bb20af3e85d97c78733a95e7c3713ec27f82b5e7fd65736f0cec7",
+            "environment": "Linux Python 3.12.14; existing PostgreSQL 18.1 native fixture",
+            "scope": "Focused combined final memory/profile and native SQL proofs on a partial private/public overlay, with the isolated private encryption fixture. Actual imported identities match the complete final four-source tuple. Not the complete canonical aggregate or a full exact private checkout.",
+            "source_git_blobs": {
+              "SOURCE/services/memory/dir.py": "07dbdea3c37d6597241a6aad83956763e3ec6f26",
+              "SOURCE/services/memory/store.py": "bcc8a21856a74b50ec4e14d2dc70503af86860db",
+              "SOURCE/services/memory/hygiene.py": "bb31563f5ab69e0e30ecdfd8aa5a32f84ef8876e",
+              "SOURCE/services/user_model/profile.py": "1bce9b347d252c49eeb2e70f0f26efcfd6d30c00"
+            },
+            "evidence_kind": "Executed focused receipt; exact listed source-blob identity. Not a full public/private aggregate or complete final-head application run.",
+            "source_binding_receipt_sha256": "824ebd3c669282195f4da0f0fe634425977a1d86e8b59f802a9fb3da29e8f81f"
+          },
+          "plugin_sandbox_author": {
+            "passed": 65,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "junit_sha256": "7691bf23f793cd3db181c683c5b911170850eafdc85e1fbe8c9abd2111889a89",
+            "environment": "Linux Python 3.11.17; existing full-dependency-closure runtime",
+            "scope": "Corrected ordinary plugin exception isolation at sync/async and lifecycle callback boundaries; consecutive crash/reset behavior, payload-free diagnostics and explicit concurrent.futures cancellation propagation. One public source blob; reviewed private test fixture and runner remain separate.",
+            "source_git_blobs": {
+              "SOURCE/plugins/sandbox.py": "dc9cb3300eaf2ee7e6a0754dc9964ea4575db9d2"
+            },
+            "source_binding_receipt_sha256": "d60e3f339ac1ab0fe68867ed1ba639901608991dce3dbf8e26c1ce784569a90e",
+            "evidence_kind": "Previously executed focused receipt reused by exact listed source-blob identity. No six-source combined, full public/private aggregate or complete final-head application qualification."
+          },
+          "plugin_sandbox_independent": {
+            "passed": 115,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "junit_sha256": "3aa4a38f16850a34e6f9582d165dc9957e91faa9aec249e566b9edcce70be19d",
+            "environment": "Linux Python 3.11.17; existing full-dependency-closure runtime",
+            "scope": "65 author cases, 10 existing isolation cases and 40 independent controls. Cancellation and BaseException propagation, crash threshold/reset semantics, cleanup and payload-free diagnostics. The 65 author cases overlap this receipt. No plugin feature or resource-enforcement expansion.",
+            "source_git_blobs": {
+              "SOURCE/plugins/sandbox.py": "dc9cb3300eaf2ee7e6a0754dc9964ea4575db9d2"
+            },
+            "source_binding_receipt_sha256": "6d465e60b0f85caced36fbfe52a78a9c1eb1140c8b8226f4fcc877b1b2b51e03",
+            "evidence_kind": "Previously executed focused receipt reused by exact listed source-blob identity. No six-source combined, full public/private aggregate or complete final-head application qualification.",
+            "independent_review_sha256": "8b20b9ec640ca3b26afb1a777274142a69fc5028eb09a2e366df7afd869eca9a"
+          },
+          "wake_sensitivity_author": {
+            "passed": 16,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "junit_sha256": "b4726136638b27e09601100ce6951a32c27dbbdd68f153ad3aabeab1b46915e4",
+            "environment": "Linux CPython 3.11.17 native-venv; isolated focused composition",
+            "scope": "Public source comment only; production AST unchanged. Saved sensitivities, including 0.80, remain preserved; absent-key defaults reach 0.90. Focused private migration, persistence, reload, canonical/legacy alias and generic settings regressions. No new runtime behavior, broad wake/audio/device campaign or combined composition qualification.",
+            "source_git_blobs": {
+              "SOURCE/ui/settings_manager.py": "4cf8e70270df565ac02a654889fdb223d0fbdaf7"
+            },
+            "source_binding_receipt_sha256": "a5c818cfb1bbd8a64a5f7453d933e46154a846db930833c219da9c991dc45e87",
+            "evidence_kind": "Previously executed focused receipt reused by exact listed source-blob identity. No six-source combined, full public/private aggregate or complete final-head application qualification."
+          },
+          "wake_sensitivity_independent": {
+            "passed": 16,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "junit_sha256": "46af20353fec06d8629f61ea4ff5cf9a7c8415fac06e06f365d16bf92f67f463",
+            "environment": "Linux CPython 3.11.17 native-venv; isolated focused composition",
+            "scope": "Public source comment only; production AST unchanged. Saved sensitivities, including 0.80, remain preserved; absent-key defaults reach 0.90. Focused private migration, persistence, reload, canonical/legacy alias and generic settings regressions. No new runtime behavior, broad wake/audio/device campaign or combined composition qualification. Independent rerun of the same 16 cases, not 16 additional cases.",
+            "source_git_blobs": {
+              "SOURCE/ui/settings_manager.py": "4cf8e70270df565ac02a654889fdb223d0fbdaf7"
+            },
+            "source_binding_receipt_sha256": "a2d6384e23d3d9584dce4ef47b21ded6335ea180ee14b91742336ce3d4467af3",
+            "evidence_kind": "Previously executed focused receipt reused by exact listed source-blob identity. No six-source combined, full public/private aggregate or complete final-head application qualification.",
+            "independent_review_sha256": "8fbf5ea803bb5b2f74366dcbb15d4b852ae72f87bf212b896a9d1b21ec9dc337"
+          },
+          "strict_route_original_fourteen_author": {
+            "passed": 14,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "junit_sha256": "3051222b17f9885d27e13d9ca3bad9921dc9546488b7cb6e42129df45f228300",
+            "environment": "Linux CPython 3.11.17; existing full-dependency-closure runtime and partial private/public overlay",
+            "scope": "Final-source execution of the original 14 previously unexecuted private obligations: two GPT model fixtures, seven routing parameter cases, one local TTS boundary and four NumPy/scalar Silero cases. Reuses one reviewed route catalog/decoder source and owned mock-provider/PCM boundaries; only a partial overlay, not a current full aggregate.",
+            "source_git_blobs": {
+              "SOURCE/services/llm/route_tool_schemas.py": "75507a7aa08e75317a33c78471f4cbdbf83b2eab"
+            },
+            "source_binding_receipt_sha256": "22327f88988d42e7cb732caf75cef10bbb3f8e0a80f0639bd417abfecafeff95",
+            "independent_review_sha256": "05c3a8d315374ed2300fab9443c9bb4f680a755c5a74ade629e87d2c38ea4e9e",
+            "runner_invocation_sha256": "20a05c08e5624084a9946a9c44dfd7d222542a2a4d505e5e0e0a19203fc170ed",
+            "runner_summary_sha256": "724b663a0d301eed2e04f0e3cc686024cdf5b26a051800f4395041331cc6ffe8",
+            "frozen_repair_manifest_sha256": "906ec4a13750cfa497ce98378549de10fa3bfd38c8e1e3e67bdd5faf35aa8735",
+            "private_fixture_git_blobs": {
+              "tests/unit/test_gpt_handler.py": "ef0dc939e8ad18eb07d5e99ec2fc9527202d984b",
+              "tests/unit/test_model_routing.py": "fd9fcfd4dcebbdcbb2ff30ff9e2a4f2471a3f9c0",
+              "tests/unit/test_tts_pipeline_injection.py": "a8749acad9b28614f1b11f8117cdd68377195e0c",
+              "tests/unit/voice/test_silero_vad_endpoint.py": "222e286b0c55eaa1c80f987d8e4fdabd6261ff96",
+              "tests/unit/services/llm/test_assistant_capability_route_schemas.py": "ad78427adb15ce2f3e6ba9b62de767d61fc2b493"
+            },
+            "receipt_public_baseline": "2186ca5cc6f1b1eacc8299a2c5f9704cefef5cbc",
+            "receipt_private_baseline": "2bdf1c9d52793a6e8aca80274c9e73ba92bff69a",
+            "evidence_kind": "Previously executed focused receipt reused by exact final route-schema blob and frozen fixture identities. This partial overlay is not the complete protected 97678cdb or e279cd0d composition; no current full aggregate or final-head application qualification.",
+            "current_source_import_identity_comparison": {
+              "name": "strict_route_original_fourteen_author",
+              "unique_imported_public_files": 190,
+              "matching_current_source_files": 188,
+              "different_current_source_files": [
+                {
+                  "path": "SOURCE/plugins/sandbox.py",
+                  "receipt_git_blob": "c94210fffb6174bd88d7989a9839909ff685c5d0",
+                  "current_git_blob": "dc9cb3300eaf2ee7e6a0754dc9964ea4575db9d2"
+                },
+                {
+                  "path": "SOURCE/ui/settings_manager.py",
+                  "receipt_git_blob": "5228feac890a64dfc115d3bfe79b82c47f6912b5",
+                  "current_git_blob": "4cf8e70270df565ac02a654889fdb223d0fbdaf7"
+                }
+              ],
+              "interpretation": "Partial-overlay source receipt only. Imported files outside the scoped reviewed route and consumer tuple do not establish complete current-source qualification."
+            }
+          },
+          "strict_route_consumers_author": {
+            "passed": 22,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "junit_sha256": "9694e653328f836c790261d1a86258c0ea984078385ebfd1fda3dd30bcb7969f",
+            "environment": "Linux CPython 3.11.17; existing full-dependency-closure runtime and partial private/public overlay",
+            "scope": "Closed nullable MCP-compatible room_name prefill and OpenAI JSON-string card transport decoded losslessly into actual native/MCP/UI consumers. Existing neutral/Anthropic extensible objects and legacy dicts preserved. Strict converter remains unchanged and rejects reopened schemas. Missing/null/empty/malformed/scalar/array/deep/oversized-number/nonfinite controls retain the answer without an unusable card. No tenant/auth/dispatch changes.",
+            "source_git_blobs": {
+              "SOURCE/services/llm/route_tool_schemas.py": "75507a7aa08e75317a33c78471f4cbdbf83b2eab"
+            },
+            "source_binding_receipt_sha256": "2f0481896ddcc02fa033fa447fa45cb22ffc201e7b5244530060d41ee0db6791",
+            "independent_review_sha256": "05c3a8d315374ed2300fab9443c9bb4f680a755c5a74ade629e87d2c38ea4e9e",
+            "runner_invocation_sha256": "561dcc3c787a632f478ac5d52ab7c25a125904051a1e5520f81ca033fab58e6a",
+            "runner_summary_sha256": "5afcd2e9ca0081986cd1fab09bedb6146a34625fdb2c3350336de9af3ed76416",
+            "frozen_repair_manifest_sha256": "906ec4a13750cfa497ce98378549de10fa3bfd38c8e1e3e67bdd5faf35aa8735",
+            "private_fixture_git_blobs": {
+              "tests/unit/test_gpt_handler.py": "ef0dc939e8ad18eb07d5e99ec2fc9527202d984b",
+              "tests/unit/test_model_routing.py": "fd9fcfd4dcebbdcbb2ff30ff9e2a4f2471a3f9c0",
+              "tests/unit/test_tts_pipeline_injection.py": "a8749acad9b28614f1b11f8117cdd68377195e0c",
+              "tests/unit/voice/test_silero_vad_endpoint.py": "222e286b0c55eaa1c80f987d8e4fdabd6261ff96",
+              "tests/unit/services/llm/test_assistant_capability_route_schemas.py": "ad78427adb15ce2f3e6ba9b62de767d61fc2b493"
+            },
+            "receipt_public_baseline": "2186ca5cc6f1b1eacc8299a2c5f9704cefef5cbc",
+            "receipt_private_baseline": "2bdf1c9d52793a6e8aca80274c9e73ba92bff69a",
+            "evidence_kind": "Previously executed focused receipt reused by exact final route-schema blob and frozen fixture identities. This partial overlay is not the complete protected 97678cdb or e279cd0d composition; no current full aggregate or final-head application qualification.",
+            "current_source_import_identity_comparison": {
+              "name": "strict_route_consumers_author",
+              "unique_imported_public_files": 270,
+              "matching_current_source_files": 265,
+              "different_current_source_files": [
+                {
+                  "path": "SOURCE/plugins/sandbox.py",
+                  "receipt_git_blob": "c94210fffb6174bd88d7989a9839909ff685c5d0",
+                  "current_git_blob": "dc9cb3300eaf2ee7e6a0754dc9964ea4575db9d2"
+                },
+                {
+                  "path": "SOURCE/services/memory/dir.py",
+                  "receipt_git_blob": "10791377ca9ef1e00161bc9fa3a44aad3a40d727",
+                  "current_git_blob": "07dbdea3c37d6597241a6aad83956763e3ec6f26"
+                },
+                {
+                  "path": "SOURCE/services/memory/hygiene.py",
+                  "receipt_git_blob": "7689eb6b9c4f61acc72d1212d34fd3df1cadb097",
+                  "current_git_blob": "bb31563f5ab69e0e30ecdfd8aa5a32f84ef8876e"
+                },
+                {
+                  "path": "SOURCE/services/memory/store.py",
+                  "receipt_git_blob": "8ac31de2996cb9a424fcbf2c994949e1300d840b",
+                  "current_git_blob": "bcc8a21856a74b50ec4e14d2dc70503af86860db"
+                },
+                {
+                  "path": "SOURCE/ui/settings_manager.py",
+                  "receipt_git_blob": "5228feac890a64dfc115d3bfe79b82c47f6912b5",
+                  "current_git_blob": "4cf8e70270df565ac02a654889fdb223d0fbdaf7"
+                }
+              ],
+              "interpretation": "Partial-overlay source receipt only. Imported files outside the scoped reviewed route and consumer tuple do not establish complete current-source qualification."
+            }
+          },
+          "strict_route_consumers_independent": {
+            "passed": 22,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "junit_sha256": "28c82f4e180212816a6bca76c788c04c5924bba2318212bbb66302ffd77f77c7",
+            "environment": "Linux CPython 3.11.17; existing full-dependency-closure runtime and partial private/public overlay",
+            "scope": "Closed nullable MCP-compatible room_name prefill and OpenAI JSON-string card transport decoded losslessly into actual native/MCP/UI consumers. Existing neutral/Anthropic extensible objects and legacy dicts preserved. Strict converter remains unchanged and rejects reopened schemas. Missing/null/empty/malformed/scalar/array/deep/oversized-number/nonfinite controls retain the answer without an unusable card. No tenant/auth/dispatch changes. Independent rerun of the same 22 cases, not 22 additional cases; no live provider or hardware execution.",
+            "source_git_blobs": {
+              "SOURCE/services/llm/route_tool_schemas.py": "75507a7aa08e75317a33c78471f4cbdbf83b2eab"
+            },
+            "source_binding_receipt_sha256": "2f0481896ddcc02fa033fa447fa45cb22ffc201e7b5244530060d41ee0db6791",
+            "independent_review_sha256": "05c3a8d315374ed2300fab9443c9bb4f680a755c5a74ade629e87d2c38ea4e9e",
+            "runner_invocation_sha256": "af69cd7253d63b9d38c3a542c9fbe11068d9501d7a074824c9a939088f07bf60",
+            "runner_summary_sha256": "62ff0654183bd66a4400748eae05805773f2c98c0d701cd7cb553beb96518707",
+            "frozen_repair_manifest_sha256": "906ec4a13750cfa497ce98378549de10fa3bfd38c8e1e3e67bdd5faf35aa8735",
+            "private_fixture_git_blobs": {
+              "tests/unit/test_gpt_handler.py": "ef0dc939e8ad18eb07d5e99ec2fc9527202d984b",
+              "tests/unit/test_model_routing.py": "fd9fcfd4dcebbdcbb2ff30ff9e2a4f2471a3f9c0",
+              "tests/unit/test_tts_pipeline_injection.py": "a8749acad9b28614f1b11f8117cdd68377195e0c",
+              "tests/unit/voice/test_silero_vad_endpoint.py": "222e286b0c55eaa1c80f987d8e4fdabd6261ff96",
+              "tests/unit/services/llm/test_assistant_capability_route_schemas.py": "ad78427adb15ce2f3e6ba9b62de767d61fc2b493"
+            },
+            "receipt_public_baseline": "2186ca5cc6f1b1eacc8299a2c5f9704cefef5cbc",
+            "receipt_private_baseline": "2bdf1c9d52793a6e8aca80274c9e73ba92bff69a",
+            "evidence_kind": "Previously executed focused receipt reused by exact final route-schema blob and frozen fixture identities. This partial overlay is not the complete protected 97678cdb or e279cd0d composition; no current full aggregate or final-head application qualification.",
+            "current_source_import_identity_comparison": {
+              "name": "strict_route_consumers_independent",
+              "unique_imported_public_files": 270,
+              "matching_current_source_files": 265,
+              "different_current_source_files": [
+                {
+                  "path": "SOURCE/plugins/sandbox.py",
+                  "receipt_git_blob": "c94210fffb6174bd88d7989a9839909ff685c5d0",
+                  "current_git_blob": "dc9cb3300eaf2ee7e6a0754dc9964ea4575db9d2"
+                },
+                {
+                  "path": "SOURCE/services/memory/dir.py",
+                  "receipt_git_blob": "10791377ca9ef1e00161bc9fa3a44aad3a40d727",
+                  "current_git_blob": "07dbdea3c37d6597241a6aad83956763e3ec6f26"
+                },
+                {
+                  "path": "SOURCE/services/memory/hygiene.py",
+                  "receipt_git_blob": "7689eb6b9c4f61acc72d1212d34fd3df1cadb097",
+                  "current_git_blob": "bb31563f5ab69e0e30ecdfd8aa5a32f84ef8876e"
+                },
+                {
+                  "path": "SOURCE/services/memory/store.py",
+                  "receipt_git_blob": "8ac31de2996cb9a424fcbf2c994949e1300d840b",
+                  "current_git_blob": "bcc8a21856a74b50ec4e14d2dc70503af86860db"
+                },
+                {
+                  "path": "SOURCE/ui/settings_manager.py",
+                  "receipt_git_blob": "5228feac890a64dfc115d3bfe79b82c47f6912b5",
+                  "current_git_blob": "4cf8e70270df565ac02a654889fdb223d0fbdaf7"
+                }
+              ],
+              "interpretation": "Partial-overlay source receipt only. Imported files outside the scoped reviewed route and consumer tuple do not establish complete current-source qualification."
+            }
+          }
+        },
+        "private_encryption_fixture_review": {
+          "path": "tests/unit/test_memory_encryption.py",
+          "sha256": "5129d202bd1056663e819832b9a7b4d335180e8cca842419ffdac6d4fe7b434b",
+          "git_blob": "c7384e78b0d3a7e20ab38da00191dbec59b6acfd",
+          "independent_review_sha256": "1ecb924a2cd0f513723c57b02f1cab7d567e05133d416cf05a7ec45ec6500984",
+          "independent_test_count": 13,
+          "independent_junit_sha256": "a87b60566c8eced39b7744f528a284eefd9de7aa2c25726faa500ba89c2e7165",
+          "scope": "Private fixture only: synthetic key, previous/shared-key isolation, real temporary SQLite salt storage. 11 unchanged class cases and 2 independent controls. PostgreSQL-specific/native proof remains explicit in the combined 141 receipt.",
+          "environment": "Independent fixture proof: Linux Python 3.11.17. Combined final proof: Linux Python 3.12.14 and native PostgreSQL 18.1."
+        },
+        "receipt_relationship": "All predecessor focused and diagnostics receipt objects retain their original identities and scopes. New overlapping call-history selections and probes must not be summed as distinct tests or treated as complete application qualification.",
+        "independent_review": "The exact runtime/test correction has independent scoped PASS review recorded under call_history_memory_overlap_evidence. This two-file metadata successor remains subject to independent exact-candidate review.",
+        "protected_public_checks": "Exact metadata-successor hosted source checks remain pending; local metadata preparation claims no hosted result.",
+        "canonical_private_public_composition": "Focused synthetic tests bind the exact two changed source files in an author-owned composed test workspace; they do not establish a complete current protected private/public composition. Private adoption of the published public successor and full aggregate qualification remain separate stages.",
+        "full_public_suite": false,
+        "native_windows_qualification": false,
+        "image_qualification": false,
+        "production_deployment": false,
+        "installed_customer_acceptance": false,
+        "provider_sandbox_acceptance": false,
+        "limits": "Scoped local source/checksum and synthetic call-history evidence only. No full public/private suite, native Windows, dependency inventory refresh, image, live provider, deployed key replacement, retained-data migration, historical-secret remediation, release, deployment or installed-customer qualification.",
+        "diagnostics_correction_receipts": {
+          "qt-positive": {
+            "summary": {
+              "passed": 10,
+              "failed": 0,
+              "skipped": 0,
+              "errors": 0,
+              "duration_seconds": 1.24
+            },
+            "exit_code": 0,
+            "pytest_args": [
+              "tests/unit/test_diagnostics_bus.py"
+            ],
+            "sha256": "3733216750615c4fb22d0b4b5963acebf1fa11423d65c7a29d53e586811eba5a",
+            "raw_sha256": "6ca53f1d1d50035dc68b29f37f789730e101b424aea7f247ead92b06630d6cac",
+            "source_git_blobs": {
+              "SOURCE/diagnostics/sinks.py": "a84018df229279a9abf8782a48924177ba9c54b3"
+            },
+            "public_baseline": "28d918eb64ad3d9eea5252544f84135812f9c431",
+            "private_baseline": "4bc876e9c22413b760354a062734644eb99fb7f8",
+            "source_and_test_receipt_sha256": "cae0e6a15f1705aaf03c49c0fbaf227275885090fa74c39fee8341727bdbda02",
+            "environment": "Linux CPython 3.11.17; actual PySide6-Essentials 6.11.1 and shiboken6 6.11.1; unchanged repository custom runner and pytest.ini",
+            "scope": "Ten real QtCore diagnostics cases, including the existing handler/emission obligations and actual receiver disconnect/reconnect counts.",
+            "limits": "Scoped local source evidence only. The ten Qt cases are included in the 64-case selection; counts must not be summed. No full suite, complete current private/public composition, native Windows, GUI launch, QtWebEngine, hardware, provider, image, deployment, release or installed-customer qualification."
+          },
+          "final-all-six": {
+            "summary": {
+              "passed": 64,
+              "failed": 0,
+              "skipped": 0,
+              "errors": 0,
+              "duration_seconds": 5.45
+            },
+            "exit_code": 0,
+            "pytest_args": [
+              "tests/unit/step_log_analysis/test_step_log_analysis_stack.py",
+              "tests/unit/test_agent_mcp_wiring.py::TestAgentMCPWiring::test_empty_native_tool_surface_blocks_hub_routing",
+              "tests/unit/test_device_discovery.py",
+              "tests/unit/test_ui_state.py",
+              "tests/unit/music/test_player_control_service.py",
+              "tests/unit/test_youtube_iframe_backend.py",
+              "tests/unit/voice/test_silero_vad_endpoint.py",
+              "tests/unit/test_diagnostics_bus.py"
+            ],
+            "sha256": "78d8a02cd04efee42312b103bcc3170bcc5ba202393cf2916c12095722c19de6",
+            "raw_sha256": "0f94e35fa25902b32412ec4a37d64c374bc21277288f2df539c52ae803b029bc",
+            "source_git_blobs": {
+              "SOURCE/diagnostics/sinks.py": "a84018df229279a9abf8782a48924177ba9c54b3"
+            },
+            "public_baseline": "28d918eb64ad3d9eea5252544f84135812f9c431",
+            "private_baseline": "4bc876e9c22413b760354a062734644eb99fb7f8",
+            "source_and_test_receipt_sha256": "cae0e6a15f1705aaf03c49c0fbaf227275885090fa74c39fee8341727bdbda02",
+            "environment": "Linux CPython 3.11.17; actual PySide6-Essentials 6.11.1 and shiboken6 6.11.1; unchanged repository custom runner and pytest.ini",
+            "scope": "Bounded 64-case selection across diagnostics and seven other selectors, on the original private/public composition plus the four exact private fixture corrections and this public source correction.",
+            "limits": "Scoped local source evidence only. The ten Qt cases are included in the 64-case selection; counts must not be summed. No full suite, complete current private/public composition, native Windows, GUI launch, QtWebEngine, hardware, provider, image, deployment, release or installed-customer qualification."
+          }
+        },
+        "diagnostics_correction_review": {
+          "result": "PASS",
+          "independent_review_sha256": "502192865afdc70111395794358bd7009f7085bdc8271a9ad78ffcb85cb10005",
+          "independent_probe_sha256": "566823644f5f477e1c304b0135e1dc4f9a03b217f90eed3ed35f0194765abcaf",
+          "public_patch_sha256": "7d31ce9cfc03d99f3512c8038c1e89063c896f692ae68d625d1a9739a6dc96c5",
+          "source_git_blobs": {
+            "SOURCE/diagnostics/sinks.py": "a84018df229279a9abf8782a48924177ba9c54b3"
+          },
+          "scope": "Independent review of the frozen one-public-source/four-private-fixture correction and author receipt hashes, plus actual Linux PySide6 receiver counts 1 -> 2 -> 1 -> 0 -> 1, DiagnosticsBus dispatch/buffer effects, unrelated-signal and optional-no-Qt controls. No additional full or focused green suite was rerun by the reviewer.",
+          "limits": "Source-scoped code review and independent diagnostic probe only. No metadata-successor review, hosted checks, full composition, native Windows, GUI or installed acceptance is established."
+        },
+        "call_history_memory_overlap_evidence": {
+          "public_baseline": "da27e7ac918ae1aa75f24908418586767ed8b702",
+          "source_git_blobs": {
+            "SOURCE/telephony/call_history.py": "183fabf4fe1be6be489ea0018ca47045a7951a56",
+            "SOURCE/tests/public/test_call_history_order_contract.py": "8ed5ea1709468910149d99aa96db1ddb85e9e87c"
+          },
+          "source_patch_sha256": "4ed9cbd53cea474a743bfbd60bf7a29a58f154b39dc49b7d3ef114364bccd21d",
+          "frozen_evidence_sha256": "29016a16d9fd150d510d52adfe276868d8caa4eedab2287913af258295255735",
+          "test_receipts": {
+            "author_composed_selection": {
+              "passed": 17,
+              "failed": 0,
+              "errors": 0,
+              "skipped": 0,
+              "selectors": [
+                "tests/public/test_call_history_order_contract.py",
+                "tests/unit/telephony/test_call_history_user_scoping.py",
+                "tests/unit/telephony/test_call_history_unconnected_call_timestamp.py"
+              ],
+              "receipt_sha256": "80cc3d65ed5b4354dfe781b053ba5d377d36169dfab5f0228571e6fe0f29d4ff",
+              "junit_sha256": "e870069c99d293ec4698aeda8fb201df9a69adc2bed7cf706603e68a600e9abc"
+            },
+            "independent_composed_selection": {
+              "passed": 17,
+              "failed": 0,
+              "errors": 0,
+              "skipped": 0,
+              "selectors": [
+                "tests/public/test_call_history_order_contract.py",
+                "tests/unit/telephony/test_call_history_user_scoping.py",
+                "tests/unit/telephony/test_call_history_unconnected_call_timestamp.py"
+              ],
+              "receipt_sha256": "6ea4ffe11ff4cbfeaf1a3f599aa82ca3eaee113c8c1ac7d250fb79bb7af5660c",
+              "junit_sha256": "efe10d40771778ca9cc892205ff44d0ca73a9178deafe2dc9ce1d68b90b9d6e1"
+            },
+            "independent_standalone_public": {
+              "passed": 12,
+              "failed": 0,
+              "errors": 0,
+              "skipped": 0,
+              "receipt_sha256": "a7ab7bda801fdecd0f9bc7aa23e991b9b27914490991624cabc27b5eb1058130",
+              "scope": "The two existing persistence contracts plus ten added synthetic rotation cases; included in each 17-case selection."
+            },
+            "unchanged_public_runtime_negative_control": {
+              "passed": 7,
+              "failures": 4,
+              "errors": 1,
+              "expected": true,
+              "receipt_sha256": "8d1f2ff59caf544cadc3ba9104d293291816f79f6cc933326c4a83897ca7532c",
+              "scope": "Final public tests reproduce missing overlap behavior and the unsupported previous-key selector against the original runtime."
+            },
+            "environment": "Linux CPython 3.11.17; packet-owned interpreter with declared phonenumbers 9.0.33, cryptography 50.0.2 and filelock 3.32.0. The alternate original interpreter lacks phonenumbers and did not pass the expanded timestamp selection.",
+            "relationship": "The author and reviewer repeat the same 17-case selection; standalone 12 cases are included in it. Counts must not be summed. No complete current protected private/public composition or full-suite claim."
+          },
+          "independent_review": {
+            "result": "PASS",
+            "review_sha256": "8889fc29d8aa832f6ac2df73cfc9412a2fb05691041b82822bc99e17791c09cf",
+            "probe_sha256": "93a34aa6624c60548ed75b6c4dd2d9378388d3e3bfc28eb68751dad0d792094c",
+            "probe_script_sha256": "0c3888d51ccf42d2e6ee168014b168686d0a659e8c0499a75b0b795df3a5e5d4",
+            "identity_and_synthetic_runtime_checks": 185,
+            "strict_changed_line_gate": {
+              "result": "PASS",
+              "rules": [
+                "BLE001",
+                "S110",
+                "S112",
+                "E722"
+              ],
+              "receipt_sha256": "8727280e8ca79e4a6344ff8434b9aa4b38883579e01fbbb8d6c48f067071c52b"
+            },
+            "actual_public_layout_import_style": {
+              "result": "PASS",
+              "rules": [
+                "I",
+                "E",
+                "F"
+              ],
+              "ruff_version": "0.14.6",
+              "receipt_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+            },
+            "scope": "Independent exact patch reconstruction, file identity and mapped ownership checks, 17-case composed selection, overlapping 12-case standalone public test, original-runtime negative control, and 185 mixed identity/runtime assertions. Expected failures are limited to InvalidToken, UnicodeError and ValueError; current-write KDF/precedence and retained data remain unchanged.",
+            "limits": "The 185 assertions are not 185 service tests. Full-ruleset whole-file Ruff under the composed configuration retains 11 pre-existing PT009/PT027 findings in the unchanged original public class. No complete application, native Windows, deployed key replacement, actual retained-data migration, historical-secret remediation, release, deployment or installed acceptance qualification."
+          },
+          "behavior_scope": "Previous memory key is a decrypt-only fallback for retained call-history envelopes. Current-write precedence and existing KDF/envelope remain unchanged. Synthetic tests cover old-read/current-write, previous-key removal, restart and existing ownership/no-key behavior. Reads do not rewrite retained ciphertext.",
+          "limits": "Scoped local source/checksum and synthetic call-history evidence only. No full public/private suite, native Windows, dependency inventory refresh, image, live provider, deployed key replacement, retained-data migration, historical-secret remediation, release, deployment or installed-customer qualification."
+        }
+      },
+      "reviewed_source_patch": {
+        "source_commit": "e787cf89f03a213524b06331b91a28177cd4c0c1",
+        "paths": [
+          "SOURCE/telephony/call_history.py",
+          "SOURCE/tests/public/test_call_history_order_contract.py"
+        ],
+        "git_blobs": {
+          "SOURCE/telephony/call_history.py": "183fabf4fe1be6be489ea0018ca47045a7951a56",
+          "SOURCE/tests/public/test_call_history_order_contract.py": "8ed5ea1709468910149d99aa96db1ddb85e9e87c"
+        }
+      },
+      "new_runtime_qualification_scope": "Metadata preparation runs no application runtime suite or dependency installation. Separately retained synthetic source receipts have their exact scope in qualification.call_history_memory_overlap_evidence. Scoped local source/checksum and synthetic call-history evidence only. No full public/private suite, native Windows, dependency inventory refresh, image, live provider, deployed key replacement, retained-data migration, historical-secret remediation, release, deployment or installed-customer qualification.",
+      "new_source_contract_qualification_scope": "The unchanged generator and binding verifier cover 2,714 source files and six historical SBOMs. Exactly two existing source rows change; all other 2,712 rows and the full file inventory are identical. Eight revision contracts and five negative controls are verified locally."
+    },
+    "retention": "Every replaced predecessor value is retained verbatim as JSON. Unreplaced historical fields and all six complete SBOM status objects are unchanged. Original binding/manifest raw bytes remain addressable at the immutable predecessor; historical signatures and inventories are not regenerated."
   }
 }

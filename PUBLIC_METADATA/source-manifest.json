@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "8acc56a7992e8b0efc5958da84e87202bff23c77",
-  "sha256": "f3b5e852d3150f4f253467ed04fbc48d02b1c6ac2d3c4f1c039f0187af5b7adb",
+  "revision": "4c70b74db8a0860f4c1fe24bacb2f6e199755ff4",
+  "sha256": "9dc71cf7801d2b49f2bb353a73653c507c098b41a034e19c3f83bb87e9f79477",
   "files": [
     {
       "path": ".env.example",
@@ -885,8 +885,8 @@
     },
     {
       "path": "config/searxng/render-settings.sh",
-      "sha256": "06ea2cd5ce63e85ee49a7baa3997c6651d49e0449a43d678f6c3baa49b1f806a",
-      "bytes": 1444
+      "sha256": "b63c5fafe452fdfe84f2315a312d5ac95c8e53169c1b0c93569548bf1ae49cc8",
+      "bytes": 1604
     },
     {
       "path": "config/searxng/settings.yml",
@@ -5695,8 +5695,8 @@
     },
     {
       "path": "telephony/call_history.py",
-      "sha256": "b16d50ede5d4c523d68df188a65dc6c2692a82c32a59d10ac8964906cbfb0b7c",
-      "bytes": 17760
+      "sha256": "86a252dada0eaa4360037dc3cc479b6ceaba9eb88283d5ffb1123c11a7d60007",
+      "bytes": 18696
     },
     {
       "path": "telephony/call_manager.py",
@@ -6040,8 +6040,8 @@
     },
     {
       "path": "tests/public/test_call_history_order_contract.py",
-      "sha256": "0cc8b760badad62729d74d5a40f9963540cb9821afc8ea951582b7161538d32e",
-      "bytes": 5503
+      "sha256": "a9ff3b35a5f2ab905413e4801b99da3ad88e9c71acf6e6ac7dad3683b6f5ee78",
+      "bytes": 15291
     },
     {
       "path": "tests/public/test_capacity_phone_resource_bridge.py",
