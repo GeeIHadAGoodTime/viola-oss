@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "e787cf89f03a213524b06331b91a28177cd4c0c1",
-  "sha256": "d7c517f072e0ced7f45a61ae9d7f497454b8391626132a2cf104c5cacd55da4d",
+  "revision": "4c70b74db8a0860f4c1fe24bacb2f6e199755ff4",
+  "sha256": "9dc71cf7801d2b49f2bb353a73653c507c098b41a034e19c3f83bb87e9f79477",
   "files": [
     {
       "path": ".env.example",
@@ -885,8 +885,8 @@
     },
     {
       "path": "config/searxng/render-settings.sh",
-      "sha256": "06ea2cd5ce63e85ee49a7baa3997c6651d49e0449a43d678f6c3baa49b1f806a",
-      "bytes": 1444
+      "sha256": "b63c5fafe452fdfe84f2315a312d5ac95c8e53169c1b0c93569548bf1ae49cc8",
+      "bytes": 1604
     },
     {
       "path": "config/searxng/settings.yml",
