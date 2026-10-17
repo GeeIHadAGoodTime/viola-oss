@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "8acc56a7992e8b0efc5958da84e87202bff23c77",
-  "sha256": "f3b5e852d3150f4f253467ed04fbc48d02b1c6ac2d3c4f1c039f0187af5b7adb",
+  "revision": "e787cf89f03a213524b06331b91a28177cd4c0c1",
+  "sha256": "d7c517f072e0ced7f45a61ae9d7f497454b8391626132a2cf104c5cacd55da4d",
   "files": [
     {
       "path": ".env.example",
@@ -5695,8 +5695,8 @@
     },
     {
       "path": "telephony/call_history.py",
-      "sha256": "b16d50ede5d4c523d68df188a65dc6c2692a82c32a59d10ac8964906cbfb0b7c",
-      "bytes": 17760
+      "sha256": "86a252dada0eaa4360037dc3cc479b6ceaba9eb88283d5ffb1123c11a7d60007",
+      "bytes": 18696
     },
     {
       "path": "telephony/call_manager.py",
@@ -6040,8 +6040,8 @@
     },
     {
       "path": "tests/public/test_call_history_order_contract.py",
-      "sha256": "0cc8b760badad62729d74d5a40f9963540cb9821afc8ea951582b7161538d32e",
-      "bytes": 5503
+      "sha256": "a9ff3b35a5f2ab905413e4801b99da3ad88e9c71acf6e6ac7dad3683b6f5ee78",
+      "bytes": 15291
     },
     {
       "path": "tests/public/test_capacity_phone_resource_bridge.py",
