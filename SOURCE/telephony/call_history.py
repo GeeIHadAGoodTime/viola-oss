@@ -56,8 +56,8 @@ def _ensure_legacy_history_migrated() -> None:
         )
 
 
-def _get_fernet():
-    """Return a Fernet instance for call history encryption, or None."""
+def _get_fernet(*, previous: bool = False):
+    """Return the write key, or the memory rotation key for decrypt-only use."""
     try:
         import os
 
@@ -66,7 +66,16 @@ def _get_fernet():
         # Read directly from os.environ to mirror services/memory/store.py:150.
         # AppConfig does not declare these fields, so getattr always returned None
         # before — leaving every transcript redacted even when the env var was set.
-        key = os.environ.get("VIOLA_MEMORY_ENCRYPTION_KEY") or os.environ.get("VIOLA_CALL_HISTORY_ENCRYPTION_KEY") or ""
+        memory_key = os.environ.get("VIOLA_MEMORY_ENCRYPTION_KEY")
+        if previous:
+            # Match the shared memory consumer's configured overlap. A previous
+            # memory key must not become the write key or affect dedicated-key
+            # installations that have no current memory key configured.
+            key = os.environ.get("VIOLA_MEMORY_ENCRYPTION_KEY_PREVIOUS") if memory_key else ""
+            if key == memory_key:
+                return None
+        else:
+            key = memory_key or os.environ.get("VIOLA_CALL_HISTORY_ENCRYPTION_KEY") or ""
         if not key:
             return None
         # Derive a 32-byte key via SHA-256, then base64-encode for Fernet
@@ -102,6 +111,10 @@ def _encrypt_sensitive(data: dict) -> dict:
 def _decrypt_sensitive(data: dict) -> dict:
     """Decrypt sensitive fields in-place. Returns as-is if not encrypted."""
     fernet = _get_fernet()
+    previous_fernet = _get_fernet(previous=True) if fernet else None
+    if fernet:
+        from cryptography.fernet import InvalidToken
+
     result = dict(data)
     for field_name in _SENSITIVE_FIELDS:
         value = result.get(field_name)
@@ -110,15 +123,24 @@ def _decrypt_sensitive(data: dict) -> dict:
         if not fernet:
             result[field_name] = "[encrypted — key unavailable]"
             continue
-        try:
-            decrypted = fernet.decrypt(value[4:].encode()).decode()
-            # Try to parse back as JSON (for list/dict fields like transcript)
+        decrypted = None
+        for candidate in (fernet, previous_fernet):
+            if candidate is None:
+                continue
             try:
-                result[field_name] = json.loads(decrypted)
-            except (json.JSONDecodeError, ValueError):
-                result[field_name] = decrypted
-        except Exception:
+                decrypted = candidate.decrypt(value[4:].encode()).decode()
+            except (InvalidToken, UnicodeError, ValueError):
+                decrypted = None
+            if decrypted is not None:
+                break
+        if decrypted is None:
             result[field_name] = "[encrypted — decryption failed]"
+            continue
+        # Try to parse back as JSON (for list/dict fields like transcript)
+        try:
+            result[field_name] = json.loads(decrypted)
+        except (json.JSONDecodeError, ValueError):
+            result[field_name] = decrypted
     return result
 
 
