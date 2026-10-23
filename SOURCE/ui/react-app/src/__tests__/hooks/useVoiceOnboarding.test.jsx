@@ -25,6 +25,8 @@ function waitMs(ms) {
 
 describe('useVoiceOnboarding first-run trigger', () => {
   beforeEach(() => {
+    // The onboarding phase persists across a reload (sessionStorage); start each test fresh.
+    window.sessionStorage.clear();
     apiFetch.mockReset();
     authFetch.mockReset();
     mockAuthFetch();

@@ -144,6 +144,21 @@ LEGACY_USER_SETTINGS_SAFE_IMPORT_KEYS = frozenset(
         "wake_sensitivity",
     }
 )
+# First-run answers a desktop user gives BEFORE signing in. Pre-login the
+# install runs as its device principal, whose user-scoped writes land in the
+# install's shared settings blob; at sign-in the account gets its own (empty)
+# blob, so without a carry-over the account looked like a fresh install and
+# onboarding restarted with the cloud-AI choice and the autonomy decision lost.
+# Only onboarding / consent preferences belong here — never credentials, plan,
+# or anything another person on the install could have set for themselves.
+ONBOARDING_CARRY_OVER_KEYS = frozenset(
+    {
+        "onboarding_completed",  # finished first run
+        "ai_source",  # cloud-AI consent choice (managed vs own key)
+        "agent_autonomy",  # mode / permission tier chosen in onboarding
+        "browser_session_mode",  # derived from agent_autonomy alongside it
+    }
+)
 LEGACY_USER_SETTINGS_SCRUB_KEEP_KEYS = frozenset(
     {
         _USER_SETTINGS_MIGRATION_MARKER,
@@ -1939,14 +1954,49 @@ class SettingsManager:
 
         return user_count == 1 and first_user_id == user_id
 
+    def _onboarding_carry_over_settings(self, user_id: str) -> dict[str, object]:
+        """Onboarding answers this install's device principal already gave.
+
+        Copied one way — from this desktop install's shared settings blob into
+        the signed-in account's own blob, keyed by that account's ``user_id`` —
+        and only when the account blob is first created. Never on the cloud,
+        where the shared blob belongs to no one, and never for a desktop-local
+        pseudo-identity. Values equal to the default carry no answer and are
+        skipped.
+        """
+        if _is_cloud_deployment() or not user_id or _uses_global_settings_only(user_id):
+            return {}
+        carried: dict[str, object] = {}
+        for key in sorted(ONBOARDING_CARRY_OVER_KEYS):
+            if not self._is_user_scoped_key(key) or self._is_credential_setting_key(key):
+                continue
+            value = self.settings.get(key, _MISSING)
+            if value is _MISSING or value in (None, "", {}):
+                continue
+            if isinstance(value, str) and value in _SECRET_PLACEHOLDERS:
+                continue
+            default_value = self.DEFAULT_SETTINGS.get(key, _MISSING)
+            if default_value is not _MISSING and value == default_value:
+                continue
+            carried[key] = value
+        if carried:
+            logger.info(
+                "Carried %d first-run onboarding answer(s) from this install into account %s: %s",
+                len(carried),
+                user_id,
+                ", ".join(sorted(carried)),
+            )
+        return carried
+
     def _import_legacy_user_settings(self, user_id: str) -> dict[str, object]:
         """Migrate safe legacy settings only for the local operator bootstrap."""
+        carried = self._onboarding_carry_over_settings(user_id)
         if not self._legacy_user_settings_import_allowed(user_id):
             logger.info("Skipping legacy settings import for non-operator user %s", user_id)
-            self._save_user_settings_blob(user_id, {})
-            return {}
+            self._save_user_settings_blob(user_id, carried)
+            return carried
 
-        legacy_settings: dict[str, object] = {}
+        legacy_settings: dict[str, object] = dict(carried)
         for key in self.settings:
             if key not in LEGACY_USER_SETTINGS_SAFE_IMPORT_KEYS:
                 continue

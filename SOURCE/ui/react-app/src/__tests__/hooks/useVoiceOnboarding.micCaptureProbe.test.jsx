@@ -86,6 +86,8 @@ async function walkToMicPhase(result) {
 
 describe('useVoiceOnboarding microphone capture probe', () => {
   beforeEach(() => {
+    // The onboarding phase persists across a reload (sessionStorage); start each test fresh.
+    window.sessionStorage.clear();
     apiFetch.mockReset();
     gotrueClient.getSession.mockReset();
     gotrueClient.getSession.mockResolvedValue({
