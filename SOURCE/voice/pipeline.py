@@ -8,6 +8,7 @@ a single unified voice processing pipeline.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import math
 import threading
 from collections import deque
@@ -930,12 +931,19 @@ class VoicePipeline:
                 return None, 0
 
         logger.debug("[PIPELINE] Calling listen_and_record_command_buffer()...")
-        audio, sample_rate = buffer_fn(
-            silence_threshold,
-            silence_duration,
-            timeout,
-            onset_timeout=onset_timeout,
-        )
+        # The buffer path talks to the listener directly, so it marks the
+        # capture on the detector itself; /health reports it as "recording".
+        capture_marker = getattr(self.wake_detector, "command_capture", None)
+        capture_context = capture_marker() if callable(capture_marker) else None
+        if not isinstance(capture_context, contextlib.AbstractContextManager):
+            capture_context = contextlib.nullcontext()
+        with capture_context:
+            audio, sample_rate = buffer_fn(
+                silence_threshold,
+                silence_duration,
+                timeout,
+                onset_timeout=onset_timeout,
+            )
         if audio is not None:
             logger.debug("[PIPELINE] Buffer recording complete: %d samples", len(audio))
         else:

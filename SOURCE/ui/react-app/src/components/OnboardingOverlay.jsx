@@ -481,12 +481,35 @@ AccountSignInPanel.propTypes = {
 
 function MicPermissionPanel({ micPermission, onRetry, onSkipMicStep }) {
   const { t } = useTranslation();
-  if (!micPermission?.checking && !micPermission?.blocked) return null;
+  if (!micPermission?.checking && !micPermission?.blocked) {
+    // The microphone works, but speaking is still optional: a user in a
+    // shared room (or who would rather type) can move on. The typed sample
+    // chip below also completes the step.
+    if (!onSkipMicStep) return null;
+    return (
+      <Panel>
+        <ActionButton
+          label={t('onboarding.mic.continue_without')}
+          variant="secondary"
+          onClick={onSkipMicStep}
+        />
+      </Panel>
+    );
+  }
 
   return (
     <Panel>
       {micPermission.checking ? (
-        <MutedText>{t('onboarding.mic.checking')}</MutedText>
+        <>
+          <MutedText>{t('onboarding.mic.checking')}</MutedText>
+          {onSkipMicStep && (
+            <ActionButton
+              label={t('onboarding.mic.continue_without')}
+              variant="secondary"
+              onClick={onSkipMicStep}
+            />
+          )}
+        </>
       ) : (
         <>
           <ErrorText>{micPermission.message || t('onboarding.mic.unknown')}</ErrorText>

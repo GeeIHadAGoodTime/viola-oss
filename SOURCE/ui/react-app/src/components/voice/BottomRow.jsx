@@ -20,7 +20,10 @@ import '../../i18n';
 const WAKE_STATUS_LABELS = {
   recording: 'recording',
   processing: 'processing',
-  wake_listening: 'listening',
+  responding: 'responding',
+  // Waiting for the wake word, not recording: a bare "listening" read as if
+  // the microphone were capturing the room the whole time.
+  wake_listening: 'listening for wake word',
   degraded: 'limited',
   enabled: 'configured',
   muted: 'muted',

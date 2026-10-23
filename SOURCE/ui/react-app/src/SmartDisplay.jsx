@@ -1811,7 +1811,14 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
     if (wakeDetectorHealth?.reason === 'not_initialized') return 'starting';
     if (wakeDetectorHealth?.status === 'error' || wakeDetectorHealth?.status === 'degraded') return 'unavailable';
     if (voiceStatus?.degraded) return 'degraded';
-    if (wakeDetectorHealth?.status === 'ok' && wakeDetectorHealth.is_running === true) return 'wake_listening';
+    if (wakeDetectorHealth?.status === 'ok' && wakeDetectorHealth.is_running === true) {
+      // The native detector says what the mic is doing: capturing a command
+      // after a wake, handling one, or only waiting for the wake word. Without
+      // this the label read "listening" the whole time the detector ran.
+      if (wakeDetectorHealth.activity === 'recording') return 'recording';
+      if (wakeDetectorHealth.activity === 'busy') return 'responding';
+      return 'wake_listening';
+    }
     if (wakeDetectorHealth?.status === 'ok' && wakeDetectorHealth.is_running === false) return 'stopped';
     return 'unknown';
   })();
