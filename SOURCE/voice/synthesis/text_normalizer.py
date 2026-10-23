@@ -40,6 +40,10 @@ _DIGIT_NAMES = ["zero", "one", "two", "three", "four", "five", "six", "seven", "
 # Percentages: 15% → "fifteen percent"
 # ---------------------------------------------------------------------------
 _PERCENT_RE = re.compile(r"\b(\d+(?:\.\d+)?)%")
+# Degrees: 68°F → "68 degrees Fahrenheit" (the number is spoken by the passes below).
+_DEGREE_RE = re.compile(r"\s*°(?:\s*([FC])(?:ahrenheit|elsius)?(?![A-Za-z]))?")
+_DEGREE_UNITS = {"F": " Fahrenheit", "C": " Celsius"}
+_DEGREE_WORDS = {"en": " degrees", "es": " grados"}
 
 # ---------------------------------------------------------------------------
 # Times: 2:30 PM → "two thirty PM", 10:05 → "ten oh five"
@@ -298,6 +302,7 @@ def _normalize_english_numbers(text: str) -> str:
         segment = _YEAR_RE.sub(_replace_year, segment)
         return _STANDALONE_NUMBER_RE.sub(_replace_number, segment)
 
+    text = _expand_degrees(text, "en")
     parts = []
     cursor = 0
     for decimal in _DECIMAL_RE.finditer(text):
@@ -306,6 +311,17 @@ def _normalize_english_numbers(text: str) -> str:
         cursor = decimal.end()
     parts.append(other_numbers(text[cursor:]))
     return "".join(parts)
+
+
+def _expand_degrees(text: str, language: str) -> str:
+    """Spell the degree sign (and an attached F/C unit) for a locale with a word for it."""
+    word = _DEGREE_WORDS[language]
+    return _DEGREE_RE.sub(lambda match: word + _DEGREE_UNITS.get(match.group(1), ""), text)
+
+
+def _locale_base(language: object | None) -> str:
+    value = getattr(language, "value", language)
+    return value.strip().lower().replace("_", "-").split("-", 1)[0] if isinstance(value, str) else ""
 
 
 def _replace_currency(match: re.Match[str]) -> str:
@@ -531,6 +547,8 @@ class SpeechFormatter:
             result = _URL_RE.sub(_replace_url if english else "…", result)
             if english:
                 result = _normalize_english_numbers(result)
+            elif _locale_base(language) in _DEGREE_WORDS:
+                result = _expand_degrees(result, _locale_base(language))
             # Explicit user overrides keep their existing scope. The built-in
             # dictionaries are English respellings, not multilingual rules.
             result = _apply_pronunciation_overrides(result, cfg)

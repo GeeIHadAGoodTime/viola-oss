@@ -715,13 +715,45 @@ class KokoroTTSEngine:
                 return self._synthesize_internal(text, voice, speed, apply_volume=apply_volume)
             except Exception as exc:
                 if getattr(self, "_customer_tokenizer", None) is not None:
-                    raise
+                    return self._retry_without_unspeakable(text, voice, speed, exc, apply_volume=apply_volume)
                 logger.error(
                     "Kokoro synthesis failed text_length=%d: %s",
                     len(text),
                     exc,
                 )
                 return b""
+
+    def _retry_without_unspeakable(
+        self, text: str, voice: str | None, speed: float | None, exc: Exception, *, apply_volume: bool
+    ) -> bytes:
+        """Customer route: retry once without the tokens the pronunciation step rejected.
+
+        The pronunciation component itself stays fail-closed; this keeps the
+        rest of a reply audible. Logs carry the reason and tokens, never the text.
+        """
+        from voice.customer_pronunciation import PronunciationError, drop_unspeakable
+
+        if not isinstance(exc, PronunciationError):
+            raise exc
+        tokens = getattr(exc, "tokens", ())
+        language = str(getattr(self, "_speech_language", "en-us")).lower().replace("_", "-")
+        latin_script = language.split("-", 1)[0] in {"en", "es", "fr", "pt"}
+        retry_text = drop_unspeakable(text, tokens, latin_script=latin_script)
+        if not retry_text or retry_text == text or not any(character.isalnum() for character in retry_text):
+            logger.warning("Customer speech could not be spoken: %s tokens=%s", exc, list(tokens))
+            raise exc
+        try:
+            audio = self._synthesize_internal(retry_text, voice, speed, apply_volume=apply_volume)
+        except PronunciationError as retry_exc:
+            logger.warning(
+                "Customer speech could not be spoken after dropping tokens=%s: %s tokens=%s",
+                list(tokens),
+                retry_exc,
+                list(getattr(retry_exc, "tokens", ())),
+            )
+            raise retry_exc from exc
+        logger.warning("Customer speech dropped unspeakable tokens=%s (%s)", list(tokens), exc)
+        return audio
 
     def _synthesize_internal(
         self, text: str, voice: str | None, speed: float | None = None, *, apply_volume: bool = True
@@ -1172,6 +1204,12 @@ class KokoroTTSEngine:
         text = normalize_for_speech(text, **normalization_kwargs)
         if not text or not text.strip():
             return
+        logger.info(
+            "Speaking reply voice=%s blend=%s language=%s",
+            getattr(self, "_voice", None),
+            getattr(self, "_voice_blend_spec", None) or "none",
+            language,
+        )
 
         try:
             from admin.instrumentation import record_feature_used
@@ -1514,6 +1552,12 @@ class KokoroTTSEngine:
             language = getattr(self, "_speech_language", "en-us")
             route_epoch = None
         normalization_kwargs = {} if language == "en-us" else {"language": language}
+        logger.info(
+            "Speaking reply voice=%s blend=%s language=%s",
+            getattr(self, "_voice", None),
+            getattr(self, "_voice_blend_spec", None) or "none",
+            language,
+        )
 
         # Lazy-create the asyncio lock
         if self._speak_lock is None:
