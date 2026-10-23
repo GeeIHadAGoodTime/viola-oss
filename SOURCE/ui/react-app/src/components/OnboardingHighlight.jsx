@@ -6,6 +6,9 @@ import PropTypes from 'prop-types';
  */
 const KEYFRAMES_ID = 'onboarding-highlight-keyframes';
 
+/** How many times the highlight pulses before it settles into a steady glow. */
+export const HIGHLIGHT_PULSE_COUNT = 3;
+
 /**
  * CSS keyframes for the pulse animation.
  * Injected into the document head once when needed.
@@ -150,7 +153,10 @@ export default function OnboardingHighlight({ targetId, active }) {
         pointerEvents: 'none',
         boxShadow: `0 0 22px 8px ${glow}`,
         borderRadius: '8px',
-        animation: 'onboarding-pulse 1.5s ease-in-out infinite',
+        // A few pulses to draw the eye, then a steady glow. An infinite pulse
+        // made Chromium produce a frame every vsync for as long as the step
+        // was open (see OnboardingOverlay's backdrop note).
+        animation: `onboarding-pulse 1.5s ease-in-out ${HIGHLIGHT_PULSE_COUNT}`,
         zIndex: 9999,
         // Subtle border to match the glow
         border: `2px solid ${glow}`,

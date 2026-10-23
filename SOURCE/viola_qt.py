@@ -1720,6 +1720,15 @@ def main():
     # Materialize the WebEngine window before backend readiness. The embedded
     # CDP browser target lives in ViolaWebViewWindow, and browser tools must be
     # attachable even when /health/ready is slow to report ready.
+    # Settings > Apps entry: if Velopack's per-user uninstall key is missing
+    # for this install root, put it back (daemon thread, once per process).
+    try:
+        from utils.velopack_updater import start_uninstall_entry_self_heal
+
+        start_uninstall_entry_self_heal()
+    except Exception as exc:  # noqa: BLE001, RUF100 - a repair helper must never block startup
+        logger.warning("Uninstall entry self-heal did not start: %s", exc)
+
     early_window = _ensure_window()
     _attach_window_startup(early_window)
 

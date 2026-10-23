@@ -12,7 +12,8 @@ from __future__ import annotations
 
 import threading
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import AbstractContextManager
 from pathlib import Path
 from typing import Protocol, cast
 
@@ -204,6 +205,10 @@ class WakeDetector:
         # Pause flag - when True, wake callbacks are suppressed
         self._paused = False
         self._pause_lock = threading.Lock()
+        # How many command recordings are in progress right now. Status
+        # surfaces read it so "recording" is shown only while the microphone
+        # is really capturing a command, not for the whole time detection runs.
+        self._command_capture_depth = 0
 
         # Get policy reference for centralized decisions
         self._policy: WakeDecisionPolicyProtocol | None = None
@@ -446,12 +451,13 @@ class WakeDetector:
             return None
 
         logger.info("[DETECTOR] Calling _impl.listen_and_record_command()...")
-        result = self._impl.listen_and_record_command(
-            silence_threshold,
-            silence_duration,
-            timeout,
-            onset_timeout=onset_timeout,
-        )
+        with self.command_capture():
+            result = self._impl.listen_and_record_command(
+                silence_threshold,
+                silence_duration,
+                timeout,
+                onset_timeout=onset_timeout,
+            )
         logger.info("[DETECTOR] _impl.listen_and_record_command() returned: %s", result)
         return result
 
@@ -484,6 +490,17 @@ class WakeDetector:
             # A later explicit enable may already own a different worker.
             if self._thread is thread and (thread is None or not thread.is_alive()):
                 self._thread = None
+
+    def hold_off(self) -> None:
+        """Mark a detector that is not running as deliberately off.
+
+        Used when startup is held back (no Viola account signed in yet): the
+        detector reports STOPPED instead of STALLED, so the supervisor does not
+        "recover" a listener the user has not unlocked. ``start`` clears it.
+        """
+        with self._lifecycle_lock:
+            if not self.is_running():
+                self._intentionally_stopped = True
 
     @property
     def detection_signal(self) -> WorkSignal | None:
@@ -754,6 +771,37 @@ class WakeDetector:
         with self._pause_lock:
             return self._paused
 
+    def command_capture(self) -> AbstractContextManager[None]:
+        """Mark a voice-command recording as in progress for status surfaces."""
+        import contextlib
+
+        @contextlib.contextmanager
+        def _capture() -> Iterator[None]:
+            with self._pause_lock:
+                self._command_capture_depth += 1
+            try:
+                yield
+            finally:
+                with self._pause_lock:
+                    self._command_capture_depth = max(0, self._command_capture_depth - 1)
+
+        return _capture()
+
+    def activity(self) -> str:
+        """What the microphone is doing for the user right now.
+
+        ``"recording"`` while a command is being captured, ``"busy"`` while a
+        command is being handled (wake detection is paused from the wake until
+        the reply has been spoken), ``"wake"`` while only waiting for the wake
+        word.
+        """
+        with self._pause_lock:
+            if self._command_capture_depth > 0:
+                return "recording"
+            if self._paused:
+                return "busy"
+        return "wake"
+
 
 class WakeDetectorFacade:
     """
@@ -768,6 +816,16 @@ class WakeDetectorFacade:
     _lock = threading.RLock()
     _state_generation = 0
     _requested_running: bool | None = None
+    # Desktop account gate: False while no Viola account is signed in on this
+    # desktop, so the microphone is never listening for the wake word before
+    # anyone can be served. None means no gate is installed (spokes, tests).
+    _account_signed_in: bool | None = None
+    # The start the account gate held back, resumed on sign-in.
+    _held_start: tuple[WakeDetector, threading.Event] | None = None
+
+    @classmethod
+    def _wake_allowed_locked(cls) -> bool:
+        return cls._requested_running is not False and cls._account_signed_in is not False
 
     @classmethod
     def get_instance(cls) -> WakeDetector | None:
@@ -788,7 +846,7 @@ class WakeDetectorFacade:
     def begin_restart(cls, detector: WakeDetector | None) -> int | None:
         """Stop the owned instance and capture intent before slow construction."""
         with cls._lock:
-            if cls._instance is not detector or cls._requested_running is False:
+            if cls._instance is not detector or not cls._wake_allowed_locked():
                 return None
             try:
                 if detector is not None:
@@ -801,7 +859,7 @@ class WakeDetectorFacade:
     def start_current(cls, detector: WakeDetector, stop_event: threading.Event) -> bool:
         """Admit startup only while this is still the enabled current instance."""
         with cls._lock:
-            if cls._instance is not detector or cls._requested_running is False or stop_event.is_set():
+            if cls._instance is not detector or not cls._wake_allowed_locked() or stop_event.is_set():
                 return False
             if detector.is_running():
                 # A stopped worker can still be draining its final cleanup.
@@ -826,7 +884,7 @@ class WakeDetectorFacade:
             if (
                 cls._instance is not expected
                 or cls._state_generation != generation
-                or cls._requested_running is False
+                or not cls._wake_allowed_locked()
                 or stop_event.is_set()
             ):
                 return False, False
@@ -869,6 +927,14 @@ class WakeDetectorFacade:
         if instance is None:
             return Health.UNAVAILABLE
         return instance.health()
+
+    @classmethod
+    def activity(cls) -> str:
+        """Microphone activity of the singleton detector (see WakeDetector.activity)."""
+        instance = cls.get_instance()
+        if instance is None or not callable(getattr(instance, "activity", None)):
+            return "wake"
+        return instance.activity()
 
     @classmethod
     def detection_snapshot(cls) -> dict[str, object] | None:
@@ -921,7 +987,7 @@ class WakeDetectorFacade:
             logger.debug("No wake detector instance to sync to voice_mode/mic_muted state")
             return False
 
-        should_run = voice_mode == "wake_word" and not mic_muted
+        should_run = voice_mode == "wake_word" and not mic_muted and cls._account_signed_in is not False
         try:
             if should_run:
                 deferred = False
@@ -970,11 +1036,72 @@ class WakeDetectorFacade:
             if (
                 cls._instance is not instance
                 or cls._state_generation != generation
-                or cls._requested_running is not True
+                or not cls._wake_allowed_locked()
                 or shutdown.is_set()
             ):
                 return
             instance.resume_after_drain(lifecycle, shutdown)
+
+    @classmethod
+    def hold_until_signed_in(cls, detector: WakeDetector, stop_event: threading.Event) -> bool:
+        """Hold a pipeline start back while no Viola account is signed in.
+
+        Returns True when the start was held (it resumes on sign-in), False when
+        the gate is open or not installed and the caller should start normally.
+        """
+        with cls._lock:
+            if cls._account_signed_in is not False:
+                return False
+            cls._held_start = (detector, stop_event)
+            detector.hold_off()
+            return True
+
+    @classmethod
+    def set_account_signed_in(cls, signed_in: bool) -> None:
+        """Open or close the desktop account gate and start/stop the listener to match."""
+        signed_in = bool(signed_in)
+        with cls._lock:
+            if cls._account_signed_in is signed_in:
+                return
+            cls._account_signed_in = signed_in
+            cls._state_generation += 1
+            instance = cls._instance
+            if not signed_in:
+                logger.info(
+                    "Wake word listening off: no Viola account is signed in on this desktop "
+                    "(push-to-talk and typing still work)"
+                )
+                if instance is not None and instance.is_running() and not instance._intentionally_stopped:
+                    shutdown = instance._stop_event
+                    instance.stop()
+                    if shutdown is not None:
+                        cls._held_start = (instance, shutdown)
+                return
+
+            logger.info("Wake word listening on: a Viola account is signed in on this desktop")
+            held, cls._held_start = cls._held_start, None
+            if instance is None or cls._requested_running is False:
+                return
+            if held is not None and held[0] is instance:
+                shutdown = held[1]
+            elif cls._requested_running is True:
+                shutdown = instance._stop_event or threading.Event()
+            else:
+                # Wake was never asked for in this process (push-to-talk mode).
+                return
+            if shutdown.is_set():
+                return
+            try:
+                if instance.is_running() and instance._intentionally_stopped:
+                    generation = cls._state_generation
+                    instance.when_drained(
+                        lambda lifecycle: cls._resume_current_after_drain(instance, generation, lifecycle, shutdown)
+                    )
+                elif not instance.is_running():
+                    started = instance.start(shutdown)
+                    logger.info("Wake detector started after sign-in: %s", started)
+            except Exception:
+                logger.exception("Failed to start the wake detector after sign-in")
 
     @classmethod
     def reset_for_tests(cls) -> None:
@@ -983,6 +1110,8 @@ class WakeDetectorFacade:
             cls._instance = None
             cls._state_generation = 0
             cls._requested_running = None
+            cls._account_signed_in = None
+            cls._held_start = None
 
 
 class WakeDetectorAdapter:
@@ -1044,3 +1173,55 @@ class WakeDetectorAdapter:
         """Set AEC reference source callback for echo cancellation."""
         if hasattr(self._listener, "set_aec_reference_source"):
             self._listener.set_aec_reference_source(callback)
+
+
+# ---------------------------------------------------------------------------
+# Desktop account gate
+# ---------------------------------------------------------------------------
+
+_account_gate_lock = threading.Lock()
+
+
+def desktop_account_signed_in() -> bool:
+    """Whether a Viola account (not just the anonymous device user) is signed in here.
+
+    Fails closed: if the session store cannot be read, nobody is signed in.
+    """
+    try:
+        from core.user_context import get_desktop_authenticated_user_id
+
+        return bool(get_desktop_authenticated_user_id())
+    except LookupError:
+        return False
+    except Exception:  # noqa: BLE001, RUF100 - an unreadable session store means signed out, never a crash
+        logger.warning("Could not read desktop sign-in state; treating as signed out", exc_info=True)
+        return False
+
+
+def refresh_desktop_account_wake_gate() -> bool:
+    """Re-read desktop sign-in state and open or close the wake gate to match.
+
+    Serialized so that the last refresh always applies the latest state, even
+    when sign-out and sign-in notifications arrive back to back.
+    """
+    with _account_gate_lock:
+        signed_in = desktop_account_signed_in()
+        WakeDetectorFacade.set_account_signed_in(signed_in)
+        return signed_in
+
+
+def install_desktop_account_wake_gate() -> bool:
+    """Keep wake-word listening off until a Viola account signs in on this desktop.
+
+    Call once on the desktop app before the voice pipeline starts. Reads the
+    current sign-in state (so a restart with a saved session resumes listening)
+    and subscribes to the desktop session store's sign-in/sign-out signal.
+    Returns whether an account is signed in now.
+    """
+    try:
+        from auth.desktop_session import add_account_change_listener
+
+        add_account_change_listener(refresh_desktop_account_wake_gate)
+    except ImportError:
+        logger.warning("Desktop session store unavailable; wake word stays off until sign-in can be read")
+    return refresh_desktop_account_wake_gate()

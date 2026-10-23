@@ -114,6 +114,37 @@ def _is_dismiss_phrase(transcript: str) -> bool:
     return bool(_DISMISS_RE.match(transcript.strip()))
 
 
+# What the user says right after a wake to take it back ("never mind",
+# "cancel", "nothing", "not you"), optionally wrapped in filler. Deliberately
+# narrower than _DISMISS_RE: "stop", "skip" and "quiet" are real commands on a
+# wake turn ("Viola, stop" stops the music), so they are not undo phrases here.
+_WAKE_UNDO_RE = re.compile(
+    r"^\s*"
+    r"(?:(?:oh|oops|sorry|um+|uh+|no|nah|okay|ok|hey|viola)\s*[,.!]?\s*)*"
+    r"(?:"
+    r"never\s*mind"
+    r"|cancel(?:\s+(?:that|it))?"
+    r"|nothing"
+    r"|forget\s+(?:it|about\s+it)"
+    r"|not\s+(?:you|now)"
+    r"|false\s+alarm"
+    r"|(?:I\s+)?(?:wasn'?t|was\s+not)\s+talking\s+to\s+you"
+    r"|I\s+(?:didn'?t|did\s+not)\s+(?:call|mean|say|need)\s+(?:you|viola|that|anything)"
+    r")"
+    r"(?:\s*[,.!]?\s*(?:sorry|thanks|thank\s+you|viola))*"
+    r"[.!,?\s]*$",
+    re.IGNORECASE,
+)
+# A transcript with no words in it: punctuation, or only hesitation sounds.
+_NO_COMMAND_RE = re.compile(r"^[\s.,!?\u2026-]*(?:(?:h?m+|hmm+|um+|uh+|ah+|er+m?)[\s.,!?\u2026-]*)*$", re.IGNORECASE)
+
+
+def _is_wake_undo(transcript: str) -> bool:
+    """True when what followed a wake means "no command": an undo phrase or no words at all."""
+    text = (transcript or "").strip()
+    return bool(_NO_COMMAND_RE.match(text) or _WAKE_UNDO_RE.match(text))
+
+
 def _update_state_hub_voice_mode(mode_name: str, *, user_id: str) -> None:
     """
     Update the central StateHub with voice mode change.
@@ -464,6 +495,20 @@ class VoiceCommandHandler:
                     self._unduck_audio()
                     ctx.ducking_cleaned_up = True
                 exit_reason = "no_speech"
+                break
+
+            # Wake undo: right after a wake, "never mind" / "cancel" / "nothing",
+            # or no words at all, ends the turn silently. No LLM call, nothing
+            # spoken, ducked music restored. The wake is logged as a false one.
+            if turn == 1 and _is_wake_undo(transcript):
+                logger.info("Wake taken back or no command after wake; ending the turn silently")
+                detector = getattr(self.voice_pipeline, "wake_detector", None)
+                if detector:
+                    detector.mark_detection_as_false_positive()
+                _notify_data_collector("cancel", ctx.data_clip_id)
+                self._unduck_audio()
+                ctx.ducking_cleaned_up = True
+                exit_reason = "wake_undo"
                 break
 
             # --- Validate transcript ---

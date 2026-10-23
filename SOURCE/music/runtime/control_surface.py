@@ -19,6 +19,7 @@ from music.resolution.provider_router import Source
 from .autoplay_service import AutoplayService
 from .backend_manager import BackendLifecycleManager
 from .contracts import PlayerControlSurface, QueueEngine, StateService
+from .embedded_playback import backend_drives_embedded_video, is_react_iframe_item, react_iframe_owns_playback
 from .play_command import PlayCommandService
 from .queue_command import QueueCommandService
 
@@ -301,6 +302,10 @@ class PlayerControlService(PlayerControlSurface):
                 # can claim it after the old transport has finished stopping.
                 self._backend_manager.clear_pending_start()
             backend = self._backend_manager.backend
+            if react_iframe_owns_playback(self._player, backend):
+                # The React iframe is audible; the stream backend is idle and
+                # React pauses the iframe from the WebSocket command.
+                backend = None
             self._cv.notify_all()
         # Backend pause OUTSIDE lock — CDP engines may do network I/O
         if backend and hasattr(backend, "pause"):
@@ -333,6 +338,8 @@ class PlayerControlService(PlayerControlSurface):
             else:
                 _sm_transition(self._player, PlaybackPhase.PLAYING)
                 backend = self._backend_manager.backend
+                if react_iframe_owns_playback(self._player, backend):
+                    backend = None
             self._cv.notify_all()
         # Backend resume OUTSIDE lock — CDP engines may do network I/O
         if backend and hasattr(backend, "resume"):
@@ -446,11 +453,12 @@ class PlayerControlService(PlayerControlSurface):
             # instead of stopping playback / refusing.
             if is_embedded and now_playing and (has_upcoming or not provider_native):
                 play_args = self._skip_embedded_locked()
+                next_track = self._queue_engine.current()
+                if next_track is not None:
+                    next_track_id = getattr(next_track, "id", None)
+                    autoplay_anchor = next_track
                 if play_args is not None:
                     backend, url = play_args
-                    next_track = self._queue_engine.current()
-                    next_track_id = getattr(next_track, "id", None) if next_track is not None else None
-                    autoplay_anchor = next_track or autoplay_anchor
                     try:
                         backend.play(url)
                         self._logger.info("SKIP_EMBEDDED: Backend play() called for next track")
@@ -726,6 +734,18 @@ class PlayerControlService(PlayerControlSurface):
 
             # Capture backend + URL for caller to invoke OUTSIDE the lock
             backend = player._backend
+            if is_react_iframe_item(next_track) and not backend_drives_embedded_video(backend):
+                # React renders the next video from the state broadcast. The
+                # stream backend cannot decode a YouTube watch URL; starting
+                # it here only produced "Playback produced no audio" and
+                # progress callbacks that fought the iframe's position.
+                player._position_ms = 0
+                player._duration_ms = 0
+                logger.info(
+                    "SKIP_EMBEDDED: %s plays in the React iframe; stream backend not started",
+                    getattr(next_track, "id", "unknown"),
+                )
+                return None
             track_url = getattr(next_track, "url", None) or ""
             if backend and hasattr(backend, "play"):
                 return (backend, track_url)
@@ -801,6 +821,11 @@ class PlayerControlService(PlayerControlSurface):
                 if hasattr(self._player._state, "position_ms"):
                     self._player._state.position_ms = position_ms
             backend = self._backend_manager.backend
+            if react_iframe_owns_playback(self._player, backend):
+                # The iframe seeks from the WebSocket ``seek`` command. The
+                # idle stream backend would restart a YouTube stream it
+                # cannot decode.
+                backend = None
             self._cv.notify_all()
 
         if backend and hasattr(backend, "seek"):

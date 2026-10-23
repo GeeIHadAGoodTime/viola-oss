@@ -240,6 +240,18 @@ _SYSTEM_KEY_PREFIXES = frozenset(
     }
 )
 
+# Protected system keys that belong to ONE desktop account and are written only
+# by a trusted server-side path through set_system_value(user_id=...). They stay
+# system keys (every public settings write still refuses them), but on desktop
+# they are kept in, and read back from, that account's own per-user blob. The
+# billing snapshot is the desktop's entitlement authority
+# (core/request_context.read_desktop_entitlement_snapshot), written by the
+# /billing/status cloud proxy (billing/routes.py). Before this, the write landed
+# in the per-user cache, get() looked for it in the shared global blob, and the
+# DB save dropped it, so every desktop account (a gifted Pro included) resolved
+# as Free in the assistant's context while the Account page showed Pro.
+_DESKTOP_USER_SYSTEM_KEYS = frozenset({"billing_plan_snapshot"})
+
 # Secret-key patterns.  Settings keys matching one of these MUST flow through
 # .env / the encrypted credential store, NEVER through the user-facing HTTP
 # settings API. The HTTP layer (ui/settings_api.py) consults
@@ -1642,12 +1654,17 @@ class SettingsManager:
 
         db = self._get_auth_db()
         settings_blob, _ = self._migrate_setting_aliases(dict(settings_blob))
+        keep_desktop_system_keys = not _is_cloud_deployment()
         clean_blob = {
             key: value
             for key, value in settings_blob.items()
             if (
                 not self._is_credential_setting_key(key)
-                and (self._is_user_scoped_key(key) or key in LEGACY_USER_SETTINGS_SAFE_IMPORT_KEYS)
+                and (
+                    self._is_user_scoped_key(key)
+                    or key in LEGACY_USER_SETTINGS_SAFE_IMPORT_KEYS
+                    or (keep_desktop_system_keys and key in _DESKTOP_USER_SYSTEM_KEYS)
+                )
             )
         }
 
@@ -2175,6 +2192,15 @@ class SettingsManager:
                 return default
             return legacy_value
         if resolved_user_id and not _uses_global_settings_only(resolved_user_id) and self._is_user_scoped_key(key):
+            return self.get_user_setting(resolved_user_id, key, default, on_load_error=on_load_error)
+        if (
+            key in _DESKTOP_USER_SYSTEM_KEYS
+            and resolved_user_id
+            and not _uses_global_settings_only(resolved_user_id)
+            and not _is_cloud_deployment()
+        ):
+            # One signed-in account's protected value lives in that account's
+            # own blob (see _DESKTOP_USER_SYSTEM_KEYS), not the shared one.
             return self.get_user_setting(resolved_user_id, key, default, on_load_error=on_load_error)
 
         # Cloud mode: if no authenticated user and key is user-scoped,
@@ -3087,11 +3113,18 @@ class SettingsManager:
             True if successful
         """
         # Auto-map agent_autonomy → browser_session_mode (unless caller set both).
-        # Accept the legacy `capability_tier` key as an alias.
+        # Accept the legacy `capability_tier` key as an alias. When a key the
+        # settings read echoes back as an alias (SETTING_KEY_READ_ALIASES)
+        # arrives in both forms, the canonical one wins, so a stale echo can
+        # never overwrite the value the caller actually changed. Other aliases
+        # keep last-wins: an imported backup's alias carries the user's value.
+        read_echo_aliases = set(self.SETTING_KEY_READ_ALIASES.values())
         pending_updates = {}
         for raw_key, raw_value in updates.items():
             canonical_key = self.canonicalize_setting_key(raw_key)
             if canonical_key in self.REMOVED_LEGACY_SETTING_KEYS:
+                continue
+            if raw_key in read_echo_aliases and canonical_key != raw_key and canonical_key in updates:
                 continue
             pending_updates[canonical_key] = raw_value
         autonomy = pending_updates.get("agent_autonomy")

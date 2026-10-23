@@ -53,6 +53,9 @@ class AudioDucker:
         self._fade_thread: threading.Thread | None = None
         self._fade_cancel = threading.Event()
         self._timeout_timer: threading.Timer | None = None
+        # Volume an in-flight un-duck fade is restoring to. A duck that starts
+        # during that fade must restore to it, not to the half-faded level.
+        self._restore_target: int | None = None
 
         logger.info(
             "AudioDucker initialized: duck_level=%s, fade_duration=%ss",
@@ -75,11 +78,21 @@ class AudioDucker:
                 try:
                     state = self.music_player.state()
                     if hasattr(state, "volume"):
-                        self._original_volume = state.volume
+                        current_volume = state.volume
                     elif isinstance(state, dict):
-                        self._original_volume = state.get("volume", 50)
+                        current_volume = state.get("volume", 50)
                     else:
-                        self._original_volume = 50
+                        current_volume = 50
+                    restoring = self._restore_target is not None and (
+                        self._fade_thread is not None and self._fade_thread.is_alive()
+                    )
+                    # Back-to-back replies duck again while the previous
+                    # un-duck is still fading up. Reading the live volume then
+                    # saved a half-faded level (e.g. 26) as the "original" and
+                    # every later un-duck restored to it: music sank from 80 to
+                    # ~22-30 over a few replies (1.0.5 laptop test, item 10).
+                    self._original_volume = self._restore_target if restoring else current_volume
+                    self._restore_target = None
                     # Ducking is attenuation, never amplification.  A user
                     # already listening below the configured duck level must
                     # stay at that quieter volume during voice activity.
@@ -111,7 +124,7 @@ class AudioDucker:
                     self._fade_cancel.clear()
                     self._fade_thread = threading.Thread(
                         target=self._fade_to_volume,
-                        args=(self._original_volume, self._active_duck_level),
+                        args=(current_volume, self._active_duck_level),
                         daemon=True,
                         name="audio-duck-down",
                     )
@@ -164,6 +177,7 @@ class AudioDucker:
                     )
                     self._fade_thread.start()
 
+                    self._restore_target = self._original_volume
                     self._original_volume = None
                     self._active_duck_level = self.duck_level
             else:

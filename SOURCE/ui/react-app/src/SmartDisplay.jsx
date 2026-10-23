@@ -89,6 +89,7 @@ import LoadingSkeleton from './components/shared/LoadingSkeleton';
 import ModalLoadingSpinner from './components/shared/ModalLoadingSpinner';
 import ProviderBadge from './components/shared/ProviderBadge';
 import AgentDrawer from './components/AgentDrawer';
+import { clampWakeThreshold } from './utils/wakeSensitivity';
 
 // Shared CSS: animations + variables (replaces all inline <style> tags)
 import './styles/variables.css';
@@ -1383,13 +1384,10 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
   const browserWakeOnWake = useCallback(() => {
     if (browserWakeActionRef.current) browserWakeActionRef.current();
   }, []);
-  // Honor the user's Wake-Up Sensitivity setting (same slider the desktop
-  // engine uses); default is the 0.90 canon threshold.
-  const wakeSensitivity = Number(userSettings?.wake_sensitivity);
-  const browserWakeThreshold =
-    Number.isFinite(wakeSensitivity) && wakeSensitivity > 0 && wakeSensitivity <= 1
-      ? wakeSensitivity
-      : 0.9;
+  // Honor the user's Wake sensitivity setting (the saved value is the score
+  // threshold the desktop engine uses, clamped to the same 0.80-0.97 range);
+  // default is the 0.90 canon threshold.
+  const browserWakeThreshold = clampWakeThreshold(userSettings?.wake_sensitivity);
   const browserWakePaused = voice.isRecording || voice.isProcessing || cloudLlmConsentOpen || cloudWelcomeOpen;
   const browserWake = useBrowserWakeWord({
     enabled: !settingsLoading && voiceCaptureEnabled && handsFreeWake && (isSpoke || cloudSurfaceActive),
@@ -1811,7 +1809,14 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
     if (wakeDetectorHealth?.reason === 'not_initialized') return 'starting';
     if (wakeDetectorHealth?.status === 'error' || wakeDetectorHealth?.status === 'degraded') return 'unavailable';
     if (voiceStatus?.degraded) return 'degraded';
-    if (wakeDetectorHealth?.status === 'ok' && wakeDetectorHealth.is_running === true) return 'wake_listening';
+    if (wakeDetectorHealth?.status === 'ok' && wakeDetectorHealth.is_running === true) {
+      // The native detector says what the mic is doing: capturing a command
+      // after a wake, handling one, or only waiting for the wake word. Without
+      // this the label read "listening" the whole time the detector ran.
+      if (wakeDetectorHealth.activity === 'recording') return 'recording';
+      if (wakeDetectorHealth.activity === 'busy') return 'responding';
+      return 'wake_listening';
+    }
     if (wakeDetectorHealth?.status === 'ok' && wakeDetectorHealth.is_running === false) return 'stopped';
     return 'unknown';
   })();
@@ -1991,12 +1996,19 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
     onTranscript: handleCloudPhoneTranscript,
   });
 
-  // CB-7 FIX: Forward playback commands from backend to YouTube iframe
+  // CB-7 FIX: Forward playback commands from backend to YouTube iframe.
+  // The backend player cannot reach this iframe, so a typed/spoken/agent
+  // pause or resume only reaches the audio through these frames (1.0.5
+  // laptop test: "Got it, paused." while the video kept playing).
   useEffect(() => {
     if (!setPlaybackCommandCallback) return;
     const handlePlaybackCommand = (command, payload) => {
       if (command === 'seek' && payload.position !== undefined) {
         sendToIframe('seekTo', { seconds: payload.position });
+      } else if (command === 'pause') {
+        sendToIframe('pause');
+      } else if (command === 'play' || command === 'resume') {
+        sendToIframe('play');
       }
     };
     setPlaybackCommandCallback(handlePlaybackCommand);

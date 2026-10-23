@@ -55,6 +55,9 @@ class TitlebarResizeRoutingTests(unittest.TestCase):
             frameGeometry=lambda: SimpleNamespace(topLeft=lambda: Point(0, 0)),
             width=lambda: 1400, move=lambda point: self.moves.append((point.x(), point.y())),
             showNormal=lambda: self.restores.append(True),
+            # No native window here, so the OS move is unavailable and the
+            # manual drag below is what runs (as on offscreen/Wayland).
+            windowHandle=lambda: None,
         )
         self.bar = SimpleNamespace(_parent=self.parent, _drag_pos=None, _set_maximize_icon=self.icons.append)
 
@@ -111,6 +114,18 @@ class TitlebarResizeRoutingTests(unittest.TestCase):
         self.assertIsNone(self.bar._drag_pos)
         self.assertFalse(event.ignored)
 
+    def test_titlebar_drag_hands_the_move_to_the_os_when_it_can(self):
+        """A native move is what gives drag-to-edge Snap and drag-to-restore."""
+        system_moves = []
+        self.parent.windowHandle = lambda: SimpleNamespace(startSystemMove=lambda: system_moves.append(True) or True)
+        self.call("mousePressEvent", Event(y=16))
+        event = Event(750, 46)
+        self.call("mouseMoveEvent", event)
+        self.assertEqual(system_moves, [True])
+        self.assertEqual(self.moves, [])
+        self.assertTrue(event.accepted)
+        self.assertIsNone(self.bar._drag_pos)
+
     def test_exact_margin_boundary_remains_titlebar_drag(self):
         event = Event(y=8)
         self.call("mousePressEvent", event)
@@ -138,7 +153,7 @@ def qt_worker(path):
     from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout
     namespace = dict(QPoint=QPoint, QRect=QRect, QMouseEvent=QMouseEvent, Qt=Qt, QMainWindow=QMainWindow, QWidget=QWidget)
     for original, name, base, selected in [
-        ("ViolaWebViewWindow", "ResizeWindow", "QMainWindow", {"_get_resize_edge", "_update_cursor", "mousePressEvent", "mouseMoveEvent", "mouseReleaseEvent"}),
+        ("ViolaWebViewWindow", "ResizeWindow", "QMainWindow", {"_get_resize_edge", "_update_cursor", "_start_system_resize", "mousePressEvent", "mouseMoveEvent", "mouseReleaseEvent"}),
         ("CustomTitleBar", "Titlebar", "QWidget", {"mousePressEvent", "mouseMoveEvent", "mouseReleaseEvent", "mouseDoubleClickEvent", "_toggle_maximize"}),
     ]:
         node = ast.ClassDef(name=name, bases=[ast.Name(id=base, ctx=ast.Load())], keywords=[], body=methods(path, original, selected), decorator_list=[])

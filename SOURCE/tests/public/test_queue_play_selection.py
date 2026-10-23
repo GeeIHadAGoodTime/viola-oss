@@ -40,7 +40,12 @@ def definitions(relative, namespace, names=None):
     nodes.extend(
         node
         for node in tree.body
-        if isinstance(node, (ast.ClassDef, ast.FunctionDef)) and (names is None or node.name in names)
+        if (isinstance(node, (ast.ClassDef, ast.FunctionDef)) and (names is None or node.name in names))
+        or (
+            names is not None
+            and isinstance(node, ast.Assign)
+            and any(isinstance(target, ast.Name) and target.id in names for target in node.targets)
+        )
     )
     module = types.ModuleType("_queue_selection_" + path.stem)
     module.__dict__.update(namespace)
@@ -59,9 +64,24 @@ PlaybackPhase = phase_module.PlaybackPhase
 engine_module = definitions("music/runtime/queue_engine.py", {"PlaylistCursor": PlaylistCursor, "deque": deque})
 controller_module = definitions("music/controller/playback_controller.py", {})
 pipeline_module = definitions("music/runtime/state_pipeline.py", {"deque": deque})
+embedded_module = definitions(
+    "music/runtime/embedded_playback.py",
+    {},
+    {
+        "_EMBEDDED_VIDEO_BACKENDS",
+        "_STREAM_PLAYBACK_MODES",
+        "_NON_IFRAME_PROVIDERS",
+        "is_react_iframe_item",
+        "backend_drives_embedded_video",
+        "react_iframe_owns_playback",
+    },
+)
 control_module = definitions(
     "music/runtime/control_surface.py",
     {
+        "is_react_iframe_item": embedded_module.is_react_iframe_item,
+        "backend_drives_embedded_video": embedded_module.backend_drives_embedded_video,
+        "react_iframe_owns_playback": embedded_module.react_iframe_owns_playback,
         "PlayerControlSurface": object,
         "PlaybackPhase": PlaybackPhase,
         "ConfigurationError": type("ConfigurationError", (Exception,), {}),

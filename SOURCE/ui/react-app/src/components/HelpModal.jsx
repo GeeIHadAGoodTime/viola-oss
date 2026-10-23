@@ -200,7 +200,8 @@ function TroubleshootingTab() {
         <ul style={{ margin: 0, paddingLeft: 20 }}>
           <li>Check microphone permissions at the OS level.</li>
           <li>Background noise can mask the wake word — try speaking at conversational volume.</li>
-          <li>Adjust wake sensitivity in Settings → Voice if she misses or fires too often.</li>
+          <li>Wake-word listening starts once you sign in to your Viola account.</li>
+          <li>Adjust wake sensitivity in Settings → Voice: toward “More sensitive” if she misses you, toward “Fewer false wakes” if she wakes up when nobody called her.</li>
           <li>Hold push-to-talk (Space by default) any time you want to skip wake detection.</li>
         </ul>
       </AccordionItem>

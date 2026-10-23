@@ -117,7 +117,7 @@ class RealCustomerPronunciationTests(unittest.TestCase):
             for word, phones in _REPLY_WORDS.items():
                 with self.subTest(locale=locale, word=word):
                     self.assertIn(phones, self.g2p.phonemize(f"Play {word} now.", locale))
-            for word in ("Brubeck", "Xqzt"):
+            for word in ("Xqzt", "KGB"):
                 with self.subTest(locale=locale, word=word):
                     letters = self.g2p.phonemize(" ".join(word.upper()), locale)
                     strip = str.maketrans("", "", "ˈˌ ")
@@ -127,6 +127,69 @@ class RealCustomerPronunciationTests(unittest.TestCase):
         with self.assertRaises(self.error) as caught:
             self.g2p.phonemize("Hello 世界.")
         self.assertEqual(caught.exception.tokens, ("世界",))
+
+    def test_out_of_lexicon_names_are_pronounced_not_spelled(self):
+        names = [
+            "Brubeck",
+            "Coltrane",
+            "Beyoncé",
+            "Beyonce",
+            "Hozier",
+            "Lizzo",
+            "Eilish",
+            "Kygo",
+            "Odesza",
+            "Jerry",
+            "Aaliyah",
+            "Jaxon",
+            "Nevaeh",
+            "Oconomowoc",
+            "Menomonee",
+            "Doja",
+            "Khalid",
+            "Tiesto",
+            "Kehlani",
+            "Bieber",
+            "Shakira",
+            "Zedd",
+            "Avicii",
+            "Skrillex",
+            "Marshmello",
+            "Glorilla",
+            "Ozuna",
+            "Rosalía",
+            "Chappell",
+            "Sabrina",
+            "Olivia",
+            "Rodrigo",
+            "Sufjan",
+            "Tycho",
+            "Khruangbin",
+            "Etsy",
+            "Shopify",
+            "Klarna",
+            "Zillow",
+            "Instacart",
+            "O'Brien",
+            "McGregor",
+            "Lizzo's",
+        ]
+        strip = str.maketrans("", "", "ˈˌ ")
+        for locale in ("en-us", "en-gb"):
+            for name in names:
+                with self.subTest(locale=locale, name=name):
+                    phones = self.g2p.phonemize(name, locale)
+                    self.assertTrue(set(phones) <= set(self.g2p.vocab))
+                    self.assertEqual(phones.count("ˈ"), 1)
+                    if name.isascii():
+                        letters = self.g2p.phonemize(" ".join(name.upper().replace("'", "")), locale)
+                        self.assertNotEqual(phones.translate(strip), letters.translate(strip))
+        self.assertEqual(self.g2p.phonemize("Dave Brubeck", "en-us"), "dˈAv bɹˈubɛk")
+        self.assertEqual(self.g2p.phonemize("Tom and Jerry", "en-us"), "tˈɑm ænd ʤˈɛɹi")
+        self.assertEqual(self.g2p.phonemize("Billie Eilish", "en-gb"), "bˈɪli ˈIlɪʃ")
+        for mixed in ("Play Brubеck now.", "Hello 世界."):
+            with self.subTest(mixed=mixed), self.assertRaises(self.error):
+                self.g2p.phonemize(mixed)
 
     def test_laptop_replies_speak_after_normalization(self):
         from voice.synthesis.text_normalizer import normalize_for_speech

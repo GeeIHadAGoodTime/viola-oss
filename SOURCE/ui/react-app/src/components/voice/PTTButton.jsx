@@ -11,6 +11,7 @@ function getWakeColors(status) {
     wake_listening: { ring: THEME.colors.statusRed, glow: `${THEME.colors.statusRed}66` },
     recording: { ring: THEME.colors.statusYellow, glow: `${THEME.colors.statusYellow}66` },
     processing: { ring: THEME.colors.statusYellow, glow: `${THEME.colors.statusYellow}66` },
+    responding: { ring: THEME.colors.statusYellow, glow: `${THEME.colors.statusYellow}66` },
     off: { ring: THEME.colors.textMuted, glow: 'transparent' },
     degraded: { ring: THEME.colors.statusYellow, glow: `${THEME.colors.statusYellow}66` },
     listening: { ring: THEME.colors.statusGreen, glow: `${THEME.colors.statusGreen}66` },

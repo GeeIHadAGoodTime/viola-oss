@@ -28,11 +28,10 @@
   to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-/* A slow breathing glow on the brand mark — barely-there warmth. */
-@keyframes violaOnboardEmberPulse {
-  0%, 100% { opacity: 0.55; }
-  50%      { opacity: 1; }
-}
+/* The brand mark's ember glows steadily. It used to breathe on an infinite
+   animation; first run must not produce a new frame every vsync while the
+   user reads (GPU-composited Windows build: flicker + ~0.6 cores idle), so
+   nothing in the onboarding overlay animates forever. */
 
 .viola-onboard-backdrop {
   animation: violaOnboardBackdropIn 0.5s ease-out both;
@@ -40,10 +39,6 @@
 
 .viola-onboard-card {
   animation: violaOnboardCardIn 0.55s cubic-bezier(0.16, 0.84, 0.44, 1) both;
-}
-
-.viola-onboard-ember {
-  animation: violaOnboardEmberPulse 3.2s ease-in-out infinite;
 }
 
 .viola-onboard-serif {
@@ -66,8 +61,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .viola-onboard-backdrop,
-  .viola-onboard-card,
-  .viola-onboard-ember {
+  .viola-onboard-card {
     animation: none !important;
   }
   .viola-onboard-btn:hover:not(:disabled) {

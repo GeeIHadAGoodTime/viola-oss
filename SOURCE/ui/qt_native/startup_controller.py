@@ -397,6 +397,11 @@ def _start_backend(host: str, port: int, policy: StartupPolicy) -> BackendStartu
                         boot.voice = voice_orch
                         if getattr(boot, "app", None) is not None:
                             boot.app.state.voice_orchestrator = voice_orch
+                        # No wake-word listening until a Viola account is signed
+                        # in here; it starts on sign-in and stops on sign-out.
+                        from voice.wake_detector.facade import install_desktop_account_wake_gate
+
+                        install_desktop_account_wake_gate()
                         voice_orch.start()
                         _wire_deferred_aec(boot)
                         logger.info("✅ Voice orchestrator created and started (deferred)")
@@ -659,14 +664,19 @@ class StartupCoordinator(QObject):
                 result.detail,
             )
             self._backend = result.boot
-            self._set_state(
-                StartupState.WAITING_READY,
-                {
-                    "detail": result.detail or "backend_started",
-                    "host": self.host,
-                    "port": self.port,
-                },
-            )
+            # Never move a coordinator that already reached RUNNING back to
+            # WAITING_READY: that turned the next passive poll into a second
+            # "ready" (and, before the guard in _apply_health_status, was what
+            # parked startup for a full passive poll interval).
+            if self._state == StartupState.STARTING_BACKEND:
+                self._set_state(
+                    StartupState.WAITING_READY,
+                    {
+                        "detail": result.detail or "backend_started",
+                        "host": self.host,
+                        "port": self.port,
+                    },
+                )
             _emit_debug(
                 "app_starting",
                 {
@@ -777,6 +787,18 @@ class StartupCoordinator(QObject):
         )
         summary = status.as_summary()
         self.health_updated.emit(summary)
+        starting_up = self._state not in (StartupState.RUNNING, StartupState.DEGRADED)
+        if status.ready and self._backend is None and starting_up:
+            # The server can answer /health/ready a moment BEFORE
+            # _run_backend_worker hands over the boot object (a probe that was
+            # already waiting on the socket lands as uvicorn binds). Marking
+            # RUNNING here could not emit ``ready`` (nothing to emit), the worker
+            # then reset the state to WAITING_READY, and the UI waited for the
+            # next 30 s passive poll: measured on the frozen 1.0.5 build as
+            # "Health status check succeeded" at +8 s, "Backend ready" at +38 s.
+            # Stay in the startup cycle and look again on the fast poll.
+            self._schedule_health_probe(self.policy.poll_interval_ms)
+            return
         if status.ready:
             self._readiness_retry_count = 0
             if self._state != StartupState.RUNNING:

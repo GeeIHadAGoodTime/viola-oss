@@ -523,9 +523,14 @@ class SingleInstanceGuard(QObject):
             if self._window_is_raisable() and self._window is not None:
                 logger.info("Received RAISE_WINDOW from second instance")
                 try:
-                    self._window.showNormal()
-                    self._window.raise_()
-                    self._window.activateWindow()
+                    restore = getattr(self._window, "restore_window", None)
+                    if callable(restore):
+                        # Keeps a maximized window maximized (showNormal() un-maximized it).
+                        restore()
+                    else:
+                        self._window.showNormal()
+                        self._window.raise_()
+                        self._window.activateWindow()
                     raised = True
                 except RuntimeError:
                     logger.exception("Failed to raise window on RAISE_WINDOW")

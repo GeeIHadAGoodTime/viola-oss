@@ -182,10 +182,37 @@ describe('real SmartDisplay wake status', () => {
     expect(state.browserOptions.enabled).toBe(true);
   });
 
+  it.each([
+    [{ status: 'ok', is_running: true, activity: 'wake' }, 'listening for wake word'],
+    [{ status: 'ok', is_running: true }, 'listening for wake word'],
+    [{ status: 'ok', is_running: true, activity: 'recording' }, 'recording'],
+    [{ status: 'ok', is_running: true, activity: 'busy' }, 'responding'],
+  ])('follows the native microphone activity %j instead of a permanent "listening"', async (wake, label) => {
+    healthRequest.mockResolvedValue(health(wake));
+    render(<SmartDisplay />);
+    await waitFor(() => expect(pttLabel()).toHaveTextContent(label));
+    expect(pttLabel().textContent).toBe(label);
+  });
+
+  it('moves from waiting for the wake word to recording and back as the detector reports it', async () => {
+    healthRequest.mockResolvedValue(health({ status: 'ok', is_running: true, activity: 'wake' }));
+    render(<SmartDisplay />);
+    await waitFor(() => expect(pttLabel().textContent).toBe('listening for wake word'));
+    healthRequest.mockResolvedValue(health({ status: 'ok', is_running: true, activity: 'recording' }));
+    await poll();
+    expect(pttLabel().textContent).toBe('recording');
+    healthRequest.mockResolvedValue(health({ status: 'ok', is_running: true, activity: 'busy' }));
+    await poll();
+    expect(pttLabel().textContent).toBe('responding');
+    healthRequest.mockResolvedValue(health({ status: 'ok', is_running: true, activity: 'wake' }));
+    await poll();
+    expect(pttLabel().textContent).toBe('listening for wake word');
+  });
+
   it('associates the live microphone status with the push-to-talk button', async () => {
     render(<SmartDisplay />);
     await waitFor(() => expect(pttLabel()).toHaveTextContent('listening'));
-    expect(screen.getByRole('button', { name: 'Push to talk' })).toHaveAccessibleDescription('listening');
+    expect(screen.getByRole('button', { name: 'Push to talk' })).toHaveAccessibleDescription('listening for wake word');
     expect(screen.getByRole('status', { name: 'Microphone status' })).toHaveAttribute('aria-live', 'polite');
   });
 

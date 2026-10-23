@@ -74,6 +74,30 @@ def _nothing_playing(music: object) -> bool:
     return is_playing is not True and now_playing is None
 
 
+def _sync_hub_canonical_playback(music: object, is_playing: bool) -> None:
+    """Record an intentional pause/resume on the hub authority (as /v1/pause does).
+
+    Without it the next reconciliation sees hub=playing vs player=paused and
+    logs "State conflict detected: is_playing" for a change the user asked for.
+    """
+    player = getattr(music, "player", None) or getattr(music, "_player", None) or music
+    hub_authority = getattr(player, "_hub_state_authority", None)
+    update = getattr(hub_authority, "update_canonical_playback_state", None)
+    if not callable(update):
+        return
+    try:
+        update(is_playing)
+    except Exception:
+        log.debug("Hub canonical playback update failed (non-critical)", exc_info=True)
+
+
+async def _broadcast_transport(handler: object, command: str) -> None:
+    """Tell the React UI to apply ``command`` (pause/play) to its YouTube iframe."""
+    broadcast = getattr(handler, "_broadcast_playback_command", None)
+    if callable(broadcast):
+        await broadcast(command, {"source": "voice"})
+
+
 class MusicHandlersMixin:
     """Music and playback instant command handlers."""
 
@@ -756,6 +780,11 @@ class MusicHandlersMixin:
             if _nothing_playing(self.controller.music):
                 return {"ok": True, "message": _NOTHING_PLAYING_MESSAGE, "data": {"noop": True}}
             await _call_maybe_async(self.controller.music, "pause")
+            _sync_hub_canonical_playback(self.controller.music, False)
+            # The audible player for a YouTube track is the React iframe; the
+            # backend pause above cannot reach it (1.0.5 laptop test: "Got it,
+            # paused." while the iframe kept playing).
+            await _broadcast_transport(self, "pause")
             return {
                 "ok": True,
                 "message": _vary("paused", "Playback paused"),
@@ -790,6 +819,9 @@ class MusicHandlersMixin:
 
             await _call_maybe_async(self.controller.music, "resume")
             post_is_playing, post_track = _extract_playback_snapshot(self.controller.music)
+            if post_track is not None and post_is_playing is not False:
+                _sync_hub_canonical_playback(self.controller.music, True)
+                await _broadcast_transport(self, "play")
             if post_track is None:
                 return {
                     "ok": False,

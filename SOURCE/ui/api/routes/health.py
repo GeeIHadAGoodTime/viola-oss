@@ -322,7 +322,15 @@ def _check_wake_detector_health() -> dict[str, Any]:
 
         health = facade.health()
         if health is Health.WORKING:
-            return {"status": "ok", "is_running": True}
+            # "activity" says what the microphone is doing on this device:
+            # "wake" (waiting for the wake word), "recording" (capturing a
+            # command) or "busy" (handling one). Device state only, no user
+            # data. Without it the UI could only ever say "listening".
+            try:
+                activity = str(WakeDetectorFacade.activity() or "wake")
+            except Exception:  # noqa: BLE001, RUF100 - activity is a detail; never fail the check over it
+                activity = "wake"
+            return {"status": "ok", "is_running": True, "activity": activity}
         if health is Health.STOPPED:
             return {"status": "ok", "is_running": False, "reason": "stopped"}
         if health is Health.STALLED:

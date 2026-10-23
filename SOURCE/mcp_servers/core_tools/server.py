@@ -3694,7 +3694,7 @@ async def memory(
     ] = "",
     where: Annotated[
         str,
-        Field(description="Write target: memory, topic:<name>, or a markdown path under memory/."),
+        Field(description="Write target: topic:<name>, a path under memory/, or memory (saved to a topic, indexed)."),
     ] = "memory",
     position: Annotated[
         str,
@@ -3724,7 +3724,7 @@ async def memory(
     """Manage the markdown memory directory.
 
     Examples:
-    - memory(action="write", content="- User prefers jazz in the morning.")
+    - memory(action="write", where="topic:preferences", content="- User prefers jazz in the morning.")
     - memory(action="write", where="topic:allergies", content="- User is allergic to shellfish.")
     - memory(action="recall", query="shellfish")
     - memory(action="search", query="shellfish")

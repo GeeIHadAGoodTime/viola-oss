@@ -141,15 +141,19 @@ export default function OnboardingOverlay({
       style={{
         position: 'fixed',
         inset: 0,
-        // Deep dim with a warm mahogany glow rising from below (lamplight on
-        // wood), plus a heavy blur so the running app fully dissolves behind
-        // the card. pointerEvents stay off the backdrop so the highlighted
-        // push-to-talk button underneath remains reachable during the mic
-        // and try-a-command phases.
+        // A warm mahogany glow rising from below (lamplight on wood) over an
+        // OPAQUE base, so the running app is fully hidden behind the card.
+        // No backdrop-filter, and nothing in the overlay animates forever:
+        // with Chromium GPU compositing on Windows (1.0.5), a full-window
+        // blur(30px) recomposited on every frame of an infinite animation is
+        // what made the screen alternate between this card and the stage on
+        // an Iris Xe laptop and cost ~0.6 cores while first run was open.
+        // Pinned by OnboardingOverlay.stableFrames.test.jsx.
+        // pointerEvents stay off the backdrop so the highlighted push-to-talk
+        // button (lifted above it by OnboardingHighlight) remains reachable
+        // during the mic and try-a-command phase.
         background:
-          'radial-gradient(130% 105% at 50% 118%, rgba(107,46,27,0.30) 0%, rgba(107,46,27,0.12) 32%, rgba(0,0,0,0.86) 68%)',
-        backdropFilter: 'blur(30px) saturate(118%)',
-        WebkitBackdropFilter: 'blur(30px) saturate(118%)',
+          'radial-gradient(130% 105% at 50% 118%, rgba(107,46,27,0.30) 0%, rgba(107,46,27,0.12) 32%, rgba(0,0,0,0) 68%), #0b0908',
         zIndex: 90,
         display: 'flex',
         flexDirection: 'column',
@@ -481,12 +485,35 @@ AccountSignInPanel.propTypes = {
 
 function MicPermissionPanel({ micPermission, onRetry, onSkipMicStep }) {
   const { t } = useTranslation();
-  if (!micPermission?.checking && !micPermission?.blocked) return null;
+  if (!micPermission?.checking && !micPermission?.blocked) {
+    // The microphone works, but speaking is still optional: a user in a
+    // shared room (or who would rather type) can move on. The typed sample
+    // chip below also completes the step.
+    if (!onSkipMicStep) return null;
+    return (
+      <Panel>
+        <ActionButton
+          label={t('onboarding.mic.continue_without')}
+          variant="secondary"
+          onClick={onSkipMicStep}
+        />
+      </Panel>
+    );
+  }
 
   return (
     <Panel>
       {micPermission.checking ? (
-        <MutedText>{t('onboarding.mic.checking')}</MutedText>
+        <>
+          <MutedText>{t('onboarding.mic.checking')}</MutedText>
+          {onSkipMicStep && (
+            <ActionButton
+              label={t('onboarding.mic.continue_without')}
+              variant="secondary"
+              onClick={onSkipMicStep}
+            />
+          )}
+        </>
       ) : (
         <>
           <ErrorText>{micPermission.message || t('onboarding.mic.unknown')}</ErrorText>

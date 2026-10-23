@@ -154,7 +154,7 @@ class EnglishDecimalNormalization(unittest.TestCase):
             "3,5 o 68.5 o 0.001": "tres coma cinco o sesenta y ocho coma cinco o cero coma cero cero uno",
             "Un 0,25% y 7%.": "Un cero coma veinticinco por ciento y siete por ciento.",
             "$5 o 12,50 €": "cinco dólares o doce coma cincuenta euros",
-            "-3 y +2, del 10-20": "menos tres y más dos, del diez-veinte",
+            "-3 y +2, del 10-20": "menos tres y más dos, del diez a veinte",
             "1º lugar, 3er día, la 2ª vez, el 7º.": "primer lugar, tercer día, la segunda vez, el séptimo.",
             "Llama al 414-555-1234.": "Llama al cuatro uno cuatro cinco cinco cinco uno dos tres cuatro.",
         }
@@ -162,6 +162,59 @@ class EnglishDecimalNormalization(unittest.TestCase):
             for locale in ("es", "es-MX", "ES_us"):
                 with self.subTest(source=source, locale=locale):
                     self.assertEqual(self.formatter.format(source, language=locale), expected)
+
+    def test_spanish_counts_agree_with_the_noun_that_follows(self):
+        cases = {
+            "101 mesas, 21 personas y 200 casas.": "ciento una mesas, veintiuna personas y doscientas casas.",
+            "21 días, 1 grado y 1 día.": "veintiún días, un grado y un día.",
+            "1 persona, 1 hora y 1 minuto.": "una persona, una hora y un minuto.",
+            "1 canción, 1 mano, 1 mapa.": "una canción, una mano, un mapa.",
+            "31 semanas, 500 millas, 41 fotos.": "treinta y una semanas, quinientas millas, cuarenta y una fotos.",
+            "1 alarma, 21 tormentas, 1 libro, 21 libros.": "una alarma, veintiuna tormentas, un libro, veintiún libros.",
+            "3 notificaciones, 201 ciudades.": "tres notificaciones, doscientas una ciudades.",
+            "201 000 personas, 21 000 euros": "doscientas un mil personas, veintiún mil euros",
+            "$1 y $21, 1 €": "un dólar y veintiún dólares, un euro",
+            # Standalone counts, verbs, pronouns, decimals and percents keep "uno".
+            "Tengo 21. Quedan 1 o 2.": "Tengo veintiuno. Quedan uno o dos.",
+            "En 2021 hubo 21 tormentas.": "En dos mil veintiuno hubo veintiuna tormentas.",
+            "En 2021 llega. Los 21 estamos.": "En dos mil veintiuno llega. Los veintiuno estamos.",
+            "1,5 horas, 21% de 101.": "uno coma cinco horas, veintiuno por ciento de ciento uno.",
+            "Son las 21:00 y la 1:00.": "Son las veintiuna en punto y la una en punto.",
+        }
+        for source, expected in cases.items():
+            with self.subTest(source=source):
+                self.assertEqual(self.formatter.format(source, language="es"), expected)
+
+    def test_one_degree_is_singular_and_whole_millions_take_de(self):
+        english = {"1°F": "one degree Fahrenheit", "It is 1 °C.": "It is one degree Celsius.", "1°": "one degree",
+                   "1.5°C": "one point five degrees Celsius", "21°": "twenty one degrees"}
+        for source, expected in english.items():
+            with self.subTest(source=source):
+                self.assertEqual(self.formatter.format(source), expected)
+        spanish = {
+            "1°C, 1°F y 1°.": "un grado Celsius, un grado Fahrenheit y un grado.",
+            "Hace -1 °C, luego 21°C o 1,5°C.": "Hace menos un grado Celsius, luego veintiún grados Celsius o uno coma cinco grados Celsius.",
+            "1000000 personas y 2000000 casas.": "un millón de personas y dos millones de casas.",
+            "1500000 personas, 1000000 de euros, $1000000.": "un millón quinientas mil personas, un millón de euros, un millón de dólares.",
+            "Unos 2000000.": "Unos dos millones.",
+        }
+        for source, expected in spanish.items():
+            with self.subTest(source=source):
+                self.assertEqual(self.formatter.format(source, language="es"), expected)
+
+    def test_spanish_ranges_and_english_ordinal_suffixes(self):
+        cases = {
+            "del 10-20 de octubre": "del diez a veinte de octubre",
+            "de 10 – 20 minutos": "de diez a veinte minutos",
+            "el 21st de octubre, el 1st y el 3rd": "el veintiuno de octubre, el uno y el tres",
+            "El 22nd y el 4TH.": "El veintidós y el cuatro.",
+            # ISO dates and phone numbers are not ranges.
+            "2026-10-23": "dos mil veintiséis-diez-veintitrés",
+            "Llama al 414-555-1234.": "Llama al cuatro uno cuatro cinco cinco cinco uno dos tres cuatro.",
+        }
+        for source, expected in cases.items():
+            with self.subTest(source=source):
+                self.assertEqual(self.formatter.format(source, language="es"), expected)
 
     def test_mandarin_symbols_are_spoken_around_route_numbers(self):
         cases = {

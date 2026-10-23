@@ -8,6 +8,7 @@ a single unified voice processing pipeline.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import math
 import threading
 from collections import deque
@@ -602,6 +603,14 @@ class VoicePipeline:
             # Start wake word detection
             from voice.wake_detector.facade import WakeDetectorFacade
 
+            # No wake listening before a Viola account signs in on this desktop:
+            # the facade holds the start and resumes it on sign-in. That is a
+            # normal start, not a failure, so report success.
+            if WakeDetectorFacade.hold_until_signed_in(self.wake_detector, self._stop_event):
+                self._try_start_continuous_capture()
+                logger.info("✅ Voice pipeline started (wake word waits for sign-in)")
+                return True
+
             if WakeDetectorFacade.start_current(self.wake_detector, self._stop_event):
                 self._try_start_continuous_capture()
                 logger.info("✅ Voice pipeline started (wake word enabled)")
@@ -930,12 +939,19 @@ class VoicePipeline:
                 return None, 0
 
         logger.debug("[PIPELINE] Calling listen_and_record_command_buffer()...")
-        audio, sample_rate = buffer_fn(
-            silence_threshold,
-            silence_duration,
-            timeout,
-            onset_timeout=onset_timeout,
-        )
+        # The buffer path talks to the listener directly, so it marks the
+        # capture on the detector itself; /health reports it as "recording".
+        capture_marker = getattr(self.wake_detector, "command_capture", None)
+        capture_context = capture_marker() if callable(capture_marker) else None
+        if not isinstance(capture_context, contextlib.AbstractContextManager):
+            capture_context = contextlib.nullcontext()
+        with capture_context:
+            audio, sample_rate = buffer_fn(
+                silence_threshold,
+                silence_duration,
+                timeout,
+                onset_timeout=onset_timeout,
+            )
         if audio is not None:
             logger.debug("[PIPELINE] Buffer recording complete: %d samples", len(audio))
         else:

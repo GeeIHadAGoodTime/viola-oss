@@ -21,6 +21,7 @@ import hmac
 import json
 import sqlite3
 import threading
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -211,6 +212,7 @@ class DesktopSessionStore:
                 self._delete_token_pair(token_payload.user_id, session_hash)
                 raise DesktopSessionError("desktop session store write failed") from exc
 
+        _notify_account_change()
         return MintedDesktopSession(
             session_token=session_token,
             user_id=token_payload.user_id,
@@ -567,10 +569,13 @@ class DesktopSessionStore:
                         "DELETE FROM desktop_sessions WHERE session_hash = ?",
                         (session_hash,),
                     )
-                return bool(cursor.rowcount)
+                deleted = bool(cursor.rowcount)
             except sqlite3.Error:
                 logger.exception("Failed to delete desktop local session")
                 return False
+        if deleted:
+            _notify_account_change()
+        return deleted
 
     def purge_user(self, user_id: str) -> dict[str, Any]:
         normalized = _require_user_id(user_id)
@@ -590,6 +595,8 @@ class DesktopSessionStore:
                     deleted_rows = int(cursor.rowcount if cursor.rowcount is not None else 0)
             except (OSError, sqlite3.Error, ValueError) as exc:
                 failures.append(str(exc))
+        if deleted_rows:
+            _notify_account_change()
         return {
             "deleted": deleted_rows,
             "sqlite_rows": deleted_rows,
@@ -768,6 +775,47 @@ class DesktopSessionStore:
 
 _store: DesktopSessionStore | None = None
 _store_lock = threading.Lock()
+
+# Callbacks run when a desktop account signs in or out (a session row is
+# created, or the last rows are deleted or purged). They take no arguments and
+# re-read the store themselves, so a late or repeated call is harmless.
+_account_change_listeners: list[Callable[[], None]] = []
+_account_change_listeners_lock = threading.Lock()
+
+
+def add_account_change_listener(callback: Callable[[], None]) -> None:
+    """Call ``callback`` (on a worker thread) whenever desktop sign-in state may have changed."""
+    with _account_change_listeners_lock:
+        if callback not in _account_change_listeners:
+            _account_change_listeners.append(callback)
+
+
+def remove_account_change_listener(callback: Callable[[], None]) -> None:
+    with _account_change_listeners_lock:
+        if callback in _account_change_listeners:
+            _account_change_listeners.remove(callback)
+
+
+def _notify_account_change() -> None:
+    """Tell listeners that a session was created or removed.
+
+    Runs them on a short-lived daemon thread: sign-in and sign-out happen inside
+    request handlers (and sometimes while the caller holds the store lock), and
+    a listener may do slow work such as starting or stopping the microphone.
+    """
+    with _account_change_listeners_lock:
+        listeners = list(_account_change_listeners)
+    if not listeners:
+        return
+
+    def _run() -> None:
+        for listener in listeners:
+            try:
+                listener()
+            except Exception:  # noqa: BLE001, RUF100 - one listener must not break sign-in for the rest
+                logger.exception("Desktop account change listener failed")
+
+    threading.Thread(target=_run, daemon=True, name="desktop-account-change").start()
 
 
 def get_desktop_session_store() -> DesktopSessionStore:
