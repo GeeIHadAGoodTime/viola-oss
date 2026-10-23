@@ -190,6 +190,17 @@ from voice.wake_detector.wake_decision_policy import (
 
 logger = get_logger(__name__)
 
+
+def _viola_self_speech_active() -> bool:
+    """True while Viola's own TTS is speaking (or just stopped). Fails open."""
+    try:
+        from voice.wake_detector.wake_decision_policy import viola_self_speech_active
+
+        return bool(viola_self_speech_active())
+    except Exception:  # noqa: BLE001, RUF100 - self-speech probe must never break wake detection
+        return False
+
+
 # Minimum seconds between per-frame AEC DEBUG metric lines. The wake loop runs
 # ~60-100 frames/sec; logging every frame (or every 10th) floods the log with
 # tens of thousands of lines/session and burns string-format + file-I/O on the
@@ -2082,6 +2093,7 @@ class ViolaWakeListener:
                 vad_confidence=vad_confidence,
                 recent_scores=list(recent_inference_scores),
                 frame_count=frame_count,
+                self_speech_active=_viola_self_speech_active(),
             )
 
             # Use policy for authoritative decision
@@ -2109,7 +2121,7 @@ class ViolaWakeListener:
                     blocking_layer=blocking_layer,
                     playback_active=self._policy.is_playback_active,
                     volume=self._policy._playback_volume,
-                    tts_active=False,  # TTS state would need separate wiring
+                    tts_active=context.self_speech_active,
                 )
             except Exception as diag_err:
                 logger.debug("Wake analytics record failed: %s", diag_err)
