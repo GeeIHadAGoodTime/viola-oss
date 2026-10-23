@@ -30,6 +30,8 @@ function stubMacHost() {
 
 describe('useVoiceOnboarding mic-permission guidance (issue C-078)', () => {
   beforeEach(() => {
+    // The onboarding phase persists across a reload (sessionStorage); start each test fresh.
+    window.sessionStorage.clear();
     apiFetch.mockReset();
     authFetch.mockReset();
     gotrueClient.getSession.mockReset();

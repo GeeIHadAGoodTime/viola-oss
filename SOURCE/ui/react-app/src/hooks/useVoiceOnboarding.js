@@ -95,6 +95,24 @@ const PHASES = {
 };
 
 const PHASE_ORDER = ['welcome', 'account_pair', 'cloud_consent', 'autonomy_tier', 'mic_try', 'hear_about'];
+
+// The current phase survives a page reload (signing in reloads the shell), so
+// first run resumes where the user was instead of restarting at welcome.
+const PHASE_STORAGE_KEY = 'viola_onboarding_phase';
+function readStoredOnboardingPhase() {
+  try {
+    const stored = window.sessionStorage.getItem(PHASE_STORAGE_KEY);
+    return PHASE_ORDER.includes(stored) ? stored : null;
+  } catch {
+    return null;
+  }
+}
+function storeOnboardingPhase(phaseId) {
+  try {
+    if (phaseId) window.sessionStorage.setItem(PHASE_STORAGE_KEY, phaseId);
+    else window.sessionStorage.removeItem(PHASE_STORAGE_KEY);
+  } catch { /* storage unavailable: resume is a convenience only */ }
+}
 const TOTAL_PHASES = PHASE_ORDER.length;
 
 function speakText(text) {
@@ -194,6 +212,7 @@ async function checkOnboardingStatus() {
 }
 
 async function completeOnboarding() {
+  storeOnboardingPhase(null);
   try {
     await apiFetch('/v1/onboarding/complete', { method: 'POST' });
   } catch {
@@ -357,7 +376,7 @@ export function useVoiceOnboarding() {
   const { t } = useTranslation();
   const onboardingAvailable = isFeatureAvailable('onboarding');
   const [isOnboarding, setIsOnboarding] = useState(false);
-  const [phaseId, setPhaseId] = useState('welcome');
+  const [phaseId, setPhaseId] = useState(() => readStoredOnboardingPhase() || 'welcome');
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [micRetries, setMicRetries] = useState(0);
   const [micPermission, setMicPermission] = useState({
@@ -396,6 +415,7 @@ export function useVoiceOnboarding() {
   const accountSkippedRef = useRef(false);
 
   useEffect(() => { phaseIdRef.current = phaseId; }, [phaseId]);
+  useEffect(() => { if (isOnboarding) storeOnboardingPhase(phaseId); }, [isOnboarding, phaseId]);
   useEffect(() => { cloudConsentStatusRef.current = cloudConsentStatus; }, [cloudConsentStatus]);
   useEffect(() => { accountSkippedRef.current = accountSkipped; }, [accountSkipped]);
 

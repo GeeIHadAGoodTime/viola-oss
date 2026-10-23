@@ -132,6 +132,34 @@ def _token_source_from_request(request: Request) -> str:
     return "none"
 
 
+def _prefer_desktop_session_cookie(
+    request: Request,
+    token: str | None,
+    token_source: str,
+) -> tuple[str | None, str]:
+    """On desktop, let the session cookie win over a Bearer that can never validate.
+
+    A desktop request is authenticated only by a ``vls_`` local-session token.
+    The webview's GoTrue client also holds the raw cloud access token, and a
+    caller that attaches it as ``Authorization: Bearer`` used to win over the
+    valid ``viola_session`` cookie riding on the same request (Bearer is read
+    first), so the request failed unauthenticated and the middleware logged a
+    rejection on every such call. Falling back to the cookie only changes which
+    already-presented credential is checked: with no cookie, the Bearer stays
+    and is still rejected (fail closed). Cloud keeps Bearer-first validation.
+    """
+    if token_source != "bearer" or not token or _is_cloud_surface():
+        return token, token_source
+    cookie_token = request.cookies.get(SESSION_COOKIE_NAME)
+    if not cookie_token:
+        return token, token_source
+    from auth.desktop_session import is_desktop_local_session_token
+
+    if is_desktop_local_session_token(token):
+        return token, token_source
+    return cookie_token, "cookie"
+
+
 def _audit_user_id_or_none(user_id: str | None) -> str | None:
     if not user_id:
         return None
@@ -458,6 +486,7 @@ class AuthMiddleware:
 
         token = extract_token_from_request(request)
         token_source = _token_source_from_request(request)
+        token, token_source = _prefer_desktop_session_cookie(request, token, token_source)
 
         if path.startswith("/auth/"):
             cookie_value = request.cookies.get(SESSION_COOKIE_NAME)
@@ -684,8 +713,10 @@ class AuthMiddleware:
             validation = await validate_desktop_session_token(token)
             if not validation.authenticated or validation.user is None or validation.session is None:
                 logger.warning(
-                    "Desktop local auth middleware rejected token: %s",
+                    "Desktop local auth middleware rejected token (reason=%s path=%s source=%s)",
                     validation.reason,
+                    request.url.path,
+                    token_source,
                 )
                 request.state.auth_error = "Invalid or expired session"
                 # A TRANSIENT refresh failure (cloud 5xx / network blip mid-refresh)

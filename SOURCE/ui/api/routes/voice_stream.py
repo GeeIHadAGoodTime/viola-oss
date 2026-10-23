@@ -244,6 +244,34 @@ def _normalize_required_user_id(user_id: str | None) -> str:
     return user_id.strip()
 
 
+def _effective_desktop_voice_user_id(bound_user_id: str) -> str:
+    """Upgrade a socket bound to this install's device principal to its account.
+
+    The socket's identity is fixed at the handshake, and the client keeps the
+    connection warm across turns (CONFIRM-6). A socket opened before the user
+    signed in therefore stayed bound to the anonymous ``device-*`` principal,
+    and the first voice turns after sign-in hit "Managed LLM blocked: current
+    user has no Viola account" while typed commands (cookie-authenticated)
+    worked. Per turn, a desktop-local principal is re-resolved to the install's
+    active principal: the signed-in account when a valid desktop session
+    exists, otherwise the same device id. One-user-per-install, so this never
+    crosses to another person's account; a real account id is never changed,
+    and cloud surfaces raise LookupError, which keeps the bound id.
+    """
+    try:
+        from core.user_context import get_desktop_active_user_id, is_desktop_local_principal
+    except ImportError:
+        return bound_user_id
+    if not is_desktop_local_principal(bound_user_id):
+        return bound_user_id
+    try:
+        active = get_desktop_active_user_id()
+    except LookupError:
+        return bound_user_id
+    active = active.strip() if isinstance(active, str) else ""
+    return active or bound_user_id
+
+
 def _wake_audio_int16(audio_buffer: np.ndarray) -> np.ndarray:
     clipped = np.clip(audio_buffer, -1.0, 1.0)
     return np.clip(clipped * AUDIO_INT16_SCALE, -AUDIO_INT16_SCALE, AUDIO_INT16_SCALE - 1).astype(np.int16)
@@ -1004,6 +1032,17 @@ async def _handle_command(session: _SpokeVoiceSession, _engine) -> None:
             response_text="Authentication required",
         )
         return
+
+    effective_user_id = _effective_desktop_voice_user_id(user_id)
+    if effective_user_id != user_id:
+        logger.info("Voice stream: device-bound socket now runs as the signed-in account (room=%s)", session.room)
+        user_id = effective_user_id
+        # This runs in its own command Task, whose context is a private copy, so
+        # rebinding here cannot leak past the turn (the connection-level binding
+        # is unwound by the connection's own finally).
+        from core.user_context import set_current_user_id
+
+        set_current_user_id(user_id)
 
     raw_pcm = session.get_command_audio()
     if not raw_pcm or len(raw_pcm) < 3200:  # < 100 ms of audio
