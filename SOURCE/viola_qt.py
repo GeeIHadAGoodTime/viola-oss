@@ -708,7 +708,15 @@ if not _cdp_port:
 # GPU driver, preventing native access violations in OpenGL threads that
 # --disable-gpu alone does not prevent (Chromium flag vs Qt rendering pipeline).
 os.environ.setdefault("QT_OPENGL", "software")
-_chromium_stability_flags = "--autoplay-policy=no-user-gesture-required --disable-gpu"
+_chromium_stability_flags = "--autoplay-policy=no-user-gesture-required"
+# Windows keeps Chromium GPU compositing on. With --disable-gpu the whole React
+# UI is rasterized on the CPU every frame: the 1.0.5 build idled at ~107% of a
+# core (one Qt6WebEngineCore thread) and lagged clicks and typing on a laptop;
+# without the flag it idled at ~22%. QT_OPENGL=software above stays, and
+# Chromium's own GPU blocklist still falls back to software on bad drivers.
+# VIOLA_DISABLE_GPU=1 restores --disable-gpu for a machine that needs it.
+if sys.platform != "win32" or os.environ.get("VIOLA_DISABLE_GPU") == "1":
+    _chromium_stability_flags = _chromium_stability_flags + " --disable-gpu"
 if sys.platform == "win32":
     # ProcTap needs Chromium's audio kept in-process to target a single PID;
     # Linux/macOS have no ProcTap consumer, so they keep Chromium's default
