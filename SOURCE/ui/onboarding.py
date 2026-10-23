@@ -398,9 +398,72 @@ class OnboardingSystem:
             self.settings_manager.set("onboarding_completed", True)
             return True
 
-        # Fresh install — show onboarding
-        logger.info("ONBOARDING_DECISION outcome=show_onboarding reason=fresh_install value=n/a")
+        # Not completed. Name WHY accurately: a sign-in mid-flow resumes first
+        # run, and logging that as "fresh_install" (1.0.5 laptop report) sent
+        # the reader hunting for a lost-settings bug that was not there.
+        reason, value = self._not_completed_reason()
+        logger.info("ONBOARDING_DECISION outcome=show_onboarding reason=%s value=%s", reason, value)
         return False
+
+    def _not_completed_reason(self) -> tuple[str, str]:
+        """Classify a not-yet-completed first run for the decision log.
+
+        * ``resume_in_progress``: this principal already has saved onboarding
+          steps or first-run answers (including the ones carried into an
+          account at sign-in), so the UI is resuming, not starting.
+        * ``signed_in_resume``: a signed-in Viola account with nothing saved
+          yet, e.g. the user signed in on the account step and the shell
+          reloaded before the next answer.
+        * ``fresh_install``: neither; a genuinely new install.
+
+        Logging only: never changes the decision itself.
+        """
+        try:
+            saved_steps = [
+                step.value
+                for step in OnboardingStep
+                if self.settings_manager.get(f"onboarding_step_{step.value}", None) is not None
+            ]
+            answers = self._first_run_answers()
+            if saved_steps or answers:
+                parts = []
+                if saved_steps:
+                    parts.append("steps=" + ",".join(saved_steps))
+                if answers:
+                    parts.append("answers=" + ",".join(answers))
+                return "resume_in_progress", ";".join(parts)
+            if self._current_principal_is_account():
+                return "signed_in_resume", "n/a"
+        except Exception as exc:  # noqa: BLE001, RUF100 - a log label must never break the decision
+            logger.debug("Onboarding decision reason unavailable: %s", exc)
+        return "fresh_install", "n/a"
+
+    def _first_run_answers(self) -> list[str]:
+        """First-run answers (non-default) the current principal already holds."""
+        try:
+            from ui.settings_manager import ONBOARDING_CARRY_OVER_KEYS
+        except ImportError:
+            return []
+        defaults = getattr(self.settings_manager, "DEFAULT_SETTINGS", {})
+        answers = []
+        for key in sorted(ONBOARDING_CARRY_OVER_KEYS - _ONBOARDING_STATE_KEYS):
+            value = self.settings_manager.get(key, None)
+            if self._is_empty_prior_use_value(value):
+                continue
+            if key in defaults and value == defaults[key]:
+                continue
+            answers.append(key)
+        return answers
+
+    @staticmethod
+    def _current_principal_is_account() -> bool:
+        try:
+            from core.user_context import get_current_user_id, is_desktop_local_principal
+
+            user_id = get_current_user_id()
+        except (ImportError, LookupError):
+            return False
+        return bool(user_id) and not is_desktop_local_principal(user_id)
 
     def _detect_existing_user(self) -> bool:
         """Return True when persisted user state exists from a prior install."""
