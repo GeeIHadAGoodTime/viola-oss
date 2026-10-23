@@ -659,14 +659,19 @@ class StartupCoordinator(QObject):
                 result.detail,
             )
             self._backend = result.boot
-            self._set_state(
-                StartupState.WAITING_READY,
-                {
-                    "detail": result.detail or "backend_started",
-                    "host": self.host,
-                    "port": self.port,
-                },
-            )
+            # Never move a coordinator that already reached RUNNING back to
+            # WAITING_READY: that turned the next passive poll into a second
+            # "ready" (and, before the guard in _apply_health_status, was what
+            # parked startup for a full passive poll interval).
+            if self._state == StartupState.STARTING_BACKEND:
+                self._set_state(
+                    StartupState.WAITING_READY,
+                    {
+                        "detail": result.detail or "backend_started",
+                        "host": self.host,
+                        "port": self.port,
+                    },
+                )
             _emit_debug(
                 "app_starting",
                 {
@@ -777,6 +782,18 @@ class StartupCoordinator(QObject):
         )
         summary = status.as_summary()
         self.health_updated.emit(summary)
+        starting_up = self._state not in (StartupState.RUNNING, StartupState.DEGRADED)
+        if status.ready and self._backend is None and starting_up:
+            # The server can answer /health/ready a moment BEFORE
+            # _run_backend_worker hands over the boot object (a probe that was
+            # already waiting on the socket lands as uvicorn binds). Marking
+            # RUNNING here could not emit ``ready`` (nothing to emit), the worker
+            # then reset the state to WAITING_READY, and the UI waited for the
+            # next 30 s passive poll: measured on the frozen 1.0.5 build as
+            # "Health status check succeeded" at +8 s, "Backend ready" at +38 s.
+            # Stay in the startup cycle and look again on the fast poll.
+            self._schedule_health_probe(self.policy.poll_interval_ms)
+            return
         if status.ready:
             self._readiness_retry_count = 0
             if self._state != StartupState.RUNNING:
