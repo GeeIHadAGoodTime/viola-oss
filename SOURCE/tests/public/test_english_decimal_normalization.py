@@ -111,6 +111,26 @@ class EnglishDecimalNormalization(unittest.TestCase):
             with self.subTest(locale=locale):
                 self.assertEqual(self.formatter.format(source, language=locale), source)
 
+    def test_degree_sign_is_spoken_before_phonemization(self):
+        english = {
+            "A high of 68°F, a low of 52°F.": (
+                "A high of sixty eight degrees Fahrenheit, a low of fifty two degrees Fahrenheit."
+            ),
+            "It is 20 °C.": "It is twenty degrees Celsius.",
+            "68.5°F": "sixty eight point five degrees Fahrenheit",
+            "turn 90° left": "turn ninety degrees left",
+            "52°Fahrenheit": "fifty two degrees Fahrenheit",
+        }
+        for source, expected in english.items():
+            for locale in (None, "en-us", "en-gb"):
+                with self.subTest(source=source, locale=locale):
+                    self.assertEqual(self.formatter.format(source, language=locale), expected)
+        self.assertEqual(self.formatter.format("Máxima de 68°F.", language="es"), "Máxima de 68 grados Fahrenheit.")
+        self.assertEqual(self.formatter.format("Hace 20 °C.", language="es-MX"), "Hace 20 grados Celsius.")
+        for locale in ("zh", "ja", "fr"):
+            with self.subTest(locale=locale):
+                self.assertEqual(self.formatter.format("68°F", language=locale), "68°F")
+
     def test_decimal_conversion_never_uses_float(self):
         with patch("builtins.float", side_effect=AssertionError("Float conversion prohibited")):
             self.assertEqual(self.formatter.format("Value 1.2500."), "Value one point two five zero zero.")

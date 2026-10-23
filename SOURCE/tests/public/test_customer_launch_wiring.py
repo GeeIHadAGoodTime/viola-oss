@@ -223,7 +223,7 @@ class QualificationLaunchTests(unittest.TestCase):
         self.assertIn(("tts_voice", {"on_load_error": "raise"}), requested)
 
     def engine(self):
-        methods = {"set_customer_route", "invalidate_customer_route", "_prepare_route_text", "_synthesize_locked"}
+        methods = {"set_customer_route", "invalidate_customer_route", "_prepare_route_text", "_synthesize_locked", "_retry_without_unspeakable"}
         cls = actual_source("voice/synthesis/kokoro_engine.py", methods, {"logger": LOG, "_MAX_TEXT_LENGTH": 5000, "_strip_emoji": lambda text: text.replace("❓", "")}, class_name="KokoroTTSEngine")
         engine = cls(); engine._lock = threading.Lock()
         engine._customer_tokenizer = types.SimpleNamespace(supports_locale=lambda locale: locale in {"en-us", "es", "zh"})
@@ -269,6 +269,30 @@ class QualificationLaunchTests(unittest.TestCase):
             engine._synthesize_locked("hola ❓", None)
         engine._customer_tokenizer = None
         self.assertEqual(engine._prepare_route_text("hello ❓"), "hello ")
+
+    def test_pronunciation_rejection_retries_once_without_named_tokens(self):
+        from voice.customer_pronunciation import PronunciationError
+
+        self.activate()
+        engine = self.engine()
+        engine._synthesize_internal.side_effect = [PronunciationError("unknown word", tokens=("Brubeck",)), b"audio"]
+        self.assertEqual(engine._synthesize_locked("Take Five by Dave Brubeck.", None), b"audio")
+        self.assertEqual(engine._synthesize_internal.call_args.args[0], "Take Five by Dave .")
+        engine._synthesize_internal.reset_mock()
+        engine._synthesize_internal.side_effect = [PronunciationError("unknown word"), b"audio"]
+        self.assertEqual(engine._synthesize_locked("Hello 世界.", None), b"audio")
+        self.assertEqual(engine._synthesize_internal.call_args.args[0], "Hello .")
+        engine._synthesize_internal.reset_mock()
+        engine._synthesize_internal.side_effect = PronunciationError("unknown word", tokens=("x",))
+        with self.assertRaises(PronunciationError):
+            engine._synthesize_locked("x y", None)
+        self.assertEqual(engine._synthesize_internal.call_count, 2)
+        engine._synthesize_internal.reset_mock()
+        engine._synthesize_internal.side_effect = PronunciationError("unknown word", tokens=("世界",))
+        engine._speech_language = "zh"
+        with self.assertRaises(PronunciationError):
+            engine._synthesize_locked("世界", None)
+        self.assertEqual(engine._synthesize_internal.call_count, 1)
 
     def test_phone_normal_constructor_binds_composition_before_queue_side_effects(self):
         self.activate(); owner = object()

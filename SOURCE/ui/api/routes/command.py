@@ -224,7 +224,9 @@ def _speak_reply_now(context: ApiContext, envelope: Any, *, channel_value: Any, 
         # An audio device can fail any way at all, and a reply that cannot be
         # spoken is still a reply.
         except Exception as exc:  # noqa: BLE001, RUF100
-            log.warning("Spoken reply failed: %s", exc)
+            # The engine already retried once without unspeakable tokens; name
+            # them (never the reply text) so a silent reply is diagnosable.
+            log.warning("Spoken reply failed: %s tokens=%s", exc, list(getattr(exc, "tokens", ())))
             return
         try:
             from admin.instrumentation import record_feature_used

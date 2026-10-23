@@ -204,6 +204,52 @@ class CustomerAdapterTests(unittest.TestCase):
             with self.subTest(phones=phones[:20]), self.assertRaises(PronunciationError):
                 obj.tokenize(phones)
 
+    def test_rejections_name_offending_tokens_without_leaking_text(self):
+        obj = self.adapter("abc", [types.SimpleNamespace(text="Brubeck", phonemes=None)])
+        with self.assertRaises(PronunciationError) as caught:
+            obj.phonemize("private Brubeck input")
+        self.assertEqual(caught.exception.tokens, ("Brubeck",))
+        self.assertNotIn("Brubeck", str(caught.exception))
+        obj = self.adapter("abc❓", [types.SimpleNamespace(text="eight°F", phonemes="abc❓")])
+        with self.assertRaises(PronunciationError) as caught:
+            obj.phonemize("private input")
+        self.assertEqual(caught.exception.tokens, ("eight°F",))
+        self.assertEqual(PronunciationError("plain").tokens, ())
+
+    def test_unknown_word_fallback_prefers_lexicon_then_compound_then_letters(self):
+        from voice.customer_pronunciation import _spell_unknown_word
+
+        golds = {"lo": "lˈO", "fi": "fˈI", "chill": "ʧˈɪl", "hop": "hˈɑp", "jerry": "ʤˈɛɹi"}
+        spelled = []
+        lexicon = types.SimpleNamespace(
+            golds=golds,
+            get_word=lambda word, tag, stress, ctx: (golds.get(word), 4) if word in golds else (None, None),
+            get_NNP=lambda word: spelled.append(word) or ("ˈɛl", 3),
+        )
+        fallback = _spell_unknown_word(lexicon)
+
+        def token(text, alias=None):
+            return types.SimpleNamespace(text=text, _=types.SimpleNamespace(alias=alias))
+
+        self.assertEqual(fallback(token("Jerry")), ("ʤˈɛɹi", 4))
+        self.assertEqual(fallback(token("Lofi")), ("lˈOfˌI", 2))
+        self.assertEqual(fallback(token("Chillhop")), ("ʧˈɪlhˌɑp", 2))
+        self.assertEqual(fallback(token("Xqzt")), ("ˈɛl", 3))
+        self.assertEqual(fallback(token("O'Brien")), ("ˈɛl", 3))
+        for text in ("eight°F", "世界", "B2", "", "lo fi"):
+            with self.subTest(text=text):
+                self.assertEqual(fallback(token(text)), (None, None))
+        self.assertEqual(spelled, ["Xqzt", "O'Brien"])
+
+    def test_drop_unspeakable_removes_only_named_tokens_and_foreign_runs(self):
+        from voice.customer_pronunciation import drop_unspeakable
+
+        self.assertEqual(drop_unspeakable("Play Brubeck now.", ("Brubeck",)), "Play now.")
+        self.assertEqual(drop_unspeakable("a high of 68°F today", ("68°F",)), "a high of today")
+        self.assertEqual(drop_unspeakable("Hello 世界, friend."), "Hello , friend.")
+        self.assertEqual(drop_unspeakable("Hola señor, ¿qué tal?"), "Hola señor, ¿qué tal?")
+        self.assertEqual(drop_unspeakable("你好 Hello", latin_script=False), "你好 Hello")
+
     def test_empty_explicit_overrides_cannot_drop_words(self):
         obj = self.adapter()
         for phones in (" ", "", ",", ".", "\u200b", "ˈˌ"):
