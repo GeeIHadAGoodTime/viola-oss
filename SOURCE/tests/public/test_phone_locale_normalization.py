@@ -59,13 +59,14 @@ class FormatterLocaleTests(unittest.TestCase):
 
     def test_all_seven_non_english_families_preserve_exact_values_and_names(self):
         # Spanish and Mandarin speak their digits/symbols (their routes accept
-        # no raw "3:30" or "%"); names and unknown tokens stay exact.
+        # no raw "3:30" or "%"; Spanish reads an English "21st" as the plain
+        # number); names and unknown tokens stay exact.
         self.assertEqual(
             self.module.normalize_for_speech(
                 "El precio es $1.5 a las 3:30. Spotify y OpenAI: 0.001, 15% y 21st.", language="es"
             ),
             "El precio es uno coma cinco dólares a las tres y treinta. Spotify y OpenAI: "
-            "cero coma cero cero uno, quince por ciento y 21st.",
+            "cero coma cero cero uno, quince por ciento y veintiuno.",
         )
         self.assertEqual(
             self.module.normalize_for_speech("价格是$1.5。Spotify OpenAI 3:30 0.001 15% 21st。", language="zh"),
