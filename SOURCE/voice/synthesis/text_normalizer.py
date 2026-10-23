@@ -359,6 +359,68 @@ _ES_NUMBER_RE = re.compile(
     r"(?:[.,](?P<frac>\d+))?(?![\w])(?P<pct>\s?%)?"
 )
 
+# A number range (10-20, 10 – 20) reads "diez a veinte"; ISO dates and
+# phone-like chains (two or more dashes) are left alone.
+_ES_RANGE_RE = re.compile(r"(?<![\w.,\-–])(\d+)\s?[-–]\s?(\d+)(?![\-–]?\d|[.,]\d)")
+# English ordinal suffixes leaking into a Spanish reply ("el 21st de octubre")
+# read as the plain number, which is how Spanish says dates.
+_ES_ENGLISH_ORDINAL_RE = re.compile(r"(?<=\d)(?:st|nd|rd|th)\b", re.IGNORECASE)
+_ES_NEXT_WORD_RE = re.compile(r"\s+([a-záéíóúüñ]+)", re.IGNORECASE)
+# Grammatical gender of the noun a count precedes, which picks "una"/"un" and
+# "-cientas"/"-cientos". A short list of nouns common in assistant replies,
+# then the -a/-o ending rule. Unknown words keep the plain "uno" form.
+_ES_FEMININE_NOUNS = frozenset(
+    "persona personas hora horas mesa mesas canción canciones vez veces semana semanas casa casas "
+    "milla millas noche noches calle calles mano manos foto fotos moto motos radio imagen imágenes "
+    "parte partes mujer mujeres clase clases llave llaves libra libras pulgada pulgadas tonelada toneladas "
+    "red redes flor flores luz luces tarde tardes gente leche nube nubes fuente fuentes".split()
+)
+_ES_MASCULINE_NOUNS = frozenset(
+    "día días grado grados minuto minutos segundo segundos año años kilómetro kilómetros euro euros "
+    "dólar dólares mapa mapas problema problemas tema temas programa programas idioma idiomas sistema "
+    "sistemas planeta planetas mes meses pie pies mensaje mensajes lugar lugares hombre hombres coche "
+    "coches viaje viajes país países nivel niveles hotel hoteles color colores gramo gramos kilogramo "
+    "kilogramos kilo kilos metro metros litro litros punto puntos peso pesos paso pasos tranvía".split()
+)
+# Determiners, pronouns and verb endings that look like -as/-os nouns but are not.
+_ES_NOT_NOUNS = frozenset(
+    "las los unas unos estas estos esas esos aquellas aquellos otras otros todas todos algunas algunos "
+    "muchas muchos pocas pocos nosotras nosotros vosotras vosotros ellas ellos más menos casi solo ambos ambas".split()
+)
+
+
+def _spanish_noun_gender(word: str, count: int) -> str | None:
+    """Return "f", "m" or None for the word after a count of ``count``."""
+    word = word.lower()
+    if word in _ES_FEMININE_NOUNS:
+        return "f"
+    if word in _ES_MASCULINE_NOUNS:
+        return "m"
+    if len(word) < 3 or word in _ES_NOT_NOUNS or word.endswith(("mos", "ías", "abas", "aban", "ían")):
+        return None
+    # One takes a singular noun, anything else a plural one; requiring the
+    # matching number keeps verbs ("en 2021 hubo", "llega") out of the rule.
+    if count == 1:
+        if word.endswith(("ción", "sión", "dad", "tad", "tud")):
+            return "f"
+        return "f" if word.endswith("a") else "m" if word.endswith("o") else None
+    if word.endswith(("ciones", "siones", "dades", "tades", "tudes")):
+        return "f"
+    return "f" if word.endswith("as") else "m" if word.endswith("os") else None
+
+
+def _spanish_agree(words: str, gender: str) -> str:
+    """Make a spelled count agree with the noun after it: una/un, -cientas."""
+    # Only the part below a million agrees; "millón" is itself a masculine noun.
+    head, sep, tail = words.rpartition(" millones ") if " millones " in words else words.rpartition(" millón ")
+    if gender == "f":
+        tail = tail.replace("ientos", "ientas")
+        if tail.endswith("uno"):
+            tail = tail[:-1] + "a"
+    else:
+        tail = _spanish_apocope(tail)
+    return head + sep + tail
+
 
 def _spanish_below_thousand(n: int) -> str:
     if n < 30:
@@ -399,7 +461,13 @@ def _spanish_digits(digits: str) -> str:
 
 
 def _replace_spanish_number(match: re.Match[str]) -> str:
-    words = _spanish_digits(re.sub(r"\D", "", match.group("int")))
+    digits = re.sub(r"\D", "", match.group("int"))
+    words = _spanish_digits(digits)
+    if match.group("frac") is None and not match.group("pct") and len(digits) <= 9:
+        following = _ES_NEXT_WORD_RE.match(match.string, match.end())
+        gender = following and _spanish_noun_gender(following.group(1), int(digits))
+        if gender:
+            words = _spanish_agree(words, gender)
     if match.group("sign"):
         words = ("más " if match.group("sign") == "+" else "menos ") + words
     fraction = match.group("frac")
@@ -428,8 +496,9 @@ def _replace_spanish_ordinal(match: re.Match[str]) -> str:
 
 def _replace_spanish_currency(match: re.Match[str]) -> str:
     if match.group("usd"):
-        return match.group("usd") + " dólares"
-    return (match.group("eur") or match.group("eur2")) + " euros"
+        return match.group("usd") + (" dólar" if match.group("usd") == "1" else " dólares")
+    amount = match.group("eur") or match.group("eur2")
+    return amount + (" euro" if amount == "1" else " euros")
 
 
 # ---------------------------------------------------------------------------
@@ -457,6 +526,8 @@ def _normalize_mandarin_symbols(text: str) -> str:
 def _normalize_spanish_numbers(text: str) -> str:
     text = _ES_TIME_RE.sub(_replace_spanish_time, text)
     text = _ES_PHONE_RE.sub(lambda match: " ".join(_ES_UNITS[int(d)] for d in re.sub(r"\D", "", match.group(0))), text)
+    text = _ES_RANGE_RE.sub(r"\1 a \2", text)
+    text = _ES_ENGLISH_ORDINAL_RE.sub("", text)
     text = _ES_CURRENCY_RE.sub(_replace_spanish_currency, text)
     text = _ES_ORDINAL_RE.sub(_replace_spanish_ordinal, text)
     text = re.sub(r"\b([13])er\b", lambda match: _ES_ORDINALS[int(match.group(1))], text)
