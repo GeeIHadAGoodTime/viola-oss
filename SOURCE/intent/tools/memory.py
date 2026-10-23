@@ -71,6 +71,21 @@ def _recall_memory(uid: str, query: str, limit: int = 5) -> ToolResult:
 
     memory = get_memory_dir(uid)
     selected = select_relevant_memory_headers(memory, query, limit=limit, user_id=uid)
+    if not selected:
+        # The side-query needs an OpenAI key, which a managed desktop does not
+        # have, so on its own it selects nothing and recall always missed
+        # (1.0.5 laptop item 4). Fall back to the user's decrypted topic
+        # bodies, then to the manifest metadata.
+        selected = memory.find_relevant_memories_by_content(query, limit=limit)
+    if not selected:
+        selected = select_relevant_memory_headers(
+            memory,
+            query,
+            limit=limit,
+            user_id=uid,
+            selector=lambda _request: [],
+            allow_metadata_fallback=True,
+        )
     chunks: list[str] = []
     files: list[str] = []
     for header in selected:
@@ -144,7 +159,10 @@ async def memory_handler(
             # is a no-op today -- but it matches the edit/delete pattern
             # below and stops a future fail-soft return from being
             # silently reported as success.
-            write_result = memory.write(content, where=where, position=position)
+            # write_agent_memory saves raw content aimed at the MEMORY.md index
+            # to a topic file instead of rejecting it, and keeps the index
+            # pointing at every topic the agent writes (1.0.5 laptop item 4).
+            write_result = memory.write_agent_memory(content, where=where, position=position)
             return ToolResult(ok=bool(write_result.get("ok", True)), data=write_result, error=write_result.get("error"))
         if normalized_action == "edit":
             error = _sensitive_error(replace)
