@@ -4,6 +4,26 @@ WASAPI Loopback Capture Module
 
 Provides WASAPI loopback audio capture using PyAudioWPatch.
 This captures system audio output for AEC reference.
+
+ENDPOINT VOLUME COMPENSATION
+----------------------------
+On an output endpoint whose volume is applied in software (no hardware volume
+control, which is most USB headsets and many onboard codecs), WASAPI loopback
+hands back the mix *after* the Windows master volume. Measured on the dev box
+(Amazonbasics210 USB headset, software volume, master volume at 0): a -23 dBFS
+test tone came back at about -97 dBFS (2 LSB peaks); an earlier capture at a
+low non-zero volume was ~44 dB under the played level. Music played at a low
+Windows volume into an amplified speaker is therefore loud in the room but
+reaches the echo canceller tens of dB down, under its -60 dBFS "reference is
+silent" floor (``aec_viola._ref_threshold``), so the canceller bypasses (and
+resets) instead of removing the music, and the wake word hears the song.
+
+So while capturing, this module reads the endpoint volume about once a second
+and scales the loopback back up to the pre-volume level, capped at
+``MAX_LOOPBACK_COMPENSATION_DB``. That makes a software-volume endpoint look
+like a hardware-volume one, where loopback is already pre-volume. It never
+changes the system volume. Any failure (no pycaw, COM error, a loopback that is
+not the default endpoint) leaves the gain at 1.0, which is the old behaviour.
 """
 
 from __future__ import annotations
@@ -12,6 +32,8 @@ import platform
 import threading
 from collections.abc import Callable
 from typing import cast
+
+import numpy as np
 
 from audio_core.portaudio_guard import PORTAUDIO_LOCK, open_stream, terminate_portaudio
 from core.constants import AUDIO_INT16_MAX, SAMPLE_RATE_16K, SAMPLE_RATE_48K
@@ -30,6 +52,86 @@ try:
         _PYAUDIOWPATCH_AVAILABLE = True
 except ImportError:
     pyaudio = None
+
+
+# --- Endpoint volume compensation (see module docstring) ---
+#: Largest gain applied to undo the endpoint volume. 40 dB covers the low end
+#: of the Windows slider people actually use with amplified speakers without
+#: turning quantization noise into a loud fake reference.
+MAX_LOOPBACK_COMPENSATION_DB = 40.0
+#: At or below this master level the speakers are effectively silent, so there
+#: is no echo to cancel; the loopback is left as is rather than amplifying noise.
+ENDPOINT_SILENT_DB = -60.0
+#: A loopback block quieter than this (int16 RMS, before gain) is passed through
+#: unamplified: it is dither or digital silence, not playback.
+LOOPBACK_NOISE_FLOOR_RMS = 2.0
+#: How often the endpoint volume is re-read while capturing.
+ENDPOINT_VOLUME_POLL_S = 1.0
+#: IAudioEndpointVolume::QueryHardwareSupport bit for hardware volume control.
+_ENDPOINT_HARDWARE_SUPPORT_VOLUME = 0x1
+
+
+def loopback_compensation_gain(
+    master_db: float | None,
+    *,
+    muted: bool = False,
+    hardware_volume: bool = False,
+) -> float:
+    """Linear gain that restores a loopback captured after a software endpoint volume.
+
+    Returns 1.0 (no change) when the level is unknown, the endpoint is muted or
+    effectively silent, the volume is applied in hardware (loopback is already
+    pre-volume there), or the volume is at or above 0 dB.
+    """
+    if master_db is None or muted or hardware_volume:
+        return 1.0
+    try:
+        db = float(master_db)
+    except (TypeError, ValueError):
+        return 1.0
+    if not np.isfinite(db) or db >= 0.0 or db <= ENDPOINT_SILENT_DB:
+        return 1.0
+    return float(10.0 ** (min(-db, MAX_LOOPBACK_COMPENSATION_DB) / 20.0))
+
+
+def apply_loopback_gain(pcm_bytes: bytes, gain: float) -> bytes:
+    """Scale int16 loopback PCM by ``gain`` with clipping; noise-floor blocks pass unchanged."""
+    usable = len(pcm_bytes) - (len(pcm_bytes) % 2)
+    if gain == 1.0 or usable <= 0:
+        return pcm_bytes
+    samples = np.frombuffer(pcm_bytes[:usable], dtype=np.int16).astype(np.float32)
+    if float(np.sqrt(np.mean(samples * samples))) < LOOPBACK_NOISE_FLOOR_RMS:
+        return pcm_bytes
+    return np.clip(np.rint(samples * gain), -32768, 32767).astype(np.int16).tobytes()
+
+
+def _read_default_endpoint_volume() -> tuple[str, float, bool, bool] | None:
+    """Return ``(friendly_name, master_db, muted, hardware_volume)`` for the default render endpoint.
+
+    The caller must have initialized COM on this thread. Returns None when
+    pycaw/comtypes are missing or the endpoint cannot be read.
+    """
+    try:
+        from comtypes import CLSCTX_ALL
+        from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
+    except ImportError:
+        return None
+    try:
+        device = AudioUtilities.GetSpeakers()
+        endpoint = getattr(device, "EndpointVolume", None)
+        if endpoint is None:
+            activate = getattr(device, "Activate", None) or getattr(getattr(device, "_dev", None), "Activate", None)
+            if not callable(activate):
+                return None
+            endpoint = activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None).QueryInterface(IAudioEndpointVolume)
+        name = str(getattr(device, "FriendlyName", "") or "")
+        master_db = float(endpoint.GetMasterVolumeLevel())
+        muted = bool(endpoint.GetMute())
+        hardware_volume = bool(int(endpoint.QueryHardwareSupport()) & _ENDPOINT_HARDWARE_SUPPORT_VOLUME)
+        return name, master_db, muted, hardware_volume
+    except Exception as exc:  # noqa: BLE001, RUF100 - COM failures must leave the reference untouched
+        logger.debug("Endpoint volume read failed: %s", exc)
+        return None
 
 
 class NativeWasapiCaptureModule:
@@ -52,6 +154,10 @@ class NativeWasapiCaptureModule:
         self._loopback_device_info: dict | None = None
         self._callback_error_count = 0
         self._callback_error_logged = False
+        # Endpoint volume compensation (see module docstring)
+        self._loopback_gain = 1.0
+        self._volume_stop = threading.Event()
+        self._volume_thread: threading.Thread | None = None
 
     def start(self, config, callback: Callable[[bytes], None]) -> bool:
         """
@@ -124,6 +230,7 @@ class NativeWasapiCaptureModule:
                 )
                 self._stream.start_stream()
                 self._running = True
+                self._start_volume_watch(str(loopback_device.get("name", "")))
 
                 logger.info("WASAPI loopback capture started successfully (native)")
                 return True
@@ -138,6 +245,7 @@ class NativeWasapiCaptureModule:
 
     def stop(self) -> None:
         """Stop WASAPI loopback capture."""
+        self._stop_volume_watch()
         with self._lock:
             if self._stream is not None:
                 try:
@@ -168,9 +276,76 @@ class NativeWasapiCaptureModule:
         if callback is None or not pcm_bytes:
             return
         try:
+            gain = self._loopback_gain
+            if gain != 1.0:
+                pcm_bytes = apply_loopback_gain(pcm_bytes, gain)
             callback(pcm_bytes)
         except Exception as exc:  # noqa: BLE001, RUF100 - PortAudio callback safety boundary
             self._record_callback_error("dispatch", exc)
+
+    # ------------------------------------------------------------------ #
+    # Endpoint volume compensation                                         #
+    # ------------------------------------------------------------------ #
+
+    def _update_loopback_gain(self, loopback_name: str, reading: tuple[str, float, bool, bool] | None) -> float:
+        """Set the loopback gain from one endpoint-volume reading and return it.
+
+        Only compensates when the reading is for the endpoint this loopback
+        captures (loopback names are ``"{endpoint name} [Loopback]"``); a
+        fallback loopback on another device keeps gain 1.0.
+        """
+        gain = 1.0
+        if reading is not None:
+            name, master_db, muted, hardware_volume = reading
+            if name and loopback_name.startswith(name):
+                gain = loopback_compensation_gain(master_db, muted=muted, hardware_volume=hardware_volume)
+        if abs(gain - self._loopback_gain) > 1e-3:
+            logger.info(
+                "[WASAPI] Loopback endpoint-volume compensation %.1f dB -> %.1f dB (reading=%s)",
+                20.0 * np.log10(self._loopback_gain),
+                20.0 * np.log10(gain),
+                reading,
+            )
+        self._loopback_gain = gain
+        return gain
+
+    def _start_volume_watch(self, loopback_name: str) -> None:
+        """Poll the endpoint volume on a daemon thread while capture runs."""
+        if self._volume_thread is not None and self._volume_thread.is_alive():
+            return
+        self._volume_stop.clear()
+
+        def _watch() -> None:
+            try:
+                from comtypes import CoInitialize, CoUninitialize
+            except ImportError:
+                return
+            try:
+                CoInitialize()
+            except OSError as exc:
+                logger.debug("COM init failed for loopback volume watch: %s", exc)
+                return
+            try:
+                while not self._volume_stop.is_set():
+                    self._update_loopback_gain(loopback_name, _read_default_endpoint_volume())
+                    self._volume_stop.wait(ENDPOINT_VOLUME_POLL_S)
+            finally:
+                self._loopback_gain = 1.0
+                try:
+                    CoUninitialize()
+                except (OSError, RuntimeError):
+                    logger.debug("COM uninitialization failed after loopback volume watch")
+
+        self._volume_thread = threading.Thread(target=_watch, name="wasapi-loopback-volume", daemon=True)
+        self._volume_thread.start()
+
+    def _stop_volume_watch(self) -> None:
+        self._volume_stop.set()
+        thread = self._volume_thread
+        self._volume_thread = None
+        if thread is not None and thread.is_alive() and thread is not threading.current_thread():
+            thread.join(timeout=2.0)
+        self._loopback_gain = 1.0
 
     def _record_callback_error(self, source: str, exc: BaseException) -> None:
         self._callback_error_count += 1
@@ -395,8 +570,13 @@ def get_available_loopback_devices() -> list[dict]:
 
 
 __all__ = [
+    "ENDPOINT_SILENT_DB",
     "IS_WINDOWS",
+    "LOOPBACK_NOISE_FLOOR_RMS",
+    "MAX_LOOPBACK_COMPENSATION_DB",
     "_PYAUDIOWPATCH_AVAILABLE",
     "NativeWasapiCaptureModule",
+    "apply_loopback_gain",
     "get_available_loopback_devices",
+    "loopback_compensation_gain",
 ]

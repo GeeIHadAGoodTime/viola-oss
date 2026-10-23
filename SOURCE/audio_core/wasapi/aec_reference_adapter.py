@@ -84,6 +84,15 @@ class WasapiAECReferenceAdapter(RingBufferAECReferenceAdapter):
                 if actual_rate:
                     self._device_sample_rate = actual_rate
                     logger.info("AEC_ADAPTER_START: Device sample rate: %sHz", actual_rate)
+                # Believe the capture's real channel count. The base class
+                # otherwise guesses "even length means stereo", which on a 5.1
+                # or 7.1 mix format (6 or 8 loopback channels) averages the
+                # wrong samples together and stretches the reference 3-4x in
+                # time, so music never lines up with the mic and is not cancelled.
+                actual_channels = getattr(self._capture_module, "_channels", None)
+                if isinstance(actual_channels, int) and actual_channels > 0:
+                    self._channels_hint = actual_channels
+                    logger.info("AEC_ADAPTER_START: Loopback channels: %d", actual_channels)
 
             self._running = True
             logger.info("AEC_ADAPTER_SUCCESS: WASAPI loopback AEC reference capture started")
