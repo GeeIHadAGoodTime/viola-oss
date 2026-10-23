@@ -59,6 +59,18 @@ _STATIC_ASSET_PREFIXES = ("/static/", "/icons/")
 # proxy routes must return that raw shape, not the canonical Viola envelope.
 _GOTRUE_AUTH_PREFIXES = ("/auth/v1/",)
 _GOTRUE_AUTH_EXACT = ("/auth/v1",)
+# Desktop billing reads forward the cloud's own JSON verbatim (the company
+# billing extension's cloud proxy). The cloud owns that shape, so enforcing
+# the desktop envelope here turned every successful plan/usage/capacity read
+# into a "Missing 'ok' key" 500. The cloud app does not mount these paths
+# behind this middleware, so the exemption only affects desktop proxies.
+_CLOUD_BILLING_PROXY_EXACT = (
+    "/billing/status",
+    "/billing/usage",
+    "/billing/usage/today",
+    "/v1/billing/capacity",
+)
+_CLOUD_BILLING_PROXY_PREFIXES = ("/v1/billing/capacity/",)
 _COMPRESSED_CONTENT_ENCODINGS = {b"gzip", b"br", b"deflate"}
 
 
@@ -92,6 +104,10 @@ class _ResponseEnvelopeMiddleware:
         if path in self._skip_paths:
             return True
         if path in _HEALTH_PROBE_EXACT or path in _PAYMENT_CONFIRM_EXACT or path in _GOTRUE_AUTH_EXACT:
+            return True
+        if path in _CLOUD_BILLING_PROXY_EXACT:
+            return True
+        if any(path.startswith(prefix) for prefix in _CLOUD_BILLING_PROXY_PREFIXES):
             return True
         if any(path.startswith(prefix) for prefix in _HEALTH_PROBE_PREFIXES):
             return True
