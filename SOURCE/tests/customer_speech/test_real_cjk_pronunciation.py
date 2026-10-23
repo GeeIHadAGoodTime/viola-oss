@@ -23,7 +23,7 @@ class RealMandarinModelPhones(unittest.TestCase):
 
         cls.vocab = json.loads((ROOT / "third_party/kokoro_onnx/src/kokoro_onnx/config.json").read_text())["vocab"]
         cls.english = CustomerTokenizer(cls.vocab)
-        cls.composed = compose_customer_tokenizer(cls.english, mandarin=True)
+        cls.composed = compose_customer_tokenizer(cls.english, mandarin=True, romance_locales=("es",))
         cls.route = cls.composed._routes["zh"]
 
     @classmethod
@@ -46,6 +46,27 @@ class RealMandarinModelPhones(unittest.TestCase):
         self.assertEqual(self.composed.phonemize("你好", "zh"), "ni↓xau↓")
         self.assertTrue(self.composed.tokenize(result["phonemes"]))
         self.assertIsNone(sys.modules.get("onnxruntime"))
+
+    def test_normalized_spanish_and_mandarin_numbers_reach_real_routes(self):
+        from voice.synthesis.text_normalizer import normalize_for_speech
+
+        for language, replies in {
+            "es": (
+                "Hace 20 grados.",
+                "Son las 11:45.",
+                "Mañana: máxima de 68°F, 16% de lluvia.",
+                "Mañana: máxima de 68 grados Fahrenheit, 16 por ciento de lluvia.",
+                "Somos 21001, 101000 y 1000000; cuesta $5 o 3,5 €, quedó en 1º lugar.",
+            ),
+            "zh": ("现在是11:45。", "降雨概率16%。", "温度是20°C，68°F。"),
+        }.items():
+            for reply in replies:
+                with self.subTest(language=language, reply=reply):
+                    with self.assertRaises(ValueError):
+                        self.composed.phonemize(reply, language)
+                    self.assertTrue(self.composed.phonemize(normalize_for_speech(reply, language=language), language))
+        # Mandarin digits alone were already read by the route's own number preparer.
+        self.assertTrue(self.composed.phonemize("今天是2026年10月23日，价格3.5元。", "zh"))
 
     def test_unknown_diacritics_and_empty_output_still_fail_closed(self):
         self.assertNotIn("❓", self.vocab)

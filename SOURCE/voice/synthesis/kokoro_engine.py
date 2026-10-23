@@ -496,9 +496,15 @@ class KokoroTTSEngine:
         return await self._run_synthesize_with_watchdog(text, voice, policy_marker=policy_marker)
 
     async def _run_synthesize_with_watchdog(
-        self, text: str, voice: str | None, *, policy_marker: object | None = None
+        self, text: str, voice: str | None, *, policy_marker: object | None = None, later_sentence: bool = False
     ) -> bytes:
-        """Bound admission and waiting while retaining actual worker ownership."""
+        """Bound admission and waiting while retaining actual worker ownership.
+
+        ``later_sentence`` marks a non-first sentence of a reply whose earlier
+        sentences may already be audible. If the customer pronunciation step
+        still rejects it after its own one-shot retry, only that sentence is
+        skipped, so the caller never fails (and re-speaks) the whole reply.
+        """
         if policy_marker is None:
             policy_marker = getattr(self, "_tts_disable_marker", 0)
         deadline = time.monotonic() + STREAM_TIMEOUT_SECONDS
@@ -601,6 +607,17 @@ class KokoroTTSEngine:
             work["cancelled"].set()
             task.cancel()
             raise
+        except Exception as exc:
+            from voice.customer_pronunciation import PronunciationError
+
+            if not later_sentence or not isinstance(exc, PronunciationError):
+                raise
+            logger.warning(
+                "Skipping one unspeakable later sentence of a spoken reply: %s tokens=%s",
+                exc,
+                list(getattr(exc, "tokens", ())),
+            )
+            return b""
 
     async def _synthesize_chunked(self, text: str, voice: str | None, *, policy_marker: object | None = None) -> bytes:
         """Synthesise long text sentence-by-sentence and concatenate."""
@@ -1421,7 +1438,9 @@ class KokoroTTSEngine:
                         pcm = await prefetch_task
                         prefetch_task = None
                     else:
-                        pcm = await self._run_synthesize_with_watchdog(sentence, None, policy_marker=policy_marker)
+                        pcm = await self._run_synthesize_with_watchdog(
+                            sentence, None, policy_marker=policy_marker, later_sentence=i > 0
+                        )
 
                     if policy_marker is not getattr(self, "_tts_disable_marker", 0):
                         previous_pcm = None
@@ -1432,7 +1451,9 @@ class KokoroTTSEngine:
                     if i + 1 < len(sentences):
                         next_sentence = sentences[i + 1]
                         prefetch_task = asyncio.ensure_future(
-                            self._run_synthesize_with_watchdog(next_sentence, None, policy_marker=policy_marker)
+                            self._run_synthesize_with_watchdog(
+                                next_sentence, None, policy_marker=policy_marker, later_sentence=True
+                            )
                         )
 
                     if not pcm:
@@ -1639,7 +1660,7 @@ class KokoroTTSEngine:
                                 prefetch_task = None
                             else:
                                 pcm = await self._run_synthesize_with_watchdog(
-                                    sentence, None, policy_marker=policy_marker
+                                    sentence, None, policy_marker=policy_marker, later_sentence=sentence_count > 1
                                 )
 
                             if policy_marker is not getattr(self, "_tts_disable_marker", 0):
@@ -1650,7 +1671,9 @@ class KokoroTTSEngine:
                             if sentences_queue:
                                 next_s = sentences_queue[0]
                                 prefetch_task = asyncio.ensure_future(
-                                    self._run_synthesize_with_watchdog(next_s, None, policy_marker=policy_marker)
+                                    self._run_synthesize_with_watchdog(
+                                        next_s, None, policy_marker=policy_marker, later_sentence=True
+                                    )
                                 )
 
                             if not pcm:
@@ -1699,7 +1722,9 @@ class KokoroTTSEngine:
                             pcm = await prefetch_task
                             prefetch_task = None
                         else:
-                            pcm = await self._run_synthesize_with_watchdog(sentence, None, policy_marker=policy_marker)
+                            pcm = await self._run_synthesize_with_watchdog(
+                                sentence, None, policy_marker=policy_marker, later_sentence=sentence_count > 1
+                            )
                         if pcm:
                             if previous_sentence is not None:
                                 await self._sleep_sentence_gap(previous_sentence, sentence)

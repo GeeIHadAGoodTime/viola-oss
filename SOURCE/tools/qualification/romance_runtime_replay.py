@@ -225,7 +225,10 @@ class RomanceCompositionTests(unittest.TestCase):
         formatter = SpeechFormatter(summarize=False, config=types.SimpleNamespace())
         voices = {locale: voice for locale, _, voice in CASES}
         for locale in LOCALES:
-            for text in ("12.50", "hola €12.50", "hola $25", "hello 世界", "hello नमस्ते"):
+            # Spanish now spells digits/currency before its letter-only route;
+            # other scripts are still preserved for whole-input rejection.
+            numbers = () if locale == "es" else ("12.50", "hola €12.50", "hola $25")
+            for text in (*numbers, "hello 世界", "hello नमस्ते"):
                 normalized = formatter.format(text, language=locale)
                 self.assertEqual(normalized, text)
                 for streaming in (False, True):
@@ -238,6 +241,14 @@ class RomanceCompositionTests(unittest.TestCase):
                         self.assertNotIn(text, str(error.exception))
                         self.assertIsNone(error.exception.__cause__)
         self.assertEqual(self.calls, [])
+        for text, spoken in (
+            ("12.50", "doce coma cincuenta"),
+            ("hola €12.50", "hola doce coma cincuenta euros"),
+            ("hola $25", "hola veinticinco dólares"),
+        ):
+            with self.subTest(spanish=text):
+                self.assertEqual(formatter.format(text, language="es"), spoken)
+                self.assertTrue(self.component.phonemize(spoken, "es"))
 
     def test_unsupported_words_controls_and_locales_never_reach_inference(self):
         voices = {locale: voice for locale, _, voice in CASES}

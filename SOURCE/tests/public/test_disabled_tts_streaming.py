@@ -100,6 +100,7 @@ class DisabledTTSStreamingTests(unittest.IsolatedAsyncioTestCase):
                 "_prepare_route_text",
                 "_play_pcm_if_enabled",
                 "_synthesize_locked",
+                "_retry_without_unspeakable",
                 "speak",
                 "_speak_single",
                 "_speak_streaming",
@@ -221,6 +222,56 @@ class DisabledTTSStreamingTests(unittest.IsolatedAsyncioTestCase):
 
         await self.facade.speak_streaming(chunks())
         self.assertEqual(self.plays, [])
+
+    def _customer_reply(self, failing, *, named=True):
+        from voice.customer_pronunciation import PronunciationError
+
+        self.engine._customer_tokenizer = object()
+        text = (
+            "The first sentence is spoken and long enough to make this reply stream sentence by sentence. "
+            "Here is Take Five by Dave Brubeck, a second sentence that the route rejects. "
+            "The third sentence keeps going so the whole reply is clearly past the chunk threshold."
+        )
+        attempts = []
+
+        def internal(text, voice, speed, *, apply_volume):
+            attempts.append(text)
+            bad = tuple(word for word in failing if word in text)
+            if bad:
+                raise PronunciationError("unknown word", tokens=bad if named else ())
+            self.calls.append(text)
+            return self.pcm
+
+        self.engine._synthesize_internal = internal
+        return text, attempts
+
+    async def test_later_sentence_retry_never_respeaks_earlier_sentences(self):
+        text, attempts = self._customer_reply(("Brubeck",))
+        await self.engine.speak(text)
+        self.assertEqual(len(attempts), 4)  # three sentences plus one retry of the second
+        self.assertEqual(sum("first sentence" in attempt for attempt in attempts), 1)
+        self.assertEqual(sum("Brubeck" in attempt for attempt in attempts), 1)
+        self.assertIn("Dave", attempts[2])
+        self.assertNotIn("Brubeck", attempts[2])
+        self.assertEqual(len(self.calls), 3)
+        self.assertEqual(len(self.plays), 3)
+
+    async def test_unspeakable_later_sentence_is_skipped_not_the_whole_reply(self):
+        text, attempts = self._customer_reply(("Brubeck",), named=False)
+        await self.engine.speak(text)
+        self.assertEqual(len(attempts), 3)
+        self.assertEqual(sum("first sentence" in attempt for attempt in attempts), 1)
+        self.assertEqual([("third" in call) for call in self.calls], [False, True])
+        self.assertEqual(len(self.plays), 2)
+
+    async def test_unspeakable_first_sentence_still_fails_before_any_audio(self):
+        from voice.customer_pronunciation import PronunciationError
+
+        text, attempts = self._customer_reply(("first",), named=False)
+        with self.assertRaises(PronunciationError):
+            await self.engine.speak(text)
+        self.assertEqual(self.plays, [])
+        self.assertEqual(sum("first sentence" in attempt for attempt in attempts), 1)
 
     async def test_cached_pcm_cannot_bypass_disable_at_playback_boundary(self):
         self.config.tts_enabled = False
