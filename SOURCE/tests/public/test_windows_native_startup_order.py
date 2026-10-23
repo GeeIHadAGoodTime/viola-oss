@@ -192,25 +192,36 @@ class WindowsNativeStartupOrderTests(unittest.TestCase):
 
 
 class InitialWindowGeometryTests(unittest.TestCase):
-    def test_initial_window_fits_available_logical_screen(self):
+    """First-launch placement stays inside the available logical screen."""
+
+    def _placement(self):
         path = ENTRY.parent / "ui/qt_native/webview_window.py"
         tree = ast.parse(path.read_text(encoding="utf-8"))
+        wanted_functions = {"resolve_window_placement", "_overlap", "_fit_into"}
+        wanted_names = {"_WINDOW_DEFAULT_SIZE", "_WINDOW_FILL_RATIO", "_WINDOW_MIN_VISIBLE_PX", "Rect"}
+        body = [
+            n
+            for n in tree.body
+            if (isinstance(n, ast.FunctionDef) and n.name in wanted_functions)
+            or (isinstance(n, ast.Assign) and any(isinstance(t, ast.Name) and t.id in wanted_names for t in n.targets))
+        ]
+        namespace = {}
+        exec(compile(ast.Module(body=body, type_ignores=[]), str(path), "exec"), namespace)
         setup = next(n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == "_setup_window")
-        qt = SimpleNamespace(WindowType=SimpleNamespace(FramelessWindowHint=1), WidgetAttribute=SimpleNamespace(WA_TranslucentBackground=2))
-        namespace = {"Qt": qt}
-        exec(compile(ast.Module(body=[setup], type_ignores=[]), str(path), "exec"), namespace)
+        self.assertIn("_apply_startup_placement", ast.unparse(setup))
+        return namespace["resolve_window_placement"]
+
+    def test_initial_window_fits_available_logical_screen(self):
+        resolve = self._placement()
         for left, top, width, height in [(0, 0, 1024, 728), (0, 0, 800, 560), (0, 0, 1364, 900), (0, 40, 1920, 1040), (-1280, 20, 1280, 720)]:
             with self.subTest(screen=(left, top, width, height)):
-                calls = {}
-                geometry = SimpleNamespace(width=lambda: width, height=lambda: height, left=lambda: left, top=lambda: top)
-                window = SimpleNamespace(screen=lambda: SimpleNamespace(availableGeometry=lambda: geometry))
-                for name in ["setWindowTitle", "setWindowFlags", "setAttribute", "setStyleSheet", "setMouseTracking", "setMinimumSize", "resize", "move"]:
-                    setattr(window, name, lambda *args, key=name: calls.__setitem__(key, args))
-                namespace["_setup_window"](window)
+                (x, y, w, h), maximized = resolve(None, [(left, top, width, height)])
                 expected_size = (min(1400, width), min(800, height))
-                self.assertEqual(calls["resize"], expected_size)
-                self.assertEqual(calls["setMinimumSize"], (min(1024, width), min(600, height)))
-                self.assertEqual(calls.get("move"), (left + (width - expected_size[0]) // 2, top + (height - expected_size[1]) // 2))
+                self.assertEqual((w, h), expected_size)
+                self.assertEqual((x, y), (left + (width - w) // 2, top + (height - h) // 2))
+                # A default that fills the screen anyway starts maximized, so
+                # first launch and every relaunch look the same.
+                self.assertEqual(maximized, w >= width * 0.9 or h >= height * 0.9)
 
 
 class NativeTitlebarNames(unittest.TestCase):
@@ -336,6 +347,12 @@ class StartupSurfaceVisibilityTests(unittest.TestCase):
 
             def showNormal(self):
                 self.show()
+
+            def restore_window(self):
+                self.show()
+
+            def _remember_window_state(self):
+                events.append("remember-window-state")
 
             def activateWindow(self):
                 pass

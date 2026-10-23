@@ -360,3 +360,27 @@ describe('OnboardingOverlay attribution phase ("How did you hear about Viola?")'
     expect(onAttributionChoice).toHaveBeenCalledWith('');
   });
 });
+
+describe('OnboardingOverlay mic step: continue without the microphone', () => {
+  const micProps = { ...baseProps, isMicPermissionPhase: true };
+
+  it.each([
+    ['working', { checking: false, granted: true, blocked: false }],
+    ['still checking', { checking: true, granted: false, blocked: false }],
+    ['blocked', { checking: false, granted: false, blocked: true, message: 'No microphone found' }],
+  ])('offers the option while the microphone is %s and reports the choice', (_label, micPermission) => {
+    const onSkipMicStep = vi.fn();
+    render(<OnboardingOverlay {...micProps} micPermission={micPermission} onSkipMicStep={onSkipMicStep} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Continue without the microphone' }));
+
+    expect(onSkipMicStep).toHaveBeenCalledTimes(1);
+    // The typed sample stays available next to it.
+    expect(screen.getByRole('button', { name: /try command: what is two plus two/i })).toBeInTheDocument();
+  });
+
+  it('does not render the option outside the mic step', () => {
+    render(<OnboardingOverlay {...baseProps} onSkipMicStep={vi.fn()} />);
+    expect(screen.queryByRole('button', { name: 'Continue without the microphone' })).toBeNull();
+  });
+});

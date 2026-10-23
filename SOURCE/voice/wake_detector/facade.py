@@ -12,7 +12,8 @@ from __future__ import annotations
 
 import threading
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import AbstractContextManager
 from pathlib import Path
 from typing import Protocol, cast
 
@@ -204,6 +205,10 @@ class WakeDetector:
         # Pause flag - when True, wake callbacks are suppressed
         self._paused = False
         self._pause_lock = threading.Lock()
+        # How many command recordings are in progress right now. Status
+        # surfaces read it so "recording" is shown only while the microphone
+        # is really capturing a command, not for the whole time detection runs.
+        self._command_capture_depth = 0
 
         # Get policy reference for centralized decisions
         self._policy: WakeDecisionPolicyProtocol | None = None
@@ -446,12 +451,13 @@ class WakeDetector:
             return None
 
         logger.info("[DETECTOR] Calling _impl.listen_and_record_command()...")
-        result = self._impl.listen_and_record_command(
-            silence_threshold,
-            silence_duration,
-            timeout,
-            onset_timeout=onset_timeout,
-        )
+        with self.command_capture():
+            result = self._impl.listen_and_record_command(
+                silence_threshold,
+                silence_duration,
+                timeout,
+                onset_timeout=onset_timeout,
+            )
         logger.info("[DETECTOR] _impl.listen_and_record_command() returned: %s", result)
         return result
 
@@ -754,6 +760,37 @@ class WakeDetector:
         with self._pause_lock:
             return self._paused
 
+    def command_capture(self) -> AbstractContextManager[None]:
+        """Mark a voice-command recording as in progress for status surfaces."""
+        import contextlib
+
+        @contextlib.contextmanager
+        def _capture() -> Iterator[None]:
+            with self._pause_lock:
+                self._command_capture_depth += 1
+            try:
+                yield
+            finally:
+                with self._pause_lock:
+                    self._command_capture_depth = max(0, self._command_capture_depth - 1)
+
+        return _capture()
+
+    def activity(self) -> str:
+        """What the microphone is doing for the user right now.
+
+        ``"recording"`` while a command is being captured, ``"busy"`` while a
+        command is being handled (wake detection is paused from the wake until
+        the reply has been spoken), ``"wake"`` while only waiting for the wake
+        word.
+        """
+        with self._pause_lock:
+            if self._command_capture_depth > 0:
+                return "recording"
+            if self._paused:
+                return "busy"
+        return "wake"
+
 
 class WakeDetectorFacade:
     """
@@ -869,6 +906,14 @@ class WakeDetectorFacade:
         if instance is None:
             return Health.UNAVAILABLE
         return instance.health()
+
+    @classmethod
+    def activity(cls) -> str:
+        """Microphone activity of the singleton detector (see WakeDetector.activity)."""
+        instance = cls.get_instance()
+        if instance is None or not callable(getattr(instance, "activity", None)):
+            return "wake"
+        return instance.activity()
 
     @classmethod
     def detection_snapshot(cls) -> dict[str, object] | None:

@@ -12,6 +12,7 @@ from __future__ import annotations
 import hashlib
 import html
 import json
+import sys
 import threading
 from ipaddress import ip_address
 from pathlib import Path
@@ -112,6 +113,241 @@ _FULLSCREEN_TITLE_BAR_REVEAL_PX = 30
 _FULLSCREEN_TITLE_BAR_HIDE_PX = 80
 _FULLSCREEN_TITLE_BAR_HIDE_DELAY_MS = 400
 _FULLSCREEN_POINTER_POLL_MS = 150
+
+# ---------------------------------------------------------------------------
+# Main window placement (remembered across launches) and Windows Snap support
+# ---------------------------------------------------------------------------
+#
+# The main window used to open at a computed 1400x800 every time, which on a
+# small or high-DPI screen (a Surface at 200% has about 1440x900 logical
+# pixels) fills the screen and looks maximized on first launch, then came back
+# "not maximized" after a relaunch because nothing was remembered. Placement is
+# now one rule: a first launch maximizes when the default size would fill the
+# screen anyway, and every later launch restores what the user left (normal
+# rectangle plus maximized flag), kept on screen. The file is desktop-local UI
+# state, never synced.
+
+_WINDOW_STATE_FILENAME = "window_state.json"
+_WINDOW_DEFAULT_SIZE = (1400, 800)
+_WINDOW_MIN_SIZE = (1024, 600)
+# A first launch whose default size covers this share of the screen maximizes.
+_WINDOW_FILL_RATIO = 0.9
+# How much of a remembered window must be on a screen to keep its position.
+_WINDOW_MIN_VISIBLE_PX = 120
+
+Rect = tuple[int, int, int, int]
+
+
+def _window_state_path() -> Path:
+    return get_data_dir() / _WINDOW_STATE_FILENAME
+
+
+def load_window_state(path: Path | None = None) -> dict | None:
+    """Read the remembered window placement, or None when there is none usable."""
+    target = path or _window_state_path()
+    try:
+        data = json.loads(target.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    normal = data.get("normal")
+    if (
+        not isinstance(normal, list)
+        or len(normal) != 4
+        or not all(isinstance(v, int) and not isinstance(v, bool) for v in normal)
+        or normal[2] <= 0
+        or normal[3] <= 0
+    ):
+        return None
+    return {"normal": [int(v) for v in normal], "maximized": bool(data.get("maximized", False))}
+
+
+def save_window_state(normal: Rect, maximized: bool, path: Path | None = None) -> bool:
+    """Remember the window's normal rectangle and maximized flag."""
+    x, y, w, h = (int(v) for v in normal)
+    if w <= 0 or h <= 0:
+        return False
+    target = path or _window_state_path()
+    payload = {"version": 1, "normal": [x, y, w, h], "maximized": bool(maximized)}
+    try:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        tmp = target.with_name(target.name + ".tmp")
+        tmp.write_text(json.dumps(payload), encoding="utf-8")
+        tmp.replace(target)
+    except OSError as exc:
+        logger.debug("Window placement not saved: %s", exc)
+        return False
+    return True
+
+
+def _overlap(a: Rect, b: Rect) -> tuple[int, int]:
+    width = min(a[0] + a[2], b[0] + b[2]) - max(a[0], b[0])
+    height = min(a[1] + a[3], b[1] + b[3]) - max(a[1], b[1])
+    return max(0, width), max(0, height)
+
+
+def _fit_into(rect: Rect, screen: Rect) -> Rect:
+    x, y, w, h = rect
+    sx, sy, sw, sh = screen
+    w = min(w, sw)
+    h = min(h, sh)
+    x = min(max(x, sx), sx + sw - w)
+    y = min(max(y, sy), sy + sh - h)
+    return x, y, w, h
+
+
+def resolve_window_placement(
+    saved: dict | None,
+    screens: list[Rect],
+    *,
+    default_size: tuple[int, int] = _WINDOW_DEFAULT_SIZE,
+) -> tuple[Rect, bool]:
+    """Pick the startup rectangle and maximized flag.
+
+    ``screens`` are the available (work-area) rectangles, primary first.
+    """
+    usable = [s for s in screens if s[2] > 0 and s[3] > 0]
+    if not usable:
+        return (0, 0, default_size[0], default_size[1]), False
+    primary = usable[0]
+    if saved is not None:
+        normal = tuple(saved["normal"])
+        best = max(usable, key=lambda s: _overlap(normal, s)[0] * _overlap(normal, s)[1])
+        visible_w, visible_h = _overlap(normal, best)
+        if visible_w >= _WINDOW_MIN_VISIBLE_PX and visible_h >= _WINDOW_MIN_VISIBLE_PX:
+            return _fit_into(normal, best), bool(saved["maximized"])
+        # The screen it was on is gone (monitor unplugged, resolution change):
+        # keep the size and the maximized choice, centre it on the primary.
+        w, h = min(normal[2], primary[2]), min(normal[3], primary[3])
+        centred = (primary[0] + (primary[2] - w) // 2, primary[1] + (primary[3] - h) // 2, w, h)
+        return centred, bool(saved["maximized"])
+    w, h = min(default_size[0], primary[2]), min(default_size[1], primary[3])
+    rect = (primary[0] + (primary[2] - w) // 2, primary[1] + (primary[3] - h) // 2, w, h)
+    fills_screen = w >= primary[2] * _WINDOW_FILL_RATIO or h >= primary[3] * _WINDOW_FILL_RATIO
+    return rect, fills_screen
+
+
+# Win32 bits for giving the frameless window the styles Windows Snap needs.
+# Snap (Win+arrow keys, drag to a screen edge, Snap Layouts) only acts on
+# windows that have a sizing frame and a maximize box; Qt's FramelessWindowHint
+# creates a bare WS_POPUP window without them. The styles are added after the
+# native window exists, and WM_NCCALCSIZE is answered so Windows still draws no
+# frame or caption of its own: the custom title bar stays the only chrome.
+_WS_CAPTION = 0x00C00000
+_WS_THICKFRAME = 0x00040000
+_WS_MINIMIZEBOX = 0x00020000
+_WS_MAXIMIZEBOX = 0x00010000
+SNAP_WINDOW_STYLES = _WS_CAPTION | _WS_THICKFRAME | _WS_MINIMIZEBOX | _WS_MAXIMIZEBOX
+_WM_NCCALCSIZE = 0x0083
+_GWL_STYLE = -16
+_SWP_FRAMECHANGED = 0x0020
+_SWP_NOSIZE = 0x0001
+_SWP_NOMOVE = 0x0002
+_SWP_NOZORDER = 0x0004
+_SWP_NOACTIVATE = 0x0010
+_SM_CXSIZEFRAME = 32
+_SM_CYSIZEFRAME = 33
+_SM_CXPADDEDBORDER = 92
+
+
+def snap_style_bits(style: int) -> int:
+    """Return ``style`` with the Snap styles added (idempotent)."""
+    return (int(style) | SNAP_WINDOW_STYLES) & 0xFFFFFFFF
+
+
+def maximized_client_inset(frame_x: int, frame_y: int, padded: int) -> tuple[int, int]:
+    """How far a maximized WS_THICKFRAME window overhangs each screen edge.
+
+    Windows positions a maximized window with its sizing frame outside the
+    monitor; with WM_NCCALCSIZE returning the whole window as client area that
+    overhang would put the title bar and edges off screen, so the client
+    rectangle is pulled in by the frame thickness.
+    """
+    return int(frame_x) + int(padded), int(frame_y) + int(padded)
+
+
+def _apply_snap_styles(hwnd: int) -> bool:
+    import ctypes
+
+    user32 = ctypes.windll.user32
+    get_style = getattr(user32, "GetWindowLongPtrW", None) or user32.GetWindowLongW
+    set_style = getattr(user32, "SetWindowLongPtrW", None) or user32.SetWindowLongW
+    get_style.restype = ctypes.c_ssize_t
+    get_style.argtypes = [ctypes.c_void_p, ctypes.c_int]
+    set_style.restype = ctypes.c_ssize_t
+    set_style.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_ssize_t]
+    current = int(get_style(hwnd, _GWL_STYLE)) & 0xFFFFFFFF
+    wanted = snap_style_bits(current)
+    if wanted == current:
+        return False
+    set_style(hwnd, _GWL_STYLE, wanted)
+    user32.SetWindowPos(
+        ctypes.c_void_p(hwnd),
+        None,
+        0,
+        0,
+        0,
+        0,
+        _SWP_FRAMECHANGED | _SWP_NOSIZE | _SWP_NOMOVE | _SWP_NOZORDER | _SWP_NOACTIVATE,
+    )
+    return True
+
+
+def _handle_nccalcsize(hwnd: int, lparam: int) -> None:
+    """Make the whole window client area; pull it in when maximized."""
+    import ctypes
+    from ctypes import wintypes
+
+    user32 = ctypes.windll.user32
+    if not user32.IsZoomed(ctypes.c_void_p(hwnd)):
+        return
+    rect = wintypes.RECT.from_address(lparam)
+    get_dpi = getattr(user32, "GetDpiForWindow", None)
+    metrics_for_dpi = getattr(user32, "GetSystemMetricsForDpi", None)
+    dpi = int(get_dpi(ctypes.c_void_p(hwnd))) if get_dpi is not None else 0
+    if dpi and metrics_for_dpi is not None:
+        frame_x = metrics_for_dpi(_SM_CXSIZEFRAME, dpi)
+        frame_y = metrics_for_dpi(_SM_CYSIZEFRAME, dpi)
+        padded = metrics_for_dpi(_SM_CXPADDEDBORDER, dpi)
+    else:
+        frame_x = user32.GetSystemMetrics(_SM_CXSIZEFRAME)
+        frame_y = user32.GetSystemMetrics(_SM_CYSIZEFRAME)
+        padded = user32.GetSystemMetrics(_SM_CXPADDEDBORDER)
+    inset_x, inset_y = maximized_client_inset(frame_x, frame_y, padded)
+    rect.left += inset_x
+    rect.right -= inset_x
+    rect.top += inset_y
+    rect.bottom -= inset_y
+    if _taskbar_autohides():
+        # A window covering the whole monitor would stop an auto-hide taskbar
+        # from sliding back up.
+        rect.bottom -= 2
+
+
+def _taskbar_autohides() -> bool:
+    import ctypes
+    from ctypes import wintypes
+
+    class _APPBARDATA(ctypes.Structure):
+        _fields_ = [
+            ("cbSize", wintypes.DWORD),
+            ("hWnd", wintypes.HWND),
+            ("uCallbackMessage", wintypes.UINT),
+            ("uEdge", wintypes.UINT),
+            ("rc", wintypes.RECT),
+            ("lParam", wintypes.LPARAM),
+        ]
+
+    data = _APPBARDATA()
+    data.cbSize = ctypes.sizeof(_APPBARDATA)
+    try:
+        state = ctypes.windll.shell32.SHAppBarMessage(0x00000004, ctypes.byref(data))  # ABM_GETSTATE
+    except (AttributeError, OSError):
+        return False
+    return bool(state & 0x0000001)  # ABS_AUTOHIDE
+
+
 _NEW_WINDOW_POLICY_POPUP = "popup"
 _NEW_WINDOW_POLICY_CURRENT_PAGE = "current_page"
 _ALLOWED_NEW_WINDOW_POLICIES = frozenset(
@@ -2002,6 +2238,18 @@ class CustomTitleBar(QWidget):
             if self._parent.isFullScreen():
                 event.accept()
                 return
+            # Let the OS run the move: that is what makes drag-to-edge Snap,
+            # Snap Layouts and drag-down-to-restore work. Started on the first
+            # move, not on press, so a double-click still toggles maximize.
+            handle = self._parent.windowHandle()
+            try:
+                started = bool(handle is not None and handle.startSystemMove())
+            except (RuntimeError, TypeError):
+                started = False
+            if started:
+                self._drag_pos = None
+                event.accept()
+                return
             # If maximized, restore before dragging
             if self._parent.isMaximized():
                 self._parent.showNormal()
@@ -2267,27 +2515,98 @@ class ViolaWebViewWindow(QMainWindow):
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, False)
 
         # Qt exposes logical screen coordinates, including display scaling and
-        # reserved taskbar space. Keep first-run controls within that work area.
-        screen = self.screen()
-        available = screen.availableGeometry() if screen is not None else None
-        if available is not None and available.width() > 0 and available.height() > 0:
-            width = min(1400, available.width())
-            height = min(800, available.height())
-            self.setMinimumSize(min(1024, available.width()), min(600, available.height()))
-            self.resize(width, height)
-            self.move(
-                available.left() + (available.width() - width) // 2,
-                available.top() + (available.height() - height) // 2,
-            )
-        else:
-            self.setMinimumSize(1024, 600)
-            self.resize(1400, 800)
+        # reserved taskbar space. Keep the window within that work area, and
+        # come back where the user left it (see resolve_window_placement).
+        self._apply_startup_placement()
 
         # Dark background
         self.setStyleSheet("QMainWindow { background-color: #000000; }")
 
         # Enable mouse tracking for resize cursors
         self.setMouseTracking(True)
+
+    def _available_screen_rects(self) -> list[Rect]:
+        primary = QApplication.primaryScreen()
+        screens = [primary] if primary is not None else []
+        screens += [screen for screen in QApplication.screens() if screen is not primary]
+        rects: list[Rect] = []
+        for screen in screens:
+            geo = screen.availableGeometry()
+            rects.append((geo.x(), geo.y(), geo.width(), geo.height()))
+        return rects
+
+    def _apply_startup_placement(self) -> None:
+        """Set the first-show geometry and maximized state (one rule, every launch)."""
+        screens = self._available_screen_rects()
+        (x, y, w, h), maximized = resolve_window_placement(load_window_state(), screens)
+        if screens:
+            sw, sh = screens[0][2], screens[0][3]
+            self.setMinimumSize(min(_WINDOW_MIN_SIZE[0], sw), min(_WINDOW_MIN_SIZE[1], sh))
+        else:
+            self.setMinimumSize(*_WINDOW_MIN_SIZE)
+        self.setGeometry(x, y, max(w, self.minimumWidth()), max(h, self.minimumHeight()))
+        if maximized:
+            # Applied by the first show(), so there is no normal-size flash.
+            self.setWindowState(self.windowState() | Qt.WindowState.WindowMaximized)
+        logger.info("Main window placement: rect=%s maximized=%s", (x, y, w, h), maximized)
+        # Only the real main window (built through _setup_window) remembers
+        # its placement; test doubles and helper windows never write the file.
+        self._window_state_tracking = True
+
+    def _remember_window_state(self) -> None:
+        """Save the normal rectangle and maximized flag for the next launch."""
+        if not getattr(self, "_window_state_tracking", False):
+            return
+        if self.isMinimized():
+            return
+        if self.isFullScreen():
+            maximized = self._was_maximized_before_fullscreen
+        else:
+            maximized = self.isMaximized()
+        geo = self.normalGeometry() if (maximized or self.isFullScreen()) else self.geometry()
+        if not geo.isValid() or geo.width() <= 0 or geo.height() <= 0:
+            geo = self.geometry()
+        save_window_state((geo.x(), geo.y(), geo.width(), geo.height()), maximized)
+
+    def restore_window(self) -> None:
+        """Bring the window back (tray, second launch) without dropping maximized."""
+        if self.windowState() & Qt.WindowState.WindowMaximized:
+            self.showMaximized()
+        else:
+            self.showNormal()
+        self.raise_()
+        self.activateWindow()
+
+    def showEvent(self, event) -> None:
+        """Give the native window the styles Windows Snap needs, once it exists."""
+        super().showEvent(event)
+        if sys.platform == "win32" and not self.isFullScreen():
+            # Set first: SWP_FRAMECHANGED inside _apply_snap_styles sends
+            # WM_NCCALCSIZE synchronously, and nativeEvent must already answer
+            # it or Windows draws a caption strip until the next resize.
+            already_applied = getattr(self, "_snap_styles_applied", False)
+            self._snap_styles_applied = True
+            try:
+                if _apply_snap_styles(int(self.winId())):
+                    logger.info("Main window: Windows Snap styles applied")
+            except Exception as exc:  # noqa: BLE001, RUF100 - Snap is a nicety; never break showing the window
+                self._snap_styles_applied = already_applied
+                logger.warning("Could not enable Windows Snap for the main window: %s", exc)
+
+    def nativeEvent(self, event_type, message):
+        """Keep the frameless look after adding the Snap styles (Windows only)."""
+        if getattr(self, "_snap_styles_applied", False) and sys.platform == "win32":
+            try:
+                from ctypes import wintypes
+
+                msg = wintypes.MSG.from_address(int(message))
+                if msg.message == _WM_NCCALCSIZE:
+                    if not self.isFullScreen():
+                        _handle_nccalcsize(int(msg.hWnd), int(msg.lParam))
+                    return True, 0
+            except Exception as exc:  # noqa: BLE001, RUF100 - fall back to Qt's own handling
+                logger.debug("nativeEvent fallback: %s", exc)
+        return super().nativeEvent(event_type, message)
 
     def _setup_ui(self):
         """Create the UI with custom title bar and webview."""
@@ -2818,6 +3137,7 @@ class ViolaWebViewWindow(QMainWindow):
         super().changeEvent(event)
         if event.type() == QEvent.Type.WindowStateChange:
             self._sync_fullscreen_controls()
+            self._remember_window_state()
 
     def resizeEvent(self, event: QEvent) -> None:
         """Reposition floating chrome when the window changes size."""
@@ -3645,6 +3965,29 @@ class ViolaWebViewWindow(QMainWindow):
             return "bottom"
         return None
 
+    def _start_system_resize(self, edge: str) -> bool:
+        """Hand the resize to the OS so it behaves (and snaps) like any window.
+
+        Returns False where the platform cannot (offscreen, some Wayland
+        compositors); the manual resize below then takes over.
+        """
+        handle = self.windowHandle()
+        if handle is None:
+            return False
+        edges = Qt.Edge(0)
+        for name, flag in (
+            ("left", Qt.Edge.LeftEdge),
+            ("right", Qt.Edge.RightEdge),
+            ("top", Qt.Edge.TopEdge),
+            ("bottom", Qt.Edge.BottomEdge),
+        ):
+            if name in edge:
+                edges |= flag
+        try:
+            return bool(handle.startSystemResize(edges))
+        except (RuntimeError, TypeError):
+            return False
+
     def _update_cursor(self, edge: str | None):
         """Update cursor based on resize edge."""
         cursors = {
@@ -3666,6 +4009,9 @@ class ViolaWebViewWindow(QMainWindow):
         """Start resize if on edge."""
         if event.button() == Qt.MouseButton.LeftButton:
             edge = self._get_resize_edge(event.pos())
+            if edge and not self.isMaximized() and self._start_system_resize(edge):
+                event.accept()
+                return
             if edge:
                 self._resize_edge = edge
                 self._resize_start_pos = event.globalPosition().toPoint()
@@ -3813,13 +4159,12 @@ class ViolaWebViewWindow(QMainWindow):
             logger.exception("Failed to toggle mic mute from tray")
 
     def _restore_from_tray(self):
-        """Restore window from system tray."""
-        self.showNormal()
-        self.activateWindow()
-        self.raise_()
+        """Restore window from system tray (a maximized window stays maximized)."""
+        self.restore_window()
 
     def _quit_app(self):
         """Actually quit the application (tray menu, Ctrl+Q, in-app Quit)."""
+        self._remember_window_state()
         self._force_quit = True
         if hasattr(self, "_tray_icon"):
             self._tray_icon.hide()
@@ -3843,6 +4188,7 @@ class ViolaWebViewWindow(QMainWindow):
 
     def closeEvent(self, event):
         """Handle window close -- minimize to tray if setting is enabled."""
+        self._remember_window_state()
         if self._force_quit:
             # User chose Quit from tray menu
             logger.info("Window closing (force quit)")

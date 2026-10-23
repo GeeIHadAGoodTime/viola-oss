@@ -41,7 +41,12 @@ plumbing (no boxing of Viola's model).
 
 from __future__ import annotations
 
+import datetime
+import os
+import sys
+import threading
 from dataclasses import dataclass
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable
 
 from updates.update_policy import ApplyDisposition, classify_apply
@@ -434,14 +439,219 @@ def install_startup_hook(auto_apply_on_startup: bool = False) -> bool:
         return False
 
 
+# ---------------------------------------------------------------------------
+# Settings > Apps entry self-heal
+# ---------------------------------------------------------------------------
+#
+# Velopack's Setup.exe writes the per-user uninstall key
+# HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\<packId> during
+# install, Update.exe rewrites it after every applied update, and only
+# ``Update.exe --uninstall`` (or an app-id change during apply) deletes it.
+# A 1.0.5 laptop install still ended up with no key and therefore no
+# Settings > Apps entry, after an earlier cleanup script and a previous
+# uninstall had both been through that key. Without the entry the user has no
+# supported way to remove Viola, so the app repairs it: when it is running from
+# a Velopack install root and the key is missing, it writes the same values
+# Velopack writes (value names and formats from vpk 0.0.1589's
+# src/bins/src/windows/registry.rs, checked against the clean-VM receipt).
+
+_UNINSTALL_REGISTRY_PATH = "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall"
+_UNINSTALL_SELF_HEAL_LOCK = threading.Lock()
+_UNINSTALL_SELF_HEAL_STARTED = False
+
+
+@dataclass(frozen=True)
+class VelopackInstallLayout:
+    """The pieces of a Velopack install root the uninstall entry points at."""
+
+    root_dir: str
+    update_exe: str
+    main_exe: str
+    pack_id: str
+    title: str
+    authors: str
+    version: str
+
+
+def _read_sq_version(manifest_path: Path) -> dict[str, str]:
+    import xml.etree.ElementTree as ET  # nosec B405 - Velopack's own manifest in our install root
+
+    tree = ET.parse(str(manifest_path))  # nosec B314 - written by Velopack Setup, not network input
+    values: dict[str, str] = {}
+    for element in tree.iter():
+        tag = element.tag.rsplit("}", 1)[-1]
+        if tag in {"id", "title", "authors", "version", "mainExe"} and element.text:
+            values[tag] = element.text.strip()
+    return values
+
+
+def detect_velopack_install_layout(executable: str | None = None) -> VelopackInstallLayout | None:
+    """Return the Velopack install root this process runs from, or None.
+
+    A Velopack install is ``<root>/Update.exe`` plus ``<root>/current/`` holding
+    the app and its ``sq.version`` manifest. Anything else (dev run, Inno
+    install, portable build) is not ours to register.
+    """
+    exe = Path(executable or sys.executable)
+    current_dir = exe.parent
+    if current_dir.name.lower() != "current":
+        return None
+    root = current_dir.parent
+    update_exe = root / "Update.exe"
+    manifest = current_dir / "sq.version"
+    if not update_exe.is_file() or not manifest.is_file():
+        return None
+    if (root / ".portable").exists():
+        # Velopack itself skips the uninstall entry for portable apps.
+        return None
+    try:
+        values = _read_sq_version(manifest)
+    except Exception as exc:  # noqa: BLE001, RUF100 - unreadable manifest means "do not register"
+        logger.warning("Uninstall entry check skipped: cannot read %s: %s", manifest, exc)
+        return None
+    pack_id = values.get("id", "")
+    version = values.get("version", "")
+    if not pack_id or not version:
+        return None
+    return VelopackInstallLayout(
+        root_dir=str(root),
+        update_exe=str(update_exe),
+        main_exe=str(current_dir / (values.get("mainExe") or exe.name)),
+        pack_id=pack_id,
+        title=values.get("title") or pack_id,
+        authors=values.get("authors") or values.get("title") or pack_id,
+        version=version,
+    )
+
+
+def _directory_size_kb(root: str) -> int:
+    total = 0
+    for dirpath, _dirnames, filenames in os.walk(root):
+        for name in filenames:
+            try:
+                total += os.path.getsize(os.path.join(dirpath, name))
+            except OSError:
+                continue
+    return min(total // 1024, 0xFFFFFFFF)
+
+
+def uninstall_entry_values(
+    layout: VelopackInstallLayout,
+    *,
+    size_kb: int,
+    today: datetime.date | None = None,
+) -> dict[str, tuple[str | int, str]]:
+    """The values Velopack writes, as ``{name: (value, "sz" | "dword")}``."""
+    day = today or datetime.date.today()
+    update = layout.update_exe
+    return {
+        "DisplayIcon": (layout.main_exe, "sz"),
+        "DisplayName": (layout.title, "sz"),
+        "DisplayVersion": (layout.version, "sz"),
+        "InstallDate": (day.strftime("%Y%m%d"), "sz"),
+        "InstallLocation": (layout.root_dir, "sz"),
+        "Publisher": (layout.authors, "sz"),
+        "QuietUninstallString": ('"%s" --uninstall --silent' % update, "sz"),
+        "UninstallString": ('"%s" --uninstall' % update, "sz"),
+        "EstimatedSize": (int(size_kb), "dword"),
+        "NoModify": (1, "dword"),
+        "NoRepair": (1, "dword"),
+        "Language": (0x0409, "dword"),
+    }
+
+
+def ensure_uninstall_entry(
+    *,
+    executable: str | None = None,
+    winreg_module: Any = None,
+    size_kb: Callable[[str], int] | None = None,
+) -> str:
+    """Recreate the per-user Settings > Apps entry if Velopack's key is missing.
+
+    Returns what happened: ``"not_velopack"``, ``"present"``, ``"repaired"`` or
+    ``"failed"``. Never raises, never touches HKLM, and never rewrites a key
+    that already has an UninstallString (Velopack owns it then, and refreshes
+    it on every update).
+    """
+    if winreg_module is None:
+        if sys.platform != "win32":
+            return "not_velopack"
+        import winreg as winreg_module  # type: ignore[no-redef]
+    winreg = winreg_module
+    layout = detect_velopack_install_layout(executable)
+    if layout is None:
+        return "not_velopack"
+    key_path = "%s\\%s" % (_UNINSTALL_REGISTRY_PATH, layout.pack_id)
+    try:
+        existing = winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path, 0, winreg.KEY_READ)
+    except FileNotFoundError:
+        existing = None
+    except OSError as exc:
+        logger.warning("Uninstall entry check failed for HKCU\\%s: %s", key_path, exc)
+        return "failed"
+    if existing is not None:
+        try:
+            winreg.QueryValueEx(existing, "UninstallString")
+            return "present"
+        except FileNotFoundError:
+            pass  # an empty shell of a key shows nothing in Settings; fill it in
+        except OSError as exc:
+            logger.warning("Uninstall entry read failed for HKCU\\%s: %s", key_path, exc)
+            return "failed"
+        finally:
+            winreg.CloseKey(existing)
+    try:
+        values = uninstall_entry_values(layout, size_kb=(size_kb or _directory_size_kb)(layout.root_dir))
+        key = winreg.CreateKeyEx(winreg.HKEY_CURRENT_USER, key_path, 0, winreg.KEY_WRITE)
+        try:
+            for name, (value, kind) in values.items():
+                reg_type = winreg.REG_DWORD if kind == "dword" else winreg.REG_SZ
+                winreg.SetValueEx(key, name, 0, reg_type, value)
+        finally:
+            winreg.CloseKey(key)
+    except Exception as exc:  # noqa: BLE001, RUF100 - repair is best effort, never a startup failure
+        logger.warning("Could not recreate the Settings > Apps entry HKCU\\%s: %s", key_path, exc)
+        return "failed"
+    logger.warning(
+        "Settings > Apps entry for %s %s was missing; recreated HKCU\\%s (install root %s)",
+        layout.title,
+        layout.version,
+        key_path,
+        layout.root_dir,
+    )
+    return "repaired"
+
+
+def start_uninstall_entry_self_heal() -> bool:
+    """Run :func:`ensure_uninstall_entry` once per process on a daemon thread.
+
+    Sizing the install root walks a large tree, so it never runs on the UI
+    thread. Returns False off Windows, in a dev run, or when it already ran.
+    """
+    global _UNINSTALL_SELF_HEAL_STARTED
+    if sys.platform != "win32" or not getattr(sys, "frozen", False):
+        return False
+    with _UNINSTALL_SELF_HEAL_LOCK:
+        if _UNINSTALL_SELF_HEAL_STARTED:
+            return False
+        _UNINSTALL_SELF_HEAL_STARTED = True
+    threading.Thread(target=ensure_uninstall_entry, name="uninstall-entry-self-heal", daemon=True).start()
+    return True
+
+
 __all__ = [
     "ConsentRequiredError",
     "StageResult",
     "VelopackApplyError",
     "VelopackError",
+    "VelopackInstallLayout",
     "VelopackNotInstalled",
     "VelopackUnavailable",
     "VelopackUpdater",
+    "detect_velopack_install_layout",
+    "ensure_uninstall_entry",
     "install_startup_hook",
+    "start_uninstall_entry_self_heal",
+    "uninstall_entry_values",
     "velopack_channel",
 ]
