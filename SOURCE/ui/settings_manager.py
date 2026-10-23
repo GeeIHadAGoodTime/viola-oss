@@ -3113,15 +3113,18 @@ class SettingsManager:
             True if successful
         """
         # Auto-map agent_autonomy → browser_session_mode (unless caller set both).
-        # Accept the legacy `capability_tier` key as an alias. When both forms
-        # arrive the canonical one wins, so a stale alias echo can never
-        # overwrite the value the caller actually changed.
+        # Accept the legacy `capability_tier` key as an alias. When a key the
+        # settings read echoes back as an alias (SETTING_KEY_READ_ALIASES)
+        # arrives in both forms, the canonical one wins, so a stale echo can
+        # never overwrite the value the caller actually changed. Other aliases
+        # keep last-wins: an imported backup's alias carries the user's value.
+        read_echo_aliases = set(self.SETTING_KEY_READ_ALIASES.values())
         pending_updates = {}
         for raw_key, raw_value in updates.items():
             canonical_key = self.canonicalize_setting_key(raw_key)
             if canonical_key in self.REMOVED_LEGACY_SETTING_KEYS:
                 continue
-            if canonical_key != raw_key and canonical_key in updates:
+            if raw_key in read_echo_aliases and canonical_key != raw_key and canonical_key in updates:
                 continue
             pending_updates[canonical_key] = raw_value
         autonomy = pending_updates.get("agent_autonomy")
