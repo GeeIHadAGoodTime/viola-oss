@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "34c8e97743c7d489f1057ba796e79e076c59dde3",
-  "sha256": "b00b62bc838d5bb9cc35aa2bc78342bbb20d3e3085c84fb0a5c33496bfc5347f",
+  "revision": "6b5a40312517380bcaa116e9bde6e96956823059",
+  "sha256": "a267adfdbd4bcceb87971bc90bb19bda8efc840ec2c22445be33c8e3efe52faa",
   "files": [
     {
       "path": ".env.example",
@@ -9900,13 +9900,13 @@
     },
     {
       "path": "ui/react-app/package-lock.json",
-      "sha256": "81f7fbef0f2c717256cde0ec911bebfa239aeffe0c42cafa948666525827d3af",
-      "bytes": 236773
+      "sha256": "e76ddb664f72ec19005bc95e80ccba83e4b54b86ab11dd8bf4d8dc4f8581abf3",
+      "bytes": 236775
     },
     {
       "path": "ui/react-app/package.json",
-      "sha256": "c6c8bfcae858d9b95169788bb1b5ff1ed1fa97a9fff21f59b3debf4862ec2064",
-      "bytes": 1249
+      "sha256": "14257976de460d1bad9c4cf88a362e656370f74b50f605f4ae6097770105c21e",
+      "bytes": 1250
     },
     {
       "path": "ui/react-app/patches/minimatch+3.1.5.patch",

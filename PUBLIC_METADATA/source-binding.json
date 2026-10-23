@@ -30,14 +30,16 @@
   },
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "96c3ecf8f8c75ad4feba2a9399cb364fba362bc8b04a169dced1ca8dc4a25770",
-  "source_tree_sha256": "b00b62bc838d5bb9cc35aa2bc78342bbb20d3e3085c84fb0a5c33496bfc5347f",
+  "source_manifest_sha256": "e7369cd788f37b546f19915ddd3750aefefdff4115a4896ae5e21c3547e9e427",
+  "source_tree_sha256": "a267adfdbd4bcceb87971bc90bb19bda8efc840ec2c22445be33c8e3efe52faa",
   "source_file_count": 2715,
-  "source_revision": "34c8e97743c7d489f1057ba796e79e076c59dde3",
+  "source_revision": "6b5a40312517380bcaa116e9bde6e96956823059",
   "comparison_public_revision": "ecab2772465fcc89ae6645b028af1c2273b9199f",
   "changed_source_paths": [
     "viola_qt.py",
-    "tests/public/test_windows_gpu_compositing.py"
+    "tests/public/test_windows_gpu_compositing.py",
+    "ui/react-app/package.json",
+    "ui/react-app/package-lock.json"
   ],
   "retained_sboms": [
     {
@@ -111,7 +113,7 @@
     "historical_inventory_limits": "This renderer correction changes no dependency or workflow inputs. All six retained SBOMs and their complete status objects stay historical and unchanged; no current installed inventory qualification is claimed."
   },
   "qualification": {
-    "source_commit": "34c8e97743c7d489f1057ba796e79e076c59dde3",
+    "source_commit": "6b5a40312517380bcaa116e9bde6e96956823059",
     "kind": "Windows Chromium GPU compositing default; source checksum binding only, desktop qualification runs in the private release chain"
   },
   "historical_bindings": [
