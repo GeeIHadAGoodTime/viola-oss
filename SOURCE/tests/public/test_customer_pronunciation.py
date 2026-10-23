@@ -216,7 +216,7 @@ class CustomerAdapterTests(unittest.TestCase):
         self.assertEqual(caught.exception.tokens, ("eight°F",))
         self.assertEqual(PronunciationError("plain").tokens, ())
 
-    def test_unknown_word_fallback_prefers_lexicon_then_compound_then_letters(self):
+    def test_unknown_word_fallback_prefers_lexicon_then_compound_then_rules(self):
         from voice.customer_pronunciation import _spell_unknown_word
 
         golds = {"lo": "lˈO", "fi": "fˈI", "chill": "ʧˈɪl", "hop": "hˈɑp", "jerry": "ʤˈɛɹi"}
@@ -234,12 +234,46 @@ class CustomerAdapterTests(unittest.TestCase):
         self.assertEqual(fallback(token("Jerry")), ("ʤˈɛɹi", 4))
         self.assertEqual(fallback(token("Lofi")), ("lˈOfˌI", 2))
         self.assertEqual(fallback(token("Chillhop")), ("ʧˈɪlhˌɑp", 2))
+        # Acronym-like tokens (no vowel, or all caps up to four letters) stay letters.
         self.assertEqual(fallback(token("Xqzt")), ("ˈɛl", 3))
-        self.assertEqual(fallback(token("O'Brien")), ("ˈɛl", 3))
-        for text in ("eight°F", "世界", "B2", "", "lo fi"):
+        self.assertEqual(fallback(token("KGB")), ("ˈɛl", 3))
+        # Other Latin words are read by the English letter-to-sound rules.
+        self.assertEqual(fallback(token("Brubeck")), ("bɹˈubɛk", 1))
+        self.assertEqual(fallback(token("O'Brien")), ("ˌObɹˈin", 1))
+        self.assertEqual(fallback(token("Beyoncé")), ("bijˈɑnsA", 1))
+        self.assertEqual(fallback(token("Lizzo's")), ("lˈɪzOz", 1))
+        self.assertEqual(fallback(token("ODESZA")), ("Odˈɛsə", 1))
+        for text in ("eight°F", "世界", "B2", "", "lo fi", "Brub\u0435ck", "\u041f\u0440\u0438\u0432\u0435\u0442"):
             with self.subTest(text=text):
                 self.assertEqual(fallback(token(text)), (None, None))
-        self.assertEqual(spelled, ["Xqzt", "O'Brien"])
+        self.assertEqual(spelled, ["Xqzt", "KGB"])
+
+    def test_letter_sound_rules_read_names_within_the_misaki_inventories(self):
+        from voice.customer_pronunciation import _GB_PHONES, _US_PHONES, _letter_sounds
+
+        expected = {
+            "Brubeck": ("bɹˈubɛk", "bɹˈuːbɛk"),
+            "Coltrane": ("kˈOltɹˌAn", "kˈQltɹˌAn"),
+            "Hozier": ("hˈOziəɹ", "hˈQzɪə"),
+            "Shakira": ("ʃəkˈɪɹə", "ʃəkˈɪɹə"),
+            "Skrillex": ("skɹˈɪlɛks", "skɹˈɪlɛks"),
+            "Instacart": ("ˈɪnstəkˌɑɹt", "ˈɪnstəkˌɑːt"),
+            "Adele": ("ədˈɛl", "ədˈɛl"),
+            "Jerry": ("ʤˈɛɹi", "ʤˈɛɹi"),
+        }
+        for word, (us, gb) in expected.items():
+            with self.subTest(word=word):
+                self.assertEqual(_letter_sounds(word), us)
+                self.assertEqual(_letter_sounds(word, british=True), gb)
+        for word in ("Wauwatosa", "Oconomowoc", "Aaliyah", "Khruangbin", "Rosalía", "Björk", "McGregor", "Tchaikovsky"):
+            for british, inventory in ((False, _US_PHONES), (True, _GB_PHONES)):
+                with self.subTest(word=word, british=british):
+                    phones = _letter_sounds(word, british)
+                    self.assertTrue(phones and set(phones) <= inventory)
+                    self.assertEqual(phones.count("ˈ"), 1)
+        for word in ("Xqzt", "Hmm", "世界", "B2", "Brub\u0435ck"):
+            with self.subTest(word=word):
+                self.assertIsNone(_letter_sounds(word))
 
     def test_drop_unspeakable_removes_only_named_tokens_and_foreign_runs(self):
         from voice.customer_pronunciation import drop_unspeakable

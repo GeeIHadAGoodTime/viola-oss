@@ -3,7 +3,8 @@
 Never guesses an unsupported locale, drops unknown words/phonemes, invokes
 an eSpeak fallback or downloads assets during speech. An out-of-lexicon Latin
 word is read from Misaki's own lexicon (case variants, then a two-word
-compound, then letter by letter) so a reply is still spoken; anything else
+compound), then by small offline English letter-to-sound rules, and only
+acronym-like tokens letter by letter, so a reply is still spoken; anything else
 still fails closed and names the offending tokens on the error (never in its
 message) so the reply layer can retry without them. Packaging qualification
 must separately verify the installed graph, bundled files and actual audio.
@@ -14,6 +15,7 @@ from __future__ import annotations
 import importlib.metadata
 import re
 import threading
+import unicodedata
 from pathlib import Path
 
 from voice.english_numbers import num2words
@@ -61,16 +63,313 @@ _REPLY_WORDS = {
     "chillhop": "ʧˈɪlhˌɑp",
     "synthwave": "sˈɪnθwˌAv",
 }
-_SPELLABLE_WORD = re.compile(r"[A-Za-z]+(?:['’][A-Za-z]+)*")
+_SPELLABLE_WORD = re.compile(r"[A-Za-zÀ-ÖØ-öø-ɏ]+(?:['’][A-Za-zÀ-ÖØ-öø-ɏ]+)*")
 _MIN_COMPOUND_PART = 2
+# Misaki 0.9.4 phoneme inventories; a rule reading outside them is discarded.
+_US_PHONES = frozenset("AIOWYbdfhijklmnpstuvwzæðŋɑɔəɛɜɡɪɹɾʃʊʌʒʤʧˈˌθᵊᵻʔ")
+_GB_PHONES = frozenset("AIQWYabdfhijklmnpstuvwzðŋɑɒɔəɛɜɡɪɹʃʊʌʒʤʧˈˌːθᵊ")
+
+_VOWEL_LETTERS = "aeiouy"
+# Ordered English spelling rules for words the lexicon lacks: (pattern, kind,
+# payload). "V" is a fixed nucleus (stressed, unstressed), "v" a single vowel
+# letter whose quality depends on syllable shape, "C" consonant phones (None:
+# the letter itself), "" silent. The first rule matching at the cursor wins.
+_LETTER_RULES = tuple(
+    (re.compile(pattern), kind, payload)
+    for pattern, kind, payload in (
+        (r"eau", "V", ("O", "O")),
+        (r"aa", "V", ("ɑ", "ə")),
+        (r"a[iy]$", "V", ("I", "I")),
+        (r"ai|ay|ae", "V", ("A", "A")),
+        (r"au|aw", "V", ("ɔ", "ɔ")),
+        (r"eer|ear(?![aeiouy])", "V", ("ɪɹ", "ɪɹ")),
+        (r"ee|ea", "V", ("i", "i")),
+        (r"^ei", "V", ("I", "I")),
+        (r"ey$", "V", ("i", "i")),
+        (r"e(?=y[aeiou])", "v", "e"),
+        (r"ei|ey", "V", ("A", "A")),
+        (r"eu|ew", "V", ("ju", "ju")),
+        (r"ie(?!r)", "V", ("i", "i")),
+        (r"oa|oe", "V", ("O", "O")),
+        (r"oor|oar", "V", ("ɔɹ", "ɔɹ")),
+        (r"oo", "V", ("u", "u")),
+        (r"ou$", "V", ("u", "u")),
+        (r"ou", "V", ("W", "W")),
+        (r"o(?=w[aeiouy])", "v", "o"),
+        (r"ow$", "V", ("O", "O")),
+        (r"ow", "V", ("W", "W")),
+        (r"oi|oy", "V", ("Y", "Y")),
+        (r"ue$|ui", "V", ("u", "u")),
+        (r"uy", "V", ("I", "I")),
+        (r"o(?=l(?:[^aeiouyl]|$))", "V", ("O", "O")),
+        (r"air|are$", "V", ("ɛɹ", "ɛɹ")),
+        (r"arr(?=[aeiouy])", "V", ("æɹ", "əɹ")),
+        (r"ar", "V", ("ɑɹ", "əɹ")),
+        (r"err|er(?=[aeiouy])", "V", ("ɛɹ", "əɹ")),
+        (r"er", "V", ("ɜɹ", "əɹ")),
+        (r"irr|ir(?=[aeiouy])", "V", ("ɪɹ", "əɹ")),
+        (r"ir|ur|yr", "V", ("ɜɹ", "əɹ")),
+        (r"orr|or", "V", ("ɔɹ", "əɹ")),
+        (r"(?<=[^aeiouy])le$", "V", ("əl", "əl")),
+        (r"ii$", "V", ("i", "i")),
+        (r"(?<=if)y$", "V", ("I", "I")),
+        (r"y(?=[aeiou])", "C", "j"),
+        (r"[aeiouy]", "v", None),
+        (r"^mc", "C", "mək"),
+        (r"tch", "C", "ʧ"),
+        (r"sch", "C", "ʃ"),
+        (r"ch(?=[lr])|(?<=y)ch|kh", "C", "k"),
+        (r"ch", "C", "ʧ"),
+        (r"ck", "CC", "k"),
+        (r"cc(?=[eiy])", "CC", "ks"),
+        (r"c(?=ii$)", "C", "ʧ"),
+        (r"c(?=[eiy])", "C", "s"),
+        (r"dg", "CC", "ʤ"),
+        (r"gh(?=t)|(?<!^)gh", "", ""),
+        (r"gh", "C", "ɡ"),
+        (r"^gn|gn$", "C", "n"),
+        (r"g(?=[eiy])", "C", "ʤ"),
+        (r"ng(?=[aeiouy])", "CC", "ŋɡ"),
+        (r"ng", "C", "ŋ"),
+        (r"n(?=k)", "C", "ŋ"),
+        (r"ph", "C", "f"),
+        (r"qu", "C", "kw"),
+        (r"sh", "C", "ʃ"),
+        (r"sz", "C", "s"),
+        (r"(?<=[aeiouy])s(?=[aeiouy])", "C", "z"),
+        (r"th", "C", "θ"),
+        (r"wh|^wr", "C", "w"),
+        (r"^kn", "C", "n"),
+        (r"mb$", "C", "m"),
+        (r"rh", "C", "ɹ"),
+        (r"(?<=[^aeiouy])h|h(?![aeiouy])", "", ""),
+        (r"^x", "C", "z"),
+        (r"x", "CC", "ks"),
+        (r"([bcdfgjklmnpqrstvwz])\1", "CC", None),
+        (r"[bcdfghjklmnpqrstvwz]", "C", None),
+    )
+)
+_LETTER_PHONES = {"c": "k", "j": "ʤ", "q": "k", "r": "ɹ", "g": "ɡ"}
+# Single vowel letter: closed stressed, open stressed, word-final, magic-e, reduced.
+_SINGLE_VOWELS = {
+    "a": ("æ", "ɑ", "ə", "A", "ə"),
+    "e": ("ɛ", "ɛ", "i", "i", "ə"),
+    "i": ("ɪ", "i", "i", "I", "ɪ"),
+    "o": ("ɒ", "O", "O", "O", "ə"),
+    "u": ("ʌ", "u", "u", "u", "ə"),
+    "y": ("ɪ", "I", "i", "I", "ɪ"),
+}
+_NOT_RHOTIC = "(?![ˈˌ]?[AIOQWYaiuæɑɒɔəɛɜɪʊʌ])"
+_BRITISH = (
+    ("ɑɹ" + _NOT_RHOTIC, "ɑː"),
+    ("ɔɹ" + _NOT_RHOTIC, "ɔː"),
+    ("ɜɹ" + _NOT_RHOTIC, "ɜː"),
+    ("ɪɹ" + _NOT_RHOTIC, "ɪə"),
+    ("ɛɹ" + _NOT_RHOTIC, "ɛː"),
+    ("əɹ" + _NOT_RHOTIC, "ə"),
+    ("ɑ(?!ː)", "ɑː"),
+    ("ɔ(?!ː)", "ɔː"),
+    ("æ", "a"),
+    ("O", "Q"),
+    ("u", "uː"),
+    ("(?<=[ˈˌ])i", "iː"),
+    ("i(?=[ˈˌ]?[AIQWYaiuæɑɒɔəɛɜɪʊʌ])", "ɪ"),
+)
+# French-style endings take the stress on their own short e (Adele, Annette).
+_STRESSED_ENDINGS = ("ele", "elle", "ette", "esse")
+
+
+def _fold_latin(word):
+    """Lowercase ASCII letters of a Latin word plus the acute-accented index."""
+    letters, accent = [], None
+    for character in word.lower():
+        if character in "'’":
+            continue
+        decomposed = unicodedata.normalize("NFKD", character)
+        plain = {"æ": "ae", "ç": "s", "ø": "o", "ß": "ss", "œ": "oe"}.get(
+            character, "".join(c for c in decomposed if not unicodedata.combining(c))
+        )
+        if not plain.isascii() or not plain.isalpha():
+            return None, None
+        if "́" in decomposed and plain in _VOWEL_LETTERS:
+            accent = len(letters)
+        letters.append(plain)
+    return "".join(letters), accent
+
+
+def _parse(letters, accent):
+    units, i = [], 0
+    while i < len(letters):
+        if (
+            i == len(letters) - 1
+            and letters[i] == "e"
+            and accent != i
+            and any(c in _VOWEL_LETTERS for c in letters[:-1])
+        ):
+            break  # silent final e
+        for pattern, kind, payload in _LETTER_RULES:
+            match = pattern.match(letters, i)
+            if match and match.end() > i:
+                break
+        else:
+            return None
+        text = match.group(0)
+        if kind == "v":
+            units.append(["v", payload or text, i, False])
+        elif kind == "V":
+            units.append(["V", payload, i, False])
+        elif kind:
+            units.append(["C", payload or _LETTER_PHONES.get(text[0], text[0]), i, kind == "CC"])
+        i = match.end()
+    return units
+
+
+def _shape(units, k):
+    """Syllable shape after nucleus k: final, open or closed."""
+    consonants = []
+    for unit in units[k + 1 :]:
+        if unit[0] != "C":
+            break
+        consonants.append(unit)
+    if k + 1 == len(units):
+        return "final"
+    if not consonants:
+        return "open"
+    if k + 1 + len(consonants) == len(units) or consonants[0][3]:
+        return "closed"
+    if len(consonants) == 1:
+        return "open"
+    if len(consonants) == 2 and consonants[1][1] in ("l", "ɹ", "w") and consonants[0][1] not in "lɹnmŋ":
+        return "open"
+    return "closed"
+
+
+def _stress_index(units, nuclei, letters):
+    count = len(nuclei)
+    if count >= 2 and letters.endswith(_STRESSED_ENDINGS):
+        return count - 1
+    if count == 2 and units[nuclei[0]][1] == "e" and units[nuclei[0] + 1][1] == "j":
+        return 1  # Be-yon(ce)
+    if count <= 2:
+        return 0
+    pen = nuclei[-2]
+    if letters.rstrip("h")[-1] in "aiou":
+        if units[pen][0] == "v" and units[pen][1] in "ie" and units[pen + 1][0] != "C":
+            return count - 3  # hiatus: O-li-vi-a
+        return count - 2
+    heavy = units[pen][0] == "V" or _shape(units, pen) == "closed"
+    return count - 2 if heavy else count - 3
+
+
+def _single_vowel(units, k, stressed, letters, accent):
+    letter = units[k][1]
+    closed, open_, final, magic, reduced = _SINGLE_VOWELS[letter]
+    shape = _shape(units, k)
+    after = units[k + 1 :]
+    if accent == units[k][2] and letter == "e" and shape == "final":
+        return "A"
+    if shape == "closed" and len(after) == 1 and not after[0][3] and letters.endswith("e"):
+        return "ɛ" if letter == "e" and letters.endswith(_STRESSED_ENDINGS) else magic
+    if shape == "final":
+        return final
+    if stressed:
+        if shape == "closed":
+            return closed
+        if letter == "a" and letters.rstrip("h")[-1] not in "aiou":
+            return "A"
+        if letter == "i" and any(u[0] == "v" and u[1] == "i" for u in after[1:2]):
+            return "ɪ"  # O-li-vi-a, Vi-vi-an
+        return open_
+    if shape == "open" and (after[0][0] != "C" or after[0][1] == "j"):
+        return {"e": "i", "i": "i", "y": "i", "o": "O"}.get(letter, reduced)
+    if letter == "o" and k == 0 and shape == "open":
+        return "O"
+    if shape == "closed" and after[0][3] and all(u[0] == "C" for u in after) and letter != "o":
+        return closed  # an unstressed last syllable closed by a cluster keeps its vowel
+    return reduced
+
+
+def _letter_sounds(word, british=False):
+    """Rule-based English reading of a Latin word, or None (no vowel/non-Latin)."""
+    possessive = re.fullmatch(r"(.+)['’]s", word)
+    if possessive:
+        stem = _letter_sounds(possessive.group(1), british)
+        if not stem:
+            return None
+        last = stem.rstrip("ˈˌ")[-1]
+        return stem + ("ɪz" if last in "szʃʒʧʤ" else "s" if last in "ptkfθ" else "z")
+    if re.match(r"[Oo]['’]\w", word):
+        rest = _letter_sounds(word[2:], british)
+        return rest and ("ˌQ" if british else "ˌO") + rest
+    letters, accent = _fold_latin(word)
+    if not letters or not any(c in _VOWEL_LETTERS for c in letters):
+        return None
+    units = _parse(letters, accent)
+    nuclei = [k for k, unit in enumerate(units or ()) if unit[0] in "vV"]
+    if not nuclei:
+        return None
+    # An acute accent marks the stress (Rosalía), except a final é in a longer
+    # name, which only sets the vowel (Beyoncé).
+    primary = next((n for n, k in enumerate(nuclei) if units[k][2] == accent), None)
+    if primary == len(nuclei) - 1 and len(nuclei) > 2:
+        primary = None
+    if primary is None:
+        primary = _stress_index(units, nuclei, letters)
+    secondary = set()
+    first, last = nuclei[0], nuclei[-1]
+    if primary >= 2 or (primary == 1 and (units[first][0] == "V" or _shape(units, first) == "closed")):
+        secondary.add(0)
+    if primary < len(nuclei) - 1 and (
+        (
+            units[last][0] == "V"
+            and (last + 1 < len(units) or (primary < len(nuclei) - 2 and units[last][1][0] in "AIOWY"))
+        )
+        or (
+            units[last][0] == "v"
+            and letters.endswith("e")
+            and _shape(units, last) == "closed"
+            and len(units) - last == 2
+            and not units[-1][3]
+        )
+    ):
+        secondary.add(len(nuclei) - 1)
+    out = []
+    for k, unit in enumerate(units):
+        if unit[0] == "C":
+            out.append(unit[1])
+            continue
+        n = nuclei.index(k)
+        mark = "ˈ" if n == primary else ("ˌ" if n in secondary else "")
+        if unit[0] == "V":
+            phones = unit[1][0] if mark else unit[1][1]
+        else:
+            phones = _single_vowel(units, k, bool(mark), letters, accent)
+        if mark:
+            at = next((p for p, c in enumerate(phones) if c not in "jw"), 0)
+            phones = phones[:at] + mark + phones[at:]
+        out.append(phones)
+    phonemes = "".join(out)
+    if not british:
+        return phonemes.replace("ɒ", "ɑ")
+    for pattern, replacement in _BRITISH:
+        phonemes = re.sub(pattern, replacement, phonemes)
+    return phonemes
+
+
+def _reads_as_letters(word):
+    """Acronym-like tokens (no vowel, or short all-caps) stay letter by letter."""
+    letters, _ = _fold_latin(word)
+    return not letters or not any(c in _VOWEL_LETTERS for c in letters) or (word.isupper() and len(letters) <= 4)
 
 
 def _spell_unknown_word(lexicon):
-    """Misaki fallback hook for an unknown Latin word, from the lexicon only.
+    """Misaki fallback hook for an unknown Latin word; never eSpeak or a model.
 
     Tries case variants, then the most balanced split into two gold lexicon
-    words, then letter-by-letter golds (Misaki's NNP path). Mixed tokens
-    (digits, symbols, other scripts) return no phonemes and keep failing closed.
+    words, then the English letter-to-sound rules (kept only inside Misaki's
+    phoneme inventory), then letter-by-letter golds (Misaki's NNP path) for
+    acronym-like tokens. Mixed tokens (digits, symbols, other scripts) return
+    no phonemes and keep failing closed.
     """
 
     def known(word):
@@ -87,17 +386,28 @@ def _spell_unknown_word(lexicon):
                 if ps:
                     return ps, rating
         plain = word.lower().replace("'", "").replace("’", "")
+        if not plain.isascii():
+            plain = ""
         splits = sorted(
             range(_MIN_COMPOUND_PART, len(plain) - _MIN_COMPOUND_PART + 1),
             key=lambda cut: (-min(cut, len(plain) - cut), cut),
         )
         for cut in splits:
             left, right = plain[:cut], plain[cut:]
+            if left[-1] in _VOWEL_LETTERS and right[0] in _VOWEL_LETTERS:
+                continue  # a vowel-vowel seam is one name (bey|once), not a compound
             if left in lexicon.golds and right in lexicon.golds:
                 left_ps, _ = known(left)
                 right_ps, _ = known(right)
                 if left_ps and right_ps:
                     return left_ps + right_ps.replace("ˈ", "ˌ"), 2
+        if not _reads_as_letters(word):
+            british = bool(getattr(lexicon, "british", False))
+            ps = _letter_sounds(word, british)
+            if ps and set(ps) <= (_GB_PHONES if british else _US_PHONES):
+                return ps, 1
+        if not word.isascii():
+            return None, None
         return lexicon.get_NNP(word)
 
     return fallback
