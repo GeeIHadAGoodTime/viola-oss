@@ -14,6 +14,63 @@ from core.logging_config import get_logger
 logger = get_logger(__name__)
 
 
+_QUEUE_PANEL_PATH = ["musicQueueRenderer", "content", "playlistPanelRenderer"]
+_WATCH_NEXT_PATH = [
+    "contents",
+    "singleColumnMusicWatchNextResultsRenderer",
+    "tabbedRenderer",
+    "watchNextTabbedResultsRenderer",
+]
+
+
+def _get_watch_playlist(client, seed_video_id: str, limit: int) -> dict:
+    """Fetch the radio queue for ``seed_video_id``.
+
+    ytmusicapi 1.11.4's ``get_watch_playlist`` also reads the browse ids of
+    the Lyrics and Related tabs, and it indexes ``tabRenderer["endpoint"]``
+    for any tab not marked ``unselectable``. YouTube Music now returns tabs
+    that carry neither key, so the call raised ``KeyError: 'endpoint'`` on
+    every seed after the queue itself had already arrived, and autoplay
+    never queued a next track. Autoplay only needs the queue, so on that
+    failure re-read the same ``next`` response and parse the queue alone.
+    """
+    try:
+        return client.get_watch_playlist(seed_video_id, limit=limit)
+    except KeyError as exc:
+        logger.warning(
+            "YouTubeMusicRadio: get_watch_playlist could not parse the tab list (%r); reading the queue only",
+            exc,
+        )
+    return _get_watch_queue_only(client, seed_video_id)
+
+
+def _get_watch_queue_only(client, seed_video_id: str) -> dict:
+    """Same request as ``get_watch_playlist(videoId)``, parsing only the queue."""
+    from ytmusicapi.navigation import TAB_CONTENT, nav
+    from ytmusicapi.parsers.watch import parse_watch_playlist
+
+    body = {
+        "enablePersistentPlaylistPanel": True,
+        "isAudioOnly": True,
+        "tunerSettingValue": "AUTOMIX_SETTING_NORMAL",
+        "videoId": seed_video_id,
+        "playlistId": "RDAMVM" + seed_video_id,
+        "watchEndpointMusicSupportedConfigs": {
+            "watchEndpointMusicConfig": {
+                "hasPersistentPlaylistPanel": True,
+                "musicVideoType": "MUSIC_VIDEO_TYPE_ATV",
+            }
+        },
+    }
+    response = client._send_request("next", body)
+    renderer = nav(response, _WATCH_NEXT_PATH, True)
+    panel = nav(renderer, [*TAB_CONTENT, *_QUEUE_PANEL_PATH], True) if renderer else None
+    contents = panel.get("contents") if isinstance(panel, dict) else None
+    if not isinstance(contents, list):
+        return {"tracks": []}
+    return {"tracks": parse_watch_playlist(contents)}
+
+
 class YouTubeMusicRadio:
     """
     Autoplay using YouTube Music's radio feature.
@@ -112,9 +169,10 @@ class YouTubeMusicRadio:
 
             _radio_t0 = _time.monotonic()
             playlist = await asyncio.to_thread(
-                client.get_watch_playlist,
+                _get_watch_playlist,
+                client,
                 seed_video_id,
-                limit=limit + 10,  # Fetch extra to filter
+                limit + 10,  # Fetch extra to filter
             )
             _radio_elapsed = (_time.monotonic() - _radio_t0) * 1000
             logger.warning(
