@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "4c70b74db8a0860f4c1fe24bacb2f6e199755ff4",
-  "sha256": "9dc71cf7801d2b49f2bb353a73653c507c098b41a034e19c3f83bb87e9f79477",
+  "revision": "6b5a40312517380bcaa116e9bde6e96956823059",
+  "sha256": "a267adfdbd4bcceb87971bc90bb19bda8efc840ec2c22445be33c8e3efe52faa",
   "files": [
     {
       "path": ".env.example",
@@ -6374,6 +6374,11 @@
       "bytes": 47579
     },
     {
+      "path": "tests/public/test_windows_gpu_compositing.py",
+      "sha256": "627859251b41aff483494970a59d1896b11724bc90752a7f311485a4a8334870",
+      "bytes": 1322
+    },
+    {
       "path": "tests/public/test_windows_native_startup_order.py",
       "sha256": "78ef446927057a67890043144a8b4f7b21bd32b2003f53b9a24741fccca421ee",
       "bytes": 25460
@@ -9895,13 +9900,13 @@
     },
     {
       "path": "ui/react-app/package-lock.json",
-      "sha256": "81f7fbef0f2c717256cde0ec911bebfa239aeffe0c42cafa948666525827d3af",
-      "bytes": 236773
+      "sha256": "e76ddb664f72ec19005bc95e80ccba83e4b54b86ab11dd8bf4d8dc4f8581abf3",
+      "bytes": 236775
     },
     {
       "path": "ui/react-app/package.json",
-      "sha256": "c6c8bfcae858d9b95169788bb1b5ff1ed1fa97a9fff21f59b3debf4862ec2064",
-      "bytes": 1249
+      "sha256": "14257976de460d1bad9c4cf88a362e656370f74b50f605f4ae6097770105c21e",
+      "bytes": 1250
     },
     {
       "path": "ui/react-app/patches/minimatch+3.1.5.patch",
@@ -12955,8 +12960,8 @@
     },
     {
       "path": "viola_qt.py",
-      "sha256": "7fce32bffa126ff1c87be2b8dc673c3c9b4bb345b3c075a92ddfeaca6aeb1c85",
-      "bytes": 82310
+      "sha256": "d14f89e3dfb4239a18f4cd1642bdfc3d0666507cb39e10671edb9d6cb792f6ee",
+      "bytes": 82908
     },
     {
       "path": "viola_spoke.py",

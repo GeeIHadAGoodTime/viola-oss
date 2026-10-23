@@ -38,7 +38,7 @@
     "globals": "^15.0.0",
     "jsdom": "^25.0.1",
     "vite": "^6.2.0",
-    "vitest": "^4.1.8"
+    "vitest": "^4.1.12"
   },
   "overrides": {
     "brace-expansion": "5.0.12",
