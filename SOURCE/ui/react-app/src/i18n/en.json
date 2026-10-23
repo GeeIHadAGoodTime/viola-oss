@@ -93,7 +93,7 @@
       "added_key": "I added my key",
       "enable": "Enable cloud AI",
       "use_own_key": "Use my own AI key",
-      "enabled_tts": "Cloud AI is enabled. Now try your first command.",
+      "enabled_tts": "Cloud AI is enabled.",
       "declined_tts": "Okay. Viola is set to use your own AI key. Open AI settings, add your provider key, then return here.",
       "byok_ready_tts": "Got it. Try your first command with your own AI key.",
       "save_error": "Couldn't save that AI setting. Try again.",

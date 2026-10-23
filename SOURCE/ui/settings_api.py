@@ -6,6 +6,7 @@ Provides REST API for managing settings.
 
 from __future__ import annotations
 
+import asyncio
 import re as _re
 from typing import Any, NamedTuple
 
@@ -17,6 +18,7 @@ from config import env as config_env
 from contracts.api_response import failure_response, success_response
 from core.constants import TIMEOUT_LONG, WAKE_SENSITIVITY_MIN
 from core.logging_config import get_logger
+from core.task_tracker import TaskTracker
 from music.playlist_manager import get_playlist_manager
 from services.llm.local_models import detect_local_ai_servers
 from ui.settings_manager import (
@@ -28,6 +30,35 @@ from ui.settings_manager import (
 )
 
 logger = get_logger(__name__)
+
+# Owns the background LLM-router rebuilds started by a settings save, so the
+# task is not garbage-collected mid-rebuild.
+_router_reinit_tasks = TaskTracker()
+
+
+def _schedule_llm_router_reinitialize(router: Any) -> None:
+    """Rebuild the LLM router in a worker thread, after the save has answered.
+
+    ``reinitialize()`` is blocking (sync Ollama probes with 1.5 s timeouts, the
+    managed-account gate, provider construction). It used to run inline on the
+    event loop inside the settings save, so "Enable cloud AI" in first run sat
+    on "Saving..." for the whole rebuild and every other local request stalled
+    with it. The router swaps the new provider in atomically, and a command
+    that arrives mid-rebuild waits for it in its own worker thread
+    (``_reinitialize_if_stale``), so nothing sees a half-built provider.
+    """
+
+    async def _run() -> None:
+        try:
+            await asyncio.to_thread(router.reinitialize)
+            logger.info("LLM router reinitialized after settings change")
+        # A failed rebuild leaves the previous provider in place; the next
+        # command retries through the runtime-signature check.
+        except Exception as exc:  # noqa: BLE001, RUF100
+            logger.warning("Failed to reinitialize LLM router: %s", exc)
+
+    _router_reinit_tasks.create_task(_run())
+
 
 # Maximum allowed length for any string setting value
 _MAX_STRING_LENGTH = 10_000
@@ -1265,8 +1296,7 @@ def create_settings_router(*, music_service: object | None = None) -> APIRouter:
 
                         router = get_active_router()
                         if router is not None:
-                            router.reinitialize()
-                            logger.info("LLM router reinitialized after settings change")
+                            _schedule_llm_router_reinitialize(router)
                         else:
                             logger.debug("No active LLM router to reinitialize")
                     except Exception as exc:

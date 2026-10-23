@@ -14,6 +14,7 @@ import asyncio
 import copy
 import inspect
 import json
+import threading
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from contextvars import ContextVar
@@ -319,6 +320,13 @@ class ProviderAgnosticRouter:
         self._init_error_payload: dict[str, Any] | None = None
         self._timeout_mgr = get_timeout_manager()
         self._provider_sync_lock = asyncio.Lock()
+        # Serializes provider rebuilds across threads. A rebuild can take
+        # seconds (sync Ollama probes, the managed-account gate), so callers
+        # run it in a worker thread; this lock keeps two rebuilds from
+        # interleaving. Readers never take it: reinitialize() builds the new
+        # providers off to the side and swaps them in, so a reader sees the
+        # old complete provider or the new complete one, never a gap.
+        self._reinit_lock = threading.Lock()
         self._runtime_signature: tuple[Any, ...] | None = None
 
         global _ACTIVE_ROUTER
@@ -363,7 +371,6 @@ class ProviderAgnosticRouter:
         async with self._provider_sync_lock:
             signature = self._build_runtime_signature()
             if signature != self._runtime_signature:
-                logger.info("LLM router context changed; rebuilding active providers")
                 # reinitialize() does blocking network I/O (the local/Ollama
                 # provider probes ``${base}/api/tags`` via a SYNC httpx.get in
                 # services/llm/factory.py). Running that on the event-loop thread
@@ -373,7 +380,7 @@ class ProviderAgnosticRouter:
                 # local-LLM path (2026-07-07). Offload the sync rebuild to a worker
                 # thread; the asyncio.Lock still serializes it and to_thread copies
                 # the current context so the runtime-signature contextvars resolve.
-                await asyncio.to_thread(self.reinitialize)
+                await asyncio.to_thread(self._reinitialize_if_stale)
             self._store_frozen_provider_snapshot()
 
     def _is_cloud_provider(self, provider) -> bool:
@@ -419,6 +426,21 @@ class ProviderAgnosticRouter:
 
     def _initialize_providers(self) -> None:
         """Initialize providers based on settings."""
+        provider, init_error, init_error_payload = self._build_primary_provider()
+        self._provider = provider
+        self._init_error = init_error
+        self._init_error_payload = init_error_payload
+
+    def _build_primary_provider(self) -> tuple[Any, str | None, dict[str, Any] | None]:
+        """Build the primary provider from settings WITHOUT touching router state.
+
+        Returns ``(provider, init_error, init_error_payload)``. Kept free of
+        side effects on ``self`` so reinitialize() can build in a worker thread
+        while commands keep using the current provider.
+        """
+        provider: Any = None
+        init_error: str | None = None
+        init_error_payload: dict[str, Any] | None = None
         try:
             settings = get_settings_manager()
         except ImportError:
@@ -434,13 +456,13 @@ class ProviderAgnosticRouter:
 
         if not ai_enabled:
             logger.info("AI features disabled in settings")
-            self._init_error = "AI features disabled"
-            return
+            init_error = "AI features disabled"
+            return provider, init_error, init_error_payload
 
         # Try to create primary provider from settings
         try:
-            self._provider = create_provider_from_settings()
-            if self._provider and self._provider.is_available():
+            provider = create_provider_from_settings()
+            if provider and provider.is_available():
                 # Consent gate removed — factory.create_from_settings() is the
                 # authoritative consent check.  It returns None when cloud
                 # consent is not given, so no duplicate check is needed here.
@@ -448,19 +470,19 @@ class ProviderAgnosticRouter:
                 # route_command() and ask() below.
                 logger.info(
                     "Primary LLM provider ready: %s (%s)",
-                    self._provider.get_provider_name(),
-                    self._provider.config.model,
+                    provider.get_provider_name(),
+                    provider.config.model,
                 )
-            elif self._provider:
-                reason = self._provider.get_unavailable_reason()
+            elif provider:
+                reason = provider.get_unavailable_reason()
                 logger.warning("Primary provider not available: %s", reason)
-                self._provider = None
+                provider = None
         except Exception as exc:
             if getattr(exc, "error_code", None) == "login_required_for_paid_action":
-                self._init_error_payload = getattr(exc, "data", None)
-                self._init_error = str(exc)
+                init_error_payload = getattr(exc, "data", None)
+                init_error = str(exc)
                 logger.info("Managed LLM provider blocked until account login: %s", exc)
-                self._provider = None
+                provider = None
             elif isinstance(exc, (ImportError, ValueError, RuntimeError)):
                 error = ProviderUnavailableError("primary", str(exc))
                 logger.warning(
@@ -468,18 +490,19 @@ class ProviderAgnosticRouter:
                     exc,
                     error.user_friendly_message(),
                 )
-                self._init_error = f"Primary provider failed: {exc}"
-                self._provider = None
+                init_error = f"Primary provider failed: {exc}"
+                provider = None
             else:
                 raise
 
         # Log status
-        if not self._provider and not self._fallback_provider:
-            self._init_error = self._init_error or "No LLM providers available"
+        if not provider:
+            init_error = init_error or "No LLM providers available"
             logger.warning(
                 "No LLM providers available - AI features will be disabled. "
                 "Say 'set up AI' to configure, or start Ollama locally."
             )
+        return provider, init_error, init_error_payload
 
     @staticmethod
     def _current_user_id() -> str | None:
@@ -588,11 +611,10 @@ class ProviderAgnosticRouter:
         async with self._provider_sync_lock:
             signature = self._build_runtime_signature()
             if signature != self._runtime_signature:
-                logger.info("LLM router context changed; rebuilding active providers")
                 # Offload the blocking rebuild off the event loop — see the note
                 # in freeze_current_provider_snapshot (sync Ollama I/O in
                 # reinitialize corrupts the anyio cancel scope on the request path).
-                await asyncio.to_thread(self.reinitialize)
+                await asyncio.to_thread(self._reinitialize_if_stale)
             if _FREEZE_PROVIDER_SELECTION.get():
                 frozen = self._store_frozen_provider_snapshot()
                 return frozen.provider, frozen.fallback_provider, frozen.haiku_provider
@@ -606,8 +628,7 @@ class ProviderAgnosticRouter:
 
         signature = self._build_runtime_signature()
         if signature != self._runtime_signature:
-            logger.info("LLM router context changed; rebuilding active providers")
-            self.reinitialize()
+            self._reinitialize_if_stale()
         if _FREEZE_PROVIDER_SELECTION.get():
             self._store_frozen_provider_snapshot()
 
@@ -1493,14 +1514,37 @@ class ProviderAgnosticRouter:
             self._fallback_provider.clear_history()
 
     def reinitialize(self) -> None:
-        """Rebuild provider instances from current settings."""
-        self._provider = None
+        """Rebuild provider instances from current settings.
+
+        Blocking (network probes, account gate): call it from a worker thread
+        when on the event loop. The new providers are built first and swapped
+        in at the end, so concurrent commands keep a complete provider for the
+        whole rebuild instead of seeing ``None`` while it runs.
+        """
+        with self._reinit_lock:
+            self._rebuild_locked()
+
+    def _rebuild_locked(self) -> None:
+        provider, init_error, init_error_payload = self._build_primary_provider()
+        signature = self._build_runtime_signature()
+        self._provider = provider
         self._fallback_provider = None
         self._haiku_provider = None
-        self._init_error = None
-        self._init_error_payload = None
-        self._initialize_providers()
-        self._runtime_signature = self._build_runtime_signature()
+        self._init_error = init_error
+        self._init_error_payload = init_error_payload
+        self._runtime_signature = signature
+
+    def _reinitialize_if_stale(self) -> None:
+        """Rebuild only if the request context no longer matches the providers.
+
+        Waits for a rebuild already running (e.g. one started by a settings
+        save), then re-checks, so a command issued mid-rebuild gets the finished
+        provider and does not trigger a second build.
+        """
+        with self._reinit_lock:
+            if self._build_runtime_signature() != self._runtime_signature:
+                logger.info("LLM router context changed; rebuilding active providers")
+                self._rebuild_locked()
 
     def get_history(self) -> list[dict[str, str]]:
         """Get conversation history from primary provider."""
