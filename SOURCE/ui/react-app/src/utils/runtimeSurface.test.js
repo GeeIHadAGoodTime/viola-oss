@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, it } from 'vitest';
-import { isDesktopApp, isWebClient, shouldStreamBrowserView } from './runtimeSurface';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { canQuitDesktopApp, isDesktopApp, isWebClient, quitDesktopApp, shouldStreamBrowserView } from './runtimeSurface';
 
 describe('runtimeSurface', () => {
   afterEach(() => {
@@ -34,5 +34,26 @@ describe('runtimeSurface', () => {
     window.viola = { setBrowserOverlayBounds: () => {} };
     // Desktop app, not a spoke → native embedded webview, no streaming.
     expect(shouldStreamBrowserView(false)).toBe(false);
+  });
+});
+
+describe('quitDesktopApp', () => {
+  afterEach(() => {
+    delete window.viola;
+  });
+
+  it('calls the Qt bridge quitApp slot on desktop', () => {
+    const quitApp = vi.fn();
+    window.viola = { quitApp };
+    expect(canQuitDesktopApp()).toBe(true);
+    expect(quitDesktopApp()).toBe(true);
+    expect(quitApp).toHaveBeenCalledTimes(1);
+  });
+
+  it('is a no-op without a bridge or before the bridge handshake', () => {
+    expect(canQuitDesktopApp()).toBe(false);
+    expect(quitDesktopApp()).toBe(false);
+    window.viola = { __pending: true };
+    expect(quitDesktopApp()).toBe(false);
   });
 });

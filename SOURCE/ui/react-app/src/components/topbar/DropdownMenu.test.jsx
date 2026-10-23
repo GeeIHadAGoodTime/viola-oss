@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import DropdownMenu from './DropdownMenu';
 
@@ -64,5 +64,37 @@ describe('DropdownMenu keyboard lifecycle', () => {
     fireEvent.keyDown(first, { key: 'Tab' });
     expect(handlers.onClose).toHaveBeenCalledTimes(1);
     expect(handlers.onOpenHistory).not.toHaveBeenCalled();
+  });
+});
+
+describe('DropdownMenu Quit Viola (desktop)', () => {
+  afterEach(() => {
+    delete window.viola;
+  });
+
+  it('offers Quit Viola in the desktop app and asks the Qt shell to quit', () => {
+    const quitApp = vi.fn();
+    window.viola = { quitApp };
+    render(<DropdownMenu isOpen {...handlers} />);
+
+    const quit = screen.getByRole('menuitem', { name: 'Quit Viola' });
+    fireEvent.click(quit);
+
+    expect(quitApp).toHaveBeenCalledTimes(1);
+    expect(handlers.onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps Quit Viola reachable with arrow keys as the last item', () => {
+    window.viola = { quitApp: vi.fn() };
+    render(<DropdownMenu isOpen {...handlers} />);
+    const first = screen.getByRole('menuitem', { name: 'Chat History' });
+    first.focus();
+    fireEvent.keyDown(first, { key: 'ArrowUp' });
+    expect(screen.getByRole('menuitem', { name: 'Quit Viola' })).toHaveFocus();
+  });
+
+  it('does not offer Quit Viola in a browser (no Qt bridge)', () => {
+    render(<DropdownMenu isOpen {...handlers} />);
+    expect(screen.queryByRole('menuitem', { name: 'Quit Viola' })).toBeNull();
   });
 });
