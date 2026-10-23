@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 import time
 from pathlib import Path
 from typing import Protocol, cast
@@ -22,6 +23,43 @@ except ImportError as exc:  # pragma: no cover - optional dependency
     _WHISPER_IMPORT_ERROR = exc
 else:
     _WHISPER_IMPORT_ERROR = None
+
+
+# One loaded faster-whisper model per (model, device, compute_type, cache) in
+# this process. The desktop builds two WhisperTranscribers at startup (the
+# in-process ASR seam for /ws/voice-stream and the VoicePipeline's own
+# Transcriber), and each used to load its own copy of the same weights
+# (1.0.5 log: 'tiny.en' loaded at 11:02:42 and again at 11:02:50). A loaded
+# CTranslate2 model is safe to call from several threads, so they share it.
+_SHARED_MODELS: dict[tuple[object, ...], object] = {}
+_SHARED_MODELS_LOCK = threading.Lock()
+
+
+def _shared_whisper_model(model_name: str, *, device: str, compute_type: str) -> object:
+    """Return the process-wide WhisperModel for these arguments, loading it once."""
+    load_kwargs = resolve_model_load(model_name)
+    key = (
+        WhisperModel,  # a test that patches WhisperModel never sees another test's model
+        model_name,
+        device,
+        compute_type,
+        str(load_kwargs.get("download_root")),
+        bool(load_kwargs.get("local_files_only")),
+    )
+    with _SHARED_MODELS_LOCK:
+        model = _SHARED_MODELS.get(key)
+        if model is not None:
+            logger.info("Whisper model '%s' is already loaded; reusing it.", model_name)
+            return model
+        model = WhisperModel(
+            model_name,
+            device=device,
+            compute_type=compute_type,
+            download_root=load_kwargs.get("download_root"),
+            local_files_only=bool(load_kwargs.get("local_files_only", False)),
+        )
+        _SHARED_MODELS[key] = model
+        return model
 
 
 def _settings_value(key: str, default: object, *, user_id: str | None = None) -> object:
@@ -137,11 +175,10 @@ class WhisperTranscriber:
                         device,
                         attempt_compute,
                     )
-                    self.model = WhisperModel(
+                    self.model = _shared_whisper_model(
                         attempt_model,
                         device=device,
                         compute_type=attempt_compute,
-                        **resolve_model_load(attempt_model),
                     )
                     logger.info(
                         "Whisper model '%s' loaded successfully (compute_type=%s).",
@@ -176,11 +213,10 @@ class WhisperTranscriber:
             if device != "cpu" and (available_offline or not network_download_failed):
                 try:
                     logger.info("Trying CPU fallback for model '%s'...", attempt_model)
-                    self.model = WhisperModel(
+                    self.model = _shared_whisper_model(
                         attempt_model,
                         device="cpu",
                         compute_type="int8",
-                        **resolve_model_load(attempt_model),
                     )
                     logger.info("Whisper model '%s' loaded on CPU (fallback).", attempt_model)
                     return

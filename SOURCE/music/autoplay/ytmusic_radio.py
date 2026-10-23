@@ -30,7 +30,7 @@ class YouTubeMusicRadio:
 
     def _get_client(self):
         """Lazy-load ytmusicapi client."""
-        logger.warning(
+        logger.debug(
             "[QUEUE_TRACE] _get_client ENTER _ytmusic=%s _init_attempted=%s",
             self._ytmusic,
             getattr(self, "_init_attempted", "N/A"),
@@ -40,17 +40,17 @@ class YouTubeMusicRadio:
                 from ytmusicapi import YTMusic
 
                 # No auth needed for get_watch_playlist
-                logger.warning("[QUEUE_TRACE] _get_client CREATING YTMusic")
+                logger.debug("[QUEUE_TRACE] _get_client CREATING YTMusic")
                 self._ytmusic = YTMusic()
-                logger.warning("[QUEUE_TRACE] _get_client SUCCESS client=%s", self._ytmusic)
+                logger.debug("[QUEUE_TRACE] _get_client SUCCESS client=%s", self._ytmusic)
                 logger.info("YouTubeMusicRadio: ytmusicapi client initialized")
             except ImportError:
-                logger.warning("[QUEUE_TRACE] _get_client FAILED ImportError — ytmusicapi not installed")
+                logger.debug("[QUEUE_TRACE] _get_client FAILED ImportError — ytmusicapi not installed")
                 logger.error("YouTubeMusicRadio: ytmusicapi not installed. Run: pip install ytmusicapi")
             except Exception as e:
                 logger.warning("[QUEUE_TRACE] _get_client FAILED exception=%s", e, exc_info=True)
                 logger.exception("YouTubeMusicRadio: Failed to init ytmusicapi: %s", e)
-        logger.warning("[QUEUE_TRACE] _get_client RETURN client_is_none=%s", self._ytmusic is None)
+        logger.debug("[QUEUE_TRACE] _get_client RETURN client_is_none=%s", self._ytmusic is None)
         return self._ytmusic
 
     @property
@@ -80,14 +80,14 @@ class YouTubeMusicRadio:
         Returns:
             List of track dicts with video_id, title, artist
         """
-        logger.warning(
+        logger.debug(
             "[QUEUE_TRACE] radio.get_related_tracks ENTER seed=%s limit=%d",
             seed_video_id,
             limit,
         )
         client = self._get_client()
         if not client:
-            logger.warning(
+            logger.debug(
                 "[QUEUE_TRACE] radio.get_related_tracks EXIT reason=no_client (_ytmusic is %s)",
                 type(self._ytmusic).__name__ if self._ytmusic else "None",
             )
@@ -95,13 +95,13 @@ class YouTubeMusicRadio:
             return []
 
         if self._is_fetching:
-            logger.warning("[QUEUE_TRACE] radio.get_related_tracks EXIT reason=already_fetching")
+            logger.debug("[QUEUE_TRACE] radio.get_related_tracks EXIT reason=already_fetching")
             logger.debug("YouTubeMusicRadio: Already fetching, skipping")
             return []
 
         self._is_fetching = True
         try:
-            logger.warning(
+            logger.debug(
                 "[QUEUE_TRACE] radio.get_related_tracks NETWORK_START seed=%s",
                 seed_video_id,
             )
@@ -117,27 +117,27 @@ class YouTubeMusicRadio:
                 limit=limit + 10,  # Fetch extra to filter
             )
             _radio_elapsed = (_time.monotonic() - _radio_t0) * 1000
-            logger.warning(
+            logger.debug(
                 "[QUEUE_TRACE] radio.get_related_tracks NETWORK_DONE elapsed_ms=%.1f playlist_keys=%s",
                 _radio_elapsed,
                 (list(playlist.keys()) if isinstance(playlist, dict) else type(playlist).__name__),
             )
 
             if not playlist:
-                logger.warning("[QUEUE_TRACE] radio.get_related_tracks EXIT reason=playlist_none")
+                logger.debug("[QUEUE_TRACE] radio.get_related_tracks EXIT reason=playlist_none")
                 logger.warning("YouTubeMusicRadio: get_watch_playlist returned None")
                 return []
 
             tracks = playlist.get("tracks", [])
             if not tracks:
-                logger.warning(
+                logger.debug(
                     "[QUEUE_TRACE] radio.get_related_tracks EXIT reason=no_tracks_in_playlist keys=%s",
                     list(playlist.keys()),
                 )
                 logger.warning("YouTubeMusicRadio: No tracks in playlist")
                 return []
 
-            logger.warning(
+            logger.debug(
                 "[QUEUE_TRACE] radio.get_related_tracks RAW_TRACKS=%d recent_ids=%d",
                 len(tracks),
                 len(self._recent_video_ids),

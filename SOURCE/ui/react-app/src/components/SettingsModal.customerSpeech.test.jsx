@@ -60,6 +60,24 @@ describe('qualification-only speech settings', () => {
     },
   );
 
+  it('shows friendly voice labels, marks the default, and saves the raw voice id', async () => {
+    harness.customerSpeech.locales[0] = {
+      value: 'en-us', label: 'English (US)', voices: ['af_heart', 'am_echo'], default_voice: 'af_heart',
+      voice_options: [
+        { value: 'af_heart', label: 'Heart (female, default)' },
+        { value: 'am_echo', label: 'Echo (male)' },
+      ],
+    };
+    openVoice();
+    fireEvent.click(await screen.findByRole('button', { name: 'Assistant Voice: Heart (female, default)' }));
+    expect(screen.queryByRole('option', { name: 'af_heart' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('option', { name: 'Echo (male)' }));
+    expect(screen.queryByText(/qualification build/i)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
+    await waitFor(() => expect(harness.updateSettings).toHaveBeenCalledTimes(1));
+    expect(harness.updateSettings.mock.calls[0][0]).toMatchObject({ tts_language: 'en-us', tts_voice: 'am_echo' });
+  });
+
   it('keeps ordinary Assistant Voice options and hides the new selector outside qualification', async () => {
     harness.customerSpeech = null;
     openVoice();

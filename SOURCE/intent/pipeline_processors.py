@@ -46,6 +46,8 @@ _LLM_FINAL_COMMANDS = frozenset(
         "smart_stop",
         "pause",
         "resume",
+        # skip (1.0.5): its executor answers "Nothing is playing." itself.
+        "skip",
     }
 )
 

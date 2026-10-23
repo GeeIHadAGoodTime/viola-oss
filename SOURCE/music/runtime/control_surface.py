@@ -286,6 +286,10 @@ class PlayerControlService(PlayerControlSurface):
         """
         backend = None
         with self._cv:
+            sm = getattr(self._player, "_playback_sm", None)
+            if sm is not None and sm.phase == PlaybackPhase.STOPPED:
+                # Nothing to pause; STOPPED -> PAUSED is not a valid transition.
+                return
             self._player._user_paused = True
             self._player._paused = True
             self._player._is_playing = False
