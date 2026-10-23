@@ -547,6 +547,13 @@ def register_health(context: ApiContext) -> None:
         from diagnostics.voice_status import get_voice_status
 
         payload["voice_status"] = get_voice_status()
+        # The desktop UI polls /health every 3 s for the label under the
+        # push-to-talk button and reads dependencies.wake_detector. Only
+        # /health/details ever carried it, so on the desktop that label read
+        # "status unknown" forever (first run's mic step included). The wake
+        # check is a cheap in-process read, unlike the full dependency sweep,
+        # so it rides on the basic payload.
+        payload["dependencies"] = {"wake_detector": _check_wake_detector_health()}
         return payload
 
     def _collect_dependencies() -> dict[str, Any]:

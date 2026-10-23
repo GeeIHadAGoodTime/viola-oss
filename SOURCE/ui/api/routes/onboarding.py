@@ -21,6 +21,53 @@ _narration_tasks = TaskTracker()
 _SPEAK_TIMEOUT_SECONDS = 120.0
 
 
+class _NarrationSlot:
+    """The one first-run narration line that may be playing right now.
+
+    First run used to let narration lines pile up: every step change asked for a
+    new line while the previous one was still being spoken, the TTS engine
+    queued them, and the user heard step 2's line while looking at step 4.
+    Only the newest line is ever wanted, so starting one cuts the last, and the
+    frontend cuts the current one when the user moves on.
+    """
+
+    def __init__(self) -> None:
+        self.seq = 0
+        self.task: asyncio.Task[None] | None = None
+
+
+_narration = _NarrationSlot()
+
+
+def _stop_audio_playback() -> None:
+    """Silence the line that is playing now.
+
+    Cancelling the narration task only stops it at its next await; the sentence
+    already handed to the sound device keeps playing to the end. ``sd.stop()``
+    ends that ``sd.play()`` and releases the engine's blocking ``sd.wait()``.
+    """
+    try:
+        import sounddevice as sd
+
+        sd.stop()
+    # A missing or failing audio stack just means there is nothing to silence.
+    except Exception as exc:  # noqa: BLE001, RUF100
+        log.debug("Narration playback stop failed: %s", exc)
+
+
+async def _cut_current_narration() -> bool:
+    """Stop the narration line in flight, if any. Returns whether one was cut."""
+    task = _narration.task
+    _narration.task = None
+    if task is None or task.done():
+        return False
+    task.cancel()
+    # Blocking PortAudio call: keep it off the event loop. Awaited so a
+    # following line cannot be started and then silenced by this stop.
+    await asyncio.to_thread(_stop_audio_playback)
+    return True
+
+
 def register_onboarding_routes(context: ApiContext, toolbox: RouteToolbox) -> None:
     router = context.router
 
@@ -289,11 +336,15 @@ def register_onboarding_routes(context: ApiContext, toolbox: RouteToolbox) -> No
                     except Exception as exc:  # noqa: BLE001, RUF100
                         log.warning("Narration failed: %s", exc)
 
+                # A new line replaces the old one instead of queueing behind it.
+                await _cut_current_narration()
+
                 # Fire-and-forget on purpose: the caller paces itself and holding
                 # the response open for the length of the sentence would stall
                 # first run behind every line.
-                _narration_tasks.create_task(_run())
-                return {"ok": True, "spoken": True}
+                _narration.seq += 1
+                _narration.task = _narration_tasks.create_task(_run())
+                return {"ok": True, "spoken": True, "narration_id": _narration.seq}
             # Narration is decoration. Any way this fails, first run continues
             # on the caller's browser-speech fallback rather than stopping.
             except Exception as exc:  # noqa: BLE001, RUF100
@@ -301,5 +352,30 @@ def register_onboarding_routes(context: ApiContext, toolbox: RouteToolbox) -> No
                 return handle_route_error(exc, "tts_speak")
 
         return await toolbox.record_and_call(_inner, route="/v1/tts/speak", method="POST")
+
+    @router.post("/v1/tts/stop", dependencies=[Depends(require_auth)])
+    async def tts_stop(body: dict | None = Body(default=None)):
+        """Cut the first-run narration line that is playing.
+
+        First run calls this when the user moves past a step, so a step's line
+        never keeps talking over the next step. ``narration_id`` (from the speak
+        reply) names the line the caller means; a stop for a line that a newer
+        one already replaced is ignored, so a late stop cannot silence the next
+        step's narration.
+        """
+
+        async def _inner():
+            try:
+                raw_id = body.get("narration_id") if isinstance(body, dict) else None
+                if isinstance(raw_id, int) and not isinstance(raw_id, bool) and raw_id != _narration.seq:
+                    return {"ok": True, "stopped": False, "reason": "superseded"}
+                stopped = await _cut_current_narration()
+                return {"ok": True, "stopped": stopped}
+            # Narration is decoration; failing to stop it must not break first run.
+            except Exception as exc:  # noqa: BLE001, RUF100
+                log.warning("Failed to stop narration: %s", exc)
+                return handle_route_error(exc, "tts_stop")
+
+        return await toolbox.record_and_call(_inner, route="/v1/tts/stop", method="POST")
 
     log.info("🎓 Onboarding routes registered")
