@@ -352,9 +352,13 @@ class SelfKnowledgeBuilder:
             # "what plan am I on" the model was echoing "capability tier: symphony"
             # verbatim (issue #1406). This is descriptive self-knowledge, not a
             # per-query hint.
+            # Name where it changes: asked by chat to switch to Ensemble, the
+            # model read the levels as plans and told a Pro user to "upgrade
+            # to Ensemble" (1.0.5 laptop report). The levels are not sold.
             lines.append(
-                "Tool-permission level (internal setting, not the user's billing plan or subscription): %s -- %s"
-                % (tier, description)
+                "Tool-permission level (internal setting, not the user's billing plan or subscription): %s -- %s "
+                "Every plan can use Solo, Ensemble or Symphony; the user switches it in Settings > AI & Agents > "
+                "Agent Autonomy (you cannot change it from chat)." % (tier, description)
             )
             if bool(sm.get("auto_propose_shortcuts", False, user_id=user_id)):
                 lines.append(
