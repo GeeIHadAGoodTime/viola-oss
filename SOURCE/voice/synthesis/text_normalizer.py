@@ -44,6 +44,8 @@ _PERCENT_RE = re.compile(r"\b(\d+(?:\.\d+)?)%")
 _DEGREE_RE = re.compile(r"\s*°(?:\s*([FC])(?:ahrenheit|elsius)?(?![A-Za-z]))?")
 _DEGREE_UNITS = {"F": " Fahrenheit", "C": " Celsius"}
 _DEGREE_WORDS = {"en": " degrees", "es": " grados"}
+_DEGREE_SINGULAR = {"en": " degree", "es": " grado"}
+_DEGREE_ONE_RE = re.compile(r"(?<![\d.,])[-−+]?1$")
 
 # ---------------------------------------------------------------------------
 # Times: 2:30 PM → "two thirty PM", 10:05 → "ten oh five"
@@ -315,8 +317,14 @@ def _normalize_english_numbers(text: str) -> str:
 
 def _expand_degrees(text: str, language: str) -> str:
     """Spell the degree sign (and an attached F/C unit) for a locale with a word for it."""
-    word = _DEGREE_WORDS[language]
-    return _DEGREE_RE.sub(lambda match: word + _DEGREE_UNITS.get(match.group(1), ""), text)
+
+    def replace(match: re.Match[str]) -> str:
+        # Exactly one (1°, -1°, not 1.5° or 21°) takes the singular: "one degree", "un grado".
+        one = _DEGREE_ONE_RE.search(match.string, 0, match.start())
+        word = (_DEGREE_SINGULAR if one else _DEGREE_WORDS)[language]
+        return word + _DEGREE_UNITS.get(match.group(1), "")
+
+    return _DEGREE_RE.sub(replace, text)
 
 
 def _locale_base(language: object | None) -> str:
@@ -468,6 +476,8 @@ def _replace_spanish_number(match: re.Match[str]) -> str:
         gender = following and _spanish_noun_gender(following.group(1), int(digits))
         if gender:
             words = _spanish_agree(words, gender)
+            if words.endswith(("millón", "millones")):
+                words += " de"  # un millón de personas, but un millón quinientas mil personas
     if match.group("sign"):
         words = ("más " if match.group("sign") == "+" else "menos ") + words
     fraction = match.group("frac")

@@ -185,6 +185,23 @@ class EnglishDecimalNormalization(unittest.TestCase):
             with self.subTest(source=source):
                 self.assertEqual(self.formatter.format(source, language="es"), expected)
 
+    def test_one_degree_is_singular_and_whole_millions_take_de(self):
+        english = {"1°F": "one degree Fahrenheit", "It is 1 °C.": "It is one degree Celsius.", "1°": "one degree",
+                   "1.5°C": "one point five degrees Celsius", "21°": "twenty one degrees"}
+        for source, expected in english.items():
+            with self.subTest(source=source):
+                self.assertEqual(self.formatter.format(source), expected)
+        spanish = {
+            "1°C, 1°F y 1°.": "un grado Celsius, un grado Fahrenheit y un grado.",
+            "Hace -1 °C, luego 21°C o 1,5°C.": "Hace menos un grado Celsius, luego veintiún grados Celsius o uno coma cinco grados Celsius.",
+            "1000000 personas y 2000000 casas.": "un millón de personas y dos millones de casas.",
+            "1500000 personas, 1000000 de euros, $1000000.": "un millón quinientas mil personas, un millón de euros, un millón de dólares.",
+            "Unos 2000000.": "Unos dos millones.",
+        }
+        for source, expected in spanish.items():
+            with self.subTest(source=source):
+                self.assertEqual(self.formatter.format(source, language="es"), expected)
+
     def test_spanish_ranges_and_english_ordinal_suffixes(self):
         cases = {
             "del 10-20 de octubre": "del diez a veinte de octubre",
