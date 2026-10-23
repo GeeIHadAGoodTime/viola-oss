@@ -268,9 +268,9 @@ class AutoplayController:
         """
         hub = self._event_hub
         loop = self._main_loop
-        logger.warning("[QUEUE_TRACE] _broadcast_state_update ENTER hub=%s loop=%s", hub, loop)
+        logger.debug("[QUEUE_TRACE] _broadcast_state_update ENTER hub=%s loop=%s", hub, loop)
         if hub is None or loop is None:
-            logger.warning("[QUEUE_TRACE] _broadcast_state_update ABORT hub=%s loop=%s", hub, loop)
+            logger.debug("[QUEUE_TRACE] _broadcast_state_update ABORT hub=%s loop=%s", hub, loop)
             return
 
         try:
@@ -294,7 +294,7 @@ class AutoplayController:
                 if not user_id:
                     logger.error("Autoplay state broadcast skipped: blank user_id")
                     return
-                logger.warning(
+                logger.debug(
                     "[QUEUE_TRACE] _broadcast_state_update EXECUTING queue_len=%d",
                     _qlen,
                 )
@@ -304,9 +304,9 @@ class AutoplayController:
                 asyncio.create_task(_do_broadcast())
 
             loop.call_soon_threadsafe(_schedule)
-            logger.warning("[QUEUE_TRACE] _broadcast_state_update SCHEDULED queue_len=%d", _qlen)
+            logger.debug("[QUEUE_TRACE] _broadcast_state_update SCHEDULED queue_len=%d", _qlen)
         except Exception as exc:
-            logger.warning("[QUEUE_TRACE] _broadcast_state_update FAILED reason=%s", exc)
+            logger.debug("[QUEUE_TRACE] _broadcast_state_update FAILED reason=%s", exc)
 
     # ------------------------------------------------------------------ #
     # Trigger logic
@@ -418,7 +418,7 @@ class AutoplayController:
         Returns:
             Number of songs added to queue
         """
-        logger.warning(
+        logger.debug(
             "[QUEUE_TRACE] ensure_buffer ENTER current_track=%s takeover=%s",
             current_track,
             takeover_generation,
@@ -438,14 +438,14 @@ class AutoplayController:
 
         try:
             if not self.should_trigger(respect_generation_flag=False):
-                logger.warning("[QUEUE_TRACE] ensure_buffer EXIT_EARLY reason=should_trigger_false")
+                logger.debug("[QUEUE_TRACE] ensure_buffer EXIT_EARLY reason=should_trigger_false")
                 logger.debug("🟢 ENSURE_BUFFER: should_trigger=False, returning 0")
                 return 0
 
             config = self.config  # already refreshed during should_trigger
             queue_size = self._current_queue_size()
             needed = max(1, config.min_queue_size - queue_size)
-            logger.warning(
+            logger.debug(
                 "[QUEUE_TRACE] ensure_buffer QUEUE_CHECK current=%d threshold=%d needed=%d",
                 queue_size,
                 config.min_queue_size,
@@ -455,7 +455,7 @@ class AutoplayController:
             # Check if we're in PLAYLIST mode first
             session_controller = self.get_session_controller()
             is_playlist = session_controller is not None and session_controller.is_playlist_mode()
-            logger.warning(
+            logger.debug(
                 "[QUEUE_TRACE] ensure_buffer PLAYLIST_CHECK session_ctrl=%s is_playlist=%s",
                 session_controller is not None,
                 is_playlist,
@@ -498,7 +498,7 @@ class AutoplayController:
             # FREEFORM mode: Use AI-driven recommendations
             if not current_track:
                 current_track = self._resolve_current_track()
-                logger.warning(
+                logger.debug(
                     "[QUEUE_TRACE] ensure_buffer RESOLVE_TRACK result=%s",
                     current_track.title if current_track else None,
                 )
@@ -530,13 +530,13 @@ class AutoplayController:
                         )
 
             if not current_track:
-                logger.warning("[QUEUE_TRACE] ensure_buffer EXIT_EARLY reason=no_current_track")
+                logger.debug("[QUEUE_TRACE] ensure_buffer EXIT_EARLY reason=no_current_track")
                 logger.warning("🟢 ENSURE_BUFFER: No current track - waiting for playback to start")
                 return 0
 
             # FREEFORM mode: Use YouTube Music Radio for related tracks
             # This replaced the AI/GPT-based autoplay to save API tokens
-            logger.warning(
+            logger.debug(
                 "[QUEUE_TRACE] ensure_buffer STRATEGY=freeform track=%s video_id=%s url=%s",
                 current_track.title,
                 getattr(current_track, "video_id", None),
@@ -546,7 +546,7 @@ class AutoplayController:
             from music.autoplay import get_ytmusic_radio
 
             radio = get_ytmusic_radio()
-            logger.warning(
+            logger.debug(
                 "[QUEUE_TRACE] ensure_buffer RADIO_INSTANCE is_fetching=%s client=%s",
                 radio._is_fetching,
                 radio._ytmusic is not None,
@@ -562,15 +562,15 @@ class AutoplayController:
                 if match:
                     seed_video_id = match.group(1)
 
-            logger.warning("[QUEUE_TRACE] ensure_buffer SEED_VIDEO_ID=%s", seed_video_id)
+            logger.debug("[QUEUE_TRACE] ensure_buffer SEED_VIDEO_ID=%s", seed_video_id)
             if not seed_video_id:
-                logger.warning(
+                logger.debug(
                     "[QUEUE_TRACE] ensure_buffer EXIT_EARLY reason=no_video_id track=%s",
                     current_track.title,
                 )
                 return 0
 
-            logger.warning(
+            logger.debug(
                 "[QUEUE_TRACE] ensure_buffer FETCH_START strategy=radio seed=%s limit=%d",
                 seed_video_id,
                 needed,
@@ -585,7 +585,7 @@ class AutoplayController:
                 limit=needed,
             )
             _fetch_elapsed_ms = (_time.monotonic() - _fetch_t0) * 1000
-            logger.warning(
+            logger.debug(
                 "[QUEUE_TRACE] ensure_buffer FETCH_RESULT count=%d elapsed_ms=%.1f",
                 len(related) if related else 0,
                 _fetch_elapsed_ms,
@@ -623,7 +623,7 @@ class AutoplayController:
                     result = self.player.enqueue_autoplay(query, metadata=metadata)
                     if result is not None:
                         added += 1
-                        logger.warning(
+                        logger.debug(
                             "[QUEUE_TRACE] ensure_buffer ENQUEUED track=%s total=%d",
                             track_data.get("title", "Unknown"),
                             added,
@@ -642,13 +642,13 @@ class AutoplayController:
                 len(related),
             )
             if added > 0:
-                logger.warning(
+                logger.debug(
                     "[QUEUE_TRACE] ensure_buffer BROADCASTING queue_len=%d",
                     self._current_queue_size(),
                 )
                 self._broadcast_state_update()
             else:
-                logger.warning("[QUEUE_TRACE] ensure_buffer NO_TRACKS_ADDED, skipping broadcast")
+                logger.debug("[QUEUE_TRACE] ensure_buffer NO_TRACKS_ADDED, skipping broadcast")
             return added
 
         except Exception as exc:
@@ -889,16 +889,16 @@ class AutoplayController:
         Check if autoplay should run and trigger it asynchronously.
         This is the non-blocking entry point called from the music player.
         """
-        logger.warning("[QUEUE_TRACE] check_and_run_async ENTER")
+        logger.debug("[QUEUE_TRACE] check_and_run_async ENTER")
         if not self._claim_generation():
-            logger.warning("[QUEUE_TRACE] check_and_run_async SKIP reason=could not claim generation lock")
+            logger.debug("[QUEUE_TRACE] check_and_run_async SKIP reason=could not claim generation lock")
             return
 
         try:
             should = self.should_trigger(respect_generation_flag=False)
-            logger.warning("[QUEUE_TRACE] check_and_run_async should_trigger=%s", should)
+            logger.debug("[QUEUE_TRACE] check_and_run_async should_trigger=%s", should)
             if not should:
-                logger.warning("[QUEUE_TRACE] check_and_run_async SKIP reason=should_trigger returned False")
+                logger.debug("[QUEUE_TRACE] check_and_run_async SKIP reason=should_trigger returned False")
                 self._release_generation()
                 return
 

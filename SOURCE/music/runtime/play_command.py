@@ -235,7 +235,7 @@ class PlayCommandService:
         """
         player = self._player
         logger = self._logger
-        logger.warning("[QUEUE_TRACE] PlayCommandService.play() ENTER query=%s", query[:80])
+        logger.debug("[QUEUE_TRACE] PlayCommandService.play() ENTER query=%s", query[:80])
 
         self._ensure_engine_finish_hook()
 
@@ -287,16 +287,16 @@ class PlayCommandService:
                 autoplay.set_anchor(item)
                 ensure_blocking = getattr(autoplay, "ensure_buffer_blocking", None)
                 if callable(ensure_blocking):
-                    logger.warning("[QUEUE_TRACE] PlayCommandService.play() calling ensure_buffer_blocking")
+                    logger.debug("[QUEUE_TRACE] PlayCommandService.play() calling ensure_buffer_blocking")
                     added = int(ensure_blocking(current_track=item, timeout_seconds=6.0))
-                    logger.warning(
+                    logger.debug(
                         "[QUEUE_TRACE] PlayCommandService.play() ensure_buffer_blocking returned added=%d",
                         added,
                     )
                 else:
-                    logger.warning("[QUEUE_TRACE] PlayCommandService.play() calling check_and_run_async")
+                    logger.debug("[QUEUE_TRACE] PlayCommandService.play() calling check_and_run_async")
                     autoplay.check_and_run_async()
-                    logger.warning("[QUEUE_TRACE] PlayCommandService.play() check_and_run_async returned")
+                    logger.debug("[QUEUE_TRACE] PlayCommandService.play() check_and_run_async returned")
             except Exception as exc:
                 logger.exception("Autoplay reseed failed after manual play: %s", exc)
         else:

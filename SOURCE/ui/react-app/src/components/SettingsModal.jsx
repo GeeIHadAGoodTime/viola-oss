@@ -3504,7 +3504,7 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
                         }}
                       />
                       <div style={{ color: theme.colors.textMuted, fontSize: '12px', marginTop: '8px' }}>
-                        Speech qualification build. Choose a language and matching voice, then save.
+                        Choose a language and a matching voice, then save.
                       </div>
                     </div>
                   )}
@@ -3516,7 +3516,7 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
                       onChange={(voice) => customerSpeech
                         ? updateLocalSettings(prev => ({ ...prev, tts_language: speechSelection.language, tts_voice: voice }))
                         : updateLocal('tts_voice', voice)}
-                      options={customerSpeech ? speechSelection.voices.map(voice => ({ value: voice, label: voice })) : [
+                      options={customerSpeech ? speechSelection.voiceOptions : [
                         { value: 'default', label: 'Default' },
                         { value: 'alloy', label: 'Alloy' },
                         { value: 'echo', label: 'Echo' },

@@ -38,6 +38,7 @@ try:
 except ImportError:
     pass
 
+import logging
 import re
 import secrets
 import threading
@@ -890,7 +891,7 @@ class ViolaWakeListener:
                 if frame_count % 500 == 0 and i == 0:
                     ref_rms_diag = float(np.sqrt(np.mean(ref_frame.astype(np.float32) ** 2)))
                     ref_nonzero = int(np.count_nonzero(ref_frame))
-                    logger.info(
+                    logger.debug(
                         "AEC_REF_DIAG: frame=%d ref_rms=%.1f ref_nonzero=%d/%d ref_min=%d ref_max=%d",
                         frame_count,
                         ref_rms_diag,
@@ -2468,11 +2469,14 @@ class ViolaWakeListener:
                 mic_rms = float(np.sqrt(np.mean(mic_float32**2)))
                 last_mic_rms = mic_rms
 
-                # WAKE_AUDIO_DIAG: periodic diagnostic every ~2s (25 frames * 80ms)
+                # WAKE_AUDIO_DIAG: periodic diagnostic every ~2s (25 frames * 80ms).
+                # DEBUG, not INFO: at INFO it alone wrote ~450 lines per 15 min.
+                # "[STAGE1] audio_in" (every ~10 s) stays at INFO as the
+                # audio-is-flowing proof the live voice oracle reads.
                 if frame_count % 25 == 0:
                     stream_active = self._stream is not None and self._stream.is_active()
                     peak_amplitude = int(np.max(np.abs(mic_int16)))
-                    logger.info(
+                    logger.debug(
                         "WAKE_AUDIO_DIAG: stream_active=%s, frames_read=%d, "
                         "peak_amplitude=%d, rms=%.1f, device=%s (index=%s)",
                         stream_active,
@@ -2488,7 +2492,7 @@ class ViolaWakeListener:
                     min_val = int(np.min(mic_int16))
                     max_val = int(np.max(mic_int16))
                     nonzero = int(np.count_nonzero(mic_int16))
-                    logger.info(
+                    logger.debug(
                         "[AUDIO_DEBUG] frame=%d mic_rms=%.1f min=%d max=%d nonzero=%d/%d",
                         frame_count,
                         mic_rms,
@@ -2661,7 +2665,7 @@ class ViolaWakeListener:
                         buf_rms = float(np.sqrt(np.mean(contiguous_buffer**2)))
                         buf_max = float(np.max(np.abs(contiguous_buffer)))
                         buf_nonzero = np.count_nonzero(contiguous_buffer)
-                        logger.info(
+                        logger.debug(
                             "[DIAG_BUFFER] rms=%.6f max=%.6f nonzero=%d/%d",
                             buf_rms,
                             buf_max,
@@ -2745,8 +2749,11 @@ class ViolaWakeListener:
                     # STAGE2: Score computed - log ALL scores for debugging
                     if last_wake_score is not None:
                         # Log every 25th frame or if score > 0.1 (to capture near-detections)
+                        # Near-detections (> 0.5) stay at INFO; the periodic and
+                        # low-score lines are DEBUG so an idle mic is not log spam.
                         if frame_count % 25 == 0 or last_wake_score > 0.1:
-                            logger.info(
+                            logger.log(
+                                logging.INFO if last_wake_score > 0.5 else logging.DEBUG,
                                 "[STAGE2] score: score=%.3f threshold=%.3f frame=%d",
                                 last_wake_score,
                                 effective_threshold,

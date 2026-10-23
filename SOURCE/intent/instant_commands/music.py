@@ -50,6 +50,30 @@ def _extract_playback_snapshot(music: object) -> tuple[bool | None, object | Non
     return is_playing, now_playing
 
 
+_NOTHING_PLAYING_MESSAGE = "Nothing is playing."
+_NOT_PLAYING_PHASES = frozenset({"IDLE", "STOPPED", "ERROR"})
+
+
+def _playback_phase_name(music: object) -> str | None:
+    """Return the player's PlaybackStateMachine phase name, when reachable."""
+    for holder in (music, getattr(music, "_player", None), getattr(music, "player", None)):
+        if holder is None:
+            continue
+        name = getattr(getattr(getattr(holder, "_playback_sm", None), "phase", None), "name", None)
+        if isinstance(name, str):
+            return name
+    return None
+
+
+def _nothing_playing(music: object) -> bool:
+    """True when there is clearly nothing playing or paused to act on."""
+    phase = _playback_phase_name(music)
+    if phase is not None:
+        return phase in _NOT_PLAYING_PHASES
+    is_playing, now_playing = _extract_playback_snapshot(music)
+    return is_playing is not True and now_playing is None
+
+
 class MusicHandlersMixin:
     """Music and playback instant command handlers."""
 
@@ -729,6 +753,8 @@ class MusicHandlersMixin:
     async def pause(self, params: dict[str, object]) -> dict[str, object]:
         """Pause playback."""
         try:
+            if _nothing_playing(self.controller.music):
+                return {"ok": True, "message": _NOTHING_PLAYING_MESSAGE, "data": {"noop": True}}
             await _call_maybe_async(self.controller.music, "pause")
             return {
                 "ok": True,
@@ -795,6 +821,8 @@ class MusicHandlersMixin:
     async def skip(self, params: dict[str, object]) -> dict[str, object]:
         """Skip to next track."""
         try:
+            if _nothing_playing(self.controller.music):
+                return {"ok": True, "message": _NOTHING_PLAYING_MESSAGE, "data": {"noop": True}}
             await _call_maybe_async(self.controller.music, "skip")
             return {
                 "ok": True,

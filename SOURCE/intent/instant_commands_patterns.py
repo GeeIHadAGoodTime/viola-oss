@@ -84,6 +84,21 @@ RESUME_REGEX = re.compile(
     re.I,
 )
 
+# 1.0.5: typed "next" went to the model, which answered "Do you mean the time
+# now, or the next weather forecast day?". "next" / "skip" are zero-argument
+# transport words, the same class as pause/resume. Same tight bar: the bare
+# word, optionally followed by "song" / "track" (with an optional "this" /
+# "the"), plus the shared polite wrapper. "next week", "skip the intro" and
+# anything else with extra words still route to the model. When nothing is
+# playing the executor answers "Nothing is playing." instead of guessing.
+SKIP_REGEX = re.compile(
+    r"^"
+    + POLITE_PREFIX
+    + _NEGATION_LOOKAHEAD
+    + r"(?:next|skip)(?:\s+(?:(?:this|the)\s+)?(?:song|track))?(?:\s+please)?[!.]*$",
+    re.I,
+)
+
 # Instant command patterns - execute immediately without AI.
 #
 # DEBOX (2026-05-29, boxing audit W2 intent lane) + #1402 (2026-07-16): the
@@ -141,5 +156,13 @@ INSTANT_PATTERNS: list[InstantPattern] = [
         "resume",
         {},
         "Resume playback",
+    ),
+    # ===== SKIP / NEXT (1.0.5) =====
+    # Same five-criteria bar as pause. See SKIP_REGEX's comment above.
+    (
+        SKIP_REGEX,
+        "skip",
+        {},
+        "Skip to the next track",
     ),
 ]
