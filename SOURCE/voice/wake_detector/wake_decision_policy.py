@@ -40,7 +40,7 @@ import numpy as np
 
 from core.constants import SAMPLE_RATE_16K
 from core.logging_config import get_logger
-from core.quiet_hours import is_quiet_hours, wake_threshold_for_now
+from core.quiet_hours import clamp_user_wake_threshold, is_quiet_hours, wake_threshold_for_now
 from voice.wake_detector.wake.config import WakePolicyConfig
 from voice.wake_detector.wake.context import WakeContext, WakeDecisionResult
 
@@ -615,12 +615,13 @@ def set_wake_sensitivity(threshold: float) -> bool:
 
     Returns True when a live policy was updated, False when none exists yet
     (in which case the value is picked up when the policy is first built).
+    The value is clamped into the supported user range first.
     """
     global _global_policy
     with _policy_lock:
         if _global_policy is None:
             return False
-        _global_policy._config.base_threshold = float(threshold)
+        _global_policy._config.base_threshold = clamp_user_wake_threshold(threshold)
         return True
 
 

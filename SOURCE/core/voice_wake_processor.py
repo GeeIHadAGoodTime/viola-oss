@@ -127,6 +127,8 @@ class VoiceWakeProcessor:
         self._last_wake_time = now
 
         logger.info("Wake accepted; entering LISTENING")
+        # Soft chime first, so every wake (including a false one) is noticeable.
+        self.play_wake_chime()
 
         # Record accepted wake
         from diagnostics.wake_metrics import get_wake_metrics
@@ -156,6 +158,15 @@ class VoiceWakeProcessor:
                 },
                 source="voice_orchestrator",
             )
+
+    def play_wake_chime(self) -> None:
+        """Play the short wake confirmation chime without blocking the wake path."""
+        try:
+            from voice.wake_chime import play_wake_chime
+
+            play_wake_chime()
+        except Exception as e:  # noqa: BLE001, RUF100 - a missing chime must never block a wake
+            logger.debug("Wake chime unavailable (non-critical): %s", e)
 
     def get_policy_diagnostics(self) -> dict[str, Any]:
         """Get diagnostics from the wake decision policy."""

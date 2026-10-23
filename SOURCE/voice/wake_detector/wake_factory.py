@@ -11,7 +11,7 @@ from typing import Any
 
 from config import AppConfig
 from core.logging_config import get_logger
-from core.quiet_hours import wake_threshold_for_now
+from core.quiet_hours import clamp_user_wake_threshold, wake_threshold_for_now
 
 logger = get_logger(__name__)
 
@@ -55,7 +55,7 @@ def create_wake_listener(config: AppConfig, on_wake_word_detected: Callable[[], 
         try:
             from voice.wake_detector.violawake_listener import ViolaWakeListener
 
-            threshold = wake_threshold_for_now(getattr(config, "wake_sensitivity", 0.80))
+            threshold = wake_threshold_for_now(clamp_user_wake_threshold(getattr(config, "wake_sensitivity", 0.90)))
             return ViolaWakeListener(
                 config=config,
                 on_wake_word_detected=on_wake_word_detected,

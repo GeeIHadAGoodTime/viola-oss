@@ -89,6 +89,7 @@ import LoadingSkeleton from './components/shared/LoadingSkeleton';
 import ModalLoadingSpinner from './components/shared/ModalLoadingSpinner';
 import ProviderBadge from './components/shared/ProviderBadge';
 import AgentDrawer from './components/AgentDrawer';
+import { clampWakeThreshold } from './utils/wakeSensitivity';
 
 // Shared CSS: animations + variables (replaces all inline <style> tags)
 import './styles/variables.css';
@@ -1383,13 +1384,10 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
   const browserWakeOnWake = useCallback(() => {
     if (browserWakeActionRef.current) browserWakeActionRef.current();
   }, []);
-  // Honor the user's Wake-Up Sensitivity setting (same slider the desktop
-  // engine uses); default is the 0.90 canon threshold.
-  const wakeSensitivity = Number(userSettings?.wake_sensitivity);
-  const browserWakeThreshold =
-    Number.isFinite(wakeSensitivity) && wakeSensitivity > 0 && wakeSensitivity <= 1
-      ? wakeSensitivity
-      : 0.9;
+  // Honor the user's Wake sensitivity setting (the saved value is the score
+  // threshold the desktop engine uses, clamped to the same 0.80-0.97 range);
+  // default is the 0.90 canon threshold.
+  const browserWakeThreshold = clampWakeThreshold(userSettings?.wake_sensitivity);
   const browserWakePaused = voice.isRecording || voice.isProcessing || cloudLlmConsentOpen || cloudWelcomeOpen;
   const browserWake = useBrowserWakeWord({
     enabled: !settingsLoading && voiceCaptureEnabled && handsFreeWake && (isSpoke || cloudSurfaceActive),

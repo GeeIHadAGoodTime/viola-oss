@@ -603,6 +603,14 @@ class VoicePipeline:
             # Start wake word detection
             from voice.wake_detector.facade import WakeDetectorFacade
 
+            # No wake listening before a Viola account signs in on this desktop:
+            # the facade holds the start and resumes it on sign-in. That is a
+            # normal start, not a failure, so report success.
+            if WakeDetectorFacade.hold_until_signed_in(self.wake_detector, self._stop_event):
+                self._try_start_continuous_capture()
+                logger.info("✅ Voice pipeline started (wake word waits for sign-in)")
+                return True
+
             if WakeDetectorFacade.start_current(self.wake_detector, self._stop_event):
                 self._try_start_continuous_capture()
                 logger.info("✅ Voice pipeline started (wake word enabled)")
