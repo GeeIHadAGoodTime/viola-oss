@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "4c70b74db8a0860f4c1fe24bacb2f6e199755ff4",
-  "sha256": "9dc71cf7801d2b49f2bb353a73653c507c098b41a034e19c3f83bb87e9f79477",
+  "revision": "34c8e97743c7d489f1057ba796e79e076c59dde3",
+  "sha256": "b00b62bc838d5bb9cc35aa2bc78342bbb20d3e3085c84fb0a5c33496bfc5347f",
   "files": [
     {
       "path": ".env.example",
@@ -6372,6 +6372,11 @@
       "path": "tests/public/test_wake_listener_lifecycle.py",
       "sha256": "fcd8d847997d7a6f47796c53b6529f58d08e6c4177e1f6039c0904e80ad95cd3",
       "bytes": 47579
+    },
+    {
+      "path": "tests/public/test_windows_gpu_compositing.py",
+      "sha256": "627859251b41aff483494970a59d1896b11724bc90752a7f311485a4a8334870",
+      "bytes": 1322
     },
     {
       "path": "tests/public/test_windows_native_startup_order.py",
@@ -12955,8 +12960,8 @@
     },
     {
       "path": "viola_qt.py",
-      "sha256": "7fce32bffa126ff1c87be2b8dc673c3c9b4bb345b3c075a92ddfeaca6aeb1c85",
-      "bytes": 82310
+      "sha256": "d14f89e3dfb4239a18f4cd1642bdfc3d0666507cb39e10671edb9d6cb792f6ee",
+      "bytes": 82908
     },
     {
       "path": "viola_spoke.py",
