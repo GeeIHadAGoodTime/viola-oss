@@ -17,10 +17,15 @@ from core.constants import (
     QUIET_HOURS_WAKE_THRESHOLD_BOOST,
     QUIET_HOURS_WAKE_THRESHOLD_MAX,
     WAKE_SENSITIVITY_MIN,
+    WAKE_THRESHOLD_USER_MAX,
+    WAKE_THRESHOLD_USER_MIN,
 )
 from core.logging_config import get_logger
 
 logger = get_logger(__name__)
+
+_WAKE_THRESHOLD_DEFAULT = 0.90
+_clamp_logged: set[float] = set()
 
 
 def _clamp(value: float, minimum: float, maximum: float) -> float:
@@ -222,6 +227,32 @@ def tts_volume_for_now(
     return volume
 
 
+def clamp_user_wake_threshold(value: object, default: float = _WAKE_THRESHOLD_DEFAULT) -> float:
+    """Return a saved ``wake_sensitivity`` as a usable wake score threshold.
+
+    ``wake_sensitivity`` is the score threshold itself: higher is stricter.
+    Older builds let users save anything from 0.05 to 1.0 (and their help text
+    pointed people with false wakes toward 0.5). A threshold that low wakes on
+    ordinary conversation many times an hour, and 1.0 never wakes at all, so
+    every reader of the saved value clamps it into the supported range here.
+    The saved value itself is never rewritten, and an in-range value is
+    returned unchanged, so nobody's effective threshold moves silently.
+    """
+
+    threshold = _coerce_float(value, default)
+    clamped = _clamp(threshold, WAKE_THRESHOLD_USER_MIN, WAKE_THRESHOLD_USER_MAX)
+    if clamped != threshold and threshold not in _clamp_logged:
+        _clamp_logged.add(threshold)
+        logger.info(
+            "Saved wake_sensitivity %.2f is outside the supported %.2f-%.2f range; using %.2f",
+            threshold,
+            WAKE_THRESHOLD_USER_MIN,
+            WAKE_THRESHOLD_USER_MAX,
+            clamped,
+        )
+    return clamped
+
+
 def wake_threshold_for_now(
     base_threshold: float | None = None,
     *,
@@ -233,10 +264,10 @@ def wake_threshold_for_now(
 ) -> float:
     """Return wake-word score threshold, boosted during quiet hours."""
 
-    raw_threshold: object = base_threshold
-    if raw_threshold is None:
-        raw_threshold = _settings_value("wake_sensitivity", 0.80, user_id)
-    threshold = _clamp(_coerce_float(raw_threshold, 0.80), WAKE_SENSITIVITY_MIN, 1.0)
+    if base_threshold is None:
+        threshold = clamp_user_wake_threshold(_settings_value("wake_sensitivity", _WAKE_THRESHOLD_DEFAULT, user_id))
+    else:
+        threshold = _clamp(_coerce_float(base_threshold, 0.80), WAKE_SENSITIVITY_MIN, 1.0)
     if is_quiet_hours(now=now, user_id=user_id, **quiet_window):
         return _clamp(threshold + quiet_boost, WAKE_SENSITIVITY_MIN, max_threshold)
     return threshold
@@ -254,6 +285,7 @@ def prompt_time_of_day_mode() -> str:
 
 
 __all__ = [
+    "clamp_user_wake_threshold",
     "is_quiet_hours",
     "prompt_time_of_day_mode",
     "tts_volume_for_now",

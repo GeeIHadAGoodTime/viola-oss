@@ -240,6 +240,13 @@ QUIET_HOURS_DEFAULT_TIMEZONE = "auto"
 QUIET_HOURS_TIME_OVERRIDE_ENV = "VIOLA_TIME_OF_DAY_OVERRIDE"
 QUIET_HOURS_TTS_VOLUME_SCALE = 0.30
 WAKE_SENSITIVITY_MIN = 0.05
+# The range a user can choose for ``wake_sensitivity``, which IS the wake score
+# threshold (higher = stricter, fewer false wakes). Below 0.80 the shipped model
+# false-wakes many times an hour on ordinary speech; above 0.97 it misses most
+# real "Viola"s. Saved values outside the range are clamped where they are read,
+# never rewritten on disk.
+WAKE_THRESHOLD_USER_MIN = 0.80
+WAKE_THRESHOLD_USER_MAX = 0.97
 QUIET_HOURS_WAKE_THRESHOLD_BOOST = 0.08
 QUIET_HOURS_WAKE_THRESHOLD_MAX = 0.98
 
@@ -349,6 +356,8 @@ __all__ = [
     "TIMEOUT_VERY_LONG",
     "VIOLA_VERSION",
     "WAKE_SENSITIVITY_MIN",
+    "WAKE_THRESHOLD_USER_MAX",
+    "WAKE_THRESHOLD_USER_MIN",
     "WEATHER_CACHE_THRESHOLD",
     "WS_TRANSIT_DELAY_MS",
     "Endpoints",

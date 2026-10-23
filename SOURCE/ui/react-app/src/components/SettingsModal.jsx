@@ -51,6 +51,7 @@ import {
   Icons,
   useDebouncedCallback,
 } from './settings';
+import WakeSensitivitySlider from './settings/WakeSensitivitySlider';
 
 // Use centralized theme from config.js
 const theme = THEME;
@@ -3313,16 +3314,11 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
               </Section>
             )}
 
-            <Section title="Wake Word Sensitivity">
+            <Section title="Wake Sensitivity">
               <div style={{ padding: '16px 20px' }}>
-                <Slider
-                  label="Wake-Up Sensitivity"
-                  tooltip="How easily Viola wakes up when you say its name. Higher means easier wake-ups and more accidental triggers."
-                  value={localSettings.wake_sensitivity ?? 0.9}
+                <WakeSensitivitySlider
+                  threshold={localSettings.wake_sensitivity}
                   onChange={(v) => updateLocal('wake_sensitivity', v)}
-                  min={0}
-                  max={1}
-                  step={0.1}
                 />
                 <div style={{ color: theme.colors.textMuted, fontSize: '12px', marginTop: '12px' }}>
                   Wake-word selection and custom training live in Customize.

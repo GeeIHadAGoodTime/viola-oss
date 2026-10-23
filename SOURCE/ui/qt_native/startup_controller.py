@@ -397,6 +397,11 @@ def _start_backend(host: str, port: int, policy: StartupPolicy) -> BackendStartu
                         boot.voice = voice_orch
                         if getattr(boot, "app", None) is not None:
                             boot.app.state.voice_orchestrator = voice_orch
+                        # No wake-word listening until a Viola account is signed
+                        # in here; it starts on sign-in and stops on sign-out.
+                        from voice.wake_detector.facade import install_desktop_account_wake_gate
+
+                        install_desktop_account_wake_gate()
                         voice_orch.start()
                         _wire_deferred_aec(boot)
                         logger.info("✅ Voice orchestrator created and started (deferred)")

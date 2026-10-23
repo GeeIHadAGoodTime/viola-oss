@@ -14,8 +14,11 @@ const theme = THEME;
  * @param {string} [props.label] - Label text shown above slider
  * @param {number} [props.step=1] - Step increment
  * @param {string} [props.tooltip] - Tooltip text
+ * @param {string} [props.valueLabel] - Text shown (and announced) instead of the raw value
+ * @param {string} [props.minLabel] - Caption under the left end of the track
+ * @param {string} [props.maxLabel] - Caption under the right end of the track
  */
-const Slider = React.memo(({ value, onChange, min = 0, max = 100, label, step = 1, tooltip }) => {
+const Slider = React.memo(({ value, onChange, min = 0, max = 100, label, step = 1, tooltip, valueLabel, minLabel, maxLabel }) => {
   const trackRef = useRef(null);
   const [isDragging, setIsDragging] = useState(false);
 
@@ -81,7 +84,7 @@ const Slider = React.memo(({ value, onChange, min = 0, max = 100, label, step = 
   }, [isDragging, updateValue]);
 
   // Format display value
-  const displayValue = step < 1 ? value.toFixed(1) : value;
+  const displayValue = valueLabel ?? (step < 1 ? value.toFixed(1) : value);
 
   return (
     <div style={{ width: '100%' }} title={tooltip}>
@@ -102,6 +105,7 @@ const Slider = React.memo(({ value, onChange, min = 0, max = 100, label, step = 
         aria-valuemin={min}
         aria-valuemax={max}
         aria-valuenow={value}
+        aria-valuetext={valueLabel}
         onKeyDown={handleKeyDown}
         data-hold-interactive
         onMouseDown={handleMouseDown}
@@ -150,6 +154,12 @@ const Slider = React.memo(({ value, onChange, min = 0, max = 100, label, step = 
           transition: isDragging ? 'none' : 'left 0.1s ease',
         }} />
       </div>
+      {(minLabel || maxLabel) && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', color: theme.colors.textMuted, fontSize: '12px' }}>
+          <span>{minLabel}</span>
+          <span>{maxLabel}</span>
+        </div>
+      )}
     </div>
   );
 });
@@ -162,6 +172,9 @@ Slider.propTypes = {
   label: PropTypes.string,
   step: PropTypes.number,
   tooltip: PropTypes.string,
+  valueLabel: PropTypes.string,
+  minLabel: PropTypes.string,
+  maxLabel: PropTypes.string,
 };
 
 export default Slider;

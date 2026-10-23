@@ -11,7 +11,7 @@ the per-user preferences DB on multi-tenant cloud).
 Voice flow example:
     User: "set wake sensitivity to 0.85"
     LLM picks user_settings(action="set", key="wake_sensitivity", value="0.85")
-    Tool validates 0 <= 0.85 <= 1.0, calls SettingsManager.set(...),
+    Tool validates 0.80 <= 0.85 <= 0.97, calls SettingsManager.set(...),
     then applies the change through ``ui.settings_effects`` and reports
     whether it actually took effect.
 
@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import re
 
+from core.constants import WAKE_THRESHOLD_USER_MAX, WAKE_THRESHOLD_USER_MIN
 from core.logging_config import get_logger
 from intent.tool_types import ToolResult
 
@@ -118,11 +119,14 @@ _MUSIC_PROVIDER_ALIASES: dict[str, str | None] = {
 _ADJUSTABLE_SETTINGS: dict[str, dict[str, object]] = {
     "wake_sensitivity": {
         "kind": "float",
-        "min": 0.0,
-        "max": 1.0,
+        "min": WAKE_THRESHOLD_USER_MIN,
+        "max": WAKE_THRESHOLD_USER_MAX,
         "description": (
-            "How sensitive the wake-word detector is. 0.0 is least sensitive "
-            "(never triggers), 1.0 is most sensitive (may have false wakes)."
+            "The wake-word score threshold (default 0.90). HIGHER is STRICTER: "
+            "fewer false wakes, but the user may need to say 'Viola' more clearly. "
+            "LOWER wakes more easily but adds false wakes. If Viola wakes up when "
+            "nobody said her name, raise it (e.g. 0.93); if she misses the user, "
+            "lower it (e.g. 0.87)."
         ),
     },
     "voice_mode": {

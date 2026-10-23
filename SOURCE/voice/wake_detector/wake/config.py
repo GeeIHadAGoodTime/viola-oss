@@ -59,8 +59,12 @@ class WakePolicyConfig:
     @classmethod
     def from_app_config(cls, config: AppConfig) -> WakePolicyConfig:
         """Create policy config from AppConfig."""
+        from core.quiet_hours import clamp_user_wake_threshold
+
         return cls(
-            base_threshold=getattr(config, "wake_sensitivity", 0.90),
+            # wake_sensitivity IS the score threshold (higher = stricter);
+            # saved values outside the supported range are clamped here.
+            base_threshold=clamp_user_wake_threshold(getattr(config, "wake_sensitivity", 0.90)),
             cooldown_ms=getattr(config, "wake_cooldown_ms", 2000),
             zero_input_rms_threshold=getattr(config, "wake_zero_input_rms", 1.0),
         )
