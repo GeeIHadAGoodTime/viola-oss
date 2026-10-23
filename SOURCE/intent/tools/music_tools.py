@@ -7,6 +7,8 @@ playback APIs so the agent does not duplicate player internals.
 
 from __future__ import annotations
 
+import asyncio
+import time
 from typing import Any
 
 from core.cache import BaseTTLCache, Cache
@@ -648,6 +650,25 @@ def _play_tool_result(result: dict[str, Any], *, fallback_label: str = "") -> To
 
 
 _SEEK_TOLERANCE_SECONDS = 1.5
+# A YouTube track plays in the React UI's iframe, which reports its position
+# at most once a second (SmartDisplay ``position_update``). The first read
+# after /v1/seek only echoes the requested position the route wrote, and a
+# report from before the seek can still land after it, so the iframe's own
+# post-seek report is what verifies the move.
+_IFRAME_SEEK_SETTLE_SECONDS = 1.2
+_IFRAME_SEEK_VERIFY_WINDOW_SECONDS = 4.0
+_IFRAME_SEEK_POLL_SECONDS = 0.4
+
+
+def _plays_in_iframe(state: dict[str, Any]) -> bool:
+    now = state.get("now_playing")
+    return isinstance(now, dict) and bool(now.get("video_id"))
+
+
+def _seek_landed(observed: float, target_seconds: float, elapsed: float, *, playing: bool) -> bool:
+    """True when ``observed`` is where a seek to ``target_seconds`` would be now."""
+    upper = target_seconds + _SEEK_TOLERANCE_SECONDS + (elapsed if playing else 0.0)
+    return target_seconds - _SEEK_TOLERANCE_SECONDS <= observed <= upper
 
 
 async def _transport_result(action_name: str, before: dict[str, Any], response: dict[str, Any]) -> ToolResult:
@@ -719,7 +740,10 @@ async def _seek_result(
     delta_seconds: float | None = None,
 ) -> ToolResult:
     """Report where the player actually is, not where it was asked to go."""
+    started = time.monotonic()
     after = await _read_live_playback_state()
+    if after.get("probe_ok") and _plays_in_iframe(after):
+        after = await _read_iframe_position_after_seek(target_seconds, started)
     result_data: dict[str, Any] = {
         "action": action_name,
         "requested_position_seconds": target_seconds,
@@ -737,7 +761,15 @@ async def _seek_result(
         return ToolResult(ok=True, data=result_data, unverified=True)
 
     result_data["position_seconds"] = float(observed)
-    if abs(float(observed) - target_seconds) <= _SEEK_TOLERANCE_SECONDS:
+    landed = abs(float(observed) - target_seconds) <= _SEEK_TOLERANCE_SECONDS
+    if not landed and _plays_in_iframe(after):
+        landed = _seek_landed(
+            float(observed),
+            target_seconds,
+            time.monotonic() - started,
+            playing=bool(after.get("is_playing")),
+        )
+    if landed:
         result_data["verified"] = True
         result_data["message"] = "Moved to %.1f seconds." % float(observed)
         return ToolResult(ok=True, data=result_data)
@@ -748,6 +780,25 @@ async def _seek_result(
         float(observed),
     )
     return ToolResult(ok=True, data=result_data, unverified=True)
+
+
+async def _read_iframe_position_after_seek(target_seconds: float, started: float) -> dict[str, Any]:
+    """Poll the live state until the iframe reports a post-seek position."""
+    await asyncio.sleep(_IFRAME_SEEK_SETTLE_SECONDS)
+    after = await _read_live_playback_state()
+    while True:
+        elapsed = time.monotonic() - started
+        observed = after.get("position_seconds")
+        if (
+            after.get("probe_ok")
+            and isinstance(observed, (int, float))
+            and _seek_landed(float(observed), target_seconds, elapsed, playing=bool(after.get("is_playing")))
+        ):
+            return after
+        if elapsed >= _IFRAME_SEEK_VERIFY_WINDOW_SECONDS:
+            return after
+        await asyncio.sleep(_IFRAME_SEEK_POLL_SECONDS)
+        after = await _read_live_playback_state()
 
 
 def _normalize_rating_value(value: str) -> str:

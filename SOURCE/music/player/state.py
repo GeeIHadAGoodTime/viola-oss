@@ -347,10 +347,25 @@ class MusicPlayerStateManager:
             progress: Progress information from backend
         """
         try:
-            # Extract progress information
-            position_ms = getattr(progress, "position_ms", 0)
-            duration_ms = getattr(progress, "duration_ms", 0)
+            # Extract progress information. Backends report an unknown
+            # duration as None (BackendProgress.duration_ms is Optional), so
+            # coerce before comparing: "'>' not supported between instances
+            # of 'NoneType' and 'int'" (1.0.5 laptop test).
+            position_ms = getattr(progress, "position_ms", 0) or 0
+            duration_ms = getattr(progress, "duration_ms", 0) or 0
             is_playing = getattr(progress, "is_playing", True)
+
+            # A stream backend's progress says nothing about a track the React
+            # YouTube iframe is playing; applying it would overwrite the
+            # iframe-reported position and is_playing.
+            try:
+                from music.runtime.embedded_playback import react_iframe_owns_playback
+
+                if react_iframe_owns_playback(self.player):
+                    logger.debug("Ignoring backend progress: React iframe owns playback")
+                    return
+            except Exception:
+                logger.debug("iframe ownership check failed", exc_info=True)
 
             # Update player state
             with self.player._lock:

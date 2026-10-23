@@ -23,6 +23,7 @@ const playerHarness = vi.hoisted(() => ({
   overlayCallback: null,
   chatResponseCallback: null,
   progressCallback: null,
+  playbackCommandCallback: null,
   state: null,
   setLocalIsPlaying: vi.fn(),
 }));
@@ -102,7 +103,7 @@ vi.mock('../hooks/usePlayerState', () => ({
     setAgentProgressCallback: vi.fn((callback) => { playerHarness.progressCallback = callback; }),
     setDisplayPriorityCallback: vi.fn(),
     setAgentFrameCallback: vi.fn(),
-    setPlaybackCommandCallback: vi.fn(),
+    setPlaybackCommandCallback: vi.fn((callback) => { playerHarness.playbackCommandCallback = callback; }),
     setChatResponseCallback: vi.fn((callback) => { playerHarness.chatResponseCallback = callback; }),
     setCalendarUpdateCallback: vi.fn(),
     setDisconnectCallback: vi.fn(),
@@ -2258,6 +2259,24 @@ describe('SmartDisplay acknowledged pause acceptance', () => {
     await user.click(pauseButton());
     expect(apiHarness.pause).toHaveBeenCalledTimes(2);
     expect(playerHarness.setLocalIsPlaying).toHaveBeenCalledExactlyOnceWith(false);
+  });
+
+  it.each([
+    ['pause', 'pause'],
+    ['play', 'play'],
+  ])('forwards a backend %s command (typed/spoken/agent) to the iframe', async (command, expected) => {
+    // 1.0.5 laptop test: typed "pause" answered "Got it, paused." but only the
+    // backend player paused; nothing told this iframe, so the audio kept going.
+    const view = mount();
+    const iframe = view.container.querySelector('iframe');
+    const send = vi.spyOn(iframe.contentWindow, 'postMessage');
+    try {
+      expect(playerHarness.playbackCommandCallback).toEqual(expect.any(Function));
+      act(() => playerHarness.playbackCommandCallback(command, { source: 'voice' }));
+      expect(send.mock.calls.map(([message]) => message.command)).toContain(expected);
+    } finally {
+      send.mockRestore();
+    }
   });
 
   it('does not send a second pause while the first result is pending', async () => {

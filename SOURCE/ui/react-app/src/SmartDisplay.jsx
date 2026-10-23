@@ -1991,12 +1991,19 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
     onTranscript: handleCloudPhoneTranscript,
   });
 
-  // CB-7 FIX: Forward playback commands from backend to YouTube iframe
+  // CB-7 FIX: Forward playback commands from backend to YouTube iframe.
+  // The backend player cannot reach this iframe, so a typed/spoken/agent
+  // pause or resume only reaches the audio through these frames (1.0.5
+  // laptop test: "Got it, paused." while the video kept playing).
   useEffect(() => {
     if (!setPlaybackCommandCallback) return;
     const handlePlaybackCommand = (command, payload) => {
       if (command === 'seek' && payload.position !== undefined) {
         sendToIframe('seekTo', { seconds: payload.position });
+      } else if (command === 'pause') {
+        sendToIframe('pause');
+      } else if (command === 'play' || command === 'resume') {
+        sendToIframe('play');
       }
     };
     setPlaybackCommandCallback(handlePlaybackCommand);

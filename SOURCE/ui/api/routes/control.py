@@ -560,6 +560,13 @@ def register_control_routes(context: ApiContext, toolbox: RouteToolbox) -> None:
                 await hub.broadcast("state", ps, user_id=user_id, force=True)
             except Exception as exc:
                 log.warning("Failed to broadcast state after pause: %s", exc)
+            # A YouTube track plays in the React UI's iframe, which the player
+            # cannot reach: tell every UI of this user to pause it (agent tool
+            # and other-window pauses arrive here, not via the local button).
+            try:
+                await hub.broadcast_command("pause", {"source": "rest"}, user_id=user_id)
+            except Exception as exc:
+                log.debug("Pause broadcast_command failed (non-critical): %s", exc)
 
             return {"ok": True, "error": None, "data": {}}
 
@@ -657,6 +664,10 @@ def register_control_routes(context: ApiContext, toolbox: RouteToolbox) -> None:
                 await hub.broadcast("state", ps, user_id=user_id, force=True)
             except Exception as exc:
                 log.warning("Failed to broadcast state after resume: %s", exc)
+            try:
+                await hub.broadcast_command("play", {"source": "rest"}, user_id=user_id)
+            except Exception as exc:
+                log.debug("Resume broadcast_command failed (non-critical): %s", exc)
 
             return {"ok": True, "error": None, "data": {}}
 

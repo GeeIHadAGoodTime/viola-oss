@@ -47,6 +47,23 @@ def _is_stopped(player) -> bool:
     return sm is not None and sm.phase == PlaybackPhase.STOPPED
 
 
+def _iframe_owns_playback(player, backend: Any = None) -> bool:
+    """True when the React YouTube iframe is the audible source, not ``player._backend``.
+
+    Transport for such a track must not touch the stream backend: pausing it
+    pauses nothing audible, and seek/play hand it a YouTube URL it cannot
+    decode (1.0.5 laptop test: "Playback produced no audio"). React receives
+    the pause/play/seek over the WebSocket instead.
+    """
+    try:
+        from music.runtime.embedded_playback import react_iframe_owns_playback
+
+        return react_iframe_owns_playback(player, backend)
+    except Exception:
+        logger.debug("iframe ownership check failed", exc_info=True)
+        return False
+
+
 # ============================================================================
 # Playback Controller
 # ============================================================================
@@ -168,8 +185,11 @@ class MusicPlayerPlaybackController:
         need_engine_resume = False
         need_backend_resume = False
         try:
+            iframe_owned = _iframe_owns_playback(self.player)
             # Check engine manager first if available
-            if hasattr(self.player, "_engine_manager") and self.player._engine_manager is not None:
+            if iframe_owned:
+                logger.debug("resume: React iframe owns playback, backend left alone")
+            elif hasattr(self.player, "_engine_manager") and self.player._engine_manager is not None:
                 try:
                     active_provider = self.player._engine_manager.active_provider()
                     if active_provider:
@@ -177,7 +197,7 @@ class MusicPlayerPlaybackController:
                 except Exception as exc:
                     logger.warning("Engine manager active_provider check failed: %r", exc)
 
-            if not need_engine_resume:
+            if not need_engine_resume and not iframe_owned:
                 # Fall back to backend manager
                 self.player._ensure_playlist_coherent_locked()
                 if self.player._backend_manager.backend:
@@ -215,7 +235,7 @@ class MusicPlayerPlaybackController:
     def _best_effort_resume(self) -> None:
         """Resume backend and set flags without holding _cv. Used as fallback."""
         backend = getattr(self.player._backend_manager, "backend", None)
-        if backend and hasattr(backend, "resume"):
+        if backend and hasattr(backend, "resume") and not _iframe_owns_playback(self.player, backend):
             try:
                 backend.resume()
             except Exception as exc:
@@ -321,6 +341,12 @@ class MusicPlayerPlaybackController:
         """
         with self.player._lock:
             try:
+                if _iframe_owns_playback(self.player):
+                    # The iframe seeks via the WebSocket ``seek`` command; the
+                    # idle stream backend would restart a doomed stream here.
+                    self.player._position_ms = position_ms
+                    logger.debug("Seek %sms left to the React iframe", position_ms)
+                    return
                 if not self.player._backend:
                     raise ValueError("No active backend")
 
@@ -624,6 +650,20 @@ class MusicPlayerPlaybackController:
     def _tell_backend_to_play(self, track: Any) -> None:
         """Tell backend to play the new track."""
         backend = self.player._backend
+        try:
+            from music.runtime.embedded_playback import backend_drives_embedded_video, is_react_iframe_item
+
+            iframe_track = is_react_iframe_item(track) and not backend_drives_embedded_video(backend)
+        except Exception:
+            iframe_track = False
+        if iframe_track:
+            # React renders the new video from the state broadcast.
+            self.player._position_ms = 0
+            logger.info(
+                "SKIP_EMBEDDED: %s plays in the React iframe; stream backend not started",
+                getattr(track, "id", "unknown"),
+            )
+            return
         if backend and hasattr(backend, "play"):
             try:
                 backend.play(track)
@@ -708,7 +748,10 @@ class MusicPlayerPlaybackController:
             if _is_stopped(self.player):
                 logger.debug("pause_playback: playback is stopped, nothing to pause")
                 return
-            if not self.player._backend_manager.backend:
+            if _iframe_owns_playback(self.player):
+                # The React iframe is playing; the stream backend is idle.
+                logger.debug("pause_playback: React iframe owns playback, backend left alone")
+            elif not self.player._backend_manager.backend:
                 # Engine manager path
                 need_engine_pause = hasattr(self.player, "_engine_manager") and self.player._engine_manager is not None
             else:
@@ -746,7 +789,7 @@ class MusicPlayerPlaybackController:
         if _is_stopped(self.player):
             return
         backend = getattr(self.player._backend_manager, "backend", None)
-        if backend and hasattr(backend, "pause"):
+        if backend and hasattr(backend, "pause") and not _iframe_owns_playback(self.player, backend):
             try:
                 backend.pause()
             except Exception as exc:
