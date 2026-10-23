@@ -600,9 +600,72 @@ def play_embedded_webview(
     return False
 
 
+# ---------------------------------------------------------------------------
+# React iframe ownership
+# ---------------------------------------------------------------------------
+# YouTube tracks on the desktop play inside the React UI's own <iframe>
+# (EMBEDDED_DEFER): the backend sets now_playing and React renders the embed.
+# The player's ``_backend`` meanwhile is whatever stream backend was created at
+# startup (SimpleBackend on Windows). That backend cannot play a YouTube watch
+# URL -- handing it one starts a doomed ffmpeg stream ("Playback produced no
+# audio") and its progress callbacks then stomp the position/is_playing that
+# the iframe reports. Transport calls (pause/resume/seek/next) for an iframe
+# track must therefore leave such a backend alone; React is told over the
+# WebSocket instead (``command`` frames, see intent/instant_commands/_base.py).
+
+# Backends that really drive an embedded video surface themselves.
+_EMBEDDED_VIDEO_BACKENDS = frozenset({"YouTubeIFrameBackend", "YouTubeWebBackend", "EmbeddedPlayerBackend"})
+# Modes that mean "a stream backend decodes this item", never the React iframe.
+_STREAM_PLAYBACK_MODES = frozenset({"vlc_stream", "external_browser", "spotify_cdp"})
+_NON_IFRAME_PROVIDERS = frozenset({"browser", "spotify", "spotify_cdp", "local"})
+
+
+def is_react_iframe_item(item: Any) -> bool:
+    """True when ``item`` is a YouTube track the React iframe plays."""
+    if item is None:
+        return False
+    provider = str(getattr(item, "provider", "") or "").lower()
+    if provider in _NON_IFRAME_PROVIDERS:
+        return False
+    mode = getattr(item, "playback_mode", None)
+    if isinstance(mode, str) and mode in _STREAM_PLAYBACK_MODES:
+        return False
+    return bool(getattr(item, "video_id", None))
+
+
+def backend_drives_embedded_video(backend: Any) -> bool:
+    """True when ``backend`` itself controls an embedded video player."""
+    if backend is None:
+        return False
+    names = {cls.__name__ for cls in type(backend).__mro__}
+    if not names & _EMBEDDED_VIDEO_BACKENDS:
+        return False
+    if "YouTubeIFrameBackend" in names:
+        # Without a webview controller its JS calls go nowhere (YTI_JS_SKIP).
+        return getattr(backend, "_webview_controller", None) is not None
+    return True
+
+
+def react_iframe_owns_playback(player: Any, backend: Any = None) -> bool:
+    """True when the React iframe, not ``player._backend``, is the audible source.
+
+    ``backend`` defaults to ``player._backend``; pass the backend snapshot a
+    caller already captured under the player lock.
+    """
+    state = getattr(player, "_state", None)
+    if not is_react_iframe_item(getattr(state, "now_playing", None)):
+        return False
+    if backend is None:
+        backend = getattr(player, "_backend", None)
+    return not backend_drives_embedded_video(backend)
+
+
 __all__ = [
+    "backend_drives_embedded_video",
     "get_browser_backend_display_name",
+    "is_react_iframe_item",
     "play_embedded_iframe_webview",
     "play_embedded_webview",
     "play_external_browser",
+    "react_iframe_owns_playback",
 ]

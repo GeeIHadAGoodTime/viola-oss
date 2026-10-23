@@ -308,7 +308,17 @@ class BaseInstantCommandHandlersMixin:
         postMessage, so voice-initiated seeks update backend state but the
         video keeps playing from its old position.
         """
-        hub = self._event_hub
+        await self._broadcast_playback_command("seek", {"position": position_seconds, "source": "voice"})
+
+    async def _broadcast_playback_command(self, command: str, payload: dict[str, object] | None = None) -> None:
+        """Send a transport ``command`` frame (seek/pause/play) to this user's UI.
+
+        The desktop plays YouTube inside the React UI's own iframe; the backend
+        player has no handle on it. React forwards these frames to the iframe
+        (SmartDisplay ``handlePlaybackCommand``), so a typed or spoken pause
+        actually stops the audio instead of only flipping backend state.
+        """
+        hub = getattr(self, "_event_hub", None)
         if hub is None:
             return
         try:
@@ -319,12 +329,12 @@ class BaseInstantCommandHandlersMixin:
             user_id = None
         try:
             await hub.broadcast_command(
-                "seek",
-                {"position": position_seconds, "source": "voice"},
+                command,
+                dict(payload or {"source": "voice"}),
                 user_id=user_id,
             )
         except Exception as exc:
-            log.debug("Seek broadcast_command failed (non-critical): %s", exc)
+            log.debug("%s broadcast_command failed (non-critical): %s", command, exc)
 
     async def _broadcast_calendar_updated(self, action: str, payload: dict[str, object] | None = None) -> None:
         """Broadcast a calendar cache invalidation event to WS clients."""
