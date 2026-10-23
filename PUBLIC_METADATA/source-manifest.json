@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "48aa92a50b527ea5d4f7153bb859fe710e931f7b",
-  "sha256": "623a70fe614d7e48d6aea485523cf896912385ba57ed51d2dda444dbdc5058f7",
+  "revision": "1e23f9be4118200a834a0a12b97bdab2de55a0d2",
+  "sha256": "e0a1be0b5edde11e3714fc272020d40b9abcdff68e0c7d03eb4dc7b0765fa2e5",
   "files": [
     {
       "path": ".env.example",
@@ -500,13 +500,13 @@
     },
     {
       "path": "audio_core/wasapi/aec_reference_adapter.py",
-      "sha256": "987ba13050b6c731fb74934aa0017252d523fcc7e82de761e51986ecc521b2b0",
-      "bytes": 4267
+      "sha256": "28e24529aefd4f930ee64154a5da33e65cc56877f8dbaa81d10a5b046bfeb584",
+      "bytes": 4968
     },
     {
       "path": "audio_core/wasapi/capture_module.py",
-      "sha256": "c60ab445c57d9791d51ead8b57183786c9a763f819a0bc628795d88d0bc101c9",
-      "bytes": 15252
+      "sha256": "f2451484ab6a06ed8216bd96aa0a49d8ba42402af760ce9d4519e14116dbf43b",
+      "bytes": 23680
     },
     {
       "path": "audio_core/wasapi/loopback.py",
@@ -540,8 +540,8 @@
     },
     {
       "path": "auth/desktop_session.py",
-      "sha256": "b1ffd9ed8ff3dbc235965a387733385ac2815ff66b47d76585792ae968a8cdf7",
-      "bytes": 46676
+      "sha256": "80b5239a3132c21c89e90d00c9297ada4e7bae98c4a040635714984ac23205b8",
+      "bytes": 49781
     },
     {
       "path": "auth/entitlement_projection.py",
@@ -995,8 +995,8 @@
     },
     {
       "path": "core/constants.py",
-      "sha256": "d0a0c45ba3fe638ff8d1cb95f12fd8c6ba5a05ed39a9998faa3669a146054edc",
-      "bytes": 11919
+      "sha256": "aab124d17d5173cd2d799f905e5d5ebf3ae193b663d7de332316274d729c9a22",
+      "bytes": 12391
     },
     {
       "path": "core/contribution_exclusion.py",
@@ -1115,8 +1115,8 @@
     },
     {
       "path": "core/quiet_hours.py",
-      "sha256": "666252f3a325c21bf586571940b102fa7dec688775c5afe1daa960d3efb82327",
-      "bytes": 8252
+      "sha256": "17dc6d70597dea8b97c10299162d7ce311689e23a46bd3f1644c3bb8ae3b1df1",
+      "bytes": 9928
     },
     {
       "path": "core/request_context.py",
@@ -1160,8 +1160,8 @@
     },
     {
       "path": "core/single_instance.py",
-      "sha256": "6a1d1771eb30bbd293bdbfb05988a8755815339f80e358d4567ff5b530401cc5",
-      "bytes": 24461
+      "sha256": "2afbcff7a0def5968ba99e355b23c7aa92a966d6d7c36c63bbb3a35bce4b4b72",
+      "bytes": 24744
     },
     {
       "path": "core/state_hub.py",
@@ -1240,8 +1240,8 @@
     },
     {
       "path": "core/voice_command_handler.py",
-      "sha256": "8e97e7e23c765c1816caee280fe4a92098f8f5bb9ac23a606d985396ae824434",
-      "bytes": 76031
+      "sha256": "e987ce71155e7427e8619ee73a71185b5147e66893a23363faee8b9727b1ce29",
+      "bytes": 80040
     },
     {
       "path": "core/voice_orchestrator.py",
@@ -1275,8 +1275,8 @@
     },
     {
       "path": "core/voice_wake_processor.py",
-      "sha256": "28896094efbf167d973172947bc652c9e8fe1f2f933a86bf32b7af863dd79af5",
-      "bytes": 9814
+      "sha256": "817557274a91ead4f27a2060e1e3ec80c15973be60ddfc885f35769eedff4531",
+      "bytes": 10587
     },
     {
       "path": "core/win32_job.py",
@@ -1785,8 +1785,8 @@
     },
     {
       "path": "intent/instant_commands/_base.py",
-      "sha256": "9b38f0bd3e56dcdb9d27da30b9d9fc47f9ec3a1a142d60c22baafd3b3a239227",
-      "bytes": 11461
+      "sha256": "e8e6cd04d9ac55d6db93a8be0f4ba6e44f1c5275cbfe343932811a9925962ee2",
+      "bytes": 12098
     },
     {
       "path": "intent/instant_commands/calendar.py",
@@ -1805,8 +1805,8 @@
     },
     {
       "path": "intent/instant_commands/music.py",
-      "sha256": "fb5d834fdda964535ae67899901ce4fbb4ddeaae658efcae155a2f1e7c9d72a8",
-      "bytes": 103676
+      "sha256": "ae383a5c905af2082765e3d6ce43eb9b59ffc0446cb6eb2f7efd50afbe45c145",
+      "bytes": 105274
     },
     {
       "path": "intent/instant_commands/runtime.py",
@@ -2095,8 +2095,8 @@
     },
     {
       "path": "intent/tools/memory.py",
-      "sha256": "d8c81465e53942d7759d658427c53bac9fa49e9dac03da509425bbc5b2c135e7",
-      "bytes": 8617
+      "sha256": "947f5565eb0e59b24c1f58efbe086f970add7f404caa6d2a02516596714249c6",
+      "bytes": 9494
     },
     {
       "path": "intent/tools/music_connect.py",
@@ -2105,8 +2105,8 @@
     },
     {
       "path": "intent/tools/music_tools.py",
-      "sha256": "6b05196d18de9a5e3e434faaf80ed9a9666835397f24ff15a8762bbe32e18186",
-      "bytes": 60136
+      "sha256": "a0ae3bff07385a20c669022a13e81467c111e681716f90e48f9279d698a6836e",
+      "bytes": 62362
     },
     {
       "path": "intent/tools/notification_tools.py",
@@ -2140,8 +2140,8 @@
     },
     {
       "path": "intent/tools/settings_tools.py",
-      "sha256": "1bb5d6c3d913094c1fdf0ee74380686b5d0103373b0f188817e6deae6d46640e",
-      "bytes": 24217
+      "sha256": "3cc52a58cd16f18f1090dedd5316b4e9b557f1460b165877ecdbc1572e420ce2",
+      "bytes": 25197
     },
     {
       "path": "intent/tools/shell.py",
@@ -2360,8 +2360,8 @@
     },
     {
       "path": "mcp_servers/core_tools/server.py",
-      "sha256": "1033027005eac00863cbb60f1eb1337f31e8d380dc3962b1308cc7dffa0fa48a",
-      "bytes": 244911
+      "sha256": "1fb17db7b960afa718120f2ae6d50158e301be4870d7b2bc7527dc85310be0ba",
+      "bytes": 244957
     },
     {
       "path": "mcp_servers/phone_tool_descriptions.py",
@@ -2850,8 +2850,8 @@
     },
     {
       "path": "music/player/playback.py",
-      "sha256": "98832fb939420185d3a9f2f7020f5d0847c23b6ccee6ac581c124f21ebd80443",
-      "bytes": 44064
+      "sha256": "ed88c83ca4f5d650ca0eda6cb11fd75a59fa7ed8088e0c2add4363f72f3d4ce4",
+      "bytes": 46294
     },
     {
       "path": "music/player/playback_state.py",
@@ -2860,8 +2860,8 @@
     },
     {
       "path": "music/player/state.py",
-      "sha256": "0cb5b1c60f6fdcaf9d2b11023f6819d5981646330e88b7568028a7e1faec5c33",
-      "bytes": 24994
+      "sha256": "adbc4bc68f1096e89557dd1224a7cd861942f3eb38971a107326694831a1b375",
+      "bytes": 25842
     },
     {
       "path": "music/player/test_stub.py",
@@ -3190,13 +3190,13 @@
     },
     {
       "path": "music/runtime/control_surface.py",
-      "sha256": "7346479708909a07ba872e6c97d5dbdfacc7d2520019f53d953dfefe2e6c4939",
-      "bytes": 41430
+      "sha256": "8c075a6dd0b1eb78926b4f363fc8ee9369700898b08a0794538f5bb5e62f2f6d",
+      "bytes": 42856
     },
     {
       "path": "music/runtime/embedded_playback.py",
-      "sha256": "85bc58e767e3009af9d40baaa2aaecd435e103b58eb36e1a083400ec0be40a3f",
-      "bytes": 24142
+      "sha256": "13ae720725ba47dff9b78d46fc8f98f7cf88bfbbb8c2ad2d8da1ca2ef80ba68a",
+      "bytes": 27086
     },
     {
       "path": "music/runtime/play_command.py",
@@ -4750,8 +4750,8 @@
     },
     {
       "path": "services/memory/dir.py",
-      "sha256": "44c090964e0946efe4f06cfb2a8d80b1ef7973203f339b80990bea98da235139",
-      "bytes": 92935
+      "sha256": "8b86c736314e5af043314429c13670c1fef92f56264244ea795dfa5ee2318310",
+      "bytes": 98339
     },
     {
       "path": "services/memory/extract_memories.py",
@@ -6010,8 +6010,8 @@
     },
     {
       "path": "tests/customer_speech/test_real_pronunciation.py",
-      "sha256": "ca50620f42998c1fbc4070da7a7959c397360ed6f796219bbe20aeeef5928bd7",
-      "bytes": 7453
+      "sha256": "8a05fc8f9efcf289080f46223673d9aaa301916173b50615f6bb4b877ff5c111",
+      "bytes": 9588
     },
     {
       "path": "tests/customer_speech/test_real_routing.py",
@@ -6090,8 +6090,8 @@
     },
     {
       "path": "tests/public/test_customer_pronunciation.py",
-      "sha256": "081291f8c3660decc8a9d183ea9adad76564c080d01e55770964576ce95a108d",
-      "bytes": 18730
+      "sha256": "67ccba305910acb9823d5496570fadc1d98f1a0588f77a4bfb915d18d1706b70",
+      "bytes": 20792
     },
     {
       "path": "tests/public/test_customer_romance_composition.py",
@@ -6145,8 +6145,8 @@
     },
     {
       "path": "tests/public/test_english_decimal_normalization.py",
-      "sha256": "9620c631c3f396d915f48ff2acbe5ad497c52007c4cb2f1f158b2bfbbac68f55",
-      "bytes": 10503
+      "sha256": "e0e9bdf3cffa5a2ff7ea3e97ac242744c93eb5a1ff9374ddd76568724455157a",
+      "bytes": 14177
     },
     {
       "path": "tests/public/test_execution_safety_contract.py",
@@ -6205,8 +6205,8 @@
     },
     {
       "path": "tests/public/test_native_titlebar_resize.py",
-      "sha256": "e3e8a93b3e885331cf5b4a465fe98b649c7ed9390098f8c28bd59c849c0a5fbd",
-      "bytes": 10727
+      "sha256": "edc6e1e955039792d77ea758f8f0719cb190c58008304a923f08a01300bd47a1",
+      "bytes": 11532
     },
     {
       "path": "tests/public/test_ollama_openai_fallback_model.py",
@@ -6240,8 +6240,8 @@
     },
     {
       "path": "tests/public/test_phone_locale_normalization.py",
-      "sha256": "24d3b34c16e3a5bbcf2644b2c03374133e5adde57ead62dc31af929c1f6db184",
-      "bytes": 11022
+      "sha256": "f665059b0314ebdbb083b84a75c6f4a67f73469ddd282d9a4d65e6037d288ba5",
+      "bytes": 11090
     },
     {
       "path": "tests/public/test_phone_queue_lifecycle.py",
@@ -6270,8 +6270,8 @@
     },
     {
       "path": "tests/public/test_queue_play_selection.py",
-      "sha256": "efa32d40a28b950560fda6fa47068fb339fd55f51075b4706d2d0e4e34f24824",
-      "bytes": 25201
+      "sha256": "c1a3679df89229eb1eb5d58878ce82143a58f3862f816dfaed3e05de91c379e1",
+      "bytes": 25951
     },
     {
       "path": "tests/public/test_queue_wire_contract.py",
@@ -6380,8 +6380,8 @@
     },
     {
       "path": "tests/public/test_windows_native_startup_order.py",
-      "sha256": "78ef446927057a67890043144a8b4f7b21bd32b2003f53b9a24741fccca421ee",
-      "bytes": 25460
+      "sha256": "9f35955cf85d27dc74cf985bb5b6073459050f5712affb93f8e1d4e41cf76345",
+      "bytes": 25801
     },
     {
       "path": "tests/public/test_windows_toast_delivery_contract.py",
@@ -6470,7 +6470,7 @@
     },
     {
       "path": "third_party/misaki_cjk_prototype.patch",
-      "sha256": "13d7a8d342281dc7583f0f7b0a7b395ab17eb5d013025c8035f257d2e9209e35",
+      "sha256": "08d634e060081b31b69c88ec92527f96e0426c16ea574d4f83b948b2fd1a998a",
       "bytes": 37567
     },
     {
@@ -6545,7 +6545,7 @@
     },
     {
       "path": "third_party/misaki_cjk_prototype/viola_cjk/customer_english_span.py",
-      "sha256": "362e2a28d0b41db1e6a4b334fb8c9aa68248b32e9581c423c0bb3c891ed4f6a2",
+      "sha256": "3912e0eb7135e90220597eb3d0c450dbf452ba20ced06b9fe8a7afc7b0e8e71b",
       "bytes": 2772
     },
     {
@@ -9200,7 +9200,7 @@
     },
     {
       "path": "third_party/sources.toml",
-      "sha256": "e69f1526cc50f28a7f50f60ab2181725b7caa918014b3519be04a6cebd30d86f",
+      "sha256": "bf7d015be536f225c22c3a83cee709af75244b30a378750abe7a871ecaaf7c31",
       "bytes": 211050
     },
     {
@@ -9410,8 +9410,8 @@
     },
     {
       "path": "ui/api/routes/control.py",
-      "sha256": "b54cef7506ceb05c9353bc2d70522c550c7788e30e883f5403872ce176af91f5",
-      "bytes": 67165
+      "sha256": "2916cf926be6da1bc46eaca2eeee957b7fb072fce1fa83fb876ecb0bf8fc38aa",
+      "bytes": 67857
     },
     {
       "path": "ui/api/routes/cost.py",
@@ -9455,8 +9455,8 @@
     },
     {
       "path": "ui/api/routes/health.py",
-      "sha256": "7ce3fcd66c9a316bde119dc1eed84bdce184eadec4b1616361235546c0dc4497",
-      "bytes": 25882
+      "sha256": "e51dc9c906777fe9580f79f8c9d0c75d524a789c6ee8dcfc1665f4c6b9936ffc",
+      "bytes": 26431
     },
     {
       "path": "ui/api/routes/intent_market.py",
@@ -9740,8 +9740,8 @@
     },
     {
       "path": "ui/onboarding.py",
-      "sha256": "3ac93fb4a32f7f747cb99eab81badefa098901ccaa555aec5402c1e62da304fd",
-      "bytes": 34236
+      "sha256": "71e98981e761ccde37dc9b0b6138079fb767f43b94f13a09743ad727a6e155d8",
+      "bytes": 37130
     },
     {
       "path": "ui/qt_native/README_QT_UI.txt",
@@ -9830,8 +9830,8 @@
     },
     {
       "path": "ui/qt_native/startup_controller.py",
-      "sha256": "2fae844411d4f98234462e38ae9c1944236fb094927959dd9068d481ed916259",
-      "bytes": 35352
+      "sha256": "80deadd41d164cf237b79dcfa251259d437f08159de1b5259f7f5692b09d87bf",
+      "bytes": 36915
     },
     {
       "path": "ui/qt_native/startup_types.py",
@@ -9860,8 +9860,8 @@
     },
     {
       "path": "ui/qt_native/webview_window.py",
-      "sha256": "34c0a863e20421d640fab41e05250c9841a3ee6730e6a2dbe58407ea89d98130",
-      "bytes": 202954
+      "sha256": "43c3ec7ac3ce8ea287b4a39f18026573e87eb407e2db85818b0a40fc779910c5",
+      "bytes": 217334
     },
     {
       "path": "ui/qt_native/widgets/connectivity_status.py",
@@ -10010,8 +10010,8 @@
     },
     {
       "path": "ui/react-app/src/SmartDisplay.jsx",
-      "sha256": "b0fe2adab2fdd2b1b6de1e24b7c22055f7d1ae7aac72733a6df9b2e90f673536",
-      "bytes": 172672
+      "sha256": "61bc2297e4f191e625116f16fb30182d07a17a146e5c8f82997e387f08429124",
+      "bytes": 173439
     },
     {
       "path": "ui/react-app/src/SmartDisplay.spokePolicy.test.jsx",
@@ -10030,8 +10030,8 @@
     },
     {
       "path": "ui/react-app/src/SmartDisplay.wakeStatus.test.jsx",
-      "sha256": "d2c487f320bf1b5efffd0545e59dcc60b7f33370e24d06c35ce7d4aa10ed5dcc",
-      "bytes": 11474
+      "sha256": "660f7b0f3d2c5a7c4e19163c5bf511dc8e9d828df9010436b050b0a5689d72e1",
+      "bytes": 12990
     },
     {
       "path": "ui/react-app/src/__tests__/README.md",
@@ -10040,8 +10040,8 @@
     },
     {
       "path": "ui/react-app/src/__tests__/SmartDisplay.test.jsx",
-      "sha256": "512f45286fb722fc0f231343dd5ba15e1d366af282d3df391d49de610becb20b",
-      "bytes": 130256
+      "sha256": "950c53c6a5c8e567cd529042a390962f31271ac03b699a72a815c4a125bd0c17",
+      "bytes": 131149
     },
     {
       "path": "ui/react-app/src/__tests__/hooks/useEventBus.test.jsx",
@@ -10575,8 +10575,8 @@
     },
     {
       "path": "ui/react-app/src/components/HelpModal.jsx",
-      "sha256": "6a5d65e6de4917115cf0bf0b28d94c8405386dbcaf4729efbc5b2f641d287d96",
-      "bytes": 15550
+      "sha256": "b0652d5976b16db96dbe54a82f26be86a21bba8be45f56a7bfe287f6a60ce795",
+      "bytes": 16158
     },
     {
       "path": "ui/react-app/src/components/HelpModal.test.jsx",
@@ -10665,18 +10665,23 @@
     },
     {
       "path": "ui/react-app/src/components/OnboardingHighlight.jsx",
-      "sha256": "a967b9b4de5fd9688e58b4ce0774929f13886342de6ad0dc0884fe9666b28fbc",
-      "bytes": 5166
+      "sha256": "7db8d1394d2e9ce76c4e680b7daaaac5608a306bce060732d2bf0c5db8c0e43b",
+      "bytes": 5521
     },
     {
       "path": "ui/react-app/src/components/OnboardingOverlay.jsx",
-      "sha256": "0aafc75684816c5d47e77de2e256ad0c140126c9e595b6b4ab4674bf159077bc",
-      "bytes": 30241
+      "sha256": "df33e92ba9f02da6dfc0cf3e8838c7f8f53dd26e8a21a3d102e5ea8dfe64fe95",
+      "bytes": 31258
+    },
+    {
+      "path": "ui/react-app/src/components/OnboardingOverlay.stableFrames.test.jsx",
+      "sha256": "bbedf4993eb16667de5b9d1436267deebb1eec5117af8c58e8ed335b046aa2f5",
+      "bytes": 4500
     },
     {
       "path": "ui/react-app/src/components/OnboardingOverlay.test.jsx",
-      "sha256": "8295f88cb9631c20a262b7985852cef24b32afb0bf4432850b017c241c93bea2",
-      "bytes": 13400
+      "sha256": "c20a116dd0ff9ded518736a20a0e9cc756960f69b096a132444700a158670730",
+      "bytes": 14615
     },
     {
       "path": "ui/react-app/src/components/OnboardingSkip.jsx",
@@ -10800,8 +10805,8 @@
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.jsx",
-      "sha256": "6e506fe88fedf5692b4350df94e670aa55aa06d23cf207ca492d4350026fc03e",
-      "bytes": 203938
+      "sha256": "6c5116e244322cbb6d3a3f9f5d3e84f02815e2c7004ba9037a6eda012cf35434",
+      "bytes": 208222
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.localDiscovery.test.jsx",
@@ -11275,8 +11280,8 @@
     },
     {
       "path": "ui/react-app/src/components/settings/Slider.jsx",
-      "sha256": "3e17c0c367543674e4e8fd62c67e5520e011bdffd8a8bb8f93c269f4124fd8a5",
-      "bytes": 5564
+      "sha256": "fdeedf4ad49b2b3e8c3ffa1b5e7fed95dc974e14fba01b0dbf0df2c62e8622cf",
+      "bytes": 6420
     },
     {
       "path": "ui/react-app/src/components/settings/Slider.test.jsx",
@@ -11322,6 +11327,16 @@
       "path": "ui/react-app/src/components/settings/TtsStatusIndicator.test.jsx",
       "sha256": "194422d61bbdca71db53cec8fc9e9134db61f55824546c7fcc871e8211286674",
       "bytes": 2261
+    },
+    {
+      "path": "ui/react-app/src/components/settings/WakeSensitivitySlider.jsx",
+      "sha256": "d737ab17c425367416e5ea0079d2b3d1651148c10d5f660f281421d8c0aa4024",
+      "bytes": 1556
+    },
+    {
+      "path": "ui/react-app/src/components/settings/WakeSensitivitySlider.test.jsx",
+      "sha256": "452483d703465e9098118bbd14bc97d72522bc9a065c088067bf75260e121b44",
+      "bytes": 4382
     },
     {
       "path": "ui/react-app/src/components/settings/index.js",
@@ -11615,8 +11630,8 @@
     },
     {
       "path": "ui/react-app/src/components/voice/BottomRow.jsx",
-      "sha256": "795890feceb0c7a62f7d128ffb8d050c1351c2ea6593cfba156add855e195c09",
-      "bytes": 8737
+      "sha256": "0c2f8907d5f3e7fdb0306e9ab30b1e4a08990686974ac719f3cdfee0af817934",
+      "bytes": 8916
     },
     {
       "path": "ui/react-app/src/components/voice/BottomRow.module.css",
@@ -11635,8 +11650,8 @@
     },
     {
       "path": "ui/react-app/src/components/voice/PTTButton.jsx",
-      "sha256": "056d94b4ec7a0d4bc240b672f06c5c8b321cc3bba0b11fb0faef4cf1719fdecf",
-      "bytes": 3805
+      "sha256": "f9179d31dbba93997a6436651a62a2b138056debcf1648940c0da34e6f94b8e6",
+      "bytes": 3898
     },
     {
       "path": "ui/react-app/src/components/voice/PTTButton.module.css",
@@ -12150,8 +12165,8 @@
     },
     {
       "path": "ui/react-app/src/styles/onboarding.css",
-      "sha256": "e735d352232edf44f661b70d88ab8ab17ca57b41097fd82bc4c592fde1b9562b",
-      "bytes": 2228
+      "sha256": "9f4122d5e4669b5409955bc9e6da84a6823da9415bbfabe063cbdec7e1f449f0",
+      "bytes": 2234
     },
     {
       "path": "ui/react-app/src/styles/responsive-smart-display.css",
@@ -12374,6 +12389,11 @@
       "bytes": 1512
     },
     {
+      "path": "ui/react-app/src/utils/wakeSensitivity.js",
+      "sha256": "5f55530c4705cff68aceeea9e6ffa3744d2fad1c1be0a0c1b8b184d87992dd16",
+      "bytes": 2904
+    },
+    {
       "path": "ui/react-app/src/utils/weatherCondition.js",
       "sha256": "ca3a4d05fc1b61f409e3a4993f8e9d6e4305eb4caa3d71314fd2ab595d746d5c",
       "bytes": 3954
@@ -12510,8 +12530,8 @@
     },
     {
       "path": "ui/settings_api.py",
-      "sha256": "de8957cd30bcde9f33610b7e7994c84576b8fe0e82ef85ae4f6421be03dcaffa",
-      "bytes": 86263
+      "sha256": "2416a50c59dbd5edf8513354787c09b109c3d1dda6e80546d80e8a4edb19fab5",
+      "bytes": 87029
     },
     {
       "path": "ui/settings_effects.py",
@@ -12520,8 +12540,8 @@
     },
     {
       "path": "ui/settings_manager.py",
-      "sha256": "c4024158fa601b4b4ed8ec77a1054ae64b9349b0231291080e1bef242c879846",
-      "bytes": 163103
+      "sha256": "a9428c8eb45b768fe7bb83c3514166d435733a695df8b936bd26282d8f1bd634",
+      "bytes": 165131
     },
     {
       "path": "ui/settings_schema.py",
@@ -12685,8 +12705,8 @@
     },
     {
       "path": "utils/audio_ducking.py",
-      "sha256": "bf10b401fdeeda39e6f29c795716cf142322b114682239601974e3a7b72e8a2b",
-      "bytes": 13728
+      "sha256": "9c97b365046dbb7ee3b73028becf53485d1b9313c94993f312eebe6649f313a1",
+      "bytes": 14683
     },
     {
       "path": "utils/audio_preprocessing.py",
@@ -12865,8 +12885,8 @@
     },
     {
       "path": "utils/self_knowledge.py",
-      "sha256": "3babf810ec123616692671d47db6de4c3f2797cf3656b903eaae3268f90431e6",
-      "bytes": 16773
+      "sha256": "b0ddb88d82538cac434ae41d76fbf3ce864d2b6f77ee68e552e2c966da2d7256",
+      "bytes": 17170
     },
     {
       "path": "utils/service_registry.py",
@@ -12905,8 +12925,8 @@
     },
     {
       "path": "utils/velopack_updater.py",
-      "sha256": "f785a5159fa651077c5ed59a0300a16d7f3a9a612b1b6b03e50ebf9c4ea018cc",
-      "bytes": 20083
+      "sha256": "dcf56c1627d6d3ee99bc69c23ecec0f6d63cbfa82ce1f08edb8b1e05e9e37e1b",
+      "bytes": 28347
     },
     {
       "path": "utils/wake_word/__init__.py",
@@ -12970,8 +12990,8 @@
     },
     {
       "path": "viola_qt.py",
-      "sha256": "d14f89e3dfb4239a18f4cd1642bdfc3d0666507cb39e10671edb9d6cb792f6ee",
-      "bytes": 82908
+      "sha256": "0d040d5454646219c86745a986484e11caa78dc2d0bf45618fdc288a5dcdc1ab",
+      "bytes": 83360
     },
     {
       "path": "viola_spoke.py",
@@ -13110,8 +13130,8 @@
     },
     {
       "path": "voice/customer_pronunciation.py",
-      "sha256": "39a85fff8a60a4a6b768e952523275f520c9bc62c29ef12ec83823383ab1e498",
-      "bytes": 12221
+      "sha256": "e5a3040b8f5a45f7339915e63c647c18800c129622bae245b633d058b31ecf37",
+      "bytes": 24347
     },
     {
       "path": "voice/customer_romance/README.md",
@@ -13280,8 +13300,8 @@
     },
     {
       "path": "voice/pipeline.py",
-      "sha256": "1d2d320d8d1f32b9ae03cfa1226988cfaac1c9193c82d39d41e200eca68effe0",
-      "bytes": 43883
+      "sha256": "b7709034460376bcc80af2706c72cb6809083997c9a55602f4df08a1ae6a1450",
+      "bytes": 44884
     },
     {
       "path": "voice/pipeline_initialization.py",
@@ -13350,8 +13370,8 @@
     },
     {
       "path": "voice/synthesis/text_normalizer.py",
-      "sha256": "e87b17be75c3290ded00d7c1ab205599628a9ca49b37b48244c4a438907ced38",
-      "bytes": 29391
+      "sha256": "4fbd1b7ea9a8dd14bdb48ed149b52ecf0de96d4889f1f2adc9d3388185f6fdc5",
+      "bytes": 33969
     },
     {
       "path": "voice/synthesis/tts_wire.py",
@@ -13407,6 +13427,11 @@
       "path": "voice/vad/silero_onnx.py",
       "sha256": "ce01c90173c2279d154dde645eec5ac37d8cf52344ca2d93821c07f7c920115f",
       "bytes": 7516
+    },
+    {
+      "path": "voice/wake_chime.py",
+      "sha256": "e12acc91dc58688fe1c6536dba49ec5c223b2d040116b8dde4dc51889134fa01",
+      "bytes": 5489
     },
     {
       "path": "voice/wake_detector/__init__.py",
@@ -13510,8 +13535,8 @@
     },
     {
       "path": "voice/wake_detector/facade.py",
-      "sha256": "245a06d87c78a73491f26a49407ad6e67a93420578111dea2fddc45182a2a5e4",
-      "bytes": 41694
+      "sha256": "cee624f1b4d438f17cfd1fee91069ed019652872e0ca3e6d78232381df45854d",
+      "bytes": 49658
     },
     {
       "path": "voice/wake_detector/fp_collector.py",
@@ -13565,8 +13590,8 @@
     },
     {
       "path": "voice/wake_detector/wake/config.py",
-      "sha256": "b81a79aaf8a77136725ee8a64d22fc57592b6612ebb1de1c4753dc0a654f8517",
-      "bytes": 2196
+      "sha256": "792b8ede8a0660be56456c762f9916fb95975aa7c1115735e07ce47dfd37946b",
+      "bytes": 2505
     },
     {
       "path": "voice/wake_detector/wake/context.py",
@@ -13575,13 +13600,13 @@
     },
     {
       "path": "voice/wake_detector/wake_decision_policy.py",
-      "sha256": "9d1e33fbaf48b68e46c328a55f3dbe7ae3c7d035ab08bbddd1d28f010f2d5cfc",
-      "bytes": 25840
+      "sha256": "5ebef0396730c4c789948b2f579c3761a39e07be69b1e959da6e344230fbde36",
+      "bytes": 26597
     },
     {
       "path": "voice/wake_detector/wake_factory.py",
-      "sha256": "57c2d4ff1962e581c358a111156cc0ca04fe967fca31bd4728f340b11005f89d",
-      "bytes": 3594
+      "sha256": "3c81fcdd26bb1ba0e67709b3a5c20ddd1b2e5194b63fed18f41529a08ec92f95",
+      "bytes": 3759
     },
     {
       "path": "voice/wake_detector/wake_types.py",
