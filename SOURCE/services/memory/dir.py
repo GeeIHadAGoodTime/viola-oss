@@ -1762,6 +1762,73 @@ class MemoryDir:
         )
         return {"ok": True, "audit_id": audit_id, "path": self._relative(target)}
 
+    def _topic_metadata(self, target: Path) -> tuple[str, str, str]:
+        """Return ``(title, description, type)`` for a topic file's manifest entry."""
+        slug = target.stem
+        for topic, title, memory_type, description in _SEMANTIC_MEMORY_TOPICS.values():
+            if topic == slug:
+                return title, description, memory_type
+        words = slug.replace("-", " ").replace("_", " ").strip() or slug
+        return words.title(), "User memories about %s" % words, "user"
+
+    def _index_points_to(self, topic_rel: str) -> bool:
+        if not self.index_path.exists():
+            return False
+        return "(%s)" % topic_rel in self._read_memory_file(self.index_path)
+
+    def ensure_topic_indexed(self, target: Path, *, agent_initiated: bool = True) -> dict[str, Any] | None:
+        """Add one MEMORY.md pointer for ``target`` unless the index already has it."""
+        topic_rel = target.resolve().relative_to(self.root.resolve()).as_posix()
+        if self._index_points_to(topic_rel):
+            return None
+        title, description, _memory_type = self._topic_metadata(target)
+        return self.add_index_pointer(title, topic_rel, hook=description, agent_initiated=agent_initiated)
+
+    def write_agent_memory(self, content: str, where: str = "memory", position: str = "append") -> dict[str, Any]:
+        """The memory tool's write: save, index, and keep the memory recallable.
+
+        Release 1.0.5 laptop item 4. The tool's natural first call writes to the
+        default target (the index). That used to raise "MEMORY.md is an index",
+        and the retried topic write never added an index pointer, so MEMORY.md
+        stayed empty. Now raw content aimed at the index is saved to a topic file
+        (with manifest metadata) and indexed, and every agent topic write makes
+        sure the index points at its topic. Index pointers themselves still go to
+        MEMORY.md unchanged.
+        """
+        target = self._path_for_where(where)
+        if (
+            target.resolve() == self.index_path.resolve()
+            and position != "replace"
+            and not self._looks_like_index_pointer(content)
+        ):
+            result = self.store_semantic_memory(content, category="note", agent_initiated=True)
+            result["rerouted_from"] = self._relative(self.index_path)
+            return result
+        is_topic = target.parent.resolve() == self.topics_dir.resolve()
+        if is_topic and position == "append" and not (target.exists() and self._read_memory_file(target).strip()):
+            title, description, memory_type = self._topic_metadata(target)
+            self._ensure_semantic_frontmatter(
+                target,
+                name=title.lower(),
+                description=description,
+                memory_type=memory_type,
+                agent_initiated=True,
+            )
+        result = self.write(content, where=where, position=position, agent_initiated=True)
+        landed = self.root / str(result.get("path") or "").removeprefix("memory/")
+        if is_topic and landed.parent.resolve() == self.topics_dir.resolve() and landed.is_file():
+            try:
+                pointer = self.ensure_topic_indexed(landed, agent_initiated=True)
+            except (OSError, ValueError) as exc:
+                # The memory itself is saved; a full or unreadable index must
+                # not turn that into a reported failure.
+                logger.warning("Memory saved but MEMORY.md pointer was not added: %s", exc)
+                result["index_error"] = str(exc)
+            else:
+                if pointer is not None:
+                    result["index_pointer"] = pointer
+        return result
+
     def add_index_pointer(
         self,
         title: str,
@@ -2064,6 +2131,43 @@ class MemoryDir:
                 scored.append((score, header.mtime_ms, header))
         if not scored:
             return []
+        scored.sort(key=lambda item: (item[0], item[1]), reverse=True)
+        return [header for _score, _mtime, header in scored[: max(1, int(limit))]]
+
+    def find_relevant_memories_by_content(
+        self,
+        query: str,
+        limit: int = 5,
+        excluded_filenames: set[str] | None = None,
+    ) -> list[MemoryHeader]:
+        """Rank topic files by relevance of their decrypted body lines to ``query``.
+
+        Recall's fallback when the manifest side-query selects nothing (a
+        managed desktop has no OpenAI key, so it always selects nothing) and
+        the metadata names nothing either: "favorite color" lives in the body
+        of ``preferences.md``, not in its name or description. Bodies are read
+        through the same per-install decryption as every other read; files
+        that cannot be decrypted are skipped, never surfaced as text.
+        """
+        from services.memory.store import _context_memory_relevance_score
+
+        if not (query or "").strip():
+            return []
+        excluded = excluded_filenames or set()
+        scored: list[tuple[float, float, MemoryHeader]] = []
+        for header in self.scan_memory_files():
+            if header.filename in excluded:
+                continue
+            try:
+                body = self._strip_frontmatter(self._read_memory_file(Path(header.file_path)))
+            except (OSError, MemoryDecryptionError):
+                continue
+            best = max(
+                (_context_memory_relevance_score(query, line) for line in body.splitlines() if line.strip()),
+                default=0.0,
+            )
+            if best > 0:
+                scored.append((best, header.mtime_ms, header))
         scored.sort(key=lambda item: (item[0], item[1]), reverse=True)
         return [header for _score, _mtime, header in scored[: max(1, int(limit))]]
 
