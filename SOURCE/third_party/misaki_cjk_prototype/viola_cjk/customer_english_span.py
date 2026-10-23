@@ -12,7 +12,7 @@ import sys
 from pathlib import Path
 from types import CodeType
 
-_ENGLISH_SHA256 = "39a85fff8a60a4a6b768e952523275f520c9bc62c29ef12ec83823383ab1e498"
+_ENGLISH_SHA256 = "e5a3040b8f5a45f7339915e63c647c18800c129622bae245b633d058b31ecf37"
 
 
 def _find_code(code, qualname):
