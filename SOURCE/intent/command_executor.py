@@ -211,6 +211,24 @@ def _extract_applied_volume(result: object) -> int | None:
     return None
 
 
+def _youtube_identity_matches(query: str, now_playing: JsonDict) -> bool:
+    """True when the request names the exact YouTube video that is playing.
+
+    Reads only identity fields (``video_id`` or a watch/embed address), never
+    the title, so a different video can never be admitted by this check.
+    """
+    from music.youtube_embed import extract_video_id
+
+    requested_id = extract_video_id(query)
+    if not requested_id:
+        return False
+    for key in ("video_id", "url", "track_uri"):
+        value = now_playing.get(key)
+        if isinstance(value, str) and value.strip() and extract_video_id(value) == requested_id:
+            return True
+    return False
+
+
 class CommandExecutor:
     """
     Executes commands identified by the intent pipeline.
@@ -620,6 +638,14 @@ class CommandExecutor:
         local_match = classify_local_file_match(query, np)
         if local_match is not None:
             return local_match
+        # A YouTube selection is played by its video id (media search_play
+        # hands the chosen candidate's id to /v1/play). An 11-character id
+        # shares no words with the title, so the word comparison below labels
+        # the very track that was asked for "fallback_unrelated" and the play
+        # tool stops it a second after it starts. Compare reported identity
+        # first: the same id is an exact match; anything else falls through.
+        if _youtube_identity_matches(query, np):
+            return "exact"
         title = str(np.get("title") or "").strip().lower()
         artist = str(np.get("artist") or "").strip().lower()
         # An unverified title is a query-echo placeholder (e.g. the browser
