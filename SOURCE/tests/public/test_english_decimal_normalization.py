@@ -107,7 +107,7 @@ class EnglishDecimalNormalization(unittest.TestCase):
 
     def test_other_locales_preserve_exact_decimals_and_units(self):
         source = "Value -1.25 +0.005 0.12345678901234567890 $1.5 7.5% 555.123.4567"
-        for locale in ("es", "fr", "hi", "it", "pt", "ja", "zh", "unknown", ""):
+        for locale in ("fr", "hi", "it", "pt", "ja", "unknown", ""):
             with self.subTest(locale=locale):
                 self.assertEqual(self.formatter.format(source, language=locale), source)
 
@@ -125,11 +125,54 @@ class EnglishDecimalNormalization(unittest.TestCase):
             for locale in (None, "en-us", "en-gb"):
                 with self.subTest(source=source, locale=locale):
                     self.assertEqual(self.formatter.format(source, language=locale), expected)
-        self.assertEqual(self.formatter.format("Máxima de 68°F.", language="es"), "Máxima de 68 grados Fahrenheit.")
-        self.assertEqual(self.formatter.format("Hace 20 °C.", language="es-MX"), "Hace 20 grados Celsius.")
-        for locale in ("zh", "ja", "fr"):
+        self.assertEqual(
+            self.formatter.format("Máxima de 68°F.", language="es"), "Máxima de sesenta y ocho grados Fahrenheit."
+        )
+        self.assertEqual(self.formatter.format("Hace 20 °C.", language="es-MX"), "Hace veinte grados Celsius.")
+        self.assertEqual(self.formatter.format("68°F, 20 °C, 90°", language="zh"), "68华氏度, 20摄氏度, 90度")
+        for locale in ("ja", "fr"):
             with self.subTest(locale=locale):
                 self.assertEqual(self.formatter.format("68°F", language=locale), "68°F")
+
+    def test_spanish_numbers_are_spelled_for_the_letter_only_route(self):
+        cases = {
+            "Hace 20 grados.": "Hace veinte grados.",
+            "Son las 11:45.": "Son las once y cuarenta y cinco.",
+            "Es la 1:05, luego las 21:00.": "Es la una y cinco, luego las veintiuna en punto.",
+            "Máxima de 68°F, 16% de lluvia.": "Máxima de sesenta y ocho grados Fahrenheit, dieciséis por ciento de lluvia.",
+            "0, 15, 21, 29, 31, 100, 101, 115, 500, 999.": (
+                "cero, quince, veintiuno, veintinueve, treinta y uno, cien, ciento uno, ciento quince, "
+                "quinientos, novecientos noventa y nueve."
+            ),
+            "1000, 2000, 21001, 31000, 101000, 999999.": (
+                "mil, dos mil, veintiún mil uno, treinta y un mil, ciento un mil, "
+                "novecientos noventa y nueve mil novecientos noventa y nueve."
+            ),
+            "1000000 y 2500000": "un millón y dos millones quinientos mil",
+            "En 2026": "En dos mil veintiséis",
+            "1.250 pesos, 21 000 personas": "mil doscientos cincuenta pesos, veintiún mil personas",
+            "3,5 o 68.5 o 0.001": "tres coma cinco o sesenta y ocho coma cinco o cero coma cero cero uno",
+            "Un 0,25% y 7%.": "Un cero coma veinticinco por ciento y siete por ciento.",
+            "$5 o 12,50 €": "cinco dólares o doce coma cincuenta euros",
+            "-3 y +2, del 10-20": "menos tres y más dos, del diez-veinte",
+            "1º lugar, 3er día, la 2ª vez, el 7º.": "primer lugar, tercer día, la segunda vez, el séptimo.",
+            "Llama al 414-555-1234.": "Llama al cuatro uno cuatro cinco cinco cinco uno dos tres cuatro.",
+        }
+        for source, expected in cases.items():
+            for locale in ("es", "es-MX", "ES_us"):
+                with self.subTest(source=source, locale=locale):
+                    self.assertEqual(self.formatter.format(source, language=locale), expected)
+
+    def test_mandarin_symbols_are_spoken_around_route_numbers(self):
+        cases = {
+            "现在是11:45。": "现在是11点45分。",
+            "现在是11:05，明天8:00。": "现在是11点零5分，明天8点。",
+            "降雨概率16%，0.5%。": "降雨概率百分之16，百分之0.5。",
+            "今天是2026年10月23日。": "今天是2026年10月23日。",
+        }
+        for source, expected in cases.items():
+            with self.subTest(source=source):
+                self.assertEqual(self.formatter.format(source, language="zh"), expected)
 
     def test_decimal_conversion_never_uses_float(self):
         with patch("builtins.float", side_effect=AssertionError("Float conversion prohibited")):
