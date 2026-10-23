@@ -137,6 +137,21 @@ _CHUNK_THRESHOLD = 200
 _MAX_TEXT_LENGTH = 5000
 
 
+def _push_tts_aec_reference(samples: np.ndarray, sample_rate: int) -> None:
+    """Give the wake detector's echo canceller the speech Viola is playing.
+
+    Without this, the only reference was the device loopback, which on some
+    machines reads silence while Viola speaks, so the wake word fired on Viola's
+    own narration. Best effort: speech must never fail because of it.
+    """
+    try:
+        from audio_core.aec_reference_base import push_local_playback_reference
+
+        push_local_playback_reference(samples, sample_rate)
+    except Exception as exc:  # noqa: BLE001, RUF100 - reference tap must never break playback
+        logger.debug("TTS AEC reference push failed: %s", exc)
+
+
 def _strip_emoji(text: str) -> str:
     """Remove emoji characters that would confuse the phonemizer."""
     cleaned = _EMOJI_RE.sub("", text)
@@ -496,9 +511,15 @@ class KokoroTTSEngine:
         return await self._run_synthesize_with_watchdog(text, voice, policy_marker=policy_marker)
 
     async def _run_synthesize_with_watchdog(
-        self, text: str, voice: str | None, *, policy_marker: object | None = None
+        self, text: str, voice: str | None, *, policy_marker: object | None = None, later_sentence: bool = False
     ) -> bytes:
-        """Bound admission and waiting while retaining actual worker ownership."""
+        """Bound admission and waiting while retaining actual worker ownership.
+
+        ``later_sentence`` marks a non-first sentence of a reply whose earlier
+        sentences may already be audible. If the customer pronunciation step
+        still rejects it after its own one-shot retry, only that sentence is
+        skipped, so the caller never fails (and re-speaks) the whole reply.
+        """
         if policy_marker is None:
             policy_marker = getattr(self, "_tts_disable_marker", 0)
         deadline = time.monotonic() + STREAM_TIMEOUT_SECONDS
@@ -601,6 +622,17 @@ class KokoroTTSEngine:
             work["cancelled"].set()
             task.cancel()
             raise
+        except Exception as exc:
+            from voice.customer_pronunciation import PronunciationError
+
+            if not later_sentence or not isinstance(exc, PronunciationError):
+                raise
+            logger.warning(
+                "Skipping one unspeakable later sentence of a spoken reply: %s tokens=%s",
+                exc,
+                list(getattr(exc, "tokens", ())),
+            )
+            return b""
 
     async def _synthesize_chunked(self, text: str, voice: str | None, *, policy_marker: object | None = None) -> bytes:
         """Synthesise long text sentence-by-sentence and concatenate."""
@@ -700,13 +732,45 @@ class KokoroTTSEngine:
                 return self._synthesize_internal(text, voice, speed, apply_volume=apply_volume)
             except Exception as exc:
                 if getattr(self, "_customer_tokenizer", None) is not None:
-                    raise
+                    return self._retry_without_unspeakable(text, voice, speed, exc, apply_volume=apply_volume)
                 logger.error(
                     "Kokoro synthesis failed text_length=%d: %s",
                     len(text),
                     exc,
                 )
                 return b""
+
+    def _retry_without_unspeakable(
+        self, text: str, voice: str | None, speed: float | None, exc: Exception, *, apply_volume: bool
+    ) -> bytes:
+        """Customer route: retry once without the tokens the pronunciation step rejected.
+
+        The pronunciation component itself stays fail-closed; this keeps the
+        rest of a reply audible. Logs carry the reason and tokens, never the text.
+        """
+        from voice.customer_pronunciation import PronunciationError, drop_unspeakable
+
+        if not isinstance(exc, PronunciationError):
+            raise exc
+        tokens = getattr(exc, "tokens", ())
+        language = str(getattr(self, "_speech_language", "en-us")).lower().replace("_", "-")
+        latin_script = language.split("-", 1)[0] in {"en", "es", "fr", "pt"}
+        retry_text = drop_unspeakable(text, tokens, latin_script=latin_script)
+        if not retry_text or retry_text == text or not any(character.isalnum() for character in retry_text):
+            logger.warning("Customer speech could not be spoken: %s tokens=%s", exc, list(tokens))
+            raise exc
+        try:
+            audio = self._synthesize_internal(retry_text, voice, speed, apply_volume=apply_volume)
+        except PronunciationError as retry_exc:
+            logger.warning(
+                "Customer speech could not be spoken after dropping tokens=%s: %s tokens=%s",
+                list(tokens),
+                retry_exc,
+                list(getattr(retry_exc, "tokens", ())),
+            )
+            raise retry_exc from exc
+        logger.warning("Customer speech dropped unspeakable tokens=%s (%s)", list(tokens), exc)
+        return audio
 
     def _synthesize_internal(
         self, text: str, voice: str | None, speed: float | None = None, *, apply_volume: bool = True
@@ -1048,6 +1112,19 @@ class KokoroTTSEngine:
                     if position == len(pcm):
                         raise sd.CallbackStop
 
+                # Feed what has just been handed to the speaker into the wake
+                # detector's echo-canceller reference. Done here on the worker,
+                # never in the PortAudio callback, and paced by the callback's
+                # own progress so the reference tracks real playback time.
+                reference_pos = 0
+
+                def feed_aec_reference() -> None:
+                    nonlocal reference_pos
+                    end = position
+                    if end > reference_pos:
+                        _push_tts_aec_reference(pcm[reference_pos:end], sample_rate)
+                        reference_pos = end
+
                 try:
                     stream = sd.OutputStream(
                         samplerate=sample_rate,
@@ -1062,11 +1139,13 @@ class KokoroTTSEngine:
                         if not playback_retired():
                             broadcasted = self._broadcast_pcm_to_spokes(pcm_bytes, sample_rate)
                         while not finished.wait(0.01):
+                            feed_aec_reference()
                             if playback_retired():
                                 # Only this worker aborts/closes its own stream;
                                 # never race close against another native call.
                                 stream.abort()
                                 break
+                        feed_aec_reference()
                         played_locally = not playback_retired() and position == len(pcm)
                 finally:
                     try:
@@ -1142,6 +1221,12 @@ class KokoroTTSEngine:
         text = normalize_for_speech(text, **normalization_kwargs)
         if not text or not text.strip():
             return
+        logger.info(
+            "Speaking reply voice=%s blend=%s language=%s",
+            getattr(self, "_voice", None),
+            getattr(self, "_voice_blend_spec", None) or "none",
+            language,
+        )
 
         try:
             from admin.instrumentation import record_feature_used
@@ -1383,7 +1468,9 @@ class KokoroTTSEngine:
                         pcm = await prefetch_task
                         prefetch_task = None
                     else:
-                        pcm = await self._run_synthesize_with_watchdog(sentence, None, policy_marker=policy_marker)
+                        pcm = await self._run_synthesize_with_watchdog(
+                            sentence, None, policy_marker=policy_marker, later_sentence=i > 0
+                        )
 
                     if policy_marker is not getattr(self, "_tts_disable_marker", 0):
                         previous_pcm = None
@@ -1394,7 +1481,9 @@ class KokoroTTSEngine:
                     if i + 1 < len(sentences):
                         next_sentence = sentences[i + 1]
                         prefetch_task = asyncio.ensure_future(
-                            self._run_synthesize_with_watchdog(next_sentence, None, policy_marker=policy_marker)
+                            self._run_synthesize_with_watchdog(
+                                next_sentence, None, policy_marker=policy_marker, later_sentence=True
+                            )
                         )
 
                     if not pcm:
@@ -1484,6 +1573,12 @@ class KokoroTTSEngine:
             language = getattr(self, "_speech_language", "en-us")
             route_epoch = None
         normalization_kwargs = {} if language == "en-us" else {"language": language}
+        logger.info(
+            "Speaking reply voice=%s blend=%s language=%s",
+            getattr(self, "_voice", None),
+            getattr(self, "_voice_blend_spec", None) or "none",
+            language,
+        )
 
         # Lazy-create the asyncio lock
         if self._speak_lock is None:
@@ -1595,7 +1690,7 @@ class KokoroTTSEngine:
                                 prefetch_task = None
                             else:
                                 pcm = await self._run_synthesize_with_watchdog(
-                                    sentence, None, policy_marker=policy_marker
+                                    sentence, None, policy_marker=policy_marker, later_sentence=sentence_count > 1
                                 )
 
                             if policy_marker is not getattr(self, "_tts_disable_marker", 0):
@@ -1606,7 +1701,9 @@ class KokoroTTSEngine:
                             if sentences_queue:
                                 next_s = sentences_queue[0]
                                 prefetch_task = asyncio.ensure_future(
-                                    self._run_synthesize_with_watchdog(next_s, None, policy_marker=policy_marker)
+                                    self._run_synthesize_with_watchdog(
+                                        next_s, None, policy_marker=policy_marker, later_sentence=True
+                                    )
                                 )
 
                             if not pcm:
@@ -1655,7 +1752,9 @@ class KokoroTTSEngine:
                             pcm = await prefetch_task
                             prefetch_task = None
                         else:
-                            pcm = await self._run_synthesize_with_watchdog(sentence, None, policy_marker=policy_marker)
+                            pcm = await self._run_synthesize_with_watchdog(
+                                sentence, None, policy_marker=policy_marker, later_sentence=sentence_count > 1
+                            )
                         if pcm:
                             if previous_sentence is not None:
                                 await self._sleep_sentence_gap(previous_sentence, sentence)

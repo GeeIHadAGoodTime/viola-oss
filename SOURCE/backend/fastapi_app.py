@@ -967,11 +967,19 @@ def _ensure_billing_capacity_routes(app: FastAPI) -> None:
 
 
 def _ensure_billing_usage_routes(app: FastAPI) -> None:
-    """Read company usage through the same authenticated desktop cloud proxy."""
-    from billing.routes import SpendUsageTodayResponse, get_usage, get_usage_today
+    """Read company plan and usage through the same authenticated desktop cloud proxy.
+
+    ``/billing/status`` is the account's canonical plan read (the React
+    ``readBillingSubscription``). Without it the desktop Account page could
+    only ever show "Plan unavailable".
+    """
+    from billing.routes import SpendUsageTodayResponse, get_subscription_status, get_usage, get_usage_today
 
     paths = {getattr(route, "path", None) for route in getattr(app.router, "routes", [])}
     router = APIRouter()
+    if "/billing/status" not in paths:
+        router.add_api_route("/billing/status", get_subscription_status, methods=["GET"],
+                             name="desktop_billing_status")
     if "/billing/usage" not in paths:
         router.add_api_route("/billing/usage", get_usage, methods=["GET"], name="desktop_billing_usage")
     if "/billing/usage/today" not in paths:

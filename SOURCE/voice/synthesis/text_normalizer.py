@@ -40,6 +40,10 @@ _DIGIT_NAMES = ["zero", "one", "two", "three", "four", "five", "six", "seven", "
 # Percentages: 15% → "fifteen percent"
 # ---------------------------------------------------------------------------
 _PERCENT_RE = re.compile(r"\b(\d+(?:\.\d+)?)%")
+# Degrees: 68°F → "68 degrees Fahrenheit" (the number is spoken by the passes below).
+_DEGREE_RE = re.compile(r"\s*°(?:\s*([FC])(?:ahrenheit|elsius)?(?![A-Za-z]))?")
+_DEGREE_UNITS = {"F": " Fahrenheit", "C": " Celsius"}
+_DEGREE_WORDS = {"en": " degrees", "es": " grados"}
 
 # ---------------------------------------------------------------------------
 # Times: 2:30 PM → "two thirty PM", 10:05 → "ten oh five"
@@ -298,6 +302,7 @@ def _normalize_english_numbers(text: str) -> str:
         segment = _YEAR_RE.sub(_replace_year, segment)
         return _STANDALONE_NUMBER_RE.sub(_replace_number, segment)
 
+    text = _expand_degrees(text, "en")
     parts = []
     cursor = 0
     for decimal in _DECIMAL_RE.finditer(text):
@@ -306,6 +311,157 @@ def _normalize_english_numbers(text: str) -> str:
         cursor = decimal.end()
     parts.append(other_numbers(text[cursor:]))
     return "".join(parts)
+
+
+def _expand_degrees(text: str, language: str) -> str:
+    """Spell the degree sign (and an attached F/C unit) for a locale with a word for it."""
+    word = _DEGREE_WORDS[language]
+    return _DEGREE_RE.sub(lambda match: word + _DEGREE_UNITS.get(match.group(1), ""), text)
+
+
+def _locale_base(language: object | None) -> str:
+    value = getattr(language, "value", language)
+    return value.strip().lower().replace("_", "-").split("-", 1)[0] if isinstance(value, str) else ""
+
+
+# ---------------------------------------------------------------------------
+# Spanish numbers: the Spanish pronunciation route accepts letters only, so
+# digits are spelled here (dependency-free, 0 to 999 999 999).
+# ---------------------------------------------------------------------------
+_ES_UNITS = (
+    "cero uno dos tres cuatro cinco seis siete ocho nueve diez once doce trece catorce quince "
+    "dieciséis diecisiete dieciocho diecinueve veinte veintiuno veintidós veintitrés veinticuatro "
+    "veinticinco veintiséis veintisiete veintiocho veintinueve"
+).split()
+_ES_TENS = ("", "", "", "treinta", "cuarenta", "cincuenta", "sesenta", "setenta", "ochenta", "noventa")
+_ES_HUNDREDS = (
+    "",
+    "ciento",
+    "doscientos",
+    "trescientos",
+    "cuatrocientos",
+    "quinientos",
+    "seiscientos",
+    "setecientos",
+    "ochocientos",
+    "novecientos",
+)
+_ES_ORDINALS = ("", "primer", "segund", "tercer", "cuart", "quint", "sext", "séptim", "octav", "noven", "décim")
+_ES_PHONE_RE = re.compile(r"(?<![\w.,])\(?\d{3}\)?[\s.\-]\d{3}[\s.\-]\d{4}(?!\d)")
+_ES_TIME_RE = re.compile(r"(?<![\d:])([01]?\d|2[0-3]):([0-5]\d)(?![\d:])")
+_ES_ORDINAL_RE = re.compile(r"\b(10|[1-9])\s?([ºª])(?=(\s+[a-záéíóúñ])?)")
+_ES_CURRENCY_RE = re.compile(
+    r"(?:\$\s?(?P<usd>\d(?:[\d.,]*\d)?)|€\s?(?P<eur>\d(?:[\d.,]*\d)?)|(?P<eur2>\d(?:[\d.,]*\d)?)\s?€)"
+)
+# Grouped thousands (1.000 / 1,000 / 21 000) or a decimal (68,5 / 68.5), with an optional percent sign.
+_ES_NUMBER_RE = re.compile(
+    r"(?<![\w.,])(?P<sign>[-−+](?=\d))?(?P<int>[1-9]\d{0,2}(?:(?P<sep>[., \u00a0\u202f])\d{3})(?:(?P=sep)\d{3})*|\d+)"
+    r"(?:[.,](?P<frac>\d+))?(?![\w])(?P<pct>\s?%)?"
+)
+
+
+def _spanish_below_thousand(n: int) -> str:
+    if n < 30:
+        return _ES_UNITS[n]
+    if n < 100:
+        tens, unit = divmod(n, 10)
+        return _ES_TENS[tens] + (" y " + _ES_UNITS[unit] if unit else "")
+    if n == 100:
+        return "cien"
+    hundreds, rest = divmod(n, 100)
+    return _ES_HUNDREDS[hundreds] + (" " + _spanish_below_thousand(rest) if rest else "")
+
+
+def _spanish_apocope(words: str) -> str:
+    """'uno' shortens to 'un' before mil/millón(es): veintiún mil, ciento un mil."""
+    if words.endswith("veintiuno"):
+        return words[: -len("veintiuno")] + "veintiún"
+    return words[:-1] if words.endswith("uno") else words
+
+
+def _spanish_number(n: int) -> str:
+    if n < 1000:
+        return _spanish_below_thousand(n)
+    if n < 1_000_000:
+        thousands, rest = divmod(n, 1000)
+        head = "mil" if thousands == 1 else _spanish_apocope(_spanish_below_thousand(thousands)) + " mil"
+        return head + (" " + _spanish_below_thousand(rest) if rest else "")
+    millions, rest = divmod(n, 1_000_000)
+    head = "un millón" if millions == 1 else _spanish_apocope(_spanish_number(millions)) + " millones"
+    return head + (" " + _spanish_number(rest) if rest else "")
+
+
+def _spanish_digits(digits: str) -> str:
+    value = int(digits)
+    if value < 1_000_000_000:
+        return _spanish_number(value)
+    return " ".join(_ES_UNITS[int(digit)] for digit in digits)
+
+
+def _replace_spanish_number(match: re.Match[str]) -> str:
+    words = _spanish_digits(re.sub(r"\D", "", match.group("int")))
+    if match.group("sign"):
+        words = ("más " if match.group("sign") == "+" else "menos ") + words
+    fraction = match.group("frac")
+    if fraction is not None:
+        if len(fraction) <= 3 and not fraction.startswith("0"):
+            words += " coma " + _spanish_number(int(fraction))
+        else:
+            words += " coma " + " ".join(_ES_UNITS[int(digit)] for digit in fraction)
+    if match.group("pct"):
+        words += " por ciento"
+    return words
+
+
+def _replace_spanish_time(match: re.Match[str]) -> str:
+    hour, minute = int(match.group(1)), int(match.group(2))
+    hour_words = {1: "una", 21: "veintiuna"}.get(hour) or _spanish_number(hour)
+    return hour_words + (" y " + _spanish_number(minute) if minute else " en punto")
+
+
+def _replace_spanish_ordinal(match: re.Match[str]) -> str:
+    n, feminine = int(match.group(1)), match.group(2) == "ª"
+    if not feminine and n in (1, 3) and match.group(3):
+        return _ES_ORDINALS[n]  # primer lugar, tercer día
+    return _ES_ORDINALS[n] + ("a" if feminine else "o")
+
+
+def _replace_spanish_currency(match: re.Match[str]) -> str:
+    if match.group("usd"):
+        return match.group("usd") + " dólares"
+    return (match.group("eur") or match.group("eur2")) + " euros"
+
+
+# ---------------------------------------------------------------------------
+# Mandarin: the route's own number preparer (cn2an) already reads digits;
+# only the symbols around them need words.
+# ---------------------------------------------------------------------------
+_ZH_PERCENT_RE = re.compile(r"(\d+(?:\.\d+)?)\s?%")
+_ZH_DEGREE_RE = re.compile(r"\s*°\s*([FC])?(?![A-Za-z])")
+_ZH_TIME_RE = re.compile(r"(?<![\d:])([01]?\d|2[0-3]):([0-5]\d)(?![\d:])")
+
+
+def _replace_mandarin_time(match: re.Match[str]) -> str:
+    hour, minute = int(match.group(1)), int(match.group(2))
+    if not minute:
+        return "%d点" % hour
+    return "%d点%s%d分" % (hour, "零" if minute < 10 else "", minute)
+
+
+def _normalize_mandarin_symbols(text: str) -> str:
+    text = _ZH_TIME_RE.sub(_replace_mandarin_time, text)
+    text = _ZH_PERCENT_RE.sub(r"百分之\1", text)
+    return _ZH_DEGREE_RE.sub(lambda match: {"F": "华氏度", "C": "摄氏度"}.get(match.group(1), "度"), text)
+
+
+def _normalize_spanish_numbers(text: str) -> str:
+    text = _ES_TIME_RE.sub(_replace_spanish_time, text)
+    text = _ES_PHONE_RE.sub(lambda match: " ".join(_ES_UNITS[int(d)] for d in re.sub(r"\D", "", match.group(0))), text)
+    text = _ES_CURRENCY_RE.sub(_replace_spanish_currency, text)
+    text = _ES_ORDINAL_RE.sub(_replace_spanish_ordinal, text)
+    text = re.sub(r"\b([13])er\b", lambda match: _ES_ORDINALS[int(match.group(1))], text)
+    text = re.sub(r"(?<=\d)\s?[ºª]", "", text)
+    return _ES_NUMBER_RE.sub(_replace_spanish_number, text)
 
 
 def _replace_currency(match: re.Match[str]) -> str:
@@ -531,6 +687,10 @@ class SpeechFormatter:
             result = _URL_RE.sub(_replace_url if english else "…", result)
             if english:
                 result = _normalize_english_numbers(result)
+            elif _locale_base(language) == "es":
+                result = _normalize_spanish_numbers(_expand_degrees(result, "es"))
+            elif _locale_base(language) == "zh":
+                result = _normalize_mandarin_symbols(result)
             # Explicit user overrides keep their existing scope. The built-in
             # dictionaries are English respellings, not multilingual rules.
             result = _apply_pronunciation_overrides(result, cfg)

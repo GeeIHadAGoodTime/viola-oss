@@ -1,5 +1,6 @@
 import type { Session } from '@supabase/auth-js';
 import { DEFAULTS } from '../config';
+import { isDesktopApp } from '../utils/runtimeSurface';
 
 export type GiftWindow = {
   window_id: string; user_id: string; selected_level: 'pro' | 'max' | 'flexible';
@@ -76,8 +77,15 @@ export async function readBillingSubscription(session: Session): Promise<Billing
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), DEFAULTS.BILLING_READ_TIMEOUT_MS);
   try {
+    // Desktop: the local backend authenticates this read with the httpOnly
+    // `viola_session` cookie. A raw cloud GoTrue JWT can never validate there
+    // (it is not a `vls_` local session) and, sent as a Bearer, it used to
+    // shadow the valid cookie: every read 401'd and logged a rejection.
+    const headers: Record<string, string> = isDesktopApp()
+      ? {}
+      : { Authorization: `Bearer ${session.access_token}` };
     const response = await fetch(`${origin}/billing/status`, {
-      headers: { Authorization: `Bearer ${session.access_token}` },
+      headers,
       credentials: 'include',
       cache: 'no-store',
       signal: controller.signal,

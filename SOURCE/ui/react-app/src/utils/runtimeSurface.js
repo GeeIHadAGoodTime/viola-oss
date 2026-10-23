@@ -60,8 +60,32 @@ export function shouldStreamBrowserView(isSpoke = false) {
   return Boolean(isSpoke) || isWebClient();
 }
 
+/**
+ * Whether the in-app "Quit Viola" action should be offered. Only the
+ * desktop app has a process to quit; closing its window just hides it to
+ * the tray, so the "..." menu and Settings > System need a real Quit.
+ * @returns {boolean}
+ */
+export function canQuitDesktopApp() {
+  return isDesktopApp();
+}
+
+/**
+ * Ask the Qt shell to quit Viola, the same shutdown as the tray menu's Quit.
+ * @returns {boolean} true when the request reached the Qt bridge.
+ */
+export function quitDesktopApp() {
+  if (typeof window === 'undefined') return false;
+  const bridge = window.viola;
+  if (!bridge || typeof bridge.quitApp !== 'function') return false;
+  bridge.quitApp();
+  return true;
+}
+
 export default {
   isDesktopApp,
   isWebClient,
   shouldStreamBrowserView,
+  canQuitDesktopApp,
+  quitDesktopApp,
 };

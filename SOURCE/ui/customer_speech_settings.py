@@ -23,6 +23,7 @@ _LOCALE_LABELS = {
     "ja": "Japanese",
     "pt-br": "Portuguese (Brazil)",
 }
+_VOICE_GENDERS = {"f": "female", "m": "male"}
 _selection_lock = threading.RLock()
 _selection_binding = None
 _selection_effect = None
@@ -35,6 +36,21 @@ def qualification_profile():
     from voice.customer_runtime import qualification_profile as selected_profile
 
     return selected_profile()
+
+
+def customer_voice_label(voice_id: str, *, is_default: bool = False) -> str:
+    """Friendly picker label for a Kokoro voice id ("af_heart" -> "Heart (female, default)").
+
+    Kokoro ids are ``<lang><gender>_<name>``; the saved value stays the raw id.
+    """
+    prefix, sep, name = voice_id.partition("_")
+    if not sep or not name or len(prefix) != 2:
+        return voice_id
+    details = [_VOICE_GENDERS[prefix[1]]] if prefix[1] in _VOICE_GENDERS else []
+    if is_default:
+        details.append("default")
+    base = name.replace("_", " ").title()
+    return "%s (%s)" % (base, ", ".join(details)) if details else base
 
 
 def customer_speech_payload(settings: dict) -> dict | None:
@@ -54,7 +70,22 @@ def customer_speech_payload(settings: dict) -> dict | None:
                 continue
             voices.append(voice)
         if voices:
-            locales.append({"value": locale, "label": label, "voices": voices})
+            try:
+                default_voice = resolve_selection(SimpleNamespace(tts_language=locale, tts_voice="default"))[1]
+            except (ValueError, RuntimeError, StopIteration):
+                default_voice = None
+            locales.append(
+                {
+                    "value": locale,
+                    "label": label,
+                    "voices": voices,
+                    "default_voice": default_voice,
+                    "voice_options": [
+                        {"value": voice, "label": customer_voice_label(voice, is_default=voice == default_voice)}
+                        for voice in voices
+                    ],
+                }
+            )
     selection = None
     try:
         locale, voice = resolve_selection(SimpleNamespace(**settings))

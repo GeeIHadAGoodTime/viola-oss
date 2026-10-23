@@ -49,6 +49,27 @@ from core.logging_config import get_logger
 logger = get_logger(__name__)
 
 
+def _to_json_builtin(value: Any) -> Any:
+    """Recursively turn numpy scalars (int64, float32, bool_) into Python builtins.
+
+    Calibration code hands us numpy results (e.g. ``np.argmax`` -> ``int64``),
+    which ``json.dump`` rejects: "Object of type int64 is not JSON serializable".
+    """
+    if isinstance(value, dict):
+        return {k: _to_json_builtin(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_to_json_builtin(v) for v in value]
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    item = getattr(value, "item", None)
+    if callable(item):
+        try:
+            return item()
+        except (TypeError, ValueError):
+            return value
+    return value
+
+
 def _default_profile_base_path() -> Path:
     """Writable calibration-profile root under the user data dir (PATH-1).
 
@@ -112,7 +133,7 @@ class DeviceProfile:
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to JSON-serializable dictionary."""
-        return asdict(self)
+        return _to_json_builtin(asdict(self))
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> DeviceProfile:

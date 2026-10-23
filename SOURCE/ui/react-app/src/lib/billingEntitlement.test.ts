@@ -8,7 +8,10 @@ const grant = {
   current_period_end: new Date(Date.now() + 86400000).toISOString(),
 };
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  delete (window as any).viola;
+});
 
 describe('canonical complimentary billing read', () => {
   it('uses current access token and canonical Pro despite empty GoTrue metadata', async () => {
@@ -19,6 +22,15 @@ describe('canonical complimentary billing read', () => {
     expect(value.subscription_source).toBe('admin_grant');
     expect(fetch.mock.calls[0][1].headers.Authorization).toBe('Bearer existing-access');
     expect(fetch.mock.calls[0][0]).toContain('/billing/status');
+  });
+  it('desktop relies on the session cookie and never sends the cloud JWT as a Bearer', async () => {
+    (window as any).viola = {};
+    const fetch = vi.fn(async () => ({ ok: true, json: async () => ({ ok: true, data: grant }) }));
+    vi.stubGlobal('fetch', fetch);
+    const value = await readBillingSubscription(session);
+    expect(value.plan_id).toBe('pro_monthly');
+    expect(fetch.mock.calls[0][1].headers.Authorization).toBeUndefined();
+    expect(fetch.mock.calls[0][1].credentials).toBe('include');
   });
   it('rejects another account response', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({ ...grant, user_id: 'user-b' }) })));

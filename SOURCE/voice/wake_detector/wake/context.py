@@ -36,6 +36,10 @@ class WakeContext:
     # Confirmation gate: recent inference scores (last N frames)
     recent_scores: list[float] = field(default_factory=list)
 
+    # True while Viola's own TTS is speaking, and for a short tail after it
+    # stops. The listener fills it from viola_self_speech_active().
+    self_speech_active: bool = False
+
     # Timing
     timestamp: float = field(default_factory=time.time)
     frame_count: int = 0

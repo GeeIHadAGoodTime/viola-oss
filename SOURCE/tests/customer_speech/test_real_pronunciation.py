@@ -110,6 +110,38 @@ class RealCustomerPronunciationTests(unittest.TestCase):
                     self.g2p.phonemize(f"Hello [{label}](/{phones}/) world.")
         self.assertTrue(self.g2p.phonemize("Hello [name](/həlˈO/) world."))
 
+    def test_out_of_lexicon_words_degrade_instead_of_failing(self):
+        from voice.customer_pronunciation import _REPLY_WORDS
+
+        for locale in ("en-us", "en-gb"):
+            for word, phones in _REPLY_WORDS.items():
+                with self.subTest(locale=locale, word=word):
+                    self.assertIn(phones, self.g2p.phonemize(f"Play {word} now.", locale))
+            for word in ("Brubeck", "Xqzt"):
+                with self.subTest(locale=locale, word=word):
+                    letters = self.g2p.phonemize(" ".join(word.upper()), locale)
+                    strip = str.maketrans("", "", "ˈˌ ")
+                    self.assertIn(
+                        letters.translate(strip), self.g2p.phonemize(f"Play {word} now.", locale).translate(strip)
+                    )
+        with self.assertRaises(self.error) as caught:
+            self.g2p.phonemize("Hello 世界.")
+        self.assertEqual(caught.exception.tokens, ("世界",))
+
+    def test_laptop_replies_speak_after_normalization(self):
+        from voice.synthesis.text_normalizer import normalize_for_speech
+
+        for reply in (
+            "Tomorrow in Milwaukee: overcast, with a high of 68°F, a low of 52°F, and a 16% chance of rain.",
+            "Playing Lofi beats for you.",
+            "Playing some lo-fi music on Spotify.",
+            "Here is Take Five by Dave Brubeck.",
+            "It's 11:45 AM Central Daylight Time.",
+            "Tom & Jerry cost $5 at 3 p.m.",
+        ):
+            with self.subTest(reply=reply):
+                self.assertTrue(self.g2p.phonemize(normalize_for_speech(reply)))
+
     def test_all_retained_brand_and_acronym_tables_remain_pronounceable(self):
         tree = ast.parse((ROOT / "voice/pronunciation_tables.py").read_text())
         tables = {"_BRAND_PRONUNCIATIONS", "_ACRONYM_WORDS", "_ACRONYM_INITIALISMS"}

@@ -10,7 +10,7 @@ from typing import Any, Protocol
 from PySide6.QtCore import QObject, QTimer, Signal
 
 from config import env
-from core.constants import LOCALHOST, TIMEOUT_DEFAULT, TIMEOUT_MEDIUM
+from core.constants import LOCALHOST, TIMEOUT_DEFAULT, TIMEOUT_LONG, TIMEOUT_MEDIUM
 from core.logging_config import get_logger
 from ui.qt_native.api_client import ViolaAPIClient
 from ui.qt_native.startup_types import HealthStatus, StartupPolicy, StartupState
@@ -492,6 +492,12 @@ class StartupCoordinator(QObject):
         self._degraded_since: float | None = None
         self._readiness_retry_count = 0
         self._readiness_failure_reported = False
+        # ``ready`` means "the backend came up": it is emitted once per start
+        # cycle. A DEGRADED -> RUNNING recovery is announced through
+        # ``state_changed`` (recovered_from_degraded=True), never by re-emitting
+        # ``ready``, whose slots re-run every startup wiring step (and, when the
+        # webview's tracked first load ended failed, re-navigate the page).
+        self._ready_emitted = False
         self._health_probe = health_probe or self._default_health_probe
         self._health_worker_active = False
         # A retry may begin while the previous bounded HTTP probe is still
@@ -513,6 +519,7 @@ class StartupCoordinator(QObject):
         self._start_time = time.monotonic()
         self._degraded_since = None
         self._readiness_retry_count = 0
+        self._ready_emitted = False
         self._readiness_failure_reported = False
         self._set_state(
             StartupState.STARTING_BACKEND,
@@ -787,7 +794,8 @@ class StartupCoordinator(QObject):
                         "recovered_from_degraded": recovering,
                     },
                 )
-                if self._backend is not None:
+                if self._backend is not None and not (recovering and self._ready_emitted):
+                    self._ready_emitted = True
                     self.ready.emit(self._backend)
             self._schedule_health_probe(self.policy.passive_poll_interval_ms)
             return
@@ -839,8 +847,13 @@ class StartupCoordinator(QObject):
             else self.policy.health_ready_endpoint
         )
         probe_url = "%s%s" % (self.api_client.base_url, endpoint)
+        # Post-startup passive probes get a real budget: with 1 s, any brief
+        # event-loop stall (keychain write at sign-in, a heavy handler) flipped
+        # a healthy backend to DEGRADED and back every few minutes.
+        post_startup = self._state in (StartupState.RUNNING, StartupState.DEGRADED)
+        probe_timeout = TIMEOUT_LONG if post_startup else TIMEOUT_DEFAULT
         t0 = time.monotonic()
-        status = self.api_client.get_health_status(endpoint=endpoint, timeout=TIMEOUT_DEFAULT)
+        status = self.api_client.get_health_status(endpoint=endpoint, timeout=probe_timeout)
         latency_ms = (time.monotonic() - t0) * 1000
         logger.debug(
             "[DIAG_STARTUP] health_probe url=%s http=%s ready=%s latency=%.0fms body=%s",
@@ -854,7 +867,7 @@ class StartupCoordinator(QObject):
             logger.debug(
                 "[DIAG_STARTUP] health_probe endpoint mismatch, trying /health/live fallback",
             )
-            fallback = self.api_client.get_health_status(endpoint="/health/live", timeout=TIMEOUT_DEFAULT)
+            fallback = self.api_client.get_health_status(endpoint="/health/live", timeout=probe_timeout)
             logger.debug(
                 "[DIAG_STARTUP] health_probe fallback http=%s ready=%s body=%s",
                 fallback.http_status,

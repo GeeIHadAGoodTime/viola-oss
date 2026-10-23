@@ -36,6 +36,17 @@ def _sm_transition(player, phase: PlaybackPhase, *, user_initiated: bool = False
         logger.debug("State machine transition to %s failed (non-critical)", phase.name)
 
 
+def _is_stopped(player) -> bool:
+    """True when the state machine says playback was explicitly stopped.
+
+    STOPPED -> PAUSED is not a valid transition: there is nothing to pause, so
+    pause must be a no-op instead of forcing the state machine (1.0.5 log:
+    "Forced transition STOPPED -> PAUSED (not in VALID_TRANSITIONS)").
+    """
+    sm = getattr(player, "_playback_sm", None)
+    return sm is not None and sm.phase == PlaybackPhase.STOPPED
+
+
 # ============================================================================
 # Playback Controller
 # ============================================================================
@@ -694,6 +705,9 @@ class MusicPlayerPlaybackController:
         need_engine_pause = False
         need_backend_pause = False
         try:
+            if _is_stopped(self.player):
+                logger.debug("pause_playback: playback is stopped, nothing to pause")
+                return
             if not self.player._backend_manager.backend:
                 # Engine manager path
                 need_engine_pause = hasattr(self.player, "_engine_manager") and self.player._engine_manager is not None
@@ -729,6 +743,8 @@ class MusicPlayerPlaybackController:
 
     def _best_effort_pause(self) -> None:
         """Pause backend and set flags without holding _cv. Used as fallback."""
+        if _is_stopped(self.player):
+            return
         backend = getattr(self.player._backend_manager, "backend", None)
         if backend and hasattr(backend, "pause"):
             try:

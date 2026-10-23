@@ -8,6 +8,7 @@ import { isCloudSurface } from './auth/cloudSurface';
 import { apiFetch } from '../hooks/useViolaApi';
 import { THEME, applyTheme, setAccent } from '../config';
 import { isFeatureHidden } from '../utils/featureSurface';
+import { canQuitDesktopApp, quitDesktopApp } from '../utils/runtimeSurface';
 import { outputDeviceOptions as buildOutputDeviceOptions, outputDeviceValue } from '../utils/audioOutputSelection';
 import { customerSpeechSelection, customerSpeechLanguagePatch } from '../utils/customerSpeechSelection';
 import DesktopUpsell from './DesktopUpsell';
@@ -3503,7 +3504,7 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
                         }}
                       />
                       <div style={{ color: theme.colors.textMuted, fontSize: '12px', marginTop: '8px' }}>
-                        Speech qualification build. Choose a language and matching voice, then save.
+                        Choose a language and a matching voice, then save.
                       </div>
                     </div>
                   )}
@@ -3515,7 +3516,7 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
                       onChange={(voice) => customerSpeech
                         ? updateLocalSettings(prev => ({ ...prev, tts_language: speechSelection.language, tts_voice: voice }))
                         : updateLocal('tts_voice', voice)}
-                      options={customerSpeech ? speechSelection.voices.map(voice => ({ value: voice, label: voice })) : [
+                      options={customerSpeech ? speechSelection.voiceOptions : [
                         { value: 'default', label: 'Default' },
                         { value: 'alloy', label: 'Alloy' },
                         { value: 'echo', label: 'Echo' },
@@ -3848,6 +3849,29 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
                   ariaLabel={startupToggleCopy.title}
                 />
               </SettingRow>
+              {canQuitDesktopApp() && (
+                <>
+                  <SectionDivider />
+                  <SettingRow title="Quit Viola" description="Close Viola completely instead of keeping it in the system tray">
+                    <button
+                      type="button"
+                      onClick={() => quitDesktopApp()}
+                      style={{
+                        padding: '8px 14px',
+                        minHeight: '44px',
+                        borderRadius: '8px',
+                        border: `1px solid ${theme.colors.borderLight}`,
+                        backgroundColor: 'transparent',
+                        color: theme.colors.textSecondary,
+                        fontSize: '13px',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Quit Viola
+                    </button>
+                  </SettingRow>
+                </>
+              )}
             </Section>
 
             <Section title="Updates">

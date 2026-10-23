@@ -632,5 +632,16 @@ describe('SettingsModal desktop-only panels (#4226)', () => {
         expect(settingsHarness.refreshDevices).toHaveBeenCalled();
       });
     });
+
+    it('offers Quit Viola on the System tab and asks the Qt shell to quit', async () => {
+      const quitApp = vi.fn();
+      window.viola = { quitApp };
+      render(<SettingsModal isOpen onClose={vi.fn()} />);
+      openTab('System');
+
+      await screen.findByText('Audio Devices');
+      fireEvent.click(screen.getByRole('button', { name: 'Quit Viola' }));
+      expect(quitApp).toHaveBeenCalledTimes(1);
+    });
   });
 });

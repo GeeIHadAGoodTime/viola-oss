@@ -95,13 +95,51 @@ const PHASES = {
 };
 
 const PHASE_ORDER = ['welcome', 'account_pair', 'cloud_consent', 'autonomy_tier', 'mic_try', 'hear_about'];
+
+// The current phase survives a page reload (signing in reloads the shell), so
+// first run resumes where the user was instead of restarting at welcome.
+const PHASE_STORAGE_KEY = 'viola_onboarding_phase';
+function readStoredOnboardingPhase() {
+  try {
+    const stored = window.sessionStorage.getItem(PHASE_STORAGE_KEY);
+    return PHASE_ORDER.includes(stored) ? stored : null;
+  } catch {
+    return null;
+  }
+}
+function storeOnboardingPhase(phaseId) {
+  try {
+    if (phaseId) window.sessionStorage.setItem(PHASE_STORAGE_KEY, phaseId);
+    else window.sessionStorage.removeItem(PHASE_STORAGE_KEY);
+  } catch { /* storage unavailable: resume is a convenience only */ }
+}
 const TOTAL_PHASES = PHASE_ORDER.length;
 
+// Narration is background audio. Nothing in first run may wait for a line to
+// finish before it reacts to the user: steps advance the moment the user's
+// choice is saved, and moving on cuts the line that was playing (cancel()
+// below, run by clearTimers() on every phase change). The returned promise only
+// drives the isSpeaking indicator.
 function speakText(text) {
   let cancelled = false;
   // Lets the server-TTS wait below race a cancel() call, the same way the
   // fallback branch's speechSynthesis wait already can (via settle()).
   let onCancel = null;
+  // The server's id for the line it accepted, so a stop names exactly that
+  // line. The server ignores a stop for a line a newer one already replaced,
+  // which keeps this stop from racing the next step's narration.
+  let narrationId = null;
+  let stopSent = false;
+  const stopServerNarration = () => {
+    if (stopSent || narrationId === null) return;
+    stopSent = true;
+    apiFetch('/v1/tts/stop', {
+      method: 'POST',
+      body: JSON.stringify({ narration_id: narrationId }),
+    }).catch(() => {
+      // Best effort: the next line replaces this one server-side anyway.
+    });
+  };
 
   const promise = (async () => {
     if (cancelled) return;
@@ -117,6 +155,14 @@ function speakText(text) {
         method: 'POST',
         body: JSON.stringify({ text }),
       });
+      if (result?.spoken === true && Number.isInteger(result?.narration_id)) {
+        narrationId = result.narration_id;
+      }
+      if (result?.spoken === true && cancelled) {
+        // The user moved on while the request was in flight.
+        stopServerNarration();
+        return;
+      }
       if (result?.spoken === true && !cancelled) {
         const wordCount = text.split(/\s+/).length;
         const estimatedMs = Math.max(1800, wordCount * 230);
@@ -140,11 +186,9 @@ function speakText(text) {
 
     if (cancelled) return;
 
-    // Fallback narration path. This must NEVER be able to hang: onboarding
-    // advances when this promise resolves, so if browser speech synthesis is
-    // unavailable or never fires onend (e.g. a headless/voice-less WebView, or
-    // TTS assets missing), a hard time cap still resolves it. Otherwise a
-    // missing TTS voice could strand the user on a step forever.
+    // Fallback narration path. A hard time cap still resolves it if browser
+    // speech synthesis is unavailable or never fires onend (e.g. a
+    // headless/voice-less WebView), so the speaking indicator cannot stick.
     const wordCount = text.split(/\s+/).length;
     const capMs = Math.max(1800, wordCount * 230) + 1500;
 
@@ -179,6 +223,7 @@ function speakText(text) {
     cancel: () => {
       cancelled = true;
       if (onCancel) onCancel();
+      stopServerNarration();
       if ('speechSynthesis' in window) window.speechSynthesis.cancel();
     },
   };
@@ -194,6 +239,7 @@ async function checkOnboardingStatus() {
 }
 
 async function completeOnboarding() {
+  storeOnboardingPhase(null);
   try {
     await apiFetch('/v1/onboarding/complete', { method: 'POST' });
   } catch {
@@ -357,7 +403,7 @@ export function useVoiceOnboarding() {
   const { t } = useTranslation();
   const onboardingAvailable = isFeatureAvailable('onboarding');
   const [isOnboarding, setIsOnboarding] = useState(false);
-  const [phaseId, setPhaseId] = useState('welcome');
+  const [phaseId, setPhaseId] = useState(() => readStoredOnboardingPhase() || 'welcome');
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [micRetries, setMicRetries] = useState(0);
   const [micPermission, setMicPermission] = useState({
@@ -394,8 +440,14 @@ export function useVoiceOnboarding() {
   const byokCheckRef = useRef(false);
   const cloudConsentStatusRef = useRef(cloudConsentStatus);
   const accountSkippedRef = useRef(false);
+  // A short confirmation ("Cloud AI is on.") for the choice that just moved
+  // the user on. It is spoken as the opening of the next step's narration
+  // rather than as its own line the step waits for: waiting for it is what
+  // made every step feel like 10-17 seconds of input lag.
+  const leadInRef = useRef(null);
 
   useEffect(() => { phaseIdRef.current = phaseId; }, [phaseId]);
+  useEffect(() => { if (isOnboarding) storeOnboardingPhase(phaseId); }, [isOnboarding, phaseId]);
   useEffect(() => { cloudConsentStatusRef.current = cloudConsentStatus; }, [cloudConsentStatus]);
   useEffect(() => { accountSkippedRef.current = accountSkipped; }, [accountSkipped]);
 
@@ -464,13 +516,9 @@ export function useVoiceOnboarding() {
     saveOnboardingStep('api_access', { account_signed_in: true });
 
     clearTimers();
-    setIsSpeaking(true);
-    const tts = speakText(t('onboarding.account_pair.signed_in_tts'));
-    speechRef.current = tts;
-    tts.promise.then(() => {
-      setIsSpeaking(false);
-      if (!skipRef.current) advancePhase();
-    });
+    if (skipRef.current) return;
+    leadInRef.current = t('onboarding.account_pair.signed_in_tts');
+    advancePhase();
   }, [advancePhase, clearTimers, stopSignInPolling, t]);
 
   // The guest path out of the account step. Viola's runtime only requires an
@@ -497,13 +545,8 @@ export function useVoiceOnboarding() {
     });
 
     clearTimers();
-    setIsSpeaking(true);
-    const tts = speakText(t('onboarding.account_pair.no_account_tts'));
-    speechRef.current = tts;
-    tts.promise.then(() => {
-      setIsSpeaking(false);
-      if (!skipRef.current) advancePhase();
-    });
+    leadInRef.current = t('onboarding.account_pair.no_account_tts');
+    advancePhase();
     return true;
   }, [advancePhase, clearTimers, isOnboarding, onboardingAvailable, stopSignInPolling, t]);
 
@@ -601,8 +644,11 @@ export function useVoiceOnboarding() {
         });
       }
 
+      const leadIn = leadInRef.current;
+      leadInRef.current = null;
+      const speech = t(currentPhase.speechKey);
       setIsSpeaking(true);
-      const tts = speakText(t(currentPhase.speechKey));
+      const tts = speakText(leadIn ? `${leadIn} ${speech}` : speech);
       speechRef.current = tts;
 
       tts.promise.then(() => {
@@ -701,13 +747,11 @@ export function useVoiceOnboarding() {
 
       if (enableCloud) {
         setCloudConsentStatus('enabled');
-        setIsSpeaking(true);
-        const tts = speakText(t('onboarding.cloud.enabled_tts'));
-        speechRef.current = tts;
-        tts.promise.then(() => {
-          setIsSpeaking(false);
-          if (!skipRef.current) advancePhase();
-        });
+        // Saved: move on now. The confirmation opens the next step's line.
+        if (!skipRef.current && phaseIdRef.current === 'cloud_consent') {
+          leadInRef.current = t('onboarding.cloud.enabled_tts');
+          advancePhase();
+        }
       } else {
         setCloudConsentStatus('declined');
         setIsSpeaking(true);
@@ -744,12 +788,8 @@ export function useVoiceOnboarding() {
       }
       if (skipRef.current || phaseIdRef.current !== 'cloud_consent') return false;
       setCloudConsentStatus('byok_ready');
-      setIsSpeaking(true);
-      const tts = speakText(t('onboarding.cloud.byok_ready_tts'));
-      speechRef.current = tts;
-      await tts.promise;
-      setIsSpeaking(false);
-      if (!skipRef.current && phaseIdRef.current === 'cloud_consent') advancePhase();
+      leadInRef.current = t('onboarding.cloud.byok_ready_tts');
+      advancePhase();
       return true;
     } catch {
       if (skipRef.current || phaseIdRef.current !== 'cloud_consent') return false;
@@ -773,12 +813,12 @@ export function useVoiceOnboarding() {
     // '' = "prefer not to say" — the stored default. Anything else must be
     // one of the closed ATTRIBUTION_OPTIONS values (enforced server-side too).
     const answer = typeof value === 'string' ? value : '';
-    try {
-      await updateSettings({ attribution_self_report: answer });
-    } catch {
-      // The answer is optional marketing self-report; a failed save must
-      // never block first-run. Continue without it.
-    }
+    // The answer is optional marketing self-report, and a failed save never
+    // blocked first run, so there is nothing to wait for: finishing setup must
+    // not sit behind a settings round-trip. Save in the background.
+    updateSettings({ attribution_self_report: answer }).catch(() => {
+      // Continue without it.
+    });
     setAttributionStatus('idle');
     if (!skipRef.current) advancePhase();
     return true;

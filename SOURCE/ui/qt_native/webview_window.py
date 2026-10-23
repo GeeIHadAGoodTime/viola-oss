@@ -536,6 +536,26 @@ class ViolaBridge(QObject):
                 self._window.hide_browser_overlay()
             logger.info("[ViolaBridge] hideBrowserOverlay called from React")
 
+    @Slot(result=str)
+    def quitApp(self) -> str:
+        """Quit Viola from the in-app UI (the "..." menu / Settings > System).
+
+        Same shutdown as the tray menu's Quit: it calls the window's
+        ``_quit_app`` (force-quit past minimize-to-tray, hide the tray icon,
+        ``QApplication.quit()``). Deferred one event-loop turn so this
+        QWebChannel call returns to JavaScript before teardown starts.
+        Refused for non-local caller pages, like the other native actions.
+        """
+        if not self._caller_page_is_local():
+            logger.warning("[ViolaBridge] Refused quitApp from non-local caller page")
+            return json.dumps({"ok": False, "error": "origin_not_allowed"}, sort_keys=True)
+        window = self._window
+        if window is None:
+            return json.dumps({"ok": False, "error": "window_unavailable"}, sort_keys=True)
+        logger.info("[ViolaBridge] quitApp called from React")
+        QTimer.singleShot(0, window._quit_app)
+        return json.dumps({"ok": True}, sort_keys=True)
+
     @Slot(int, int, int, int)
     def setBrowserOverlayBounds(self, x: int, y: int, w: int, h: int) -> None:
         """Called from React when the media area resizes.
@@ -2553,6 +2573,12 @@ class ViolaWebViewWindow(QMainWindow):
                 self.exit_fullscreen()
                 event.accept()
                 return True
+            # Ctrl+Q (Cmd+Q on macOS) quits for real, the same as the tray
+            # menu's Quit. Closing the window only hides it to the tray.
+            if key == Qt.Key.Key_Q and event.modifiers() == Qt.KeyboardModifier.ControlModifier:
+                self._quit_app()
+                event.accept()
+                return True
         return super().eventFilter(watched, event)
 
     def _window_pos_from_mouse_event(self, watched: QObject, event: QMouseEvent) -> QPoint | None:
@@ -3793,7 +3819,7 @@ class ViolaWebViewWindow(QMainWindow):
         self.raise_()
 
     def _quit_app(self):
-        """Actually quit the application (from tray menu)."""
+        """Actually quit the application (tray menu, Ctrl+Q, in-app Quit)."""
         self._force_quit = True
         if hasattr(self, "_tray_icon"):
             self._tray_icon.hide()
@@ -3802,8 +3828,17 @@ class ViolaWebViewWindow(QMainWindow):
         QApplication.instance().quit()
 
     def _on_tray_activated(self, reason):
-        """Handle tray icon activation (double-click restores)."""
-        if reason == QSystemTrayIcon.ActivationReason.DoubleClick:
+        """Handle tray icon activation.
+
+        A single left click (``Trigger``) or a double-click restores the
+        window, the standard Windows tray behavior; touch users on a tablet
+        cannot easily right-click. Right-click (``Context``) still opens the
+        tray menu through ``setContextMenu``.
+        """
+        if reason in (
+            QSystemTrayIcon.ActivationReason.Trigger,
+            QSystemTrayIcon.ActivationReason.DoubleClick,
+        ):
             self._restore_from_tray()
 
     def closeEvent(self, event):

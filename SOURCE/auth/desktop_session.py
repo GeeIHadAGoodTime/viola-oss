@@ -45,7 +45,12 @@ _TOKEN_CACHE_FILENAME = ".gotrue_tokens.enc"
 _TOKEN_KEY_FILENAME = ".gotrue_tokens.master_key"
 _TOKEN_SECRET_APP = "viola-desktop-gotrue-tokens"  # pragma: allowlist secret
 _LOCAL_SESSION_TTL_DAYS = 30
-_ACCESS_REFRESH_SKEW_SECONDS = 30
+# Must cover @supabase/auth-js's refresh window (3 ticks x 30 s, checked every
+# 30 s, so it asks once fewer than ~120 s remain). With a smaller skew the store
+# answered the webview's refresh grant with the SAME near-expiry token, auth-js
+# saw it still inside its window, and re-asked on every tick (a TOKEN_REFRESHED
+# storm, each re-running the billing read).
+_ACCESS_REFRESH_SKEW_SECONDS = 120
 _DEFAULT_ACCESS_TTL_SECONDS = 15 * 60
 _SQLITE_TIMEOUT_SECONDS = 5.0
 

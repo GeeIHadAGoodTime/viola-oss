@@ -58,14 +58,25 @@ class FormatterLocaleTests(unittest.TestCase):
                 self.assertEqual(self.module.normalize_for_speech(source, language=language), expected)
 
     def test_all_seven_non_english_families_preserve_exact_values_and_names(self):
+        # Spanish and Mandarin speak their digits/symbols (their routes accept
+        # no raw "3:30" or "%"); names and unknown tokens stay exact.
+        self.assertEqual(
+            self.module.normalize_for_speech(
+                "El precio es $1.5 a las 3:30. Spotify y OpenAI: 0.001, 15% y 21st.", language="es"
+            ),
+            "El precio es uno coma cinco dólares a las tres y treinta. Spotify y OpenAI: "
+            "cero coma cero cero uno, quince por ciento y 21st.",
+        )
+        self.assertEqual(
+            self.module.normalize_for_speech("价格是$1.5。Spotify OpenAI 3:30 0.001 15% 21st。", language="zh"),
+            "价格是$1.5。Spotify OpenAI 3点30分 0.001 百分之15 21st。",
+        )
         samples = {
-            "es": "El precio es $1.5 a las 3:30. Spotify y OpenAI: 0.001, 15% y 21st.",
             "fr": "Le prix est $1.5 à 3:30. Spotify et OpenAI : 0.001, 15% et 21st.",
             "hi": "कीमत $1.5 है। Spotify OpenAI 3:30 0.001 15% 21st।",
             "it": "Il prezzo è $1.5 alle 3:30. Spotify e OpenAI: 0.001, 15% e 21st.",
             "pt": "O preço é $1.5 às 3:30. Spotify e OpenAI: 0.001, 15% e 21st.",
             "ja": "価格は$1.5です。Spotify OpenAI 3:30 0.001 15% 21st。",
-            "zh": "价格是$1.5。Spotify OpenAI 3:30 0.001 15% 21st。",
         }
         for language, source in samples.items():
             with self.subTest(language=language):
@@ -73,16 +84,19 @@ class FormatterLocaleTests(unittest.TestCase):
 
     def test_regions_enums_and_unknown_explicit_locales_do_not_guess_english(self):
         source = "$1.50 3:30 2026 AI MP3 Spotify 0.00000000000000000001"
-        for language in ("es-MX", "pt_BR", "ZH-cn", "", "unknown", "Language.ES", types.SimpleNamespace(value="fr-FR")):
+        for language in ("pt_BR", "", "unknown", "Language.ES", types.SimpleNamespace(value="fr-FR")):
             with self.subTest(language=language):
                 self.assertEqual(self.module.normalize_for_speech(source, language=language), source)
+        self.assertEqual(self.module.normalize_for_speech(source, language="ZH-cn"), source.replace("3:30", "3点30分"))
+        self.assertTrue(self.module.normalize_for_speech(source, language="es-MX").startswith("uno coma cincuenta dólares"))
 
     def test_markup_url_redaction_and_script_survive_without_english_claims(self):
         source = "# 详情\n[查看](https://example.com/?secret=fixture)\n```\nhidden_fixture_secret\n```\n价格 **$1.50**，地址 https://example.com/?secret=another"
         for language in LANGUAGES:
             with self.subTest(language=language):
                 result = self.module.normalize_for_speech(source, language=language, summarize=False)
-                self.assertEqual(result, "详情 查看 价格 $1.50，地址 …")
+                price = "uno coma cincuenta dólares" if language == "es" else "$1.50"
+                self.assertEqual(result, "详情 查看 价格 %s，地址 …" % price)
                 self.assertNotIn("secret", result)
                 self.assertNotIn("hidden_fixture", result)
                 self.assertNotIn("link sent in chat", result)
@@ -112,13 +126,16 @@ class FormatterLocaleTests(unittest.TestCase):
     def test_explicit_user_overrides_keep_existing_scope(self):
         self.config.tts_pronunciation_overrides = {"Name": "nom"}
         for language in LANGUAGES:
-            self.assertEqual(self.module.normalize_for_speech("Name $1.5", language=language), "nom $1.5")
+            expected = "nom uno coma cinco dólares" if language == "es" else "nom $1.5"
+            self.assertEqual(self.module.normalize_for_speech("Name $1.5", language=language), expected)
         self.assertEqual(self.module.normalize_for_speech("Name $1.5"), "nom one dollar and fifty cents")
 
     def test_shared_formatter_never_stores_a_call_locale(self):
         source = "$1.5 AI"
         for language in ("en", "ja", "fr", "en-GB", "zh", "en", "es") * 4:
-            expected = "one dollar and fifty cents A I" if language.startswith("en") else source
+            expected = {"en": "one dollar and fifty cents A I", "es": "uno coma cinco dólares AI"}.get(
+                language[:2], source
+            )
             self.assertEqual(self.module.normalize_for_speech(source, language=language), expected)
         self.assertFalse(hasattr(self.module._DEFAULT_FORMATTER, "language"))
         self.assertFalse(hasattr(self.module._DEFAULT_FORMATTER, "_language"))
@@ -163,7 +180,11 @@ class PhoneFilterLocaleTests(unittest.IsolatedAsyncioTestCase):
         for language in LANGUAGES:
             with self.subTest(language=language):
                 tts._settings.language = language
-                self.assertEqual(await self.filter.filter(source), source)
+                expected = {
+                    "es": "uno coma cincuenta dólares tres y treinta OpenAI Spotify cero coma cero cero uno",
+                    "zh": "$1.50 3点30分 OpenAI Spotify 0.001",
+                }.get(language, source)
+                self.assertEqual(await self.filter.filter(source), expected)
                 self.assertEqual(tts._settings.voice, "af_heart")
         tts._settings.language = "en-gb"
         self.assertEqual(await self.filter.filter("$1.5"), "one dollar and fifty cents")

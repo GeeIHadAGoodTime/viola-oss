@@ -437,13 +437,13 @@ def configure_lifecycle(context: ApiContext) -> None:
             _autoplay = getattr(music, "autoplay", None) or getattr(music, "autoplay_controller", None)
             if _autoplay is not None and hasattr(_autoplay, "set_broadcast_context"):
                 _autoplay.set_broadcast_context(hub, main_loop)
-                log.warning(
+                log.debug(
                     "[QUEUE_TRACE] WIRING SUCCESS autoplay=%s hub=%s",
                     _autoplay,
                     hub,
                 )
             else:
-                log.warning(
+                log.debug(
                     "[QUEUE_TRACE] WIRING FAILED autoplay=%s music_type=%s attrs=%s",
                     _autoplay,
                     type(music).__name__,

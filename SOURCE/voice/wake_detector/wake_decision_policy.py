@@ -80,6 +80,36 @@ def _check_state_hub_listening() -> bool:
         return False
 
 
+# How long after Viola's own TTS stops that a wake trigger is still treated as
+# self-speech. The wake model scores a 1.5s ring buffer, so for that long after
+# the last word the buffer still holds Viola's voice; the extra margin covers
+# output latency and room echo.
+SELF_SPEECH_TAIL_MS: float = 2000.0
+
+# A TTS "speaking" flag older than this is assumed stuck (a crashed playback
+# that never cleared it) and ignored, so a stale flag cannot disable wake
+# detection for good. No single spoken reply runs this long.
+SELF_SPEECH_MAX_S: float = 180.0
+
+
+def viola_self_speech_active(tail_ms: float = SELF_SPEECH_TAIL_MS) -> bool:
+    """Return True while Viola's own TTS is speaking, or within ``tail_ms`` after.
+
+    Reads the TTS state every TTS engine already reports
+    (``diagnostics.wake_state_sync``). Command replies were already covered by
+    the listening gate (the voice mode is SPEAKING then), but speech that does
+    not go through a voice command, such as the first-run onboarding narration,
+    left the voice mode IDLE, and the wake word fired on Viola's own words.
+    Fails open (False) when the state is unavailable.
+    """
+    try:
+        from diagnostics.wake_state_sync import get_state_sync_monitor
+
+        return bool(get_state_sync_monitor().is_tts_likely_cause(tail_ms=tail_ms, max_speaking_s=SELF_SPEECH_MAX_S))
+    except Exception:  # noqa: BLE001, RUF100 - diagnostics state must never break wake detection
+        return False
+
+
 class WakeDecisionPolicy:
     """
     Central authority for wake word detection decisions.
@@ -399,6 +429,14 @@ class WakeDecisionPolicy:
                 hub_listening,
                 context.wake_score,
             )
+            return result
+
+        # Self-speech is part of the listening gate: Viola is talking, so a
+        # "wake word" heard now is overwhelmingly Viola's own voice.
+        if context.self_speech_active:
+            result.blocking_reason = "SELF_SPEECH_BLOCK: Viola's own TTS is speaking (or just stopped)"
+            result.layers_failed.append("listening_gate")
+            logger.info("SELF_SPEECH: Wake blocked while Viola is speaking, score=%.3f", context.wake_score)
             return result
 
         result.layers_passed.append("listening_gate")

@@ -1,7 +1,11 @@
 """Offline English Misaki adapter for the explicit customer Kokoro profile.
 
 Never guesses an unsupported locale, drops unknown words/phonemes, invokes
-an eSpeak fallback or downloads assets during speech. Packaging qualification
+an eSpeak fallback or downloads assets during speech. An out-of-lexicon Latin
+word is read from Misaki's own lexicon (case variants, then a two-word
+compound, then letter by letter) so a reply is still spoken; anything else
+still fails closed and names the offending tokens on the error (never in its
+message) so the reply layer can retry without them. Packaging qualification
 must separately verify the installed graph, bundled files and actual audio.
 """
 
@@ -46,6 +50,73 @@ _RESPELLINGS = {
     "oo": "ˈu",
     "ber": "bɚ",
 }
+# Music/app words likely in replies that the reviewed lexicon lacks. Each was
+# checked against viola-misaki-en 0.9.4+viola.1; words it already reads well
+# (EDM, R&B, K-pop, lo-fi, YouTube, Viola, playlist) are deliberately absent.
+_REPLY_WORDS = {
+    "lofi": "lˈOfˌI",
+    "LoFi": "lˈOfˌI",
+    "Spotify": "spˈɑTəfˌI",
+    "Deezer": "dˈizəɹ",
+    "chillhop": "ʧˈɪlhˌɑp",
+    "synthwave": "sˈɪnθwˌAv",
+}
+_SPELLABLE_WORD = re.compile(r"[A-Za-z]+(?:['’][A-Za-z]+)*")
+_MIN_COMPOUND_PART = 2
+
+
+def _spell_unknown_word(lexicon):
+    """Misaki fallback hook for an unknown Latin word, from the lexicon only.
+
+    Tries case variants, then the most balanced split into two gold lexicon
+    words, then letter-by-letter golds (Misaki's NNP path). Mixed tokens
+    (digits, symbols, other scripts) return no phonemes and keep failing closed.
+    """
+
+    def known(word):
+        ps, rating = lexicon.get_word(word, None, None, None)
+        return (ps, rating) if ps and any(c in _SPOKEN_PHONEMES for c in ps) else (None, None)
+
+    def fallback(token):
+        word = token.text if token._.alias is None else token._.alias
+        if not _SPELLABLE_WORD.fullmatch(word):
+            return None, None
+        for variant in dict.fromkeys((word.lower(), word.capitalize())):
+            if variant != word:
+                ps, rating = known(variant)
+                if ps:
+                    return ps, rating
+        plain = word.lower().replace("'", "").replace("’", "")
+        splits = sorted(
+            range(_MIN_COMPOUND_PART, len(plain) - _MIN_COMPOUND_PART + 1),
+            key=lambda cut: (-min(cut, len(plain) - cut), cut),
+        )
+        for cut in splits:
+            left, right = plain[:cut], plain[cut:]
+            if left in lexicon.golds and right in lexicon.golds:
+                left_ps, _ = known(left)
+                right_ps, _ = known(right)
+                if left_ps and right_ps:
+                    return left_ps + right_ps.replace("ˈ", "ˌ"), 2
+        return lexicon.get_NNP(word)
+
+    return fallback
+
+
+def drop_unspeakable(text: str, tokens=(), *, latin_script: bool = True) -> str:
+    """Remove only the named unspeakable tokens (and, for Latin-script locales,
+    runs of other scripts) so the rest of a reply can still be spoken."""
+    result = text
+    for token in sorted({t for t in tokens if isinstance(t, str) and t.strip()}, key=len, reverse=True):
+        bounded = re.sub(r"(?<!\w)" + re.escape(token) + r"(?!\w)", " ", result)
+        result = bounded if bounded != result else result.replace(token, " ")
+    if latin_script:
+        result = _NON_LATIN_RUN.sub(" ", result)
+    return re.sub(r"\s+", " ", result).strip()
+
+
+# Anything outside ASCII, Latin-1/Extended-A/B, general punctuation and currency.
+_NON_LATIN_RUN = re.compile(r"[^\s\x00-\x7f -ɏ -⁯₠-₿]+")
 
 
 # Derive only complete spaced-letter phrases from the same retained tables
@@ -100,7 +171,15 @@ def _protect_initialism_a(text: str) -> str:
 
 
 class PronunciationError(ValueError):
-    """Input cannot be spoken completely by the qualified English route."""
+    """Input cannot be spoken completely by the qualified English route.
+
+    ``tokens`` names the offending tokens for a reply-layer retry; they are
+    never part of the message, which stays free of user text.
+    """
+
+    def __init__(self, *args: object, tokens=()) -> None:
+        super().__init__(*args)
+        self.tokens = tuple(tokens)
 
 
 class CustomerTokenizer:
@@ -140,7 +219,8 @@ class CustomerTokenizer:
             "en-gb": en.G2P(nlp=nlp, number_to_words=num2words, british=True),
         }
         for g2p in self._g2p.values():
-            g2p.lexicon.golds.update(en.Lexicon.grow_dictionary(_RESPELLINGS))
+            g2p.lexicon.golds.update(en.Lexicon.grow_dictionary({**_RESPELLINGS, **_REPLY_WORDS}))
+            g2p.fallback = _spell_unknown_word(g2p.lexicon)
         self.vocab = vocab
         self._lock = threading.Lock()
 
@@ -170,16 +250,23 @@ class CustomerTokenizer:
             phonemes, tokens = self._g2p[locale](text.strip() if norm else text)
         # Unknown words must not disappear when the neural wrapper filters its
         # vocabulary. Do not include potentially private utterances in errors.
-        if not tokens or any(
-            token.phonemes is None
+        unknown = [
+            token.text
+            for token in tokens or ()
+            if token.phonemes is None
             or (
                 any(character.isalnum() for character in token.text)
                 and not any(character in _SPOKEN_PHONEMES for character in token.phonemes)
             )
-            for token in tokens
-        ):
-            raise PronunciationError("Customer speech contains an unknown word; supply a pronunciation override")
+        ]
+        if not tokens or unknown:
+            raise PronunciationError(
+                "Customer speech contains an unknown word; supply a pronunciation override", tokens=unknown
+            )
         phonemes = phonemes.strip()
         if not phonemes or any(character not in self.vocab for character in phonemes):
-            raise PronunciationError("Customer speech contains unsupported phonemes")
+            unsupported = [
+                token.text for token in tokens if any(character not in self.vocab for character in token.phonemes)
+            ]
+            raise PronunciationError("Customer speech contains unsupported phonemes", tokens=unsupported)
         return phonemes
