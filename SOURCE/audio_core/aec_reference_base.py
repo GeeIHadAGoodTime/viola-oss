@@ -26,6 +26,7 @@ the existing WASAPI adapter test suite is the regression net for that claim.
 from __future__ import annotations
 
 import threading
+import weakref
 from collections import deque
 from math import gcd
 
@@ -42,7 +43,64 @@ logger = get_logger(__name__)
 # few callbacks when the loopback buffer has barely filled.
 MIN_READY_SAMPLES = 800
 
-__all__ = ["MIN_READY_SAMPLES", "RingBufferAECReferenceAdapter", "resample_mono_int16"]
+# A device loopback frame quieter than this (int16 RMS) is treated as "the
+# loopback cannot hear Viola's own playback". Real playback captured at a usable
+# level sits in the hundreds or thousands; a broken, offloaded, or heavily
+# attenuated loopback reads exactly 0 or single digits.
+LOOPBACK_SILENT_RMS = 50.0
+
+# Most of Viola's own playback the reference keeps queued (250ms at 16kHz). The
+# wake listener drains it in real time; the cap only bounds the backlog when the
+# listener pauses (for example while a command is being recorded).
+LOCAL_PLAYBACK_BUFFER_SAMPLES = 4000
+
+__all__ = [
+    "LOCAL_PLAYBACK_BUFFER_SAMPLES",
+    "LOOPBACK_SILENT_RMS",
+    "MIN_READY_SAMPLES",
+    "LocalPlaybackAECReferenceAdapter",
+    "RingBufferAECReferenceAdapter",
+    "push_local_playback_reference",
+    "resample_mono_int16",
+]
+
+# Every live reference adapter, so Viola's own output path (TTS) can feed the
+# PCM it is playing straight into the echo canceller's reference. Weak, so a
+# dropped adapter is never kept alive by this registry.
+_LOCAL_PLAYBACK_SINKS: weakref.WeakSet[RingBufferAECReferenceAdapter] = weakref.WeakSet()
+_LOCAL_PLAYBACK_SINKS_LOCK = threading.Lock()
+
+
+def push_local_playback_reference(samples: np.ndarray, sample_rate: int) -> int:
+    """Hand PCM that Viola itself is playing to every live AEC reference adapter.
+
+    The device loopback is the general reference: it hears whatever any process
+    plays. It is not reliable for Viola's own voice, though. On some machines it
+    reads digital silence while Viola is audibly speaking (1.0.5: ``ref_rms=0``
+    for the whole onboarding narration while the microphone heard it clearly),
+    and the wake word then fired on Viola's own words. Viola always knows exactly
+    what it is playing, so the TTS output path pushes those samples here as it
+    plays them.
+
+    Args:
+        samples: Mono PCM, either float in [-1, 1] or int16.
+        sample_rate: Sample rate of ``samples`` in Hz.
+
+    Returns:
+        Number of adapters that received the samples.
+    """
+    if samples is None or len(samples) == 0 or sample_rate <= 0:
+        return 0
+    with _LOCAL_PLAYBACK_SINKS_LOCK:
+        sinks = list(_LOCAL_PLAYBACK_SINKS)
+    delivered = 0
+    for sink in sinks:
+        try:
+            sink.push_local_playback(samples, sample_rate)
+            delivered += 1
+        except Exception as exc:  # noqa: BLE001, RUF100 - playback must never fail because of the reference tap
+            logger.debug("Local playback AEC reference push failed: %s", exc)
+    return delivered
 
 
 def resample_mono_int16(samples: np.ndarray, source_rate: int, target_rate: int) -> np.ndarray:
@@ -113,6 +171,13 @@ class RingBufferAECReferenceAdapter:
         self._diagnostics_disabled = False
         self._callback_error_count = 0
         self._callback_error_logged = False
+
+        # Viola's own playback (TTS), pushed by the output path. Served in place
+        # of the device loopback whenever the loopback cannot hear it.
+        self._local_buffer: deque[np.int16] = deque(maxlen=LOCAL_PLAYBACK_BUFFER_SAMPLES)
+        self._local_reference_logged = False
+        with _LOCAL_PLAYBACK_SINKS_LOCK:
+            _LOCAL_PLAYBACK_SINKS.add(self)
 
     # ------------------------------------------------------------------ #
     # Subclass contract                                                    #
@@ -211,35 +276,92 @@ class RingBufferAECReferenceAdapter:
             target_rate = self._target_rate
 
         with self._lock:
-            # Startup gate: wait until buffer has accumulated enough samples
-            # to give the FDAF a meaningful reference signal.
-            if not self._primed:
-                if len(self._buffer) < MIN_READY_SAMPLES:
-                    return np.zeros(frame_samples, dtype=np.int16)
-                self._primed = True
-                logger.info(
-                    "AEC_ADAPTER_PRIMED: buffer reached %s samples, serving real frames",
-                    len(self._buffer),
-                )
+            frame_data = self._next_loopback_frame_locked(frame_samples)
+            local_frame = self._next_local_frame_locked(frame_samples)
 
-            if len(self._buffer) < frame_samples:
-                # Underrun: not enough fresh data -- replay last good frame
-                return self._last_frame.copy()
-
-            # FIFO: consume samples from the left side of the deque
-            consumed = []
-            for _ in range(min(frame_samples, len(self._buffer))):
-                consumed.append(self._buffer.popleft())
-            frame_data = np.array(consumed, dtype=np.int16)
-
-            # Save as last good frame for underrun protection
-            self._last_frame = frame_data.copy()
+        if local_frame is not None:
+            loopback_rms = float(np.sqrt(np.mean(frame_data.astype(np.float32) ** 2))) if len(frame_data) else 0.0
+            if loopback_rms < LOOPBACK_SILENT_RMS:
+                # The loopback is not hearing Viola's own playback (silent,
+                # offloaded, or attenuated to nothing). Use what Viola knows it
+                # is playing instead, so the echo canceller still has a
+                # reference while Viola speaks.
+                if not self._local_reference_logged:
+                    self._local_reference_logged = True
+                    logger.info(
+                        "AEC_LOCAL_REFERENCE: serving Viola's own playback as the AEC reference "
+                        "(device loopback rms=%.1f is below %.0f)",
+                        loopback_rms,
+                        LOOPBACK_SILENT_RMS,
+                    )
+                frame_data = local_frame
 
         # Resample if rate doesn't match
         if target_rate != self._target_rate:
             frame_data = resample_mono_int16(frame_data, self._target_rate, target_rate)
 
         return frame_data
+
+    def _next_loopback_frame_locked(self, frame_samples: int) -> np.ndarray:
+        """Next device-loopback frame. Caller holds ``self._lock``."""
+        # Startup gate: wait until buffer has accumulated enough samples
+        # to give the FDAF a meaningful reference signal.
+        if not self._primed:
+            if len(self._buffer) < MIN_READY_SAMPLES:
+                return np.zeros(frame_samples, dtype=np.int16)
+            self._primed = True
+            logger.info(
+                "AEC_ADAPTER_PRIMED: buffer reached %s samples, serving real frames",
+                len(self._buffer),
+            )
+
+        if len(self._buffer) < frame_samples:
+            # Underrun: not enough fresh data -- replay last good frame
+            return self._last_frame.copy()
+
+        # FIFO: consume samples from the left side of the deque
+        consumed = []
+        for _ in range(min(frame_samples, len(self._buffer))):
+            consumed.append(self._buffer.popleft())
+        frame_data = np.array(consumed, dtype=np.int16)
+
+        # Save as last good frame for underrun protection
+        self._last_frame = frame_data.copy()
+        return frame_data
+
+    def _next_local_frame_locked(self, frame_samples: int) -> np.ndarray | None:
+        """Next frame of Viola's own playback, or None when nothing is queued.
+
+        Caller holds ``self._lock``. A partial frame is zero-padded: the tail of
+        an utterance is real audio followed by real silence.
+        """
+        if not self._local_buffer:
+            return None
+        count = min(frame_samples, len(self._local_buffer))
+        frame = np.zeros(frame_samples, dtype=np.int16)
+        frame[:count] = [self._local_buffer.popleft() for _ in range(count)]
+        return frame
+
+    def push_local_playback(self, samples: np.ndarray, sample_rate: int) -> None:
+        """Queue PCM that Viola itself is playing as AEC reference.
+
+        Args:
+            samples: Mono PCM, float in [-1, 1] or int16.
+            sample_rate: Sample rate of ``samples`` in Hz.
+        """
+        data = np.asarray(samples)
+        if data.size == 0:
+            return
+        if data.ndim > 1:
+            data = data.mean(axis=1)
+        if np.issubdtype(data.dtype, np.floating):
+            data = np.clip(np.rint(data * 32767.0), -32768, 32767).astype(np.int16)
+        else:
+            data = data.astype(np.int16, copy=False)
+        if sample_rate != self._target_rate:
+            data = resample_mono_int16(data, int(sample_rate), self._target_rate)
+        with self._lock:
+            self._local_buffer.extend(data)
 
     def has_aec_reference(self) -> bool:
         """Check if AEC reference buffer has actual data.
@@ -334,3 +456,21 @@ class RingBufferAECReferenceAdapter:
             # Snapshot the tail (most recent samples) without consuming
             buf_list = list(self._buffer)
             return np.array(buf_list[-n:], dtype=np.int16)
+
+
+class LocalPlaybackAECReferenceAdapter(RingBufferAECReferenceAdapter):
+    """Reference adapter fed only by Viola's own playback.
+
+    Used when the platform has no device-level capture (or it failed to start),
+    so the echo canceller still gets a reference whenever Viola itself speaks.
+    It cannot cancel audio from other processes; that needs the device loopback.
+    """
+
+    REFERENCE_LABEL = "Local playback AEC reference"
+
+    def start(self) -> bool:
+        self._running = True
+        return True
+
+    def stop(self) -> None:
+        self._running = False

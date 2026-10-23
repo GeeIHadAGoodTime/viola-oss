@@ -580,12 +580,20 @@ class StateSyncMonitor:
                 "recent_5min_count": recent_count,
             }
 
-    def is_tts_likely_cause(self, timestamp: float | None = None) -> bool:
+    def is_tts_likely_cause(
+        self,
+        timestamp: float | None = None,
+        tail_ms: float = 1000.0,
+        max_speaking_s: float | None = None,
+    ) -> bool:
         """
         Check if TTS could be the cause of a detection.
 
         Args:
             timestamp: Detection timestamp (uses current time if None)
+            tail_ms: How long after TTS stops it still counts as the cause
+            max_speaking_s: When set, a "speaking" flag raised longer ago than
+                this is treated as stuck and ignored
 
         Returns:
             True if TTS was recently active
@@ -595,12 +603,14 @@ class StateSyncMonitor:
         with self._lock:
             # Check if currently speaking
             if self._tts.is_speaking:
-                return True
+                started = self._tts.speech_start_timestamp
+                if max_speaking_s is None or started is None or ts - started <= max_speaking_s:
+                    return True
 
-            # Check if recently stopped speaking (within 1 second)
+            # Check if recently stopped speaking
             if self._tts.last_utterance_end_timestamp is not None:
                 elapsed = (ts - self._tts.last_utterance_end_timestamp) * 1000
-                if elapsed < 1000:
+                if elapsed < tail_ms:
                     return True
 
             return False

@@ -137,6 +137,21 @@ _CHUNK_THRESHOLD = 200
 _MAX_TEXT_LENGTH = 5000
 
 
+def _push_tts_aec_reference(samples: np.ndarray, sample_rate: int) -> None:
+    """Give the wake detector's echo canceller the speech Viola is playing.
+
+    Without this, the only reference was the device loopback, which on some
+    machines reads silence while Viola speaks, so the wake word fired on Viola's
+    own narration. Best effort: speech must never fail because of it.
+    """
+    try:
+        from audio_core.aec_reference_base import push_local_playback_reference
+
+        push_local_playback_reference(samples, sample_rate)
+    except Exception as exc:  # noqa: BLE001, RUF100 - reference tap must never break playback
+        logger.debug("TTS AEC reference push failed: %s", exc)
+
+
 def _strip_emoji(text: str) -> str:
     """Remove emoji characters that would confuse the phonemizer."""
     cleaned = _EMOJI_RE.sub("", text)
@@ -1048,6 +1063,19 @@ class KokoroTTSEngine:
                     if position == len(pcm):
                         raise sd.CallbackStop
 
+                # Feed what has just been handed to the speaker into the wake
+                # detector's echo-canceller reference. Done here on the worker,
+                # never in the PortAudio callback, and paced by the callback's
+                # own progress so the reference tracks real playback time.
+                reference_pos = 0
+
+                def feed_aec_reference() -> None:
+                    nonlocal reference_pos
+                    end = position
+                    if end > reference_pos:
+                        _push_tts_aec_reference(pcm[reference_pos:end], sample_rate)
+                        reference_pos = end
+
                 try:
                     stream = sd.OutputStream(
                         samplerate=sample_rate,
@@ -1062,11 +1090,13 @@ class KokoroTTSEngine:
                         if not playback_retired():
                             broadcasted = self._broadcast_pcm_to_spokes(pcm_bytes, sample_rate)
                         while not finished.wait(0.01):
+                            feed_aec_reference()
                             if playback_retired():
                                 # Only this worker aborts/closes its own stream;
                                 # never race close against another native call.
                                 stream.abort()
                                 break
+                        feed_aec_reference()
                         played_locally = not playback_retired() and position == len(pcm)
                 finally:
                     try:

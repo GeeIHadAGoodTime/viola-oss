@@ -140,10 +140,35 @@ def _build_aec_adapter() -> tuple[RingBufferAECReferenceAdapter | None, str]:
 def create_and_start_aec_adapter() -> RingBufferAECReferenceAdapter | None:
     """Create and start an AEC reference adapter (standalone, no VoiceOrchestrator needed).
 
+    Prefers the platform's device-level capture. When that is unavailable or
+    fails to start, falls back to a reference fed only by Viola's own playback
+    (TTS), so the echo canceller still has a reference whenever Viola itself is
+    speaking instead of running as a pure passthrough.
+
     Returns:
         A started AEC adapter implementing the AECReferenceSource protocol,
         or None if no adapter could be created/started.
     """
+    adapter = _create_and_start_platform_aec_adapter()
+    if adapter is not None:
+        return adapter
+    try:
+        from audio_core.aec_reference_base import LocalPlaybackAECReferenceAdapter
+
+        fallback = LocalPlaybackAECReferenceAdapter()
+        if fallback.start():
+            logger.warning(
+                "AEC_WIRED: local-playback reference only (Viola's own speech is cancelled; "
+                "audio from other apps is not)"
+            )
+            return fallback
+    except Exception as e:  # noqa: BLE001, RUF100 - AEC fallback must not break voice startup
+        logger.warning("AEC_NOT_WIRED: local-playback reference fallback failed: %s", e)
+    return None
+
+
+def _create_and_start_platform_aec_adapter() -> RingBufferAECReferenceAdapter | None:
+    """Create and start the platform's device-level AEC reference adapter, or None."""
     try:
         adapter, description = _build_aec_adapter()
         if adapter is None:
@@ -439,12 +464,21 @@ class VoiceOrchestrator:
         if not self._startup_validator.check_wake_detector(self.wake_enabled):
             return
 
-        if not self._startup_validator.check_wake_start(self.wake_enabled):
-            return
-
-        # Start AEC reference adapter for echo cancellation during music playback
+        # Start and wire the AEC reference BEFORE the wake listener starts, so
+        # its very first frame is already echo-cancelled. Starting it after the
+        # listener left a window where the listener ran with no reference at
+        # all and logged "AEC reference source NOT wired" on every launch; if
+        # Viola was already speaking (first-run narration), that window was
+        # spent listening to her own voice uncancelled.
         # MUST run regardless of STT availability — AEC protects wake detection
         self._start_aec_reference_adapter()
+
+        if not self._startup_validator.check_wake_start(self.wake_enabled):
+            if self._owns_aec_adapter:
+                self._stop_aec_reference_adapter()
+                self.aec_reference_source = None
+                self._owns_aec_adapter = False
+            return
 
         # Verify AEC reference is actually wired
         if self.aec_reference_source is not None:
