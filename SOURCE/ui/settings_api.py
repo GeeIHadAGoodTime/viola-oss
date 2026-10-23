@@ -1023,9 +1023,21 @@ def create_settings_router(*, music_service: object | None = None) -> APIRouter:
             # silently dropped — the SettingsManager alias would never fire.
             from ui.settings_manager import _is_system_key
 
+            #
+            # The canonical key always wins over its legacy alias. GET echoes
+            # `capability_tier` next to `agent_autonomy` (see
+            # _settings_response_payload), and the Settings window posts its
+            # whole draft back, so a save carried the NEW `agent_autonomy`
+            # plus the STALE `capability_tier` echo. The alias came later in
+            # the body and overwrote the user's choice, the stale value was
+            # then stripped as unchanged, and the save answered "updated
+            # successfully" with the old mode still stored (1.0.5 laptop
+            # report: Ensemble always reverted to Solo).
             normalized_incoming = {}
             for raw_key, raw_value in request.settings.items():
                 canonical = settings_mgr.canonicalize_setting_key(raw_key)
+                if canonical != raw_key and canonical in request.settings:
+                    continue
                 normalized_incoming[canonical] = raw_value
 
             submitted_speech = {
