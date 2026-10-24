@@ -4270,10 +4270,11 @@ def _speech_engines_to_stop(bootstrap: object | None) -> list[object]:
     return engines
 
 
-def _stop_voice_for_quit(bootstrap: object | None) -> None:
+def _stop_voice_for_quit(bootstrap: object | None, report: dict[str, object]) -> None:
     for engine in _speech_engines_to_stop(bootstrap):
         try:
             engine.stop()  # type: ignore[attr-defined]
+            report.setdefault("speech_stopped", []).append(type(engine).__name__)  # type: ignore[union-attr]
         except Exception:  # noqa: BLE001, RUF100 - a failed cut must not stop the quit
             logger.warning("Could not cut speech while quitting", exc_info=True)
     voice = getattr(bootstrap, "voice", None) if bootstrap is not None else None
@@ -4281,6 +4282,7 @@ def _stop_voice_for_quit(bootstrap: object | None) -> None:
     if callable(stop_voice):
         try:
             stop_voice()
+            report["voice_stopped"] = True
         except Exception:  # noqa: BLE001, RUF100 - a failed stop must not stop the quit
             logger.warning("Could not stop the wake detector while quitting", exc_info=True)
 
@@ -4296,9 +4298,10 @@ def silence_voice_for_quit(bootstrap: object | None) -> None:
     """
     if bootstrap is None:
         return
+    report: dict[str, object] = {}
     worker = threading.Thread(
         target=_stop_voice_for_quit,
-        args=(bootstrap,),
+        args=(bootstrap, report),
         name="quit-voice-stop",
         daemon=True,
     )
@@ -4310,4 +4313,8 @@ def silence_voice_for_quit(bootstrap: object | None) -> None:
             _QUIT_VOICE_STOP_TIMEOUT_S,
         )
     else:
-        logger.info("Speech cut and wake detection stopped for quit")
+        logger.info(
+            "Quitting: speech cut (%s), wake detection and microphone stopped=%s",
+            ", ".join(report.get("speech_stopped", [])) or "nothing playing",  # type: ignore[arg-type]
+            bool(report.get("voice_stopped")),
+        )
