@@ -30,10 +30,10 @@
   },
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "843262df979c478bc2664578db7a27fe7f17c6d74800b8aa2b4dbed292b3c466",
-  "source_tree_sha256": "0a157b73df6bc3933459661e5def905aa4c126477eb71f309c7465b1cc3194eb",
-  "source_file_count": 2729,
-  "source_revision": "7f5fedee5a4ed7ce58a6c984663d4e876c4d95f2",
+  "source_manifest_sha256": "6c2618b0a71f7de16852d4dcebb6e2361011e346e363d4f14f95be9e509fcca3",
+  "source_tree_sha256": "9431c30c4ad855c943a9c2335957d09047fcd181f6257dd53c83ef174df628c5",
+  "source_file_count": 2730,
+  "source_revision": "74c21465a4e5207d65ec62e4c55da9638081ae4e",
   "comparison_public_revision": "ecab2772465fcc89ae6645b028af1c2273b9199f",
   "changed_source_paths": [
     "audio_core/aec_reference_base.py",
@@ -44,6 +44,7 @@
     "backend/fastapi_app.py",
     "chat/channel.py",
     "config/searxng/render-settings.sh",
+    "config/settings.py",
     "contracts/fastapi.py",
     "core/constants.py",
     "core/lan_exposure.py",
@@ -56,6 +57,7 @@
     "diagnostics/wake_state_sync.py",
     "intent/agent_loop.py",
     "intent/ai_controller.py",
+    "intent/approval.py",
     "intent/command_executor.py",
     "intent/content_sanitizer.py",
     "intent/instant_commands/_base.py",
@@ -65,20 +67,29 @@
     "intent/tools/memory.py",
     "intent/tools/music_tools.py",
     "intent/tools/settings_tools.py",
+    "intent/tools/vision_tools.py",
     "mcp_hub/approval_bridge.py",
     "mcp_hub/client_hub.py",
     "mcp_servers/core_tools/server.py",
     "music/autoplay/ytmusic_radio.py",
     "music/autoplay_controller.py",
+    "music/consent/providers.py",
     "music/player/playback.py",
     "music/player/state.py",
     "music/runtime/backend_manager.py",
     "music/runtime/control_surface.py",
     "music/runtime/embedded_playback.py",
     "music/runtime/play_command.py",
+    "music/spotify/cdp_controller.py",
+    "services/browser/qt_cdp_bridge.py",
     "services/llm/provider_router.py",
     "services/llm/route_tool_schemas.py",
+    "services/llm/spend_accounting.py",
+    "services/memory/auto_dream.py",
     "services/memory/dir.py",
+    "services/memory/extract_memories.py",
+    "services/memory/selector.py",
+    "services/openai_background.py",
     "tests/customer_speech/test_real_cjk_pronunciation.py",
     "tests/customer_speech/test_real_pronunciation.py",
     "tests/public/test_billing_capacity_mount.py",
@@ -107,6 +118,7 @@
     "ui/onboarding.py",
     "ui/qt_native/startup_controller.py",
     "ui/qt_native/webview_window.py",
+    "ui/queue_discovery.py",
     "ui/react-app/package-lock.json",
     "ui/react-app/package.json",
     "ui/react-app/src/SmartDisplay.jsx",
@@ -165,6 +177,8 @@
     "utils/speaker_pairing_flow.py",
     "utils/velopack_updater.py",
     "viola_qt.py",
+    "violawake/config.py",
+    "violawake/engine.py",
     "voice/customer_pronunciation.py",
     "voice/pipeline.py",
     "voice/pipeline_wake_callback.py",
@@ -178,7 +192,8 @@
     "voice/wake_detector/wake/config.py",
     "voice/wake_detector/wake/context.py",
     "voice/wake_detector/wake_decision_policy.py",
-    "voice/wake_detector/wake_factory.py"
+    "voice/wake_detector/wake_factory.py",
+    "voice/wake_detector/wake_verifier.py"
   ],
   "retained_sboms": [
     {
@@ -252,8 +267,8 @@
     "historical_inventory_limits": "This renderer correction changes no dependency or workflow inputs. All six retained SBOMs and their complete status objects stay historical and unchanged; no current installed inventory qualification is claimed."
   },
   "qualification": {
-    "source_commit": "7f5fedee5a4ed7ce58a6c984663d4e876c4d95f2",
-    "kind": "Viola 1.0.5 build 5 integration; source checksum binding only, desktop qualification runs in the private release chain"
+    "source_commit": "74c21465a4e5207d65ec62e4c55da9638081ae4e",
+    "kind": "1.0.5 build 5 background AI on keyless managed installs"
   },
   "historical_bindings": [
     {
