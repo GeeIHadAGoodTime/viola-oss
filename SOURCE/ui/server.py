@@ -500,6 +500,10 @@ def create_app(state: Any, music: Any, intent: Any) -> FastAPI:
     # voice-initiated seek commands broadcast to WebSocket clients.
     # Without this, "seek to 2:00" updates backend state but the YouTube
     # iframe never receives the seekTo postMessage.
+    # The desktop builds intent lazily (LazyIntentBridge), so this injection is
+    # skipped there; the instant handlers fall back to the global hub set
+    # above (ui.websocket.event_hub.broadcast_transport_command). Injecting into
+    # the lazy bridge would materialize it here and undo the lazy start.
     try:
         from bootstrap.lazy_intent import LazyIntentBridge
 
