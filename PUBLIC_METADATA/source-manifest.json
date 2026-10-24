@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "26d2765d05b945878996dae52428d1f5439bf570",
-  "sha256": "9de0783e068653e82c487067f5cbb4245ea1696bff9e355a9eda1662cf4959eb",
+  "revision": "ab0691507b4c97b382ae57b0d9f5700ac8cd3b45",
+  "sha256": "68bea2b5b8114dcfc7d6213aa32cdba69955ce2421ffc0b5c3cc7bbb51c74a2f",
   "files": [
     {
       "path": ".env.example",
@@ -530,8 +530,8 @@
     },
     {
       "path": "auth/database.py",
-      "sha256": "74ae4c3a51df610133bbe9c0e51352b571f7476a9db9a2d08e3e149bf5de31a2",
-      "bytes": 147331
+      "sha256": "5a209f2feef3943fef8790bafb9827aecae6f00f46a1b859f35d4e0f93f94ae0",
+      "bytes": 149165
     },
     {
       "path": "auth/dependencies.py",
@@ -1575,8 +1575,8 @@
     },
     {
       "path": "intent/agent_executor.py",
-      "sha256": "436b446fc6b47fedaf6c5d30f1edce8e0e0bfe2f3b5f9b4ce30ca9ce833b3628",
-      "bytes": 578884
+      "sha256": "33e3cb47b0df66a523a71fccd82a13f9d3e18ce8de84e0d834da84ba213f075c",
+      "bytes": 579858
     },
     {
       "path": "intent/agent_loop.py",
@@ -5335,8 +5335,8 @@
     },
     {
       "path": "services/telnyx_sender.py",
-      "sha256": "14a2f05a929aa5092be862cb4c8aba53453d01614dc4aa62b64027061a0d8882",
-      "bytes": 7290
+      "sha256": "b3f2f7f654805d9fef8c9ecd73970b54ff49ab07b0bda400b400dd1e8f76abf5",
+      "bytes": 15322
     },
     {
       "path": "services/timer_core.py",
@@ -10360,8 +10360,8 @@
     },
     {
       "path": "ui/react-app/src/components/AccountTab.jsx",
-      "sha256": "4c84e1e623665c508bd4caaa0d34433f07ced26298b83226d457df4e2b62e2f3",
-      "bytes": 77664
+      "sha256": "2c2e09c7bfb3d135bc903243aab8cc2d93028d111722179342ed7c6d0b7183ed",
+      "bytes": 84743
     },
     {
       "path": "ui/react-app/src/components/AccountTab.legacy.jsx",
@@ -10390,8 +10390,8 @@
     },
     {
       "path": "ui/react-app/src/components/AccountTab.test.jsx",
-      "sha256": "5e31c5edb980377be19df6a931c8f7d2bd6519df91535549a5e0567ffb04d4ba",
-      "bytes": 18535
+      "sha256": "37cfd66a74c415a568ce2f526316c224fcd10d9ef65b942c0e6520d146b25ed9",
+      "bytes": 22304
     },
     {
       "path": "ui/react-app/src/components/AccountTab.usageCloudAuth.test.jsx",
