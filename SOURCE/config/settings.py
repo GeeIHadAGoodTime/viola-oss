@@ -914,8 +914,9 @@ class AppConfig:
     # --- Agentic Browser Display (CDP) ---
     # DevTools port the agent browser (stage QtWebEngine view) is driven on.
     # 0 (default): viola_qt.py picks a random free loopback port each launch
-    # and writes it back here; never a fixed well-known port, never wildcard
-    # remote origins. >0: that explicit port (dev tooling). <0: switched off.
+    # and writes it back here; never a fixed well-known port, and remote
+    # origins limited to one no web page can have. >0: that explicit port
+    # (dev tooling). <0: switched off.
     cdp_port: int = 0
 
     # --- MCP (Model Context Protocol) Servers ---

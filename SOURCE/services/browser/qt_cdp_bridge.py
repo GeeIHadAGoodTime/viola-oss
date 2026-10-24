@@ -41,8 +41,9 @@ per-page CDP sessions all work against real sites, with zero other protocol
 errors.
 
 The relay binds to loopback only, exists only while a CDP browser session is
-attached, and like Chromium's own DevTools port it refuses any handshake that
-carries an Origin header, so no web page can drive it.
+attached, and like the upstream DevTools port (which viola_qt restricts with
+--remote-allow-origins) it refuses any handshake that carries a web Origin
+header, so no web page can drive it.
 """
 
 from __future__ import annotations
@@ -130,8 +131,8 @@ class QtWebEngineCDPBridge:
         # origins=[None] accepts only handshakes WITHOUT an Origin header.
         # Playwright's driver sends none; any web page in any browser always
         # does, so a page cannot reach the agent browser through this relay.
-        # This mirrors Chromium's own default for the upstream DevTools port
-        # (Viola never passes --remote-allow-origins).
+        # This mirrors the --remote-allow-origins restriction viola_qt puts on
+        # the upstream DevTools port.
         self._server = await serve(
             self._handle_client,
             _BRIDGE_HOST,

@@ -599,6 +599,9 @@ _HEADLESS_FLAG = "--headless"
 _QT_ONLY_FLAGS_WITH_VALUE = {"--remote-debugging-port"}
 _QT_ONLY_FLAGS = {_HEADLESS_FLAG, "--no-wake"}
 _CDP_LOOPBACK_BIND_HOST = "127.0.0.1"
+# The only origin the agent browser's DevTools port accepts. RFC 6761 reserves
+# .invalid, so no web page can ever be served from it.
+_CDP_NO_WEB_ORIGIN = "https://viola-no-web-origin.invalid"
 
 
 def _headless_requested(argv: list[str] | None = None) -> bool:
@@ -671,8 +674,8 @@ def _pick_ephemeral_cdp_port() -> int:
     driven over Chromium's DevTools endpoint, which has no authentication.
     It is therefore never put on a fixed, well-known port such as 9222, the
     port commodity cookie stealers probe. A fresh OS-assigned port per launch,
-    bound to loopback only, with Chromium's default Origin check left on
-    (no --remote-allow-origins flag), keeps web pages and the LAN out.
+    bound to loopback only, plus a --remote-allow-origins list that no web
+    page can match (see _CDP_NO_WEB_ORIGIN), keeps web pages and the LAN out.
     """
     import socket
 
@@ -795,6 +798,17 @@ if _cdp_debugging_bind:
         _cfg.cdp_port = int(_resolved_cdp_port)
     except Exception:
         _bootstrap_logging.warning("Could not publish the agent browser DevTools port to settings")
+    # QtWebEngine 6.8's Chromium does NOT refuse Origin-bearing DevTools
+    # WebSockets by default (measured: a handshake with Origin
+    # https://evil.example is accepted), but it does honor an explicit
+    # --remote-allow-origins list. Viola's own clients (Playwright, httpx)
+    # send no Origin header, so allow exactly one origin that no web page can
+    # ever have (.invalid is reserved and never resolves). Every browser page,
+    # including data: and sandboxed ones ("null"), is then refused with 403.
+    if "--remote-allow-origins" not in os.environ["QTWEBENGINE_CHROMIUM_FLAGS"]:
+        os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = (
+            os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] + " --remote-allow-origins=" + _CDP_NO_WEB_ORIGIN
+        ).strip()
     _bootstrap_logging.info("Agent browser DevTools listener: %s (loopback, per-launch)", _cdp_debugging_bind)
 
 
