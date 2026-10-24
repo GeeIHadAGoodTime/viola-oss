@@ -571,7 +571,35 @@ def _resume_messages_from_subagent_transcript(messages: Any, message: str) -> li
 
 
 class _PaymentConfirmationGateRefused(RuntimeError):
-    """Raised when PAYMENT_GATE cannot safely bind to a merchant checkout page."""
+    """Raised when PAYMENT_GATE cannot safely bind to a merchant checkout page.
+
+    ``user_message`` (optional) is the plain-language reply for the user when the
+    refusal has a specific cause, such as a hosted approval link the cloud never
+    received.
+    """
+
+    def __init__(self, message: str, *, user_message: str | None = None) -> None:
+        super().__init__(message)
+        self.user_message = user_message
+
+
+async def _require_cloud_confirmation_link(mgr: Any, token: str) -> None:
+    """Refuse to hand out a hosted approval link the cloud never received.
+
+    A link whose session never reached the cloud opens as "Link expired", which
+    tells the user nothing. When the confirmation manager knows why the sync
+    failed (not signed in, cloud sync off, cloud refused the sign-in, cloud
+    unreachable), drop the session and raise with that reason instead. A sync
+    that is only slow is left alone: the link may still start working.
+    """
+    if await mgr.ensure_cloud_synced(token) is not False:
+        return
+    describe = getattr(mgr, "cloud_sync_failure_message", None)
+    message = describe(token) if callable(describe) else None
+    if not isinstance(message, str) or not message.strip():
+        return
+    mgr.invalidate_session(token)
+    raise _PaymentConfirmationGateRefused("payment confirmation cloud sync failed", user_message=message)
 
 
 def _gate_state_record_params(
@@ -3904,7 +3932,7 @@ class AgentExecutor:
                         channel=(getattr(channel, "channel_type", None) if channel is not None else None),
                         metadata=({"merchant_url": merchant_url} if merchant_url else None),
                     )
-                    await mgr.ensure_cloud_synced(token)
+                    await _require_cloud_confirmation_link(mgr, token)
                     ctx = {
                         "mgr": mgr,
                         "token": token,
@@ -3939,6 +3967,18 @@ class AgentExecutor:
                 result.confirmation_url = str(ctx["url"])
                 result.origin_channel = executor._get_origin_channel_type()
                 return result
+            except _PaymentConfirmationGateRefused as exc:
+                # Keep the checkpoint waiting so "continue" retries once the
+                # cause (sign-in, cloud sync, connection) is fixed.
+                logger.warning("Payment gate checkpoint resume refused: %s", exc)
+                return AgentResult(
+                    ok=False,
+                    answer=exc.user_message
+                    or "The payment confirmation session is no longer available. Please start checkout again.",
+                    iterations_used=0,
+                    tools_called=[],
+                    error="payment confirmation resume refused",
+                )
             except Exception:
                 logger.exception("Payment gate checkpoint resume failed")
                 mark_complete(checkpoint, "completed", "payment_gate")
@@ -11604,7 +11644,7 @@ class AgentExecutor:
                 metadata=None,
                 executor=self,
             )
-            await mgr.ensure_cloud_synced(token)
+            await _require_cloud_confirmation_link(mgr, token)
             return {
                 "mgr": mgr,
                 "token": token,
@@ -11662,7 +11702,7 @@ class AgentExecutor:
             metadata={"merchant_url": merchant_url} if merchant_url else None,
             executor=self,
         )
-        await mgr.ensure_cloud_synced(token)
+        await _require_cloud_confirmation_link(mgr, token)
         return {
             "mgr": mgr,
             "token": token,
