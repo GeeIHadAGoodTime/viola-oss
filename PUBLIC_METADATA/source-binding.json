@@ -30,10 +30,10 @@
   },
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "06e5b8efce96f777157e6b1fa0b486afffa7b0b819f4477ab26d94279aef4463",
-  "source_tree_sha256": "e75e853a37a49c89aad1a3411eca3a50187b3d6f0df89a8ee68d48ada1173311",
+  "source_manifest_sha256": "c189fe7b9ab978522b3c8c0896112eac7f351a3ab49e779d7a55b446594b641a",
+  "source_tree_sha256": "08a2ec276d04983999892f8691614b4346b11f74f1edb5107531d1e4f3f29c71",
   "source_file_count": 2737,
-  "source_revision": "b69d1cc03d8b708d5bd773e15b142c6c9e10550d",
+  "source_revision": "9a30d5839e0e592f73424f8b72be52b280a5db9c",
   "comparison_public_revision": "ecab2772465fcc89ae6645b028af1c2273b9199f",
   "changed_source_paths": [
     "audio_core/aec_reference_base.py",
@@ -132,6 +132,7 @@
     "tests/public/test_native_titlebar_resize.py",
     "tests/public/test_phone_locale_normalization.py",
     "tests/public/test_queue_play_selection.py",
+    "tests/public/test_request_tool_surface_boundary.py",
     "tests/public/test_windows_gpu_compositing.py",
     "tests/public/test_windows_native_startup_order.py",
     "third_party/misaki_cjk_prototype.patch",
@@ -319,7 +320,7 @@
     "historical_inventory_limits": "This renderer correction changes no dependency or workflow inputs. All six retained SBOMs and their complete status objects stay historical and unchanged; no current installed inventory qualification is claimed."
   },
   "qualification": {
-    "source_commit": "b69d1cc03d8b708d5bd773e15b142c6c9e10550d",
+    "source_commit": "9a30d5839e0e592f73424f8b72be52b280a5db9c",
     "kind": "phone calling on installed builds"
   },
   "historical_bindings": [
