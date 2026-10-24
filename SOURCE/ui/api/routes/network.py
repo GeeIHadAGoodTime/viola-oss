@@ -5,12 +5,27 @@ from __future__ import annotations
 from pathlib import Path
 
 from fastapi.responses import FileResponse, JSONResponse
+from pydantic import BaseModel
 
 from contracts.api_response import success_response
-from fastapi import Depends
+from fastapi import Depends, HTTPException, Request
 from ui.api.context import ApiContext
 from ui.api.routes.auth_dependencies import require_auth
-from utils.speaker_pairing_flow import build_local_address_payload
+from ui.core.security import is_loopback_request
+from utils.speaker_pairing_flow import build_local_address_payload, ensure_lan_access
+
+
+class LanAccessRequest(BaseModel):
+    """Body of ``POST /v1/network/lan-access``."""
+
+    enabled: bool
+
+
+async def _require_loopback_caller(request: Request) -> None:
+    """Only the desktop itself may switch LAN access on or off."""
+    if not is_loopback_request(request):
+        raise HTTPException(status_code=403, detail="Forbidden")
+
 
 _CONNECT_PAGE_PATH = Path(__file__).resolve().parents[2] / "static" / "connect-page" / "index.html"
 
@@ -35,8 +50,38 @@ def register_network_routes(context: ApiContext) -> None:
         API key. ``pairing_code`` is the human-friendly word (or base36 fallback) a user
         can type at useviola.com/connect or the bundled /connect page to reach
         this hub without scanning a QR or typing the IP.
+
+        Opening Add Room is the user asking for other devices to reach this
+        hub, so this first opens LAN access (``ensure_lan_access``). The link
+        and code are only returned when that address is actually being served;
+        otherwise ``lan_access`` says why and the panel shows that instead.
         """
-        return success_response(build_local_address_payload())
+        status = await ensure_lan_access(enable=True)
+        return success_response(build_local_address_payload(status))
+
+    @router.get(
+        "/v1/network/lan-access",
+        tags=["network"],
+        dependencies=[Depends(require_auth), Depends(_require_loopback_caller)],
+    )
+    async def get_lan_access() -> dict:
+        """Report whether devices on the Wi-Fi can reach this hub (no change)."""
+        status = await ensure_lan_access(enable=None)
+        return success_response(status.to_dict())
+
+    @router.post(
+        "/v1/network/lan-access",
+        tags=["network"],
+        dependencies=[Depends(require_auth), Depends(_require_loopback_caller)],
+    )
+    async def set_lan_access(body: LanAccessRequest) -> dict:
+        """Turn LAN access on or off from the desktop (Rooms panel, Settings).
+
+        Loopback-only: a device on the network must not be able to open or
+        close the hub's LAN listener, even with a paired-speaker credential.
+        """
+        status = await ensure_lan_access(enable=body.enabled)
+        return success_response(status.to_dict())
 
     @router.get(
         "/v1/network/pair/pending",

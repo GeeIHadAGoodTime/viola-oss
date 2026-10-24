@@ -5,12 +5,34 @@ useful only for a LAN-bound API. A clean install binds to loopback; opening
 mDNS there needlessly triggers Windows Firewall consent over onboarding
 (#4867). Explicit LAN/wildcard binds keep discovery available. This policy
 does not change bind settings or control user-initiated smart-home scans.
+
+It also records the extra LAN listener the app opens when the user adds a
+room (``utils.speaker_pairing_flow``), so checks that depend on LAN exposure,
+such as the websocket Origin check, can see it without reading the bind
+setting. Recording it opens nothing.
 """
 
 from __future__ import annotations
 
 import ipaddress
 import socket
+import threading
+
+_ACTIVE_LAN_LISTENER_LOCK = threading.Lock()
+_ACTIVE_LAN_LISTENER: tuple[str, int] | None = None
+
+
+def set_active_lan_listener(host: str | None, port: int | None = None) -> None:
+    """Record (or clear, with ``None``) the LAN address the app is serving on."""
+    global _ACTIVE_LAN_LISTENER
+    with _ACTIVE_LAN_LISTENER_LOCK:
+        _ACTIVE_LAN_LISTENER = (str(host), int(port)) if host and port else None
+
+
+def active_lan_listener() -> tuple[str, int] | None:
+    """Return ``(host, port)`` of the running LAN listener, or ``None``."""
+    with _ACTIVE_LAN_LISTENER_LOCK:
+        return _ACTIVE_LAN_LISTENER
 
 
 def _is_loopback(address: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
