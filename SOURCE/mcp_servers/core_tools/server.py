@@ -68,6 +68,7 @@ from intent.tools.music_connect import (
 from intent.tools.music_tools import (
     playback_control_handler as _playback_control_handler,
     rate_track_handler as _rate_track_handler,
+    video_fullscreen_handler as _video_fullscreen_handler,
 )
 from intent.tools.notification_tools import (
     list_notify_reminders_handler as _list_notify_reminders_handler,
@@ -4773,6 +4774,32 @@ async def open_app_panel(
             payload["room_name"] = prefill_payload["room_name"]
 
     return _format_result(ToolResult(ok=True, data=payload))
+
+
+@server.tool(
+    description=(
+        "Show the playing Music-stage video full screen (enabled=true: 'put this in full screen', "
+        "'go full screen') or end it (enabled=false: 'end full screen', 'exit full screen'; while "
+        "full screen also 'go back', 'normal size'). Desktop app only. Returns a ui_action; does "
+        "not change playback."
+    ),
+    annotations=_SAFE,
+    # Always loaded: a one-shot spoken command must not spend an extra
+    # ToolSearch round-trip finding its schema (same reason as weather, #2094).
+    meta={"risk": "safe", "anthropic/alwaysLoad": True},
+)
+async def video_fullscreen(
+    enabled: Annotated[
+        bool,
+        Field(description="True to go full screen, false to end it."),
+    ] = True,
+) -> str:
+    """Return the enter/exit video-fullscreen ui_action, or why it cannot happen."""
+    try:
+        return _format_result(await _video_fullscreen_handler(bool(enabled)))
+    except Exception as exc:
+        logger.exception("video_fullscreen failed (enabled=%s)", enabled)
+        return json.dumps({"error": str(exc)})
 
 
 @server.tool(

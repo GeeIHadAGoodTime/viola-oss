@@ -1,0 +1,43 @@
+/* Voice "full screen" (hooks/useVideoFullscreen.js). The Qt window is already
+   full screen; this lays the Music stage's video over the whole page.
+   Nothing is moved or remounted, so the YouTube iframe keeps playing and
+   removing the attribute puts every element back exactly where it was.
+
+   Everything else is hidden with `visibility` rather than covered: the
+   Stage is its own stacking context (isolation: isolate), so the pill row and
+   other chrome would paint over a covering z-index. */
+.smart-display[data-video-fullscreen='true'] {
+  visibility: hidden;
+}
+
+.smart-display[data-video-fullscreen='true'] [data-stage-mode-panel]:not([data-stage-mode-panel='music']) {
+  visibility: hidden !important;
+}
+
+/* The Music panel may be the inactive one (opacity 0) for a moment while the
+   stage switches to it. */
+.smart-display[data-video-fullscreen='true'] [data-stage-mode-panel='music'] {
+  opacity: 1 !important;
+}
+
+.smart-display[data-video-fullscreen='true'] [data-video-fullscreen-target='true'] {
+  visibility: visible;
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  max-width: none !important;
+  max-height: none !important;
+  aspect-ratio: auto !important;
+  margin: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  background-color: #000 !important;
+  transition: none !important;
+  pointer-events: auto;
+  z-index: 2147483000;
+}
+
+.smart-display[data-video-fullscreen='true'] [data-video-fullscreen-target='true'] iframe {
+  border-radius: 0 !important;
+}

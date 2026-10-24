@@ -1242,6 +1242,7 @@ class MCPClientHub:
             # --- Viola UI navigation (own panels only, not third-party apps) ---
             "open_app_panel",
             "pair_speaker_setup",
+            "video_fullscreen",
             # --- Pending-gate plumbing (works at every tier) ---
             "resume_signature_gate",
             "cancel_signature_gate",
