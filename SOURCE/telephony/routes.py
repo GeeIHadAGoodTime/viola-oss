@@ -538,6 +538,123 @@ async def take_over_active_phone_call(
     return JSONResponse(success_response(result))
 
 
+# ---------------------------------------------------------------------------
+# Text messages: add / verify / remove the account phone (desktop -> cloud)
+# ---------------------------------------------------------------------------
+# Settings > Account > Phone in the desktop app. The phone, its verification
+# and the SMS consent are cloud account state (the cloud texts the code and the
+# purchase approval links), so these routes forward to the cloud's
+# /api/account/sms/* with the signed-in user's OWN bearer, resolved server-side
+# and bound to this user (never handed to the browser, never another account's).
+
+_SMS_PROXY_PATHS = {
+    "status": ("GET", "/api/account/sms/status"),
+    "send-code": ("POST", "/api/account/sms/send-code"),
+    "verify-code": ("POST", "/api/account/sms/verify-code"),
+    "remove": ("POST", "/api/account/sms/remove"),
+}
+
+
+async def _proxy_account_sms(action: str, user: User | None, body: dict | None) -> JSONResponse:
+    import httpx
+
+    from config.settings import settings as app_settings
+
+    try:
+        from services.payments.confirmation import _cloud_bearer_for_user
+    except ImportError:
+        # Source-only editions without the hosted account service.
+        return JSONResponse(
+            {"error": "Text messages need a Viola account.", "error_code": "account_service_unavailable"},
+            status_code=501,
+        )
+
+    user_id = _route_user_id(user)
+    if not user_id:
+        return JSONResponse(
+            {"error": "Sign in to Viola to add a phone.", "error_code": "auth_required"},
+            status_code=401,
+        )
+    cloud_url = str(getattr(app_settings, "cloud_url", "") or "").rstrip("/")
+    bearer = await _cloud_bearer_for_user(user_id)
+    if not cloud_url or not bearer:
+        return JSONResponse(
+            {"error": "Sign in to your Viola account to add a phone.", "error_code": "cloud_sign_in_required"},
+            status_code=401,
+        )
+    method, path = _SMS_PROXY_PATHS[action]
+    try:
+        async with httpx.AsyncClient(timeout=20) as client:
+            resp = await client.request(
+                method,
+                cloud_url + path,
+                json=body if method == "POST" else None,
+                headers={"Authorization": "Bearer %s" % bearer},
+            )
+        payload = resp.json()
+    except (httpx.HTTPError, ValueError) as exc:
+        logger.warning("Account SMS proxy %s failed: %s", action, type(exc).__name__)
+        return JSONResponse(
+            {
+                "error": "Viola could not reach your account. Check your connection and try again.",
+                "error_code": "cloud_unreachable",
+            },
+            status_code=502,
+        )
+    if not isinstance(payload, dict):
+        return JSONResponse({"error": "Unexpected response.", "error_code": "cloud_bad_response"}, status_code=502)
+    return JSONResponse(payload, status_code=resp.status_code)
+
+
+class _SmsSendCodeBody(BaseModel):
+    phone: str
+    consent: bool
+    consent_text_version: str | None = None
+
+
+class _SmsVerifyCodeBody(BaseModel):
+    phone: str
+    code: str
+
+
+@tos_router.get("/sms/status")
+async def get_account_sms_status(user: User | None = Depends(get_current_user_optional)) -> JSONResponse:
+    """Phone, verification and SMS consent state for the signed-in account."""
+    return await _proxy_account_sms("status", user, None)
+
+
+@tos_router.post("/sms/send-code")
+async def send_account_sms_code(
+    body: _SmsSendCodeBody,
+    request: Request,
+    user: User | None = Depends(get_current_user_optional),
+) -> JSONResponse:
+    """Text a verification code to the phone the user typed (their own)."""
+    await csrf_required(request)
+    return await _proxy_account_sms("send-code", user, body.model_dump())
+
+
+@tos_router.post("/sms/verify-code")
+async def verify_account_sms_code(
+    body: _SmsVerifyCodeBody,
+    request: Request,
+    user: User | None = Depends(get_current_user_optional),
+) -> JSONResponse:
+    """Check the code; on success the phone is verified and consent is stored."""
+    await csrf_required(request)
+    return await _proxy_account_sms("verify-code", user, body.model_dump())
+
+
+@tos_router.post("/sms/remove")
+async def remove_account_sms(
+    request: Request,
+    user: User | None = Depends(get_current_user_optional),
+) -> JSONResponse:
+    """Remove the phone and withdraw SMS consent."""
+    await csrf_required(request)
+    return await _proxy_account_sms("remove", user, {})
+
+
 @tos_router.post("/call/{call_id}/reply")
 async def reply_to_phone_call_consultation(
     call_id: str,
