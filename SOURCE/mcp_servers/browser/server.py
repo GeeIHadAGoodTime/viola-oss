@@ -2888,6 +2888,16 @@ _SIGNATURE_GATE_OVERRIDE_ACTIONS = 4
 _payment_gate_overrides: dict[str, float] = {}
 _payment_gate_override_tokens: dict[str, float] = {}
 _payment_gate_lock = threading.Lock()
+# Approvals whose card fill succeeded: {"token:<override>" | "session:<id>": when}.
+# The approval's one gated action (the place-order click) is allowed only
+# after the approved card was actually filled for that approval (r5/commerce:
+# live, a failed fill was followed by a successful Place order click).
+_payment_fill_succeeded: dict[str, float] = {}
+_PAYMENT_FILL_PENDING_MESSAGE = (
+    "PAYMENT SAFETY: the approved card has not been filled in for this order, so the order "
+    "cannot be submitted yet. Call fill_payment_details on the payment page first; submit only "
+    "after it reports ok. If filling keeps failing, stop and tell the user."
+)
 _signature_gate_overrides: dict[str, tuple[float, int]] = {}
 _signature_gate_override_tokens: dict[str, float] = {}
 _signature_gate_lock = threading.Lock()
@@ -3068,17 +3078,78 @@ def revoke_signature_gate_override(session_id: str) -> None:
         logger.info("Signature gate override REVOKED for session=%s (unconsumed)", session_id)
 
 
+def _payment_fill_keys(override_token: str | None, session_id: str | None) -> list[str]:
+    keys = []
+    if override_token:
+        keys.append("token:%s" % override_token)
+    if session_id:
+        keys.append("session:%s" % session_id)
+    return keys
+
+
+def _record_payment_fill_outcome(result: str) -> None:
+    """Remember whether the secure fill for this call's approval succeeded."""
+    ok = False
+    try:
+        payload = json.loads(result)
+    except (TypeError, ValueError):
+        payload = None
+    if isinstance(payload, dict):
+        ok = payload.get("ok") is True
+    keys = _payment_fill_keys(
+        _get_call_payment_gate_override_token(),
+        _current_payment_session.get() or _get_call_gate_session_id(),
+    )
+    now_monotonic = time.monotonic()
+    with _payment_gate_lock:
+        for key in keys:
+            if ok:
+                _payment_fill_succeeded[key] = now_monotonic
+            else:
+                _payment_fill_succeeded.pop(key, None)
+        stale = [k for k, at in _payment_fill_succeeded.items() if now_monotonic - at > _OVERRIDE_STALE_SECONDS]
+        for key in stale:
+            _payment_fill_succeeded.pop(key, None)
+
+
+def _payment_fill_succeeded_for(override_token: str | None, session_id: str | None) -> bool:
+    now_monotonic = time.monotonic()
+    with _payment_gate_lock:
+        for key in _payment_fill_keys(override_token, session_id):
+            at = _payment_fill_succeeded.get(key)
+            if at is not None and now_monotonic - at <= _OVERRIDE_STALE_SECONDS:
+                return True
+    return False
+
+
+def _payment_gate_refusal(blocked: str) -> str:
+    """The refusal for a gated action: say "fill first" when an approval is waiting on the fill."""
+    override_token = _get_call_payment_gate_override_token()
+    session_id = _current_payment_session.get() or _get_call_gate_session_id()
+    if override_token and not _payment_fill_succeeded_for(override_token, session_id):
+        return _PAYMENT_FILL_PENDING_MESSAGE
+    return blocked
+
+
 def _consume_payment_gate_override() -> bool:
     """If an override is active for the CURRENT session, consume it and return True.
 
     Uses the ``_current_payment_session`` context var to identify the session.
-    Returns False if no override exists, the session is unknown, or the
-    override has expired.
+    Returns False if no override exists, the session is unknown, the
+    override has expired, or the approved card was not filled successfully for
+    this approval yet (the override is then left unused).
     """
     session_id = _current_payment_session.get() or _get_call_gate_session_id()
     if not session_id:
         return False
     override_token = _get_call_payment_gate_override_token()
+    if not _payment_fill_succeeded_for(override_token, session_id):
+        if override_token or session_id in _payment_gate_overrides:
+            logger.warning(
+                "Payment gate override withheld for session=%s: the approved card was not filled for this approval",
+                session_id,
+            )
+        return False
     now_monotonic = time.monotonic()
     with _payment_gate_lock:
         expired_count, _evicted_count = _prune_payment_gate_overrides_locked(now_monotonic)
@@ -3300,7 +3371,7 @@ async def _is_payment_blocked(text: str) -> str | None:
             text[:60],
         )
         return None
-    return blocked
+    return _payment_gate_refusal(blocked)
 
 
 async def _merchant_submit_owner_block_message(signal: str) -> str | None:
@@ -3656,7 +3727,7 @@ async def _payment_gate_block_from_locator(locator: Any, *fallback_values: str) 
                     candidate[:60],
                 )
                 return None, candidate
-            return blocked, candidate
+            return _payment_gate_refusal(blocked), candidate
     return None, ""
 
 
@@ -6061,11 +6132,14 @@ async def fill_payment_details_on_page(
         from core.user_context import user_scope
 
         with user_scope(user_id):
-            return await handler(
+            result = await handler(
                 fill_args,
                 page=page,
             )
+        _record_payment_fill_outcome(result)
+        return result
     except Exception as exc:
+        _record_payment_fill_outcome("")
         logger.exception("fill_payment_details failed")
         # Boundary redaction (#583): this string is returned straight to the
         # model and persisted into the task trace. Playwright's own fill /

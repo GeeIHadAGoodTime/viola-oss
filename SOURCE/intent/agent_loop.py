@@ -5165,6 +5165,17 @@ async def run_agent_loop(
         # (this read must precede the return, before any next turn reuses the
         # executor); the encrypt+serialize+disk *write* is deferred below.
         _snapshot_agent_checkpoint(executor, checkpoint, loop_messages, compress_messages)
+        if payment_gate or signature_gate:
+            # A gate continues this same executor after the user's decision
+            # (continue_after_event), which restores from executor history.
+            # Without the run's tool frames there, the continuation lost every
+            # page it had read: the untrusted-content rule was not rebuilt
+            # (r5/commerce, seen live after a purchase approval) and the model
+            # no longer saw the checkout it was asked to finish.
+            if getattr(executor, "_use_native", False):
+                executor._native_messages = copy.deepcopy(loop_messages)
+            else:
+                executor._text_messages = copy.deepcopy(loop_messages)
         # Lane C (#466): on the clean warm-answer path, the completed-checkpoint
         # write is post-answer bookkeeping the user should never wait on -- defer
         # it off the response path (a completed task is never resumed, so the
