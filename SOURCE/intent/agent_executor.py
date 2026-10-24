@@ -625,12 +625,23 @@ def _confirmation_manager_link(mgr: Any, name: str, token: str) -> str | None:
     return link if isinstance(link, str) and link.strip() else None
 
 
-async def _payment_confirmation_links(mgr: Any, token: str, public_url: str) -> dict[str, Any]:
+_LOCAL_APPROVAL_ORIGINS = frozenset({None, "", "web", "desktop", "http"})
+
+
+async def _payment_confirmation_links(
+    mgr: Any,
+    token: str,
+    public_url: str,
+    *,
+    origin_channel: str | None = None,
+) -> dict[str, Any]:
     """Pick the links for one desktop-side payment approval (r5/commerce).
 
     * ``url``: what the chat answer, the desktop card and the checkpoint show.
-      The approval page on this computer: it works without the cloud and asks
-      for the payment PIN. Nothing secret is in it.
+      For a request made on this computer, the approval page on this computer:
+      it works without the cloud and asks for the payment PIN. Nothing secret
+      is in it. A request from a messaging app keeps the hosted URL there
+      (the keyed link reaches the user by email).
     * ``delivery_url``: what email/text/messaging delivery sends. The hosted
       page plus the ``#k=`` key that only the link holder and this computer
       have, so the phone can see the cards and seal the PIN. It is never put in
@@ -650,8 +661,9 @@ async def _payment_confirmation_links(mgr: Any, token: str, public_url: str) -> 
         note_builder = getattr(mgr, "local_fallback_note", None)
         note = note_builder(token) if callable(note_builder) else None
         return {"url": local_url, "delivery_url": None, "link_note": note if isinstance(note, str) else None}
+    local_first = (origin_channel or "") in _LOCAL_APPROVAL_ORIGINS
     return {
-        "url": local_url or public_url,
+        "url": (local_url if local_first else None) or public_url,
         "delivery_url": _confirmation_manager_link(mgr, "delivery_url", token) or public_url,
         "link_note": None,
     }
@@ -4010,7 +4022,9 @@ class AgentExecutor:
                         channel=(getattr(channel, "channel_type", None) if channel is not None else None),
                         metadata=({"merchant_url": merchant_url} if merchant_url else None),
                     )
-                    links = await _payment_confirmation_links(mgr, token, url)
+                    links = await _payment_confirmation_links(
+                        mgr, token, url, origin_channel=executor._get_origin_channel_type()
+                    )
                     url = links["url"]
                     ctx = {
                         "mgr": mgr,
@@ -11860,7 +11874,7 @@ class AgentExecutor:
             metadata={"merchant_url": merchant_url} if merchant_url else None,
             executor=self,
         )
-        links = await _payment_confirmation_links(mgr, token, url)
+        links = await _payment_confirmation_links(mgr, token, url, origin_channel=origin_channel)
         return {
             "mgr": mgr,
             "token": token,
