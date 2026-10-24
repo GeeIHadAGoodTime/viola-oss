@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "2e313e8cc5e2070fbfea1eaa5f19f151372dbde7",
-  "sha256": "4fb8aa65ef6ffc739271996b1b31ac71de44f643d7c9f54108b529a21c250c11",
+  "revision": "704b9a488b49e4234de751aa996517104c20ee11",
+  "sha256": "c53dca10e6d782b1b2b8c0c731c7c8ab41984d9eb3b9100012996ec3e4af2213",
   "files": [
     {
       "path": ".env.example",
@@ -1575,13 +1575,13 @@
     },
     {
       "path": "intent/agent_executor.py",
-      "sha256": "3831fea3d297f597e690cb428872ef56904ca42e3404c694e68a175b1d8b248c",
-      "bytes": 568235
+      "sha256": "b45098afc4afeb968c673b94765b66cb04c21c42368260f4b7ef1f80195204c2",
+      "bytes": 568330
     },
     {
       "path": "intent/agent_loop.py",
-      "sha256": "219b5e665019a95edc58aae32a22ef047ddf43df47707625fc2a687b43e2bb2d",
-      "bytes": 249303
+      "sha256": "3d20b2f9bd29fe3e248f7af9480d04942ee39288599342a3dd689677020e6dfd",
+      "bytes": 250592
     },
     {
       "path": "intent/agent_message_manager.py",
@@ -1595,8 +1595,8 @@
     },
     {
       "path": "intent/agent_subagent_types.py",
-      "sha256": "83e842fad2e821e357b28e419fee5898d70dd2684da0fcd1c21ec6a7c99d8ea9",
-      "bytes": 18755
+      "sha256": "c02d6b29764d4aa1d3509098af0a7da55547aa630e5c70b2b404b5ee3eefe6d4",
+      "bytes": 18809
     },
     {
       "path": "intent/agent_ui_feedback.py",
@@ -1682,6 +1682,11 @@
       "path": "intent/context_compaction.py",
       "sha256": "165d9cc78e323947db7c7df46c1f3270c93daa12ba69e484047da301c8f9a9a5",
       "bytes": 48818
+    },
+    {
+      "path": "intent/file_gates.py",
+      "sha256": "65b816dfd75f0aa611218f168cb065621ca307e489c2aa4e7703693ea3fb1b91",
+      "bytes": 15053
     },
     {
       "path": "intent/gate_protocol.py",
@@ -1850,8 +1855,8 @@
     },
     {
       "path": "intent/irreversible_actions.py",
-      "sha256": "0a4fcdb7297e935a0db8cbd3877ef7b2029cf663e7d376481e0e6b726c9eda56",
-      "bytes": 12994
+      "sha256": "71562b1345c96d94e684760d770fc81942f513ce2f50f76f7e6b2b9016eccf01",
+      "bytes": 12981
     },
     {
       "path": "intent/json_utils.py",
@@ -2065,8 +2070,8 @@
     },
     {
       "path": "intent/tools/filesystem.py",
-      "sha256": "4b7ebd03112b07d033fe831c182bf9a46b9debda1d2731d6c40b9017479f472f",
-      "bytes": 27591
+      "sha256": "1867c44ca4b7dc436cae8061e4a7003e5b0362a9ddad545bd291b22618812f69",
+      "bytes": 77468
     },
     {
       "path": "intent/tools/knowledge.py",
@@ -2360,8 +2365,8 @@
     },
     {
       "path": "mcp_servers/core_tools/server.py",
-      "sha256": "880a0657ce70d33a4e9ab1755593a2c6b30850e94b16a8e9ef52adf594cd3c6e",
-      "bytes": 248762
+      "sha256": "f04b5997b1b9ea97e65cbe688cfb777de287d4f518088f890e7dc25af06b4cfc",
+      "bytes": 253305
     },
     {
       "path": "mcp_servers/phone_tool_descriptions.py",
@@ -4625,8 +4630,8 @@
     },
     {
       "path": "services/llm/prompts/viola_unified.py",
-      "sha256": "47b96606a7cf15dd26cc94f1b4e2d195fccafce80fcb9a055b2167d25465aae1",
-      "bytes": 16747
+      "sha256": "6071cfd60be60e6bc5d72f743bc6d55aa1aaeaa94eaa77c165ca4a8b324e1093",
+      "bytes": 17163
     },
     {
       "path": "services/llm/provider_fallback.py",
@@ -10820,8 +10825,8 @@
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.jsx",
-      "sha256": "293054815b7a35b0762d7ef209254985efdf748bec9449e0eab815a7fbf67667",
-      "bytes": 210223
+      "sha256": "a5b4d15b78276458f3c6cf650185843c076e6a5b270427b2a8672581cbe57650",
+      "bytes": 210201
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.localDiscovery.test.jsx",
@@ -12610,8 +12615,8 @@
     },
     {
       "path": "ui/settings_manager.py",
-      "sha256": "5d51a3dab23f9d145fe32055f2b9617b22a61f380b43abcc8ea2ebafa30c9925",
-      "bytes": 174497
+      "sha256": "042db6f135dd205cf9dbd0b6ad774bf2ed7ad28c364687e7e5afbf4e1bad4569",
+      "bytes": 174496
     },
     {
       "path": "ui/settings_schema.py",
@@ -13685,8 +13690,8 @@
     },
     {
       "path": "voice/wake_detector/wake_verifier.py",
-      "sha256": "1b9e2d86a8d4a78d5ee136c23abcaef72eb4af3a937875c26ad374ef053fe438",
-      "bytes": 28462
+      "sha256": "7d1907a3cc4e23fb8576661b82c5886548e4800b56b01f82fa71240f14f5121e",
+      "bytes": 28443
     }
   ]
 }
