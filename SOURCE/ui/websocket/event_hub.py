@@ -144,6 +144,60 @@ def get_event_hub() -> EventHub | None:
     return _global_hub
 
 
+def transport_command_recipients(user_id: str | None) -> list[str]:
+    """Principals whose UI must receive a playback transport command.
+
+    The desktop plays YouTube in the React UI's own iframe; only a ``command``
+    frame reaches it. The UI socket binds under whichever of this install's two
+    principals (signed-in account or device identity) resolved when it
+    connected, so on the desktop the frame goes to both, as
+    ``get_desktop_local_principals`` documents. That never leaves this one
+    install. On the cloud only the request's own user is a recipient.
+    """
+    recipients: list[str] = []
+    if isinstance(user_id, str) and user_id.strip():
+        recipients.append(user_id.strip())
+    try:
+        from core.user_context import get_desktop_local_principals, is_cloud_surface
+
+        if not is_cloud_surface():
+            for principal in get_desktop_local_principals():
+                if principal not in recipients:
+                    recipients.append(principal)
+    except LookupError:
+        pass
+    except Exception:  # noqa: BLE001, RUF100 - a principal lookup failure must not drop the request user's frame
+        logger.debug("Desktop principal lookup for transport command failed", exc_info=True)
+    return recipients
+
+
+async def broadcast_transport_command(
+    command: str,
+    payload: dict[str, Any],
+    *,
+    user_id: str | None,
+    hub: EventHub | None = None,
+) -> int:
+    """Send a pause/play/seek ``command`` frame to the UI that owns the iframe.
+
+    The one path for every transport source: the on-screen button's REST call
+    (/v1/pause, /v1/resume, /v1/seek) and typed or spoken instant commands. Uses
+    ``hub`` when given, else the process EventHub registered at startup.
+    Returns the number of principals the frame was sent to.
+    """
+    target_hub = hub if hub is not None else get_event_hub()
+    if target_hub is None:
+        logger.warning("Transport command %s not sent: no EventHub is registered", command)
+        return 0
+    recipients = transport_command_recipients(user_id)
+    if not recipients:
+        logger.warning("Transport command %s not sent: no user to send it to", command)
+        return 0
+    for recipient in recipients:
+        await target_hub.broadcast_command(command, dict(payload), user_id=recipient)
+    return len(recipients)
+
+
 class EventHub:
     """Broadcast hub for server-originated WebSocket events."""
 

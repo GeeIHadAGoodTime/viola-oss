@@ -15,6 +15,22 @@ if TYPE_CHECKING:
     from diagnostics.runtime_metrics import RuntimeMetrics
 
 
+def _stream_backend_cannot_play(item: object, backend: object) -> bool:
+    """True when ``item`` is a YouTube video the React iframe plays, not ``backend``.
+
+    The startup stream backend (SimpleBackend) cannot decode a YouTube watch
+    URL. Health checks and restarts must leave it idle for such a track; a
+    restart handed it the watch URL ("SimpleBackend start failure: Playback
+    produced no audio", 1.0.5 build 4) and its failed health then asked for
+    the next restart.
+    """
+    try:
+        from music.runtime.embedded_playback import backend_drives_embedded_video, is_react_iframe_item
+    except ImportError:
+        return False
+    return is_react_iframe_item(item) and not backend_drives_embedded_video(backend)
+
+
 class BackendLifecycleManager:
     """Manages backend lifecycle, health monitoring, and restart logic."""
 
@@ -149,6 +165,12 @@ class BackendLifecycleManager:
             backend = self.backend
         if backend is None or current_item is None:
             return
+        if _stream_backend_cannot_play(current_item, backend):
+            self._logger.info(
+                "Backend restarted idle: %s plays in the React iframe",
+                current_item.id,
+            )
+            return
         if not current_item.url:
             self._logger.warning(
                 "Unable to restart backend for %s: queue item missing resolved URL",
@@ -239,7 +261,10 @@ class BackendLifecycleManager:
         now_playing_id = getattr(snapshot.now_playing, "id", None) if snapshot.now_playing is not None else None
         backend_healthy = True
         health_error = None
-        if backend is not None:
+        # A YouTube track plays in the React iframe; the stream backend sits
+        # idle and its silence or stale start failure says nothing about it.
+        iframe_owned = playlist_current is not None and _stream_backend_cannot_play(playlist_current, backend)
+        if backend is not None and not iframe_owned:
             health_error = self.evaluate_backend_health(backend)
             backend_healthy = health_error is None
 
@@ -259,7 +284,7 @@ class BackendLifecycleManager:
                 )
             need_emit = True
 
-        if playlist_current is not None and not user_paused:
+        if playlist_current is not None and not user_paused and not iframe_owned:
             backend_playing = False
             try:
                 backend_playing = backend.is_playing() if backend else False
