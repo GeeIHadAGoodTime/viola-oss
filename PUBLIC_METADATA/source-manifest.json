@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "ab0691507b4c97b382ae57b0d9f5700ac8cd3b45",
-  "sha256": "68bea2b5b8114dcfc7d6213aa32cdba69955ce2421ffc0b5c3cc7bbb51c74a2f",
+  "revision": "33f8a381715db022fe0a3a588b2744065db544d8",
+  "sha256": "8d05f10927bf8862d40e7c5f46aa1575a08aed789182f8c8413d8abea989687c",
   "files": [
     {
       "path": ".env.example",
@@ -5925,8 +5925,8 @@
     },
     {
       "path": "telephony/routes.py",
-      "sha256": "276fa0261413671e76995cd91121c985c7d76cfceeed492f7c257e2025af5087",
-      "bytes": 48522
+      "sha256": "0f8b91ab3917e51c130e710afc3fc88f417dcb123839d0e9922c2f5522ac51bf",
+      "bytes": 52989
     },
     {
       "path": "telephony/streaming_stt_model.py",

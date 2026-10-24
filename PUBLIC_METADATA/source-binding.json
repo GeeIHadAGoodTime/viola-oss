@@ -30,10 +30,10 @@
   },
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "9b7d411b0313e579d10cf4370bc499dc926f523d63153946cf1da0727a472cb2",
-  "source_tree_sha256": "68bea2b5b8114dcfc7d6213aa32cdba69955ce2421ffc0b5c3cc7bbb51c74a2f",
+  "source_manifest_sha256": "a757e787d9b507b8162a00c3f0c82690a91a5c76219b1f7ce6ff9fd38d59fc22",
+  "source_tree_sha256": "8d05f10927bf8862d40e7c5f46aa1575a08aed789182f8c8413d8abea989687c",
   "source_file_count": 2743,
-  "source_revision": "ab0691507b4c97b382ae57b0d9f5700ac8cd3b45",
+  "source_revision": "33f8a381715db022fe0a3a588b2744065db544d8",
   "comparison_public_revision": "ecab2772465fcc89ae6645b028af1c2273b9199f",
   "changed_source_paths": [
     "audio_core/aec_reference_base.py",
@@ -343,7 +343,7 @@
     "historical_inventory_limits": "This renderer correction changes no dependency or workflow inputs. All six retained SBOMs and their complete status objects stay historical and unchanged; no current installed inventory qualification is claimed."
   },
   "qualification": {
-    "source_commit": "ab0691507b4c97b382ae57b0d9f5700ac8cd3b45",
+    "source_commit": "33f8a381715db022fe0a3a588b2744065db544d8",
     "kind": "Viola 1.0.5 build 5 r5/sms; source checksum binding only, desktop qualification runs in the private release chain"
   },
   "historical_bindings": [
