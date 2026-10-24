@@ -18,6 +18,18 @@ Viola's own music playing also passes (tiny.en mishears "Viola" over music).
 A missed real "Viola" is as bad as a false wake, so doubt always lets the wake
 through.
 
+Early start: the streaming detector confirms a wake only after k agreeing
+80 ms frames (6 of 7 at Balanced while this check is on, see
+``violawake.config.STREAM_OPERATING_POINTS_CHECKED``), a few hundred ms after
+its first agreeing frame. Once the run of agreeing frames reaches
+``VerifierConfig.early_start_frames`` (2), the listener hands the window
+ending on that frame to Whisper on the verifier's worker thread; the wake that
+run confirms decides on that result, which is usually ready by then, so the
+chime waits for nothing. That window also holds less of a command said straight
+after "Viola", which Whisper otherwise transcribes instead of the wake word.
+Without a usable early decode (model just warmed, a gap in the audio) the
+check runs serially: the window plus a short tail, then the decode.
+
 The audio read while verifying (the tail and anything that arrives while
 Whisper runs) is handed back to the caller as raw frames so the command
 recorder can start with it: "Viola, what time is it" said in one breath loses
@@ -26,7 +38,7 @@ nothing to the check.
 Every verification writes one ``[WAKE_VERIFY]`` line to the app log (verdict,
 reason, detector score, transcript, timings) so real-world false and missed
 wakes are visible in ``viola-qt.log``. The advanced setting
-``wake_verification_enabled`` (default off, opt-in) turns the check on; the
+``wake_verification_enabled`` (default on) turns the check off; the
 ``VIOLA_WAKE_VERIFICATION`` environment variable (``0``/``1``) overrides it.
 
 The defaults were measured on held-out conversational speech and on real
@@ -177,13 +189,24 @@ class VerifierConfig:
     quiet_audio_rms: float = 0.004
     # Whisper must answer within this budget or the wake passes.
     whisper_timeout_s: float = 1.5
-    # Unsure decode -> pass. -0.8 (not Whisper's usual -1.0): on the dev half
-    # of the real recordings it kept whispered "Viola" at 93% instead
-    # of 89% for 4 more of 49 look-alike windows let through.
+    # Unsure decode -> pass. -0.75 (not Whisper's usual -1.0): with the early
+    # start (below) the dev half of the real recordings lost "Viola" said over
+    # another device's music at -0.8 (Jay 89.8%, detector 93.2%); -0.75 keeps
+    # 90.7% for no more of 22 speech false wakes and 3 more of 92 over music
+    # let through. Build-5 measurement note, "Faster and steadier" section.
     no_speech_unsure: float = 0.6
-    logprob_unsure: float = -0.8
+    logprob_unsure: float = -0.75
     compression_unsure: float = 2.4
     min_words: int = 1
+    # Early start: begin the Whisper decode while the detector's agreement
+    # run is still building, once this many consecutive frames agree (0 = off).
+    # The decode hears the window that ends on that frame (no tail) and is
+    # usually finished by the time the detector confirms, so the chime waits
+    # for nothing. A wake that confirms without a usable early decode falls
+    # back to the serial check (window + tail, then decode). 2: at Balanced
+    # (6 of 7 with the check on) the decode gets about 320 ms of lead, enough
+    # for tiny.en on this class of PC; the window ends about where the word does.
+    early_start_frames: int = 2
 
 
 @dataclass(frozen=True)
@@ -290,6 +313,10 @@ class VerificationResult:
     no_speech_prob: float | None = None
     avg_logprob: float | None = None
     held_frames: list[bytes] = field(default_factory=list)
+    # "early": the decode started before the detector confirmed (lead_ms
+    # earlier); "serial": window + tail, decoded after the detector confirmed.
+    mode: str = "serial"
+    lead_ms: float = 0.0
 
     def log_line(self) -> str:
         transcript = self.transcript.replace("\n", " ")
@@ -300,9 +327,52 @@ class VerificationResult:
         return (
             f"[WAKE_VERIFY] {'PASS' if self.passed else 'REJECT'} reason={self.reason} "
             f"score={self.score:.3f} token={self.token or '-'} transcript={transcript!r} "
+            f"mode={self.mode} lead_ms={self.lead_ms:.0f} "
             f"tail_ms={self.tail_ms:.0f} whisper_ms={self.whisper_ms:.0f} total_ms={self.total_ms:.0f} "
             f"no_speech={nsp} logprob={alp}"
         )
+
+
+class EarlyStartTracker:
+    """When to start the Whisper decode early (pure bookkeeping, no audio).
+
+    Fed every streaming score with the frame threshold and the agreement rule
+    (k of the last n frames) the engine applied to it. ``update`` returns True
+    on the frame where the run of consecutive agreeing frames first reaches
+    ``launch_frames``; the caller then starts a decode of the window ending on
+    that frame. Only rules that need more agreeing frames than that (k >
+    launch_frames) start early; otherwise the detector would confirm on the
+    same frame and nothing is gained.
+    """
+
+    def __init__(self, launch_frames: int) -> None:
+        self.launch_frames = max(0, int(launch_frames))
+        self.run = 0
+
+    def reset(self) -> None:
+        self.run = 0
+
+    def update(self, score: float, threshold: float, k: int) -> bool:
+        self.run = self.run + 1 if score >= threshold else 0
+        return 0 < self.launch_frames < int(k) and self.run == self.launch_frames
+
+    @staticmethod
+    def usable(launch_frame: int, trigger_frame: int, n: int) -> bool:
+        """An early decode belongs to a wake when its window ended inside the
+        agreement window the detector confirmed on (the last n frames)."""
+        return trigger_frame - max(1, int(n)) < launch_frame <= trigger_frame
+
+
+@dataclass
+class EarlyDecode:
+    """A decode started before the detector confirmed (see EarlyStartTracker)."""
+
+    frame: int
+    started: float
+    future: Future[TranscriptInfo] | None = None
+    # The early window was too quiet to judge: the wake will pass without Whisper.
+    quiet: bool = False
+    finished: float | None = None
 
 
 def _default_model_loader() -> Any:
@@ -331,6 +401,8 @@ class WakeVerifier:
         # next warm-up request (a wake candidate), never on the wake path.
         self._load_failed_at: float | None = None
         self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="wake-verify")
+        # The newest early decode (start_early cancels it if it has not started).
+        self._early_pending: Future[TranscriptInfo] | None = None
 
     # -- model lifecycle ----------------------------------------------------
 
@@ -414,6 +486,40 @@ class WakeVerifier:
 
     # -- verification -------------------------------------------------------
 
+    def start_early(self, window: np.ndarray, frame: int) -> EarlyDecode | None:
+        """Start decoding a wake candidate before the detector confirms.
+
+        Called from the wake loop when ``EarlyStartTracker.update`` says so.
+        Never blocks and never loads the model (returns None until it is warm;
+        the wake, if it comes, is then checked serially). At most one early
+        decode waits behind a running one: a newer launch replaces an older
+        one that has not started yet (a broken run's audio is stale anyway).
+        """
+        if self._model is None:
+            self.warm_async()
+            return None
+        now = time.perf_counter()
+        audio = np.array(window, dtype=np.float32)
+        rms = _chunk_rms(audio)
+        if (float(rms.max()) if len(rms) else 0.0) < self.config.quiet_audio_rms:
+            return EarlyDecode(frame=frame, started=now, quiet=True)
+        with self._lock:
+            previous = self._early_pending
+            if previous is not None:
+                previous.cancel()  # only succeeds while it has not started
+            try:
+                future: Future[TranscriptInfo] = self._executor.submit(self.transcribe, audio)
+            except RuntimeError:
+                return None
+            self._early_pending = future
+        early = EarlyDecode(frame=frame, started=now, future=future)
+
+        def _done(_f: Future[TranscriptInfo]) -> None:
+            early.finished = time.perf_counter()
+
+        future.add_done_callback(_done)
+        return early
+
     def verify(
         self,
         window: np.ndarray,
@@ -421,6 +527,7 @@ class WakeVerifier:
         score: float,
         *,
         playback_active: bool = False,
+        early: EarlyDecode | None = None,
     ) -> VerificationResult:
         """Decide one wake candidate. Never raises; doubt passes.
 
@@ -430,10 +537,16 @@ class WakeVerifier:
         ``playback_active``: Viola is playing music. tiny.en mishears "Viola"
         over music too often (the music recordings lost 6-12% of real wakes
         in the dev pass), so the wake passes unchecked and without delay.
+        ``early``: a decode this wake's agreement run started before the
+        detector confirmed (the caller checked it belongs to this wake). Its
+        result decides; no tail is read, and the microphone is drained only
+        while it is still running.
         """
         cfg = self.config
         started = time.perf_counter()
         held: list[bytes] = []
+        mode = "serial"
+        lead_ms = 0.0
 
         def _result(passed: bool, reason: str, **kw: Any) -> VerificationResult:
             res = VerificationResult(
@@ -442,6 +555,8 @@ class WakeVerifier:
                 score=score,
                 held_frames=held,
                 total_ms=(time.perf_counter() - started) * 1000,
+                mode=mode,
+                lead_ms=lead_ms,
                 **kw,
             )
             return res
@@ -453,49 +568,59 @@ class WakeVerifier:
             self.warm_async()
             return _result(True, "not_ready")
 
-        window = np.asarray(window, dtype=np.float32)
-        rms = _chunk_rms(window)
-        peak = float(rms.max()) if len(rms) else 0.0
-        if peak < cfg.quiet_audio_rms:
-            return _result(True, "quiet_audio")
+        tail_ms = 0.0
+        if early is not None:
+            mode = "early"
+            lead_ms = max(0.0, (started - early.started) * 1000)
+            if early.quiet or early.future is None:
+                return _result(True, "quiet_audio")
+            future: Future[TranscriptInfo] = early.future
+            whisper_started = early.started
+        else:
+            window = np.asarray(window, dtype=np.float32)
+            rms = _chunk_rms(window)
+            peak = float(rms.max()) if len(rms) else 0.0
+            if peak < cfg.quiet_audio_rms:
+                return _result(True, "quiet_audio")
 
-        # "Quiet" is relative to the speech peak, but never below the room's
-        # own noise floor (else a soft voice in a noisy room never pauses and
-        # every wake waits the full tail): twice the window's quietest 10%,
-        # capped at half the peak so speech itself is never called quiet.
-        floor = float(np.percentile(rms, 10)) if len(rms) else 0.0
-        quiet_level = max(min(max(peak * cfg.quiet_ratio, floor * cfg.noise_floor_factor), peak * 0.5), 1e-5)
-        quiet_run = _trailing_quiet_chunks(rms.tolist(), quiet_level)
-        need_quiet = max(1, round(cfg.quiet_run_s * SAMPLE_RATE / CHUNK_SAMPLES))
-        min_tail = round(cfg.min_tail_s * SAMPLE_RATE)
-        max_tail = round(cfg.max_tail_s * SAMPLE_RATE)
+            # "Quiet" is relative to the speech peak, but never below the room's
+            # own noise floor (else a soft voice in a noisy room never pauses and
+            # every wake waits the full tail): twice the window's quietest 10%,
+            # capped at half the peak so speech itself is never called quiet.
+            floor = float(np.percentile(rms, 10)) if len(rms) else 0.0
+            quiet_level = max(min(max(peak * cfg.quiet_ratio, floor * cfg.noise_floor_factor), peak * 0.5), 1e-5)
+            quiet_run = _trailing_quiet_chunks(rms.tolist(), quiet_level)
+            need_quiet = max(1, round(cfg.quiet_run_s * SAMPLE_RATE / CHUNK_SAMPLES))
+            min_tail = round(cfg.min_tail_s * SAMPLE_RATE)
+            max_tail = round(cfg.max_tail_s * SAMPLE_RATE)
 
-        tail: list[np.ndarray] = []
-        tail_samples = 0
-        try:
-            while tail_samples < max_tail:
-                if tail_samples >= min_tail and quiet_run >= need_quiet:
-                    break
-                chunk = read_chunk(True)
-                if chunk is None:
-                    break
-                held.append(chunk.raw)
-                audio = np.asarray(chunk.audio, dtype=np.float32)
-                tail.append(audio)
-                tail_samples += len(audio)
-                chunk_rms = float(np.sqrt(np.mean(audio.astype(np.float64) ** 2))) if len(audio) else 0.0
-                quiet_run = quiet_run + 1 if chunk_rms < quiet_level else 0
-        except Exception as exc:  # noqa: BLE001, RUF100 - a read error must not drop the wake
-            logger.debug("[WAKE_VERIFY] tail read failed: %s", exc)
-        tail_ms = tail_samples * 1000.0 / SAMPLE_RATE
+            tail: list[np.ndarray] = []
+            tail_samples = 0
+            try:
+                while tail_samples < max_tail:
+                    if tail_samples >= min_tail and quiet_run >= need_quiet:
+                        break
+                    chunk = read_chunk(True)
+                    if chunk is None:
+                        break
+                    held.append(chunk.raw)
+                    audio = np.asarray(chunk.audio, dtype=np.float32)
+                    tail.append(audio)
+                    tail_samples += len(audio)
+                    chunk_rms = float(np.sqrt(np.mean(audio.astype(np.float64) ** 2))) if len(audio) else 0.0
+                    quiet_run = quiet_run + 1 if chunk_rms < quiet_level else 0
+            except Exception as exc:  # noqa: BLE001, RUF100 - a read error must not drop the wake
+                logger.debug("[WAKE_VERIFY] tail read failed: %s", exc)
+            tail_ms = tail_samples * 1000.0 / SAMPLE_RATE
 
-        audio = np.concatenate([window, *tail]) if tail else window
-        whisper_started = time.perf_counter()
-        try:
-            future: Future[TranscriptInfo] = self._executor.submit(self.transcribe, audio)
-        except RuntimeError as exc:
-            return _result(True, "error", tail_ms=tail_ms, transcript=str(exc)[:60])
-        deadline = whisper_started + cfg.whisper_timeout_s
+            audio = np.concatenate([window, *tail]) if tail else window
+            whisper_started = time.perf_counter()
+            try:
+                future = self._executor.submit(self.transcribe, audio)
+            except RuntimeError as exc:
+                return _result(True, "error", tail_ms=tail_ms, transcript=str(exc)[:60])
+        # The time budget runs from now (the detector confirmed), whichever path.
+        deadline = time.perf_counter() + cfg.whisper_timeout_s
         # Keep draining the microphone while Whisper runs so nothing the user
         # says meanwhile is lost (and the input buffer never overflows).
         while not future.done():
@@ -514,7 +639,8 @@ class WakeVerifier:
                 time.sleep(0.005)
                 continue
             held.append(chunk.raw)
-        whisper_ms = (time.perf_counter() - whisper_started) * 1000
+        finished = early.finished if early is not None and early.finished is not None else time.perf_counter()
+        whisper_ms = (finished - whisper_started) * 1000
         try:
             info = future.result()
         except Exception as exc:  # noqa: BLE001, RUF100 - doubt passes
@@ -550,7 +676,7 @@ def get_wake_verifier() -> WakeVerifier:
 
 
 def wake_verification_enabled() -> bool:
-    """The opt-in switch: env override first, then the device setting (default off)."""
+    """The switch: env override first, then the device setting (default on)."""
     override = os.environ.get(ENV_OVERRIDE, "").strip().lower()
     if override in {"0", "false", "off", "no"}:
         return False
@@ -559,13 +685,13 @@ def wake_verification_enabled() -> bool:
     try:
         from ui.settings_manager import get_settings_manager
 
-        value = get_settings_manager().get(SETTING_KEY, False)
+        value = get_settings_manager().get(SETTING_KEY, True)
     except Exception as exc:  # noqa: BLE001, RUF100 - unreadable settings keep the default
         logger.debug("[WAKE_VERIFY] could not read %s: %s", SETTING_KEY, exc)
-        return False
+        return True
     if isinstance(value, str):
         return value.strip().lower() not in {"0", "false", "off", "no"}
-    return bool(value) if value is not None else False
+    return bool(value) if value is not None else True
 
 
 def warm_wake_verifier() -> None:
@@ -576,6 +702,8 @@ def warm_wake_verifier() -> None:
 
 __all__ = [
     "ChunkReader",
+    "EarlyDecode",
+    "EarlyStartTracker",
     "GateDecision",
     "TranscriptInfo",
     "VerificationResult",

@@ -22,7 +22,11 @@ import { useVideoFullscreen } from './hooks/useVideoFullscreen';
 import TimerCountdown from './components/TimerCountdown';
 import { useSettings } from './hooks/useSettings';
 import { useAvailableRooms } from './hooks/useAvailableRooms';
-import CallBriefing from './components/CallBriefing';
+import CallBriefing, {
+  CALL_APPROVE_COMMAND,
+  CALL_CANCEL_COMMAND,
+  callBriefingFromConsultEvent,
+} from './components/CallBriefing';
 import DiagnosticsDisclosureNotice from './components/DiagnosticsDisclosureNotice';
 import CallConsultation from './components/CallConsultation';
 import PhoneCallPanel from './components/PhoneCallPanel';
@@ -1911,7 +1915,12 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
       return;
     }
 
-    if (data.type === 'call_briefing') {
+    if (data.type === 'consult_user') {
+      // The agent's confirm-or-cancel gate for a phone call: show the exact
+      // number and who it belongs to, with Approve / Cancel (CallBriefing).
+      const briefing = callBriefingFromConsultEvent(payload);
+      if (briefing !== undefined) setCallBriefing(briefing);
+    } else if (data.type === 'call_briefing') {
       setCallBriefing(payload);
       rememberCallMeta(payload, callId);
       if (payload.approved && callId) {
@@ -3882,7 +3891,12 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
       />
 
       {/* Phone-call UX toasts (bottom-right) driven by telephony WS events */}
-      <CallBriefing briefing={callBriefing} onDismiss={() => setCallBriefing(null)} />
+      <CallBriefing
+        briefing={callBriefing}
+        onDismiss={() => setCallBriefing(null)}
+        onApprove={() => submitTextCommand(CALL_APPROVE_COMMAND)}
+        onCancel={() => submitTextCommand(CALL_CANCEL_COMMAND).then(() => setCallBriefing(null))}
+      />
       {!activeInlineConsultation && (
         <CallConsultation
           consultation={callConsultation}

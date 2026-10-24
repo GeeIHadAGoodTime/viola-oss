@@ -2296,10 +2296,14 @@ class AIController:
 
             # Read capability tier from user settings for permission gating.
             try:
+                from config.defaults import DEFAULT_AGENT_AUTONOMY
                 from ui.settings_manager import get_settings_manager
 
                 _sm = get_settings_manager()
-                agent_autonomy = _sm.get("agent_autonomy", "symphony")
+                agent_autonomy = (
+                    _sm.get("agent_autonomy", DEFAULT_AGENT_AUTONOMY, user_id=_ctx_user_id.get() or None)
+                    or DEFAULT_AGENT_AUTONOMY
+                )
             except Exception:
                 logger.exception("Agent prompt setup skipped because user settings could not be loaded")
                 return
@@ -2888,12 +2892,17 @@ class AIController:
         if hub is None:
             return native_tools, tool_surface, prompt_bundle
 
+        from config.defaults import DEFAULT_AGENT_AUTONOMY
+
         try:
             from ui.settings_manager import get_settings_manager
 
-            agent_autonomy = get_settings_manager().get("agent_autonomy", "symphony")
+            agent_autonomy = (
+                get_settings_manager().get("agent_autonomy", DEFAULT_AGENT_AUTONOMY, user_id=user_id)
+                or DEFAULT_AGENT_AUTONOMY
+            )
         except Exception:
-            agent_autonomy = "symphony"
+            agent_autonomy = DEFAULT_AGENT_AUTONOMY
 
         interactive_tools = self._channel is not None
         if self._browser_init_task is not None:
