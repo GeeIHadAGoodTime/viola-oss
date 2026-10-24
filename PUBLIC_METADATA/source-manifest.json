@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "74c21465a4e5207d65ec62e4c55da9638081ae4e",
-  "sha256": "9431c30c4ad855c943a9c2335957d09047fcd181f6257dd53c83ef174df628c5",
+  "revision": "3113dfde9007ef23b56f34d62d890eb2f503150b",
+  "sha256": "180545ce82048bd9c12f3bcc2e0f97cde954729e9fadf49111c30d0b38d55488",
   "files": [
     {
       "path": ".env.example",
@@ -4995,8 +4995,8 @@
     },
     {
       "path": "services/openai_background.py",
-      "sha256": "8b9c91b5542ffda817f7b679105b75c317c147939fa13c0172e2cb3d32f24674",
-      "bytes": 32858
+      "sha256": "6ec5bd4195e93ee8930ec2973a6a44c82761ed6d2eec7cf69cb72748b1092531",
+      "bytes": 33867
     },
     {
       "path": "services/operator_controls.py",
