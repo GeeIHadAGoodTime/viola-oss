@@ -3697,6 +3697,18 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
             </Section>
 
             <AdvancedSection title="Voice Recognition & Advanced">
+              <SettingRow
+                title="Double-check the wake word"
+                description={'Before the chime, Viola takes a quick second listen and ignores the wake if it clearly heard talking without "Viola".'}
+                tooltip="On by default. Turn it off if Viola often misses you when you say its name. The check runs on this device."
+              >
+                <Toggle
+                  checked={localSettings.wake_verification_enabled ?? true}
+                  onChange={(v) => updateLocal('wake_verification_enabled', v)}
+                  ariaLabel="Double-check the wake word"
+                />
+              </SettingRow>
+              <SectionDivider />
               <div style={{ padding: '16px 20px' }}>
                 <Select
                   label="Voice Recognition"

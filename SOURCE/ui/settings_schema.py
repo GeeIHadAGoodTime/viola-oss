@@ -72,6 +72,7 @@ INFRASTRUCTURE_KEYS: Final[frozenset[str]] = frozenset(
         "wake_enabled",
         "wake_engine",
         "wake_sensitivity",
+        "wake_verification_enabled",
         "wake_word_active_model",
         "wake_word_engine",
         "wake_word_model",

@@ -813,6 +813,10 @@ class SettingsManager:
         WINDOW_CLOSE_QUITS_MIGRATION_FLAG: True,
         "start_on_boot": False,
         "wake_sensitivity": defaults.DEFAULT_WAKE_SENSITIVITY,
+        # Stage 2 wake check: a short Whisper listen before the chime rejects
+        # wakes where clear speech holds no "Viola" (voice/wake_detector/
+        # wake_verifier.py). On by default; Settings > Voice > advanced.
+        "wake_verification_enabled": True,
         "weather_location": "",  # Empty = auto-detect from IP
         # Pre-event calendar reminders (services/calendar/reminders.py). Fires
         # a spoken + push notification ahead of each upcoming calendar event
