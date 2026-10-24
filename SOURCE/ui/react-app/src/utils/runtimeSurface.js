@@ -82,10 +82,35 @@ export function quitDesktopApp() {
   return true;
 }
 
+/**
+ * Whether the Qt shell can put the window in full screen for the voice
+ * "full screen" command. Chromium refuses `requestFullscreen()` without a
+ * user gesture, so a spoken request has to go through the native window.
+ * @returns {boolean}
+ */
+export function canSetDesktopVideoFullscreen() {
+  if (typeof window === 'undefined') return false;
+  return Boolean(window.viola && typeof window.viola.setVideoFullscreen === 'function');
+}
+
+/**
+ * Ask the Qt shell to enter (true) or leave (false) the video full screen.
+ * Leaving restores the window's size, position and maximized state.
+ * @param {boolean} enabled
+ * @returns {boolean} true when the request reached the Qt bridge.
+ */
+export function setDesktopVideoFullscreen(enabled) {
+  if (!canSetDesktopVideoFullscreen()) return false;
+  window.viola.setVideoFullscreen(Boolean(enabled));
+  return true;
+}
+
 export default {
   isDesktopApp,
   isWebClient,
   shouldStreamBrowserView,
   canQuitDesktopApp,
   quitDesktopApp,
+  canSetDesktopVideoFullscreen,
+  setDesktopVideoFullscreen,
 };

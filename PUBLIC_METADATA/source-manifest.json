@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "1e23f9be4118200a834a0a12b97bdab2de55a0d2",
-  "sha256": "e0a1be0b5edde11e3714fc272020d40b9abcdff68e0c7d03eb4dc7b0765fa2e5",
+  "revision": "a81c3a56c82414860e0b20831d24646ab5477772",
+  "sha256": "2d9796b9a0c6d80417492f1cf5be00b5f5cbab095e4dda481b929ee0225ee22d",
   "files": [
     {
       "path": ".env.example",
@@ -815,8 +815,8 @@
     },
     {
       "path": "chat/channel.py",
-      "sha256": "ce122cb040c4ea8d33414964db327c53fcf510b4187aea236104683bdb9e54c5",
-      "bytes": 6215
+      "sha256": "1e2665a569f9bf32a2af13038d2173c44074524d9fb23f139bf487261b904ffc",
+      "bytes": 6485
     },
     {
       "path": "chat/routes.py",
@@ -1240,8 +1240,8 @@
     },
     {
       "path": "core/voice_command_handler.py",
-      "sha256": "e987ce71155e7427e8619ee73a71185b5147e66893a23363faee8b9727b1ce29",
-      "bytes": 80040
+      "sha256": "0b3fc4b19c35a1288530e1672b27f513cabb4fd24d74081abce6c17054ae95cd",
+      "bytes": 80885
     },
     {
       "path": "core/voice_orchestrator.py",
@@ -1805,8 +1805,8 @@
     },
     {
       "path": "intent/instant_commands/music.py",
-      "sha256": "ae383a5c905af2082765e3d6ce43eb9b59ffc0446cb6eb2f7efd50afbe45c145",
-      "bytes": 105274
+      "sha256": "bf8d26fb3b4195a686912431b5cb4b71af3e4490167a14e1cc505053bbb50cdc",
+      "bytes": 106534
     },
     {
       "path": "intent/instant_commands/runtime.py",
@@ -1835,8 +1835,8 @@
     },
     {
       "path": "intent/instant_commands_patterns.py",
-      "sha256": "1183c75f4970065ca6d0b398d5cf90bd9e4b05dc8dd8d468367c184e46335ae2",
-      "bytes": 8082
+      "sha256": "0d7aed90efc719cbccde38e2a338bcc7cb3e68b927a8e570f59b4440fd38f5fb",
+      "bytes": 9827
     },
     {
       "path": "intent/interpreter.py",
@@ -2105,8 +2105,8 @@
     },
     {
       "path": "intent/tools/music_tools.py",
-      "sha256": "a0ae3bff07385a20c669022a13e81467c111e681716f90e48f9279d698a6836e",
-      "bytes": 62362
+      "sha256": "5a60dfa88c94cd011061b84838eef53a23236949e2fd731685176e950a5a300a",
+      "bytes": 66082
     },
     {
       "path": "intent/tools/notification_tools.py",
@@ -2235,13 +2235,13 @@
     },
     {
       "path": "mcp_hub/approval_bridge.py",
-      "sha256": "1ce7a23934082dea923232981f1f8160b81c2cfeee42376576a04a08d9103fce",
-      "bytes": 57240
+      "sha256": "bd18c2681e3c8e2fb89c914088a66cb74c588bcee8350a86805187763bc2f363",
+      "bytes": 57280
     },
     {
       "path": "mcp_hub/client_hub.py",
-      "sha256": "ced7de87d0e276bfa4323f84ada927e1fabbd7bb382c3338373d7e394747c1db",
-      "bytes": 110324
+      "sha256": "5312d4b9d147fece7d0884564c114698aa0605c3bc8092a32f4a89c2080aa59d",
+      "bytes": 110356
     },
     {
       "path": "mcp_hub/compound_tools.py",
@@ -2360,8 +2360,8 @@
     },
     {
       "path": "mcp_servers/core_tools/server.py",
-      "sha256": "1fb17db7b960afa718120f2ae6d50158e301be4870d7b2bc7527dc85310be0ba",
-      "bytes": 244957
+      "sha256": "c82b78297fa282202b8037b95e81313d3b65d45f90800efcab2448e18f735d17",
+      "bytes": 246103
     },
     {
       "path": "mcp_servers/phone_tool_descriptions.py",
@@ -4695,8 +4695,8 @@
     },
     {
       "path": "services/llm/route_tool_schemas.py",
-      "sha256": "70e4fb3b4ce10cd8a781f4a98d53f1c1088759cb0a0c5ec3fdfa45b67784f0fd",
-      "bytes": 42953
+      "sha256": "b798b714037553d27619fb73f5376174904b914e406209fd00ec565dee989a7e",
+      "bytes": 43780
     },
     {
       "path": "services/llm/session_cost_tracker.py",
@@ -9860,8 +9860,8 @@
     },
     {
       "path": "ui/qt_native/webview_window.py",
-      "sha256": "43c3ec7ac3ce8ea287b4a39f18026573e87eb407e2db85818b0a40fc779910c5",
-      "bytes": 217334
+      "sha256": "c1c649d863279cd833ad003708bf213936861f23d1f857063b0696c9ad967b53",
+      "bytes": 222079
     },
     {
       "path": "ui/qt_native/widgets/connectivity_status.py",
@@ -10010,8 +10010,8 @@
     },
     {
       "path": "ui/react-app/src/SmartDisplay.jsx",
-      "sha256": "61bc2297e4f191e625116f16fb30182d07a17a146e5c8f82997e387f08429124",
-      "bytes": 173439
+      "sha256": "a61717af5bc8730d72bd424597a4f09e33952b0eaba6ace8feaa3e4b43b69fa2",
+      "bytes": 174778
     },
     {
       "path": "ui/react-app/src/SmartDisplay.spokePolicy.test.jsx",
@@ -11125,8 +11125,8 @@
     },
     {
       "path": "ui/react-app/src/components/player/MediaArea.jsx",
-      "sha256": "53ef1207b57ce2baf90b38fdd619efb7ebed38cd99ba158b761f7fd0dff5541f",
-      "bytes": 7641
+      "sha256": "0e25c3e6e52d30e9a33493165f42ffb5569c4cfba2357331b1440346e983a833",
+      "bytes": 7850
     },
     {
       "path": "ui/react-app/src/components/player/MediaArea.module.css",
@@ -11909,6 +11909,16 @@
       "bytes": 4181
     },
     {
+      "path": "ui/react-app/src/hooks/useVideoFullscreen.js",
+      "sha256": "ad3161d23d1e0ab29be64b92067713e964fc58892025b8f253cb821de56bb3db",
+      "bytes": 5021
+    },
+    {
+      "path": "ui/react-app/src/hooks/useVideoFullscreen.test.jsx",
+      "sha256": "4fe6aecf6ed99a36760c8d73866f018277fb21af2cad2a642a255d097c57e0f6",
+      "bytes": 6326
+    },
+    {
       "path": "ui/react-app/src/hooks/useViolaApi.js",
       "sha256": "f170c7e80e5332b2615a7a84fed15029c77efd44e32ad6a785b8866406df1b21",
       "bytes": 14212
@@ -12184,6 +12194,11 @@
       "bytes": 5299
     },
     {
+      "path": "ui/react-app/src/styles/video-fullscreen.css",
+      "sha256": "641f325af1186c778fcac7ae42a253dd3afb0fb8d6cb6ff1dfa66a660aa6bd0c",
+      "bytes": 1572
+    },
+    {
       "path": "ui/react-app/src/test/setup.js",
       "sha256": "f05b444ee8fedeace36431e52226866bbf715b2aa22bf7eea2af85044e8d87ce",
       "bytes": 5180
@@ -12340,8 +12355,8 @@
     },
     {
       "path": "ui/react-app/src/utils/runtimeSurface.js",
-      "sha256": "5829038df0cd2593c84412a50f9c3b3450137c2f48ef05c9ec70f3dc29e7c989",
-      "bytes": 3229
+      "sha256": "6cb92ff9eaac12fa979061d30e2c8cc85ef4b8135edbacbbdb1d544cd639f0e5",
+      "bytes": 4158
     },
     {
       "path": "ui/react-app/src/utils/runtimeSurface.test.js",

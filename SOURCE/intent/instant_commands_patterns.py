@@ -99,6 +99,42 @@ SKIP_REGEX = re.compile(
     re.I,
 )
 
+# Voice "full screen" for the Music-stage video. The exact control phrases
+# only; anything looser ("go back", "make it bigger") stays with the model and
+# its video_fullscreen tool. A leading "Viola," is allowed because the
+# push-to-talk transcript keeps the name ("Viola, put this in full screen").
+# Five-criteria check: (1) latency - 20-80s model round-trip on the live test
+# vs instant; (2) exact phrases only, negation rejected; (3) no overlap with
+# stop/pause/resume/skip; (4) the model path failed live: qwen3:8b answered
+# "The video is no longer in full screen" without calling the tool; (5) see
+# tests/unit/test_video_fullscreen_instant_commands.py.
+_WAKE_NAME = r"(?:viola[,!.]?\s+)?"
+_FULL_SCREEN = r"full[\s-]?screen(?:\s+mode)?"
+VIDEO_FULLSCREEN_ON_REGEX = re.compile(
+    r"^"
+    + _WAKE_NAME
+    + POLITE_PREFIX
+    + _NEGATION_LOOKAHEAD
+    + r"(?:(?:put|show)\s+(?:this|it|that|the\s+video)\s+(?:in|on)\s+"
+    + _FULL_SCREEN
+    + r"|make\s+(?:this|it|that|the\s+video)\s+"
+    + _FULL_SCREEN
+    + r"|(?:go\s+)?"
+    + _FULL_SCREEN
+    + r")(?:\s+please)?[!.]*$",
+    re.I,
+)
+VIDEO_FULLSCREEN_OFF_REGEX = re.compile(
+    r"^"
+    + _WAKE_NAME
+    + POLITE_PREFIX
+    + _NEGATION_LOOKAHEAD
+    + r"(?:(?:end|exit|leave|close|quit)\s+(?:the\s+)?"
+    + _FULL_SCREEN
+    + r"|(?:go\s+back\s+to\s+)?normal\s+size)(?:\s+please)?[!.]*$",
+    re.I,
+)
+
 # Instant command patterns - execute immediately without AI.
 #
 # DEBOX (2026-05-29, boxing audit W2 intent lane) + #1402 (2026-07-16): the
@@ -164,5 +200,19 @@ INSTANT_PATTERNS: list[InstantPattern] = [
         "skip",
         {},
         "Skip to the next track",
+    ),
+    # ===== VIDEO FULL SCREEN =====
+    # See VIDEO_FULLSCREEN_ON_REGEX's comment above for the five criteria.
+    (
+        VIDEO_FULLSCREEN_ON_REGEX,
+        "video_fullscreen_on",
+        {},
+        "Show the playing video full screen",
+    ),
+    (
+        VIDEO_FULLSCREEN_OFF_REGEX,
+        "video_fullscreen_off",
+        {},
+        "End video full screen",
     ),
 ]

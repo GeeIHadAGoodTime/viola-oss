@@ -191,6 +191,21 @@ def _update_state_hub_last_transcript(transcript: str, *, user_id: str, confiden
         logger.debug("StateHub transcript update failed (may not be initialized): %s", e)
 
 
+_UI_ACTION_BROADCAST_KEYS = (
+    "ui_action",
+    "rooms_modal_tab",
+    "path_identifier",
+    "panel_id",
+    "tab",
+    "sub_tab",
+    "section",
+    "initial_section",
+    "prefill",
+    "room_name",
+    "target_room",
+)
+
+
 def _broadcast_chat_response(result: dict[str, Any]) -> None:
     """Broadcast command response text to WebSocket clients for UI display."""
     message = result.get("message", "")
@@ -223,6 +238,15 @@ def _broadcast_chat_response(result: dict[str, Any]) -> None:
         card = result.get("card") or (result.get("data", {}) or {}).get("card")
         if card and isinstance(card, dict):
             payload["card"] = card
+        # A spoken panel or full-screen request carries a ui_action (as the
+        # /v1/command broadcast does); without it the app shows the reply but
+        # never opens the panel or goes full screen.
+        data = result.get("data") if isinstance(result.get("data"), dict) else {}
+        action_source = result if result.get("ui_action") else data
+        if isinstance(action_source.get("ui_action"), str) and action_source["ui_action"]:
+            for key in _UI_ACTION_BROADCAST_KEYS:
+                if key in action_source:
+                    payload[key] = action_source[key]
         loop = asyncio.get_event_loop()
         if loop.is_running():
             loop.create_task(hub.broadcast("chat_response", payload, user_id=_uid, force=True))
