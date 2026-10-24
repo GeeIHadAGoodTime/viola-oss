@@ -171,6 +171,11 @@ DEFAULT_CODEX_MODEL = "gpt-5.4-mini"
 # "byok" (bring your own API key), or "local" (on-device / localhost AI).
 DEFAULT_AI_SOURCE = "managed"
 
+# Agent autonomy tier ("solo" | "ensemble" | "symphony") used whenever an
+# account has none saved: Solo, the safe tier and the one onboarding starts on.
+# Every reader that needs a fallback uses this one constant.
+DEFAULT_AGENT_AUTONOMY = "solo"
+
 # Provider-level managed-mode fallback is opt-in. Subscription/managed mode
 # must not silently continue through Codex or another paid provider unless a
 # deployment explicitly enables and configures that fallback.

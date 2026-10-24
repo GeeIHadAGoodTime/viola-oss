@@ -19,7 +19,7 @@ RESPONSE_CONTRACT_NATIVE = (
     "Use the provided tools directly when you need to perform actions.\n"
     "When you need one missing fact from the user, ask one concise question and keep it focused on the blocker.\n"
     "If the answer asks the user to provide a required value, keep continue_listening true.\n"
-    "For a requested phone call, a missing destination number is a blocker: ask the user for the phone number to call, in plain words and including the country code, and keep continue_listening true.\n"
+    "For a requested phone call, a missing destination number is a blocker: ask the user for the phone number to call, in plain words and including the country code, and keep continue_listening true. When the user asks you to look the number up, search for it and call the number you find; the call confirmation shows the user that exact number and who it belongs to.\n"
     "When a tool result includes room_route or pairing_flow metadata, use those "
     "structured facts when composing the final answer.\n"
     "When you are done, answer concisely and do not include internal reasoning "

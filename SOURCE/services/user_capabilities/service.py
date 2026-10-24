@@ -48,10 +48,11 @@ def set_mcp_hub(hub: Any | None) -> None:
 
 def get_current_agent_tier(user_id: str) -> Tier:
     """Read the user's selected autonomy tier from SettingsManager."""
+    from config.defaults import DEFAULT_AGENT_AUTONOMY
     from ui.settings_manager import get_settings_manager
 
     sm = get_settings_manager()
-    return normalize_tier(sm.get("agent_autonomy", "ensemble", user_id=user_id))
+    return normalize_tier(sm.get("agent_autonomy", DEFAULT_AGENT_AUTONOMY, user_id=user_id) or DEFAULT_AGENT_AUTONOMY)
 
 
 def _required_tier_for_draft(draft: CapabilityDraft) -> tuple[Tier, TierComputation]:

@@ -223,23 +223,38 @@ export default function BugReportModal({ isOpen, onClose, onSubmit }) {
           />
         </label>
 
-        <label
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px',
-            color: THEME.colors.textSecondary,
-            fontSize: '14px',
-            minHeight: '44px',
-          }}
-        >
-          <input
-            type="checkbox"
-            checked={includeScreenContext}
-            onChange={(event) => setIncludeScreenContext(event.target.checked)}
-          />
-          Include current screen context
-        </label>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <label
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              color: THEME.colors.textSecondary,
+              fontSize: '14px',
+              minHeight: '44px',
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={includeScreenContext}
+              onChange={(event) => setIncludeScreenContext(event.target.checked)}
+              aria-describedby="bug-report-screen-context-detail"
+            />
+            Include what Viola was showing
+          </label>
+          {/* Say exactly what the box sends. It never attached a picture: the
+              report stores text only, because a screenshot cannot be scrubbed
+              of personal details the way text is. */}
+          <span
+            id="bug-report-screen-context-detail"
+            data-testid="bug-report-screen-context-detail"
+            style={{ color: THEME.colors.textTertiary, fontSize: '12px', lineHeight: 1.4 }}
+          >
+            {includeScreenContext
+              ? "Adds the screen you were on, what was playing, the agent's current task and web page, and the window size, as text. No screenshot is taken."
+              : 'Only your description, the details you typed, and the version line below are sent. No screenshot is taken.'}
+          </span>
+        </div>
 
         <div
           data-testid="bug-report-sending-line"

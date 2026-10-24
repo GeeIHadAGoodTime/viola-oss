@@ -772,7 +772,7 @@ def _file_changed_context_for_tool(
     if tool_name in {"delete_file"}:
         event = "unlink"
     elif tool_name == "file_write":
-        if action not in {"write", "delete"}:
+        if action not in {"write", "delete", "append", "insert", "replace_lines", "replace_text"}:
             return None
         event = "unlink" if action == "delete" else "change"
     elif tool_name not in {"write_file"}:

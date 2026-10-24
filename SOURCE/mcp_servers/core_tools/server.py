@@ -51,10 +51,14 @@ from intent.tools.delegation import delegate_to_provider as _delegate_to_provide
 # Handler imports
 # ---------------------------------------------------------------------------
 from intent.tools.filesystem import (
+    append_to_file as _append_to_file,
     delete_file as _delete_file,
     file_info as _file_info,
+    insert_lines as _insert_lines,
     list_directory as _list_directory,
     read_file as _read_file,
+    replace_lines as _replace_lines,
+    replace_text as _replace_text,
     search_files as _search_files,
     write_file as _write_file,
 )
@@ -154,6 +158,7 @@ from mcp_servers.phone_tool_descriptions import (
     EXTRA_CONTEXT_DESCRIPTION,
     PHONE_ACTION_DESCRIPTION,
     PHONE_NUMBER_DESCRIPTION,
+    RECIPIENT_NAME_DESCRIPTION,
     TASK_DESCRIPTION,
     WAIT_FOR_COMPLETION_DESCRIPTION,
 )
@@ -1352,8 +1357,9 @@ async def file_read(
 
 @server.tool(
     description=(
-        "Write or delete files on the local filesystem. Actions: write (create/overwrite entire file), delete (remove single file). "
-        "Read first with file_read if you need to preserve existing content."
+        "Change local files. Edit part of a file with append, insert, replace_lines or replace_text; "
+        "file_read shows only 100 lines, so never rebuild a longer file from a read. "
+        "write replaces a whole file; delete removes one."
     ),
     annotations=_DANGEROUS,
     meta={
@@ -1365,21 +1371,41 @@ async def file_read(
 async def file_write(
     action: Annotated[
         str,
-        Field(description="Filesystem write action. Use one of: 'write' or 'delete'."),
+        Field(description="append|insert|replace_lines|replace_text|write|delete"),
     ] = "write",
     path: Annotated[
         str,
-        Field(description="File path to write or delete. Deletion only supports single files, not directories."),
+        Field(description="File path."),
     ] = "",
     content: Annotated[
         str,
-        Field(description="Full file contents for action='write'. This replaces the entire file."),
+        Field(description="New text, or the whole file for write."),
     ] = "",
+    start_line: Annotated[
+        int,
+        Field(description="1-based line to insert before or replace from."),
+    ] = 0,
+    end_line: Annotated[
+        int,
+        Field(description="replace_lines: last line."),
+    ] = 0,
+    old_text: Annotated[
+        str,
+        Field(description="replace_text: exact text to replace."),
+    ] = "",
+    overwrite: Annotated[
+        bool,
+        Field(description="write: true only if the user asked to replace a long file."),
+    ] = False,
 ) -> str:
     """Modify the filesystem.
 
     Examples:
-    - file_write(action="write", path="~/notes/todo.txt", content="Buy milk")
+    - file_write(action="append", path="~/notes/todo.txt", content="Buy milk")
+    - file_write(action="insert", path="~/notes/todo.txt", start_line=1, content="# Today")
+    - file_write(action="replace_lines", path="~/notes/todo.txt", start_line=4, end_line=5, content="Call Sam")
+    - file_write(action="replace_text", path="~/notes/todo.txt", old_text="Buy milk", content="Buy oat milk")
+    - file_write(action="write", path="~/notes/new.txt", content="Hello")
     - file_write(action="delete", path="~/notes/old.txt")
     """
     refusal = _local_surface_refusal("file_write")
@@ -1387,7 +1413,16 @@ async def file_write(
         return refusal
     try:
         if action == "write":
-            return _format_result(await _write_file(path, content))
+            written = await _write_file(path, content, overwrite_existing=bool(overwrite))
+            return _format_result_with_error_data(written)
+        if action == "append":
+            return _format_result(await _append_to_file(path, content))
+        if action == "insert":
+            return _format_result(await _insert_lines(path, int(start_line), content))
+        if action == "replace_lines":
+            return _format_result(await _replace_lines(path, int(start_line), int(end_line), content))
+        if action == "replace_text":
+            return _format_result(await _replace_text(path, old_text, content))
         if action == "delete":
             return _format_result(await _delete_file(path))
         return json.dumps({"error": "Unknown action: %s" % action})
@@ -5971,6 +6006,10 @@ async def phone(
         str,
         Field(description=CALL_ID_DESCRIPTION),
     ] = "",
+    recipient_name: Annotated[
+        str,
+        Field(description=RECIPIENT_NAME_DESCRIPTION),
+    ] = "",
 ) -> str:
     """Manage phone calls.
 
@@ -5986,6 +6025,10 @@ async def phone(
         # frozen into this server's task when the hub was built.
         with _caller_cloud_bearer_bound():
             if action == "call":
+                recipient = (recipient_name or "").strip()
+                if recipient and recipient.lower() not in ("%s %s" % (task, extra_context)).lower():
+                    note = "The number belongs to %s." % recipient
+                    extra_context = ("%s %s" % (extra_context.strip(), note)).strip()
                 result = await _make_phone_call(
                     phone_number=phone_number,
                     task=task,

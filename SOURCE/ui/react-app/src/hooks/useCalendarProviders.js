@@ -14,7 +14,8 @@ import { apiFetch } from './useViolaApi';
 import { isFeatureHidden } from '../utils/featureSurface';
 
 const CONSENT_BASE = API.CONSENT;
-const DESKTOP_ONLY_MESSAGE = 'Connecting Google Calendar is available in the desktop app.';
+const DESKTOP_ONLY_MESSAGE = 'Connecting Google is available in the desktop app.';
+export const GOOGLE_NOT_SET_UP_MESSAGE = 'Google sign-in is not set up in this version of Viola. Update Viola, or contact support if this keeps happening.';
 const POLL_INTERVAL_MS = 2000;
 const POLL_TIMEOUT_MS = 120000; // 2 minutes
 const STATUS_PROVIDER_ALIASES = {
@@ -99,7 +100,14 @@ export function useCalendarProviders() {
       const step = session.steps?.[0];
 
       if (!step?.authorization_url) {
-        throw new Error('No authorization URL returned');
+        // The backend marks the step "unavailable" when this build has no
+        // Google OAuth client (see music/consent/adapters/google_calendar.py).
+        const message = step?.status === 'unavailable'
+          ? GOOGLE_NOT_SET_UP_MESSAGE
+          : "Couldn't connect Google. Try again.";
+        setError(message);
+        setConnecting(null);
+        return { success: false, error: message };
       }
 
       // Open in system browser — prefer Qt bridge, fall back to window.open
@@ -147,9 +155,9 @@ export function useCalendarProviders() {
 
       return { success: true };
     } catch {
-      setError("Couldn't connect calendar. Try again.");
+      setError("Couldn't connect Google. Try again.");
       setConnecting(null);
-      return { success: false, error: "Couldn't connect calendar. Try again." };
+      return { success: false, error: "Couldn't connect Google. Try again." };
     }
   }, [fetchProviders]);
 

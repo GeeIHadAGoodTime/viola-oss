@@ -28,12 +28,22 @@ GMAIL_SCOPES = [
     GMAIL_READONLY_SCOPE,
 ]
 
+# Scopes one desktop "Connect Google" asks for. All are Google *sensitive*
+# scopes (not restricted): Calendar read + event write, and send-only Gmail.
+# gmail.send cannot read, list or search the mailbox. Tokens for this
+# connection live only in the desktop's encrypted consent vault (storage
+# tier 3); the cloud never sees them.
+GOOGLE_CONNECTION_SCOPES = (
+    "https://www.googleapis.com/auth/calendar.readonly",
+    "https://www.googleapis.com/auth/calendar.events",
+    GMAIL_SEND_SCOPE,
+)
+
 # Least-privilege: every Workspace scope must be read-only ("*.readonly" suffix)
 # or a strictly-read scope (openid, userinfo.profile, userinfo.email). The
 # public privacy disclosure tells users Workspace data "may be read only as
 # needed" — requesting any write-capable Workspace scope here would put the
 # product out of sync with the consent screen and the privacy page.
-# Gate: scripts/check_google_oauth_scope_least_privilege.py enforces this rule.
 WORKSPACE_SCOPES = [
     "https://www.googleapis.com/auth/drive.readonly",
     "https://www.googleapis.com/auth/documents.readonly",
@@ -44,7 +54,12 @@ WORKSPACE_SCOPES = [
     "https://www.googleapis.com/auth/admin.directory.user.readonly",
 ]
 
-RESTRICTED_GOOGLE_SCOPES = tuple(sorted({*GMAIL_SCOPES, *WORKSPACE_SCOPES}))
+# Scopes Google classes as *restricted* (CASA security assessment when the
+# data touches a server). gmail.send is *sensitive*, not restricted, so it is
+# not in this set and is not behind ``google_restricted_features_enabled``.
+RESTRICTED_GOOGLE_SCOPES = tuple(
+    sorted({GMAIL_READONLY_SCOPE, *(s for s in WORKSPACE_SCOPES if not s.endswith("/userinfo.profile"))})
+)
 
 
 def _load_settings(settings_obj: object | None) -> object:
@@ -66,17 +81,22 @@ def is_google_restricted_features_enabled(settings_obj: object | None = None) ->
 
 
 def get_enabled_gmail_send_scopes(settings_obj: object | None = None) -> list[str]:
-    """Return Gmail send scopes only when the restricted Google gate is enabled."""
-    if not is_google_restricted_features_enabled(settings_obj):
-        return []
+    """Return the Gmail send scope.
+
+    ``gmail.send`` is a sensitive (not restricted) scope and is part of the
+    desktop Google connection, so it is not behind the restricted-features
+    gate. ``settings_obj`` is accepted for call-site compatibility.
+    """
+    del settings_obj
     return [GMAIL_SEND_SCOPE]
 
 
 def get_enabled_gmail_scopes(settings_obj: object | None = None) -> list[str]:
-    """Return Gmail scopes only when the restricted Google gate is enabled."""
-    if not is_google_restricted_features_enabled(settings_obj):
-        return []
-    return list(GMAIL_SCOPES)
+    """Return Gmail scopes: send always, read only when the restricted gate is on."""
+    scopes = [GMAIL_SEND_SCOPE]
+    if is_google_restricted_features_enabled(settings_obj):
+        scopes.append(GMAIL_READONLY_SCOPE)
+    return scopes
 
 
 def get_enabled_workspace_scopes(settings_obj: object | None = None) -> list[str]:

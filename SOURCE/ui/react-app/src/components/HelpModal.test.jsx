@@ -27,4 +27,14 @@ describe('HelpModal current desktop guidance', () => {
     expect(screen.getByText(/Existing local models/)).toHaveTextContent('Settings → Customize');
     expect(document.body).not.toHaveTextContent('try training again');
   });
+  it('links documentation, privacy and terms to pages that exist (not the unserved /docs/ paths)', () => {
+    render(<HelpModal isOpen onClose={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'About' }));
+    expect(screen.getByRole('link', { name: /setup guide/ })).toHaveAttribute('href', 'https://useviola.com/for-you');
+    expect(screen.getByRole('link', { name: 'Privacy Policy' })).toHaveAttribute('href', 'https://useviola.com/privacy');
+    expect(screen.getByRole('link', { name: 'Terms of Service' })).toHaveAttribute('href', 'https://useviola.com/terms');
+    for (const link of screen.getAllByRole('link')) {
+      expect(link.getAttribute('href')).not.toMatch(/^\/docs\//);
+    }
+  });
 });

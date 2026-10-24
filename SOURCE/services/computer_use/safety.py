@@ -158,8 +158,10 @@ def get_agent_autonomy(*, user_id: str | None = None) -> str:
     The SettingsManager `get()` aliases `capability_tier` to `agent_autonomy`,
     so this reads the canonical key directly.
     """
-    raw = _settings_get("agent_autonomy", "solo", user_id=user_id)
-    return str(raw or "solo").strip().lower()
+    from config.defaults import DEFAULT_AGENT_AUTONOMY
+
+    raw = _settings_get("agent_autonomy", DEFAULT_AGENT_AUTONOMY, user_id=user_id)
+    return str(raw or DEFAULT_AGENT_AUTONOMY).strip().lower()
 
 
 # Back-compat alias. Callers that imported the old name keep working.
