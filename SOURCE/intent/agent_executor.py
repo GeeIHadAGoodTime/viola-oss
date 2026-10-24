@@ -8032,6 +8032,7 @@ class AgentExecutor:
         planned_action: str,
         status: str,
         response: str | None = None,
+        tool_args: dict[str, Any] | None = None,
     ) -> None:
         payload: dict[str, Any] = {
             "tool_name": tool_name,
@@ -8041,6 +8042,13 @@ class AgentExecutor:
             "status": status,
             "choices": ["yes", "no", "cancel"],
         }
+        if action_class == "phone_call" and isinstance(tool_args, dict):
+            # The desktop call-briefing card shows the exact number and who it
+            # belongs to, with Approve / Cancel answering this same gate.
+            payload["phone_number"] = str(tool_args.get("phone_number") or "").strip()
+            payload["recipient_name"] = str(tool_args.get("recipient_name") or "").strip()
+            payload["objective"] = str(tool_args.get("task") or "").strip()
+            payload["untrusted_source"] = _content_context_is_tainted()
         task_id = getattr(self, "task_id", None)
         if task_id:
             payload["task_id"] = task_id
@@ -8076,10 +8084,13 @@ class AgentExecutor:
             return True
 
         planned_action = describe_irreversible_action(tool_name, tool_args)
+        if action_class == "phone_call" and _content_context_is_tainted():
+            planned_action = "%s (this number came from a search result or other outside content, so please check it is the right one)" % planned_action
         await self._broadcast_consult_user_event(
             tool_name=tool_name,
             action_class=action_class,
             planned_action=planned_action,
+            tool_args=tool_args,
             status="pending",
         )
 
@@ -8095,6 +8106,7 @@ class AgentExecutor:
                 tool_name=tool_name,
                 action_class=action_class,
                 planned_action=planned_action,
+                tool_args=tool_args,
                 status="unavailable",
             )
             return False
@@ -8112,6 +8124,7 @@ class AgentExecutor:
                 tool_name=tool_name,
                 action_class=action_class,
                 planned_action=planned_action,
+                tool_args=tool_args,
                 status="deferred",
             )
             raise
@@ -8122,6 +8135,7 @@ class AgentExecutor:
                 tool_name=tool_name,
                 action_class=action_class,
                 planned_action=planned_action,
+                tool_args=tool_args,
                 status="approved",
             )
             return True
@@ -8130,6 +8144,7 @@ class AgentExecutor:
             tool_name=tool_name,
             action_class=action_class,
             planned_action=planned_action,
+            tool_args=tool_args,
             status="denied",
         )
         return False

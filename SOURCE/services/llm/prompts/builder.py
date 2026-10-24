@@ -38,7 +38,7 @@ _JSON_TOOL_RESPONSE_CONTRACT = (
     'Answer: {"type": "answer", "answer": "<plain response>", "continue_listening": false}\n'
     'Question: {"type": "answer", "answer": "<one focused question>", "continue_listening": true}\n'
     "If your answer asks the user to provide a required value, it is a Question and continue_listening must be true.\n"
-    "For requested phone calls, a missing destination number is a question with continue_listening true; ask the user for the phone number to call, in plain words and including the country code.\n"
+    "For requested phone calls, a missing destination number is a question with continue_listening true; ask the user for the phone number to call, in plain words and including the country code. When the user asks you to look the number up, search for it and call the number you find; the call confirmation shows the user that exact number and who it belongs to.\n"
     'Ignore ambient speech only when clearly not directed at Viola: {"type": "ignore", "reason": "<why>", '
     '"continue_listening": false}\n'
     "Return raw JSON only. No markdown fences, prose preambles, or hidden reasoning."

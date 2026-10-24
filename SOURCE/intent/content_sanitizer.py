@@ -99,9 +99,12 @@ HIGH_RISK_TOOLS = frozenset(
 # content is in the conversation:
 #   * payments and shell commands are refused outright, with no confirm
 #     override (TAINT_HARD_BLOCK_ACTION_CLASSES);
-#   * phone calls stay refused here until the r5/phone lane lands its
-#     confirmation that shows the exact number (TAINT_PHONE_ACTION_CLASSES;
-#     that lane owns the phone decision);
+#   * a phone call goes on to its confirm-or-cancel gate like the actions
+#     below (r5/phone): the confirmation shows the user the exact number and
+#     who it belongs to, says the number came from outside content, and must
+#     be the user's own yes. "Look up the number and call them" is the core
+#     use case. TAINT_PHONE_ACTION_CLASSES stays as the switch to refuse calls
+#     outright again if that gate is ever not in place;
 #   * a legacy high-risk tool name that has no confirm-or-cancel step of its
 #     own stays refused (TAINT_UNGATED_HIGH_RISK_TOOLS);
 #   * every other consequential action (sending email, SMS or Telegram,
@@ -110,7 +113,7 @@ HIGH_RISK_TOOLS = frozenset(
 #     gate accepts only the user's own words, never a re-issued tool call
 #     alone (ApprovalManager.confirmation_holds_under_taint).
 TAINT_HARD_BLOCK_ACTION_CLASSES = frozenset({"payment", "shell_command"})
-TAINT_PHONE_ACTION_CLASSES = frozenset({"phone_call"})
+TAINT_PHONE_ACTION_CLASSES: frozenset[str] = frozenset()
 TAINT_UNGATED_HIGH_RISK_TOOLS = frozenset({"send_telegram", "write_file"})
 
 
@@ -677,7 +680,8 @@ class BrowserTaintTracker:
     (SEC-001). What taint changes (founder rule, 2026-10-24):
 
       * payments and shell commands are refused outright;
-      * phone calls stay refused until the r5/phone exact-number confirmation;
+      * phone calls reach their confirm-or-cancel gate, which shows the exact
+        number and who it belongs to (r5/phone);
       * every other consequential action goes on to its confirm-or-cancel
         gate, which under taint accepts only the user's own words;
       * searching, reading pages, browsing and reading memory/calendar are

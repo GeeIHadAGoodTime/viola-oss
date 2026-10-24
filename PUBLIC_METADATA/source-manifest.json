@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "c0c03d1e55746a8676a053e3e266acfe0b7e0221",
-  "sha256": "cf93b55ee425952ee352379b15ce3119030821aab6498bfbc3899492ea27e701",
+  "revision": "85b35f63a0e8a7d51c4b244afd60d048eb957718",
+  "sha256": "af18162b5a204e2da3c70ff26d82413ba1e19db6f903a1512227d38fc38dda94",
   "files": [
     {
       "path": ".env.example",
@@ -540,8 +540,8 @@
     },
     {
       "path": "auth/desktop_session.py",
-      "sha256": "4ec0397d4db9f1b215112666002b047949fc1e2263dc8491454cbaf16d6aa232",
-      "bytes": 50714
+      "sha256": "b41a2b7681632c1e4a3a3350d45402f705701201870431aab176dc99be4045ec",
+      "bytes": 50130
     },
     {
       "path": "auth/entitlement_projection.py",
@@ -850,8 +850,8 @@
     },
     {
       "path": "config/defaults.py",
-      "sha256": "e7ce28a4009a0b0e69217ba397a84470bcd688b81c2da5597d22e966880059eb",
-      "bytes": 23576
+      "sha256": "2bf61b3872b4f5dc7cc7c18bc705a1026859a5fd181ad0aed9410c1e614e3a8a",
+      "bytes": 23328
     },
     {
       "path": "config/env.py",
@@ -1210,8 +1210,8 @@
     },
     {
       "path": "core/user_context.py",
-      "sha256": "438f9ee8602c39da4e33e294bc774262eb72b4cb8eaaca068b129c9c3478385a",
-      "bytes": 20946
+      "sha256": "9983eacc790f9de230178513fd97ff794a4741fec704beb88ca3bfa74d203728",
+      "bytes": 19090
     },
     {
       "path": "core/user_notice.py",
@@ -1575,13 +1575,13 @@
     },
     {
       "path": "intent/agent_executor.py",
-      "sha256": "f47af1c659501bcc13b11aa7a43eeaac15b6b3c379bd7035c5fdcecee1926f9b",
-      "bytes": 567229
+      "sha256": "3831fea3d297f597e690cb428872ef56904ca42e3404c694e68a175b1d8b248c",
+      "bytes": 568235
     },
     {
       "path": "intent/agent_loop.py",
-      "sha256": "219b5e665019a95edc58aae32a22ef047ddf43df47707625fc2a687b43e2bb2d",
-      "bytes": 249303
+      "sha256": "7bd665c8e53d4e0dd52cbebf5eee20c348661b1ba8d2dee0dce991bad201908a",
+      "bytes": 249250
     },
     {
       "path": "intent/agent_message_manager.py",
@@ -1605,8 +1605,8 @@
     },
     {
       "path": "intent/ai_controller.py",
-      "sha256": "745949241cc3da2b7a60d564eb2e841878ec58439a20f431a099c2796e965a06",
-      "bytes": 166634
+      "sha256": "3453ea4c393594e9ccc6716163bd6926810638b52fa4422478bf267e2df09a14",
+      "bytes": 166258
     },
     {
       "path": "intent/ai_interpreter.py",
@@ -1670,8 +1670,8 @@
     },
     {
       "path": "intent/content_sanitizer.py",
-      "sha256": "aefcd7bdbb40daebe948af56612ec404e79654e985731b2469cd5ea9bbca87c9",
-      "bytes": 49546
+      "sha256": "c88754524c5634923201be5a97d7073aafc2bee40acf62d79b89d8f167650831",
+      "bytes": 49847
     },
     {
       "path": "intent/context_builder.py",
@@ -1835,8 +1835,8 @@
     },
     {
       "path": "intent/instant_commands_patterns.py",
-      "sha256": "7d262dce3d94439a6594b68579990a843b5542346fae2b48f43c335caa7cbebd",
-      "bytes": 10345
+      "sha256": "0d7aed90efc719cbccde38e2a338bcc7cb3e68b927a8e570f59b4440fd38f5fb",
+      "bytes": 9827
     },
     {
       "path": "intent/interpreter.py",
@@ -1850,8 +1850,8 @@
     },
     {
       "path": "intent/irreversible_actions.py",
-      "sha256": "72712e02bf5f5a7c8c1d05b793f44c15c7112523ee7c3858fa588d90f18bc017",
-      "bytes": 12816
+      "sha256": "01b817d6766a1283acc859ad5b9610f30a97dc176bf6606acc0c3cad7beee0f4",
+      "bytes": 12561
     },
     {
       "path": "intent/json_utils.py",
@@ -2040,8 +2040,8 @@
     },
     {
       "path": "intent/tools/delegation.py",
-      "sha256": "d8c6370c7d3df2e7b647749873d9d75a7cd134a511556b7ea4e9ff997ee2b4ba",
-      "bytes": 6679
+      "sha256": "edbd8b5a4decd0b28003f7fc74744ce6a95a5018a56b0accd061a6f330b1fd62",
+      "bytes": 5721
     },
     {
       "path": "intent/tools/desktop.py",
@@ -2065,8 +2065,8 @@
     },
     {
       "path": "intent/tools/filesystem.py",
-      "sha256": "4b7ebd03112b07d033fe831c182bf9a46b9debda1d2731d6c40b9017479f472f",
-      "bytes": 27591
+      "sha256": "e12bb12f322cb87c9f99c102a8c561976280de6695b475e263c3dccedeefb2ab",
+      "bytes": 17017
     },
     {
       "path": "intent/tools/knowledge.py",
@@ -2115,8 +2115,8 @@
     },
     {
       "path": "intent/tools/phone_call.py",
-      "sha256": "fb8ba7bbb299839e10d05e69f41ef7a5a0e16ec9c2caa6e664f93b9d68ee7acb",
-      "bytes": 56925
+      "sha256": "8616fe44bb40c195bd264a4d74e6648ff90401a28eb56395affb540b9d12cf9b",
+      "bytes": 56833
     },
     {
       "path": "intent/tools/playlist_tools.py",
@@ -2240,8 +2240,8 @@
     },
     {
       "path": "mcp_hub/client_hub.py",
-      "sha256": "5312d4b9d147fece7d0884564c114698aa0605c3bc8092a32f4a89c2080aa59d",
-      "bytes": 110356
+      "sha256": "f8f42b16646dd426cac1bfb20802093c97b2ce4c367252734135a2463a847c72",
+      "bytes": 111229
     },
     {
       "path": "mcp_hub/compound_tools.py",
@@ -2360,13 +2360,13 @@
     },
     {
       "path": "mcp_servers/core_tools/server.py",
-      "sha256": "d616c57f0a8303ae9d9a56618fc220874f04d6ce5c68b61d64b442fbf221e1ad",
-      "bytes": 248306
+      "sha256": "8ee10f169b4cfe3060c7dd0bb813b0de8ef690164db6aaf16caa34320d6736e3",
+      "bytes": 247243
     },
     {
       "path": "mcp_servers/phone_tool_descriptions.py",
-      "sha256": "cbf5e48a952da00a43cfa680500f23832c26a0a5e5ae396b1e0c884a52dd6c00",
-      "bytes": 2829
+      "sha256": "a5584d22837677c60226ca29ec5b4489760eb76e6dc5596d766c0e000cc53733",
+      "bytes": 3254
     },
     {
       "path": "messaging/__init__.py",
@@ -2875,8 +2875,8 @@
     },
     {
       "path": "music/playlist_manager.py",
-      "sha256": "a2047a7bc048a75be73d990270e9fe3ae834a99db02d04501960e506806ed4b7",
-      "bytes": 56449
+      "sha256": "d91071cd0a4317f39096a6977bfe580c9efeafe6bdea6c516b8128527703bc8a",
+      "bytes": 56037
     },
     {
       "path": "music/playlist_queue.py",
@@ -4310,8 +4310,8 @@
     },
     {
       "path": "services/computer_use/safety.py",
-      "sha256": "250786ce5c6f9a465786d5de7e0eed754c9d5450a38dc2d76dd392eb6e305a94",
-      "bytes": 22895
+      "sha256": "a5d8e143ab0fd5e609d0974759bcceddca1044a117a4dafc815631aef4aabfcf",
+      "bytes": 22807
     },
     {
       "path": "services/computer_use/screen.py",
@@ -4595,13 +4595,13 @@
     },
     {
       "path": "services/llm/prompts/builder.py",
-      "sha256": "4ccf46011cf10b45d3394f8b629230800910c33c0fa2d8aba50a98ce82043172",
-      "bytes": 13062
+      "sha256": "d00c4b4d9ad28ded325b78c5595f108ba1d0888305a15d63125366ea014f3a12",
+      "bytes": 13230
     },
     {
       "path": "services/llm/prompts/constants.py",
-      "sha256": "6802ec2116564f33f12ac7a6bcfa90086dd23580f51666126e2fc177f2b3be84",
-      "bytes": 16115
+      "sha256": "8c40d026fa0578c7f36cf14d849010719cf01ea6abf08cb7075bf291ef2450c9",
+      "bytes": 16283
     },
     {
       "path": "services/llm/prompts/output_styles.py",
@@ -4620,8 +4620,8 @@
     },
     {
       "path": "services/llm/prompts/sections/response_format.py",
-      "sha256": "356a1deb2a9105196f036e9e9bb5905b274013d28c802c1c49bee6cb18ad4adb",
-      "bytes": 2929
+      "sha256": "66956ccf9783dac9fa941d577d44584479b7b7a1667347590589999634845f60",
+      "bytes": 3097
     },
     {
       "path": "services/llm/prompts/viola_unified.py",
@@ -5365,8 +5365,8 @@
     },
     {
       "path": "services/user_capabilities/service.py",
-      "sha256": "cf9d6f81620c9a2a4bb9b8579ea6ba9b1051d1206477e002ddaccb0016f8c948",
-      "bytes": 21897
+      "sha256": "c84508a0383c42076fe7c0acb1612e3f927a6d13c02f2f86c623834b7aa703d8",
+      "bytes": 21804
     },
     {
       "path": "services/user_capabilities/storage.py",
@@ -5855,8 +5855,8 @@
     },
     {
       "path": "telephony/phone_mode.py",
-      "sha256": "8e4dfb4c9968fe0b9af27a4bb0efa6034ca0cac230d94720aebc622554df18e5",
-      "bytes": 1357
+      "sha256": "9c1d7d871cc6e5ae60a9d9c5f660138395d07522eab3e62ff94b9e922b8c0e06",
+      "bytes": 4343
     },
     {
       "path": "telephony/phone_playout_mark.py",
@@ -9855,8 +9855,8 @@
     },
     {
       "path": "ui/qt_native/webview_window.py",
-      "sha256": "546999faa46e9ea25d725ce556e704d691305f1777584bdaecca0fe71064c90f",
-      "bytes": 231453
+      "sha256": "db64029962a599846c1284593eb9e553735765ee9e2cb305927e2af9526adb31",
+      "bytes": 226909
     },
     {
       "path": "ui/qt_native/widgets/connectivity_status.py",
@@ -10005,8 +10005,8 @@
     },
     {
       "path": "ui/react-app/src/SmartDisplay.jsx",
-      "sha256": "31d507f765f1c879fd213934c7cb33aed24806ba6f849cde5970a1473c89fb0a",
-      "bytes": 177205
+      "sha256": "8af3952bc64dcc95a6095b8e38107a3205be734ea332570b14fee032a6379baa",
+      "bytes": 177099
     },
     {
       "path": "ui/react-app/src/SmartDisplay.spokePolicy.test.jsx",
@@ -10035,8 +10035,8 @@
     },
     {
       "path": "ui/react-app/src/__tests__/SmartDisplay.test.jsx",
-      "sha256": "7fe3f571bcfe520bebd2bb959426d85d84cc32ac4bc70ce70fb33e54588bcbef",
-      "bytes": 135655
+      "sha256": "ba463f53600f2e292c82f4f64f8442c4255b8b90360a9b5c639f809aef545a54",
+      "bytes": 134117
     },
     {
       "path": "ui/react-app/src/__tests__/hooks/useEventBus.test.jsx",
@@ -10420,8 +10420,8 @@
     },
     {
       "path": "ui/react-app/src/components/BugReportModal.jsx",
-      "sha256": "68dfd452bdb26c9f0405a17b6cf47e30d057266b8c61ab580e45d59d54f0abe7",
-      "bytes": 9894
+      "sha256": "12062401bffdcaa9ca9b53ba0584d8eee6054d361cdc934523cdeab277c10742",
+      "bytes": 8922
     },
     {
       "path": "ui/react-app/src/components/CalendarView.jsx",
@@ -10440,8 +10440,13 @@
     },
     {
       "path": "ui/react-app/src/components/CallBriefing.jsx",
-      "sha256": "e4223f8165ab7d4cfc1bb27606dab1a1d223335776395317de9f2db100480d0b",
-      "bytes": 2043
+      "sha256": "3546b8088ca4f82a07cacc1bbb6a48afa56472ea48fa34437d3bc301f80b6623",
+      "bytes": 6728
+    },
+    {
+      "path": "ui/react-app/src/components/CallBriefing.test.jsx",
+      "sha256": "ef20023afe128c3bfd0332f0f1c8c2f0d8766918e16b0c31b738bdb0663641d6",
+      "bytes": 4915
     },
     {
       "path": "ui/react-app/src/components/CallConsultation.jsx",
@@ -10585,13 +10590,13 @@
     },
     {
       "path": "ui/react-app/src/components/HelpModal.jsx",
-      "sha256": "7b983c115f0a1a6590bb1cf34c6a4a5846a434111cfd4b1f779cda6e653dc974",
-      "bytes": 16515
+      "sha256": "b0652d5976b16db96dbe54a82f26be86a21bba8be45f56a7bfe287f6a60ce795",
+      "bytes": 16158
     },
     {
       "path": "ui/react-app/src/components/HelpModal.test.jsx",
-      "sha256": "779d5cd7abf0f427f334f07790e3960b1f6e2df6c2c654df19f80fe6491954fe",
-      "bytes": 2685
+      "sha256": "6c504eacdd4c0dc7e447f56a7a00ff5cb3a13b011730be4f506df8cfabc2d004",
+      "bytes": 1963
     },
     {
       "path": "ui/react-app/src/components/HistoryModal.jsx",
@@ -10815,8 +10820,8 @@
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.jsx",
-      "sha256": "109b3ad6c7fddb3cf63bf2714a4e393097f225ecf32b766fe46f80bcf9c4a2b7",
-      "bytes": 210253
+      "sha256": "a027e8e45781e31e3e210aa6a4383d319fa9f1eee1e88b807d5943965fa99d6b",
+      "bytes": 212310
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.localDiscovery.test.jsx",
@@ -11234,16 +11239,6 @@
       "bytes": 3446
     },
     {
-      "path": "ui/react-app/src/components/settings/AddPlaylistForm.jsx",
-      "sha256": "ce935177f3a1bb217fd4b75bf7b4848b2fa8dfdd53db4b88392334c6b0293b41",
-      "bytes": 4472
-    },
-    {
-      "path": "ui/react-app/src/components/settings/AddPlaylistForm.test.jsx",
-      "sha256": "55af345f2072d5afd9d386cf81f225d293b40a5e0701e32e7f0f7fa819301d50",
-      "bytes": 3265
-    },
-    {
       "path": "ui/react-app/src/components/settings/AdvancedSection.jsx",
       "sha256": "9c5cd57dc85a2a9e7436bbf7b4d506080474dda2e5a00fa57a3daf8235520713",
       "bytes": 2542
@@ -11485,8 +11480,8 @@
     },
     {
       "path": "ui/react-app/src/components/stage/modes/browser/BrowserMode.jsx",
-      "sha256": "939232c7c8a414c8b5f1c789b0bd3d25b94853c42c6952d19c81b79ea0282c4a",
-      "bytes": 15158
+      "sha256": "dd44165f85954ebeeabbf903d11544843798c06a309fef6ae54e9981934ed225",
+      "bytes": 14968
     },
     {
       "path": "ui/react-app/src/components/stage/modes/browser/BrowserMode.module.css",
@@ -11500,8 +11495,8 @@
     },
     {
       "path": "ui/react-app/src/components/stage/modes/chat/ChatInput.jsx",
-      "sha256": "f105dc1ef711d4c1aa0abe7a4eb33998ff8b8402b2f2e651543173b5eca96a65",
-      "bytes": 2976
+      "sha256": "84a2f1729ad02508eeb3c250afbec49b42c259ac9a13eedf412953eb1d1ca953",
+      "bytes": 2996
     },
     {
       "path": "ui/react-app/src/components/stage/modes/chat/ChatInput.test.jsx",
@@ -11670,18 +11665,13 @@
     },
     {
       "path": "ui/react-app/src/components/voice/PTTButton.jsx",
-      "sha256": "5a7a1b27362483b5ab6b845cb9df9b0b502532eb274ddd984ca9197522a88309",
-      "bytes": 4046
+      "sha256": "f9179d31dbba93997a6436651a62a2b138056debcf1648940c0da34e6f94b8e6",
+      "bytes": 3898
     },
     {
       "path": "ui/react-app/src/components/voice/PTTButton.module.css",
-      "sha256": "d2254be23dd88fa427f70d657dadbbb9a93eb922054dce477769df758ad1266f",
-      "bytes": 1196
-    },
-    {
-      "path": "ui/react-app/src/components/voice/PTTButton.touch.test.jsx",
-      "sha256": "472cf7200b5ed58a94a0dab9e76078f7c7ea895746516c2e4206c0c464afbf0d",
-      "bytes": 7225
+      "sha256": "6bcc7b5f7a46622f118fb39b06c4e9eefe0b6f57e2d22003e73e91250d86adae",
+      "bytes": 946
     },
     {
       "path": "ui/react-app/src/config.js",
@@ -11902,11 +11892,6 @@
       "path": "ui/react-app/src/hooks/usePlayerState.unmount.test.js",
       "sha256": "69414fbd766fbe98679b5519d907a9bcce9a8f9ac7bd83a09ed65adc8b626f15",
       "bytes": 4603
-    },
-    {
-      "path": "ui/react-app/src/hooks/usePressAndHold.js",
-      "sha256": "a9463df39705d772ba16a1ba101f340e81f7f5a4fe243ae567ec47d83c641e0c",
-      "bytes": 3776
     },
     {
       "path": "ui/react-app/src/hooks/useRoomGroups.js",
@@ -12595,8 +12580,8 @@
     },
     {
       "path": "ui/settings_api.py",
-      "sha256": "7f2659ad8cf39b644b6b9c08b10037367c16b6b777da18500173e279e5dc63f8",
-      "bytes": 88511
+      "sha256": "2416a50c59dbd5edf8513354787c09b109c3d1dda6e80546d80e8a4edb19fab5",
+      "bytes": 87029
     },
     {
       "path": "ui/settings_effects.py",
@@ -12605,13 +12590,13 @@
     },
     {
       "path": "ui/settings_manager.py",
-      "sha256": "5d51a3dab23f9d145fe32055f2b9617b22a61f380b43abcc8ea2ebafa30c9925",
-      "bytes": 174497
+      "sha256": "2528437df982b1acc15c9f7b1bac2d23ae6206c3135ff30fbbf584ab89e3cc2c",
+      "bytes": 167923
     },
     {
       "path": "ui/settings_schema.py",
-      "sha256": "d40a058f4b824f123524202186bf5e72d018b6f00538e1cf8e97889cce127e92",
-      "bytes": 9846
+      "sha256": "94a7ac80d1e782f577f44059f6c62cd71f94699f3e26836dbdf748a92409a0e1",
+      "bytes": 8993
     },
     {
       "path": "ui/static/README_WEB_UI.txt",
@@ -12950,8 +12935,8 @@
     },
     {
       "path": "utils/self_knowledge.py",
-      "sha256": "41ac25aa367a7865d1f24a34036d120b399e5d7440c5bd1eac0c100080ed3c04",
-      "bytes": 17380
+      "sha256": "b0ddb88d82538cac434ae41d76fbf3ce864d2b6f77ee68e552e2c966da2d7256",
+      "bytes": 17170
     },
     {
       "path": "utils/service_registry.py",

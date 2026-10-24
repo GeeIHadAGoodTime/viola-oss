@@ -1025,22 +1025,41 @@ class MCPClientHub:
         """Return tools that should be hidden because this runtime cannot use them."""
         hidden: set[str] = set()
 
+        # The phone tool works through either path: the hosted cloud CallManager
+        # (every installed desktop build; no local Telnyx settings) or an
+        # independent install's own carrier. Hide it only when neither exists.
         try:
-            from config.settings import settings
+            from telephony.phone_mode import phone_calling_unavailable_reason
 
-            telnyx_api_key = getattr(settings, "telnyx_api_key", "") or ""
-            telnyx_phone_number = getattr(settings, "telnyx_phone_number", "") or ""
-            telnyx_sip_connection_id = getattr(settings, "telnyx_sip_connection_id", "") or ""
-            if not all((telnyx_api_key, telnyx_phone_number, telnyx_sip_connection_id)):
+            reason = phone_calling_unavailable_reason()
+            if reason:
                 hidden.add("phone")
+                logger.info("Phone tool unavailable in this runtime: %s", reason)
         except (AttributeError, ImportError, RuntimeError, TypeError, ValueError):
             logger.debug("Could not read settings for runtime tool visibility")
 
         return hidden
 
     def hide_runtime_unavailable_tools(self) -> set[str]:
-        """Hide tools whose hard prerequisites are missing in this runtime."""
+        """Hide tools whose hard prerequisites are missing in this runtime.
+
+        Re-evaluated on every server connect, so a tool hidden earlier for a
+        missing prerequisite comes back once the prerequisite is met (for
+        example the phone tool after the cloud URL is configured). Tools hidden
+        for any other reason stay hidden.
+        """
         hidden = self._runtime_unavailable_tools()
+        for name in [
+            name
+            for name, reasons in self._hidden_tool_reasons.items()
+            if "runtime_unavailable" in reasons and name not in hidden
+        ]:
+            reasons = self._hidden_tool_reasons[name]
+            reasons.discard("runtime_unavailable")
+            if not reasons:
+                self._hidden_tool_reasons.pop(name, None)
+                self._hidden_tools.discard(name)
+                logger.info("Tool '%s' is available again in this runtime", name)
         if hidden:
             self.hide_tools(hidden, reason="runtime_unavailable")
         return hidden
