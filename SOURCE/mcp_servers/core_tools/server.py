@@ -51,15 +51,23 @@ from intent.tools.delegation import delegate_to_provider as _delegate_to_provide
 # Handler imports
 # ---------------------------------------------------------------------------
 from intent.tools.filesystem import (
+    FileScope as _FileScope,
     append_to_file as _append_to_file,
-    delete_file as _delete_file,
+    copy_path as _copy_path,
+    delete_path as _delete_path,
     file_info as _file_info,
+    glob_files as _glob_files,
+    grep_files as _grep_files,
     insert_lines as _insert_lines,
+    list_changes as _list_changes,
     list_directory as _list_directory,
+    make_directory as _make_directory,
+    move_path as _move_path,
+    multi_edit_file as _multi_edit_file,
     read_file as _read_file,
+    redo_change as _redo_change,
     replace_lines as _replace_lines,
-    replace_text as _replace_text,
-    search_files as _search_files,
+    undo_change as _undo_change,
     write_file as _write_file,
 )
 from intent.tools.liked_songs_tools import get_liked_songs_handler as _get_liked_songs
@@ -1299,10 +1307,44 @@ async def think(
 # ===========================================================================
 
 
+class FileEditSpec(BaseModel):
+    # One exact-string replacement in file_write(action="edit", edits=[...]).
+    # (No docstring: pydantic would ship it in every request's tool schema.)
+
+    old_string: str = Field(description="Exact text to find.")
+    new_string: str = Field(description="Replacement.")
+    replace_all: bool = Field(default=False, description="Replace every match.")
+
+
+def _file_scope(*, required: bool) -> _FileScope | None:
+    """The caller's conversation, for read records, backups and undo.
+
+    Changes always need a concrete user (backups are kept per user). Reads
+    work without one but are then not remembered for read-before-overwrite.
+    """
+    try:
+        user_id = _require_call_user_id("file tools")
+    except ValueError:
+        if required:
+            raise
+        return None
+    meta = _get_call_meta()
+    user_context = meta.get("viola_user_context")
+    session_key = ""
+    if isinstance(user_context, dict):
+        for key in ("gate_session_id", "session_id", "task_id"):
+            value = user_context.get(key)
+            if isinstance(value, str) and value.strip():
+                session_key = value.strip()
+                break
+    return _FileScope(user_id=user_id, session_key=session_key or "local")
+
+
 @server.tool(
     description=(
-        "Read from the local filesystem without making changes. "
-        "Actions: list (browse directory), read (file contents), info (size/dates/permissions), search (glob filenames)."
+        "Read local files without changing them. read: numbered lines (offset/limit page a long file). "
+        "glob: find files by name. grep: search contents by regex. list: a folder. info: size and dates. "
+        "history: this conversation's file changes."
     ),
     annotations=_SAFE,
     meta={"risk": "safe"},
@@ -1310,46 +1352,67 @@ async def think(
 async def file_read(
     action: Annotated[
         str,
-        Field(description="Filesystem action: list, read, info or search."),
+        Field(description="read, glob, grep, list, info or history."),
     ] = "list",
     path: Annotated[
         str,
-        Field(description="Path: directory for list/search, file for read/info."),
+        Field(description="File for read/info; folder for glob/grep/list."),
     ] = "~",
     offset: Annotated[
         int,
-        Field(description="For read: zero-based line offset."),
+        Field(description="read: lines to skip. grep/list: results to skip."),
     ] = 0,
     limit: Annotated[
         int,
-        Field(description="For read: maximum lines returned."),
-    ] = 100,
+        Field(description="Max lines (read) or results; 0 = default."),
+    ] = 0,
     pattern: Annotated[
         str,
-        Field(description="Search filename glob, e.g. '*.py' or 'README*'."),
+        Field(description="glob: e.g. '*.pdf' or 'src/**/*.py'. grep: regex, (?i) ignores case."),
     ] = "",
+    include: Annotated[
+        str,
+        Field(description="grep: only files matching this glob, e.g. '*.py'."),
+    ] = "",
+    context: Annotated[
+        int,
+        Field(description="grep: context lines around each match."),
+    ] = 0,
 ) -> str:
     """Read from the filesystem.
 
     Examples:
-    - file_read(action="list", path="~/Documents")
-    - file_read(action="read", path="~/notes/todo.txt", offset=0, limit=50)
-    - file_read(action="info", path="~/notes/todo.txt")
-    - file_read(action="search", path="~/Documents", pattern="*.pdf")
+    - file_read(action="read", path="~/notes/todo.txt")
+    - file_read(action="read", path="~/big.log", offset=2000)
+    - file_read(action="glob", path="~/Documents", pattern="*.pdf")
+    - file_read(action="grep", path="~/code/app", pattern="def main", include="*.py", context=2)
+    - file_read(action="list", path="~/Downloads")
+    - file_read(action="history")
     """
     refusal = _local_surface_refusal("file_read")
     if refusal is not None:
         return refusal
+    action = str(action or "list").strip().lower()
     try:
-        if action == "list":
-            return _format_result(await _list_directory(path))
         if action == "read":
-            return _format_result(await _read_file(path, offset, limit))
+            scope = _file_scope(required=False)
+            return _format_result_with_error_data(await _read_file(path, int(offset), int(limit), scope=scope))
+        if action in {"glob", "search"}:
+            return _format_result(await _glob_files(pattern, path, int(limit)))
+        if action == "grep":
+            return _format_result(await _grep_files(pattern, path, include, int(context), int(offset), int(limit)))
+        if action == "list":
+            return _format_result(await _list_directory(path, int(offset), int(limit)))
         if action == "info":
             return _format_result(await _file_info(path))
-        if action == "search":
-            return _format_result(await _search_files(pattern, path))
+        if action == "history":
+            return _format_result(await _list_changes(scope=_file_scope(required=True)))
         return json.dumps({"error": "Unknown action: %s" % action})
+    except ValueError as exc:
+        if _is_expected_auth_error(exc):
+            return _expected_auth_error_payload(exc)
+        logger.exception("file_read failed for action=%s path=%s", action, path)
+        return json.dumps({"error": str(exc)})
     except Exception as exc:
         logger.exception("file_read failed for action=%s path=%s", action, path)
         return json.dumps({"error": str(exc)})
@@ -1357,9 +1420,9 @@ async def file_read(
 
 @server.tool(
     description=(
-        "Change local files. Edit part of a file with append, insert, replace_lines or replace_text; "
-        "file_read shows only 100 lines, so never rebuild a longer file from a read. "
-        "write replaces a whole file; delete removes one."
+        "Change local files. edit: replace exact old_string with new_string (edits for several, all or none). "
+        "write: create or replace a whole file; read it first. Every change is backed up and undo reverts it. "
+        "Also append, insert, replace_lines, move, copy, mkdir, delete (to Recycle Bin), redo."
     ),
     annotations=_DANGEROUS,
     meta={
@@ -1371,61 +1434,100 @@ async def file_read(
 async def file_write(
     action: Annotated[
         str,
-        Field(description="append|insert|replace_lines|replace_text|write|delete"),
-    ] = "write",
+        Field(description="edit|write|append|insert|replace_lines|move|copy|mkdir|delete|undo|redo"),
+    ] = "edit",
     path: Annotated[
         str,
-        Field(description="File path."),
+        Field(description="File or folder. undo/redo: empty = latest change."),
     ] = "",
+    old_string: Annotated[
+        str,
+        Field(description="edit: exact text to replace, matching once unless replace_all. No line-number prefixes."),
+    ] = "",
+    new_string: Annotated[
+        str,
+        Field(description="edit: replacement text."),
+    ] = "",
+    replace_all: Annotated[
+        bool,
+        Field(description="edit: replace every match."),
+    ] = False,
+    edits: Annotated[
+        list[FileEditSpec],
+        Field(description="edit: several replacements in order, all or none; empty for one edit."),
+    ] = [],
     content: Annotated[
         str,
-        Field(description="New text, or the whole file for write."),
+        Field(description="write: the whole file. append/insert/replace_lines: the lines."),
+    ] = "",
+    destination: Annotated[
+        str,
+        Field(description="move/copy: target path or folder."),
     ] = "",
     start_line: Annotated[
         int,
-        Field(description="1-based line to insert before or replace from."),
+        Field(description="insert/replace_lines: 1-based first line."),
     ] = 0,
     end_line: Annotated[
         int,
         Field(description="replace_lines: last line."),
     ] = 0,
-    old_text: Annotated[
-        str,
-        Field(description="replace_text: exact text to replace."),
-    ] = "",
-    overwrite: Annotated[
-        bool,
-        Field(description="write: true only if the user asked to replace a long file."),
-    ] = False,
 ) -> str:
     """Modify the filesystem.
 
     Examples:
-    - file_write(action="append", path="~/notes/todo.txt", content="Buy milk")
-    - file_write(action="insert", path="~/notes/todo.txt", start_line=1, content="# Today")
-    - file_write(action="replace_lines", path="~/notes/todo.txt", start_line=4, end_line=5, content="Call Sam")
-    - file_write(action="replace_text", path="~/notes/todo.txt", old_text="Buy milk", content="Buy oat milk")
+    - file_write(action="edit", path="~/notes/todo.txt", old_string="Buy milk", new_string="Buy oat milk")
+    - file_write(action="edit", path="~/app.py", edits=[{"old_string": "a = 1", "new_string": "a = 2"}, ...])
     - file_write(action="write", path="~/notes/new.txt", content="Hello")
+    - file_write(action="append", path="~/notes/todo.txt", content="Call Sam")
+    - file_write(action="move", path="~/Downloads/a.pdf", destination="~/Documents")
     - file_write(action="delete", path="~/notes/old.txt")
+    - file_write(action="undo")
     """
     refusal = _local_surface_refusal("file_write")
     if refusal is not None:
         return refusal
+    action = str(action or "edit").strip().lower()
     try:
-        if action == "write":
-            written = await _write_file(path, content, overwrite_existing=bool(overwrite))
-            return _format_result_with_error_data(written)
-        if action == "append":
-            return _format_result(await _append_to_file(path, content))
-        if action == "insert":
-            return _format_result(await _insert_lines(path, int(start_line), content))
-        if action == "replace_lines":
-            return _format_result(await _replace_lines(path, int(start_line), int(end_line), content))
-        if action == "replace_text":
-            return _format_result(await _replace_text(path, old_text, content))
-        if action == "delete":
-            return _format_result(await _delete_file(path))
-        return json.dumps({"error": "Unknown action: %s" % action})
+        scope = _file_scope(required=True)
+        if action in {"edit", "replace_text", "multi_edit"}:
+            specs: list[dict[str, object]] = []
+            for item in edits or []:
+                if isinstance(item, BaseModel):
+                    specs.append(item.model_dump())
+                elif isinstance(item, dict):
+                    specs.append(dict(item))
+            if not specs:
+                specs = [{"old_string": old_string, "new_string": new_string, "replace_all": bool(replace_all)}]
+            result = await _multi_edit_file(path, specs, scope=scope)
+        elif action == "write":
+            result = await _write_file(path, content, scope=scope)
+        elif action == "append":
+            result = await _append_to_file(path, content, scope=scope)
+        elif action == "insert":
+            result = await _insert_lines(path, int(start_line), content, scope=scope)
+        elif action == "replace_lines":
+            result = await _replace_lines(path, int(start_line), int(end_line), content, scope=scope)
+        elif action in {"move", "rename"}:
+            result = await _move_path(path, destination, scope=scope)
+        elif action == "copy":
+            result = await _copy_path(path, destination, scope=scope)
+        elif action == "mkdir":
+            result = await _make_directory(path, scope=scope)
+        elif action == "delete":
+            result = await _delete_path(path, recursive=True, scope=scope)
+        elif action == "undo":
+            result = await _undo_change(path, scope=scope)
+        elif action == "redo":
+            result = await _redo_change(path, scope=scope)
+        else:
+            return json.dumps({"error": "Unknown action: %s" % action})
+        return _format_result_with_error_data(result)
+    except ValueError as exc:
+        if _is_expected_auth_error(exc):
+            return _expected_auth_error_payload(exc)
+        logger.exception("file_write failed for action=%s path=%s", action, path)
+        return json.dumps({"error": str(exc)})
     except Exception as exc:
         logger.exception("file_write failed for action=%s path=%s", action, path)
         return json.dumps({"error": str(exc)})

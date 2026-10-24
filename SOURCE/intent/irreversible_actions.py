@@ -58,7 +58,6 @@ _DIRECT_ACTION_CLASSES: dict[str, str] = {
 }
 
 _SEND_EMAIL_ACTIONS = {"send", "send_draft"}
-_FILE_WRITE_ACTIONS = {"write", "save", "create", "overwrite", "append", "insert", "replace_lines", "replace_text"}
 _FILE_DELETE_ACTIONS = {"delete", "forget", "trash"}
 _CALENDAR_DELETE_ACTIONS = {"delete", "delete_event", "remove", "cancel"}
 _CALENDAR_WRITE_ACTIONS = {
@@ -142,9 +141,14 @@ def irreversible_action_class(
         return "phone_call"
     if name == "gmail" and action in _SEND_EMAIL_ACTIONS:
         return "send_email"
-    if name == "file_write" and (not action or action in _FILE_WRITE_ACTIONS):
-        return "file_write"
-    if name in {"file_write", "workbench"} and action in _FILE_DELETE_ACTIONS:
+    if name == "file_write":
+        # Targeted gates (founder rule 2026-10-24): deletes, changes to files the
+        # user never referred to, bulk moves and autostart/program locations
+        # ask; everything else is backed up and undoable, so it just happens.
+        from intent.file_gates import file_write_action_class
+
+        return file_write_action_class(args)
+    if name == "workbench" and action in _FILE_DELETE_ACTIONS:
         return "file_delete"
     if name in {"calendar", "google_calendar"}:
         if action in _CALENDAR_DELETE_ACTIONS:
@@ -208,19 +212,17 @@ def describe_irreversible_action(tool_name: str, args: Mapping[str, Any] | None 
         kind = _clean(params.get("destination_kind")).lower() or "destination"
         destination = _clean(params.get("destination"))
         return "share this by %s to %s" % (kind, destination) if destination else "share this by %s" % kind
+    if name == "file_write" and action_class is not None:
+        from intent.file_gates import describe_file_action
+
+        described = describe_file_action(action_class, params)
+        if described:
+            return described
     if action_class == "file_delete":
         path = _clean(params.get("path") or params.get("filename") or params.get("file_id"))
         return "delete %s" % path if path else "delete the file"
     if action_class == "file_write":
         path = _clean(params.get("path") or params.get("filename") or params.get("file_id"))
-        target = path or "the file"
-        write_action = _clean(params.get("action")).lower()
-        if write_action == "append":
-            return "add to the end of %s" % target
-        if write_action == "insert":
-            return "insert lines into %s" % target
-        if write_action in {"replace_lines", "replace_text"}:
-            return "edit part of %s" % target
         return "write %s" % path if path else "write the file"
     if action_class == "shell_command":
         command = _clean(params.get("command"))
