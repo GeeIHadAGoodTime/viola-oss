@@ -132,25 +132,136 @@ def _track_text_matches(expected: str | None, observed: str | None) -> bool:
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
-DEFAULT_CDP_PORT = 9223  # 9222 is used by the MCP browser server; Spotify CDP uses its own port
-CDP_PORT_ENV = "VIOLA_SPOTIFY_CDP_PORT"
-
-
-def _configured_cdp_port(environ: Mapping[str, str] | None = None) -> int:
-    raw_port = (environ or os.environ).get(CDP_PORT_ENV, "").strip()
-    if not raw_port:
-        return DEFAULT_CDP_PORT
-    try:
-        port = int(raw_port)
-    except ValueError:
-        return DEFAULT_CDP_PORT
-    if port <= 0 or port > 65535:
-        return DEFAULT_CDP_PORT
-    return port
-
-
-CDP_PORT = _configured_cdp_port()
 SPOTIFY_URL = "https://open.spotify.com"
+
+# --- DevTools (CDP) exposure ------------------------------------------------
+# Viola drives the Spotify Chrome over Chromium's DevTools endpoint, which has
+# no authentication, and that Chrome holds the user's logged-in Spotify
+# session. So the endpoint must be reachable by Viola and nothing else a web
+# page or a port-scanning program could reach:
+#
+# * No fixed, well-known port. Chrome is launched with
+#   ``--remote-debugging-port=0``: the OS hands it a fresh free port at every
+#   launch, and Chrome records that port (plus a per-launch browser id) in
+#   ``<profile>/DevToolsActivePort``. That file is how Viola finds the port
+#   again, including after a Viola restart while the Chrome is still running.
+# * Loopback only (``--remote-debugging-address=127.0.0.1``; Chrome's default
+#   is loopback too).
+# * ``--remote-allow-origins`` lists exactly one origin that no web page can
+#   ever have (RFC 6761 reserves ``.invalid``), never a wildcard. Every web
+#   page's WebSocket handshake carries an Origin header and is refused with
+#   403; Viola's Playwright client sends no Origin header and still connects.
+# * A freshly launched Chrome that still accepts a web origin (a browser too
+#   old to honor the flag) is closed again and the launch fails closed.
+CDP_LOOPBACK_HOST = "127.0.0.1"
+CDP_NO_WEB_ORIGIN = "https://viola-no-web-origin.invalid"
+DEVTOOLS_ACTIVE_PORT_FILE = "DevToolsActivePort"
+# Viola builds up to 1.0.5 build 4 launched this Chrome on fixed port 9223
+# with a wildcard origin allow-list. Such a Chrome, left running for this
+# profile by an older Viola, is found by its profile path and closed before a
+# new launch (see _close_unusable_profile_chrome); Viola never connects to it.
+# Any real web origin works for the self-check; it must be refused.
+_WEB_ORIGIN_PROBE = "https://example.com"
+_CDP_LAUNCH_TIMEOUT_S = 15.0
+
+
+def read_devtools_active_port(profile_path: Path) -> tuple[int, str] | None:
+    """Return ``(port, browser_ws_path)`` from Chrome's DevToolsActivePort file.
+
+    Chrome writes the file into its ``--user-data-dir`` when the DevTools
+    server starts: line 1 is the port, line 2 the browser WebSocket path
+    (``/devtools/browser/<per-launch id>``). Returns None when the file is
+    missing or malformed. The file can be stale (Chrome crashed or was
+    killed), so callers must confirm it with :func:`devtools_browser_ws_path`.
+    """
+    try:
+        text = (Path(profile_path) / DEVTOOLS_ACTIVE_PORT_FILE).read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return None
+    lines = text.splitlines()
+    if not lines:
+        return None
+    try:
+        port = int(lines[0].strip())
+    except ValueError:
+        return None
+    if not 0 < port <= 65535:
+        return None
+    ws_path = lines[1].strip() if len(lines) > 1 else ""
+    return port, ws_path
+
+
+def devtools_browser_ws_path(port: int, *, timeout: float = 1.0) -> str | None:
+    """Ask the DevTools server on loopback ``port`` for its browser WebSocket path.
+
+    Returns None when nothing DevTools-shaped answers there.
+    """
+    import http.client
+    from urllib.parse import urlsplit
+
+    conn = http.client.HTTPConnection(CDP_LOOPBACK_HOST, port, timeout=timeout)
+    try:
+        conn.request("GET", "/json/version")
+        response = conn.getresponse()
+        if response.status != 200:
+            return None
+        payload = json.loads(response.read(65536).decode("utf-8", "replace"))
+    except (OSError, ValueError, http.client.HTTPException):
+        return None
+    finally:
+        conn.close()
+    ws_url = payload.get("webSocketDebuggerUrl") if isinstance(payload, dict) else None
+    if not isinstance(ws_url, str) or not ws_url:
+        return None
+    path = urlsplit(ws_url).path
+    return path if path.startswith("/devtools/browser/") else None
+
+
+def cdp_endpoint_accepts_web_origin(
+    port: int,
+    ws_path: str,
+    *,
+    origin: str = _WEB_ORIGIN_PROBE,
+    timeout: float = 2.0,
+) -> bool:
+    """Return True when the DevTools WebSocket on ``port`` accepts a web Origin.
+
+    Sends a WebSocket upgrade carrying ``Origin: <origin>``, as any web page's
+    handshake would, and reports whether Chrome switched protocols (101)
+    instead of refusing it (403). The socket is closed straight away, so no
+    DevTools command is ever sent.
+    """
+    import base64
+
+    key = base64.b64encode(os.urandom(16)).decode("ascii")
+    request = (
+        "GET %s HTTP/1.1\r\n"
+        "Host: %s:%d\r\n"
+        "Upgrade: websocket\r\n"
+        "Connection: Upgrade\r\n"
+        "Sec-WebSocket-Key: %s\r\n"
+        "Sec-WebSocket-Version: 13\r\n"
+        "Origin: %s\r\n"
+        "\r\n"
+    ) % (ws_path, CDP_LOOPBACK_HOST, port, key, origin)
+    try:
+        with socket.create_connection((CDP_LOOPBACK_HOST, port), timeout=timeout) as sock:
+            sock.sendall(request.encode("ascii"))
+            status_line = b""
+            while b"\r\n" not in status_line and len(status_line) < 1024:
+                chunk = sock.recv(256)
+                if not chunk:
+                    break
+                status_line += chunk
+    except OSError:
+        return False
+    parts = status_line.split(b"\r\n", 1)[0].split()
+    return len(parts) >= 2 and parts[1] == b"101"
+
+
+def _same_path(left: str, right: str | os.PathLike[str]) -> bool:
+    return os.path.normcase(os.path.abspath(left)) == os.path.normcase(os.path.abspath(os.fspath(right)))
+
 
 SPOTIFY_RECONNECTING_TOAST = "Spotify Chrome closed unexpectedly — reconnecting."
 SPOTIFY_RECONNECT_FAILED_TOAST = "Reconnect failed — open Settings → Music to relink Spotify."
@@ -654,6 +765,9 @@ class SpotifyCDPController:
         self._pw_context_manager: Any = None
         self._pw_context: Any = None
         self._chrome_proc: subprocess.Popen | None = None
+        # DevTools port of the Chrome this controller drives. Chosen by the OS
+        # at each launch (never fixed); None until a Chrome is up.
+        self._cdp_port: int | None = None
         self._connected = False
         self._cookie_bridge_last_injected = False
         self._account_tier_cache: dict[str, Any] | None = None
@@ -783,6 +897,7 @@ class SpotifyCDPController:
         )
         self._unregister_chrome_for_capture()
         self._chrome_proc = None
+        self._cdp_port = None
         self._connected = False
         self._page = None
         return True
@@ -854,12 +969,143 @@ class SpotifyCDPController:
     # ------------------------------------------------------------------
     # Port check
     # ------------------------------------------------------------------
-    @staticmethod
-    def _is_port_open(port: int = CDP_PORT) -> bool:
-        """Check if CDP port is open."""
+    def _is_port_open(self, port: int | None = None) -> bool:
+        """Whether a DevTools port accepts connections on loopback.
+
+        With no argument, checks the port of the Chrome this controller
+        drives; False while no Chrome has been launched or found.
+        """
+        if port is None:
+            port = self._cdp_port
+        if not port:
+            return False
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.settimeout(1)
-            return s.connect_ex(("127.0.0.1", port)) == 0
+            return s.connect_ex((CDP_LOOPBACK_HOST, port)) == 0
+
+    def _profile_cdp_endpoint(self) -> tuple[int, str] | None:
+        """Return ``(port, ws_path)`` of a live DevTools server for this profile.
+
+        Reads the DevToolsActivePort file Chrome keeps in the profile and only
+        trusts it when the server on that port reports the same per-launch
+        browser id, so a stale file (Chrome gone, port now used by another
+        program) is never followed.
+        """
+        record = read_devtools_active_port(self._profile_path)
+        if record is None:
+            return None
+        port, recorded_ws_path = record
+        live_ws_path = devtools_browser_ws_path(port)
+        if live_ws_path is None or (recorded_ws_path and live_ws_path != recorded_ws_path):
+            return None
+        return port, live_ws_path
+
+    def _find_reusable_cdp_port(self) -> int | None:
+        """Port of a Chrome already running for this profile that is safe to reuse.
+
+        This is how Viola reconnects after a restart while its Spotify Chrome
+        kept running (macOS/Linux, where no lifetime job closes it). A Chrome
+        whose DevTools endpoint accepts a web origin, such as one an older
+        Viola started on fixed port 9223 with wildcard origins, is not reused;
+        the next launch closes it.
+        """
+        endpoint = self._profile_cdp_endpoint()
+        if endpoint is None:
+            return None
+        port, ws_path = endpoint
+        if cdp_endpoint_accepts_web_origin(port, ws_path):
+            logger.warning(
+                "Spotify Chrome on port %d accepts DevTools connections from web pages "
+                "(started by an older Viola); it will be closed and relaunched",
+                port,
+            )
+            return None
+        return port
+
+    def _find_profile_chrome_pids(self) -> list[int]:
+        """PIDs of browser main processes running with this controller's profile."""
+        try:
+            import psutil
+        except ImportError:
+            return []
+
+        profile = str(self._profile_path)
+        pids: list[int] = []
+        try:
+            for proc in psutil.process_iter(["pid", "cmdline"]):
+                try:
+                    cmdline = proc.info.get("cmdline") or []
+                    if any(arg.startswith("--type=") for arg in cmdline):
+                        continue  # renderer/GPU/utility child, not the browser process
+                    for arg in cmdline:
+                        if arg.startswith("--user-data-dir=") and _same_path(arg.split("=", 1)[1].strip('"'), profile):
+                            pids.append(int(proc.info["pid"]))
+                            break
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    continue
+        except Exception:
+            logger.debug("Process scan for the Spotify Chrome profile failed", exc_info=True)
+        return pids
+
+    def _terminate_tracked_chrome(self) -> None:
+        """Terminate the Chrome process this controller launched, if any."""
+        if self._chrome_proc is None:
+            return
+        pid = self._chrome_proc.pid
+        self._unregister_chrome_for_capture()
+        try:
+            self._chrome_proc.terminate()
+            self._chrome_proc.wait(timeout=5)
+            logger.info("Chrome process %d terminated", pid)
+        except Exception:
+            try:
+                self._chrome_proc.kill()
+                logger.info("Chrome process %d killed", pid)
+            except Exception:
+                logger.warning("Failed to kill Chrome process %d", pid)
+        self._chrome_proc = None
+        self._cdp_port = None
+
+    def _close_unusable_profile_chrome(self) -> None:
+        """Close any Chrome still holding this profile before a fresh launch.
+
+        Called only when no safe, reachable DevTools endpoint exists for the
+        profile. A Chrome left holding it is then either insecure (an older
+        Viola's fixed port 9223 with wildcard origins) or unreachable, and if
+        it stayed up, Chrome's single-instance rule would hand the new launch
+        to it and the new flags would never apply.
+        """
+        self._terminate_tracked_chrome()
+        pids = self._find_profile_chrome_pids()
+        if not pids:
+            return
+        try:
+            import psutil
+        except ImportError:
+            return
+        procs = []
+        for pid in pids:
+            try:
+                proc = psutil.Process(pid)
+                proc.terminate()
+                procs.append(proc)
+                logger.warning("Closed Spotify Chrome PID %d left running for this profile", pid)
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                continue
+        _gone, alive = psutil.wait_procs(procs, timeout=5)
+        for proc in alive:
+            try:
+                proc.kill()
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                continue
+
+    def _remove_devtools_active_port_file(self) -> None:
+        try:
+            (self._profile_path / DEVTOOLS_ACTIVE_PORT_FILE).unlink()
+        except FileNotFoundError:
+            pass
+        except OSError:
+            logger.debug("Could not remove a stale DevToolsActivePort file", exc_info=True)
 
     # ------------------------------------------------------------------
     # DRM / Protected content
@@ -981,7 +1227,127 @@ class SpotifyCDPController:
         """
         # Verify browser is available (will be launched by connect())
         self.find_browser()
-        logger.info("Spotify CDP launch requested (port=%d, offscreen=True)", CDP_PORT)
+        logger.info("Spotify CDP launch requested (random loopback DevTools port, offscreen=True)")
+
+    def _launch_chrome(self) -> int:
+        """Start the Spotify Chrome and return its per-launch DevTools port.
+
+        Launched via subprocess (not Playwright) to keep native Widevine.
+        See the DevTools exposure notes at the top of this module for the
+        port, bind and origin policy.
+
+        Raises:
+            SpotifyCDPError: If Chrome does not come up, or comes up accepting
+                DevTools connections from web pages.
+        """
+        browser_name, browser_path = self.find_browser()
+        self._close_unusable_profile_chrome()
+        self._remove_devtools_active_port_file()
+
+        chrome_args = [
+            browser_path,
+            "--no-first-run",
+            "--no-default-browser-check",
+            "--disable-blink-features=AutomationControlled",
+            "--remote-debugging-port=0",
+            "--remote-debugging-address=%s" % CDP_LOOPBACK_HOST,
+            "--remote-allow-origins=%s" % CDP_NO_WEB_ORIGIN,
+            "--autoplay-policy=no-user-gesture-required",
+            "--user-data-dir=%s" % self._profile_path,
+            # Spotify's Web Playback UI needs a real headed page for
+            # the CDP click/DRM/user-gesture path. Keep normal playback
+            # off-screen but headed so the click path can start audio.
+            "--window-size=1280,720",
+            "--window-position=-32000,-32000",
+        ]
+        if sys.platform == "win32":
+            # Multi-room, WINDOWS-ONLY (#2533, same rationale as
+            # #2423's viola_qt.py fix, different process topology):
+            # Chrome's audio service runs out-of-process by default in
+            # a sandboxed subprocess. Windows Process Audio Tap
+            # (ProcTap) can't read PCM from a sandboxed audio service
+            # that isn't a child of our target PID, so even with the
+            # right Chrome browser PID registered, ProcTap captures
+            # silence (verified live: capture_rms=0.0004 vs 0.028 for
+            # in-process Qt-Chromium audio).
+            #
+            # Pulling the audio service in-process AND unsandboxing
+            # it puts the audio rendering on the Chrome browser PID
+            # we already register with ProcTap (see
+            # _register_chrome_for_capture() below), so the
+            # per-process tap actually has something to read.
+            #
+            # ProcTap is Windows-only
+            # (audio_core/capture/proctap_provider.py::is_available()
+            # gates on sys.platform == "win32"), and it is the ONLY
+            # consumer of this Chrome subprocess's in-process audio:
+            # register_external_audio_pid()/find_audio_child_pid() in
+            # audio_core/capture/hub_audio_controller.py are read
+            # exclusively by ProcTapProvider -- no macOS
+            # (CoreAudioCaptureProvider) or Linux capture path touches
+            # them. Linux/macOS therefore keep Chromium's upstream
+            # default (out-of-process, sandboxed) audio service.
+            chrome_args.append("--disable-features=AudioServiceSandbox,AudioServiceOutOfProcess")
+        logger.info("Launching %s via subprocess (random loopback DevTools port, offscreen=True)", browser_name)
+
+        # CREATE_NO_WINDOW on Windows prevents a console flash
+        creation_flags = 0
+        if sys.platform == "win32":
+            creation_flags = subprocess.CREATE_NO_WINDOW
+
+        self._chrome_proc = popen_silent(
+            chrome_args,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            creationflags=creation_flags,
+        )
+        logger.info("Chrome PID: %d", self._chrome_proc.pid)
+
+        # Bind Chrome to the Viola-lifetime Job Object so the OS
+        # kernel forcibly terminates Chrome (and all its child
+        # renderers / audio service processes) when Viola exits —
+        # clean shutdown OR crash. Without this, Chrome keeps
+        # rendering audio after Viola dies and the user has no UI
+        # to stop it (orphan-music UX bug, observed 2026-05-07
+        # 15:47 with PID 57252 surviving Viola for 12 minutes).
+        # It also closes the DevTools port with Viola.
+        try:
+            from core.win32_job import assign_to_lifetime_job
+
+            assign_to_lifetime_job(self._chrome_proc.pid)
+        except (ImportError, OSError, RuntimeError) as exc:
+            logger.debug("Failed to bind Chrome to lifetime job: %s", exc)
+
+        # Wait for Chrome to open its DevTools port and record it.
+        deadline = time.monotonic() + _CDP_LAUNCH_TIMEOUT_S
+        endpoint = self._profile_cdp_endpoint()
+        while endpoint is None:
+            if self._chrome_proc.poll() is not None:
+                exit_code = self._chrome_proc.returncode
+                self._chrome_proc = None
+                raise SpotifyCDPError(
+                    "%s exited (code %s) before opening its DevTools port" % (browser_name, exit_code)
+                )
+            if time.monotonic() >= deadline:
+                self._terminate_tracked_chrome()
+                raise SpotifyCDPError(
+                    "%s did not open its DevTools port within %ds" % (browser_name, _CDP_LAUNCH_TIMEOUT_S)
+                )
+            time.sleep(0.25)
+            endpoint = self._profile_cdp_endpoint()
+
+        port, ws_path = endpoint
+        if cdp_endpoint_accepts_web_origin(port, ws_path):
+            self._terminate_tracked_chrome()
+            raise SpotifyCDPError(
+                "%s accepted a DevTools connection from a web page origin, so Viola closed it. "
+                "Update %s and try again." % (browser_name, browser_name)
+            )
+        logger.info("Spotify Chrome DevTools listening on %s:%d (loopback, per-launch)", CDP_LOOPBACK_HOST, port)
+
+        # Small extra wait for Chrome to finish initializing
+        time.sleep(1.5)
+        return port
 
     # ------------------------------------------------------------------
     # Connect
@@ -1028,104 +1394,25 @@ class SpotifyCDPController:
             # Ensure Chrome profile allows DRM/protected content (Widevine).
             self._enable_protected_content_in_profile()
 
-            # ---- Step 1: Launch Chrome via subprocess ----
-            # This preserves native Widevine CDM loading that Playwright strips.
+            # ---- Step 1: Find or launch the Spotify Chrome ----
+            # Subprocess launch preserves native Widevine CDM loading that
+            # Playwright strips. The DevTools port is per-launch (never fixed):
+            # reuse the Chrome already serving this profile (this controller's,
+            # or one still running after a Viola restart) when it is verified
+            # and refuses web origins, else launch a new one.
             target_url = SPOTIFY_URL
-            if not self._is_port_open(CDP_PORT):
-                browser_name, browser_path = self.find_browser()
-
-                chrome_args = [
-                    browser_path,
-                    "--no-first-run",
-                    "--no-default-browser-check",
-                    "--disable-blink-features=AutomationControlled",
-                    "--remote-allow-origins=*",
-                    "--remote-debugging-port=%d" % CDP_PORT,
-                    "--autoplay-policy=no-user-gesture-required",
-                    "--user-data-dir=%s" % self._profile_path,
-                    # Spotify's Web Playback UI needs a real headed page for
-                    # the CDP click/DRM/user-gesture path. Keep normal playback
-                    # off-screen but headed so the click path can start audio.
-                    "--window-size=1280,720",
-                    "--window-position=-32000,-32000",
-                ]
-                if sys.platform == "win32":
-                    # Multi-room, WINDOWS-ONLY (#2533, same rationale as
-                    # #2423's viola_qt.py fix, different process topology):
-                    # Chrome's audio service runs out-of-process by default in
-                    # a sandboxed subprocess. Windows Process Audio Tap
-                    # (ProcTap) can't read PCM from a sandboxed audio service
-                    # that isn't a child of our target PID, so even with the
-                    # right Chrome browser PID registered, ProcTap captures
-                    # silence (verified live: capture_rms=0.0004 vs 0.028 for
-                    # in-process Qt-Chromium audio).
-                    #
-                    # Pulling the audio service in-process AND unsandboxing
-                    # it puts the audio rendering on the Chrome browser PID
-                    # we already register with ProcTap (see
-                    # _register_chrome_for_capture() below), so the
-                    # per-process tap actually has something to read.
-                    #
-                    # ProcTap is Windows-only
-                    # (audio_core/capture/proctap_provider.py::is_available()
-                    # gates on sys.platform == "win32"), and it is the ONLY
-                    # consumer of this Chrome subprocess's in-process audio:
-                    # register_external_audio_pid()/find_audio_child_pid() in
-                    # audio_core/capture/hub_audio_controller.py are read
-                    # exclusively by ProcTapProvider -- no macOS
-                    # (CoreAudioCaptureProvider) or Linux capture path touches
-                    # them. Linux/macOS therefore keep Chromium's upstream
-                    # default (out-of-process, sandboxed) audio service.
-                    chrome_args.append("--disable-features=AudioServiceSandbox,AudioServiceOutOfProcess")
-                logger.info(
-                    "Launching %s via subprocess on port %d (offscreen=True)",
-                    browser_name,
-                    CDP_PORT,
-                )
-
-                # CREATE_NO_WINDOW on Windows prevents a console flash
-                creation_flags = 0
-                if sys.platform == "win32":
-                    creation_flags = subprocess.CREATE_NO_WINDOW
-
-                self._chrome_proc = popen_silent(
-                    chrome_args,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                    creationflags=creation_flags,
-                )
-                logger.info("Chrome PID: %d", self._chrome_proc.pid)
-
-                # Bind Chrome to the Viola-lifetime Job Object so the OS
-                # kernel forcibly terminates Chrome (and all its child
-                # renderers / audio service processes) when Viola exits —
-                # clean shutdown OR crash. Without this, Chrome keeps
-                # rendering audio after Viola dies and the user has no UI
-                # to stop it (orphan-music UX bug, observed 2026-05-07
-                # 15:47 with PID 57252 surviving Viola for 12 minutes).
-                try:
-                    from core.win32_job import assign_to_lifetime_job
-
-                    assign_to_lifetime_job(self._chrome_proc.pid)
-                except (ImportError, OSError, RuntimeError) as exc:
-                    logger.debug("Failed to bind Chrome to lifetime job: %s", exc)
-
-                # Wait for CDP port to become available
-                for _ in range(30):
-                    if self._is_port_open(CDP_PORT):
-                        break
-                    time.sleep(0.5)
-                else:
-                    raise SpotifyCDPError("Chrome did not start CDP on port %d within 15s" % CDP_PORT)
-
-                # Small extra wait for Chrome to finish initializing
-                time.sleep(1.5)
+            port = self._find_reusable_cdp_port()
+            if port is not None and port != self._cdp_port:
+                logger.info("Reusing the Spotify Chrome already running on loopback port %d", port)
+            if port is None:
+                port = self._launch_chrome()
+            self._cdp_port = port
 
             # ---- Step 2: Connect Playwright via connect_over_cdp ----
             self._pw_context_manager = sync_playwright()
             self._playwright = self._pw_context_manager.start()
 
-            cdp_url = "http://127.0.0.1:%d" % CDP_PORT
+            cdp_url = "http://%s:%d" % (CDP_LOOPBACK_HOST, port)
             self._browser = self._playwright.chromium.connect_over_cdp(cdp_url)
 
             contexts = self._browser.contexts
@@ -2265,59 +2552,6 @@ class SpotifyCDPController:
                 logger.debug("Window moveTo off-screen failed after seek click (non-critical)")
 
     # ------------------------------------------------------------------
-    # Playlist playback (URL navigation)
-    # ------------------------------------------------------------------
-    def play_playlist(self, playlist_id: str) -> None:
-        """Navigate to a Spotify playlist and start playback (thread-safe).
-
-        Args:
-            playlist_id: Spotify playlist ID (e.g., "37i9dQZF1DXcBWIGoYBM5M").
-        """
-        self._in_cdp_thread(self._play_playlist_impl, playlist_id)
-
-    def _play_playlist_impl(self, playlist_id: str) -> None:
-        """Navigate to a Spotify playlist and click play."""
-        self._ensure_page()
-
-        playlist_url = "https://open.spotify.com/playlist/%s" % playlist_id
-
-        try:
-            self._page.goto(
-                playlist_url,
-                wait_until="domcontentloaded",
-                timeout=15000,
-            )
-        except Exception as exc:
-            raise SpotifyCDPError("Playlist navigation failed: %s" % exc) from exc
-
-        try:
-            self._page.wait_for_load_state("networkidle", timeout=10000)
-        except Exception:
-            logger.debug("networkidle timed out for playlist page")
-
-        # Extra settle time for Spotify SPA rendering
-        time.sleep(1.5)
-
-        # Click the large play button on the playlist page
-        try:
-            play_btn = self._page.query_selector('button[data-testid="play-button"]')
-            if not play_btn:
-                # Fallback: aria-label based selector
-                play_btn = self._page.query_selector('button[aria-label="Play"]')
-            if play_btn:
-                play_btn.click()
-                logger.info(
-                    "Playlist play button clicked for %s",
-                    playlist_id,
-                )
-            else:
-                raise SpotifyCDPError("Could not find play button on playlist page")
-        except SpotifyCDPError:
-            raise
-        except Exception as exc:
-            raise SpotifyCDPError("Playlist play failed: %s" % exc) from exc
-
-    # ------------------------------------------------------------------
     # Navigate to Spotify home
     # ------------------------------------------------------------------
     def navigate_home(self) -> None:
@@ -2345,10 +2579,11 @@ class SpotifyCDPController:
         self._in_cdp_thread(self._shutdown_impl)
 
     def _shutdown_impl(self) -> None:
-        """Close Playwright connection and kill Viola's Chrome process.
+        """Close Playwright connection and Viola's Spotify Chrome.
 
-        Only kills the Chrome process that Viola launched (tracked by PID).
-        Does NOT kill other Chrome processes.
+        Closes the Chrome this controller launched (tracked by PID) and any
+        Chrome it adopted that runs with Viola's own Spotify profile, so the
+        DevTools port closes with it. Does NOT touch other Chrome processes.
         """
         logger.info("Shutting down Spotify CDP controller")
         self._connected = False
@@ -2358,20 +2593,12 @@ class SpotifyCDPController:
 
         self._stop_playwright_session()
 
-        if self._chrome_proc:
-            pid = self._chrome_proc.pid
-            self._unregister_chrome_for_capture()
-            try:
-                self._chrome_proc.terminate()
-                self._chrome_proc.wait(timeout=5)
-                logger.info("Chrome process %d terminated", pid)
-            except Exception:
-                try:
-                    self._chrome_proc.kill()
-                    logger.info("Chrome process %d killed", pid)
-                except Exception:
-                    logger.warning("Failed to kill Chrome process %d", pid)
-            self._chrome_proc = None
+        adopted = self._chrome_proc is None and self._cdp_port is not None
+        self._terminate_tracked_chrome()
+        if adopted:
+            self._close_unusable_profile_chrome()
+        self._cdp_port = None
+        self._remove_devtools_active_port_file()
 
     # ------------------------------------------------------------------
     # Multi-room ProcTap integration
@@ -2432,41 +2659,34 @@ class SpotifyCDPController:
         )
 
     def _find_chrome_cdp_pid(self) -> int | None:
-        """Find the Chrome PID listening on the CDP port.
+        """Find the PID of the Chrome serving this controller's DevTools port.
 
         Tries multiple strategies:
-        1. psutil.net_connections (fast, may need elevated privileges)
-        2. Iterate all chrome.exe processes and check cmdline for CDP port
+        1. psutil.net_connections on the current per-launch port (fast, may
+           need elevated privileges)
+        2. The browser process running with this controller's profile
         """
         import psutil
 
         # Strategy 1: net_connections (may fail with AccessDenied on Windows)
-        try:
-            for conn in psutil.net_connections(kind="tcp"):
-                if conn.laddr.port == CDP_PORT and conn.status == "LISTEN":
-                    if conn.pid:
-                        logger.debug("Found Chrome CDP PID %d via net_connections", conn.pid)
-                        return conn.pid
-        except (psutil.AccessDenied, PermissionError):
-            logger.debug("net_connections needs elevated privileges, trying process scan")
-        except Exception:
-            logger.debug("net_connections failed, trying process scan")
+        port = self._cdp_port
+        if port:
+            try:
+                for conn in psutil.net_connections(kind="tcp"):
+                    if conn.laddr.port == port and conn.status == "LISTEN":
+                        if conn.pid:
+                            logger.debug("Found Chrome CDP PID %d via net_connections", conn.pid)
+                            return conn.pid
+            except (psutil.AccessDenied, PermissionError):
+                logger.debug("net_connections needs elevated privileges, trying process scan")
+            except Exception:
+                logger.debug("net_connections failed, trying process scan")
 
-        # Strategy 2: Scan chrome.exe processes for our CDP port in cmdline
-        port_flag = "--remote-debugging-port=%d" % CDP_PORT
-        try:
-            for proc in psutil.process_iter(["pid", "name", "cmdline"]):
-                try:
-                    if proc.info["name"] and "chrome" in proc.info["name"].lower():
-                        cmdline = proc.info.get("cmdline") or []
-                        if any(port_flag in arg for arg in cmdline):
-                            logger.debug("Found Chrome CDP PID %d via cmdline scan", proc.pid)
-                            return proc.pid
-                except (psutil.NoSuchProcess, psutil.AccessDenied):
-                    continue
-        except Exception:
-            logger.debug("Process scan for Chrome CDP also failed")
-
+        # Strategy 2: the browser process holding this controller's profile
+        pids = self._find_profile_chrome_pids()
+        if pids:
+            logger.debug("Found Chrome CDP PID %d via profile scan", pids[0])
+            return pids[0]
         return None
 
     def get_capture_chrome_pid(self) -> int | None:
