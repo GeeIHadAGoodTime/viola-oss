@@ -2073,7 +2073,7 @@ class ViolaWakeListener:
 
         # Set up detection callback with policy-based decision
         def on_detection():
-            nonlocal last_wake_score, last_mic_rms, last_processed_int16
+            nonlocal last_wake_score, last_mic_rms, last_processed_int16, stream_gap
 
             # STAGE4: Callback invoked - engine threshold exceeded
             logger.info("[STAGE4] callback: on_detection called (raw trigger)")
@@ -2256,11 +2256,21 @@ class ViolaWakeListener:
 
             # Stage 2: a second listen (Whisper) before the chime. Runs only
             # after every policy gate allowed the wake; a soft gate.
-            if not self._force_wake and not self._verify_wake_candidate(
-                np.concatenate([audio_buffer[buffer_write_idx:], audio_buffer[:buffer_write_idx]]),
-                actual_score,
-            ):
-                return
+            if not self._force_wake:
+                reads_before = self._verify_frame_count
+                verified = self._verify_wake_candidate(
+                    np.concatenate([audio_buffer[buffer_write_idx:], audio_buffer[:buffer_write_idx]]),
+                    actual_score,
+                )
+                if self._verify_frame_count != reads_before:
+                    # The check read microphone audio this loop never fed the
+                    # engine: a gap. Reset the streaming features and the
+                    # k-of-n window before the next chunk (debounce is kept),
+                    # whether the wake passed or not (a passed wake can still
+                    # be dropped downstream without a command recording).
+                    stream_gap = True
+                if not verified:
+                    return
 
             logger.info(
                 "🎤 VIOLA detected! (ViolaWake) score=%s threshold=%s",
