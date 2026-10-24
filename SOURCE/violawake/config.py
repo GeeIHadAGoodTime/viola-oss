@@ -184,6 +184,60 @@ SILENCE_GATE_RMS = 0.001
 # Minimum score to log as potential detection
 LOG_THRESHOLD = 0.3
 
+# ============================================================
+# STREAMING (80 ms) SCORING -- wake plan Stage 1
+# ============================================================
+#
+# The shipped app used to re-embed the whole 1.5 s buffer and score it once
+# every 400 ms, and woke on ONE score at or above the threshold. "Viola" is
+# about 0.6 s long, so at 400 ms the model saw the word once or twice, and any
+# agreement rule cost half the real wakes. The engine now computes one
+# openWakeWord embedding per 80 ms chunk incrementally (the same thing
+# openWakeWord's own streaming path does), scores the temporal CNN on every
+# chunk, and wakes only when STREAM_AGREE_K of the last STREAM_AGREE_N scores
+# (the current one included) are at or above the threshold.
+#
+# The rule was chosen by measurement on never-seen speech (21.7 h of MUSAN
+# us-gov + LibriVox) and on the 542 real Jay/Sierra recordings; see
+# docs/wake/STAGE1_CADENCE_AGREEMENT.md in the private repo for the tables.
+STREAM_CHUNK_SAMPLES = 1280  # 80 ms at 16 kHz: one embedding per chunk
+STREAM_AGREE_K = 7
+STREAM_AGREE_N = 7
+
+# The saved ``wake_sensitivity`` stays the user's sensitivity LEVEL (0.80 to
+# 0.97, higher = stricter, 0.90 = Balanced; quiet hours add 0.08, capped at
+# 0.98). On the streaming path each level is one measured operating point:
+# (level, k, n, per-frame score threshold). Agreement over 7 frames is far
+# stricter than one frame, so the per-frame threshold is lower than the level.
+# Every row has fewer false wakes than the old single-frame 400 ms rule at the
+# same level AND at least its recall on the real recordings (doc above).
+STREAM_OPERATING_POINTS: tuple[tuple[float, int, int, float], ...] = (
+    (0.80, 4, 5, 0.74),  # Most sensitive
+    (0.84, 5, 6, 0.78),  # More sensitive
+    (0.87, 5, 6, 0.81),  # Slightly more sensitive
+    (0.90, 7, 7, 0.79),  # Balanced (default)
+    (0.93, 7, 7, 0.83),  # Slightly stricter
+    (0.95, 7, 7, 0.87),  # Fewer false wakes
+    (0.97, 7, 7, 0.92),  # Fewest false wakes
+    (0.98, 7, 7, 0.94),  # quiet hours at Balanced (0.90 + 0.08, capped)
+)
+
+
+def stream_operating_point(level: float) -> tuple[int, int, float]:
+    """Return (k, n, frame_threshold) for a sensitivity level.
+
+    Uses the nearest measured level; an exact tie goes to the stricter row, the
+    same rule the Settings slider uses to show a saved value as a position.
+    """
+    try:
+        lv = float(level)
+    except (TypeError, ValueError):
+        lv = DEFAULT_THRESHOLD
+    if lv != lv:  # NaN
+        lv = DEFAULT_THRESHOLD
+    best = min(STREAM_OPERATING_POINTS, key=lambda row: (round(abs(row[0] - lv), 9), -row[0]))
+    return best[1], best[2], best[3]
+
 
 def get_feature_config() -> dict:
     """Return the complete feature configuration dict.
