@@ -2005,6 +2005,10 @@ async def run_agent_loop(
     # gate persists exactly as long as the tainted tool result remains in
     # context (structural — keys off the recorded tool name, not the content).
     taint_tracker.restore_from_history(loop_messages)
+    # A file the user's own request names may be read without tainting the
+    # follow-up write (founder rule 2026-10-23; content_sanitizer
+    # is_user_named_file_read). Consequential actions keep their confirm gates.
+    taint_tracker.set_user_request(user_text)
     pending_hook_context_messages: list[dict[str, Any]] = []
     native_turn_max_tokens = _native_turn_max_tokens_for_model(executor._get_model_name_safe())
 
@@ -4462,8 +4466,9 @@ async def run_agent_loop(
                     # sanitizer (size/charset) and taint the context so the
                     # high-risk gate fires on these vectors — and so navigation
                     # sinks are gated to close exfil-via-navigation (SEC-004).
+                    # tool_args lets a read of a file the user named pass.
                     result_text = _sanitize_web_content(result_text)
-                    taint_tracker.mark_tainted(tc_name)
+                    taint_tracker.mark_tainted(tc_name, tool_args=tc_args)
 
                 content_for_llm: Any = result_text
                 # Claude parity (S6-011): per-tool result mappers. MCP tools
