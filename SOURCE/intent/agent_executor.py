@@ -823,7 +823,10 @@ _AGENT_CHAIN_CAP_MESSAGE = "I've completed as much as I can in one task. Want me
 from intent.content_sanitizer import (
     BROWSER_CONTENT_TOOLS as _BROWSER_CONTENT_TOOLS,
     BROWSER_PAGE_CONTENT_TOOLS as _BROWSER_PAGE_CONTENT_TOOLS,
+    bind_active_taint_tracker as _bind_active_taint_tracker,
     canonicalize_tool_name_for_safety,
+    context_is_tainted as _content_context_is_tainted,
+    reset_active_taint_tracker as _reset_active_taint_tracker,
 )
 from intent.tool_allowlist import tool_name_allowed_by_allowlist
 
@@ -4985,23 +4988,29 @@ class AgentExecutor:
             # compaction metadata, and provider repair.
             from diagnostics import latency_spans
 
-            with latency_spans.span(
-                "AGENT_LOOP",
-                task_id=str(getattr(self, "task_id", "?")),
-                provider=type(provider).__name__,
-            ):
-                agent_result = await run_agent_loop(
-                    executor=self,
-                    provider=provider,
-                    task_log=task_log,
-                    user_text=user_text,
-                    system_prompt=getattr(self, "_system_prompt_text", "") or "",
-                    checkpoint=checkpoint,
-                    prompt_context_bundle=getattr(self, "_prompt_context_bundle", None),
-                    initial_tool_call=current_tool_call,
-                    initial_messages=initial_loop_messages,
-                    start_time=start_time,
-                )
+            # run_agent_loop binds its taint tracker for the approval layer;
+            # scope that binding to this loop so it never outlives the task.
+            _taint_scope = _bind_active_taint_tracker(None)
+            try:
+                with latency_spans.span(
+                    "AGENT_LOOP",
+                    task_id=str(getattr(self, "task_id", "?")),
+                    provider=type(provider).__name__,
+                ):
+                    agent_result = await run_agent_loop(
+                        executor=self,
+                        provider=provider,
+                        task_log=task_log,
+                        user_text=user_text,
+                        system_prompt=getattr(self, "_system_prompt_text", "") or "",
+                        checkpoint=checkpoint,
+                        prompt_context_bundle=getattr(self, "_prompt_context_bundle", None),
+                        initial_tool_call=current_tool_call,
+                        initial_messages=initial_loop_messages,
+                        start_time=start_time,
+                    )
+            finally:
+                _reset_active_taint_tracker(_taint_scope)
             if post_turn_memory_extraction:
                 await self._run_post_turn_memory_extraction(
                     user_text=user_text,
@@ -8056,7 +8065,9 @@ class AgentExecutor:
         action_class = self._irreversible_confirmation_class(tool_name, tool_args)
         if action_class is None:
             return True
-        if self._is_irreversible_confirmation_remembered(action_class):
+        # Under taint every consequential action is asked about afresh: an
+        # earlier yes in this task must not carry an injected follow-up through.
+        if not _content_context_is_tainted() and self._is_irreversible_confirmation_remembered(action_class):
             logger.info(
                 "Irreversible confirmation reused for class=%s tool=%s",
                 action_class,
@@ -9348,7 +9359,7 @@ class AgentExecutor:
             elif blocked_msg := spin_detector.is_call_blocked(tool_name, tool_args, page_url=page_url):
                 tool_result = ToolResult(ok=False, error=blocked_msg)
                 tool_error = blocked_msg
-            elif taint_block := taint_tracker.check_tool(tool_name):
+            elif taint_block := taint_tracker.check_tool(tool_name, tool_args):
                 tool_result = ToolResult(ok=False, error=taint_block)
                 tool_error = taint_block
 
