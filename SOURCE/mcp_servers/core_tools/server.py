@@ -158,6 +158,7 @@ from mcp_servers.phone_tool_descriptions import (
     EXTRA_CONTEXT_DESCRIPTION,
     PHONE_ACTION_DESCRIPTION,
     PHONE_NUMBER_DESCRIPTION,
+    RECIPIENT_NAME_DESCRIPTION,
     TASK_DESCRIPTION,
     WAIT_FOR_COMPLETION_DESCRIPTION,
 )
@@ -6005,6 +6006,10 @@ async def phone(
         str,
         Field(description=CALL_ID_DESCRIPTION),
     ] = "",
+    recipient_name: Annotated[
+        str,
+        Field(description=RECIPIENT_NAME_DESCRIPTION),
+    ] = "",
 ) -> str:
     """Manage phone calls.
 
@@ -6020,6 +6025,10 @@ async def phone(
         # frozen into this server's task when the hub was built.
         with _caller_cloud_bearer_bound():
             if action == "call":
+                recipient = (recipient_name or "").strip()
+                if recipient and recipient.lower() not in ("%s %s" % (task, extra_context)).lower():
+                    note = "The number belongs to %s." % recipient
+                    extra_context = ("%s %s" % (extra_context.strip(), note)).strip()
                 result = await _make_phone_call(
                     phone_number=phone_number,
                     task=task,

@@ -194,6 +194,9 @@ def describe_irreversible_action(tool_name: str, args: Mapping[str, Any] | None 
 
     if action_class == "phone_call":
         number = _clean(params.get("phone_number") or params.get("number") or params.get("to"))
+        recipient = _clean(params.get("recipient_name") or params.get("business_name"))
+        if number and recipient:
+            return "call %s at %s" % (recipient, number)
         return "call %s" % number if number else "place the phone call"
     if action_class == "send_email":
         recipient = _clean(params.get("to") or params.get("recipient") or params.get("destination"))
