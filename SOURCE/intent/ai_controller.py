@@ -2300,7 +2300,10 @@ class AIController:
                 from ui.settings_manager import get_settings_manager
 
                 _sm = get_settings_manager()
-                agent_autonomy = _sm.get("agent_autonomy", DEFAULT_AGENT_AUTONOMY) or DEFAULT_AGENT_AUTONOMY
+                agent_autonomy = (
+                    _sm.get("agent_autonomy", DEFAULT_AGENT_AUTONOMY, user_id=_ctx_user_id.get() or None)
+                    or DEFAULT_AGENT_AUTONOMY
+                )
             except Exception:
                 logger.exception("Agent prompt setup skipped because user settings could not be loaded")
                 return
@@ -2894,7 +2897,10 @@ class AIController:
         try:
             from ui.settings_manager import get_settings_manager
 
-            agent_autonomy = get_settings_manager().get("agent_autonomy", DEFAULT_AGENT_AUTONOMY) or DEFAULT_AGENT_AUTONOMY
+            agent_autonomy = (
+                get_settings_manager().get("agent_autonomy", DEFAULT_AGENT_AUTONOMY, user_id=user_id)
+                or DEFAULT_AGENT_AUTONOMY
+            )
         except Exception:
             agent_autonomy = DEFAULT_AGENT_AUTONOMY
 
