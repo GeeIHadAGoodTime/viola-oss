@@ -555,7 +555,11 @@ class AppConfig:
     # --- Feature toggles ---
 
     # --- Browser-native provider ---
-    browser_provider_enabled: bool = False  # Feature flag — off by default
+    # Experimental browser-native playback provider (music played inside the
+    # embedded webview) and the cloud browser routes. Off by default. It does
+    # NOT gate the in-app music sign-in (Settings > Connect Spotify), which is
+    # always on for the desktop.
+    browser_provider_enabled: bool = False
     preferred_music_provider: str = "youtube_iframe"  # Default: existing behavior
 
     # --- Browser-based YouTube search ---
@@ -831,8 +835,6 @@ class AppConfig:
     spotify_client_id: str | None = None
     spotify_client_secret: str | None = None
     spotify_redirect_uri: str | None = None
-    spotify_device_id: str | None = None
-    spotify_refresh_token: str | None = None
 
     # --- Calendar Integration ---
     google_calendar_credentials_path: str | None = None

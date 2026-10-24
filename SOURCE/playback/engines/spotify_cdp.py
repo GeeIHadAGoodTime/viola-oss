@@ -497,8 +497,16 @@ class SpotifyCDPEngine(ProviderPlaybackEngine):
         # capabilities when search_tracks returned a spotify:track:<id>.
         track_uri = item.capabilities.get("uri") or item.capabilities.get("track_uri")
         search_index = item.capabilities.get("search_index")
+        liked_songs = item.capabilities.get("spotify_context") == "liked_songs"
 
-        if track_uri and isinstance(track_uri, str) and track_uri.strip():
+        if liked_songs:
+            shuffle = item.capabilities.get("shuffle")
+            try:
+                played_meta = controller.play_liked_songs(shuffle=shuffle if isinstance(shuffle, bool) else None)
+            except Exception as exc:
+                raise PlaybackError("Spotify Liked Songs playback failed: %s" % exc) from exc
+            self._adopt_direct_uri_metadata(item, played_meta)
+        elif track_uri and isinstance(track_uri, str) and track_uri.strip():
             try:
                 played_meta = controller.play_track_by_uri(track_uri, max_wait=18.0)
             except Exception as exc:
@@ -528,7 +536,9 @@ class SpotifyCDPEngine(ProviderPlaybackEngine):
 
         handle.mark_started()
         handle._spotify_cdp_started_at = time.monotonic()
-        handle._spotify_cdp_expected_title = item.title or ""
+        # A collection start plays whatever Spotify picks first, so there is
+        # no expected title to guard against a stale startup track.
+        handle._spotify_cdp_expected_title = "" if liked_songs else (item.title or "")
         # Queue-advance/skip lands here as a fresh play() (the poller's
         # track-change hook deliberately does not fire for the first
         # observed track), and no generic play-path rescan exists for

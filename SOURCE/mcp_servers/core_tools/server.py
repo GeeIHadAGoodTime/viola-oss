@@ -4404,7 +4404,12 @@ async def playlist(
     ] = "",
     provider: Annotated[
         str,
-        Field(description="Music provider for action='create' or action='add_track'."),
+        Field(
+            description=(
+                "Music provider for action='create' or action='add_track'. For action='play_favorites', "
+                "'spotify' plays the user's Spotify Liked Songs."
+            )
+        ),
     ] = "youtube_music",
     shuffle: Annotated[
         bool,
@@ -4463,7 +4468,13 @@ async def playlist(
         if action == "play":
             return _format_result(await _call_user_scoped(_play_playlist_mcp, name))
         if action == "play_favorites":
-            return _format_result(await _call_user_scoped(_play_favorites, shuffle=shuffle, limit=limit))
+            # provider keeps its 'youtube_music' default for create/add_track; for
+            # favorites only an explicit other value counts (spotify = the user's
+            # Spotify Liked Songs; otherwise the active music service decides).
+            favorites_provider = "" if provider == "youtube_music" else provider
+            return _format_result(
+                await _call_user_scoped(_play_favorites, shuffle=shuffle, limit=limit, provider=favorites_provider)
+            )
         return json.dumps({"error": "Unknown action: %s" % action})
     except Exception as exc:
         logger.exception("playlist failed for action=%s", action)
@@ -4950,8 +4961,9 @@ async def rate_track(
         str,
         Field(
             description=(
-                "Rating value. Use 'thumbs_up' to like the track or "
-                "'thumbs_down' to dislike it. The aliases 'up' and 'down' are accepted."
+                "Rating value. Use 'thumbs_up' to like the track (on Spotify: save it to the user's "
+                "Spotify Liked Songs), 'remove' to unlike it (remove from liked songs, keep playing), or "
+                "'thumbs_down' to dislike it. The aliases 'up', 'down' and 'unlike' are accepted."
             )
         ),
     ] = "",

@@ -222,7 +222,6 @@ CREDENTIAL_RELOCATE_KEYS: Final[frozenset[str]] = frozenset(
         "openai_api_key",
         "slack_app_token",
         "slack_bot_token",
-        "spotify_refresh_token",
         "telegram_bot_token",
     }
 )
@@ -232,6 +231,9 @@ STALE_DELETE_KEYS: Final[frozenset[str]] = frozenset(
         "signal_account",
         "signal_daemon_url",
         "signal_enabled",
+        # Read only by the deleted spotipy SpotifyWebPlaybackEngine; drop any
+        # leftover plaintext copy on load.
+        "spotify_refresh_token",
         "volume",
         "whatsapp_bridge_url",
         "whatsapp_enabled",

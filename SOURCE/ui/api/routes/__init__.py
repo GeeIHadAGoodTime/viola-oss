@@ -674,12 +674,23 @@ def _register_telephony_routes(app: FastAPI, context: ApiContext) -> None:
 
 
 def _register_browser_auth_routes(app: FastAPI, context: ApiContext) -> None:
-    """Register browser authentication routes if browser provider is enabled."""
+    """Register the in-app music sign-in routes (``/v1/browser/auth/*``).
+
+    These carry the shipped Settings > Music "Connect Spotify" button and the
+    "connect Spotify" voice tool (sign-in in the embedded webview, cookies
+    bridged to the Spotify Chrome). On the desktop they are always on. They
+    used to be gated on ``browser_provider_enabled``, the March 2026 switch
+    for the experimental browser-native *playback* provider, which defaults
+    to off and is only set in dev ``.env`` files, so clean installs answered
+    the Connect button with 404. That switch still gates browser-native
+    playback, and still gates these routes on the cloud surface.
+    """
     from config.settings import settings
     from ui.security.rate_limit_utils import configure_router_rate_limits
 
-    if not settings.browser_provider_enabled:
-        log.debug("Browser auth routes disabled (browser_provider_enabled=false)")
+    surface = (getattr(settings, "app_surface", "desktop") or "desktop").strip().lower()
+    if surface == "cloud" and not settings.browser_provider_enabled:
+        log.debug("Browser auth routes disabled on the cloud surface (browser_provider_enabled=false)")
         return
 
     try:

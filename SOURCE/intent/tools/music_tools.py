@@ -816,10 +816,14 @@ def _normalize_rating_value(value: str) -> str:
         "disliked": "thumbs_down",
         "negative": "thumbs_down",
         "thumbsdown": "thumbs_down",
+        "remove": "remove",
+        "unlike": "remove",
+        "unliked": "remove",
+        "clear": "remove",
     }
     normalized = aliases.get(raw)
     if not normalized:
-        raise ValueError("Rating value must be 'thumbs_up' or 'thumbs_down'.")
+        raise ValueError("Rating value must be 'thumbs_up', 'thumbs_down' or 'remove'.")
     return normalized
 
 
@@ -1493,7 +1497,7 @@ async def rate_track_handler(
         rating_value = _normalize_rating_value(value)
         explicit_track_id = track_id.strip()
 
-        if explicit_track_id:
+        if explicit_track_id and rating_value != "remove":
             track_rating = "up" if rating_value == "thumbs_up" else "down"
             request_payload: dict[str, Any] = {
                 "track_id": explicit_track_id,
@@ -1518,10 +1522,13 @@ async def rate_track_handler(
                 )
             return ToolResult(ok=False, data=data, error=_response_error(data))
 
-        ui_rating = "liked" if rating_value == "thumbs_up" else "disliked"
+        ui_rating = {"thumbs_up": "liked", "thumbs_down": "disliked"}.get(rating_value)
         data = await _post_runtime("/v1/rating", {"rating": ui_rating}, timeout=10.0)
+        response_data = data.get("data") if isinstance(data.get("data"), dict) else {}
+        spotify_sync = data.get("spotify") or response_data.get("spotify")
+        if isinstance(spotify_sync, dict) and spotify_sync.get("error"):
+            return ToolResult(ok=False, data=data, error=str(spotify_sync["error"]))
         if data.get("ok"):
-            response_data = data.get("data") if isinstance(data.get("data"), dict) else {}
             rated_track_id = data.get("video_id") or response_data.get("video_id") or ""
             result_data: dict[str, Any] = {
                 "message": "Current track rated %s" % rating_value,
