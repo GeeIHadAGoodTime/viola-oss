@@ -427,6 +427,12 @@ class ViolaWakeListener:
         self._mic_ring: deque[np.ndarray] = deque(maxlen=500)  # ~5s of 10ms frames
         # Preroll frames: last N audio frames before wake onset, for recording context
         self._preroll_frames: deque[np.ndarray] = deque(maxlen=8)  # 8 frames = 640ms at 80ms/frame
+        # Stage 2 wake check: raw frames read after a verified wake word, handed
+        # to the command recorder so a "Viola, ..." said in one breath is whole.
+        self._command_preroll: list[bytes] = []
+        self._command_preroll_since: float | None = None
+        self._command_preroll_lock = threading.Lock()
+        self._verify_frame_count = 0
         self._last_passive_cal_frame: int = 0
         self._passive_cal_interval_frames: int = 375  # ~30s at 80ms/frame
 
@@ -1961,6 +1967,7 @@ class ViolaWakeListener:
             return
 
         logger.info("🎤 ViolaWake detection started")
+        self._warm_wake_verifier()
         logger.info("    Model: %s", self._model_path)
         logger.info("    Threshold: %s", self.threshold)
         logger.info(
@@ -2197,6 +2204,14 @@ class ViolaWakeListener:
                     decision.layers_passed,
                     decision.layers_failed,
                 )
+                return
+
+            # Stage 2: a second listen (Whisper) before the chime. Runs only
+            # after every policy gate allowed the wake; a soft gate.
+            if not self._force_wake and not self._verify_wake_candidate(
+                np.concatenate([audio_buffer[buffer_write_idx:], audio_buffer[:buffer_write_idx]]),
+                actual_score,
+            ):
                 return
 
             logger.info(
@@ -2460,6 +2475,9 @@ class ViolaWakeListener:
                         _tap(audio_data)
                     except Exception:
                         pass  # Never let a tap error kill the wake loop
+                # A verified wake's command audio keeps accumulating until the
+                # command recorder takes it (no-op otherwise).
+                self._extend_command_preroll(audio_data)
 
                 # Convert to int16 for AEC processing
                 mic_int16 = np.frombuffer(audio_data, dtype=np.int16)
@@ -2798,6 +2816,114 @@ class ViolaWakeListener:
         except Exception as e:
             logger.exception("ViolaWake detection error: %s", e)
 
+    # ------------------------------------------------------------------ #
+    # Stage 2 wake verification (voice/wake_detector/wake_verifier.py)
+    # ------------------------------------------------------------------ #
+
+    # A verified wake's held audio is only for the command that wake starts.
+    COMMAND_PREROLL_MAX_AGE_S = 4.0
+
+    def _warm_wake_verifier(self) -> None:
+        """Load the Whisper check in the background at startup, never on a wake."""
+        try:
+            from voice.wake_detector.wake_verifier import warm_wake_verifier
+
+            warm_wake_verifier()
+        except Exception as exc:  # noqa: BLE001, RUF100 - the check is optional; wakes pass without it
+            logger.warning("[WAKE_VERIFY] could not start the verifier warm-up: %s", exc)
+
+    def _verify_wake_candidate(self, window: np.ndarray, score: float) -> bool:
+        """Second listen before the chime. True lets the wake through.
+
+        Runs on the wake loop thread inside the detection callback, so it may
+        read the stream itself; the frames it reads are kept for the command.
+        """
+        try:
+            from voice.wake_detector.wake_verifier import get_wake_verifier, wake_verification_enabled
+
+            if not wake_verification_enabled():
+                return True
+            result = get_wake_verifier().verify(
+                window,
+                self._read_verification_chunk,
+                score,
+                playback_active=bool(self._policy.is_playback_active),
+            )
+        except Exception as exc:  # noqa: BLE001, RUF100 - doubt passes
+            logger.warning("[WAKE_VERIFY] PASS reason=error score=%.3f (%s)", score, exc)
+            return True
+        logger.info(result.log_line())
+        if result.passed:
+            self._start_command_preroll(result.held_frames)
+        return result.passed
+
+    def _read_verification_chunk(self, block: bool) -> Any:
+        """Read the next 80 ms for the wake check (raw bytes + echo-cancelled audio).
+
+        ``block=False`` returns None while less than a chunk is buffered, so the
+        check can stop the moment Whisper answers.
+        """
+        from voice.wake_detector.wake_verifier import WakeChunk
+
+        stream = self._stream
+        if stream is None:
+            return None
+        if not block:
+            try:
+                if stream.get_read_available() < self.CHUNK_SIZE:
+                    return None
+            except Exception:  # noqa: BLE001, RUF100 - unknown fill level: a blocking read still drains
+                pass
+        try:
+            audio_data = stream.read(self.CHUNK_SIZE, exception_on_overflow=False)
+        except Exception as exc:  # noqa: BLE001, RUF100 - the wake loop's own read handles recovery
+            logger.debug("[WAKE_VERIFY] stream read failed: %s", exc)
+            return None
+        self.detection_signal.mark()
+        tap = self._frame_tap
+        if tap is not None:
+            try:
+                tap(audio_data)
+            except Exception:  # noqa: BLE001, RUF100 - never let a tap error stop the check
+                pass
+        mic_int16 = np.frombuffer(audio_data, dtype=np.int16)
+        self._verify_frame_count += 1
+        processed = self._apply_aec_to_chunk(mic_int16, self._verify_frame_count)
+        return WakeChunk(raw=audio_data, audio=processed.astype(np.float32) * (1.0 / AUDIO_INT16_SCALE))
+
+    def _start_command_preroll(self, frames: list[bytes]) -> None:
+        with self._command_preroll_lock:
+            self._command_preroll = list(frames)
+            self._command_preroll_since = time.monotonic()
+
+    def _extend_command_preroll(self, audio_data: bytes) -> None:
+        """Keep a verified wake's audio flowing until the recorder takes it."""
+        if self._command_preroll_since is None:
+            return
+        with self._command_preroll_lock:
+            since = self._command_preroll_since
+            if since is None:
+                return
+            if time.monotonic() - since > self.COMMAND_PREROLL_MAX_AGE_S:
+                # The wake was dropped downstream (rate limit, already
+                # listening); its audio belongs to nobody.
+                self._command_preroll = []
+                self._command_preroll_since = None
+                return
+            self._command_preroll.append(audio_data)
+
+    def _take_command_preroll(self) -> list[bytes]:
+        with self._command_preroll_lock:
+            frames = self._command_preroll
+            since = self._command_preroll_since
+            self._command_preroll = []
+            self._command_preroll_since = None
+        if since is None or time.monotonic() - since > self.COMMAND_PREROLL_MAX_AGE_S:
+            return []
+        if frames:
+            logger.info("[WAKE_VERIFY] command recording starts with %d frames read during the check", len(frames))
+        return list(frames)
+
     def listen_and_record_command(
         self,
         silence_threshold: int = 500,
@@ -2849,7 +2975,9 @@ class ViolaWakeListener:
         else:
             logger.debug("[ViolaWake] SileroVAD unavailable, using RMS fallback")
 
-        frames = []
+        # Audio the wake check already read after the wake word (the start of
+        # a "Viola, ..." said in one breath) opens the command recording.
+        frames = self._take_command_preroll()
         silence_samples = 0
         silence_samples_threshold = int(silence_duration * self.SAMPLE_RATE / self.CHUNK_SIZE)
 
