@@ -108,6 +108,15 @@ class PlayerControlService(PlayerControlSurface):
     def _play_backend_for_track(self, item: QueueItem | None, backend: object | None) -> None:
         if item is None or backend is None:
             return
+        if is_react_iframe_item(item) and not backend_drives_embedded_video(backend):
+            # React renders this video from the state broadcast. Handing its
+            # watch URL to the stream backend only decodes nothing
+            # ("SimpleBackend start failure: Playback produced no audio").
+            self._logger.info(
+                "Autoplay start: %s plays in the React iframe; stream backend not started",
+                getattr(item, "id", "unknown"),
+            )
+            return
         url = getattr(item, "url", None)
         if not isinstance(url, str) or not url:
             return
