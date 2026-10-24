@@ -599,6 +599,9 @@ _HEADLESS_FLAG = "--headless"
 _QT_ONLY_FLAGS_WITH_VALUE = {"--remote-debugging-port"}
 _QT_ONLY_FLAGS = {_HEADLESS_FLAG, "--no-wake"}
 _CDP_LOOPBACK_BIND_HOST = "127.0.0.1"
+# The only origin the agent browser's DevTools port accepts. RFC 6761 reserves
+# .invalid, so no web page can ever be served from it.
+_CDP_NO_WEB_ORIGIN = "https://viola-no-web-origin.invalid"
 
 
 def _headless_requested(argv: list[str] | None = None) -> bool:
@@ -664,6 +667,33 @@ def _normalize_cdp_debugging_bind(raw: object) -> str | None:
     return "%s:%d" % (_CDP_LOOPBACK_BIND_HOST, port)
 
 
+def _pick_ephemeral_cdp_port() -> int:
+    """Ask the OS for a free loopback port for this launch's agent browser.
+
+    The agent browser (the stage's embedded QtWebEngine view) can only be
+    driven over Chromium's DevTools endpoint, which has no authentication.
+    It is therefore never put on a fixed, well-known port such as 9222, the
+    port commodity cookie stealers probe. A fresh OS-assigned port per launch,
+    bound to loopback only, plus a --remote-allow-origins list that no web
+    page can match (see _CDP_NO_WEB_ORIGIN), keeps web pages and the LAN out.
+    """
+    import socket
+
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind((_CDP_LOOPBACK_BIND_HOST, 0))
+        return int(sock.getsockname()[1])
+
+
+def _strip_wildcard_remote_allow_origins(flags: str) -> str:
+    """Drop any inherited ``--remote-allow-origins`` that contains a wildcard."""
+    kept = [
+        flag
+        for flag in flags.split()
+        if not (flag.startswith("--remote-allow-origins") and "*" in flag.split("=", 1)[-1])
+    ]
+    return " ".join(kept)
+
+
 # Parse --remote-debugging-port BEFORE any Qt imports.
 # QTWEBENGINE_REMOTE_DEBUGGING must be set before QApplication is created.
 _cdp_port = None
@@ -673,17 +703,22 @@ for _arg in sys.argv[1:]:
     elif _arg == "--remote-debugging-port" and sys.argv.index(_arg) + 1 < len(sys.argv):
         _cdp_port = sys.argv[sys.argv.index(_arg) + 1]
 
-# Also enable CDP from explicit config if not set via CLI flag.
-# Chromium DevTools Protocol has no Viola auth layer, so default settings keep
-# it disabled unless the operator explicitly sets VIOLA_CDP_PORT.
-if not _cdp_port:
+# Agent browser DevTools port. settings.cdp_port: 0 (default) = a random
+# loopback port picked fresh for this launch; >0 = that explicit port (dev
+# tooling only); <0 = agent browser switched off. Solo still gets no browser
+# tools: that is enforced per request by the tier tool map, so switching
+# Solo -> Ensemble in Settings works without a restart.
+if not _cdp_port and not _headless_requested():
     try:
         from config.settings import settings as _cfg
 
-        if getattr(_cfg, "cdp_port", 0):
-            _cdp_port = str(_cfg.cdp_port)
+        _configured_cdp_port = int(getattr(_cfg, "cdp_port", 0) or 0)
+        if _configured_cdp_port > 0:
+            _cdp_port = str(_configured_cdp_port)
+        elif _configured_cdp_port == 0 and not os.environ.get("QTWEBENGINE_REMOTE_DEBUGGING"):
+            _cdp_port = str(_pick_ephemeral_cdp_port())
     except Exception:
-        _bootstrap_logging.debug("Could not read cdp_port from settings, CDP disabled")
+        _bootstrap_logging.warning("Could not resolve the agent browser DevTools port; agent browser disabled")
 
 # -- Chromium stability flags (MUST be set before QApplication creation) -------
 # AudioServiceOutOfProcess: Keeps Chromium's audio in Viola's main process.
@@ -742,7 +777,7 @@ _existing_flags = os.environ.get("QTWEBENGINE_CHROMIUM_FLAGS", "")
 for _flag in _chromium_stability_flags.split():
     if _flag.split("=")[0] not in _existing_flags:
         _existing_flags = (_existing_flags + " " + _flag).strip()
-os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = _existing_flags
+os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = _strip_wildcard_remote_allow_origins(_existing_flags)
 
 _raw_cdp_debugging = _cdp_port or os.environ.get("QTWEBENGINE_REMOTE_DEBUGGING", "")
 try:
@@ -753,6 +788,28 @@ except ValueError as _cdp_error:
     sys.exit(2)
 if _cdp_debugging_bind:
     os.environ["QTWEBENGINE_REMOTE_DEBUGGING"] = _cdp_debugging_bind
+    # Publish the resolved port in-process so the CDP browser tools attach to
+    # this launch's listener (they read settings.cdp_port).
+    _resolved_cdp_port = _cdp_debugging_bind.rsplit(":", 1)[1]
+    os.environ["VIOLA_CDP_PORT"] = _resolved_cdp_port
+    try:
+        from config.settings import settings as _cfg
+
+        _cfg.cdp_port = int(_resolved_cdp_port)
+    except Exception:
+        _bootstrap_logging.warning("Could not publish the agent browser DevTools port to settings")
+    # QtWebEngine 6.8's Chromium does NOT refuse Origin-bearing DevTools
+    # WebSockets by default (measured: a handshake with Origin
+    # https://evil.example is accepted), but it does honor an explicit
+    # --remote-allow-origins list. Viola's own clients (Playwright, httpx)
+    # send no Origin header, so allow exactly one origin that no web page can
+    # ever have (.invalid is reserved and never resolves). Every browser page,
+    # including data: and sandboxed ones ("null"), is then refused with 403.
+    if "--remote-allow-origins" not in os.environ["QTWEBENGINE_CHROMIUM_FLAGS"]:
+        os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = (
+            os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] + " --remote-allow-origins=" + _CDP_NO_WEB_ORIGIN
+        ).strip()
+    _bootstrap_logging.info("Agent browser DevTools listener: %s (loopback, per-launch)", _cdp_debugging_bind)
 
 
 logger = _bootstrap_logging.getLogger(__name__)
@@ -1146,7 +1203,7 @@ def _wire_cdp_browser_server(window: "ViolaWebViewWindow") -> None:
     """
     from config.settings import settings as _cfg
 
-    if not _cfg.cdp_port:
+    if int(getattr(_cfg, "cdp_port", 0) or 0) <= 0:
         return
 
     webview = getattr(window, "browser_webview", None)
@@ -1158,7 +1215,7 @@ def _wire_cdp_browser_server(window: "ViolaWebViewWindow") -> None:
         from mcp_servers.browser_cdp.server import set_webview
 
         set_webview(webview)
-        logger.info("CDP browser MCP server: webview reference wired")
+        logger.info("CDP browser MCP server: webview reference wired (agent browser on 127.0.0.1:%s)", _cfg.cdp_port)
     except Exception as exc:
         logger.warning("Failed to wire CDP browser server webview: %s", exc)
 

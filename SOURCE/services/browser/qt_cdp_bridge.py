@@ -40,8 +40,10 @@ shimmed, navigation, accessibility snapshots, evaluation, clicking, typing and
 per-page CDP sessions all work against real sites, with zero other protocol
 errors.
 
-The relay binds to loopback only and fronts an endpoint that is already
-loopback-only and unauthenticated, so it widens no trust boundary.
+The relay binds to loopback only, exists only while a CDP browser session is
+attached, and like the upstream DevTools port (which viola_qt restricts with
+--remote-allow-origins) it refuses any handshake that carries a web Origin
+header, so no web page can drive it.
 """
 
 from __future__ import annotations
@@ -61,6 +63,8 @@ _LOCALLY_ANSWERED_METHODS = frozenset({"Browser.setDownloadBehavior"})
 
 _BRIDGE_HOST = "127.0.0.1"
 _UPSTREAM_HOST = "127.0.0.1"
+# Only Origin-less clients (Playwright's driver). Never a wildcard.
+_ALLOWED_ORIGINS: tuple[None, ...] = (None,)
 
 
 class QtCDPBridgeError(RuntimeError):
@@ -124,10 +128,16 @@ class QtWebEngineCDPBridge:
         # endpoints did not ask for, and no keepalive policy of its own -- an
         # injected ping timeout would tear down a browsing session that
         # Playwright and Qt WebEngine both still consider healthy.
+        # origins=[None] accepts only handshakes WITHOUT an Origin header.
+        # Playwright's driver sends none; any web page in any browser always
+        # does, so a page cannot reach the agent browser through this relay.
+        # This mirrors the --remote-allow-origins restriction viola_qt puts on
+        # the upstream DevTools port.
         self._server = await serve(
             self._handle_client,
             _BRIDGE_HOST,
             0,
+            origins=_ALLOWED_ORIGINS,
             max_size=None,
             ping_interval=None,
             compression=None,

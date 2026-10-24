@@ -912,10 +912,11 @@ class AppConfig:
     browser_session_mode: str = "viola"
 
     # --- Agentic Browser Display (CDP) ---
-    # Remote debugging port for Qt WebEngine CDP access.
-    # Disabled by default because Chromium DevTools Protocol has no Viola
-    # authentication layer. Set VIOLA_CDP_PORT or pass --remote-debugging-port
-    # only for an explicit local debugging/agentic-browser session.
+    # DevTools port the agent browser (stage QtWebEngine view) is driven on.
+    # 0 (default): viola_qt.py picks a random free loopback port each launch
+    # and writes it back here; never a fixed well-known port, and remote
+    # origins limited to one no web page can have. >0: that explicit port
+    # (dev tooling). <0: switched off.
     cdp_port: int = 0
 
     # --- MCP (Model Context Protocol) Servers ---
