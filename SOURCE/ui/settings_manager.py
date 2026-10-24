@@ -18,7 +18,7 @@ import os
 import tempfile
 import threading
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from pathlib import Path
 from typing import Literal, Protocol, TypeVar, overload
 
@@ -29,6 +29,7 @@ from core.logging_config import get_logger
 from core.product import AiSource, coerce_ai_source
 from core.subprocess_utils import run_silent
 from ui.settings_schema import (
+    ACCOUNT_BOUND_DEVICE_KEYS as SETTINGS_ACCOUNT_BOUND_DEVICE_KEYS,
     BIPA_DELETE_KEYS as SETTINGS_BIPA_DELETE_KEYS,
     CLOUD_COMPAT_USER_SETTING_KEYS as SETTINGS_CLOUD_COMPAT_USER_SETTING_KEYS,
     CLOUD_CONSENT_KEYS as SETTINGS_CLOUD_CONSENT_KEYS,
@@ -405,6 +406,46 @@ def _is_cloud_deployment() -> bool:
 
 def normalize_setting_key(key: str) -> str:
     return SETTINGS_KEY_ALIASES.get(key, key)
+
+
+# Device settings an older account blob may still hold that are NOT copied to
+# this machine's settings when they move out of it. ``minimize_to_tray`` was
+# reset to off on every install once in 1.0.5 (``_migrate_close_button_quits``)
+# because an old default could not be told apart from a choice; a value left in
+# an account blob from before then has the same problem, so it is dropped.
+_DEVICE_KEYS_NOT_CARRIED_FROM_ACCOUNT_BLOBS = frozenset({"minimize_to_tray"})
+
+
+def is_install_scoped_device_key(key: str) -> bool:
+    """Return True when *key* belongs to this machine, not to the signed-in account.
+
+    On the desktop every device-tier key (``INFRASTRUCTURE_KEYS``) other than
+    the few personal ones in ``ACCOUNT_BOUND_DEVICE_KEYS`` lives in this
+    machine's ``settings.json``. Reads and writes both resolve there, with or
+    without a signed-in account, so a choice saved from the Settings page while
+    signed in is the same value the window, wake detector, hotkey and audio
+    threads read with no account context. On the cloud this is always False:
+    there the global blob is shared by every tenant.
+    """
+    canonical_key = normalize_setting_key(key)
+    if canonical_key not in SETTINGS_INFRASTRUCTURE_KEYS or canonical_key in SETTINGS_ACCOUNT_BOUND_DEVICE_KEYS:
+        return False
+    return not _is_cloud_deployment()
+
+
+def _desktop_signed_in_account_user_id() -> str | None:
+    """The signed-in desktop account for a settings call made outside any request.
+
+    None on the cloud and when nobody is signed in, so those callers keep using
+    the global settings exactly as before.
+    """
+    try:
+        from core.user_context import get_cached_desktop_account_user_id
+
+        return get_cached_desktop_account_user_id()
+    except Exception:  # noqa: BLE001, RUF100 - an unreadable session store means signed out
+        logger.debug("Desktop account lookup failed; using this machine's settings", exc_info=True)
+        return None
 
 
 def setting_string_value_limit_bytes(key: str) -> int:
@@ -949,7 +990,7 @@ class SettingsManager:
         # `capability_tier` is accepted as a back-compat alias by set()
         # and read by get(); both forms resolve to the same stored value.
         "agent_enabled": True,
-        "agent_autonomy": "solo",  # solo | ensemble | symphony
+        "agent_autonomy": defaults.DEFAULT_AGENT_AUTONOMY,  # solo | ensemble | symphony
         "auto_propose_shortcuts": defaults.AUTO_PROPOSE_SHORTCUTS_DEFAULT,
         "browser_session_mode": "viola",  # "viola", "ephemeral"
         "session_purchase_ceiling_cents": None,  # Optional rolling 60-min merchant-purchase ceiling
@@ -1549,6 +1590,41 @@ class SettingsManager:
             self._write_user_credential(user_id, key, value)
         return settings_blob, changed
 
+    def _move_device_settings_out_of_account_blob(
+        self,
+        user_id: str,
+        settings_blob: dict[str, object],
+    ) -> tuple[dict[str, object], bool]:
+        """Move this machine's settings out of an older desktop account blob.
+
+        Before device settings were install-scoped, a change made while signed
+        in (the keep-in-tray option, the wake sensitivity, a hotkey, the
+        microphone) was saved in the account's blob, where the threads that act
+        on it never looked. The account's value is the one its Settings page
+        showed, so it becomes this machine's value once, and the key leaves the
+        blob so it is never copied again. If the machine's settings cannot be
+        saved the blob is left untouched and the move is retried on the next
+        load. Returns the remaining blob and whether it changed.
+        """
+        moved = {key: value for key, value in settings_blob.items() if is_install_scoped_device_key(key)}
+        if not moved:
+            return settings_blob, False
+        carried = {key: value for key, value in moved.items() if key not in _DEVICE_KEYS_NOT_CARRIED_FROM_ACCOUNT_BLOBS}
+        if carried and not self._write_global_setting_updates(carried, save_immediately=True):
+            logger.warning(
+                "Could not move device settings %s out of account %s's settings; will retry",
+                sorted(carried),
+                user_id,
+            )
+            return settings_blob, False
+        logger.info(
+            "Moved device settings %s from account %s's settings to this machine's settings (dropped: %s)",
+            sorted(carried),
+            user_id,
+            sorted(set(moved) - set(carried)),
+        )
+        return {key: value for key, value in settings_blob.items() if key not in moved}, True
+
     def _load_user_settings_blob(self, user_id: str) -> dict[str, object]:
         """Load per-user settings from the auth DB.
 
@@ -1664,8 +1740,16 @@ class SettingsManager:
         settings_blob, normalized = self._normalize_runtime_model_settings(settings_blob)
         settings_blob, dropped_removed_legacy = self._drop_removed_legacy_settings(settings_blob)
         settings_blob, relocated_credentials = self._relocate_user_credentials_from_blob(user_id, settings_blob)
+        settings_blob, moved_device_keys = self._move_device_settings_out_of_account_blob(user_id, settings_blob)
         rescaled_volume = self._migrate_tts_volume_percent_scale(settings_blob)
-        normalized = normalized or renamed_aliases or dropped_removed_legacy or relocated_credentials or rescaled_volume
+        normalized = (
+            normalized
+            or renamed_aliases
+            or dropped_removed_legacy
+            or relocated_credentials
+            or moved_device_keys
+            or rescaled_volume
+        )
 
         if migration_marker_seen:
             if normalized:
@@ -2076,6 +2160,8 @@ class SettingsManager:
                 continue
             if key in self.REMOVED_LEGACY_SETTING_KEYS:
                 continue
+            if is_install_scoped_device_key(key):
+                continue  # already this machine's setting; it never moves into an account
             value = self._get_legacy_user_setting_value(key)
             if value is _MISSING or value in (None, "", {}):
                 continue
@@ -2108,6 +2194,10 @@ class SettingsManager:
         """
 
         key = self.canonicalize_setting_key(key)
+        if is_install_scoped_device_key(key):
+            # This machine's setting, whoever is asking (see
+            # is_install_scoped_device_key).
+            return self._read_setting_from_blob(self.settings, key, default)
         if not user_id:
             return default
         # Desktop device/session pseudo-identities have no auth
@@ -2233,7 +2323,7 @@ class SettingsManager:
         # Back-compat aliases (e.g. capability_tier -> agent_autonomy).
         # Read-side resolution so older code keeps working during migration.
         key = self.canonicalize_setting_key(key)
-        resolved_user_id = self._resolve_user_id(user_id)
+        resolved_user_id = self._resolve_user_id_for_keys(user_id, (key,))
         if (
             resolved_user_id
             and not _uses_global_settings_only(resolved_user_id)
@@ -2326,7 +2416,7 @@ class SettingsManager:
                 return False
 
         # Auto-map capability_tier → browser_session_mode
-        resolved_user_id = self._resolve_user_id()
+        resolved_user_id = self._resolve_user_id_for_keys(None, (key,))
         pending_updates = self._expand_setting_updates(key, value, resolved_user_id)
 
         if resolved_user_id and not _uses_global_settings_only(resolved_user_id) and self._is_user_scoped_key(key):
@@ -2371,9 +2461,13 @@ class SettingsManager:
             return False
         if key in _GLOBAL_SETTINGS_KEYS:
             return False
-        # D7's "device" tier is a sync/storage classification: local-only or
-        # hardware-adjacent. It is not permission to share values across
-        # authenticated users on the same install.
+        # Device-tier keys belong to the machine on the desktop (see
+        # is_install_scoped_device_key). Unclassified keys also fall back to the
+        # device tier in classify_setting_key, but only keys listed in
+        # INFRASTRUCTURE_KEYS are install-scoped: an unreviewed key stays with
+        # the signed-in account rather than becoming shared machine state.
+        if is_install_scoped_device_key(key):
+            return False
         return key in cls.DEFAULT_SETTINGS or tier in {"user", "consent", "credential"}
 
     @staticmethod
@@ -2386,6 +2480,29 @@ class SettingsManager:
             return get_current_user_id()
         except (ImportError, LookupError):
             return None
+
+    def _needs_account_scope(self, key: str) -> bool:
+        key = self.canonicalize_setting_key(key)
+        return self._is_user_scoped_key(key) or self._is_credential_setting_key(key) or key in _DESKTOP_USER_SYSTEM_KEYS
+
+    def _resolve_user_id_for_keys(self, user_id: str | None, keys: Iterable[str]) -> str | None:
+        """Resolve whose settings a get/set/update of *keys* uses.
+
+        An explicit ``user_id`` or the request's bound principal wins. With
+        neither (the Qt window, the wake detector, the agent loop on a worker
+        thread), a desktop call that touches an account setting resolves to the
+        signed-in desktop account: that is where the Settings page wrote it, so
+        that is where it must be read. Signed out, on the cloud, or for
+        install-scoped keys this stays None and the global settings are used.
+        """
+        resolved = self._resolve_user_id(user_id)
+        if resolved is not None:
+            return resolved
+        if not any(self._needs_account_scope(key) for key in keys):
+            return None
+        if _is_cloud_deployment():
+            return None
+        return _desktop_signed_in_account_user_id()
 
     def _lock_for_user_settings_write(self, user_id: str) -> threading.RLock:
         """Get-or-create the per-user write-serialization lock (#2781).
@@ -2450,6 +2567,16 @@ class SettingsManager:
             if _is_system_key(update_key):
                 logger.warning("Blocked write to system key via set_user_setting: %s", update_key)
                 return False
+
+        # A device setting written for an account (the voice settings tool
+        # passes the speaker's user_id) still belongs to this machine.
+        install_updates = {key: value for key, value in updates.items() if is_install_scoped_device_key(key)}
+        if install_updates:
+            if not self._write_global_setting_updates(install_updates, save_immediately=save_immediately):
+                return False
+            updates = {key: value for key, value in updates.items() if key not in install_updates}
+            if not updates:
+                return True
 
         return self._write_user_settings_values(
             user_id,
@@ -3217,7 +3344,7 @@ class SettingsManager:
         if autonomy and autonomy in self._TIER_MODE_MAP and "browser_session_mode" not in pending_updates:
             pending_updates["browser_session_mode"] = self._TIER_MODE_MAP[autonomy]
 
-        resolved_user_id = self._resolve_user_id(user_id)
+        resolved_user_id = self._resolve_user_id_for_keys(user_id, pending_updates)
         pending_updates = self._normalize_runtime_setting_updates(pending_updates, resolved_user_id)
         return self._persist_setting_updates(
             pending_updates,
@@ -3300,7 +3427,7 @@ class SettingsManager:
 
             # Stage defaults-plus-import privately while reusing update()'s
             # guards, aliases, normalization and credential handling.
-            user_id = self._resolve_user_id()
+            user_id = self._resolve_user_id_for_keys(None, imported)
             if user_id and not _uses_global_settings_only(user_id):
                 # An authenticated import replaces only that user's settings.
                 # Reject global fields rather than changing shared state.

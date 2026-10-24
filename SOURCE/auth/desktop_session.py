@@ -787,6 +787,15 @@ _store_lock = threading.Lock()
 # re-read the store themselves, so a late or repeated call is harmless.
 _account_change_listeners: list[Callable[[], None]] = []
 _account_change_listeners_lock = threading.Lock()
+# Bumped synchronously on every sign-in or sign-out, before any listener runs,
+# so a cached "who is signed in" answer (core.user_context) is never reused
+# across an account change.
+_account_change_generation = 0
+
+
+def account_change_generation() -> int:
+    """A counter that changes whenever desktop sign-in state may have changed."""
+    return _account_change_generation
 
 
 def add_account_change_listener(callback: Callable[[], None]) -> None:
@@ -809,7 +818,9 @@ def _notify_account_change() -> None:
     request handlers (and sometimes while the caller holds the store lock), and
     a listener may do slow work such as starting or stopping the microphone.
     """
+    global _account_change_generation
     with _account_change_listeners_lock:
+        _account_change_generation += 1
         listeners = list(_account_change_listeners)
     if not listeners:
         return
@@ -836,9 +847,11 @@ def get_desktop_session_store() -> DesktopSessionStore:
 def reset_desktop_session_store_for_tests(
     root_dir: Path | None = None,
 ) -> DesktopSessionStore:
-    global _store
+    global _store, _account_change_generation
     with _store_lock:
         _store = DesktopSessionStore(root_dir=root_dir)
+        with _account_change_listeners_lock:
+            _account_change_generation += 1
         return _store
 
 

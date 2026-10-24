@@ -81,6 +81,22 @@ INFRASTRUCTURE_KEYS: Final[frozenset[str]] = frozenset(
     }
 )
 
+# Device-tier keys that still belong to one person rather than to the machine.
+# Every other INFRASTRUCTURE_KEYS entry is install-scoped on the desktop: it is
+# stored in, and read from, this machine's settings.json whoever is signed in,
+# because the code that reads it (the window's close button, the wake detector,
+# the hotkey and audio threads) runs with no account context. These few stay in
+# the signed-in account's own local blob instead: a personal phone number, the
+# person's own acknowledgement of the dangerous-mode warning, and the person's
+# computer-use allowlist (read with an explicit user_id by its safety check).
+ACCOUNT_BOUND_DEVICE_KEYS: Final[frozenset[str]] = frozenset(
+    {
+        "computer_use_app_whitelist",
+        "dangerous_mode_acknowledged",
+        "founder_phone_number",
+    }
+)
+
 USER_SETTING_KEYS: Final[frozenset[str]] = frozenset(
     {
         "accent_color",
@@ -269,6 +285,7 @@ SETTING_KEY_ALIASES: Final[dict[str, str]] = {
 }
 
 __all__ = [
+    "ACCOUNT_BOUND_DEVICE_KEYS",
     "BIPA_DELETE_KEYS",
     "CLOUD_COMPAT_USER_SETTING_KEYS",
     "CLOUD_CONSENT_KEYS",

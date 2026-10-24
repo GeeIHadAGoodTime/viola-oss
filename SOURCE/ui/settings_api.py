@@ -949,17 +949,25 @@ def create_settings_router(*, music_service: object | None = None) -> APIRouter:
         except HTTPException:
             user_id = None
 
-        snapshot = dict(settings_mgr.settings)
         if user_id is None:
-            return snapshot
+            return dict(settings_mgr.settings)
 
         is_user_scoped_key = getattr(settings_mgr, "_is_user_scoped_key", lambda _key: True)
+        account_values = {
+            key: settings_mgr.get(key, settings_mgr.DEFAULT_SETTINGS.get(key), user_id=user_id)
+            for key in settings_mgr.DEFAULT_SETTINGS
+            if is_user_scoped_key(key)
+        }
+        # Copied only after the account's settings have loaded: the first load
+        # of an older account blob moves this machine's device settings out of
+        # it into the machine's own settings, and the page must show those.
+        snapshot = dict(settings_mgr.settings)
         for key in settings_mgr.DEFAULT_SETTINGS:
-            if is_user_scoped_key(key):
-                fallback = settings_mgr.DEFAULT_SETTINGS.get(key)
+            if key in account_values:
+                snapshot[key] = account_values[key]
             else:
                 fallback = snapshot.get(key, settings_mgr.DEFAULT_SETTINGS.get(key))
-            snapshot[key] = settings_mgr.get(key, fallback, user_id=user_id)
+                snapshot[key] = settings_mgr.get(key, fallback, user_id=user_id)
         return snapshot
 
     async def _handle_settings_mutation(
@@ -1673,11 +1681,14 @@ def create_settings_router(*, music_service: object | None = None) -> APIRouter:
     # Playlist endpoints
     playlist_mgr = get_playlist_manager()
 
-    def _playlist_response_payload(*, ok: bool, **extra: Any) -> dict[str, Any]:
+    # Every playlist route acts on the requesting account's own playlists. The
+    # playlist store would otherwise fall back to whatever principal is bound
+    # ambiently (or the device identity), which is not necessarily the caller.
+    def _playlist_response_payload(*, ok: bool, user_id: str, **extra: Any) -> dict[str, Any]:
         payload: dict[str, Any] = {
             "ok": ok,
-            "playlists": playlist_mgr.list_playlists(),
-            "default_playlist": playlist_mgr.get_default_playlist() or "",
+            "playlists": playlist_mgr.list_playlists(user_id=user_id),
+            "default_playlist": playlist_mgr.get_default_playlist(user_id=user_id) or "",
         }
         payload.update(extra)
         return payload
@@ -1693,30 +1704,33 @@ def create_settings_router(*, music_service: object | None = None) -> APIRouter:
         )
 
     @router.get("/playlists")
-    async def get_playlists():
+    async def get_playlists(request: Request):
         """Get all saved playlists."""
+        user_id = _get_request_user_id(request)
         try:
-            return JSONResponse(content=success_response(_playlist_response_payload(ok=True)))
+            return JSONResponse(content=success_response(_playlist_response_payload(ok=True, user_id=user_id)))
         except Exception:
             logger.exception("Failed to get playlists")
             return _settings_route_failure("playlist_error", "Something went wrong. Try again.")
 
     @router.post("/playlists")
-    async def add_playlist(name: str, url: str, shuffle: bool = True):
+    async def add_playlist(request: Request, name: str, url: str, shuffle: bool = True):
         """Add a YouTube playlist with optional shuffle setting."""
+        user_id = _get_request_user_id(request)
         try:
-            success = playlist_mgr.add_playlist(name, url, shuffle)
-            return JSONResponse(content=success_response(_playlist_response_payload(ok=success)))
+            success = playlist_mgr.add_playlist(name, url, shuffle, user_id=user_id)
+            return JSONResponse(content=success_response(_playlist_response_payload(ok=success, user_id=user_id)))
         except Exception:
             logger.exception("Failed to add playlist")
             return _settings_route_failure("playlist_error", "Something went wrong. Try again.")
 
     @router.delete("/playlists/{name}")
-    async def delete_playlist(name: str):
+    async def delete_playlist(request: Request, name: str):
         """Delete a playlist."""
+        user_id = _get_request_user_id(request)
         try:
-            success = playlist_mgr.remove_playlist(name)
-            return JSONResponse(content=success_response(_playlist_response_payload(ok=success)))
+            success = playlist_mgr.remove_playlist(name, user_id=user_id)
+            return JSONResponse(content=success_response(_playlist_response_payload(ok=success, user_id=user_id)))
         except Exception:
             logger.exception("Failed to delete playlist '%s'", name)
             return _settings_route_failure("playlist_error", "Something went wrong. Try again.")
@@ -1728,7 +1742,9 @@ def create_settings_router(*, music_service: object | None = None) -> APIRouter:
         try:
             synced_count = playlist_mgr.sync_from_provider(user_id=user_id)
             return JSONResponse(
-                content=success_response(_playlist_response_payload(ok=True, synced_count=synced_count))
+                content=success_response(
+                    _playlist_response_payload(ok=True, user_id=user_id, synced_count=synced_count)
+                )
             )
         except Exception as e:
             from music.providers.errors import MusicProviderUnavailableError
@@ -1751,41 +1767,45 @@ def create_settings_router(*, music_service: object | None = None) -> APIRouter:
             return _settings_route_failure("playlist_sync_error", "Something went wrong. Try again.")
 
     @router.post("/playlists/rename")
-    async def rename_playlist(old_name: str, new_name: str):
+    async def rename_playlist(request: Request, old_name: str, new_name: str):
         """Rename a playlist (local name only)."""
+        user_id = _get_request_user_id(request)
         try:
-            success = playlist_mgr.rename_playlist(old_name, new_name)
-            return JSONResponse(content=success_response(_playlist_response_payload(ok=success)))
+            success = playlist_mgr.rename_playlist(old_name, new_name, user_id=user_id)
+            return JSONResponse(content=success_response(_playlist_response_payload(ok=success, user_id=user_id)))
         except Exception:
             logger.exception("Failed to rename playlist")
             return _settings_route_failure("playlist_error", "Something went wrong. Try again.")
 
     @router.post("/playlists/star")
-    async def star_playlist(name: str, starred: bool = True):
+    async def star_playlist(request: Request, name: str, starred: bool = True):
         """Star or unstar a playlist."""
+        user_id = _get_request_user_id(request)
         try:
-            success = playlist_mgr.star_playlist(name, starred)
-            return JSONResponse(content=success_response(_playlist_response_payload(ok=success)))
+            success = playlist_mgr.star_playlist(name, starred, user_id=user_id)
+            return JSONResponse(content=success_response(_playlist_response_payload(ok=success, user_id=user_id)))
         except Exception:
             logger.exception("Failed to star playlist")
             return _settings_route_failure("playlist_error", "Something went wrong. Try again.")
 
     @router.post("/playlists/default")
-    async def set_default_playlist(name: str):
+    async def set_default_playlist(request: Request, name: str):
         """Set a playlist as the default."""
+        user_id = _get_request_user_id(request)
         try:
-            success = playlist_mgr.set_default_playlist(name)
-            return JSONResponse(content=success_response(_playlist_response_payload(ok=success)))
+            success = playlist_mgr.set_default_playlist(name, user_id=user_id)
+            return JSONResponse(content=success_response(_playlist_response_payload(ok=success, user_id=user_id)))
         except Exception:
             logger.exception("Failed to set default playlist")
             return _settings_route_failure("playlist_error", "Something went wrong. Try again.")
 
     @router.post("/playlists/update-url")
-    async def update_playlist_url(name: str, url: str):
+    async def update_playlist_url(request: Request, name: str, url: str):
         """Update a playlist's URL."""
+        user_id = _get_request_user_id(request)
         try:
-            success = playlist_mgr.update_playlist_url(name, url)
-            return JSONResponse(content=success_response(_playlist_response_payload(ok=success)))
+            success = playlist_mgr.update_playlist_url(name, url, user_id=user_id)
+            return JSONResponse(content=success_response(_playlist_response_payload(ok=success, user_id=user_id)))
         except Exception:
             logger.exception("Failed to update playlist URL")
             return _settings_route_failure("playlist_error", "Something went wrong. Try again.")
