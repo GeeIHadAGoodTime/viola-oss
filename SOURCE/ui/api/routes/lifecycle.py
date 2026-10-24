@@ -764,6 +764,18 @@ def _setup_automatic_state_broadcast(*, hub: Any, music: Any, state: Any) -> Non
         last_broadcast_is_playing: list[bool | None] = [None]
         state_debounce_lock = threading.Lock()
         state_debounce_ms = 200
+        # One trailing flush per debounce window, so the LAST state of a burst
+        # always goes out. Without it the final state of a burst (e.g. the duck
+        # level at the end of a volume change) waited for the next unrelated
+        # state change, about 1 s later during playback (1.0.5 build-4 test).
+        trailing_flush_timer: list[threading.Timer | None] = [None]
+
+        def flush_pending_state() -> None:
+            with state_debounce_lock:
+                trailing_flush_timer[0] = None
+                pending = pending_state_change[0]
+            if pending is not None:
+                on_music_state_change(pending)
 
         # Spoke forwarding dedup tracking
         last_fwd_video_id: list[str | None] = [None]
@@ -806,6 +818,14 @@ def _setup_automatic_state_broadcast(*, hub: Any, music: Any, state: Any) -> Non
                             int(time_since_last),
                             state_debounce_ms,
                         )
+                        if trailing_flush_timer[0] is None:
+                            flush_timer = threading.Timer(
+                                (state_debounce_ms - time_since_last + 5) / 1000.0,
+                                flush_pending_state,
+                            )
+                            flush_timer.daemon = True
+                            trailing_flush_timer[0] = flush_timer
+                            flush_timer.start()
                         return
                     if playback_toggle:
                         log.debug(

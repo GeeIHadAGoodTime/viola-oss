@@ -1077,6 +1077,19 @@ class ProviderAgnosticRouter:
             },
         }
 
+    def account_login_required(self) -> bool:
+        """True when there is no provider only because no Viola account is signed in.
+
+        The managed provider is withheld until sign-in (``ManagedLLMAuthRequired``).
+        Callers use this to tell the user to sign in, instead of a generic
+        "provider not configured" message that names the wrong problem.
+        """
+        self._sync_runtime_provider_if_needed()
+        if self._provider_from_frozen_or_current() is not None:
+            return False
+        payload = self._init_error_payload
+        return isinstance(payload, dict) and payload.get("error_code") == "login_required_for_paid_action"
+
     def _raise_init_auth_required(self) -> None:
         payload = self._init_error_payload
         if not isinstance(payload, dict):

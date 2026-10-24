@@ -33,49 +33,6 @@ class WakeCallbackManager:
         """Set the event loop for thread-safe async operations."""
         self._event_loop = loop
 
-    def _run_async_threadsafe(self, coro) -> None:
-        """
-        Run an async coroutine from the wake detector thread.
-
-        The wake detector runs on its own thread, not the main event loop,
-        so we need to schedule coroutines using run_coroutine_threadsafe.
-        """
-        loop = self._event_loop
-
-        # Try to get the loop from the pipeline if not set
-        if loop is None and hasattr(self.pipeline, "_event_loop"):
-            loop = self.pipeline._event_loop
-
-        if loop is None or loop.is_closed():
-            # This is expected when running from wake detector thread without async context
-            # TTS feedback is non-critical - log at debug level
-            logger.debug("No event loop available for async TTS feedback (wake thread)")
-            # Close the coroutine to avoid "never awaited" warning
-            coro.close()
-            return
-
-        try:
-            asyncio.run_coroutine_threadsafe(coro, loop)
-        except (RuntimeError, asyncio.InvalidStateError) as exc:
-            logger.warning("Failed to schedule async TTS: %s", exc)
-            coro.close()
-
-    def _is_playback_active(self) -> bool:
-        """Check if audio is currently playing (music, podcast, etc.)."""
-        try:
-            from core.state_selectors import select_is_playing
-
-            return select_is_playing()
-        except Exception:
-            # Fallback: check wake decision policy's playback state
-            try:
-                from voice.wake_detector.wake_decision_policy import get_wake_policy
-
-                policy = get_wake_policy()
-                return policy.is_playback_active
-            except Exception:
-                return False
-
     def create_wake_callback_with_ducking(self, on_wake_word_detected: Callable[[], None] | None) -> Callable[[], None]:
         """
         Create wake callback with audio ducking support.
@@ -158,16 +115,8 @@ class WakeCallbackManager:
                         error.user_friendly_message(),
                     )
 
-            # TTS feedback (wake word acknowledged) - async call from thread
-            # During active playback, skip "Yes?" — the audio duck alone signals wake detection.
-            # This prevents interrupting podcasts/music with unnecessary TTS.
-            if self.pipeline.synthesizer and not self._is_playback_active():
-                try:
-                    self._run_async_threadsafe(self.pipeline.synthesizer.speak("Yes?"))
-                except (AttributeError, RuntimeError) as exc:
-                    logger.warning("Wake word TTS feedback failed: %s", exc)
-            elif self._is_playback_active():
-                logger.debug("Skipping 'Yes?' TTS — playback active, duck alone is signal")
+            # Wake feedback is the chime alone (played by the wake processor in
+            # the callback below, right after this duck), never a spoken "Yes?".
 
             # NOTE: Audio stays ducked until voice interaction completes.
             # This matches Alexa/Google Home behavior - ducking persists during:

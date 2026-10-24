@@ -120,11 +120,18 @@ class AudioDucker:
                         self._fade_cancel.set()
                         self._fade_thread.join(timeout=TIMEOUT_MEDIUM)
 
-                    # Start fade down
+                    # Drop straight to the duck level: no fade down. Wake
+                    # feedback is the chime, and the music has to dip at the
+                    # same moment. A 300 ms fade down was ~7 volume steps, and
+                    # each one is a player state change the UI's 200 ms
+                    # broadcast debounce coalesces, so the final duck level
+                    # reached the YouTube player only with the next position
+                    # tick, about 1 s after the chime (1.0.5 build-4 laptop
+                    # test). The restore still fades up.
                     self._fade_cancel.clear()
                     self._fade_thread = threading.Thread(
-                        target=self._fade_to_volume,
-                        args=(current_volume, self._active_duck_level),
+                        target=self._set_final_volume,
+                        args=(self._active_duck_level,),
                         daemon=True,
                         name="audio-duck-down",
                     )
@@ -237,6 +244,10 @@ class AudioDucker:
             time.sleep(step_duration)
 
         # Ensure we reach exact target volume
+        self._set_final_volume(end_vol)
+
+    def _set_final_volume(self, end_vol: int) -> None:
+        """Set ``end_vol`` in one step and verify the player took it."""
         try:
             self.music_player.set_volume(end_vol)
 

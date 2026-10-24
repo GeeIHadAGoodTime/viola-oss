@@ -344,6 +344,8 @@ class VoiceCommandHandler:
         self._wake_timestamp: float | None = None  # Track when wake was detected
         self._wake_perf_counter: float | None = None  # High-precision wake timing
         self._continuous_capture: Any | None = None  # ContinuousMicCapture instance
+        # Same-class fallback when no running app holds the desktop's command service.
+        self._local_command_service: Any | None = None
 
     def record_wake_timestamp(self) -> None:
         """Record timestamp when wake word was detected for guardrail checks."""
@@ -974,85 +976,6 @@ class VoiceCommandHandler:
             return False
         return True
 
-    @staticmethod
-    def _unwrap_envelope(envelope: dict) -> dict:
-        """Unwrap a ResponseEnvelope to its data dict.
-
-        IntentBridge.interpret() and .dispatch() return ResponseEnvelope
-        (``{"ok": ..., "error": ..., "data": {...}}``).  Callers need the
-        inner ``data`` dict which contains the actual intent/message/spoken
-        fields.
-        """
-        if isinstance(envelope, dict) and "ok" in envelope and "data" in envelope:
-            data = envelope.get("data")
-            if isinstance(data, dict):
-                return data
-        return envelope
-
-    @staticmethod
-    def _is_agent_tier_interpretation(interpretation: dict) -> bool:
-        """Check if interpretation indicates a long-running agent/AI task.
-
-        Agent-tier tasks are identified by:
-        - type == "answer" with spoken == True (AI already answered via pipeline)
-        - type == "delegated" with spoken == True (AI executed and spoke result)
-        - source field indicating AI routing (knowledge, ai, agent, llm)
-
-        These tasks have already been executed during interpret() by the
-        IntentPipeline's AI controller.  dispatch() for these is fast
-        (just returns the already-computed result), so the timeout concern
-        is actually on the interpret() side.
-        """
-        intent_type = str(interpretation.get("type", ""))
-        params = interpretation.get("params", {})
-        if not isinstance(params, dict):
-            params = {}
-
-        # Already-spoken AI answers — these were handled during interpret()
-        if intent_type in ("answer", "delegated") and params.get("spoken"):
-            return True
-
-        # Source-based detection (pipeline annotates source on results)
-        source = str(params.get("source", "") or interpretation.get("source", ""))
-        if source in ("ai", "agent", "llm_route"):
-            return True
-
-        return False
-
-    async def _try_command_registry(self, transcript: str, *, user_id: str) -> dict | None:
-        pipeline = getattr(self.intent, "_pipeline", None)
-        resolver = getattr(pipeline, "try_command_registry", None)
-        if not callable(resolver):
-            return None
-        try:
-            result = await resolver(transcript, user_key=user_id)
-        except LookupError as exc:
-            return {
-                "ok": False,
-                "success": False,
-                "intent": "auth_required",
-                "message": str(exc),
-                "spoken": False,
-                "continue_listening": False,
-                "command_registry": True,
-            }
-        except Exception as exc:
-            logger.debug("Voice command registry resolution failed: %s", exc)
-            return None
-        if result is None:
-            return None
-        data = dict(result.data) if getattr(result, "data", None) else {}
-        message = data.get("message", "")
-        return {
-            "ok": bool(result.ok),
-            "success": bool(result.ok),
-            "intent": str(result.intent or "command_registry"),
-            "message": message if isinstance(message, str) else str(message),
-            "spoken": False,
-            "continue_listening": False,
-            "command_registry": True,
-        }
-
     def _resolve_voice_user_id(self) -> str:
         try:
             from core.user_context import (
@@ -1153,22 +1076,30 @@ class VoiceCommandHandler:
         is_follow_up: bool = False,
         user_id: str,
     ) -> dict | None:
-        """Interpret and dispatch the command.
+        """Run a spoken command through the same command path as push-to-talk.
 
-        Args:
-            transcript: User's transcribed speech.
-            is_follow_up: True for turn > 1 in conversational mode.
-                When True, uses a fast path that skips intent classification
-                and routes directly to the LLM with conversation history.
+        Push-to-talk and typed commands go ``POST /v1/command`` ->
+        ``CommandService.execute`` -> the bridge's canonical
+        ``IntentPipeline.process(user_key=<signed-in user>)``. A wake turn, and
+        every follow-up or barge-in turn after it, takes exactly that path with
+        the same ``user_id``: same account, same provider router, same
+        conversation, same agent loop.
 
-        Uses a two-tier timeout strategy:
-        - interpret() runs with a soft deadline: if it takes longer than
-          VOICE_COMMAND_TIMEOUT (30s), the user hears "Working on it" but
-          the interpretation continues in the foreground until the pipeline's
-          own timeout fires (up to 600s for agent tasks).
-        - dispatch() keeps the 30s hard timeout for simple commands.  For
-          agent-tier results (already executed during interpret()), dispatch
-          is just envelope wrapping and finishes instantly.
+        Wake turns used to take a separate legacy route instead
+        (``IntentBridge.interpret`` -> ``IntentInterpreter`` ->
+        ``route_command``). That route ran on a second pipeline built at
+        startup for the anonymous ``device-*`` identity and never passed the
+        speaker's ``user_key``, so the pipeline rebound the turn to the device
+        identity and the managed-AI account gate saw nobody signed in. Every
+        wake turn that needed the AI failed with "Managed LLM provider blocked
+        until account login" while push-to-talk on the same account worked
+        (1.0.5 build-4 laptop test). Turns that never reached the AI (a music
+        skill, "never mind") still worked, which is why it looked like it broke
+        "after a while".
+
+        Returns the result dict the rest of the voice turn reads (``message``,
+        ``spoken``, ``continue_listening``, ``card``...), or ``None`` when the
+        command failed or hit the hard outer timeout.
         """
         _update_state_hub_voice_mode("processing", user_id=user_id)
 
@@ -1177,239 +1108,75 @@ class VoiceCommandHandler:
 
             return account_required_envelope_data()
 
-        registry_result = await self._try_command_registry(transcript, user_id=user_id)
-        if registry_result is not None:
-            return registry_result
+        from services.command import CommandRequest
 
-        # GAP-7: Fast path for conversational follow-ups.
-        # Skip the full IntentBridge interpret/dispatch cycle and route
-        # directly to the IntentPipeline with force_ai=True so the LLM
-        # receives conversation history and handles short answers like
-        # "yes", "the large one", "tomorrow" without re-classification.
-        if is_follow_up:
-            _lower = transcript.strip().lower()
-            _INSTANT_FOLLOW_UP = frozenset(
-                {
-                    "stop",
-                    "cancel",
-                    "nevermind",
-                    "never mind",
-                    "quit",
-                    "shut up",
-                    "pause",
-                }
-            )
-            if _lower not in _INSTANT_FOLLOW_UP:
-                fast_result = await self._interpret_follow_up_direct(
-                    transcript,
-                    user_id=user_id,
-                )
-                if fast_result is not None:
-                    return fast_result
-                # Fast path failed — fall through to normal path
-                logger.debug("Follow-up fast path returned None, using normal path")
-
-        # ---- Phase 0: Try streaming answer path (LLM + TTS overlap) ----
-        # For simple chat/answer queries, stream LLM tokens directly to TTS
-        # so the user hears the first sentence while the LLM is still
-        # generating.  Falls back to the batch path for agent tasks, commands,
-        # and unsupported providers.
-        streaming_result = await self._try_streaming_answer(transcript, user_id=user_id)
-        if streaming_result is not None:
-            return streaming_result
-
-        # ---- Phase 1: Interpretation (with soft "working on it" notification) ----
-        interpretation = await self._interpret_with_progress(transcript)
-        if interpretation is None:
-            return None
-
-        # ---- Phase 2: Dispatch ----
-        # Agent-tier results were already executed during interpret() — the
-        # AI controller ran tools, generated a response, and spoke via TTS.
-        # dispatch() for these just wraps the result and returns instantly.
-        # Simple commands (play, pause, etc.) still get the 30s hard timeout.
-        try:
-            if self._is_agent_tier_interpretation(interpretation):
-                # Fast path — dispatch is just envelope wrapping for agent results
-                logger.debug(
-                    "Agent-tier result detected (type=%s), dispatching without timeout",
-                    interpretation.get("type"),
-                )
-                result_envelope = await self.intent.dispatch(interpretation)
-            else:
-                result_envelope = await asyncio.wait_for(
-                    self.intent.dispatch(interpretation),
-                    timeout=VOICE_COMMAND_TIMEOUT,
-                )
-            return self._unwrap_envelope(result_envelope)
-        except TimeoutError:
-            logger.error(
-                "Intent dispatch timed out after %ds transcript_length=%d",
-                VOICE_COMMAND_TIMEOUT,
-                len(transcript),
-            )
-            return None
-
-    async def _interpret_follow_up_direct(
-        self,
-        transcript: str,
-        *,
-        user_id: str | None = None,
-    ) -> dict | None:
-        """Fast-path interpretation for conversational follow-ups.
-
-        Bypasses the IntentBridge interpret/dispatch cycle and routes
-        directly through the IntentPipeline with ``force_ai=True``.
-        The pipeline skips Phase 1 (instant commands / regex) and sends
-        the transcript straight to the AI controller, which already has
-        conversation history from prior turns.
-
-        Returns the unwrapped result dict, or None on failure (caller
-        should fall back to the normal path).
-        """
-        pipeline = getattr(self.intent, "_pipeline", None)
-        if pipeline is None:
-            return None
-        voice_user_key = str(user_id or "").strip()
-        if not voice_user_key:
-            # Resolve user identity so the pipeline binds the correct per-user
-            # conversation manager. Without this, a shared pipeline on desktop
-            # daemon mode would write voice turns under the wrong tenant when
-            # multiple users are linked to the same process (CHAN-R1).
-            try:
-                voice_user_key = self._resolve_voice_user_id()
-            except LookupError:
-                voice_user_key = ""
-        if not voice_user_key:
-            return {
-                "ok": False,
-                "intent": "auth_required",
-                "message": "user_id is required for voice command handling",
-                "spoken": False,
-                "continue_listening": False,
-                "success": False,
-            }
-        try:
-            pipeline_result = await pipeline.process(
-                transcript,
-                force_ai=True,
-                user_key=voice_user_key,
-            )
-            # Convert PipelineResult to the dict shape the voice handler expects
-            data = dict(pipeline_result.data) if pipeline_result.data else {}
-            result: dict[str, Any] = {
-                "ok": pipeline_result.ok,
-                "intent": pipeline_result.intent,
-                "message": data.get("message", ""),
-                "spoken": data.get("spoken", False),
-                "continue_listening": data.get("continue_listening", False),
-                "success": pipeline_result.ok,
-            }
-            card = data.get("card")
-            if card and isinstance(card, dict):
-                result["card"] = card
-            return result
-        except Exception:
-            logger.warning(
-                "Follow-up fast path failed, falling back: %s",
-                transcript[:60],
-                exc_info=True,
-            )
-            return None
-
-    async def _try_streaming_answer(self, transcript: str, *, user_id: str) -> dict | None:
-        """Try to stream LLM answer tokens to TTS concurrently.
-
-        When the LLM provider supports streaming and the request produces a
-        simple text answer (not a command or agent task), this method runs
-        LLM token generation and TTS playback concurrently so the user hears
-        the first sentence while the LLM is still generating.
-
-        Returns the completed result dict on success, or ``None`` to signal
-        the caller to fall back to the batch path.
-        """
-        # Need the AI controller for streaming
-        pipeline = getattr(self.intent, "_pipeline", None)
-        if pipeline is None:
-            return None
-        ai_ctrl = getattr(pipeline, "ai_controller", None)
-        if ai_ctrl is None or not hasattr(ai_ctrl, "stream_answer_tokens"):
-            return None
-
-        # Need TTS for streaming playback
-        tts_enabled = self.capabilities.get("enable_tts", True)
-        if not self.tts or not tts_enabled:
-            return None
-
-        # Check if TTS has streaming support
-        if not hasattr(self.tts, "speak_streaming"):
-            return None
-
-        _update_state_hub_voice_mode("processing", user_id=user_id)
-
-        token_queue: asyncio.Queue[str | None] = asyncio.Queue()
-
-        async def _token_generator():
-            """Async generator that yields tokens from the queue."""
-            while True:
-                token = await token_queue.get()
-                if token is None:
-                    break
-                yield token
-
-        # Run LLM streaming and TTS concurrently
-        llm_task = asyncio.ensure_future(ai_ctrl.stream_answer_tokens(transcript, token_queue))
-
-        # Start TTS immediately — it reads from the queue as tokens arrive
-        _update_state_hub_voice_mode("speaking", user_id=user_id)
-        tts_task = asyncio.ensure_future(self.tts.speak_streaming(_token_generator()))
-
-        try:
-            # Wait for both to complete
-            stream_result, spoken_text = await asyncio.gather(llm_task, tts_task)
-        except Exception:
-            logger.debug(
-                "Streaming answer failed, falling back to batch: %s",
-                transcript[:60],
-                exc_info=True,
-            )
-            # Cancel any pending tasks
-            for task in (llm_task, tts_task):
-                if not task.done():
-                    task.cancel()
-                    try:
-                        await task
-                    except (asyncio.CancelledError, Exception):
-                        pass
-            return None
-
-        if stream_result is None:
-            # Streaming not applicable (agent mode, command, etc.)
-            # TTS may have consumed some tokens — but since stream_result
-            # is None, the queue should have received sentinel immediately.
-            return None
-
-        # Streaming succeeded — result already has spoken=True
-        # Update message with the full spoken text (for logging/broadcast)
-        if spoken_text and isinstance(spoken_text, str):
-            if not stream_result.get("message"):
-                stream_result["message"] = spoken_text
-
-        await self._record_voice_event(
-            "streaming_tts_finalized",
-            {
-                "source": "streaming_tts",
-                "spoken_chars": len(spoken_text) if isinstance(spoken_text, str) else 0,
-                "response_intent": str(stream_result.get("intent", "")),
-            },
+        request = CommandRequest(
+            text=transcript,
+            channel="voice",
+            origin="voice_wake",
             user_id=user_id,
         )
-
-        logger.info(
-            "Streaming answer complete: %d chars spoken",
-            len(spoken_text) if spoken_text else 0,
+        logger.debug("Voice turn via command service (follow_up=%s)", is_follow_up)
+        command_result = await self._run_command_bounded(
+            self._command_service().execute(request),
+            transcript,
         )
-        return stream_result
+        if command_result is None:
+            return None
+        return self._voice_result_from_command(command_result)
+
+    def _command_service(self) -> Any:
+        """Return the command service push-to-talk and typed commands use.
+
+        The desktop builds one ``CommandService`` per process and keeps it on
+        ``app.state.command_service`` (``ui/api/routes/command.py``); the
+        companion relay reaches it the same way. Only when no app is running
+        (headless runs, tests) is the same class built here around this
+        handler's intent bridge, which owns the same canonical pipeline.
+        """
+        try:
+            from ui.server import get_app
+
+            app = get_app()
+        except Exception:  # noqa: BLE001, RUF100 - no running app means the local fallback below
+            app = None
+        service = getattr(getattr(app, "state", None), "command_service", None)
+        if service is not None and callable(getattr(service, "execute", None)):
+            return service
+        if self._local_command_service is None:
+            from services.command import CommandService, CommandServiceContext
+
+            self._local_command_service = CommandService(
+                context=CommandServiceContext(state=None, music=self.music, intent=self.intent)
+            )
+        return self._local_command_service
+
+    @staticmethod
+    def _voice_result_from_command(command_result: Any) -> dict[str, Any]:
+        """Shape a ``CommandResult`` the way the rest of the voice turn reads it.
+
+        Uses the same envelope ``POST /v1/command`` returns, so a wake reply
+        and a push-to-talk reply carry the same text and fields.
+        """
+        envelope = command_result.to_envelope()
+        raw_data = envelope.get("data") if isinstance(envelope, dict) else None
+        result: dict[str, Any] = dict(raw_data) if isinstance(raw_data, dict) else {}
+        ok = bool(getattr(command_result, "ok", False))
+        message = result.get("message")
+        if not isinstance(message, str) or not message:
+            message = ""
+            error = envelope.get("error") if isinstance(envelope, dict) else None
+            if not ok and isinstance(error, dict) and isinstance(error.get("message"), str):
+                message = error["message"]
+        result.update(
+            ok=ok,
+            success=ok,
+            intent=str(getattr(command_result, "intent", "") or result.get("intent") or "unknown"),
+            message=message,
+            spoken=bool(result.get("spoken", False)),
+            continue_listening=bool(result.get("continue_listening", False)),
+        )
+        return result
 
     async def _play_follow_up_cue(self) -> None:
         """Play a brief audio cue to signal Viola is listening for follow-up.
@@ -1458,12 +1225,12 @@ class VoiceCommandHandler:
         except Exception:
             pass
 
-    def _interpret_hard_timeout(self) -> float:
-        """Hard outer bound (seconds) for a single interpret() call (WL-1).
+    def _command_hard_timeout(self) -> float:
+        """Hard outer bound (seconds) for a single voice command (WL-1).
 
-        A hung downstream await under interpret() must never leave the wake
+        A hung downstream await under the command must never leave the wake
         detector paused forever — handle_once() pauses it at entry and only
-        resumes it once handle_once returns, so an unbounded interpret bricks
+        resumes it once handle_once returns, so an unbounded command bricks
         the voice session (Viola cannot even hear "stop"). This bound is the
         backstop that guarantees the turn always ends.
 
@@ -1473,7 +1240,7 @@ class VoiceCommandHandler:
         executor at ai_controller.py) auto-extends x1.5 once (agent_loop.py),
         so the legitimate ceiling is budget * 1.5. We use budget * 2.0 (with a
         1800s floor for small budgets) to clear that ceiling with margin for
-        intent classification, tool wrap-up and TTS inside the interpret path.
+        intent classification, tool wrap-up and TTS inside the command path.
         """
         agent_budget = 900.0
         try:
@@ -1481,70 +1248,56 @@ class VoiceCommandHandler:
 
             agent_budget = float(getattr(settings, "agent_timeout_seconds", 900.0) or 900.0)
         except (ImportError, AttributeError, TypeError, ValueError):
-            logger.debug("Could not read agent_timeout_seconds; using default for interpret bound")
+            logger.debug("Could not read agent_timeout_seconds; using default for command bound")
         return max(agent_budget * 2.0, 1800.0)
 
-    async def _interpret_with_progress(self, transcript: str) -> dict | None:
-        """Run interpret() without automatic progress speech.
+    async def _run_command_bounded(self, command: Any, transcript: str) -> Any | None:
+        """Await one voice command under the WL-1 hard outer timeout.
 
-        Returns:
-            Unwrapped interpretation dict, or None on failure.
+        No progress speech: long agent tasks keep running silently and the
+        final answer or a user interruption still works.
+
+        Returns the command's result, or ``None`` if it raised or exceeded the
+        hard outer timeout (it is cancelled then, so the turn ends and the wake
+        detector resumes).
         """
-        interpret_task = asyncio.ensure_future(self.intent.interpret(transcript))
+        command_task = asyncio.ensure_future(command)
 
         try:
-            # Wait up to VOICE_COMMAND_TIMEOUT for fast interpretation
-            done, _pending = await asyncio.wait(
-                {interpret_task},
-                timeout=VOICE_COMMAND_TIMEOUT,
-            )
-
+            done, _pending = await asyncio.wait({command_task}, timeout=VOICE_COMMAND_TIMEOUT)
             if done:
-                # Interpretation completed within the timeout — normal path
-                interpretation_envelope = interpret_task.result()
-                return self._unwrap_envelope(interpretation_envelope)
+                return command_task.result()
 
-            # Interpretation is still running — this is likely an agent task.
-            # Keep waiting silently; final answers and user interruptions still work.
-            logger.info(
-                "Interpretation exceeding %ds, likely agent task",
-                VOICE_COMMAND_TIMEOUT,
-            )
+            logger.info("Voice command exceeding %ds, likely agent task", VOICE_COMMAND_TIMEOUT)
 
             # Keep waiting, but under a generous HARD outer timeout so a single
-            # unbounded await anywhere under interpret() can never hang the turn
-            # forever with the mic paused (WL-1). The bound sits well above the
-            # agent's legitimate max wall-clock (see _interpret_hard_timeout).
-            # Uses asyncio.wait (not wait_for) to mirror the soft-deadline idiom
-            # above and to keep cancellation handling explicit and local.
-            hard_timeout = self._interpret_hard_timeout()
-            done, _pending = await asyncio.wait(
-                {interpret_task},
-                timeout=hard_timeout,
-            )
+            # unbounded await anywhere under the command can never hang the
+            # turn forever with the mic paused (WL-1). The bound sits well above
+            # the agent's legitimate max wall-clock (see _command_hard_timeout).
+            hard_timeout = self._command_hard_timeout()
+            done, _pending = await asyncio.wait({command_task}, timeout=hard_timeout)
             if done:
-                interpretation_envelope = interpret_task.result()
-                return self._unwrap_envelope(interpretation_envelope)
+                return command_task.result()
 
             # Hard outer timeout fired: a downstream await did not return within
             # the generous bound. Cancel and end the turn so handle_once()'s
             # finally resumes the wake detector — Viola stays able to hear "stop".
             logger.error(
-                "Interpretation exceeded hard outer timeout %.0fs; cancelling to "
+                "Voice command exceeded hard outer timeout %.0fs; cancelling to "
                 "release the wake detector transcript_length=%d",
                 hard_timeout,
                 len(transcript),
             )
-            interpret_task.cancel()
+            command_task.cancel()
             # Give the cancellation a bounded chance to settle so we don't leak
             # the task; asyncio.wait never raises on task cancellation/error.
-            await asyncio.wait({interpret_task}, timeout=TIMEOUT_GRACE)
+            await asyncio.wait({command_task}, timeout=TIMEOUT_GRACE)
             return None
 
         except Exception:
-            logger.exception("Interpretation failed transcript_length=%d", len(transcript))
-            if not interpret_task.done():
-                interpret_task.cancel()
+            logger.exception("Voice command failed transcript_length=%d", len(transcript))
+            if not command_task.done():
+                command_task.cancel()
             return None
 
     @staticmethod
