@@ -949,17 +949,25 @@ def create_settings_router(*, music_service: object | None = None) -> APIRouter:
         except HTTPException:
             user_id = None
 
-        snapshot = dict(settings_mgr.settings)
         if user_id is None:
-            return snapshot
+            return dict(settings_mgr.settings)
 
         is_user_scoped_key = getattr(settings_mgr, "_is_user_scoped_key", lambda _key: True)
+        account_values = {
+            key: settings_mgr.get(key, settings_mgr.DEFAULT_SETTINGS.get(key), user_id=user_id)
+            for key in settings_mgr.DEFAULT_SETTINGS
+            if is_user_scoped_key(key)
+        }
+        # Copied only after the account's settings have loaded: the first load
+        # of an older account blob moves this machine's device settings out of
+        # it into the machine's own settings, and the page must show those.
+        snapshot = dict(settings_mgr.settings)
         for key in settings_mgr.DEFAULT_SETTINGS:
-            if is_user_scoped_key(key):
-                fallback = settings_mgr.DEFAULT_SETTINGS.get(key)
+            if key in account_values:
+                snapshot[key] = account_values[key]
             else:
                 fallback = snapshot.get(key, settings_mgr.DEFAULT_SETTINGS.get(key))
-            snapshot[key] = settings_mgr.get(key, fallback, user_id=user_id)
+                snapshot[key] = settings_mgr.get(key, fallback, user_id=user_id)
         return snapshot
 
     async def _handle_settings_mutation(
