@@ -23,6 +23,7 @@ import TimerCountdown from './components/TimerCountdown';
 import { useSettings } from './hooks/useSettings';
 import { useAvailableRooms } from './hooks/useAvailableRooms';
 import CallBriefing from './components/CallBriefing';
+import DiagnosticsDisclosureNotice from './components/DiagnosticsDisclosureNotice';
 import CallConsultation from './components/CallConsultation';
 import PhoneCallPanel from './components/PhoneCallPanel';
 import LoginPromptModal from './components/LoginPromptModal';
@@ -3159,7 +3160,10 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
           requested: true,
           provided: false,
           storage: 'metadata_only',
-          reason: 'browser_capture_unavailable',
+          // Screen context is sent as the text fields above, never as an
+          // image: the backend stores metadata only because pixels cannot go
+          // through the support redaction.
+          reason: 'text_context_only',
         }
         : {
           requested: false,
@@ -3200,8 +3204,18 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
     // value here was either typed by the user or shown to them verbatim in the
     // modal's "Sending: Viola v… on …" line before Send -- nothing is populated
     // from anything they could not see.
+    const builtContext = buildBugReportContext(includeScreenContext);
+    // The "Include what Viola was showing" box used to change only a metadata
+    // flag while the screen, track, agent task and page address were sent
+    // either way. Unchecked now really leaves them out.
+    const screenContext = includeScreenContext ? builtContext : {
+      source: builtContext.source,
+      surface: builtContext.surface,
+      ui_entrypoint: builtContext.ui_entrypoint,
+      screen_capture_metadata: builtContext.screen_capture_metadata,
+    };
     const context = {
-      ...buildBugReportContext(includeScreenContext),
+      ...screenContext,
       app_version: appVersion,
       os,
       contact,
@@ -3858,6 +3872,14 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
       />
 
       {activeCard && <ContentCard data={activeCard} onDismiss={dismissCard} />}
+
+      {/* One-time notice for automatic anonymous crash reports (desktop hub
+          only; waits until onboarding is finished). Crash reports stay queued
+          on this machine until it has been shown. */}
+      <DiagnosticsDisclosureNotice
+        enabled={!isSpoke && !cloudSurfaceActive && !onboarding.isOnboarding}
+        onOpenPrivacySettings={() => openSettingsPanel('account')}
+      />
 
       {/* Phone-call UX toasts (bottom-right) driven by telephony WS events */}
       <CallBriefing briefing={callBriefing} onDismiss={() => setCallBriefing(null)} />

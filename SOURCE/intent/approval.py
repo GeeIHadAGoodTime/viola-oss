@@ -607,6 +607,37 @@ class ApprovalManager:
         self._apply_tool_arg_confirmation_normalization(tool_name_value, tool_args)
         return "accepted"
 
+    async def confirmation_holds_under_taint(self, action_description: str, risk: RiskLevel) -> bool:
+        """Check a cross-turn confirmation against the user's own words when tainted.
+
+        A deferred confirmation is accepted when the model re-issues the
+        pending tool call on the user's next turn. While untrusted content
+        (web, email, calendar, memory, files) is in the conversation, the model
+        may be following injected text, so its re-issue alone is not the
+        user's consent. The user's actual message for this turn is classified
+        on its own (the classifier sees only that message and the action, never
+        the tainted conversation) and must affirm the action. Fails closed.
+        Outside taint this returns True and nothing changes.
+        """
+        try:
+            from intent.content_sanitizer import active_taint_tracker
+        except ImportError:  # pragma: no cover - same package
+            return True
+        tracker = active_taint_tracker()
+        if not bool(getattr(tracker, "is_tainted", False)):
+            return True
+        user_words = str(getattr(tracker, "user_request", "") or "").strip()
+        decision = await self._classify_response(user_words, action_description, risk) if user_words else "unclear"
+        if decision in ("strong_affirm", "affirm"):
+            logger.info("Confirmation under taint matched the user's own words (%s): %s", decision, action_description)
+            return True
+        logger.warning(
+            "Confirmation under taint refused: the user's message did not confirm (%s): %s",
+            decision,
+            action_description,
+        )
+        return False
+
     async def request_approval(
         self,
         action_description: str,
@@ -676,6 +707,8 @@ class ApprovalManager:
             allow_implicit_match=True,
         )
         if confirmation_state == "accepted":
+            if not await self.confirmation_holds_under_taint(action_description, risk):
+                return False
             logger.info(
                 "Deferred confirmation accepted for %s action: %s",
                 risk.value,

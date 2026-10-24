@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "1f81065b3a65bfaedb520878c7385f520aa20ef2",
-  "sha256": "69eae78548ce86fac690a7aea52743a2be3b0e5e0a95f49de8777a456487efbd",
+  "revision": "02bb00ef9eae9247baa8193796ef817d14ecf05a",
+  "sha256": "746bd93b8dc81f47dea4f1f68e2307a7f87efaa8f1bdf11e11d5ab6b2f392b7b",
   "files": [
     {
       "path": ".env.example",
@@ -540,8 +540,8 @@
     },
     {
       "path": "auth/desktop_session.py",
-      "sha256": "4ec0397d4db9f1b215112666002b047949fc1e2263dc8491454cbaf16d6aa232",
-      "bytes": 50714
+      "sha256": "b41a2b7681632c1e4a3a3350d45402f705701201870431aab176dc99be4045ec",
+      "bytes": 50130
     },
     {
       "path": "auth/entitlement_projection.py",
@@ -850,8 +850,8 @@
     },
     {
       "path": "config/defaults.py",
-      "sha256": "e7ce28a4009a0b0e69217ba397a84470bcd688b81c2da5597d22e966880059eb",
-      "bytes": 23576
+      "sha256": "2bf61b3872b4f5dc7cc7c18bc705a1026859a5fd181ad0aed9410c1e614e3a8a",
+      "bytes": 23328
     },
     {
       "path": "config/env.py",
@@ -1210,8 +1210,8 @@
     },
     {
       "path": "core/user_context.py",
-      "sha256": "438f9ee8602c39da4e33e294bc774262eb72b4cb8eaaca068b129c9c3478385a",
-      "bytes": 20946
+      "sha256": "9983eacc790f9de230178513fd97ff794a4741fec704beb88ca3bfa74d203728",
+      "bytes": 19090
     },
     {
       "path": "core/user_notice.py",
@@ -1575,13 +1575,13 @@
     },
     {
       "path": "intent/agent_executor.py",
-      "sha256": "7736808a68bdf3f04b4672ef06964d9391784edd5fcd65796d1576a15bd80c86",
-      "bytes": 566467
+      "sha256": "f47af1c659501bcc13b11aa7a43eeaac15b6b3c379bd7035c5fdcecee1926f9b",
+      "bytes": 567229
     },
     {
       "path": "intent/agent_loop.py",
-      "sha256": "f21a3a680b3f0d82515460953131bba7101198a1eae41a856fd2ab8a014c6e79",
-      "bytes": 248501
+      "sha256": "7bd665c8e53d4e0dd52cbebf5eee20c348661b1ba8d2dee0dce991bad201908a",
+      "bytes": 249250
     },
     {
       "path": "intent/agent_message_manager.py",
@@ -1605,8 +1605,8 @@
     },
     {
       "path": "intent/ai_controller.py",
-      "sha256": "745949241cc3da2b7a60d564eb2e841878ec58439a20f431a099c2796e965a06",
-      "bytes": 166634
+      "sha256": "3453ea4c393594e9ccc6716163bd6926810638b52fa4422478bf267e2df09a14",
+      "bytes": 166258
     },
     {
       "path": "intent/ai_interpreter.py",
@@ -1615,8 +1615,8 @@
     },
     {
       "path": "intent/approval.py",
-      "sha256": "7d836f742e2ccc1782a0a8a26587b88e0f7e3713f71e263c2bf46d22e0ea4900",
-      "bytes": 47764
+      "sha256": "7e49a01fb2efb5371363929e381b29027c705ef297d21edf035254f0dbacfceb",
+      "bytes": 49565
     },
     {
       "path": "intent/capability_resolver.py",
@@ -1670,8 +1670,8 @@
     },
     {
       "path": "intent/content_sanitizer.py",
-      "sha256": "e5bd9565c61c191ed3164402d254d3e0cb8b3c4a1941ad3daa9f7fd2b1f6d2c7",
-      "bytes": 31539
+      "sha256": "aefcd7bdbb40daebe948af56612ec404e79654e985731b2469cd5ea9bbca87c9",
+      "bytes": 49546
     },
     {
       "path": "intent/context_builder.py",
@@ -2235,8 +2235,8 @@
     },
     {
       "path": "mcp_hub/approval_bridge.py",
-      "sha256": "bd18c2681e3c8e2fb89c914088a66cb74c588bcee8350a86805187763bc2f363",
-      "bytes": 57280
+      "sha256": "c3c5cda2508c2f6b90e442a433f3319e73781717b79e159581a58968859445db",
+      "bytes": 57714
     },
     {
       "path": "mcp_hub/client_hub.py",
@@ -4310,8 +4310,8 @@
     },
     {
       "path": "services/computer_use/safety.py",
-      "sha256": "250786ce5c6f9a465786d5de7e0eed754c9d5450a38dc2d76dd392eb6e305a94",
-      "bytes": 22895
+      "sha256": "a5d8e143ab0fd5e609d0974759bcceddca1044a117a4dafc815631aef4aabfcf",
+      "bytes": 22807
     },
     {
       "path": "services/computer_use/screen.py",
@@ -5365,8 +5365,8 @@
     },
     {
       "path": "services/user_capabilities/service.py",
-      "sha256": "cf9d6f81620c9a2a4bb9b8579ea6ba9b1051d1206477e002ddaccb0016f8c948",
-      "bytes": 21897
+      "sha256": "c84508a0383c42076fe7c0acb1612e3f927a6d13c02f2f86c623834b7aa703d8",
+      "bytes": 21804
     },
     {
       "path": "services/user_capabilities/storage.py",
@@ -12560,8 +12560,8 @@
     },
     {
       "path": "ui/settings_api.py",
-      "sha256": "4e652918e94083ff80d00bad75d19b23ce6eaf9b1a1fe47d566e1548959539bf",
-      "bytes": 87495
+      "sha256": "2416a50c59dbd5edf8513354787c09b109c3d1dda6e80546d80e8a4edb19fab5",
+      "bytes": 87029
     },
     {
       "path": "ui/settings_effects.py",
@@ -12570,13 +12570,13 @@
     },
     {
       "path": "ui/settings_manager.py",
-      "sha256": "5d51a3dab23f9d145fe32055f2b9617b22a61f380b43abcc8ea2ebafa30c9925",
-      "bytes": 174497
+      "sha256": "2528437df982b1acc15c9f7b1bac2d23ae6206c3135ff30fbbf584ab89e3cc2c",
+      "bytes": 167923
     },
     {
       "path": "ui/settings_schema.py",
-      "sha256": "d40a058f4b824f123524202186bf5e72d018b6f00538e1cf8e97889cce127e92",
-      "bytes": 9846
+      "sha256": "94a7ac80d1e782f577f44059f6c62cd71f94699f3e26836dbdf748a92409a0e1",
+      "bytes": 8993
     },
     {
       "path": "ui/static/README_WEB_UI.txt",
@@ -12915,8 +12915,8 @@
     },
     {
       "path": "utils/self_knowledge.py",
-      "sha256": "41ac25aa367a7865d1f24a34036d120b399e5d7440c5bd1eac0c100080ed3c04",
-      "bytes": 17380
+      "sha256": "b0ddb88d82538cac434ae41d76fbf3ce864d2b6f77ee68e552e2c966da2d7256",
+      "bytes": 17170
     },
     {
       "path": "utils/service_registry.py",

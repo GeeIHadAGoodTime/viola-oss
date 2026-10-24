@@ -1541,8 +1541,17 @@ const isGoogleCalendarSyncConnected = (statusData) => {
   ));
 };
 
+// Shown under the Google row until Google finishes reviewing Viola's app.
+// Keep it short and literal: what the user will see, and what Viola can do.
+export const GOOGLE_CONNECT_NOTE = (
+  "Google is still reviewing Viola, so you'll see a \"Google hasn't verified this app\" screen. "
+  + 'To continue, click Advanced, then Go to Viola. '
+  + 'Viola asks to see and edit your calendar events and to send email for you. It cannot read your inbox. '
+  + 'Your Google sign-in stays on this computer. '
+  + 'Until the review is done, Google limits how many people can connect; if Google blocks the sign-in, contact support.'
+);
+
 export const CalendarSettings = () => {
-  const { user } = useAuth();
   const { connect, disconnect } = useCalendarProviders();
   const [confirmDisconnect, setConfirmDisconnect] = useState(null);
   const [disconnecting, setDisconnecting] = useState(false);
@@ -1574,7 +1583,6 @@ export const CalendarSettings = () => {
 
   const isConnected = calendarConnected === true;
   const loading = calendarConnected === null;
-  const accountEmail = user?.email || null;
 
   const handleConnect = useCallback(async () => {
     setError(null);
@@ -1662,7 +1670,7 @@ export const CalendarSettings = () => {
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ color: theme.colors.textPrimary, fontSize: '15px', fontWeight: 500 }}>
-              Google Calendar
+              Google
             </div>
             <div style={{
               display: 'flex',
@@ -1686,12 +1694,12 @@ export const CalendarSettings = () => {
                     textOverflow: 'ellipsis',
                     whiteSpace: 'nowrap',
                   }}>
-                    {accountEmail ? `Connected - ${accountEmail}` : 'Connected'}
+                    Connected: Calendar and email
                   </span>
                 </>
               ) : (
                 <span style={{ color: theme.colors.textMuted, fontSize: '13px' }}>
-                  Not connected
+                  Not connected. Lets Viola use your calendar and send email you ask it to send.
                 </span>
               )}
             </div>
@@ -1749,6 +1757,20 @@ export const CalendarSettings = () => {
         )}
       </div>
 
+      {!isConnected && (
+        <div
+          data-testid="google-unverified-note"
+          style={{
+            padding: '0 20px 12px',
+            color: theme.colors.textMuted,
+            fontSize: '12px',
+            lineHeight: '1.5',
+          }}
+        >
+          {GOOGLE_CONNECT_NOTE}
+        </div>
+      )}
+
       {error && (
         <div style={{
           padding: '8px 20px 12px',
@@ -1774,7 +1796,7 @@ export const CalendarSettings = () => {
             fontWeight: 500,
             marginBottom: '8px',
           }}>
-            Disconnect Google Calendar?
+            Disconnect Google?
           </div>
           <div style={{
             color: theme.colors.textMuted,
@@ -1782,7 +1804,7 @@ export const CalendarSettings = () => {
             marginBottom: '16px',
             lineHeight: '1.4',
           }}>
-            You can reconnect anytime. Your calendar events will no longer appear in Viola.
+            Viola will stop using your Google Calendar and can no longer send email from your Gmail. You can reconnect anytime.
           </div>
           <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
             <button

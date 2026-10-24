@@ -4,6 +4,7 @@
 import { useState } from 'react';
 import PropTypes from 'prop-types';
 import { THEME } from '../../config';
+import { usePressAndHold } from '../../hooks/usePressAndHold';
 import styles from './PTTButton.module.css';
 
 function getWakeColors(status) {
@@ -25,29 +26,27 @@ const PTTButton = ({ active, disabled, wakeStatus, statusDescriptionId, onMouseD
   const [isPressed, setIsPressed] = useState(false);
   const colors = getWakeColors(wakeStatus);
 
-  const handleDown = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsPressed(true);
-    onMouseDown?.();
-  };
-
-  const handleUp = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsPressed(false);
-    onMouseUp?.();
-  };
+  // Pointer Events with capture: one handler set for mouse, pen and touch,
+  // and the hold ends on release, cancel (scroll/drag/long-press stole the
+  // gesture) or lost capture -- never left recording, never double-fired by
+  // the emulated mouse events that follow a touch.
+  const pressHandlers = usePressAndHold({
+    disabled,
+    onStart: () => {
+      setIsPressed(true);
+      onMouseDown?.();
+    },
+    onEnd: () => {
+      setIsPressed(false);
+      onMouseUp?.();
+    },
+  });
 
   const isActive = active || isPressed;
 
   return (
     <button
-      onMouseDown={handleDown}
-      onMouseUp={handleUp}
-      onMouseLeave={(e) => { if (isPressed) handleUp(e); }}
-      onTouchStart={handleDown}
-      onTouchEnd={handleUp}
+      {...pressHandlers}
       // CONFIRM-6 warm-keeping: hover/focus is a speculative intent signal —
       // "the user is likely about to press this" — used to pre-open the
       // voice WS connection ahead of the actual press (never the mic itself;

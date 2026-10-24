@@ -219,6 +219,23 @@ _STRIP_HEADER_KEYS = frozenset(
         "x_viola_api_key",
     }
 )
+# Proxy headers that carry the CALLER's IP address. Behind Cloudflare every
+# request has CF-Connecting-IP / True-Client-IP; an IPv6 value is not caught by
+# the text scrubber, so these are removed by name rather than by value.
+_CLIENT_ADDRESS_HEADER_KEYS = frozenset(
+    {
+        "cf_connecting_ip",
+        "cf_connecting_ipv6",
+        "cf_pseudo_ipv4",
+        "forwarded",
+        "true_client_ip",
+        "x_client_ip",
+        "x_cluster_client_ip",
+        "x_forwarded_for",
+        "x_original_forwarded_for",
+        "x_real_ip",
+    }
+)
 _PII_EXACT_KEYS = frozenset(
     {
         "address",
@@ -551,10 +568,12 @@ def _is_header_key_to_strip(parent_path: tuple[str, ...], key: str) -> bool:
         return False
     return (
         key in _STRIP_HEADER_KEYS
+        or key in _CLIENT_ADDRESS_HEADER_KEYS
         or "authorization" in key
         or "cookie" in key
         or "apikey" in key
         or "api_key" in key
+        or key.endswith("_key")
         or "token" in key
         or "secret" in key
     )

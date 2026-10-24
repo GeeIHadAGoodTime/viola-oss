@@ -103,6 +103,34 @@ _ABS_PATH_RES = (
     ),
 )
 
+# IPv6 addresses. The shared scrubber (redact_diagnostic_payload) only catches
+# IPv4, so an IPv6 literal in an exception message ("connect to 2001:db8::1
+# failed") would otherwise reach GlitchTip intact. Every compressed form needs a
+# "::" and the full form needs eight groups, so clock times ("12:30:45") and
+# module:function labels do not match.
+_HEX4 = r"[0-9A-Fa-f]{1,4}"
+_IPV6_RE = re.compile(
+    r"(?<![\w:.])(?:"
+    rf"(?:{_HEX4}:){{7}}{_HEX4}"
+    rf"|(?:{_HEX4}:){{1,7}}:"
+    rf"|(?:{_HEX4}:){{1,6}}:{_HEX4}"
+    rf"|(?:{_HEX4}:){{1,5}}(?::{_HEX4}){{1,2}}"
+    rf"|(?:{_HEX4}:){{1,4}}(?::{_HEX4}){{1,3}}"
+    rf"|(?:{_HEX4}:){{1,3}}(?::{_HEX4}){{1,4}}"
+    rf"|(?:{_HEX4}:){{1,2}}(?::{_HEX4}){{1,5}}"
+    rf"|{_HEX4}:(?::{_HEX4}){{1,6}}"
+    rf"|:(?::{_HEX4}){{1,7}}"
+    r")(?:%[0-9A-Za-z]+)?(?![\w:])"
+)
+
+# Quoted free text inside an exception message. Messages very often quote the
+# thing that failed -- and when that thing came from the user it is a spoken
+# command, a song title, a contact's name ("No track found for 'play the song
+# Sarah sent me'"). A quoted run that contains whitespace is natural language,
+# not a code identifier, so its contents are replaced. Single tokens such as a
+# missing dict key ('wake_model') stay, because they localize the bug.
+_QUOTED_TEXT_RE = re.compile("([\"'\u2018\u201c])([^\"'\u2018\u2019\u201c\u201d\r\n]{1,500})([\"'\u2019\u201d])")
+
 # Reports we attach the minimum to. "crash" = automatic (unhandled exception /
 # faulthandler); "bug_report" = user-initiated.
 _ALLOWED_REPORT_KINDS = frozenset({"crash", "bug_report"})
@@ -485,10 +513,89 @@ def _safe_error_text(raw: Any) -> str:
         text = str(raw or "")
     except _SAFE_CAPTURE_EXCEPTIONS:
         return "<unrepresentable>"
-    scrubbed = _scrub_text(text)
+    scrubbed = _scrub_text(_redact_quoted_free_text(text))
     if len(scrubbed) > _MAX_ERROR_VALUE_LEN:
         scrubbed = scrubbed[: _MAX_ERROR_VALUE_LEN - 3] + "..."
     return scrubbed
+
+
+def _redact_quoted_free_text(text: str) -> str:
+    """Blank out quoted runs that contain whitespace (see ``_QUOTED_TEXT_RE``)."""
+
+    def _replace(match: re.Match[str]) -> str:
+        inner = match.group(2)
+        if any(char.isspace() for char in inner):
+            return match.group(1) + "[REDACTED:TEXT]" + match.group(3)
+        return match.group(0)
+
+    try:
+        return _QUOTED_TEXT_RE.sub(_replace, text)
+    except _SAFE_CAPTURE_EXCEPTIONS:
+        return "[REDACTED:SCRUBBER_UNAVAILABLE]"
+
+
+def sanitize_untrusted_minimum(raw: Any) -> dict[str, Any] | None:
+    """Rebuild a minimum that arrived over the network, field by field.
+
+    The cloud ingest endpoint must not trust that a client ran
+    :func:`build_diagnostic_minimum` (an old build, a tampered one, or someone
+    who simply POSTs JSON). This applies the SAME per-field rules the builder
+    uses -- enum tokens, the scrubbed + bounded error text, bounded
+    ``{module, function, lineno}`` frames, the app-state allowlist -- so
+    nothing reaches GlitchTip that the desktop builder could not have produced.
+    Returns ``None`` when no allowlisted field is present. Never raises.
+    """
+    try:
+        if not isinstance(raw, Mapping):
+            return None
+        if not any(key in raw for key in _ALLOWED_TOP_LEVEL_KEYS):
+            return None
+        out: dict[str, Any] = {}
+        if "schema_version" in raw:
+            out["schema_version"] = _safe_int(raw.get("schema_version")) or SCHEMA_VERSION
+        if "report_kind" in raw:
+            kind = raw.get("report_kind")
+            out["report_kind"] = kind if kind in _ALLOWED_REPORT_KINDS else "bug_report"
+        for key, limit in (
+            ("app_version", _MAX_ENUM_LEN),
+            ("surface", _MAX_SURFACE_LEN),
+            ("os_family", _MAX_ENUM_LEN),
+            ("os_version", _MAX_OS_VERSION_LEN),
+            ("arch", _MAX_ENUM_LEN),
+            ("python_version", _MAX_ENUM_LEN),
+            ("error_type", _MAX_FUNCTION_LEN),
+        ):
+            if key in raw:
+                out[key] = _safe_enum(raw.get(key), limit=limit)
+        if "error_value" in raw:
+            out["error_value"] = _safe_error_text(raw.get("error_value"))
+        if "stack" in raw:
+            frames = raw.get("stack")
+            out["stack"] = (
+                [_untrusted_frame(frame) for frame in frames[-_MAX_STACK_FRAMES:] if isinstance(frame, Mapping)]
+                if isinstance(frames, (list, tuple))
+                else []
+            )
+        if "error_location" in raw:
+            location = raw.get("error_location")
+            out["error_location"] = _untrusted_frame(location) if isinstance(location, Mapping) else {}
+        if "app_state" in raw:
+            state = raw.get("app_state")
+            out["app_state"] = _allowlist_app_state(state if isinstance(state, Mapping) else None)
+        scrubbed = _defense_in_depth_scrub(out)
+        return {key: value for key, value in scrubbed.items() if key in _ALLOWED_TOP_LEVEL_KEYS}
+    except _SAFE_CAPTURE_EXCEPTIONS:
+        return None
+
+
+def _untrusted_frame(frame: Mapping[str, Any]) -> dict[str, Any]:
+    lineno = frame.get("lineno")
+    valid_lineno = isinstance(lineno, (int, float, str)) and not isinstance(lineno, bool)
+    return {
+        "module": _safe_enum(frame.get("module"), limit=_MAX_MODULE_LEN) or "unknown",
+        "function": _safe_enum(frame.get("function"), limit=_MAX_FUNCTION_LEN) or "unknown",
+        "lineno": _safe_int(lineno) if valid_lineno else None,
+    }
 
 
 def _allowlist_app_state(raw: Mapping[str, Any] | None) -> dict[str, Any]:
@@ -561,6 +668,7 @@ def _scrub_text(text: str) -> str:
         stripped = text
         for _abs_path_re in _ABS_PATH_RES:
             stripped = _abs_path_re.sub("[REDACTED:PATH]", stripped)
+        stripped = _IPV6_RE.sub("[REDACTED:IP]", stripped)
         stripped = _WINDOWS_USER_PATH_RE.sub(r"\1[REDACTED:USER]", stripped)
         stripped = _POSIX_USER_PATH_RE.sub(r"\1[REDACTED:USER]", stripped)
         from intent.log_redaction import redact_diagnostic_payload
@@ -588,4 +696,5 @@ __all__ = [
     "SCHEMA_VERSION",
     "build_browser_diagnostic_minimum",
     "build_diagnostic_minimum",
+    "sanitize_untrusted_minimum",
 ]

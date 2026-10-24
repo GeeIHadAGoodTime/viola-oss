@@ -30,10 +30,10 @@
   },
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "29a5d92794389dbe1f3c57d9c0d124f31b56c34769a5db1b99f0eb4169454bdc",
-  "source_tree_sha256": "69eae78548ce86fac690a7aea52743a2be3b0e5e0a95f49de8777a456487efbd",
+  "source_manifest_sha256": "58c9019ee9f3b6d34f2b0b1bedd0fc5670b39ecde15b30766b3ccd459f897a53",
+  "source_tree_sha256": "746bd93b8dc81f47dea4f1f68e2307a7f87efaa8f1bdf11e11d5ab6b2f392b7b",
   "source_file_count": 2729,
-  "source_revision": "1f81065b3a65bfaedb520878c7385f520aa20ef2",
+  "source_revision": "02bb00ef9eae9247baa8193796ef817d14ecf05a",
   "comparison_public_revision": "ecab2772465fcc89ae6645b028af1c2273b9199f",
   "changed_source_paths": [
     "audio_core/aec_reference_base.py",
@@ -44,7 +44,6 @@
     "backend/fastapi_app.py",
     "backend/weather_fetch.py",
     "chat/channel.py",
-    "config/defaults.py",
     "config/searxng/render-settings.sh",
     "config/settings.py",
     "config/settings_validation.py",
@@ -54,7 +53,6 @@
     "core/quiet_hours.py",
     "core/server_factory.py",
     "core/single_instance.py",
-    "core/user_context.py",
     "core/voice_command_handler.py",
     "core/voice_orchestrator.py",
     "core/voice_wake_processor.py",
@@ -94,7 +92,6 @@
     "playback/engines/spotify.py",
     "playback/engines/spotify_cdp.py",
     "services/browser/qt_cdp_bridge.py",
-    "services/computer_use/safety.py",
     "services/llm/provider_router.py",
     "services/llm/route_tool_schemas.py",
     "services/llm/spend_accounting.py",
@@ -103,7 +100,6 @@
     "services/memory/extract_memories.py",
     "services/memory/selector.py",
     "services/openai_background.py",
-    "services/user_capabilities/service.py",
     "tests/customer_speech/test_real_cjk_pronunciation.py",
     "tests/customer_speech/test_real_pronunciation.py",
     "tests/public/test_billing_capacity_mount.py",
@@ -285,7 +281,7 @@
     "historical_inventory_limits": "This renderer correction changes no dependency or workflow inputs. All six retained SBOMs and their complete status objects stay historical and unchanged; no current installed inventory qualification is claimed."
   },
   "qualification": {
-    "source_commit": "1f81065b3a65bfaedb520878c7385f520aa20ef2",
+    "source_commit": "02bb00ef9eae9247baa8193796ef817d14ecf05a",
     "kind": "1.0.5 build 5 keyless managed source availability"
   },
   "historical_bindings": [
