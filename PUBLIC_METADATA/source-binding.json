@@ -30,13 +30,16 @@
   },
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "6b0a23d1eddf036b4d50698106ddad3fe6b7ad4b31bb6ac70b86207cc14ac62e",
-  "source_tree_sha256": "4a510a37f6628bb990e7b78c93f5089f4cbdd53c3a5b35ab02c612b266f899db",
+  "source_manifest_sha256": "8c1e41ac0a3e768e67912f69649e7eba9772d165af6fcd75162dd181467c8746",
+  "source_tree_sha256": "2d9796b9a0c6d80417492f1cf5be00b5f5cbab095e4dda481b929ee0225ee22d",
   "source_file_count": 2725,
-  "source_revision": "0be7548831efad34f0dd17a8b1bef76ff6351fdc",
+  "source_revision": "a81c3a56c82414860e0b20831d24646ab5477772",
   "comparison_public_revision": "ecab2772465fcc89ae6645b028af1c2273b9199f",
   "changed_source_paths": [
     "chat/channel.py",
+    "core/voice_command_handler.py",
+    "intent/instant_commands/music.py",
+    "intent/instant_commands_patterns.py",
     "intent/tools/music_tools.py",
     "mcp_hub/approval_bridge.py",
     "mcp_hub/client_hub.py",
@@ -122,7 +125,7 @@
     "historical_inventory_limits": "This renderer correction changes no dependency or workflow inputs. All six retained SBOMs and their complete status objects stay historical and unchanged; no current installed inventory qualification is claimed."
   },
   "qualification": {
-    "source_commit": "0be7548831efad34f0dd17a8b1bef76ff6351fdc",
+    "source_commit": "a81c3a56c82414860e0b20831d24646ab5477772",
     "kind": "Viola voice full screen for the Music-stage video; source checksum binding only, desktop qualification runs in the private release chain"
   },
   "historical_bindings": [
