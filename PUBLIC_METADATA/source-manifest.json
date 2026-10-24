@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "704b9a488b49e4234de751aa996517104c20ee11",
-  "sha256": "c53dca10e6d782b1b2b8c0c731c7c8ab41984d9eb3b9100012996ec3e4af2213",
+  "revision": "5715234a961a81b2ae3cc9db05e67578600f1fc7",
+  "sha256": "0f5b195c8c601c9c33cfdeabb573b6602d809a447cabac63f3a47dcc8e2361ab",
   "files": [
     {
       "path": ".env.example",
@@ -1685,8 +1685,8 @@
     },
     {
       "path": "intent/file_gates.py",
-      "sha256": "65b816dfd75f0aa611218f168cb065621ca307e489c2aa4e7703693ea3fb1b91",
-      "bytes": 15053
+      "sha256": "956a572ee79195952afc4144e1a550a2156ff939e0668622838bbf3f2b0150d4",
+      "bytes": 15128
     },
     {
       "path": "intent/gate_protocol.py",
@@ -2070,8 +2070,8 @@
     },
     {
       "path": "intent/tools/filesystem.py",
-      "sha256": "1867c44ca4b7dc436cae8061e4a7003e5b0362a9ddad545bd291b22618812f69",
-      "bytes": 77468
+      "sha256": "7e551e417a1234e00d804b159f31d515c113861382d5ff1bc8aecc7057c35a19",
+      "bytes": 77508
     },
     {
       "path": "intent/tools/knowledge.py",
