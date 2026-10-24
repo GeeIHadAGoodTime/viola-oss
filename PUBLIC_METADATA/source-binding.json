@@ -30,10 +30,10 @@
   },
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "8ca2913cdf6f3a125dec341e02d7a2b4f60b71d842c85cd3b179215339f4bb6f",
-  "source_tree_sha256": "180545ce82048bd9c12f3bcc2e0f97cde954729e9fadf49111c30d0b38d55488",
+  "source_manifest_sha256": "c838281d3a766ac4c485b08be2376694013163bf8f0639ea13b90c4c86d02399",
+  "source_tree_sha256": "2d05ba73a4e338758d854eda95bb9a110493844deb70ca5deb44fa736467f528",
   "source_file_count": 2730,
-  "source_revision": "3113dfde9007ef23b56f34d62d890eb2f503150b",
+  "source_revision": "cfdd131420a778b4ac99a5a3494e5c3bfd4fae5c",
   "comparison_public_revision": "ecab2772465fcc89ae6645b028af1c2273b9199f",
   "changed_source_paths": [
     "audio_core/aec_reference_base.py",
@@ -42,6 +42,7 @@
     "auth/desktop_session.py",
     "auth/middleware.py",
     "backend/fastapi_app.py",
+    "backend/weather_fetch.py",
     "chat/channel.py",
     "config/searxng/render-settings.sh",
     "config/settings.py",
@@ -55,6 +56,7 @@
     "core/voice_orchestrator.py",
     "core/voice_wake_processor.py",
     "diagnostics/wake_state_sync.py",
+    "intent/agent_executor.py",
     "intent/agent_loop.py",
     "intent/ai_controller.py",
     "intent/approval.py",
@@ -106,6 +108,7 @@
     "third_party/misaki_cjk_prototype/viola_cjk/customer_english_span.py",
     "third_party/sources.toml",
     "tools/qualification/romance_runtime_replay.py",
+    "ui/api/routes/_guards.py",
     "ui/api/routes/command.py",
     "ui/api/routes/control.py",
     "ui/api/routes/health.py",
@@ -267,8 +270,8 @@
     "historical_inventory_limits": "This renderer correction changes no dependency or workflow inputs. All six retained SBOMs and their complete status objects stay historical and unchanged; no current installed inventory qualification is claimed."
   },
   "qualification": {
-    "source_commit": "3113dfde9007ef23b56f34d62d890eb2f503150b",
-    "kind": "1.0.5 build 5 background AI on keyless managed installs"
+    "source_commit": "cfdd131420a778b4ac99a5a3494e5c3bfd4fae5c",
+    "kind": "1.0.5 build 5 keyless managed source availability"
   },
   "historical_bindings": [
     {
