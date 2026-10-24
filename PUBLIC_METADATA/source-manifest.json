@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "2dff3ddd9b33481fe275725f8a357e2771293c81",
-  "sha256": "ed5c7c6bb6f102a5a8097abafe8cf375904518ed30f847264651c26c1c21d0e9",
+  "revision": "ad2432bf3f034373a4a3b93bbde80d2dedfed144",
+  "sha256": "9d2693dcf4bc9afffac21badc34e4cdcf01b7abd33a82f8d1fd77615d2e05231",
   "files": [
     {
       "path": ".env.example",
@@ -10572,6 +10572,11 @@
       "path": "ui/react-app/src/components/ExtraUsageTopUpButton.test.jsx",
       "sha256": "87e7d36c3fd5d5e6a011b5929a648317a811591af23d29963b3398dd21959abc",
       "bytes": 4109
+    },
+    {
+      "path": "ui/react-app/src/components/GoogleConnectSettings.test.jsx",
+      "sha256": "adc1d75c713e3321687a3e04d143679c78042ff57d27cbc71769715f9a480baa",
+      "bytes": 3100
     },
     {
       "path": "ui/react-app/src/components/HelpModal.jsx",
