@@ -10,6 +10,13 @@
 // Keep the range and default in step with core/constants.py
 // (WAKE_THRESHOLD_USER_MIN / WAKE_THRESHOLD_USER_MAX) and config/defaults.py
 // (DEFAULT_WAKE_SENSITIVITY).
+//
+// Since 1.0.5 build 5 the desktop detector scores every 80 ms and wakes on
+// k-of-n frame agreement. Each saved level below is then one measured
+// operating point (rule + per-frame threshold), listed per level in
+// violawake/config.py STREAM_OPERATING_POINTS; keep these levels in step with
+// that table. Every position has fewer false wakes and at least the recall it
+// had before, so the labels still say what each position does.
 
 export const WAKE_THRESHOLD_MIN = 0.8;
 export const WAKE_THRESHOLD_MAX = 0.97;

@@ -420,6 +420,8 @@ class ViolaWakeListener:
                 type(e).__name__,
             )
             # Engine will be None - _init() will handle the error
+        self._streaming = False
+        self._configure_cadence()
 
         # --- Passive AEC delay calibration ---
         self._passive_calibrator: Any = None
@@ -527,6 +529,35 @@ class ViolaWakeListener:
             debounce_seconds=2.0,
         )
 
+    def _configure_cadence(self) -> None:
+        """Pick the scoring cadence for the loaded engine.
+
+        Temporal openWakeWord-embedding models (the shipped temporal_cnn.onnx)
+        are scored on EVERY 80 ms chunk through the engine's incremental
+        embedding stream, and the engine wakes on its k-of-n agreement rule
+        (wake plan Stage 1). Any other model keeps the old path: re-score the
+        1.5 s ring buffer every ``_infer_interval`` chunks, single-frame rule.
+        """
+        engine = self._engine
+        self._streaming = bool(engine is not None and getattr(engine, "supports_streaming", False) is True)
+        if self._streaming:
+            self._infer_interval = 1
+            k, n = engine.agreement
+            logger.info(
+                "Wake scoring cadence: every chunk (80 ms, streaming embeddings), wake on %d of %d frames "
+                "at frame threshold %.2f (sensitivity level %.2f)",
+                k,
+                n,
+                engine.stream_threshold,
+                engine.threshold,
+            )
+        else:
+            logger.info(
+                "Wake scoring cadence: every %d chunks (%d ms), single frame",
+                self._infer_interval,
+                80 * self._infer_interval,
+            )
+
     def reload_model(self, model_path: str | Path) -> dict[str, object]:
         """Validate and swap the active wake-word model without restarting audio capture."""
 
@@ -556,6 +587,7 @@ class ViolaWakeListener:
             self._model_path = candidate
             model_name = candidate.name.lower()
             self._infer_interval = 2 if "mlp" in model_name else 5
+            self._configure_cadence()
 
         logger.info("Wake model hot-reloaded: %s -> %s", previous_path, candidate)
         self._emit_status_event(
@@ -2021,6 +2053,17 @@ class ViolaWakeListener:
         prev_loopback_rms: float = 0.0
         transition_blank_remaining: int = 0
 
+        # Streaming cadence (Stage 1): the engine scores every chunk, but the
+        # threshold refresh (quiet hours reads settings) and the track-change
+        # check keep the old 400 ms grid, so their cost and timing are exactly
+        # what shipped. A blank of N grid steps covers N * 5 chunks.
+        LEGACY_GRID_CHUNKS = 5
+        effective_threshold: float | None = None
+        # Any gap in the audio (first frame, command recording, device change,
+        # read error) resets the engine's embedding stream so stale audio from
+        # before the gap is never scored.
+        stream_gap = True
+
         # Set up detection callback with policy-based decision
         def on_detection():
             nonlocal last_wake_score, last_mic_rms, last_processed_int16
@@ -2037,6 +2080,10 @@ class ViolaWakeListener:
             with self._engine_lock:
                 engine = self._engine
                 actual_score = engine.last_score if engine is not None else 0.0
+                # Streaming path: the per-frame threshold the engine's k-of-n
+                # rule used for this level (the policy re-checks against it).
+                streaming_engine = engine is not None and getattr(engine, "supports_streaming", False) is True
+                frame_threshold = engine.stream_threshold if streaming_engine else None
 
             # --- Contributor Mode Intercept ---
             # If contributor mode is active, save as sample and DON'T trigger wake
@@ -2095,6 +2142,7 @@ class ViolaWakeListener:
                 recent_scores=list(recent_inference_scores),
                 frame_count=frame_count,
                 self_speech_active=_viola_self_speech_active(),
+                score_threshold=frame_threshold,
             )
 
             # Use policy for authoritative decision
@@ -2320,6 +2368,7 @@ class ViolaWakeListener:
                 # Skip wake detection while recording a command
                 with self._recording_lock:
                     if self._recording_command:
+                        stream_gap = True
                         time.sleep(
                             0.05
                         )  # 50ms sleep to avoid busy loop (shorter than TIMEOUT_SHORT for responsiveness)
@@ -2331,6 +2380,7 @@ class ViolaWakeListener:
                 # locks out a command recording on the bridge thread meanwhile.
                 if self._device_change_pending.is_set():
                     if self._claim_stream_for_device_change():
+                        stream_gap = True
                         try:
                             self._service_device_change()
                         finally:
@@ -2442,6 +2492,7 @@ class ViolaWakeListener:
                         )
                         break
                     # Recover the stream, then retry on the next iteration.
+                    stream_gap = True
                     self._reopen_audio_stream()
                     time.sleep(0.1)  # brief backoff to let the device settle
                     continue
@@ -2545,6 +2596,7 @@ class ViolaWakeListener:
                                     "(silence is expected during direct injection)"
                                 )
                                 recent_frame_dead.clear()
+                                stream_gap = True
                                 continue
                         except ImportError:
                             pass
@@ -2570,6 +2622,7 @@ class ViolaWakeListener:
                         # PortAudio state (common with USB webcam mics on Windows).
                         # A failed reopen leaves self._stream None; the read-error
                         # path below retries rather than dying, so we don't exit here.
+                        stream_gap = True
                         if self._reopen_audio_stream():
                             recent_frame_dead.clear()  # Reset tracking after restart
 
@@ -2639,8 +2692,19 @@ class ViolaWakeListener:
 
                 buffer_write_idx = end_idx % CLIP_SAMPLES
 
+                # A gap in the audio: drop the engine's streamed features so
+                # nothing from before the gap is scored (warm-up ~1.4 s).
+                if stream_gap:
+                    stream_gap = False
+                    if self._streaming:
+                        with self._engine_lock:
+                            if self._engine is not None and self._streaming:
+                                self._engine.reset_stream()
+
                 # Process according to the configured inference interval
+                # (every chunk on the streaming path)
                 if frame_count % self._infer_interval == 0:
+                    on_legacy_grid = frame_count % LEGACY_GRID_CHUNKS == 0 or not self._streaming
                     # Reconstruct contiguous buffer for processing (only when needed)
                     if buffer_write_idx == 0:
                         contiguous_buffer = audio_buffer
@@ -2652,13 +2716,15 @@ class ViolaWakeListener:
                                 audio_buffer[:buffer_write_idx],
                             ]
                         )
-                    # Use policy for effective threshold calculation
-                    context = WakeContext(
-                        base_threshold=self._base_threshold,
-                        loopback_rms=self._current_loopback_rms,
-                        correlation=self._current_correlation,
-                    )
-                    effective_threshold = self._policy.effective_threshold(context)
+                    # Use policy for effective threshold calculation (refreshed
+                    # on the 400 ms grid; quiet hours reads settings)
+                    if on_legacy_grid or effective_threshold is None:
+                        context = WakeContext(
+                            base_threshold=self._base_threshold,
+                            loopback_rms=self._current_loopback_rms,
+                            correlation=self._current_correlation,
+                        )
+                        effective_threshold = self._policy.effective_threshold(context)
 
                     # DIAGNOSTIC: Check audio buffer health before engine
                     if frame_count % 125 == 5:  # Log occasionally
@@ -2674,22 +2740,42 @@ class ViolaWakeListener:
                         )
 
                     # --- Track-transition blanking ---
-                    cur_lb = self._current_loopback_rms
-                    if prev_loopback_rms > 100 and cur_lb > 100:
-                        ratio = max(cur_lb, prev_loopback_rms) / min(cur_lb, prev_loopback_rms)
-                        if ratio > TRANSITION_RMS_RATIO:
-                            transition_blank_remaining = TRANSITION_BLANK_FRAMES
-                            logger.debug(
-                                "[TRANSITION_BLANK] loopback jump %.0f→%.0f (%.1fx), blanking %d frames",
-                                prev_loopback_rms,
-                                cur_lb,
-                                ratio,
-                                TRANSITION_BLANK_FRAMES,
-                            )
-                    prev_loopback_rms = cur_lb
+                    # Checked on the 400 ms grid in both modes, so the jump test
+                    # and the blank length are exactly what shipped.
+                    if on_legacy_grid:
+                        cur_lb = self._current_loopback_rms
+                        if prev_loopback_rms > 100 and cur_lb > 100:
+                            ratio = max(cur_lb, prev_loopback_rms) / min(cur_lb, prev_loopback_rms)
+                            if ratio > TRANSITION_RMS_RATIO:
+                                transition_blank_remaining = TRANSITION_BLANK_FRAMES * (
+                                    LEGACY_GRID_CHUNKS if self._streaming else 1
+                                )
+                                logger.debug(
+                                    "[TRANSITION_BLANK] loopback jump %.0f→%.0f (%.1fx), blanking %d frames",
+                                    prev_loopback_rms,
+                                    cur_lb,
+                                    ratio,
+                                    TRANSITION_BLANK_FRAMES,
+                                )
+                        prev_loopback_rms = cur_lb
 
-                    if transition_blank_remaining > 0:
+                    blanked = transition_blank_remaining > 0
+                    if blanked:
                         transition_blank_remaining -= 1
+                    if self._streaming:
+                        # Every chunk feeds the engine's embedding stream (even
+                        # while blanked, so features stay continuous); the
+                        # engine applies the k-of-n rule and fires on_detection.
+                        with self._engine_lock:
+                            engine = self._engine
+                            if engine is None or getattr(engine, "supports_streaming", False) is not True:
+                                # None, or a hot reload swapped in a legacy model
+                                # between frames; the next frame uses its cadence.
+                                last_wake_score = 0.0
+                            else:
+                                engine.threshold = effective_threshold
+                                last_wake_score = engine.process_chunk(audio_chunk, suppress=blanked)
+                    elif blanked:
                         last_wake_score = 0.0
                     else:
                         with self._engine_lock:
@@ -2751,7 +2837,7 @@ class ViolaWakeListener:
                         # Log every 25th frame or if score > 0.1 (to capture near-detections)
                         # Near-detections (> 0.5) stay at INFO; the periodic and
                         # low-score lines are DEBUG so an idle mic is not log spam.
-                        if frame_count % 25 == 0 or last_wake_score > 0.1:
+                        if frame_count % 25 == 0 or last_wake_score > 0.5 or (last_wake_score > 0.1 and on_legacy_grid):
                             logger.log(
                                 logging.INFO if last_wake_score > 0.5 else logging.DEBUG,
                                 "[STAGE2] score: score=%.3f threshold=%.3f frame=%d",
