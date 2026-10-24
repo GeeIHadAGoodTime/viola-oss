@@ -75,3 +75,31 @@ describe('TopBar spoke surface', () => {
     expect(screen.queryByTestId('weather-icon-unknown')).not.toBeInTheDocument();
   });
 });
+
+describe('TopBar auto-detected weather location', () => {
+  it('shows the detected place instead of the setup prompt', () => {
+    renderTopBar({
+      weatherLocation: 'Milwaukee, Wisconsin',
+      weatherLocationAutoDetected: true,
+      weatherCondition: 'clear',
+      weatherTemp: '61°',
+      weatherDesc: 'Clear',
+    });
+
+    expect(screen.queryByText('Set your location')).not.toBeInTheDocument();
+    expect(screen.getByText('Clear · Milwaukee')).toBeInTheDocument();
+    expect(screen.getByTitle(/Weather for Milwaukee, Wisconsin, detected automatically/)).toBeInTheDocument();
+  });
+
+  it('does not add the place for a location the user saved', () => {
+    renderTopBar({
+      weatherLocation: 'Chicago, IL',
+      weatherCondition: 'clear',
+      weatherTemp: '61°',
+      weatherDesc: 'Clear',
+    });
+
+    expect(screen.getByText('Clear')).toBeInTheDocument();
+    expect(screen.queryByText(/Chicago/)).not.toBeInTheDocument();
+  });
+});

@@ -28,8 +28,10 @@ runtime must trust the model" by silently modifying tool-result text.
 
 from __future__ import annotations
 
+import json
+import re
 import unicodedata
-from collections.abc import Collection
+from collections.abc import Collection, Mapping
 
 from core.logging_config import get_logger
 
@@ -274,6 +276,94 @@ def _is_navigation_sink_name(tool_name: str | None) -> bool:
     return canonicalize_tool_name_for_safety(tool_name) in NAVIGATION_SINK_TOOLS
 
 
+# ---------------------------------------------------------------------------
+# Files the user named in their own request (founder rule, 2026-10-23)
+# ---------------------------------------------------------------------------
+# Reading a file the user's OWN message names ("add a line saying hello to
+# viola-test.txt") is part of carrying out that request, not untrusted content
+# arriving from a third party, so it does not taint the context against the
+# follow-up write. Consequential actions are defended where they matter: the
+# confirm-or-cancel gates. This is a provenance check on the tool ARGUMENTS
+# (the path the model passed) against the user's request text; it never reads
+# or classifies the file's content. Only ``file_read`` with action ``read`` /
+# ``info`` qualifies: a directory ``list`` / ``search`` returns names of files
+# the user did not name, and every other source (web, email, calendar, memory,
+# shared documents, a file the user did not name) still taints.
+_USER_NAMED_FILE_ACTIONS = frozenset({"read", "info"})
+
+
+def _tool_args_mapping(tool_args: object) -> Mapping[str, object] | None:
+    if isinstance(tool_args, Mapping):
+        return tool_args
+    if isinstance(tool_args, str) and tool_args.strip():
+        try:
+            parsed = json.loads(tool_args)
+        except (TypeError, ValueError):
+            return None
+        return parsed if isinstance(parsed, Mapping) else None
+    return None
+
+
+def is_user_named_file_read(tool_name: str | None, tool_args: object, user_text: str | None) -> bool:
+    """True when ``file_read`` reads a file whose name the user's request contains.
+
+    The file name (the last path component, which must carry an extension such
+    as ``viola-test.txt``) has to appear in ``user_text`` as a whole name: not
+    inside a longer name (``old-viola-test.txt``) and not as the stem of another
+    file (``viola-test.txt.bak``). Matching is case-insensitive because Windows
+    paths are.
+    """
+    if canonicalize_tool_name_for_safety(tool_name) != "file_read":
+        return False
+    text = str(user_text or "")
+    args = _tool_args_mapping(tool_args)
+    if not text.strip() or args is None:
+        return False
+    action = str(args.get("action") or "list").strip().lower()
+    if action not in _USER_NAMED_FILE_ACTIONS:
+        return False
+    path = str(args.get("path") or "").strip().rstrip("\\/")
+    name = re.split(r"[\\/]", path)[-1] if path else ""
+    stem, dot, extension = name.rpartition(".")
+    if not dot or not stem.strip(".") or not extension:
+        return False
+    pattern = r"(?<![\w.\-])" + re.escape(name) + r"(?![\w\-]|\.\w)"
+    return re.search(pattern, text, flags=re.IGNORECASE) is not None
+
+
+def _user_request_text(message: Mapping[str, object]) -> str | None:
+    """Text the user typed in a ``user`` frame; None for tool-result frames."""
+    content = message.get("content")
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts = [
+            str(block.get("text") or "")
+            for block in content
+            if isinstance(block, Mapping) and block.get("type") in {"text", "input_text"}
+        ]
+        if parts:
+            return "\n".join(parts)
+    return None
+
+
+def _tool_calls_in_assistant_message(message: dict[str, object]) -> list[tuple[str, object]]:
+    """(name, arguments) for each tool call an assistant frame recorded."""
+    calls: list[tuple[str, object]] = []
+    content = message.get("content")
+    if isinstance(content, dict) and content.get("_openai_assistant"):
+        for call in content.get("tool_calls") or []:
+            if isinstance(call, dict):
+                fn = call.get("function")
+                if isinstance(fn, dict) and fn.get("name"):
+                    calls.append((str(fn["name"]), fn.get("arguments")))
+    elif isinstance(content, list):
+        for block in content:
+            if isinstance(block, dict) and block.get("type") == "tool_use" and block.get("name"):
+                calls.append((str(block["name"]), block.get("input")))
+    return calls
+
+
 def _tool_names_in_assistant_message(message: dict[str, object]) -> list[str]:
     """Extract the tool names an assistant frame called (structural provenance).
 
@@ -403,6 +493,13 @@ class BrowserTaintTracker:
         # file) has tainted the context. Drives navigation-sink gating without
         # breaking ordinary multi-page browsing under browser-only taint.
         self._non_browser_tainted: bool = False
+        # The current user request. A file it names may be read without
+        # tainting (see ``is_user_named_file_read``).
+        self._user_request: str = ""
+
+    def set_user_request(self, user_text: str | None) -> None:
+        """Record the current user request for the user-named-file exemption."""
+        self._user_request = str(user_text or "")
 
     @property
     def is_tainted(self) -> bool:
@@ -429,13 +526,27 @@ class BrowserTaintTracker:
         # browser-only behavior for any name not in the source taxonomy.
         return "browser"
 
-    def mark_tainted(self, source_tool: str, *, category: str | None = None) -> None:
+    def mark_tainted(
+        self,
+        source_tool: str,
+        *,
+        category: str | None = None,
+        tool_args: object = None,
+        user_text: str | None = None,
+    ) -> None:
         """Mark the context as tainted by untrusted content.
 
         ``category`` ("browser" or "non_browser") is inferred from the source
         tool name when not supplied. A non-browser taint additionally enables
         the navigation-sink gate (SEC-004).
+
+        A ``file_read`` of a file the user's request names (``user_text``, else
+        the request recorded by ``set_user_request``) does not taint.
         """
+        request = self._user_request if user_text is None else user_text
+        if tool_args is not None and is_user_named_file_read(source_tool, tool_args, request):
+            logger.info("Content taint skipped: %s read a file the user named in the request", source_tool)
+            return
         if category is None:
             category = self._classify_source(source_tool)
         if not self._tainted:
@@ -466,12 +577,24 @@ class BrowserTaintTracker:
         as the tainted tool result remains in context (and clears once it is
         compacted out).
         """
+        last_user_request = ""
         for message in messages or []:
-            if not isinstance(message, dict) or message.get("role") != "assistant":
+            if not isinstance(message, dict):
                 continue
-            for name in _tool_names_in_assistant_message(message):
-                if is_untrusted_content_source(name):
-                    self.mark_tainted(name)
+            role = message.get("role")
+            if role == "user":
+                text = _user_request_text(message)
+                if text is not None:
+                    last_user_request = text
+                continue
+            if role != "assistant":
+                continue
+            for name, args in _tool_calls_in_assistant_message(message):
+                if not is_untrusted_content_source(name):
+                    continue
+                if is_user_named_file_read(name, args, last_user_request):
+                    continue
+                self.mark_tainted(name)
 
     def reset(self) -> None:
         """Clear the taint flag."""
@@ -502,9 +625,12 @@ class BrowserTaintTracker:
             )
             return (
                 "BLOCKED: '%s' cannot be called while untrusted content "
-                "(web, email, calendar, memory, or file) is in context "
-                "(prompt injection defense). The user must explicitly request "
-                "this action in a new message." % tool_name
+                "(web, email, calendar, memory, or a file the user did not name) "
+                "is in this conversation (prompt injection defense). The block "
+                "lasts as long as that content stays in the conversation, so "
+                "asking again or retrying will not lift it. Tell the user you "
+                "could not do this and why. A file the user names in their own "
+                "request does not count as untrusted." % tool_name
             )
 
         if self._non_browser_tainted and _is_navigation_sink_name(tool_name):
@@ -515,9 +641,11 @@ class BrowserTaintTracker:
             )
             return (
                 "BLOCKED: '%s' cannot fetch an external URL/query while "
-                "untrusted non-browser content (email, calendar, memory, or "
-                "file) is in context (exfiltration defense). The user must "
-                "explicitly request this navigation in a new message." % tool_name
+                "untrusted non-browser content (email, calendar, memory, or a "
+                "file the user did not name) is in this conversation "
+                "(exfiltration defense). The block lasts as long as that "
+                "content stays in the conversation, so asking again or retrying "
+                "will not lift it. Tell the user you could not do this and why." % tool_name
             )
 
         return None

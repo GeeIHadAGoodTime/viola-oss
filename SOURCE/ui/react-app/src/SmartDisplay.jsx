@@ -90,6 +90,8 @@ import ModalLoadingSpinner from './components/shared/ModalLoadingSpinner';
 import ProviderBadge from './components/shared/ProviderBadge';
 import AgentDrawer from './components/AgentDrawer';
 import { clampWakeThreshold } from './utils/wakeSensitivity';
+import { appendAssistantEntry } from './utils/chatHistory';
+import { autoDetectedWeatherLocation } from './utils/weatherLocation';
 
 // Shared CSS: animations + variables (replaces all inline <style> tags)
 import './styles/variables.css';
@@ -580,6 +582,10 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
   const [weatherDesc, setWeatherDesc] = useState('Loading...');
   const [weatherData, setWeatherData] = useState(null);
   const [weatherRetryTrigger, setWeatherRetryTrigger] = useState(0);
+  // Location the backend worked out on its own (saved setting default or IP
+  // geolocation) when the user has not set weather_location. Shown in the top
+  // bar instead of the "Set your location" prompt.
+  const [autoWeatherLocation, setAutoWeatherLocation] = useState(null);
   const [weatherForecastOpen, setWeatherForecastOpen] = useState(false);
   const [weatherForecastAnchor, setWeatherForecastAnchor] = useState(null);
   const [weatherForecastData, setWeatherForecastData] = useState(null);
@@ -1183,10 +1189,9 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
       const responseText = result.data?.message || result.data?.response || result.message || result.response || result.data?.text || '';
       if (responseText) {
         setLastResponse(`"${responseText}"`);
-        setChatHistory(prev => [
-          ...prev,
-          { role: 'assistant', content: responseText, timestamp: new Date().toISOString() }
-        ]);
+        // The backend's chat_response broadcast for this same turn usually
+        // arrives first and has already added this reply; don't add it twice.
+        setChatHistory(prev => appendAssistantEntry(prev, responseText));
       } else if (result.ok === false) {
         // A failed command carries its text in `error.message`, which the
         // expression above never reads — so a crashed turn used to leave the
@@ -1749,11 +1754,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
       } else {
         // Short responses: show in chat only, no card
         setLastResponse(`"${text}"`);
-        setChatHistory(prev => {
-          const last = prev.length > 0 ? prev[prev.length - 1] : null;
-          if (last && last.role === 'assistant' && last.content === text) { return prev; }
-          return [...prev, { role: 'assistant', content: text, timestamp: new Date().toISOString() }];
-        });
+        setChatHistory(prev => appendAssistantEntry(prev, text));
       }
     };
     setChatResponseCallback(handleChatResponse);
@@ -2723,18 +2724,27 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
   }, [isSpoke, sendToIframe]);
 
   // Fetch weather
-  const weatherLocation = userSettings?.weather_location;
+  const savedWeatherLocation = userSettings?.weather_location;
+  // The location every weather surface uses: the user's saved one, else the
+  // one the backend auto-detected for this session.
+  const weatherLocation = savedWeatherLocation || autoWeatherLocation;
   const prevWeatherLocationRef = useRef(undefined);
   useEffect(() => {
     if (settingsLoading) return;
-    if (!weatherLocation) {
+    // No saved location: ask the backend with no city. It resolves a location
+    // itself (IP geolocation on desktop, the signed-in user's saved one on
+    // cloud) and names it in the payload. If it cannot, the top bar keeps the
+    // "Set your location" prompt.
+    const autoMode = !savedWeatherLocation;
+    if (autoMode) {
       setWeatherTemp('--');
       setWeatherDesc('');
       setWeatherData(null);
       setWeatherForecastData(null);
       setWeatherForecastFetchedAt(0);
       setWeatherForecastOpen(false);
-      return;
+    } else {
+      setAutoWeatherLocation(null);
     }
     let weatherTimerId = null;
     let retryTimerId = null;
@@ -2762,19 +2772,28 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
       setWeatherCondition(
         conditionKey === 'clear' && isNight ? 'clear-night' : conditionKey,
       );
-      if (data.auto_detected_location) { refreshSettings(); }
       return true;
     };
     const fetchWeather = async (forceRefresh = false) => {
       try {
-        const data = await api.getWeather(weatherLocation, { forceRefresh });
-        if (!cancelled && applyWeatherData(data)) {
+        const data = await api.getWeather(savedWeatherLocation || '', { forceRefresh });
+        if (cancelled) return;
+        if (autoMode) {
+          const detected = autoDetectedWeatherLocation(data);
+          if (!detected) return;
+          setAutoWeatherLocation(detected);
+        }
+        if (applyWeatherData(data)) {
           weatherLoaded = true; failureCount = 0;
           if (retryTimerId) { clearInterval(retryTimerId); retryTimerId = null; }
           if (!weatherTimerId) { weatherTimerId = setInterval(() => fetchWeather(false), 10 * 60 * 1000); }
         }
       } catch (e) {
         if (cancelled || weatherLoaded) return;
+        // Nothing to auto-detect from (offline, or the lookup failed): keep
+        // the "Set your location" prompt rather than a weather error for a
+        // location the user never chose.
+        if (autoMode) return;
         failureCount++;
         if (failureCount >= 3) {
           setWeatherDesc('Weather unavailable'); setWeatherTemp('--');
@@ -2787,11 +2806,11 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
       }
     };
     const prev = prevWeatherLocationRef.current;
-    const shouldForceRefresh = prev !== undefined && prev !== weatherLocation;
-    prevWeatherLocationRef.current = weatherLocation;
+    const shouldForceRefresh = prev !== undefined && prev !== savedWeatherLocation;
+    prevWeatherLocationRef.current = savedWeatherLocation;
     fetchWeather(shouldForceRefresh);
     return () => { cancelled = true; if (weatherTimerId) clearInterval(weatherTimerId); if (retryTimerId) clearInterval(retryTimerId); };
-  }, [api, weatherLocation, settingsLoading, refreshSettings, weatherRetryTrigger]);
+  }, [api, savedWeatherLocation, settingsLoading, weatherRetryTrigger]);
 
   const handleOpenWeatherForecast = useCallback((anchorRect) => {
     if (!weatherLocation || weatherTemp === '--' || weatherDesc === 'Weather unavailable') {
@@ -3450,6 +3469,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
           formatTime={formatTime}
           formatDate={formatDate}
           weatherLocation={weatherLocation}
+          weatherLocationAutoDetected={!savedWeatherLocation && Boolean(autoWeatherLocation)}
           weatherCondition={weatherCondition}
           weatherTemp={weatherTemp}
           weatherDesc={weatherDesc}
