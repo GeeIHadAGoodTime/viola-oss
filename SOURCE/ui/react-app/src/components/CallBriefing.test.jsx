@@ -103,3 +103,19 @@ describe('CallBriefing approve and cancel', () => {
     expect(CALL_CANCEL_COMMAND).toBe('cancel');
   });
 });
+
+describe('CallBriefing on a touch screen', () => {
+  it('the dismiss, approve and cancel controls grow to 44px targets on touch', () => {
+    // The dismiss control was a bare "x" glyph with an 8x18px target.
+    const briefing = callBriefingFromConsultEvent(pendingSearchCall);
+    const onDismiss = vi.fn();
+    render(<CallBriefing briefing={briefing} onApprove={vi.fn()} onCancel={vi.fn()} onDismiss={onDismiss} />);
+    const dismiss = screen.getByRole('button', { name: 'Dismiss' });
+    expect(dismiss.className).toContain('viola-touch-target');
+    expect(dismiss.style.padding).toBe('6px 8px');
+    expect(screen.getByRole('button', { name: 'Approve' }).className).toContain('viola-touch-target');
+    expect(screen.getByRole('button', { name: 'Cancel' }).className).toContain('viola-touch-target');
+    fireEvent.click(dismiss);
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+  });
+});

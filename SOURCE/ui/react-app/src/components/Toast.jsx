@@ -180,6 +180,7 @@ const ToastContainer = ({ toasts, onDismiss }) => {
 
   return (
     <div
+      className="viola-toast-stack"
       aria-live="polite"
       aria-atomic="false"
       aria-relevant="additions removals"

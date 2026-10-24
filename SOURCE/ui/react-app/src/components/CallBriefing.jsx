@@ -117,6 +117,7 @@ export default function CallBriefing({ briefing, onDismiss, onApprove, onCancel 
         <span style={{ color: accent, fontWeight: 600, fontSize: 13 }}>{title}</span>
         <button
           type="button"
+          className="viola-touch-target"
           aria-label="Dismiss"
           onClick={onDismiss}
           style={{
@@ -125,6 +126,12 @@ export default function CallBriefing({ briefing, onDismiss, onApprove, onCancel 
             color: '#888',
             cursor: 'pointer',
             fontSize: 16,
+            lineHeight: 1,
+            padding: '6px 8px',
+            margin: '-6px -8px -6px 0',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
           }}
         >
           x
@@ -176,6 +183,7 @@ export default function CallBriefing({ briefing, onDismiss, onApprove, onCancel 
         <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
           <button
             type="button"
+            className="viola-touch-target"
             onClick={() => answer('approve')}
             disabled={Boolean(sending)}
             style={{
@@ -190,6 +198,7 @@ export default function CallBriefing({ briefing, onDismiss, onApprove, onCancel 
           </button>
           <button
             type="button"
+            className="viola-touch-target"
             onClick={() => answer('cancel')}
             disabled={Boolean(sending)}
             style={{
