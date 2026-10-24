@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "a81c3a56c82414860e0b20831d24646ab5477772",
-  "sha256": "2d9796b9a0c6d80417492f1cf5be00b5f5cbab095e4dda481b929ee0225ee22d",
+  "revision": "7f5fedee5a4ed7ce58a6c984663d4e876c4d95f2",
+  "sha256": "0a157b73df6bc3933459661e5def905aa4c126477eb71f309c7465b1cc3194eb",
   "files": [
     {
       "path": ".env.example",
@@ -1075,8 +1075,8 @@
     },
     {
       "path": "core/lan_exposure.py",
-      "sha256": "c4a03884f531ff9a352038587cab694ba062de981beec780839e3b148d1afe8a",
-      "bytes": 2078
+      "sha256": "ee10f59544f60d6c05a421bb0793a2e0e1c1bb01ebe54bcce31bf093cbaba2b1",
+      "bytes": 2971
     },
     {
       "path": "core/logging_config.py",
@@ -1155,8 +1155,8 @@
     },
     {
       "path": "core/server_factory.py",
-      "sha256": "40d90ebfae75685118880800d50ad0725a6fedfe0e36793d8c70a858f53d3d54",
-      "bytes": 30554
+      "sha256": "57bed6d8414a5c02d0c669753195e0ade72887d235314f136e9bb6c4857996c8",
+      "bytes": 35946
     },
     {
       "path": "core/single_instance.py",
@@ -1240,8 +1240,8 @@
     },
     {
       "path": "core/voice_command_handler.py",
-      "sha256": "0b3fc4b19c35a1288530e1672b27f513cabb4fd24d74081abce6c17054ae95cd",
-      "bytes": 80885
+      "sha256": "bcaedccc2500f80fecdd58b1472669a1cfdc517faecc5cf81fd5003fcb5062b9",
+      "bytes": 70800
     },
     {
       "path": "core/voice_orchestrator.py",
@@ -1580,8 +1580,8 @@
     },
     {
       "path": "intent/agent_loop.py",
-      "sha256": "ac10d07b66610095a71b3dba031c95b45f86c57ee07587bd1db95d4c9ce83cd6",
-      "bytes": 248102
+      "sha256": "077a015e894d72fffae90defd2125fff092db31ab7fa735609ba63a2684756ba",
+      "bytes": 248463
     },
     {
       "path": "intent/agent_message_manager.py",
@@ -1605,8 +1605,8 @@
     },
     {
       "path": "intent/ai_controller.py",
-      "sha256": "616351ba086ecc61278601e4bf0cd5c08d60973443c189baa94fd78e9ed18436",
-      "bytes": 165078
+      "sha256": "3453ea4c393594e9ccc6716163bd6926810638b52fa4422478bf267e2df09a14",
+      "bytes": 166258
     },
     {
       "path": "intent/ai_interpreter.py",
@@ -1670,8 +1670,8 @@
     },
     {
       "path": "intent/content_sanitizer.py",
-      "sha256": "eb741a74fa59fde00ec9610b6d058fddbba5ab173f2a808ec110d379e8c80c05",
-      "bytes": 25664
+      "sha256": "e5bd9565c61c191ed3164402d254d3e0cb8b3c4a1941ad3daa9f7fd2b1f6d2c7",
+      "bytes": 31539
     },
     {
       "path": "intent/context_builder.py",
@@ -1785,8 +1785,8 @@
     },
     {
       "path": "intent/instant_commands/_base.py",
-      "sha256": "e8e6cd04d9ac55d6db93a8be0f4ba6e44f1c5275cbfe343932811a9925962ee2",
-      "bytes": 12098
+      "sha256": "fa3a2102608079522ad40db58b7e51898ac30305ebdfbf47f9cc923834e1a5d4",
+      "bytes": 12507
     },
     {
       "path": "intent/instant_commands/calendar.py",
@@ -2140,8 +2140,8 @@
     },
     {
       "path": "intent/tools/settings_tools.py",
-      "sha256": "3cc52a58cd16f18f1090dedd5316b4e9b557f1460b165877ecdbc1572e420ce2",
-      "bytes": 25197
+      "sha256": "1e67653aa2dc69e43a70c1addd352d50beb3eef039c7c10ed843cca8250d98c6",
+      "bytes": 25318
     },
     {
       "path": "intent/tools/shell.py",
@@ -3175,8 +3175,8 @@
     },
     {
       "path": "music/runtime/backend_manager.py",
-      "sha256": "32405c04020843934f01d69d435801002a3529e4e2460a06162f1987f81ad048",
-      "bytes": 24732
+      "sha256": "c705b23e6f5fbbf185233f90ba33ce38039b231d987e7ee46c278d91fc942500",
+      "bytes": 26009
     },
     {
       "path": "music/runtime/compliance_service.py",
@@ -3190,8 +3190,8 @@
     },
     {
       "path": "music/runtime/control_surface.py",
-      "sha256": "8c075a6dd0b1eb78926b4f363fc8ee9369700898b08a0794538f5bb5e62f2f6d",
-      "bytes": 42856
+      "sha256": "1fe6294e58dc902fb0c41ad77a8c6e46b7f504039c57387cb2254495f9b10374",
+      "bytes": 43365
     },
     {
       "path": "music/runtime/embedded_playback.py",
@@ -4640,8 +4640,8 @@
     },
     {
       "path": "services/llm/provider_router.py",
-      "sha256": "d3030588b62293bf5ecedc8f3f5ceaacdbbcc7e081683ff678059ff4349f098d",
-      "bytes": 68051
+      "sha256": "a3a16f531091e3b2b861e72daa50a148985c250a9cf992d9ea7e81c55bd33213",
+      "bytes": 68716
     },
     {
       "path": "services/llm/providers/__init__.py",
@@ -9410,8 +9410,8 @@
     },
     {
       "path": "ui/api/routes/control.py",
-      "sha256": "2916cf926be6da1bc46eaca2eeee957b7fb072fce1fa83fb876ecb0bf8fc38aa",
-      "bytes": 67857
+      "sha256": "dcabbcc441c66ba2513b58677646b2068af57a3a48af7da899245d920255470c",
+      "bytes": 67989
     },
     {
       "path": "ui/api/routes/cost.py",
@@ -9470,8 +9470,8 @@
     },
     {
       "path": "ui/api/routes/lifecycle.py",
-      "sha256": "d94d3450e52a094474431e00a362963cdeb90731bd3f71d8f0197d305b6d9d82",
-      "bytes": 39006
+      "sha256": "36c17253fc7fa3b1aadec7b2dcc2a1f901eebccc19e99157852e3f8261629817",
+      "bytes": 45832
     },
     {
       "path": "ui/api/routes/llm_stream.py",
@@ -9510,8 +9510,8 @@
     },
     {
       "path": "ui/api/routes/network.py",
-      "sha256": "7cca7bf78aa0724e48bd1a01f0c81d31978bf3269df2c8839620d6547d188a80",
-      "bytes": 4874
+      "sha256": "2622e688b187c2f2e18bd4148bf1d870879b3475148f482286940fb171e4c0bb",
+      "bytes": 6687
     },
     {
       "path": "ui/api/routes/onboarding.py",
@@ -9710,8 +9710,8 @@
     },
     {
       "path": "ui/core/security.py",
-      "sha256": "3be9c2f9642c2617b04208e611a7d65f2282a313e342fd2e13976126537dbddc",
-      "bytes": 18647
+      "sha256": "fa8d82392164c141675c0d5c5be246e70cf18d52521c8371076b115334bfe292",
+      "bytes": 19893
     },
     {
       "path": "ui/customer_speech_settings.py",
@@ -9740,8 +9740,8 @@
     },
     {
       "path": "ui/onboarding.py",
-      "sha256": "71e98981e761ccde37dc9b0b6138079fb767f43b94f13a09743ad727a6e155d8",
-      "bytes": 37130
+      "sha256": "be8471bead95aa0331c571a75350fa717ad2b3372fac5c383819dcb8677fd2c6",
+      "bytes": 38160
     },
     {
       "path": "ui/qt_native/README_QT_UI.txt",
@@ -9860,8 +9860,8 @@
     },
     {
       "path": "ui/qt_native/webview_window.py",
-      "sha256": "c1c649d863279cd833ad003708bf213936861f23d1f857063b0696c9ad967b53",
-      "bytes": 222079
+      "sha256": "db64029962a599846c1284593eb9e553735765ee9e2cb305927e2af9526adb31",
+      "bytes": 226909
     },
     {
       "path": "ui/qt_native/widgets/connectivity_status.py",
@@ -10010,8 +10010,8 @@
     },
     {
       "path": "ui/react-app/src/SmartDisplay.jsx",
-      "sha256": "a61717af5bc8730d72bd424597a4f09e33952b0eaba6ace8feaa3e4b43b69fa2",
-      "bytes": 174778
+      "sha256": "52b76a1c72811a4fc791612635f9986cc77efdde75268a22f39e0e4f5f13235e",
+      "bytes": 176020
     },
     {
       "path": "ui/react-app/src/SmartDisplay.spokePolicy.test.jsx",
@@ -10040,8 +10040,8 @@
     },
     {
       "path": "ui/react-app/src/__tests__/SmartDisplay.test.jsx",
-      "sha256": "950c53c6a5c8e567cd529042a390962f31271ac03b699a72a815c4a125bd0c17",
-      "bytes": 131149
+      "sha256": "ba463f53600f2e292c82f4f64f8442c4255b8b90360a9b5c639f809aef545a54",
+      "bytes": 134117
     },
     {
       "path": "ui/react-app/src/__tests__/hooks/useEventBus.test.jsx",
@@ -10505,13 +10505,13 @@
     },
     {
       "path": "ui/react-app/src/components/ConnectSpeakerPanel.jsx",
-      "sha256": "b6cb9d90ff5d83ad45fa80329dc31a4eb3876b0023b0cb04730c13fdc0128f8c",
-      "bytes": 20385
+      "sha256": "66866d713cc340256b07dd8099632cbe8dc6fce3fd463fd6368c3e0f1309ced4",
+      "bytes": 24618
     },
     {
       "path": "ui/react-app/src/components/ConnectSpeakerPanel.test.jsx",
-      "sha256": "7f8673bf68c3da5e3e14c2a5453b9b5699998e19d9d5cfa43a8f35106ea20848",
-      "bytes": 7327
+      "sha256": "f03af961d3a32eacc480d4230e5ceed43d5f5601ad5e4a9da273186c21114484",
+      "bytes": 10851
     },
     {
       "path": "ui/react-app/src/components/ContentCard.accountRequired.test.jsx",
@@ -10800,13 +10800,13 @@
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.desktopOnlyPanels.test.jsx",
-      "sha256": "7d1f49217a41afaf40ad29c4d5eebd74ac3ee2c7d67e06f40d0b23e9f4964a01",
-      "bytes": 32710
+      "sha256": "5b675f318aa0e3c04c4cd5d18390ffe63f340c5249fc9b538e29abeeb06ca25e",
+      "bytes": 33758
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.jsx",
-      "sha256": "6c5116e244322cbb6d3a3f9f5d3e84f02815e2c7004ba9037a6eda012cf35434",
-      "bytes": 208222
+      "sha256": "29ac5dae0eebbc253aeca5c4a4b02dfd733e433f17cef577c11e24ca91150a3a",
+      "bytes": 210746
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.localDiscovery.test.jsx",
@@ -11575,8 +11575,8 @@
     },
     {
       "path": "ui/react-app/src/components/topbar/DropdownMenu.jsx",
-      "sha256": "cd9c63825350975892bfeeeca78474f71507ec8439d67831b09729e025902797",
-      "bytes": 5179
+      "sha256": "8828817007db0f3852ebbf868873ed79839a502eb15b19d05bbb5fd6bd11f7ea",
+      "bytes": 5212
     },
     {
       "path": "ui/react-app/src/components/topbar/DropdownMenu.module.css",
@@ -11600,8 +11600,8 @@
     },
     {
       "path": "ui/react-app/src/components/topbar/TopBar.jsx",
-      "sha256": "eaf80ec172e5b4715e5a8aac439c0e0e662df32c25ecea5b6b65d89c7014329e",
-      "bytes": 8363
+      "sha256": "b3edf9f5cc7167d25a1524a3ae923f9d4c3e339f387a7a4a4f60f264ea919dbf",
+      "bytes": 8995
     },
     {
       "path": "ui/react-app/src/components/topbar/TopBar.module.css",
@@ -11610,8 +11610,8 @@
     },
     {
       "path": "ui/react-app/src/components/topbar/TopBar.test.jsx",
-      "sha256": "83ca28595f18b4cd9559c6de71969b61f06e0e24f482c7722f784269a4dd2b3b",
-      "bytes": 2234
+      "sha256": "8836d029a355457de02566843f00a061afeec7e886d1371dd975a391bbaf8671",
+      "bytes": 3192
     },
     {
       "path": "ui/react-app/src/components/topbar/WeatherIcons.jsx",
@@ -11875,8 +11875,8 @@
     },
     {
       "path": "ui/react-app/src/hooks/usePlayerState.unmount.test.js",
-      "sha256": "a88b077846fcef499545e45132c8e9656de19c0487dbdeeeb1b5eec061cc2fa2",
-      "bytes": 3310
+      "sha256": "69414fbd766fbe98679b5519d907a9bcce9a8f9ac7bd83a09ed65adc8b626f15",
+      "bytes": 4603
     },
     {
       "path": "ui/react-app/src/hooks/useRoomGroups.js",
@@ -12259,6 +12259,16 @@
       "bytes": 2343
     },
     {
+      "path": "ui/react-app/src/utils/chatHistory.js",
+      "sha256": "5464cbbed021b93f5e036732bf8e023a815b35ea47c1950f9b929557ac29e86b",
+      "bytes": 1012
+    },
+    {
+      "path": "ui/react-app/src/utils/chatHistory.test.js",
+      "sha256": "8bc6686e7a574b8bf72c171724cb04348d3efc9fc65efbac7a5cc54f25353c89",
+      "bytes": 1293
+    },
+    {
       "path": "ui/react-app/src/utils/clockSync.js",
       "sha256": "a0954a586a0a046e19a60408efae3334111e276ef453af7c7b9ecb0b60e0ff72",
       "bytes": 20379
@@ -12355,8 +12365,8 @@
     },
     {
       "path": "ui/react-app/src/utils/runtimeSurface.js",
-      "sha256": "6cb92ff9eaac12fa979061d30e2c8cc85ef4b8135edbacbbdb1d544cd639f0e5",
-      "bytes": 4158
+      "sha256": "34ee49715f301537d9ec4e2c59754f25ad417584a26428092881a0694fa43020",
+      "bytes": 4141
     },
     {
       "path": "ui/react-app/src/utils/runtimeSurface.test.js",
@@ -12417,6 +12427,16 @@
       "path": "ui/react-app/src/utils/weatherCondition.test.js",
       "sha256": "c6747949869ddf7a58ea8aa115b2028cc14328b413a50241f634d084bf5aca19",
       "bytes": 2958
+    },
+    {
+      "path": "ui/react-app/src/utils/weatherLocation.js",
+      "sha256": "ee4b232c115d54658047bda51befe2299ec3d6367c0936ae164917c86a57bf11",
+      "bytes": 925
+    },
+    {
+      "path": "ui/react-app/src/utils/weatherLocation.test.js",
+      "sha256": "562f2d9b4ca0f01a00c2f5da494525f0f139e75b826e80372bf6141d691fbe22",
+      "bytes": 1162
     },
     {
       "path": "ui/react-app/src/utils/youtubeEmbed.js",
@@ -12540,8 +12560,8 @@
     },
     {
       "path": "ui/server.py",
-      "sha256": "cd05b6f51f31a97193b5d126ba6b0864ef9467fd55271d83b3f74ece97869281",
-      "bytes": 33715
+      "sha256": "c5824e5677c7f8d561ee5389da1cc1d5022ced6e91dbec3eb9a9f6bfd1859470",
+      "bytes": 35709
     },
     {
       "path": "ui/settings_api.py",
@@ -12550,18 +12570,18 @@
     },
     {
       "path": "ui/settings_effects.py",
-      "sha256": "d198cbaed33158e08023f6a1cc3dd09ce5bb62fe810c4a84578d25b9e890d68b",
-      "bytes": 21761
+      "sha256": "73dd6456bcbec67da2484eda6dffd73e80abc3f4e63850560fb3bbf169844ffa",
+      "bytes": 21861
     },
     {
       "path": "ui/settings_manager.py",
-      "sha256": "a9428c8eb45b768fe7bb83c3514166d435733a695df8b936bd26282d8f1bd634",
-      "bytes": 165131
+      "sha256": "79e152fdee4821bce11ef7286273d69479e6eec5073b444a82254e24c7d18247",
+      "bytes": 167726
     },
     {
       "path": "ui/settings_schema.py",
-      "sha256": "15c0b2b54e7c7dcf4f795c6982601c7f4daaaa277031216f709a64b99c9ba5d9",
-      "bytes": 8688
+      "sha256": "948b78904a3ba60343e150cf3533e15ad059808b30a01ac13bf5cb4617e95656",
+      "bytes": 8835
     },
     {
       "path": "ui/static/README_WEB_UI.txt",
@@ -12640,8 +12660,8 @@
     },
     {
       "path": "ui/websocket/event_hub.py",
-      "sha256": "86eac5e63fb80d6c5c9e0c11a8996e10ef58caa707b775cdca4267f7601cd60c",
-      "bytes": 65932
+      "sha256": "f8847c5b2f1419cf36c6c191b7912d237cc9d7735644f7817ef63373ad6c19be",
+      "bytes": 68267
     },
     {
       "path": "ui/websocket/routes.py",
@@ -12720,8 +12740,8 @@
     },
     {
       "path": "utils/audio_ducking.py",
-      "sha256": "9c97b365046dbb7ee3b73028becf53485d1b9313c94993f312eebe6649f313a1",
-      "bytes": 14683
+      "sha256": "6b47477a13079a1d0ca1b915b8e08f2dfc5d84d90c46f6c86e72c6e6e954b292",
+      "bytes": 15389
     },
     {
       "path": "utils/audio_preprocessing.py",
@@ -12915,8 +12935,8 @@
     },
     {
       "path": "utils/speaker_pairing_flow.py",
-      "sha256": "9ae22b5814d6f5b3acb28cfe4c51c49766af7ebb7bd4415a64e93263862c9987",
-      "bytes": 4889
+      "sha256": "ea012216559a98e4a4ece45027c0651108faf2e435785f1018411b0fcb5f45b6",
+      "bytes": 21410
     },
     {
       "path": "utils/startup_validation.py",
@@ -13330,8 +13350,8 @@
     },
     {
       "path": "voice/pipeline_wake_callback.py",
-      "sha256": "8cfb162e18dc21ec88b02297a877e09e4588af7fbd6bbbced8a3f77ea33212cd",
-      "bytes": 10742
+      "sha256": "99a6e94407855b259758f69c1e5e835886afa614fc26d113409b38974858a6b0",
+      "bytes": 8480
     },
     {
       "path": "voice/pronunciation_tables.py",
