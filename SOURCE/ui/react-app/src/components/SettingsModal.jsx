@@ -2528,7 +2528,12 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
                 />
               </SettingRow>
               <SectionDivider />
-              <SettingRow title="Error Reporting" description="Send anonymous crash reports">
+              {/* This consent gates error/crash COUNTS inside Usage Reports
+                  (telemetry/reporter.py) and the developer-build Sentry SDK.
+                  Installed builds' actual crash reports are the "Automatic
+                  Crash Reports" row below; the old copy here ("Send anonymous
+                  crash reports") made the two look like the same switch. */}
+              <SettingRow title="Error Reporting" description="Include error and crash counts in Usage Reports (needs Usage Reports on). Crash reports themselves are controlled by Automatic Crash Reports below.">
                 <Toggle
                   checked={localSettings.consent_error_reporting ?? false}
                   onChange={(v) => updateLocal('consent_error_reporting', v)}
@@ -2545,11 +2550,12 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
                   acknowledges the disclosure (diagnostics_disclosure_shown=true) in one
                   step, since this row's own description IS the disclosure. Sending itself
                   additionally requires the fleet-level master flag
-                  (diagnostics_baseline_enabled); until that is on, this toggle safely
-                  records consent but nothing leaves the device. */}
+                  (diagnostics_baseline_enabled), which is on in installed builds and off
+                  in source/dev runs. The first-run card (DiagnosticsDisclosureNotice)
+                  is the other place the disclosure is shown and the same switch offered. */}
               <SettingRow
                 title="Automatic Crash Reports"
-                description="When Viola crashes or hits an unexpected error, send a small anonymized report (app version, error type, redacted state) so we can fix it. Never includes recordings, conversation content, files, or account credentials."
+                description="On by default. When Viola crashes or hits an unexpected error, it sends a short anonymous report (app version, operating system, the error and where in Viola's code it happened) to Viola's own error tracker so we can fix it. Personal details are removed first. Never includes your name, email, account, recordings, conversations, files or passwords."
               >
                 <Toggle
                   checked={!(localSettings.diagnostics_baseline_opted_out ?? false)}

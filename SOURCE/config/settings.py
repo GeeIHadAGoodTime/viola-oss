@@ -1128,16 +1128,22 @@ class AppConfig:
     sentry_require_consent: bool = True
 
     # Anonymized diagnostic minimum (rides crashes + bug reports, opt-out
-    # baseline). MASTER arming flag: default OFF so the whole feature ships dark
-    # until the founder signs off on the disclosure UI. Env override:
+    # baseline). MASTER arming flag. The founder signed off on the disclosure UI
+    # for 1.0.5 (ADR-0013: self-hosted GlitchTip is canonical), so it defaults
+    # ON in installed/packaged builds (is_release_build) and stays OFF for
+    # source/dev runs and tests. The user's own opt-out
+    # (Settings > Account > Privacy & Data > Automatic Crash Reports, or the
+    # first-run notice) still stops every send. Env override:
     # VIOLA_DIAGNOSTICS_BASELINE_ENABLED. Read via diagnostics.diagnostic_consent.
-    diagnostics_baseline_enabled: bool = False
+    diagnostics_baseline_enabled: bool = field(default_factory=lambda: is_release_build())
     # Shared ingest credential the desktop sends as X-Viola-Diagnostics-Key to
     # the cloud relay (/v1/diagnostics/ingest). It authenticates a genuine Viola
     # client WITHOUT carrying user identity, so the anonymized baseline stays
     # anonymous end to end. Empty on the server = ingest endpoint disabled (503);
-    # empty on the desktop = no relay. Provisioned only when the feature flips on.
-    diagnostics_ingest_key: str = ""
+    # empty on the desktop = no relay. Installed builds get it BAKED at build time
+    # from the build environment (never committed; see _baked_build_value); the
+    # cloud gets it from VIOLA_DIAGNOSTICS_INGEST_KEY in .env.cloud.
+    diagnostics_ingest_key: str = field(default_factory=lambda: _baked_build_value("diagnostics_ingest_key"))
 
     metrics_db_path: str = "metrics.db"  # SQLite metrics DB location
 
@@ -1374,6 +1380,37 @@ def is_release_build() -> bool:
     if getattr(sys, "frozen", False):
         return True
     return env.get_bool("VIOLA_RELEASE_BUILD", default=False)
+
+
+#: Module the desktop build generates at freeze time with values taken from the
+#: build environment (see the private build's ``scripts/bake_build_values.py``).
+#: It is written OUTSIDE the source tree, compiled into the frozen bundle, and
+#: never committed, so a credential like the diagnostics ingest key reaches
+#: installed builds without ever entering the repository.
+BAKED_BUILD_MODULE = "_viola_build_baked"
+
+
+def _baked_build_value(name: str) -> str:
+    """Return a value baked into this packaged build, or ``""``.
+
+    Only a frozen (installed) build consults the baked module, so a source run
+    can never pick up a stray generated file from the working directory.
+    Never raises and never logs the value.
+    """
+    import importlib
+    import sys
+
+    if not getattr(sys, "frozen", False):
+        return ""
+    try:
+        module = importlib.import_module(BAKED_BUILD_MODULE)
+    except ImportError:
+        return ""
+    values = getattr(module, "VALUES", None)
+    if not isinstance(values, dict):
+        return ""
+    value = values.get(name)
+    return value.strip() if isinstance(value, str) else ""
 
 
 def _missing_required_secrets(cfg: AppConfig) -> list[str]:

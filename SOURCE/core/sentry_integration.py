@@ -620,6 +620,32 @@ def capture_diagnostic_minimum(payload: dict[str, Any]) -> str | None:
     return _capture_event(event)
 
 
+def _is_anonymized_minimum_event(event: dict[str, Any]) -> bool:
+    # The tag is set server-side by capture_diagnostic_minimum; a desktop client
+    # cannot set tags (sanitize_untrusted_minimum rebuilds its payload).
+    tags = event.get("tags")
+    return isinstance(tags, dict) and tags.get("diagnostic_source") == "anonymized_minimum"
+
+
+def _strip_ambient_context_from_anonymized_minimum(event: dict[str, Any]) -> None:
+    """Remove everything the SDK adds around a relayed desktop diagnostic.
+
+    The minimum is captured on the cloud while it handles the desktop's
+    ``POST /v1/diagnostics/ingest``. The FastAPI integration then attaches THAT
+    request to the event: its headers carry the shared ``X-Viola-Diagnostics-Key``
+    and the desktop's IP address (``CF-Connecting-IP`` / ``X-Forwarded-For``).
+    None of it describes the crash, and the IP would make an "anonymous" report
+    identifying, so the request block, breadcrumbs, the cloud host name and the
+    SDK's extra data are dropped. A user block survives only when the payload
+    carried the separate identifiable opt-in.
+    """
+    for key in ("request", "breadcrumbs", "server_name", "extra", "modules"):
+        event.pop(key, None)
+    tags = event.get("tags") if isinstance(event.get("tags"), dict) else {}
+    if tags.get("has_identifiable_extra") != "true":
+        event.pop("user", None)
+
+
 def capture_user_bug_report(
     *,
     user_id: str,
@@ -1131,6 +1157,11 @@ def _before_send(event: dict[str, Any], hint: dict[str, Any]) -> dict[str, Any] 
         # Filter connection errors (client disconnected, not a bug)
         if _is_connection_error(exc_type, exc_value):
             return None
+
+    # A relayed anonymized diagnostic must not pick up the ingest request's
+    # headers (shared ingest key, the desktop's IP) or any ambient identity.
+    if _is_anonymized_minimum_event(event):
+        _strip_ambient_context_from_anonymized_minimum(event)
 
     # Defense-in-depth: strip request body data even if the SDK body-size
     # setting is somehow overridden. Voice/conversation data must never
