@@ -392,6 +392,22 @@ class OnboardingSystem:
 
         # Key not present — could be a fresh install or an existing user
         # who predates the onboarding feature.  Check for evidence of prior use.
+        #
+        # Only for the install's own device principal. The evidence below is
+        # device-wide (the shared settings.json, the secure-settings cache, the
+        # local auth DB), so for a signed-in account it describes whoever used
+        # this install before, not this account. Applying it to an account
+        # meant a second person signing in on the same computer skipped first
+        # run, and had onboarding_completed written into their own blob, so they
+        # were never asked the per-account questions (AI processing consent,
+        # autonomy) (1.0.5 build-4 laptop report: reason=existing_user_detected
+        # for a brand-new Free account). An account that finished first run has
+        # the flag in its own blob, or gets it from the sign-in carry-over.
+        if self._current_principal_is_account():
+            reason, value = self._not_completed_reason()
+            logger.info("ONBOARDING_DECISION outcome=show_onboarding reason=%s value=%s", reason, value)
+            return False
+
         if self._detect_existing_user():
             logger.info("ONBOARDING_DECISION outcome=completed reason=existing_user_detected value=n/a")
             logger.info("Persisted user state detected; auto-completing onboarding")
