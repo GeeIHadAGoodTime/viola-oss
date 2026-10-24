@@ -32,6 +32,28 @@ def set_mcp_hub(hub: Any) -> None:
     _mcp_hub = hub
 
 
+def _provider_tool_prefixes(provider: str) -> tuple[str, str]:
+    """Tool-name prefixes the hub registers for an external provider's tools.
+
+    External (``namespace=True``) servers are registered by
+    ``MCPClientHub._discover_tools`` under Claude's canonical
+    ``mcp__<server>__<tool>`` name, plus Viola's legacy ``<server>__<tool>``
+    routing alias. The canonical prefix comes first so it is preferred.
+    """
+    from mcp_hub.mcp_string_utils import get_mcp_prefix, normalize_name_for_mcp
+
+    return get_mcp_prefix(provider), "%s__" % normalize_name_for_mcp(provider)
+
+
+def _provider_tool_names(provider: str, tool_routes: Any) -> list[str]:
+    """Registered tool names that belong to ``provider``, canonical names first."""
+    canonical_prefix, legacy_prefix = _provider_tool_prefixes(provider)
+    names = [str(name) for name in tool_routes]
+    canonical = [name for name in names if name.startswith(canonical_prefix)]
+    legacy = [name for name in names if name.startswith(legacy_prefix)]
+    return canonical + legacy
+
+
 def _get_available_providers() -> list[str]:
     """Return names of connected external providers that support delegation.
 
@@ -46,9 +68,7 @@ def _get_available_providers() -> list[str]:
     available: list[str] = []
     tool_routes = getattr(_mcp_hub, "_tool_routes", {})
     for provider_key in EXTERNAL_PROVIDERS:
-        # External providers are namespaced: "{provider}.{tool}"
-        prefix = "%s." % provider_key
-        if any(name.startswith(prefix) for name in tool_routes):
+        if _provider_tool_names(provider_key, tool_routes):
             available.append(provider_key)
     return available
 
@@ -81,8 +101,9 @@ def _resolve_provider(requested: str) -> str | None:
 def _find_provider_tool(provider: str) -> str | None:
     """Find the primary tool name for a provider.
 
-    External providers expose tools namespaced as "{provider}.{tool}".
-    We look for common delegation entry points.
+    External providers expose tools as ``mcp__{provider}__{tool}`` (with a
+    legacy ``{provider}__{tool}`` alias). We look for common delegation entry
+    points, preferring the canonical name.
     """
     if _mcp_hub is None:
         return None
@@ -90,23 +111,15 @@ def _find_provider_tool(provider: str) -> str | None:
     tool_routes = getattr(_mcp_hub, "_tool_routes", {})
 
     # Try common tool names that delegation providers expose
-    candidates = [
-        "%s.codex" % provider,
-        "%s.generate" % provider,
-        "%s.chat" % provider,
-        "%s.complete" % provider,
-    ]
-    for candidate in candidates:
-        if candidate in tool_routes:
-            return candidate
+    for prefix in _provider_tool_prefixes(provider):
+        for entry_point in ("codex", "generate", "chat", "complete"):
+            candidate = prefix + entry_point
+            if candidate in tool_routes:
+                return candidate
 
     # Fall back to the first tool from this provider
-    prefix = "%s." % provider
-    for name in tool_routes:
-        if name.startswith(prefix):
-            return name
-
-    return None
+    names = _provider_tool_names(provider, tool_routes)
+    return names[0] if names else None
 
 
 async def delegate_to_provider(

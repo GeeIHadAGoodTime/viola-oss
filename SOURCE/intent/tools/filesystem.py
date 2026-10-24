@@ -41,6 +41,8 @@ _BLOCKED_DIRS_UNIX = {
 _MAX_LIST_ENTRIES = 100
 _MAX_READ_LINES = 100
 _MAX_SEARCH_RESULTS = 20
+# Upper bound for files the partial-edit operations load whole into memory.
+_MAX_EDIT_FILE_BYTES = 5 * 1024 * 1024
 
 # Local runtime stores can contain cookies, vault material, and auth/session
 # state. They must not be exposed through generic filesystem tools.
@@ -283,17 +285,22 @@ async def read_file(path: str, offset: int = 0, limit: int = _MAX_READ_LINES) ->
         limit = min(limit, _MAX_READ_LINES)
         selected = lines[offset : offset + limit]
         content = "".join(selected)
+        end = offset + len(selected)
 
-        return ToolResult(
-            ok=True,
-            data={
-                "path": str(p),
-                "content": content,
-                "total_lines": total_lines,
-                "offset": offset,
-                "lines_returned": len(selected),
-            },
-        )
+        data: dict[str, object] = {
+            "path": str(p),
+            "content": content,
+            "total_lines": total_lines,
+            "offset": offset,
+            "lines_returned": len(selected),
+            # Structured truncation facts (not prose): a read never returns
+            # more than _MAX_READ_LINES lines, so the model must know when it
+            # has NOT seen the whole file before it edits it.
+            "truncated": offset > 0 or end < total_lines,
+        }
+        if end < total_lines:
+            data["next_offset"] = end
+        return ToolResult(ok=True, data=data)
     except PermissionError:
         return ToolResult(ok=False, error="Permission denied: %s" % p)
     except OSError as exc:
@@ -312,8 +319,40 @@ def _is_write_denied(path: Path) -> str | None:
     return None
 
 
-async def write_file(path: str, content: str) -> ToolResult:
-    """Write content to a file (creates parent directories if needed)."""
+def _count_lines(text: str) -> int:
+    """Count lines the way ``read_file`` does (``readlines`` semantics)."""
+    if not text:
+        return 0
+    return text.count("\n") + (0 if text.endswith("\n") else 1)
+
+
+def _existing_line_count(p: Path) -> int | None:
+    """Line count of an existing regular file, or None when it cannot be read."""
+    try:
+        if not p.is_file():
+            return None
+        if p.stat().st_size > _MAX_EDIT_FILE_BYTES:
+            # Too large to count cheaply; treat as "longer than one read".
+            return _MAX_READ_LINES + 1
+        data = p.read_bytes()
+    except OSError:
+        return None
+    if not data:
+        return 0
+    return data.count(b"\n") + (0 if data.endswith(b"\n") else 1)
+
+
+async def write_file(path: str, content: str, overwrite_existing: bool = False) -> ToolResult:
+    """Write content to a file (creates parent directories if needed).
+
+    A whole-file write that would make an existing file SHORTER than a single
+    ``read_file`` call can show (more than ``_MAX_READ_LINES`` lines) is
+    refused unless ``overwrite_existing`` is True. A read returns at most
+    ``_MAX_READ_LINES`` lines, so "read it, add a line, write it back" on a
+    long file would otherwise silently drop everything past the part that was
+    read. Partial edits go through ``append_to_file`` / ``insert_lines`` /
+    ``replace_lines`` / ``replace_text`` instead, which never touch the rest.
+    """
     p, err = _validate_path(path)
     if err:
         return ToolResult(ok=False, error=err)
@@ -322,6 +361,35 @@ async def write_file(path: str, content: str) -> ToolResult:
     if denied:
         logger.warning("Blocked write to protected path: %s", p)
         return ToolResult(ok=False, error=denied)
+
+    if not overwrite_existing:
+        existing_lines = _existing_line_count(p)
+        new_lines = _count_lines(content)
+        if existing_lines is not None and existing_lines > _MAX_READ_LINES and new_lines < existing_lines:
+            logger.warning(
+                "Refused whole-file write that would shrink %s from %d to %d lines",
+                p,
+                existing_lines,
+                new_lines,
+            )
+            return ToolResult(
+                ok=False,
+                error=(
+                    "Not written: this would replace all %d lines of %s with %d lines. "
+                    "A read shows at most %d lines at a time, so a whole-file write can drop "
+                    "content that was never read. To change part of the file, use "
+                    "action='append', 'insert', 'replace_lines' or 'replace_text'. Only if the "
+                    "user asked to replace the entire file, write again with overwrite=true."
+                )
+                % (existing_lines, p, new_lines, _MAX_READ_LINES),
+                error_category="would_truncate_file",
+                data={
+                    "path": str(p),
+                    "existing_lines": existing_lines,
+                    "new_lines": new_lines,
+                    "written": False,
+                },
+            )
 
     try:
         p.parent.mkdir(parents=True, exist_ok=True)
@@ -334,6 +402,188 @@ async def write_file(path: str, content: str) -> ToolResult:
         return ToolResult(ok=False, error="Permission denied: %s" % p)
     except OSError as exc:
         return ToolResult(ok=False, error="Write error: %s" % exc)
+
+
+# ---------------------------------------------------------------------------
+# Partial edits: change part of a file without rewriting the rest from a read.
+# ---------------------------------------------------------------------------
+
+
+def _load_for_edit(path: str, *, must_exist: bool) -> tuple[Path, str | None, str | None]:
+    """Validate a path for an in-place edit and load its full text.
+
+    Returns ``(path, text, error)``. ``text`` is None when the file does not
+    exist (allowed only when ``must_exist`` is False). The file is read whole
+    (bounded by ``_MAX_EDIT_FILE_BYTES``) with newlines preserved exactly, and
+    as strict UTF-8: a file that does not decode is refused rather than
+    rewritten with replacement characters.
+    """
+    p, err = _validate_path(path)
+    if err:
+        return p, None, err
+    denied = _is_write_denied(p)
+    if denied:
+        logger.warning("Blocked edit of protected path: %s", p)
+        return p, None, denied
+    if not p.exists():
+        if must_exist:
+            return p, None, "File does not exist: %s" % p
+        return p, None, None
+    if not p.is_file():
+        return p, None, "Not a file: %s" % p
+    try:
+        size = p.stat().st_size
+        if size > _MAX_EDIT_FILE_BYTES:
+            return (
+                p,
+                None,
+                "File is too large to edit safely (%d bytes; limit %d): %s" % (size, _MAX_EDIT_FILE_BYTES, p),
+            )
+        raw = p.read_bytes()
+    except PermissionError:
+        return p, None, "Permission denied: %s" % p
+    except OSError as exc:
+        return p, None, "Read error: %s" % exc
+    if b"\x00" in raw[:1024]:
+        return p, None, "Binary file detected, cannot edit as text: %s" % p
+    try:
+        text = raw.decode("utf-8")
+    except UnicodeDecodeError:
+        return p, None, "File is not UTF-8 text, so editing it could corrupt it: %s" % p
+    return p, text, None
+
+
+def _newline_style(text: str) -> str:
+    return "\r\n" if "\r\n" in text else "\n"
+
+
+def _as_lines(content: str, newline: str) -> list[str]:
+    """Split inserted content into lines that each end with ``newline``."""
+    if content == "":
+        return []
+    parts = content.splitlines()
+    return [part + newline for part in parts]
+
+
+def _save_edit(p: Path, text: str, data: dict[str, object]) -> ToolResult:
+    try:
+        p.parent.mkdir(parents=True, exist_ok=True)
+        # newline="" writes the text byte-for-byte (no \n -> \r\n translation),
+        # so untouched lines keep their original line endings.
+        with open(p, "w", encoding="utf-8", newline="") as f:
+            f.write(text)
+    except PermissionError:
+        return ToolResult(ok=False, error="Permission denied: %s" % p)
+    except OSError as exc:
+        return ToolResult(ok=False, error="Write error: %s" % exc)
+    data.setdefault("path", str(p))
+    data["total_lines"] = _count_lines(text)
+    data["bytes_written"] = len(text.encode("utf-8"))
+    return ToolResult(ok=True, data=data)
+
+
+async def append_to_file(path: str, content: str) -> ToolResult:
+    """Append ``content`` to the end of a file, creating it if missing."""
+    if content == "":
+        return ToolResult(ok=False, error="Nothing to append: content is empty")
+    p, text, err = _load_for_edit(path, must_exist=False)
+    if err:
+        return ToolResult(ok=False, error=err)
+    existing = text or ""
+    newline = _newline_style(existing)
+    if existing and not existing.endswith(("\n", "\r")):
+        existing += newline
+    added = "".join(_as_lines(content, newline))
+    return _save_edit(p, existing + added, {"action": "append", "lines_added": _count_lines(added)})
+
+
+async def insert_lines(path: str, line: int, content: str) -> ToolResult:
+    """Insert ``content`` before 1-based line ``line`` (``total + 1`` appends)."""
+    if content == "":
+        return ToolResult(ok=False, error="Nothing to insert: content is empty")
+    p, text, err = _load_for_edit(path, must_exist=True)
+    if err or text is None:
+        return ToolResult(ok=False, error=err or "File does not exist: %s" % p)
+    lines = text.splitlines(keepends=True)
+    total = len(lines)
+    if line < 1 or line > total + 1:
+        return ToolResult(
+            ok=False,
+            error="Line %d is out of range: the file has %d lines (use 1 to %d)" % (line, total, total + 1),
+        )
+    newline = _newline_style(text)
+    if lines and line == total + 1 and not lines[-1].endswith(("\n", "\r")):
+        lines[-1] += newline
+    new_lines = _as_lines(content, newline)
+    lines[line - 1 : line - 1] = new_lines
+    return _save_edit(
+        p,
+        "".join(lines),
+        {"action": "insert", "inserted_at_line": line, "lines_added": len(new_lines)},
+    )
+
+
+async def replace_lines(path: str, start_line: int, end_line: int, content: str) -> ToolResult:
+    """Replace 1-based inclusive lines ``start_line..end_line`` with ``content``.
+
+    Empty ``content`` deletes those lines. Every other line is kept as-is.
+    """
+    p, text, err = _load_for_edit(path, must_exist=True)
+    if err or text is None:
+        return ToolResult(ok=False, error=err or "File does not exist: %s" % p)
+    lines = text.splitlines(keepends=True)
+    total = len(lines)
+    if end_line <= 0:
+        end_line = start_line
+    if start_line < 1 or end_line < start_line or end_line > total:
+        return ToolResult(
+            ok=False,
+            error="Lines %d-%d are out of range: the file has %d lines" % (start_line, end_line, total),
+        )
+    newline = _newline_style(text)
+    new_lines = _as_lines(content, newline)
+    # Keep the file's "no newline at end of file" state when the last line
+    # itself is replaced.
+    if end_line == total and new_lines and not lines[-1].endswith(("\n", "\r")):
+        new_lines[-1] = new_lines[-1][: -len(newline)]
+    lines[start_line - 1 : end_line] = new_lines
+    return _save_edit(
+        p,
+        "".join(lines),
+        {
+            "action": "replace_lines",
+            "start_line": start_line,
+            "end_line": end_line,
+            "lines_removed": end_line - start_line + 1,
+            "lines_added": len(new_lines),
+        },
+    )
+
+
+async def replace_text(path: str, old_text: str, new_text: str) -> ToolResult:
+    """Replace the single exact occurrence of ``old_text`` with ``new_text``."""
+    if not old_text:
+        return ToolResult(ok=False, error="old_text is required for replace_text")
+    p, text, err = _load_for_edit(path, must_exist=True)
+    if err or text is None:
+        return ToolResult(ok=False, error=err or "File does not exist: %s" % p)
+    count = text.count(old_text)
+    if count == 0 and "\r\n" in text and "\r\n" not in old_text:
+        # The model usually quotes text with \n even when the file uses \r\n.
+        old_text = old_text.replace("\n", "\r\n")
+        new_text = new_text.replace("\r\n", "\n").replace("\n", "\r\n")
+        count = text.count(old_text)
+    if count == 0:
+        return ToolResult(ok=False, error="old_text was not found in %s; nothing was changed" % p)
+    if count > 1:
+        return ToolResult(
+            ok=False,
+            error=(
+                "old_text appears %d times in %s; include more surrounding text so it matches "
+                "exactly once. Nothing was changed." % (count, p)
+            ),
+        )
+    return _save_edit(p, text.replace(old_text, new_text, 1), {"action": "replace_text", "replacements": 1})
 
 
 async def file_info(path: str) -> ToolResult:

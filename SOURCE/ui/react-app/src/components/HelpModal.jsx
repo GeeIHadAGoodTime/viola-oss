@@ -3,6 +3,13 @@ import PropTypes from 'prop-types';
 import { THEME } from '../config';
 import Modal, { secondaryButtonStyle } from './Modal';
 
+// The installed app does not serve /docs/USER_GUIDE.md or /docs/legal/ (only
+// the dev tree has those files), so those relative links 404'd. Point at the
+// published pages on useviola.com, the same Terms/Privacy links AccountTab uses.
+const HELP_GUIDE_URL = 'https://useviola.com/for-you';
+const PRIVACY_URL = 'https://useviola.com/privacy';
+const TERMS_URL = 'https://useviola.com/terms';
+
 // The version of the build the user is actually running, injected at build
 // time from core/constants.py (VIOLA_VERSION) by vite.config.js — the same
 // source BugReportModal attaches to reports. This line used to be the literal
@@ -309,7 +316,7 @@ function AboutTab() {
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <a
-          href="/docs/USER_GUIDE.md"
+          href={HELP_GUIDE_URL}
           target="_blank"
           rel="noopener noreferrer"
           style={{
@@ -325,11 +332,11 @@ function AboutTab() {
           onMouseOver={(e) => (e.currentTarget.style.backgroundColor = THEME.colors.glassHover)}
           onMouseOut={(e) => (e.currentTarget.style.backgroundColor = THEME.colors.bgSurface)}
         >
-          Full Documentation &rarr;
+          How Viola works (setup guide) &rarr;
         </a>
 
         <a
-          href="/docs/legal/CORE_PRIVACY_POLICY.md"
+          href={PRIVACY_URL}
           target="_blank"
           rel="noopener noreferrer"
           style={{
@@ -349,7 +356,7 @@ function AboutTab() {
         </a>
 
         <a
-          href="/docs/legal/CORE_TERMS_OF_SERVICE.md"
+          href={TERMS_URL}
           target="_blank"
           rel="noopener noreferrer"
           style={{

@@ -677,6 +677,30 @@ describe('SmartDisplay', () => {
     });
   });
 
+  it('leaves the screen context out when "Include what Viola was showing" is unchecked', async () => {
+    sentryHarness.openSentryUserFeedback.mockResolvedValueOnce(false);
+    const { user } = render(<SmartDisplay />);
+
+    await user.click(screen.getByRole('button', { name: 'Report a bug' }));
+    fireEvent.change(await screen.findByLabelText('What broke?'), {
+      target: { value: 'The queue went blank after a skip' },
+    });
+    expect(screen.getByTestId('bug-report-screen-context-detail')).toHaveTextContent('No screenshot is taken.');
+    await user.click(screen.getByRole('checkbox', { name: 'Include what Viola was showing' }));
+    expect(screen.getByTestId('bug-report-screen-context-detail')).toHaveTextContent('Only your description');
+    await user.click(screen.getByRole('button', { name: 'Submit report' }));
+
+    await waitFor(() => expect(apiHarness.submitBugReport).toHaveBeenCalledTimes(1));
+    const [, context] = apiHarness.submitBugReport.mock.calls[0];
+    for (const key of ['current_url', 'display_mode', 'stage_mode', 'recent_action', 'viewport', 'player', 'agent_task', 'phone']) {
+      expect(context).not.toHaveProperty(key);
+    }
+    expect(context).toMatchObject({
+      source: 'react_topbar',
+      screen_capture_metadata: { requested: false, provided: false, storage: 'metadata_only' },
+    });
+  });
+
   it('carries the user-consented repro/contact/version fields the backend allowlists', async () => {
     // Contract for the enhanced bug-report form: every consented field the user
     // typed or was shown (steps/expected/actual/contact + app_version/os) must
@@ -754,13 +778,14 @@ describe('SmartDisplay', () => {
       const { user, rerender } = render(<SmartDisplay />);
       await user.click(screen.getByTestId('stage-pill-chat'));
       const ptt = within(await screen.findByTestId('chat-mode')).getByRole('button', { name: 'Push to talk' });
-      fireEvent.mouseDown(ptt);
+      fireEvent.pointerDown(ptt, { pointerId: 1, pointerType: 'mouse', button: 0 });
       expect(voiceHarness.startRecording).not.toHaveBeenCalled();
+      fireEvent.pointerUp(ptt, { pointerId: 1, pointerType: 'mouse', button: 0 });
       expect(voiceHarness.options.enabled).toBe(false);
       expect(screen.getByText(/Voice input is disabled/)).toBeInTheDocument();
       voiceMode = 'push_to_talk';
       rerender(<SmartDisplay />);
-      fireEvent.mouseDown(ptt);
+      fireEvent.pointerDown(ptt, { pointerId: 1, pointerType: 'mouse', button: 0 });
       expect(voiceHarness.options.enabled).toBe(true);
       expect(voiceHarness.startRecording).toHaveBeenCalledTimes(1);
     } finally { delete window.viola; }

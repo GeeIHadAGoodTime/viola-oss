@@ -58,7 +58,7 @@ _DIRECT_ACTION_CLASSES: dict[str, str] = {
 }
 
 _SEND_EMAIL_ACTIONS = {"send", "send_draft"}
-_FILE_WRITE_ACTIONS = {"write", "save", "create", "overwrite"}
+_FILE_WRITE_ACTIONS = {"write", "save", "create", "overwrite", "append", "insert", "replace_lines", "replace_text"}
 _FILE_DELETE_ACTIONS = {"delete", "forget", "trash"}
 _CALENDAR_DELETE_ACTIONS = {"delete", "delete_event", "remove", "cancel"}
 _CALENDAR_WRITE_ACTIONS = {
@@ -210,6 +210,14 @@ def describe_irreversible_action(tool_name: str, args: Mapping[str, Any] | None 
         return "delete %s" % path if path else "delete the file"
     if action_class == "file_write":
         path = _clean(params.get("path") or params.get("filename") or params.get("file_id"))
+        target = path or "the file"
+        write_action = _clean(params.get("action")).lower()
+        if write_action == "append":
+            return "add to the end of %s" % target
+        if write_action == "insert":
+            return "insert lines into %s" % target
+        if write_action in {"replace_lines", "replace_text"}:
+            return "edit part of %s" % target
         return "write %s" % path if path else "write the file"
     if action_class == "shell_command":
         command = _clean(params.get("command"))
