@@ -4,7 +4,7 @@ import asyncio
 import datetime
 import inspect
 import time
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from typing import Any, cast
 
@@ -90,6 +90,134 @@ def _resolve_broadcast_user_id(hub: Any) -> str | None:  # hub parameter kept fo
         return get_current_or_device_user_id()
     except LookupError:
         return None
+
+
+def _desktop_account_key() -> tuple[bool, str | None]:
+    """(readable, signed-in account user_id or None) for this desktop install."""
+    try:
+        from auth.desktop_session import get_desktop_account_identity
+
+        identity = get_desktop_account_identity()
+    except Exception:  # noqa: BLE001, RUF100 - an unreadable session store is not an account change
+        log.debug("Desktop account identity unreadable", exc_info=True)
+        return False, None
+    if not getattr(identity, "signed_in", False):
+        return True, None
+    user_id = getattr(identity, "user_id", None)
+    return True, str(user_id) if user_id else None
+
+
+def reset_music_for_account_change(music: Any, *, hub_authority: Any = None) -> bool:
+    """Stop playback and drop the queue, now-playing and autoplay context.
+
+    The desktop has one music player for the whole install. Without this the
+    previous account's queue kept playing after sign-out and restarted in the
+    next account (1.0.5 build 4, Pro -> Free). Returns False when there was
+    nothing to reset (music never started).
+    """
+    if music is None:
+        return False
+    is_materialized = getattr(music, "is_materialized", None)
+    if callable(is_materialized) and not is_materialized():
+        return False
+    for name in ("stop", "clear_queue"):
+        method = getattr(music, name, None)
+        if not callable(method):
+            continue
+        try:
+            method()
+        except Exception as exc:  # noqa: BLE001, RUF100 - keep resetting the rest of the state
+            log.warning("Account change: music %s failed: %s", name, exc)
+    player = getattr(music, "player", None) or music
+    history = getattr(player, "_history", None)
+    clear_history = getattr(history, "clear", None)
+    if callable(clear_history):
+        try:
+            clear_history()
+        except Exception:  # noqa: BLE001, RUF100 - history is best effort
+            log.debug("Account change: play history clear failed", exc_info=True)
+    autoplay = getattr(player, "autoplay", None)
+    for name in ("cancel_pending", "reset_context"):
+        method = getattr(autoplay, name, None)
+        if not callable(method):
+            continue
+        try:
+            method()
+        except Exception:  # noqa: BLE001, RUF100 - autoplay context is best effort
+            log.debug("Account change: autoplay %s failed", name, exc_info=True)
+    if hub_authority is not None:
+        try:
+            from models.player import PlayerState
+
+            snapshot = player.state() if callable(getattr(player, "state", None)) else None
+            if isinstance(snapshot, PlayerState):
+                hub_authority.update_canonical_now_playing(snapshot)
+            else:
+                hub_authority.update_canonical_now_playing(None)
+        except Exception:  # noqa: BLE001, RUF100 - the next state read re-syncs the hub
+            log.debug("Account change: hub canonical reset failed", exc_info=True)
+    log.info("Account change: music stopped and queue cleared")
+    return True
+
+
+def install_music_account_scope(
+    music: Any,
+    *,
+    hub: Any = None,
+    hub_authority: Any = None,
+    loop: asyncio.AbstractEventLoop | None = None,
+) -> Callable[[], None] | None:
+    """Reset music whenever the desktop's signed-in Viola account changes.
+
+    Subscribes to the desktop session store's sign-in/sign-out signal. A token
+    refresh for the same account changes nothing; sign-out, or a different
+    account signing in, stops playback and clears the queue so one account's
+    music never carries into the next (CLAUDE.md rule 3). Desktop only.
+    Returns the installed listener, or None when not installed.
+    """
+    try:
+        from core.user_context import is_cloud_surface
+
+        if is_cloud_surface():
+            return None
+        from auth.desktop_session import add_account_change_listener
+    except ImportError:
+        log.debug("Desktop session store unavailable; music account scope not installed")
+        return None
+
+    import threading
+
+    readable, initial_account = _desktop_account_key()
+    last_account: list[str | None] = [initial_account if readable else None]
+    lock = threading.Lock()
+
+    def on_account_change() -> None:
+        with lock:
+            readable_now, account = _desktop_account_key()
+            if not readable_now:
+                return
+            previous = last_account[0]
+            if account == previous:
+                return
+            last_account[0] = account
+            log.info("Desktop account changed (signed_in=%s); resetting music", account is not None)
+            reset = reset_music_for_account_change(music, hub_authority=hub_authority)
+        if not reset or hub is None or loop is None or loop.is_closed():
+            return
+        # Pause the iframe now, before React sees the cleared state. The old
+        # account's socket may still be bound under its id, so include it.
+        try:
+            from ui.websocket.event_hub import broadcast_transport_command
+
+            asyncio.run_coroutine_threadsafe(
+                broadcast_transport_command("pause", {"source": "account_change"}, user_id=previous, hub=hub),
+                loop,
+            )
+        except Exception:  # noqa: BLE001, RUF100 - the state broadcast still clears the UI
+            log.debug("Account change: iframe pause broadcast failed", exc_info=True)
+
+    add_account_change_listener(on_account_change)
+    return on_account_change
 
 
 def configure_lifecycle(context: ApiContext) -> None:
@@ -432,6 +560,12 @@ def configure_lifecycle(context: ApiContext) -> None:
 
             _setup_automatic_state_broadcast(hub=hub, music=music, state=state)
             log.info("Automatic state updates enabled")
+            install_music_account_scope(
+                music,
+                hub=hub,
+                hub_authority=getattr(app.state, "hub_state_authority", None),
+                loop=getattr(hub, "_main_loop", None),
+            )
 
             # Wire autoplay → WebSocket state broadcast
             _autoplay = getattr(music, "autoplay", None) or getattr(music, "autoplay_controller", None)
