@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "3113dfde9007ef23b56f34d62d890eb2f503150b",
-  "sha256": "180545ce82048bd9c12f3bcc2e0f97cde954729e9fadf49111c30d0b38d55488",
+  "revision": "cfdd131420a778b4ac99a5a3494e5c3bfd4fae5c",
+  "sha256": "2d05ba73a4e338758d854eda95bb9a110493844deb70ca5deb44fa736467f528",
   "files": [
     {
       "path": ".env.example",
@@ -540,8 +540,8 @@
     },
     {
       "path": "auth/desktop_session.py",
-      "sha256": "80b5239a3132c21c89e90d00c9297ada4e7bae98c4a040635714984ac23205b8",
-      "bytes": 49781
+      "sha256": "b41a2b7681632c1e4a3a3350d45402f705701201870431aab176dc99be4045ec",
+      "bytes": 50130
     },
     {
       "path": "auth/entitlement_projection.py",
@@ -750,8 +750,8 @@
     },
     {
       "path": "backend/weather_fetch.py",
-      "sha256": "bbf2ebf873782c1d2b09eccc8c898ccbc13385f18285f110044d96c53450b4d8",
-      "bytes": 74069
+      "sha256": "1c81ee6c8fcd2b1162edcc7525cf92d43d72dde66405c6be9bf43a9f66a09b00",
+      "bytes": 74920
     },
     {
       "path": "backend/webhooks/__init__.py",
@@ -895,8 +895,8 @@
     },
     {
       "path": "config/settings.py",
-      "sha256": "e08077dc4be8fe9f09c5a3f823187590496e492ce7a61cb5c89f18d839f2e8f7",
-      "bytes": 71759
+      "sha256": "9014f4a2eaf72cfe80e0b4960e6c2238d864a144f988a294592fe8363179d649",
+      "bytes": 72636
     },
     {
       "path": "config/settings_validation.py",
@@ -1575,13 +1575,13 @@
     },
     {
       "path": "intent/agent_executor.py",
-      "sha256": "bd4c73d64e4e5bfd76bbace7cfa812fcfd15fc258b70a815748d9ca829f5b277",
-      "bytes": 564461
+      "sha256": "7736808a68bdf3f04b4672ef06964d9391784edd5fcd65796d1576a15bd80c86",
+      "bytes": 566467
     },
     {
       "path": "intent/agent_loop.py",
-      "sha256": "077a015e894d72fffae90defd2125fff092db31ab7fa735609ba63a2684756ba",
-      "bytes": 248463
+      "sha256": "f21a3a680b3f0d82515460953131bba7101198a1eae41a856fd2ab8a014c6e79",
+      "bytes": 248501
     },
     {
       "path": "intent/agent_message_manager.py",
@@ -9330,8 +9330,8 @@
     },
     {
       "path": "ui/api/routes/_guards.py",
-      "sha256": "7b573b24ef33af295b4e39a9c8de85d1d48fc1813fc1bd55bfd501058460d158",
-      "bytes": 2031
+      "sha256": "d39f9ef87ab4ae476c2bc9121b4efc4af705eac575b686b34f062dd5d351c0a2",
+      "bytes": 2535
     },
     {
       "path": "ui/api/routes/about.py",
@@ -12575,8 +12575,8 @@
     },
     {
       "path": "ui/settings_manager.py",
-      "sha256": "83b80c47a53409fe9072d4bb252788ba7697de28b480cbe9be515156bf41cbc0",
-      "bytes": 167994
+      "sha256": "4c47ec83a583e7f1775af967bf5a60fb3966f4ae722e9e0f86f71fe7720430ee",
+      "bytes": 167955
     },
     {
       "path": "ui/settings_schema.py",
@@ -13615,8 +13615,8 @@
     },
     {
       "path": "voice/wake_detector/violawake_listener.py",
-      "sha256": "56c600f2159a378d3a028fe2b63bf716567694fdfddd7c485c484ddee5acc049",
-      "bytes": 148064
+      "sha256": "ad212762bbd5a2dadab267e24467dfbd93c97b4e8842260ed5c79104da881a7f",
+      "bytes": 148681
     },
     {
       "path": "voice/wake_detector/wake/__init__.py",
