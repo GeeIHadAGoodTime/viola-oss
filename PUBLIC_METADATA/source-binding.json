@@ -30,10 +30,10 @@
   },
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "ae7bb350d46a1a0c3f3793d91e3d13e943208d6aa4ba498abd708735ce50623d",
-  "source_tree_sha256": "a2241ae9e37e467b0cea10ceb2eb9e5f04f049e8b6b7afe9f87ac20da3629189",
+  "source_manifest_sha256": "789584fcb4e6ed42bf0a8f0136395830963669e883ce6063ba66ddc82f6b17b2",
+  "source_tree_sha256": "c461211228c2a9aeab5999f43941f559c8dbe1ddd7285658ea5d55e1856c6593",
   "source_file_count": 2743,
-  "source_revision": "0f3332d31f260c38c59e2e4af8dbf8c64db03a44",
+  "source_revision": "766e3950de029393f4a05c95ad7db73359694fbf",
   "comparison_public_revision": "ecab2772465fcc89ae6645b028af1c2273b9199f",
   "changed_source_paths": [
     "audio_core/aec_reference_base.py",
@@ -189,6 +189,7 @@
     "ui/react-app/src/components/SettingsModal.customerSpeech.test.jsx",
     "ui/react-app/src/components/SettingsModal.desktopOnlyPanels.test.jsx",
     "ui/react-app/src/components/SettingsModal.jsx",
+    "ui/react-app/src/components/Toast.jsx",
     "ui/react-app/src/components/player/MediaArea.jsx",
     "ui/react-app/src/components/player/ProgressBar.jsx",
     "ui/react-app/src/components/player/ProgressBar.module.css",
@@ -339,8 +340,8 @@
     "historical_inventory_limits": "This renderer correction changes no dependency or workflow inputs. All six retained SBOMs and their complete status objects stay historical and unchanged; no current installed inventory qualification is claimed."
   },
   "qualification": {
-    "source_commit": "0f3332d31f260c38c59e2e4af8dbf8c64db03a44",
-    "kind": "1.0.5 build 5 touch: whole-app touch sizing on a wide tablet, edit-only context menu, touch keyboard, finger-sized title bar, drag-to-seek"
+    "source_commit": "766e3950de029393f4a05c95ad7db73359694fbf",
+    "kind": "1.0.5 build 5 touch: whole-app touch sizing on a wide tablet, edit-only context menu, touch keyboard, finger-sized title bar, drag-to-seek, toasts off modal footers"
   },
   "historical_bindings": [
     {

@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "0f3332d31f260c38c59e2e4af8dbf8c64db03a44",
-  "sha256": "a2241ae9e37e467b0cea10ceb2eb9e5f04f049e8b6b7afe9f87ac20da3629189",
+  "revision": "766e3950de029393f4a05c95ad7db73359694fbf",
+  "sha256": "c461211228c2a9aeab5999f43941f559c8dbe1ddd7285658ea5d55e1856c6593",
   "files": [
     {
       "path": ".env.example",
@@ -9865,8 +9865,8 @@
     },
     {
       "path": "ui/qt_native/webview_window.py",
-      "sha256": "8058ee7b80ebccb66ccf46c59ae3c49efce3957992072ac67bccac58ce743002",
-      "bytes": 240243
+      "sha256": "e67b2f53762baeb3e028c436e4766b09a85fa757cb95f91bde94b9b3e5f1d3f9",
+      "bytes": 240165
     },
     {
       "path": "ui/qt_native/widgets/connectivity_status.py",
@@ -10885,8 +10885,8 @@
     },
     {
       "path": "ui/react-app/src/components/Toast.jsx",
-      "sha256": "cc8ec18d7684e056cb9e50f4e19bf8160671fd4b1f23f41030e61f7ebc60d135",
-      "bytes": 8215
+      "sha256": "703058568beea41a0e956ddfef1ee3a4ba74627dcce3ad1b95f5a02d8e1c98c9",
+      "bytes": 8251
     },
     {
       "path": "ui/react-app/src/components/UsageBadge.test.jsx",
@@ -12235,8 +12235,8 @@
     },
     {
       "path": "ui/react-app/src/styles/touch-hardening.css",
-      "sha256": "fd73ce386b227c0a541171f03d4d32e31a50d71e1bf3f5f1c713606695ca0185",
-      "bytes": 5695
+      "sha256": "ffb04e43d8e6bcfcb46405ca6f317b0de9839dd782a35abc244f738811e5eb58",
+      "bytes": 6121
     },
     {
       "path": "ui/react-app/src/styles/variables.css",
@@ -12525,8 +12525,8 @@
     },
     {
       "path": "ui/react-app/tests/touch_modality_css.test.js",
-      "sha256": "d2f0d8f72bd2e780cbf3362c23a04cab881ef1a7a0fa1dd87e55925ea7c28f8f",
-      "bytes": 5396
+      "sha256": "6bef3d148ea682e2f75b3c1cdbbc9f1f8d6f43625f0cbe7accdb67f8376e4e62",
+      "bytes": 5757
     },
     {
       "path": "ui/react-app/tests/youtube_embed_bridge.test.js",
