@@ -1327,6 +1327,15 @@ def _is_approval_block_error(error_category: str | None = None) -> bool:
     return str(error_category or "").upper() == "APPROVAL_BLOCKED"
 
 
+def _confirmation_phone_number(tool_args: dict[str, Any] | None) -> str:
+    """Canonical digits-only form of a dial's number for confirmation binding."""
+    if not isinstance(tool_args, dict):
+        return ""
+    raw = str(tool_args.get("phone_number") or tool_args.get("number") or tool_args.get("to") or "")
+    digits = re.sub(r"\D", "", raw)
+    return "+" + digits if digits else ""
+
+
 def _confirmation_deferred_tool_result(deferred: ConfirmationDeferred) -> ToolResult:
     return ToolResult(
         ok=False,
@@ -3034,6 +3043,11 @@ class AgentExecutor:
         self._rejected_tools: set[str] = set()
         self._approval_blocked_tools: list[str] = []
         self._irreversible_confirmed_action_classes: set[str] = set()
+        # Exact phone numbers the user confirmed in this task, and whether
+        # untrusted content (web, email, ...) is in context for the current tool
+        # call. A dial under untrusted content re-asks for any number not here.
+        self._irreversible_confirmed_phone_numbers: set[str] = set()
+        self._untrusted_content_in_context: bool = False
 
         # Fix 4: Consecutive click failure counter.
         # Tracks failed browser_interact calls (timeout/error).
@@ -4550,6 +4564,8 @@ class AgentExecutor:
         self._memory_enumeration_blocked_after_no_match = False
         self._consecutive_click_failures = 0
         self._irreversible_confirmed_action_classes = set()
+        self._irreversible_confirmed_phone_numbers = set()
+        self._untrusted_content_in_context = False
         # Compatibility hook for older web_search counter code. The current
         # path keeps web routing model-directed.
         from intent.tools.web_search import clear_web_search_counter
@@ -8015,6 +8031,32 @@ class AgentExecutor:
         confirmed = getattr(self, "_irreversible_confirmed_action_classes", None)
         return isinstance(confirmed, set) and action_class in confirmed
 
+    def _remember_confirmed_phone_number(self, tool_args: dict[str, Any]) -> None:
+        number = _confirmation_phone_number(tool_args)
+        if not number:
+            return
+        numbers = getattr(self, "_irreversible_confirmed_phone_numbers", None)
+        if not isinstance(numbers, set):
+            numbers = set()
+            self._irreversible_confirmed_phone_numbers = numbers
+        numbers.add(number)
+
+    def _phone_call_needs_number_confirmation(self, action_class: str, tool_args: dict[str, Any]) -> bool:
+        """Re-ask for an unconfirmed number when untrusted content is in context.
+
+        Phone calls ask once per task. The phone tool is the one high-risk tool
+        let through the taint gate (so "look up the number and call them"
+        works), so while web/email/etc. content is in context the once-per-task
+        reuse is bound to the exact number the user already said yes to: a
+        number that arrived later, possibly from injected content, is asked
+        about again with the number shown.
+        """
+        if action_class != "phone_call" or not getattr(self, "_untrusted_content_in_context", False):
+            return False
+        numbers = getattr(self, "_irreversible_confirmed_phone_numbers", None)
+        number = _confirmation_phone_number(tool_args)
+        return not (isinstance(numbers, set) and number and number in numbers)
+
     async def _broadcast_consult_user_event(
         self,
         *,
@@ -8023,6 +8065,7 @@ class AgentExecutor:
         planned_action: str,
         status: str,
         response: str | None = None,
+        tool_args: dict[str, Any] | None = None,
     ) -> None:
         payload: dict[str, Any] = {
             "tool_name": tool_name,
@@ -8032,6 +8075,13 @@ class AgentExecutor:
             "status": status,
             "choices": ["yes", "no", "cancel"],
         }
+        if action_class == "phone_call" and isinstance(tool_args, dict):
+            # The desktop call-briefing card shows the exact number and who it
+            # belongs to, with Approve / Cancel answering this same gate.
+            payload["phone_number"] = str(tool_args.get("phone_number") or "").strip()
+            payload["recipient_name"] = str(tool_args.get("recipient_name") or "").strip()
+            payload["objective"] = str(tool_args.get("task") or "").strip()
+            payload["untrusted_source"] = bool(getattr(self, "_untrusted_content_in_context", False))
         task_id = getattr(self, "task_id", None)
         if task_id:
             payload["task_id"] = task_id
@@ -8056,7 +8106,9 @@ class AgentExecutor:
         action_class = self._irreversible_confirmation_class(tool_name, tool_args)
         if action_class is None:
             return True
-        if self._is_irreversible_confirmation_remembered(action_class):
+        if self._is_irreversible_confirmation_remembered(
+            action_class
+        ) and not self._phone_call_needs_number_confirmation(action_class, tool_args):
             logger.info(
                 "Irreversible confirmation reused for class=%s tool=%s",
                 action_class,
@@ -8065,10 +8117,13 @@ class AgentExecutor:
             return True
 
         planned_action = describe_irreversible_action(tool_name, tool_args)
+        if action_class == "phone_call" and getattr(self, "_untrusted_content_in_context", False):
+            planned_action = "%s (I found this number online, so please check it is the right one)" % planned_action
         await self._broadcast_consult_user_event(
             tool_name=tool_name,
             action_class=action_class,
             planned_action=planned_action,
+            tool_args=tool_args,
             status="pending",
         )
 
@@ -8084,6 +8139,7 @@ class AgentExecutor:
                 tool_name=tool_name,
                 action_class=action_class,
                 planned_action=planned_action,
+                tool_args=tool_args,
                 status="unavailable",
             )
             return False
@@ -8101,16 +8157,20 @@ class AgentExecutor:
                 tool_name=tool_name,
                 action_class=action_class,
                 planned_action=planned_action,
+                tool_args=tool_args,
                 status="deferred",
             )
             raise
 
         if approved:
             self._remember_irreversible_confirmation(action_class)
+            if action_class == "phone_call":
+                self._remember_confirmed_phone_number(tool_args)
             await self._broadcast_consult_user_event(
                 tool_name=tool_name,
                 action_class=action_class,
                 planned_action=planned_action,
+                tool_args=tool_args,
                 status="approved",
             )
             return True
@@ -8119,6 +8179,7 @@ class AgentExecutor:
             tool_name=tool_name,
             action_class=action_class,
             planned_action=planned_action,
+            tool_args=tool_args,
             status="denied",
         )
         return False

@@ -104,6 +104,51 @@ def _is_high_risk_tool_name(tool_name: str | None) -> bool:
     return canonicalize_tool_name_for_safety(tool_name) in HIGH_RISK_TOOLS
 
 
+# The phone tool is the one high-risk tool that may run while untrusted content
+# is in context (founder rule: Viola is free to act, and the defense lives at the
+# crucial moment). "Look up the number and call them" is the core use case, and
+# a dial already stops at the unified confirm-or-cancel gate, which shows the
+# user the exact number and who it belongs to and is re-asked for any number the
+# user has not already confirmed (``AgentExecutor._confirm_irreversible_tool_call``).
+# Its non-dialing actions (status / end / transcript) only touch the user's own
+# calls. Payments, shell, file writes, messaging and MCP registration stay hard
+# blocked.
+_CONFIRM_GATED_UNDER_TAINT_TOOLS = frozenset({"phone"})
+
+
+def _tool_args_action(tool_args: object) -> str:
+    args = _tool_args_mapping(tool_args)
+    if args is None:
+        return ""
+    return str(args.get("action") or "status").strip().lower()
+
+
+def is_confirm_gated_phone_call(tool_name: str | None, tool_args: object) -> bool:
+    """True for a ``phone`` dial with a concrete number (the confirm-gated case)."""
+    if canonicalize_tool_name_for_safety(tool_name) not in _CONFIRM_GATED_UNDER_TAINT_TOOLS:
+        return False
+    args = _tool_args_mapping(tool_args)
+    if args is None or _tool_args_action(args) != "call":
+        return False
+    return bool(str(args.get("phone_number") or "").strip())
+
+
+def _allowed_under_taint(tool_name: str | None, tool_args: object) -> bool:
+    """Whether a high-risk tool may proceed (to its own gate) while tainted.
+
+    ``tool_args`` must be the real call arguments. A caller that does not pass
+    them gets the hard block, so the exception can never widen by accident.
+    """
+    if canonicalize_tool_name_for_safety(tool_name) not in _CONFIRM_GATED_UNDER_TAINT_TOOLS:
+        return False
+    if _tool_args_mapping(tool_args) is None:
+        return False
+    action = _tool_args_action(tool_args)
+    if action == "call":
+        return is_confirm_gated_phone_call(tool_name, tool_args)
+    return action in {"status", "end", "transcript"}
+
+
 # Browser content tools — tools whose output contains web page content
 # PAGE_CONTENT taints the conversation via BrowserTaintTracker;
 # PAGE_METADATA does not taint; NON_CONTENT bypasses the taint gate entirely.
@@ -604,7 +649,7 @@ class BrowserTaintTracker:
         self._taint_source = ""
         self._non_browser_tainted = False
 
-    def check_tool(self, tool_name: str | None) -> str | None:
+    def check_tool(self, tool_name: str | None, tool_args: object = None) -> str | None:
         """Check if a tool is blocked due to taint.
 
         INT-09 None-safety: ``tool_name`` may be ``None`` (e.g. during early
@@ -612,9 +657,21 @@ class BrowserTaintTracker:
         missing name cannot match the gated sets and must NOT raise — return
         ``None`` so the caller continues without spurious blocking.
 
+        ``tool_args`` lets a phone dial through to its confirm-or-cancel gate
+        (see ``_CONFIRM_GATED_UNDER_TAINT_TOOLS``); without them the phone tool
+        is hard blocked like every other high-risk tool.
+
         Returns an error message if blocked, or None if safe.
         """
         if not self._tainted or not tool_name:
+            return None
+
+        if _allowed_under_taint(tool_name, tool_args):
+            logger.info(
+                "TAINT_GATE: letting '%s' through to its confirm-or-cancel gate after untrusted content from '%s'",
+                tool_name,
+                self._taint_source,
+            )
             return None
 
         if _is_high_risk_tool_name(tool_name):
