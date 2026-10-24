@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "3113dfde9007ef23b56f34d62d890eb2f503150b",
-  "sha256": "180545ce82048bd9c12f3bcc2e0f97cde954729e9fadf49111c30d0b38d55488",
+  "revision": "2dff3ddd9b33481fe275725f8a357e2771293c81",
+  "sha256": "ed5c7c6bb6f102a5a8097abafe8cf375904518ed30f847264651c26c1c21d0e9",
   "files": [
     {
       "path": ".env.example",
@@ -540,8 +540,8 @@
     },
     {
       "path": "auth/desktop_session.py",
-      "sha256": "80b5239a3132c21c89e90d00c9297ada4e7bae98c4a040635714984ac23205b8",
-      "bytes": 49781
+      "sha256": "b41a2b7681632c1e4a3a3350d45402f705701201870431aab176dc99be4045ec",
+      "bytes": 50130
     },
     {
       "path": "auth/entitlement_projection.py",
@@ -750,8 +750,8 @@
     },
     {
       "path": "backend/weather_fetch.py",
-      "sha256": "bbf2ebf873782c1d2b09eccc8c898ccbc13385f18285f110044d96c53450b4d8",
-      "bytes": 74069
+      "sha256": "1c81ee6c8fcd2b1162edcc7525cf92d43d72dde66405c6be9bf43a9f66a09b00",
+      "bytes": 74920
     },
     {
       "path": "backend/webhooks/__init__.py",
@@ -895,13 +895,13 @@
     },
     {
       "path": "config/settings.py",
-      "sha256": "e08077dc4be8fe9f09c5a3f823187590496e492ce7a61cb5c89f18d839f2e8f7",
-      "bytes": 71759
+      "sha256": "9014f4a2eaf72cfe80e0b4960e6c2238d864a144f988a294592fe8363179d649",
+      "bytes": 72636
     },
     {
       "path": "config/settings_validation.py",
-      "sha256": "3f24ba05a39f6aec177833759a912e5fe28511c7b45105d54d475a5150ad4018",
-      "bytes": 35310
+      "sha256": "0545310b459f77e89643525fcbb340fc6c2f56acea80bfd892e61306d02e16ec",
+      "bytes": 37457
     },
     {
       "path": "config/wake_config.py",
@@ -1575,13 +1575,13 @@
     },
     {
       "path": "intent/agent_executor.py",
-      "sha256": "bd4c73d64e4e5bfd76bbace7cfa812fcfd15fc258b70a815748d9ca829f5b277",
-      "bytes": 564461
+      "sha256": "7736808a68bdf3f04b4672ef06964d9391784edd5fcd65796d1576a15bd80c86",
+      "bytes": 566467
     },
     {
       "path": "intent/agent_loop.py",
-      "sha256": "077a015e894d72fffae90defd2125fff092db31ab7fa735609ba63a2684756ba",
-      "bytes": 248463
+      "sha256": "f21a3a680b3f0d82515460953131bba7101198a1eae41a856fd2ab8a014c6e79",
+      "bytes": 248501
     },
     {
       "path": "intent/agent_message_manager.py",
@@ -2060,8 +2060,8 @@
     },
     {
       "path": "intent/tools/email.py",
-      "sha256": "161542f488e54ebe749bae80f6f09f32d371ab31bc2ccda6c8bd26ac8375f1b8",
-      "bytes": 22571
+      "sha256": "e95a8d0465c43bcbd4d82e98b890b1b91bb03200da526f8e77d1fc3479d948c6",
+      "bytes": 25743
     },
     {
       "path": "intent/tools/filesystem.py",
@@ -2660,8 +2660,8 @@
     },
     {
       "path": "music/consent/adapters/google_calendar.py",
-      "sha256": "0206019243a64d1f5b0ffe01aa135d7cf7715fe54ba77264245215f81e6d29e1",
-      "bytes": 8935
+      "sha256": "4d99002b987a11cd10558bdfc352c0e4776b5e41e677eb0a684e7c31be4471c5",
+      "bytes": 19725
     },
     {
       "path": "music/consent/adapters/microsoft_calendar.py",
@@ -4165,8 +4165,8 @@
     },
     {
       "path": "services/capability_registry.py",
-      "sha256": "dd0b991a11b40f60054deff63a04618ccae9d2a0c404c91fb2ba45eef4cc1984",
-      "bytes": 24392
+      "sha256": "18eaa2845622de8f07ec6bdb4de6b8fa8e70042bd9fffaa87abd3c9ae11de5f7",
+      "bytes": 24401
     },
     {
       "path": "services/cdp_target.py",
@@ -4985,8 +4985,8 @@
     },
     {
       "path": "services/oauth/google.py",
-      "sha256": "c9185580a3a07244e670a8fbde1f1e93098b40512c82eb893e82cd094e64f17f",
-      "bytes": 4055
+      "sha256": "79199753f6328841bd6acf36f02fe227e69d721a834a60c84208f2793e00a1cc",
+      "bytes": 4936
     },
     {
       "path": "services/oauth/workspace_bridge.py",
@@ -9330,8 +9330,8 @@
     },
     {
       "path": "ui/api/routes/_guards.py",
-      "sha256": "7b573b24ef33af295b4e39a9c8de85d1d48fc1813fc1bd55bfd501058460d158",
-      "bytes": 2031
+      "sha256": "d39f9ef87ab4ae476c2bc9121b4efc4af705eac575b686b34f062dd5d351c0a2",
+      "bytes": 2535
     },
     {
       "path": "ui/api/routes/about.py",
@@ -10355,8 +10355,8 @@
     },
     {
       "path": "ui/react-app/src/components/AccountTab.jsx",
-      "sha256": "f9f60a99b05900e2fe30214bc3905dacac7269831b050867c127e2348e524e1d",
-      "bytes": 76735
+      "sha256": "4c84e1e623665c508bd4caaa0d34433f07ced26298b83226d457df4e2b62e2f3",
+      "bytes": 77664
     },
     {
       "path": "ui/react-app/src/components/AccountTab.legacy.jsx",
@@ -11750,8 +11750,8 @@
     },
     {
       "path": "ui/react-app/src/hooks/useCalendarProviders.js",
-      "sha256": "b371bf978a6aaa57e6620fac2690bf0ca3590ef3593df155984e55780bfdb8a3",
-      "bytes": 6966
+      "sha256": "522b91ec03434f1f59853deb2f8c101b96869743eb4132e0e9a3329f14a4e3e7",
+      "bytes": 7458
     },
     {
       "path": "ui/react-app/src/hooks/useCallAudio.js",
@@ -13615,8 +13615,8 @@
     },
     {
       "path": "voice/wake_detector/violawake_listener.py",
-      "sha256": "56c600f2159a378d3a028fe2b63bf716567694fdfddd7c485c484ddee5acc049",
-      "bytes": 148064
+      "sha256": "ad212762bbd5a2dadab267e24467dfbd93c97b4e8842260ed5c79104da881a7f",
+      "bytes": 148681
     },
     {
       "path": "voice/wake_detector/wake/__init__.py",
