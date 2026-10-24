@@ -5095,7 +5095,7 @@ async def run_agent_loop(
                     _set_final_response(executor, final_answer, continue_listening=False)
                 except _PaymentConfirmationGateRefused as exc:
                     logger.warning("Payment confirmation gate refused: %s", exc)
-                    final_answer = (
+                    final_answer = getattr(exc, "user_message", None) or (
                         "Payment review is not ready because the browser is no longer on the merchant checkout page. "
                         "No order has been placed. Ask me to continue and I can return to checkout."
                     )

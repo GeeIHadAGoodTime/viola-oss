@@ -257,8 +257,12 @@ class DesktopSessionStore:
             logger.exception("Desktop local session validation failed closed")
             return DesktopSessionValidation(authenticated=False, reason="desktop_session_validation_error")
 
-    async def active_access_token(self) -> str | None:
-        """Return the newest valid desktop GoTrue access token, refreshing if needed."""
+    async def active_access_token(self, *, user_id: str | None = None) -> str | None:
+        """Return the newest valid desktop GoTrue access token, refreshing if needed.
+
+        With ``user_id`` only that account's sessions are considered, so a caller
+        acting for one user never picks up another signed-in account's token.
+        """
         try:
             rows = self._session_rows_by_recent_use()
         except (
@@ -274,6 +278,8 @@ class DesktopSessionStore:
             return None
 
         for row in rows:
+            if user_id is not None and str(row.user_id) != str(user_id):
+                continue
             try:
                 validation = await self._validate_session_row(row.session_hash, row)
             except (
@@ -859,8 +865,8 @@ async def desktop_access_token_for_session_token(session_token: str) -> str | No
     return validation.access_token
 
 
-async def desktop_access_token_for_active_session() -> str | None:
-    return await get_desktop_session_store().active_access_token()
+async def desktop_access_token_for_active_session(*, user_id: str | None = None) -> str | None:
+    return await get_desktop_session_store().active_access_token(user_id=user_id)
 
 
 def get_desktop_account_identity() -> DesktopAccountIdentity:

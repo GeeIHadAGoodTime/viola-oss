@@ -841,7 +841,10 @@ class AppConfig:
 
     # --- Weather Service ---
     weather_api_base: str | None = None
-    weather_gfs_url: str = "http://weather-gfs:8080"
+    # Empty on desktop: the self-hosted GFS service lives only inside the cloud
+    # Compose network (docker-compose.cloud.yml sets VIOLA_WEATHER_GFS_URL), and
+    # backend.weather_fetch falls back to that internal name on the cloud surface.
+    weather_gfs_url: str = ""
     weather_air_quality_airnow_enabled: bool = True
     weather_air_quality_airnow_reporting_area_url: str = "https://files.airnowtech.org/airnow/today/reportingarea.dat"
     weather_air_quality_airnow_cache_ttl_seconds: int = 1800
@@ -1353,6 +1356,22 @@ def _get_logger():
 
 def _is_dev_context(cfg: AppConfig) -> bool:
     return bool(cfg.dev_mode or cfg.env in ("dev", "test") or cfg.test_mode)
+
+
+def is_release_build() -> bool:
+    """True when this process is an installed/packaged build, not a source checkout.
+
+    Installed builds ship no ``.env`` and nothing sets ``VIOLA_ENV``, so they run
+    with the ``env="dev"`` default. ``env`` therefore cannot tell a customer's
+    machine from a developer's, and anything test-only must check this instead.
+    PyInstaller sets ``sys.frozen`` in every Windows/macOS/Linux bundle;
+    ``VIOLA_RELEASE_BUILD=1`` lets a source run opt in to the same behaviour.
+    """
+    import sys
+
+    if getattr(sys, "frozen", False):
+        return True
+    return env.get_bool("VIOLA_RELEASE_BUILD", default=False)
 
 
 def _missing_required_secrets(cfg: AppConfig) -> list[str]:
