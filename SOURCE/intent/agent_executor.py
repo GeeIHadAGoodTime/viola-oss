@@ -1038,6 +1038,10 @@ _ONE_SHOT_IRREVERSIBLE_CONFIRMATION_CLASSES: frozenset[str] = frozenset(
     {
         "file_delete",
         "file_write",
+        "file_move",
+        "file_bulk",
+        "file_autostart",
+        "file_executable",
         "calendar_delete",
         "calendar_write",
         "send_email",

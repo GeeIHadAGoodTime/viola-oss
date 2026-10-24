@@ -756,6 +756,36 @@ def _teammate_idle_hook_context(executor: AgentExecutor, *, outcome: str, final_
     }
 
 
+def _bind_file_gate_context_for_run(executor: Any, loop_messages: Any, user_text: str | None) -> None:
+    """Tell the file gate who is acting and what the user has said this conversation.
+
+    Without this binding every file change asks for confirmation (the gate
+    fails closed), so a failure here costs friction, never safety.
+    """
+    from intent.file_gates import FileGateContext, bind_file_gate_context, user_texts_from_messages
+
+    user_id = str(getattr(executor, "_user_id", "") or "").strip()
+    if not user_id or user_id.lower() == "default":
+        bind_file_gate_context(None)
+        return
+    try:
+        session_key = str(getattr(executor, "_session_id", "") or "").strip() or executor._ensure_task_id()
+        context = FileGateContext(
+            user_id=user_id,
+            session_key=session_key,
+            user_text=user_texts_from_messages(loop_messages, user_text),
+        )
+    except Exception:
+        logger.exception("File gate context unavailable; every file change will ask for confirmation")
+        context = None
+    bind_file_gate_context(context)
+
+
+_FILE_WRITE_CHANGE_ACTIONS = frozenset(
+    {"write", "edit", "append", "insert", "replace_lines", "replace_text", "copy", "mkdir", "undo", "redo"}
+)
+
+
 def _file_changed_context_for_tool(
     tool_name: str,
     tool_args: dict[str, Any],
@@ -772,9 +802,10 @@ def _file_changed_context_for_tool(
     if tool_name in {"delete_file"}:
         event = "unlink"
     elif tool_name == "file_write":
-        if action not in {"write", "delete", "append", "insert", "replace_lines", "replace_text"}:
+        if action in {"delete", "move"}:
+            event = "unlink"
+        elif action not in _FILE_WRITE_CHANGE_ACTIONS:
             return None
-        event = "unlink" if action == "delete" else "change"
     elif tool_name not in {"write_file"}:
         return None
     if not path:
@@ -2015,6 +2046,7 @@ async def run_agent_loop(
     # confirm-or-cancel gate under taint accepts only the user's own words.
     taint_tracker.set_schema_lookup(getattr(executor, "_irreversible_tool_schema", None))
     _bind_active_taint_tracker(taint_tracker)
+    _bind_file_gate_context_for_run(executor, loop_messages, user_text)
     pending_hook_context_messages: list[dict[str, Any]] = []
     native_turn_max_tokens = _native_turn_max_tokens_for_model(executor._get_model_name_safe())
 
