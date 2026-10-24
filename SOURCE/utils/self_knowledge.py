@@ -340,13 +340,20 @@ class SelfKnowledgeBuilder:
         self._add_memory_archive_notice(lines, user_id)
 
         try:
+            from config.defaults import DEFAULT_AGENT_AUTONOMY
             from services.user_capabilities import list_for_user
             from services.user_capabilities.tiers import TIER_DESCRIPTIONS
             from ui.settings_manager import get_settings_manager
 
             sm = get_settings_manager()
-            tier = str(sm.get("agent_autonomy", "ensemble", user_id=user_id) or "ensemble").strip().lower()
-            description = TIER_DESCRIPTIONS.get(tier, TIER_DESCRIPTIONS["ensemble"])
+            tier = (
+                str(sm.get("agent_autonomy", DEFAULT_AGENT_AUTONOMY, user_id=user_id) or DEFAULT_AGENT_AUTONOMY)
+                .strip()
+                .lower()
+            )
+            if tier not in TIER_DESCRIPTIONS:
+                tier = DEFAULT_AGENT_AUTONOMY
+            description = TIER_DESCRIPTIONS[tier]
             # Frame the tier as internal permission state so the model does not
             # surface the raw label/value to users as their "plan" -- when asked
             # "what plan am I on" the model was echoing "capability tier: symphony"

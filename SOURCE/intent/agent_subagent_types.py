@@ -204,7 +204,7 @@ def _register_builtin_subagent_types() -> None:
             aliases=frozenset({"explore", "explorer", "investigate", "investigator"}),
             tool_allowlist=_READ_ONLY_INVESTIGATION_TOOLS,
             action_allowlists={
-                "file_read": frozenset({"info", "list", "read", "search"}),
+                "file_read": frozenset({"glob", "grep", "history", "info", "list", "read", "search"}),
                 "memory": _READ_ONLY_MEMORY_ACTIONS,
                 "workbench": frozenset({"list", "path_for", "read", "search"}),
             },
@@ -242,7 +242,7 @@ def _register_builtin_subagent_types() -> None:
             aliases=frozenset({"research", "researcher"}),
             tool_allowlist=_READ_ONLY_INVESTIGATION_TOOLS | frozenset({"think"}),
             action_allowlists={
-                "file_read": frozenset({"info", "list", "read", "search"}),
+                "file_read": frozenset({"glob", "grep", "history", "info", "list", "read", "search"}),
                 "memory": _READ_ONLY_MEMORY_ACTIONS,
                 "workbench": frozenset({"list", "path_for", "read", "search"}),
             },

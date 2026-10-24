@@ -435,6 +435,12 @@ class ViolaWakeListener:
         self._command_preroll_since: float | None = None
         self._command_preroll_lock = threading.Lock()
         self._verify_frame_count = 0
+        # Stage 2 early start: the decode begins while the detector's agreement
+        # run is still building (wake_verifier.EarlyStartTracker); the wake that
+        # run confirms uses its result instead of waiting for a fresh decode.
+        self._early_tracker: Any = None
+        self._early_decode: Any = None
+        self._wake_fired_frame = -1
         self._last_passive_cal_frame: int = 0
         self._passive_cal_interval_frames: int = 375  # ~30s at 80ms/frame
 
@@ -2066,6 +2072,9 @@ class ViolaWakeListener:
         # what shipped. A blank of N grid steps covers N * 5 chunks.
         LEGACY_GRID_CHUNKS = 5
         effective_threshold: float | None = None
+        # The Stage 2 check is on: the engine maps the level with its "checked"
+        # operating points (refreshed with the threshold, on the 400 ms grid).
+        stage2_checked = False
         # Any gap in the audio (first frame, command recording, device change,
         # read error) resets the engine's embedding stream so stale audio from
         # before the gap is never scored.
@@ -2077,6 +2086,8 @@ class ViolaWakeListener:
 
             # STAGE4: Callback invoked - engine threshold exceeded
             logger.info("[STAGE4] callback: on_detection called (raw trigger)")
+            # An early Stage 2 decode belongs to this trigger or to nobody.
+            early_decode = self._take_early_decode(frame_count)
 
             # Track raw trigger (model fired) BEFORE policy decision
             get_wake_metrics().record_raw_trigger()
@@ -2261,6 +2272,7 @@ class ViolaWakeListener:
                 verified = self._verify_wake_candidate(
                     np.concatenate([audio_buffer[buffer_write_idx:], audio_buffer[:buffer_write_idx]]),
                     actual_score,
+                    early=early_decode,
                 )
                 if self._verify_frame_count != reads_before:
                     # The check read microphone audio this loop never fed the
@@ -2724,6 +2736,7 @@ class ViolaWakeListener:
                 # nothing from before the gap is scored (warm-up ~1.4 s).
                 if stream_gap:
                     stream_gap = False
+                    self._reset_early_check()
                     if self._streaming:
                         with self._engine_lock:
                             if self._engine is not None and self._streaming:
@@ -2753,6 +2766,7 @@ class ViolaWakeListener:
                             correlation=self._current_correlation,
                         )
                         effective_threshold = self._policy.effective_threshold(context)
+                        stage2_checked = self._stage2_check_on()
 
                     # DIAGNOSTIC: Check audio buffer health before engine
                     if frame_count % 125 == 5:  # Log occasionally
@@ -2802,7 +2816,9 @@ class ViolaWakeListener:
                                 last_wake_score = 0.0
                             else:
                                 engine.threshold = effective_threshold
+                                engine.checked = stage2_checked
                                 last_wake_score = engine.process_chunk(audio_chunk, suppress=blanked)
+                                self._maybe_start_early_check(engine, last_wake_score, contiguous_buffer, frame_count)
                     elif blanked:
                         last_wake_score = 0.0
                     else:
@@ -2928,22 +2944,92 @@ class ViolaWakeListener:
         except Exception as exc:  # noqa: BLE001, RUF100 - the check is optional; wakes pass without it
             logger.warning("[WAKE_VERIFY] could not start the verifier warm-up: %s", exc)
 
-    def _verify_wake_candidate(self, window: np.ndarray, score: float) -> bool:
+    def _stage2_check_on(self) -> bool:
+        """The opt-in Stage 2 check is on (and FORCE_WAKE, which skips it, is not)."""
+        if self._force_wake:
+            return False
+        try:
+            from voice.wake_detector.wake_verifier import wake_verification_enabled
+
+            return bool(wake_verification_enabled())
+        except Exception:  # noqa: BLE001, RUF100 - unreadable switch: the check's own default (off)
+            return False
+
+    def _maybe_start_early_check(self, engine: Any, score: float, window: np.ndarray, frame: int) -> None:
+        """Start the Stage 2 decode early when the agreement run reaches the launch level.
+
+        Called after every streaming score. Cheap when nothing launches (a
+        counter); a launch copies the window and hands it to the verifier's
+        worker thread, never blocking this loop.
+        """
+        if frame == self._wake_fired_frame:
+            return  # this chunk already confirmed a wake; its check is done
+        tracker = self._early_tracker
+        try:
+            if tracker is None:
+                from voice.wake_detector.wake_verifier import EarlyStartTracker, get_wake_verifier
+
+                tracker = EarlyStartTracker(get_wake_verifier().config.early_start_frames)
+                self._early_tracker = tracker
+            k, _n = engine.agreement
+            if not tracker.update(float(score), float(engine.stream_threshold), int(k)):
+                return
+            if self._force_wake or self._policy.is_playback_active:
+                return  # the check is skipped for these wakes anyway
+            from voice.wake_detector.wake_verifier import get_wake_verifier, wake_verification_enabled
+
+            if not wake_verification_enabled():
+                return
+            self._early_decode = get_wake_verifier().start_early(window, frame)
+        except Exception as exc:  # noqa: BLE001, RUF100 - the early start is an optimisation; the serial check remains
+            logger.debug("[WAKE_VERIFY] early start skipped: %s", exc)
+
+    def _reset_early_check(self) -> None:
+        """A gap in the audio: the run count restarts and any early decode is stale."""
+        self._early_decode = None
+        if self._early_tracker is not None:
+            self._early_tracker.reset()
+
+    def _take_early_decode(self, trigger_frame: int) -> Any:
+        """The early decode for the wake confirmed on ``trigger_frame``, if it belongs to it."""
+        self._wake_fired_frame = trigger_frame
+        early = self._early_decode
+        self._early_decode = None
+        if self._early_tracker is not None:
+            self._early_tracker.reset()
+        if early is None:
+            return None
+        try:
+            from voice.wake_detector.wake_verifier import EarlyStartTracker
+
+            with self._engine_lock:
+                engine = self._engine
+                _k, n = engine.agreement if engine is not None else (1, 1)
+            if EarlyStartTracker.usable(early.frame, trigger_frame, n):
+                return early
+        except Exception as exc:  # noqa: BLE001, RUF100 - fall back to the serial check
+            logger.debug("[WAKE_VERIFY] early decode unusable: %s", exc)
+        return None
+
+    def _verify_wake_candidate(self, window: np.ndarray, score: float, early: Any = None) -> bool:
         """Second listen before the chime. True lets the wake through.
 
         Runs on the wake loop thread inside the detection callback, so it may
         read the stream itself; the frames it reads are kept for the command.
+        ``early``: the decode this wake's agreement run started (or None).
         """
         try:
             from voice.wake_detector.wake_verifier import get_wake_verifier, wake_verification_enabled
 
             if not wake_verification_enabled():
                 return True
+            extra = {"early": early} if early is not None else {}
             result = get_wake_verifier().verify(
                 window,
                 self._read_verification_chunk,
                 score,
                 playback_active=bool(self._policy.is_playback_active),
+                **extra,
             )
         except Exception as exc:  # noqa: BLE001, RUF100 - doubt passes
             logger.warning("[WAKE_VERIFY] PASS reason=error score=%.3f (%s)", score, exc)
