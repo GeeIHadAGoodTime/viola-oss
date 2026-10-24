@@ -640,7 +640,7 @@ def path_touched_in_session(user_id: str, session_key: str, path: Path) -> bool:
     if state is None:
         try:
             state = _state_for(FileScope(user_id, session_key))
-        except Exception:
+        except (OSError, ValueError):
             return False
     with state.lock:
         return state.is_agent_touched(path)
@@ -702,7 +702,7 @@ def _drive_supports_recycle_bin(p: Path) -> bool:
         anchor = p.anchor or str(p)[:3]
         drive_type = ctypes.windll.kernel32.GetDriveTypeW(ctypes.c_wchar_p(anchor))
         return drive_type == 3  # DRIVE_FIXED; removable/network drives delete permanently
-    except Exception:
+    except (AttributeError, OSError, ValueError):
         return False
 
 

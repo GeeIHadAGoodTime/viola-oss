@@ -264,8 +264,8 @@ def _tainted() -> bool:
         from intent.content_sanitizer import context_is_tainted
 
         return context_is_tainted()
-    except Exception:
-        return True
+    except (ImportError, AttributeError):
+        return True  # cannot tell: treat as tainted, so every change asks
 
 
 def _action_of(args: Mapping[str, Any] | None) -> str:
