@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "5715234a961a81b2ae3cc9db05e67578600f1fc7",
-  "sha256": "0f5b195c8c601c9c33cfdeabb573b6602d809a447cabac63f3a47dcc8e2361ab",
+  "revision": "75ba420f5424bfc057299a964dc319653e0e1493",
+  "sha256": "d026ad0f1de064e0222071316a4d5c22b874d06e482603e622127c1c854b0817",
   "files": [
     {
       "path": ".env.example",
@@ -9844,6 +9844,11 @@
       "bytes": 11824
     },
     {
+      "path": "ui/qt_native/touch_input.py",
+      "sha256": "077512db9e363f0bc48de7e1a39bb2e6493f98a2b76bf82aa20660360f445d4e",
+      "bytes": 10493
+    },
+    {
       "path": "ui/qt_native/update_banner.py",
       "sha256": "40985acdfc41eb7aab0ac01dac6b92508a3072f5c3c8ffb75cecec7e483813ab",
       "bytes": 19696
@@ -9860,8 +9865,8 @@
     },
     {
       "path": "ui/qt_native/webview_window.py",
-      "sha256": "546999faa46e9ea25d725ce556e704d691305f1777584bdaecca0fe71064c90f",
-      "bytes": 231453
+      "sha256": "63ab2ec0e1a0c6e1c48941e00468a4ebeb89d86912952d6e9e70056408cfef57",
+      "bytes": 244913
     },
     {
       "path": "ui/qt_native/widgets/connectivity_status.py",
@@ -10435,8 +10440,8 @@
     },
     {
       "path": "ui/react-app/src/components/CalendarView.module.css",
-      "sha256": "a56c4f8670909983585d62613b7991010e92d913d0c7b8245fcca4d4abc0889d",
-      "bytes": 1482
+      "sha256": "9ffd69fdd6fcc98c1c843aeb3e4c4df29d9000fcfeabaaead7892ce159aa30c8",
+      "bytes": 1710
     },
     {
       "path": "ui/react-app/src/components/CalendarView.test.jsx",
@@ -10445,13 +10450,13 @@
     },
     {
       "path": "ui/react-app/src/components/CallBriefing.jsx",
-      "sha256": "3546b8088ca4f82a07cacc1bbb6a48afa56472ea48fa34437d3bc301f80b6623",
-      "bytes": 6728
+      "sha256": "04760e400f7df6f46ce5f91cb8d828f63a0cdc50efffa14facc08702de224492",
+      "bytes": 7280
     },
     {
       "path": "ui/react-app/src/components/CallBriefing.test.jsx",
-      "sha256": "ef20023afe128c3bfd0332f0f1c8c2f0d8766918e16b0c31b738bdb0663641d6",
-      "bytes": 4915
+      "sha256": "7925c17aa4a6c23ee70e2484d9808bc89c6ae2a5b22aa1b8f44af8ec0dacb3c8",
+      "bytes": 5934
     },
     {
       "path": "ui/react-app/src/components/CallConsultation.jsx",
@@ -10690,8 +10695,8 @@
     },
     {
       "path": "ui/react-app/src/components/OnboardingOverlay.jsx",
-      "sha256": "df33e92ba9f02da6dfc0cf3e8838c7f8f53dd26e8a21a3d102e5ea8dfe64fe95",
-      "bytes": 31258
+      "sha256": "84670c33b629f880411e94e7893afb7dee17b5830206ebd99387d325adbdb534",
+      "bytes": 32267
     },
     {
       "path": "ui/react-app/src/components/OnboardingOverlay.stableFrames.test.jsx",
@@ -10735,8 +10740,8 @@
     },
     {
       "path": "ui/react-app/src/components/QueueModal.jsx",
-      "sha256": "98bc3374d9a4aa55372e13492bfd483b07a56ae6e1e48131a4769218b4c2dce4",
-      "bytes": 13843
+      "sha256": "0988fdad479716c405a68c9e024492ba6d7e14d69d82e6679e004694371d7c06",
+      "bytes": 14299
     },
     {
       "path": "ui/react-app/src/components/QueueModal.readRecovery.test.jsx",
@@ -11190,13 +11195,18 @@
     },
     {
       "path": "ui/react-app/src/components/player/ProgressBar.jsx",
-      "sha256": "e8366e74739aa004f5c8e2b21b42ee38c36ba00212c6f4c3f45935ef01809468",
-      "bytes": 1389
+      "sha256": "c0cecfda49a81b02ff4cfcdb88a685357cfdbabe91e7394f0460213bb21331d9",
+      "bytes": 3322
     },
     {
       "path": "ui/react-app/src/components/player/ProgressBar.module.css",
-      "sha256": "7f42ff6ba5cfc930c0ab73f6b2c2c3cd5cad941e202dd90bc9307f24978bad61",
-      "bytes": 353
+      "sha256": "c3bef965cd93fbf7928769454f67287b28a62d5fd86aef78bb37dbd0cfd6f13a",
+      "bytes": 855
+    },
+    {
+      "path": "ui/react-app/src/components/player/ProgressBar.test.jsx",
+      "sha256": "5f09ed419f2190345a14e5efcea1b306e4a35cb3adcf13c744dc6e78c7d8b74d",
+      "bytes": 3634
     },
     {
       "path": "ui/react-app/src/components/player/RatingButton.jsx",
@@ -11205,8 +11215,8 @@
     },
     {
       "path": "ui/react-app/src/components/player/RatingButton.module.css",
-      "sha256": "465719d23142a65154452f6d56200614c7c407f2a49ec306cda7fc44c9bd35a1",
-      "bytes": 573
+      "sha256": "b54915b6831b0b8d40d1d8490592bb01f38cefc29f33d883b597aea81591f96c",
+      "bytes": 824
     },
     {
       "path": "ui/react-app/src/components/player/TransportButton.jsx",
@@ -11215,8 +11225,8 @@
     },
     {
       "path": "ui/react-app/src/components/player/TransportButton.module.css",
-      "sha256": "7aa97c4e10945ba574178923290e62a8548e1201d6935f5a5d4246f7b22e6790",
-      "bytes": 737
+      "sha256": "64e76c7a626edbafad9e2003cfbaca0c2f09c2690213ab2ebce7280f38e05d65",
+      "bytes": 1000
     },
     {
       "path": "ui/react-app/src/components/player/TransportIcons.jsx",
@@ -11230,8 +11240,8 @@
     },
     {
       "path": "ui/react-app/src/components/player/VolumeControl.module.css",
-      "sha256": "f6ead14ef7d708f916c2011e93831bdb74a51ecc60bff0eff6490e9ccf8daf36",
-      "bytes": 1716
+      "sha256": "4c332b3d006148f205fdd749f7335860f33351fa5aa4767f4ae04d4c6904b97b",
+      "bytes": 2548
     },
     {
       "path": "ui/react-app/src/components/player/VolumeControl.test.jsx",
@@ -11500,8 +11510,8 @@
     },
     {
       "path": "ui/react-app/src/components/stage/modes/browser/BrowserMode.module.css",
-      "sha256": "f17260b8664329c84d04a91efaa843449029f7fe32f21e67a7f558bf6a111dad",
-      "bytes": 4339
+      "sha256": "36724098be7c6bd40fe0fdd925a7b416b0cdeb600b06a10f3cfc470f91297a13",
+      "bytes": 4971
     },
     {
       "path": "ui/react-app/src/components/stage/modes/browser/BrowserMode.test.jsx",
@@ -11535,8 +11545,8 @@
     },
     {
       "path": "ui/react-app/src/components/stage/modes/chat/ChatMode.css",
-      "sha256": "afbc2ff7c78f098cc71b4a065de32cbdb35299788f93927b53146255c45e5167",
-      "bytes": 17712
+      "sha256": "13ce87cb72ed8cf0ba294264848bae7368519763a208937c516b2b9d576e2514",
+      "bytes": 20130
     },
     {
       "path": "ui/react-app/src/components/stage/modes/chat/ChatMode.jsx",
@@ -12170,8 +12180,8 @@
     },
     {
       "path": "ui/react-app/src/main.jsx",
-      "sha256": "e3ecd4d16ae134a7fa223ca28d2f46816d929719ebd05a32e530becf0cbe05af",
-      "bytes": 13594
+      "sha256": "44834995c44960aced4a9f1c8ceb078d57d40749555bc186497d3e1781db8606",
+      "bytes": 14168
     },
     {
       "path": "ui/react-app/src/main.test.jsx",
@@ -12225,8 +12235,8 @@
     },
     {
       "path": "ui/react-app/src/styles/touch-hardening.css",
-      "sha256": "242cd826a21a6abc630992dfe5c57ac4b447a960c9a4565b4ab78fbad0ed9504",
-      "bytes": 1998
+      "sha256": "fd73ce386b227c0a541171f03d4d32e31a50d71e1bf3f5f1c713606695ca0185",
+      "bytes": 5695
     },
     {
       "path": "ui/react-app/src/styles/variables.css",
@@ -12374,6 +12384,16 @@
       "bytes": 1884
     },
     {
+      "path": "ui/react-app/src/utils/inputModality.js",
+      "sha256": "b9d5faf4438495d9232dc525e76a807cac18ff832afc39e09532e53011bfa6f6",
+      "bytes": 7029
+    },
+    {
+      "path": "ui/react-app/src/utils/inputModality.test.js",
+      "sha256": "79438d0025d1683d45a5ea05e4b46120a9d3effdfcfc7edd5100fc8303741405",
+      "bytes": 7281
+    },
+    {
       "path": "ui/react-app/src/utils/notifications.js",
       "sha256": "3bea7a933b108fd354585858542ed156f9f85e51ac150b4569016242ff8e0e38",
       "bytes": 2017
@@ -12502,6 +12522,11 @@
       "path": "ui/react-app/tests/source_map_advisory.test.js",
       "sha256": "1e7fadfde51fb50ae7db43c01cc5ec95f0deef1cfb68aa7d5219aa38ac1c868f",
       "bytes": 2543
+    },
+    {
+      "path": "ui/react-app/tests/touch_modality_css.test.js",
+      "sha256": "d2f0d8f72bd2e780cbf3362c23a04cab881ef1a7a0fa1dd87e55925ea7c28f8f",
+      "bytes": 5396
     },
     {
       "path": "ui/react-app/tests/youtube_embed_bridge.test.js",
