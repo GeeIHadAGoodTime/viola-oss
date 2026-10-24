@@ -511,7 +511,7 @@ async def _terminal_hook_execute_tool_call(
             tool_result = ToolResult(ok=False, error=tool_error)
 
     if tool_result is None and taint_tracker is not None:
-        taint_block = getattr(taint_tracker, "check_tool", lambda *_args, **_kwargs: None)(tool_name)
+        taint_block = getattr(taint_tracker, "check_tool", lambda *_args, **_kwargs: None)(tool_name, tool_args)
         if taint_block:
             tool_error = str(taint_block)
             tool_result = ToolResult(ok=False, error=tool_error)
@@ -1434,6 +1434,7 @@ from intent.content_sanitizer import (
     BROWSER_CONTENT_TOOLS as _BROWSER_CONTENT_TOOLS,
     BROWSER_PAGE_CONTENT_TOOLS as _BROWSER_PAGE_CONTENT_TOOLS,
     BrowserTaintTracker,
+    bind_active_taint_tracker as _bind_active_taint_tracker,
     is_non_browser_untrusted_source as _is_non_browser_untrusted_source,
     sanitize_web_content as _sanitize_web_content,
 )
@@ -2009,6 +2010,11 @@ async def run_agent_loop(
     # follow-up write (founder rule 2026-10-23; content_sanitizer
     # is_user_named_file_read). Consequential actions keep their confirm gates.
     taint_tracker.set_user_request(user_text)
+    # Let the gate read a tool's _meta (a payment extension's irreversible
+    # class) and let the approval layer see this task's taint, so a
+    # confirm-or-cancel gate under taint accepts only the user's own words.
+    taint_tracker.set_schema_lookup(getattr(executor, "_irreversible_tool_schema", None))
+    _bind_active_taint_tracker(taint_tracker)
     pending_hook_context_messages: list[dict[str, Any]] = []
     native_turn_max_tokens = _native_turn_max_tokens_for_model(executor._get_model_name_safe())
 
@@ -3978,8 +3984,9 @@ async def run_agent_loop(
                             )
 
                 # â”€â”€ Layer 6: deterministic taint gate (M3 defense) â”€â”€
-                # Hard-block high-risk tools when browser content is in context.
-                _taint_block = None if _parallel_cached is not None else taint_tracker.check_tool(tc_name)
+                # Under taint: refuse payments/shell, and URLs/scripts that would
+                # carry private data to a site the user did not name.
+                _taint_block = None if _parallel_cached is not None else taint_tracker.check_tool(tc_name, tc_args)
                 if tool_result is None and _taint_block:
                     tool_result = ToolResult(ok=False, error=_taint_block)
                     tool_error = _taint_block
@@ -4458,7 +4465,8 @@ async def run_agent_loop(
                 if tc_name in _BROWSER_CONTENT_TOOLS:
                     result_text = _sanitize_web_content(result_text)
                     if tc_name in _BROWSER_PAGE_CONTENT_TOOLS:
-                        # Layer 6: mark taint so high-risk tools are blocked
+                        # Layer 6: mark taint (payments/shell refused, confirm
+                        # gates accept only the user's own words).
                         taint_tracker.mark_tainted(tc_name)
                 elif _is_non_browser_untrusted_source(tc_name):
                     # SEC-001/SEC-008: email, calendar, memory, and file content
@@ -4468,7 +4476,9 @@ async def run_agent_loop(
                     # sinks are gated to close exfil-via-navigation (SEC-004).
                     # tool_args lets a read of a file the user named pass.
                     result_text = _sanitize_web_content(result_text)
-                    taint_tracker.mark_tainted(tc_name, tool_args=tc_args)
+                    # content: recorded as private data for the exfiltration
+                    # check (a URL/script carrying it to an unnamed site).
+                    taint_tracker.mark_tainted(tc_name, tool_args=tc_args, content=result_text)
 
                 content_for_llm: Any = result_text
                 # Claude parity (S6-011): per-tool result mappers. MCP tools
