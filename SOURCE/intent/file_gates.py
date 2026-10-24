@@ -39,6 +39,7 @@ caller) every change asks -- the gate fails closed.
 from __future__ import annotations
 
 import contextvars
+import os
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -137,8 +138,12 @@ def _norm(value: str) -> str:
     return value.replace("\\", "/").lower()
 
 
-def _contains_path(text: str, form: str) -> bool:
-    """``form`` appears in ``text`` as a whole path (not inside a longer name)."""
+def _contains_path(text: str, form: str, *, whole: bool = False) -> bool:
+    """``form`` appears in ``text`` as a whole path (not inside a longer name).
+
+    With ``whole`` the match must also end there: ``j:/code/blog`` does not count
+    inside ``j:/code/blog/index.md`` (that names a file, not the folder).
+    """
     if not form:
         return False
     for match in re.finditer(re.escape(form), text):
@@ -147,6 +152,8 @@ def _contains_path(text: str, form: str) -> bool:
             continue
         after = text[match.end() : match.end() + 2]
         nxt = after[:1]
+        if whole and nxt == "/" and len(after) > 1 and (after[1].isalnum() or after[1] in "._-~"):
+            continue
         if not nxt or nxt.isspace() or nxt in "/\"'`,;:)!?]":
             return True
         if nxt == "." and (len(after) < 2 or not after[1].isalnum()):
@@ -163,11 +170,15 @@ def _name_mentioned(name: str, text: str) -> bool:
     return re.search(pattern, text, flags=re.IGNORECASE) is not None
 
 
-def _ancestors_below_home(p: Path) -> list[Path]:
+def _home() -> Path | None:
     try:
-        home = Path.home().resolve()
+        return Path.home().resolve()
     except (OSError, RuntimeError):
-        home = None
+        return None
+
+
+def _ancestors_below_home(p: Path) -> list[Path]:
+    home = _home()
     out: list[Path] = []
     current = p.parent
     while current != current.parent:
@@ -178,47 +189,115 @@ def _ancestors_below_home(p: Path) -> list[Path]:
     return out
 
 
+def _path_forms(candidate: Path, home: Path | None) -> set[str]:
+    forms = {_norm(str(candidate))}
+    if home is not None:
+        try:
+            forms.add("~/" + candidate.relative_to(home).as_posix().lower())
+        except ValueError:
+            pass
+    parts = list(candidate.parts[1:])
+    for k in range(2, min(4, len(parts)) + 1):
+        forms.add("/".join(parts[-k:]).lower())
+    return forms
+
+
+def _folder_named(folder: Path, user_text: str, text: str, home: Path | None, *, whole: bool) -> bool:
+    """The user's words name this folder: by path, or as "<name> folder" / "folder <name>"."""
+    if any(_contains_path(text, form, whole=whole) for form in _path_forms(folder, home)):
+        return True
+    name = re.escape(folder.name)
+    if not name:
+        return False
+    if re.search(r"(?<![\w.\-])%s\s+(?:folder|directory|dir)\b" % name, user_text, re.IGNORECASE):
+        return True
+    if re.search(
+        r"\b(?:folder|directory)\s+(?:called\s+|named\s+)?[\"']?%s(?![\w\-])" % name, user_text, re.IGNORECASE
+    ):
+        return True
+    return bool(
+        home is not None
+        and folder.name.lower() in _WELL_KNOWN_USER_FOLDERS
+        and _norm(str(folder.parent)) == _norm(str(home))
+        and re.search(r"\bmy\s+%s\b" % name, user_text, re.IGNORECASE)
+    )
+
+
 def is_user_referenced_path(p: Path, user_text: str) -> bool:
     """True when the user's own words point at ``p`` or a folder containing it."""
     if not user_text or not user_text.strip():
         return False
     text = _norm(user_text)
-    try:
-        home = Path.home().resolve()
-    except (OSError, RuntimeError):
-        home = None
-    ancestors = _ancestors_below_home(p)
-    for candidate in [p, *ancestors]:
-        forms = {_norm(str(candidate))}
-        if home is not None:
-            try:
-                forms.add("~/" + candidate.relative_to(home).as_posix().lower())
-            except ValueError:
-                pass
-        parts = [part for part in candidate.parts[1:]]
-        for k in range(2, min(4, len(parts)) + 1):
-            forms.add("/".join(parts[-k:]).lower())
-        if any(_contains_path(text, form) for form in forms):
-            return True
+    home = _home()
+    if any(_contains_path(text, form) for form in _path_forms(p, home)):
+        return True
     if _name_mentioned(p.name, user_text):
         return True
     # The target itself counts too: "move the photos folder" names that folder.
-    for folder in [p, *ancestors]:
-        name = re.escape(folder.name)
-        if not name:
+    return any(_folder_named(folder, user_text, text, home, whole=False) for folder in [p, *_ancestors_below_home(p)])
+
+
+# Where files arrive from outside: whatever is in them was written by someone
+# else, so naming the folder does not vouch for its contents (taint stays).
+_OUTSIDE_ARRIVAL_DIR_NAMES = frozenset(
+    {
+        "downloads",
+        "download",
+        "temp",
+        "tmp",
+        "attachments",
+        "content.outlook",
+        "inetcache",
+        "outlook temp",
+        "olk",
+    }
+)
+
+
+def _temp_roots() -> set[str]:
+    import tempfile
+
+    roots = {tempfile.gettempdir()}
+    for var in ("TEMP", "TMP"):
+        value = os.environ.get(var)
+        if value:
+            roots.add(value)
+    return roots
+
+
+def is_outside_arrival_location(p: Path) -> bool:
+    """Downloads, temp folders, browser download and mail-attachment caches."""
+    if any(part.lower() in _OUTSIDE_ARRIVAL_DIR_NAMES for part in p.parts):
+        return True
+    key = _norm(str(p))
+    for root in _temp_roots():
+        try:
+            root_key = _norm(str(Path(root).resolve()))
+        except (OSError, RuntimeError):
             continue
-        if re.search(r"(?<![\w.\-])%s\s+(?:folder|directory|dir)\b" % name, user_text, re.IGNORECASE):
+        if key == root_key or key.startswith(root_key.rstrip("/") + "/"):
             return True
-        if re.search(
-            r"\b(?:folder|directory)\s+(?:called\s+|named\s+)?[\"']?%s(?![\w\-])" % name, user_text, re.IGNORECASE
-        ):
-            return True
-        if (
-            home is not None
-            and folder.name.lower() in _WELL_KNOWN_USER_FOLDERS
-            and _norm(str(folder.parent)) == _norm(str(home))
-            and re.search(r"\bmy\s+%s\b" % name, user_text, re.IGNORECASE)
-        ):
+    return False
+
+
+def user_named_folder_contains(p: Path, user_text: str, *, include_self: bool) -> bool:
+    """Taint rule: ``p`` sits in a folder the user named directly in their own message.
+
+    Only a folder named as a folder counts (a path ending at it, or "<name>
+    folder"); a full path to some file inside it names that file, not the
+    folder. Home and drive roots never count, and nothing under Downloads,
+    temp or mail-attachment caches counts, because files there arrive from
+    outside.
+    """
+    if not user_text or not user_text.strip() or is_outside_arrival_location(p):
+        return False
+    text = _norm(user_text)
+    home = _home()
+    folders = ([p] if include_self else []) + _ancestors_below_home(p)
+    for folder in folders:
+        if folder == folder.parent or (home is not None and _norm(str(folder)) == _norm(str(home))):
+            continue
+        if _folder_named(folder, user_text, text, home, whole=True):
             return True
     return False
 
