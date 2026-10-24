@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "9a30d5839e0e592f73424f8b72be52b280a5db9c",
-  "sha256": "08a2ec276d04983999892f8691614b4346b11f74f1edb5107531d1e4f3f29c71",
+  "revision": "2e313e8cc5e2070fbfea1eaa5f19f151372dbde7",
+  "sha256": "4fb8aa65ef6ffc739271996b1b31ac71de44f643d7c9f54108b529a21c250c11",
   "files": [
     {
       "path": ".env.example",
@@ -10820,8 +10820,8 @@
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.jsx",
-      "sha256": "109b3ad6c7fddb3cf63bf2714a4e393097f225ecf32b766fe46f80bcf9c4a2b7",
-      "bytes": 210253
+      "sha256": "293054815b7a35b0762d7ef209254985efdf748bec9449e0eab815a7fbf67667",
+      "bytes": 210223
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.localDiscovery.test.jsx",
@@ -13080,13 +13080,13 @@
     },
     {
       "path": "violawake/config.py",
-      "sha256": "ca202efd7c7656110f55104889d2cbbff9ab511b8361101724725e9254190ba6",
-      "bytes": 10535
+      "sha256": "383e934219aec4d2615bdd3788435ae8d1a2b8a1e632507d343b674cb9f3d907",
+      "bytes": 11441
     },
     {
       "path": "violawake/engine.py",
-      "sha256": "f6dcef6fd371d6d527bd1d200e5733a8d8aafcfc5b1b67a69395041c30dd526e",
-      "bytes": 47267
+      "sha256": "2cd14d4ec350e949ed4ea4723fc077e9c4a549672d878b14d73ff18023844016",
+      "bytes": 47803
     },
     {
       "path": "violawake/model.py",
@@ -13650,8 +13650,8 @@
     },
     {
       "path": "voice/wake_detector/violawake_listener.py",
-      "sha256": "ad212762bbd5a2dadab267e24467dfbd93c97b4e8842260ed5c79104da881a7f",
-      "bytes": 148681
+      "sha256": "2aed784cc20afa752536f5ee7622b0368481a234586d3c96429aa58524af3bfd",
+      "bytes": 153109
     },
     {
       "path": "voice/wake_detector/wake/__init__.py",
@@ -13685,8 +13685,8 @@
     },
     {
       "path": "voice/wake_detector/wake_verifier.py",
-      "sha256": "94f7abcd3a35b471807d591997ea678f5b881b6171af530b9f6514fc242be9cc",
-      "bytes": 22076
+      "sha256": "1b9e2d86a8d4a78d5ee136c23abcaef72eb4af3a937875c26ad374ef053fe438",
+      "bytes": 28462
     }
   ]
 }
