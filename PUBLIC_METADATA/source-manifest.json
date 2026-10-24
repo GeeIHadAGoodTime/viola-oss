@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "75ba420f5424bfc057299a964dc319653e0e1493",
-  "sha256": "d026ad0f1de064e0222071316a4d5c22b874d06e482603e622127c1c854b0817",
+  "revision": "0f3332d31f260c38c59e2e4af8dbf8c64db03a44",
+  "sha256": "a2241ae9e37e467b0cea10ceb2eb9e5f04f049e8b6b7afe9f87ac20da3629189",
   "files": [
     {
       "path": ".env.example",
@@ -9865,8 +9865,8 @@
     },
     {
       "path": "ui/qt_native/webview_window.py",
-      "sha256": "63ab2ec0e1a0c6e1c48941e00468a4ebeb89d86912952d6e9e70056408cfef57",
-      "bytes": 244913
+      "sha256": "8058ee7b80ebccb66ccf46c59ae3c49efce3957992072ac67bccac58ce743002",
+      "bytes": 240243
     },
     {
       "path": "ui/qt_native/widgets/connectivity_status.py",
@@ -10440,8 +10440,8 @@
     },
     {
       "path": "ui/react-app/src/components/CalendarView.module.css",
-      "sha256": "9ffd69fdd6fcc98c1c843aeb3e4c4df29d9000fcfeabaaead7892ce159aa30c8",
-      "bytes": 1710
+      "sha256": "085b8860e4dda14d3b320e3036732c6f63abc2840d4b03c2e3bde4b777a07245",
+      "bytes": 1630
     },
     {
       "path": "ui/react-app/src/components/CalendarView.test.jsx",
@@ -10450,13 +10450,13 @@
     },
     {
       "path": "ui/react-app/src/components/CallBriefing.jsx",
-      "sha256": "04760e400f7df6f46ce5f91cb8d828f63a0cdc50efffa14facc08702de224492",
-      "bytes": 7280
+      "sha256": "9971c21d27a771e56ea31b3f63de6664dcabd1e832a460ca9d2dedffd324b9f4",
+      "bytes": 7062
     },
     {
       "path": "ui/react-app/src/components/CallBriefing.test.jsx",
-      "sha256": "7925c17aa4a6c23ee70e2484d9808bc89c6ae2a5b22aa1b8f44af8ec0dacb3c8",
-      "bytes": 5934
+      "sha256": "a9ce6b6d9d426dd54d07a396ec67094909f713c55be89ebc69827d49146d9528",
+      "bytes": 5813
     },
     {
       "path": "ui/react-app/src/components/CallConsultation.jsx",
@@ -10695,8 +10695,8 @@
     },
     {
       "path": "ui/react-app/src/components/OnboardingOverlay.jsx",
-      "sha256": "84670c33b629f880411e94e7893afb7dee17b5830206ebd99387d325adbdb534",
-      "bytes": 32267
+      "sha256": "d287c469698b6139cfe8f9b8260a9a279de388778ad51dfb6057ad220ee9cd50",
+      "bytes": 31277
     },
     {
       "path": "ui/react-app/src/components/OnboardingOverlay.stableFrames.test.jsx",
@@ -10740,8 +10740,8 @@
     },
     {
       "path": "ui/react-app/src/components/QueueModal.jsx",
-      "sha256": "0988fdad479716c405a68c9e024492ba6d7e14d69d82e6679e004694371d7c06",
-      "bytes": 14299
+      "sha256": "134180b071fafa7757b787adb537ef848d575168fdd473ac906e37018ad78bce",
+      "bytes": 13943
     },
     {
       "path": "ui/react-app/src/components/QueueModal.readRecovery.test.jsx",
@@ -11205,8 +11205,8 @@
     },
     {
       "path": "ui/react-app/src/components/player/ProgressBar.test.jsx",
-      "sha256": "5f09ed419f2190345a14e5efcea1b306e4a35cb3adcf13c744dc6e78c7d8b74d",
-      "bytes": 3634
+      "sha256": "f2789cfef466cefd10eb01551803dd1cb3b910616f9ae339cc0b1c6548f47753",
+      "bytes": 3549
     },
     {
       "path": "ui/react-app/src/components/player/RatingButton.jsx",
@@ -11215,8 +11215,8 @@
     },
     {
       "path": "ui/react-app/src/components/player/RatingButton.module.css",
-      "sha256": "b54915b6831b0b8d40d1d8490592bb01f38cefc29f33d883b597aea81591f96c",
-      "bytes": 824
+      "sha256": "3a5faf4bc3619c687095272ce8f9b645cf37f36eadfdae0dfbf8c07c3eb0a6b9",
+      "bytes": 786
     },
     {
       "path": "ui/react-app/src/components/player/TransportButton.jsx",
@@ -11225,8 +11225,8 @@
     },
     {
       "path": "ui/react-app/src/components/player/TransportButton.module.css",
-      "sha256": "64e76c7a626edbafad9e2003cfbaca0c2f09c2690213ab2ebce7280f38e05d65",
-      "bytes": 1000
+      "sha256": "c1d3d1e69d246c76d75cd6bf315a9534a998366f459088641ae689b102fd6504",
+      "bytes": 950
     },
     {
       "path": "ui/react-app/src/components/player/TransportIcons.jsx",
@@ -11240,8 +11240,8 @@
     },
     {
       "path": "ui/react-app/src/components/player/VolumeControl.module.css",
-      "sha256": "4c332b3d006148f205fdd749f7335860f33351fa5aa4767f4ae04d4c6904b97b",
-      "bytes": 2548
+      "sha256": "266e88a082fb5c8e47e485d21aa276a7630d01a99f03e491c6bf6e3d160837d7",
+      "bytes": 2436
     },
     {
       "path": "ui/react-app/src/components/player/VolumeControl.test.jsx",
@@ -11510,8 +11510,8 @@
     },
     {
       "path": "ui/react-app/src/components/stage/modes/browser/BrowserMode.module.css",
-      "sha256": "36724098be7c6bd40fe0fdd925a7b416b0cdeb600b06a10f3cfc470f91297a13",
-      "bytes": 4971
+      "sha256": "98fe2e60c176b82cd4e0ffd36b2c5115a23ecb2d8303c0ce0153d777891f14d2",
+      "bytes": 4703
     },
     {
       "path": "ui/react-app/src/components/stage/modes/browser/BrowserMode.test.jsx",
@@ -11545,8 +11545,8 @@
     },
     {
       "path": "ui/react-app/src/components/stage/modes/chat/ChatMode.css",
-      "sha256": "13ce87cb72ed8cf0ba294264848bae7368519763a208937c516b2b9d576e2514",
-      "bytes": 20130
+      "sha256": "58aefbcfd92eb47863cbac78df78df0fd27504109b9ffbc4deb979f3485f838e",
+      "bytes": 19159
     },
     {
       "path": "ui/react-app/src/components/stage/modes/chat/ChatMode.jsx",
@@ -12180,8 +12180,8 @@
     },
     {
       "path": "ui/react-app/src/main.jsx",
-      "sha256": "44834995c44960aced4a9f1c8ceb078d57d40749555bc186497d3e1781db8606",
-      "bytes": 14168
+      "sha256": "1706b5e9524b2f301b4f55cca3e1339a8e538ea1830be0a2b268df616be53aab",
+      "bytes": 13763
     },
     {
       "path": "ui/react-app/src/main.test.jsx",
