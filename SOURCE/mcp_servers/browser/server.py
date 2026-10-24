@@ -5996,6 +5996,25 @@ async def fill_payment_details(card_label: str = "") -> str:
     Args:
         card_label: Label of the saved card to use. If empty, uses default.
     """
+    # Use get_page() like all other browser tools - ensures browser is
+    # launched, page is created/recovered, and async lock is acquired.
+    # Direct _page access bypassed all of this and returned None when
+    # the page hadn't been created yet (even if browser was running).
+    return await fill_payment_details_on_page(card_label, manager.get_page)
+
+
+async def fill_payment_details_on_page(
+    card_label: str,
+    page_for_user: Callable[[str], Awaitable[Any]],
+) -> str:
+    """Run the host's secure payment fill on the page ``page_for_user`` returns.
+
+    Shared by this Playwright server and the visible CDP browser server, so
+    both fill the approved card the same way: the confirmation metadata comes
+    from the executor (code-owned, never the model), the handler only fills a
+    card the user approved for this order, and the model-facing error string is
+    scrubbed of card data.
+    """
     handler = _payment_fill_handler
     if handler is None:
         return _json(
@@ -6033,13 +6052,9 @@ async def fill_payment_details(card_label: str = "") -> str:
             active_session = _current_payment_session.get()
             if active_session:
                 fill_args["payment_session_id"] = active_session
-        # Use get_page() like all other browser tools - ensures browser is
-        # launched, page is created/recovered, and async lock is acquired.
-        # Direct _page access bypassed all of this and returned None when
-        # the page hadn't been created yet (even if browser was running).
         user_id = _require_call_user_id("fill_payment_details")
         try:
-            page = await manager.get_page(user_id)
+            page = await page_for_user(user_id)
         except Exception:
             page = None
 

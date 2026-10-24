@@ -3024,27 +3024,32 @@ async def browser_close() -> str:
 
 @server.tool(
     description=(
-        "Fail-safe visible-browser payment handoff. CDP exposes the tool so agents see the same surface, but secure saved-card fill still requires Playwright page adapter support."
+        "Fill confirmed payment card details into the final payment page of the visible browser through the "
+        "host's secure vault extension. Only works after the user approved this order on the payment gate; "
+        "card numbers and CVC are never exposed to the agent."
     ),
     annotations=_CONFIRM,
     meta={"risk": "confirm", "irreversible": True, "irreversible_class": "payment"},
 )
 async def fill_payment_details(card_label: str = "") -> str:
-    """Do not expose card data in CDP; force the secure payment handoff."""
-    return _json(
-        {
-            "ok": False,
-            "code": "visible_browser_payment_fill_requires_takeover",
-            "message": (
-                "The visible CDP browser reached a payment-fill request, but saved-card DOM filling "
-                'is not available on this path yet. Call payment(action="request_review", ...) '
-                "so the user can complete the secure payment step in the visible browser."
-            ),
-            "required_tool": "payment",
-            "required_action": "request_review",
-            "card_label": card_label,
-        }
-    )
+    """ONLY call on the FINAL PAYMENT PAGE where card / CVC fields are visible,
+    after the payment gate approved the order. You will not see the card number.
+
+    Build 5 restored this visible CDP browser as the agent browser, but this
+    tool was a stub that always refused, so no approved purchase could be
+    paid. It now runs the same secure fill as the Playwright server against
+    this browser's Playwright page (the CDP connection is local loopback).
+
+    Args:
+        card_label: Label of the saved card to use. If empty, uses the approved card.
+    """
+    from mcp_servers.browser.server import fill_payment_details_on_page
+
+    async def _visible_page(_user_id: str) -> Any:
+        await manager.ensure_connected()
+        return manager.page
+
+    return await fill_payment_details_on_page(card_label, _visible_page)
 
 
 _MCP_SURFACE_REPLACEMENTS: dict[str, str] = {

@@ -12157,8 +12157,9 @@ class AgentExecutor:
                             "Payment confirmation event: the user approved this order through the secure "
                             "confirmation page. Approved saved card label: %s. Merchant checkout URL: %s. "
                             "Continue from the existing conversation and tool history. Inspect the merchant "
-                            "page, securely fill the approved payment details when the payment fields are visible, "
-                            "then submit the final order only if the page still matches the approved order."
+                            "page, securely fill the approved payment details with fill_payment_details when the "
+                            "payment fields are visible (you will not see the card digits), then submit the final "
+                            "order only if the page still matches the approved order."
                         ) % (
                             channel_type,
                             continuation_executor._session_id or "",
