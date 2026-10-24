@@ -1683,10 +1683,33 @@ async def _dispatch_payment_confirmation_link_for_executor(
             },
         )
         payment_confirmation_ctx["link_dispatch"] = delivery
+        await _announce_approval_text_outcome(executor, delivery)
         return delivery
     except Exception:
         logger.exception("Payment confirmation link dispatch failed")
         return None
+
+
+async def _announce_approval_text_outcome(executor: Any, delivery: dict[str, Any] | None) -> None:
+    """Tell the user when the approval link was not texted, and why.
+
+    The cloud decides (no verified phone, consent missing, a daily or monthly
+    cap, a send failure) and returns ``user_message``; a blocked text is never
+    dropped silently.
+    """
+    sms = delivery.get("sms_default") if isinstance(delivery, dict) else None
+    if not isinstance(sms, dict) or sms.get("sent") or sms.get("already_sent"):
+        return
+    message = str(sms.get("user_message") or "").strip()
+    if not message:
+        return
+    speak = getattr(executor, "_speak", None)
+    if not callable(speak):
+        return
+    try:
+        await speak(message)
+    except (RuntimeError, OSError, ValueError, TypeError, AttributeError):
+        logger.debug("Approval text notice could not be delivered", exc_info=True)
 
 
 _CHECKOUT_URL_PATTERNS = (
