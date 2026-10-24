@@ -1457,6 +1457,10 @@ class ConsoleCapturePage(QWebEnginePage):
                 QWebEnginePermission.PermissionType.MediaVideoCapture,
                 QWebEnginePermission.PermissionType.MediaAudioVideoCapture,
             ]
+            # Viola's own UI shows "Now playing" / mic-mute pop-ups through the
+            # Web Notifications API. Granted for these exact local origins only.
+            if hasattr(QWebEnginePermission.PermissionType, "Notifications"):
+                perm_types.append(QWebEnginePermission.PermissionType.Notifications)
 
             for origin in origins:
                 for perm_type in perm_types:
@@ -1705,6 +1709,17 @@ class ConsoleCapturePage(QWebEnginePage):
             av_capture,
         )
 
+        # Viola's own UI may raise desktop notifications; external pages may not.
+        notifications_feature = getattr(QWebEnginePage.Feature, "Notifications", None)
+        is_notification_permission = notifications_feature is not None and (
+            feature == notifications_feature
+            or (hasattr(feature, "value") and feature.value == getattr(notifications_feature, "value", None))
+        )
+        if is_localhost and is_notification_permission:
+            logger.info("[PERMISSION_GRANT] Granting notifications for Viola origin: %s", origin_str)
+            self.setFeaturePermission(origin, feature, QWebEnginePage.PermissionPolicy.PermissionGrantedByUser)
+            return
+
         if is_localhost and is_media_permission:
             logger.info(
                 "[PERMISSION_GRANT] Granting %s for origin: %s",
@@ -1762,6 +1777,15 @@ class ConsoleCapturePage(QWebEnginePage):
         is_media = perm_type in media_types
 
         logger.info("[PERMISSION_NEW] is_localhost=%s, is_media=%s", is_localhost, is_media)
+
+        # Viola's own UI may raise desktop notifications ("Now playing",
+        # mic muted). Only the exact local Viola origin is granted; pages in
+        # the browser overlay (agentic browsing, provider logins) stay denied.
+        notifications_type = getattr(QWebEnginePermission.PermissionType, "Notifications", None)
+        if is_localhost and notifications_type is not None and perm_type == notifications_type:
+            logger.info("[PERMISSION_NEW] GRANTING notifications for Viola origin %s", origin)
+            permission.grant()
+            return
 
         if is_localhost and is_media:
             logger.info("[PERMISSION_NEW] GRANTING %s for %s", perm_type_name, origin)
@@ -2037,9 +2061,12 @@ class CustomTitleBar(QWidget):
         editor.setFixedHeight(118)
         layout.addWidget(editor)
 
-        screen_capture = QCheckBox("Include screenshot")
+        # The report carries window details as text only; no image is sent
+        # (the backend keeps screenshot metadata only, since pixels cannot be
+        # redacted), so the label must not promise a screenshot.
+        screen_capture = QCheckBox("Include window details (no screenshot is sent)")
         screen_capture.setObjectName("bugReportScreenshotCheckbox")
-        screen_capture.setAccessibleName("Include screenshot")
+        screen_capture.setAccessibleName("Include window details")
         screen_capture.setChecked(True)
         layout.addWidget(screen_capture)
 
@@ -2503,6 +2530,7 @@ class ViolaWebViewWindow(QMainWindow):
         self._setup_ui()
         self._setup_fullscreen_shortcuts()
         self._setup_tray_icon()
+        self._setup_web_notification_presenter()
         # Wire the thread-safe update-event bridge to the banner handler.
         self._update_event_received.connect(self._on_update_event)
         self._update_staged.connect(self._on_update_staged)
@@ -4226,6 +4254,56 @@ class ViolaWebViewWindow(QMainWindow):
         self._tray_icon.setToolTip("Viola")
         self._tray_icon.show()
         logger.info("System tray icon created")
+
+    def _setup_web_notification_presenter(self) -> None:
+        """Show Viola's own Web Notifications as desktop pop-ups via the tray.
+
+        Granting the notification permission alone shows nothing: QtWebEngine
+        drops every ``new Notification(...)`` unless the profile has a
+        presenter. Viola's UI uses notifications for "Now playing" and the
+        mic mute/unmute confirmation, so route them through the tray icon's
+        native balloon/toast. Timers and reminders do not depend on this; they
+        speak, show in the app, and use the backend's OS toast path.
+        """
+        try:
+            profile = _get_viola_profile()
+        except Exception:
+            logger.debug("No Viola profile for the notification presenter", exc_info=True)
+            return
+        setter = getattr(profile, "setNotificationPresenter", None)
+        if not callable(setter):
+            logger.debug("QWebEngineProfile.setNotificationPresenter is not available")
+            return
+        setter(self._present_web_notification)
+        tray = self.tray_icon
+        if tray is not None:
+            tray.messageClicked.connect(self._restore_from_tray)
+        logger.info("Web notification presenter installed (tray=%s)", tray is not None)
+
+    def _present_web_notification(self, notification) -> None:
+        """Present one Web Notification from Viola's own local page only."""
+        try:
+            origin = notification.origin().toString()
+            title = str(notification.title() or "").strip() or "Viola"
+            message = str(notification.message() or "").strip()
+        except (AttributeError, RuntimeError, TypeError):
+            logger.debug("Unreadable web notification", exc_info=True)
+            return
+        # Defense in depth: the permission handlers only grant notifications
+        # to Viola's exact local origin, and this re-checks it so a page in the
+        # browser overlay can never raise a desktop pop-up.
+        if not _is_local_viola_webview_url(origin, extra_ports={int(getattr(self, "port", DEFAULT_API_PORT))}):
+            logger.warning("Dropped a web notification from a non-Viola origin")
+            return
+        tray = self.tray_icon
+        if tray is None or not QSystemTrayIcon.supportsMessages():
+            logger.info("Web notification not shown: no system tray to show it")
+            return
+        tray.showMessage(title[:120], message[:400], QSystemTrayIcon.MessageIcon.Information, 5000)
+        try:
+            notification.show()
+        except (AttributeError, RuntimeError):
+            logger.debug("Could not report the notification as shown", exc_info=True)
 
     def _refresh_tray_mute_state(self):
         """Sync the tray's checkable mute action to the live mic_muted setting."""
