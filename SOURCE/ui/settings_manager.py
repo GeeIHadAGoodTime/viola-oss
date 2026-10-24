@@ -106,6 +106,43 @@ class SecureSettingsUnavailableError(RuntimeError):
     """
 
 
+def _managed_source_available() -> bool:
+    """Whether the Viola-managed AI source can run on this install.
+
+    True with a local OpenAI key (a dev ``.env``, or the cloud server itself),
+    or, with no key, when managed turns can forward through Viola's cloud:
+    a non-cloud surface with a cloud URL and cloud-LLM consent (the condition
+    ``LLMProviderFactory._create_cloud_managed_provider`` uses).
+
+    Keyless managed AI (#269/#337): a REAL customer desktop install ships NO
+    local OpenAI key. Requiring one here silently killed the intent pipeline on
+    keyless installs ("AI features disabled in settings", then "No handler
+    matched your request") and made ``is_ai_available("managed")`` report the
+    default source as unavailable. Sign-in is not required here: a signed-out
+    managed install still routes turns so the user gets the sign-in card.
+    """
+    try:
+        from config.settings import settings as app_settings
+
+        if bool(app_settings.openai_api_key):
+            return True
+    except Exception:  # noqa: BLE001, RUF100 - availability probe never raises
+        logger.debug("Managed AI source unavailable from AppConfig")
+    try:
+        from config.settings import settings as app_settings
+        from core.privacy_consent import is_cloud_llm_consented
+
+        app_surface = str(getattr(app_settings, "app_surface", "desktop") or "desktop").strip().lower()
+        cloud_url = (getattr(app_settings, "cloud_url", "") or getattr(app_settings, "api_base_url", "") or "").strip()
+        if app_surface != "cloud" and cloud_url and is_cloud_llm_consented():
+            return True
+    # Availability probe: any config/consent read failure must fall
+    # through to disabled, never raise.
+    except Exception:  # noqa: BLE001, RUF100
+        logger.debug("Keyless managed cloud-forward availability check failed")
+    return False
+
+
 def _atomic_write_json(path: Path, payload: object, *, indent: int = 2) -> None:
     """Write JSON to ``path`` atomically: temp file in the same dir, fsync, then
     ``os.replace``. A crash/kill at any point before the final ``os.replace``
@@ -3372,39 +3409,7 @@ class SettingsManager:
                 logger.debug("codex-auth not installed — Codex source unavailable")
                 return False
         if ai_source is AiSource.MANAGED:
-            try:
-                from config.settings import settings as app_settings
-
-                if bool(app_settings.openai_api_key):
-                    return True
-            except Exception:
-                logger.debug("Managed AI source unavailable from AppConfig")
-            # Keyless managed AI (#269/#337): a REAL customer desktop install
-            # ships NO local OpenAI key — the managed turn forwards through
-            # Viola's cloud (server holds the key), authenticated by the
-            # desktop GoTrue session. Requiring a local key here predates that
-            # forward and silently killed the whole intent pipeline on keyless
-            # installs: the provider router read this gate, logged "AI features
-            # disabled in settings", and every chat/agent turn died with "No
-            # handler matched your request" even though the factory could
-            # build CloudManagedProvider fine. Mirror the availability
-            # condition of LLMProviderFactory._create_cloud_managed_provider:
-            # desktop surface + cloud URL + cloud-LLM consent.
-            try:
-                from config.settings import settings as app_settings
-                from core.privacy_consent import is_cloud_llm_consented
-
-                app_surface = str(getattr(app_settings, "app_surface", "desktop") or "desktop").strip().lower()
-                cloud_url = (
-                    getattr(app_settings, "cloud_url", "") or getattr(app_settings, "api_base_url", "") or ""
-                ).strip()
-                if app_surface != "cloud" and cloud_url and is_cloud_llm_consented():
-                    return True
-            # Availability probe: any config/consent read failure must fall
-            # through to disabled, never raise.
-            except Exception:  # noqa: BLE001, RUF100
-                logger.debug("Keyless managed cloud-forward availability check failed")
-            return False
+            return _managed_source_available()
         if ai_source is AiSource.BYOK:
             # Check if we have an API key (new or legacy)
             api_key_raw = self.get("llm_api_key", "")
@@ -3484,12 +3489,9 @@ class SettingsManager:
                 return False
 
         if source is AiSource.MANAGED:
-            try:
-                from config.settings import settings as app_settings
-
-                return bool(app_settings.openai_api_key)
-            except Exception:
-                return False
+            # Same answer as is_ai_enabled's MANAGED branch: a keyless
+            # desktop install forwards managed AI through Viola's cloud.
+            return _managed_source_available()
 
         if source is AiSource.BYOK:
             # Inline the BYOK availability probe so we don't mutate persisted
