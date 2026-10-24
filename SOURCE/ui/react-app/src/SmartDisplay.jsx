@@ -18,6 +18,7 @@ import useCallAudio, { fetchActiveCall, fetchCallQueue, removeQueuedCall } from 
 import useCloudPhoneEvents from './hooks/useCloudPhoneEvents';
 import useCallConsultationReply from './hooks/useCallConsultationReply';
 import ToastContainer, { useToast } from './components/Toast';
+import { useVideoFullscreen } from './hooks/useVideoFullscreen';
 import TimerCountdown from './components/TimerCountdown';
 import { useSettings } from './hooks/useSettings';
 import { useAvailableRooms } from './hooks/useAvailableRooms';
@@ -95,6 +96,7 @@ import { clampWakeThreshold } from './utils/wakeSensitivity';
 import './styles/variables.css';
 import './styles/animations.css';
 import './styles/responsive-smart-display.css';
+import './styles/video-fullscreen.css';
 
 // Code-split modals - only loaded when opened (Sprint 5 optimization)
 const SettingsModal = lazy(() => import('./components/SettingsModal'));
@@ -3015,6 +3017,34 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
   });
   const isChatStageActive = stageContentMode === 'chat';
 
+  // Voice "full screen" (desktop app): the video on the Music stage fills the
+  // screen; leaving puts the stage that was showing back exactly as it was.
+  const captureStageForVideoFullscreen = useCallback(() => ({
+    displayMode,
+    browserModeActive,
+    calendarModeActive,
+    displayPriorityOverride,
+  }), [displayMode, browserModeActive, calendarModeActive, displayPriorityOverride]);
+  const restoreStageAfterVideoFullscreen = useCallback((saved) => {
+    setBrowserModeActive(saved.browserModeActive);
+    setCalendarModeActive(saved.calendarModeActive);
+    setDisplayPriorityOverride(saved.displayPriorityOverride);
+    setDisplayMode(saved.displayMode);
+  }, []);
+  const notifyVideoFullscreen = useCallback((message) => {
+    addToast({ message, level: 'info' });
+  }, [addToast]);
+  const { videoFullscreen } = useVideoFullscreen({
+    isSpoke,
+    hasVideo: !isSpoke && !!playerState?.now_playing?.video_id,
+    modalOpen: anyModalOpen,
+    stageMode: stageContentMode,
+    captureStage: captureStageForVideoFullscreen,
+    showMusicStage: activateMusicMode,
+    restoreStage: restoreStageAfterVideoFullscreen,
+    notify: notifyVideoFullscreen,
+  });
+
   // BottomRow is the ONLY place in the app that renders `voice.error`, and it
   // is not mounted while the chat stage is up (see the `!isChatStageActive`
   // guard on its render below). The chat composer still has a mic button, so a
@@ -3394,7 +3424,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
   // =========================================================================
   return (
     <CloudConsentGateProvider intercept={interceptCloudConsent}>
-    <div className="viola-outer-container smart-display" data-testid="smart-display" style={{
+    <div className="viola-outer-container smart-display" data-testid="smart-display" data-video-fullscreen={videoFullscreen ? 'true' : undefined} style={{
       width: '100%',
       height: isSpoke ? '100%' : '100dvh',
       minHeight: '520px',

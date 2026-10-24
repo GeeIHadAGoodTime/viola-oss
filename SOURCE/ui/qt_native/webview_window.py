@@ -792,6 +792,24 @@ class ViolaBridge(QObject):
         QTimer.singleShot(0, window._quit_app)
         return json.dumps({"ok": True}, sort_keys=True)
 
+    @Slot(bool, result=str)
+    def setVideoFullscreen(self, enabled: bool) -> str:
+        """Voice "full screen" / "end full screen" for the playing video.
+
+        Chromium refuses ``requestFullscreen()`` without a user gesture, so a
+        spoken request cannot go full screen from React; the Qt window does it
+        instead and React lays the video over the whole page. Refused for
+        non-local caller pages, like the other native actions.
+        """
+        if not self._caller_page_is_local():
+            logger.warning("[ViolaBridge] Refused setVideoFullscreen from non-local caller page")
+            return json.dumps({"ok": False, "error": "origin_not_allowed"}, sort_keys=True)
+        window = self._window
+        if window is None:
+            return json.dumps({"ok": False, "error": "window_unavailable"}, sort_keys=True)
+        logger.info("[ViolaBridge] setVideoFullscreen(%s) called from React", bool(enabled))
+        return json.dumps(window.set_video_fullscreen(bool(enabled)), sort_keys=True)
+
     @Slot(int, int, int, int)
     def setBrowserOverlayBounds(self, x: int, y: int, w: int, h: int) -> None:
         """Called from React when the media area resizes.
@@ -2470,6 +2488,9 @@ class ViolaWebViewWindow(QMainWindow):
         self._react_ui_loaded = False
         self._react_ui_load_url: str | None = None
         self._was_maximized_before_fullscreen = False
+        self._geometry_before_fullscreen: QRect | None = None
+        self._video_fullscreen_active = False
+        self._video_fullscreen_owns_window = False
         self._fullscreen_hides_title_bar = False
         self._fullscreen_title_bar_revealed = False
         self._fullscreen_title_bar_hide_timer: QTimer | None = None
@@ -3082,6 +3103,65 @@ class ViolaWebViewWindow(QMainWindow):
                 poll.stop()
             self._sync_video_overlay_fullscreen_state(False)
             self._hide_fullscreen_hint(immediate=True)
+            # Any way out of window fullscreen (F11, Esc, the title-bar
+            # button, an OS shortcut) also ends the voice video mode, so React
+            # never keeps a video laid over a normal-size window.
+            self._video_fullscreen_active = False
+            self._video_fullscreen_owns_window = False
+        self._publish_window_fullscreen_state()
+
+    def _publish_window_fullscreen_state(self) -> None:
+        """Tell React when window fullscreen or the voice video mode changes."""
+        state = (bool(self.isFullScreen()), bool(getattr(self, "_video_fullscreen_active", False)))
+        if state == getattr(self, "_published_fullscreen_state", None):
+            return
+        webview = getattr(self, "webview", None)
+        if webview is None:
+            return
+        self._published_fullscreen_state = state
+        detail = json.dumps({"fullscreen": state[0], "video_fullscreen": state[1]})
+        try:
+            webview.page().runJavaScript(
+                "window.dispatchEvent(new CustomEvent('viola:window-fullscreen', {detail: %s}))" % detail
+            )
+        except RuntimeError:
+            logger.debug("Could not publish fullscreen state to React", exc_info=True)
+
+    def set_video_fullscreen(self, enabled: bool) -> dict[str, object]:
+        """Enter or leave the voice video full screen and report the result.
+
+        Entering remembers whether the window was already fullscreen (F11): if
+        it was, leaving only ends the video layout and the window stays
+        fullscreen, because that is how it was before. Leaving when no video
+        mode is active ("end full screen" after F11) exits window fullscreen.
+        """
+        was_active = bool(getattr(self, "_video_fullscreen_active", False))
+        if enabled:
+            if not was_active:
+                owns_window = not self.isFullScreen()
+                self._video_fullscreen_active = True
+                self._video_fullscreen_owns_window = owns_window
+                if owns_window:
+                    self.enter_fullscreen(hide_title_bar=True)
+        else:
+            owns_window = bool(getattr(self, "_video_fullscreen_owns_window", False))
+            self._video_fullscreen_active = False
+            self._video_fullscreen_owns_window = False
+            if self.isFullScreen() and (owns_window or not was_active):
+                self.exit_fullscreen()
+        self._publish_window_fullscreen_state()
+        logger.info(
+            "Video fullscreen %s: window fullscreen=%s maximized=%s geometry=%s",
+            "on" if enabled else "off",
+            self.isFullScreen(),
+            self.isMaximized(),
+            self.geometry().getRect(),
+        )
+        return {
+            "ok": True,
+            "video_fullscreen": bool(getattr(self, "_video_fullscreen_active", False)),
+            "window_fullscreen": bool(self.isFullScreen()),
+        }
 
     def enter_fullscreen(self, *, hide_title_bar: bool = True) -> None:
         """Enter fullscreen on the current screen and show the exit hint."""
@@ -3092,6 +3172,11 @@ class ViolaWebViewWindow(QMainWindow):
             return
 
         self._was_maximized_before_fullscreen = self.isMaximized()
+        # Remember the normal-size rectangle too, so leaving fullscreen puts a
+        # restored window back at its exact size and position.
+        self._geometry_before_fullscreen = QRect(
+            self.normalGeometry() if self._was_maximized_before_fullscreen else self.geometry()
+        )
         self._fullscreen_hides_title_bar = hide_title_bar
         self._fullscreen_title_bar_revealed = False
         self._sync_video_overlay_fullscreen_state(True)
@@ -3110,6 +3195,8 @@ class ViolaWebViewWindow(QMainWindow):
             return
 
         restore_maximized = self._was_maximized_before_fullscreen
+        restore_geometry = getattr(self, "_geometry_before_fullscreen", None)
+        self._geometry_before_fullscreen = None
         self._fullscreen_hides_title_bar = False
         self._fullscreen_title_bar_revealed = False
         self._was_maximized_before_fullscreen = False
@@ -3123,6 +3210,12 @@ class ViolaWebViewWindow(QMainWindow):
             self.showMaximized()
         else:
             self.showNormal()
+            if (
+                restore_geometry is not None
+                and restore_geometry.isValid()
+                and self.geometry() != restore_geometry
+            ):
+                self.setGeometry(restore_geometry)
         self._sync_fullscreen_controls()
 
     def toggle_fullscreen(self) -> None:

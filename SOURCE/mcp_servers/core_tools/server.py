@@ -68,6 +68,7 @@ from intent.tools.music_connect import (
 from intent.tools.music_tools import (
     playback_control_handler as _playback_control_handler,
     rate_track_handler as _rate_track_handler,
+    video_fullscreen_handler as _video_fullscreen_handler,
 )
 from intent.tools.notification_tools import (
     list_notify_reminders_handler as _list_notify_reminders_handler,
@@ -4773,6 +4774,34 @@ async def open_app_panel(
             payload["room_name"] = prefill_payload["room_name"]
 
     return _format_result(ToolResult(ok=True, data=payload))
+
+
+@server.tool(
+    description=(
+        "Show the video playing on Viola's Music screen full screen, or put the screen back. "
+        "Use enabled=true for 'put this in full screen', 'make the video full screen', or "
+        "'go full screen'. Use enabled=false for 'end full screen', 'exit full screen', and, "
+        "while the video is full screen, 'go back' or 'normal size'. Leaving puts the window, "
+        "stage, and video back exactly as they were. Works on the Viola desktop app only; "
+        "the result says so when the request came from a speaker, phone, or the web app, "
+        "and when nothing is playing. Returns a ui_action for the app; it does not start, "
+        "pause, or change playback."
+    ),
+    annotations=_SAFE,
+    meta={"risk": "safe"},
+)
+async def video_fullscreen(
+    enabled: Annotated[
+        bool,
+        Field(description="True to show the playing video full screen, false to end full screen."),
+    ] = True,
+) -> str:
+    """Return the enter/exit video-fullscreen ui_action, or why it cannot happen."""
+    try:
+        return _format_result(await _video_fullscreen_handler(bool(enabled)))
+    except Exception as exc:
+        logger.exception("video_fullscreen failed (enabled=%s)", enabled)
+        return json.dumps({"error": str(exc)})
 
 
 @server.tool(

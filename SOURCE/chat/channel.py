@@ -32,6 +32,7 @@ class WebChatChannel:
 
     active_delivery = False
     channel_type = "web"
+    request_channel_key = ""
     defer_confirmation_on_ask_none = True
 
     def __init__(self) -> None:
@@ -155,6 +156,10 @@ def resolve_rest_channel(raw_channel: object | None) -> object | None:
         return EmailWebhookChannel(email=email)
 
     channel = WebChatChannel()
+    # The raw key survives the type collapse below: a speaker's
+    # "voice-stream" turn and a desktop voice turn both become "voice", and
+    # the voice full-screen tool must tell them apart.
+    channel.request_channel_key = channel_key
     if channel_key in {"http", "web"}:
         channel.channel_type = "web"
     elif channel_key in {"voice-stream", "voice"}:

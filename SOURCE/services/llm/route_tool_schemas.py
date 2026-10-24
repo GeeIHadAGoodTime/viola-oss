@@ -187,6 +187,26 @@ ROUTE_TOOL_SCHEMAS: list[dict[str, Any]] = [
         },
     },
     {
+        "name": "video_fullscreen",
+        "description": (
+            "Show the video playing on Viola's Music screen full screen (enabled=true: 'put this "
+            "in full screen', 'make the video full screen', 'go full screen') or end it "
+            "(enabled=false: 'end full screen', 'exit full screen', and while full screen "
+            "'go back' or 'normal size'). Desktop app only. Returns ui_action data for the app; "
+            "it does not change playback."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "enabled": {
+                    "type": "boolean",
+                    "description": "True to go full screen, false to end full screen.",
+                },
+            },
+            "required": ["enabled"],
+        },
+    },
+    {
         "name": "play_next",
         "description": (
             "Queue a song to play after the current track. "
