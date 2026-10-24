@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef } from 'react';
 import PropTypes from 'prop-types';
 import { THEME } from '../../../../config';
 import styles from './BrowserMode.module.css';
+import { usePressAndHold } from '../../../../hooks/usePressAndHold';
 
 const DEFAULT_AGENT_TASK = {
   description: '',
@@ -80,6 +81,8 @@ export default function BrowserMode({
   commandScopeActive = false,
 }) {
   const surfaceRef = useRef(null);
+  // Push-to-talk hold: pointer capture + cancel handling (see usePressAndHold).
+  const pttPress = usePressAndHold({ onStart: onPTTStart, onEnd: onPTTEnd });
   const wsSendRef = useRef(wsSend);
   // Input (agent_browser_input) is relayed through `inputSend` — the dedicated
   // /ws/agent-browser stream sender for cloud web clients — falling back to
@@ -325,9 +328,8 @@ export default function BrowserMode({
             <button
               type="button"
               className={styles.controlButton}
-              onMouseDown={onPTTStart}
-              onMouseUp={onPTTEnd}
-              onMouseLeave={onPTTEnd}
+              {...pttPress}
+              style={{ touchAction: 'none' }}
               aria-label="Push to talk"
               title="Push to talk"
             >

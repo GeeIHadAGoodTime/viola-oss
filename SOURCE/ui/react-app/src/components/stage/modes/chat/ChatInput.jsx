@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
+import { usePressAndHold } from '../../../../hooks/usePressAndHold';
 import { AttachIcon, MicIcon, SendIcon, StopIcon } from '../../../icons';
 
 export default function ChatInput({
@@ -15,6 +16,8 @@ export default function ChatInput({
 }) {
   const textRef = useRef(null);
   const fileInputRef = useRef(null);
+  // Push-to-talk hold: pointer capture + cancel handling (see usePressAndHold).
+  const pttPress = usePressAndHold({ onStart: handlePTTStart, onEnd: handlePTTEnd });
 
   useEffect(() => {
     const node = textRef.current;
@@ -77,17 +80,8 @@ export default function ChatInput({
         className="chat-icon-button"
         aria-label="Push to talk"
         title="Push to talk"
-        onMouseDown={handlePTTStart}
-        onMouseUp={handlePTTEnd}
-        onMouseLeave={handlePTTEnd}
-        onTouchStart={(event) => {
-          event.preventDefault();
-          handlePTTStart();
-        }}
-        onTouchEnd={(event) => {
-          event.preventDefault();
-          handlePTTEnd();
-        }}
+        {...pttPress}
+        style={{ touchAction: 'none' }}
       >
         <MicIcon />
       </button>
