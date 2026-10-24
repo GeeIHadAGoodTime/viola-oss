@@ -823,7 +823,10 @@ _AGENT_CHAIN_CAP_MESSAGE = "I've completed as much as I can in one task. Want me
 from intent.content_sanitizer import (
     BROWSER_CONTENT_TOOLS as _BROWSER_CONTENT_TOOLS,
     BROWSER_PAGE_CONTENT_TOOLS as _BROWSER_PAGE_CONTENT_TOOLS,
+    bind_active_taint_tracker as _bind_active_taint_tracker,
     canonicalize_tool_name_for_safety,
+    context_is_tainted as _content_context_is_tainted,
+    reset_active_taint_tracker as _reset_active_taint_tracker,
 )
 from intent.tool_allowlist import tool_name_allowed_by_allowlist
 
@@ -1325,15 +1328,6 @@ def _set_final_response(
 def _is_approval_block_error(error_category: str | None = None) -> bool:
     """Return True when a tool result is an approval-policy denial."""
     return str(error_category or "").upper() == "APPROVAL_BLOCKED"
-
-
-def _confirmation_phone_number(tool_args: dict[str, Any] | None) -> str:
-    """Canonical digits-only form of a dial's number for confirmation binding."""
-    if not isinstance(tool_args, dict):
-        return ""
-    raw = str(tool_args.get("phone_number") or tool_args.get("number") or tool_args.get("to") or "")
-    digits = re.sub(r"\D", "", raw)
-    return "+" + digits if digits else ""
 
 
 def _confirmation_deferred_tool_result(deferred: ConfirmationDeferred) -> ToolResult:
@@ -3043,11 +3037,6 @@ class AgentExecutor:
         self._rejected_tools: set[str] = set()
         self._approval_blocked_tools: list[str] = []
         self._irreversible_confirmed_action_classes: set[str] = set()
-        # Exact phone numbers the user confirmed in this task, and whether
-        # untrusted content (web, email, ...) is in context for the current tool
-        # call. A dial under untrusted content re-asks for any number not here.
-        self._irreversible_confirmed_phone_numbers: set[str] = set()
-        self._untrusted_content_in_context: bool = False
 
         # Fix 4: Consecutive click failure counter.
         # Tracks failed browser_interact calls (timeout/error).
@@ -4564,8 +4553,6 @@ class AgentExecutor:
         self._memory_enumeration_blocked_after_no_match = False
         self._consecutive_click_failures = 0
         self._irreversible_confirmed_action_classes = set()
-        self._irreversible_confirmed_phone_numbers = set()
-        self._untrusted_content_in_context = False
         # Compatibility hook for older web_search counter code. The current
         # path keeps web routing model-directed.
         from intent.tools.web_search import clear_web_search_counter
@@ -5001,23 +4988,29 @@ class AgentExecutor:
             # compaction metadata, and provider repair.
             from diagnostics import latency_spans
 
-            with latency_spans.span(
-                "AGENT_LOOP",
-                task_id=str(getattr(self, "task_id", "?")),
-                provider=type(provider).__name__,
-            ):
-                agent_result = await run_agent_loop(
-                    executor=self,
-                    provider=provider,
-                    task_log=task_log,
-                    user_text=user_text,
-                    system_prompt=getattr(self, "_system_prompt_text", "") or "",
-                    checkpoint=checkpoint,
-                    prompt_context_bundle=getattr(self, "_prompt_context_bundle", None),
-                    initial_tool_call=current_tool_call,
-                    initial_messages=initial_loop_messages,
-                    start_time=start_time,
-                )
+            # run_agent_loop binds its taint tracker for the approval layer;
+            # scope that binding to this loop so it never outlives the task.
+            _taint_scope = _bind_active_taint_tracker(None)
+            try:
+                with latency_spans.span(
+                    "AGENT_LOOP",
+                    task_id=str(getattr(self, "task_id", "?")),
+                    provider=type(provider).__name__,
+                ):
+                    agent_result = await run_agent_loop(
+                        executor=self,
+                        provider=provider,
+                        task_log=task_log,
+                        user_text=user_text,
+                        system_prompt=getattr(self, "_system_prompt_text", "") or "",
+                        checkpoint=checkpoint,
+                        prompt_context_bundle=getattr(self, "_prompt_context_bundle", None),
+                        initial_tool_call=current_tool_call,
+                        initial_messages=initial_loop_messages,
+                        start_time=start_time,
+                    )
+            finally:
+                _reset_active_taint_tracker(_taint_scope)
             if post_turn_memory_extraction:
                 await self._run_post_turn_memory_extraction(
                     user_text=user_text,
@@ -8031,32 +8024,6 @@ class AgentExecutor:
         confirmed = getattr(self, "_irreversible_confirmed_action_classes", None)
         return isinstance(confirmed, set) and action_class in confirmed
 
-    def _remember_confirmed_phone_number(self, tool_args: dict[str, Any]) -> None:
-        number = _confirmation_phone_number(tool_args)
-        if not number:
-            return
-        numbers = getattr(self, "_irreversible_confirmed_phone_numbers", None)
-        if not isinstance(numbers, set):
-            numbers = set()
-            self._irreversible_confirmed_phone_numbers = numbers
-        numbers.add(number)
-
-    def _phone_call_needs_number_confirmation(self, action_class: str, tool_args: dict[str, Any]) -> bool:
-        """Re-ask for an unconfirmed number when untrusted content is in context.
-
-        Phone calls ask once per task. The phone tool is the one high-risk tool
-        let through the taint gate (so "look up the number and call them"
-        works), so while web/email/etc. content is in context the once-per-task
-        reuse is bound to the exact number the user already said yes to: a
-        number that arrived later, possibly from injected content, is asked
-        about again with the number shown.
-        """
-        if action_class != "phone_call" or not getattr(self, "_untrusted_content_in_context", False):
-            return False
-        numbers = getattr(self, "_irreversible_confirmed_phone_numbers", None)
-        number = _confirmation_phone_number(tool_args)
-        return not (isinstance(numbers, set) and number and number in numbers)
-
     async def _broadcast_consult_user_event(
         self,
         *,
@@ -8081,7 +8048,7 @@ class AgentExecutor:
             payload["phone_number"] = str(tool_args.get("phone_number") or "").strip()
             payload["recipient_name"] = str(tool_args.get("recipient_name") or "").strip()
             payload["objective"] = str(tool_args.get("task") or "").strip()
-            payload["untrusted_source"] = bool(getattr(self, "_untrusted_content_in_context", False))
+            payload["untrusted_source"] = _content_context_is_tainted()
         task_id = getattr(self, "task_id", None)
         if task_id:
             payload["task_id"] = task_id
@@ -8106,9 +8073,9 @@ class AgentExecutor:
         action_class = self._irreversible_confirmation_class(tool_name, tool_args)
         if action_class is None:
             return True
-        if self._is_irreversible_confirmation_remembered(
-            action_class
-        ) and not self._phone_call_needs_number_confirmation(action_class, tool_args):
+        # Under taint every consequential action is asked about afresh: an
+        # earlier yes in this task must not carry an injected follow-up through.
+        if not _content_context_is_tainted() and self._is_irreversible_confirmation_remembered(action_class):
             logger.info(
                 "Irreversible confirmation reused for class=%s tool=%s",
                 action_class,
@@ -8117,8 +8084,8 @@ class AgentExecutor:
             return True
 
         planned_action = describe_irreversible_action(tool_name, tool_args)
-        if action_class == "phone_call" and getattr(self, "_untrusted_content_in_context", False):
-            planned_action = "%s (I found this number online, so please check it is the right one)" % planned_action
+        if action_class == "phone_call" and _content_context_is_tainted():
+            planned_action = "%s (this number came from a search result or other outside content, so please check it is the right one)" % planned_action
         await self._broadcast_consult_user_event(
             tool_name=tool_name,
             action_class=action_class,
@@ -8164,8 +8131,6 @@ class AgentExecutor:
 
         if approved:
             self._remember_irreversible_confirmation(action_class)
-            if action_class == "phone_call":
-                self._remember_confirmed_phone_number(tool_args)
             await self._broadcast_consult_user_event(
                 tool_name=tool_name,
                 action_class=action_class,
@@ -9409,7 +9374,7 @@ class AgentExecutor:
             elif blocked_msg := spin_detector.is_call_blocked(tool_name, tool_args, page_url=page_url):
                 tool_result = ToolResult(ok=False, error=blocked_msg)
                 tool_error = blocked_msg
-            elif taint_block := taint_tracker.check_tool(tool_name):
+            elif taint_block := taint_tracker.check_tool(tool_name, tool_args):
                 tool_result = ToolResult(ok=False, error=taint_block)
                 tool_error = taint_block
 

@@ -27,6 +27,7 @@ import CallBriefing, {
   CALL_CANCEL_COMMAND,
   callBriefingFromConsultEvent,
 } from './components/CallBriefing';
+import DiagnosticsDisclosureNotice from './components/DiagnosticsDisclosureNotice';
 import CallConsultation from './components/CallConsultation';
 import PhoneCallPanel from './components/PhoneCallPanel';
 import LoginPromptModal from './components/LoginPromptModal';
@@ -3867,6 +3868,14 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
       />
 
       {activeCard && <ContentCard data={activeCard} onDismiss={dismissCard} />}
+
+      {/* One-time notice for automatic anonymous crash reports (desktop hub
+          only; waits until onboarding is finished). Crash reports stay queued
+          on this machine until it has been shown. */}
+      <DiagnosticsDisclosureNotice
+        enabled={!isSpoke && !cloudSurfaceActive && !onboarding.isOnboarding}
+        onOpenPrivacySettings={() => openSettingsPanel('account')}
+      />
 
       {/* Phone-call UX toasts (bottom-right) driven by telephony WS events */}
       <CallBriefing

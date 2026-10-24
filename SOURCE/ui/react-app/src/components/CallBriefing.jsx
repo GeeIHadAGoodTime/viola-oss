@@ -152,7 +152,7 @@ export default function CallBriefing({ briefing, onDismiss, onApprove, onCancel 
 
       {untrusted_source && (
         <div style={{ color: theme.colors.statusYellow, fontSize: 12, marginBottom: 6 }}>
-          Viola found this number online. Check it is the right one before you approve.
+          Viola got this number from a search result or other outside content. Check it is the right one before you approve.
         </div>
       )}
 

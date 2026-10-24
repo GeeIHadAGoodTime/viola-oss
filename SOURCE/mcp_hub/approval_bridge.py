@@ -1038,10 +1038,16 @@ class ApprovalBridge:
                 allow_implicit_match=True,
             )
             if confirmation_state == "accepted":
+                # Under taint, a re-issued call alone is not consent: the
+                # user's own words for this turn must confirm (fails closed).
+                holds_under_taint = getattr(self._approval, "confirmation_holds_under_taint", None)
+                user_confirmed = True
+                if callable(holds_under_taint):
+                    user_confirmed = bool(await holds_under_taint(description, risk))
                 final_decision = self._permission_policy.resolve_user_response(
                     context,
                     decision,
-                    approved=True,
+                    approved=user_confirmed,
                 )
                 self.last_permission_decision = final_decision
                 if final_decision.behavior == "allow":

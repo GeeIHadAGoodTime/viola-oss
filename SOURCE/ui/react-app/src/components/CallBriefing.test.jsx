@@ -14,7 +14,7 @@ vi.mock('../config', () => ({
 const pendingSearchCall = {
   tool_name: 'phone',
   action_class: 'phone_call',
-  planned_action: "call Joe's Pizza at +13125550142 (I found this number online, so please check it is the right one)",
+  planned_action: "call Joe's Pizza at +13125550142 (this number came from a search result or other outside content, so please check it is the right one)",
   status: 'deferred',
   phone_number: '+13125550142',
   recipient_name: "Joe's Pizza",
@@ -53,12 +53,12 @@ describe('callBriefingFromConsultEvent', () => {
 describe('CallBriefing approve and cancel', () => {
   const briefing = callBriefingFromConsultEvent(pendingSearchCall);
 
-  it('shows who the number belongs to, the exact number, and the found-online warning', () => {
+  it('shows who the number belongs to, the exact number, and the outside-content warning', () => {
     render(<CallBriefing briefing={briefing} onApprove={vi.fn()} onCancel={vi.fn()} onDismiss={vi.fn()} />);
     expect(screen.getByText('Viola needs your approval')).toBeTruthy();
     expect(screen.getByText("Joe's Pizza")).toBeTruthy();
     expect(screen.getByTestId('call-briefing-number').textContent).toBe('+13125550142');
-    expect(screen.getByText(/found this number online/)).toBeTruthy();
+    expect(screen.getByText(/search result or other outside content/)).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Approve' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeTruthy();
   });
