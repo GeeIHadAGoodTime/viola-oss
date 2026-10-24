@@ -1321,7 +1321,7 @@ async def file_read(
     ] = 0,
     limit: Annotated[
         int,
-        Field(description="For read: maximum lines returned (at most 100; use offset to page through longer files)."),
+        Field(description="For read: maximum lines returned."),
     ] = 100,
     pattern: Annotated[
         str,
@@ -1356,15 +1356,9 @@ async def file_read(
 
 @server.tool(
     description=(
-        "Change files on the local filesystem. To change PART of an existing file use append, insert, "
-        "replace_lines or replace_text: they keep every other line exactly as it is. file_read shows at "
-        "most 100 lines at a time, so never rebuild a longer file from a read and write it back. "
-        "Actions: append (add content at the end; creates the file if missing), insert (add content "
-        "before start_line), replace_lines (replace lines start_line..end_line; empty content deletes "
-        "them), replace_text (replace the one exact match of old_text with content), write (create a "
-        "new file or replace a whole file; making an existing file of more than 100 lines shorter needs "
-        "overwrite=true, only when the user asked to replace the entire file), delete (remove a single file). "
-        "Line numbers are 1-based."
+        "Change local files. Edit part of a file with append, insert, replace_lines or replace_text; "
+        "file_read shows only 100 lines, so never rebuild a longer file from a read. "
+        "write replaces a whole file; delete removes one."
     ),
     annotations=_DANGEROUS,
     meta={
@@ -1376,45 +1370,31 @@ async def file_read(
 async def file_write(
     action: Annotated[
         str,
-        Field(
-            description=(
-                "Filesystem change. One of: 'append', 'insert', 'replace_lines', 'replace_text', 'write' or 'delete'."
-            )
-        ),
+        Field(description="append|insert|replace_lines|replace_text|write|delete"),
     ] = "write",
     path: Annotated[
         str,
-        Field(description="File path to change. Deletion only supports single files, not directories."),
+        Field(description="File path."),
     ] = "",
     content: Annotated[
         str,
-        Field(
-            description=(
-                "Text to add or put in place: the appended text, the inserted lines, the replacement "
-                "lines, the replacement for old_text, or the full file for action='write'."
-            )
-        ),
+        Field(description="New text, or the whole file for write."),
     ] = "",
     start_line: Annotated[
         int,
-        Field(description="For insert: insert before this 1-based line. For replace_lines: first line replaced."),
+        Field(description="1-based line to insert before or replace from."),
     ] = 0,
     end_line: Annotated[
         int,
-        Field(description="For replace_lines: last line replaced (inclusive). Defaults to start_line."),
+        Field(description="replace_lines: last line."),
     ] = 0,
     old_text: Annotated[
         str,
-        Field(description="For replace_text: the exact existing text to replace. Must match exactly once."),
+        Field(description="replace_text: exact text to replace."),
     ] = "",
     overwrite: Annotated[
         bool,
-        Field(
-            description=(
-                "For write: set true only when the user asked to replace an entire existing file "
-                "that is longer than 100 lines with shorter content."
-            )
-        ),
+        Field(description="write: true only if the user asked to replace a long file."),
     ] = False,
 ) -> str:
     """Modify the filesystem.
