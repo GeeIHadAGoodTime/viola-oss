@@ -467,6 +467,10 @@ class ViolaWake:
         self._stream_threshold: float = 0.79
         self._mapped_level: float | None = None
         self._operating_point_pinned = False
+        # The Stage 2 wake check is on: map levels with the "checked" table
+        # (set by the listener; see config.STREAM_OPERATING_POINTS_CHECKED).
+        self.checked = False
+        self._mapped_checked = False
         self._chunk_energy: list[float] = []
         self._stream_ring = np.zeros(CLIP_SAMPLES, dtype=np.float32)
         self._stream_ring_idx = 0
@@ -821,13 +825,17 @@ class ViolaWake:
 
     def _sync_operating_point(self) -> None:
         """Re-map ``threshold`` (the level) when it changed since the last chunk."""
-        if self._operating_point_pinned or self.threshold == self._mapped_level:
+        checked = bool(getattr(self, "checked", False))
+        if self._operating_point_pinned or (
+            self.threshold == self._mapped_level and checked == getattr(self, "_mapped_checked", False)
+        ):
             return
-        k, n, frame_threshold = stream_operating_point(self.threshold)
+        k, n, frame_threshold = stream_operating_point(self.threshold, checked=checked)
         if (k, n) != (self._agreement.k, self._agreement.n):
             self._agreement.configure(k, n)
         self._stream_threshold = frame_threshold
         self._mapped_level = self.threshold
+        self._mapped_checked = checked
 
     def reset_stream(self) -> None:
         """Forget streamed audio after a gap (command recording, device change).
@@ -1135,6 +1143,8 @@ class ViolaWake:
         fork._stream_threshold = getattr(self, "_stream_threshold", 0.79)
         fork._mapped_level = getattr(self, "_mapped_level", None)
         fork._operating_point_pinned = getattr(self, "_operating_point_pinned", False)
+        fork.checked = getattr(self, "checked", False)
+        fork._mapped_checked = getattr(self, "_mapped_checked", False)
         fork._chunk_energy = []
         fork._stream_ring = np.zeros(CLIP_SAMPLES, dtype=np.float32)
         fork._stream_ring_idx = 0

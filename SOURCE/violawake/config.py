@@ -222,12 +222,25 @@ STREAM_OPERATING_POINTS: tuple[tuple[float, int, int, float], ...] = (
     (0.98, 7, 7, 0.94),  # quiet hours at Balanced (0.90 + 0.08, capped)
 )
 
+# With the Stage 2 wake check on (the opt-in "Double-check the wake word"
+# setting), Balanced uses 6 of 7 frames at 0.85 instead of 7 of 7 at 0.79. The
+# check removes most speech false wakes either way; this rule lets far fewer
+# through to it over music from another device (92 vs 141 in 42.6 h of MUSAN
+# music), confirms about 65 ms sooner, and with the check keeps at least 90% of
+# real wakes in every recorded set (build-5 wake-opt measurement note). Every
+# other level, and quiet hours, are unchanged.
+STREAM_OPERATING_POINTS_CHECKED: tuple[tuple[float, int, int, float], ...] = tuple(
+    (level, 6, 7, 0.85) if level == DEFAULT_THRESHOLD else (level, k, n, frame)
+    for level, k, n, frame in STREAM_OPERATING_POINTS
+)
 
-def stream_operating_point(level: float) -> tuple[int, int, float]:
+
+def stream_operating_point(level: float, *, checked: bool = False) -> tuple[int, int, float]:
     """Return (k, n, frame_threshold) for a sensitivity level.
 
     Uses the nearest measured level; an exact tie goes to the stricter row, the
     same rule the Settings slider uses to show a saved value as a position.
+    ``checked``: the Stage 2 wake check is on (STREAM_OPERATING_POINTS_CHECKED).
     """
     try:
         lv = float(level)
@@ -235,7 +248,8 @@ def stream_operating_point(level: float) -> tuple[int, int, float]:
         lv = DEFAULT_THRESHOLD
     if lv != lv:  # NaN
         lv = DEFAULT_THRESHOLD
-    best = min(STREAM_OPERATING_POINTS, key=lambda row: (round(abs(row[0] - lv), 9), -row[0]))
+    table = STREAM_OPERATING_POINTS_CHECKED if checked else STREAM_OPERATING_POINTS
+    best = min(table, key=lambda row: (round(abs(row[0] - lv), 9), -row[0]))
     return best[1], best[2], best[3]
 
 
