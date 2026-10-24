@@ -4778,22 +4778,20 @@ async def open_app_panel(
 
 @server.tool(
     description=(
-        "Show the video playing on Viola's Music screen full screen, or put the screen back. "
-        "Use enabled=true for 'put this in full screen', 'make the video full screen', or "
-        "'go full screen'. Use enabled=false for 'end full screen', 'exit full screen', and, "
-        "while the video is full screen, 'go back' or 'normal size'. Leaving puts the window, "
-        "stage, and video back exactly as they were. Works on the Viola desktop app only; "
-        "the result says so when the request came from a speaker, phone, or the web app, "
-        "and when nothing is playing. Returns a ui_action for the app; it does not start, "
-        "pause, or change playback."
+        "Show the playing Music-stage video full screen (enabled=true: 'put this in full screen', "
+        "'go full screen') or end it (enabled=false: 'end full screen', 'exit full screen'; while "
+        "full screen also 'go back', 'normal size'). Desktop app only. Returns a ui_action; does "
+        "not change playback."
     ),
     annotations=_SAFE,
-    meta={"risk": "safe"},
+    # Always loaded: a one-shot spoken command must not spend an extra
+    # ToolSearch round-trip finding its schema (same reason as weather, #2094).
+    meta={"risk": "safe", "anthropic/alwaysLoad": True},
 )
 async def video_fullscreen(
     enabled: Annotated[
         bool,
-        Field(description="True to show the playing video full screen, false to end full screen."),
+        Field(description="True to go full screen, false to end it."),
     ] = True,
 ) -> str:
     """Return the enter/exit video-fullscreen ui_action, or why it cannot happen."""

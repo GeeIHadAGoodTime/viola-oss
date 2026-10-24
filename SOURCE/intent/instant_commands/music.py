@@ -98,6 +98,21 @@ async def _broadcast_transport(handler: object, command: str) -> None:
         await broadcast(command, {"source": "voice"})
 
 
+async def _video_fullscreen(enabled: bool) -> dict[str, object]:
+    """Same answers as the video_fullscreen tool, without the model round-trip."""
+    from intent.tools.music_tools import video_fullscreen_handler
+
+    result = await video_fullscreen_handler(enabled)
+    data = dict(result.data) if isinstance(result.data, dict) else {}
+    if not result.ok:
+        # Answered, not failed: like pause with nothing playing, a "no" here
+        # ("Nothing is playing", "desktop app only") is the reply. ok=False
+        # would fall through to the model for a slow second opinion.
+        message = str(result.error or data.get("message") or "")
+        return {"ok": True, "message": message, "data": {**data, "noop": True}}
+    return {"ok": True, "message": "Full screen." if enabled else "Back to normal.", "data": data}
+
+
 class MusicHandlersMixin:
     """Music and playback instant command handlers."""
 
@@ -798,6 +813,14 @@ class MusicHandlersMixin:
                 "data": {},
                 "error": "pause_failed",
             }
+
+    async def video_fullscreen_on(self, params: dict[str, object]) -> dict[str, object]:
+        """Show the playing video full screen (the desktop app runs the ui_action)."""
+        return await _video_fullscreen(True)
+
+    async def video_fullscreen_off(self, params: dict[str, object]) -> dict[str, object]:
+        """End video full screen; the window goes back to how it was."""
+        return await _video_fullscreen(False)
 
     async def resume(self, params: dict[str, object]) -> dict[str, object]:
         """Resume playback."""
