@@ -9,6 +9,7 @@ import { isCloudSurface } from './components/auth/cloudSurface'
 import { isLocalDesktopBackend, setBackendSurface } from './utils/backendSurface'
 import { isDesktopApp } from './utils/runtimeSurface'
 import { initSentry } from './sentryClient'
+import { installInputModality } from './utils/inputModality'
 import './styles/touch-hardening.css'
 import './i18n'
 
@@ -388,6 +389,8 @@ BackendReadyGate.propTypes = {
 
 const rootElement = document.getElementById('root');
 initSentry();
+// Touch sizing and long-press / touch-keyboard behaviour (utils/inputModality.js).
+installInputModality();
 
 if (rootElement) {
   const root = ReactDOM.createRoot(rootElement);

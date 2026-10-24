@@ -66,3 +66,93 @@ textarea,
   user-select: text;
   -webkit-touch-callout: default;
 }
+
+/* No grey/blue flash over whatever was tapped; every control draws its own
+ * pressed state. Pinch and edge overscroll never move the app shell. */
+html {
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  overscroll-behavior: none;
+}
+
+/* A scroll that reaches the end of a dialog or panel stops there instead of
+ * scrolling the stage behind it (the stage itself scrolls in portrait). */
+:where([role="dialog"], [aria-modal="true"]),
+:where([role="dialog"], [aria-modal="true"]) * {
+  overscroll-behavior: contain;
+}
+
+/* ===========================================================================
+ * Touch modality: html[data-input="touch"] (utils/inputModality.js).
+ *
+ * Everything below is wrapped in :where() so it has zero specificity: a
+ * component's own class or inline style always wins, and these rules only fill
+ * in what a component left at the browser default.
+ * ======================================================================== */
+
+/* Long-press on app chrome (clock, labels, cards) must not start a text
+ * selection. Chat messages and text fields opt back in above. */
+:where(html[data-input="touch"]) body {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* Invisible hit area. A control smaller than 44x44 CSS px gets a transparent
+ * ::after that grows its tappable box to 44x44, centred on it, without
+ * changing how it looks or how it lays out. min(0px, 50% - 22px) is 0 for a
+ * control that is already big enough. Skipped for controls that contain other
+ * controls (the overlay would swallow taps meant for them), for disabled ones
+ * (a dead overlay would swallow taps meant for a neighbour), and inside
+ * [data-touch-slop="off"] (dense grids that size their own cells). */
+:where(html[data-input="touch"]) :where(
+  button, [role="button"], [role="tab"], [role="menuitem"], [role="switch"],
+  [role="checkbox"], [role="radio"], [role="option"], a[href], summary
+):where(:not(:disabled, [aria-disabled="true"], [data-touch-slop="off"], [data-touch-slop="off"] *)):where(:not(:has(
+  button, input, select, textarea, a[href], [role="button"], [role="switch"], [role="checkbox"], [role="slider"]
+))) {
+  position: relative;
+}
+
+:where(html[data-input="touch"]) :where(
+  button, [role="button"], [role="tab"], [role="menuitem"], [role="switch"],
+  [role="checkbox"], [role="radio"], [role="option"], a[href], summary
+):where(:not(:disabled, [aria-disabled="true"], [data-touch-slop="off"], [data-touch-slop="off"] *)):where(:not(:has(
+  button, input, select, textarea, a[href], [role="button"], [role="switch"], [role="checkbox"], [role="slider"]
+)))::after {
+  content: '';
+  position: absolute;
+  top: min(0px, calc(50% - 22px));
+  bottom: min(0px, calc(50% - 22px));
+  left: min(0px, calc(50% - 22px));
+  right: min(0px, calc(50% - 22px));
+}
+
+/* Text fields and selects are at least a finger tall. */
+:where(html[data-input="touch"]) :where(
+  input:not([type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="hidden"], [type="file"]),
+  select
+) {
+  min-height: 44px;
+}
+
+:where(html[data-input="touch"]) :where(input[type="checkbox"], input[type="radio"]) {
+  min-width: 22px;
+  min-height: 22px;
+}
+
+/* A slider drag belongs to the slider: the browser must not turn a slightly
+ * diagonal drag into a scroll and cancel it halfway. */
+:where(html[data-input="touch"]) :where(input[type="range"], [role="slider"]) {
+  touch-action: none;
+}
+
+/* Opt-in for small controls that sit close together (where an invisible hit
+ * area would overlap the neighbour): on touch they become 44x44 for real. */
+:where(html[data-input="touch"]) .viola-touch-target {
+  min-width: 44px;
+  min-height: 44px;
+}

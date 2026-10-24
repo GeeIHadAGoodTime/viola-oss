@@ -860,6 +860,60 @@
   }
 }
 
+/* The same tap targets for touch input on a wide screen: a Surface in landscape
+ * is 1440px wide, past the 1023px block above (utils/inputModality.js sets
+ * data-input). Sizing only; no layout rules. */
+html[data-input="touch"] .chat-icon-button,
+html[data-input="touch"] .chat-send-button,
+html[data-input="touch"] .chat-new-mini,
+html[data-input="touch"] .chat-collapse-edge,
+html[data-input="touch"] .chat-collapse-button {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+}
+
+html[data-input="touch"] .chat-new-button,
+html[data-input="touch"] .chat-search,
+html[data-input="touch"] .chat-title-input,
+html[data-input="touch"] .chat-topbar button,
+html[data-input="touch"] .chat-topbar select {
+  height: 44px;
+}
+
+html[data-input="touch"] .chat-title-input {
+  min-width: 44px;
+}
+
+/* A finger has no hover: Copy / Retry / Fork / feedback stay visible. */
+html[data-input="touch"] .chat-message-actions {
+  opacity: 1;
+}
+
+html[data-input="touch"] .chat-message-actions button {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0 12px;
+}
+
+html[data-input="touch"] .chat-input-shell {
+  grid-template-columns: 44px minmax(0, 1fr) 44px 44px;
+  gap: 6px;
+}
+
+html[data-input="touch"] .chat-input-shell textarea {
+  min-height: 44px;
+}
+
+html[data-input="touch"] .chat-thread-row {
+  grid-template-columns: minmax(0, 1fr) 44px;
+}
+
+html[data-input="touch"] .chat-thread-select,
+html[data-input="touch"] .chat-thread-menu-button {
+  height: 44px;
+}
+
 @media (max-width: 760px) {
   .chat-mode {
     grid-template-columns: minmax(0, 1fr);

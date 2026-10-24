@@ -34,6 +34,9 @@ export default function CallBriefing({ briefing, onDismiss }) {
           {approved ? 'Call approved' : 'Viola needs your approval'}
         </span>
         <button
+          type="button"
+          className="viola-touch-target"
+          aria-label="Dismiss call briefing"
           onClick={onDismiss}
           style={{
             background: 'none',
@@ -41,6 +44,12 @@ export default function CallBriefing({ briefing, onDismiss }) {
             color: '#888',
             cursor: 'pointer',
             fontSize: 16,
+            lineHeight: 1,
+            padding: '6px 8px',
+            margin: '-6px -8px -6px 0',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
           }}
         >
           x

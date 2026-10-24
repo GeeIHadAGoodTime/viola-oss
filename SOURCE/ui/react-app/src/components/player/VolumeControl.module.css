@@ -82,3 +82,31 @@
     width: 72px;
   }
 }
+
+/* Touch input on any screen size: a 44px tall drag area around the 4px track,
+ * a thumb you can see and grab (the desktop one only shows on hover, and a
+ * finger has no hover), and drags that never turn into a scroll. */
+:global(html[data-input='touch']) .slider {
+  height: 44px;
+  border-radius: 0;
+  touch-action: none;
+  background:
+    linear-gradient(
+      to right,
+      white var(--vol-fill, 0%),
+      var(--text-faint) var(--vol-fill, 0%)
+    )
+    center / 100% 4px no-repeat;
+}
+
+:global(html[data-input='touch']) .slider::-webkit-slider-thumb {
+  width: 20px;
+  height: 20px;
+  opacity: 1;
+}
+
+:global(html[data-input='touch']) .slider::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  opacity: 1;
+}

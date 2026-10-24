@@ -73,3 +73,8 @@
     animation-duration: 1ms;
   }
 }
+
+/* A finger has no hover: on touch the event actions are always shown. */
+:global(html[data-input='touch']) .eventActionButton {
+  opacity: 0.7;
+}

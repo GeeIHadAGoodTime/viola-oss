@@ -250,3 +250,19 @@
     transform: rotate(360deg);
   }
 }
+
+/* Touch input: the agent-browser controls meet the 44px tap target. */
+:global(html[data-input='touch']) .controlButton {
+  width: 44px;
+  height: 44px;
+}
+
+:global(html[data-input='touch']) .urlPill,
+:global(html[data-input='touch']) .activityPill {
+  height: 44px;
+}
+
+:global(html[data-input='touch']) .takeoverBar button {
+  height: 44px;
+  padding: 0 14px;
+}

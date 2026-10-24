@@ -289,6 +289,7 @@ export default function QueueModal({ isOpen, onClose, wsQueue }) {
               <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
                 {
                   <button
+                    className="viola-touch-target"
                     onClick={() => handlePlayItem(item.id)}
                     disabled={actionLoading}
                     aria-label={`Play ${item.title || 'track'} now`}
@@ -314,6 +315,7 @@ export default function QueueModal({ isOpen, onClose, wsQueue }) {
                   </button>
                 }
                 <button
+                  className="viola-touch-target"
                   onClick={() => handleRemoveItem(item.id)}
                   disabled={actionLoading}
                   aria-label={`Remove ${item.title || 'track'} from queue`}

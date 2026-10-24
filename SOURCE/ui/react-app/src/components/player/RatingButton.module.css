@@ -29,3 +29,10 @@
     min-height: 44px;
   }
 }
+
+/* Touch input on any screen size (a Surface in landscape is wider than 1023px;
+ * utils/inputModality.js sets data-input). */
+:global(html[data-input='touch']) .button {
+  min-width: 44px;
+  min-height: 44px;
+}
