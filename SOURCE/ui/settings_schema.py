@@ -8,6 +8,8 @@ INFRASTRUCTURE_KEYS: Final[frozenset[str]] = frozenset(
     {
         "_settings_last_saved",
         "_settings_version",
+        # One-time 1.0.5 marker: the old minimize_to_tray default was reset.
+        "_window_close_quits_migrated",
         "api_host",
         "api_port",
         "app_surface",

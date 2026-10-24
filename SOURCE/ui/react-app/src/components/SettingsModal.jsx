@@ -3830,11 +3830,14 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
             </Section>
 
             <Section title="Window">
-              <SettingRow title="Minimize to System Tray" description="Keep running in background when closed">
+              <SettingRow
+                title="Keep Viola running in the tray when the window is closed"
+                description="Off: closing the window quits Viola. On: Viola stays in the system tray and keeps listening for the wake word."
+              >
                 <Toggle
-                  checked={localSettings.minimize_to_tray ?? true}
+                  checked={localSettings.minimize_to_tray ?? false}
                   onChange={(v) => updateLocal('minimize_to_tray', v)}
-                  ariaLabel="Minimize to system tray"
+                  ariaLabel="Keep Viola running in the tray when the window is closed"
                 />
               </SettingRow>
               <SectionDivider />
@@ -3848,7 +3851,7 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
               {canQuitDesktopApp() && (
                 <>
                   <SectionDivider />
-                  <SettingRow title="Quit Viola" description="Close Viola completely instead of keeping it in the system tray">
+                  <SettingRow title="Quit Viola" description="Close Viola completely. It stops speaking and stops listening for the wake word.">
                     <button
                       type="button"
                       onClick={() => quitDesktopApp()}

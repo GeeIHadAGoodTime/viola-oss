@@ -38,8 +38,9 @@ const DropdownMenu = ({ isOpen, onClose, onOpenHistory, onOpenQueue, onOpenSetti
     { icon: 'settings', label: 'Settings', onClick: onOpenSettings },
     { icon: 'help', label: 'Help & Guide', onClick: onOpenHelp },
   ];
-  // Closing the desktop window only hides Viola to the tray, so the desktop
-  // app also needs a real Quit here (tablet users cannot right-click the tray).
+  // The desktop app's Quit. Closing the window also quits unless the user
+  // chose to keep Viola in the tray, and then this is the way out (tablet
+  // users cannot right-click the tray).
   if (canQuitDesktopApp()) {
     menuItems.push({
       icon: 'quit',

@@ -2893,7 +2893,7 @@ class ViolaWebViewWindow(QMainWindow):
                 event.accept()
                 return True
             # Ctrl+Q (Cmd+Q on macOS) quits for real, the same as the tray
-            # menu's Quit. Closing the window only hides it to the tray.
+            # menu's Quit and (by default) the window's X.
             if key == Qt.Key.Key_Q and event.modifiers() == Qt.KeyboardModifier.ControlModifier:
                 self._quit_app()
                 event.accept()
@@ -4163,11 +4163,23 @@ class ViolaWebViewWindow(QMainWindow):
         self.restore_window()
 
     def _quit_app(self):
-        """Actually quit the application (tray menu, Ctrl+Q, in-app Quit)."""
+        """Quit Viola completely.
+
+        One shutdown for every way out: the window's X (unless the user chose
+        to keep Viola in the tray), the tray menu's Quit, Ctrl+Q, and the
+        in-app "Quit Viola". The window leaves the screen at once, speech is
+        cut mid-sentence, and the wake detector and microphone stop before the
+        event loop ends, so Viola never keeps talking or listening while the
+        process exits.
+        """
         self._remember_window_state()
         self._force_quit = True
         if hasattr(self, "_tray_icon"):
             self._tray_icon.hide()
+        hide_window = getattr(self, "hide", None)
+        if callable(hide_window):
+            hide_window()
+        silence_voice_for_quit(getattr(self, "_bootstrap", None))
         from PySide6.QtWidgets import QApplication
 
         QApplication.instance().quit()
@@ -4187,31 +4199,115 @@ class ViolaWebViewWindow(QMainWindow):
             self._restore_from_tray()
 
     def closeEvent(self, event):
-        """Handle window close -- minimize to tray if setting is enabled."""
-        self._remember_window_state()
+        """The window's X, Alt+F4, or the taskbar's "Close window".
+
+        By default this quits Viola completely through ``_quit_app``. Viola
+        stays running in the tray (and keeps listening for its wake word) only
+        when the user turned on "Keep Viola running in the tray when the window
+        is closed" (``minimize_to_tray``, off by default) and the tray icon is
+        actually showing. A setting that cannot be read means quit, never a
+        hidden window that is still listening.
+        """
         if self._force_quit:
-            # User chose Quit from tray menu
+            # Quit is already under way (tray menu, Ctrl+Q, in-app Quit, or X).
+            self._remember_window_state()
             logger.info("Window closing (force quit)")
             if hasattr(self, "_tray_icon"):
                 self._tray_icon.hide()
             super().closeEvent(event)
             return
 
-        # Check minimize_to_tray setting
-        try:
-            from ui.settings_manager import get_settings_manager
+        keep_in_tray = False
+        if hasattr(self, "_tray_icon") and self._tray_icon.isVisible():
+            try:
+                from ui.settings_manager import get_settings_manager
 
-            sm = get_settings_manager()
-            minimize = sm.get("minimize_to_tray", True)
-        except Exception:
-            minimize = True
+                keep_in_tray = get_settings_manager().get("minimize_to_tray", False) is True
+            except Exception:
+                logger.warning("Could not read the keep-in-tray setting; closing quits Viola", exc_info=True)
 
-        if minimize and hasattr(self, "_tray_icon") and self._tray_icon.isVisible():
+        if keep_in_tray:
+            self._remember_window_state()
             event.ignore()
             self.hide()
-            logger.info("Window minimized to tray")
-        else:
-            logger.info("Window closing")
-            if hasattr(self, "_tray_icon"):
-                self._tray_icon.hide()
-            super().closeEvent(event)
+            logger.info("Window hidden to the tray (the user chose to keep Viola running there)")
+            return
+
+        logger.info("Window closed: quitting Viola")
+        self._quit_app()
+        super().closeEvent(event)
+
+
+# How long quitting waits for the wake detector and microphone to stop before
+# letting the event loop end anyway. Speech is cut first, so this bound only
+# limits how long a slow audio device can hold up the exit.
+_QUIT_VOICE_STOP_TIMEOUT_S = 1.5
+
+
+def _speech_engines_to_stop(bootstrap: object | None) -> list[object]:
+    """Return the speech engines that may be talking right now.
+
+    Never builds an engine just to stop it: a lazy TTS proxy that has not
+    loaded its engine yet has nothing playing, and loading Kokoro on the way
+    out would delay the quit by seconds.
+    """
+    candidates: list[object | None] = []
+    tts = getattr(bootstrap, "tts", None) if bootstrap is not None else None
+    lazy_cls = getattr(sys.modules.get("bootstrap.lazy_tts"), "LazyTTSEngine", None)
+    if lazy_cls is not None and isinstance(tts, lazy_cls):
+        tts = object.__getattribute__(tts, "_instance")
+    candidates.append(tts)
+    # The one process-wide Kokoro engine, also used by first-run narration.
+    candidates.append(getattr(sys.modules.get("voice.synthesis.factory"), "_shared_kokoro", None))
+    engines: list[object] = []
+    for engine in candidates:
+        if engine is None or any(engine is seen for seen in engines):
+            continue
+        # Look ``stop`` up on the class so a lazy wrapper's __getattr__ cannot
+        # load an engine here.
+        if callable(getattr(type(engine), "stop", None)):
+            engines.append(engine)
+    return engines
+
+
+def _stop_voice_for_quit(bootstrap: object | None) -> None:
+    for engine in _speech_engines_to_stop(bootstrap):
+        try:
+            engine.stop()  # type: ignore[attr-defined]
+        except Exception:  # noqa: BLE001, RUF100 - a failed cut must not stop the quit
+            logger.warning("Could not cut speech while quitting", exc_info=True)
+    voice = getattr(bootstrap, "voice", None) if bootstrap is not None else None
+    stop_voice = getattr(voice, "stop", None)
+    if callable(stop_voice):
+        try:
+            stop_voice()
+        except Exception:  # noqa: BLE001, RUF100 - a failed stop must not stop the quit
+            logger.warning("Could not stop the wake detector while quitting", exc_info=True)
+
+
+def silence_voice_for_quit(bootstrap: object | None) -> None:
+    """Cut speech now and stop the wake detector and microphone, for quitting.
+
+    Speech is stopped first, so a reply in progress ends mid-sentence instead
+    of finishing while the process tears down; then the voice orchestrator
+    stops wake detection and closes the microphone. The work runs on a helper
+    thread that quitting waits on for at most ``_QUIT_VOICE_STOP_TIMEOUT_S``,
+    so a stuck audio device cannot keep Viola open. Never raises.
+    """
+    if bootstrap is None:
+        return
+    worker = threading.Thread(
+        target=_stop_voice_for_quit,
+        args=(bootstrap,),
+        name="quit-voice-stop",
+        daemon=True,
+    )
+    worker.start()
+    worker.join(_QUIT_VOICE_STOP_TIMEOUT_S)
+    if worker.is_alive():
+        logger.warning(
+            "Voice stop still running after %.1fs while quitting; exiting anyway",
+            _QUIT_VOICE_STOP_TIMEOUT_S,
+        )
+    else:
+        logger.info("Speech cut and wake detection stopped for quit")

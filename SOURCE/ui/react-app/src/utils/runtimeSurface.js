@@ -62,8 +62,8 @@ export function shouldStreamBrowserView(isSpoke = false) {
 
 /**
  * Whether the in-app "Quit Viola" action should be offered. Only the
- * desktop app has a process to quit; closing its window just hides it to
- * the tray, so the "..." menu and Settings > System need a real Quit.
+ * desktop app has a process to quit. Closing its window quits too, unless
+ * the user chose to keep Viola running in the tray.
  * @returns {boolean}
  */
 export function canQuitDesktopApp() {
