@@ -30,10 +30,10 @@
   },
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "aaee4161ad1b1f2fdbf2ac3c444d03873f8cd3cb858bd54c232b648b2641ced1",
-  "source_tree_sha256": "0f5b195c8c601c9c33cfdeabb573b6602d809a447cabac63f3a47dcc8e2361ab",
+  "source_manifest_sha256": "c57d5ad0c023ac8483a3a99889420d8799a9184d830113b9e9d8cf6a8f76a762",
+  "source_tree_sha256": "fb4c3dc9aed653c15de65765dde89ed80b158fddee87c550d5316dad982b32be",
   "source_file_count": 2738,
-  "source_revision": "5715234a961a81b2ae3cc9db05e67578600f1fc7",
+  "source_revision": "6fd562b6a57f6ab0054465cd7b9a86d2a51fdcac",
   "comparison_public_revision": "ecab2772465fcc89ae6645b028af1c2273b9199f",
   "changed_source_paths": [
     "audio_core/aec_reference_base.py",
@@ -323,8 +323,8 @@
     "historical_inventory_limits": "This renderer correction changes no dependency or workflow inputs. All six retained SBOMs and their complete status objects stay historical and unchanged; no current installed inventory qualification is claimed."
   },
   "qualification": {
-    "source_commit": "5715234a961a81b2ae3cc9db05e67578600f1fc7",
-    "kind": "1.0.5 build 5 file abilities: coding-agent read/edit/write/glob/grep/move/copy/delete, read-before-overwrite, per-conversation backups with undo/redo, Recycle Bin deletes, targeted confirmation gates"
+    "source_commit": "6fd562b6a57f6ab0054465cd7b9a86d2a51fdcac",
+    "kind": "1.0.5 build 5 file abilities follow-up: a folder the user names counts as named for taint (Downloads, temp and attachment caches excluded)"
   },
   "historical_bindings": [
     {

@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "5715234a961a81b2ae3cc9db05e67578600f1fc7",
-  "sha256": "0f5b195c8c601c9c33cfdeabb573b6602d809a447cabac63f3a47dcc8e2361ab",
+  "revision": "6fd562b6a57f6ab0054465cd7b9a86d2a51fdcac",
+  "sha256": "fb4c3dc9aed653c15de65765dde89ed80b158fddee87c550d5316dad982b32be",
   "files": [
     {
       "path": ".env.example",
@@ -1670,8 +1670,8 @@
     },
     {
       "path": "intent/content_sanitizer.py",
-      "sha256": "c88754524c5634923201be5a97d7073aafc2bee40acf62d79b89d8f167650831",
-      "bytes": 49847
+      "sha256": "8222b7879095cffe77f7f3cc2004f3afe10b31a0eb6fa5ec48ec239500a89b32",
+      "bytes": 51211
     },
     {
       "path": "intent/context_builder.py",
@@ -1685,8 +1685,8 @@
     },
     {
       "path": "intent/file_gates.py",
-      "sha256": "956a572ee79195952afc4144e1a550a2156ff939e0668622838bbf3f2b0150d4",
-      "bytes": 15128
+      "sha256": "09feb91c16f89817761885a6828425b3329915aea574786105ec40ee22633768",
+      "bytes": 17799
     },
     {
       "path": "intent/gate_protocol.py",

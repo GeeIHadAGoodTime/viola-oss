@@ -502,11 +502,21 @@ def _taint_action_class(
 # follow-up write. Consequential actions are defended where they matter: the
 # confirm-or-cancel gates. This is a provenance check on the tool ARGUMENTS
 # (the path the model passed) against the user's request text; it never reads
-# or classifies the file's content. Only ``file_read`` with action ``read`` /
-# ``info`` qualifies: a directory ``list`` / ``search`` returns names of files
-# the user did not name, and every other source (web, email, calendar, memory,
-# shared documents, a file the user did not name) still taints.
+# or classifies the file's content. ``file_read`` with action ``read`` /
+# ``info`` qualifies for a file the message names exactly.
+#
+# A folder the user names directly counts the same way (founder rule,
+# 2026-10-24: liberty between crucial moments): "fix the typos in my blog
+# folder" makes reading, listing, globbing and grepping inside that folder part
+# of the request. Folders where files arrive from outside -- Downloads, temp
+# folders, the browser download folder, mail-attachment caches -- never count
+# (``intent.file_gates.is_outside_arrival_location``). Every other source (web,
+# email, calendar, memory, shared documents, a file outside the named folder)
+# still taints; deletes and payments keep their gates and shell stays
+# hard-blocked under taint.
 _USER_NAMED_FILE_ACTIONS = frozenset({"read", "info"})
+_USER_NAMED_FOLDER_ACTIONS = frozenset({"read", "info", "list", "glob", "grep", "search"})
+_FOLDER_SEARCH_ACTIONS = frozenset({"list", "glob", "grep", "search"})
 
 
 def _tool_args_mapping(tool_args: object) -> Mapping[str, object] | None:
@@ -522,7 +532,7 @@ def _tool_args_mapping(tool_args: object) -> Mapping[str, object] | None:
 
 
 def is_user_named_file_read(tool_name: str | None, tool_args: object, user_text: str | None) -> bool:
-    """True when ``file_read`` reads a file whose name the user's request contains.
+    """True when ``file_read`` reads a file the request names, or looks inside a folder it names.
 
     The file name (the last path component, which must carry an extension such
     as ``viola-test.txt``) has to appear in ``user_text`` as a whole name: not
@@ -537,15 +547,31 @@ def is_user_named_file_read(tool_name: str | None, tool_args: object, user_text:
     if not text.strip() or args is None:
         return False
     action = str(args.get("action") or "list").strip().lower()
-    if action not in _USER_NAMED_FILE_ACTIONS:
+    if action not in _USER_NAMED_FOLDER_ACTIONS:
         return False
-    path = str(args.get("path") or "").strip().rstrip("\\/")
-    name = re.split(r"[\\/]", path)[-1] if path else ""
-    stem, dot, extension = name.rpartition(".")
-    if not dot or not stem.strip(".") or not extension:
+    raw_path = str(args.get("path") or "").strip()
+    if action in _USER_NAMED_FILE_ACTIONS:
+        path = raw_path.rstrip("\\/")
+        name = re.split(r"[\\/]", path)[-1] if path else ""
+        stem, dot, extension = name.rpartition(".")
+        if dot and stem.strip(".") and extension:
+            pattern = r"(?<![\w.\-])" + re.escape(name) + r"(?![\w\-]|\.\w)"
+            if re.search(pattern, text, flags=re.IGNORECASE) is not None:
+                return True
+    return _inside_user_named_folder(raw_path, text, include_self=action in _FOLDER_SEARCH_ACTIONS)
+
+
+def _inside_user_named_folder(raw_path: str, user_text: str, *, include_self: bool) -> bool:
+    """The path is inside (or, for list/glob/grep, is) a folder the user named directly."""
+    if not raw_path:
         return False
-    pattern = r"(?<![\w.\-])" + re.escape(name) + r"(?![\w\-]|\.\w)"
-    return re.search(pattern, text, flags=re.IGNORECASE) is not None
+    from intent.file_gates import user_named_folder_contains
+    from intent.tools.filesystem import resolve_tool_path
+
+    resolved = resolve_tool_path(raw_path)
+    if resolved is None:
+        return False
+    return user_named_folder_contains(resolved, user_text, include_self=include_self)
 
 
 def _user_request_text(message: Mapping[str, object]) -> str | None:
