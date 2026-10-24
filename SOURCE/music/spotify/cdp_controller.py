@@ -133,6 +133,116 @@ def _track_text_matches(expected: str | None, observed: str | None) -> bool:
 # Constants
 # ---------------------------------------------------------------------------
 SPOTIFY_URL = "https://open.spotify.com"
+SPOTIFY_LIKED_SONGS_URL = "https://open.spotify.com/collection/tracks"
+
+# --- Liked Songs (the user's Spotify library) --------------------------------
+# Like/unlike goes through the logged-in web player itself, never through the
+# Spotify OAuth adapter (which has no credentials in shipped builds). The web
+# player calls Spotify's Web API with its own short-lived bearer token; Viola
+# reads that token off the page's own requests to *.spotify.com and makes the
+# same call from inside the page (PUT/DELETE /v1/me/tracks), then confirms it
+# with GET /v1/me/tracks/contains. The token never leaves the Chrome page and is
+# never logged. If no token is seen, "like" falls back to the now-playing
+# widget's add (heart/plus) button.
+_SPOTIFY_WEB_API = "https://api.spotify.com/v1"
+_SPOTIFY_TRACK_ID_RE = re.compile(r"^[A-Za-z0-9]{22}$")
+_WEB_BEARER_WAIT_S = 6.0
+_WEB_BEARER_MAX_AGE_S = 45 * 60
+_COLLECTION_PLAY_SELECTORS = (
+    '[data-testid="action-bar-row"] button[data-testid="play-button"]',
+    '[data-testid="action-bar"] button[data-testid="play-button"]',
+    'main button[data-testid="play-button"]',
+)
+_WEB_API_FETCH_JS = r"""
+async ({method, url, token}) => {
+    try {
+        const response = await fetch(url, {method, headers: {Authorization: 'Bearer ' + token}});
+        let body = '';
+        try { body = (await response.text()).slice(0, 400); } catch (e) {}
+        return {status: response.status, body};
+    } catch (e) {
+        return {status: 0, body: String(e).slice(0, 200)};
+    }
+}
+"""
+_NOW_PLAYING_ADD_BUTTON = '[data-testid="now-playing-widget"] button[data-testid="add-button"]'
+_NOW_PLAYING_ADD_STATE_JS = r"""
+((trackId) => {
+    const widget = document.querySelector('[data-testid="now-playing-widget"]');
+    if (!widget) return {present: false, on_target: false, checked: null};
+    const link = widget.querySelector('[data-testid="context-item-link"]') || widget.querySelector('a[href*="track"]');
+    const href = (link && link.getAttribute('href')) || '';
+    const button = widget.querySelector('button[data-testid="add-button"]');
+    return {
+        present: !!button,
+        on_target: !!trackId && href.indexOf(trackId) >= 0,
+        checked: button ? button.getAttribute('aria-checked') === 'true' : null,
+    };
+})
+"""
+# Once a track is saved, the now-playing add button opens a "Saved in" popover
+# listing Liked Songs and playlists with checkboxes plus a Done button.
+_LIKED_SONGS_CHECKBOX_JS = r"""
+(() => {
+    const roots = Array.from(document.querySelectorAll('[role="dialog"], [data-testid="context-menu"], #context-menu'));
+    for (const root of roots) {
+        const rows = Array.from(root.querySelectorAll('li, [role="row"], [role="menuitem"], label, div'));
+        for (const row of rows) {
+            const text = (row.textContent || '').trim();
+            if (!text.startsWith('Liked Songs')) continue;
+            const box = row.querySelector('[role="checkbox"], input[type="checkbox"]');
+            if (!box) continue;
+            const checked = box.getAttribute('aria-checked') === 'true' || box.checked === true;
+            return {found: true, checked: checked};
+        }
+    }
+    return {found: false, checked: null};
+})()
+"""
+_LIKED_SONGS_CHECKBOX_CLICK_JS = r"""
+(() => {
+    const roots = Array.from(document.querySelectorAll('[role="dialog"], [data-testid="context-menu"], #context-menu'));
+    for (const root of roots) {
+        const rows = Array.from(root.querySelectorAll('li, [role="row"], [role="menuitem"], label, div'));
+        for (const row of rows) {
+            if (!((row.textContent || '').trim().startsWith('Liked Songs'))) continue;
+            const box = row.querySelector('[role="checkbox"], input[type="checkbox"]');
+            if (box) { box.click(); return true; }
+        }
+    }
+    return false;
+})()
+"""
+_POPOVER_DONE_JS = r"""
+(() => {
+    const roots = Array.from(document.querySelectorAll('[role="dialog"], [data-testid="context-menu"], #context-menu'));
+    for (const root of roots) {
+        const done = Array.from(root.querySelectorAll('button')).find(b => (b.textContent || '').trim() === 'Done');
+        if (done) { done.click(); return true; }
+    }
+    return false;
+})()
+"""
+_SHUFFLE_STATE_JS = r"""
+(() => {
+    const button = document.querySelector('button[data-testid="control-button-shuffle"]');
+    if (!button) return null;
+    return {checked: button.getAttribute('aria-checked'), disabled: !!button.disabled};
+})()
+"""
+
+
+def normalize_spotify_track_id(value: str) -> str:
+    """Return the bare 22-character Spotify track id from an id, URI or URL."""
+    raw = (value or "").strip()
+    if raw.startswith("spotify:track:"):
+        raw = raw[len("spotify:track:") :]
+    elif "/track/" in raw:
+        raw = raw.split("/track/", 1)[1]
+    raw = raw.split("?", 1)[0].split("/", 1)[0].strip()
+    if not _SPOTIFY_TRACK_ID_RE.match(raw):
+        raise SpotifyCDPError("Not a Spotify track id: %r" % value)
+    return raw
 
 # --- DevTools (CDP) exposure ------------------------------------------------
 # Viola drives the Spotify Chrome over Chromium's DevTools endpoint, which has
@@ -770,6 +880,9 @@ class SpotifyCDPController:
         self._cdp_port: int | None = None
         self._connected = False
         self._cookie_bridge_last_injected = False
+        # Latest web-player bearer seen on the page's own requests (memory only).
+        self._web_bearer: str | None = None
+        self._web_bearer_at: float = 0.0
         self._account_tier_cache: dict[str, Any] | None = None
         self._account_tier_cache_at: float = 0.0
         # Dedicated single thread for all Playwright sync API calls.
@@ -1421,6 +1534,10 @@ class SpotifyCDPController:
 
             context = contexts[0]
             self._pw_context = context
+            try:
+                context.on("request", self._capture_web_player_bearer)
+            except Exception:
+                logger.debug("Could not watch Spotify web player requests", exc_info=True)
 
             try:
                 injected_count = inject_spotify_cookies_into_playwright(context, user_id=self._user_id)
@@ -1972,6 +2089,233 @@ class SpotifyCDPController:
             return True
         expected_title = str(target_title) if isinstance(target_title, str) else None
         return _track_text_matches(expected_title, str(payload.get("track") or ""))
+
+    # ------------------------------------------------------------------
+    # Liked Songs: like / unlike / play the collection
+    # ------------------------------------------------------------------
+    def _capture_web_player_bearer(self, request: Any) -> None:
+        """Remember the bearer the web player sends to Spotify's own hosts."""
+        try:
+            from urllib.parse import urlsplit
+
+            host = (urlsplit(request.url).hostname or "").lower()
+            if host != "spotify.com" and not host.endswith(".spotify.com"):
+                return
+            auth = str((request.headers or {}).get("authorization") or "")
+        except Exception:
+            return
+        if auth[:7].lower() == "bearer " and len(auth) > 27:
+            self._web_bearer = auth[7:].strip()
+            self._web_bearer_at = time.monotonic()
+
+    def _web_player_bearer(self, wait_s: float = _WEB_BEARER_WAIT_S) -> str | None:
+        deadline = time.monotonic() + wait_s
+        while True:
+            token = getattr(self, "_web_bearer", None)
+            if token and time.monotonic() - float(getattr(self, "_web_bearer_at", 0.0)) < _WEB_BEARER_MAX_AGE_S:
+                return token
+            if time.monotonic() >= deadline or self._page is None:
+                return None
+            try:
+                # Pumps Playwright's event dispatch so request events arrive.
+                self._page.wait_for_timeout(250)
+            except Exception:
+                time.sleep(0.25)
+
+    def _web_api(self, method: str, path: str, token: str) -> tuple[int, str]:
+        result = self._page.evaluate(
+            _WEB_API_FETCH_JS,
+            {"method": method, "url": _SPOTIFY_WEB_API + path, "token": token},
+        )
+        if not isinstance(result, dict):
+            return 0, ""
+        return int(result.get("status") or 0), str(result.get("body") or "")
+
+    def _track_saved_state(self, track_id: str, token: str) -> bool | None:
+        status, body = self._web_api("GET", "/me/tracks/contains?ids=%s" % track_id, token)
+        if status != 200:
+            return None
+        try:
+            data = json.loads(body)
+        except ValueError:
+            return None
+        return bool(data[0]) if isinstance(data, list) and data else None
+
+    def _set_saved_via_web_api(self, track_id: str, saved: bool) -> dict[str, Any] | None:
+        token = self._web_player_bearer()
+        for attempt in range(2):
+            if not token:
+                return None
+            status, _body = self._web_api("PUT" if saved else "DELETE", "/me/tracks?ids=%s" % track_id, token)
+            if status in (200, 201, 204):
+                state = self._track_saved_state(track_id, token)
+                if state is not None and state != saved:
+                    logger.warning("Spotify library call returned %s but the saved state did not change", status)
+                    return None
+                return {"track_id": track_id, "saved": saved, "verified": state is not None, "method": "web_api"}
+            if status == 401 and attempt == 0:
+                self._web_bearer = None
+                token = self._web_player_bearer()
+                continue
+            if status == 429 and attempt == 0:
+                self._page.wait_for_timeout(2000)
+                continue
+            logger.warning("Spotify library %s returned HTTP %s", "save" if saved else "remove", status)
+            return None
+        return None
+
+    def _save_via_add_button(self, track_id: str) -> dict[str, Any]:
+        state = self._page.evaluate(_NOW_PLAYING_ADD_STATE_JS, track_id)
+        if not isinstance(state, dict) or not state.get("present") or not state.get("on_target"):
+            raise SpotifyCDPError("Couldn't confirm the song on Spotify's player to like it. Try again in a moment.")
+        if state.get("checked"):
+            return {"track_id": track_id, "saved": True, "verified": True, "method": "already_saved"}
+        self._page.locator(_NOW_PLAYING_ADD_BUTTON).first.click(timeout=5000)
+        deadline = time.monotonic() + 3.0
+        while time.monotonic() < deadline:
+            self._page.wait_for_timeout(250)
+            state = self._page.evaluate(_NOW_PLAYING_ADD_STATE_JS, track_id)
+            if isinstance(state, dict) and state.get("checked"):
+                return {"track_id": track_id, "saved": True, "verified": True, "method": "add_button"}
+        return {"track_id": track_id, "saved": True, "verified": False, "method": "add_button"}
+
+    def _remove_via_add_button(self, track_id: str) -> dict[str, Any]:
+        """Fallback unlike: uncheck Liked Songs in the add button's "Saved in" popover."""
+        failure = SpotifyCDPError(
+            "Couldn't reach Spotify to remove the song from your Liked Songs. Try again in a moment."
+        )
+        state = self._page.evaluate(_NOW_PLAYING_ADD_STATE_JS, track_id)
+        if not isinstance(state, dict) or not state.get("present") or not state.get("on_target"):
+            raise failure
+        if state.get("checked") is False:
+            return {"track_id": track_id, "saved": False, "verified": True, "method": "already_removed"}
+        self._page.locator(_NOW_PLAYING_ADD_BUTTON).first.click(timeout=5000)
+        try:
+            deadline = time.monotonic() + 3.0
+            box = None
+            while time.monotonic() < deadline:
+                self._page.wait_for_timeout(250)
+                box = self._safe_evaluate(_LIKED_SONGS_CHECKBOX_JS, "liked songs checkbox")
+                if isinstance(box, dict) and box.get("found"):
+                    break
+            if not isinstance(box, dict) or not box.get("found"):
+                raise failure
+            if box.get("checked"):
+                self._safe_evaluate(_LIKED_SONGS_CHECKBOX_CLICK_JS, "uncheck liked songs")
+                self._page.wait_for_timeout(300)
+            self._safe_evaluate(_POPOVER_DONE_JS, "close saved-in popover")
+        finally:
+            try:
+                self._page.keyboard.press("Escape")
+            except _playwright_error_types():
+                pass
+        deadline = time.monotonic() + 3.0
+        while time.monotonic() < deadline:
+            self._page.wait_for_timeout(250)
+            state = self._page.evaluate(_NOW_PLAYING_ADD_STATE_JS, track_id)
+            if isinstance(state, dict) and state.get("checked") is False:
+                return {"track_id": track_id, "saved": False, "verified": True, "method": "add_button"}
+        raise failure
+
+    def set_track_saved(self, track_id: str, saved: bool) -> dict[str, Any]:
+        """Add a track to (saved=True) or remove it from the user's Spotify Liked Songs (thread-safe)."""
+        return self._in_cdp_thread(self._set_track_saved_impl, track_id, saved)
+
+    def _set_track_saved_impl(self, track_id: str, saved: bool) -> dict[str, Any]:
+        bare_id = normalize_spotify_track_id(track_id)
+        self._ensure_page()
+        result = self._set_saved_via_web_api(bare_id, saved)
+        if result is not None:
+            logger.info("Spotify Liked Songs %s for %s (%s)", "add" if saved else "remove", bare_id, result["method"])
+            return result
+        if saved:
+            return self._save_via_add_button(bare_id)
+        return self._remove_via_add_button(bare_id)
+
+    def play_liked_songs(self, *, shuffle: bool | None = None, max_wait: float = 18.0) -> dict[str, Any]:
+        """Play the user's Spotify Liked Songs collection (thread-safe)."""
+        return self._in_cdp_thread(self._play_liked_songs_impl, shuffle, max_wait)
+
+    def _play_liked_songs_impl(self, shuffle: bool | None, max_wait: float) -> dict[str, Any]:
+        self._ensure_page()
+        if not self._is_logged_in_impl():
+            raise SpotifyCDPError("Spotify login required. Say 'connect Spotify' to sign in.")
+        deadline = time.time() + max_wait
+        try:
+            self._page.goto(SPOTIFY_LIKED_SONGS_URL, wait_until="domcontentloaded", timeout=15000)
+        except Exception as exc:
+            raise SpotifyCDPError("Liked Songs page navigation failed: %s" % exc) from exc
+
+        play_btn = None
+        while play_btn is None and time.time() < deadline:
+            for selector in _COLLECTION_PLAY_SELECTORS:
+                for candidate in self._page.query_selector_all(selector):
+                    box = candidate.bounding_box()
+                    if box and box.get("width", 0) > 0 and box.get("height", 0) > 0:
+                        play_btn = candidate
+                        break
+                if play_btn is not None:
+                    break
+            if play_btn is None:
+                time.sleep(0.5)
+        if play_btn is None:
+            raise SpotifyCDPError("Couldn't start your Spotify Liked Songs (the list may be empty).")
+
+        self._apply_shuffle(shuffle)
+        play_btn.click(timeout=10000)
+        logger.info("Clicked Play on Spotify Liked Songs")
+        self._wait_for_any_playback_progress(deadline)
+        self._apply_shuffle(shuffle)
+
+        now_playing = self._safe_evaluate(_NOW_PLAYING_JS, "now playing after Liked Songs start")
+        payload = now_playing if isinstance(now_playing, dict) else {}
+        return {
+            "context": "liked_songs",
+            "title": str(payload.get("track") or "").strip() or None,
+            "artist": str(payload.get("artist") or "").strip() or None,
+            "track_id": payload.get("track_id"),
+        }
+
+    def _apply_shuffle(self, shuffle: bool | None) -> None:
+        """Best effort: set Spotify's own shuffle toggle; leave it alone when None."""
+        if shuffle is None or self._page is None:
+            return
+        state = self._safe_evaluate(_SHUFFLE_STATE_JS, "shuffle state")
+        if not isinstance(state, dict) or state.get("disabled"):
+            return
+        if (state.get("checked") == "true") == bool(shuffle):
+            return
+        try:
+            self._page.locator('button[data-testid="control-button-shuffle"]').first.click(timeout=5000)
+        except _playwright_error_types() as exc:
+            logger.debug("Spotify shuffle toggle failed: %s", exc)
+
+    def _wait_for_any_playback_progress(self, deadline: float) -> None:
+        """Wait until whatever Spotify started is audibly advancing."""
+        first: float | None = None
+        first_at: float | None = None
+        nudged = False
+        last_payload: Any = None
+        while time.time() < deadline:
+            audio = self._safe_evaluate(_ENSURE_AUDIO_PLAYING_JS, "ensure spotify audio playing")
+            now_playing = self._safe_evaluate(_NOW_PLAYING_JS, "now playing after collection play")
+            last_payload = now_playing
+            position: float | None = None
+            if isinstance(audio, dict) and audio.get("present") and audio.get("t") is not None:
+                position = float(audio["t"])
+            elif isinstance(now_playing, dict) and now_playing.get("is_playing") and now_playing.get("track"):
+                position = _now_playing_position_seconds(now_playing)
+            if position is not None:
+                if first is None or position < first:
+                    first, first_at = position, time.time()
+                elif position >= first + _DIRECT_TRACK_PROGRESS_DELTA_S:
+                    return
+                elif not nudged and first_at is not None and time.time() - first_at >= _DIRECT_TRACK_STALL_RETRY_S:
+                    self._nudge_footer_playback()
+                    nudged = True
+                    first = first_at = None
+            time.sleep(_DIRECT_TRACK_POLL_S)
+        raise SpotifyCDPError("Spotify Liked Songs did not start playing; last_now_playing=%r" % (last_payload,))
 
     def _nudge_footer_playback(self) -> None:
         """Pause/resume the footer transport once to recover Spotify false-starts."""

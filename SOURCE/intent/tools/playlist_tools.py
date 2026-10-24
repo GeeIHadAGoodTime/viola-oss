@@ -373,10 +373,42 @@ async def play_playlist_handler(name: str, user_id: str = "") -> ToolResult:
         return ToolResult(ok=False, data=None, error="play_playlist failed: %s" % exc)
 
 
+async def _play_spotify_liked_songs(shuffle: bool) -> ToolResult:
+    """Start the user's Spotify Liked Songs collection and confirm it plays."""
+    from music.providers.spotify_cdp import spotify_liked_songs_query
+
+    payload = await _post_runtime("/v1/play", {"query": spotify_liked_songs_query(shuffle)})
+    if int(payload.get("_status_code", 0) or 0) != 200 or not payload.get("ok"):
+        return ToolResult(ok=False, data=None, error=_runtime_error(payload))
+    verification, now_playing = await _confirm_runtime_playback()
+    data: dict[str, Any] = {
+        "provider": "spotify",
+        "collection": "liked_songs",
+        "shuffled": shuffle,
+        "verification": verification,
+        "playback_verified": verification == VERIFY_PLAYING,
+    }
+    if now_playing:
+        data["now_playing"] = now_playing
+    if verification == VERIFY_PLAYING:
+        live_title = str(now_playing.get("title") or "").strip() if now_playing else ""
+        live_artist = str(now_playing.get("artist") or "").strip() if now_playing else ""
+        message = "Playing your Spotify Liked Songs"
+        if live_title and live_title != "Liked Songs":
+            message += ", starting with %s" % live_title
+            if live_artist and live_artist != "Spotify":
+                message += " by %s" % live_artist
+        data["message"] = message + "."
+        return ToolResult(ok=True, data=data)
+    data["message"] = "I asked Spotify to play your Liked Songs, but it does not report anything playing yet."
+    return ToolResult(ok=True, data=data, unverified=True)
+
+
 async def play_favorites_handler(
     shuffle: bool = True,
     limit: int = 15,
     user_id: str = "",
+    provider: str = "",
 ) -> ToolResult:
     """Start playback from the user's liked/favorited songs.
 
@@ -396,6 +428,11 @@ async def play_favorites_handler(
         # back to the ambient/device rating store (that merges favorites across
         # accounts). Fail loudly instead.
         raise ValueError("user_id is required for multi-user data isolation")
+
+    from music.providers.spotify_cdp import wants_spotify_liked_songs
+
+    if wants_spotify_liked_songs(provider, user_id=resolved_user_id):
+        return await _play_spotify_liked_songs(bool(shuffle))
 
     try:
         capped_limit = max(1, min(int(limit), 30))

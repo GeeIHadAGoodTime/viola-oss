@@ -70,6 +70,105 @@ def set_cdp_controller(controller: SpotifyCDPController, *, user_id: str | None 
     _cdp_controllers[resolved_user_id] = controller
 
 
+# ---------------------------------------------------------------------------
+# Spotify Liked Songs (the user's real Spotify library, via the web player)
+# ---------------------------------------------------------------------------
+# Internal play query for the Liked Songs collection. The optional suffix
+# carries an explicit shuffle choice; without it Spotify's own shuffle setting
+# is left as the user had it.
+SPOTIFY_LIKED_SONGS_URI = "spotify:collection:tracks"
+_SPOTIFY_PROVIDER_IDS = frozenset({"spotify", "spotify_cdp"})
+
+
+def spotify_liked_songs_query(shuffle: bool | None = None) -> str:
+    if shuffle is None:
+        return SPOTIFY_LIKED_SONGS_URI
+    return "%s?shuffle=%s" % (SPOTIFY_LIKED_SONGS_URI, "on" if shuffle else "off")
+
+
+def parse_spotify_liked_songs_query(query: object) -> tuple[bool, bool | None]:
+    """Return ``(is_liked_songs, shuffle)`` for a play query."""
+    if not isinstance(query, str):
+        return False, None
+    raw = query.strip()
+    base, _, suffix = raw.partition("?")
+    base = base.rstrip("/")
+    if base.lower() not in (SPOTIFY_LIKED_SONGS_URI, "https://open.spotify.com/collection/tracks"):
+        return False, None
+    shuffle: bool | None = None
+    if suffix.lower() == "shuffle=on":
+        shuffle = True
+    elif suffix.lower() == "shuffle=off":
+        shuffle = False
+    return True, shuffle
+
+
+def wants_spotify_liked_songs(provider: object = None, *, user_id: str | None = None) -> bool:
+    """Whether a "play my liked songs" request means the user's Spotify Liked Songs.
+
+    An explicit provider wins. With none given, Spotify Liked Songs play when
+    Spotify is the active music service; otherwise Viola's own favorites do.
+    """
+    explicit = str(provider or "").strip().lower()
+    if explicit:
+        return explicit in _SPOTIFY_PROVIDER_IDS
+    try:
+        from music.providers.active_provider import get_active_music_provider_id
+
+        return get_active_music_provider_id(user_id) in _SPOTIFY_PROVIDER_IDS
+    except Exception:
+        logger.debug("Active music provider lookup failed", exc_info=True)
+        return False
+
+
+def spotify_track_id_from_now_playing(now_playing: object) -> str | None:
+    """Bare Spotify track id of a now-playing item, or None if it is not Spotify."""
+    if now_playing is None:
+        return None
+
+    def _get(name: str) -> object:
+        if isinstance(now_playing, dict):
+            return now_playing.get(name)
+        return getattr(now_playing, name, None)
+
+    provider = str(_get("provider") or "").strip().lower()
+    playback_mode = str(_get("playback_mode") or "").strip().lower()
+    if provider not in _SPOTIFY_PROVIDER_IDS and playback_mode != "spotify_cdp":
+        return None
+    from music.spotify.cdp_controller import normalize_spotify_track_id
+
+    # The web player is the truth for "this song": after a Liked Songs start
+    # or Spotify's own auto-advance, the queue item still names the request.
+    try:
+        live = get_cdp_controller().get_now_playing()
+    except Exception:
+        live = None
+    candidates: list[object] = [live.get("track_id") if isinstance(live, dict) else None]
+    capabilities = _get("capabilities")
+    if isinstance(capabilities, dict):
+        candidates.append(capabilities.get("uri"))
+    candidates.extend([_get("url"), _get("video_id"), _get("id")])
+    for candidate in candidates:
+        if not isinstance(candidate, str) or not candidate.strip():
+            continue
+        try:
+            return normalize_spotify_track_id(candidate)
+        except SpotifyCDPError:
+            continue
+    return None
+
+
+def set_spotify_track_saved(track_id: str, saved: bool, *, user_id: str | None = None) -> dict[str, object]:
+    """Add/remove a track in the user's Spotify Liked Songs through the web player.
+
+    Blocking (runs on the controller's CDP thread). Raises SpotifyCDPError
+    with a user-facing message on failure.
+    """
+    controller = get_cdp_controller(user_id)
+    controller.ensure_running(wait_for_login=False)
+    return controller.set_track_saved(track_id, saved)
+
+
 @auto_register(ProviderName.SPOTIFY)
 class SpotifyCDPProvider(MusicProvider[None]):
     """Provider for Spotify via Chrome DevTools Protocol.

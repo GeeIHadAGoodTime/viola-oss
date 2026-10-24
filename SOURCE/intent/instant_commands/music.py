@@ -1616,72 +1616,36 @@ class MusicHandlersMixin:
         return None
 
     def _get_spotify_track_id(self, now_playing: object) -> str | None:
-        """Extract the Spotify track ID from a now_playing item.
+        """Bare Spotify track id of the song playing right now, or None.
 
-        Returns the bare track ID (e.g. '4iV5W9uYEdYUVa79Axb7Rh') if the
-        current track is a Spotify track, otherwise None.
-
-        The URL for Spotify CDP tracks is 'https://open.spotify.com/track/{id}'.
+        Asks the Spotify web player first (after a Liked Songs start or
+        Spotify's own auto-advance the queue item still names the request),
+        then falls back to the queue item's URI/URL.
         """
-        if now_playing is None:
-            return None
-        provider = (
-            now_playing.get("provider") if isinstance(now_playing, dict) else getattr(now_playing, "provider", None)
-        )
-        if provider != "spotify":
-            return None
+        from music.providers.spotify_cdp import spotify_track_id_from_now_playing
 
-        url = now_playing.get("url") if isinstance(now_playing, dict) else getattr(now_playing, "url", None)
-        if url and isinstance(url, str) and "open.spotify.com/track/" in url:
-            return url.rstrip("/").split("/")[-1].split("?")[0]
-
-        # Fallback: video_id field (sometimes populated with track ID)
-        video_id = (
-            now_playing.get("video_id") if isinstance(now_playing, dict) else getattr(now_playing, "video_id", None)
-        )
-        if video_id and isinstance(video_id, str):
-            return video_id
-
-        return None
+        return spotify_track_id_from_now_playing(now_playing)
 
     async def _spotify_save_track(self, track_id: str, *, save: bool) -> None:
-        """Call the Spotify Web API to save (like) or unsave (unlike) a track.
+        """Add (save=True) or remove the track in the user's Spotify Liked Songs.
 
-        Args:
-            track_id: Bare Spotify track ID.
-            save: True to save (PUT /me/tracks), False to remove (DELETE /me/tracks).
+        Goes through the logged-in Spotify web player Viola already drives
+        (the page's own Web API call, falling back to its add button), never
+        through the OAuth adapter, which has no credentials in shipped builds.
 
         Raises:
-            RuntimeError: If no access token is available or the API call fails.
+            RuntimeError: with a user-facing message when it did not happen.
         """
-        import httpx
+        import asyncio
 
-        from music.consent import get_consent_service
+        from core.user_context import get_current_or_device_user_id
+        from music.providers.spotify_cdp import set_spotify_track_saved
+        from music.spotify.cdp_controller import SpotifyCDPError
 
-        service = get_consent_service()
-        token_data = service.resolve_access_token("spotify")
-        if not token_data or not token_data.get("access_token"):
-            raise RuntimeError("Your Spotify session is not active. I can start the sign-in flow.")
-
-        access_token = token_data["access_token"]
-        url = "https://api.spotify.com/v1/me/tracks"
-        headers = {"Authorization": "Bearer %s" % access_token, "Content-Type": "application/json"}
-        params = {"ids": track_id}
-
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            if save:
-                response = await client.put(url, headers=headers, params=params)
-            else:
-                response = await client.delete(url, headers=headers, params=params)
-
-        if response.status_code == 401:
-            raise RuntimeError("Your Spotify session has expired. I can start the reconnection flow.")
-        if response.status_code == 403:
-            raise RuntimeError(
-                "Spotify doesn't have permission to save tracks. " "I can reconnect Spotify with the right permissions."
-            )
-        if response.status_code not in (200, 201, 204):
-            raise RuntimeError("Spotify API error %d: %s" % (response.status_code, response.text[:200]))
+        try:
+            await asyncio.to_thread(set_spotify_track_saved, track_id, save, user_id=get_current_or_device_user_id())
+        except SpotifyCDPError as exc:
+            raise RuntimeError(str(exc)) from exc
 
     def _rate_youtube_video(self, video_id: str, rating: str) -> dict[str, object]:
         """Record YouTube rating intent locally without calling YouTube APIs.
@@ -1856,11 +1820,11 @@ class MusicHandlersMixin:
                 )
                 try:
                     await self._spotify_save_track(spotify_track_id, save=True)
-                    log.info("Liked Spotify track via Web API: %s (%s)", title, spotify_track_id)
+                    log.info("Saved Spotify track to Liked Songs: %s (%s)", title, spotify_track_id)
                     self._record_like_locally(now_playing, spotify_track_id, user_id)
                     return {
                         "ok": True,
-                        "message": "Liked%s on Spotify." % (' "%s"' % title if title else ""),
+                        "message": "Saved%s to your Spotify Liked Songs." % (' "%s"' % title if title else ""),
                         "data": {
                             "rating": "thumbs_up",
                             "provider": "spotify",
@@ -1899,6 +1863,79 @@ class MusicHandlersMixin:
             return {
                 "ok": False,
                 "message": "Couldn't save your rating right now. Try again?",
+                "data": {},
+                "error": "rating_failed",
+            }
+
+    async def unlike_track(self, params: dict[str, object]) -> dict[str, object]:
+        """Remove the current song from the user's likes and keep it playing.
+
+        "unlike this", "remove this from my liked songs". On Spotify this
+        removes it from the user's Spotify Liked Songs; elsewhere it removes
+        Viola's own like. Unlike thumbs_down, it does not skip.
+        """
+        from core.user_context import get_current_or_device_user_id, user_id_or_none
+
+        user_id = user_id_or_none(params.get("_user_id")) or get_current_or_device_user_id()
+        try:
+            now_playing = self._get_now_playing()
+            if now_playing is None:
+                return {"ok": False, "message": "Nothing is playing.", "data": {}, "error": "nothing_playing"}
+            title = now_playing.get("title") if isinstance(now_playing, dict) else getattr(now_playing, "title", None)
+            label = ' "%s"' % title if title else ""
+
+            spotify_track_id = self._get_spotify_track_id(now_playing)
+            if spotify_track_id:
+                try:
+                    await self._spotify_save_track(spotify_track_id, save=False)
+                except RuntimeError as api_err:
+                    return {
+                        "ok": False,
+                        "message": str(api_err),
+                        "data": {"rating": "unliked", "provider": "spotify", "track_id": spotify_track_id},
+                        "error": "spotify_api_error",
+                    }
+                self._record_unlike_locally(now_playing, spotify_track_id, user_id)
+                return {
+                    "ok": True,
+                    "message": "Removed%s from your Spotify Liked Songs." % label,
+                    "data": {"rating": "unliked", "provider": "spotify", "track_id": spotify_track_id},
+                }
+
+            local_id = self._get_local_track_id(now_playing)
+            if local_id is not None:
+                import asyncio
+
+                from music.providers.local.db import get_local_library_repo
+
+                def _unlike() -> None:
+                    repo = get_local_library_repo()
+                    repo.initialize()
+                    repo.remove_like(local_id)
+
+                await asyncio.to_thread(_unlike)
+                self._record_unlike_locally(now_playing, str(local_id), user_id)
+                return {
+                    "ok": True,
+                    "message": "Removed%s from your liked songs." % label,
+                    "data": {"rating": "unliked", "provider": "local", "track_id": local_id},
+                }
+
+            track_key = self._get_youtube_video_id(now_playing) or str(
+                (now_playing.get("id") if isinstance(now_playing, dict) else getattr(now_playing, "id", None)) or ""
+            )
+            if track_key:
+                self._record_unlike_locally(now_playing, track_key, user_id)
+            return {
+                "ok": True,
+                "message": "Removed%s from your Viola likes." % label,
+                "data": {"rating": "unliked", "persisted": "local"},
+            }
+        except Exception as e:
+            log.exception("Command 'unlike_track' failed: %s", e)
+            return {
+                "ok": False,
+                "message": "Couldn't update your likes right now. Try again?",
                 "data": {},
                 "error": "rating_failed",
             }
@@ -1997,7 +2034,7 @@ class MusicHandlersMixin:
                     data["provider"] = "spotify"
                     data["track_id"] = spotify_track_id
                     if spotify_removed:
-                        msg = "Removed from Spotify and skipped."
+                        msg = "Removed from your Spotify Liked Songs and skipped."
                     else:
                         msg = "Skipped. %s" % (spotify_error_msg or "Spotify dislike could not be sent.")
                 else:
@@ -2029,7 +2066,7 @@ class MusicHandlersMixin:
                     data["provider"] = "spotify"
                     data["track_id"] = spotify_track_id
                     if spotify_removed:
-                        msg = "Removed from Spotify."
+                        msg = "Removed from your Spotify Liked Songs."
                     else:
                         msg = spotify_error_msg or "Spotify dislike could not be sent."
                 else:
