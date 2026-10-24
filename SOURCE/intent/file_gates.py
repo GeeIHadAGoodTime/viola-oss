@@ -202,7 +202,8 @@ def is_user_referenced_path(p: Path, user_text: str) -> bool:
             return True
     if _name_mentioned(p.name, user_text):
         return True
-    for folder in ancestors:
+    # The target itself counts too: "move the photos folder" names that folder.
+    for folder in [p, *ancestors]:
         name = re.escape(folder.name)
         if not name:
             continue
@@ -356,10 +357,13 @@ def describe_file_action(action_class: str, args: Mapping[str, Any] | None) -> s
         path = _resolve(raw_path) if raw_path else None
         if path is not None and path.is_dir():
             count = _folder_file_count(path)
-            more = "more than %d" % BULK_FILE_THRESHOLD if count > BULK_FILE_THRESHOLD else str(count)
-            return "delete the folder %s and the %s files in it (it goes to the Recycle Bin and can be undone)" % (
+            if count > BULK_FILE_THRESHOLD:
+                inside = "more than %d files" % BULK_FILE_THRESHOLD
+            else:
+                inside = "1 file" if count == 1 else "%d files" % count
+            return "delete the folder %s and the %s in it (it goes to the Recycle Bin and can be undone)" % (
                 raw_path,
-                more,
+                inside,
             )
         return "delete %s (it goes to the Recycle Bin and can be undone)" % target if raw_path else "delete the file"
     if action_class == FILE_MOVE:
