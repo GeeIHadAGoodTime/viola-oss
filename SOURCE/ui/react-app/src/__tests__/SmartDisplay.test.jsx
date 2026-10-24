@@ -1804,6 +1804,27 @@ it('review: preserves voice history across same-principal auth object refreshes'
   expect(await within(dialog).findByText('Current principal history')).toBeInTheDocument();
 });
 
+it.each(['websocket-first', 'http-first'])('records one reply in Chat History when the broadcast and the command result both arrive (%s)', async order => {
+  // ui/api/routes/command.py broadcasts chat_response BEFORE the HTTP command
+  // response returns, so the same reply reaches both handlers for one turn.
+  apiHarness.realHistory = true;
+  apiHarness.account = { id: 'account-a' };
+  const { user } = render(<SmartDisplay />);
+  await waitFor(() => expect(playerHarness.chatResponseCallback).toBeTypeOf('function'));
+  const reply = 'Synthetic single reply.';
+  act(() => {
+    if (order === 'websocket-first') {
+      playerHarness.chatResponseCallback({ text: reply });
+      voiceHarness.onCommandResult({ ok: true, data: { message: reply } });
+    } else {
+      voiceHarness.onCommandResult({ ok: true, data: { message: reply } });
+      playerHarness.chatResponseCallback({ text: reply });
+    }
+  });
+  const dialog = await openReviewHistory(user);
+  expect(await within(dialog).findAllByText(reply)).toHaveLength(1);
+});
+
 it.each(['websocket', 'voice'])('review: ignores a late old-principal %s callback and its global UI actions', async kind => {
   apiHarness.realHistory = true;
   apiHarness.account = { id: 'account-a' };

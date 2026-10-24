@@ -90,6 +90,7 @@ import ModalLoadingSpinner from './components/shared/ModalLoadingSpinner';
 import ProviderBadge from './components/shared/ProviderBadge';
 import AgentDrawer from './components/AgentDrawer';
 import { clampWakeThreshold } from './utils/wakeSensitivity';
+import { appendAssistantEntry } from './utils/chatHistory';
 
 // Shared CSS: animations + variables (replaces all inline <style> tags)
 import './styles/variables.css';
@@ -1183,10 +1184,9 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
       const responseText = result.data?.message || result.data?.response || result.message || result.response || result.data?.text || '';
       if (responseText) {
         setLastResponse(`"${responseText}"`);
-        setChatHistory(prev => [
-          ...prev,
-          { role: 'assistant', content: responseText, timestamp: new Date().toISOString() }
-        ]);
+        // The backend's chat_response broadcast for this same turn usually
+        // arrives first and has already added this reply; don't add it twice.
+        setChatHistory(prev => appendAssistantEntry(prev, responseText));
       } else if (result.ok === false) {
         // A failed command carries its text in `error.message`, which the
         // expression above never reads — so a crashed turn used to leave the
@@ -1749,11 +1749,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
       } else {
         // Short responses: show in chat only, no card
         setLastResponse(`"${text}"`);
-        setChatHistory(prev => {
-          const last = prev.length > 0 ? prev[prev.length - 1] : null;
-          if (last && last.role === 'assistant' && last.content === text) { return prev; }
-          return [...prev, { role: 'assistant', content: text, timestamp: new Date().toISOString() }];
-        });
+        setChatHistory(prev => appendAssistantEntry(prev, text));
       }
     };
     setChatResponseCallback(handleChatResponse);
