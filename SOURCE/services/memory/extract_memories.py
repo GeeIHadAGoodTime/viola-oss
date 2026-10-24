@@ -214,9 +214,14 @@ def _background_extraction_error_types() -> tuple[type[BaseException], ...]:
 
 
 async def _default_extractor(transcript: str, *, user_id: str) -> list[ExtractedMemory]:
-    if not settings.auto_memory_extraction_enabled or not settings.openai_api_key:
+    if not settings.auto_memory_extraction_enabled:
         return []
-    from services.openai_background import run_background_openai_response
+    from services.openai_background import is_background_ai_available, run_background_openai_response
+
+    # Keyless customer installs route managed AI through Viola's cloud; a local
+    # OPENAI_API_KEY is only one of the ways background AI can be available.
+    if not is_background_ai_available(user_id):
+        return []
 
     capped_transcript = (transcript or "")[:_MAX_EXTRACTION_TRANSCRIPT_CHARS]
     # Redaction runs the PII / sensitive-prompt regexes, which historically

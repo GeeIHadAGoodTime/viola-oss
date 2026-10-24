@@ -64,6 +64,43 @@ def _get_mapping_or_attr(value: Any, key: str) -> Any:
     return getattr(value, key, None)
 
 
+# Upper-bound token estimate for one inline image. Providers bill an image by
+# its pixel tiles/patches (OpenAI caps a high-detail image at roughly 1.5k
+# patches, times a per-model multiplier of up to ~2.5x), never by the length
+# of its base64 text. Counting the base64 as text turned one screenshot into
+# hundreds of thousands of "tokens" and could trip a spend cap on reservation.
+_INLINE_IMAGE_TOKEN_ESTIMATE = 4_000
+_INLINE_IMAGE_PLACEHOLDER = "[image]"
+
+
+def _strip_inline_images(value: Any) -> tuple[Any, int]:
+    """Replace inline ``data:`` image payloads with a placeholder; count them."""
+    if isinstance(value, str):
+        if value.startswith("data:image/") and ";base64," in value[:64]:
+            return _INLINE_IMAGE_PLACEHOLDER, 1
+        return value, 0
+    if isinstance(value, dict):
+        out: dict[Any, Any] = {}
+        count = 0
+        for key, item in value.items():
+            if key == "source" and isinstance(item, dict) and item.get("type") == "base64" and item.get("data"):
+                out[key] = {**item, "data": _INLINE_IMAGE_PLACEHOLDER}
+                count += 1
+                continue
+            out[key], found = _strip_inline_images(item)
+            count += found
+        return out, count
+    if isinstance(value, (list, tuple)):
+        items: list[Any] = []
+        count = 0
+        for item in value:
+            stripped, found = _strip_inline_images(item)
+            items.append(stripped)
+            count += found
+        return items, count
+    return value, 0
+
+
 def estimate_openai_payload_usage(payload: dict[str, Any], *, default_output_tokens: int) -> LlmTokenUsage:
     requested_output = (
         _coerce_nonnegative_int(payload.get("max_output_tokens"))
@@ -71,11 +108,12 @@ def estimate_openai_payload_usage(payload: dict[str, Any], *, default_output_tok
         or _coerce_nonnegative_int(payload.get("max_tokens"))
         or max(1, int(default_output_tokens))
     )
+    text_payload, image_count = _strip_inline_images(payload)
     try:
-        serialized = json.dumps(payload, default=str, ensure_ascii=False, separators=(",", ":"))
+        serialized = json.dumps(text_payload, default=str, ensure_ascii=False, separators=(",", ":"))
     except Exception:
-        serialized = str(payload)
-    estimated_input = max(1, math.ceil(len(serialized) / 4))
+        serialized = str(text_payload)
+    estimated_input = max(1, math.ceil(len(serialized) / 4)) + image_count * _INLINE_IMAGE_TOKEN_ESTIMATE
     return LlmTokenUsage(input_tokens=estimated_input, output_tokens=requested_output)
 
 

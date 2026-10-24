@@ -1011,6 +1011,21 @@ class ApprovalManager:
 
     # -- internal helpers --------------------------------------------------------
 
+    @staticmethod
+    def _classifier_user_id() -> str:
+        """The account the approval classifier runs (and is billed) as.
+
+        The request principal when one is bound, else the desktop's signed-in
+        account. Empty when neither resolves; the background helper then
+        refuses a managed cloud call (fail closed to ``"unclear"``).
+        """
+        try:
+            from core.user_context import get_current_or_desktop_active_user_id, user_id_or_none
+
+            return user_id_or_none(get_current_or_desktop_active_user_id()) or ""
+        except (LookupError, ImportError, AttributeError, OSError, RuntimeError, TypeError, ValueError):
+            return ""
+
     async def _classify_response(
         self,
         response_text: str,
@@ -1059,7 +1074,7 @@ class ApprovalManager:
                 system_prompt=_APPROVAL_CLASSIFY_SYSTEM_PROMPT,
                 user_content=user_content,
                 max_output_tokens=_APPROVAL_CLASSIFY_MAX_TOKENS,
-                user_id="",
+                user_id=self._classifier_user_id(),
                 timeout_s=_APPROVAL_CLASSIFY_TIMEOUT_S,
             )
         except (TimeoutError, OpenAIError, RuntimeError, ValueError, TypeError) as exc:
