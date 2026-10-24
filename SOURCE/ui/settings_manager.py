@@ -2160,6 +2160,8 @@ class SettingsManager:
                 continue
             if key in self.REMOVED_LEGACY_SETTING_KEYS:
                 continue
+            if is_install_scoped_device_key(key):
+                continue  # already this machine's setting; it never moves into an account
             value = self._get_legacy_user_setting_value(key)
             if value is _MISSING or value in (None, "", {}):
                 continue
