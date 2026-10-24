@@ -3700,10 +3700,10 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
               <SettingRow
                 title="Double-check the wake word"
                 description={'Before the chime, Viola takes a quick second listen and ignores the wake if it clearly heard talking without "Viola".'}
-                tooltip="On by default. Turn it off if Viola often misses you when you say its name. The check runs on this device."
+                tooltip="Off by default. Turn it on if Viola wakes up when nobody said its name. It adds a short pause before the chime and can miss you more often with music or TV in the background. The check runs on this device."
               >
                 <Toggle
-                  checked={localSettings.wake_verification_enabled ?? true}
+                  checked={localSettings.wake_verification_enabled ?? false}
                   onChange={(v) => updateLocal('wake_verification_enabled', v)}
                   ariaLabel="Double-check the wake word"
                 />

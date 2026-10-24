@@ -26,7 +26,7 @@ nothing to the check.
 Every verification writes one ``[WAKE_VERIFY]`` line to the app log (verdict,
 reason, detector score, transcript, timings) so real-world false and missed
 wakes are visible in ``viola-qt.log``. The advanced setting
-``wake_verification_enabled`` (default on) turns the check off; the
+``wake_verification_enabled`` (default off, opt-in) turns the check on; the
 ``VIOLA_WAKE_VERIFICATION`` environment variable (``0``/``1``) overrides it.
 
 The defaults were measured on held-out conversational speech and on real
@@ -550,7 +550,7 @@ def get_wake_verifier() -> WakeVerifier:
 
 
 def wake_verification_enabled() -> bool:
-    """The kill switch: env override first, then the device setting (default on)."""
+    """The opt-in switch: env override first, then the device setting (default off)."""
     override = os.environ.get(ENV_OVERRIDE, "").strip().lower()
     if override in {"0", "false", "off", "no"}:
         return False
@@ -559,13 +559,13 @@ def wake_verification_enabled() -> bool:
     try:
         from ui.settings_manager import get_settings_manager
 
-        value = get_settings_manager().get(SETTING_KEY, True)
+        value = get_settings_manager().get(SETTING_KEY, False)
     except Exception as exc:  # noqa: BLE001, RUF100 - unreadable settings keep the default
         logger.debug("[WAKE_VERIFY] could not read %s: %s", SETTING_KEY, exc)
-        return True
+        return False
     if isinstance(value, str):
         return value.strip().lower() not in {"0", "false", "off", "no"}
-    return bool(value) if value is not None else True
+    return bool(value) if value is not None else False
 
 
 def warm_wake_verifier() -> None:
