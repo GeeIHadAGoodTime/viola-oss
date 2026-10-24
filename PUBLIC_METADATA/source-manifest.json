@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "a27e000543b8ad2985131a5aa1c4348cf846ee3f",
-  "sha256": "525a016d17a553073f65b0a774e729e8bf403fa31b90aa8786f8538d33632c79",
+  "revision": "26d2765d05b945878996dae52428d1f5439bf570",
+  "sha256": "9de0783e068653e82c487067f5cbb4245ea1696bff9e355a9eda1662cf4959eb",
   "files": [
     {
       "path": ".env.example",
@@ -1575,13 +1575,13 @@
     },
     {
       "path": "intent/agent_executor.py",
-      "sha256": "407bbd96f4d0d3555ef174895bf9063792db7d7a0735fefbacda4dd35465b211",
-      "bytes": 575592
+      "sha256": "436b446fc6b47fedaf6c5d30f1edce8e0e0bfe2f3b5f9b4ce30ca9ce833b3628",
+      "bytes": 578884
     },
     {
       "path": "intent/agent_loop.py",
-      "sha256": "b50fe08cb73d79cbfebb602e529639eb9dda795770134b45d308c071acf4997c",
-      "bytes": 250921
+      "sha256": "014491bbd1e4941f9203080f5f1162d90ddf086004398616e4da60a0516a9f95",
+      "bytes": 251632
     },
     {
       "path": "intent/agent_message_manager.py",
@@ -2330,8 +2330,8 @@
     },
     {
       "path": "mcp_servers/browser/server.py",
-      "sha256": "54b1ed78f50d696d09724c410a9c3caffd1b81078d0e74e2720831c543207755",
-      "bytes": 246195
+      "sha256": "19f6f8b95f5a1456ba18908dc84a3e8bfcece073cadc9053a232b9f0804d70a5",
+      "bytes": 249484
     },
     {
       "path": "mcp_servers/browser_cdp/__init__.py",
@@ -2340,8 +2340,8 @@
     },
     {
       "path": "mcp_servers/browser_cdp/server.py",
-      "sha256": "ecf53ed22f3e5963afd2556755b9993a48fa991cc020eeb678fc521a9f8d0164",
-      "bytes": 133233
+      "sha256": "19e63ce67a9f5c07becacd9b336e8847b1fd71b0166e62ebe71ab1e5e3b57f36",
+      "bytes": 133283
     },
     {
       "path": "mcp_servers/computer_use/__init__.py",
