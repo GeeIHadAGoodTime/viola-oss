@@ -171,6 +171,7 @@ class VerifierConfig:
     quiet_run_s: float = 0.24
     # A chunk is "quiet" below this fraction of the loudest chunk in the window.
     quiet_ratio: float = 0.2
+    noise_floor_factor: float = 2.0
     # Window too quiet to judge (whispers, far field): float RMS of the
     # loudest 80 ms chunk. 0.004 is about -48 dBFS.
     quiet_audio_rms: float = 0.004
@@ -458,7 +459,12 @@ class WakeVerifier:
         if peak < cfg.quiet_audio_rms:
             return _result(True, "quiet_audio")
 
-        quiet_level = max(peak * cfg.quiet_ratio, 1e-5)
+        # "Quiet" is relative to the speech peak, but never below the room's
+        # own noise floor (else a soft voice in a noisy room never pauses and
+        # every wake waits the full tail): twice the window's quietest 10%,
+        # capped at half the peak so speech itself is never called quiet.
+        floor = float(np.percentile(rms, 10)) if len(rms) else 0.0
+        quiet_level = max(min(max(peak * cfg.quiet_ratio, floor * cfg.noise_floor_factor), peak * 0.5), 1e-5)
         quiet_run = _trailing_quiet_chunks(rms.tolist(), quiet_level)
         need_quiet = max(1, round(cfg.quiet_run_s * SAMPLE_RATE / CHUNK_SAMPLES))
         min_tail = round(cfg.min_tail_s * SAMPLE_RATE)
