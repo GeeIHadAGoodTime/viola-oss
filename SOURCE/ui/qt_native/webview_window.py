@@ -14,6 +14,7 @@ import html
 import json
 import sys
 import threading
+import time
 from ipaddress import ip_address
 from pathlib import Path
 from urllib.parse import urlparse
@@ -106,6 +107,16 @@ _LOCAL_EXTERNAL_URL_HOSTS = frozenset(
 _LOCAL_CERTIFICATE_URL_HOSTS = frozenset({LOCALHOST_NAME, LOCALHOST, "::1"})
 
 _FULLSCREEN_HINT_TEXT = "Press Esc or F11 to exit fullscreen"
+# On a touch screen there may be no keyboard at all (a Surface in tablet mode).
+_FULLSCREEN_HINT_TEXT_TOUCH = "Tap the top edge to show the exit button"
+# A finger tap near the top reveals the hidden fullscreen title bar and keeps
+# it up this long: a finger has no hover, so the cursor poll that hides the bar
+# when the mouse moves away must not hide it before the user can tap Exit.
+_FULLSCREEN_TOUCH_REVEAL_PX = 48
+_FULLSCREEN_TOUCH_REVEAL_HOLD_S = 5.0
+# How often the docked touch keyboard's position is read while it may be up.
+_TOUCH_KEYBOARD_POLL_MS = 250
+_TOUCH_KEYBOARD_IDLE_POLLS = 12
 _FULLSCREEN_HINT_VISIBLE_MS = 3000
 _FULLSCREEN_HINT_FADE_MS = 180
 _FULLSCREEN_HINT_TOP_MARGIN = 18
@@ -809,6 +820,22 @@ class ViolaBridge(QObject):
             return json.dumps({"ok": False, "error": "window_unavailable"}, sort_keys=True)
         logger.info("[ViolaBridge] setVideoFullscreen(%s) called from React", bool(enabled))
         return json.dumps(window.set_video_fullscreen(bool(enabled)), sort_keys=True)
+
+    @Slot(result=str)
+    def showTouchKeyboard(self) -> str:
+        """A finger tapped into a text field: make sure the touch keyboard shows.
+
+        QtWebEngine does not ask Windows for the touch keyboard the way Chrome
+        does, so the page calls this on a touch focus. Only acts when the
+        device is in tablet posture; with a keyboard attached Windows' own
+        policy decides. Refused for non-local caller pages.
+        """
+        if not self._caller_page_is_local():
+            return json.dumps({"ok": False, "error": "origin_not_allowed"}, sort_keys=True)
+        window = self._window
+        if window is None:
+            return json.dumps({"ok": False, "error": "window_unavailable"}, sort_keys=True)
+        return json.dumps({"ok": bool(window.show_touch_keyboard())}, sort_keys=True)
 
     @Slot(int, int, int, int)
     def setBrowserOverlayBounds(self, x: int, y: int, w: int, h: int) -> None:
@@ -1904,7 +1931,13 @@ class CustomTitleBar(QWidget):
 
     def _setup_ui(self):
         """Create title bar layout with logo and window controls."""
-        self.setFixedHeight(32)
+        # A touch screen (a Surface in tablet mode) gets finger-sized chrome:
+        # 44px tall with 56px caption buttons instead of the 32x46 mouse size.
+        from ui.qt_native.touch_input import has_touch_screen, title_bar_metrics
+
+        self._touch_chrome = has_touch_screen()
+        bar_height, button_width = title_bar_metrics(self._touch_chrome)
+        self.setFixedHeight(bar_height)
         self.setStyleSheet("""
             CustomTitleBar {
                 background-color: #0a0a0a;
@@ -1941,20 +1974,20 @@ class CustomTitleBar(QWidget):
 
         # Window control buttons (Windows 11 style SVG icons)
         btn_style_base = """
-            QPushButton {{
+            QPushButton {{{{
                 background: transparent;
                 border: none;
-                min-width: 46px;
-                max-width: 46px;
-                min-height: 32px;
-                max-height: 32px;
+                min-width: {button_width}px;
+                max-width: {button_width}px;
+                min-height: {bar_height}px;
+                max-height: {bar_height}px;
                 padding: 0;
                 qproperty-iconSize: 10px 10px;
-            }}
-            QPushButton:hover {{
-                background: {hover_bg};
-            }}
-        """
+            }}}}
+            QPushButton:hover {{{{
+                background: {{hover_bg}};
+            }}}}
+        """.format(button_width=button_width, bar_height=bar_height)
 
         # Fullscreen button (arrows)
         self.btn_fullscreen = QPushButton()
@@ -2378,6 +2411,25 @@ class _KnowledgeUploadWorker(QThread):
             self.failed.emit(str(exc) or exc.__class__.__name__)
 
 
+# The app shell's right-click / long-press menu. QWebEngineView's standard menu
+# is a web browser's (Back, Forward, Reload, Save page, View page source); in
+# the Viola window Back and Reload throw away the app state and a long press on
+# a touch screen raised that menu on almost any tap that lingered. Only text
+# editing survives: Cut/Copy/Paste/Select all in a text field, Copy on a
+# selection, and no menu at all anywhere else.
+_EDIT_MENU_ACTIONS: tuple[str | None, ...] = ("Undo", "Redo", None, "Cut", "Copy", "Paste", None, "SelectAll")
+_SELECTION_MENU_ACTIONS: tuple[str | None, ...] = ("Copy",)
+
+
+def shell_context_menu_actions(is_editable: bool, selected_text: str) -> tuple[str | None, ...]:
+    """WebAction names (None = separator) for the shell's context menu; () = no menu."""
+    if is_editable:
+        return _EDIT_MENU_ACTIONS
+    if (selected_text or "").strip():
+        return _SELECTION_MENU_ACTIONS
+    return ()
+
+
 class _KnowledgeAwareWebView(QWebEngineView):
     """Main React webview that routes file drops through /v1/knowledge.
 
@@ -2399,6 +2451,30 @@ class _KnowledgeAwareWebView(QWebEngineView):
         self._knowledge_port = port
         self._knowledge_workers: list[_KnowledgeUploadWorker] = []
         self.setAcceptDrops(True)
+
+    def contextMenuEvent(self, event) -> None:  # noqa: N802 - Qt override
+        """Show only the text-editing menu (see shell_context_menu_actions)."""
+        try:
+            request = self.lastContextMenuRequest()
+            is_editable = bool(request is not None and request.isContentEditable())
+            selected = request.selectedText() if request is not None else ""
+        except (AttributeError, RuntimeError):
+            is_editable, selected = False, ""
+        names = shell_context_menu_actions(is_editable, selected)
+        if not names:
+            event.accept()
+            return
+        menu = QMenu(self)
+        menu.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
+        for name in names:
+            if name is None:
+                menu.addSeparator()
+                continue
+            action = self.pageAction(getattr(QWebEnginePage.WebAction, name))
+            if action is not None:
+                menu.addAction(action)
+        menu.popup(event.globalPos())
+        event.accept()
 
     @staticmethod
     def _has_local_files(event) -> bool:
@@ -2668,6 +2744,8 @@ class ViolaWebViewWindow(QMainWindow):
         layout = QVBoxLayout(central)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
+        # Kept so a docked touch keyboard can lift the page above itself.
+        self._central_layout = layout
 
         # Custom title bar
         self.title_bar = CustomTitleBar(self)
@@ -2885,9 +2963,71 @@ class ViolaWebViewWindow(QMainWindow):
             if proxy is not None:
                 proxy.installEventFilter(self)
 
+    # -- Windows touch keyboard ----------------------------------------------
+
+    def show_touch_keyboard(self) -> bool:
+        """Show the touch keyboard (tablet posture only) and track a docked one."""
+        from ui.qt_native.touch_input import TouchKeyboard, is_touch_first
+
+        if not is_touch_first():
+            return False
+        keyboard = getattr(self, "_touch_keyboard", None)
+        if keyboard is None:
+            keyboard = TouchKeyboard(int(self.winId()))
+            self._touch_keyboard = keyboard
+        shown = keyboard.try_show()
+        self._start_touch_keyboard_poll()
+        return shown
+
+    def _start_touch_keyboard_poll(self) -> None:
+        timer = getattr(self, "_touch_keyboard_timer", None)
+        if timer is None:
+            timer = QTimer(self)
+            timer.setInterval(_TOUCH_KEYBOARD_POLL_MS)
+            timer.timeout.connect(self._poll_touch_keyboard)
+            self._touch_keyboard_timer = timer
+        self._touch_keyboard_idle_polls = 0
+        if not timer.isActive():
+            timer.start()
+
+    def _poll_touch_keyboard(self) -> None:
+        """Lift the page above a docked touch keyboard; stop once it is gone."""
+        from ui.qt_native.touch_input import Rect, bottom_inset_for
+
+        keyboard = getattr(self, "_touch_keyboard", None)
+        occluded = keyboard.occluded_rect() if keyboard is not None else None
+        inset = 0
+        screen = self.screen()
+        if occluded is not None and screen is not None:
+            area = screen.geometry()
+            geo = self.geometry()
+            # A docked keyboard is anchored to the bottom of the screen; use
+            # only its height so the rectangle's coordinate origin cannot matter.
+            docked = Rect(area.x(), area.y() + area.height() - occluded.height, area.width(), occluded.height)
+            inset = bottom_inset_for(Rect(geo.x(), geo.y(), geo.width(), geo.height()), docked)
+        self._apply_touch_keyboard_inset(inset)
+        if inset:
+            self._touch_keyboard_idle_polls = 0
+            return
+        self._touch_keyboard_idle_polls = getattr(self, "_touch_keyboard_idle_polls", 0) + 1
+        if self._touch_keyboard_idle_polls >= _TOUCH_KEYBOARD_IDLE_POLLS:
+            timer = getattr(self, "_touch_keyboard_timer", None)
+            if timer is not None:
+                timer.stop()
+
+    def _apply_touch_keyboard_inset(self, inset: int) -> None:
+        layout = getattr(self, "_central_layout", None)
+        if layout is None or getattr(self, "_touch_keyboard_inset", 0) == inset:
+            return
+        self._touch_keyboard_inset = inset
+        layout.setContentsMargins(0, 0, 0, inset)
+        logger.info("Touch keyboard inset: %spx", inset)
+
     def _setup_fullscreen_hint(self) -> None:
         """Create the floating fullscreen-exit hint pill."""
-        hint = QLabel(_FULLSCREEN_HINT_TEXT, self)
+        from ui.qt_native.touch_input import has_touch_screen
+
+        hint = QLabel(_FULLSCREEN_HINT_TEXT_TOUCH if has_touch_screen() else _FULLSCREEN_HINT_TEXT, self)
         hint.setObjectName("fullscreenHintPill")
         hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
         hint.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
@@ -2922,6 +3062,10 @@ class ViolaWebViewWindow(QMainWindow):
             child = event.child()
             if isinstance(child, QWidget):
                 child.installEventFilter(self)
+
+        if event.type() == QEvent.Type.TouchBegin and self._handle_fullscreen_title_bar_touch(watched, event):
+            event.accept()
+            return True
 
         if event.type() in (
             QEvent.Type.MouseMove,
@@ -2981,6 +3125,34 @@ class ViolaWebViewWindow(QMainWindow):
                 hide_timer.stop()
         return False
 
+    def _handle_fullscreen_title_bar_touch(self, watched: QObject, event: QEvent) -> bool:
+        """A finger tap at the top edge reveals the hidden fullscreen title bar.
+
+        Returns True (consume the tap) only when it revealed a hidden bar, so
+        the same tap does not also land on the video or page underneath.
+        """
+        if not self.isFullScreen() or not getattr(self, "_fullscreen_hides_title_bar", False):
+            return False
+        try:
+            points = event.points()
+            if not points:
+                return False
+            local = points[0].position().toPoint()
+        except (AttributeError, RuntimeError, TypeError):
+            return False
+        if isinstance(watched, QWidget) and watched is not self:
+            window_pos = watched.mapTo(self, local)
+        else:
+            window_pos = local
+        if window_pos.y() > max(_FULLSCREEN_TOUCH_REVEAL_PX, _FULLSCREEN_TITLE_BAR_REVEAL_PX):
+            return False
+        was_hidden = self.title_bar.isHidden()
+        self._fullscreen_touch_reveal_until = time.monotonic() + _FULLSCREEN_TOUCH_REVEAL_HOLD_S
+        self._show_fullscreen_title_bar()
+        # Hide again once the hold is over (unless a mouse is now near the top).
+        QTimer.singleShot(int(_FULLSCREEN_TOUCH_REVEAL_HOLD_S * 1000) + 50, self._schedule_fullscreen_title_bar_hide)
+        return was_hidden
+
     def _poll_fullscreen_pointer(self) -> None:
         """Reveal/hide fullscreen title-bar chrome from the polled cursor position.
 
@@ -3016,6 +3188,8 @@ class ViolaWebViewWindow(QMainWindow):
     def _schedule_fullscreen_title_bar_hide(self) -> None:
         """Start the delayed fullscreen chrome hide."""
         if not self.isFullScreen() or not self._fullscreen_hides_title_bar:
+            return
+        if time.monotonic() < getattr(self, "_fullscreen_touch_reveal_until", 0.0):
             return
         hide_timer = getattr(self, "_fullscreen_title_bar_hide_timer", None)
         if hide_timer is None:
@@ -3687,11 +3861,16 @@ class ViolaWebViewWindow(QMainWindow):
             ws_auth_token = auth_plugin.generate_ws_auth_token()
         except Exception:
             logger.exception("Failed to generate desktop WS auth token for credential injection")
+        # Tablet posture for the page's touch sizing (utils/inputModality.js):
+        # QtWebEngine's (pointer: coarse) never matches on Windows.
+        from ui.qt_native.touch_input import is_touch_first
+
         return (
             f"window.__VIOLA_BASE_URL__ = {json.dumps(base_url)};\n"
             f"window.__VIOLA_CLOUD_URL__ = {json.dumps(cloud_url)};\n"
             f"window.__VIOLA_API_KEY__ = {json.dumps(api_key)};\n"
             f"window.__VIOLA_WS_AUTH_TOKEN__ = {json.dumps(ws_auth_token)};\n"
+            f"window.__VIOLA_TOUCH_FIRST__ = {json.dumps(is_touch_first())};\n"
         )
 
     def _install_or_refresh_credentials_script(self) -> None:
