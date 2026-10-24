@@ -397,6 +397,22 @@ def _hook_result_messages(
     return rendered_messages
 
 
+def _taint_check_tool(taint_tracker: Any, tool_name: str, tool_args: Any) -> str | None:
+    """Run the deterministic taint gate with the call's arguments.
+
+    The arguments let a phone dial continue to its confirm-or-cancel gate (see
+    ``intent.content_sanitizer``). Trackers that only take a tool name (older
+    test doubles) are still honored, and then the phone tool stays blocked.
+    """
+    check_tool = getattr(taint_tracker, "check_tool", None)
+    if not callable(check_tool):
+        return None
+    try:
+        return check_tool(tool_name, tool_args)
+    except TypeError:
+        return check_tool(tool_name)
+
+
 def _mark_executor_untrusted_content(executor: Any, taint_tracker: Any) -> None:
     """Tell the executor whether untrusted content is in context for this tool call.
 
@@ -524,7 +540,7 @@ async def _terminal_hook_execute_tool_call(
             tool_result = ToolResult(ok=False, error=tool_error)
 
     if tool_result is None and taint_tracker is not None:
-        taint_block = getattr(taint_tracker, "check_tool", lambda *_args, **_kwargs: None)(tool_name, tool_args)
+        taint_block = _taint_check_tool(taint_tracker, tool_name, tool_args)
         _mark_executor_untrusted_content(executor, taint_tracker)
         if taint_block:
             tool_error = str(taint_block)
@@ -3993,7 +4009,9 @@ async def run_agent_loop(
 
                 # â”€â”€ Layer 6: deterministic taint gate (M3 defense) â”€â”€
                 # Hard-block high-risk tools when browser content is in context.
-                _taint_block = None if _parallel_cached is not None else taint_tracker.check_tool(tc_name, tc_args)
+                _taint_block = (
+                    None if _parallel_cached is not None else _taint_check_tool(taint_tracker, tc_name, tc_args)
+                )
                 _mark_executor_untrusted_content(executor, taint_tracker)
                 if tool_result is None and _taint_block:
                     tool_result = ToolResult(ok=False, error=_taint_block)
