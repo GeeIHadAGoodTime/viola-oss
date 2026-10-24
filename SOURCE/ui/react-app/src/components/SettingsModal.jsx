@@ -52,6 +52,7 @@ import {
   useDebouncedCallback,
 } from './settings';
 import WakeSensitivitySlider from './settings/WakeSensitivitySlider';
+import AddPlaylistForm from './settings/AddPlaylistForm';
 
 // Use centralized theme from config.js
 const theme = THEME;
@@ -488,6 +489,7 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
     devices,
     playlists,
     saveSettingsWithSnapshot,
+    addPlaylist,
     syncPlaylists,
     renamePlaylist,
     setDefaultPlaylist,
@@ -3142,53 +3144,7 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
             <Section title="Playlists">
               {/* Playlists management */}
               <div style={{ padding: '16px 20px' }}>
-                <div style={{ marginBottom: '16px' }}>
-                  <label style={{ display: 'block', marginBottom: '8px', color: theme.colors.textSecondary, fontSize: '14px' }}>
-                    Add Playlist URL
-                  </label>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <input
-                      type="text"
-                      placeholder="YouTube or Spotify playlist URL"
-                      id="playlist-url-input"
-                      style={{
-                        flex: 1,
-                        padding: '12px 16px',
-                        minHeight: '44px',
-                        borderRadius: '12px',
-                        border: `1px solid ${theme.colors.borderLight}`,
-                        backgroundColor: theme.colors.bgCard,
-                        color: theme.colors.textPrimary,
-                        fontSize: '14px',
-                        outline: 'none',
-                      }}
-                    />
-                    <button
-                      onClick={() => {
-                        const input = document.getElementById('playlist-url-input');
-                        if (input?.value) {
-                          const pl = localSettings.saved_playlists || [];
-                          updateLocal('saved_playlists', [...pl, { url: input.value, name: `Playlist ${pl.length + 1}` }]);
-                          input.value = '';
-                        }
-                      }}
-                      style={{
-                        padding: '12px 20px',
-                        minHeight: '44px',
-                        borderRadius: '12px',
-                        border: 'none',
-                        backgroundColor: theme.colors.accent,
-                        color: theme.colors.textBright || '#ffffff',
-                        fontSize: '14px',
-                        fontWeight: 500,
-                        cursor: 'pointer',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      Add
-                    </button>
-                  </div>
-                </div>
+                <AddPlaylistForm onAdd={addPlaylist} theme={theme} />
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '8px' }}>
                   <button
