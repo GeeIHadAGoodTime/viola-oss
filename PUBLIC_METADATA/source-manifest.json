@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "3aa4af2c404646c0938b1c07db13abf2a65edbcb",
-  "sha256": "221fab911764b2538dec5bb11e59c419a00814550750d5661a0c8b84550e5cf6",
+  "revision": "1f81065b3a65bfaedb520878c7385f520aa20ef2",
+  "sha256": "69eae78548ce86fac690a7aea52743a2be3b0e5e0a95f49de8777a456487efbd",
   "files": [
     {
       "path": ".env.example",
@@ -12570,8 +12570,8 @@
     },
     {
       "path": "ui/settings_manager.py",
-      "sha256": "b182b5d326155a28ea92a46c709a6f9cb72f67baf1eda1f940b21f495048f651",
-      "bytes": 174356
+      "sha256": "5d51a3dab23f9d145fe32055f2b9617b22a61f380b43abcc8ea2ebafa30c9925",
+      "bytes": 174497
     },
     {
       "path": "ui/settings_schema.py",
