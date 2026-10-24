@@ -2552,59 +2552,6 @@ class SpotifyCDPController:
                 logger.debug("Window moveTo off-screen failed after seek click (non-critical)")
 
     # ------------------------------------------------------------------
-    # Playlist playback (URL navigation)
-    # ------------------------------------------------------------------
-    def play_playlist(self, playlist_id: str) -> None:
-        """Navigate to a Spotify playlist and start playback (thread-safe).
-
-        Args:
-            playlist_id: Spotify playlist ID (e.g., "37i9dQZF1DXcBWIGoYBM5M").
-        """
-        self._in_cdp_thread(self._play_playlist_impl, playlist_id)
-
-    def _play_playlist_impl(self, playlist_id: str) -> None:
-        """Navigate to a Spotify playlist and click play."""
-        self._ensure_page()
-
-        playlist_url = "https://open.spotify.com/playlist/%s" % playlist_id
-
-        try:
-            self._page.goto(
-                playlist_url,
-                wait_until="domcontentloaded",
-                timeout=15000,
-            )
-        except Exception as exc:
-            raise SpotifyCDPError("Playlist navigation failed: %s" % exc) from exc
-
-        try:
-            self._page.wait_for_load_state("networkidle", timeout=10000)
-        except Exception:
-            logger.debug("networkidle timed out for playlist page")
-
-        # Extra settle time for Spotify SPA rendering
-        time.sleep(1.5)
-
-        # Click the large play button on the playlist page
-        try:
-            play_btn = self._page.query_selector('button[data-testid="play-button"]')
-            if not play_btn:
-                # Fallback: aria-label based selector
-                play_btn = self._page.query_selector('button[aria-label="Play"]')
-            if play_btn:
-                play_btn.click()
-                logger.info(
-                    "Playlist play button clicked for %s",
-                    playlist_id,
-                )
-            else:
-                raise SpotifyCDPError("Could not find play button on playlist page")
-        except SpotifyCDPError:
-            raise
-        except Exception as exc:
-            raise SpotifyCDPError("Playlist play failed: %s" % exc) from exc
-
-    # ------------------------------------------------------------------
     # Navigate to Spotify home
     # ------------------------------------------------------------------
     def navigate_home(self) -> None:
