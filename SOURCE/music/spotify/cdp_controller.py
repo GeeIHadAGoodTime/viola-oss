@@ -856,6 +856,191 @@ class SpotifyCDPError(Exception):
     """Raised when CDP operations fail."""
 
 
+# ---------------------------------------------------------------------------
+# Keeping the playback Chrome invisible (Windows)
+# ---------------------------------------------------------------------------
+# Widevine needs a real, headed Chrome, so the playback window must exist and
+# keep rendering. Off-screen placement alone was not hidden: the window kept
+# a taskbar button and an Alt+Tab / Win+Tab entry, took focus at launch, and
+# the click paths tried to move it to (0, 0) for each click. Now:
+# * it starts hidden (STARTUPINFO SW_HIDE), so it never flashes or takes focus
+#   when it first opens;
+# * it is then shown without activation as a click-through, fully transparent
+#   (alpha 0) tool window: no taskbar button, not in Alt+Tab or Win+Tab, not
+#   visible on any monitor whatever the layout or DPI, never foreground;
+# * it is kept off every monitor, any maximized/minimized state Chrome restores
+#   is undone without activation, and the saved window placement is dropped
+#   from the profile before launch;
+# * a watchdog re-applies all of this while Chrome runs (Chrome can reset
+#   styles or open new windows), and Chrome is told not to throttle a window
+#   it may consider occluded, so audio and page scripts keep running.
+_OFFSCREEN_XY = -32000
+_CLOAK_FAST_S = 0.25
+_CLOAK_FAST_PERIOD_S = 20.0
+_CLOAK_SLOW_S = 1.0
+
+
+def _hidden_startupinfo() -> Any:
+    """STARTUPINFO that makes Chrome's first ShowWindow call hide its window."""
+    if sys.platform != "win32":
+        return None
+    info = subprocess.STARTUPINFO()
+    info.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+    info.wShowWindow = 0  # SW_HIDE
+    return info
+
+
+class _ForegroundGuard:
+    """Stop the playback Chrome from taking keyboard focus (Windows).
+
+    Chrome activates its first window at startup, and a process launched by
+    the foreground process may take the foreground. While Chrome starts, the
+    guard locks SetForegroundWindow (works when Viola is the foreground
+    process, which is exactly when Chrome would inherit the right), and the
+    watchdog hands the foreground back to the last non-Chrome window if
+    Chrome still ends up with it.
+    """
+
+    def __init__(self) -> None:
+        self.last_other_hwnd: int | None = None
+        self._locked = False
+
+    @staticmethod
+    def _user32() -> Any:
+        import ctypes
+
+        return ctypes.WinDLL("user32", use_last_error=True)
+
+    def lock(self) -> None:
+        if sys.platform != "win32":
+            return
+        user32 = self._user32()
+        self.last_other_hwnd = user32.GetForegroundWindow() or None
+        self._locked = bool(user32.LockSetForegroundWindow(1))  # LSFW_LOCK
+
+    def unlock(self) -> None:
+        if sys.platform == "win32" and self._locked:
+            self._user32().LockSetForegroundWindow(2)  # LSFW_UNLOCK
+            self._locked = False
+
+    def check(self, pids: set[int]) -> bool:
+        """Give the foreground back if a Chrome window holds it. True when it did."""
+        if sys.platform != "win32":
+            return False
+        import ctypes
+        from ctypes import wintypes
+
+        user32 = self._user32()
+        foreground = user32.GetForegroundWindow()
+        if not foreground:
+            return False
+        owner_pid = wintypes.DWORD()
+        chrome_thread = user32.GetWindowThreadProcessId(foreground, ctypes.byref(owner_pid))
+        if owner_pid.value not in pids:
+            self.last_other_hwnd = foreground
+            return False
+        target = self.last_other_hwnd
+        if not target or not user32.IsWindow(target):
+            return False
+        kernel32 = ctypes.WinDLL("kernel32")
+        own_thread = kernel32.GetCurrentThreadId()
+        attached = bool(user32.AttachThreadInput(own_thread, chrome_thread, True))
+        try:
+            user32.SetForegroundWindow(target)
+        finally:
+            if attached:
+                user32.AttachThreadInput(own_thread, chrome_thread, False)
+        return True
+
+
+def _chrome_process_tree(root_pid: int) -> set[int]:
+    try:
+        import psutil
+
+        return {root_pid} | {child.pid for child in psutil.Process(root_pid).children(recursive=True)}
+    except Exception:
+        return {root_pid}
+
+
+def cloak_chrome_windows(root_pid: int) -> int:
+    """Make every top-level window of a Chrome process tree invisible to the user.
+
+    Returns how many windows needed a change. Windows-only; a no-op elsewhere.
+    """
+    if sys.platform != "win32":
+        return 0
+    import ctypes
+    from ctypes import wintypes
+
+    pids = _chrome_process_tree(root_pid)
+    user32 = ctypes.WinDLL("user32", use_last_error=True)
+    user32.GetWindowLongPtrW.restype = ctypes.c_ssize_t
+    user32.GetWindowLongPtrW.argtypes = [wintypes.HWND, ctypes.c_int]
+    user32.SetWindowLongPtrW.restype = ctypes.c_ssize_t
+    user32.SetWindowLongPtrW.argtypes = [wintypes.HWND, ctypes.c_int, ctypes.c_ssize_t]
+    gwl_exstyle = -20
+    ws_ex_transparent, ws_ex_toolwindow, ws_ex_appwindow = 0x20, 0x80, 0x40000
+    ws_ex_layered, ws_ex_noactivate = 0x80000, 0x08000000
+    lwa_alpha = 0x2
+    sw_hide, sw_shownoactivate = 0, 4
+    swp_nosize, swp_nozorder, swp_noactivate = 0x1, 0x4, 0x10
+
+    hwnds: list[int] = []
+    enum_proc = ctypes.WINFUNCTYPE(ctypes.c_bool, wintypes.HWND, wintypes.LPARAM)
+
+    def _collect(hwnd: int, _lparam: int) -> bool:
+        pid = wintypes.DWORD()
+        user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+        if pid.value not in pids:
+            return True
+        cls = ctypes.create_unicode_buffer(64)
+        user32.GetClassNameW(hwnd, cls, 64)
+        rect = wintypes.RECT()
+        user32.GetWindowRect(hwnd, ctypes.byref(rect))
+        # Browser windows (and their bubbles) are Chrome_WidgetWin_1; leave
+        # Chrome's invisible helper windows (WidgetWin_0, zero-size) alone.
+        if cls.value == "Chrome_WidgetWin_1" and rect.right > rect.left and rect.bottom > rect.top:
+            hwnds.append(hwnd)
+        return True
+
+    user32.EnumWindows(enum_proc(_collect), 0)
+
+    changed = 0
+    for hwnd in hwnds:
+        touched = False
+        ex = int(user32.GetWindowLongPtrW(hwnd, gwl_exstyle))
+        want = (ex | ws_ex_toolwindow | ws_ex_layered | ws_ex_transparent | ws_ex_noactivate) & ~ws_ex_appwindow
+        if ex != want:
+            if user32.IsWindowVisible(hwnd):
+                # The taskbar only drops a button when the style changes while hidden.
+                user32.ShowWindow(hwnd, sw_hide)
+            user32.SetWindowLongPtrW(hwnd, gwl_exstyle, want)
+            touched = True
+        alpha = ctypes.c_ubyte(255)
+        flags = wintypes.DWORD(0)
+        has_alpha = user32.GetLayeredWindowAttributes(hwnd, None, ctypes.byref(alpha), ctypes.byref(flags))
+        if touched or not has_alpha or alpha.value != 0 or not (flags.value & lwa_alpha):
+            user32.SetLayeredWindowAttributes(hwnd, 0, 0, lwa_alpha)
+            touched = True
+        if user32.IsIconic(hwnd) or user32.IsZoomed(hwnd):
+            user32.ShowWindow(hwnd, sw_shownoactivate)  # restore without activating
+            touched = True
+        rect = wintypes.RECT()
+        user32.GetWindowRect(hwnd, ctypes.byref(rect))
+        if user32.MonitorFromRect(ctypes.byref(rect), 0):  # MONITOR_DEFAULTTONULL: on some monitor
+            user32.SetWindowPos(
+                hwnd, None, _OFFSCREEN_XY, _OFFSCREEN_XY, 0, 0, swp_nosize | swp_nozorder | swp_noactivate
+            )
+            touched = True
+        if not user32.IsWindowVisible(hwnd):
+            # Shown (but transparent and off-screen) so Chrome keeps rendering
+            # and Playwright's clicks keep working; never activated.
+            user32.ShowWindow(hwnd, sw_shownoactivate)
+            touched = True
+        changed += int(touched)
+    return changed
+
+
 class SpotifyCDPController:
     """
     Low-level Chrome/Playwright bridge for Spotify web player control.
@@ -875,6 +1060,7 @@ class SpotifyCDPController:
         self._pw_context_manager: Any = None
         self._pw_context: Any = None
         self._chrome_proc: subprocess.Popen | None = None
+        self._cloak_stop = threading.Event()
         # DevTools port of the Chrome this controller drives. Chosen by the OS
         # at each launch (never fixed); None until a Chrome is up.
         self._cdp_port: int | None = None
@@ -1162,6 +1348,9 @@ class SpotifyCDPController:
 
     def _terminate_tracked_chrome(self) -> None:
         """Terminate the Chrome process this controller launched, if any."""
+        cloak_stop = getattr(self, "_cloak_stop", None)
+        if cloak_stop is not None:
+            cloak_stop.set()
         if self._chrome_proc is None:
             return
         pid = self._chrome_proc.pid
@@ -1211,6 +1400,41 @@ class SpotifyCDPController:
                 proc.kill()
             except (psutil.NoSuchProcess, psutil.AccessDenied):
                 continue
+
+    def _start_cloak_watchdog(self, proc: subprocess.Popen, guard: _ForegroundGuard | None = None) -> None:
+        """Keep the launched Chrome's windows invisible and unfocused while it runs."""
+        if sys.platform != "win32" or not isinstance(proc, subprocess.Popen):
+            return
+        guard = guard or _ForegroundGuard()
+        stop = threading.Event()
+        old = getattr(self, "_cloak_stop", None)
+        if old is not None:
+            old.set()
+        self._cloak_stop = stop
+
+        def _watch() -> None:
+            started = time.monotonic()
+            while not stop.is_set() and proc.poll() is None:
+                try:
+                    cloak_chrome_windows(proc.pid)
+                    if guard.check(_chrome_process_tree(proc.pid)):
+                        logger.info("Spotify Chrome took the foreground; handed it back")
+                except Exception:
+                    logger.debug("Spotify Chrome cloak pass failed", exc_info=True)
+                fast = time.monotonic() - started < _CLOAK_FAST_PERIOD_S
+                stop.wait(_CLOAK_FAST_S if fast else _CLOAK_SLOW_S)
+
+        threading.Thread(target=_watch, name="spotify-chrome-cloak", daemon=True).start()
+
+    def _recloak_chrome_window(self) -> None:
+        """Re-apply the cloak now (cheap; safe to call from any click path)."""
+        proc = self._chrome_proc
+        if sys.platform != "win32" or not isinstance(proc, subprocess.Popen) or proc.poll() is not None:
+            return
+        try:
+            cloak_chrome_windows(proc.pid)
+        except Exception:
+            logger.debug("Spotify Chrome cloak pass failed", exc_info=True)
 
     def _remove_devtools_active_port_file(self) -> None:
         try:
@@ -1301,6 +1525,12 @@ class SpotifyCDPController:
         if dcsv.get("protected_media_identifier") != 1:
             dcsv["protected_media_identifier"] = 1
             changed = True
+        # Never let Chrome restore a saved (possibly maximized, on-screen)
+        # window placement for the playback window.
+        browser_prefs = prefs.get("browser")
+        if isinstance(browser_prefs, dict) and "window_placement" in browser_prefs:
+            del browser_prefs["window_placement"]
+            changed = True
 
         if changed:
             try:
@@ -1371,7 +1601,12 @@ class SpotifyCDPController:
             # the CDP click/DRM/user-gesture path. Keep normal playback
             # off-screen but headed so the click path can start audio.
             "--window-size=1280,720",
-            "--window-position=-32000,-32000",
+            "--window-position=%d,%d" % (_OFFSCREEN_XY, _OFFSCREEN_XY),
+            # The window is cloaked (see cloak_chrome_windows); do not let
+            # Chrome treat it as occluded and throttle the page.
+            "--disable-backgrounding-occluded-windows",
+            "--disable-renderer-backgrounding",
+            "--disable-background-timer-throttling",
         ]
         if sys.platform == "win32":
             # Multi-room, WINDOWS-ONLY (#2533, same rationale as
@@ -1400,7 +1635,11 @@ class SpotifyCDPController:
             # (CoreAudioCaptureProvider) or Linux capture path touches
             # them. Linux/macOS therefore keep Chromium's upstream
             # default (out-of-process, sandboxed) audio service.
-            chrome_args.append("--disable-features=AudioServiceSandbox,AudioServiceOutOfProcess")
+            # Chrome honors only the last --disable-features, so occlusion
+            # tracking is switched off in the same flag.
+            chrome_args.append(
+                "--disable-features=AudioServiceSandbox,AudioServiceOutOfProcess,CalculateNativeWinOcclusion"
+            )
         logger.info("Launching %s via subprocess (random loopback DevTools port, offscreen=True)", browser_name)
 
         # CREATE_NO_WINDOW on Windows prevents a console flash
@@ -1408,13 +1647,23 @@ class SpotifyCDPController:
         if sys.platform == "win32":
             creation_flags = subprocess.CREATE_NO_WINDOW
 
-        self._chrome_proc = popen_silent(
-            chrome_args,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            creationflags=creation_flags,
-        )
+        popen_kwargs: dict[str, Any] = {
+            "stdout": subprocess.DEVNULL,
+            "stderr": subprocess.DEVNULL,
+            "creationflags": creation_flags,
+        }
+        startupinfo = _hidden_startupinfo()
+        if startupinfo is not None:
+            popen_kwargs["startupinfo"] = startupinfo
+        focus_guard = _ForegroundGuard()
+        focus_guard.lock()
+        try:
+            self._chrome_proc = popen_silent(chrome_args, **popen_kwargs)
+        except Exception:
+            focus_guard.unlock()
+            raise
         logger.info("Chrome PID: %d", self._chrome_proc.pid)
+        self._start_cloak_watchdog(self._chrome_proc, focus_guard)
 
         # Bind Chrome to the Viola-lifetime Job Object so the OS
         # kernel forcibly terminates Chrome (and all its child
@@ -1431,35 +1680,40 @@ class SpotifyCDPController:
         except (ImportError, OSError, RuntimeError) as exc:
             logger.debug("Failed to bind Chrome to lifetime job: %s", exc)
 
-        # Wait for Chrome to open its DevTools port and record it.
-        deadline = time.monotonic() + _CDP_LAUNCH_TIMEOUT_S
-        endpoint = self._profile_cdp_endpoint()
-        while endpoint is None:
-            if self._chrome_proc.poll() is not None:
-                exit_code = self._chrome_proc.returncode
-                self._chrome_proc = None
-                raise SpotifyCDPError(
-                    "%s exited (code %s) before opening its DevTools port" % (browser_name, exit_code)
-                )
-            if time.monotonic() >= deadline:
+        try:
+            # Wait for Chrome to open its DevTools port and record it.
+            deadline = time.monotonic() + _CDP_LAUNCH_TIMEOUT_S
+            endpoint = self._profile_cdp_endpoint()
+            while endpoint is None:
+                if self._chrome_proc.poll() is not None:
+                    exit_code = self._chrome_proc.returncode
+                    self._chrome_proc = None
+                    raise SpotifyCDPError(
+                        "%s exited (code %s) before opening its DevTools port" % (browser_name, exit_code)
+                    )
+                if time.monotonic() >= deadline:
+                    self._terminate_tracked_chrome()
+                    raise SpotifyCDPError(
+                        "%s did not open its DevTools port within %ds" % (browser_name, _CDP_LAUNCH_TIMEOUT_S)
+                    )
+                time.sleep(0.25)
+                endpoint = self._profile_cdp_endpoint()
+
+            port, ws_path = endpoint
+            if cdp_endpoint_accepts_web_origin(port, ws_path):
                 self._terminate_tracked_chrome()
                 raise SpotifyCDPError(
-                    "%s did not open its DevTools port within %ds" % (browser_name, _CDP_LAUNCH_TIMEOUT_S)
+                    "%s accepted a DevTools connection from a web page origin, so Viola closed it. "
+                    "Update %s and try again." % (browser_name, browser_name)
                 )
-            time.sleep(0.25)
-            endpoint = self._profile_cdp_endpoint()
+            logger.info("Spotify Chrome DevTools listening on %s:%d (loopback, per-launch)", CDP_LOOPBACK_HOST, port)
 
-        port, ws_path = endpoint
-        if cdp_endpoint_accepts_web_origin(port, ws_path):
-            self._terminate_tracked_chrome()
-            raise SpotifyCDPError(
-                "%s accepted a DevTools connection from a web page origin, so Viola closed it. "
-                "Update %s and try again." % (browser_name, browser_name)
-            )
-        logger.info("Spotify Chrome DevTools listening on %s:%d (loopback, per-launch)", CDP_LOOPBACK_HOST, port)
-
-        # Small extra wait for Chrome to finish initializing
-        time.sleep(1.5)
+            # Small extra wait for Chrome to finish initializing, then release the
+            # foreground lock once its windows are cloaked (WS_EX_NOACTIVATE).
+            time.sleep(1.5)
+            self._recloak_chrome_window()
+        finally:
+            focus_guard.unlock()
         return port
 
     # ------------------------------------------------------------------
@@ -2567,7 +2821,7 @@ class SpotifyCDPController:
 
         # Move window on-screen for a real click that triggers Spotify's React handlers.
         try:
-            self._page.evaluate("window.moveTo(0, 0); window.resizeTo(1280, 720);")
+            self._recloak_chrome_window()
         except Exception:
             logger.debug("Window move/resize eval failed (non-critical)")
         time.sleep(0.3)
@@ -2652,7 +2906,7 @@ class SpotifyCDPController:
         finally:
             time.sleep(0.3)
             try:
-                self._page.evaluate("window.moveTo(-32000, -32000);")
+                self._recloak_chrome_window()
             except Exception:
                 logger.debug("Window moveTo off-screen failed (non-critical)")
 
@@ -2684,7 +2938,7 @@ class SpotifyCDPController:
 
         # Move window on-screen for the click, then back off-screen.
         try:
-            self._page.evaluate("window.moveTo(0, 0); window.resizeTo(1280, 720);")
+            self._recloak_chrome_window()
         except Exception:
             logger.debug("Window move/resize eval failed (non-critical)")
         time.sleep(0.3)
@@ -2706,7 +2960,7 @@ class SpotifyCDPController:
             # Move back off-screen
             time.sleep(0.3)
             try:
-                self._page.evaluate("window.moveTo(-32000, -32000);")
+                self._recloak_chrome_window()
             except Exception:
                 logger.debug("Window moveTo off-screen failed (non-critical)")
 
@@ -2714,16 +2968,13 @@ class SpotifyCDPController:
     # Window management
     # ------------------------------------------------------------------
     def hide_window(self) -> None:
-        """Move Chrome window off-screen (thread-safe)."""
+        """Re-apply the playback window cloak (thread-safe)."""
         self._in_cdp_thread(self._hide_window_impl)
 
     def _hide_window_impl(self) -> None:
-        """Move Chrome window off-screen."""
+        """Re-apply the playback window cloak (transparent, off-screen, no taskbar)."""
         self._ensure_page()
-        try:
-            self._page.evaluate("window.moveTo(-32000, -32000);")
-        except Exception as exc:
-            logger.warning("hide_window failed: %s", exc)
+        self._recloak_chrome_window()
 
     # ------------------------------------------------------------------
     # Volume control (slider click)
@@ -2744,7 +2995,7 @@ class SpotifyCDPController:
 
         try:
             try:
-                self._page.evaluate("window.moveTo(0, 0); window.resizeTo(1280, 720);")
+                self._recloak_chrome_window()
                 time.sleep(0.2)
             except playwright_errors:
                 logger.debug("Window move/resize eval failed before volume click (non-critical)")
@@ -2818,7 +3069,7 @@ class SpotifyCDPController:
             logger.warning("set_volume failed: %s", exc)
         finally:
             try:
-                self._page.evaluate("window.moveTo(-32000, -32000);")
+                self._recloak_chrome_window()
             except playwright_errors:
                 logger.debug("Window moveTo off-screen failed after volume click (non-critical)")
 
@@ -2838,7 +3089,7 @@ class SpotifyCDPController:
         self._ensure_page()
         playwright_errors = _playwright_error_types()
         try:
-            self._page.evaluate("window.moveTo(0, 0); window.resizeTo(1280, 720);")
+            self._recloak_chrome_window()
             time.sleep(0.2)
         except playwright_errors:
             logger.debug("Window move/resize eval failed before seek click (non-critical)")
@@ -2891,7 +3142,7 @@ class SpotifyCDPController:
             )
         finally:
             try:
-                self._page.evaluate("window.moveTo(-32000, -32000);")
+                self._recloak_chrome_window()
             except playwright_errors:
                 logger.debug("Window moveTo off-screen failed after seek click (non-critical)")
 
