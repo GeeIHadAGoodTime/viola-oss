@@ -62,6 +62,7 @@ from mcp_servers.browser.server import (
     _payment_block_message,
     _payment_field_block_from_locator,
     _payment_gate_block_from_locator,
+    _payment_gate_refusal,
     _payment_probe_strings_from_element_info,
     _select_dropdown_value,
 )
@@ -439,7 +440,7 @@ async def _cdp_payment_gate_block_from_info(
                 candidate[:60],
             )
             return None
-        return blocked
+        return _payment_gate_refusal(blocked)
     return None
 
 

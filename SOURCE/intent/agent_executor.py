@@ -8101,6 +8101,59 @@ class AgentExecutor:
             self._irreversible_tool_schema(tool_name),
         )
 
+    @staticmethod
+    def _payment_fill_payload(result: Any) -> dict[str, Any] | None:
+        """The fill tool's own result object (it reports ok/failed inside its data)."""
+        data = getattr(result, "data", None)
+        if isinstance(data, str):
+            try:
+                data = json.loads(data)
+            except ValueError:
+                return None
+        return data if isinstance(data, dict) else None
+
+    def _payment_fill_token(self) -> str:
+        context = getattr(self, "_payment_confirmation_tool_context", None)
+        if not isinstance(context, dict):
+            return ""
+        return str(context.get("confirmation_token") or "").strip()
+
+    def _remember_payment_fill_result(self, result: Any) -> None:
+        """Remember a successful fill for this approval (never the card data)."""
+        token = self._payment_fill_token()
+        payload = self._payment_fill_payload(result)
+        if not token or not getattr(result, "ok", False) or payload is None or payload.get("ok") is not True:
+            return
+        fills = getattr(self, "_payment_fill_results", None)
+        if not isinstance(fills, dict):
+            fills = {}
+            self._payment_fill_results = fills
+        fills[token] = {key: payload[key] for key in ("ok", "card_label", "last4", "filled_count", "total_cents") if key in payload}
+
+    def _payment_fill_already_done(self, tool_args: Any) -> ToolResult | None:
+        """Accurate answer for a second fill of the same approved order, else None."""
+        token = self._payment_fill_token()
+        fills = getattr(self, "_payment_fill_results", None)
+        if not token or not isinstance(fills, dict) or token not in fills:
+            return None
+        original = dict(fills[token])
+        requested = str((tool_args or {}).get("card_label") or "").strip() if isinstance(tool_args, Mapping) else ""
+        if requested and original.get("card_label") and requested != original["card_label"]:
+            return ToolResult(
+                ok=False,
+                error="This order was already filled with the approved card; a different card needs a new approval.",
+                error_category="payment_fill_already_done",
+                retryable=False,
+            )
+        return ToolResult(
+            ok=True,
+            data={
+                "already_filled_for_this_order": True,
+                "message": "The approved card is already filled in for this order. Do not fill it again.",
+                "original_result": original,
+            },
+        )
+
     def _payment_gate_approval_active(self, tool_name: str, tool_args: Any = None) -> bool:
         """True while the user's out-of-band approval of THIS order is live for this task.
 
@@ -8455,7 +8508,18 @@ class AgentExecutor:
                     },
                     error_category="payment_review_required",
                 )
-        idempotency_action = classify_action(tool_name, tool_args)
+        if tool_name == "fill_payment_details":
+            # The payment gate, not a five-minute window keyed on the card
+            # label, decides when a card may be filled: each fill needs this
+            # order's PIN approval. The old window answered a second approved
+            # order with "I just placed this" and ok=True while filling nothing
+            # (r5/commerce), so the model went on to submit an empty card form.
+            already = self._payment_fill_already_done(tool_args)
+            if already is not None:
+                return already
+            idempotency_action = None
+        else:
+            idempotency_action = classify_action(tool_name, tool_args)
         if idempotency_action:
             try:
                 user_scope = self._get_effective_user_id()
@@ -8721,6 +8785,8 @@ class AgentExecutor:
             self._track_page_url(tool_name, result)
             self._record_memory_all_scope_no_match(tool_name, tool_args, result)
 
+            if tool_name == "fill_payment_details":
+                self._remember_payment_fill_result(result)
             if result.ok and idempotency_action:
                 try:
                     get_idempotency_store().record_action(
