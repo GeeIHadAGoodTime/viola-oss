@@ -38,6 +38,7 @@ INFRASTRUCTURE_KEYS: Final[frozenset[str]] = frozenset(
         "founder_phone_number",
         "google_workspace_mcp_path",
         "input_device",
+        "lan_access_enabled",
         "local_music_folder",
         "log_level",
         "microphone_volume",

@@ -47,6 +47,22 @@ except ImportError as e:
         return True, ""
 
 
+def _self_signed_tls_kwargs() -> dict[str, str]:
+    """Return uvicorn TLS kwargs when the optional self-signed cert pair exists.
+
+    Shared by the main server and the LAN listener so both serve the same
+    scheme; the pairing URL's scheme follows ``settings.ssl_enabled``.
+    """
+    import os
+
+    base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    cert = os.path.join(base, "data", "secrets", "viola_cert.pem")
+    key = os.path.join(base, "data", "secrets", "viola_key.pem")
+    if os.path.exists(cert) and os.path.exists(key):
+        return {"ssl_certfile": cert, "ssl_keyfile": key}
+    return {}
+
+
 class UvicornServer:
     """Wrapper for Uvicorn server that can be stopped gracefully"""
 
@@ -56,16 +72,9 @@ class UvicornServer:
         except ImportError as e:
             raise ImportError("uvicorn is required for web server. Install: pip install uvicorn") from e
 
-        # HTTPS test: serve over TLS with self-signed cert (temporary)
-        import os
-
-        _base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        _cert = os.path.join(_base, "data", "secrets", "viola_cert.pem")
-        _key = os.path.join(_base, "data", "secrets", "viola_key.pem")
-        _ssl_kwargs: dict[str, str] = {}
-        if os.path.exists(_cert) and os.path.exists(_key):
-            _ssl_kwargs = {"ssl_certfile": _cert, "ssl_keyfile": _key}
-            logger.info("HTTPS enabled with self-signed cert: %s", _cert)
+        _ssl_kwargs = _self_signed_tls_kwargs()
+        if _ssl_kwargs:
+            logger.info("HTTPS enabled with self-signed cert: %s", _ssl_kwargs["ssl_certfile"])
 
         self.config = uvicorn.Config(
             app=app,
@@ -661,3 +670,119 @@ def create_server(app: Any, host: str, port: int) -> StoppableServer:
     except Exception as e:
         logger.exception("Failed to start Uvicorn server: %s", e)
         raise RuntimeError(f"Unexpected error starting server on {host}:{port}: {e}") from e
+
+
+class LanListenerError(RuntimeError):
+    """The LAN listener could not open its socket."""
+
+
+class LanListener:
+    """A second listening socket for the SAME app, on one LAN address.
+
+    The desktop API binds loopback so a fresh install never opens a LAN port
+    (or a firewall prompt) by itself. When the user adds a room, the phone has
+    to reach the hub over Wi-Fi, so this opens one more listener on the hub's
+    LAN address and the same port, serving the very same ASGI app object:
+    every middleware, auth layer, spoke-scope check and route-level loopback
+    guard runs unchanged, and ``request.client.host`` is the phone's address,
+    exactly as it was when the app used to bind ``0.0.0.0``.
+
+    It runs on the event loop that is already serving the app (start it from
+    a coroutine on that loop), so websockets and app state never cross loops.
+    ``lifespan="off"``: the app's startup and shutdown hooks belong to the main
+    server and must not run twice. The socket is bound here, before uvicorn
+    sees it, so a bind failure is a normal exception instead of uvicorn's
+    ``sys.exit`` inside a task on the shared loop.
+    """
+
+    def __init__(self, app: Any, host: str, port: int) -> None:
+        self.app = app
+        self.host = host
+        self.port = int(port)
+        self._server: Any = None
+        self._task: asyncio.Task[None] | None = None
+
+    @property
+    def running(self) -> bool:
+        task = self._task
+        server = self._server
+        return bool(task is not None and not task.done() and server is not None and server.started)
+
+    def _bind_socket(self) -> socket.socket:
+        try:
+            info = socket.getaddrinfo(self.host, self.port, type=socket.SOCK_STREAM, flags=socket.AI_NUMERICHOST)
+        except (OSError, UnicodeError) as exc:
+            raise LanListenerError("invalid LAN address %r: %s" % (self.host, exc)) from exc
+        family, socktype, proto, _canonname, sockaddr = info[0]
+        sock = socket.socket(family, socktype, proto)
+        try:
+            if hasattr(socket, "SO_EXCLUSIVEADDRUSE"):
+                # Windows: nobody else may bind this exact address and port
+                # underneath us (the default lets a later bind steal it).
+                sock.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+            else:
+                sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            sock.bind(sockaddr)
+            sock.setblocking(False)
+            sock.set_inheritable(False)
+        except OSError as exc:
+            sock.close()
+            raise LanListenerError("could not listen on %s:%d: %s" % (self.host, self.port, exc)) from exc
+        return sock
+
+    async def start(self, ready_timeout: float = 5.0) -> None:
+        """Bind and start serving on the running loop; raise on failure."""
+        if self.running:
+            return
+        import uvicorn
+
+        sock = self._bind_socket()
+        config = uvicorn.Config(
+            app=self.app,
+            host=self.host,
+            port=self.port,
+            lifespan="off",
+            log_config=None,
+            loop="asyncio",
+            timeout_keep_alive=30,
+            limit_concurrency=100,
+            timeout_graceful_shutdown=5,
+            proxy_headers=False,
+            forwarded_allow_ips="",
+            **_self_signed_tls_kwargs(),
+        )
+        server = uvicorn.Server(config)
+        self._server = server
+        self._task = asyncio.get_running_loop().create_task(
+            server.serve(sockets=[sock]), name="viola-lan-listener-%s" % self.host
+        )
+        deadline = time.monotonic() + ready_timeout
+        while not server.started:
+            if self._task.done():
+                exc = self._task.exception() if not self._task.cancelled() else None
+                sock.close()
+                raise LanListenerError("LAN listener on %s:%d stopped during startup: %s" % (self.host, self.port, exc))
+            if time.monotonic() > deadline:
+                await self.stop()
+                sock.close()
+                raise LanListenerError("LAN listener on %s:%d did not start in time" % (self.host, self.port))
+            await asyncio.sleep(0.02)
+        logger.info("LAN listener serving the desktop app on %s:%d", self.host, self.port)
+
+    async def stop(self, timeout: float = 5.0) -> None:
+        """Stop accepting LAN connections and close the ones that are open."""
+        server, task = self._server, self._task
+        self._server, self._task = None, None
+        if server is not None:
+            server.should_exit = True
+        if task is not None and not task.done():
+            try:
+                await asyncio.wait_for(asyncio.shield(task), timeout=timeout)
+            except (TimeoutError, asyncio.CancelledError):
+                if server is not None:
+                    server.force_exit = True
+                task.cancel()
+            except Exception:
+                logger.debug("LAN listener ended with an error during stop", exc_info=True)
+        if server is not None:
+            logger.info("LAN listener on %s:%d stopped", self.host, self.port)

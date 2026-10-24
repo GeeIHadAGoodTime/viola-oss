@@ -185,6 +185,7 @@ _GLOBAL_SETTINGS_KEYS = frozenset(
         "early_access_updates",
         "jwt_secret",
         "jwt_secret_previous",
+        "lan_access_enabled",
         "log_level",
         "security_auth_enabled",
         "sentry_dsn",
@@ -825,6 +826,11 @@ class SettingsManager:
         # SmartThings).  Off by default — user clicks "Discover" in
         # Settings > Smart Home, or says "Viola, find my smart devices".
         "network_discovery_enabled": False,
+        # Rooms: let phones/tablets on the same Wi-Fi reach this hub. Off on a
+        # fresh install (no LAN port, no firewall prompt over onboarding);
+        # opening Rooms > Add Room turns it on (utils/speaker_pairing_flow.py).
+        # Install-scoped: the listener belongs to the machine, not an account.
+        "lan_access_enabled": False,
         "home_assistant_url": "",
         "home_assistant_token": "",
         # Weekly-review service (services/meta_analysis/weekly_review.py) —

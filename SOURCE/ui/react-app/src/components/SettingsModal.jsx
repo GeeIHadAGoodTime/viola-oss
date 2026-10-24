@@ -55,6 +55,77 @@ import WakeSensitivitySlider from './settings/WakeSensitivitySlider';
 
 // Use centralized theme from config.js
 const theme = THEME;
+
+/**
+ * Settings > System > Advanced: whether phones and tablets on this Wi-Fi can
+ * reach Viola (Rooms). Applied immediately through /v1/network/lan-access, not
+ * through the Save draft, because it opens or closes a network port. Opening
+ * Rooms > Add Room turns it on; this is where the user can see and undo that.
+ */
+function LanAccessSettingRow() {
+  const [status, setStatus] = useState(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    apiFetch('/v1/network/lan-access')
+      .then((data) => {
+        if (!cancelled) setStatus(data || null);
+      })
+      .catch(() => {
+        if (!cancelled) setStatus(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleChange = useCallback(async (enabled) => {
+    setBusy(true);
+    try {
+      const data = await apiFetch('/v1/network/lan-access', {
+        method: 'POST',
+        body: JSON.stringify({ enabled }),
+      });
+      setStatus(data || null);
+    } catch {
+      // Keep the last known state; the toggle snaps back to it.
+    } finally {
+      setBusy(false);
+    }
+  }, []);
+
+  if (!status) return null;
+  const note = status.reachable
+    ? status.firewall?.message || null
+    : status.enabled
+      ? status.message
+      : null;
+  return (
+    <SettingRow
+      title="Let devices on your Wi-Fi connect"
+      description="Lets phones and tablets on this Wi-Fi join as Rooms speakers. They still need the code from Rooms > Add Room. Turns on when you add a room."
+    >
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
+        <Toggle
+          checked={Boolean(status.enabled || status.via === 'main_bind')}
+          onChange={handleChange}
+          disabled={busy || status.via === 'main_bind'}
+          ariaLabel="Let devices on your Wi-Fi connect"
+        />
+        {note && (
+          <div
+            style={{ maxWidth: '260px', textAlign: 'right', fontSize: '12px', color: theme.colors.textMuted }}
+            data-testid="settings-lan-access-note"
+          >
+            {note}
+          </div>
+        )}
+      </div>
+    </SettingRow>
+  );
+}
+
 const MODAL_OPEN_DEFER_MS = 50;
 const SPOTIFY_LOGIN_POLL_MS = 2000;
 const SPOTIFY_LOGIN_TIMEOUT_MS = 120000;
@@ -3884,6 +3955,7 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
             </Section>
 
             <AdvancedSection title="Advanced">
+              {!isFeatureHidden('rooms') && <LanAccessSettingRow />}
               <SettingRow
                 title="Network API Port"
                 description="The HTTP port the local Viola server binds to. Restart required to take effect."

@@ -563,6 +563,42 @@ def create_app(state: Any, music: Any, intent: Any) -> FastAPI:
         except Exception:
             log.exception("Failed to register main loop for asyncio_safe bridges")
 
+    # ========== LAN ACCESS FOR ROOMS (PHONE PAIRING) ==========
+    # The API binds loopback; phones reach the hub through an extra LAN
+    # listener the user turns on by opening Rooms > Add Room
+    # (utils/speaker_pairing_flow.py). The supervisor reopens a remembered
+    # listener after a restart, follows LAN address changes, and applies the
+    # Settings toggle. It opens nothing while ``lan_access_enabled`` is off, so
+    # a fresh install still has no LAN port and no firewall prompt (#4867).
+    @app.on_event("startup")
+    async def _start_lan_access_supervisor() -> None:
+        try:
+            from utils.speaker_pairing_flow import lan_access_supervisor, register_lan_app
+
+            register_lan_app(app)
+            task = asyncio.create_task(lan_access_supervisor(), name="viola-lan-access-supervisor")
+            task.add_done_callback(_log_task_exception)
+            app.state.lan_access_supervisor_task = task
+        except Exception:
+            log.exception("Failed to start the LAN access supervisor; Rooms pairing will open it on demand")
+
+    @app.on_event("shutdown")
+    async def _stop_lan_access() -> None:
+        task = getattr(app.state, "lan_access_supervisor_task", None)
+        if task is not None:
+            task.cancel()
+            try:
+                await task
+            except (asyncio.CancelledError, Exception):
+                pass
+        try:
+            from utils.speaker_pairing_flow import register_lan_app, stop_lan_access_listener
+
+            await stop_lan_access_listener()
+            register_lan_app(None)
+        except Exception:
+            log.debug("LAN access listener shutdown skipped", exc_info=True)
+
     # ========== WEATHER PREFETCH (FAST STARTUP + KEEP-WARM LOOP) ==========
     # issue #2094: the shared public weather cache (backend.weather_fetch,
     # _WEATHER_FETCH_CACHE_TTL_SECONDS = 10 min) used to be warmed exactly once,

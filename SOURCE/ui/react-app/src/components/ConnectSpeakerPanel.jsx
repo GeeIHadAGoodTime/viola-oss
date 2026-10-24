@@ -142,6 +142,7 @@ export default function ConnectSpeakerPanel({ initialRoomName = 'new-room' }) {
   // for a short-lived code; the hub shows it here so the user can read it to
   // the joining device. Polled while the panel is open.
   const [joinCode, setJoinCode] = useState(null);
+  const [lanBusy, setLanBusy] = useState(false);
 
   useEffect(() => {
     setRoomName(normalizeInitialRoomName(initialRoomName));
@@ -169,12 +170,15 @@ export default function ConnectSpeakerPanel({ initialRoomName = 'new-room' }) {
         // QR rendered from a synthesized localhost record.
         if (!cancelled) {
           setNetworkInfo({
-            ip: 'localhost',
+            ip: '',
             port: Number(window.location.port) || 8756,
-            spoke_url: `${window.location.protocol}//${window.location.hostname}:${
-              window.location.port || 8756
-            }/?room=`,
+            spoke_url: '',
             pairing_code: '',
+            lan_access: {
+              reachable: false,
+              reason_code: 'hub_unreachable',
+              message: "Viola's local server didn't answer. Click Try again in a moment.",
+            },
           });
           setLoading(false);
         }
@@ -260,16 +264,19 @@ export default function ConnectSpeakerPanel({ initialRoomName = 'new-room' }) {
     return () => clearTimeout(timer);
   }, [networkInfo]);
 
+  const lanAccess = networkInfo?.lan_access || null;
+  const lanUnreachable = Boolean(lanAccess && lanAccess.reachable === false);
+
   const spokeUrl = useMemo(() => {
-    if (!networkInfo) return '';
+    if (!networkInfo || lanUnreachable) return '';
     const safeName = roomName.trim().replace(/\s+/g, '-').toLowerCase() || 'new-room';
     const base = networkInfo.spoke_url
-      || (networkInfo.ip && networkInfo.port
+      || (!networkInfo.lan_access && networkInfo.ip && networkInfo.port
         ? `http://${networkInfo.ip}:${networkInfo.port}/?room=`
         : '');
     if (!base) return '';
     return `${base}${encodeURIComponent(safeName)}`;
-  }, [networkInfo, roomName]);
+  }, [networkInfo, roomName, lanUnreachable]);
 
   const qrModules = useMemo(() => {
     if (!spokeUrl) return null;
@@ -298,6 +305,41 @@ export default function ConnectSpeakerPanel({ initialRoomName = 'new-room' }) {
       setTimeout(() => setCopied(false), 2000);
     }
   }, [spokeUrl]);
+
+  const handleRetry = useCallback(() => {
+    setLoading(true);
+    setReloadKey((k) => k + 1);
+  }, []);
+
+  // Turning LAN access off closes the hub's Wi-Fi port right away; reopening
+  // the panel (or Try again) turns it back on.
+  const handleTurnOffLan = useCallback(async () => {
+    setLanBusy(true);
+    try {
+      const response = await authFetch('/v1/network/lan-access', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: false }),
+      });
+      if (response.ok) {
+        setNetworkInfo({
+          ip: '',
+          port: networkInfo?.port || 8756,
+          spoke_url: '',
+          pairing_code: '',
+          lan_access: {
+            reachable: false,
+            reason_code: 'lan_access_off',
+            message: 'Devices on your Wi-Fi can no longer connect to Viola. Click Try again to allow them.',
+          },
+        });
+      }
+    } catch {
+      // Leave the panel as it was; the user can retry.
+    } finally {
+      setLanBusy(false);
+    }
+  }, [networkInfo]);
 
   if (roomsHidden) {
     return (
@@ -370,7 +412,48 @@ export default function ConnectSpeakerPanel({ initialRoomName = 'new-room' }) {
     );
   }
 
-  const showLocalhostHint = isLocalhostIp(networkInfo?.ip);
+  if (lanUnreachable) {
+    return (
+      <div
+        style={{ textAlign: 'center', padding: '32px 20px' }}
+        data-testid="connect-speaker-lan-unavailable"
+      >
+        <div style={{ color: theme.colors.accent, display: 'flex', justifyContent: 'center', marginBottom: '12px' }}>
+          <Icons.Wifi />
+        </div>
+        <div
+          style={{ color: theme.colors.textPrimary, fontSize: '14px', marginBottom: '8px', lineHeight: '1.5' }}
+          data-testid="connect-speaker-lan-message"
+        >
+          {lanAccess.message || "Other devices can't reach Viola on this network right now."}
+        </div>
+        <div style={{ color: theme.colors.textMuted, fontSize: '12px', marginBottom: '16px', lineHeight: '1.5' }}>
+          No link or code is shown until a phone on your Wi-Fi can actually open it.
+        </div>
+        <button
+          type="button"
+          onClick={handleRetry}
+          style={{
+            padding: '10px 20px',
+            borderRadius: '10px',
+            border: 'none',
+            backgroundColor: theme.colors.accent,
+            color: 'white',
+            fontSize: '14px',
+            fontWeight: 500,
+            cursor: 'pointer',
+          }}
+          data-testid="connect-speaker-lan-retry"
+        >
+          Try again
+        </button>
+      </div>
+    );
+  }
+
+  const showLocalhostHint = !lanAccess && isLocalhostIp(networkInfo?.ip);
+  const firewall = lanAccess?.firewall || null;
+  const firewallBlocked = firewall?.state === 'blocked';
 
   return (
     <div
@@ -587,6 +670,47 @@ export default function ConnectSpeakerPanel({ initialRoomName = 'new-room' }) {
         >
           {copied ? <Icons.Check /> : <Icons.Copy />}
           {copied ? 'Copied' : 'Copy link'}
+        </button>
+      )}
+
+      {/* Windows Firewall: a dismissed "allow access" prompt blocks the phone
+          silently, so say so here instead of letting the phone hang. */}
+      {firewall?.message && (
+        <div
+          style={{
+            width: '100%',
+            padding: '12px 14px',
+            borderRadius: '12px',
+            border: `1px solid ${firewallBlocked ? theme.colors.statusRed : theme.colors.borderSubtle}`,
+            color: firewallBlocked ? theme.colors.statusRed : theme.colors.textMuted,
+            fontSize: '12px',
+            lineHeight: '1.5',
+            textAlign: 'center',
+            boxSizing: 'border-box',
+          }}
+          data-testid={firewallBlocked ? 'connect-speaker-firewall-blocked' : 'connect-speaker-firewall-hint'}
+        >
+          {firewall.message}
+        </div>
+      )}
+
+      {lanAccess?.via === 'lan_listener' && (
+        <button
+          type="button"
+          onClick={handleTurnOffLan}
+          disabled={lanBusy}
+          style={{
+            background: 'none',
+            border: 'none',
+            color: theme.colors.textMuted,
+            fontSize: '12px',
+            cursor: lanBusy ? 'default' : 'pointer',
+            textDecoration: 'underline',
+            padding: 0,
+          }}
+          data-testid="connect-speaker-lan-off"
+        >
+          Stop letting devices on this Wi-Fi connect
         </button>
       )}
     </div>
