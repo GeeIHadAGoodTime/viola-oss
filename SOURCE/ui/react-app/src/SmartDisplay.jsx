@@ -1728,6 +1728,8 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
   // =========================================================================
   // CHAT RESPONSE WIRING
   // =========================================================================
+  const showNotificationsRef = useRef(true);
+  showNotificationsRef.current = userSettings?.show_notifications ?? true;
   useEffect(() => {
     if (!setChatResponseCallback) return;
     const handleChatResponse = (payload) => {
@@ -1751,6 +1753,15 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
         setLastResponse(`"${truncateForResponseLine(text)}"`);
         if (hasExplicitCard) {
           setActiveCard(payload.card);
+          if (payload.card.type === 'gate_review' && payload.card.gate_kind === 'payment') {
+            // Fallback delivery for the purchase approval: a desktop
+            // notification, so a minimized window still tells the user.
+            showNotification('Approve your purchase', {
+              body: truncateForResponseLine(String(payload.card.body || 'Viola is waiting for your approval.')),
+              tag: 'viola-payment-gate',
+              requireInteraction: true,
+            }, showNotificationsRef.current);
+          }
         } else {
           // An auto-promoted long answer has no title anyone wrote for it.
           // ContentCard omits the whole title block when `title` is absent,

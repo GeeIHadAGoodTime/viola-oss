@@ -2045,6 +2045,9 @@ async def run_agent_loop(
     # class) and let the approval layer see this task's taint, so a
     # confirm-or-cancel gate under taint accepts only the user's own words.
     taint_tracker.set_schema_lookup(getattr(executor, "_irreversible_tool_schema", None))
+    # The payment gate replaces taint's blanket payment refusal for the tools
+    # that use only a card the user approved for this exact order (r5/commerce).
+    taint_tracker.set_payment_approval_probe(getattr(executor, "_payment_gate_approval_active", None))
     _bind_active_taint_tracker(taint_tracker)
     _bind_file_gate_context_for_run(executor, loop_messages, user_text)
     pending_hook_context_messages: list[dict[str, Any]] = []
@@ -5128,6 +5131,7 @@ async def run_agent_loop(
                     final_answer = _payment_gate_answer_with_confirm_url(
                         final_answer,
                         str(payment_confirmation_ctx.get("url") or ""),
+                        payment_confirmation_ctx.get("link_note"),
                     )
                     await _dispatch_payment_confirmation_link_for_executor(
                         executor,

@@ -458,6 +458,13 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
   });
   const [paymentCardSaving, setPaymentCardSaving] = useState(false);
   const [paymentCardActionError, setPaymentCardActionError] = useState('');
+  // Payment PIN: approves every purchase on the payment gate (phone link or
+  // this computer). The PIN never leaves this computer; only "is one set".
+  const [paymentPinSet, setPaymentPinSet] = useState(null);
+  const [paymentPinOpen, setPaymentPinOpen] = useState(false);
+  const [paymentPinForm, setPaymentPinForm] = useState({ current: '', pin: '', confirm: '' });
+  const [paymentPinSaving, setPaymentPinSaving] = useState(false);
+  const [paymentPinMessage, setPaymentPinMessage] = useState('');
   const [isDetectingLocalAi, setIsDetectingLocalAi] = useState(false);
   const [localAiDetectStatus, setLocalAiDetectStatus] = useState('');
   const [localAiServers, setLocalAiServers] = useState([]);
@@ -726,6 +733,12 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
     try {
       const data = await apiFetch('/api/payments/cards');
       setPaymentCards(Array.isArray(data?.cards) ? data.cards : []);
+      try {
+        const pinData = await apiFetch('/api/payments/cards/pin');
+        setPaymentPinSet(Boolean(pinData?.pin_set));
+      } catch {
+        setPaymentPinSet(null);
+      }
     } catch {
       if (!silent) {
         setPaymentCards([]);
@@ -1325,6 +1338,41 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
       setPaymentCardSaving(false);
     }
   }, [paymentCardDialog, paymentCardForm, refreshPaymentCards]);
+
+  const handleSavePaymentPin = useCallback(async () => {
+    const pin = paymentPinForm.pin.trim();
+    if (!/^\d{4,8}$/.test(pin)) {
+      setPaymentPinMessage('Use 4 to 8 digits.');
+      return;
+    }
+    if (pin !== paymentPinForm.confirm.trim()) {
+      setPaymentPinMessage('The two PINs do not match.');
+      return;
+    }
+    if (paymentPinSet && !paymentPinForm.current.trim()) {
+      setPaymentPinMessage('Enter your current PIN to change it.');
+      return;
+    }
+    setPaymentPinSaving(true);
+    setPaymentPinMessage('');
+    try {
+      await apiFetch('/api/payments/cards/pin', {
+        method: 'PUT',
+        body: JSON.stringify({
+          pin,
+          ...(paymentPinSet ? { current_pin: paymentPinForm.current.trim() } : {}),
+        }),
+      });
+      setPaymentPinSet(true);
+      setPaymentPinOpen(false);
+      setPaymentPinForm({ current: '', pin: '', confirm: '' });
+      setPaymentPinMessage('Payment PIN saved.');
+    } catch (err) {
+      setPaymentPinMessage(err?.message && !/^HTTP \d+/.test(err.message) ? err.message : "Couldn't save the PIN.");
+    } finally {
+      setPaymentPinSaving(false);
+    }
+  }, [paymentPinForm, paymentPinSet]);
 
   const handleDeletePaymentCard = useCallback(async (card) => {
     if (!card?.label) return;
@@ -2388,6 +2436,108 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
                   >
                     Add a payment method
                   </button>
+                </div>
+                <div
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '8px',
+                    padding: '12px 14px',
+                    borderRadius: '8px',
+                    backgroundColor: theme.colors.bgElevated,
+                    border: `1px solid ${theme.colors.borderSubtle}`,
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ color: theme.colors.textPrimary, fontSize: '14px', fontWeight: 600 }}>
+                        Payment PIN
+                      </div>
+                      <div style={{ color: theme.colors.textMuted, fontSize: '12px', marginTop: '3px' }}>
+                        {paymentPinSet
+                          ? 'Set. You enter it to approve each purchase, on this computer or from the link Viola sends you.'
+                          : 'Needed before Viola can buy anything. You enter it to approve each purchase.'}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => { setPaymentPinOpen((open) => !open); setPaymentPinMessage(''); }}
+                      style={{
+                        padding: '8px 12px',
+                        minHeight: '44px',
+                        borderRadius: '8px',
+                        border: `1px solid ${theme.colors.borderLight}`,
+                        backgroundColor: 'transparent',
+                        color: theme.colors.textPrimary,
+                        fontSize: '13px',
+                        cursor: 'pointer',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {paymentPinSet ? 'Change PIN' : 'Set PIN'}
+                    </button>
+                  </div>
+                  {paymentPinOpen && (
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                      {paymentPinSet && (
+                        <input
+                          type="password"
+                          inputMode="numeric"
+                          autoComplete="current-password"
+                          aria-label="Current payment PIN"
+                          placeholder="Current PIN"
+                          value={paymentPinForm.current}
+                          onChange={(e) => setPaymentPinForm((prev) => ({ ...prev, current: e.target.value }))}
+                          style={{ width: '120px', padding: '8px', borderRadius: '8px', border: `1px solid ${theme.colors.borderLight}`, backgroundColor: 'transparent', color: theme.colors.textPrimary }}
+                        />
+                      )}
+                      <input
+                        type="password"
+                        inputMode="numeric"
+                        autoComplete="new-password"
+                        maxLength={8}
+                        aria-label="New payment PIN"
+                        placeholder="New PIN"
+                        value={paymentPinForm.pin}
+                        onChange={(e) => setPaymentPinForm((prev) => ({ ...prev, pin: e.target.value }))}
+                        style={{ width: '120px', padding: '8px', borderRadius: '8px', border: `1px solid ${theme.colors.borderLight}`, backgroundColor: 'transparent', color: theme.colors.textPrimary }}
+                      />
+                      <input
+                        type="password"
+                        inputMode="numeric"
+                        autoComplete="new-password"
+                        maxLength={8}
+                        aria-label="Type the new payment PIN again"
+                        placeholder="Again"
+                        value={paymentPinForm.confirm}
+                        onChange={(e) => setPaymentPinForm((prev) => ({ ...prev, confirm: e.target.value }))}
+                        style={{ width: '120px', padding: '8px', borderRadius: '8px', border: `1px solid ${theme.colors.borderLight}`, backgroundColor: 'transparent', color: theme.colors.textPrimary }}
+                      />
+                      <button
+                        type="button"
+                        onClick={handleSavePaymentPin}
+                        disabled={paymentPinSaving}
+                        style={{
+                          padding: '8px 12px',
+                          minHeight: '44px',
+                          borderRadius: '8px',
+                          border: 'none',
+                          backgroundColor: theme.colors.accent,
+                          color: '#fff',
+                          fontSize: '13px',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {paymentPinSaving ? 'Saving...' : 'Save PIN'}
+                      </button>
+                    </div>
+                  )}
+                  {paymentPinMessage && (
+                    <div role="status" style={{ color: theme.colors.textSecondary, fontSize: '12px' }}>
+                      {paymentPinMessage}
+                    </div>
+                  )}
                 </div>
                 {paymentCardsLoading && (
                   <div style={{ color: theme.colors.textMuted, fontSize: '14px' }}>

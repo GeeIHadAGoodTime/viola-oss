@@ -17,8 +17,9 @@ structural pieces that are NOT text classification:
     boundary used by ``BrowserTaintTracker`` to know when untrusted
     content has entered context.
   * ``BrowserTaintTracker`` itself — a deterministic gate that, once
-    untrusted content is in context, refuses payments and shell commands,
-    makes the confirm-or-cancel gates accept only the user's own words, and
+    untrusted content is in context, refuses shell commands and any payment
+    the user has not approved through the payment gate, makes the
+    confirm-or-cancel gates accept only the user's own words, and
     stops the user's private data from being carried out in a URL or
     script to a site the user did not name. It never classifies whether
     content "looks like" an injection.
@@ -98,7 +99,9 @@ HIGH_RISK_TOOLS = frozenset(
 # HIGH_RISK_TOOLS above is the taxonomy of consequential tools. While untrusted
 # content is in the conversation:
 #   * payments and shell commands are refused outright, with no confirm
-#     override (TAINT_HARD_BLOCK_ACTION_CLASSES);
+#     override (TAINT_HARD_BLOCK_ACTION_CLASSES), except that the two
+#     payment-gate-bound tools run once the user approved this exact order
+#     through the payment gate (PAYMENT_GATE_BOUND_TOOLS, below);
 #   * a phone call goes on to its confirm-or-cancel gate like the actions
 #     below (r5/phone): the confirmation shows the user the exact number and
 #     who it belongs to, says the number came from outside content, and must
@@ -115,6 +118,19 @@ HIGH_RISK_TOOLS = frozenset(
 TAINT_HARD_BLOCK_ACTION_CLASSES = frozenset({"payment", "shell_command"})
 TAINT_PHONE_ACTION_CLASSES: frozenset[str] = frozenset()
 TAINT_UNGATED_HIGH_RISK_TOOLS = frozenset({"send_telegram", "write_file"})
+
+# The payment gate is the crucial-moment defence for buying things (r5/commerce).
+# Shopping always reads merchant pages, so taint is on for every real purchase;
+# a blanket refusal here would make every purchase impossible. These two tools
+# only ever use a card the user approved out of band for this exact order: the
+# approval link shows the merchant, items and total, is bound to the user and
+# the order, is single use, expires, and needs the user's payment PIN, which the
+# desktop checks against its own vault. Under taint they run only while such an
+# approval is active for this task (the probe the agent loop installs answers
+# that from code-owned state, never from the model's arguments). Every other
+# payment-class call, and anything before approval, stays refused, and the
+# exfiltration defence below is unchanged.
+PAYMENT_GATE_BOUND_TOOLS = frozenset({"fill_payment_details", "transmit_payment_to_call"})
 
 
 def canonicalize_tool_name_for_safety(tool_name: str | None) -> str:
@@ -705,7 +721,9 @@ class BrowserTaintTracker:
     source: browser/web pages AND email, calendar, memory, and file content
     (SEC-001). What taint changes (founder rule, 2026-10-24):
 
-      * payments and shell commands are refused outright;
+      * shell commands are refused outright, and so is every payment except
+        filling (or speaking) the card the user approved for this exact
+        order through the payment gate's out-of-band approval;
       * phone calls reach their confirm-or-cancel gate, which shows the exact
         number and who it belongs to (r5/phone);
       * every other consequential action goes on to its confirm-or-cancel
@@ -742,6 +760,10 @@ class BrowserTaintTracker:
         # is following a link, which cannot carry new data out.
         self._seen_urls: set[str] = set()
         self._schema_lookup: Callable[[str], Mapping[str, Any] | None] | None = None
+        # Answers "has the user approved this exact order through the payment
+        # gate, and is that approval still live for this task?" Installed by
+        # the agent loop from executor state; None means "never".
+        self._payment_approval_probe: Callable[[str, Mapping[str, Any]], bool] | None = None
 
     def set_user_request(self, user_text: str | None) -> None:
         """Record the current user request (user-named file/site exemptions)."""
@@ -750,6 +772,20 @@ class BrowserTaintTracker:
     def set_schema_lookup(self, lookup: Callable[[str], Mapping[str, Any] | None] | None) -> None:
         """Let the gate read a tool's ``_meta`` (e.g. a payment extension's class)."""
         self._schema_lookup = lookup if callable(lookup) else None
+
+    def set_payment_approval_probe(self, probe: Callable[[str, Mapping[str, Any]], bool] | None) -> None:
+        """Let payment-gate-bound tools run under taint once the user approved the order."""
+        self._payment_approval_probe = probe if callable(probe) else None
+
+    def _payment_gate_approved(self, tool_name: str, args: Mapping[str, Any]) -> bool:
+        probe = self._payment_approval_probe
+        if probe is None:
+            return False
+        try:
+            return probe(tool_name, args) is True
+        except Exception:  # noqa: BLE001 - a broken probe must fail closed
+            logger.warning("TAINT_GATE: payment approval probe failed; refusing", exc_info=True)
+            return False
 
     @property
     def user_request(self) -> str:
@@ -939,6 +975,28 @@ class BrowserTaintTracker:
         args = _tool_args_mapping(tool_args) or {}
         canonical = canonicalize_tool_name_for_safety(tool_name)
         action_class = _taint_action_class(tool_name, args, self._schema_for(tool_name))
+
+        if action_class == "payment" and canonical in PAYMENT_GATE_BOUND_TOOLS:
+            if self._payment_gate_approved(canonical, args):
+                logger.info(
+                    "TAINT_GATE: allowing %s under taint from '%s': the user approved this order "
+                    "through the payment gate",
+                    tool_name,
+                    self._taint_source,
+                )
+                return None
+            logger.warning(
+                "TAINT_GATE: refusing %s before payment-gate approval (taint from '%s')",
+                tool_name,
+                self._taint_source,
+            )
+            return (
+                "BLOCKED: '%s' only runs after the user approves this exact order through the "
+                "secure payment review (merchant, items and total, confirmed with their payment "
+                "PIN). Do not fill or type card details. If checkout is ready, call "
+                'payment(action="request_review") with the merchant, items and total, then stop '
+                "and wait; Viola sends the user the approval link and continues once they approve." % tool_name
+            )
 
         if action_class in TAINT_HARD_BLOCK_ACTION_CLASSES:
             logger.warning(

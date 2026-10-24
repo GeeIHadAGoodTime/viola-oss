@@ -583,6 +583,20 @@ class _PaymentConfirmationGateRefused(RuntimeError):
         self.user_message = user_message
 
 
+async def _cloud_confirmation_link_failure(mgr: Any, token: str) -> str | None:
+    """Plain reason the hosted (phone) link for *token* will not work, or None.
+
+    None also covers a sync that is only slow: the link may still start working.
+    """
+    if await mgr.ensure_cloud_synced(token) is not False:
+        return None
+    describe = getattr(mgr, "cloud_sync_failure_message", None)
+    message = describe(token) if callable(describe) else None
+    if not isinstance(message, str) or not message.strip():
+        return None
+    return message
+
+
 async def _require_cloud_confirmation_link(mgr: Any, token: str) -> None:
     """Refuse to hand out a hosted approval link the cloud never received.
 
@@ -592,14 +606,55 @@ async def _require_cloud_confirmation_link(mgr: Any, token: str) -> None:
     unreachable), drop the session and raise with that reason instead. A sync
     that is only slow is left alone: the link may still start working.
     """
-    if await mgr.ensure_cloud_synced(token) is not False:
-        return
-    describe = getattr(mgr, "cloud_sync_failure_message", None)
-    message = describe(token) if callable(describe) else None
-    if not isinstance(message, str) or not message.strip():
+    message = await _cloud_confirmation_link_failure(mgr, token)
+    if message is None:
         return
     mgr.invalidate_session(token)
     raise _PaymentConfirmationGateRefused("payment confirmation cloud sync failed", user_message=message)
+
+
+def _confirmation_manager_link(mgr: Any, name: str, token: str) -> str | None:
+    builder = getattr(mgr, name, None)
+    if not callable(builder):
+        return None
+    try:
+        link = builder(token)
+    except Exception:
+        logger.debug("Payment confirmation %s link unavailable", name, exc_info=True)
+        return None
+    return link if isinstance(link, str) and link.strip() else None
+
+
+async def _payment_confirmation_links(mgr: Any, token: str, public_url: str) -> dict[str, Any]:
+    """Pick the links for one desktop-side payment approval (r5/commerce).
+
+    * ``url``: what the chat answer, the desktop card and the checkpoint show.
+      The approval page on this computer: it works without the cloud and asks
+      for the payment PIN. Nothing secret is in it.
+    * ``delivery_url``: what email/text/messaging delivery sends. The hosted
+      page plus the ``#k=`` key that only the link holder and this computer
+      have, so the phone can see the cards and seal the PIN. It is never put in
+      the answer, the conversation or a log.
+
+    When the hosted link cannot be prepared (not signed in, cloud sync off,
+    cloud refused the sign-in or unreachable), the purchase is still
+    completable on this computer: ``delivery_url`` is None and ``link_note``
+    says why there is no phone link.
+    """
+    local_url = _confirmation_manager_link(mgr, "local_url", token)
+    failure = await _cloud_confirmation_link_failure(mgr, token)
+    if failure is not None:
+        if not local_url:
+            mgr.invalidate_session(token)
+            raise _PaymentConfirmationGateRefused("payment confirmation cloud sync failed", user_message=failure)
+        note_builder = getattr(mgr, "local_fallback_note", None)
+        note = note_builder(token) if callable(note_builder) else None
+        return {"url": local_url, "delivery_url": None, "link_note": note if isinstance(note, str) else None}
+    return {
+        "url": local_url or public_url,
+        "delivery_url": _confirmation_manager_link(mgr, "delivery_url", token) or public_url,
+        "link_note": None,
+    }
 
 
 def _gate_state_record_params(
@@ -1553,13 +1608,20 @@ def _terminal_structured_incomplete_diagnostic(executor: Any, task_log: Any) -> 
     }
 
 
-def _payment_gate_answer_with_confirm_url(answer: str | None, confirmation_url: str | None) -> str | None:
-    """Append the raw hosted confirmation URL to PAYMENT_GATE answers."""
+def _payment_gate_answer_with_confirm_url(
+    answer: str | None,
+    confirmation_url: str | None,
+    note: str | None = None,
+) -> str | None:
+    """Append the confirmation URL (and why there is no phone link, if so) to PAYMENT_GATE answers."""
     if not answer:
         return answer
     url = (confirmation_url or "").strip()
     if not url or "/confirm/" not in url or url in answer:
         return answer
+    extra = (note or "").strip()
+    if extra and extra not in answer:
+        return "%s\n%s\n%s" % (answer.rstrip(), extra, url)
     return "%s\n%s" % (answer.rstrip(), url)
 
 
@@ -1571,6 +1633,15 @@ async def _dispatch_payment_confirmation_link_for_executor(
     """Dispatch confirmation links for channels not covered by final card rendering."""
     if not payment_confirmation_ctx:
         return None
+    if "delivery_url" in payment_confirmation_ctx:
+        delivery_url = payment_confirmation_ctx.get("delivery_url")
+        if not delivery_url:
+            # Only the on-this-computer page works (no hosted link); sending a
+            # loopback link by email or text would help nobody.
+            delivery = {"status": "local_only", "reason": "hosted_link_unavailable"}
+            payment_confirmation_ctx["link_dispatch"] = delivery
+            return delivery
+        confirmation_url = str(delivery_url)
     origin_channel = executor._get_origin_channel_type()
     if origin_channel not in {
         None,
@@ -3939,11 +4010,14 @@ class AgentExecutor:
                         channel=(getattr(channel, "channel_type", None) if channel is not None else None),
                         metadata=({"merchant_url": merchant_url} if merchant_url else None),
                     )
-                    await _require_cloud_confirmation_link(mgr, token)
+                    links = await _payment_confirmation_links(mgr, token, url)
+                    url = links["url"]
                     ctx = {
                         "mgr": mgr,
                         "token": token,
                         "url": url,
+                        "delivery_url": links["delivery_url"],
+                        "link_note": links["link_note"],
                         "channel": channel,
                         "page_ref": page_ref,
                         "page_url": merchant_url,
@@ -8013,6 +8087,52 @@ class AgentExecutor:
             self._irreversible_tool_schema(tool_name),
         )
 
+    def _payment_gate_approval_active(self, tool_name: str, tool_args: Any = None) -> bool:
+        """True while the user's out-of-band approval of THIS order is live for this task.
+
+        The payment gate is the crucial-moment defence for buying (r5/commerce):
+        the approval page shows the exact merchant, items and total, is bound to
+        this user and this order, is single use, expires, and needs the user's
+        payment PIN, checked on this device. ``_run_payment_confirmation_wait``
+        sets ``_payment_confirmation_tool_context`` and the override token only
+        after that approval, and clears both when the continuation ends. This
+        reads only that code-owned state plus the live confirmation session;
+        nothing the model passes can turn it on. Used by the taint gate and the
+        irreversible-action gate for the payment-gate-bound tools only.
+        """
+        name = str(tool_name or "").strip()
+        if name not in {"fill_payment_details", "transmit_payment_to_call"}:
+            return False
+        context = getattr(self, "_payment_confirmation_tool_context", None)
+        override_token = getattr(self, "_payment_gate_override_token", None)
+        if not isinstance(context, dict) or not override_token:
+            return False
+        token = str(context.get("confirmation_token") or "").strip()
+        approved_label = str(context.get("card_label") or "").strip()
+        if not token or not approved_label:
+            return False
+        requested_label = ""
+        if isinstance(tool_args, Mapping):
+            requested_label = str(tool_args.get("card_label") or "").strip()
+        if requested_label and requested_label != approved_label:
+            logger.warning("Payment gate approval does not cover a different card for %s", name)
+            return False
+        try:
+            from services.payments.confirmation import (
+                ConfirmationStatus,
+                get_confirmation_manager,
+            )
+
+            session = get_confirmation_manager().get_session(token)
+        except Exception:
+            logger.debug("Payment gate approval lookup failed", exc_info=True)
+            return False
+        if session is None or session.status != ConfirmationStatus.CONFIRMED:
+            return False
+        if str(getattr(session, "user_id", "") or "") != str(self._get_effective_user_id() or ""):
+            return False
+        return str(getattr(session, "selected_card_label", "") or "").strip() == approved_label
+
     def _remember_irreversible_confirmation(self, action_class: str) -> None:
         if action_class in _ONE_SHOT_IRREVERSIBLE_CONFIRMATION_CLASSES:
             return
@@ -8076,6 +8196,11 @@ class AgentExecutor:
     async def _confirm_irreversible_tool_call(self, tool_name: str, tool_args: dict[str, Any]) -> bool:
         action_class = self._irreversible_confirmation_class(tool_name, tool_args)
         if action_class is None:
+            return True
+        if action_class == "payment" and self._payment_gate_approval_active(tool_name, tool_args):
+            # The user already approved this exact order with their payment PIN
+            # on the payment gate; asking again in chat would only stall checkout.
+            logger.info("Irreversible payment confirmation satisfied by the payment gate approval: tool=%s", tool_name)
             return True
         # Under taint every consequential action is asked about afresh: an
         # earlier yes in this task must not carry an injected follow-up through.
@@ -11674,11 +11799,14 @@ class AgentExecutor:
                 metadata=None,
                 executor=self,
             )
+            # On a call the user cannot open a page on this computer, so the
+            # hosted link must work or the gate is refused with the reason.
             await _require_cloud_confirmation_link(mgr, token)
             return {
                 "mgr": mgr,
                 "token": token,
                 "url": url,
+                "delivery_url": _confirmation_manager_link(mgr, "delivery_url", token) or url,
                 "channel": channel,
                 "page_ref": "",
                 "page_url": "",
@@ -11732,11 +11860,13 @@ class AgentExecutor:
             metadata={"merchant_url": merchant_url} if merchant_url else None,
             executor=self,
         )
-        await _require_cloud_confirmation_link(mgr, token)
+        links = await _payment_confirmation_links(mgr, token, url)
         return {
             "mgr": mgr,
             "token": token,
-            "url": url,
+            "url": links["url"],
+            "delivery_url": links["delivery_url"],
+            "link_note": links["link_note"],
             "channel": channel,
             "page_ref": page_ref,
             "page_url": page_url,

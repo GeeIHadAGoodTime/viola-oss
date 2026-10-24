@@ -5987,18 +5987,24 @@ async def resume_payment_gate() -> str:
         if session.status == ConfirmationStatus.REJECTED:
             return _payment_gate_error("Payment gate was rejected by the user.", token=token)
 
+        # The approval page on this computer (asks for the payment PIN). The
+        # phone link carries a key that must never enter the conversation.
+        local_url_builder = getattr(mgr, "local_url", None)
+        review_url = (local_url_builder(token) if callable(local_url_builder) else None) or (
+            build_public_confirmation_url(token)
+        )
         card_label = str(getattr(session, "selected_card_label", "") or "").strip()
         if not card_label:
             return _payment_gate_error(
-                "Payment gate still needs secure card selection on the confirmation page: %s"
-                % build_public_confirmation_url(token),
+                "Payment gate still needs the user to pick a card and enter their payment PIN on the "
+                "approval page (or the link Viola sent them): %s" % review_url,
                 token=token,
             )
 
         if session.status == ConfirmationStatus.PENDING:
             return _payment_gate_error(
-                "Payment gate still needs local PIN confirmation on the confirmation page: %s"
-                % build_public_confirmation_url(token),
+                "Payment gate still needs the user's payment PIN on the approval page "
+                "(or the link Viola sent them): %s" % review_url,
                 token=token,
             )
         if session is None or session.status != ConfirmationStatus.CONFIRMED:
