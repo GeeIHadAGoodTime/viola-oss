@@ -30,10 +30,10 @@
   },
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "857ab2c3f2974b8b683107d7706d72defe7d094d0c3451a56620a7309b6a0d96",
-  "source_tree_sha256": "3ce75bb16c1f2003909fb4ef8050a852021afe0554da4d431343d4b3030044e0",
+  "source_manifest_sha256": "e8c7a6866e2e8abfadfea4408f256b22d780a2423f7b2d63f4c84dd75cabce77",
+  "source_tree_sha256": "221fab911764b2538dec5bb11e59c419a00814550750d5661a0c8b84550e5cf6",
   "source_file_count": 2729,
-  "source_revision": "0b5b4386ed3fad34aa0c82b9db3fa5790e500029",
+  "source_revision": "3aa4af2c404646c0938b1c07db13abf2a65edbcb",
   "comparison_public_revision": "ecab2772465fcc89ae6645b028af1c2273b9199f",
   "changed_source_paths": [
     "audio_core/aec_reference_base.py",
@@ -285,7 +285,7 @@
     "historical_inventory_limits": "This renderer correction changes no dependency or workflow inputs. All six retained SBOMs and their complete status objects stay historical and unchanged; no current installed inventory qualification is claimed."
   },
   "qualification": {
-    "source_commit": "0b5b4386ed3fad34aa0c82b9db3fa5790e500029",
+    "source_commit": "3aa4af2c404646c0938b1c07db13abf2a65edbcb",
     "kind": "1.0.5 build 5 keyless managed source availability"
   },
   "historical_bindings": [
