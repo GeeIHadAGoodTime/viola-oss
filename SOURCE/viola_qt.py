@@ -953,11 +953,9 @@ def _wire_browser_webview(window: "ViolaWebViewWindow", bootstrap) -> None:
         logger.debug("No dedicated browser webview available, skipping browser provider wiring")
         return
 
-    from config.settings import settings as _cfg
-
-    if not _cfg.browser_provider_enabled:
-        return
-
+    # No browser_provider_enabled check here: the in-app Spotify sign-in
+    # (Settings > Connect Spotify) needs this wiring on every desktop install.
+    # That flag only gates browser-native playback routing.
     try:
         music_service = getattr(bootstrap, "music", None)
         if music_service is None:

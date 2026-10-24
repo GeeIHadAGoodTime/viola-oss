@@ -149,6 +149,27 @@ def _settings_flag_enabled(attr: str) -> tuple[bool, str | None]:
     return False, "settings.%s is disabled" % attr
 
 
+def _browser_auth_route_available() -> tuple[bool, str | None]:
+    """Mirror ui.api.routes._register_browser_auth_routes.
+
+    The in-app sign-in routes are always registered on the desktop; only the
+    cloud surface still keys them on ``browser_provider_enabled``.
+    """
+    try:
+        from config.settings import settings
+    except Exception as exc:
+        return False, "settings unavailable: %s: %s" % (type(exc).__name__, exc)
+
+    surface = (getattr(settings, "app_surface", "desktop") or "desktop").strip().lower()
+    if surface == "cloud" and not bool(getattr(settings, "browser_provider_enabled", False)):
+        return False, "settings.browser_provider_enabled is disabled on the cloud surface"
+    return _router_factory_route_available(
+        "ui.api.routes.browser_auth",
+        "create_browser_auth_router",
+        "/v1/browser/auth/status",
+    )
+
+
 def _settings_flags_enabled(attrs: tuple[str, ...]) -> tuple[bool, str | None]:
     for attr in attrs:
         enabled, reason = _settings_flag_enabled(attr)
@@ -322,12 +343,7 @@ _REAL_ROUTE_PROBES: dict[str, RealRouteProbe] = {
         "router",
         "/v1/consent/providers/status",
     ),
-    "/v1/browser/auth/status": lambda: _feature_flagged_factory_route_available(
-        "browser_provider_enabled",
-        "ui.api.routes.browser_auth",
-        "create_browser_auth_router",
-        "/v1/browser/auth/status",
-    ),
+    "/v1/browser/auth/status": lambda: _browser_auth_route_available(),
     _SPOTIFY_CDP_STATUS_PATH: lambda: _router_factory_route_available(
         "ui.api.routes.spotify_cdp",
         "create_spotify_cdp_router",
