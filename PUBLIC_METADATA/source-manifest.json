@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "7f5fedee5a4ed7ce58a6c984663d4e876c4d95f2",
-  "sha256": "0a157b73df6bc3933459661e5def905aa4c126477eb71f309c7465b1cc3194eb",
+  "revision": "3113dfde9007ef23b56f34d62d890eb2f503150b",
+  "sha256": "180545ce82048bd9c12f3bcc2e0f97cde954729e9fadf49111c30d0b38d55488",
   "files": [
     {
       "path": ".env.example",
@@ -895,8 +895,8 @@
     },
     {
       "path": "config/settings.py",
-      "sha256": "dbd9c3836e719afd994bfab9533183211430534617e586cb7a7f985e37dbc2bc",
-      "bytes": 71697
+      "sha256": "e08077dc4be8fe9f09c5a3f823187590496e492ce7a61cb5c89f18d839f2e8f7",
+      "bytes": 71759
     },
     {
       "path": "config/settings_validation.py",
@@ -1615,8 +1615,8 @@
     },
     {
       "path": "intent/approval.py",
-      "sha256": "2b87d06beae8af5f5f7a7405c23b490fac3eb36c0b0bc4dfe21eccc9a43d278e",
-      "bytes": 47058
+      "sha256": "7d836f742e2ccc1782a0a8a26587b88e0f7e3713f71e263c2bf46d22e0ea4900",
+      "bytes": 47764
     },
     {
       "path": "intent/capability_resolver.py",
@@ -2185,8 +2185,8 @@
     },
     {
       "path": "intent/tools/vision_tools.py",
-      "sha256": "b7bd787e6b9d205df4f686fc6e334b5adec6d3f20847240240e2cae46303a355",
-      "bytes": 40181
+      "sha256": "178b1a7277d4e1d3e7ce99d5d5c1d7f79d1a901a10df99245f363aee1105af42",
+      "bytes": 44065
     },
     {
       "path": "intent/tools/weather_tool.py",
@@ -2700,8 +2700,8 @@
     },
     {
       "path": "music/consent/providers.py",
-      "sha256": "6f8ce5bb0fb2be91fd6f0274b75a151c817d392764af31e8dca423acea6a3488",
-      "bytes": 6734
+      "sha256": "34c11583afc8f1703d920b20ccf633c8758cb04b823e486a63ddf5ba15165ad2",
+      "bytes": 6703
     },
     {
       "path": "music/consent/rotation.py",
@@ -3260,8 +3260,8 @@
     },
     {
       "path": "music/spotify/cdp_controller.py",
-      "sha256": "b7981c0eabee9a46faac215d7122d23bf555527195ea7221005cf0eab7076e0a",
-      "bytes": 111801
+      "sha256": "926cb1ff6de261de6569a3320d1562767b4c493c102d79f9f018b7d1e020bf3b",
+      "bytes": 121369
     },
     {
       "path": "music/spotify/cookie_bridge.py",
@@ -4030,8 +4030,8 @@
     },
     {
       "path": "services/browser/qt_cdp_bridge.py",
-      "sha256": "80735168853b005811112fec8e7077ee4b5a0c7a951134a23563a0c8731a73d3",
-      "bytes": 10066
+      "sha256": "b3cb0ced586ea41d70cadfad3d8fa165c269c91e56c04248616d567c37fce879",
+      "bytes": 10690
     },
     {
       "path": "services/browser/stream_bridge.py",
@@ -4705,8 +4705,8 @@
     },
     {
       "path": "services/llm/spend_accounting.py",
-      "sha256": "37cd333eee5b8bc8a9cb97d607d8d8fd970a969ef53158d4d3fb787bb20392f8",
-      "bytes": 14168
+      "sha256": "82a4e3f2f3e218dfa36523bfa19acbe5f73506fcb5428e3b0c06528efddddfa1",
+      "bytes": 15817
     },
     {
       "path": "services/llm/stream_bus.py",
@@ -4745,8 +4745,8 @@
     },
     {
       "path": "services/memory/auto_dream.py",
-      "sha256": "45119c436a828f4d93499b6ce92e10b9f607995d54e9c0271ac4cca96e276a83",
-      "bytes": 11587
+      "sha256": "9f53e92237665af722e141daa39ca64ee6c6ee00298dcac27da89800bdea5832",
+      "bytes": 11664
     },
     {
       "path": "services/memory/dir.py",
@@ -4755,8 +4755,8 @@
     },
     {
       "path": "services/memory/extract_memories.py",
-      "sha256": "530f7f170e68bb38de4de15992b2def26d553526acc30e8897c61dd85361200d",
-      "bytes": 16879
+      "sha256": "1fdeedba276c8b2229b80b4b49dd47f8d14d4c9c9941c6d35df49d333043d8ba",
+      "bytes": 17100
     },
     {
       "path": "services/memory/hygiene.py",
@@ -4770,8 +4770,8 @@
     },
     {
       "path": "services/memory/selector.py",
-      "sha256": "4c558040ae0272d0c175ea1618fe742ad65369b05b800e193f3971b1619f704c",
-      "bytes": 7655
+      "sha256": "65fd8f1049bfd22ffe07707a435ce5372413c4df85d3311aaf33ef4311105f0e",
+      "bytes": 7727
     },
     {
       "path": "services/memory/store.py",
@@ -4995,8 +4995,8 @@
     },
     {
       "path": "services/openai_background.py",
-      "sha256": "824626b848678ff52db8ec606bc189489b1583fe411d8ef14780bf4f6fcd1a34",
-      "bytes": 11629
+      "sha256": "6ec5bd4195e93ee8930ec2973a6a44c82761ed6d2eec7cf69cb72748b1092531",
+      "bytes": 33867
     },
     {
       "path": "services/operator_controls.py",
@@ -9880,8 +9880,8 @@
     },
     {
       "path": "ui/queue_discovery.py",
-      "sha256": "4f813a878754a166b0c17835dbeaebdd18e8b988d7d1d34e01b36f5cd9f8fab2",
-      "bytes": 20163
+      "sha256": "79fca2a2d22393fe457fcc7d9554f45a50fff18ee36863dee8a834c71644f7a1",
+      "bytes": 20556
     },
     {
       "path": "ui/react-app/eslint.config.js",
@@ -10805,8 +10805,8 @@
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.jsx",
-      "sha256": "29ac5dae0eebbc253aeca5c4a4b02dfd733e433f17cef577c11e24ca91150a3a",
-      "bytes": 210746
+      "sha256": "aab1c6e92c880384b99bf3e7074cb1620a08b35b8291771dc0076036ddf8bc75",
+      "bytes": 211451
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.localDiscovery.test.jsx",
@@ -12415,8 +12415,8 @@
     },
     {
       "path": "ui/react-app/src/utils/wakeSensitivity.js",
-      "sha256": "5f55530c4705cff68aceeea9e6ffa3744d2fad1c1be0a0c1b8b184d87992dd16",
-      "bytes": 2904
+      "sha256": "30643d12e38a3a3137bf20e7ce041bd88da4c5679b913ee3046dfc8517289787",
+      "bytes": 3345
     },
     {
       "path": "ui/react-app/src/utils/weatherCondition.js",
@@ -12575,13 +12575,13 @@
     },
     {
       "path": "ui/settings_manager.py",
-      "sha256": "79e152fdee4821bce11ef7286273d69479e6eec5073b444a82254e24c7d18247",
-      "bytes": 167726
+      "sha256": "83b80c47a53409fe9072d4bb252788ba7697de28b480cbe9be515156bf41cbc0",
+      "bytes": 167994
     },
     {
       "path": "ui/settings_schema.py",
-      "sha256": "948b78904a3ba60343e150cf3533e15ad059808b30a01ac13bf5cb4617e95656",
-      "bytes": 8835
+      "sha256": "adf7251861e46de45188d8a3729aa76a89c9c77585282ea549bc38a3c9263743",
+      "bytes": 8872
     },
     {
       "path": "ui/static/README_WEB_UI.txt",
@@ -13025,8 +13025,8 @@
     },
     {
       "path": "viola_qt.py",
-      "sha256": "0d040d5454646219c86745a986484e11caa78dc2d0bf45618fdc288a5dcdc1ab",
-      "bytes": 83360
+      "sha256": "f37f990180befdcb8da5179224986c78b61f95c7e6841d3f29b2065df8dcef39",
+      "bytes": 86547
     },
     {
       "path": "viola_spoke.py",
@@ -13045,13 +13045,13 @@
     },
     {
       "path": "violawake/config.py",
-      "sha256": "a115b93699889ee5845cd7c9376c5e1f6bafd17809ef9426070096981752a9b7",
-      "bytes": 7854
+      "sha256": "ca202efd7c7656110f55104889d2cbbff9ab511b8361101724725e9254190ba6",
+      "bytes": 10535
     },
     {
       "path": "violawake/engine.py",
-      "sha256": "d141d87416bdbafd2fa686107bb7603c45fa361283df4de14c5fe2dcd010373c",
-      "bytes": 33580
+      "sha256": "f6dcef6fd371d6d527bd1d200e5733a8d8aafcfc5b1b67a69395041c30dd526e",
+      "bytes": 47267
     },
     {
       "path": "violawake/model.py",
@@ -13615,8 +13615,8 @@
     },
     {
       "path": "voice/wake_detector/violawake_listener.py",
-      "sha256": "30fa558f3d1e2ba844c8d3aa2b6071d8de9760528725de44f4e836a5c3606165",
-      "bytes": 137243
+      "sha256": "56c600f2159a378d3a028fe2b63bf716567694fdfddd7c485c484ddee5acc049",
+      "bytes": 148064
     },
     {
       "path": "voice/wake_detector/wake/__init__.py",
@@ -13630,13 +13630,13 @@
     },
     {
       "path": "voice/wake_detector/wake/context.py",
-      "sha256": "0c6fb80eeb81b9e42948b4eae50da366cd3d896f4a454f2481e88b751203d09c",
-      "bytes": 1709
+      "sha256": "6818ffffa2b208b9c0c450a35aaded88d259d5ec20c3b22c1a80e1262dcc059f",
+      "bytes": 2110
     },
     {
       "path": "voice/wake_detector/wake_decision_policy.py",
-      "sha256": "5ebef0396730c4c789948b2f579c3761a39e07be69b1e959da6e344230fbde36",
-      "bytes": 26597
+      "sha256": "b0b845fe4ffe7c22e828aeca1414f90237ce331e773b93ea2595160942c74f33",
+      "bytes": 27137
     },
     {
       "path": "voice/wake_detector/wake_factory.py",
@@ -13647,6 +13647,11 @@
       "path": "voice/wake_detector/wake_types.py",
       "sha256": "32dbc339ae60f0c74aafe9cab90e0dfd637a56610ce015a3a19c31f6fb52a8e3",
       "bytes": 9530
+    },
+    {
+      "path": "voice/wake_detector/wake_verifier.py",
+      "sha256": "6e92ee28e3cdd666b83d64aebbdc60f18f8f5a6998b450178b437b9c9f2ffa5c",
+      "bytes": 22062
     }
   ]
 }

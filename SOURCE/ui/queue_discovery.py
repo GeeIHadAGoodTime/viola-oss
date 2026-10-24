@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from typing import Any
 
 from config.settings import settings
 from core.json_types import JsonDict, JsonValue, to_json_value
@@ -290,10 +291,23 @@ class QueueDiscoverySystem:
         return recommendations[:max_items]
 
     async def _get_ai_recommendations(self, current_song: JsonDict, max_items: int) -> list[RecommendedSong]:
-        """Get AI-powered recommendations using GPT"""
+        """Get AI-powered recommendations through the background AI route.
+
+        Goes through ``services.openai_background`` so it follows the user's AI
+        source: Viola-managed AI on a keyless install runs through Viola's cloud
+        as the signed-in user (metered there), BYOK uses the user's own key,
+        local uses the local model. A local ``OPENAI_API_KEY`` is no longer
+        required (installed builds never have one).
+        """
         try:
-            api_key = settings.openai_api_key
-            if not api_key:
+            from services.openai_background import (
+                BackgroundLLMUnavailable,
+                is_background_ai_available,
+                run_background_openai_response,
+            )
+
+            user_id = _recommendation_user_id()
+            if not is_background_ai_available(user_id):
                 return []
 
             # Get recent history for context
@@ -314,49 +328,21 @@ Suggest {max_items} similar songs they might enjoy. Return ONLY a JSON array wit
 ]
 """
 
-            # F-003: Enforce per-user rate limit before any LLM call.
-            # Prefer the authenticated user from the ambient ContextVar so the
-            # rate-limit bucket is per-user; fall back to the stable device-id
-            # only when no auth context exists (desktop boot-time helpers).
-            from core.exceptions import LLMQuotaExceededError
-            from services.llm.rate_limiter import get_rate_limiter
-
             try:
-                try:
-                    from core.user_context import get_current_user_id
-
-                    limiter_user_id = get_current_user_id()
-                except LookupError:
-                    from core.user_context import get_device_user_id
-
-                    limiter_user_id = get_device_user_id()  # mt-ok: anon rate-limit bucket
-
-                limiter = get_rate_limiter()
-                await limiter.reserve(
-                    user_id=limiter_user_id,
-                    estimated_tokens=settings.llm_max_tokens_cap,
+                answer_payload = await run_background_openai_response(
+                    system_prompt="You recommend songs. Return only a JSON array.",
+                    user_content=prompt,
+                    max_output_tokens=800,
+                    user_id=user_id,
+                    timeout_s=20.0,
+                    operation="queue_recommendations",
+                    request_type="background_recommendations",
                 )
-            except LLMQuotaExceededError:
-                logger.warning("LLM rate limit exceeded for queue recommendations")
+            except BackgroundLLMUnavailable as exc:
+                logger.debug("AI recommendations unavailable: %s", exc)
                 return []
 
-            # Use canonical LLM router
-            from intent.pipeline import create_llm_router
-
-            llm_router = create_llm_router(config_or_settings={"openai_api_key": api_key})
-            if llm_router:
-                response = await llm_router.ask(prompt, history=None)
-                answer_payload = response
-            else:
-                logger.warning("No LLM providers available for queue discovery")
-                return []
-            if not isinstance(answer_payload, str):
-                return []
-
-            # Parse response
-            import json
-
-            suggestions = json.loads(answer_payload)
+            suggestions = _parse_json_array(answer_payload)
 
             return [
                 RecommendedSong(
@@ -368,6 +354,7 @@ Suggest {max_items} similar songs they might enjoy. Return ONLY a JSON array wit
                     confidence=0.8,
                 )
                 for s in suggestions[:max_items]
+                if isinstance(s, dict) and s.get("title")
             ]
 
         except Exception as e:
@@ -522,6 +509,29 @@ Suggest {max_items} similar songs they might enjoy. Return ONLY a JSON array wit
 
 # Global singleton
 _queue_discovery_system: QueueDiscoverySystem | None = None
+
+
+def _recommendation_user_id() -> str:
+    """The account recommendations run (and are metered) as, or ""."""
+    try:
+        from core.user_context import get_current_or_desktop_active_user_id, user_id_or_none
+
+        return user_id_or_none(get_current_or_desktop_active_user_id()) or ""
+    except (LookupError, ImportError, AttributeError, OSError, RuntimeError, TypeError, ValueError):
+        return ""
+
+
+def _parse_json_array(text: object) -> list[Any]:
+    """Parse a JSON array answer, tolerating a Markdown code fence."""
+    import json
+
+    raw = str(text or "").strip()
+    if raw.startswith("```"):
+        raw = raw.strip("`").strip()
+        if raw.lower().startswith("json"):
+            raw = raw[4:].strip()
+    parsed = json.loads(raw)
+    return parsed if isinstance(parsed, list) else []
 
 
 def get_queue_discovery_system(music_player=None, settings_manager=None) -> QueueDiscoverySystem:

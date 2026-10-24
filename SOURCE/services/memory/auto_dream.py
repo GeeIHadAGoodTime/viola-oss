@@ -215,9 +215,12 @@ class AutoDreamService:
         return "\n\n".join(chunks)
 
     async def _default_consolidator(self, corpus: str) -> list[ExtractedMemory]:
-        if not settings.auto_memory_dream_enabled or not settings.openai_api_key:
+        if not settings.auto_memory_dream_enabled:
             return []
-        from services.openai_background import run_background_openai_response
+        from services.openai_background import is_background_ai_available, run_background_openai_response
+
+        if not is_background_ai_available(self.user_id):
+            return []
 
         response = await run_background_openai_response(
             system_prompt=(
