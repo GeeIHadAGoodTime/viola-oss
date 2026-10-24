@@ -436,12 +436,40 @@ def _resolve_managed_route(ai_source: str, user_id: str) -> BackgroundRoute:
     return BackgroundRoute(kind=ROUTE_CLOUD_MANAGED, ai_source=ai_source, user_id=account_user_id)
 
 
+# (kind, ai_source, error type) combinations already logged in this process.
+# Holds no user data: it only stops a per-turn caller (memory selection) from
+# logging the same route on every turn.
+_LOGGED_ROUTES: set[tuple[str, str, str]] = set()
+
+
+def _log_route_once(route: BackgroundRoute) -> None:
+    key = (route.kind, route.ai_source, route.error_type.__name__ if not route.available else "")
+    if key in _LOGGED_ROUTES:
+        return
+    _LOGGED_ROUTES.add(key)
+    if route.available:
+        logger.info("Background AI route: %s (ai_source=%s)", route.kind, route.ai_source or "managed")
+    else:
+        logger.info(
+            "Background AI unavailable (ai_source=%s, %s): %s",
+            route.ai_source or "managed",
+            route.error_type.__name__,
+            route.reason,
+        )
+
+
 def resolve_background_route(user_id: str = "") -> BackgroundRoute:
     """Decide where a background AI request for ``user_id`` would go.
 
-    Cheap and side-effect free: reads settings, consent and the desktop
-    account; it never makes a network call.
+    Cheap and side-effect free apart from a once-per-process log line: reads
+    settings, consent and the desktop account; it never makes a network call.
     """
+    route = _resolve_background_route(user_id)
+    _log_route_once(route)
+    return route
+
+
+def _resolve_background_route(user_id: str) -> BackgroundRoute:
     ai_source = _resolve_background_ai_source(user_id)
 
     if ai_source == "codex":
