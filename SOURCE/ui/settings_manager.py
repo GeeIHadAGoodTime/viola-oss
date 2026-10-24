@@ -58,6 +58,10 @@ _SECRET_PLACEHOLDERS = frozenset(
 _LEGACY_OPENAI_MODELS = frozenset({"gpt-4.1-nano", "gpt-4.1-mini"})
 _MISSING = object()
 _USER_SETTINGS_MIGRATION_MARKER = "__settings_migrated__"
+# One-time 1.0.5 migration marker: closing the window now quits Viola, and the
+# old "Minimize to System Tray" default (on, never chosen by users) is turned
+# off once. See ``_migrate_close_button_quits``.
+WINDOW_CLOSE_QUITS_MIGRATION_FLAG = "_window_close_quits_migrated"
 SettingKeyTier = Literal["device", "user", "consent", "credential", "stale", "bipa", "unknown"]
 DEFAULT_SETTING_STRING_VALUE_LIMIT_BYTES = 4 * 1024
 
@@ -799,7 +803,14 @@ class SettingsManager:
         # at app start. Default False keeps remote control opt-in.
         # Migrated from legacy ``repl_bridge_enabled`` in v6->v7.
         "remote_control_at_startup": False,
-        "minimize_to_tray": True,
+        # "Keep Viola running in the tray when the window is closed". Off: the
+        # window's X quits Viola completely (speech, wake word, microphone).
+        # On: X hides Viola to the tray and the wake word keeps working. Opt-in
+        # only, so Viola never silently keeps listening with no window showing.
+        "minimize_to_tray": False,
+        # Fresh installs start with the new default, so the one-time 1.0.5
+        # reset never touches them (see _migrate_close_button_quits).
+        WINDOW_CLOSE_QUITS_MIGRATION_FLAG: True,
         "start_on_boot": False,
         "wake_sensitivity": defaults.DEFAULT_WAKE_SENSITIVITY,
         "weather_location": "",  # Empty = auto-detect from IP
@@ -2681,6 +2692,32 @@ class SettingsManager:
         settings["tts_volume"] = round(raw / 100.0, 4)
         return True
 
+    @staticmethod
+    def _migrate_close_button_quits(settings: dict[str, object], loaded: dict[str, object]) -> bool:
+        """One-time 1.0.5 reset: the window's X quits Viola unless the user opts in.
+
+        Before 1.0.5, ``minimize_to_tray`` defaulted to on, so closing the
+        window hid Viola to the tray while the wake word kept listening, with
+        no window and often no visible tray icon. Users never chose that, and
+        a merged settings blob cannot tell the old default from a choice, so
+        every existing install is turned off exactly once. The marker
+        (``WINDOW_CLOSE_QUITS_MIGRATION_FLAG``) is read from the file on disk,
+        not the defaults, and is saved with the settings, so a user who turns
+        the tray option back on after this keeps it. Returns True when the
+        settings changed and need saving.
+        """
+        if loaded.get(WINDOW_CLOSE_QUITS_MIGRATION_FLAG) is True:
+            return False
+        previous = settings.get("minimize_to_tray")
+        settings["minimize_to_tray"] = False
+        settings[WINDOW_CLOSE_QUITS_MIGRATION_FLAG] = True
+        logger.info(
+            "1.0.5 migration: minimize_to_tray %r -> False (closing the window now quits Viola; "
+            "keeping it in the tray is opt-in)",
+            previous,
+        )
+        return True
+
     def _migrate_settings(self, settings: dict[str, object], loaded: dict[str, object]) -> dict[str, object]:
         """
         Migrate settings from older schema versions.
@@ -3064,6 +3101,9 @@ class SettingsManager:
                     defaults.COMPANION_ENABLED_DEFAULT,
                 )
             settings["_settings_version"] = 10
+            needs_save = True
+
+        if self._migrate_close_button_quits(settings, loaded):
             needs_save = True
 
         # Fix: show_api_key_warning was corrupted to "***ENCRYPTED***" by a

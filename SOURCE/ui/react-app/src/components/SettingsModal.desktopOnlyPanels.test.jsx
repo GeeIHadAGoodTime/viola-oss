@@ -643,5 +643,26 @@ describe('SettingsModal desktop-only panels (#4226)', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Quit Viola' }));
       expect(quitApp).toHaveBeenCalledTimes(1);
     });
+
+    it('keeps Viola in the tray only as an opt-in, off by default (1.0.5)', async () => {
+      const onClose = vi.fn();
+      render(<SettingsModal isOpen onClose={onClose} />);
+      openTab('System');
+
+      await screen.findByText('Audio Devices');
+      expect(screen.queryByText('Minimize to System Tray')).toBeNull();
+      expect(
+        screen.getByText('Off: closing the window quits Viola. On: Viola stays in the system tray and keeps listening for the wake word.'),
+      ).toBeInTheDocument();
+      const keepInTray = screen.getByRole('switch', { name: 'Keep Viola running in the tray when the window is closed' });
+      // No stored value means the new default: closing the window quits.
+      expect(keepInTray).not.toBeChecked();
+
+      fireEvent.click(keepInTray);
+      expect(keepInTray).toBeChecked();
+      fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
+      await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+      expect(settingsHarness.settings.minimize_to_tray).toBe(true);
+    });
   });
 });
