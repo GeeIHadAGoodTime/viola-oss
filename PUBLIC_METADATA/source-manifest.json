@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "a9737978df2dd7f69ed5eac457e4f81c3ece64fc",
-  "sha256": "7ea07033da3a54a847e0814c69f7d7b2ba01f959ea8772cb7276193a00d189a3",
+  "revision": "a27e000543b8ad2985131a5aa1c4348cf846ee3f",
+  "sha256": "525a016d17a553073f65b0a774e729e8bf403fa31b90aa8786f8538d33632c79",
   "files": [
     {
       "path": ".env.example",
@@ -1575,13 +1575,13 @@
     },
     {
       "path": "intent/agent_executor.py",
-      "sha256": "b45098afc4afeb968c673b94765b66cb04c21c42368260f4b7ef1f80195204c2",
-      "bytes": 568330
+      "sha256": "407bbd96f4d0d3555ef174895bf9063792db7d7a0735fefbacda4dd35465b211",
+      "bytes": 575592
     },
     {
       "path": "intent/agent_loop.py",
-      "sha256": "3d20b2f9bd29fe3e248f7af9480d04942ee39288599342a3dd689677020e6dfd",
-      "bytes": 250592
+      "sha256": "b50fe08cb73d79cbfebb602e529639eb9dda795770134b45d308c071acf4997c",
+      "bytes": 250921
     },
     {
       "path": "intent/agent_message_manager.py",
@@ -1670,8 +1670,8 @@
     },
     {
       "path": "intent/content_sanitizer.py",
-      "sha256": "8222b7879095cffe77f7f3cc2004f3afe10b31a0eb6fa5ec48ec239500a89b32",
-      "bytes": 51211
+      "sha256": "606e849c96f118f722ceea175cd27c65db3f3c7d88730de26e05fca0c7a308ba",
+      "bytes": 54695
     },
     {
       "path": "intent/context_builder.py",
@@ -2040,8 +2040,8 @@
     },
     {
       "path": "intent/tools/deferred_tool_schemas.py",
-      "sha256": "2db55d84282101992e49dbe7147ecd96ee06f8acdfe48703b787bf89830cc898",
-      "bytes": 34844
+      "sha256": "9a0a472340d41a8654291619c0df4e75e09b33348b14dd201002796ddb50f1dd",
+      "bytes": 35258
     },
     {
       "path": "intent/tools/delegation.py",
@@ -2330,8 +2330,8 @@
     },
     {
       "path": "mcp_servers/browser/server.py",
-      "sha256": "d51903eefb601b70406fb016588d42d5324b1083cf0d6b4daac15a46bbbe2a11",
-      "bytes": 245584
+      "sha256": "54b1ed78f50d696d09724c410a9c3caffd1b81078d0e74e2720831c543207755",
+      "bytes": 246195
     },
     {
       "path": "mcp_servers/browser_cdp/__init__.py",
@@ -2340,8 +2340,8 @@
     },
     {
       "path": "mcp_servers/browser_cdp/server.py",
-      "sha256": "4b9600528ac01a7c92dffd1bcc6d647e8e30017c34753e8d9600f8932f71c4c8",
-      "bytes": 132968
+      "sha256": "ecf53ed22f3e5963afd2556755b9993a48fa991cc020eeb678fc521a9f8d0164",
+      "bytes": 133233
     },
     {
       "path": "mcp_servers/computer_use/__init__.py",
@@ -2365,8 +2365,8 @@
     },
     {
       "path": "mcp_servers/core_tools/server.py",
-      "sha256": "f04b5997b1b9ea97e65cbe688cfb777de287d4f518088f890e7dc25af06b4cfc",
-      "bytes": 253305
+      "sha256": "b3ac90a1607b124a7132225c982fa71f8deea77d8d38ae33afe23f554f62b259",
+      "bytes": 253706
     },
     {
       "path": "mcp_servers/phone_tool_descriptions.py",
@@ -10015,8 +10015,8 @@
     },
     {
       "path": "ui/react-app/src/SmartDisplay.jsx",
-      "sha256": "89bae54f21c42448975918a657ba7a917b677deed60bb9cc82e7cbb1fb265f90",
-      "bytes": 177799
+      "sha256": "9252e2cec0aeeec4d35db3005bf819303422de95be2e76f9cc36e47d5c919686",
+      "bytes": 178458
     },
     {
       "path": "ui/react-app/src/SmartDisplay.spokePolicy.test.jsx",
@@ -10830,8 +10830,8 @@
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.jsx",
-      "sha256": "a5b4d15b78276458f3c6cf650185843c076e6a5b270427b2a8672581cbe57650",
-      "bytes": 210201
+      "sha256": "1713dd04c70a42a9ee3ab3283a62e0558d5a2cc2b39bed3fd844e3316f97c876",
+      "bytes": 217613
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.localDiscovery.test.jsx",
