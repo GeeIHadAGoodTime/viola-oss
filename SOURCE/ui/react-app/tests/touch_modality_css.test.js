@@ -51,6 +51,13 @@ describe('global touch base (styles/touch-hardening.css)', () => {
     expect(decls['overscroll-behavior']).toBe('contain');
   });
 
+  it('moves toasts off a modal footer so they cannot swallow the Save tap', () => {
+    const decls = declsFor(root, (s) => s.includes('aria-modal="true"') && s.includes('.viola-toast-stack'));
+    expect(decls.left).toBe('24px');
+    expect(decls.right).toBe('auto');
+    expect(read('components/Toast.jsx')).toContain('className="viola-toast-stack"');
+  });
+
   it('turns off the tap highlight and makes sliders own their drags on touch', () => {
     expect(declsFor(root, (s) => s === 'html')['-webkit-tap-highlight-color']).toBe('transparent');
     const slider = declsFor(root, (s) => s.includes('data-input="touch"') && s.includes('input[type="range"]'));

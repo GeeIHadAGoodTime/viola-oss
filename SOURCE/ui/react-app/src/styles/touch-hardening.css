@@ -156,3 +156,12 @@ body {
   min-width: 44px;
   min-height: 44px;
 }
+
+/* Toasts stack in the bottom-right corner, which is exactly where a modal's
+ * Save / Done button sits. A tap meant for Save landed on a toast instead (the
+ * Settings "first Save tap missed" report), so while a modal dialog is open the
+ * stack moves to the bottom-left, away from the footer actions. */
+body:has([role="dialog"][aria-modal="true"]) .viola-toast-stack {
+  right: auto !important;
+  left: 24px !important;
+}
