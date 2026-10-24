@@ -1973,8 +1973,9 @@ class CustomTitleBar(QWidget):
         layout.addStretch()
 
         # Window control buttons (Windows 11 style SVG icons)
-        btn_style_base = """
-            QPushButton {{{{
+        def btn_style_base(hover_bg: str) -> str:
+            return f"""
+            QPushButton {{
                 background: transparent;
                 border: none;
                 min-width: {button_width}px;
@@ -1983,18 +1984,18 @@ class CustomTitleBar(QWidget):
                 max-height: {bar_height}px;
                 padding: 0;
                 qproperty-iconSize: 10px 10px;
-            }}}}
-            QPushButton:hover {{{{
-                background: {{hover_bg}};
-            }}}}
-        """.format(button_width=button_width, bar_height=bar_height)
+            }}
+            QPushButton:hover {{
+                background: {hover_bg};
+            }}
+        """
 
         # Fullscreen button (arrows)
         self.btn_fullscreen = QPushButton()
         self.btn_fullscreen.setObjectName("fullscreenToggleButton")
         self.btn_fullscreen.setAccessibleName("Enter fullscreen")
         self.btn_fullscreen.setToolTip("Enter fullscreen (F11)")
-        self.btn_fullscreen.setStyleSheet(btn_style_base.format(hover_bg="rgba(255, 255, 255, 0.1)"))
+        self.btn_fullscreen.setStyleSheet(btn_style_base(hover_bg="rgba(255, 255, 255, 0.1)"))
         self._set_fullscreen_icon(False)
         self.btn_fullscreen.setIconSize(QSize(12, 12))
         self.btn_fullscreen.clicked.connect(self._toggle_fullscreen)
@@ -2003,7 +2004,7 @@ class CustomTitleBar(QWidget):
         self.btn_minimize = QPushButton()
         self.btn_minimize.setAccessibleName("Minimize")
         self.btn_minimize.setToolTip("Minimize")
-        self.btn_minimize.setStyleSheet(btn_style_base.format(hover_bg="rgba(255, 255, 255, 0.1)"))
+        self.btn_minimize.setStyleSheet(btn_style_base(hover_bg="rgba(255, 255, 255, 0.1)"))
         self.btn_minimize.setIcon(
             self._create_icon_from_svg(
                 '<svg viewBox="0 0 10 10"><line x1="0" y1="5" x2="10" y2="5" stroke="white" stroke-width="1"/></svg>'
@@ -2015,7 +2016,7 @@ class CustomTitleBar(QWidget):
 
         # Maximize/Restore button (square outline)
         self.btn_maximize = QPushButton()
-        self.btn_maximize.setStyleSheet(btn_style_base.format(hover_bg="rgba(255, 255, 255, 0.1)"))
+        self.btn_maximize.setStyleSheet(btn_style_base(hover_bg="rgba(255, 255, 255, 0.1)"))
         self._set_maximize_icon(False)
         self.btn_maximize.setIconSize(QSize(10, 10))
         self.btn_maximize.clicked.connect(self._toggle_maximize)
@@ -2025,7 +2026,7 @@ class CustomTitleBar(QWidget):
         self.btn_close = QPushButton()
         self.btn_close.setAccessibleName("Close")
         self.btn_close.setToolTip("Close")
-        self.btn_close.setStyleSheet(btn_style_base.format(hover_bg="#c42b1c"))
+        self.btn_close.setStyleSheet(btn_style_base(hover_bg="#c42b1c"))
         self.btn_close.setIcon(
             self._create_icon_from_svg(
                 '<svg viewBox="0 0 10 10"><line x1="0" y1="0" x2="10" y2="10" stroke="white" stroke-width="1"/><line x1="10" y1="0" x2="0" y2="10" stroke="white" stroke-width="1"/></svg>'
@@ -2452,7 +2453,7 @@ class _KnowledgeAwareWebView(QWebEngineView):
         self._knowledge_workers: list[_KnowledgeUploadWorker] = []
         self.setAcceptDrops(True)
 
-    def contextMenuEvent(self, event) -> None:  # noqa: N802 - Qt override
+    def contextMenuEvent(self, event) -> None:
         """Show only the text-editing menu (see shell_context_menu_actions)."""
         try:
             request = self.lastContextMenuRequest()
