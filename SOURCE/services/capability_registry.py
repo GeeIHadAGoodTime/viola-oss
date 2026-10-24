@@ -389,7 +389,7 @@ def _register_all_domains(
     email_description = (
         "Read, compose, and manage email"
         if google_email_available
-        else "Send email through configured Resend or SMTP backends"
+        else "Send email from your own Gmail (connect Google in Settings > Connections)"
     )
     email_setup_guide = (
         SetupGuide(
@@ -400,10 +400,10 @@ def _register_all_domains(
         )
         if google_email_available
         else SetupGuide(
-            orthodox_path="Configure Resend or SMTP for outbound email",
-            auto_setup_possible=False,
-            requirements=["A Resend API key or SMTP credentials"],
-            estimated_effort="5 minutes",
+            orthodox_path="Connect your Google account in Settings > Connections",
+            auto_setup_possible=True,
+            requirements=["A Google account"],
+            estimated_effort="2 minutes",
         )
     )
     registry.register_domain(
