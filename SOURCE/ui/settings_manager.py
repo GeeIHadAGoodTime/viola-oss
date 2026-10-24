@@ -293,7 +293,6 @@ _USER_FACING_SECRET_ALLOWLIST: frozenset[str] = frozenset(
         "slack_bot_token",
         "slack_app_token",
         "icloud_password",
-        "spotify_refresh_token",
     }
 )
 

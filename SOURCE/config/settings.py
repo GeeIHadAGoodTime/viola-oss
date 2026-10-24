@@ -835,8 +835,6 @@ class AppConfig:
     spotify_client_id: str | None = None
     spotify_client_secret: str | None = None
     spotify_redirect_uri: str | None = None
-    spotify_device_id: str | None = None
-    spotify_refresh_token: str | None = None
 
     # --- Calendar Integration ---
     google_calendar_credentials_path: str | None = None

@@ -232,12 +232,8 @@ def _process_api_keys(config: AppConfig) -> None:
         config.spotify_client_id = env.get("SPOTIFY_CLIENT_ID")
     if not config.spotify_client_secret and env.get("SPOTIFY_CLIENT_SECRET"):
         config.spotify_client_secret = env.get("SPOTIFY_CLIENT_SECRET")
-    if not config.spotify_refresh_token and env.get("SPOTIFY_REFRESH_TOKEN"):
-        config.spotify_refresh_token = env.get("SPOTIFY_REFRESH_TOKEN")
     if not config.spotify_redirect_uri and env.get("SPOTIFY_REDIRECT_URI"):
         config.spotify_redirect_uri = env.get("SPOTIFY_REDIRECT_URI")
-    if not config.spotify_device_id and env.get("SPOTIFY_DEVICE_ID"):
-        config.spotify_device_id = env.get("SPOTIFY_DEVICE_ID")
 
     # Google OAuth credentials (non-VIOLA prefix — legacy .env.example format)
     # These map GOOGLE_CLIENT_ID → google_client_id for backwards compatibility.

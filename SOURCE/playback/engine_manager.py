@@ -21,7 +21,6 @@ from .engines import (
     ProviderPlaybackEngine,
     QueueContext,
     SpotifyCDPEngine,
-    SpotifyWebPlaybackEngine,
     YouTubeEmbeddedEngine,
 )
 from .engines.base import PlaybackError
@@ -395,12 +394,6 @@ class PlaybackEngineManager:
             controllers: Mapping of provider_id -> UI bridge controllers.
                 - "youtube_music": YouTubeEmbedController
         """
-        spotify_engine = SpotifyWebPlaybackEngine(
-            token_resolver=self._token_resolver,
-            logger=self._logger.getChild("spotify"),
-        )
-        self._engines[spotify_engine.provider_id] = spotify_engine
-
         if controllers:
             # YouTube engine - only pass YouTube controllers
             yt_controller = controllers.get("youtube_music")
