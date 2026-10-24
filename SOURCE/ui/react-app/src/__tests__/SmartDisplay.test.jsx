@@ -61,6 +61,7 @@ const apiHarness = vi.hoisted(() => ({
   setRating: vi.fn(() => Promise.resolve({})),
   pause: vi.fn(() => Promise.resolve({})),
   resume: vi.fn(() => Promise.resolve({})),
+  getWeather: vi.fn(() => Promise.resolve({})),
 }));
 const sentryHarness = vi.hoisted(() => ({
   openSentryUserFeedback: vi.fn(() => Promise.resolve(true)),
@@ -165,7 +166,7 @@ vi.mock('../hooks/useViolaApi', () => ({
     clearQueue: vi.fn(),
     sendCommand: vi.fn(() => Promise.resolve({ message: 'ok' })),
     sendCommandStreaming: apiHarness.sendCommandStreaming,
-    getWeather: vi.fn(() => Promise.resolve({})),
+    getWeather: apiHarness.getWeather,
     submitBugReport: apiHarness.submitBugReport || (apiHarness.submitBugReport = vi.fn(() => Promise.resolve({ bug_ticket_id: 42 }))),
     setShuffle: apiHarness.setShuffle,
     getCalendarEvents: vi.fn(() => Promise.resolve([])),
@@ -381,6 +382,7 @@ beforeEach(async () => {
   apiHarness.submitBugReport?.mockClear?.();
   apiHarness.submitBugReport?.mockResolvedValue?.({ bug_ticket_id: 42 });
   apiHarness.getQueue.mockReset().mockResolvedValue({ok: true, queue: []});
+  apiHarness.getWeather.mockReset().mockResolvedValue({});
   apiHarness.playQueueItem.mockReset().mockResolvedValue({ok: true});
   apiHarness.setShuffle.mockReset();
   apiHarness.setShuffle.mockResolvedValue({});
@@ -1766,6 +1768,42 @@ describe('upcoming queue controls', () => {
     const row = await screen.findByRole('listitem', {name: 'Queue position 1: Second future track'});
     fireEvent.click(within(row).getByRole('button', {name: 'Play Second future track now'}));
     await waitFor(() => expect(apiHarness.playQueueItem).toHaveBeenCalledWith('next-2'));
+  });
+});
+
+
+describe('SmartDisplay weather location', () => {
+  it('shows the auto-detected place instead of "Set your location" when none is saved', async () => {
+    apiHarness.getWeather.mockResolvedValue({
+      temperature: 61.2,
+      condition: 'Clear',
+      condition_code: 'clear',
+      location: 'Milwaukee, Wisconsin',
+      auto_detected_location: 'Milwaukee, Wisconsin',
+    });
+    render(<SmartDisplay />);
+    expect(await screen.findByText(/· Milwaukee$/)).toBeInTheDocument();
+    expect(screen.queryByText('Set your location')).not.toBeInTheDocument();
+    expect(screen.getByText('61°')).toBeInTheDocument();
+    // Asked with no city, so the backend resolves the location itself.
+    expect(apiHarness.getWeather.mock.calls[0][0]).toBe('');
+  });
+
+  it('keeps the "Set your location" prompt when nothing can be detected', async () => {
+    apiHarness.getWeather.mockRejectedValue(Object.assign(new Error('x'), { status: 400, code: 'weather_location_required' }));
+    render(<SmartDisplay />);
+    await waitFor(() => expect(apiHarness.getWeather).toHaveBeenCalled());
+    expect(screen.getByText('Set your location')).toBeInTheDocument();
+    expect(screen.queryByText('Weather unavailable')).not.toBeInTheDocument();
+  });
+
+  it('uses the saved location without adding a detected place', async () => {
+    settingsHarness.useSettings.mockImplementation(() => ({ ...mockSettingsState(), settings: { weather_location: 'Chicago, IL' } }));
+    apiHarness.getWeather.mockResolvedValue({ temperature: 50, condition: 'Rain', condition_code: 'rain', location: 'Chicago, IL' });
+    render(<SmartDisplay />);
+    expect(await screen.findByText('50°')).toBeInTheDocument();
+    expect(apiHarness.getWeather.mock.calls[0][0]).toBe('Chicago, IL');
+    expect(screen.queryByText(/· Chicago/)).not.toBeInTheDocument();
   });
 });
 
