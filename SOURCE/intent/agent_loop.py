@@ -511,7 +511,7 @@ async def _terminal_hook_execute_tool_call(
             tool_result = ToolResult(ok=False, error=tool_error)
 
     if tool_result is None and taint_tracker is not None:
-        taint_block = getattr(taint_tracker, "check_tool", lambda *_args, **_kwargs: None)(tool_name)
+        taint_block = getattr(taint_tracker, "check_tool", lambda *_args, **_kwargs: None)(tool_name, tool_args)
         if taint_block:
             tool_error = str(taint_block)
             tool_result = ToolResult(ok=False, error=tool_error)
@@ -756,6 +756,36 @@ def _teammate_idle_hook_context(executor: AgentExecutor, *, outcome: str, final_
     }
 
 
+def _bind_file_gate_context_for_run(executor: Any, loop_messages: Any, user_text: str | None) -> None:
+    """Tell the file gate who is acting and what the user has said this conversation.
+
+    Without this binding every file change asks for confirmation (the gate
+    fails closed), so a failure here costs friction, never safety.
+    """
+    from intent.file_gates import FileGateContext, bind_file_gate_context, user_texts_from_messages
+
+    user_id = str(getattr(executor, "_user_id", "") or "").strip()
+    if not user_id or user_id.lower() == "default":
+        bind_file_gate_context(None)
+        return
+    try:
+        session_key = str(getattr(executor, "_session_id", "") or "").strip() or executor._ensure_task_id()
+        context = FileGateContext(
+            user_id=user_id,
+            session_key=session_key,
+            user_text=user_texts_from_messages(loop_messages, user_text),
+        )
+    except Exception:
+        logger.exception("File gate context unavailable; every file change will ask for confirmation")
+        context = None
+    bind_file_gate_context(context)
+
+
+_FILE_WRITE_CHANGE_ACTIONS = frozenset(
+    {"write", "edit", "append", "insert", "replace_lines", "replace_text", "copy", "mkdir", "undo", "redo"}
+)
+
+
 def _file_changed_context_for_tool(
     tool_name: str,
     tool_args: dict[str, Any],
@@ -772,9 +802,10 @@ def _file_changed_context_for_tool(
     if tool_name in {"delete_file"}:
         event = "unlink"
     elif tool_name == "file_write":
-        if action not in {"write", "delete"}:
+        if action in {"delete", "move"}:
+            event = "unlink"
+        elif action not in _FILE_WRITE_CHANGE_ACTIONS:
             return None
-        event = "unlink" if action == "delete" else "change"
     elif tool_name not in {"write_file"}:
         return None
     if not path:
@@ -1434,6 +1465,7 @@ from intent.content_sanitizer import (
     BROWSER_CONTENT_TOOLS as _BROWSER_CONTENT_TOOLS,
     BROWSER_PAGE_CONTENT_TOOLS as _BROWSER_PAGE_CONTENT_TOOLS,
     BrowserTaintTracker,
+    bind_active_taint_tracker as _bind_active_taint_tracker,
     is_non_browser_untrusted_source as _is_non_browser_untrusted_source,
     sanitize_web_content as _sanitize_web_content,
 )
@@ -2005,6 +2037,19 @@ async def run_agent_loop(
     # gate persists exactly as long as the tainted tool result remains in
     # context (structural — keys off the recorded tool name, not the content).
     taint_tracker.restore_from_history(loop_messages)
+    # A file the user's own request names may be read without tainting the
+    # follow-up write (founder rule 2026-10-23; content_sanitizer
+    # is_user_named_file_read). Consequential actions keep their confirm gates.
+    taint_tracker.set_user_request(user_text)
+    # Let the gate read a tool's _meta (a payment extension's irreversible
+    # class) and let the approval layer see this task's taint, so a
+    # confirm-or-cancel gate under taint accepts only the user's own words.
+    taint_tracker.set_schema_lookup(getattr(executor, "_irreversible_tool_schema", None))
+    # The payment gate replaces taint's blanket payment refusal for the tools
+    # that use only a card the user approved for this exact order (r5/commerce).
+    taint_tracker.set_payment_approval_probe(getattr(executor, "_payment_gate_approval_active", None))
+    _bind_active_taint_tracker(taint_tracker)
+    _bind_file_gate_context_for_run(executor, loop_messages, user_text)
     pending_hook_context_messages: list[dict[str, Any]] = []
     native_turn_max_tokens = _native_turn_max_tokens_for_model(executor._get_model_name_safe())
 
@@ -3974,8 +4019,9 @@ async def run_agent_loop(
                             )
 
                 # â”€â”€ Layer 6: deterministic taint gate (M3 defense) â”€â”€
-                # Hard-block high-risk tools when browser content is in context.
-                _taint_block = None if _parallel_cached is not None else taint_tracker.check_tool(tc_name)
+                # Under taint: refuse payments/shell, and URLs/scripts that would
+                # carry private data to a site the user did not name.
+                _taint_block = None if _parallel_cached is not None else taint_tracker.check_tool(tc_name, tc_args)
                 if tool_result is None and _taint_block:
                     tool_result = ToolResult(ok=False, error=_taint_block)
                     tool_error = _taint_block
@@ -4454,7 +4500,8 @@ async def run_agent_loop(
                 if tc_name in _BROWSER_CONTENT_TOOLS:
                     result_text = _sanitize_web_content(result_text)
                     if tc_name in _BROWSER_PAGE_CONTENT_TOOLS:
-                        # Layer 6: mark taint so high-risk tools are blocked
+                        # Layer 6: mark taint (payments/shell refused, confirm
+                        # gates accept only the user's own words).
                         taint_tracker.mark_tainted(tc_name)
                 elif _is_non_browser_untrusted_source(tc_name):
                     # SEC-001/SEC-008: email, calendar, memory, and file content
@@ -4462,8 +4509,11 @@ async def run_agent_loop(
                     # sanitizer (size/charset) and taint the context so the
                     # high-risk gate fires on these vectors — and so navigation
                     # sinks are gated to close exfil-via-navigation (SEC-004).
+                    # tool_args lets a read of a file the user named pass.
                     result_text = _sanitize_web_content(result_text)
-                    taint_tracker.mark_tainted(tc_name)
+                    # content: recorded as private data for the exfiltration
+                    # check (a URL/script carrying it to an unnamed site).
+                    taint_tracker.mark_tainted(tc_name, tool_args=tc_args, content=result_text)
 
                 content_for_llm: Any = result_text
                 # Claude parity (S6-011): per-tool result mappers. MCP tools
@@ -5081,6 +5131,7 @@ async def run_agent_loop(
                     final_answer = _payment_gate_answer_with_confirm_url(
                         final_answer,
                         str(payment_confirmation_ctx.get("url") or ""),
+                        payment_confirmation_ctx.get("link_note"),
                     )
                     await _dispatch_payment_confirmation_link_for_executor(
                         executor,
@@ -5090,7 +5141,7 @@ async def run_agent_loop(
                     _set_final_response(executor, final_answer, continue_listening=False)
                 except _PaymentConfirmationGateRefused as exc:
                     logger.warning("Payment confirmation gate refused: %s", exc)
-                    final_answer = (
+                    final_answer = getattr(exc, "user_message", None) or (
                         "Payment review is not ready because the browser is no longer on the merchant checkout page. "
                         "No order has been placed. Ask me to continue and I can return to checkout."
                     )
@@ -5114,6 +5165,17 @@ async def run_agent_loop(
         # (this read must precede the return, before any next turn reuses the
         # executor); the encrypt+serialize+disk *write* is deferred below.
         _snapshot_agent_checkpoint(executor, checkpoint, loop_messages, compress_messages)
+        if payment_gate or signature_gate:
+            # A gate continues this same executor after the user's decision
+            # (continue_after_event), which restores from executor history.
+            # Without the run's tool frames there, the continuation lost every
+            # page it had read: the untrusted-content rule was not rebuilt
+            # (r5/commerce, seen live after a purchase approval) and the model
+            # no longer saw the checkout it was asked to finish.
+            if getattr(executor, "_use_native", False):
+                executor._native_messages = copy.deepcopy(loop_messages)
+            else:
+                executor._text_messages = copy.deepcopy(loop_messages)
         # Lane C (#466): on the clean warm-answer path, the completed-checkpoint
         # write is post-answer bookkeeping the user should never wait on -- defer
         # it off the response path (a completed task is never resumed, so the

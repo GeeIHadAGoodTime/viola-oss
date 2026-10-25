@@ -18,9 +18,12 @@ Threshold raised from 0.50 to 0.80 on 2026-03-11 after a false activation flood
 fixture battery showed 0.95 playback gating missed real "Viola" clips while
 0.90 still rejected the current music and near-miss fixtures.
 
-Confirmation gate (2-of-3) was tried and reverted: the model produces single-frame
-score spikes for both true and false detections, so frame-consistency checking
-blocks real wake words as much as false ones.
+Frame agreement (wake plan Stage 1, 2026-10): a 2-of-3 confirmation gate was once
+tried here and reverted because, scored every 400 ms, a real "Viola" is seen only
+once or twice. The engine now scores every 80 ms chunk from streaming embeddings
+and applies the k-of-n agreement rule itself (violawake/engine.py AgreementGate,
+STREAM_AGREE_K/N in violawake/config.py) before this policy runs, so the score
+this policy re-checks is always one of the agreeing frames.
 
 Usage:
     from voice.wake_detector.wake_decision_policy import get_wake_policy, WakeContext
@@ -452,11 +455,14 @@ class WakeDecisionPolicy:
 
         result.layers_passed.append("zero_input")
 
-        # Gate 2: Score Threshold (0.90 launch floor)
-        if context.wake_score < threshold:
+        # Gate 2: Score Threshold (0.90 launch floor). On the streaming path
+        # the engine already required k of n frames at the per-frame threshold
+        # of this level's operating point, and passes that threshold here.
+        score_floor = threshold if context.score_threshold is None else context.score_threshold
+        if context.wake_score < score_floor:
             result.blocking_reason = "Score %.3f < threshold %.3f" % (
                 context.wake_score,
-                threshold,
+                score_floor,
             )
             result.layers_failed.append("primary_score")
             return result

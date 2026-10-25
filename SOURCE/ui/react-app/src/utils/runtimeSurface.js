@@ -62,8 +62,8 @@ export function shouldStreamBrowserView(isSpoke = false) {
 
 /**
  * Whether the in-app "Quit Viola" action should be offered. Only the
- * desktop app has a process to quit; closing its window just hides it to
- * the tray, so the "..." menu and Settings > System need a real Quit.
+ * desktop app has a process to quit. Closing its window quits too, unless
+ * the user chose to keep Viola running in the tray.
  * @returns {boolean}
  */
 export function canQuitDesktopApp() {
@@ -82,10 +82,35 @@ export function quitDesktopApp() {
   return true;
 }
 
+/**
+ * Whether the Qt shell can put the window in full screen for the voice
+ * "full screen" command. Chromium refuses `requestFullscreen()` without a
+ * user gesture, so a spoken request has to go through the native window.
+ * @returns {boolean}
+ */
+export function canSetDesktopVideoFullscreen() {
+  if (typeof window === 'undefined') return false;
+  return Boolean(window.viola && typeof window.viola.setVideoFullscreen === 'function');
+}
+
+/**
+ * Ask the Qt shell to enter (true) or leave (false) the video full screen.
+ * Leaving restores the window's size, position and maximized state.
+ * @param {boolean} enabled
+ * @returns {boolean} true when the request reached the Qt bridge.
+ */
+export function setDesktopVideoFullscreen(enabled) {
+  if (!canSetDesktopVideoFullscreen()) return false;
+  window.viola.setVideoFullscreen(Boolean(enabled));
+  return true;
+}
+
 export default {
   isDesktopApp,
   isWebClient,
   shouldStreamBrowserView,
   canQuitDesktopApp,
   quitDesktopApp,
+  canSetDesktopVideoFullscreen,
+  setDesktopVideoFullscreen,
 };

@@ -14,10 +14,20 @@ structural pieces that are NOT text classification:
   * NFKC unicode normalization — a deterministic charset normalization,
     not a content classifier.
   * the ``BROWSER_PAGE_CONTENT_TOOLS`` taxonomy — a named security
-    boundary used by ``BrowserTaintTracker`` to block high-risk tools
-    after browser/web content enters context.
-  * ``BrowserTaintTracker`` itself — a structural deterministic gate on
-    tool *names*, not tool *content*.
+    boundary used by ``BrowserTaintTracker`` to know when untrusted
+    content has entered context.
+  * ``BrowserTaintTracker`` itself — a deterministic gate that, once
+    untrusted content is in context, refuses shell commands and any payment
+    the user has not approved through the payment gate, makes the
+    confirm-or-cancel gates accept only the user's own words, and
+    stops the user's private data from being carried out in a URL or
+    script to a site the user did not name. It never classifies whether
+    content "looks like" an injection.
+
+Founder rule (2026-10-24): Viola is free to act between crucial moments
+and is defended at the crucial moments themselves. Searching, reading pages,
+browsing and reading memory or calendar are never refused because untrusted
+content is in the conversation.
 
 What was deleted: ``INJECTION_PATTERNS`` / ``INJECTION_RE`` /
 ``_STRIP_PATTERNS`` and the ``[REDACTED]`` rewrite, plus the
@@ -28,10 +38,19 @@ runtime must trust the model" by silently modifying tool-result text.
 
 from __future__ import annotations
 
+import base64
+import binascii
+import contextvars
+import html
+import json
+import re
 import unicodedata
-from collections.abc import Collection
+from collections.abc import Callable, Collection, Mapping
+from typing import Any
+from urllib.parse import unquote_plus, urlsplit
 
 from core.logging_config import get_logger
+from intent.irreversible_actions import irreversible_action_class
 
 logger = get_logger(__name__)
 
@@ -72,6 +91,46 @@ HIGH_RISK_TOOLS = frozenset(
         "register_mcp_server",
     }
 )
+
+
+# ---------------------------------------------------------------------------
+# What taint does to consequential actions (founder rule, 2026-10-24)
+# ---------------------------------------------------------------------------
+# HIGH_RISK_TOOLS above is the taxonomy of consequential tools. While untrusted
+# content is in the conversation:
+#   * payments and shell commands are refused outright, with no confirm
+#     override (TAINT_HARD_BLOCK_ACTION_CLASSES), except that the two
+#     payment-gate-bound tools run once the user approved this exact order
+#     through the payment gate (PAYMENT_GATE_BOUND_TOOLS, below);
+#   * a phone call goes on to its confirm-or-cancel gate like the actions
+#     below (r5/phone): the confirmation shows the user the exact number and
+#     who it belongs to, says the number came from outside content, and must
+#     be the user's own yes. "Look up the number and call them" is the core
+#     use case. TAINT_PHONE_ACTION_CLASSES stays as the switch to refuse calls
+#     outright again if that gate is ever not in place;
+#   * a legacy high-risk tool name that has no confirm-or-cancel step of its
+#     own stays refused (TAINT_UNGATED_HIGH_RISK_TOOLS);
+#   * every other consequential action (sending email, SMS or Telegram,
+#     sharing, writing or deleting files, registering an MCP server, changing
+#     email labels) goes on to its confirm-or-cancel gate. Under taint that
+#     gate accepts only the user's own words, never a re-issued tool call
+#     alone (ApprovalManager.confirmation_holds_under_taint).
+TAINT_HARD_BLOCK_ACTION_CLASSES = frozenset({"payment", "shell_command"})
+TAINT_PHONE_ACTION_CLASSES: frozenset[str] = frozenset()
+TAINT_UNGATED_HIGH_RISK_TOOLS = frozenset({"send_telegram", "write_file"})
+
+# The payment gate is the crucial-moment defence for buying things (r5/commerce).
+# Shopping always reads merchant pages, so taint is on for every real purchase;
+# a blanket refusal here would make every purchase impossible. These two tools
+# only ever use a card the user approved out of band for this exact order: the
+# approval link shows the merchant, items and total, is bound to the user and
+# the order, is single use, expires, and needs the user's payment PIN, which the
+# desktop checks against its own vault. Under taint they run only while such an
+# approval is active for this task (the probe the agent loop installs answers
+# that from code-owned state, never from the model's arguments). Every other
+# payment-class call, and anything before approval, stays refused, and the
+# exfiltration defence below is unchanged.
+PAYMENT_GATE_BOUND_TOOLS = frozenset({"fill_payment_details", "transmit_payment_to_call"})
 
 
 def canonicalize_tool_name_for_safety(tool_name: str | None) -> str:
@@ -215,22 +274,181 @@ NON_BROWSER_CONTENT_SOURCE_TOOLS = frozenset(NON_BROWSER_CONTENT_SOURCE_TOOL_REA
 UNTRUSTED_CONTENT_SOURCE_TOOLS = BROWSER_PAGE_CONTENT_TOOLS | NON_BROWSER_CONTENT_SOURCE_TOOLS
 
 # ---------------------------------------------------------------------------
-# Navigation / GET-capable exfil sinks (SEC-004)
+# Exfiltration sinks (SEC-004, narrowed 2026-10-24)
 # ---------------------------------------------------------------------------
-# These tools fetch an attacker-chosen URL or query. After untrusted content
-# from a NON-browser source has entered context, they become an exfiltration
-# channel (secrets URL-encoded into the path/query of a request to an attacker
-# host). They are gated as SINKS only when the taint came from a non-browser
-# source — gating them under browser taint would break ordinary browsing
-# (every page load taints, and navigation is how browsing proceeds).
+# The real risk once untrusted text is in context is exfiltration: injected text
+# tells the agent to put the user's private data (email, calendar, memory,
+# files) into a URL or script aimed at a host the attacker reads. These tools
+# can do that. They are NOT refused for being called under taint (that broke
+# "check my calendar, then look up the restaurant"); a call is refused only when
+# it would actually carry the user's private data to a site the user has not
+# named (``BrowserTaintTracker.check_tool``). ``web_search`` is not a sink: the
+# query goes to Viola's search backend, never to a host the page chose.
 NAVIGATION_SINK_TOOL_REASONS: dict[str, str] = {
     "browser_navigate": "navigates to an arbitrary URL; data can be exfiltrated in the path/query",
     "web_read": "fetches an arbitrary URL; data can be exfiltrated in the URL",
-    "web_search": "issues an arbitrary external query; data can be exfiltrated in the query string",
     "browser_evaluate": "executes arbitrary JS that can fetch() data out to any host",
     "browser_run_script": "executes arbitrary JS that can fetch() data out to any host",
 }
 NAVIGATION_SINK_TOOLS = frozenset(NAVIGATION_SINK_TOOL_REASONS)
+_URL_SINK_TOOLS = frozenset({"browser_navigate", "web_read"})
+_SCRIPT_SINK_TOOLS = frozenset({"browser_evaluate", "browser_run_script"})
+
+# Private-data fingerprints. A run of this many consecutive words from a
+# private result, or one distinctive token (a long number, account id, code or
+# key), found in the outbound URL/script means private data is leaving.
+_EXFIL_NGRAM_WORDS = 4
+_EXFIL_NGRAM_MIN_CHARS = 12
+_EXFIL_DIGIT_TOKEN_MIN = 6
+_EXFIL_LONG_TOKEN_MIN = 20
+_EXFIL_ENCODED_TOKEN_MIN = 16
+_PRIVATE_TEXT_BUDGET_CHARS = 200_000
+_SEEN_URL_BUDGET = 2_000
+_AGENT_WRITABLE_SOURCES = frozenset({"memory", "workbench", "knowledge"})
+
+_WORD_RE = re.compile(r"[^\W_]+", re.UNICODE)
+_URL_IN_TEXT_RE = re.compile(r"""(?:https?:)?//[^\s"'<>()\[\]{}\\^`|]+""", re.IGNORECASE)
+_ENCODED_TOKEN_RE = re.compile(r"[A-Za-z0-9+/_\-]{%d,}={0,2}" % _EXFIL_ENCODED_TOKEN_MIN)
+_HEX_TOKEN_RE = re.compile(r"\b(?:[0-9a-fA-F]{2}){%d,}\b" % (_EXFIL_ENCODED_TOKEN_MIN // 2))
+
+
+def _words(text: str) -> list[str]:
+    return [word.lower() for word in _WORD_RE.findall(unicodedata.normalize("NFKC", text))]
+
+
+def _private_fingerprints(text: str) -> set[str]:
+    """Word 4-grams and distinctive single tokens of ``text`` (lowercased)."""
+    words = _words(text)
+    prints: set[str] = set()
+    for word in words:
+        if (len(word) >= _EXFIL_DIGIT_TOKEN_MIN and any(ch.isdigit() for ch in word)) or len(
+            word
+        ) >= _EXFIL_LONG_TOKEN_MIN:
+            prints.add(word)
+    for index in range(len(words) - _EXFIL_NGRAM_WORDS + 1):
+        gram = words[index : index + _EXFIL_NGRAM_WORDS]
+        if sum(len(word) for word in gram) >= _EXFIL_NGRAM_MIN_CHARS:
+            prints.add(" ".join(gram))
+    return prints
+
+
+def _decoded_variants(text: str) -> list[str]:
+    """URL-decoded text plus base64/hex decodings of long opaque tokens in it."""
+    decoded = unquote_plus(unquote_plus(text))
+    variants = [decoded]
+    for token in _ENCODED_TOKEN_RE.findall(decoded):
+        padded = token + "=" * (-len(token) % 4)
+        for decoder in (base64.urlsafe_b64decode, base64.b64decode):
+            try:
+                raw = decoder(padded)
+            except (binascii.Error, ValueError):
+                continue
+            candidate = raw.decode("utf-8", errors="ignore")
+            if candidate and sum(ch.isprintable() for ch in candidate) >= 0.9 * len(candidate):
+                variants.append(candidate)
+                break
+    for token in _HEX_TOKEN_RE.findall(decoded):
+        try:
+            candidate = bytes.fromhex(token).decode("utf-8", errors="ignore")
+        except ValueError:
+            continue
+        if candidate and sum(ch.isprintable() for ch in candidate) >= 0.9 * len(candidate):
+            variants.append(candidate)
+    return variants
+
+
+def _normalize_url(url: str) -> str:
+    """Comparable form of a URL: no scheme, no ``www.``, no trailing slash or fragment."""
+    value = html.unescape(str(url or "").strip()).strip(".,;:!?)]}'\"")
+    value = re.sub(r"^(?:https?:)?//", "", value, flags=re.IGNORECASE)
+    value = value.split("#", 1)[0].rstrip("/")
+    if value.lower().startswith("www."):
+        value = value[4:]
+    return value.lower()
+
+
+def _url_host(url: str) -> str:
+    value = str(url or "").strip()
+    if not re.match(r"^(?:[a-z][a-z0-9+.\-]*:)?//", value, flags=re.IGNORECASE):
+        value = "//" + value
+    try:
+        host = urlsplit(value).hostname or ""
+    except ValueError:
+        return ""
+    return host[4:] if host.startswith("www.") else host
+
+
+def _host_named_in(host: str, user_text: str) -> bool:
+    """True when the user's request names this site (``evil.com`` or ``evil``)."""
+    if not host or not user_text:
+        return False
+    text = user_text.lower()
+    labels = [label for label in host.lower().split(".") if label]
+    candidates = {host.lower()}
+    if len(labels) >= 2:
+        candidates.add(".".join(labels[-2:]))
+        candidates.add(labels[-2])
+    elif labels:
+        candidates.add(labels[0])
+    for name in candidates:
+        if len(name) < 3:
+            continue
+        if re.search(r"(?<![\w.\-])" + re.escape(name) + r"(?![\w\-]|\.\w)", text):
+            return True
+    return False
+
+
+def _content_text(content: object) -> str:
+    """Flatten a tool result (str, content blocks, or JSON-able data) to text."""
+    if content is None:
+        return ""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts: list[str] = []
+        for block in content:
+            if isinstance(block, Mapping):
+                if block.get("type") == "image":
+                    continue
+                parts.append(_content_text(block.get("text") if "text" in block else block.get("content")))
+            else:
+                parts.append(_content_text(block))
+        return "\n".join(part for part in parts if part)
+    try:
+        return json.dumps(content, default=str, ensure_ascii=False)
+    except (TypeError, ValueError):
+        return str(content)
+
+
+# The taint tracker for the agent task running in this context. The approval
+# layer reads it so a confirm-or-cancel gate knows the conversation is tainted
+# (and what the user actually said) without a global flag shared across tasks.
+_ACTIVE_TAINT_TRACKER: contextvars.ContextVar[Any] = contextvars.ContextVar("viola_active_taint_tracker", default=None)
+
+
+def bind_active_taint_tracker(tracker: Any) -> contextvars.Token[Any]:
+    """Make ``tracker`` the active taint tracker for this context."""
+    return _ACTIVE_TAINT_TRACKER.set(tracker)
+
+
+def reset_active_taint_tracker(token: contextvars.Token[Any]) -> None:
+    """Restore the active taint tracker that was bound before ``token``."""
+    try:
+        _ACTIVE_TAINT_TRACKER.reset(token)
+    except ValueError:
+        # Token created in another context (e.g. a copied task context).
+        _ACTIVE_TAINT_TRACKER.set(None)
+
+
+def active_taint_tracker() -> Any:
+    """The taint tracker bound for the current agent task, or None."""
+    return _ACTIVE_TAINT_TRACKER.get()
+
+
+def context_is_tainted() -> bool:
+    """True when the current agent task has untrusted content in context."""
+    tracker = _ACTIVE_TAINT_TRACKER.get()
+    return bool(getattr(tracker, "is_tainted", False))
 
 
 def is_browser_page_content_source(tool_name: str | None) -> bool:
@@ -272,6 +490,120 @@ def _is_navigation_sink_name(tool_name: str | None) -> bool:
     if not tool_name:
         return False
     return canonicalize_tool_name_for_safety(tool_name) in NAVIGATION_SINK_TOOLS
+
+
+def _taint_action_class(
+    tool_name: str,
+    args: Mapping[str, Any],
+    schema: Mapping[str, Any] | None,
+) -> str | None:
+    """Confirm-gate class of this call, by requested and canonical name."""
+    canonical = canonicalize_tool_name_for_safety(tool_name)
+    for name in dict.fromkeys((tool_name, canonical)):
+        try:
+            action_class = irreversible_action_class(name, args, schema)
+        except (AttributeError, TypeError, ValueError):
+            action_class = None
+        if action_class is not None:
+            return action_class
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Files the user named in their own request (founder rule, 2026-10-23)
+# ---------------------------------------------------------------------------
+# Reading a file the user's OWN message names ("add a line saying hello to
+# viola-test.txt") is part of carrying out that request, not untrusted content
+# arriving from a third party, so it does not taint the context against the
+# follow-up write. Consequential actions are defended where they matter: the
+# confirm-or-cancel gates. This is a provenance check on the tool ARGUMENTS
+# (the path the model passed) against the user's request text; it never reads
+# or classifies the file's content. ``file_read`` with action ``read`` /
+# ``info`` qualifies for a file the message names exactly.
+#
+# A folder the user names directly counts the same way (founder rule,
+# 2026-10-24: liberty between crucial moments): "fix the typos in my blog
+# folder" makes reading, listing, globbing and grepping inside that folder part
+# of the request. Folders where files arrive from outside -- Downloads, temp
+# folders, the browser download folder, mail-attachment caches -- never count
+# (``intent.file_gates.is_outside_arrival_location``). Every other source (web,
+# email, calendar, memory, shared documents, a file outside the named folder)
+# still taints; deletes and payments keep their gates and shell stays
+# hard-blocked under taint.
+_USER_NAMED_FILE_ACTIONS = frozenset({"read", "info"})
+_USER_NAMED_FOLDER_ACTIONS = frozenset({"read", "info", "list", "glob", "grep", "search"})
+_FOLDER_SEARCH_ACTIONS = frozenset({"list", "glob", "grep", "search"})
+
+
+def _tool_args_mapping(tool_args: object) -> Mapping[str, object] | None:
+    if isinstance(tool_args, Mapping):
+        return tool_args
+    if isinstance(tool_args, str) and tool_args.strip():
+        try:
+            parsed = json.loads(tool_args)
+        except (TypeError, ValueError):
+            return None
+        return parsed if isinstance(parsed, Mapping) else None
+    return None
+
+
+def is_user_named_file_read(tool_name: str | None, tool_args: object, user_text: str | None) -> bool:
+    """True when ``file_read`` reads a file the request names, or looks inside a folder it names.
+
+    The file name (the last path component, which must carry an extension such
+    as ``viola-test.txt``) has to appear in ``user_text`` as a whole name: not
+    inside a longer name (``old-viola-test.txt``) and not as the stem of another
+    file (``viola-test.txt.bak``). Matching is case-insensitive because Windows
+    paths are.
+    """
+    if canonicalize_tool_name_for_safety(tool_name) != "file_read":
+        return False
+    text = str(user_text or "")
+    args = _tool_args_mapping(tool_args)
+    if not text.strip() or args is None:
+        return False
+    action = str(args.get("action") or "list").strip().lower()
+    if action not in _USER_NAMED_FOLDER_ACTIONS:
+        return False
+    raw_path = str(args.get("path") or "").strip()
+    if action in _USER_NAMED_FILE_ACTIONS:
+        path = raw_path.rstrip("\\/")
+        name = re.split(r"[\\/]", path)[-1] if path else ""
+        stem, dot, extension = name.rpartition(".")
+        if dot and stem.strip(".") and extension:
+            pattern = r"(?<![\w.\-])" + re.escape(name) + r"(?![\w\-]|\.\w)"
+            if re.search(pattern, text, flags=re.IGNORECASE) is not None:
+                return True
+    return _inside_user_named_folder(raw_path, text, include_self=action in _FOLDER_SEARCH_ACTIONS)
+
+
+def _inside_user_named_folder(raw_path: str, user_text: str, *, include_self: bool) -> bool:
+    """The path is inside (or, for list/glob/grep, is) a folder the user named directly."""
+    if not raw_path:
+        return False
+    from intent.file_gates import user_named_folder_contains
+    from intent.tools.filesystem import resolve_tool_path
+
+    resolved = resolve_tool_path(raw_path)
+    if resolved is None:
+        return False
+    return user_named_folder_contains(resolved, user_text, include_self=include_self)
+
+
+def _user_request_text(message: Mapping[str, object]) -> str | None:
+    """Text the user typed in a ``user`` frame; None for tool-result frames."""
+    content = message.get("content")
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts = [
+            str(block.get("text") or "")
+            for block in content
+            if isinstance(block, Mapping) and block.get("type") in {"text", "input_text"}
+        ]
+        if parts:
+            return "\n".join(parts)
+    return None
 
 
 def _tool_names_in_assistant_message(message: dict[str, object]) -> list[str]:
@@ -386,23 +718,79 @@ class BrowserTaintTracker:
     """Track whether untrusted content has entered the LLM context.
 
     Despite the legacy name, this tracks taint from EVERY untrusted content
-    source — browser/web pages AND email, calendar, memory, and file content
-    (SEC-001). When tainted, high-risk tool calls are blocked with a
-    deterministic code gate that cannot be bypassed by prompt injection. When
-    the taint came from a *non-browser* source, navigation/GET-capable tools
-    are gated too, to close exfil-via-navigation (SEC-004).
+    source: browser/web pages AND email, calendar, memory, and file content
+    (SEC-001). What taint changes (founder rule, 2026-10-24):
 
-    This is a structural gate on tool *names* — it never classifies the content
-    of tool results, the user's query, or the model's output.
+      * shell commands are refused outright, and so is every payment except
+        filling (or speaking) the card the user approved for this exact
+        order through the payment gate's out-of-band approval;
+      * phone calls reach their confirm-or-cancel gate, which shows the exact
+        number and who it belongs to (r5/phone);
+      * every other consequential action goes on to its confirm-or-cancel
+        gate, which under taint accepts only the user's own words;
+      * searching, reading pages, browsing and reading memory/calendar are
+        never refused, EXCEPT a URL or script that would carry the user's
+        private data (text from email, calendar, memory or file results) to a
+        site the user has not named, unless the URL is a link that private
+        content itself contained (exfiltration defense).
+
+    The tracker never classifies whether content looks like an injection. It
+    records which tools produced results, and the private text and links those
+    private results returned, and compares the agent's outbound URL or script
+    against that provenance.
     """
 
     def __init__(self) -> None:
         self._tainted: bool = False
         self._taint_source: str = ""
         # True once any NON-browser untrusted source (email/calendar/memory/
-        # file) has tainted the context. Drives navigation-sink gating without
-        # breaking ordinary multi-page browsing under browser-only taint.
+        # file) has tainted the context. Kept for diagnostics and callers.
         self._non_browser_tainted: bool = False
+        # The current user request. A file it names may be read without
+        # tainting (see ``is_user_named_file_read``), a site it names may be
+        # sent data, and it is what a confirmation under taint is checked
+        # against.
+        self._user_request: str = ""
+        # Fingerprints of private text returned by email/calendar/memory/file
+        # results (including a file the user named: its content is still the
+        # user's private data).
+        self._private_prints: set[str] = set()
+        self._private_text_chars: int = 0
+        # Normalized URLs that appeared in any tool result. Opening one of them
+        # is following a link, which cannot carry new data out.
+        self._seen_urls: set[str] = set()
+        self._schema_lookup: Callable[[str], Mapping[str, Any] | None] | None = None
+        # Answers "has the user approved this exact order through the payment
+        # gate, and is that approval still live for this task?" Installed by
+        # the agent loop from executor state; None means "never".
+        self._payment_approval_probe: Callable[[str, Mapping[str, Any]], bool] | None = None
+
+    def set_user_request(self, user_text: str | None) -> None:
+        """Record the current user request (user-named file/site exemptions)."""
+        self._user_request = str(user_text or "")
+
+    def set_schema_lookup(self, lookup: Callable[[str], Mapping[str, Any] | None] | None) -> None:
+        """Let the gate read a tool's ``_meta`` (e.g. a payment extension's class)."""
+        self._schema_lookup = lookup if callable(lookup) else None
+
+    def set_payment_approval_probe(self, probe: Callable[[str, Mapping[str, Any]], bool] | None) -> None:
+        """Let payment-gate-bound tools run under taint once the user approved the order."""
+        self._payment_approval_probe = probe if callable(probe) else None
+
+    def _payment_gate_approved(self, tool_name: str, args: Mapping[str, Any]) -> bool:
+        probe = self._payment_approval_probe
+        if probe is None:
+            return False
+        try:
+            return probe(tool_name, args) is True
+        except Exception:  # noqa: BLE001 - a broken probe must fail closed
+            logger.warning("TAINT_GATE: payment approval probe failed; refusing", exc_info=True)
+            return False
+
+    @property
+    def user_request(self) -> str:
+        """The user's own words for the current turn."""
+        return self._user_request
 
     @property
     def is_tainted(self) -> bool:
@@ -419,23 +807,74 @@ class BrowserTaintTracker:
         """Whether a non-browser untrusted source tainted the context."""
         return self._non_browser_tainted
 
+    @property
+    def holds_private_data(self) -> bool:
+        """Whether private email/calendar/memory/file text is in context."""
+        return bool(self._private_prints)
+
     def _classify_source(self, source_tool: str | None) -> str:
         if is_non_browser_untrusted_source(source_tool):
             return "non_browser"
         if is_browser_page_content_source(source_tool):
             return "browser"
-        # Unknown sources are treated as browser-equivalent: they still taint
-        # high-risk tools but do not gate navigation, matching the legacy
-        # browser-only behavior for any name not in the source taxonomy.
+        # Unknown sources are treated as browser-equivalent.
         return "browser"
 
-    def mark_tainted(self, source_tool: str, *, category: str | None = None) -> None:
+    def record_result(self, source_tool: str | None, content: object) -> None:
+        """Remember a private source's text and the links it contained.
+
+        Only email/calendar/chat/document/file results count. A link in one of
+        them (a meeting link in an invite, a tracking link in an email) may be
+        opened even though it contains that private text: following an
+        existing link carries nothing new out. Stores the agent can write to
+        itself (memory, workbench, knowledge) do not vouch for links, so a URL
+        cannot be laundered by saving it and reading it back.
+        """
+        if not is_non_browser_untrusted_source(source_tool):
+            return
+        text = _content_text(content)
+        if not text:
+            return
+        if (
+            canonicalize_tool_name_for_safety(source_tool) not in _AGENT_WRITABLE_SOURCES
+            and len(self._seen_urls) < _SEEN_URL_BUDGET
+        ):
+            for match in _URL_IN_TEXT_RE.findall(html.unescape(text)):
+                normalized = _normalize_url(match)
+                if normalized:
+                    self._seen_urls.add(normalized)
+        if self._private_text_chars < _PRIVATE_TEXT_BUDGET_CHARS:
+            budget = _PRIVATE_TEXT_BUDGET_CHARS - self._private_text_chars
+            chunk = text[:budget]
+            self._private_text_chars += len(chunk)
+            self._private_prints |= _private_fingerprints(chunk)
+
+    def mark_tainted(
+        self,
+        source_tool: str,
+        *,
+        category: str | None = None,
+        tool_args: object = None,
+        user_text: str | None = None,
+        content: object = None,
+    ) -> None:
         """Mark the context as tainted by untrusted content.
 
         ``category`` ("browser" or "non_browser") is inferred from the source
-        tool name when not supplied. A non-browser taint additionally enables
-        the navigation-sink gate (SEC-004).
+        tool name when not supplied. ``content`` (the tool result) is recorded
+        for the exfiltration check: its links, and its text when the source is
+        private (email/calendar/memory/file).
+
+        A ``file_read`` of a file the user's request names (``user_text``, else
+        the request recorded by ``set_user_request``) does not taint, but its
+        content is still recorded as private data.
         """
+        if content is not None:
+            self.record_result(source_tool, content)
+        request = self._user_request if user_text is None else user_text
+        if tool_args is not None and is_user_named_file_read(source_tool, tool_args, request):
+            logger.info("Content taint skipped: %s read a file the user named in the request", source_tool)
+            return
         if category is None:
             category = self._classify_source(source_tool)
         if not self._tainted:
@@ -461,63 +900,231 @@ class BrowserTaintTracker:
         survives in the conversation history would otherwise bypass the gate on
         the next turn. This scans the incoming message chain for assistant
         frames that called an untrusted content SOURCE tool and re-marks taint
-        accordingly. It keys off the recorded tool *name* (structural
-        provenance) — never the content — so the gate persists exactly as long
-        as the tainted tool result remains in context (and clears once it is
-        compacted out).
+        accordingly, keyed off the recorded tool *name* (structural
+        provenance). The matching tool results still in history are recorded
+        exactly as the live loop records them (links, and private text for
+        email/calendar/memory/file sources), so the rebuilt gate is the same
+        gate. Once the results are compacted out, the data they held is no
+        longer in context to leak either.
         """
+        last_user_request = ""
+        calls_by_id: dict[str, str] = {}
         for message in messages or []:
-            if not isinstance(message, dict) or message.get("role") != "assistant":
+            if not isinstance(message, dict):
                 continue
-            for name in _tool_names_in_assistant_message(message):
-                if is_untrusted_content_source(name):
-                    self.mark_tainted(name)
+            role = message.get("role")
+            if role == "user":
+                text = _user_request_text(message)
+                if text is not None:
+                    last_user_request = text
+                for call_id, content in _tool_results_in_message(message):
+                    source = calls_by_id.get(call_id)
+                    if source:
+                        self.record_result(source, content)
+                continue
+            if role == "tool":
+                call_id = str(message.get("tool_call_id") or message.get("tool_use_id") or "")
+                source = calls_by_id.get(call_id) or str(message.get("name") or "")
+                if source and is_untrusted_content_source(source):
+                    self.record_result(source, message.get("content"))
+                continue
+            if role != "assistant":
+                continue
+            for call_id, name, args in _tool_call_records_in_assistant_message(message):
+                if not is_untrusted_content_source(name):
+                    continue
+                if call_id:
+                    calls_by_id[call_id] = name
+                if is_user_named_file_read(name, args, last_user_request):
+                    continue
+                self.mark_tainted(name)
 
     def reset(self) -> None:
-        """Clear the taint flag."""
+        """Clear the taint flag and recorded provenance."""
         if self._tainted:
             logger.debug("Content taint cleared")
         self._tainted = False
         self._taint_source = ""
         self._non_browser_tainted = False
+        self._private_prints = set()
+        self._private_text_chars = 0
+        self._seen_urls = set()
 
-    def check_tool(self, tool_name: str | None) -> str | None:
-        """Check if a tool is blocked due to taint.
+    def _schema_for(self, tool_name: str) -> Mapping[str, Any] | None:
+        if self._schema_lookup is None:
+            return None
+        try:
+            schema = self._schema_lookup(tool_name)
+        except (AttributeError, KeyError, TypeError, ValueError):
+            return None
+        return schema if isinstance(schema, Mapping) else None
+
+    def check_tool(self, tool_name: str | None, tool_args: object = None) -> str | None:
+        """Check if a tool call is refused because untrusted content is in context.
 
         INT-09 None-safety: ``tool_name`` may be ``None`` (e.g. during early
         tool dispatch when the tool name has not yet been resolved). A
         missing name cannot match the gated sets and must NOT raise — return
         ``None`` so the caller continues without spurious blocking.
 
-        Returns an error message if blocked, or None if safe.
+        Returns an error message if refused, or None if the call may proceed
+        (consequential calls then still meet their confirm-or-cancel gate).
         """
         if not self._tainted or not tool_name:
             return None
+        args = _tool_args_mapping(tool_args) or {}
+        canonical = canonicalize_tool_name_for_safety(tool_name)
+        action_class = _taint_action_class(tool_name, args, self._schema_for(tool_name))
 
-        if _is_high_risk_tool_name(tool_name):
+        if action_class == "payment" and canonical in PAYMENT_GATE_BOUND_TOOLS:
+            if self._payment_gate_approved(canonical, args):
+                logger.info(
+                    "TAINT_GATE: allowing %s under taint from '%s': the user approved this order "
+                    "through the payment gate",
+                    tool_name,
+                    self._taint_source,
+                )
+                return None
             logger.warning(
-                "TAINT_GATE: blocking high-risk '%s' after untrusted content from '%s'",
+                "TAINT_GATE: refusing %s before payment-gate approval (taint from '%s')",
                 tool_name,
                 self._taint_source,
             )
             return (
-                "BLOCKED: '%s' cannot be called while untrusted content "
-                "(web, email, calendar, memory, or file) is in context "
-                "(prompt injection defense). The user must explicitly request "
-                "this action in a new message." % tool_name
+                "BLOCKED: '%s' only runs after the user approves this exact order through the "
+                "secure payment review (merchant, items and total, confirmed with their payment "
+                "PIN). Do not fill or type card details. If checkout is ready, call "
+                'payment(action="request_review") with the merchant, items and total, then stop '
+                "and wait; Viola sends the user the approval link and continues once they approve." % tool_name
             )
 
-        if self._non_browser_tainted and _is_navigation_sink_name(tool_name):
+        if action_class in TAINT_HARD_BLOCK_ACTION_CLASSES:
             logger.warning(
-                "TAINT_GATE: blocking navigation sink '%s' after non-browser content from '%s'",
+                "TAINT_GATE: refusing %s '%s' after untrusted content from '%s'",
+                action_class,
+                tool_name,
+                self._taint_source,
+            )
+            what = "a payment" if action_class == "payment" else "a shell command"
+            do_it = "complete the payment" if action_class == "payment" else "run the command"
+            return (
+                "BLOCKED: '%s' (%s) cannot run while untrusted content (web, email, "
+                "calendar, memory, or a file the user did not name) is in this "
+                "conversation (prompt injection defense). There is no confirmation "
+                "that unlocks it, and asking again or retrying in this conversation "
+                "will not lift it. Tell the user you could not do this here and why; "
+                "they can %s themselves." % (tool_name, what, do_it)
+            )
+
+        if action_class in TAINT_PHONE_ACTION_CLASSES:
+            logger.warning(
+                "TAINT_GATE: refusing phone call '%s' after untrusted content from '%s'",
                 tool_name,
                 self._taint_source,
             )
             return (
-                "BLOCKED: '%s' cannot fetch an external URL/query while "
-                "untrusted non-browser content (email, calendar, memory, or "
-                "file) is in context (exfiltration defense). The user must "
-                "explicitly request this navigation in a new message." % tool_name
+                "BLOCKED: '%s' (a phone call) cannot be placed while untrusted content "
+                "(web, email, calendar, memory, or a file the user did not name) is in "
+                "this conversation (prompt injection defense). Asking again or retrying "
+                "in this conversation will not lift it. Tell the user you could not "
+                "place the call here and why; they can place it themselves." % tool_name
             )
 
-        return None
+        if canonical in TAINT_UNGATED_HIGH_RISK_TOOLS:
+            logger.warning(
+                "TAINT_GATE: refusing ungated high-risk '%s' after untrusted content from '%s'",
+                tool_name,
+                self._taint_source,
+            )
+            return (
+                "BLOCKED: '%s' has no confirm step, so it cannot run while untrusted "
+                "content is in this conversation (prompt injection defense). Use the "
+                "current tool for this action instead (it asks the user to confirm)." % tool_name
+            )
+
+        return self._check_exfiltration(tool_name, canonical, args)
+
+    def _check_exfiltration(self, tool_name: str, canonical: str, args: Mapping[str, Any]) -> str | None:
+        """Refuse a URL/script that carries private data to a site the user did not name."""
+        if not self._private_prints or canonical not in NAVIGATION_SINK_TOOLS:
+            return None
+        user_prints = _private_fingerprints(self._user_request) if self._user_request else set()
+
+        if canonical in _URL_SINK_TOOLS:
+            url = str(args.get("url") or "").strip()
+            if not url:
+                return None
+            host = _url_host(url)
+            if _normalize_url(url) in self._seen_urls or _host_named_in(host, self._user_request):
+                return None
+            outbound = url
+        else:
+            script = str(args.get("script") or args.get("code") or args.get("expression") or "")
+            if not script:
+                return None
+            hosts = {_url_host(match) for match in _URL_IN_TEXT_RE.findall(script)}
+            hosts.discard("")
+            foreign = sorted(h for h in hosts if not _host_named_in(h, self._user_request))
+            if not foreign:
+                return None
+            host = foreign[0]
+            outbound = script
+
+        leaked: set[str] = set()
+        for variant in _decoded_variants(outbound):
+            leaked |= (_private_fingerprints(variant) & self._private_prints) - user_prints
+        if not leaked:
+            return None
+
+        logger.warning(
+            "TAINT_GATE: refusing %s to %s: it carries private data from this conversation "
+            "(%d fragment(s)); taint source '%s'",
+            tool_name,
+            host or "an unnamed site",
+            len(leaked),
+            self._taint_source,
+        )
+        site = host or "that site"
+        return (
+            "BLOCKED: this %s would send text from the user's private data (email, "
+            "calendar, memory, or files) to %s, a site the user has not named, while "
+            "untrusted content is in this conversation (exfiltration defense). "
+            "Searching, reading pages and opening links you found still work. If the "
+            "user really wants this, they can ask for it in a message that names the "
+            'site (for example "open it on %s") and it will go through. Tell the '
+            "user what you were about to send and where."
+            % ("URL" if canonical in _URL_SINK_TOOLS else "script", site, site)
+        )
+
+
+def _tool_call_records_in_assistant_message(message: dict[str, object]) -> list[tuple[str, str, object]]:
+    """(call id, name, arguments) for each tool call an assistant frame recorded."""
+    records: list[tuple[str, str, object]] = []
+    content = message.get("content")
+    if isinstance(content, dict) and content.get("_openai_assistant"):
+        for call in content.get("tool_calls") or []:
+            if isinstance(call, dict):
+                fn = call.get("function")
+                if isinstance(fn, dict) and fn.get("name"):
+                    records.append((str(call.get("id") or ""), str(fn["name"]), fn.get("arguments")))
+    elif isinstance(content, list):
+        for block in content:
+            if isinstance(block, dict) and block.get("type") == "tool_use" and block.get("name"):
+                records.append((str(block.get("id") or ""), str(block["name"]), block.get("input")))
+    for call in message.get("tool_calls") or []:  # plain OpenAI chat frame
+        if isinstance(call, dict):
+            fn = call.get("function")
+            if isinstance(fn, dict) and fn.get("name"):
+                records.append((str(call.get("id") or ""), str(fn["name"]), fn.get("arguments")))
+    return records
+
+
+def _tool_results_in_message(message: Mapping[str, object]) -> list[tuple[str, object]]:
+    """(tool_use_id, content) for each tool_result block in a user frame."""
+    content = message.get("content")
+    results: list[tuple[str, object]] = []
+    if isinstance(content, list):
+        for block in content:
+            if isinstance(block, Mapping) and block.get("type") == "tool_result":
+                results.append((str(block.get("tool_use_id") or ""), block.get("content")))
+    return results

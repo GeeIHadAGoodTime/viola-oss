@@ -38,6 +38,10 @@ from violawake.config import (
     DEFAULT_THRESHOLD,
     SAMPLE_RATE,
     SILENCE_GATE_RMS,
+    STREAM_AGREE_K,
+    STREAM_AGREE_N,
+    STREAM_CHUNK_SAMPLES,
+    stream_operating_point,
 )
 
 if TYPE_CHECKING:
@@ -289,6 +293,107 @@ def _single_threaded_session_options(ort_local: ModuleType) -> object:
     return options
 
 
+# openWakeWord front-end geometry (fixed by its melspectrogram/embedding models).
+_MEL_CONTEXT_SAMPLES = 480  # 3 STFT hops of left context per chunk, as OWW streaming
+_MEL_WINDOW_FRAMES = 76  # mel frames the embedding model reads
+_MEL_BINS = 32
+_EMBEDDING_DIM = 96
+# 76 mel frames at 8 per chunk need 10 chunks of real audio; the classifier
+# window then needs (seq_len - 1) more embeddings. Before that the features
+# still hold the start-up fill, so no score is produced.
+_MEL_WARMUP_CHUNKS = 10
+# Silence gate over the last ~1.5 s, the same span process_audio() gates on.
+_SILENCE_GATE_CHUNKS = round(CLIP_SAMPLES / STREAM_CHUNK_SAMPLES)
+
+
+class StreamingEmbedder:
+    """One openWakeWord embedding per 80 ms chunk, computed incrementally.
+
+    Numerically this is openWakeWord's own streaming path
+    (``AudioFeatures.__call__`` + ``get_features``): each 1280-sample chunk,
+    with 480 samples of left context, yields 8 mel frames; the embedding model
+    reads the last 76 mel frames. It skips OWW's 10 s Python-list raw buffer,
+    which costs more than the models on every call. A full re-embed of the
+    1.5 s window (what ``process_audio`` does) costs about 8x more per score.
+    """
+
+    def __init__(self, preprocessor: Any, seq_len: int):
+        self._pre = preprocessor
+        self._seq_len = max(1, int(seq_len))
+        self.warmup_chunks = _MEL_WARMUP_CHUNKS + self._seq_len - 1
+        self.reset()
+
+    def reset(self) -> None:
+        """Forget all audio (call after any gap in the stream)."""
+        self._tail = np.zeros(_MEL_CONTEXT_SAMPLES, dtype=np.int16)
+        self._mel = np.ones((_MEL_WINDOW_FRAMES, _MEL_BINS), dtype=np.float32)
+        self._emb = np.zeros((self._seq_len, _EMBEDDING_DIM), dtype=np.float32)
+        self._chunks = 0
+
+    @property
+    def warm(self) -> bool:
+        """True once every feature the classifier reads came from real audio."""
+        return self._chunks >= self.warmup_chunks
+
+    def push(self, chunk_int16: np.ndarray) -> None:
+        """Add one 1280-sample int16 chunk and compute its embedding."""
+        x = np.concatenate((self._tail, chunk_int16))
+        self._tail = x[-_MEL_CONTEXT_SAMPLES:].copy()
+        spec = np.asarray(self._pre._get_melspectrogram(x), dtype=np.float32)
+        self._mel = np.concatenate((self._mel, spec), axis=0)[-_MEL_WINDOW_FRAMES:]
+        emb = self._pre.embedding_model_predict(self._mel[None, :, :, None])
+        self._emb[:-1] = self._emb[1:]
+        self._emb[-1] = np.asarray(emb, dtype=np.float32).reshape(-1)
+        self._chunks += 1
+
+    def features(self) -> np.ndarray:
+        """The last ``seq_len`` embeddings as a (1, seq_len, 96) float32 array."""
+        return self._emb[None, :, :]
+
+
+class AgreementGate:
+    """Wake when ``k`` of the last ``n`` scores are at or above the threshold.
+
+    The current score must itself be at or above the threshold (so the score
+    the policy re-checks is always a passing one). After a trigger the history
+    clears and no new trigger can fire for ``debounce_frames`` frames. Time is
+    counted in frames of stream audio, not wall-clock, so offline replays of a
+    recording decide exactly what the live app decides.
+    """
+
+    def __init__(self, k: int, n: int, debounce_frames: int):
+        self.configure(k, n)
+        self.debounce_frames = max(0, int(debounce_frames))
+        self._frames_since_trigger = self.debounce_frames
+
+    def configure(self, k: int, n: int) -> None:
+        n = max(1, int(n))
+        k = min(n, max(1, int(k)))
+        self.k = k
+        self.n = n
+        self._history: list[bool] = []
+
+    def reset(self, *, clear_debounce: bool = False) -> None:
+        self._history.clear()
+        if clear_debounce:
+            self._frames_since_trigger = self.debounce_frames
+
+    def update(self, score: float, threshold: float) -> bool:
+        positive = score >= threshold
+        self._history.append(positive)
+        if len(self._history) > self.n:
+            self._history.pop(0)
+        if self._frames_since_trigger < self.debounce_frames:
+            self._frames_since_trigger += 1
+        if not positive or sum(self._history) < self.k:
+            return False
+        if self._frames_since_trigger < self.debounce_frames:
+            return False
+        self._history.clear()
+        self._frames_since_trigger = 0
+        return True
+
+
 class ViolaWake:
     """
     Wake word detection engine for "Viola".
@@ -340,12 +445,35 @@ class ViolaWake:
         self._fp_logging_enabled: bool = False
         self._fp_log_dir: Path | None = None
 
-        # Temporal smoothing: require N consecutive high scores to trigger
-        # Window=1 (single-frame trigger) is optimal: music FPs score max 0.037
-        # (far below threshold), so multi-frame gating only hurts TP (−2.6%)
-        # without filtering any real FPs. See logs/tp_optimization_log.jsonl.
+        # Temporal smoothing for the legacy process_audio() path (one 1.5 s
+        # window per call): require N consecutive high scores to trigger.
+        # Window=1 there because callers score every 400 ms, which sees a real
+        # "Viola" only once or twice. The live listener now uses
+        # process_chunk() (every 80 ms) with the AgreementGate k-of-n rule.
         self._temporal_window: int = 1
         self._score_history: list[bool] = []
+
+        # Streaming (80 ms) path -- see process_chunk(). Built in
+        # _load_onnx_mlp for temporal openWakeWord-embedding models only.
+        self._embedder: StreamingEmbedder | None = None
+        self._agreement = AgreementGate(
+            STREAM_AGREE_K,
+            STREAM_AGREE_N,
+            debounce_frames=round(debounce_seconds * SAMPLE_RATE / STREAM_CHUNK_SAMPLES),
+        )
+        # ``threshold`` stays the sensitivity LEVEL (what the policy and the
+        # saved setting mean); the streaming path maps it to a measured
+        # (k, n, frame threshold) operating point, see stream_operating_point.
+        self._stream_threshold: float = 0.79
+        self._mapped_level: float | None = None
+        self._operating_point_pinned = False
+        # The Stage 2 wake check is on: map levels with the "checked" table
+        # (set by the listener; see config.STREAM_OPERATING_POINTS_CHECKED).
+        self.checked = False
+        self._mapped_checked = False
+        self._chunk_energy: list[float] = []
+        self._stream_ring = np.zeros(CLIP_SAMPLES, dtype=np.float32)
+        self._stream_ring_idx = 0
 
         # Track active user for multi-tenant isolation — score history leaks
         # decisions across users if a second user wakes mid-window otherwise.
@@ -530,6 +658,7 @@ class ViolaWake:
         self._oww_temporal_seq_len: int = 0
         if len(input_shape) == 3 and input_shape[-1] == 96:
             self._oww_temporal_seq_len = input_shape[1] if isinstance(input_shape[1], int) else 9
+            self._embedder = StreamingEmbedder(self._oww_preprocessor, self._oww_temporal_seq_len)
 
         _release_torch_if_loaded()
 
@@ -568,6 +697,7 @@ class ViolaWake:
                 )
             self._score_history.clear()
             self._last_trigger_time = 0
+            self._agreement.reset(clear_debounce=True)
             self._bound_user_id = current_user
 
     def process_audio(self, audio: np.ndarray) -> float:
@@ -660,6 +790,155 @@ class ViolaWake:
                     self._callback()
 
         return score
+
+    # ------------------------------------------------------------------ #
+    # Streaming (80 ms) path                                               #
+    # ------------------------------------------------------------------ #
+
+    @property
+    def supports_streaming(self) -> bool:
+        """True when process_chunk() can be used (temporal OWW-embedding model)."""
+        return self._embedder is not None and self._backend == "onnx_mlp"
+
+    @property
+    def agreement(self) -> tuple[int, int]:
+        """The (k, n) agreement rule process_chunk() applies at the current level."""
+        self._sync_operating_point()
+        return (self._agreement.k, self._agreement.n)
+
+    @property
+    def stream_threshold(self) -> float:
+        """The per-frame score threshold process_chunk() applies at the current level."""
+        self._sync_operating_point()
+        return self._stream_threshold
+
+    def set_operating_point(self, k: int, n: int, frame_threshold: float) -> None:
+        """Pin an explicit rule (k of last n frames at ``frame_threshold``).
+
+        Bypasses the level -> operating point table; for evaluation harnesses
+        and tests. The live listener only sets ``threshold`` (the level).
+        """
+        self._operating_point_pinned = True
+        if (k, n) != (self._agreement.k, self._agreement.n):
+            self._agreement.configure(k, n)
+        self._stream_threshold = float(frame_threshold)
+
+    def _sync_operating_point(self) -> None:
+        """Re-map ``threshold`` (the level) when it changed since the last chunk."""
+        checked = bool(getattr(self, "checked", False))
+        if self._operating_point_pinned or (
+            self.threshold == self._mapped_level and checked == getattr(self, "_mapped_checked", False)
+        ):
+            return
+        k, n, frame_threshold = stream_operating_point(self.threshold, checked=checked)
+        if (k, n) != (self._agreement.k, self._agreement.n):
+            self._agreement.configure(k, n)
+        self._stream_threshold = frame_threshold
+        self._mapped_level = self.threshold
+        self._mapped_checked = checked
+
+    def reset_stream(self) -> None:
+        """Forget streamed audio after a gap (command recording, device change).
+
+        Scoring resumes once the features hold only post-gap audio
+        (``StreamingEmbedder.warmup_chunks`` chunks, about 1.4 s). Debounce is
+        kept, so a gap cannot be used to re-fire a wake early.
+        """
+        if self._embedder is not None:
+            self._embedder.reset()
+        self._agreement.reset()
+        self._chunk_energy.clear()
+        self._stream_ring[:] = 0.0
+        self._stream_ring_idx = 0
+
+    def process_chunk(self, chunk: np.ndarray, *, suppress: bool = False) -> float:
+        """Score one 80 ms chunk (1280 float32 samples, 16 kHz, [-1, 1]).
+
+        Feeds the chunk into the incremental embedding stream, scores the
+        temporal CNN on the last ``seq_len`` embeddings, and applies the k-of-n
+        agreement rule of the operating point for ``self.threshold`` (the
+        sensitivity level; see ``stream_operating_point``). Fires the callback when the rule
+        passes (2 s debounce, counted in stream time). ``suppress=True`` still
+        feeds the audio (so the stream stays continuous) but records a zero
+        score, e.g. while the listener blanks a music track change.
+
+        Returns the chunk's wake score (0.0 while warming up, gated by silence,
+        or suppressed).
+        """
+        if self._embedder is None:
+            raise RuntimeError("process_chunk() needs a temporal openWakeWord-embedding model")
+        self._maybe_reset_for_user()
+        self._sync_operating_point()
+
+        audio = np.asarray(chunk, dtype=np.float32).reshape(-1)
+        if audio.shape[0] != STREAM_CHUNK_SAMPLES:
+            raise ValueError("process_chunk expects %d samples, got %d" % (STREAM_CHUNK_SAMPLES, audio.shape[0]))
+
+        # Silence gate on the last ~1.5 s, same RMS floor as process_audio().
+        self._chunk_energy.append(float(np.dot(audio, audio)) / STREAM_CHUNK_SAMPLES)
+        if len(self._chunk_energy) > _SILENCE_GATE_CHUNKS:
+            self._chunk_energy.pop(0)
+
+        # Keep the last 1.5 s for false-positive logging.
+        end = self._stream_ring_idx + STREAM_CHUNK_SAMPLES
+        if end <= CLIP_SAMPLES:
+            self._stream_ring[self._stream_ring_idx : end] = audio
+        else:
+            first = CLIP_SAMPLES - self._stream_ring_idx
+            self._stream_ring[self._stream_ring_idx :] = audio[:first]
+            self._stream_ring[: STREAM_CHUNK_SAMPLES - first] = audio[first:]
+        self._stream_ring_idx = end % CLIP_SAMPLES
+
+        audio_int16 = (np.clip(audio, -1.0, 1.0) * 32767).astype(np.int16)
+        self._embedder.push(audio_int16)
+
+        rms = float(np.sqrt(sum(self._chunk_energy) / len(self._chunk_energy)))
+        if suppress or not self._embedder.warm or rms < SILENCE_GATE_RMS:
+            score = 0.0
+        else:
+            score = self._classify(self._embedder.features())
+        self._last_score = score
+
+        if _AUD_R1_DEBUG:
+            try:
+                _aud_r1_logger.info(
+                    "AUD_R1 wake_probe id=%d user=%s history_len=%d score=%.4f",
+                    id(self),
+                    self._bound_user_id,
+                    len(self._agreement._history),
+                    float(score),
+                )
+            except (RuntimeError, TypeError, ValueError) as exc:
+                _aud_r1_logger.debug("AUD_R1 wake_probe logging failed: %s", exc)
+
+        if self._agreement.update(score, self._stream_threshold):
+            self._last_trigger_time = time.time()
+            if self._fp_logging_enabled:
+                idx = self._stream_ring_idx
+                window = np.concatenate((self._stream_ring[idx:], self._stream_ring[:idx]))
+                self._log_detection(window, score)
+            if self._callback is not None:
+                logger.info(
+                    "[STAGE3] threshold_pass: PASS score=%.3f frame_threshold=%.3f rule=%d-of-%d@80ms level=%.3f",
+                    score,
+                    self._stream_threshold,
+                    self._agreement.k,
+                    self._agreement.n,
+                    self.threshold,
+                )
+                self._callback()
+        return score
+
+    def _classify(self, model_input: np.ndarray) -> float:
+        """Run the ONNX classifier on a prepared (1, seq_len, 96) input."""
+        assert self._session is not None
+        inputs = self._session.get_inputs()
+        if not inputs:
+            raise RuntimeError("ONNX session has no inputs")
+        outputs = self._session.run(None, {inputs[0].name: model_input})
+        if not outputs:
+            raise RuntimeError("ONNX session returned no outputs")
+        return float(np.asarray(outputs[0]).flatten()[0])
 
     def _infer(self, features: np.ndarray) -> float:
         """Run model inference on the configured backend input."""
@@ -812,6 +1091,8 @@ class ViolaWake:
         """Reset engine state (clear debounce timer and score history)."""
         self._last_trigger_time = 0
         self._score_history.clear()
+        self.reset_stream()
+        self._agreement.reset(clear_debounce=True)
 
     def fork_runtime_state(self) -> ViolaWake:
         """Return an isolated runtime engine sharing loaded model resources.
@@ -839,6 +1120,34 @@ class ViolaWake:
         fork._session = self._session
         fork._oww_preprocessor = self._oww_preprocessor
         fork._oww_temporal_seq_len = self._oww_temporal_seq_len
+        # Streaming state is per audio stream: fresh features and history,
+        # same agreement rule. The ONNX sessions inside the preprocessor are
+        # shared read-only.
+        # getattr: engines built without __init__ (test templates) have no
+        # streaming state; their forks simply have no streaming path.
+        fork._embedder = (
+            StreamingEmbedder(self._oww_preprocessor, self._oww_temporal_seq_len)
+            if getattr(self, "_embedder", None) is not None
+            else None
+        )
+        agreement = getattr(self, "_agreement", None)
+        fork._agreement = AgreementGate(
+            agreement.k if agreement is not None else STREAM_AGREE_K,
+            agreement.n if agreement is not None else STREAM_AGREE_N,
+            debounce_frames=(
+                agreement.debounce_frames
+                if agreement is not None
+                else round(self.debounce_seconds * SAMPLE_RATE / STREAM_CHUNK_SAMPLES)
+            ),
+        )
+        fork._stream_threshold = getattr(self, "_stream_threshold", 0.79)
+        fork._mapped_level = getattr(self, "_mapped_level", None)
+        fork._operating_point_pinned = getattr(self, "_operating_point_pinned", False)
+        fork.checked = getattr(self, "checked", False)
+        fork._mapped_checked = getattr(self, "_mapped_checked", False)
+        fork._chunk_energy = []
+        fork._stream_ring = np.zeros(CLIP_SAMPLES, dtype=np.float32)
+        fork._stream_ring_idx = 0
         return fork
 
     def set_temporal_window(self, window: int) -> None:

@@ -317,10 +317,13 @@ class BaseInstantCommandHandlersMixin:
         player has no handle on it. React forwards these frames to the iframe
         (SmartDisplay ``handlePlaybackCommand``), so a typed or spoken pause
         actually stops the audio instead of only flipping backend state.
+
+        Uses the same sender as the button's /v1/pause route. The injected hub
+        is optional: the desktop builds the intent pipeline lazily, so
+        ``ui/server.py`` never injects it there, and a hub-less handler used to
+        drop every pause/play frame silently (1.0.5 build 4: typed "pause"
+        logged success while the video kept playing).
         """
-        hub = getattr(self, "_event_hub", None)
-        if hub is None:
-            return
         try:
             from core.user_context import get_current_user_id
 
@@ -328,13 +331,16 @@ class BaseInstantCommandHandlersMixin:
         except LookupError:
             user_id = None
         try:
-            await hub.broadcast_command(
+            from ui.websocket.event_hub import broadcast_transport_command
+
+            await broadcast_transport_command(
                 command,
                 dict(payload or {"source": "voice"}),
                 user_id=user_id,
+                hub=getattr(self, "_event_hub", None),
             )
         except Exception as exc:
-            log.debug("%s broadcast_command failed (non-critical): %s", command, exc)
+            log.warning("%s transport command was not sent to the UI: %s", command, exc)
 
     async def _broadcast_calendar_updated(self, action: str, payload: dict[str, object] | None = None) -> None:
         """Broadcast a calendar cache invalidation event to WS clients."""

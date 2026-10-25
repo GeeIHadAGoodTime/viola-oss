@@ -50,6 +50,9 @@ log = get_logger(__name__)
 _NWS_USER_AGENT = "Viola/1.0 (github.com/user/viola)"
 _NWS_TIMEOUT = httpx.Timeout(15.0, connect=5.0)
 _SELF_GFS_TIMEOUT = httpx.Timeout(10.0, connect=3.0)
+# The self-hosted GFS service is a Docker service on the cloud box; this name
+# resolves only inside that Compose network. Desktops never use it.
+_CLOUD_INTERNAL_GFS_URL = "http://weather-gfs:8080"
 _GEOCODE_TIMEOUT = httpx.Timeout(10.0, connect=5.0)
 _AIRNOW_REPORTING_AREA_URL = "https://files.airnowtech.org/airnow/today/reportingarea.dat"
 _AIRNOW_REPORTING_AREA_TIMEOUT = httpx.Timeout(10.0, connect=3.0)
@@ -680,7 +683,9 @@ async def _fetch_self_gfs(
     display_location: str | None = None,
 ) -> dict[str, Any] | None:
     """Fetch forecast data from the internal self-hosted NOAA GFS service."""
-    base_url = str(getattr(settings, "weather_gfs_url", "") or "http://weather-gfs:8080").rstrip("/")
+    base_url = _self_gfs_base_url()
+    if not base_url:
+        return None
     try:
         async with httpx.AsyncClient(timeout=_SELF_GFS_TIMEOUT) as client:
             resp = await client.get(
@@ -718,6 +723,22 @@ async def _fetch_self_gfs(
         provider=str(payload.get("provider") or "NOAA GFS"),
     )
     return dict(normalized)
+
+
+def _self_gfs_base_url() -> str:
+    """Return the GFS service URL, or "" when this install has none.
+
+    ``VIOLA_WEATHER_GFS_URL`` wins when set (the cloud Compose file sets it).
+    With it unset, the cloud surface still uses its internal service name, and a
+    desktop skips GFS entirely instead of paying a failed DNS lookup on every
+    forecast before falling back to NWS / wttr.in.
+    """
+    configured = str(getattr(settings, "weather_gfs_url", "") or "").strip()
+    if configured:
+        return configured.rstrip("/")
+    if str(getattr(settings, "app_surface", "desktop") or "").strip().lower() == "cloud":
+        return _CLOUD_INTERNAL_GFS_URL
+    return ""
 
 
 def _parse_nws_time(value: Any) -> datetime.datetime | None:

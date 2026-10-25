@@ -643,7 +643,7 @@ function AttributionPanel({ status, onChoice }) {
           <button
             key={option.value}
             type="button"
-            className="viola-onboard-btn"
+            className="viola-onboard-btn viola-touch-target"
             data-testid={`attribution-${option.value}`}
             disabled={saving}
             onClick={() => onChoice && onChoice(option.value)}

@@ -53,6 +53,12 @@ CRITICAL_ALWAYS_LOAD_TOOLS = frozenset(
         "media",
         "memory",
         "payment",
+        # After the user approves a purchase on the payment gate, the
+        # continuation's first step is filling the approved card. Deferred, it
+        # needed a ToolSearch round trip the model often skipped, and the
+        # approved order was never placed (r5/commerce). It is still useless
+        # before approval: it only fills a card the user approved for this order.
+        "fill_payment_details",
         "phone",
         "signature",
         "resume_signature_gate",

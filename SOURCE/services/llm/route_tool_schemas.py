@@ -187,6 +187,26 @@ ROUTE_TOOL_SCHEMAS: list[dict[str, Any]] = [
         },
     },
     {
+        "name": "video_fullscreen",
+        "description": (
+            "Show the video playing on Viola's Music screen full screen (enabled=true: 'put this "
+            "in full screen', 'make the video full screen', 'go full screen') or end it "
+            "(enabled=false: 'end full screen', 'exit full screen', and while full screen "
+            "'go back' or 'normal size'). Desktop app only. Returns ui_action data for the app; "
+            "it does not change playback."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "enabled": {
+                    "type": "boolean",
+                    "description": "True to go full screen, false to end full screen.",
+                },
+            },
+            "required": ["enabled"],
+        },
+    },
+    {
         "name": "play_next",
         "description": (
             "Queue a song to play after the current track. "
@@ -348,15 +368,18 @@ ROUTE_TOOL_SCHEMAS: list[dict[str, Any]] = [
         "description": (
             "Rate the current song. "
             "Use rating='up' to like / thumbs up the current song for "
-            "'I like this song', 'thumbs up', 'love this'. "
-            "Use rating='down' to dislike / thumbs down the current song."
+            "'I like this song', 'thumbs up', 'love this', 'save this to my liked songs' "
+            "(on Spotify this adds it to the user's Spotify Liked Songs). "
+            "Use rating='remove' for 'unlike this', 'remove this from my liked songs' "
+            "(removes the like and keeps playing). "
+            "Use rating='down' to dislike / thumbs down the current song (also skips it)."
         ),
         "parameters": {
             "type": "object",
             "properties": {
                 "rating": {
                     "type": "string",
-                    "enum": ["up", "down"],
+                    "enum": ["up", "down", "remove"],
                     "description": "Track rating to apply",
                 },
             },
@@ -370,7 +393,8 @@ ROUTE_TOOL_SCHEMAS: list[dict[str, Any]] = [
             "Playlist control for saved Viola playlists and liked-song playback. "
             "action='play' plays a saved playlist by name; match names from current system state when available. "
             "action='set_default' sets the default playlist. "
-            "action='play_favorites' plays liked/favorited songs for requests like 'play my favorites' or 'play something I like'. "
+            "action='play_favorites' plays liked/favorited songs for requests like 'play my favorites', 'play my liked songs' or 'play something I like'; "
+            "with provider='spotify' (or when Spotify is the active music service) it plays the user's Spotify Liked Songs. "
             "action='create' creates a playlist from context, using inferred names such as workout, chill, or My Playlist when no name is given. "
             "provider='local' fits requests from local songs or local files. "
             "action='delete' removes a saved playlist by name. "
@@ -403,7 +427,9 @@ ROUTE_TOOL_SCHEMAS: list[dict[str, Any]] = [
                 "provider": {
                     "type": "string",
                     "description": (
-                        "Optional for action='create'. Music provider to use " '(e.g. "local", "youtube").'
+                        "Optional for action='create' and action='play_favorites'. Music provider to use "
+                        '(e.g. "local", "youtube", "spotify"). For play_favorites, "spotify" plays the user\'s '
+                        "Spotify Liked Songs."
                     ),
                 },
             },
@@ -753,6 +779,7 @@ _COMPOUND_TOOLS: dict[str, dict[str, str]] = {
     "rate_track": {
         "up": "thumbs_up",
         "down": "thumbs_down",
+        "remove": "unlike_track",
     },
     "playlist": {
         "play": "play_saved_playlist",

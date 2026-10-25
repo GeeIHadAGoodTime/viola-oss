@@ -13,8 +13,10 @@ OUTBOUND_PHONE_CALL_DESCRIPTION = (
     "confirming or canceling bookings, or asking about hours or services. Emergency or crisis calls such "
     "as 911 or 988 are excluded; the user must call emergency services or 988 directly. "
     "Repeated calls to the same number require "
-    "the user's explicit instruction. If the destination number is unknown, ask the user for the phone number "
-    "to call, including its country code, before calling. A call is a means to obtain or confirm a deliverable "
+    "the user's explicit instruction. If the destination number is unknown, look it up (for a business, search "
+    "the web for its number) or ask the user for it, including its country code, before calling; put who the "
+    "number belongs to in recipient_name so the user sees it when confirming. A call is a means to obtain or "
+    "confirm a deliverable "
     "for the user; the task is not complete just because Viola says the opening words."
 )
 
@@ -27,6 +29,11 @@ TASK_DESCRIPTION = (
     "order, quote, or message to bring back to the user, not only words to say."
 )
 CALLER_NAME_DESCRIPTION = "Optional caller name for the call."
+RECIPIENT_NAME_DESCRIPTION = (
+    "Who the destination number belongs to, e.g. the business or person's name. Viola shows it next to the exact "
+    "number when the user confirms the call, so always fill it when you know it (especially for a number you "
+    "found by searching)."
+)
 EXTRA_CONTEXT_DESCRIPTION = (
     "Optional extra context for the call, such as preferences, account details the user provided, or constraints."
 )

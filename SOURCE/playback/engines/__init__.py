@@ -14,7 +14,6 @@ from .base import (
     ProviderPlaybackEngine,
     QueueContext,
 )
-from .spotify import SpotifyWebPlaybackEngine
 from .spotify_cdp import SpotifyCDPEngine
 from .youtube import YouTubeEmbeddedEngine
 
@@ -24,6 +23,5 @@ __all__ = [
     "ProviderPlaybackEngine",
     "QueueContext",
     "SpotifyCDPEngine",
-    "SpotifyWebPlaybackEngine",
     "YouTubeEmbeddedEngine",
 ]

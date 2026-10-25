@@ -294,7 +294,7 @@ class PlaylistManager:
         name: str,
         url: str,
         shuffle: bool = True,
-        provider: ProviderName | str = ProviderName.YOUTUBE_MUSIC,
+        provider: ProviderName | str | None = None,
         playlist_id: str | None = None,
         display_name: str | None = None,
         starred: bool = False,
@@ -307,7 +307,9 @@ class PlaylistManager:
             name: Friendly name for playlist (e.g., "workout", "chill")
             url: Provider playlist URL or local identifier
             shuffle: Whether to shuffle playlist when playing (default True)
-            provider: Provider that owns the playlist
+            provider: Provider that owns the playlist. When omitted it is taken
+                from the link: Spotify links are Spotify, anything else is
+                YouTube Music (the long-standing default).
             playlist_id: Provider playlist ID (for synced playlists)
             display_name: Custom display name (overrides provider name)
             starred: Whether playlist is starred/favorited
@@ -316,6 +318,10 @@ class PlaylistManager:
             True if successful
         """
         name = name.lower().strip()
+        if provider is None:
+            url_lower = str(url or "").strip().lower()
+            is_spotify = "open.spotify.com" in url_lower or url_lower.startswith("spotify:")
+            provider = ProviderName.SPOTIFY if is_spotify else ProviderName.YOUTUBE_MUSIC
         provider_name = self._normalize_provider_name(provider)
 
         if not name:

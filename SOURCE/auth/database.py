@@ -3089,6 +3089,54 @@ class SQLiteSmsRepository:
             )
         return True
 
+    async def clear_phone_opt_out(self, phone: str) -> bool:
+        """Remove the durable phone-level opt-out (the number texted START)."""
+        with self.db.transaction() as conn:
+            cursor = conn.execute("DELETE FROM sms_phone_opt_outs WHERE phone = ?", (phone,))
+            return cursor.rowcount > 0
+
+    async def resubscribe_by_phone(
+        self,
+        *,
+        user_id: str,
+        phone: str,
+        resubscribed_at: datetime,
+        consent_text_version: str,
+    ) -> bool:
+        """Restore SMS consent after the verified owner of *phone* texted START.
+
+        Only a phone already verified on *user_id* is re-consented; the audit
+        row records the keyword opt-in under the current consent version.
+        """
+        from auth.utils import generate_id
+
+        now = resubscribed_at.isoformat()
+        with self.db.transaction() as conn:
+            conn.execute("DELETE FROM sms_phone_opt_outs WHERE phone = ?", (phone,))
+            cursor = conn.execute(
+                """
+                UPDATE users
+                SET sms_consent = 1,
+                    sms_consent_at = ?,
+                    sms_consent_text_version = ?,
+                    updated_at = ?
+                WHERE id = ? AND phone = ? AND phone_verified = 1
+                """,
+                (now, consent_text_version, now, user_id, phone),
+            )
+            if cursor.rowcount == 0:
+                return False
+            conn.execute(
+                """
+                INSERT INTO sms_consent_audit (
+                    id, user_id, action, phone_last4, consent_text_version, created_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (generate_id(), user_id, "start", phone[-4:], consent_text_version, now),
+            )
+        return True
+
     async def record_inbound(self, user_id: str, phone: str, text: str, received_at: datetime) -> None:
         from auth.utils import generate_id
 

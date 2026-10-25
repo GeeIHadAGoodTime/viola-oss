@@ -9,6 +9,7 @@ import CalendarView from '../CalendarView';
 import { WeatherIcon } from './WeatherIcons';
 import MenuButton from './MenuButton';
 import DropdownMenu from './DropdownMenu';
+import { shortPlaceName } from '../../utils/weatherLocation';
 import styles from './TopBar.module.css';
 
 const TopBar = ({
@@ -16,6 +17,7 @@ const TopBar = ({
   formatTime,
   formatDate,
   weatherLocation,
+  weatherLocationAutoDetected = false,
   weatherCondition,
   weatherTemp,
   weatherDesc,
@@ -45,6 +47,15 @@ const TopBar = ({
     && weatherDesc !== 'Weather unavailable'
     && weatherDesc !== 'Retrying...'
   );
+  // A location the backend detected (not one the user saved) is named in the
+  // description so the user can see which place the weather is for.
+  const autoPlace = weatherLocationAutoDetected ? shortPlaceName(weatherLocation) : '';
+  const weatherDescText = [weatherDesc, autoPlace].filter(Boolean).join(' · ');
+  const weatherTitle = weatherDesc === 'Weather unavailable'
+    ? 'Click to retry'
+    : autoPlace
+      ? `Weather for ${weatherLocation}, detected automatically. Set your own location in Settings.`
+      : canOpenWeatherForecast ? 'Open forecast' : undefined;
   const handleWeatherClick = (event) => {
     if (weatherDesc === 'Weather unavailable') {
       setWeatherDesc('Retrying...');
@@ -89,7 +100,7 @@ const TopBar = ({
               className={styles.weatherDisplay}
               style={{ cursor: weatherDesc === 'Weather unavailable' || canOpenWeatherForecast ? 'pointer' : 'default' }}
               onClick={handleWeatherClick}
-              title={weatherDesc === 'Weather unavailable' ? 'Click to retry' : canOpenWeatherForecast ? 'Open forecast' : undefined}
+              title={weatherTitle}
             >
               <div className={styles.weatherIconWrap}>
                 <WeatherIcon condition={weatherCondition} />
@@ -99,7 +110,7 @@ const TopBar = ({
                   {weatherTemp}
                 </span>
                 <span className={styles.weatherDesc} style={{ color: THEME.colors.textMuted }}>
-                  {weatherDesc}
+                  {weatherDescText}
                 </span>
               </div>
             </div>
@@ -193,6 +204,7 @@ TopBar.propTypes = {
   formatTime: PropTypes.func.isRequired,
   formatDate: PropTypes.func.isRequired,
   weatherLocation: PropTypes.string,
+  weatherLocationAutoDetected: PropTypes.bool,
   weatherCondition: PropTypes.string.isRequired,
   weatherTemp: PropTypes.string.isRequired,
   weatherDesc: PropTypes.string.isRequired,

@@ -8,6 +8,37 @@ from ui.api.routes.common import RouteToolbox
 from ui.api.routes.error_handler import handle_route_error
 from utils.api_helpers import error_response
 
+
+def _with_spotify(payload: dict, spotify_sync: dict | None) -> dict:
+    if spotify_sync is not None:
+        payload["spotify"] = spotify_sync
+    return payload
+
+
+async def _sync_spotify_liked_songs(current_track: object, rating_value: object) -> dict | None:
+    """Mirror a rating of a Spotify track into the user's Spotify Liked Songs.
+
+    liked -> add; disliked or cleared -> remove. Returns None for non-Spotify
+    tracks or unknown values, else {"track_id", "saved"} or {"error"}.
+    """
+    if rating_value not in ("liked", "disliked", None):
+        return None
+    import asyncio
+
+    from core.user_context import get_current_or_device_user_id
+    from music.providers.spotify_cdp import set_spotify_track_saved, spotify_track_id_from_now_playing
+    from music.spotify.cdp_controller import SpotifyCDPError
+
+    track_id = await asyncio.to_thread(spotify_track_id_from_now_playing, current_track)
+    if not track_id:
+        return None
+    saved = rating_value == "liked"
+    try:
+        await asyncio.to_thread(set_spotify_track_saved, track_id, saved, user_id=get_current_or_device_user_id())
+    except SpotifyCDPError as exc:
+        return {"track_id": track_id, "saved": None, "error": str(exc)}
+    return {"track_id": track_id, "saved": saved}
+
 log = get_logger(__name__)
 
 
@@ -126,11 +157,22 @@ def register_rating_routes(context: ApiContext, toolbox: RouteToolbox) -> None:
                         return error_response("rating_track_changed", status_code=409)
 
                 rating_system = get_rating_system()
+                spotify_sync = await _sync_spotify_liked_songs(current_track, rating_value)
+                if spotify_sync is not None and spotify_sync.get("error"):
+                    # The Spotify library is the user's real list; do not
+                    # report a like that did not reach it.
+                    return {
+                        "ok": False,
+                        "video_id": video_id,
+                        "rating": rating_value,
+                        "spotify": spotify_sync,
+                        "error": spotify_sync["error"],
+                    }
 
                 if rating_value == "liked":
                     rating_system.thumbs_up(video_id=video_id, title=title, artist=artist)
                     log.info("👍 Song rated (liked): %s - %s (%s)", title, artist, video_id)
-                    return {"ok": True, "video_id": video_id, "rating": "liked"}
+                    return _with_spotify({"ok": True, "video_id": video_id, "rating": "liked"}, spotify_sync)
                 elif rating_value == "disliked":
                     rating_system.thumbs_down(video_id=video_id, title=title, artist=artist)
                     log.info(
@@ -139,11 +181,11 @@ def register_rating_routes(context: ApiContext, toolbox: RouteToolbox) -> None:
                         artist,
                         video_id,
                     )
-                    return {"ok": True, "video_id": video_id, "rating": "disliked"}
+                    return _with_spotify({"ok": True, "video_id": video_id, "rating": "disliked"}, spotify_sync)
                 elif rating_value is None:
                     rating_system.remove_rating(video_id)
                     log.info("🔄 Rating removed: %s - %s (%s)", title, artist, video_id)
-                    return {"ok": True, "video_id": video_id, "rating": None}
+                    return _with_spotify({"ok": True, "video_id": video_id, "rating": None}, spotify_sync)
                 else:
                     return error_response(f"Invalid rating value: {rating_value}", status_code=400)
             except Exception as exc:

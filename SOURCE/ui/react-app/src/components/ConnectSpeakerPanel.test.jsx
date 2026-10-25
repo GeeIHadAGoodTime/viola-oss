@@ -196,4 +196,96 @@ describe('ConnectSpeakerPanel', () => {
     // The legacy device-discovery error string must be gone for good.
     expect(screen.queryByText("Couldn't find this device on your network.")).toBeNull();
   });
+
+  // 1.0.5 RC b4: the panel showed http://<lan-ip>:8756 while the hub listened
+  // only on 127.0.0.1, so the phone hung. The hub now reports whether a phone
+  // can reach it; when it cannot, the panel must show why and no link at all.
+  it('shows the reason and no QR, link or code when phones cannot reach the hub', async () => {
+    mockSuccessfulFetch({
+      ip: '',
+      port: 8756,
+      spoke_url: '',
+      pairing_code: '',
+      lan_access: {
+        reachable: false,
+        reason_code: 'auth_disabled',
+        message: "Phones can't connect while Viola's security checks are turned off on this computer.",
+      },
+    });
+
+    render(<ConnectSpeakerPanel />);
+
+    expect(await screen.findByTestId('connect-speaker-lan-unavailable')).toBeInTheDocument();
+    expect(screen.getByTestId('connect-speaker-lan-message')).toHaveTextContent('security checks are turned off');
+    expect(screen.queryByTestId('connect-speaker-qr')).toBeNull();
+    expect(screen.queryByTestId('connect-speaker-url')).toBeNull();
+    expect(screen.queryByTestId('connect-speaker-pairing-code')).toBeNull();
+    expect(screen.getByTestId('connect-speaker-lan-retry')).toBeInTheDocument();
+  });
+
+  it('never invents a link from ip and port when the hub says it is unreachable', async () => {
+    mockSuccessfulFetch({
+      ip: '192.168.1.23',
+      port: 8756,
+      spoke_url: '',
+      pairing_code: '',
+      lan_access: { reachable: false, reason_code: 'listen_failed', message: 'Port busy.' },
+    });
+
+    render(<ConnectSpeakerPanel />);
+
+    await screen.findByTestId('connect-speaker-lan-unavailable');
+    expect(screen.queryByText(/192\.168\.1\.23/)).toBeNull();
+  });
+
+  it('explains a firewall block instead of letting the phone hang', async () => {
+    mockSuccessfulFetch({
+      ip: '192.168.1.23',
+      port: 8756,
+      spoke_url: 'http://192.168.1.23:8756/?room=',
+      pairing_code: 'ABCD',
+      lan_access: {
+        reachable: true,
+        via: 'lan_listener',
+        firewall: { state: 'blocked', message: 'Windows Firewall is blocking Viola on this network.' },
+      },
+    });
+
+    render(<ConnectSpeakerPanel />);
+
+    expect(await screen.findByTestId('connect-speaker-firewall-blocked')).toHaveTextContent(
+      'Windows Firewall is blocking Viola',
+    );
+    expect(screen.getByTestId('connect-speaker-qr')).toBeInTheDocument();
+  });
+
+  it('turns LAN access off from the panel and drops the link', async () => {
+    const fetchSpy = vi.fn().mockImplementation(async (url) => ({
+      ok: true,
+      status: 200,
+      json: async () => (url === '/v1/network/lan-access'
+        ? { ok: true, data: { reachable: false, reason_code: 'lan_access_off' } }
+        : {
+          ip: '192.168.1.23',
+          port: 8756,
+          spoke_url: 'http://192.168.1.23:8756/?room=',
+          pairing_code: 'ABCD',
+          lan_access: { reachable: true, via: 'lan_listener', firewall: null },
+        }),
+      text: async () => '',
+    }));
+    vi.stubGlobal('fetch', fetchSpy);
+
+    render(<ConnectSpeakerPanel />);
+
+    const off = await screen.findByTestId('connect-speaker-lan-off');
+    off.click();
+
+    expect(await screen.findByTestId('connect-speaker-lan-unavailable')).toBeInTheDocument();
+    const post = fetchSpy.mock.calls.find(([url]) => url === '/v1/network/lan-access');
+    expect(post).toBeTruthy();
+    expect(post[1].method).toBe('POST');
+    expect(JSON.parse(post[1].body)).toEqual({ enabled: false });
+    expect(screen.queryByTestId('connect-speaker-qr')).toBeNull();
+  });
 });

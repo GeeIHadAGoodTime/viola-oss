@@ -21,7 +21,6 @@ from .engines import (
     ProviderPlaybackEngine,
     QueueContext,
     SpotifyCDPEngine,
-    SpotifyWebPlaybackEngine,
     YouTubeEmbeddedEngine,
 )
 from .engines.base import PlaybackError
@@ -395,12 +394,6 @@ class PlaybackEngineManager:
             controllers: Mapping of provider_id -> UI bridge controllers.
                 - "youtube_music": YouTubeEmbedController
         """
-        spotify_engine = SpotifyWebPlaybackEngine(
-            token_resolver=self._token_resolver,
-            logger=self._logger.getChild("spotify"),
-        )
-        self._engines[spotify_engine.provider_id] = spotify_engine
-
         if controllers:
             # YouTube engine - only pass YouTube controllers
             yt_controller = controllers.get("youtube_music")
@@ -456,11 +449,14 @@ class PlaybackEngineManager:
         return engine
 
     def _lazy_register_browser_engine(self) -> ProviderPlaybackEngine | None:
-        """Lazy-register BrowserPlaybackEngine on first use."""
-        from config.settings import settings
+        """Lazy-register BrowserPlaybackEngine on first use.
 
-        if not settings.browser_provider_enabled:
-            return None
+        Always allowed: the engine owns the embedded webview controller that
+        the in-app Spotify sign-in drives, and registering it starts no
+        playback. Whether music is *routed* to the browser provider is still
+        gated by ``browser_provider_enabled`` (music/providers/selection.py,
+        music/resolution/provider_router.py).
+        """
         try:
             from playback.engines.browser import BrowserPlaybackEngine
 

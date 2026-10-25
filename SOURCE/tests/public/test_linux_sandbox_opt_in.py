@@ -24,9 +24,15 @@ def load_startup_flags(platform="linux", environ=None, source=None):
         if isinstance(node, ast.Assign)
         and any(isinstance(target, ast.Name) and target.id == "_raw_cdp_debugging" for target in node.targets)
     )
+    block = tree.body[start:end]
+    # The block may call small module-level helpers defined above it (for
+    # example the wildcard --remote-allow-origins filter). Run those real
+    # definitions too, so the block is exercised as shipped, not stubbed.
+    used = {node.id for stmt in block for node in ast.walk(stmt) if isinstance(node, ast.Name)}
+    helpers = [node for node in tree.body[:start] if isinstance(node, ast.FunctionDef) and node.name in used]
     isolated = dict(environ or {})
     namespace = {"os": SimpleNamespace(environ=isolated), "sys": SimpleNamespace(platform=platform)}
-    exec(compile(ast.Module(body=tree.body[start:end], type_ignores=[]), str(ENTRY), "exec"), namespace)
+    exec(compile(ast.Module(body=helpers + block, type_ignores=[]), str(ENTRY), "exec"), namespace)
     return isolated
 
 
@@ -64,6 +70,30 @@ class LinuxSandboxOptInTests(unittest.TestCase):
         )
         self.assertNotIn("QTWEBENGINE_DISABLE_SANDBOX", result)
         self.assertEqual(result["QTWEBENGINE_CHROMIUM_FLAGS"].split().count("--no-sandbox"), 1)
+
+    def test_inherited_wildcard_devtools_origin_is_dropped(self):
+        # A caller or .env must not be able to re-open the unauthenticated
+        # DevTools endpoint to every web origin. Explicit origin lists and
+        # unrelated caller flags are kept.
+        for platform in ("linux", "win32", "darwin"):
+            with self.subTest(platform=platform):
+                result = load_startup_flags(
+                    platform=platform,
+                    environ={"QTWEBENGINE_CHROMIUM_FLAGS": "--lang=en-US --remote-allow-origins=* --foo"},
+                )
+                flags = result["QTWEBENGINE_CHROMIUM_FLAGS"].split()
+                self.assertFalse(any(flag.startswith("--remote-allow-origins") for flag in flags), flags)
+                self.assertIn("--lang=en-US", flags)
+                self.assertIn("--foo", flags)
+                self.assertIn("--autoplay-policy=no-user-gesture-required", flags)
+        mixed = load_startup_flags(
+            environ={"QTWEBENGINE_CHROMIUM_FLAGS": "--remote-allow-origins=http://a.invalid,*"}
+        )["QTWEBENGINE_CHROMIUM_FLAGS"].split()
+        self.assertFalse(any(flag.startswith("--remote-allow-origins") for flag in mixed), mixed)
+        explicit = load_startup_flags(
+            environ={"QTWEBENGINE_CHROMIUM_FLAGS": "--remote-allow-origins=http://viola.invalid"}
+        )["QTWEBENGINE_CHROMIUM_FLAGS"].split()
+        self.assertIn("--remote-allow-origins=http://viola.invalid", explicit)
 
     def test_other_platforms_keep_environment_semantics(self):
         for platform in ("win32", "darwin"):

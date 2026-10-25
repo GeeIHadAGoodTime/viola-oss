@@ -256,7 +256,10 @@ _ADJUSTABLE_SETTINGS: dict[str, dict[str, object]] = {
     },
     "minimize_to_tray": {
         "kind": "bool",
-        "description": "When closing the main window, minimize to system tray instead of exiting.",
+        "description": (
+            "Keep Viola running in the system tray when the main window is closed, still listening "
+            "for the wake word. Off by default: closing the window quits Viola."
+        ),
     },
     "start_on_boot": {
         "kind": "bool",

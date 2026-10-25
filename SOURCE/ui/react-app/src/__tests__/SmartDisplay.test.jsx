@@ -61,6 +61,7 @@ const apiHarness = vi.hoisted(() => ({
   setRating: vi.fn(() => Promise.resolve({})),
   pause: vi.fn(() => Promise.resolve({})),
   resume: vi.fn(() => Promise.resolve({})),
+  getWeather: vi.fn(() => Promise.resolve({})),
 }));
 const sentryHarness = vi.hoisted(() => ({
   openSentryUserFeedback: vi.fn(() => Promise.resolve(true)),
@@ -165,7 +166,7 @@ vi.mock('../hooks/useViolaApi', () => ({
     clearQueue: vi.fn(),
     sendCommand: vi.fn(() => Promise.resolve({ message: 'ok' })),
     sendCommandStreaming: apiHarness.sendCommandStreaming,
-    getWeather: vi.fn(() => Promise.resolve({})),
+    getWeather: apiHarness.getWeather,
     submitBugReport: apiHarness.submitBugReport || (apiHarness.submitBugReport = vi.fn(() => Promise.resolve({ bug_ticket_id: 42 }))),
     setShuffle: apiHarness.setShuffle,
     getCalendarEvents: vi.fn(() => Promise.resolve([])),
@@ -381,6 +382,7 @@ beforeEach(async () => {
   apiHarness.submitBugReport?.mockClear?.();
   apiHarness.submitBugReport?.mockResolvedValue?.({ bug_ticket_id: 42 });
   apiHarness.getQueue.mockReset().mockResolvedValue({ok: true, queue: []});
+  apiHarness.getWeather.mockReset().mockResolvedValue({});
   apiHarness.playQueueItem.mockReset().mockResolvedValue({ok: true});
   apiHarness.setShuffle.mockReset();
   apiHarness.setShuffle.mockResolvedValue({});
@@ -675,6 +677,30 @@ describe('SmartDisplay', () => {
     });
   });
 
+  it('leaves the screen context out when "Include what Viola was showing" is unchecked', async () => {
+    sentryHarness.openSentryUserFeedback.mockResolvedValueOnce(false);
+    const { user } = render(<SmartDisplay />);
+
+    await user.click(screen.getByRole('button', { name: 'Report a bug' }));
+    fireEvent.change(await screen.findByLabelText('What broke?'), {
+      target: { value: 'The queue went blank after a skip' },
+    });
+    expect(screen.getByTestId('bug-report-screen-context-detail')).toHaveTextContent('No screenshot is taken.');
+    await user.click(screen.getByRole('checkbox', { name: 'Include what Viola was showing' }));
+    expect(screen.getByTestId('bug-report-screen-context-detail')).toHaveTextContent('Only your description');
+    await user.click(screen.getByRole('button', { name: 'Submit report' }));
+
+    await waitFor(() => expect(apiHarness.submitBugReport).toHaveBeenCalledTimes(1));
+    const [, context] = apiHarness.submitBugReport.mock.calls[0];
+    for (const key of ['current_url', 'display_mode', 'stage_mode', 'recent_action', 'viewport', 'player', 'agent_task', 'phone']) {
+      expect(context).not.toHaveProperty(key);
+    }
+    expect(context).toMatchObject({
+      source: 'react_topbar',
+      screen_capture_metadata: { requested: false, provided: false, storage: 'metadata_only' },
+    });
+  });
+
   it('carries the user-consented repro/contact/version fields the backend allowlists', async () => {
     // Contract for the enhanced bug-report form: every consented field the user
     // typed or was shown (steps/expected/actual/contact + app_version/os) must
@@ -752,13 +778,14 @@ describe('SmartDisplay', () => {
       const { user, rerender } = render(<SmartDisplay />);
       await user.click(screen.getByTestId('stage-pill-chat'));
       const ptt = within(await screen.findByTestId('chat-mode')).getByRole('button', { name: 'Push to talk' });
-      fireEvent.mouseDown(ptt);
+      fireEvent.pointerDown(ptt, { pointerId: 1, pointerType: 'mouse', button: 0 });
       expect(voiceHarness.startRecording).not.toHaveBeenCalled();
+      fireEvent.pointerUp(ptt, { pointerId: 1, pointerType: 'mouse', button: 0 });
       expect(voiceHarness.options.enabled).toBe(false);
       expect(screen.getByText(/Voice input is disabled/)).toBeInTheDocument();
       voiceMode = 'push_to_talk';
       rerender(<SmartDisplay />);
-      fireEvent.mouseDown(ptt);
+      fireEvent.pointerDown(ptt, { pointerId: 1, pointerType: 'mouse', button: 0 });
       expect(voiceHarness.options.enabled).toBe(true);
       expect(voiceHarness.startRecording).toHaveBeenCalledTimes(1);
     } finally { delete window.viola; }
@@ -1770,6 +1797,42 @@ describe('upcoming queue controls', () => {
 });
 
 
+describe('SmartDisplay weather location', () => {
+  it('shows the auto-detected place instead of "Set your location" when none is saved', async () => {
+    apiHarness.getWeather.mockResolvedValue({
+      temperature: 61.2,
+      condition: 'Clear',
+      condition_code: 'clear',
+      location: 'Milwaukee, Wisconsin',
+      auto_detected_location: 'Milwaukee, Wisconsin',
+    });
+    render(<SmartDisplay />);
+    expect(await screen.findByText(/· Milwaukee$/)).toBeInTheDocument();
+    expect(screen.queryByText('Set your location')).not.toBeInTheDocument();
+    expect(screen.getByText('61°')).toBeInTheDocument();
+    // Asked with no city, so the backend resolves the location itself.
+    expect(apiHarness.getWeather.mock.calls[0][0]).toBe('');
+  });
+
+  it('keeps the "Set your location" prompt when nothing can be detected', async () => {
+    apiHarness.getWeather.mockRejectedValue(Object.assign(new Error('x'), { status: 400, code: 'weather_location_required' }));
+    render(<SmartDisplay />);
+    await waitFor(() => expect(apiHarness.getWeather).toHaveBeenCalled());
+    expect(screen.getByText('Set your location')).toBeInTheDocument();
+    expect(screen.queryByText('Weather unavailable')).not.toBeInTheDocument();
+  });
+
+  it('uses the saved location without adding a detected place', async () => {
+    settingsHarness.useSettings.mockImplementation(() => ({ ...mockSettingsState(), settings: { weather_location: 'Chicago, IL' } }));
+    apiHarness.getWeather.mockResolvedValue({ temperature: 50, condition: 'Rain', condition_code: 'rain', location: 'Chicago, IL' });
+    render(<SmartDisplay />);
+    expect(await screen.findByText('50°')).toBeInTheDocument();
+    expect(apiHarness.getWeather.mock.calls[0][0]).toBe('Chicago, IL');
+    expect(screen.queryByText(/· Chicago/)).not.toBeInTheDocument();
+  });
+});
+
+
 async function openReviewHistory(user) {
   if (!screen.queryByRole('dialog', { name: 'Chat History' })) {
     await user.click(screen.getByRole('button', { name: 'Open menu' }));
@@ -1802,6 +1865,27 @@ it('review: preserves voice history across same-principal auth object refreshes'
   rerender(<SmartDisplay />);
   const dialog = await openReviewHistory(user);
   expect(await within(dialog).findByText('Current principal history')).toBeInTheDocument();
+});
+
+it.each(['websocket-first', 'http-first'])('records one reply in Chat History when the broadcast and the command result both arrive (%s)', async order => {
+  // ui/api/routes/command.py broadcasts chat_response BEFORE the HTTP command
+  // response returns, so the same reply reaches both handlers for one turn.
+  apiHarness.realHistory = true;
+  apiHarness.account = { id: 'account-a' };
+  const { user } = render(<SmartDisplay />);
+  await waitFor(() => expect(playerHarness.chatResponseCallback).toBeTypeOf('function'));
+  const reply = 'Synthetic single reply.';
+  act(() => {
+    if (order === 'websocket-first') {
+      playerHarness.chatResponseCallback({ text: reply });
+      voiceHarness.onCommandResult({ ok: true, data: { message: reply } });
+    } else {
+      voiceHarness.onCommandResult({ ok: true, data: { message: reply } });
+      playerHarness.chatResponseCallback({ text: reply });
+    }
+  });
+  const dialog = await openReviewHistory(user);
+  expect(await within(dialog).findAllByText(reply)).toHaveLength(1);
 });
 
 it.each(['websocket', 'voice'])('review: ignores a late old-principal %s callback and its global UI actions', async kind => {

@@ -102,3 +102,35 @@ describe('usePlayerState multiroom delay timer cleanup', () => {
     }
   });
 });
+
+// 1.0.5 build 4: typed "pause" never stopped the YouTube iframe. The backend
+// dropped the frame (fixed there); this pins the browser half of the chain with
+// the exact frames ui/websocket/event_hub.py broadcast_transport_command sends:
+// a `command` frame on the socket must reach the playback-command callback
+// that SmartDisplay forwards to the iframe (covered in SmartDisplay.test.jsx).
+describe('usePlayerState transport command frames', () => {
+  beforeEach(() => {
+    getStateMock.mockResolvedValue({});
+    capturedHandleMessage = null;
+  });
+
+  it.each([
+    ['pause', { source: 'voice' }],
+    ['play', { source: 'voice' }],
+    ['pause', { source: 'rest' }],
+    ['seek', { position: 127, source: 'rest' }],
+    ['pause', { source: 'account_change' }],
+  ])('hands a %s frame to the playback command callback', async (command, payload) => {
+    const { usePlayerState } = await import('./usePlayerState');
+    const { result, unmount } = renderHook(() => usePlayerState());
+    const received = vi.fn();
+    act(() => result.current.setPlaybackCommandCallback(received));
+
+    await act(async () => {
+      capturedHandleMessage({ type: 'command', command, payload });
+    });
+
+    expect(received).toHaveBeenCalledExactlyOnceWith(command, payload);
+    unmount();
+  });
+});

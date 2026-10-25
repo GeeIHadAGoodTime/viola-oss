@@ -111,6 +111,12 @@ class ProviderRouter:
         *,
         engine_manager: ProviderEngineManager | None = None,
     ) -> QueueItem:
+        from music.providers.spotify_cdp import parse_spotify_liked_songs_query
+
+        is_liked_songs, liked_songs_shuffle = parse_spotify_liked_songs_query(query)
+        if is_liked_songs:
+            return self._spotify_liked_songs_item(liked_songs_shuffle)
+
         if metadata:
             # Spotify track identifiers must NEVER take the generic
             # inline-metadata path: that path types items
@@ -589,6 +595,33 @@ class ProviderRouter:
             search_url,
         )
         return item
+
+    def _spotify_liked_songs_item(self, shuffle: bool | None) -> QueueItem:
+        """Queue item that plays the user's Spotify Liked Songs collection.
+
+        The Spotify web player then runs the collection itself (next/previous
+        and auto-advance stay inside Spotify, as for any spotify_cdp item).
+        """
+        from music.spotify.cdp_controller import SPOTIFY_LIKED_SONGS_URL
+
+        capabilities: dict[str, object] = {
+            "requires_embedded_player": False,
+            "spotify_context": "liked_songs",
+            "resolver_path": "provider.spotify_cdp.liked_songs",
+            "resolver_extras": {"playback_mode": "spotify_cdp"},
+        }
+        if shuffle is not None:
+            capabilities["shuffle"] = shuffle
+        return QueueItem(
+            id=str(uuid.uuid4()),
+            title="Liked Songs",
+            url=SPOTIFY_LIKED_SONGS_URL,
+            source="spotify_cdp",
+            artist="Spotify",
+            provider="spotify",
+            playback_mode="spotify_cdp",
+            capabilities=capabilities,
+        )
 
     def _resolve_via_spotify_cdp(self, query: str) -> QueueItem:
         """Resolve a search query through the Spotify CDP provider.

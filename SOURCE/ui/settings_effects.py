@@ -396,7 +396,10 @@ SETTING_EFFECTS: dict[str, SettingEffect] = {
     ),
     "minimize_to_tray": SettingEffect(
         kind=EffectKind.LIVE,
-        controls="Whether closing the main window hides Viola to the system tray instead of exiting.",
+        controls=(
+            "Whether closing the main window keeps Viola running in the system tray (still listening "
+            "for the wake word) instead of quitting. Off by default."
+        ),
     ),
 }
 

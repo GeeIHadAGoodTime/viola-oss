@@ -257,8 +257,12 @@ class DesktopSessionStore:
             logger.exception("Desktop local session validation failed closed")
             return DesktopSessionValidation(authenticated=False, reason="desktop_session_validation_error")
 
-    async def active_access_token(self) -> str | None:
-        """Return the newest valid desktop GoTrue access token, refreshing if needed."""
+    async def active_access_token(self, *, user_id: str | None = None) -> str | None:
+        """Return the newest valid desktop GoTrue access token, refreshing if needed.
+
+        With ``user_id`` only that account's sessions are considered, so a caller
+        acting for one user never picks up another signed-in account's token.
+        """
         try:
             rows = self._session_rows_by_recent_use()
         except (
@@ -274,6 +278,8 @@ class DesktopSessionStore:
             return None
 
         for row in rows:
+            if user_id is not None and str(row.user_id) != str(user_id):
+                continue
             try:
                 validation = await self._validate_session_row(row.session_hash, row)
             except (
@@ -781,6 +787,15 @@ _store_lock = threading.Lock()
 # re-read the store themselves, so a late or repeated call is harmless.
 _account_change_listeners: list[Callable[[], None]] = []
 _account_change_listeners_lock = threading.Lock()
+# Bumped synchronously on every sign-in or sign-out, before any listener runs,
+# so a cached "who is signed in" answer (core.user_context) is never reused
+# across an account change.
+_account_change_generation = 0
+
+
+def account_change_generation() -> int:
+    """A counter that changes whenever desktop sign-in state may have changed."""
+    return _account_change_generation
 
 
 def add_account_change_listener(callback: Callable[[], None]) -> None:
@@ -803,7 +818,9 @@ def _notify_account_change() -> None:
     request handlers (and sometimes while the caller holds the store lock), and
     a listener may do slow work such as starting or stopping the microphone.
     """
+    global _account_change_generation
     with _account_change_listeners_lock:
+        _account_change_generation += 1
         listeners = list(_account_change_listeners)
     if not listeners:
         return
@@ -830,9 +847,11 @@ def get_desktop_session_store() -> DesktopSessionStore:
 def reset_desktop_session_store_for_tests(
     root_dir: Path | None = None,
 ) -> DesktopSessionStore:
-    global _store
+    global _store, _account_change_generation
     with _store_lock:
         _store = DesktopSessionStore(root_dir=root_dir)
+        with _account_change_listeners_lock:
+            _account_change_generation += 1
         return _store
 
 
@@ -859,8 +878,8 @@ async def desktop_access_token_for_session_token(session_token: str) -> str | No
     return validation.access_token
 
 
-async def desktop_access_token_for_active_session() -> str | None:
-    return await get_desktop_session_store().active_access_token()
+async def desktop_access_token_for_active_session(*, user_id: str | None = None) -> str | None:
+    return await get_desktop_session_store().active_access_token(user_id=user_id)
 
 
 def get_desktop_account_identity() -> DesktopAccountIdentity:

@@ -25,6 +25,7 @@ from __future__ import annotations
 import contextlib
 import contextvars
 import sqlite3
+import time
 from collections.abc import Generator
 from datetime import UTC, datetime
 from typing import Any
@@ -383,6 +384,53 @@ def get_desktop_active_user_id() -> str:
         return get_desktop_authenticated_user_id()
     except LookupError:
         return get_device_user_id()
+
+
+# How long one answer from get_cached_desktop_account_user_id is reused. A
+# sign-in or sign-out invalidates it at once (account_change_generation); the
+# age limit only bounds how long an expired session can still look signed in.
+_DESKTOP_ACCOUNT_CACHE_MAX_AGE_S = 2.0
+_desktop_account_cache: tuple[int, float, str | None] | None = None
+
+
+def _desktop_account_change_generation() -> int:
+    try:
+        from auth.desktop_session import account_change_generation
+    except ImportError:
+        return 0
+    return account_change_generation()
+
+
+def get_cached_desktop_account_user_id() -> str | None:
+    """The signed-in desktop account, or None, for code outside any request.
+
+    Same answer as ``get_desktop_authenticated_user_id`` (None instead of
+    ``LookupError`` when nobody is signed in, and always None on the cloud),
+    cached briefly because settings reads on background threads ask often and
+    each uncached answer opens the session database. The cache is dropped the
+    moment an account signs in or out, so one account's answer is never served
+    after a switch to another.
+    """
+    global _desktop_account_cache
+    if _is_cloud_surface():
+        return None
+    generation = _desktop_account_change_generation()
+    now = time.monotonic()
+    cached = _desktop_account_cache
+    if cached is not None and cached[0] == generation and now - cached[1] < _DESKTOP_ACCOUNT_CACHE_MAX_AGE_S:
+        return cached[2]
+    try:
+        account = user_id_or_none(get_desktop_authenticated_user_id())
+    except LookupError:
+        account = None
+    _desktop_account_cache = (generation, now, account)
+    return account
+
+
+def clear_cached_desktop_account_user_id() -> None:
+    """Drop the cached signed-in account (tests that swap session stores)."""
+    global _desktop_account_cache
+    _desktop_account_cache = None
 
 
 def get_desktop_local_principals() -> list[str]:

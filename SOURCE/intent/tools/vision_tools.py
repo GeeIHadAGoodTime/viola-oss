@@ -843,13 +843,110 @@ class VisionAnalysisUnavailable(Exception):
     """
 
 
+_VISION_INSTRUCTIONS = (
+    "You are Viola's screen-awareness module. The user has shared "
+    "what is currently visible on their display. Analyse the visual "
+    "content and give a concise, helpful answer. Be direct. Never "
+    "mention you are looking at a 'screenshot' - speak as though "
+    "you can see the user's screen naturally."
+)
+_VISION_EMPTY_ANSWER = "I could see the screen but couldn't form a response."
+# Screens are downscaled before leaving the machine on the background route:
+# the provider resizes larger images anyway, and a full-resolution 4K PNG is
+# several MB of base64 on every look.
+_VISION_UPLOAD_MAX_EDGE = 1600
+_VISION_UPLOAD_JPEG_QUALITY = 80
+
+
+def _vision_route_user_id() -> str:
+    """Resolve the account a vision call runs as, BEFORE choosing a route."""
+    return _current_user_id_for_llm_accounting()
+
+
+def _image_for_upload(image_bytes: bytes) -> tuple[bytes, str]:
+    """Downscale and JPEG-encode a capture; fall back to the original PNG."""
+    try:
+        import io
+
+        from PIL import Image
+
+        with Image.open(io.BytesIO(image_bytes)) as img:
+            converted = img.convert("RGB")
+            converted.thumbnail((_VISION_UPLOAD_MAX_EDGE, _VISION_UPLOAD_MAX_EDGE))
+            buf = io.BytesIO()
+            converted.save(buf, format="JPEG", quality=_VISION_UPLOAD_JPEG_QUALITY, optimize=True)
+            return buf.getvalue(), "image/jpeg"
+    except (ImportError, OSError, ValueError):
+        return image_bytes, "image/png"
+
+
+async def _call_vision_llm_background(prompt: str, image_bytes: bytes, *, user_id: str) -> str:
+    """Analyse the screen through the user's background AI route.
+
+    Viola-managed AI on a keyless install goes through Viola's cloud as the
+    signed-in user (metered there); BYOK uses the user's own key; Codex uses
+    its sign-in. Local models are text-only, so they get a clear refusal.
+    Nothing is sent when the route is unavailable (signed out, no cloud-AI
+    consent).
+    """
+    import base64
+
+    import config.defaults as defaults
+    from services.openai_background import (
+        BackgroundLLMConsentRequired,
+        BackgroundLLMSignInRequired,
+        BackgroundLLMUnavailable,
+        UnsupportedBackgroundAISource,
+        run_background_openai_response,
+    )
+
+    upload_bytes, mime = _image_for_upload(image_bytes)
+    content = [
+        {"type": "input_text", "text": prompt},
+        {
+            "type": "input_image",
+            "image_url": "data:%s;base64,%s" % (mime, base64.b64encode(upload_bytes).decode("ascii")),
+        },
+    ]
+    try:
+        return await run_background_openai_response(
+            system_prompt=_VISION_INSTRUCTIONS,
+            user_content=content,
+            max_output_tokens=2000,
+            user_id=user_id,
+            timeout_s=60.0,
+            model=defaults.DEFAULT_AGENT_MODEL,
+            operation="vision_screen_analysis",
+            request_type="vision_screen_analysis",
+        )
+    except BackgroundLLMSignInRequired as exc:
+        raise VisionAnalysisUnavailable(
+            "I captured the screen, but you need to sign in to Viola before I can analyse it."
+        ) from exc
+    except BackgroundLLMConsentRequired as exc:
+        raise VisionAnalysisUnavailable(
+            "I captured the screen, but cloud AI is turned off, so I can't analyse it."
+        ) from exc
+    except UnsupportedBackgroundAISource as exc:
+        raise VisionAnalysisUnavailable(
+            "I captured the screen, but screen analysis isn't available with your current AI source."
+        ) from exc
+    except BackgroundLLMUnavailable as exc:
+        raise VisionAnalysisUnavailable(
+            "I captured the screen but can't analyse it right now. %s" % exc.user_message
+        ) from exc
+
+
 async def _call_vision_llm(prompt: str, image_bytes: bytes) -> str:
     """Send the screenshot to a vision-capable LLM and return the analysis.
 
-    Uses OpenAI Responses directly because the provider router does not support
-    image inputs yet. Raises ``VisionAnalysisUnavailable`` when the call cannot
-    be completed (no API key, missing dependency, provider error) so the caller
-    never reports a failed analysis as a success.
+    With a local OpenAI key and a Viola-managed source this calls OpenAI
+    Responses directly, as before. Every other case (above all a keyless
+    customer install on Viola-managed AI) goes through the background AI route
+    (``services.openai_background``), which forwards images to Viola's cloud
+    as the signed-in user. Raises ``VisionAnalysisUnavailable`` when the call
+    cannot be completed (signed out, no consent, missing dependency, provider
+    error) so the caller never reports a failed analysis as a success.
     """
     try:
         import base64
@@ -861,6 +958,12 @@ async def _call_vision_llm(prompt: str, image_bytes: bytes) -> str:
             extract_message_text_from_response,
         )
         from services.llm.providers.openai_compatible import _is_reasoning_model
+        from services.openai_background import ROUTE_OPENAI_DIRECT, resolve_background_route
+
+        route_user_id = _vision_route_user_id()
+        route = resolve_background_route(route_user_id)
+        if route.kind != ROUTE_OPENAI_DIRECT:
+            return await _call_vision_llm_background(prompt, image_bytes, user_id=route_user_id)
 
         api_key = settings.openai_api_key
         if not api_key:
@@ -877,13 +980,7 @@ async def _call_vision_llm(prompt: str, image_bytes: bytes) -> str:
         model = defaults.DEFAULT_AGENT_MODEL
         _api_kwargs: dict = {
             "model": model,
-            "instructions": (
-                "You are Viola's screen-awareness module. The user has shared "
-                "what is currently visible on their display. Analyse the visual "
-                "content and give a concise, helpful answer. Be direct. Never "
-                "mention you are looking at a 'screenshot' - speak as though "
-                "you can see the user's screen naturally."
-            ),
+            "instructions": _VISION_INSTRUCTIONS,
             "input": [
                 {
                     "role": "user",
@@ -927,7 +1024,7 @@ async def _call_vision_llm(prompt: str, image_bytes: bytes) -> str:
         # user_id is resolved fail-closed BEFORE any reservation: an unresolved
         # account raises VisionAnalysisUnavailable here and nothing is reserved.
         reservation = LlmSpendReservation(
-            user_id=_current_user_id_for_llm_accounting(),
+            user_id=route_user_id,
             model=model,
             estimated_usage=estimated_usage,
             operation="vision_screen_analysis",
@@ -948,9 +1045,7 @@ async def _call_vision_llm(prompt: str, image_bytes: bytes) -> str:
             client = openai.AsyncOpenAI(api_key=api_key, base_url=OPENAI_DEFAULT_BASE_URL)
             response = await client.responses.create(**_api_kwargs)
             await reservation.settle(usage_from_openai_response(response, estimated_usage))
-            return (
-                extract_message_text_from_response(response) or "I could see the screen but couldn't form a response."
-            )
+            return extract_message_text_from_response(response) or _VISION_EMPTY_ANSWER
         finally:
             await reservation.settle(failed=True)
 

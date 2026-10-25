@@ -33,7 +33,7 @@ class RequestToolSurfaceBoundaryTests(unittest.IsolatedAsyncioTestCase):
             result = await executor._execute_parallel_tool_batch(
                 [{"tool": "synthetic_counter", "args": {}}],
                 spin_detector=SimpleNamespace(is_call_blocked=lambda *_args, **_kwargs: None),
-                taint_tracker=SimpleNamespace(check_tool=lambda _name: None),
+                taint_tracker=SimpleNamespace(check_tool=lambda _name, _args=None: None),
                 page_url=None,
             )
         return next(iter(result.values()))["tool_result"], effects

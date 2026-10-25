@@ -96,10 +96,13 @@ def _run_coroutine_blocking(coro: Any) -> Any:
 
 def default_side_query_selector(request: MemorySelectionRequest) -> Sequence[str]:
     """Run the background selector, returning filenames from the manifest."""
-    if not settings.auto_memory_side_query_enabled or not settings.openai_api_key:
+    if not settings.auto_memory_side_query_enabled:
         return []
 
-    from services.openai_background import run_background_openai_response
+    from services.openai_background import is_background_ai_available, run_background_openai_response
+
+    if not is_background_ai_available(request.user_id):
+        return []
 
     recent_tools = ", ".join(request.recent_tools) if request.recent_tools else "none"
     user_content = "User query:\n%s\n\nRecent tools: %s\n\nLimit: %d\n\nAvailable memory files:\n%s" % (

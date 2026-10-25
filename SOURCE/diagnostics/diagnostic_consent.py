@@ -9,12 +9,12 @@ are enforced by one ratchet gate (``scripts/check_diagnostic_consent_invariants.
 The founder's approved model has THREE independent switches, and the gates below
 compose them so the safe state is the default at every layer:
 
-1. MASTER FEATURE FLAG (``diagnostics_baseline_enabled``, default **False**).
-   The fleet-level arming for the whole feature. It stays OFF in the committed
-   default until the founder signs off on the final disclosure UI. While it is
-   off, NOTHING sends -- not a crash, not a bug-report attach -- regardless of
-   any per-install switch. This is the "land it gated, don't flip the default
-   on" knob.
+1. MASTER FEATURE FLAG (``diagnostics_baseline_enabled``). The fleet-level
+   arming for the whole feature. The founder signed off on the disclosure UI
+   for 1.0.5, so it defaults **on in installed builds** (``is_release_build``)
+   and **off for source/dev runs and tests**. While it is off, NOTHING sends --
+   not a crash, not a bug-report attach -- regardless of any per-install
+   switch. ``VIOLA_DIAGNOSTICS_BASELINE_ENABLED`` overrides it either way.
 
 2. DISCLOSURE SHOWN (``diagnostics_disclosure_shown``, per-install, default
    **False**). The first-run/post-update disclosure card must have been shown
@@ -91,12 +91,12 @@ def _settings_bool(key: str, *, default: bool, fail_value: bool) -> bool:
 
 
 def master_baseline_enabled() -> bool:
-    """Fleet-level master arming for the anonymized baseline. Default OFF.
+    """Fleet-level master arming for the anonymized baseline.
 
     Env ``VIOLA_DIAGNOSTICS_BASELINE_ENABLED`` wins; else AppConfig
-    ``diagnostics_baseline_enabled``; else False. Committed default is OFF until
-    the founder signs off on the disclosure UI -- so the whole feature ships
-    dark and nothing sends until this flips.
+    ``diagnostics_baseline_enabled`` (on in installed builds, off in source/dev
+    runs); else False. The per-install disclosure and opt-out gates below still
+    apply on top of it.
     """
     env = _env_truthy(ENV_MASTER_ENABLED)
     if env is not None:

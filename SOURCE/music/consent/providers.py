@@ -62,7 +62,6 @@ _AUTO_IMPORT_CANDIDATES = (
     "music.consent.adapters.google_calendar",  # Google Calendar OAuth adapter
     "music.consent.adapters.microsoft_calendar",  # Microsoft Calendar OAuth adapter
     "music.consent.adapters.spotify",  # Spotify OAuth adapter
-    "music.providers.spotify",
     "music.providers.youtube_music",
     "music.providers.calendar",
 )

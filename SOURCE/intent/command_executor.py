@@ -2389,6 +2389,35 @@ class CommandExecutor:
         """
         import random
 
+        from music.providers.spotify_cdp import spotify_liked_songs_query, wants_spotify_liked_songs
+
+        user_id_obj = params.get("_user_id") or params.get("user_id")
+        if wants_spotify_liked_songs(params.get("provider"), user_id=str(user_id_obj) if user_id_obj else None):
+            shuffle_param = params.get("shuffle")
+            query = spotify_liked_songs_query(shuffle_param if isinstance(shuffle_param, bool) else None)
+            try:
+                play_method = getattr(self.music, "play", None)
+                if not callable(play_method):
+                    raise RuntimeError("music player unavailable")
+                if asyncio.iscoroutinefunction(play_method):
+                    await cast(Callable[[str], Awaitable[object]], play_method)(query)
+                else:
+                    cast(Callable[[str], object], play_method)(query)
+            except Exception as exc:
+                logger.exception("Spotify Liked Songs playback failed: %s", exc)
+                return {
+                    "success": False,
+                    "message": "Couldn't start your Spotify Liked Songs right now.",
+                    "data": {"provider": "spotify"},
+                    "error": "spotify_liked_songs_failed",
+                }
+            return {
+                "success": True,
+                "message": "Playing your Spotify Liked Songs.",
+                "data": {"provider": "spotify", "collection": "liked_songs"},
+                "error": None,
+            }
+
         from music.rating_system import get_rating_system
 
         rating_system = get_rating_system()

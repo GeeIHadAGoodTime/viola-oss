@@ -816,11 +816,95 @@ def _normalize_rating_value(value: str) -> str:
         "disliked": "thumbs_down",
         "negative": "thumbs_down",
         "thumbsdown": "thumbs_down",
+        "remove": "remove",
+        "unlike": "remove",
+        "unliked": "remove",
+        "clear": "remove",
     }
     normalized = aliases.get(raw)
     if not normalized:
-        raise ValueError("Rating value must be 'thumbs_up' or 'thumbs_down'.")
+        raise ValueError("Rating value must be 'thumbs_up', 'thumbs_down' or 'remove'.")
     return normalized
+
+
+# Voice "full screen" for the video on the Music stage. The window work is
+# done by the desktop app (React + the Qt window); these are the answers when
+# it cannot happen, so Viola says why instead of failing silently.
+VIDEO_FULLSCREEN_DESKTOP_ONLY = "Full screen is only available on the Viola desktop app's own screen."
+VIDEO_FULLSCREEN_NOTHING_PLAYING = "Nothing is playing, so there's no video to show full screen."
+VIDEO_FULLSCREEN_NOT_A_VIDEO = "What's playing isn't a video, so there's nothing to show full screen."
+# Request channels that come from the desktop window itself: its typed box
+# ("http", or "chat_mode" on the Chat stage) and its own microphone ("voice").
+# A speaker (spoke, "voice-stream"), Telegram, SMS, email or a phone call has
+# no desktop screen in front of the person asking.
+_VIDEO_FULLSCREEN_LOCAL_CHANNELS = frozenset({"", "http", "chat_mode", "voice", "desktop", "console"})
+
+
+def _video_fullscreen_request_channel() -> str:
+    """Return the raw channel of the current request ("" when none is bound)."""
+    from messaging.channel import get_request_channel
+    from services.command.command_service_core import channel_key
+
+    channel = get_request_channel()
+    if channel is None:
+        return ""
+    raw_key = getattr(channel, "request_channel_key", None)
+    if isinstance(raw_key, str) and raw_key.strip():
+        return raw_key.strip().lower()
+    return channel_key(channel)
+
+
+async def video_fullscreen_handler(enabled: bool) -> ToolResult:
+    """Ask the desktop app to show the playing video full screen, or put it back."""
+    from intent.permissions.remote_relay import is_unconsented_remote_relay
+    from ui.core.security import is_desktop_surface
+
+    channel = _video_fullscreen_request_channel()
+    from_desktop_window = channel in _VIDEO_FULLSCREEN_LOCAL_CHANNELS and not is_unconsented_remote_relay()
+    if not is_desktop_surface() or not from_desktop_window:
+        logger.info("video_fullscreen refused: surface is not the desktop window (channel=%r)", channel)
+        return ToolResult(
+            ok=False,
+            data={"message": VIDEO_FULLSCREEN_DESKTOP_ONLY, "reason": "desktop_app_only"},
+            error=VIDEO_FULLSCREEN_DESKTOP_ONLY,
+        )
+
+    if not enabled:
+        return ToolResult(
+            ok=True,
+            data={
+                "summary": "Leaving full screen; the window goes back to how it was.",
+                "ui_action": "exit_video_fullscreen",
+            },
+        )
+
+    state = await _read_live_playback_state()
+    now_playing = state.get("now_playing") if isinstance(state.get("now_playing"), dict) else None
+    if state.get("probe_ok"):
+        if now_playing is None:
+            return ToolResult(
+                ok=False,
+                data={"message": VIDEO_FULLSCREEN_NOTHING_PLAYING, "reason": "nothing_playing"},
+                error=VIDEO_FULLSCREEN_NOTHING_PLAYING,
+            )
+        if not now_playing.get("video_id"):
+            return ToolResult(
+                ok=False,
+                data={"message": VIDEO_FULLSCREEN_NOT_A_VIDEO, "reason": "not_a_video"},
+                error=VIDEO_FULLSCREEN_NOT_A_VIDEO,
+            )
+    # A failed probe does not block: the app checks for a video itself before
+    # going full screen and says so if there is none. The text is under
+    # "summary", not "message": a ui_action payload is merged into the reply
+    # envelope, where "message" is the reply the app shows.
+    title = str((now_playing or {}).get("title") or "").strip()
+    return ToolResult(
+        ok=True,
+        data={
+            "summary": "Showing %s full screen." % (title or "the video"),
+            "ui_action": "enter_video_fullscreen",
+        },
+    )
 
 
 async def view_queue_handler() -> ToolResult:
@@ -1413,7 +1497,7 @@ async def rate_track_handler(
         rating_value = _normalize_rating_value(value)
         explicit_track_id = track_id.strip()
 
-        if explicit_track_id:
+        if explicit_track_id and rating_value != "remove":
             track_rating = "up" if rating_value == "thumbs_up" else "down"
             request_payload: dict[str, Any] = {
                 "track_id": explicit_track_id,
@@ -1438,10 +1522,13 @@ async def rate_track_handler(
                 )
             return ToolResult(ok=False, data=data, error=_response_error(data))
 
-        ui_rating = "liked" if rating_value == "thumbs_up" else "disliked"
+        ui_rating = {"thumbs_up": "liked", "thumbs_down": "disliked"}.get(rating_value)
         data = await _post_runtime("/v1/rating", {"rating": ui_rating}, timeout=10.0)
+        response_data = data.get("data") if isinstance(data.get("data"), dict) else {}
+        spotify_sync = data.get("spotify") or response_data.get("spotify")
+        if isinstance(spotify_sync, dict) and spotify_sync.get("error"):
+            return ToolResult(ok=False, data=data, error=str(spotify_sync["error"]))
         if data.get("ok"):
-            response_data = data.get("data") if isinstance(data.get("data"), dict) else {}
             rated_track_id = data.get("video_id") or response_data.get("video_id") or ""
             result_data: dict[str, Any] = {
                 "message": "Current track rated %s" % rating_value,

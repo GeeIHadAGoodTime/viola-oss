@@ -23,6 +23,12 @@ class WakeContext:
     # Primary signals
     wake_score: float = 0.0
     base_threshold: float = 0.80
+    # Per-frame score threshold the score was tested against, when it differs
+    # from the sensitivity level (the 80 ms streaming path maps each level to a
+    # k-of-n operating point with a lower per-frame threshold; see
+    # violawake.config.stream_operating_point). None = compare the score to
+    # the effective threshold itself (single-frame paths).
+    score_threshold: float | None = None
 
     # Audio metrics (kept for diagnostics and AEC tracking)
     mic_rms: float = 0.0

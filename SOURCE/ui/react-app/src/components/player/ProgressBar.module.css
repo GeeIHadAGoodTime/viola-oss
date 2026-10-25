@@ -24,3 +24,20 @@
   transition: width 0.3s linear;
   pointer-events: none;
 }
+
+.track[data-scrubbing='true'] .fill {
+  transition: none;
+}
+
+/* Touch input: a 44px tall press-and-drag area around the 4px track. The
+ * padding is outside the painted band (background-clip) and the negative
+ * margin gives the extra height back, so nothing else moves. */
+:global(html[data-input='touch']) .track,
+:global(html[data-input='touch']) .track:hover {
+  height: 44px;
+  margin: -20px 0;
+  padding: 20px 0;
+  box-sizing: border-box;
+  background-clip: content-box;
+  touch-action: none;
+}

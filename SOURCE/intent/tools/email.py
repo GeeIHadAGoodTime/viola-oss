@@ -1,10 +1,11 @@
 """Email tools for the agent.
 
-Provides SMTP send capabilities with graceful
-"not configured" fallback when credentials are absent.
-
-For Gmail specifically, the Google Workspace MCP server (MCP-4) provides
-richer read/search functionality. This module only sends email.
+Customers send email from their own Gmail: the desktop Google connection
+(Settings > Connections, send-only ``gmail.send`` scope, token kept in the
+local consent vault) posts straight to gmail.googleapis.com. Viola runs no
+sender for customers. Resend / SMTP from the environment remain as a
+developer and advanced fallback. Every send passes the irreversible-action
+confirmation gate before it reaches this module.
 """
 
 from __future__ import annotations
@@ -258,6 +259,56 @@ def _get_configured_system_email_service():
     return services[0] if services else None
 
 
+GOOGLE_NOT_CONNECTED_MESSAGE = (
+    "To send email, connect your Google account in Settings > Connections. Nothing was sent."
+)
+GOOGLE_SEND_PERMISSION_MISSING_MESSAGE = (
+    "Your Google account is connected, but Viola was not given permission to send email, so nothing was sent. "
+    "Reconnect Google in Settings > Connections and allow 'Send email on your behalf'."
+)
+
+
+def _effective_send_user_id(user_id: str | None) -> str | None:
+    scoped = str(user_id or "").strip()
+    if scoped:
+        return scoped
+    try:
+        from core.user_context import get_current_user_id
+
+        return str(get_current_user_id() or "").strip() or None
+    except Exception:
+        return None
+
+
+def _google_connected_without_send(user_id: str) -> bool:
+    """True when this user's local Google token exists but lacks gmail.send."""
+    try:
+        from music.consent import get_consent_service
+        from services.oauth.google import GMAIL_SEND_SCOPE
+
+        bundle = get_consent_service()._vault.get_token("google_calendar", user_id=user_id)
+    except Exception:
+        return False
+    if not bundle or not (bundle.access_token or bundle.refresh_token):
+        return False
+    return GMAIL_SEND_SCOPE not in set(bundle.scopes or ())
+
+
+def _google_not_connected_result(*, send_scope_missing: bool) -> ToolResult:
+    return ToolResult(
+        ok=False,
+        error=GOOGLE_SEND_PERMISSION_MISSING_MESSAGE if send_scope_missing else GOOGLE_NOT_CONNECTED_MESSAGE,
+        error_category="EMAIL_GOOGLE_NOT_CONNECTED",
+        data={
+            "configured": False,
+            "sent": False,
+            "send_attempted": False,
+            "provider": "gmail_oauth",
+            "google_connected": send_scope_missing,
+        },
+    )
+
+
 async def _send_email_via_gmail_oauth(
     to: str,
     subject: str,
@@ -265,36 +316,39 @@ async def _send_email_via_gmail_oauth(
     *,
     user_id: str | None,
 ) -> ToolResult | None:
-    """Send through the user's Google OAuth token when Gmail send is available."""
+    """Send from the user's own Gmail through their desktop Google connection.
+
+    The token comes from the desktop's local consent vault (storage tier 3)
+    and the request goes straight from this machine to gmail.googleapis.com.
+    Returns a not-sent ``ToolResult`` with ``send_attempted: False`` when
+    Google is not connected (or was connected without the send permission),
+    so the caller can tell the user exactly what to do.
+    """
+    user_id = _effective_send_user_id(user_id)
     if not user_id:
-        return None
+        return _google_not_connected_result(send_scope_missing=False)
 
     try:
         from services.oauth.google import get_enabled_gmail_send_scopes
 
         gmail_send_scopes = get_enabled_gmail_send_scopes()
-        if not gmail_send_scopes:
-            return None
 
         from services.oauth.credentials import get_google_credentials
 
         creds = await get_google_credentials(user_id, required_scopes=gmail_send_scopes)
     except Exception as exc:
         logger.debug("Gmail OAuth credential lookup failed for user %s: %s", user_id, exc)
-        return None
+        creds = None
 
     token = str(getattr(creds, "token", "") or "").strip() if creds else ""
     if not token:
-        return None
+        return _google_not_connected_result(send_scope_missing=_google_connected_without_send(user_id))
 
-    sender = await _resolve_account_email(user_id)
-    if not sender:
-        logger.debug("Gmail OAuth send skipped because account email is unavailable for user %s", user_id)
-        return None
-
+    # No From header: Gmail stamps the connected Google account's own address
+    # (or its default send-as alias). The Viola account email can differ from
+    # the Google account, and a mismatched From would be rewritten or flagged.
     message = EmailMessage()
     message["To"] = to
-    message["From"] = sender
     message["Subject"] = subject
     message.set_content(body or "")
     raw = base64.urlsafe_b64encode(message.as_bytes()).decode("ascii")
@@ -355,8 +409,18 @@ async def _send_email_via_gmail_oauth(
         )
 
     if response.status_code in {401, 403}:
-        logger.warning("Gmail OAuth send denied with status %d; trying configured system backend", response.status_code)
-        return None
+        # Nothing was sent. A configured dev/advanced backend may still try;
+        # otherwise the user needs to reconnect Google.
+        logger.warning("Gmail OAuth send denied with status %d", response.status_code)
+        return ToolResult(
+            ok=False,
+            error=(
+                "Google refused to send this email for your account, so nothing was sent. "
+                "Reconnect Google in Settings > Connections and allow Viola to send email, then try again."
+            ),
+            error_category="GMAIL_SEND_DENIED",
+            data={"configured": True, "sent": False, "send_attempted": True, "provider": "gmail_oauth"},
+        )
 
     logger.warning("Gmail OAuth send failed with status %d", response.status_code)
     return ToolResult(
@@ -423,7 +487,7 @@ async def _send_email_via_system_backend(to: str, subject: str, body: str) -> To
 
 
 async def send_email(to: str, subject: str, body: str, *, user_id: str | None = None) -> ToolResult:
-    """Send an email via Gmail OAuth, user SMTP, or the system email backend.
+    """Send an email from the user's Gmail, or a configured SMTP / system backend.
 
     Args:
         to: Recipient email address
@@ -501,10 +565,13 @@ async def send_email(to: str, subject: str, body: str, *, user_id: str | None = 
     has_user_smtp = bool(smtp_host and cfg.get("address") and cfg.get("password"))
     if not has_user_smtp:
         system_result = await _send_email_via_system_backend(to, subject, body)
+        # Resend/SMTP from the environment is a dev / advanced fallback only;
+        # customers send through their own connected Google account.
         if system_result is not None:
             if system_result.ok:
                 _record_send(rate_bucket)
-            if gmail_result is not None and not system_result.ok:
+            gmail_attempted = bool(gmail_result is not None and (gmail_result.data or {}).get("send_attempted", True))
+            if gmail_attempted and not system_result.ok:
                 return gmail_result
             return system_result
         if gmail_result is not None:
@@ -517,8 +584,8 @@ async def send_email(to: str, subject: str, body: str, *, user_id: str | None = 
         return ToolResult(
             ok=False,
             error=(
-                "Email sending is not configured, so nothing was sent. Set VIOLA_RESEND_API_KEY for the "
-                "system backend, or VIOLA_SMTP_HOST, VIOLA_SMTP_USERNAME, and VIOLA_SMTP_PASSWORD for SMTP."
+                GOOGLE_NOT_CONNECTED_MESSAGE + " (Developers: VIOLA_RESEND_API_KEY or VIOLA_SMTP_HOST, "
+                "VIOLA_SMTP_USERNAME and VIOLA_SMTP_PASSWORD also work.)"
             ),
             error_category="EMAIL_NOT_CONFIGURED",
             data={

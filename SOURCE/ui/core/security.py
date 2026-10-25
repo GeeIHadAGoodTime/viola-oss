@@ -82,6 +82,16 @@ def _allowed_websocket_origins() -> tuple[str, ...]:
     return tuple(normalized)
 
 
+def _active_lan_listener() -> tuple[str, int] | None:
+    """Return the Rooms LAN listener's ``(host, port)`` when it is serving."""
+    try:
+        from core.lan_exposure import active_lan_listener
+
+        return active_lan_listener()
+    except ImportError:
+        return None
+
+
 def is_loopback_request(request: Request) -> bool:
     """Return True when the incoming request originated from loopback."""
     client_host = request.client.host if request.client is not None else None
@@ -139,7 +149,8 @@ def get_security_posture_snapshot(
     api_port = int(getattr(app_settings, "api_port", 0) or 0)
     multiroom_enabled = True
     wildcard_bind = is_wildcard_bind_host(api_host)
-    lan_exposed = app_surface == "desktop" and is_lan_exposed_host(api_host)
+    lan_listener = _active_lan_listener()
+    lan_exposed = app_surface == "desktop" and (is_lan_exposed_host(api_host) or lan_listener is not None)
     auto_promoted_for_multiroom = bool(
         lan_exposed
         and wildcard_bind
@@ -161,7 +172,10 @@ def get_security_posture_snapshot(
         warning = None
     elif config.auth_enabled:
         mode = "lan_auth_required"
-        if auto_promoted_for_multiroom:
+        if lan_listener is not None and not is_lan_exposed_host(api_host):
+            summary = "Desktop API also serves %s:%d for Rooms; authentication is required." % lan_listener
+            warning = "LAN access for Rooms is on. Remote clients need the API key or a paired-speaker credential."
+        elif auto_promoted_for_multiroom:
             summary = "LAN-exposed desktop API for multiroom; authentication is required."
             warning = "api_host was auto-promoted to 0.0.0.0 for multiroom reachability."
         else:
@@ -243,6 +257,18 @@ def check_websocket_origin(ws: WebSocket, client_host: str | None = None) -> boo
             return True
     except Exception:
         log.debug("Origin URL parse failed for loopback WebSocket origin check")
+
+    # The Rooms LAN listener (utils/speaker_pairing_flow.py) serves the spoke
+    # page at exactly http(s)://<lan-ip>:<port>; its websockets carry that
+    # origin. Accept only that exact host and port, not a whole range.
+    lan_listener = _active_lan_listener()
+    if lan_listener is not None:
+        try:
+            parsed = urlparse(origin_stripped)
+            if parsed.hostname == lan_listener[0] and parsed.port == lan_listener[1]:
+                return True
+        except Exception:
+            log.debug("Origin URL parse failed for LAN listener WebSocket origin check")
 
     # When binding to all interfaces, accept origins from private IP ranges
     # (RFC 1918) on our API port.  The previous check accepted ANY hostname

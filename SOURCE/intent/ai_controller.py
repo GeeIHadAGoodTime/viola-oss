@@ -18,7 +18,7 @@ import inspect
 import json
 import re
 import time
-from typing import Any, TypedDict
+from typing import Any, TypedDict, cast
 from urllib.parse import urlsplit
 
 from core.logging_config import get_logger
@@ -114,6 +114,8 @@ def _build_tool_schema_text_from_visible_tools(hub: Any, tools: list[dict[str, A
 
 
 _PENDING_TOOL_CONFIRMATION_EXPIRY_SECONDS = 120.0
+# Spoken and shown when Viola's managed AI is unavailable only because nobody is signed in.
+_SIGN_IN_FOR_AI_MESSAGE = "Please sign in to use Viola's AI."
 _MCP_HUB_INIT_RETRY_BACKOFF_SECONDS = 30.0
 _INTERNAL_HISTORY_TOOL_TYPES = frozenset({"tool_call", "tool_use", "function_call"})
 _INTERNAL_HISTORY_GAUNTLET_RE = re.compile(r"\bCG-[A-Z0-9][A-Z0-9_-]*-\d{9,}\b")
@@ -2294,10 +2296,14 @@ class AIController:
 
             # Read capability tier from user settings for permission gating.
             try:
+                from config.defaults import DEFAULT_AGENT_AUTONOMY
                 from ui.settings_manager import get_settings_manager
 
                 _sm = get_settings_manager()
-                agent_autonomy = _sm.get("agent_autonomy", "symphony")
+                agent_autonomy = (
+                    _sm.get("agent_autonomy", DEFAULT_AGENT_AUTONOMY, user_id=_ctx_user_id.get() or None)
+                    or DEFAULT_AGENT_AUTONOMY
+                )
             except Exception:
                 logger.exception("Agent prompt setup skipped because user settings could not be loaded")
                 return
@@ -2886,12 +2892,17 @@ class AIController:
         if hub is None:
             return native_tools, tool_surface, prompt_bundle
 
+        from config.defaults import DEFAULT_AGENT_AUTONOMY
+
         try:
             from ui.settings_manager import get_settings_manager
 
-            agent_autonomy = get_settings_manager().get("agent_autonomy", "symphony")
+            agent_autonomy = (
+                get_settings_manager().get("agent_autonomy", DEFAULT_AGENT_AUTONOMY, user_id=user_id)
+                or DEFAULT_AGENT_AUTONOMY
+            )
         except Exception:
-            agent_autonomy = "symphony"
+            agent_autonomy = DEFAULT_AGENT_AUTONOMY
 
         interactive_tools = self._channel is not None
         if self._browser_init_task is not None:
@@ -3667,6 +3678,23 @@ class AIController:
 
     async def _process_with_gpt(self, text: str, result: ProcessResultDict) -> ProcessResultDict:
         """Reject raw OpenAI clients; all LLM routing must use provider wrappers."""
+        login_required = getattr(self.client, "account_login_required", None)
+        if callable(login_required) and login_required() is True:
+            # No provider because Viola's managed AI waits for sign-in. Say
+            # that, in plain words, rather than blaming tool-calling support.
+            from core.account_gate import paid_action_login_required_data
+
+            login_data = paid_action_login_required_data(action="managed_llm", message=_SIGN_IN_FOR_AI_MESSAGE)
+            loose_result = cast(dict[str, Any], result)
+            loose_result["ok"] = False
+            loose_result["error"] = login_data["error_code"]
+            loose_result["message"] = _SIGN_IN_FOR_AI_MESSAGE
+            loose_result["card"] = login_data["card"]
+            loose_data = cast(dict[str, Any], result["data"])
+            loose_data["answer"] = _SIGN_IN_FOR_AI_MESSAGE
+            loose_data["error_code"] = login_data["error_code"]
+            loose_data["card"] = login_data["card"]
+            return result
         if callable(getattr(self.client, "route_command_native", None)):
             result["ok"] = False
             result["error"] = "native_tools_unverified"

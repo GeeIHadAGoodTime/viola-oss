@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor } from '../test/test-utils';
+import { render, screen, waitFor, fireEvent } from '../test/test-utils';
 import { AuthProvider } from '../hooks/useAuth';
 import { AuthProvider as CloudAuthProvider } from '../auth/AuthProvider';
 import { GOTRUE_STORAGE_KEY } from '../lib/gotrue_client';
 import { inMemorySessionStorage } from '../lib/sessionStore';
-import { AccountTab } from './AccountTab';
+import { AccountTab, TextMessagesSettings } from './AccountTab';
 
 // ---------------------------------------------------------------------------
 // GoTrue test scaffolding. Since the GoTrue migration (bce028c3c), auth flows
@@ -527,3 +527,75 @@ describe('AccountTab - Cloud Sync status copy', () => {
     expect(await screen.findByText('Synced across your devices')).toBeInTheDocument();
   });
 });
+
+describe('AccountTab - Text messages (phone opt-in)', () => {
+  const CONSENT = 'I agree to receive text messages from Viola at this number: verification codes, purchase approval links I ask for, and replies when I text Viola. Message frequency varies. Message and data rates may apply. Reply HELP for help, STOP to opt out.';
+
+  function jsonResponse(body, status = 200) {
+    return { ok: status >= 200 && status < 300, status, headers: { get: () => null }, json: () => Promise.resolve(body) };
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('shows the server consent text, needs the box ticked, then sends and verifies the code', async () => {
+    const calls = [];
+    let verified = false;
+    vi.stubGlobal('fetch', vi.fn(async (input, init) => {
+      const url = typeof input === 'string' ? input : input?.url || '';
+      calls.push({ url, init });
+      if (url.endsWith('/sms/status')) {
+        return jsonResponse(verified
+          ? { phone: '+14145550100', phone_verified: true, sms_consent: true, consent_text: CONSENT, consent_text_version: 'v2' }
+          : { phone: null, phone_verified: false, sms_consent: false, consent_text: CONSENT, consent_text_version: 'v2' });
+      }
+      if (url.endsWith('/sms/send-code')) return jsonResponse({ ok: true });
+      if (url.endsWith('/sms/verify-code')) { verified = true; return jsonResponse({ ok: true }); }
+      return jsonResponse({});
+    }));
+
+    render(<TextMessagesSettings />);
+
+    expect(await screen.findByTestId('sms-consent-text')).toHaveTextContent('Message and data rates may apply');
+    const sendButton = screen.getByRole('button', { name: 'Text me a code' });
+    fireEvent.change(screen.getByLabelText('Mobile number for texts'), { target: { value: '+14145550100' } });
+    expect(sendButton).toBeDisabled();
+    fireEvent.click(screen.getByLabelText('Agree to receive texts from Viola'));
+    expect(sendButton).not.toBeDisabled();
+    fireEvent.click(sendButton);
+
+    await screen.findByLabelText('Verification code');
+    const sendCall = calls.find((c) => c.url.endsWith('/sms/send-code'));
+    expect(JSON.parse(sendCall.init.body)).toEqual({ phone: '+14145550100', consent: true, consent_text_version: 'v2' });
+
+    fireEvent.change(screen.getByLabelText('Verification code'), { target: { value: '123456' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Verify' }));
+
+    expect(await screen.findByTestId('sms-verified-phone')).toHaveTextContent('+14145550100');
+    const verifyCall = calls.find((c) => c.url.endsWith('/sms/verify-code'));
+    expect(JSON.parse(verifyCall.init.body)).toEqual({ phone: '+14145550100', code: '123456' });
+  });
+
+  it('shows the cloud refusal message instead of failing silently', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (input) => {
+      const url = typeof input === 'string' ? input : input?.url || '';
+      if (url.endsWith('/sms/status')) {
+        return jsonResponse({ phone: null, phone_verified: false, sms_consent: false, consent_text: CONSENT, consent_text_version: 'v2' });
+      }
+      if (url.endsWith('/sms/send-code')) {
+        return jsonResponse({ error: 'Viola can text US and Canadian mobile numbers (+1) for now.' }, 400);
+      }
+      return jsonResponse({});
+    }));
+
+    render(<TextMessagesSettings />);
+    await screen.findByTestId('sms-consent-text');
+    fireEvent.change(screen.getByLabelText('Mobile number for texts'), { target: { value: '+442071234567' } });
+    fireEvent.click(screen.getByLabelText('Agree to receive texts from Viola'));
+    fireEvent.click(screen.getByRole('button', { name: 'Text me a code' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('US and Canadian mobile numbers');
+  });
+});
+

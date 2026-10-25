@@ -8,6 +8,8 @@ INFRASTRUCTURE_KEYS: Final[frozenset[str]] = frozenset(
     {
         "_settings_last_saved",
         "_settings_version",
+        # One-time 1.0.5 marker: the old minimize_to_tray default was reset.
+        "_window_close_quits_migrated",
         "api_host",
         "api_port",
         "app_surface",
@@ -38,6 +40,7 @@ INFRASTRUCTURE_KEYS: Final[frozenset[str]] = frozenset(
         "founder_phone_number",
         "google_workspace_mcp_path",
         "input_device",
+        "lan_access_enabled",
         "local_music_folder",
         "log_level",
         "microphone_volume",
@@ -69,11 +72,28 @@ INFRASTRUCTURE_KEYS: Final[frozenset[str]] = frozenset(
         "wake_enabled",
         "wake_engine",
         "wake_sensitivity",
+        "wake_verification_enabled",
         "wake_word_active_model",
         "wake_word_engine",
         "wake_word_model",
         "whisper_device",
         "whisper_model",
+    }
+)
+
+# Device-tier keys that still belong to one person rather than to the machine.
+# Every other INFRASTRUCTURE_KEYS entry is install-scoped on the desktop: it is
+# stored in, and read from, this machine's settings.json whoever is signed in,
+# because the code that reads it (the window's close button, the wake detector,
+# the hotkey and audio threads) runs with no account context. These few stay in
+# the signed-in account's own local blob instead: a personal phone number, the
+# person's own acknowledgement of the dangerous-mode warning, and the person's
+# computer-use allowlist (read with an explicit user_id by its safety check).
+ACCOUNT_BOUND_DEVICE_KEYS: Final[frozenset[str]] = frozenset(
+    {
+        "computer_use_app_whitelist",
+        "dangerous_mode_acknowledged",
+        "founder_phone_number",
     }
 )
 
@@ -218,7 +238,6 @@ CREDENTIAL_RELOCATE_KEYS: Final[frozenset[str]] = frozenset(
         "openai_api_key",
         "slack_app_token",
         "slack_bot_token",
-        "spotify_refresh_token",
         "telegram_bot_token",
     }
 )
@@ -228,6 +247,9 @@ STALE_DELETE_KEYS: Final[frozenset[str]] = frozenset(
         "signal_account",
         "signal_daemon_url",
         "signal_enabled",
+        # Read only by the deleted spotipy SpotifyWebPlaybackEngine; drop any
+        # leftover plaintext copy on load.
+        "spotify_refresh_token",
         "volume",
         "whatsapp_bridge_url",
         "whatsapp_enabled",
@@ -263,6 +285,7 @@ SETTING_KEY_ALIASES: Final[dict[str, str]] = {
 }
 
 __all__ = [
+    "ACCOUNT_BOUND_DEVICE_KEYS",
     "BIPA_DELETE_KEYS",
     "CLOUD_COMPAT_USER_SETTING_KEYS",
     "CLOUD_CONSENT_KEYS",

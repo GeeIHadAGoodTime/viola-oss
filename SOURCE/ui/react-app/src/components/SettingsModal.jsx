@@ -52,9 +52,81 @@ import {
   useDebouncedCallback,
 } from './settings';
 import WakeSensitivitySlider from './settings/WakeSensitivitySlider';
+import AddPlaylistForm from './settings/AddPlaylistForm';
 
 // Use centralized theme from config.js
 const theme = THEME;
+
+/**
+ * Settings > System > Advanced: whether phones and tablets on this Wi-Fi can
+ * reach Viola (Rooms). Applied immediately through /v1/network/lan-access, not
+ * through the Save draft, because it opens or closes a network port. Opening
+ * Rooms > Add Room turns it on; this is where the user can see and undo that.
+ */
+function LanAccessSettingRow() {
+  const [status, setStatus] = useState(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    apiFetch('/v1/network/lan-access')
+      .then((data) => {
+        if (!cancelled) setStatus(data || null);
+      })
+      .catch(() => {
+        if (!cancelled) setStatus(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleChange = useCallback(async (enabled) => {
+    setBusy(true);
+    try {
+      const data = await apiFetch('/v1/network/lan-access', {
+        method: 'POST',
+        body: JSON.stringify({ enabled }),
+      });
+      setStatus(data || null);
+    } catch {
+      // Keep the last known state; the toggle snaps back to it.
+    } finally {
+      setBusy(false);
+    }
+  }, []);
+
+  if (!status) return null;
+  const note = status.reachable
+    ? status.firewall?.message || null
+    : status.enabled
+      ? status.message
+      : null;
+  return (
+    <SettingRow
+      title="Let devices on your Wi-Fi connect"
+      description="Lets phones and tablets on this Wi-Fi join as Rooms speakers. They still need the code from Rooms > Add Room. Turns on when you add a room."
+    >
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
+        <Toggle
+          checked={Boolean(status.enabled || status.via === 'main_bind')}
+          onChange={handleChange}
+          disabled={busy || status.via === 'main_bind'}
+          ariaLabel="Let devices on your Wi-Fi connect"
+        />
+        {note && (
+          <div
+            style={{ maxWidth: '260px', textAlign: 'right', fontSize: '12px', color: theme.colors.textMuted }}
+            data-testid="settings-lan-access-note"
+          >
+            {note}
+          </div>
+        )}
+      </div>
+    </SettingRow>
+  );
+}
+
 const MODAL_OPEN_DEFER_MS = 50;
 const SPOTIFY_LOGIN_POLL_MS = 2000;
 const SPOTIFY_LOGIN_TIMEOUT_MS = 120000;
@@ -386,6 +458,13 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
   });
   const [paymentCardSaving, setPaymentCardSaving] = useState(false);
   const [paymentCardActionError, setPaymentCardActionError] = useState('');
+  // Payment PIN: approves every purchase on the payment gate (phone link or
+  // this computer). The PIN never leaves this computer; only "is one set".
+  const [paymentPinSet, setPaymentPinSet] = useState(null);
+  const [paymentPinOpen, setPaymentPinOpen] = useState(false);
+  const [paymentPinForm, setPaymentPinForm] = useState({ current: '', pin: '', confirm: '' });
+  const [paymentPinSaving, setPaymentPinSaving] = useState(false);
+  const [paymentPinMessage, setPaymentPinMessage] = useState('');
   const [isDetectingLocalAi, setIsDetectingLocalAi] = useState(false);
   const [localAiDetectStatus, setLocalAiDetectStatus] = useState('');
   const [localAiServers, setLocalAiServers] = useState([]);
@@ -417,6 +496,7 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
     devices,
     playlists,
     saveSettingsWithSnapshot,
+    addPlaylist,
     syncPlaylists,
     renamePlaylist,
     setDefaultPlaylist,
@@ -653,6 +733,12 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
     try {
       const data = await apiFetch('/api/payments/cards');
       setPaymentCards(Array.isArray(data?.cards) ? data.cards : []);
+      try {
+        const pinData = await apiFetch('/api/payments/cards/pin');
+        setPaymentPinSet(Boolean(pinData?.pin_set));
+      } catch {
+        setPaymentPinSet(null);
+      }
     } catch {
       if (!silent) {
         setPaymentCards([]);
@@ -1252,6 +1338,41 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
       setPaymentCardSaving(false);
     }
   }, [paymentCardDialog, paymentCardForm, refreshPaymentCards]);
+
+  const handleSavePaymentPin = useCallback(async () => {
+    const pin = paymentPinForm.pin.trim();
+    if (!/^\d{4,8}$/.test(pin)) {
+      setPaymentPinMessage('Use 4 to 8 digits.');
+      return;
+    }
+    if (pin !== paymentPinForm.confirm.trim()) {
+      setPaymentPinMessage('The two PINs do not match.');
+      return;
+    }
+    if (paymentPinSet && !paymentPinForm.current.trim()) {
+      setPaymentPinMessage('Enter your current PIN to change it.');
+      return;
+    }
+    setPaymentPinSaving(true);
+    setPaymentPinMessage('');
+    try {
+      await apiFetch('/api/payments/cards/pin', {
+        method: 'PUT',
+        body: JSON.stringify({
+          pin,
+          ...(paymentPinSet ? { current_pin: paymentPinForm.current.trim() } : {}),
+        }),
+      });
+      setPaymentPinSet(true);
+      setPaymentPinOpen(false);
+      setPaymentPinForm({ current: '', pin: '', confirm: '' });
+      setPaymentPinMessage('Payment PIN saved.');
+    } catch (err) {
+      setPaymentPinMessage(err?.message && !/^HTTP \d+/.test(err.message) ? err.message : "Couldn't save the PIN.");
+    } finally {
+      setPaymentPinSaving(false);
+    }
+  }, [paymentPinForm, paymentPinSet]);
 
   const handleDeletePaymentCard = useCallback(async (card) => {
     if (!card?.label) return;
@@ -2316,6 +2437,108 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
                     Add a payment method
                   </button>
                 </div>
+                <div
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '8px',
+                    padding: '12px 14px',
+                    borderRadius: '8px',
+                    backgroundColor: theme.colors.bgElevated,
+                    border: `1px solid ${theme.colors.borderSubtle}`,
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ color: theme.colors.textPrimary, fontSize: '14px', fontWeight: 600 }}>
+                        Payment PIN
+                      </div>
+                      <div style={{ color: theme.colors.textMuted, fontSize: '12px', marginTop: '3px' }}>
+                        {paymentPinSet
+                          ? 'Set. You enter it to approve each purchase, on this computer or from the link Viola sends you.'
+                          : 'Needed before Viola can buy anything. You enter it to approve each purchase.'}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => { setPaymentPinOpen((open) => !open); setPaymentPinMessage(''); }}
+                      style={{
+                        padding: '8px 12px',
+                        minHeight: '44px',
+                        borderRadius: '8px',
+                        border: `1px solid ${theme.colors.borderLight}`,
+                        backgroundColor: 'transparent',
+                        color: theme.colors.textPrimary,
+                        fontSize: '13px',
+                        cursor: 'pointer',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {paymentPinSet ? 'Change PIN' : 'Set PIN'}
+                    </button>
+                  </div>
+                  {paymentPinOpen && (
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                      {paymentPinSet && (
+                        <input
+                          type="password"
+                          inputMode="numeric"
+                          autoComplete="current-password"
+                          aria-label="Current payment PIN"
+                          placeholder="Current PIN"
+                          value={paymentPinForm.current}
+                          onChange={(e) => setPaymentPinForm((prev) => ({ ...prev, current: e.target.value }))}
+                          style={{ width: '120px', padding: '8px', borderRadius: '8px', border: `1px solid ${theme.colors.borderLight}`, backgroundColor: 'transparent', color: theme.colors.textPrimary }}
+                        />
+                      )}
+                      <input
+                        type="password"
+                        inputMode="numeric"
+                        autoComplete="new-password"
+                        maxLength={8}
+                        aria-label="New payment PIN"
+                        placeholder="New PIN"
+                        value={paymentPinForm.pin}
+                        onChange={(e) => setPaymentPinForm((prev) => ({ ...prev, pin: e.target.value }))}
+                        style={{ width: '120px', padding: '8px', borderRadius: '8px', border: `1px solid ${theme.colors.borderLight}`, backgroundColor: 'transparent', color: theme.colors.textPrimary }}
+                      />
+                      <input
+                        type="password"
+                        inputMode="numeric"
+                        autoComplete="new-password"
+                        maxLength={8}
+                        aria-label="Type the new payment PIN again"
+                        placeholder="Again"
+                        value={paymentPinForm.confirm}
+                        onChange={(e) => setPaymentPinForm((prev) => ({ ...prev, confirm: e.target.value }))}
+                        style={{ width: '120px', padding: '8px', borderRadius: '8px', border: `1px solid ${theme.colors.borderLight}`, backgroundColor: 'transparent', color: theme.colors.textPrimary }}
+                      />
+                      <button
+                        type="button"
+                        onClick={handleSavePaymentPin}
+                        disabled={paymentPinSaving}
+                        style={{
+                          padding: '8px 12px',
+                          minHeight: '44px',
+                          borderRadius: '8px',
+                          border: 'none',
+                          backgroundColor: theme.colors.accent,
+                          color: '#fff',
+                          fontSize: '13px',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {paymentPinSaving ? 'Saving...' : 'Save PIN'}
+                      </button>
+                    </div>
+                  )}
+                  {paymentPinMessage && (
+                    <div role="status" style={{ color: theme.colors.textSecondary, fontSize: '12px' }}>
+                      {paymentPinMessage}
+                    </div>
+                  )}
+                </div>
                 {paymentCardsLoading && (
                   <div style={{ color: theme.colors.textMuted, fontSize: '14px' }}>
                     Loading payment methods...
@@ -2457,7 +2680,12 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
                 />
               </SettingRow>
               <SectionDivider />
-              <SettingRow title="Error Reporting" description="Send anonymous crash reports">
+              {/* This consent gates error/crash COUNTS inside Usage Reports
+                  (telemetry/reporter.py) and the developer-build Sentry SDK.
+                  Installed builds' actual crash reports are the "Automatic
+                  Crash Reports" row below; the old copy here ("Send anonymous
+                  crash reports") made the two look like the same switch. */}
+              <SettingRow title="Error Reporting" description="Include error and crash counts in Usage Reports (needs Usage Reports on). Crash reports themselves are controlled by Automatic Crash Reports below.">
                 <Toggle
                   checked={localSettings.consent_error_reporting ?? false}
                   onChange={(v) => updateLocal('consent_error_reporting', v)}
@@ -2474,11 +2702,12 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
                   acknowledges the disclosure (diagnostics_disclosure_shown=true) in one
                   step, since this row's own description IS the disclosure. Sending itself
                   additionally requires the fleet-level master flag
-                  (diagnostics_baseline_enabled); until that is on, this toggle safely
-                  records consent but nothing leaves the device. */}
+                  (diagnostics_baseline_enabled), which is on in installed builds and off
+                  in source/dev runs. The first-run card (DiagnosticsDisclosureNotice)
+                  is the other place the disclosure is shown and the same switch offered. */}
               <SettingRow
                 title="Automatic Crash Reports"
-                description="When Viola crashes or hits an unexpected error, send a small anonymized report (app version, error type, redacted state) so we can fix it. Never includes recordings, conversation content, files, or account credentials."
+                description="On by default. When Viola crashes or hits an unexpected error, it sends a short anonymous report (app version, operating system, the error and where in Viola's code it happened) to Viola's own error tracker so we can fix it. Personal details are removed first. Never includes your name, email, account, recordings, conversations, files or passwords."
               >
                 <Toggle
                   checked={!(localSettings.diagnostics_baseline_opted_out ?? false)}
@@ -3071,53 +3300,7 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
             <Section title="Playlists">
               {/* Playlists management */}
               <div style={{ padding: '16px 20px' }}>
-                <div style={{ marginBottom: '16px' }}>
-                  <label style={{ display: 'block', marginBottom: '8px', color: theme.colors.textSecondary, fontSize: '14px' }}>
-                    Add Playlist URL
-                  </label>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <input
-                      type="text"
-                      placeholder="YouTube or Spotify playlist URL"
-                      id="playlist-url-input"
-                      style={{
-                        flex: 1,
-                        padding: '12px 16px',
-                        minHeight: '44px',
-                        borderRadius: '12px',
-                        border: `1px solid ${theme.colors.borderLight}`,
-                        backgroundColor: theme.colors.bgCard,
-                        color: theme.colors.textPrimary,
-                        fontSize: '14px',
-                        outline: 'none',
-                      }}
-                    />
-                    <button
-                      onClick={() => {
-                        const input = document.getElementById('playlist-url-input');
-                        if (input?.value) {
-                          const pl = localSettings.saved_playlists || [];
-                          updateLocal('saved_playlists', [...pl, { url: input.value, name: `Playlist ${pl.length + 1}` }]);
-                          input.value = '';
-                        }
-                      }}
-                      style={{
-                        padding: '12px 20px',
-                        minHeight: '44px',
-                        borderRadius: '12px',
-                        border: 'none',
-                        backgroundColor: theme.colors.accent,
-                        color: theme.colors.textBright || '#ffffff',
-                        fontSize: '14px',
-                        fontWeight: 500,
-                        cursor: 'pointer',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      Add
-                    </button>
-                  </div>
-                </div>
+                <AddPlaylistForm onAdd={addPlaylist} theme={theme} />
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '8px' }}>
                   <button
@@ -3626,6 +3809,18 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
             </Section>
 
             <AdvancedSection title="Voice Recognition & Advanced">
+              <SettingRow
+                title="Double-check the wake word"
+                description={'Before the chime, Viola takes a quick second listen and ignores the wake if it clearly heard talking without "Viola".'}
+                tooltip="On by default. It cuts false wakes from talking, TV and music. Turn it off if Viola often misses you when you say its name. The check runs on this device."
+              >
+                <Toggle
+                  checked={localSettings.wake_verification_enabled ?? true}
+                  onChange={(v) => updateLocal('wake_verification_enabled', v)}
+                  ariaLabel="Double-check the wake word"
+                />
+              </SettingRow>
+              <SectionDivider />
               <div style={{ padding: '16px 20px' }}>
                 <Select
                   label="Voice Recognition"
@@ -3830,11 +4025,14 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
             </Section>
 
             <Section title="Window">
-              <SettingRow title="Minimize to System Tray" description="Keep running in background when closed">
+              <SettingRow
+                title="Keep Viola running in the tray when the window is closed"
+                description="Off: closing the window quits Viola. On: Viola stays in the system tray and keeps listening for the wake word."
+              >
                 <Toggle
-                  checked={localSettings.minimize_to_tray ?? true}
+                  checked={localSettings.minimize_to_tray ?? false}
                   onChange={(v) => updateLocal('minimize_to_tray', v)}
-                  ariaLabel="Minimize to system tray"
+                  ariaLabel="Keep Viola running in the tray when the window is closed"
                 />
               </SettingRow>
               <SectionDivider />
@@ -3848,7 +4046,7 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
               {canQuitDesktopApp() && (
                 <>
                   <SectionDivider />
-                  <SettingRow title="Quit Viola" description="Close Viola completely instead of keeping it in the system tray">
+                  <SettingRow title="Quit Viola" description="Close Viola completely. It stops speaking and stops listening for the wake word.">
                     <button
                       type="button"
                       onClick={() => quitDesktopApp()}
@@ -3884,6 +4082,7 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
             </Section>
 
             <AdvancedSection title="Advanced">
+              {!isFeatureHidden('rooms') && <LanAccessSettingRow />}
               <SettingRow
                 title="Network API Port"
                 description="The HTTP port the local Viola server binds to. Restart required to take effect."

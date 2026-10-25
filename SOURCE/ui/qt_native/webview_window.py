@@ -14,6 +14,7 @@ import html
 import json
 import sys
 import threading
+import time
 from ipaddress import ip_address
 from pathlib import Path
 from urllib.parse import urlparse
@@ -106,6 +107,16 @@ _LOCAL_EXTERNAL_URL_HOSTS = frozenset(
 _LOCAL_CERTIFICATE_URL_HOSTS = frozenset({LOCALHOST_NAME, LOCALHOST, "::1"})
 
 _FULLSCREEN_HINT_TEXT = "Press Esc or F11 to exit fullscreen"
+# On a touch screen there may be no keyboard at all (a Surface in tablet mode).
+_FULLSCREEN_HINT_TEXT_TOUCH = "Tap the top edge to show the exit button"
+# A finger tap near the top reveals the hidden fullscreen title bar and keeps
+# it up this long: a finger has no hover, so the cursor poll that hides the bar
+# when the mouse moves away must not hide it before the user can tap Exit.
+_FULLSCREEN_TOUCH_REVEAL_PX = 48
+_FULLSCREEN_TOUCH_REVEAL_HOLD_S = 5.0
+# How often the docked touch keyboard's position is read while it may be up.
+_TOUCH_KEYBOARD_POLL_MS = 250
+_TOUCH_KEYBOARD_IDLE_POLLS = 12
 _FULLSCREEN_HINT_VISIBLE_MS = 3000
 _FULLSCREEN_HINT_FADE_MS = 180
 _FULLSCREEN_HINT_TOP_MARGIN = 18
@@ -792,6 +803,40 @@ class ViolaBridge(QObject):
         QTimer.singleShot(0, window._quit_app)
         return json.dumps({"ok": True}, sort_keys=True)
 
+    @Slot(bool, result=str)
+    def setVideoFullscreen(self, enabled: bool) -> str:
+        """Voice "full screen" / "end full screen" for the playing video.
+
+        Chromium refuses ``requestFullscreen()`` without a user gesture, so a
+        spoken request cannot go full screen from React; the Qt window does it
+        instead and React lays the video over the whole page. Refused for
+        non-local caller pages, like the other native actions.
+        """
+        if not self._caller_page_is_local():
+            logger.warning("[ViolaBridge] Refused setVideoFullscreen from non-local caller page")
+            return json.dumps({"ok": False, "error": "origin_not_allowed"}, sort_keys=True)
+        window = self._window
+        if window is None:
+            return json.dumps({"ok": False, "error": "window_unavailable"}, sort_keys=True)
+        logger.info("[ViolaBridge] setVideoFullscreen(%s) called from React", bool(enabled))
+        return json.dumps(window.set_video_fullscreen(bool(enabled)), sort_keys=True)
+
+    @Slot(result=str)
+    def showTouchKeyboard(self) -> str:
+        """A finger tapped into a text field: make sure the touch keyboard shows.
+
+        QtWebEngine does not ask Windows for the touch keyboard the way Chrome
+        does, so the page calls this on a touch focus. Only acts when the
+        device is in tablet posture; with a keyboard attached Windows' own
+        policy decides. Refused for non-local caller pages.
+        """
+        if not self._caller_page_is_local():
+            return json.dumps({"ok": False, "error": "origin_not_allowed"}, sort_keys=True)
+        window = self._window
+        if window is None:
+            return json.dumps({"ok": False, "error": "window_unavailable"}, sort_keys=True)
+        return json.dumps({"ok": bool(window.show_touch_keyboard())}, sort_keys=True)
+
     @Slot(int, int, int, int)
     def setBrowserOverlayBounds(self, x: int, y: int, w: int, h: int) -> None:
         """Called from React when the media area resizes.
@@ -1439,6 +1484,10 @@ class ConsoleCapturePage(QWebEnginePage):
                 QWebEnginePermission.PermissionType.MediaVideoCapture,
                 QWebEnginePermission.PermissionType.MediaAudioVideoCapture,
             ]
+            # Viola's own UI shows "Now playing" / mic-mute pop-ups through the
+            # Web Notifications API. Granted for these exact local origins only.
+            if hasattr(QWebEnginePermission.PermissionType, "Notifications"):
+                perm_types.append(QWebEnginePermission.PermissionType.Notifications)
 
             for origin in origins:
                 for perm_type in perm_types:
@@ -1687,6 +1736,17 @@ class ConsoleCapturePage(QWebEnginePage):
             av_capture,
         )
 
+        # Viola's own UI may raise desktop notifications; external pages may not.
+        notifications_feature = getattr(QWebEnginePage.Feature, "Notifications", None)
+        is_notification_permission = notifications_feature is not None and (
+            feature == notifications_feature
+            or (hasattr(feature, "value") and feature.value == getattr(notifications_feature, "value", None))
+        )
+        if is_localhost and is_notification_permission:
+            logger.info("[PERMISSION_GRANT] Granting notifications for Viola origin: %s", origin_str)
+            self.setFeaturePermission(origin, feature, QWebEnginePage.PermissionPolicy.PermissionGrantedByUser)
+            return
+
         if is_localhost and is_media_permission:
             logger.info(
                 "[PERMISSION_GRANT] Granting %s for origin: %s",
@@ -1744,6 +1804,15 @@ class ConsoleCapturePage(QWebEnginePage):
         is_media = perm_type in media_types
 
         logger.info("[PERMISSION_NEW] is_localhost=%s, is_media=%s", is_localhost, is_media)
+
+        # Viola's own UI may raise desktop notifications ("Now playing",
+        # mic muted). Only the exact local Viola origin is granted; pages in
+        # the browser overlay (agentic browsing, provider logins) stay denied.
+        notifications_type = getattr(QWebEnginePermission.PermissionType, "Notifications", None)
+        if is_localhost and notifications_type is not None and perm_type == notifications_type:
+            logger.info("[PERMISSION_NEW] GRANTING notifications for Viola origin %s", origin)
+            permission.grant()
+            return
 
         if is_localhost and is_media:
             logger.info("[PERMISSION_NEW] GRANTING %s for %s", perm_type_name, origin)
@@ -1862,7 +1931,13 @@ class CustomTitleBar(QWidget):
 
     def _setup_ui(self):
         """Create title bar layout with logo and window controls."""
-        self.setFixedHeight(32)
+        # A touch screen (a Surface in tablet mode) gets finger-sized chrome:
+        # 44px tall with 56px caption buttons instead of the 32x46 mouse size.
+        from ui.qt_native.touch_input import has_touch_screen, title_bar_metrics
+
+        self._touch_chrome = has_touch_screen()
+        bar_height, button_width = title_bar_metrics(self._touch_chrome)
+        self.setFixedHeight(bar_height)
         self.setStyleSheet("""
             CustomTitleBar {
                 background-color: #0a0a0a;
@@ -1898,14 +1973,15 @@ class CustomTitleBar(QWidget):
         layout.addStretch()
 
         # Window control buttons (Windows 11 style SVG icons)
-        btn_style_base = """
+        def btn_style_base(hover_bg: str) -> str:
+            return f"""
             QPushButton {{
                 background: transparent;
                 border: none;
-                min-width: 46px;
-                max-width: 46px;
-                min-height: 32px;
-                max-height: 32px;
+                min-width: {button_width}px;
+                max-width: {button_width}px;
+                min-height: {bar_height}px;
+                max-height: {bar_height}px;
                 padding: 0;
                 qproperty-iconSize: 10px 10px;
             }}
@@ -1919,7 +1995,7 @@ class CustomTitleBar(QWidget):
         self.btn_fullscreen.setObjectName("fullscreenToggleButton")
         self.btn_fullscreen.setAccessibleName("Enter fullscreen")
         self.btn_fullscreen.setToolTip("Enter fullscreen (F11)")
-        self.btn_fullscreen.setStyleSheet(btn_style_base.format(hover_bg="rgba(255, 255, 255, 0.1)"))
+        self.btn_fullscreen.setStyleSheet(btn_style_base(hover_bg="rgba(255, 255, 255, 0.1)"))
         self._set_fullscreen_icon(False)
         self.btn_fullscreen.setIconSize(QSize(12, 12))
         self.btn_fullscreen.clicked.connect(self._toggle_fullscreen)
@@ -1928,7 +2004,7 @@ class CustomTitleBar(QWidget):
         self.btn_minimize = QPushButton()
         self.btn_minimize.setAccessibleName("Minimize")
         self.btn_minimize.setToolTip("Minimize")
-        self.btn_minimize.setStyleSheet(btn_style_base.format(hover_bg="rgba(255, 255, 255, 0.1)"))
+        self.btn_minimize.setStyleSheet(btn_style_base(hover_bg="rgba(255, 255, 255, 0.1)"))
         self.btn_minimize.setIcon(
             self._create_icon_from_svg(
                 '<svg viewBox="0 0 10 10"><line x1="0" y1="5" x2="10" y2="5" stroke="white" stroke-width="1"/></svg>'
@@ -1940,7 +2016,7 @@ class CustomTitleBar(QWidget):
 
         # Maximize/Restore button (square outline)
         self.btn_maximize = QPushButton()
-        self.btn_maximize.setStyleSheet(btn_style_base.format(hover_bg="rgba(255, 255, 255, 0.1)"))
+        self.btn_maximize.setStyleSheet(btn_style_base(hover_bg="rgba(255, 255, 255, 0.1)"))
         self._set_maximize_icon(False)
         self.btn_maximize.setIconSize(QSize(10, 10))
         self.btn_maximize.clicked.connect(self._toggle_maximize)
@@ -1950,7 +2026,7 @@ class CustomTitleBar(QWidget):
         self.btn_close = QPushButton()
         self.btn_close.setAccessibleName("Close")
         self.btn_close.setToolTip("Close")
-        self.btn_close.setStyleSheet(btn_style_base.format(hover_bg="#c42b1c"))
+        self.btn_close.setStyleSheet(btn_style_base(hover_bg="#c42b1c"))
         self.btn_close.setIcon(
             self._create_icon_from_svg(
                 '<svg viewBox="0 0 10 10"><line x1="0" y1="0" x2="10" y2="10" stroke="white" stroke-width="1"/><line x1="10" y1="0" x2="0" y2="10" stroke="white" stroke-width="1"/></svg>'
@@ -2019,9 +2095,12 @@ class CustomTitleBar(QWidget):
         editor.setFixedHeight(118)
         layout.addWidget(editor)
 
-        screen_capture = QCheckBox("Include screenshot")
+        # The report carries window details as text only; no image is sent
+        # (the backend keeps screenshot metadata only, since pixels cannot be
+        # redacted), so the label must not promise a screenshot.
+        screen_capture = QCheckBox("Include window details (no screenshot is sent)")
         screen_capture.setObjectName("bugReportScreenshotCheckbox")
-        screen_capture.setAccessibleName("Include screenshot")
+        screen_capture.setAccessibleName("Include window details")
         screen_capture.setChecked(True)
         layout.addWidget(screen_capture)
 
@@ -2333,6 +2412,25 @@ class _KnowledgeUploadWorker(QThread):
             self.failed.emit(str(exc) or exc.__class__.__name__)
 
 
+# The app shell's right-click / long-press menu. QWebEngineView's standard menu
+# is a web browser's (Back, Forward, Reload, Save page, View page source); in
+# the Viola window Back and Reload throw away the app state and a long press on
+# a touch screen raised that menu on almost any tap that lingered. Only text
+# editing survives: Cut/Copy/Paste/Select all in a text field, Copy on a
+# selection, and no menu at all anywhere else.
+_EDIT_MENU_ACTIONS: tuple[str | None, ...] = ("Undo", "Redo", None, "Cut", "Copy", "Paste", None, "SelectAll")
+_SELECTION_MENU_ACTIONS: tuple[str | None, ...] = ("Copy",)
+
+
+def shell_context_menu_actions(is_editable: bool, selected_text: str) -> tuple[str | None, ...]:
+    """WebAction names (None = separator) for the shell's context menu; () = no menu."""
+    if is_editable:
+        return _EDIT_MENU_ACTIONS
+    if (selected_text or "").strip():
+        return _SELECTION_MENU_ACTIONS
+    return ()
+
+
 class _KnowledgeAwareWebView(QWebEngineView):
     """Main React webview that routes file drops through /v1/knowledge.
 
@@ -2354,6 +2452,30 @@ class _KnowledgeAwareWebView(QWebEngineView):
         self._knowledge_port = port
         self._knowledge_workers: list[_KnowledgeUploadWorker] = []
         self.setAcceptDrops(True)
+
+    def contextMenuEvent(self, event) -> None:
+        """Show only the text-editing menu (see shell_context_menu_actions)."""
+        try:
+            request = self.lastContextMenuRequest()
+            is_editable = bool(request is not None and request.isContentEditable())
+            selected = request.selectedText() if request is not None else ""
+        except (AttributeError, RuntimeError):
+            is_editable, selected = False, ""
+        names = shell_context_menu_actions(is_editable, selected)
+        if not names:
+            event.accept()
+            return
+        menu = QMenu(self)
+        menu.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
+        for name in names:
+            if name is None:
+                menu.addSeparator()
+                continue
+            action = self.pageAction(getattr(QWebEnginePage.WebAction, name))
+            if action is not None:
+                menu.addAction(action)
+        menu.popup(event.globalPos())
+        event.accept()
 
     @staticmethod
     def _has_local_files(event) -> bool:
@@ -2470,6 +2592,9 @@ class ViolaWebViewWindow(QMainWindow):
         self._react_ui_loaded = False
         self._react_ui_load_url: str | None = None
         self._was_maximized_before_fullscreen = False
+        self._geometry_before_fullscreen: QRect | None = None
+        self._video_fullscreen_active = False
+        self._video_fullscreen_owns_window = False
         self._fullscreen_hides_title_bar = False
         self._fullscreen_title_bar_revealed = False
         self._fullscreen_title_bar_hide_timer: QTimer | None = None
@@ -2482,6 +2607,7 @@ class ViolaWebViewWindow(QMainWindow):
         self._setup_ui()
         self._setup_fullscreen_shortcuts()
         self._setup_tray_icon()
+        self._setup_web_notification_presenter()
         # Wire the thread-safe update-event bridge to the banner handler.
         self._update_event_received.connect(self._on_update_event)
         self._update_staged.connect(self._on_update_staged)
@@ -2619,6 +2745,8 @@ class ViolaWebViewWindow(QMainWindow):
         layout = QVBoxLayout(central)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
+        # Kept so a docked touch keyboard can lift the page above itself.
+        self._central_layout = layout
 
         # Custom title bar
         self.title_bar = CustomTitleBar(self)
@@ -2836,9 +2964,71 @@ class ViolaWebViewWindow(QMainWindow):
             if proxy is not None:
                 proxy.installEventFilter(self)
 
+    # -- Windows touch keyboard ----------------------------------------------
+
+    def show_touch_keyboard(self) -> bool:
+        """Show the touch keyboard (tablet posture only) and track a docked one."""
+        from ui.qt_native.touch_input import TouchKeyboard, is_touch_first
+
+        if not is_touch_first():
+            return False
+        keyboard = getattr(self, "_touch_keyboard", None)
+        if keyboard is None:
+            keyboard = TouchKeyboard(int(self.winId()))
+            self._touch_keyboard = keyboard
+        shown = keyboard.try_show()
+        self._start_touch_keyboard_poll()
+        return shown
+
+    def _start_touch_keyboard_poll(self) -> None:
+        timer = getattr(self, "_touch_keyboard_timer", None)
+        if timer is None:
+            timer = QTimer(self)
+            timer.setInterval(_TOUCH_KEYBOARD_POLL_MS)
+            timer.timeout.connect(self._poll_touch_keyboard)
+            self._touch_keyboard_timer = timer
+        self._touch_keyboard_idle_polls = 0
+        if not timer.isActive():
+            timer.start()
+
+    def _poll_touch_keyboard(self) -> None:
+        """Lift the page above a docked touch keyboard; stop once it is gone."""
+        from ui.qt_native.touch_input import Rect, bottom_inset_for
+
+        keyboard = getattr(self, "_touch_keyboard", None)
+        occluded = keyboard.occluded_rect() if keyboard is not None else None
+        inset = 0
+        screen = self.screen()
+        if occluded is not None and screen is not None:
+            area = screen.geometry()
+            geo = self.geometry()
+            # A docked keyboard is anchored to the bottom of the screen; use
+            # only its height so the rectangle's coordinate origin cannot matter.
+            docked = Rect(area.x(), area.y() + area.height() - occluded.height, area.width(), occluded.height)
+            inset = bottom_inset_for(Rect(geo.x(), geo.y(), geo.width(), geo.height()), docked)
+        self._apply_touch_keyboard_inset(inset)
+        if inset:
+            self._touch_keyboard_idle_polls = 0
+            return
+        self._touch_keyboard_idle_polls = getattr(self, "_touch_keyboard_idle_polls", 0) + 1
+        if self._touch_keyboard_idle_polls >= _TOUCH_KEYBOARD_IDLE_POLLS:
+            timer = getattr(self, "_touch_keyboard_timer", None)
+            if timer is not None:
+                timer.stop()
+
+    def _apply_touch_keyboard_inset(self, inset: int) -> None:
+        layout = getattr(self, "_central_layout", None)
+        if layout is None or getattr(self, "_touch_keyboard_inset", 0) == inset:
+            return
+        self._touch_keyboard_inset = inset
+        layout.setContentsMargins(0, 0, 0, inset)
+        logger.info("Touch keyboard inset: %spx", inset)
+
     def _setup_fullscreen_hint(self) -> None:
         """Create the floating fullscreen-exit hint pill."""
-        hint = QLabel(_FULLSCREEN_HINT_TEXT, self)
+        from ui.qt_native.touch_input import has_touch_screen
+
+        hint = QLabel(_FULLSCREEN_HINT_TEXT_TOUCH if has_touch_screen() else _FULLSCREEN_HINT_TEXT, self)
         hint.setObjectName("fullscreenHintPill")
         hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
         hint.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
@@ -2874,6 +3064,10 @@ class ViolaWebViewWindow(QMainWindow):
             if isinstance(child, QWidget):
                 child.installEventFilter(self)
 
+        if event.type() == QEvent.Type.TouchBegin and self._handle_fullscreen_title_bar_touch(watched, event):
+            event.accept()
+            return True
+
         if event.type() in (
             QEvent.Type.MouseMove,
             QEvent.Type.MouseButtonPress,
@@ -2893,7 +3087,7 @@ class ViolaWebViewWindow(QMainWindow):
                 event.accept()
                 return True
             # Ctrl+Q (Cmd+Q on macOS) quits for real, the same as the tray
-            # menu's Quit. Closing the window only hides it to the tray.
+            # menu's Quit and (by default) the window's X.
             if key == Qt.Key.Key_Q and event.modifiers() == Qt.KeyboardModifier.ControlModifier:
                 self._quit_app()
                 event.accept()
@@ -2932,6 +3126,34 @@ class ViolaWebViewWindow(QMainWindow):
                 hide_timer.stop()
         return False
 
+    def _handle_fullscreen_title_bar_touch(self, watched: QObject, event: QEvent) -> bool:
+        """A finger tap at the top edge reveals the hidden fullscreen title bar.
+
+        Returns True (consume the tap) only when it revealed a hidden bar, so
+        the same tap does not also land on the video or page underneath.
+        """
+        if not self.isFullScreen() or not getattr(self, "_fullscreen_hides_title_bar", False):
+            return False
+        try:
+            points = event.points()
+            if not points:
+                return False
+            local = points[0].position().toPoint()
+        except (AttributeError, RuntimeError, TypeError):
+            return False
+        if isinstance(watched, QWidget) and watched is not self:
+            window_pos = watched.mapTo(self, local)
+        else:
+            window_pos = local
+        if window_pos.y() > max(_FULLSCREEN_TOUCH_REVEAL_PX, _FULLSCREEN_TITLE_BAR_REVEAL_PX):
+            return False
+        was_hidden = self.title_bar.isHidden()
+        self._fullscreen_touch_reveal_until = time.monotonic() + _FULLSCREEN_TOUCH_REVEAL_HOLD_S
+        self._show_fullscreen_title_bar()
+        # Hide again once the hold is over (unless a mouse is now near the top).
+        QTimer.singleShot(int(_FULLSCREEN_TOUCH_REVEAL_HOLD_S * 1000) + 50, self._schedule_fullscreen_title_bar_hide)
+        return was_hidden
+
     def _poll_fullscreen_pointer(self) -> None:
         """Reveal/hide fullscreen title-bar chrome from the polled cursor position.
 
@@ -2967,6 +3189,8 @@ class ViolaWebViewWindow(QMainWindow):
     def _schedule_fullscreen_title_bar_hide(self) -> None:
         """Start the delayed fullscreen chrome hide."""
         if not self.isFullScreen() or not self._fullscreen_hides_title_bar:
+            return
+        if time.monotonic() < getattr(self, "_fullscreen_touch_reveal_until", 0.0):
             return
         hide_timer = getattr(self, "_fullscreen_title_bar_hide_timer", None)
         if hide_timer is None:
@@ -3082,6 +3306,65 @@ class ViolaWebViewWindow(QMainWindow):
                 poll.stop()
             self._sync_video_overlay_fullscreen_state(False)
             self._hide_fullscreen_hint(immediate=True)
+            # Any way out of window fullscreen (F11, Esc, the title-bar
+            # button, an OS shortcut) also ends the voice video mode, so React
+            # never keeps a video laid over a normal-size window.
+            self._video_fullscreen_active = False
+            self._video_fullscreen_owns_window = False
+        self._publish_window_fullscreen_state()
+
+    def _publish_window_fullscreen_state(self) -> None:
+        """Tell React when window fullscreen or the voice video mode changes."""
+        state = (bool(self.isFullScreen()), bool(getattr(self, "_video_fullscreen_active", False)))
+        if state == getattr(self, "_published_fullscreen_state", None):
+            return
+        webview = getattr(self, "webview", None)
+        if webview is None:
+            return
+        self._published_fullscreen_state = state
+        detail = json.dumps({"fullscreen": state[0], "video_fullscreen": state[1]})
+        try:
+            webview.page().runJavaScript(
+                "window.dispatchEvent(new CustomEvent('viola:window-fullscreen', {detail: %s}))" % detail
+            )
+        except RuntimeError:
+            logger.debug("Could not publish fullscreen state to React", exc_info=True)
+
+    def set_video_fullscreen(self, enabled: bool) -> dict[str, object]:
+        """Enter or leave the voice video full screen and report the result.
+
+        Entering remembers whether the window was already fullscreen (F11): if
+        it was, leaving only ends the video layout and the window stays
+        fullscreen, because that is how it was before. Leaving when no video
+        mode is active ("end full screen" after F11) exits window fullscreen.
+        """
+        was_active = bool(getattr(self, "_video_fullscreen_active", False))
+        if enabled:
+            if not was_active:
+                owns_window = not self.isFullScreen()
+                self._video_fullscreen_active = True
+                self._video_fullscreen_owns_window = owns_window
+                if owns_window:
+                    self.enter_fullscreen(hide_title_bar=True)
+        else:
+            owns_window = bool(getattr(self, "_video_fullscreen_owns_window", False))
+            self._video_fullscreen_active = False
+            self._video_fullscreen_owns_window = False
+            if self.isFullScreen() and (owns_window or not was_active):
+                self.exit_fullscreen()
+        self._publish_window_fullscreen_state()
+        logger.info(
+            "Video fullscreen %s: window fullscreen=%s maximized=%s geometry=%s",
+            "on" if enabled else "off",
+            self.isFullScreen(),
+            self.isMaximized(),
+            self.geometry().getRect(),
+        )
+        return {
+            "ok": True,
+            "video_fullscreen": bool(getattr(self, "_video_fullscreen_active", False)),
+            "window_fullscreen": bool(self.isFullScreen()),
+        }
 
     def enter_fullscreen(self, *, hide_title_bar: bool = True) -> None:
         """Enter fullscreen on the current screen and show the exit hint."""
@@ -3092,6 +3375,11 @@ class ViolaWebViewWindow(QMainWindow):
             return
 
         self._was_maximized_before_fullscreen = self.isMaximized()
+        # Remember the normal-size rectangle too, so leaving fullscreen puts a
+        # restored window back at its exact size and position.
+        self._geometry_before_fullscreen = QRect(
+            self.normalGeometry() if self._was_maximized_before_fullscreen else self.geometry()
+        )
         self._fullscreen_hides_title_bar = hide_title_bar
         self._fullscreen_title_bar_revealed = False
         self._sync_video_overlay_fullscreen_state(True)
@@ -3110,6 +3398,8 @@ class ViolaWebViewWindow(QMainWindow):
             return
 
         restore_maximized = self._was_maximized_before_fullscreen
+        restore_geometry = getattr(self, "_geometry_before_fullscreen", None)
+        self._geometry_before_fullscreen = None
         self._fullscreen_hides_title_bar = False
         self._fullscreen_title_bar_revealed = False
         self._was_maximized_before_fullscreen = False
@@ -3123,6 +3413,12 @@ class ViolaWebViewWindow(QMainWindow):
             self.showMaximized()
         else:
             self.showNormal()
+            if (
+                restore_geometry is not None
+                and restore_geometry.isValid()
+                and self.geometry() != restore_geometry
+            ):
+                self.setGeometry(restore_geometry)
         self._sync_fullscreen_controls()
 
     def toggle_fullscreen(self) -> None:
@@ -3566,11 +3862,16 @@ class ViolaWebViewWindow(QMainWindow):
             ws_auth_token = auth_plugin.generate_ws_auth_token()
         except Exception:
             logger.exception("Failed to generate desktop WS auth token for credential injection")
+        # Tablet posture for the page's touch sizing (utils/inputModality.js):
+        # QtWebEngine's (pointer: coarse) never matches on Windows.
+        from ui.qt_native.touch_input import is_touch_first
+
         return (
             f"window.__VIOLA_BASE_URL__ = {json.dumps(base_url)};\n"
             f"window.__VIOLA_CLOUD_URL__ = {json.dumps(cloud_url)};\n"
             f"window.__VIOLA_API_KEY__ = {json.dumps(api_key)};\n"
             f"window.__VIOLA_WS_AUTH_TOKEN__ = {json.dumps(ws_auth_token)};\n"
+            f"window.__VIOLA_TOUCH_FIRST__ = {json.dumps(is_touch_first())};\n"
         )
 
     def _install_or_refresh_credentials_script(self) -> None:
@@ -4134,6 +4435,56 @@ class ViolaWebViewWindow(QMainWindow):
         self._tray_icon.show()
         logger.info("System tray icon created")
 
+    def _setup_web_notification_presenter(self) -> None:
+        """Show Viola's own Web Notifications as desktop pop-ups via the tray.
+
+        Granting the notification permission alone shows nothing: QtWebEngine
+        drops every ``new Notification(...)`` unless the profile has a
+        presenter. Viola's UI uses notifications for "Now playing" and the
+        mic mute/unmute confirmation, so route them through the tray icon's
+        native balloon/toast. Timers and reminders do not depend on this; they
+        speak, show in the app, and use the backend's OS toast path.
+        """
+        try:
+            profile = _get_viola_profile()
+        except Exception:
+            logger.debug("No Viola profile for the notification presenter", exc_info=True)
+            return
+        setter = getattr(profile, "setNotificationPresenter", None)
+        if not callable(setter):
+            logger.debug("QWebEngineProfile.setNotificationPresenter is not available")
+            return
+        setter(self._present_web_notification)
+        tray = self.tray_icon
+        if tray is not None:
+            tray.messageClicked.connect(self._restore_from_tray)
+        logger.info("Web notification presenter installed (tray=%s)", tray is not None)
+
+    def _present_web_notification(self, notification) -> None:
+        """Present one Web Notification from Viola's own local page only."""
+        try:
+            origin = notification.origin().toString()
+            title = str(notification.title() or "").strip() or "Viola"
+            message = str(notification.message() or "").strip()
+        except (AttributeError, RuntimeError, TypeError):
+            logger.debug("Unreadable web notification", exc_info=True)
+            return
+        # Defense in depth: the permission handlers only grant notifications
+        # to Viola's exact local origin, and this re-checks it so a page in the
+        # browser overlay can never raise a desktop pop-up.
+        if not _is_local_viola_webview_url(origin, extra_ports={int(getattr(self, "port", DEFAULT_API_PORT))}):
+            logger.warning("Dropped a web notification from a non-Viola origin")
+            return
+        tray = self.tray_icon
+        if tray is None or not QSystemTrayIcon.supportsMessages():
+            logger.info("Web notification not shown: no system tray to show it")
+            return
+        tray.showMessage(title[:120], message[:400], QSystemTrayIcon.MessageIcon.Information, 5000)
+        try:
+            notification.show()
+        except (AttributeError, RuntimeError):
+            logger.debug("Could not report the notification as shown", exc_info=True)
+
     def _refresh_tray_mute_state(self):
         """Sync the tray's checkable mute action to the live mic_muted setting."""
         try:
@@ -4163,11 +4514,23 @@ class ViolaWebViewWindow(QMainWindow):
         self.restore_window()
 
     def _quit_app(self):
-        """Actually quit the application (tray menu, Ctrl+Q, in-app Quit)."""
+        """Quit Viola completely.
+
+        One shutdown for every way out: the window's X (unless the user chose
+        to keep Viola in the tray), the tray menu's Quit, Ctrl+Q, and the
+        in-app "Quit Viola". The window leaves the screen at once, speech is
+        cut mid-sentence, and the wake detector and microphone stop before the
+        event loop ends, so Viola never keeps talking or listening while the
+        process exits.
+        """
         self._remember_window_state()
         self._force_quit = True
         if hasattr(self, "_tray_icon"):
             self._tray_icon.hide()
+        hide_window = getattr(self, "hide", None)
+        if callable(hide_window):
+            hide_window()
+        silence_voice_for_quit(getattr(self, "_bootstrap", None))
         from PySide6.QtWidgets import QApplication
 
         QApplication.instance().quit()
@@ -4187,31 +4550,122 @@ class ViolaWebViewWindow(QMainWindow):
             self._restore_from_tray()
 
     def closeEvent(self, event):
-        """Handle window close -- minimize to tray if setting is enabled."""
-        self._remember_window_state()
+        """The window's X, Alt+F4, or the taskbar's "Close window".
+
+        By default this quits Viola completely through ``_quit_app``. Viola
+        stays running in the tray (and keeps listening for its wake word) only
+        when the user turned on "Keep Viola running in the tray when the window
+        is closed" (``minimize_to_tray``, off by default) and the tray icon is
+        actually showing. A setting that cannot be read means quit, never a
+        hidden window that is still listening.
+        """
         if self._force_quit:
-            # User chose Quit from tray menu
+            # Quit is already under way (tray menu, Ctrl+Q, in-app Quit, or X).
+            self._remember_window_state()
             logger.info("Window closing (force quit)")
             if hasattr(self, "_tray_icon"):
                 self._tray_icon.hide()
             super().closeEvent(event)
             return
 
-        # Check minimize_to_tray setting
-        try:
-            from ui.settings_manager import get_settings_manager
+        keep_in_tray = False
+        if hasattr(self, "_tray_icon") and self._tray_icon.isVisible():
+            try:
+                from ui.settings_manager import get_settings_manager
 
-            sm = get_settings_manager()
-            minimize = sm.get("minimize_to_tray", True)
-        except Exception:
-            minimize = True
+                keep_in_tray = get_settings_manager().get("minimize_to_tray", False) is True
+            except Exception:
+                logger.warning("Could not read the keep-in-tray setting; closing quits Viola", exc_info=True)
 
-        if minimize and hasattr(self, "_tray_icon") and self._tray_icon.isVisible():
+        if keep_in_tray:
+            self._remember_window_state()
             event.ignore()
             self.hide()
-            logger.info("Window minimized to tray")
-        else:
-            logger.info("Window closing")
-            if hasattr(self, "_tray_icon"):
-                self._tray_icon.hide()
-            super().closeEvent(event)
+            logger.info("Window hidden to the tray (the user chose to keep Viola running there)")
+            return
+
+        logger.info("Window closed: quitting Viola")
+        self._quit_app()
+        super().closeEvent(event)
+
+
+# How long quitting waits for the wake detector and microphone to stop before
+# letting the event loop end anyway. Speech is cut first, so this bound only
+# limits how long a slow audio device can hold up the exit.
+_QUIT_VOICE_STOP_TIMEOUT_S = 1.5
+
+
+def _speech_engines_to_stop(bootstrap: object | None) -> list[object]:
+    """Return the speech engines that may be talking right now.
+
+    Never builds an engine just to stop it: a lazy TTS proxy that has not
+    loaded its engine yet has nothing playing, and loading Kokoro on the way
+    out would delay the quit by seconds.
+    """
+    candidates: list[object | None] = []
+    tts = getattr(bootstrap, "tts", None) if bootstrap is not None else None
+    lazy_cls = getattr(sys.modules.get("bootstrap.lazy_tts"), "LazyTTSEngine", None)
+    if lazy_cls is not None and isinstance(tts, lazy_cls):
+        tts = object.__getattribute__(tts, "_instance")
+    candidates.append(tts)
+    # The one process-wide Kokoro engine, also used by first-run narration.
+    candidates.append(getattr(sys.modules.get("voice.synthesis.factory"), "_shared_kokoro", None))
+    engines: list[object] = []
+    for engine in candidates:
+        if engine is None or any(engine is seen for seen in engines):
+            continue
+        # Look ``stop`` up on the class so a lazy wrapper's __getattr__ cannot
+        # load an engine here.
+        if callable(getattr(type(engine), "stop", None)):
+            engines.append(engine)
+    return engines
+
+
+def _stop_voice_for_quit(bootstrap: object | None, report: dict[str, object]) -> None:
+    for engine in _speech_engines_to_stop(bootstrap):
+        try:
+            engine.stop()  # type: ignore[attr-defined]
+            report.setdefault("speech_stopped", []).append(type(engine).__name__)  # type: ignore[union-attr]
+        except Exception:  # noqa: BLE001, RUF100 - a failed cut must not stop the quit
+            logger.warning("Could not cut speech while quitting", exc_info=True)
+    voice = getattr(bootstrap, "voice", None) if bootstrap is not None else None
+    stop_voice = getattr(voice, "stop", None)
+    if callable(stop_voice):
+        try:
+            stop_voice()
+            report["voice_stopped"] = True
+        except Exception:  # noqa: BLE001, RUF100 - a failed stop must not stop the quit
+            logger.warning("Could not stop the wake detector while quitting", exc_info=True)
+
+
+def silence_voice_for_quit(bootstrap: object | None) -> None:
+    """Cut speech now and stop the wake detector and microphone, for quitting.
+
+    Speech is stopped first, so a reply in progress ends mid-sentence instead
+    of finishing while the process tears down; then the voice orchestrator
+    stops wake detection and closes the microphone. The work runs on a helper
+    thread that quitting waits on for at most ``_QUIT_VOICE_STOP_TIMEOUT_S``,
+    so a stuck audio device cannot keep Viola open. Never raises.
+    """
+    if bootstrap is None:
+        return
+    report: dict[str, object] = {}
+    worker = threading.Thread(
+        target=_stop_voice_for_quit,
+        args=(bootstrap, report),
+        name="quit-voice-stop",
+        daemon=True,
+    )
+    worker.start()
+    worker.join(_QUIT_VOICE_STOP_TIMEOUT_S)
+    if worker.is_alive():
+        logger.warning(
+            "Voice stop still running after %.1fs while quitting; exiting anyway",
+            _QUIT_VOICE_STOP_TIMEOUT_S,
+        )
+    else:
+        logger.info(
+            "Quitting: speech cut (%s), wake detection and microphone stopped=%s",
+            ", ".join(report.get("speech_stopped", [])) or "nothing playing",  # type: ignore[arg-type]
+            bool(report.get("voice_stopped")),
+        )

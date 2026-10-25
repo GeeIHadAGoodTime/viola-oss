@@ -555,7 +555,11 @@ class AppConfig:
     # --- Feature toggles ---
 
     # --- Browser-native provider ---
-    browser_provider_enabled: bool = False  # Feature flag — off by default
+    # Experimental browser-native playback provider (music played inside the
+    # embedded webview) and the cloud browser routes. Off by default. It does
+    # NOT gate the in-app music sign-in (Settings > Connect Spotify), which is
+    # always on for the desktop.
+    browser_provider_enabled: bool = False
     preferred_music_provider: str = "youtube_iframe"  # Default: existing behavior
 
     # --- Browser-based YouTube search ---
@@ -831,8 +835,6 @@ class AppConfig:
     spotify_client_id: str | None = None
     spotify_client_secret: str | None = None
     spotify_redirect_uri: str | None = None
-    spotify_device_id: str | None = None
-    spotify_refresh_token: str | None = None
 
     # --- Calendar Integration ---
     google_calendar_credentials_path: str | None = None
@@ -841,7 +843,10 @@ class AppConfig:
 
     # --- Weather Service ---
     weather_api_base: str | None = None
-    weather_gfs_url: str = "http://weather-gfs:8080"
+    # Empty on desktop: the self-hosted GFS service lives only inside the cloud
+    # Compose network (docker-compose.cloud.yml sets VIOLA_WEATHER_GFS_URL), and
+    # backend.weather_fetch falls back to that internal name on the cloud surface.
+    weather_gfs_url: str = ""
     weather_air_quality_airnow_enabled: bool = True
     weather_air_quality_airnow_reporting_area_url: str = "https://files.airnowtech.org/airnow/today/reportingarea.dat"
     weather_air_quality_airnow_cache_ttl_seconds: int = 1800
@@ -912,10 +917,11 @@ class AppConfig:
     browser_session_mode: str = "viola"
 
     # --- Agentic Browser Display (CDP) ---
-    # Remote debugging port for Qt WebEngine CDP access.
-    # Disabled by default because Chromium DevTools Protocol has no Viola
-    # authentication layer. Set VIOLA_CDP_PORT or pass --remote-debugging-port
-    # only for an explicit local debugging/agentic-browser session.
+    # DevTools port the agent browser (stage QtWebEngine view) is driven on.
+    # 0 (default): viola_qt.py picks a random free loopback port each launch
+    # and writes it back here; never a fixed well-known port, and remote
+    # origins limited to one no web page can have. >0: that explicit port
+    # (dev tooling). <0: switched off.
     cdp_port: int = 0
 
     # --- MCP (Model Context Protocol) Servers ---
@@ -1122,16 +1128,22 @@ class AppConfig:
     sentry_require_consent: bool = True
 
     # Anonymized diagnostic minimum (rides crashes + bug reports, opt-out
-    # baseline). MASTER arming flag: default OFF so the whole feature ships dark
-    # until the founder signs off on the disclosure UI. Env override:
+    # baseline). MASTER arming flag. The founder signed off on the disclosure UI
+    # for 1.0.5 (ADR-0013: self-hosted GlitchTip is canonical), so it defaults
+    # ON in installed/packaged builds (is_release_build) and stays OFF for
+    # source/dev runs and tests. The user's own opt-out
+    # (Settings > Account > Privacy & Data > Automatic Crash Reports, or the
+    # first-run notice) still stops every send. Env override:
     # VIOLA_DIAGNOSTICS_BASELINE_ENABLED. Read via diagnostics.diagnostic_consent.
-    diagnostics_baseline_enabled: bool = False
+    diagnostics_baseline_enabled: bool = field(default_factory=lambda: is_release_build())
     # Shared ingest credential the desktop sends as X-Viola-Diagnostics-Key to
     # the cloud relay (/v1/diagnostics/ingest). It authenticates a genuine Viola
     # client WITHOUT carrying user identity, so the anonymized baseline stays
     # anonymous end to end. Empty on the server = ingest endpoint disabled (503);
-    # empty on the desktop = no relay. Provisioned only when the feature flips on.
-    diagnostics_ingest_key: str = ""
+    # empty on the desktop = no relay. Installed builds get it BAKED at build time
+    # from the build environment (never committed; see _baked_build_value); the
+    # cloud gets it from VIOLA_DIAGNOSTICS_INGEST_KEY in .env.cloud.
+    diagnostics_ingest_key: str = field(default_factory=lambda: _baked_build_value("diagnostics_ingest_key"))
 
     metrics_db_path: str = "metrics.db"  # SQLite metrics DB location
 
@@ -1352,6 +1364,53 @@ def _get_logger():
 
 def _is_dev_context(cfg: AppConfig) -> bool:
     return bool(cfg.dev_mode or cfg.env in ("dev", "test") or cfg.test_mode)
+
+
+def is_release_build() -> bool:
+    """True when this process is an installed/packaged build, not a source checkout.
+
+    Installed builds ship no ``.env`` and nothing sets ``VIOLA_ENV``, so they run
+    with the ``env="dev"`` default. ``env`` therefore cannot tell a customer's
+    machine from a developer's, and anything test-only must check this instead.
+    PyInstaller sets ``sys.frozen`` in every Windows/macOS/Linux bundle;
+    ``VIOLA_RELEASE_BUILD=1`` lets a source run opt in to the same behaviour.
+    """
+    import sys
+
+    if getattr(sys, "frozen", False):
+        return True
+    return env.get_bool("VIOLA_RELEASE_BUILD", default=False)
+
+
+#: Module the desktop build generates at freeze time with values taken from the
+#: build environment (see the private build's ``scripts/bake_build_values.py``).
+#: It is written OUTSIDE the source tree, compiled into the frozen bundle, and
+#: never committed, so a credential like the diagnostics ingest key reaches
+#: installed builds without ever entering the repository.
+BAKED_BUILD_MODULE = "_viola_build_baked"
+
+
+def _baked_build_value(name: str) -> str:
+    """Return a value baked into this packaged build, or ``""``.
+
+    Only a frozen (installed) build consults the baked module, so a source run
+    can never pick up a stray generated file from the working directory.
+    Never raises and never logs the value.
+    """
+    import importlib
+    import sys
+
+    if not getattr(sys, "frozen", False):
+        return ""
+    try:
+        module = importlib.import_module(BAKED_BUILD_MODULE)
+    except ImportError:
+        return ""
+    values = getattr(module, "VALUES", None)
+    if not isinstance(values, dict):
+        return ""
+    value = values.get(name)
+    return value.strip() if isinstance(value, str) else ""
 
 
 def _missing_required_secrets(cfg: AppConfig) -> list[str]:

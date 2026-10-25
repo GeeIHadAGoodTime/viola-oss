@@ -474,10 +474,9 @@ def _get_manager():
 
 def _uses_independent_local_phone() -> bool:
     """Select only an explicitly configured independent local installation."""
-    from telephony.phone_mode import phone_mode_is_cloud
-    from telephony.usage import company_phone_billing_available
+    from telephony.phone_mode import uses_independent_local_phone
 
-    return not phone_mode_is_cloud() and not company_phone_billing_available()
+    return uses_independent_local_phone()
 
 
 def _local_phone_manager():

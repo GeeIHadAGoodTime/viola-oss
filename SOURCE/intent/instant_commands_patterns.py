@@ -33,6 +33,14 @@ POLITE_PREFIX = r"(?:(?:please|can\s+you|could\s+you|go\s+ahead\s+and|hey\s+viol
 # Backwards-compatible alias for in-module use.
 _POLITE = POLITE_PREFIX
 
+# Optional leading wake name. Push-to-talk and typed transcripts often keep the
+# name ("Viola, pause", "Hey Viola, next song"), and without this prefix those
+# fell through to the slow model path even though the command is the same exact
+# control phrase. Only the name (optionally after "hey"/"ok"/"okay") plus
+# punctuation is accepted; anything else still routes to the model.
+WAKE_NAME_PREFIX = r"(?:(?:(?:hey|hi|ok(?:ay)?)[,!.]?\s+)?viola(?:[,!.:;]+\s*|\s+))?"
+_WAKE_NAME = WAKE_NAME_PREFIX
+
 # Shared negative lookahead so a negated control phrase ("don't stop",
 # "won't pause") never bypasses the model -- every exact-phrase instant
 # pattern in this module reuses the same rejection list (#1402).
@@ -44,7 +52,7 @@ _NEGATION_LOOKAHEAD = r"(?!(?:don['\u2019]?t|do\s+not|won['\u2019]?t|cannot|can[
 # "that is enough", and the negative-lookahead \u2014 letting CB-6 reject genuine
 # stop intents the instant pattern would have accepted).
 SMART_STOP_REGEX = re.compile(
-    r"^" + POLITE_PREFIX + _NEGATION_LOOKAHEAD + r"(?:stop"
+    r"^" + _WAKE_NAME + POLITE_PREFIX + _NEGATION_LOOKAHEAD + r"(?:stop"
     r"(?:\s+(?:playing|music|playback|it|that|this|the\s+(?:music|song|track|audio)))?"
     r"|halt|emergency\s+stop"
     r"|turn\s+off\s+(?:the\s+)?(?:music|song|audio|playback)"
@@ -65,7 +73,7 @@ SMART_STOP_REGEX = re.compile(
 # music". Any extra word after "pause" routes to the model, per CLAUDE.md's
 # "any extra words around an exact phrase route to the model too".
 PAUSE_REGEX = re.compile(
-    r"^" + POLITE_PREFIX + _NEGATION_LOOKAHEAD + r"pause(?:\s+please)?[!.]*$",
+    r"^" + _WAKE_NAME + POLITE_PREFIX + _NEGATION_LOOKAHEAD + r"pause(?:\s+please)?[!.]*$",
     re.I,
 )
 
@@ -80,7 +88,7 @@ PAUSE_REGEX = re.compile(
 # it can be added later with its own evidence. Same tight discipline as
 # pause: the bare word only, no "resume playing" / "resume the music".
 RESUME_REGEX = re.compile(
-    r"^" + POLITE_PREFIX + _NEGATION_LOOKAHEAD + r"resume(?:\s+please)?[!.]*$",
+    r"^" + _WAKE_NAME + POLITE_PREFIX + _NEGATION_LOOKAHEAD + r"resume(?:\s+please)?[!.]*$",
     re.I,
 )
 
@@ -93,9 +101,45 @@ RESUME_REGEX = re.compile(
 # playing the executor answers "Nothing is playing." instead of guessing.
 SKIP_REGEX = re.compile(
     r"^"
+    + _WAKE_NAME
     + POLITE_PREFIX
     + _NEGATION_LOOKAHEAD
     + r"(?:next|skip)(?:\s+(?:(?:this|the)\s+)?(?:song|track))?(?:\s+please)?[!.]*$",
+    re.I,
+)
+
+# Voice "full screen" for the Music-stage video. The exact control phrases
+# only; anything looser ("go back", "make it bigger") stays with the model and
+# its video_fullscreen tool. A leading "Viola," is allowed because the
+# push-to-talk transcript keeps the name ("Viola, put this in full screen").
+# Five-criteria check: (1) latency - 20-80s model round-trip on the live test
+# vs instant; (2) exact phrases only, negation rejected; (3) no overlap with
+# stop/pause/resume/skip; (4) the model path failed live: qwen3:8b answered
+# "The video is no longer in full screen" without calling the tool; (5) see
+# tests/unit/test_video_fullscreen_instant_commands.py.
+_FULL_SCREEN = r"full[\s-]?screen(?:\s+mode)?"
+VIDEO_FULLSCREEN_ON_REGEX = re.compile(
+    r"^"
+    + _WAKE_NAME
+    + POLITE_PREFIX
+    + _NEGATION_LOOKAHEAD
+    + r"(?:(?:put|show)\s+(?:this|it|that|the\s+video)\s+(?:in|on)\s+"
+    + _FULL_SCREEN
+    + r"|make\s+(?:this|it|that|the\s+video)\s+"
+    + _FULL_SCREEN
+    + r"|(?:go\s+)?"
+    + _FULL_SCREEN
+    + r")(?:\s+please)?[!.]*$",
+    re.I,
+)
+VIDEO_FULLSCREEN_OFF_REGEX = re.compile(
+    r"^"
+    + _WAKE_NAME
+    + POLITE_PREFIX
+    + _NEGATION_LOOKAHEAD
+    + r"(?:(?:end|exit|leave|close|quit)\s+(?:the\s+)?"
+    + _FULL_SCREEN
+    + r"|(?:go\s+back\s+to\s+)?normal\s+size)(?:\s+please)?[!.]*$",
     re.I,
 )
 
@@ -164,5 +208,19 @@ INSTANT_PATTERNS: list[InstantPattern] = [
         "skip",
         {},
         "Skip to the next track",
+    ),
+    # ===== VIDEO FULL SCREEN =====
+    # See VIDEO_FULLSCREEN_ON_REGEX's comment above for the five criteria.
+    (
+        VIDEO_FULLSCREEN_ON_REGEX,
+        "video_fullscreen_on",
+        {},
+        "Show the playing video full screen",
+    ),
+    (
+        VIDEO_FULLSCREEN_OFF_REGEX,
+        "video_fullscreen_off",
+        {},
+        "End video full screen",
     ),
 ]

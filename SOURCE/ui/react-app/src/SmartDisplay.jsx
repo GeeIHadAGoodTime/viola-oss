@@ -18,10 +18,16 @@ import useCallAudio, { fetchActiveCall, fetchCallQueue, removeQueuedCall } from 
 import useCloudPhoneEvents from './hooks/useCloudPhoneEvents';
 import useCallConsultationReply from './hooks/useCallConsultationReply';
 import ToastContainer, { useToast } from './components/Toast';
+import { useVideoFullscreen } from './hooks/useVideoFullscreen';
 import TimerCountdown from './components/TimerCountdown';
 import { useSettings } from './hooks/useSettings';
 import { useAvailableRooms } from './hooks/useAvailableRooms';
-import CallBriefing from './components/CallBriefing';
+import CallBriefing, {
+  CALL_APPROVE_COMMAND,
+  CALL_CANCEL_COMMAND,
+  callBriefingFromConsultEvent,
+} from './components/CallBriefing';
+import DiagnosticsDisclosureNotice from './components/DiagnosticsDisclosureNotice';
 import CallConsultation from './components/CallConsultation';
 import PhoneCallPanel from './components/PhoneCallPanel';
 import LoginPromptModal from './components/LoginPromptModal';
@@ -90,11 +96,14 @@ import ModalLoadingSpinner from './components/shared/ModalLoadingSpinner';
 import ProviderBadge from './components/shared/ProviderBadge';
 import AgentDrawer from './components/AgentDrawer';
 import { clampWakeThreshold } from './utils/wakeSensitivity';
+import { appendAssistantEntry } from './utils/chatHistory';
+import { autoDetectedWeatherLocation } from './utils/weatherLocation';
 
 // Shared CSS: animations + variables (replaces all inline <style> tags)
 import './styles/variables.css';
 import './styles/animations.css';
 import './styles/responsive-smart-display.css';
+import './styles/video-fullscreen.css';
 
 // Code-split modals - only loaded when opened (Sprint 5 optimization)
 const SettingsModal = lazy(() => import('./components/SettingsModal'));
@@ -580,6 +589,10 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
   const [weatherDesc, setWeatherDesc] = useState('Loading...');
   const [weatherData, setWeatherData] = useState(null);
   const [weatherRetryTrigger, setWeatherRetryTrigger] = useState(0);
+  // Location the backend worked out on its own (saved setting default or IP
+  // geolocation) when the user has not set weather_location. Shown in the top
+  // bar instead of the "Set your location" prompt.
+  const [autoWeatherLocation, setAutoWeatherLocation] = useState(null);
   const [weatherForecastOpen, setWeatherForecastOpen] = useState(false);
   const [weatherForecastAnchor, setWeatherForecastAnchor] = useState(null);
   const [weatherForecastData, setWeatherForecastData] = useState(null);
@@ -1183,10 +1196,9 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
       const responseText = result.data?.message || result.data?.response || result.message || result.response || result.data?.text || '';
       if (responseText) {
         setLastResponse(`"${responseText}"`);
-        setChatHistory(prev => [
-          ...prev,
-          { role: 'assistant', content: responseText, timestamp: new Date().toISOString() }
-        ]);
+        // The backend's chat_response broadcast for this same turn usually
+        // arrives first and has already added this reply; don't add it twice.
+        setChatHistory(prev => appendAssistantEntry(prev, responseText));
       } else if (result.ok === false) {
         // A failed command carries its text in `error.message`, which the
         // expression above never reads — so a crashed turn used to leave the
@@ -1716,6 +1728,8 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
   // =========================================================================
   // CHAT RESPONSE WIRING
   // =========================================================================
+  const showNotificationsRef = useRef(true);
+  showNotificationsRef.current = userSettings?.show_notifications ?? true;
   useEffect(() => {
     if (!setChatResponseCallback) return;
     const handleChatResponse = (payload) => {
@@ -1739,6 +1753,15 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
         setLastResponse(`"${truncateForResponseLine(text)}"`);
         if (hasExplicitCard) {
           setActiveCard(payload.card);
+          if (payload.card.type === 'gate_review' && payload.card.gate_kind === 'payment') {
+            // Fallback delivery for the purchase approval: a desktop
+            // notification, so a minimized window still tells the user.
+            showNotification('Approve your purchase', {
+              body: truncateForResponseLine(String(payload.card.body || 'Viola is waiting for your approval.')),
+              tag: 'viola-payment-gate',
+              requireInteraction: true,
+            }, showNotificationsRef.current);
+          }
         } else {
           // An auto-promoted long answer has no title anyone wrote for it.
           // ContentCard omits the whole title block when `title` is absent,
@@ -1749,11 +1772,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
       } else {
         // Short responses: show in chat only, no card
         setLastResponse(`"${text}"`);
-        setChatHistory(prev => {
-          const last = prev.length > 0 ? prev[prev.length - 1] : null;
-          if (last && last.role === 'assistant' && last.content === text) { return prev; }
-          return [...prev, { role: 'assistant', content: text, timestamp: new Date().toISOString() }];
-        });
+        setChatHistory(prev => appendAssistantEntry(prev, text));
       }
     };
     setChatResponseCallback(handleChatResponse);
@@ -1907,7 +1926,12 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
       return;
     }
 
-    if (data.type === 'call_briefing') {
+    if (data.type === 'consult_user') {
+      // The agent's confirm-or-cancel gate for a phone call: show the exact
+      // number and who it belongs to, with Approve / Cancel (CallBriefing).
+      const briefing = callBriefingFromConsultEvent(payload);
+      if (briefing !== undefined) setCallBriefing(briefing);
+    } else if (data.type === 'call_briefing') {
       setCallBriefing(payload);
       rememberCallMeta(payload, callId);
       if (payload.approved && callId) {
@@ -2723,18 +2747,27 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
   }, [isSpoke, sendToIframe]);
 
   // Fetch weather
-  const weatherLocation = userSettings?.weather_location;
+  const savedWeatherLocation = userSettings?.weather_location;
+  // The location every weather surface uses: the user's saved one, else the
+  // one the backend auto-detected for this session.
+  const weatherLocation = savedWeatherLocation || autoWeatherLocation;
   const prevWeatherLocationRef = useRef(undefined);
   useEffect(() => {
     if (settingsLoading) return;
-    if (!weatherLocation) {
+    // No saved location: ask the backend with no city. It resolves a location
+    // itself (IP geolocation on desktop, the signed-in user's saved one on
+    // cloud) and names it in the payload. If it cannot, the top bar keeps the
+    // "Set your location" prompt.
+    const autoMode = !savedWeatherLocation;
+    if (autoMode) {
       setWeatherTemp('--');
       setWeatherDesc('');
       setWeatherData(null);
       setWeatherForecastData(null);
       setWeatherForecastFetchedAt(0);
       setWeatherForecastOpen(false);
-      return;
+    } else {
+      setAutoWeatherLocation(null);
     }
     let weatherTimerId = null;
     let retryTimerId = null;
@@ -2762,19 +2795,28 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
       setWeatherCondition(
         conditionKey === 'clear' && isNight ? 'clear-night' : conditionKey,
       );
-      if (data.auto_detected_location) { refreshSettings(); }
       return true;
     };
     const fetchWeather = async (forceRefresh = false) => {
       try {
-        const data = await api.getWeather(weatherLocation, { forceRefresh });
-        if (!cancelled && applyWeatherData(data)) {
+        const data = await api.getWeather(savedWeatherLocation || '', { forceRefresh });
+        if (cancelled) return;
+        if (autoMode) {
+          const detected = autoDetectedWeatherLocation(data);
+          if (!detected) return;
+          setAutoWeatherLocation(detected);
+        }
+        if (applyWeatherData(data)) {
           weatherLoaded = true; failureCount = 0;
           if (retryTimerId) { clearInterval(retryTimerId); retryTimerId = null; }
           if (!weatherTimerId) { weatherTimerId = setInterval(() => fetchWeather(false), 10 * 60 * 1000); }
         }
       } catch (e) {
         if (cancelled || weatherLoaded) return;
+        // Nothing to auto-detect from (offline, or the lookup failed): keep
+        // the "Set your location" prompt rather than a weather error for a
+        // location the user never chose.
+        if (autoMode) return;
         failureCount++;
         if (failureCount >= 3) {
           setWeatherDesc('Weather unavailable'); setWeatherTemp('--');
@@ -2787,11 +2829,11 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
       }
     };
     const prev = prevWeatherLocationRef.current;
-    const shouldForceRefresh = prev !== undefined && prev !== weatherLocation;
-    prevWeatherLocationRef.current = weatherLocation;
+    const shouldForceRefresh = prev !== undefined && prev !== savedWeatherLocation;
+    prevWeatherLocationRef.current = savedWeatherLocation;
     fetchWeather(shouldForceRefresh);
     return () => { cancelled = true; if (weatherTimerId) clearInterval(weatherTimerId); if (retryTimerId) clearInterval(retryTimerId); };
-  }, [api, weatherLocation, settingsLoading, refreshSettings, weatherRetryTrigger]);
+  }, [api, savedWeatherLocation, settingsLoading, weatherRetryTrigger]);
 
   const handleOpenWeatherForecast = useCallback((anchorRect) => {
     if (!weatherLocation || weatherTemp === '--' || weatherDesc === 'Weather unavailable') {
@@ -3015,6 +3057,34 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
   });
   const isChatStageActive = stageContentMode === 'chat';
 
+  // Voice "full screen" (desktop app): the video on the Music stage fills the
+  // screen; leaving puts the stage that was showing back exactly as it was.
+  const captureStageForVideoFullscreen = useCallback(() => ({
+    displayMode,
+    browserModeActive,
+    calendarModeActive,
+    displayPriorityOverride,
+  }), [displayMode, browserModeActive, calendarModeActive, displayPriorityOverride]);
+  const restoreStageAfterVideoFullscreen = useCallback((saved) => {
+    setBrowserModeActive(saved.browserModeActive);
+    setCalendarModeActive(saved.calendarModeActive);
+    setDisplayPriorityOverride(saved.displayPriorityOverride);
+    setDisplayMode(saved.displayMode);
+  }, []);
+  const notifyVideoFullscreen = useCallback((message) => {
+    addToast({ message, level: 'info' });
+  }, [addToast]);
+  const { videoFullscreen } = useVideoFullscreen({
+    isSpoke,
+    hasVideo: !isSpoke && !!playerState?.now_playing?.video_id,
+    modalOpen: anyModalOpen,
+    stageMode: stageContentMode,
+    captureStage: captureStageForVideoFullscreen,
+    showMusicStage: activateMusicMode,
+    restoreStage: restoreStageAfterVideoFullscreen,
+    notify: notifyVideoFullscreen,
+  });
+
   // BottomRow is the ONLY place in the app that renders `voice.error`, and it
   // is not mounted while the chat stage is up (see the `!isChatStageActive`
   // guard on its render below). The chat composer still has a mic button, so a
@@ -3110,7 +3180,10 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
           requested: true,
           provided: false,
           storage: 'metadata_only',
-          reason: 'browser_capture_unavailable',
+          // Screen context is sent as the text fields above, never as an
+          // image: the backend stores metadata only because pixels cannot go
+          // through the support redaction.
+          reason: 'text_context_only',
         }
         : {
           requested: false,
@@ -3151,8 +3224,18 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
     // value here was either typed by the user or shown to them verbatim in the
     // modal's "Sending: Viola v… on …" line before Send -- nothing is populated
     // from anything they could not see.
+    const builtContext = buildBugReportContext(includeScreenContext);
+    // The "Include what Viola was showing" box used to change only a metadata
+    // flag while the screen, track, agent task and page address were sent
+    // either way. Unchecked now really leaves them out.
+    const screenContext = includeScreenContext ? builtContext : {
+      source: builtContext.source,
+      surface: builtContext.surface,
+      ui_entrypoint: builtContext.ui_entrypoint,
+      screen_capture_metadata: builtContext.screen_capture_metadata,
+    };
     const context = {
-      ...buildBugReportContext(includeScreenContext),
+      ...screenContext,
       app_version: appVersion,
       os,
       contact,
@@ -3394,7 +3477,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
   // =========================================================================
   return (
     <CloudConsentGateProvider intercept={interceptCloudConsent}>
-    <div className="viola-outer-container smart-display" data-testid="smart-display" style={{
+    <div className="viola-outer-container smart-display" data-testid="smart-display" data-video-fullscreen={videoFullscreen ? 'true' : undefined} style={{
       width: '100%',
       height: isSpoke ? '100%' : '100dvh',
       minHeight: '520px',
@@ -3450,6 +3533,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
           formatTime={formatTime}
           formatDate={formatDate}
           weatherLocation={weatherLocation}
+          weatherLocationAutoDetected={!savedWeatherLocation && Boolean(autoWeatherLocation)}
           weatherCondition={weatherCondition}
           weatherTemp={weatherTemp}
           weatherDesc={weatherDesc}
@@ -3809,8 +3893,21 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
 
       {activeCard && <ContentCard data={activeCard} onDismiss={dismissCard} />}
 
+      {/* One-time notice for automatic anonymous crash reports (desktop hub
+          only; waits until onboarding is finished). Crash reports stay queued
+          on this machine until it has been shown. */}
+      <DiagnosticsDisclosureNotice
+        enabled={!isSpoke && !cloudSurfaceActive && !onboarding.isOnboarding}
+        onOpenPrivacySettings={() => openSettingsPanel('account')}
+      />
+
       {/* Phone-call UX toasts (bottom-right) driven by telephony WS events */}
-      <CallBriefing briefing={callBriefing} onDismiss={() => setCallBriefing(null)} />
+      <CallBriefing
+        briefing={callBriefing}
+        onDismiss={() => setCallBriefing(null)}
+        onApprove={() => submitTextCommand(CALL_APPROVE_COMMAND)}
+        onCancel={() => submitTextCommand(CALL_CANCEL_COMMAND).then(() => setCallBriefing(null))}
+      />
       {!activeInlineConsultation && (
         <CallConsultation
           consultation={callConsultation}

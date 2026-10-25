@@ -68,6 +68,9 @@ const MediaArea = forwardRef(({
     <div
       ref={ref}
       className={`${styles.container} ${hasWideEmbed ? styles.wide : styles.square}`}
+      // The hub's video is what the voice "full screen" command lays over the
+      // page (styles/video-fullscreen.css).
+      data-video-fullscreen-target={showVideoEmbed && !isSpoke ? 'true' : undefined}
       style={{
         backgroundColor: 'var(--bg-elevated)',
         boxShadow: '0 12px 48px var(--shadow-medium)',

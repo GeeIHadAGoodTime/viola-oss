@@ -18,6 +18,7 @@ from ui.api.context import ApiContext
 from ui.api.models import PlayIn, VolumeIn
 from ui.api.routes.common import RouteToolbox
 from ui.core.player_state import redact as redact_text, to_player_state
+from ui.websocket.event_hub import broadcast_transport_command
 
 
 def _sm_transition(player, phase: PlaybackPhase, *, user_initiated: bool = False) -> None:
@@ -564,7 +565,7 @@ def register_control_routes(context: ApiContext, toolbox: RouteToolbox) -> None:
             # cannot reach: tell every UI of this user to pause it (agent tool
             # and other-window pauses arrive here, not via the local button).
             try:
-                await hub.broadcast_command("pause", {"source": "rest"}, user_id=user_id)
+                await broadcast_transport_command("pause", {"source": "rest"}, user_id=user_id, hub=hub)
             except Exception as exc:
                 log.debug("Pause broadcast_command failed (non-critical): %s", exc)
 
@@ -665,7 +666,7 @@ def register_control_routes(context: ApiContext, toolbox: RouteToolbox) -> None:
             except Exception as exc:
                 log.warning("Failed to broadcast state after resume: %s", exc)
             try:
-                await hub.broadcast_command("play", {"source": "rest"}, user_id=user_id)
+                await broadcast_transport_command("play", {"source": "rest"}, user_id=user_id, hub=hub)
             except Exception as exc:
                 log.debug("Resume broadcast_command failed (non-critical): %s", exc)
 
@@ -1065,10 +1066,11 @@ def register_control_routes(context: ApiContext, toolbox: RouteToolbox) -> None:
                 # expects seconds.
                 try:
                     position_sec = position / 1000.0
-                    await hub.broadcast_command(
+                    await broadcast_transport_command(
                         "seek",
                         {"position": position_sec, "source": "rest"},
                         user_id=user_id,
+                        hub=hub,
                     )
                 except Exception as exc:
                     log.debug("Seek broadcast_command failed (non-critical): %s", exc)

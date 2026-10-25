@@ -13,6 +13,7 @@ import os
 import re
 import warnings
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any, cast
 
 from config import env
@@ -118,6 +119,42 @@ def _resolve_calendar_timezone(raw_value: str | None) -> str:
 def _process_environment_variables(config: AppConfig) -> None:
     """Process environment variable overrides for config fields."""
     _apply_environment_overrides(config)
+
+
+BAKED_GOOGLE_OAUTH_CLIENT_FILENAME = "google_oauth_client.json"
+
+
+def baked_google_oauth_client_path() -> Path:
+    """Where a build-time baked Google OAuth client file is looked up."""
+    return Path(__file__).resolve().parent / BAKED_GOOGLE_OAUTH_CLIENT_FILENAME
+
+
+def load_baked_google_oauth_client(path: Path | None = None) -> tuple[str, str] | None:
+    """Return the build-time baked (client_id, client_secret), or None.
+
+    Google treats the secret of an installed-app ("Desktop app") client as
+    non-confidential: it ships inside every copy of the app, and PKCE is what
+    protects the authorization code. The cloud backend never uses this file.
+    Values are never logged.
+    """
+    if os.environ.get("VIOLA_CLOUD_BACKEND") == "1":
+        return None
+    target = path or baked_google_oauth_client_path()
+    try:
+        if not target.is_file():
+            return None
+        payload = json.loads(target.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        _logger.warning("Baked Google OAuth client file is unreadable: %s", type(exc).__name__)
+        return None
+    if not isinstance(payload, dict):
+        return None
+    client_id = str(payload.get("client_id") or "").strip()
+    client_secret = str(payload.get("client_secret") or "").strip()
+    if not client_id or not client_secret:
+        _logger.warning("Baked Google OAuth client file is incomplete; Google connection disabled")
+        return None
+    return client_id, client_secret
 
 
 def _process_legacy_aliases(config: AppConfig) -> None:
@@ -232,12 +269,8 @@ def _process_api_keys(config: AppConfig) -> None:
         config.spotify_client_id = env.get("SPOTIFY_CLIENT_ID")
     if not config.spotify_client_secret and env.get("SPOTIFY_CLIENT_SECRET"):
         config.spotify_client_secret = env.get("SPOTIFY_CLIENT_SECRET")
-    if not config.spotify_refresh_token and env.get("SPOTIFY_REFRESH_TOKEN"):
-        config.spotify_refresh_token = env.get("SPOTIFY_REFRESH_TOKEN")
     if not config.spotify_redirect_uri and env.get("SPOTIFY_REDIRECT_URI"):
         config.spotify_redirect_uri = env.get("SPOTIFY_REDIRECT_URI")
-    if not config.spotify_device_id and env.get("SPOTIFY_DEVICE_ID"):
-        config.spotify_device_id = env.get("SPOTIFY_DEVICE_ID")
 
     # Google OAuth credentials (non-VIOLA prefix — legacy .env.example format)
     # These map GOOGLE_CLIENT_ID → google_client_id for backwards compatibility.
@@ -246,6 +279,16 @@ def _process_api_keys(config: AppConfig) -> None:
         config.google_client_id = env.get("GOOGLE_CLIENT_ID")
     if not config.google_client_secret and env.get("GOOGLE_CLIENT_SECRET"):
         config.google_client_secret = env.get("GOOGLE_CLIENT_SECRET")
+    # Desktop release builds carry the installed-app ("Desktop app" type)
+    # Google OAuth client baked in at build time (viola.spec writes
+    # config/google_oauth_client.json from the build environment; it is never
+    # committed). Env values above always win, and the pair is used only when
+    # neither half came from the environment so a dev client is never mixed
+    # with the baked one.
+    if not config.google_client_id and not config.google_client_secret:
+        baked = load_baked_google_oauth_client()
+        if baked is not None:
+            config.google_client_id, config.google_client_secret = baked
     # Telnyx credentials (non-VIOLA prefix)
     if not config.telnyx_api_key and env.get("TELNYX_API_KEY"):
         config.telnyx_api_key = env.get("TELNYX_API_KEY")
