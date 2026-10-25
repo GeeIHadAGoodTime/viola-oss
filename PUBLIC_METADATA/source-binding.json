@@ -30,15 +30,16 @@
   },
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "a757e787d9b507b8162a00c3f0c82690a91a5c76219b1f7ce6ff9fd38d59fc22",
-  "source_tree_sha256": "8d05f10927bf8862d40e7c5f46aa1575a08aed789182f8c8413d8abea989687c",
+  "source_manifest_sha256": "cc86e47dfa7d23132859a65f6748fb40c8c10050693b42217e303b54cc547f0f",
+  "source_tree_sha256": "294d4b89428227bd8adac7b7c3fa4344e0172e51ae84a74321f20c7bdcd2490c",
   "source_file_count": 2743,
-  "source_revision": "33f8a381715db022fe0a3a588b2744065db544d8",
+  "source_revision": "e1acd026c6f9988d870e068b7c5f0bc85241b9c6",
   "comparison_public_revision": "ecab2772465fcc89ae6645b028af1c2273b9199f",
   "changed_source_paths": [
     "audio_core/aec_reference_base.py",
     "audio_core/wasapi/aec_reference_adapter.py",
     "audio_core/wasapi/capture_module.py",
+    "auth/database.py",
     "auth/desktop_session.py",
     "auth/middleware.py",
     "backend/fastapi_app.py",
@@ -126,8 +127,10 @@
     "services/memory/selector.py",
     "services/oauth/google.py",
     "services/openai_background.py",
+    "services/telnyx_sender.py",
     "services/user_capabilities/service.py",
     "telephony/phone_mode.py",
+    "telephony/routes.py",
     "tests/customer_speech/test_real_cjk_pronunciation.py",
     "tests/customer_speech/test_real_pronunciation.py",
     "tests/public/test_billing_capacity_mount.py",
@@ -135,10 +138,12 @@
     "tests/public/test_customer_pronunciation.py",
     "tests/public/test_disabled_tts_streaming.py",
     "tests/public/test_english_decimal_normalization.py",
+    "tests/public/test_linux_sandbox_opt_in.py",
     "tests/public/test_native_titlebar_resize.py",
     "tests/public/test_phone_locale_normalization.py",
     "tests/public/test_queue_play_selection.py",
     "tests/public/test_request_tool_surface_boundary.py",
+    "tests/public/test_source_contract.py",
     "tests/public/test_windows_gpu_compositing.py",
     "tests/public/test_windows_native_startup_order.py",
     "third_party/misaki_cjk_prototype.patch",
@@ -173,6 +178,7 @@
     "ui/react-app/src/__tests__/hooks/useVoiceOnboarding.phaseResume.test.jsx",
     "ui/react-app/src/__tests__/hooks/useVoiceOnboarding.test.jsx",
     "ui/react-app/src/components/AccountTab.jsx",
+    "ui/react-app/src/components/AccountTab.test.jsx",
     "ui/react-app/src/components/BugReportModal.jsx",
     "ui/react-app/src/components/CalendarView.module.css",
     "ui/react-app/src/components/CallBriefing.jsx",
@@ -343,8 +349,8 @@
     "historical_inventory_limits": "This renderer correction changes no dependency or workflow inputs. All six retained SBOMs and their complete status objects stay historical and unchanged; no current installed inventory qualification is claimed."
   },
   "qualification": {
-    "source_commit": "33f8a381715db022fe0a3a588b2744065db544d8",
-    "kind": "Viola 1.0.5 build 5 r5/sms; source checksum binding only, desktop qualification runs in the private release chain"
+    "source_commit": "e1acd026c6f9988d870e068b7c5f0bc85241b9c6",
+    "kind": "Viola 1.0.5 build 5 integration; source checksum binding only, desktop qualification runs in the private release chain"
   },
   "historical_bindings": [
     {
