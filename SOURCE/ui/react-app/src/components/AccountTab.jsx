@@ -21,7 +21,7 @@ import { useCalendarProviders } from '../hooks/useCalendarProviders';
 import { useUsage } from '../hooks/useUsage';
 import BillingCapacityPanel from './BillingCapacityPanel';
 import MonthGiftSummary from './MonthGiftSummary';
-import { apiFetch } from '../hooks/useViolaApi';
+import { apiFetch, authFetch } from '../hooks/useViolaApi';
 import { THEME as theme } from '../config';
 import { ACCEPTED_PRIVACY_VERSION, ACCEPTED_TERMS_VERSION } from '../auth/legalVersions';
 import ToastContainer, { useToast } from './Toast';
@@ -1862,7 +1862,7 @@ const PhoneSettings = ({
   <>
     <SettingRow
       title="Your phone number"
-      description="Used when Viola needs to call or text you for confirmations. This is not a Viola-owned public number."
+      description="Used when Viola needs to call you. Purchase approval texts go only to the verified phone under Text messages."
     >
       <input
         type="tel"
@@ -1979,6 +1979,207 @@ PhoneSettings.propTypes = {
   onDeleteAllCallData: PropTypes.func.isRequired,
   isDeletingCallData: PropTypes.bool,
   callDataDeleteStatus: PropTypes.string,
+};
+
+// ---------------------------------------------------------------------------
+// Text messages: add, verify and remove the account phone
+// ---------------------------------------------------------------------------
+// The phone, its verification code and the SMS consent are account state held
+// by the Viola cloud (it sends the code and the purchase approval texts). The
+// desktop reaches it through its own backend (/v1/phone/sms/*), which adds the
+// signed-in user's credentials server-side; the web app calls the cloud route.
+
+const smsApiBase = () => (isCloudSurface() ? '/api/account/sms' : '/v1/phone/sms');
+
+async function smsRequest(path, body) {
+  const options = body === undefined
+    ? { method: 'GET' }
+    : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) };
+  let response;
+  try {
+    response = await authFetch(`${smsApiBase()}${path}`, options);
+  } catch {
+    return { ok: false, data: null, error: 'Viola could not reach your account. Try again.' };
+  }
+  let data = null;
+  try {
+    data = await response.json();
+  } catch {
+    data = null;
+  }
+  if (!response.ok) {
+    const error = (data && (data.error || data.message || data.detail)) || 'That did not work. Try again.';
+    return { ok: false, data, error: typeof error === 'string' ? error : 'That did not work. Try again.' };
+  }
+  return { ok: true, data, error: '' };
+}
+
+const smsInputStyle = {
+  width: '100%',
+  minHeight: '44px',
+  padding: '10px 12px',
+  borderRadius: '8px',
+  border: `1px solid ${theme.colors.borderLight}`,
+  backgroundColor: theme.colors.bgCard,
+  color: theme.colors.textPrimary,
+  fontSize: '13px',
+  outline: 'none',
+  boxSizing: 'border-box',
+};
+
+export const TextMessagesSettings = () => {
+  const [status, setStatus] = useState(null);
+  const [loadError, setLoadError] = useState('');
+  const [phone, setPhone] = useState('');
+  const [consent, setConsent] = useState(false);
+  const [code, setCode] = useState('');
+  const [codeSentTo, setCodeSentTo] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+
+  const load = useCallback(async () => {
+    const result = await smsRequest('/status');
+    if (result.ok) {
+      setStatus(result.data || {});
+      setLoadError('');
+    } else {
+      setLoadError(result.error);
+    }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const verified = Boolean(status?.phone_verified && status?.sms_consent && status?.phone);
+  const consentText = status?.consent_text || '';
+
+  const sendCode = async () => {
+    setBusy(true);
+    setError('');
+    setMessage('');
+    const result = await smsRequest('/send-code', {
+      phone: phone.trim(),
+      consent,
+      consent_text_version: status?.consent_text_version || null,
+    });
+    setBusy(false);
+    if (result.ok) {
+      setCodeSentTo(phone.trim());
+      setMessage('We texted a 6-digit code. Enter it below.');
+    } else {
+      setError(result.error);
+    }
+  };
+
+  const verifyCode = async () => {
+    setBusy(true);
+    setError('');
+    setMessage('');
+    const result = await smsRequest('/verify-code', { phone: codeSentTo, code: code.trim() });
+    setBusy(false);
+    if (result.ok) {
+      setCode('');
+      setCodeSentTo('');
+      setConsent(false);
+      setMessage('Your phone is verified. Viola will text purchase approval links here.');
+      await load();
+    } else {
+      setError(result.error);
+    }
+  };
+
+  const removePhone = async () => {
+    setBusy(true);
+    setError('');
+    setMessage('');
+    const result = await smsRequest('/remove', {});
+    setBusy(false);
+    if (result.ok) {
+      setMessage('Phone removed. Viola will not text you.');
+      await load();
+    } else {
+      setError(result.error);
+    }
+  };
+
+  return (
+    <div data-testid="text-messages-settings" style={{ padding: '16px 20px', display: 'grid', gap: '12px' }}>
+      <div>
+        <div style={{ color: theme.colors.textPrimary, fontSize: '13px', fontWeight: 600 }}>Text messages</div>
+        <div style={{ color: theme.colors.textMuted, fontSize: '12px', marginTop: '6px' }}>
+          Get purchase approval links by text. Viola texts only this verified number, and each text counts toward your usage.
+        </div>
+      </div>
+
+      {loadError && !status && (
+        <div role="alert" style={{ color: theme.colors.statusRed, fontSize: '12px' }}>{loadError}</div>
+      )}
+
+      {status && verified && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+          <span data-testid="sms-verified-phone" style={{ color: theme.colors.textPrimary, fontSize: '13px' }}>
+            Verified: {status.phone}
+          </span>
+          <Button variant="secondary" onClick={removePhone} disabled={busy}>Remove phone</Button>
+        </div>
+      )}
+
+      {status && !verified && !codeSentTo && (
+        <>
+          <input
+            type="tel"
+            aria-label="Mobile number for texts"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            placeholder="+1 414 555 0100"
+            style={smsInputStyle}
+          />
+          <label style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', fontSize: '12px', color: theme.colors.textMuted }}>
+            <input
+              type="checkbox"
+              aria-label="Agree to receive texts from Viola"
+              checked={consent}
+              onChange={(e) => setConsent(e.target.checked)}
+              style={{ marginTop: '2px' }}
+            />
+            <span data-testid="sms-consent-text">{consentText}</span>
+          </label>
+          <div>
+            <Button onClick={sendCode} disabled={busy || !consent || !phone.trim() || !consentText}>
+              {busy ? 'Sending...' : 'Text me a code'}
+            </Button>
+          </div>
+        </>
+      )}
+
+      {status && !verified && codeSentTo && (
+        <>
+          <input
+            type="text"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            aria-label="Verification code"
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+            placeholder="6-digit code"
+            maxLength={6}
+            style={smsInputStyle}
+          />
+          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+            <Button onClick={verifyCode} disabled={busy || code.trim().length !== 6}>
+              {busy ? 'Checking...' : 'Verify'}
+            </Button>
+            <Button variant="secondary" onClick={() => { setCodeSentTo(''); setCode(''); }} disabled={busy}>
+              Use a different number
+            </Button>
+          </div>
+        </>
+      )}
+
+      {message && <div role="status" style={{ color: theme.colors.textMuted, fontSize: '12px' }}>{message}</div>}
+      {error && <div role="alert" style={{ color: theme.colors.statusRed, fontSize: '12px' }}>{error}</div>}
+    </div>
+  );
 };
 
 /**
@@ -2114,6 +2315,8 @@ export function AccountTab({
         </Section>
 
         <Section title="Phone">
+          <TextMessagesSettings />
+          <SectionDivider />
           <PhoneSettings
             settings={settings}
             onSettingChange={onSettingChange}
