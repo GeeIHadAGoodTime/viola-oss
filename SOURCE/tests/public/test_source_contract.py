@@ -369,7 +369,7 @@ class SourceContract(unittest.TestCase):
 
 
 class CurrentTrackRatingContract(unittest.IsolatedAsyncioTestCase):
-    async def _rate(self, music, value):
+    async def _rate(self, music, value, spotify_track_id=None, spotify_error=None):
         import logging
         import sys
         import types
@@ -378,8 +378,12 @@ class CurrentTrackRatingContract(unittest.IsolatedAsyncioTestCase):
 
         source = ROOT / 'ui/api/routes/rating.py'
         tree = ast.parse(source.read_text(encoding='utf-8'))
-        register = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == 'register_rating_routes')
-        isolated = ast.Module(body=[ast.ImportFrom(module='__future__', names=[ast.alias(name='annotations')], level=0), register], type_ignores=[])
+        # The route plus the real module-level helpers it calls (Spotify Liked
+        # Songs mirroring); only their external dependencies are stubbed below.
+        wanted = {'register_rating_routes', '_with_spotify', '_sync_spotify_liked_songs'}
+        defs = [n for n in tree.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.name in wanted]
+        self.assertEqual({n.name for n in defs}, wanted)
+        isolated = ast.Module(body=[ast.ImportFrom(module='__future__', names=[ast.alias(name='annotations')], level=0), *defs], type_ignores=[])
         routes = {}
         class Router:
             def post(self, path, **kwargs):
@@ -391,6 +395,15 @@ class CurrentTrackRatingContract(unittest.IsolatedAsyncioTestCase):
             async def record_and_call(self, callback, **kwargs): return await callback()
         rating = SimpleNamespace(thumbs_up=Mock(), thumbs_down=Mock(), remove_rating=Mock())
         module = types.ModuleType('music.rating_system');module.get_rating_system=lambda:rating
+        class SpotifyCDPError(Exception): pass
+        spotify = types.ModuleType('music.providers.spotify_cdp')
+        spotify.spotify_track_id_from_now_playing = Mock(return_value=spotify_track_id)
+        spotify.set_spotify_track_saved = Mock(side_effect=SpotifyCDPError(spotify_error) if spotify_error else None)
+        rating.spotify = spotify
+        controller = types.ModuleType('music.spotify.cdp_controller');controller.SpotifyCDPError=SpotifyCDPError
+        user_context = types.ModuleType('core.user_context');user_context.get_current_or_device_user_id=lambda:'user-synthetic'
+        stubs = {'music.rating_system':module,'music.providers.spotify_cdp':spotify,
+                 'music.spotify.cdp_controller':controller,'core.user_context':user_context}
         namespace = {'log':logging.getLogger('rating-contract'),'Body':lambda value:value,
                      'Depends':lambda value:value,'require_auth':lambda:None,
                      'error_response':lambda message,status_code=400:{'ok':False,'status':status_code,'error':message},
@@ -398,7 +411,7 @@ class CurrentTrackRatingContract(unittest.IsolatedAsyncioTestCase):
         exec(compile(ast.fix_missing_locations(isolated),str(source),'exec'),namespace)
         context=SimpleNamespace(router=Router(),bindings=SimpleNamespace(music=music))
         namespace['register_rating_routes'](context,Toolbox())
-        with patch.dict(sys.modules,{'music.rating_system':module}):
+        with patch.dict(sys.modules,stubs):
             result=await routes['/v1/rating']({'rating':value})
         return result,rating
 
@@ -420,12 +433,34 @@ class CurrentTrackRatingContract(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(result['ok'],result)
             rating.thumbs_up.assert_called_once_with(video_id='synthetic-current',title='Current',artist=None)
 
+    async def test_spotify_track_rating_is_mirrored_to_liked_songs(self):
+        from types import SimpleNamespace
+        track=SimpleNamespace(id='spotify:track:synthetic',video_id=None,title='Synthetic',artist='Synthetic')
+        for value,saved,method in [('liked',True,'thumbs_up'),('disliked',False,'thumbs_down'),(None,False,'remove_rating')]:
+            with self.subTest(value=value):
+                result,rating=await self._rate(SimpleNamespace(current_track=track),value,spotify_track_id='synthetic')
+                self.assertEqual(result,{'ok':True,'video_id':'spotify:track:synthetic','rating':value,
+                                         'spotify':{'track_id':'synthetic','saved':saved}})
+                rating.spotify.set_spotify_track_saved.assert_called_once_with('synthetic',saved,user_id='user-synthetic')
+                getattr(rating,method).assert_called_once()
+
+    async def test_spotify_failure_is_reported_and_not_saved_locally(self):
+        from types import SimpleNamespace
+        track=SimpleNamespace(id='spotify:track:synthetic',video_id=None,title='Synthetic',artist=None)
+        result,rating=await self._rate(SimpleNamespace(current_track=track),'liked',
+                                       spotify_track_id='synthetic',spotify_error='web player not ready')
+        self.assertFalse(result['ok'])
+        self.assertEqual(result['error'],'web player not ready')
+        self.assertEqual(result['spotify'],{'track_id':'synthetic','saved':None,'error':'web player not ready'})
+        rating.thumbs_up.assert_not_called();rating.thumbs_down.assert_not_called();rating.remove_rating.assert_not_called()
+
     async def test_missing_track_and_invalid_rating_do_not_mutate_ratings(self):
         from types import SimpleNamespace
         for music,value in [(None,'liked'),(SimpleNamespace(current_track=None),'liked'),(SimpleNamespace(current_track={'id':'synthetic'}),'invalid')]:
-            result,rating=await self._rate(music,value)
+            result,rating=await self._rate(music,value,spotify_track_id='synthetic')
             self.assertFalse(result['ok'])
             self.assertEqual(result['status'],400)
+            rating.spotify.set_spotify_track_saved.assert_not_called()
             rating.thumbs_up.assert_not_called();rating.thumbs_down.assert_not_called();rating.remove_rating.assert_not_called()
 
 
