@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "5a4fed0a46f37510a5a638900280045169a65cf5",
-  "sha256": "0a7a9c53294b129172bfe6691c771fe95501993752a0fccbdebdca459b7c644b",
+  "revision": "ad085ddffe3bf719c036bcb5988d3a673af5763c",
+  "sha256": "3896e96a5880ebfbea7e06f28e6fd04f052f3621d257d11172f7eed3d1480cf3",
   "files": [
     {
       "path": ".env.example",
@@ -1575,8 +1575,8 @@
     },
     {
       "path": "intent/agent_executor.py",
-      "sha256": "35b4b13e8ac80fdf528494c8e45904db7af9d022250c2076e74ce45939052610",
-      "bytes": 582779
+      "sha256": "6df1f58965169e3c951c7ad3a3fa6c2ecc9869b582fc8c74ccc72ab0d71a6300",
+      "bytes": 583187
     },
     {
       "path": "intent/agent_loop.py",
@@ -10015,8 +10015,8 @@
     },
     {
       "path": "ui/react-app/src/SmartDisplay.jsx",
-      "sha256": "9252e2cec0aeeec4d35db3005bf819303422de95be2e76f9cc36e47d5c919686",
-      "bytes": 178458
+      "sha256": "54f44ee0957358e8d695139bc4496bb51a8ea2f3a01d5c975b39a77860c7c84a",
+      "bytes": 179017
     },
     {
       "path": "ui/react-app/src/SmartDisplay.spokePolicy.test.jsx",
@@ -10450,13 +10450,13 @@
     },
     {
       "path": "ui/react-app/src/components/CallBriefing.jsx",
-      "sha256": "9971c21d27a771e56ea31b3f63de6664dcabd1e832a460ca9d2dedffd324b9f4",
-      "bytes": 7062
+      "sha256": "caf34e72e2930aa7488782bbefa2c14b126d06755f0cb432c3392f3194ab6cd1",
+      "bytes": 7804
     },
     {
       "path": "ui/react-app/src/components/CallBriefing.test.jsx",
-      "sha256": "a9ce6b6d9d426dd54d07a396ec67094909f713c55be89ebc69827d49146d9528",
-      "bytes": 5813
+      "sha256": "01c304ba6daa9afde7aa5084bb3b641d07a7c7c49bf2b2276aa1234a2fb30d83",
+      "bytes": 7096
     },
     {
       "path": "ui/react-app/src/components/CallConsultation.jsx",
