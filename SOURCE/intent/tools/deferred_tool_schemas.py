@@ -59,6 +59,12 @@ CRITICAL_ALWAYS_LOAD_TOOLS = frozenset(
         # approved order was never placed (r5/commerce). It is still useless
         # before approval: it only fills a card the user approved for this order.
         "fill_payment_details",
+        # The single canonical way to send an email (or a text, or save a
+        # file). Deferred, it was only a bare name in the catalog, and with
+        # Gmail connected the model answered "I can't send email from this
+        # environment" without calling any tool until the user told it to
+        # search its tools (r5 Google demo). Sending still asks the user first.
+        "share_response",
         "phone",
         "signature",
         "resume_signature_gate",

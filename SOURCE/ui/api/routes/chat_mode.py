@@ -434,6 +434,7 @@ async def _run_chat_command(
     history_messages: list[ChatMessageRecord],
     target_assistant_message_id: str | None = None,
 ) -> None:
+    from intent.approval import confirmation_conversation_scope
     from services.command import CommandRequest
     from services.conversation.state_manager import ConversationStateManager
     from services.llm.stream_bus import (
@@ -465,7 +466,12 @@ async def _run_chat_command(
             origin="typed",
         )
         started = time.time()
-        with command_stream_context(stream_id, metadata={"thread_id": thread_id}):
+        # A yes/no asked in this chat is answered in this chat only: a new chat
+        # must not consume a confirmation still pending in another one.
+        with (
+            command_stream_context(stream_id, metadata={"thread_id": thread_id}),
+            confirmation_conversation_scope("chat:%s" % thread_id),
+        ):
             result = await command_service.execute(request)
         envelope = result.to_envelope()
         assistant_text = _command_stream_message(envelope)

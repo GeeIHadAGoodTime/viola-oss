@@ -1027,9 +1027,13 @@ class LLMProviderFactory:
             except Exception:
                 managed_key = ""
 
-            if managed_key and api_key == managed_key:
-                logger.warning("Ignoring OpenAI BYOK llm_api_key because it matches the shared managed key")
-                api_key = ""
+            # The user's own saved key (llm_api_key) is BYOK whatever the
+            # environment holds: a developer who saves the same key that is in
+            # their OPENAI_API_KEY is still paying for it themselves. Treating
+            # it as the shared managed key dropped it silently and the BYOK
+            # source came up with no key (r5 Google demo). Only the legacy
+            # openai_api_key field, which older installs mirrored from the
+            # environment, is still screened against the shared key.
             if managed_key and legacy_api_key == managed_key:
                 if legacy_api_key and legacy_api_key != "***ENCRYPTED***":
                     logger.debug("Ignoring legacy openai_api_key for BYOK because it matches the shared managed key")

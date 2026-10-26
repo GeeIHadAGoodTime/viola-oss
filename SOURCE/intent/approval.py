@@ -11,12 +11,15 @@ policy says behavior=ask.
 
 from __future__ import annotations
 
+import contextlib
+import contextvars
 import json
 import os
 import threading
 import time
 import unicodedata
 import uuid
+from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal
 
@@ -105,6 +108,38 @@ class _PendingConfirmation:
     tool_args: dict[str, Any]
     created_task_id: str | None
     expires_at: float
+    # The conversation (chat thread) the question was asked in. ``None`` is the
+    # main voice/typed conversation. A pending yes/no belongs to the chat it
+    # was asked in, never to another one.
+    conversation_scope: str | None = None
+
+
+# A pending confirmation is answered in the conversation that asked for it.
+# Before this, the store was per user only, so asking for the same event in a
+# NEW chat silently consumed the confirmation still pending in the old one and
+# created the event with no second prompt (r5 Google demo). Chat routes bind
+# their thread here; everything else is the main conversation (``None``).
+_CONFIRMATION_CONVERSATION_SCOPE: contextvars.ContextVar[str | None] = contextvars.ContextVar(
+    "viola_confirmation_conversation_scope", default=None
+)
+
+
+@contextlib.contextmanager
+def confirmation_conversation_scope(scope: str | None) -> Iterator[None]:
+    """Bind the conversation that pending confirmations belong to."""
+
+    normalized = str(scope or "").strip() or None
+    token = _CONFIRMATION_CONVERSATION_SCOPE.set(normalized)
+    try:
+        yield
+    finally:
+        _CONFIRMATION_CONVERSATION_SCOPE.reset(token)
+
+
+def current_confirmation_conversation_scope() -> str | None:
+    """The conversation the current turn belongs to (``None`` = main conversation)."""
+
+    return _CONFIRMATION_CONVERSATION_SCOPE.get()
 
 
 class _PendingStore:
@@ -437,12 +472,14 @@ class ApprovalManager:
         args_fingerprint = self._args_fingerprint_for_tool(tool_name_value, tool_args)
         stored_tool_args = self._stored_tool_args_for_tool(tool_name_value, tool_args)
         created_task_id = str(task_id) if task_id else None
+        scope = current_confirmation_conversation_scope()
         store = self._pending_store()
         with store.lock:
             self._prune_pending_confirmations(store, now)
             for pending in store.confirmations.values():
                 if (
-                    pending.tool_name == tool_name_value
+                    pending.conversation_scope == scope
+                    and pending.tool_name == tool_name_value
                     and pending.risk == risk
                     and pending.args_fingerprint == args_fingerprint
                 ):
@@ -465,6 +502,7 @@ class ApprovalManager:
             tool_args=stored_tool_args,
             created_task_id=created_task_id,
             expires_at=now + _DEFERRED_CONFIRMATION_TTL_S,
+            conversation_scope=scope,
         )
         with store.lock:
             store.confirmations[confirmation_id] = pending
@@ -481,10 +519,13 @@ class ApprovalManager:
         """Return live pending confirmations for runtime prompt context."""
 
         now = time.monotonic()
+        scope = current_confirmation_conversation_scope()
         store = self._pending_store()
         with store.lock:
             self._prune_pending_confirmations(store, now)
-            pending_items = list(store.confirmations.values())
+            pending_items = [
+                pending for pending in store.confirmations.values() if pending.conversation_scope == scope
+            ]
 
         frames: list[dict[str, Any]] = []
         for pending in sorted(pending_items, key=lambda item: item.expires_at):
@@ -542,6 +583,9 @@ class ApprovalManager:
             pending = store.confirmations.get(confirmation_id)
             if pending is None:
                 return "rejected"
+            if pending.conversation_scope != current_confirmation_conversation_scope():
+                # Asked in another chat: this conversation cannot answer it.
+                return "rejected"
             current_task_id = str(task_id) if task_id else None
             if pending.created_task_id and pending.created_task_id == current_task_id:
                 return "rejected"
@@ -587,11 +631,14 @@ class ApprovalManager:
         tool_name_value = str(tool_name or "")
         args_fingerprint = self._args_fingerprint_for_tool(tool_name_value, tool_args)
         current_task_id = str(task_id) if task_id else None
+        scope = current_confirmation_conversation_scope()
         matching_ids: list[str] = []
         store = self._pending_store()
         with store.lock:
             self._prune_pending_confirmations(store, now)
             for confirmation_id, pending in store.confirmations.items():
+                if pending.conversation_scope != scope:
+                    continue
                 if pending.created_task_id and pending.created_task_id == current_task_id:
                     continue
                 if (
@@ -606,6 +653,41 @@ class ApprovalManager:
                 store.confirmations.pop(confirmation_id, None)
         self._apply_tool_arg_confirmation_normalization(tool_name_value, tool_args)
         return "accepted"
+
+    def pending_confirmation_args(
+        self,
+        *,
+        tool_name: str,
+        tool_args: dict[str, Any],
+        ignore_keys: tuple[str, ...] = (),
+    ) -> dict[str, Any] | None:
+        """Stored args of this conversation's pending confirmation for the same call.
+
+        ``ignore_keys`` are left out of the comparison, so a caller can recover
+        the exact value the user was asked about (for example which calendar a
+        new event goes to) when the model re-issues the call with that one field
+        changed. Read-only: nothing is consumed.
+        """
+
+        if not isinstance(tool_args, dict):
+            return None
+        tool_name_value = str(tool_name or "")
+        ignored = set(ignore_keys)
+        wanted = self._args_fingerprint_for_tool(
+            tool_name_value, {key: value for key, value in tool_args.items() if key not in ignored}
+        )
+        scope = current_confirmation_conversation_scope()
+        now = time.monotonic()
+        store = self._pending_store()
+        with store.lock:
+            self._prune_pending_confirmations(store, now)
+            for pending in store.confirmations.values():
+                if pending.conversation_scope != scope or pending.tool_name != tool_name_value:
+                    continue
+                stored = {key: value for key, value in pending.tool_args.items() if key not in ignored}
+                if self._args_fingerprint_for_tool(tool_name_value, stored) == wanted:
+                    return dict(pending.tool_args)
+        return None
 
     async def confirmation_holds_under_taint(self, action_description: str, risk: RiskLevel) -> bool:
         """Check a cross-turn confirmation against the user's own words when tainted.
