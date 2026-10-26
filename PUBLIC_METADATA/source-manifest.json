@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "e1acd026c6f9988d870e068b7c5f0bc85241b9c6",
-  "sha256": "294d4b89428227bd8adac7b7c3fa4344e0172e51ae84a74321f20c7bdcd2490c",
+  "revision": "ad085ddffe3bf719c036bcb5988d3a673af5763c",
+  "sha256": "3896e96a5880ebfbea7e06f28e6fd04f052f3621d257d11172f7eed3d1480cf3",
   "files": [
     {
       "path": ".env.example",
@@ -1575,8 +1575,8 @@
     },
     {
       "path": "intent/agent_executor.py",
-      "sha256": "33e3cb47b0df66a523a71fccd82a13f9d3e18ce8de84e0d834da84ba213f075c",
-      "bytes": 579858
+      "sha256": "6df1f58965169e3c951c7ad3a3fa6c2ecc9869b582fc8c74ccc72ab0d71a6300",
+      "bytes": 583187
     },
     {
       "path": "intent/agent_loop.py",
@@ -1615,8 +1615,8 @@
     },
     {
       "path": "intent/approval.py",
-      "sha256": "7e49a01fb2efb5371363929e381b29027c705ef297d21edf035254f0dbacfceb",
-      "bytes": 49565
+      "sha256": "3044e3cd7d311d51ac75b939479222827cf68adb842c5d39a9bf60daa5f08fde",
+      "bytes": 53189
     },
     {
       "path": "intent/capability_resolver.py",
@@ -2030,8 +2030,8 @@
     },
     {
       "path": "intent/tools/calendar_tools.py",
-      "sha256": "3bad627a3bb38af9b4390a5c8ad315f9883f0f293f21cbb6d15b70ee587e12b2",
-      "bytes": 24956
+      "sha256": "4daf1ce99c7d046b052ed81f6f0ae04865a4d7e5787d55d0c6c1077078026426",
+      "bytes": 27905
     },
     {
       "path": "intent/tools/contacts_tools.py",
@@ -2040,8 +2040,8 @@
     },
     {
       "path": "intent/tools/deferred_tool_schemas.py",
-      "sha256": "9a0a472340d41a8654291619c0df4e75e09b33348b14dd201002796ddb50f1dd",
-      "bytes": 35258
+      "sha256": "590e7a8e108c3be8c5746c2caacaa91cb306f40b8eb5138e2e7ac9f6300dc9f4",
+      "bytes": 35663
     },
     {
       "path": "intent/tools/delegation.py",
@@ -2365,8 +2365,8 @@
     },
     {
       "path": "mcp_servers/core_tools/server.py",
-      "sha256": "b3ac90a1607b124a7132225c982fa71f8deea77d8d38ae33afe23f554f62b259",
-      "bytes": 253706
+      "sha256": "f183521b0b7cbba7f9fa3ccf8ce6ca8b59bd9b39114437c63b36d08c1bda4c70",
+      "bytes": 254070
     },
     {
       "path": "mcp_servers/phone_tool_descriptions.py",
@@ -4535,8 +4535,8 @@
     },
     {
       "path": "services/llm/factory.py",
-      "sha256": "bc9d8d0b853fbd16a41a4ca81e13340063b9dd21990d23a4fcfce7b76e44c254",
-      "bytes": 59028
+      "sha256": "9862bf21e58cd17c108ff791f05dce6f43dae9f8e738100f1ea7390ee1859552",
+      "bytes": 59362
     },
     {
       "path": "services/llm/hook_llm.py",
@@ -4695,8 +4695,8 @@
     },
     {
       "path": "services/llm/route_tool_schemas.py",
-      "sha256": "5fe5a9672db0c8341653a95c364f0236946341eaf334e8f0f84918eef55325ef",
-      "bytes": 44395
+      "sha256": "e591a828df5e1e6a4a6ba4d6d8f8943bc3848dd775ea1a273b5d60350f5e2aad",
+      "bytes": 44415
     },
     {
       "path": "services/llm/session_cost_tracker.py",
@@ -9375,8 +9375,8 @@
     },
     {
       "path": "ui/api/routes/chat_mode.py",
-      "sha256": "13da4594cb0e68b21ede0c50069818c05459acc01cbf702566cf1c5e457e488a",
-      "bytes": 40357
+      "sha256": "86a76a0610cfcfed1845c15b62eea30cbd2b12abd917afd3f44c9c67c85631b7",
+      "bytes": 40666
     },
     {
       "path": "ui/api/routes/clock.py",
@@ -10015,8 +10015,8 @@
     },
     {
       "path": "ui/react-app/src/SmartDisplay.jsx",
-      "sha256": "9252e2cec0aeeec4d35db3005bf819303422de95be2e76f9cc36e47d5c919686",
-      "bytes": 178458
+      "sha256": "54f44ee0957358e8d695139bc4496bb51a8ea2f3a01d5c975b39a77860c7c84a",
+      "bytes": 179017
     },
     {
       "path": "ui/react-app/src/SmartDisplay.spokePolicy.test.jsx",
@@ -10450,13 +10450,13 @@
     },
     {
       "path": "ui/react-app/src/components/CallBriefing.jsx",
-      "sha256": "9971c21d27a771e56ea31b3f63de6664dcabd1e832a460ca9d2dedffd324b9f4",
-      "bytes": 7062
+      "sha256": "caf34e72e2930aa7488782bbefa2c14b126d06755f0cb432c3392f3194ab6cd1",
+      "bytes": 7804
     },
     {
       "path": "ui/react-app/src/components/CallBriefing.test.jsx",
-      "sha256": "a9ce6b6d9d426dd54d07a396ec67094909f713c55be89ebc69827d49146d9528",
-      "bytes": 5813
+      "sha256": "01c304ba6daa9afde7aa5084bb3b641d07a7c7c49bf2b2276aa1234a2fb30d83",
+      "bytes": 7096
     },
     {
       "path": "ui/react-app/src/components/CallConsultation.jsx",

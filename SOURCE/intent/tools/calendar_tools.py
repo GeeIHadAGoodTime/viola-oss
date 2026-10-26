@@ -43,6 +43,72 @@ def _calendar_connection_fields(result: dict[str, Any]) -> dict[str, object]:
     }
 
 
+# ---------------------------------------------------------------------------
+# Which calendar a new event goes to
+#
+# provider="auto" already writes to the connected calendar (Google, Microsoft,
+# CalDAV) and falls back to the local one. But the model kept passing
+# provider="local" on its own, even for "add it to my Google Calendar", so a
+# connected Google user's events landed in Viola's local calendar unless they
+# added "not the local one" (r5 Google demo). The user's own words decide:
+# a calendar they name wins, and "local" is kept only when they asked for it.
+# ---------------------------------------------------------------------------
+
+_NAMED_REMOTE_CALENDARS: tuple[tuple[str, re.Pattern[str]], ...] = (
+    ("google", re.compile(r"\bgoogle\s*cal(?:endar)?s?\b", re.IGNORECASE)),
+    ("graph", re.compile(r"\b(?:outlook|microsoft\s*cal(?:endar)?|office\s*365\s*cal(?:endar)?)\b", re.IGNORECASE)),
+    ("caldav", re.compile(r"\b(?:icloud|apple\s*cal(?:endar)?|caldav)\b", re.IGNORECASE)),
+)
+_LOCAL_CALENDAR_WORDS = re.compile(
+    r"\blocal\b|\bviola(?:'s|s)?\s+(?:own\s+)?cal(?:endar)?\b|\bon\s+this\s+(?:computer|pc|device)\b",
+    re.IGNORECASE,
+)
+_CALENDAR_CREATE_ACTIONS = frozenset({"add", "create", "create_event"})
+
+
+def calendar_provider_named_by_user(user_text: str | None) -> str | None:
+    """The one remote calendar the user named ("my Google Calendar"), if any."""
+
+    text = str(user_text or "")
+    if not text.strip():
+        return None
+    named = [provider for provider, pattern in _NAMED_REMOTE_CALENDARS if pattern.search(text)]
+    return named[0] if len(named) == 1 else None
+
+
+def user_asked_for_local_calendar(user_text: str | None) -> bool:
+    """True when the user's words ask for Viola's own local calendar."""
+
+    return bool(_LOCAL_CALENDAR_WORDS.search(str(user_text or "")))
+
+
+def resolve_calendar_create_provider(provider: str | None, user_text: str | None) -> str:
+    """Return the provider a new calendar event should be written to.
+
+    - A remote calendar the user named always wins ("Google Calendar" -> google).
+    - provider="local" stays local only when the user asked for the local
+      calendar; otherwise it becomes "auto", which writes to the connected
+      calendar first and falls back to local.
+    - Anything else is left as the model chose it (blank already means "auto").
+    """
+
+    chosen = str(provider or "").strip().lower()
+    named = calendar_provider_named_by_user(user_text)
+    if named is not None:
+        return named
+    if chosen == "local" and not user_asked_for_local_calendar(user_text):
+        return "auto"
+    return chosen
+
+
+def is_calendar_create_call(tool_name: str, tool_args: dict[str, Any] | None) -> bool:
+    """True for the calendar tool's create action."""
+
+    if tool_name != "calendar" or not isinstance(tool_args, dict):
+        return False
+    return str(tool_args.get("action") or "").strip().lower() in _CALENDAR_CREATE_ACTIONS
+
+
 def _require_user_id(user_id: str | None) -> str:
     if not user_id:
         raise ValueError("user_id is required")

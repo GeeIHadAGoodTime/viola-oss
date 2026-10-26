@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import CallBriefing, {
   CALL_APPROVE_COMMAND,
   CALL_CANCEL_COMMAND,
+  answerCallBriefing,
   callBriefingFromConsultEvent,
 } from './CallBriefing';
 
@@ -117,5 +118,33 @@ describe('CallBriefing on a touch screen', () => {
     expect(screen.getByRole('button', { name: 'Cancel' }).className).toContain('viola-touch-target');
     fireEvent.click(dismiss);
     expect(onDismiss).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('answerCallBriefing', () => {
+  // A pending confirmation belongs to the chat it was asked in (r5 Google demo:
+  // a new chat silently consumed another chat's pending yes/no).
+  it('answers a call asked for in a saved chat in that chat', async () => {
+    const briefing = callBriefingFromConsultEvent({ ...pendingSearchCall, chat_thread_id: 'thread-A' });
+    expect(briefing.chat_thread_id).toBe('thread-A');
+    const sendCommand = vi.fn(() => Promise.resolve());
+    const sendToChat = vi.fn(() => Promise.resolve());
+
+    await answerCallBriefing(briefing, CALL_APPROVE_COMMAND, { sendCommand, sendToChat });
+
+    expect(sendToChat).toHaveBeenCalledWith('thread-A', 'confirm');
+    expect(sendCommand).not.toHaveBeenCalled();
+  });
+
+  it('answers everything else through the normal command path', async () => {
+    const briefing = callBriefingFromConsultEvent(pendingSearchCall);
+    expect(briefing.chat_thread_id).toBeNull();
+    const sendCommand = vi.fn(() => Promise.resolve());
+    const sendToChat = vi.fn(() => Promise.resolve());
+
+    await answerCallBriefing(briefing, CALL_CANCEL_COMMAND, { sendCommand, sendToChat });
+
+    expect(sendCommand).toHaveBeenCalledWith('cancel');
+    expect(sendToChat).not.toHaveBeenCalled();
   });
 });

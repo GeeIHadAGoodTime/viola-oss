@@ -555,14 +555,14 @@ ROUTE_TOOL_SCHEMAS: list[dict[str, Any]] = [
         "name": "calendar",
         "description": (
             "Calendar control. "
-            "Calendar has an always-on local primary calendar; Google, Microsoft, and CalDAV are optional sync targets. "
+            "Calendar has an always-on local calendar; a connected Google, Microsoft or CalDAV calendar receives new events first. "
             "action='today' gets today's calendar events. "
             "action='next' gets the next upcoming calendar event. "
             "action='create' creates a calendar event with title and time. "
             "action='delete' deletes a calendar event by title or event_id. "
             "Calendar read results include calendars_connected, connected_providers, and events. "
             "With the local provider connected, events=[] is an empty schedule for the requested range. "
-            "Do not present Google/Microsoft/CalDAV setup as a prerequisite; remote connection only enables sync. "
+            "Do not present Google/Microsoft/CalDAV setup as a prerequisite; without one, events go to the local calendar. "
             "Does not handle countdown timers or recurring Viola automations; timer and schedule cover those. "
             "Examples: calendar(action='today'), calendar(action='next'), "
             "calendar(action='create', title='Lunch', time='tomorrow 3pm'), "

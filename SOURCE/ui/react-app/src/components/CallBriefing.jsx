@@ -10,7 +10,9 @@
  * The card always shows the exact number next to who it belongs to. Approve and
  * Cancel answer the same gate the user can answer by voice or by typing: they
  * send "confirm" or "cancel" through the normal command path, which resolves
- * the pending confirmation (the dial happens only after a yes).
+ * the pending confirmation (the dial happens only after a yes). A call asked
+ * for in a saved chat is pending in that chat only, so the answer goes to that
+ * chat (`answerCallBriefing`).
  */
 import React, { useEffect, useState } from 'react';
 import { THEME } from '../config';
@@ -43,9 +45,23 @@ export function callBriefingFromConsultEvent(payload) {
     planned_action: payload.planned_action || payload.message || '',
     untrusted_source: Boolean(payload.untrusted_source),
     task_id: payload.task_id || null,
+    chat_thread_id: payload.chat_thread_id || null,
     awaiting_confirmation: awaiting,
     approved: status === 'approved',
   };
+}
+
+/**
+ * Send the card's "confirm" / "cancel" to the conversation that asked.
+ *
+ * A pending confirmation belongs to the chat it was asked in and no other chat
+ * can answer it, so a call requested in a saved chat is answered in that chat's
+ * thread; everything else goes through the normal command path.
+ */
+export function answerCallBriefing(briefing, text, { sendCommand, sendToChat }) {
+  const threadId = briefing && briefing.chat_thread_id;
+  if (threadId && typeof sendToChat === 'function') return sendToChat(threadId, text);
+  return sendCommand(text);
 }
 
 const buttonBase = {

@@ -2891,7 +2891,8 @@ async def sms_send(
 
 @server.tool(
     description=(
-        "Deliver or save content from the previous assistant response, explicit text, or a short transcript. "
+        "Send an email or a text message, or save to a file: the previous assistant response, explicit text, "
+        "or a short transcript. This is the tool for every outbound email. "
         "For email, this uses connected Gmail OAuth when available and otherwise uses Viola's configured "
         "Resend/SMTP sender. "
         "content_source='last_assistant_message' selects the prior answer; 'explicit_text' selects "
@@ -5409,13 +5410,15 @@ async def notify(
 
 @server.tool(
     description=(
-        "View and manage the always-on local primary calendar, with Google, Microsoft, and CalDAV as optional sync targets. "
+        "View and manage the user's calendars: an always-on local calendar plus any connected Google, Microsoft or CalDAV calendar. "
         "Actions: list (by date range), list_calendars, get, add "
         "(title + start_time, 1hr default duration), update, delete, respond, and find_free_time. "
+        "For add, leave provider='auto': it writes to the connected calendar and falls back to local. "
+        "Pass a provider only when the user names one ('my Google Calendar' = google); 'local' only when they ask for the local calendar. "
         "List results include calendars_connected, connected_providers, and events. "
         "Event results include stored_iso_utc for storage/audit and display_local for user-local display; user-facing answers should quote display_local, not stored_iso_utc. "
         "With the local provider connected, events=[] is an empty schedule for the requested range. "
-        "Do not present Google/Microsoft/CalDAV setup as a prerequisite; remote connection only upgrades sync. "
+        "Do not present Google/Microsoft/CalDAV setup as a prerequisite; without one, events go to the local calendar. "
         "action='icloud_status' reports whether an iCloud/CalDAV account is connected and, if not, "
         "directs the user to the desktop Settings > Calendar UI to connect it -- this tool never "
         "collects an Apple ID or app-specific password through conversation. "
@@ -5451,7 +5454,7 @@ async def calendar(
     ] = 10,
     provider: Annotated[
         str,
-        Field(description="Provider: auto, all, local, google, graph or caldav."),
+        Field(description="Provider: auto (connected calendar first), all, local, google, graph or caldav."),
     ] = "auto",
     calendar_id: Annotated[
         str,

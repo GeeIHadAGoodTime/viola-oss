@@ -45,6 +45,7 @@ from intent.agent_message_manager import (
 from intent.approval import (
     ApprovalManager,
     ConfirmationDeferred,
+    current_confirmation_conversation_scope,
 )
 from intent.context_compaction import (
     compact_messages,
@@ -8223,6 +8224,56 @@ class AgentExecutor:
             return False
         return str(getattr(session, "selected_card_label", "") or "").strip() == approved_label
 
+    def _route_calendar_create_to_user_calendar(self, tool_args: dict[str, Any]) -> None:
+        """Send a new calendar event to the calendar the user means.
+
+        The model chose provider="local" on its own, even for "add it to my
+        Google Calendar", so a connected Google user's events landed in the
+        local calendar (r5 Google demo). The user's words decide: a calendar
+        they name wins, "local" stays only when they asked for it, otherwise
+        "auto" writes to the connected calendar first. On the "yes" turn the
+        calendar they were asked about is kept.
+        """
+
+        from intent.tools.calendar_tools import (
+            calendar_provider_named_by_user,
+            is_calendar_create_call,
+            resolve_calendar_create_provider,
+            user_asked_for_local_calendar,
+        )
+
+        if not is_calendar_create_call("calendar", tool_args):
+            return
+        try:
+            from intent.content_sanitizer import active_taint_tracker
+
+            user_text = str(getattr(active_taint_tracker(), "user_request", "") or "")
+        except ImportError:  # pragma: no cover - same package
+            user_text = ""
+        chosen = str(tool_args.get("provider") or "").strip().lower()
+        if calendar_provider_named_by_user(user_text) is None and not user_asked_for_local_calendar(user_text):
+            pending_args = None
+            pending_args_for = getattr(getattr(self, "_approval", None), "pending_confirmation_args", None)
+            if callable(pending_args_for):
+                try:
+                    pending_args = pending_args_for(tool_name="calendar", tool_args=tool_args, ignore_keys=("provider",))
+                except Exception:  # noqa: BLE001, RUF100 - a lookup failure only skips the reuse
+                    logger.debug("Pending calendar confirmation lookup failed", exc_info=True)
+            pending_provider = str((pending_args or {}).get("provider") or "").strip().lower()
+            if pending_provider:
+                if pending_provider != chosen:
+                    logger.info(
+                        "Calendar create keeps the calendar the user was asked about: %s -> %s",
+                        chosen or "(blank)",
+                        pending_provider,
+                    )
+                    tool_args["provider"] = pending_provider
+                return
+        resolved = resolve_calendar_create_provider(chosen, user_text)
+        if resolved != chosen:
+            logger.info("Calendar create routed to the user's calendar: %s -> %s", chosen or "(blank)", resolved)
+            tool_args["provider"] = resolved
+
     def _remember_irreversible_confirmation(self, action_class: str) -> None:
         if action_class in _ONE_SHOT_IRREVERSIBLE_CONFIRMATION_CLASSES:
             return
@@ -8266,6 +8317,11 @@ class AgentExecutor:
         task_id = getattr(self, "task_id", None)
         if task_id:
             payload["task_id"] = task_id
+        conversation_scope = current_confirmation_conversation_scope() or ""
+        if conversation_scope.startswith("chat:"):
+            # A pending yes/no is answered in the chat that asked, so the card's
+            # Approve / Cancel must go to that chat, not the main command box.
+            payload["chat_thread_id"] = conversation_scope[len("chat:") :]
         if response is not None:
             payload["response"] = response
 
@@ -8531,6 +8587,11 @@ class AgentExecutor:
                     },
                     error_category="payment_review_required",
                 )
+        if tool_name == "calendar":
+            # Before the duplicate check and the confirm gate, so the user is
+            # asked about (and dedup keys on) the calendar the event really
+            # goes to.
+            self._route_calendar_create_to_user_calendar(tool_args)
         if tool_name == "fill_payment_details":
             # The payment gate, not a five-minute window keyed on the card
             # label, decides when a card may be filled: each fill needs this

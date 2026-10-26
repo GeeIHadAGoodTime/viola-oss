@@ -4,7 +4,7 @@ import PropTypes from 'prop-types';
 import { usePlayerState } from './hooks/usePlayerState';
 import { useOrderedPreference } from './hooks/useOrderedPreference';
 import { useWebSocket } from './hooks/useWebSocket';
-import { useViolaApi, authFetch } from './hooks/useViolaApi';
+import { useViolaApi, authFetch, apiFetch } from './hooks/useViolaApi';
 import { useAuth } from './hooks/useAuth';
 import { useAgentRegistry } from './hooks/useAgentRegistry';
 import { useVoice } from './hooks/useVoice';
@@ -25,6 +25,7 @@ import { useAvailableRooms } from './hooks/useAvailableRooms';
 import CallBriefing, {
   CALL_APPROVE_COMMAND,
   CALL_CANCEL_COMMAND,
+  answerCallBriefing,
   callBriefingFromConsultEvent,
 } from './components/CallBriefing';
 import DiagnosticsDisclosureNotice from './components/DiagnosticsDisclosureNotice';
@@ -1308,6 +1309,15 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
     if (interceptCloudConsent({ kind: 'text', text })) return Promise.resolve();
     return api.sendCommand(text).then(handleCommandResult);
   }, [interceptCloudConsent, api, handleCommandResult]);
+
+  // A call asked for in a saved chat is pending in that chat only, so the
+  // card's Approve / Cancel go to that chat's thread (answerCallBriefing).
+  const answerCallBriefingInItsChat = useCallback((text) => answerCallBriefing(callBriefing, text, {
+    sendCommand: submitTextCommand,
+    sendToChat: (threadId, answer) => apiFetch(`/v1/chat/threads/${encodeURIComponent(threadId)}/send`, {
+      method: 'POST', body: JSON.stringify({ text: answer }),
+    }),
+  }), [callBriefing, submitTextCommand]);
 
   // Cloud browser first-visit welcome (#2607): server-side completion-gated
   // (useCloudWelcome -> /v1/cloud-welcome/*), so it opens once `completed`
@@ -3905,8 +3915,8 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
       <CallBriefing
         briefing={callBriefing}
         onDismiss={() => setCallBriefing(null)}
-        onApprove={() => submitTextCommand(CALL_APPROVE_COMMAND)}
-        onCancel={() => submitTextCommand(CALL_CANCEL_COMMAND).then(() => setCallBriefing(null))}
+        onApprove={() => answerCallBriefingInItsChat(CALL_APPROVE_COMMAND)}
+        onCancel={() => answerCallBriefingInItsChat(CALL_CANCEL_COMMAND).then(() => setCallBriefing(null))}
       />
       {!activeInlineConsultation && (
         <CallConsultation
