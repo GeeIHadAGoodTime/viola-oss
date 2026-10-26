@@ -45,6 +45,7 @@ from intent.agent_message_manager import (
 from intent.approval import (
     ApprovalManager,
     ConfirmationDeferred,
+    current_confirmation_conversation_scope,
 )
 from intent.context_compaction import (
     compact_messages,
@@ -8316,6 +8317,11 @@ class AgentExecutor:
         task_id = getattr(self, "task_id", None)
         if task_id:
             payload["task_id"] = task_id
+        conversation_scope = current_confirmation_conversation_scope() or ""
+        if conversation_scope.startswith("chat:"):
+            # A pending yes/no is answered in the chat that asked, so the card's
+            # Approve / Cancel must go to that chat, not the main command box.
+            payload["chat_thread_id"] = conversation_scope[len("chat:") :]
         if response is not None:
             payload["response"] = response
 
