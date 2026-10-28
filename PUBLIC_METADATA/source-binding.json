@@ -30,17 +30,10 @@
   },
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-<<<<<<< HEAD
-  "source_manifest_sha256": "15c3345786b463639aa9be8eb3bfd0fcee0eeed0a4e3986d33a810088dbdae93",
-  "source_tree_sha256": "831cdb7633a4e9129c7d463ac3098c512e412266ac4ceba2679f6f02a2b813a3",
-  "source_file_count": 2752,
-  "source_revision": "0072bdcc159f1d3fef2a1e8f8ce2a5f1a8a67730",
-=======
   "source_manifest_sha256": "dc2a09b2e522ec0a78cfb132c0d192694cfa51d53c50bfe2ef4f8844cbd09815",
   "source_tree_sha256": "e21956ae03f62149a248365cf6942426ba1494dae6475d24d10c7c73c4efe90e",
   "source_file_count": 2743,
   "source_revision": "4c9cc11b4dc02bed16f88646c1e4aca3bf70029c",
->>>>>>> origin/main
   "comparison_public_revision": "ecab2772465fcc89ae6645b028af1c2273b9199f",
   "changed_source_paths": [
     "audio_core/aec_reference_base.py",
@@ -142,8 +135,6 @@
     "services/memory/selector.py",
     "services/oauth/google.py",
     "services/openai_background.py",
-    "services/scheduler/actions.py",
-    "services/scheduler/service.py",
     "services/telnyx_sender.py",
     "services/user_capabilities/service.py",
     "telephony/phone_mode.py",
@@ -169,7 +160,6 @@
     "tools/qualification/romance_runtime_replay.py",
     "ui/api/routes/__init__.py",
     "ui/api/routes/_guards.py",
-    "ui/api/routes/agents.py",
     "ui/api/routes/chat_mode.py",
     "ui/api/routes/command.py",
     "ui/api/routes/control.py",
@@ -189,7 +179,6 @@
     "ui/queue_discovery.py",
     "ui/react-app/package-lock.json",
     "ui/react-app/package.json",
-    "ui/react-app/src/SmartDisplay.agentBrowser.test.jsx",
     "ui/react-app/src/SmartDisplay.jsx",
     "ui/react-app/src/SmartDisplay.wakeStatus.test.jsx",
     "ui/react-app/src/__tests__/SmartDisplay.test.jsx",
@@ -197,39 +186,22 @@
     "ui/react-app/src/__tests__/hooks/useVoiceOnboarding.micPermissionGuidance.test.jsx",
     "ui/react-app/src/__tests__/hooks/useVoiceOnboarding.phaseResume.test.jsx",
     "ui/react-app/src/__tests__/hooks/useVoiceOnboarding.test.jsx",
-<<<<<<< HEAD
-    "ui/react-app/src/auth/authProviders.ts",
-=======
     "ui/react-app/src/auth/desktopOAuth.test.ts",
     "ui/react-app/src/auth/desktopOAuth.ts",
->>>>>>> origin/main
     "ui/react-app/src/components/AccountTab.jsx",
-    "ui/react-app/src/components/AccountTab.signInLayout.test.jsx",
     "ui/react-app/src/components/AccountTab.test.jsx",
-    "ui/react-app/src/components/AgentCard.jsx",
-    "ui/react-app/src/components/AgentCard.test.jsx",
-    "ui/react-app/src/components/BillingCapacityPanel.jsx",
-    "ui/react-app/src/components/BillingCapacityPanel.test.jsx",
     "ui/react-app/src/components/BugReportModal.jsx",
-    "ui/react-app/src/components/CalendarView.jsx",
-    "ui/react-app/src/components/CalendarView.liveToday.test.jsx",
     "ui/react-app/src/components/CalendarView.module.css",
     "ui/react-app/src/components/CallBriefing.jsx",
     "ui/react-app/src/components/CallBriefing.test.jsx",
     "ui/react-app/src/components/ConnectSpeakerPanel.jsx",
     "ui/react-app/src/components/ConnectSpeakerPanel.test.jsx",
-<<<<<<< HEAD
-    "ui/react-app/src/components/ContentCard.jsx",
-=======
     "ui/react-app/src/components/DeviceDiscoveryPanel.jsx",
->>>>>>> origin/main
     "ui/react-app/src/components/DiagnosticsDisclosureNotice.jsx",
     "ui/react-app/src/components/DiagnosticsDisclosureNotice.test.jsx",
     "ui/react-app/src/components/GoogleConnectSettings.test.jsx",
     "ui/react-app/src/components/HelpModal.jsx",
     "ui/react-app/src/components/HelpModal.test.jsx",
-    "ui/react-app/src/components/MonthGiftSummary.jsx",
-    "ui/react-app/src/components/MonthGiftSummary.test.jsx",
     "ui/react-app/src/components/OnboardingHighlight.jsx",
     "ui/react-app/src/components/OnboardingOverlay.jsx",
     "ui/react-app/src/components/OnboardingOverlay.stableFrames.test.jsx",
@@ -260,39 +232,23 @@
     "ui/react-app/src/components/stage/modes/browser/BrowserMode.module.css",
     "ui/react-app/src/components/stage/modes/chat/ChatInput.jsx",
     "ui/react-app/src/components/stage/modes/chat/ChatMode.css",
-    "ui/react-app/src/components/stage/modes/chat/ChatMode.jsx",
-    "ui/react-app/src/components/stage/modes/chat/ChatSidebar.jsx",
     "ui/react-app/src/components/topbar/DropdownMenu.jsx",
     "ui/react-app/src/components/topbar/DropdownMenu.test.jsx",
     "ui/react-app/src/components/topbar/TopBar.jsx",
     "ui/react-app/src/components/topbar/TopBar.test.jsx",
     "ui/react-app/src/components/voice/BottomRow.jsx",
-    "ui/react-app/src/components/voice/BottomRow.module.css",
-    "ui/react-app/src/components/voice/BottomRow.stageReply.test.jsx",
     "ui/react-app/src/components/voice/PTTButton.jsx",
     "ui/react-app/src/components/voice/PTTButton.module.css",
     "ui/react-app/src/components/voice/PTTButton.touch.test.jsx",
-    "ui/react-app/src/hooks/useBillingCapacity.js",
-    "ui/react-app/src/hooks/useCalendarEvents.js",
     "ui/react-app/src/hooks/useCalendarProviders.js",
-<<<<<<< HEAD
-    "ui/react-app/src/hooks/useDesktopAccount.js",
-=======
     "ui/react-app/src/hooks/useDeviceDiscovery.js",
     "ui/react-app/src/hooks/useDeviceDiscovery.test.jsx",
->>>>>>> origin/main
     "ui/react-app/src/hooks/usePlayerState.unmount.test.js",
     "ui/react-app/src/hooks/usePressAndHold.js",
     "ui/react-app/src/hooks/useVideoFullscreen.js",
     "ui/react-app/src/hooks/useVideoFullscreen.test.jsx",
-    "ui/react-app/src/hooks/useVoice.holdToTalk.test.js",
-    "ui/react-app/src/hooks/useVoice.js",
     "ui/react-app/src/hooks/useVoiceOnboarding.js",
     "ui/react-app/src/i18n/en.json",
-<<<<<<< HEAD
-    "ui/react-app/src/lib/auth_context.desktopRestore.test.jsx",
-=======
->>>>>>> origin/main
     "ui/react-app/src/lib/auth_context.tsx",
     "ui/react-app/src/lib/billingEntitlement.mountedRoute.test.ts",
     "ui/react-app/src/lib/billingEntitlement.test.ts",
@@ -308,8 +264,6 @@
     "ui/react-app/src/utils/inputModality.test.js",
     "ui/react-app/src/utils/runtimeSurface.js",
     "ui/react-app/src/utils/runtimeSurface.test.js",
-    "ui/react-app/src/utils/stageMarkdown.jsx",
-    "ui/react-app/src/utils/stageMarkdown.test.jsx",
     "ui/react-app/src/utils/wakeSensitivity.js",
     "ui/react-app/src/utils/weatherLocation.js",
     "ui/react-app/src/utils/weatherLocation.test.js",
@@ -419,13 +373,8 @@
     "historical_inventory_limits": "This renderer correction changes no dependency or workflow inputs. All six retained SBOMs and their complete status objects stay historical and unchanged; no current installed inventory qualification is claimed."
   },
   "qualification": {
-<<<<<<< HEAD
-    "source_commit": "0072bdcc159f1d3fef2a1e8f8ce2a5f1a8a67730",
-    "kind": "ui fixes"
-=======
     "source_commit": "4c9cc11b4dc02bed16f88646c1e4aca3bf70029c",
     "kind": "r6 audio"
->>>>>>> origin/main
   },
   "historical_bindings": [
     {
