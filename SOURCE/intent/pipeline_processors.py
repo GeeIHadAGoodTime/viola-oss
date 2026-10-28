@@ -64,13 +64,21 @@ class IntentPipelineProcessors:
         """
         self.pipeline = pipeline_instance
 
-    async def try_instant(self, text: str, user_key: str = "") -> PipelineResult | None:
+    async def try_instant(
+        self,
+        text: str,
+        user_key: str = "",
+        *,
+        instant_match: tuple[str, dict[str, object], str] | None = None,
+    ) -> PipelineResult | None:
         """
         Try instant command processing.
 
         Args:
             text: Input text
             user_key: Authenticated user identifier from the pipeline
+            instant_match: An already-matched ``(command, params, description)``
+                (the busy-session transport phrases); skips pattern matching.
 
         Returns:
             PipelineResult if instant command matches, None otherwise
@@ -79,7 +87,8 @@ class IntentPipelineProcessors:
             return None
 
         # Check for instant command match
-        instant_match = self.pipeline.instant_handler.check_instant_command(text)
+        if instant_match is None:
+            instant_match = self.pipeline.instant_handler.check_instant_command(text)
         if not instant_match:
             return None
 

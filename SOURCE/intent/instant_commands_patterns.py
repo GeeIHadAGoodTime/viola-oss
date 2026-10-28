@@ -224,3 +224,68 @@ INSTANT_PATTERNS: list[InstantPattern] = [
         "End video full screen",
     ),
 ]
+
+
+# ===== WHILE BUSY ONLY: transport phrases that never wait behind a task =====
+# 1.0.5 build 5: "Next!" by voice while a typed agent task ran was refused with
+# "I'm still working on your previous request". Every INSTANT_PATTERNS entry
+# above now runs immediately even while a command is in progress
+# (IntentPipeline._run_instant_while_busy). These extra exact phrases are
+# matched ONLY while the user's previous command is still running: when Viola
+# is idle they keep going to the model (volume/mute stay model-owned, per the
+# founder rule above), but while busy the model is occupied, and making the
+# user wait out a whole agent task to go back a track or turn the music down
+# is the failure the build-5 report describes. Same bar as above: exact
+# control phrases, negation rejected, nothing with extra words. The handlers
+# are the existing instant handlers (intent/instant_commands/music.py), the
+# same music calls the transport buttons and the volume slider make.
+def _busy_transport(body: str) -> Pattern[str]:
+    return re.compile(
+        r"^" + _WAKE_NAME + POLITE_PREFIX + _NEGATION_LOOKAHEAD + r"(?:" + body + r")(?:\s+please)?[!.]*$",
+        re.I,
+    )
+
+
+BUSY_TRANSPORT_PATTERNS: list[InstantPattern] = [
+    (
+        _busy_transport(r"previous(?:\s+(?:song|track))?|(?:go\s+)?back\s+(?:a|one)\s+(?:song|track)"),
+        "previous",
+        {},
+        "Go back to the previous track",
+    ),
+    (
+        _busy_transport(r"mute(?:\s+(?:the\s+)?(?:music|sound|audio))?"),
+        "mute",
+        {},
+        "Mute the music",
+    ),
+    (
+        _busy_transport(r"unmute(?:\s+(?:the\s+)?(?:music|sound|audio))?"),
+        "unmute",
+        {},
+        "Unmute the music",
+    ),
+    (
+        _busy_transport(r"volume\s+up|louder|turn\s+(?:it|the\s+(?:music|volume))\s+up"),
+        "volume_up",
+        {},
+        "Turn the volume up",
+    ),
+    (
+        _busy_transport(r"volume\s+down|quieter|softer|turn\s+(?:it|the\s+(?:music|volume))\s+down"),
+        "volume_down",
+        {},
+        "Turn the volume down",
+    ),
+]
+
+
+def match_busy_transport_command(text: str) -> tuple[str, dict[str, Any], str] | None:
+    """Match an exact transport phrase that may run while another command is busy."""
+
+    text_normalized = (text or "").strip().lower()
+    for pattern, command, params, description in BUSY_TRANSPORT_PATTERNS:
+        match = pattern.match(text_normalized)
+        if match:
+            return command, {**params, **match.groupdict(), "_original_text": text_normalized}, description
+    return None
