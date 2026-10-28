@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "0be4de4dd130bb9b18400618e133754663129012",
-  "sha256": "dab9a1a54453a637c97bf232f1de2d2a0b489fd5268b6e43ca529a6274bef7b9",
+  "revision": "0072bdcc159f1d3fef2a1e8f8ce2a5f1a8a67730",
+  "sha256": "831cdb7633a4e9129c7d463ac3098c512e412266ac4ceba2679f6f02a2b813a3",
   "files": [
     {
       "path": ".env.example",
@@ -5135,8 +5135,8 @@
     },
     {
       "path": "services/scheduler/service.py",
-      "sha256": "1e0e768b59e3ad1301ff55e119e17d42e998a53eaae94d03c4568fe3f3167207",
-      "bytes": 44378
+      "sha256": "e3fb423e9952359454361a12f3c4d213a995c329853c2e672c4e6f6a20433635",
+      "bytes": 44377
     },
     {
       "path": "services/scheduler/store.py",
@@ -9865,8 +9865,8 @@
     },
     {
       "path": "ui/qt_native/webview_window.py",
-      "sha256": "b6e19ba08d798b8f68cf5d39135ab8d979e5088940af0188e7ea65ce7ecc26ea",
-      "bytes": 245092
+      "sha256": "3b72ea27d18fbfe4333ae9f7934ebefa66473fe28309ebc4f6cfc9871a197b35",
+      "bytes": 245076
     },
     {
       "path": "ui/qt_native/widgets/connectivity_status.py",
@@ -10004,6 +10004,11 @@
       "bytes": 2657
     },
     {
+      "path": "ui/react-app/src/SmartDisplay.agentBrowser.test.jsx",
+      "sha256": "7da19234d102dbe7337f1ddf21a35a1ae1ee6ad2a4e3c2dac2007ea5b20debbf",
+      "bytes": 5167
+    },
+    {
       "path": "ui/react-app/src/SmartDisplay.browserUrlReset.test.jsx",
       "sha256": "8eb3b807b2bc5c849947fec9a6b92ef5a34c48f4c6f1974836e6aa21cd0a4e7e",
       "bytes": 6750
@@ -10015,8 +10020,8 @@
     },
     {
       "path": "ui/react-app/src/SmartDisplay.jsx",
-      "sha256": "1025d6549b3dab3f8f84a0efd54e21c050bda5b142c36fc7d128c7416d17c9a8",
-      "bytes": 181545
+      "sha256": "52ac28e597a99ec47605a4754b39c4a96cc9b33c6e900d0119a53ba1ea35a0d9",
+      "bytes": 181715
     },
     {
       "path": "ui/react-app/src/SmartDisplay.spokePolicy.test.jsx",
@@ -10389,6 +10394,11 @@
       "bytes": 4992
     },
     {
+      "path": "ui/react-app/src/components/AccountTab.signInLayout.test.jsx",
+      "sha256": "3549566610dd6e2540821a0ce00cd22acd79d19f51e3deeaa6fb83c9b739af76",
+      "bytes": 6457
+    },
+    {
       "path": "ui/react-app/src/components/AccountTab.test.jsx",
       "sha256": "37cfd66a74c415a568ce2f526316c224fcd10d9ef65b942c0e6520d146b25ed9",
       "bytes": 22304
@@ -10405,8 +10415,8 @@
     },
     {
       "path": "ui/react-app/src/components/AgentCard.test.jsx",
-      "sha256": "f9ec43759fc4090aab7d1bd1b711080b667bda9576023aa6ed4410ac5df19939",
-      "bytes": 1761
+      "sha256": "f98ecc5cda7b3c3145924338864ccb90e6473455ce151ac8011020f4d8faf253",
+      "bytes": 3371
     },
     {
       "path": "ui/react-app/src/components/AgentDrawer.jsx",
@@ -10425,8 +10435,8 @@
     },
     {
       "path": "ui/react-app/src/components/BillingCapacityPanel.test.jsx",
-      "sha256": "9e46ffe1e010c0596b98d8e323f21e165730177a8ef60d0456d1cc65fe7ad489",
-      "bytes": 16974
+      "sha256": "4c07f69369f884670c47e122d06199db483ad514dc7aa8ac2849528712258358",
+      "bytes": 19352
     },
     {
       "path": "ui/react-app/src/components/BugReportModal.jsx",
@@ -10435,8 +10445,13 @@
     },
     {
       "path": "ui/react-app/src/components/CalendarView.jsx",
-      "sha256": "de8b836a7b6d543b1ee782ac35b38f8eb7707ac370c6839926e2dcd8d09c7f5e",
-      "bytes": 46955
+      "sha256": "978e10273a0f17e7e5aa69fb7724ad3a639f7a65db9630617902807ea6f848b0",
+      "bytes": 47005
+    },
+    {
+      "path": "ui/react-app/src/components/CalendarView.liveToday.test.jsx",
+      "sha256": "c7fd8522384b4eabf4a29c7b8796d13c19309aa4b8a45148232109e5fb630f8b",
+      "bytes": 4278
     },
     {
       "path": "ui/react-app/src/components/CalendarView.module.css",
@@ -10530,8 +10545,8 @@
     },
     {
       "path": "ui/react-app/src/components/ContentCard.jsx",
-      "sha256": "3c206bbd5eb49dbf3073673d60f43532459bfc28d41ee4cf4a59ffde94e67552",
-      "bytes": 27212
+      "sha256": "43fb3b6e95b1b42d408099cf201f1833a8440e87e2cdbb7de68a68e176122e73",
+      "bytes": 27213
     },
     {
       "path": "ui/react-app/src/components/ContentCard.test.jsx",
@@ -10680,8 +10695,8 @@
     },
     {
       "path": "ui/react-app/src/components/MonthGiftSummary.test.jsx",
-      "sha256": "9b505a6117de9082e7935150c11d4123eb01fb1f741d64bc7b84293bc0d08c46",
-      "bytes": 1849
+      "sha256": "6bf2b363d308c9af051c7fc02202e153697eb252982c6bcb96c681e3649fee2d",
+      "bytes": 3603
     },
     {
       "path": "ui/react-app/src/components/MusicServicesTab.jsx",
@@ -11679,6 +11694,11 @@
       "bytes": 4042
     },
     {
+      "path": "ui/react-app/src/components/voice/BottomRow.stageReply.test.jsx",
+      "sha256": "1639796a7b2209e0a39dbe4eeb81f8d66823320eba6395f9c74c02a3b71664f1",
+      "bytes": 3139
+    },
+    {
       "path": "ui/react-app/src/components/voice/HandsFreeMicIndicator.jsx",
       "sha256": "db4e18f5d98d87ccf6c7fedc326a89e1d7eb726c7d70b60e31b812c1adec8735",
       "bytes": 2631
@@ -11999,6 +12019,11 @@
       "bytes": 9124
     },
     {
+      "path": "ui/react-app/src/hooks/useVoice.holdToTalk.test.js",
+      "sha256": "1b6f917d8b9c96294b722a97eb7f20c295e2279c13690572ec38113e18c90f23",
+      "bytes": 5836
+    },
+    {
       "path": "ui/react-app/src/hooks/useVoice.js",
       "sha256": "c463bdc7372ee1a4be7412f26f4347e89c462fe6b98de804a3c1d31d147604af",
       "bytes": 19024
@@ -12077,6 +12102,11 @@
       "path": "ui/react-app/src/i18n/index.js",
       "sha256": "e0fc9e8e4115a23164738b3c43fd97d778599f62ac06ca46d2e909db4bfd24ea",
       "bytes": 630
+    },
+    {
+      "path": "ui/react-app/src/lib/auth_context.desktopRestore.test.jsx",
+      "sha256": "65db4e1966e98b3961df714335c4ff1c158a8592b80292f0abc100761891f5cd",
+      "bytes": 4781
     },
     {
       "path": "ui/react-app/src/lib/auth_context.monthGift.test.jsx",
@@ -12445,8 +12475,13 @@
     },
     {
       "path": "ui/react-app/src/utils/stageMarkdown.jsx",
-      "sha256": "7f73182e1fdbdf598b88db9943d62451c3e7459d6617af51e49a03150d75699b",
-      "bytes": 4561
+      "sha256": "7cad46027e8577703ec090d615cedf35adeb10beeb34f1cf7e7d3869b0977cc8",
+      "bytes": 4690
+    },
+    {
+      "path": "ui/react-app/src/utils/stageMarkdown.test.jsx",
+      "sha256": "5dc77dd8145153780da1e9da57a907a79bd2022e6ac5a4a425337283888de6f2",
+      "bytes": 2668
     },
     {
       "path": "ui/react-app/src/utils/syncQuality.test.js",
