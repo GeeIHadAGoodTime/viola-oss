@@ -486,6 +486,51 @@ async def _send_email_via_system_backend(to: str, subject: str, body: str) -> To
     )
 
 
+async def email_send_unavailable(user_id: str | None) -> ToolResult | None:
+    """A not-sent result when this user has no way to send email, else None.
+
+    Checked before the "send this email?" confirmation, so a user with no
+    connected account is told so (and offered the connection) instead of
+    being asked to approve a send that cannot happen, and instead of the
+    agent trying to send through a webmail site in the browser (1.0.5 laptop
+    A6.5). Any doubt answers "available": the send path itself still reports
+    a real failure.
+    """
+    scoped = _effective_send_user_id(user_id)
+    if scoped:
+        try:
+            from services.oauth.credentials import get_google_credentials
+            from services.oauth.google import get_enabled_gmail_send_scopes
+
+            creds = await get_google_credentials(scoped, required_scopes=get_enabled_gmail_send_scopes())
+            if creds is not None and str(getattr(creds, "token", "") or "").strip():
+                return None
+        except Exception as exc:  # noqa: BLE001, RUF100 - unknown means "try the send", never block it
+            logger.debug("Email readiness: Google credential lookup failed: %s", exc)
+            return None
+    cfg = _get_email_settings()
+    if cfg.get("smtp_host") and cfg.get("address") and cfg.get("password"):
+        return None
+    try:
+        services, errors = _configured_system_email_backends()
+    except Exception as exc:  # noqa: BLE001, RUF100 - unknown means "try the send", never block it
+        logger.debug("Email readiness: system backend lookup failed: %s", exc)
+        return None
+    if services or errors:
+        return None
+    send_scope_missing = bool(scoped) and _google_connected_without_send(scoped)
+    result = _google_not_connected_result(send_scope_missing=send_scope_missing)
+    result.data = dict(result.data or {})
+    result.data.update(
+        {
+            "offers_setup": True,
+            "setup_url": "/settings#google",
+            "asked_user": False,
+        }
+    )
+    return result
+
+
 async def send_email(to: str, subject: str, body: str, *, user_id: str | None = None) -> ToolResult:
     """Send an email from the user's Gmail, or a configured SMTP / system backend.
 

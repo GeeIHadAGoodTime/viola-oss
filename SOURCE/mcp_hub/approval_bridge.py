@@ -382,6 +382,23 @@ def _derive_risk_from_annotations(tool_name: str) -> RiskLevel | None:
     return RiskLevel.CONFIRM
 
 
+# self_manage actions that only read Viola's own version/update status.
+_SELF_MANAGE_READ_ONLY_ACTIONS = frozenset({"update_status", "check_updates", "update"})
+
+
+def _gate_lets_through(tool_name: str, args: Mapping[str, Any] | None) -> bool:
+    """The confirm-or-cancel gate needs nothing for this call (read-only shell, new saved file)."""
+    from intent.irreversible_actions import gate_action_class
+
+    try:
+        from intent.content_sanitizer import context_is_tainted
+
+        tainted = context_is_tainted()
+    except (ImportError, AttributeError):
+        tainted = True
+    return gate_action_class(tool_name, args, None, tainted=tainted) is None
+
+
 def _derive_call_risk_from_args(tool_name: str, args: Mapping[str, Any] | None) -> RiskLevel | None:
     """Return a per-call risk override when a compound tool mixes safe and dangerous actions."""
     normalized_tool_name = _normalize_workspace_tool_name(tool_name)
@@ -393,6 +410,8 @@ def _derive_call_risk_from_args(tool_name: str, args: Mapping[str, Any] | None) 
         return RiskLevel.DANGEROUS
 
     if is_irreversible_tool_call(tool_name, args, None):
+        if _gate_lets_through(tool_name, args):
+            return RiskLevel.SAFE
         return RiskLevel.DANGEROUS
 
     if tool_name.startswith("api_"):
@@ -400,6 +419,15 @@ def _derive_call_risk_from_args(tool_name: str, args: Mapping[str, Any] | None) 
         if method in {"GET", "HEAD", "OPTIONS"}:
             return RiskLevel.CONFIRM
         return RiskLevel.DANGEROUS
+
+    if tool_name == "self_manage":
+        # "Is there a Viola update?" is a read-only manifest check. As a
+        # DANGEROUS call it was refused before any prompt (1.0.5 laptop X8.9).
+        # Installing packages and enabling Codex keep the full confirmation.
+        action = str((args or {}).get("action") or "update_status").strip().lower()
+        if action in _SELF_MANAGE_READ_ONLY_ACTIONS:
+            return RiskLevel.SAFE
+        return None
 
     if tool_name == "playlist":
         if not args:

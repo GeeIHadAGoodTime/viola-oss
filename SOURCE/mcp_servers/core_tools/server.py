@@ -930,6 +930,48 @@ def _resolve_share_export_path(
     return candidate
 
 
+def _resolve_share_local_path(
+    *,
+    destination: str,
+    title: str,
+    file_format: str,
+    content: str,
+) -> tuple[Path, str | None]:
+    """Where share_response saves on the desktop, or an error.
+
+    The destination is read like a file-tool path (``Desktop/x.txt`` is the
+    user's real Desktop, a bare name goes to Documents). An explicit file that
+    already exists is refused rather than overwritten.
+    """
+    from intent.tools.filesystem import resolve_user_path_text
+
+    fmt = (file_format or "md").strip().lower()
+    if fmt not in {"md", "txt"}:
+        fmt = "md"
+    raw = (destination or "").strip()
+    if raw:
+        target = Path(resolve_user_path_text(raw))
+        if raw.endswith(("/", "\\")) or target.is_dir():
+            stem = _slug_part(title.strip() or _title_from_content(content))
+            target = target / ("%s.%s" % (stem, fmt))
+        elif not target.suffix:
+            target = target.with_name("%s.%s" % (target.name, fmt))
+        if target.exists():
+            return target, (
+                "%s already exists, so nothing was saved. To add to it or change it, use file_write "
+                "(action append or edit); to keep both, save under a new name." % target
+            )
+        return target, None
+    base = Path(resolve_user_path_text("Documents"))
+    stem = _slug_part(title.strip() or _title_from_content(content))
+    target = base / ("%s.%s" % (stem, fmt))
+    counter = 2
+    while target.exists():
+        target = base / ("%s_%d.%s" % (stem, counter, fmt))
+        counter += 1
+    return target, None
+
+
 def _require_gate_user_id() -> str | None:
     """Return the explicit MCP caller user_id for sensitive gate tools."""
     user_id = _get_call_user_id()
@@ -1563,7 +1605,7 @@ async def run_command(
     working_directory: Annotated[
         str,
         Field(
-            description="Working directory for the command. Leave empty to use the default process directory, or provide an absolute path to run elsewhere."
+            description="Working directory for the command. Leave empty to run in the user's home folder, or provide an absolute path to run elsewhere."
         ),
     ] = "",
 ) -> str:
@@ -2899,8 +2941,11 @@ async def sms_send(
         "the exact content supplied in explicit_text; 'last_n_messages' selects a short transcript. "
         "destination_kind must be sms, email, or file. For sms/email, destination is the phone number or "
         "email address. If the user says 'my email' without an address, leave destination blank; "
-        "the tool will use the account owner's email. For file, destination is an optional file name or "
-        "title; the saved path is always scoped under data/exports/<user_id>/."
+        "the tool will use the account owner's email. For file, destination is where to save a NEW file: "
+        "include the folder the user named, for example 'Desktop/notes.txt' or 'Downloads/plan.md' (these "
+        "mean the user's real folders) or a full path; a bare name is saved in Documents. It never "
+        "replaces an existing file: to add to or change a file, use file_write. The result gives the exact "
+        "saved path; tell the user that path."
     ),
     annotations=_CONFIRM,
     meta={"risk": "confirm", "irreversible": True},
@@ -2914,9 +2959,9 @@ async def share_response(
         str,
         Field(
             description=(
-                "Phone number for sms, email address for email, or optional file name/title for file saves. "
-                "For email, leave blank when the user asks for 'my email' and did not provide an address. "
-                "File saves are always written under data/exports/<user_id>/."
+                "Phone number for sms, email address for email, or for file the path of the new file, "
+                "including the folder the user named (for example 'Desktop/notes.txt'). "
+                "For email, leave blank when the user asks for 'my email' and did not provide an address."
             )
         ),
     ] = "",
@@ -3049,14 +3094,35 @@ async def share_response(
             delivery=delivery,
         )
 
-    export_path = _resolve_share_export_path(
-        user_id=user_id,
-        destination=destination_text,
-        title=title_text,
-        file_format=file_format,
-        content=content,
-    )
-    write_result = await _write_file(str(export_path), content)
+    if _local_surface_refusal("file_write") is None:
+        # On the user's own computer a saved answer goes where the user said
+        # (Desktop, Documents, a full path), resolved to their real folders,
+        # and a bare name lands in Documents. It never replaces an existing
+        # file: changing a file is file_write's job, with its own backups.
+        export_path, path_error = _resolve_share_local_path(
+            destination=destination_text,
+            title=title_text,
+            file_format=file_format,
+            content=content,
+        )
+        if path_error:
+            return _share_error(
+                path_error,
+                destination_kind=kind,
+                destination=str(export_path),
+                content_source=content_source,
+                content_length=content_length,
+            )
+        write_result = await _write_file(str(export_path), content, scope=_file_scope(required=False))
+    else:
+        export_path = _resolve_share_export_path(
+            user_id=user_id,
+            destination=destination_text,
+            title=title_text,
+            file_format=file_format,
+            content=content,
+        )
+        write_result = await _write_file(str(export_path), content)
     if not getattr(write_result, "ok", False):
         return _share_error(
             getattr(write_result, "error", "") or "File save failed.",
@@ -3073,6 +3139,7 @@ async def share_response(
         path=str(export_path),
         content_source=content_source,
         content_length=content_length,
+        message="Saved to %s. Tell the user this exact path." % export_path,
     )
 
 
@@ -3083,14 +3150,15 @@ async def share_response(
 
 @server.tool(
     description=(
-        "Manage Viola's local tooling and read her own update status. "
-        "Actions: update_status (offline version report with manual reinstall guidance), "
+        "Check whether a newer Viola version is available ('is there a Viola update?') and manage "
+        "Viola's local tooling. "
+        "Actions: update_status (read-only: checks the public update manifest and reports the current "
+        "and latest version; needs no confirmation), "
         "setup_codex, install_package (pip/npm). "
         "install_package is an extension path — Viola can grow her own dependencies. "
         "Prefer proposing an install over declining when a missing dependency is the "
-        "only thing preventing a reasonable task. The user confirms before anything runs. "
-        "Note: the agent does NOT apply Viola updates — update_status does not call a manifest; "
-        "users reinstall manually from useviola.com."
+        "only thing preventing a reasonable task. The user confirms before setup_codex or "
+        "install_package runs. The agent does not apply Viola updates; it only reports them."
     ),
     annotations=_DANGEROUS,
     meta={"risk": "destructive"},

@@ -50,6 +50,11 @@ CRITICAL_ALWAYS_LOAD_TOOLS = frozenset(
         "browser_run_script",
         "ask_user",
         "desktop_volume",
+        # "What's on my screen?": a compact first-turn tool, like desktop_volume,
+        # so the full computer schema can stay deferred. With only the bare
+        # name "computer" in the catalog the model never found a screen tool
+        # (1.0.5 laptop A6.4). Hidden below Symphony by the tier filter.
+        "view_screen",
         "media",
         "memory",
         "payment",

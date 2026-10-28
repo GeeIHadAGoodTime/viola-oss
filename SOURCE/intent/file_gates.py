@@ -27,9 +27,11 @@ Asks first
     .reg files, PowerShell profiles, LaunchAgents/systemd user units, and
     program files (.exe, .dll, .lnk, ...).
 
-Untrusted content still wins: while the conversation is tainted (web page,
-email, a file the user did not name ...) every file change goes to the
-confirm-or-cancel gate, exactly as ``intent.content_sanitizer`` requires.
+Untrusted content narrows this: while the conversation is tainted (web page,
+email, a file the user did not name ...) the only changes that go ahead are
+edits and writes to a file the user named in their current message (injected
+text cannot put words in the user's message); every other change goes to the
+confirm-or-cancel gate, as ``intent.content_sanitizer`` requires.
 
 The decision needs to know who is asking and what the user said, so the agent
 loop binds a :class:`FileGateContext` for the run. Without one (any other
@@ -357,6 +359,22 @@ def _action_of(args: Mapping[str, Any] | None) -> str:
 # ---------------------------------------------------------------------------
 
 
+def _named_in_current_request(p: Path) -> bool:
+    """The user's message for this turn names this file (by name or full path)."""
+    try:
+        from intent.content_sanitizer import active_taint_tracker
+
+        words = str(getattr(active_taint_tracker(), "user_request", "") or "")
+    except ImportError:  # pragma: no cover - same package
+        return False
+    if not words.strip():
+        return False
+    if _name_mentioned(p.name, words):
+        return True
+    text = _norm(words)
+    return any(_contains_path(text, form) for form in _path_forms(p, _home()) if "/" in form)
+
+
 def base_file_write_class(action: str) -> str | None:
     """Context-free class: what this action is when nothing vouches for it."""
     if action in _NEVER_ASK_ACTIONS:
@@ -376,7 +394,7 @@ def file_write_action_class(args: Mapping[str, Any] | None) -> str | None:
     if base is None or action in _DELETE_ACTIONS:
         return base
     context = active_file_gate_context()
-    if context is None or not context.user_id or _tainted():
+    if context is None or not context.user_id:
         return base
     known = _EDIT_ACTIONS | _WRITE_ACTIONS | _MOVE_ACTIONS | _COPY_ACTIONS
     if action not in known:
@@ -384,6 +402,20 @@ def file_write_action_class(args: Mapping[str, Any] | None) -> str | None:
     path = _resolve((args or {}).get("path"))
     if path is None:
         return base
+    if _tainted():
+        # Untrusted content is in the conversation, so only a change the user
+        # asked for in this very message, to a file they named in it, goes
+        # ahead (1.0.5 laptop A6.2a: "add a line ... to viola-test.txt on my
+        # desktop" asked, while an earlier web page sat in the chat). Injected
+        # text cannot put a file name into the user's own words. Everything
+        # else asks, as before.
+        if action not in _EDIT_ACTIONS | _WRITE_ACTIONS or not _named_in_current_request(path):
+            return base
+        if is_autostart_location(path):
+            return FILE_AUTOSTART
+        if is_executable_file(path):
+            return FILE_EXECUTABLE
+        return None
     destination = None
     if action in _MOVE_ACTIONS | _COPY_ACTIONS:
         destination = _resolve((args or {}).get("destination"))

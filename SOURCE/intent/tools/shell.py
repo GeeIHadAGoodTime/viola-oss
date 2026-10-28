@@ -11,7 +11,9 @@ import asyncio
 import datetime
 import fnmatch
 import os
+import re
 import shlex
+import subprocess
 import sys
 from pathlib import Path
 from typing import Literal
@@ -347,6 +349,83 @@ def _redact_shell_log_value(value: str) -> str:
     return str(redact_diagnostic_payload(str(value or "")))
 
 
+# Words that mark a read of secrets (keys, passwords, tokens, browser and
+# credential stores). A read-only command naming any of them still asks.
+_SENSITIVE_READ_RE = re.compile(
+    r"ssh|\.aws|gnupg|\bgpg\b|credential|passw|secret|token|\bkeys?\b|\.key\b|\.pem\b|id_rsa|id_ed25519"
+    r"|\.env\b|netrc|npmrc|pypirc|wallet|cookie|vault|keychain|keystore|login data|cmdkey|vaultcmd"
+    r"|\bdpapi\b|\bsam\b|system32[\\/]config\b",
+    re.IGNORECASE,
+)
+
+
+def is_read_only_command(command: object, working_directory: object = "") -> bool:
+    """True when the shell safety parser proves the command only reads.
+
+    ``echo``, ``dir``, ``pwd``, ``git status`` and the like change nothing,
+    so they run without a confirmation (founder rule: confirm only at
+    crucial moments). Anything the parser cannot prove read-only, or that is
+    too long to run, keeps the confirmation. Fails closed on any error.
+    """
+    text = str(command or "").strip()
+    if not text or len(text) > _MAX_COMMAND_LENGTH:
+        return False
+    if _SENSITIVE_READ_RE.search(text):
+        # Reading keys, passwords or tokens is never "harmless": the file
+        # tools refuse those paths, so the shell must at least ask.
+        return False
+    try:
+        cwd = str(working_directory or "").strip() or _default_working_directory()
+        decision = validate_shell_command(text, _infer_shell(text, None), cwd, "default")
+    except Exception:  # noqa: BLE001, RUF100 - an unparseable command keeps its confirmation
+        return False
+    return decision.behavior == "allow" and bool(decision.read_only)
+
+
+def _default_working_directory() -> str:
+    """Where a command runs when the model names no folder: the user's home.
+
+    It used to be Viola's own folder, which on an installed build is the
+    program directory, so "dir" or a relative path answered about Viola's
+    install instead of the user's files.
+    """
+    try:
+        home = Path.home()
+        if home.is_dir():
+            return str(home)
+    except (OSError, RuntimeError):
+        pass
+    return str(_PROJECT_ROOT)
+
+
+def _run_process_blocking(
+    command: str,
+    argv: list[str] | None,
+    cwd: str,
+    env: dict[str, str],
+    timeout: float,
+) -> tuple[int, bytes, bytes]:
+    """Run one command to completion on the calling (worker) thread.
+
+    ``subprocess.run`` kills the child when ``timeout`` expires and re-raises
+    ``TimeoutExpired``. No console window is opened on Windows.
+    """
+    creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0) if sys.platform == "win32" else 0
+    completed = subprocess.run(  # noqa: S603, RUF100 - validated by validate_shell_command and confirmed by the user
+        command if argv is None else argv,
+        shell=argv is None,  # noqa: S602, RUF100 - same: shell syntax was validated before this point
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        cwd=cwd,
+        env=env,
+        timeout=timeout,
+        check=False,
+        creationflags=creationflags,
+    )
+    return completed.returncode, completed.stdout or b"", completed.stderr or b""
+
+
 async def run_command(
     command: str,
     timeout: float = _DEFAULT_TIMEOUT,
@@ -376,7 +455,7 @@ async def run_command(
             return ToolResult(ok=False, error="Working directory does not exist: %s" % cwd)
         cwd_str = str(cwd)
     else:
-        cwd_str = str(_PROJECT_ROOT)
+        cwd_str = _default_working_directory()
 
     timeout = min(max(float(timeout), 1.0), _MAX_TIMEOUT)
     decision = validate_shell_command(command, _infer_shell(command, shell), cwd_str, permission_mode)
@@ -418,39 +497,45 @@ async def run_command(
 
     use_shell = _requires_shell_interpretation(command, decision.shell)
     proc: asyncio.subprocess.Process | None = None
+    if decision.shell == "powershell":
+        powershell_exe = "powershell.exe" if sys.platform == "win32" else "pwsh"
+        argv: list[str] | None = [powershell_exe, "-NoProfile", "-NonInteractive", "-Command", command]
+    elif use_shell:
+        argv = None
+    else:
+        argv = shlex.split(command, posix=(decision.shell == "bash"))
+    returncode: int | None = None
 
     try:
-        if decision.shell == "powershell":
-            powershell_exe = "powershell.exe" if sys.platform == "win32" else "pwsh"
-            proc = await asyncio.create_subprocess_exec(
-                powershell_exe,
-                "-NoProfile",
-                "-NonInteractive",
-                "-Command",
-                command,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                cwd=cwd_str,
-                env=env,
-            )
-        elif use_shell:
-            proc = await asyncio.create_subprocess_shell(
-                command,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                cwd=cwd_str,
-                env=env,
+        try:
+            if argv is None:
+                proc = await asyncio.create_subprocess_shell(
+                    command,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                    cwd=cwd_str,
+                    env=env,
+                )
+            else:
+                proc = await asyncio.create_subprocess_exec(
+                    *argv,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                    cwd=cwd_str,
+                    env=env,
+                )
+        except NotImplementedError:
+            # The desktop runs its tools on a Windows selector event loop
+            # (Qt integration), which cannot create subprocesses. Every
+            # confirmed command then failed and the model asked to confirm a
+            # new one, forever (1.0.5 laptop X8.1). Run it on a worker thread.
+            returncode, stdout, stderr = await asyncio.to_thread(
+                _run_process_blocking, command, argv, cwd_str, env, timeout
             )
         else:
-            proc = await asyncio.create_subprocess_exec(
-                *shlex.split(command, posix=(decision.shell == "bash")),
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                cwd=cwd_str,
-                env=env,
-            )
-        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
-    except TimeoutError:
+            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
+            returncode = proc.returncode
+    except (TimeoutError, subprocess.TimeoutExpired):
         logger.warning("Shell command timed out after %.0fs: %s", timeout, _redact_shell_log_value(command[:100]))
         if proc is not None:
             try:
@@ -474,7 +559,7 @@ async def run_command(
         stderr_text = stderr_text[:_MAX_OUTPUT_CHARS] + "\n... [stderr truncated]"
         truncated = True
 
-    returncode = proc.returncode or 0
+    returncode = returncode or 0
     _audit_log(command, cwd_str, exit_code=returncode)
 
     result_data = {

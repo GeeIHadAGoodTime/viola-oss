@@ -197,6 +197,20 @@ def should_defer_confirmation_on_empty_response(channel: Any | None) -> bool:
     return getattr(channel, "defer_confirmation_on_ask_none", False) is True
 
 
+def _carries_confirmation_token(tool_args: dict[str, Any]) -> bool:
+    """True when the call carries this layer's own cross-turn confirmation fields.
+
+    A bare ``confirmed`` is also an ordinary parameter of some tools
+    (``self_manage(confirmed=False)`` is its preview step), and strict tool
+    schemas make the model send it on every call. Read as a confirmation token
+    with no id, it turned every such call into a silent "rejected": the tool
+    was refused as "not approved by the user" and no prompt was ever shown
+    (1.0.5 laptop X8.9). Only an explicit id or ``_approval_confirmed`` is a
+    token; a bare ``confirmed`` goes through the normal match-or-ask path.
+    """
+    return any(key in tool_args for key in _CONFIRMATION_ARG_KEYS if key != "confirmed")
+
+
 class ConfirmationDeferred(RuntimeError):
     """Raised when approval must continue through the conversational surface."""
 
@@ -559,7 +573,7 @@ class ApprovalManager:
     ) -> Literal["missing", "accepted", "rejected"]:
         """Validate and consume a structured cross-turn confirmation."""
 
-        if not isinstance(tool_args, dict) or not any(key in tool_args for key in _CONFIRMATION_ARG_KEYS):
+        if not isinstance(tool_args, dict) or not _carries_confirmation_token(tool_args):
             if allow_implicit_match:
                 return self._consume_matching_deferred_confirmation(
                     tool_name=tool_name,

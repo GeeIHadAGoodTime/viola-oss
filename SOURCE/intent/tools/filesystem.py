@@ -254,6 +254,165 @@ def _windows_system_dir(p: Path) -> str | None:
     return None
 
 
+# ---------------------------------------------------------------------------
+# The user's own folders. "Desktop", "Documents", "Downloads" ... and relative
+# paths mean the user's real folders, never Viola's install or working folder.
+# 1.0.5 laptop X8.2: "save it to a file on my desktop" was written as the
+# relative path ``Desktop\viola-share-test.txt`` and landed inside the program
+# folder (lost on the next update) while Viola said "on your desktop".
+# ---------------------------------------------------------------------------
+
+# Windows KNOWNFOLDERIDs. SHGetKnownFolderPath returns the folder where the
+# user really keeps it, including OneDrive / folder redirection.
+_KNOWN_FOLDER_IDS: dict[str, str] = {
+    "desktop": "{B4BFCC3A-DB2C-424C-B029-7FE99A87C641}",
+    "documents": "{FDD39AD0-238F-46AF-ADB4-6C85480369C7}",
+    "downloads": "{374DE290-123F-4565-9164-39C4925E467B}",
+    "pictures": "{33E28130-4E1E-4676-835A-98395C3BC3BB}",
+    "music": "{4BD8D571-6D19-48D3-BE97-422220080E43}",
+    "videos": "{18989B1D-99B5-455B-841C-AB7C74E4DDFC}",
+}
+_KNOWN_FOLDER_ALIASES: dict[str, str] = {
+    "desktop": "desktop",
+    "documents": "documents",
+    "my documents": "documents",
+    "downloads": "downloads",
+    "pictures": "pictures",
+    "my pictures": "pictures",
+    "photos": "pictures",
+    "music": "music",
+    "my music": "music",
+    "videos": "videos",
+    "my videos": "videos",
+    "movies": "videos",
+}
+# freedesktop user-dirs.dirs keys.
+_XDG_KEYS: dict[str, str] = {
+    "desktop": "XDG_DESKTOP_DIR",
+    "documents": "XDG_DOCUMENTS_DIR",
+    "downloads": "XDG_DOWNLOAD_DIR",
+    "pictures": "XDG_PICTURES_DIR",
+    "music": "XDG_MUSIC_DIR",
+    "videos": "XDG_VIDEOS_DIR",
+}
+_DEFAULT_FOLDER_NAMES: dict[str, str] = {
+    "desktop": "Desktop",
+    "documents": "Documents",
+    "downloads": "Downloads",
+    "pictures": "Pictures",
+    "music": "Music",
+    "videos": "Videos",
+}
+# Where a bare relative name ("notes.txt", "projects/plan.md") goes.
+_RELATIVE_PATH_BASE_FOLDER = "documents"
+
+
+def _windows_known_folder(folder_id: str) -> Path | None:
+    import ctypes
+    from ctypes import wintypes
+
+    class _GUID(ctypes.Structure):
+        _fields_ = [
+            ("Data1", wintypes.DWORD),
+            ("Data2", wintypes.WORD),
+            ("Data3", wintypes.WORD),
+            ("Data4", ctypes.c_ubyte * 8),
+        ]
+
+    guid = _GUID()
+    ole32 = ctypes.windll.ole32  # type: ignore[attr-defined]
+    if ole32.CLSIDFromString(ctypes.c_wchar_p(folder_id), ctypes.byref(guid)) != 0:
+        return None
+    path_ptr = ctypes.c_wchar_p()
+    shell32 = ctypes.windll.shell32  # type: ignore[attr-defined]
+    result = shell32.SHGetKnownFolderPath(ctypes.byref(guid), 0, None, ctypes.byref(path_ptr))
+    try:
+        if result != 0 or not path_ptr.value:
+            return None
+        return Path(path_ptr.value)
+    finally:
+        ole32.CoTaskMemFree(path_ptr)
+
+
+def _xdg_user_dir(key: str, home: Path) -> Path | None:
+    config_home = Path(os.environ.get("XDG_CONFIG_HOME") or (home / ".config"))
+    try:
+        text = (config_home / "user-dirs.dirs").read_text(encoding="utf-8")
+    except OSError:
+        return None
+    match = re.search(r'^\s*%s\s*=\s*"([^"]*)"' % re.escape(key), text, flags=re.MULTILINE)
+    if not match:
+        return None
+    value = match.group(1).replace("$HOME", str(home))
+    return Path(value) if value else None
+
+
+def user_known_folder(name: str) -> Path | None:
+    """The user's real Desktop / Documents / Downloads / ... folder, or None.
+
+    Windows asks the shell (OneDrive and redirected folders included); Linux
+    reads the freedesktop user-dirs file; otherwise ``~/<Name>``.
+    """
+    key = _KNOWN_FOLDER_ALIASES.get(str(name or "").strip().lower())
+    if key is None:
+        return None
+    try:
+        home = Path.home()
+    except (OSError, RuntimeError):
+        return None
+    if os.name == "nt":
+        try:
+            found = _windows_known_folder(_KNOWN_FOLDER_IDS[key])
+        except (AttributeError, OSError, ValueError):
+            found = None
+        if found is not None:
+            return found
+    elif key in _XDG_KEYS:
+        found = _xdg_user_dir(_XDG_KEYS[key], home)
+        if found is not None:
+            return found
+    return home / _DEFAULT_FOLDER_NAMES[key]
+
+
+def _split_first_component(text: str) -> tuple[str, str]:
+    parts = re.split(r"[\\/]+", text, maxsplit=1)
+    head = parts[0]
+    rest = parts[1] if len(parts) > 1 else ""
+    return head, rest
+
+
+def resolve_user_path_text(path_str: str) -> str:
+    """Turn what the model wrote into the path the user means.
+
+    * ``~`` and environment variables expand as usual.
+    * ``Desktop/x``, ``~/Desktop/x``, ``Documents``, ``Downloads/...`` (and
+      Pictures, Music, Videos) go to the user's real known folder.
+    * Any other relative path goes under the user's Documents folder.
+    * Absolute paths are left exactly as written.
+    """
+    text = os.path.expandvars(str(path_str or "").strip())
+    if not text:
+        return text
+    if text == "~" or text.startswith(("~/", "~\\")):
+        rest = text[2:] if len(text) > 1 else ""
+        head, tail = _split_first_component(rest)
+        folder = user_known_folder(head) if head else None
+        if folder is not None:
+            return str(folder / tail) if tail else str(folder)
+        return os.path.expanduser(text)
+    text = os.path.expanduser(text)
+    if os.path.isabs(text) or re.match(r"^[A-Za-z]:", text) or text.startswith(("\\\\", "//")):
+        return text
+    head, tail = _split_first_component(text)
+    folder = user_known_folder(head)
+    if folder is not None:
+        return str(folder / tail) if tail else str(folder)
+    base = user_known_folder(_RELATIVE_PATH_BASE_FOLDER)
+    if base is None:
+        return text
+    return str(base / text)
+
+
 def _validate_path(path_str: str) -> tuple[Path, str | None]:
     """Validate and resolve a filesystem path.
 
@@ -263,7 +422,7 @@ def _validate_path(path_str: str) -> tuple[Path, str | None]:
     if not str(path_str or "").strip():
         return Path("."), "A path is required"
     try:
-        p_raw = Path(os.path.expanduser(str(path_str).strip()))
+        p_raw = Path(resolve_user_path_text(str(path_str)))
     except (ValueError, OSError) as exc:
         return Path("."), "Invalid path: %s" % exc
 
