@@ -55,12 +55,40 @@ function elapsedSecondsFor(agent) {
   return (Date.now() - parsed) / 1000;
 }
 
+const TOOL_ACTION_PREFIX = 'viola-tool-action:v1:';
+
+/**
+ * The card title. Scheduled work is stored as an encoded tool action; the
+ * backend now sends a readable title, and this keeps an older or unexpected
+ * encoded value from ever reaching the screen raw (1.0.5 build 5 reminder card).
+ */
+export function agentTaskTitle(agent) {
+  const raw = agent?.task || agent?.reason || 'Background task';
+  if (typeof raw !== 'string' || !raw.startsWith(TOOL_ACTION_PREFIX)) return raw;
+  try {
+    const payload = JSON.parse(raw.slice(TOOL_ACTION_PREFIX.length));
+    const args = payload && typeof payload.args === 'object' && payload.args ? payload.args : {};
+    const text = (value) => (typeof value === 'string' ? value.trim() : '');
+    if (payload?.tool === 'notify') {
+      const message = text(args.message);
+      if (!message) return 'Reminder';
+      return /^reminder/i.test(message) ? message : `Reminder: ${message}`;
+    }
+    if (payload?.tool === 'alarm') return text(args.label) && text(args.label).toLowerCase() !== 'alarm' ? `Alarm: ${text(args.label)}` : 'Alarm';
+    if (payload?.tool === 'playback') return args.reason === 'sleep_timer' ? 'Sleep timer' : 'Music';
+  } catch { /* fall through to the generic title */ }
+  return 'Scheduled task';
+}
+
 export default function AgentCard({ agent, thinkingText = '', onCancel }) {
   const status = agent.status || 'running';
   const statusStyle = statusStyleFor(status);
   const terminal = ['completed', 'cancelled', 'killed', 'error', 'failed'].includes(status);
-  const visibleThinking = thinkingText ? thinkingText.slice(-80) : 'Waiting for reasoning...';
-  const task = agent.task || agent.reason || 'Background task';
+  const scheduled = agent.subagent_type === 'scheduler' || String(agent.reason || '').startsWith('scheduler:');
+  const visibleThinking = thinkingText
+    ? thinkingText.slice(-80)
+    : scheduled ? (terminal ? 'Scheduled task' : 'Running a scheduled task') : 'Waiting for reasoning...';
+  const task = agentTaskTitle(agent);
 
   return (
     <article
@@ -166,6 +194,7 @@ AgentCard.propTypes = {
     agent_id: PropTypes.string.isRequired,
     task: PropTypes.string,
     reason: PropTypes.string,
+    subagent_type: PropTypes.string,
     status: PropTypes.string,
     started_at: PropTypes.string,
     elapsed_seconds: PropTypes.number,

@@ -278,6 +278,78 @@ def maximized_client_inset(frame_x: int, frame_y: int, padded: int) -> tuple[int
     return int(frame_x) + int(padded), int(frame_y) + int(padded)
 
 
+_CLSID_TASKBAR_LIST = "{56FDF344-FD6D-11d0-958A-006097C9A090}"
+_IID_ITASKBAR_LIST2 = "{602D4995-B13A-429b-A66E-1935E44F4317}"
+# ITaskbarList2 vtable: IUnknown (0-2), HrInit 3, AddTab 4, DeleteTab 5,
+# ActivateTab 6, SetActiveAlt 7, MarkFullscreenWindow 8.
+_TASKBAR_HRINIT = 3
+_TASKBAR_MARK_FULLSCREEN = 8
+
+
+def mark_taskbar_fullscreen(hwnd: int, fullscreen: bool) -> bool:
+    """Tell the Windows shell this window is (or no longer is) full screen.
+
+    Qt's showFullScreen() on a frameless window that keeps the Snap styles is
+    not recognised by the shell straight away, so the taskbar stayed on top for
+    a few seconds before Windows' own detection hid it (1.0.5 build 5). This is
+    the call browsers make for the same reason. Windows only; never raises.
+    """
+    if sys.platform != "win32" or not hwnd:
+        return False
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        ole32 = ctypes.windll.ole32
+        # Qt normally initialised COM on the GUI thread already (S_FALSE);
+        # balance any successful init, ignore RPC_E_CHANGED_MODE.
+        com_init = ctypes.c_long(ole32.CoInitializeEx(None, 0x2)).value
+        try:
+            return _mark_taskbar_fullscreen_com(ctypes, wintypes, ole32, hwnd, fullscreen)
+        finally:
+            if com_init in (0, 1):
+                ole32.CoUninitialize()
+    except Exception as exc:  # noqa: BLE001, RUF100 - a shell hint must never break fullscreen
+        logger.debug("MarkFullscreenWindow failed: %s", exc)
+        return False
+
+
+def _mark_taskbar_fullscreen_com(ctypes, wintypes, ole32, hwnd: int, fullscreen: bool) -> bool:
+    """CoCreate ITaskbarList2 and call MarkFullscreenWindow (COM already initialised)."""
+
+    class _GUID(ctypes.Structure):
+        _fields_ = [
+            ("Data1", wintypes.DWORD),
+            ("Data2", wintypes.WORD),
+            ("Data3", wintypes.WORD),
+            ("Data4", ctypes.c_ubyte * 8),
+        ]
+
+    def _guid(text: str) -> _GUID:
+        value = _GUID()
+        ole32.CLSIDFromString(ctypes.c_wchar_p(text), ctypes.byref(value))
+        return value
+
+    clsid = _guid(_CLSID_TASKBAR_LIST)
+    iid = _guid(_IID_ITASKBAR_LIST2)
+    instance = ctypes.c_void_p()
+    hr = ole32.CoCreateInstance(ctypes.byref(clsid), None, 0x1, ctypes.byref(iid), ctypes.byref(instance))
+    if hr != 0 or not instance.value:
+        return False
+    vtable = ctypes.cast(instance, ctypes.POINTER(ctypes.POINTER(ctypes.c_void_p))).contents
+    hr_init = ctypes.WINFUNCTYPE(ctypes.c_long, ctypes.c_void_p)(vtable[_TASKBAR_HRINIT])
+    mark = ctypes.WINFUNCTYPE(ctypes.c_long, ctypes.c_void_p, wintypes.HWND, wintypes.BOOL)(
+        vtable[_TASKBAR_MARK_FULLSCREEN]
+    )
+    release = ctypes.WINFUNCTYPE(ctypes.c_ulong, ctypes.c_void_p)(vtable[2])
+    try:
+        if hr_init(instance) != 0:
+            return False
+        return mark(instance, wintypes.HWND(hwnd), wintypes.BOOL(1 if fullscreen else 0)) == 0
+    finally:
+        release(instance)
+
+
 def _apply_snap_styles(hwnd: int) -> bool:
     import ctypes
 
@@ -803,6 +875,22 @@ class ViolaBridge(QObject):
             else:
                 self._window.hide_browser_overlay()
             logger.info("[ViolaBridge] hideBrowserOverlay called from React")
+
+    @Slot()
+    def showBrowserOverlay(self) -> None:
+        """Reopen the agent's browser view from React (pill or Ctrl+K).
+
+        Shows the native browser surface again where React's browser stage
+        publishes its bounds. It does not start or resume an agent task; the
+        page the agent left open is simply visible again (1.0.5 build 5, A5.2:
+        "Open Agent Browser" showed nothing once the view had been hidden).
+        """
+        if not self._caller_page_is_local():
+            logger.warning("[ViolaBridge] Refused showBrowserOverlay from non-local caller page")
+            return
+        if self._window is not None:
+            self._window.show_browser_overlay("agentic")
+            logger.info("[ViolaBridge] showBrowserOverlay called from React")
 
     @Slot(result=str)
     def quitApp(self) -> str:
@@ -2626,6 +2714,9 @@ class ViolaWebViewWindow(QMainWindow):
         self._setup_fullscreen_title_bar_hide_timer()
         self._setup_window()
         self._setup_ui()
+        # The startup maximized state was applied before the title bar existed,
+        # so its state-change event could not update the maximize/restore glyph.
+        self._sync_title_bar_window_state()
         self._setup_fullscreen_shortcuts()
         self._setup_tray_icon()
         self._setup_web_notification_presenter()
@@ -2724,9 +2815,21 @@ class ViolaWebViewWindow(QMainWindow):
         self.raise_()
         self.activateWindow()
 
+    def _sync_title_bar_window_state(self) -> None:
+        """Make the maximize/restore and fullscreen glyphs match the window now."""
+        title_bar = getattr(self, "title_bar", None)
+        if title_bar is None:
+            return
+        is_fullscreen = self.isFullScreen()
+        title_bar.set_fullscreen_active(is_fullscreen)
+        title_bar.set_maximized_active(self.isMaximized() and not is_fullscreen)
+
     def showEvent(self, event) -> None:
         """Give the native window the styles Windows Snap needs, once it exists."""
         super().showEvent(event)
+        # Shown again from the tray or a second launch without a state change:
+        # re-read the state so the glyph never says "maximize" while maximized.
+        self._sync_title_bar_window_state()
         if sys.platform == "win32" and not self.isFullScreen():
             # Set first: SWP_FRAMECHANGED inside _apply_snap_styles sends
             # WM_NCCALCSIZE synchronously, and nativeEvent must already answer
@@ -3409,6 +3512,11 @@ class ViolaWebViewWindow(QMainWindow):
         else:
             self.title_bar.show()
         self.showFullScreen()
+        # Hide the taskbar now, not when the shell notices a few seconds later.
+        self.raise_()
+        self.activateWindow()
+        if mark_taskbar_fullscreen(int(self.winId()), True):
+            logger.info("Main window: marked full screen for the taskbar")
         self._sync_fullscreen_controls()
         QTimer.singleShot(0, self._position_fullscreen_hint)
         self._show_fullscreen_hint()
@@ -3430,6 +3538,7 @@ class ViolaWebViewWindow(QMainWindow):
             hide_timer.stop()
         self.title_bar.show()
         self._hide_fullscreen_hint(immediate=True)
+        mark_taskbar_fullscreen(int(self.winId()), False)
         if restore_maximized:
             self.showMaximized()
         else:

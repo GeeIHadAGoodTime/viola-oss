@@ -26,3 +26,39 @@ describe('customer month-gift facts', () => {
     expect(screen.queryByText(/Current gift:/)).not.toBeInTheDocument();
   });
 });
+
+// 1.0.5 build 5: the complimentary-access text had no colour of its own and
+// inherited the browser default (black) on the dark Account card.
+function parseColor(value) {
+  const rgba = /rgba?\(([^)]+)\)/.exec(value);
+  if (rgba) {
+    const [r, g, b, a = '1'] = rgba[1].split(',').map((part) => part.trim());
+    return { r: Number(r), g: Number(g), b: Number(b), a: Number(a) };
+  }
+  const hex = /^#([0-9a-f]{6})$/i.exec(value);
+  if (!hex) throw new Error(`unparsed colour ${value}`);
+  const n = parseInt(hex[1], 16);
+  return { r: n >> 16, g: (n >> 8) & 255, b: n & 255, a: 1 };
+}
+function luminance({ r, g, b }) {
+  const channel = (c) => { const v = c / 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
+  return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
+}
+function contrastOn(fg, bg) {
+  const f = parseColor(fg); const b = parseColor(bg);
+  const mixed = { r: f.r * f.a + b.r * (1 - f.a), g: f.g * f.a + b.g * (1 - f.a), b: f.b * f.a + b.b * (1 - f.a) };
+  const [hi, lo] = [luminance(mixed), luminance(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+describe('complimentary-access text is readable', () => {
+  it('sets its own text colours with AA contrast on the Account card', async () => {
+    const { THEME } = await import('../config');
+    render(<MonthGiftSummary entitlement={projection} />);
+    const section = screen.getByTestId('month-gift-summary');
+    expect(section.style.color).not.toBe('');
+    expect(contrastOn(section.style.color, THEME.colors.bgElevated)).toBeGreaterThanOrEqual(4.5);
+    const heading = screen.getByText('Complimentary access');
+    expect(contrastOn(heading.style.color, THEME.colors.bgElevated)).toBeGreaterThanOrEqual(4.5);
+  });
+});

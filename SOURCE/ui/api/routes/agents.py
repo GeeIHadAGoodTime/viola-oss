@@ -232,6 +232,7 @@ def _serialize_task(task: Any, *, now: datetime) -> dict[str, Any]:
         "agent_id": agent_id,
         "task": to_json_value(_field(task, "task")),
         "reason": to_json_value(_field(task, "reason")),
+        "subagent_type": to_json_value(_field(task, "subagent_type")),
         "status": to_json_value(_field(task, "status")),
         "started_at": _json_time(started_at),
         "completed_at": _json_time(completed_at),

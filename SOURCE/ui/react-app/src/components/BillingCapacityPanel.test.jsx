@@ -293,3 +293,54 @@ describe('payment handoff URL', () => {
     }
   });
 });
+
+// 1.0.5 build 5: "Loading billing..." showed for about 5 s every time the
+// Account page opened. The last good read for the same account now shows at
+// once while a fresh read runs, and no change control works until it lands.
+describe('billing card renders the last read immediately', () => {
+  let release;
+  beforeEach(async () => {
+    const { clearBillingSnapshots } = await import('../hooks/useBillingCapacity');
+    clearBillingSnapshots();
+    localStorage.clear();
+    window.viola = { openExternalUrl: vi.fn() };
+    apiFetch.mockReset().mockImplementation(async (path) => {
+      if (path === `${BASE}/catalog`) return catalog;
+      if (path === BASE) return account;
+      throw new Error(`Unexpected request: ${path}`);
+    });
+  });
+  afterEach(() => { delete window.viola; vi.restoreAllMocks(); });
+
+  it('shows the cached summary on the next open and keeps actions disabled until fresh', async () => {
+    const first = render(<BillingCapacityPanel accountId="account-1" />);
+    expect(screen.getByText('Loading billing…')).toBeInTheDocument();
+    await screen.findByText('49% used');
+    first.unmount();
+
+    const pending = [];
+    release = () => pending.forEach((done) => done());
+    apiFetch.mockImplementation((path) => new Promise((resolve) => {
+      pending.push(() => resolve(path === `${BASE}/catalog` ? catalog : { ...account, usage_percent: 50 }));
+    }));
+    render(<BillingCapacityPanel accountId="account-1" />);
+
+    expect(screen.queryByText('Loading billing…')).not.toBeInTheDocument();
+    expect(screen.getByText('49% used')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add more usage' })).toBeDisabled();
+    await act(async () => { release(); });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Add more usage' })).toBeEnabled());
+    expect(screen.getByText('50% used')).toBeInTheDocument();
+  });
+
+  it('never shows one account the cached card of another', async () => {
+    const first = render(<BillingCapacityPanel accountId="account-1" />);
+    await screen.findByText('49% used');
+    first.unmount();
+
+    apiFetch.mockImplementation(() => new Promise(() => {}));
+    render(<BillingCapacityPanel accountId="account-2" />);
+    expect(screen.getByText('Loading billing…')).toBeInTheDocument();
+    expect(screen.queryByText('49% used')).not.toBeInTheDocument();
+  });
+});
