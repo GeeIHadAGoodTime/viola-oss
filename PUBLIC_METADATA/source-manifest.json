@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "4efecd94790662b7d29f8fbad79986354c730d66",
-  "sha256": "42b1c246b73b6ced6bd638a09e885731a99a04cc91d1aac54d1bafe10bb9f96f",
+  "revision": "02eee42cbdb6b5dcf71056d933f4deb6200f8978",
+  "sha256": "17e00defec567666d80432f90d80a814d08d3bb696e9c4cdefecad5cc6676472",
   "files": [
     {
       "path": ".env.example",
@@ -10045,8 +10045,8 @@
     },
     {
       "path": "ui/react-app/src/__tests__/SmartDisplay.test.jsx",
-      "sha256": "d6ed67b15483ab0c61791132f0886673070e12cca5533eb0bc916f10a7f3ec4a",
-      "bytes": 138756
+      "sha256": "645ffd2b6fd3f39760e484fc75773e1504daee0efb26101bcead6edb2a7ab2a9",
+      "bytes": 138922
     },
     {
       "path": "ui/react-app/src/__tests__/hooks/useEventBus.test.jsx",
@@ -11185,12 +11185,12 @@
     },
     {
       "path": "ui/react-app/src/components/player/PlayerSection.module.css",
-      "sha256": "2c0cf11df84838d569bf9e95d8377622ffcf7c7bbe3ba3cc17980e2b3323baa0",
+      "sha256": "1ca765877a78fef38f55d37518fcda7179d996ce838c10912b5bddd38f224fa0",
       "bytes": 3694
     },
     {
       "path": "ui/react-app/src/components/player/PlayerSection.test.jsx",
-      "sha256": "455f2e6a5d17bd5d38c39221dde416cfaf2d26bb9847e568f45dedb12734e9a0",
+      "sha256": "2f301e176fb9727f6467f4fd9bf8af5a922c6e7789e8255f2b78bad6265ca15e",
       "bytes": 4092
     },
     {
@@ -11235,8 +11235,8 @@
     },
     {
       "path": "ui/react-app/src/components/player/VolumeControl.jsx",
-      "sha256": "992d0415df1e74a6b5f2e6005916bf0e0b9399d33edbfe0a75e67e69dc866899",
-      "bytes": 10072
+      "sha256": "7a4878db98f9f7db2b7d42df4c772f560bc5029799382372847fe61eac2e9a04",
+      "bytes": 10586
     },
     {
       "path": "ui/react-app/src/components/player/VolumeControl.module.css",
@@ -11245,8 +11245,8 @@
     },
     {
       "path": "ui/react-app/src/components/player/VolumeControl.test.jsx",
-      "sha256": "1011aac9df04581b0adc4f711c81d69bee60261814a27dd2eec1be8b40df1086",
-      "bytes": 16083
+      "sha256": "f1cfb50aa0af028b8cca47ab39bbf53a6ae0e5ba01db82114cb780afc53f5e51",
+      "bytes": 16773
     },
     {
       "path": "ui/react-app/src/components/settings/AccountRow.jsx",
