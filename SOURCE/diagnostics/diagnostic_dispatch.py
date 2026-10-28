@@ -32,7 +32,11 @@ from typing import Any
 
 from core.logging_config import get_logger
 from diagnostics import diagnostic_consent, diagnostic_spool
-from diagnostics.diagnostic_minimum import build_browser_diagnostic_minimum, build_diagnostic_minimum
+from diagnostics.diagnostic_minimum import (
+    build_browser_diagnostic_minimum,
+    build_diagnostic_minimum,
+    build_native_crash_minimum,
+)
 
 log = get_logger(__name__)
 
@@ -120,6 +124,33 @@ def dispatch_browser_crash_diagnostic(
         return "suppressed"
 
     return _dispatch_built_crash(payload, app_state=app_state)
+
+
+def dispatch_native_crash_diagnostic(
+    *,
+    error_type: Any,
+    error_value: Any,
+    frames: Any = None,
+    surface: str | None = None,
+) -> str:
+    """Handle a native crash found in a previous run's faulthandler log.
+
+    Same baseline and the SAME gates as :func:`dispatch_crash_diagnostic`
+    (``_dispatch_built_crash``): suppressed when opted out, queued until the
+    disclosure has been shown, sent once armed. Never raises.
+    """
+    try:
+        payload = build_native_crash_minimum(
+            error_type=error_type,
+            error_value=error_value,
+            frames=frames,
+            surface=surface or _DEFAULT_SURFACE,
+        )
+    except Exception:  # noqa: BLE001, RUF100 - fail closed; must never raise
+        log.debug("diagnostic-dispatch: native crash minimum build failed", exc_info=True)
+        return "suppressed"
+
+    return _dispatch_built_crash(payload)
 
 
 def dispatch_bug_report_minimum(
@@ -259,5 +290,6 @@ __all__ = [
     "dispatch_browser_crash_diagnostic",
     "dispatch_bug_report_minimum",
     "dispatch_crash_diagnostic",
+    "dispatch_native_crash_diagnostic",
     "flush_spool",
 ]

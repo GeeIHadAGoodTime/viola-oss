@@ -15,11 +15,15 @@ _configure_viola_environment()
 # logs/crash_diag.log in "w" mode, which avoided the shared-file conflation
 # problem only by DESTROYING the previous run's crash evidence on every start --
 # so a crash that took two attempts to notice had already erased itself.
-from core.crash_forensics import install_crash_forensics as _install_crash_forensics
+from core.crash_forensics import (
+    faulthandler_all_threads as _faulthandler_all_threads,
+    install_crash_forensics as _install_crash_forensics,
+)
 
 _crash_forensics = _install_crash_forensics("web_interface")
 _crash_log_path = _crash_forensics.log_path
-_fh.enable(file=_crash_forensics.stream, all_threads=True)
+# Faulting thread only on Windows: see core.crash_forensics.faulthandler_all_threads.
+_fh.enable(file=_crash_forensics.stream, all_threads=_faulthandler_all_threads())
 
 
 def _crash_dump():

@@ -58,13 +58,16 @@ install_process_exception_hooks("desktop_daemon", entry_point="services.daemon.v
 try:
     import faulthandler
 
-    from core.crash_forensics import install_crash_forensics
+    from core.crash_forensics import faulthandler_all_threads, install_crash_forensics
 
     # Run-scoped + dated + module-mapped, and (on Windows) it dies promptly
     # instead of suspending behind an unattended modal dialog. See #4650 and
     # core/crash_forensics.py for why a bare append-only log was undiagnosable.
     _crash_forensics = install_crash_forensics("viola_daemon")
-    faulthandler.enable(file=_crash_forensics.stream, all_threads=True)
+    # Windows: faulting thread only. Dumping every thread from the vectored
+    # handler on a handled first-chance COM exception crashed the app
+    # (see core.crash_forensics.faulthandler_all_threads).
+    faulthandler.enable(file=_crash_forensics.stream, all_threads=faulthandler_all_threads())
 except (OSError, ValueError, RuntimeError, ImportError):
     logger.debug("Daemon faulthandler setup failed (non-critical)", exc_info=True)
 

@@ -30,12 +30,13 @@
   },
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "80d576943cd42b938fb200573202b9a3bc796e90676aed53c976a9a03ff71de8",
-  "source_tree_sha256": "1986cfabf2cbe2c6559600a8506297f813a39e684cea2b7c577baf4383fec624",
-  "source_file_count": 2743,
-  "source_revision": "aab050c3ad26cf604ac3189b6dd7e823436da754",
+  "source_manifest_sha256": "70418a3bc7eec13a6e5b4d2be51a3834b835c98276afcb5f96d7ead003b68ec6",
+  "source_tree_sha256": "18bc60a39eea5da354069dbe43fbcb80ef6c656c6044aa5c9d8b550c34b0f5cd",
+  "source_file_count": 2747,
+  "source_revision": "2f64862574724736fb5b550693677487e0cdadc3",
   "comparison_public_revision": "ecab2772465fcc89ae6645b028af1c2273b9199f",
   "changed_source_paths": [
+    "START_WEB_INTERFACE.py",
     "audio_core/aec_reference_base.py",
     "audio_core/capture/_proctap_subprocess.py",
     "audio_core/capture/proctap_provider.py",
@@ -54,6 +55,7 @@
     "config/settings_validation.py",
     "contracts/fastapi.py",
     "core/constants.py",
+    "core/crash_forensics.py",
     "core/hub_state_authority.py",
     "core/lan_exposure.py",
     "core/quiet_hours.py",
@@ -67,7 +69,9 @@
     "core/voice_orchestrator.py",
     "core/voice_wake_processor.py",
     "diagnostics/diagnostic_consent.py",
+    "diagnostics/diagnostic_dispatch.py",
     "diagnostics/diagnostic_minimum.py",
+    "diagnostics/native_crash_relay.py",
     "diagnostics/wake_state_sync.py",
     "intent/agent_executor.py",
     "intent/agent_loop.py",
@@ -124,6 +128,7 @@
     "services/capability_registry.py",
     "services/computer_use/safety.py",
     "services/conversation/context_frames.py",
+    "services/daemon/viola_daemon.py",
     "services/llm/factory.py",
     "services/llm/prompts/builder.py",
     "services/llm/prompts/constants.py",
@@ -149,7 +154,10 @@
     "tests/public/test_customer_pronunciation.py",
     "tests/public/test_disabled_tts_streaming.py",
     "tests/public/test_english_decimal_normalization.py",
+    "tests/public/test_exit_watchdog.py",
+    "tests/public/test_faulthandler_first_chance_race.py",
     "tests/public/test_linux_sandbox_opt_in.py",
+    "tests/public/test_native_crash_relay.py",
     "tests/public/test_native_titlebar_resize.py",
     "tests/public/test_phone_locale_normalization.py",
     "tests/public/test_queue_play_selection.py",
@@ -284,6 +292,7 @@
     "utils/speaker_pairing_flow.py",
     "utils/velopack_updater.py",
     "viola_qt.py",
+    "viola_spoke.py",
     "violawake/config.py",
     "violawake/engine.py",
     "voice/continuous_capture.py",
@@ -376,8 +385,8 @@
     "historical_inventory_limits": "This renderer correction changes no dependency or workflow inputs. All six retained SBOMs and their complete status objects stay historical and unchanged; no current installed inventory qualification is claimed."
   },
   "qualification": {
-    "source_commit": "aab050c3ad26cf604ac3189b6dd7e823436da754",
-    "kind": "voice prompt + busy queue"
+    "source_commit": "2f64862574724736fb5b550693677487e0cdadc3",
+    "kind": "crash lifecycle"
   },
   "historical_bindings": [
     {

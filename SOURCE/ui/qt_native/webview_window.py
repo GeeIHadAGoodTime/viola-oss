@@ -4546,6 +4546,10 @@ class ViolaWebViewWindow(QMainWindow):
         """
         self._remember_window_state()
         self._force_quit = True
+        # From here the process must be gone within a few seconds, whatever
+        # is stuck: a Windows passkey dialog opened by the agent browser kept a
+        # quit hanging for over a minute (1.0.5 build-5 laptop report).
+        _arm_quit_watchdog()
         if hasattr(self, "_tray_icon"):
             self._tray_icon.hide()
         hide_window = getattr(self, "hide", None)
@@ -4608,6 +4612,16 @@ class ViolaWebViewWindow(QMainWindow):
         logger.info("Window closed: quitting Viola")
         self._quit_app()
         super().closeEvent(event)
+
+
+def _arm_quit_watchdog() -> None:
+    """Start the exit deadline (core.crash_forensics.arm_exit_watchdog). Never raises."""
+    try:
+        from core.crash_forensics import arm_exit_watchdog
+
+        arm_exit_watchdog()
+    except Exception:  # noqa: BLE001, RUF100 - a quit must never fail on its watchdog
+        logger.debug("Exit watchdog not armed", exc_info=True)
 
 
 # How long quitting waits for the wake detector and microphone to stop before
