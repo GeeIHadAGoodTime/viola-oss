@@ -94,6 +94,10 @@ export default function TimerCountdown({ addToast }) {
   // Force a re-render each tick so the countdown updates without churning state.
   const [, setTick] = useState(0);
   const firedRef = useRef(new Set());
+  // Set once any live socket event lands; a slower REST seed must not then
+  // overwrite the fresher state (e.g. clear a card that just started ringing).
+  const liveTimersRef = useRef(false);
+  const liveAlarmsRef = useRef(false);
 
   const applySnapshot = useCallback((list) => {
     const normalized = (Array.isArray(list) ? list : [])
@@ -106,6 +110,7 @@ export default function TimerCountdown({ addToast }) {
   const onMessage = useCallback((msg) => {
     if (!msg || !msg.type) return;
     if (msg.type === 'timer_update' && msg.payload) {
+      liveTimersRef.current = true;
       applySnapshot(msg.payload.timers);
     } else if (msg.type === 'timer_completed' && msg.payload) {
       const timerId = String(msg.payload.timer_id || '');
@@ -117,10 +122,12 @@ export default function TimerCountdown({ addToast }) {
       if (addToast) addToast({ message, level: 'info', persist: true });
       setTimers((prev) => prev.filter((t) => t.timer_id !== timerId));
     } else if (msg.type === 'alarm_ringing' && msg.payload) {
+      liveAlarmsRef.current = true;
       const alarm = normalizeAlarm(msg.payload);
       // One ring per user at a time; a new alarm replaces the old card.
       if (alarm) setAlarms([alarm]);
     } else if (msg.type === 'alarm_stopped' && msg.payload) {
+      liveAlarmsRef.current = true;
       const alarmId = String(msg.payload.alarm_id ?? '');
       setAlarms((prev) => prev.filter((a) => a.alarm_id !== alarmId));
       setStopping(false);
@@ -148,7 +155,7 @@ export default function TimerCountdown({ addToast }) {
     (async () => {
       try {
         const data = await apiFetch('/v1/timers');
-        if (!cancelled && data && Array.isArray(data.timers)) {
+        if (!cancelled && !liveTimersRef.current && data && Array.isArray(data.timers)) {
           applySnapshot(data.timers);
         }
       } catch {
@@ -156,7 +163,7 @@ export default function TimerCountdown({ addToast }) {
       }
       try {
         const ringing = await apiFetch('/v1/alarms/ringing');
-        if (!cancelled && ringing && Array.isArray(ringing.alarms)) {
+        if (!cancelled && !liveAlarmsRef.current && ringing && Array.isArray(ringing.alarms)) {
           setAlarms(ringing.alarms.map(normalizeAlarm).filter(Boolean));
         }
       } catch {
