@@ -53,6 +53,15 @@
   letter-spacing: 0.3px;
   line-height: 1.08;
   overflow-wrap: anywhere;
+  /* A3.7 (1.0.5 build 5): a long YouTube title wrapped to four or five lines
+     and pushed play/pause below the stage on the Surface, so you had to
+     scroll to reach them. Clamp to two lines with an ellipsis; the full title
+     stays in the element's title tooltip. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
 }
 
 .trackArtist {
@@ -79,6 +88,15 @@
 
 .spacer {
   width: 20px;
+}
+
+/* Short stages (landscape tablet, small window): one line is all the room
+   the controls can spare. */
+@media (max-height: 820px) {
+  .trackTitle {
+    -webkit-line-clamp: 1;
+    line-clamp: 1;
+  }
 }
 
 @media (max-width: 1279px) {

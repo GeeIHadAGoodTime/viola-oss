@@ -22,9 +22,10 @@ STATUS:
       passive cross-correlation every ~30s during playback
       (audio_core/calibration/passive_calibrate.py).
     - ERLE (echo return loss enhancement) tracked in rolling 60s window.
-    - Reference gate has a warm-up watchdog that logs WARN if the gate has
-      not opened within _WARMUP_WATCHDOG_FRAMES (~3s of frames) — useful
-      for catching broken loopback feeds that silently return zeros.
+    - Reference gate has a warm-up watchdog that logs (INFO) if the gate has
+      not opened within _WARMUP_WATCHDOG_FRAMES (~3s of frames). A closed gate
+      is normal while nothing plays; echo_cancellation_degraded_reason() is
+      the check that runs while Viola is actually speaking.
 
 KNOWN LIMITATIONS:
     - Clock drift between capture/playback devices not explicitly handled
@@ -236,7 +237,7 @@ _MAX_ACTIVE_FRAMES = 300
 # Warm-up watchdog thresholds.  Telemetry-only: the gate does NOT get
 # forced open — a genuinely-silent session is a valid state and forcing
 # adaptation on silence degrades AEC output.  These thresholds fire a
-# one-shot WARN log so operators can see a stuck-closed gate, which
+# one-shot INFO log so operators can see a stuck-closed gate, which
 # typically means the reference feed is silently returning zeros (broken
 # WASAPI loopback, muted output device, or unhooked AECReferenceSource
 # callback).
@@ -351,10 +352,14 @@ class _RefGate:
         ):
             self._watchdog_warn_fired = True
             self._watchdog_warn_count += 1
-            logger.warning(
-                "AEC RefGate has not opened after %d frames (~%.1fs); "
-                "reference signal is silent or broken.  Echo cancellation "
-                "is effectively pass-through until playback energy resumes.",
+            # INFO, not WARNING: at startup nothing is playing, so a closed
+            # gate is the normal state, and this line used to be read as
+            # "echo cancellation is broken". The barge-in monitor reports a
+            # real failure (silent reference WHILE Viola speaks) as
+            # "AEC degraded: ...".
+            logger.info(
+                "AEC RefGate has not opened after %d frames (~%.1fs): no playback on the "
+                "echo-cancellation reference yet. Normal while nothing is playing.",
                 self._frames_since_warmup_reset,
                 self._frames_since_warmup_reset * 0.01,
             )
@@ -364,10 +369,10 @@ class _RefGate:
             and self._frames_since_warmup_reset >= _WARMUP_WATCHDOG_FRAMES_ESCALATE
         ):
             self._watchdog_escalate_fired = True
-            logger.warning(
-                "AEC RefGate still closed after %d frames (~%.0fs).  "
-                "Check WASAPI loopback feed, output device mute state, "
-                "or AECReferenceSource wiring.",
+            logger.info(
+                "AEC RefGate still closed after %d frames (~%.0fs). Normal while idle; "
+                "if audio was playing, check the WASAPI loopback feed, output device mute "
+                "state, or AECReferenceSource wiring.",
                 self._frames_since_warmup_reset,
                 self._frames_since_warmup_reset * 0.01,
             )
@@ -996,6 +1001,17 @@ class ViolaAECAdapter(AECProcessor):
                 "ref_gate_delay_samples": self._ref_gate.delay_samples,
             }
         )
+        if self._local_playback_active and self._downshift_backend is not None:
+            # While downshifted the FDAF and its gate see no frames, so their
+            # numbers are frozen. Report the canceller that is actually running.
+            try:
+                active = self._downshift_backend.get_diagnostics() or {}
+            except (AttributeError, RuntimeError, TypeError, ValueError):
+                active = {}
+            base["active_backend"] = self._downshift_backend.name
+            base["ref_gate_open"] = active.get("ref_gate_open", base["ref_gate_open"])
+            if "erle_db" in active:
+                base["erle_db"] = active["erle_db"]
         return base
 
 
@@ -1108,6 +1124,50 @@ def create_aec_processor(
 
 
 # --------------------------------------------------------------------------- #
+# Health check used while Viola is speaking                                    #
+# --------------------------------------------------------------------------- #
+
+# Below this ERLE the canceller's output is louder than the microphone: it is
+# adding a (misaligned) copy of the reference instead of removing it.
+_DEGRADED_ERLE_DB = -6.0
+
+
+def echo_cancellation_degraded_reason(
+    processor: AECProcessor | None,
+    reference: object | None,
+) -> str | None:
+    """Why the echo canceller cannot remove Viola's own voice right now, or None.
+
+    Meant to be asked WHILE Viola is speaking (the barge-in monitor). Then the
+    reference must be carrying Viola's speech: a closed reference gate means it
+    is silent or broken, and a strongly negative ERLE means the filter has
+    diverged. In either case the "echo-cancelled" microphone still contains
+    Viola's reply, so anything listening to it would hear Viola as a person.
+
+    The returned text is stable (no numbers) so callers can log each cause once.
+    """
+    if reference is None:
+        return "no echo-cancellation reference is wired"
+    if processor is None:
+        return "no echo canceller is running"
+    try:
+        name = str(getattr(processor, "name", "") or "")
+        if name == "noop" or not processor.is_available:
+            return "the echo canceller is a passthrough"
+        diagnostics = processor.get_diagnostics() or {}
+    except (AttributeError, ImportError, OSError, RuntimeError, TypeError, ValueError):
+        logger.debug("AEC diagnostics unreadable", exc_info=True)
+        return "the echo canceller's health is unreadable"
+    gate_open = diagnostics.get("ref_gate_open")
+    if gate_open is False:
+        return "the echo-cancellation reference is silent while Viola is speaking"
+    erle = diagnostics.get("erle_db")
+    if isinstance(erle, (int, float)) and erle == erle and erle < _DEGRADED_ERLE_DB:
+        return "the echo canceller is adding signal instead of removing it (negative ERLE)"
+    return None
+
+
+# --------------------------------------------------------------------------- #
 # Exports                                                                      #
 # --------------------------------------------------------------------------- #
 
@@ -1125,4 +1185,5 @@ __all__ = [
     "SpeexAEC",
     "ViolaAECAdapter",
     "create_aec_processor",
+    "echo_cancellation_degraded_reason",
 ]

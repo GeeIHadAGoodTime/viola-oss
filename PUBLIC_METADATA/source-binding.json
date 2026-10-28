@@ -30,19 +30,29 @@
   },
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
+<<<<<<< HEAD
   "source_manifest_sha256": "15c3345786b463639aa9be8eb3bfd0fcee0eeed0a4e3986d33a810088dbdae93",
   "source_tree_sha256": "831cdb7633a4e9129c7d463ac3098c512e412266ac4ceba2679f6f02a2b813a3",
   "source_file_count": 2752,
   "source_revision": "0072bdcc159f1d3fef2a1e8f8ce2a5f1a8a67730",
+=======
+  "source_manifest_sha256": "dc2a09b2e522ec0a78cfb132c0d192694cfa51d53c50bfe2ef4f8844cbd09815",
+  "source_tree_sha256": "e21956ae03f62149a248365cf6942426ba1494dae6475d24d10c7c73c4efe90e",
+  "source_file_count": 2743,
+  "source_revision": "4c9cc11b4dc02bed16f88646c1e4aca3bf70029c",
+>>>>>>> origin/main
   "comparison_public_revision": "ecab2772465fcc89ae6645b028af1c2273b9199f",
   "changed_source_paths": [
     "audio_core/aec_reference_base.py",
+    "audio_core/capture/_proctap_subprocess.py",
+    "audio_core/capture/proctap_provider.py",
     "audio_core/wasapi/aec_reference_adapter.py",
     "audio_core/wasapi/capture_module.py",
     "auth/database.py",
     "auth/desktop_session.py",
     "auth/middleware.py",
     "backend/fastapi_app.py",
+    "backend/ip_rate_limiter.py",
     "backend/weather_fetch.py",
     "chat/channel.py",
     "config/defaults.py",
@@ -51,6 +61,7 @@
     "config/settings_validation.py",
     "contracts/fastapi.py",
     "core/constants.py",
+    "core/hub_state_authority.py",
     "core/lan_exposure.py",
     "core/quiet_hours.py",
     "core/sentry_integration.py",
@@ -90,6 +101,7 @@
     "intent/tools/vision_tools.py",
     "mcp_hub/approval_bridge.py",
     "mcp_hub/client_hub.py",
+    "mcp_hub/inprocess.py",
     "mcp_servers/browser/server.py",
     "mcp_servers/browser_cdp/server.py",
     "mcp_servers/core_tools/server.py",
@@ -107,6 +119,7 @@
     "music/runtime/control_surface.py",
     "music/runtime/embedded_playback.py",
     "music/runtime/play_command.py",
+    "music/runtime/worker_manager.py",
     "music/spotify/cdp_controller.py",
     "playback/engine_manager.py",
     "playback/engines/__init__.py",
@@ -184,7 +197,12 @@
     "ui/react-app/src/__tests__/hooks/useVoiceOnboarding.micPermissionGuidance.test.jsx",
     "ui/react-app/src/__tests__/hooks/useVoiceOnboarding.phaseResume.test.jsx",
     "ui/react-app/src/__tests__/hooks/useVoiceOnboarding.test.jsx",
+<<<<<<< HEAD
     "ui/react-app/src/auth/authProviders.ts",
+=======
+    "ui/react-app/src/auth/desktopOAuth.test.ts",
+    "ui/react-app/src/auth/desktopOAuth.ts",
+>>>>>>> origin/main
     "ui/react-app/src/components/AccountTab.jsx",
     "ui/react-app/src/components/AccountTab.signInLayout.test.jsx",
     "ui/react-app/src/components/AccountTab.test.jsx",
@@ -200,7 +218,11 @@
     "ui/react-app/src/components/CallBriefing.test.jsx",
     "ui/react-app/src/components/ConnectSpeakerPanel.jsx",
     "ui/react-app/src/components/ConnectSpeakerPanel.test.jsx",
+<<<<<<< HEAD
     "ui/react-app/src/components/ContentCard.jsx",
+=======
+    "ui/react-app/src/components/DeviceDiscoveryPanel.jsx",
+>>>>>>> origin/main
     "ui/react-app/src/components/DiagnosticsDisclosureNotice.jsx",
     "ui/react-app/src/components/DiagnosticsDisclosureNotice.test.jsx",
     "ui/react-app/src/components/GoogleConnectSettings.test.jsx",
@@ -218,12 +240,17 @@
     "ui/react-app/src/components/SettingsModal.jsx",
     "ui/react-app/src/components/Toast.jsx",
     "ui/react-app/src/components/player/MediaArea.jsx",
+    "ui/react-app/src/components/player/PlayerSection.jsx",
+    "ui/react-app/src/components/player/PlayerSection.module.css",
+    "ui/react-app/src/components/player/PlayerSection.test.jsx",
     "ui/react-app/src/components/player/ProgressBar.jsx",
     "ui/react-app/src/components/player/ProgressBar.module.css",
     "ui/react-app/src/components/player/ProgressBar.test.jsx",
     "ui/react-app/src/components/player/RatingButton.module.css",
     "ui/react-app/src/components/player/TransportButton.module.css",
+    "ui/react-app/src/components/player/VolumeControl.jsx",
     "ui/react-app/src/components/player/VolumeControl.module.css",
+    "ui/react-app/src/components/player/VolumeControl.test.jsx",
     "ui/react-app/src/components/settings/AddPlaylistForm.jsx",
     "ui/react-app/src/components/settings/AddPlaylistForm.test.jsx",
     "ui/react-app/src/components/settings/Slider.jsx",
@@ -248,7 +275,12 @@
     "ui/react-app/src/hooks/useBillingCapacity.js",
     "ui/react-app/src/hooks/useCalendarEvents.js",
     "ui/react-app/src/hooks/useCalendarProviders.js",
+<<<<<<< HEAD
     "ui/react-app/src/hooks/useDesktopAccount.js",
+=======
+    "ui/react-app/src/hooks/useDeviceDiscovery.js",
+    "ui/react-app/src/hooks/useDeviceDiscovery.test.jsx",
+>>>>>>> origin/main
     "ui/react-app/src/hooks/usePlayerState.unmount.test.js",
     "ui/react-app/src/hooks/usePressAndHold.js",
     "ui/react-app/src/hooks/useVideoFullscreen.js",
@@ -257,7 +289,10 @@
     "ui/react-app/src/hooks/useVoice.js",
     "ui/react-app/src/hooks/useVoiceOnboarding.js",
     "ui/react-app/src/i18n/en.json",
+<<<<<<< HEAD
     "ui/react-app/src/lib/auth_context.desktopRestore.test.jsx",
+=======
+>>>>>>> origin/main
     "ui/react-app/src/lib/auth_context.tsx",
     "ui/react-app/src/lib/billingEntitlement.mountedRoute.test.ts",
     "ui/react-app/src/lib/billingEntitlement.test.ts",
@@ -279,11 +314,13 @@
     "ui/react-app/src/utils/weatherLocation.js",
     "ui/react-app/src/utils/weatherLocation.test.js",
     "ui/react-app/tests/touch_modality_css.test.js",
+    "ui/security/bootstrap.py",
     "ui/server.py",
     "ui/settings_api.py",
     "ui/settings_effects.py",
     "ui/settings_manager.py",
     "ui/settings_schema.py",
+    "ui/websocket/command_handlers.py",
     "ui/websocket/event_hub.py",
     "utils/audio_ducking.py",
     "utils/self_knowledge.py",
@@ -292,6 +329,7 @@
     "viola_qt.py",
     "violawake/config.py",
     "violawake/engine.py",
+    "voice/continuous_capture.py",
     "voice/customer_pronunciation.py",
     "voice/pipeline.py",
     "voice/pipeline_wake_callback.py",
@@ -299,6 +337,7 @@
     "voice/synthesis/text_normalizer.py",
     "voice/transcription/whisper.py",
     "voice/wake_chime.py",
+    "voice/wake_detector/aec_processor.py",
     "voice/wake_detector/device_profile_manager.py",
     "voice/wake_detector/facade.py",
     "voice/wake_detector/violawake_listener.py",
@@ -380,8 +419,13 @@
     "historical_inventory_limits": "This renderer correction changes no dependency or workflow inputs. All six retained SBOMs and their complete status objects stay historical and unchanged; no current installed inventory qualification is claimed."
   },
   "qualification": {
+<<<<<<< HEAD
     "source_commit": "0072bdcc159f1d3fef2a1e8f8ce2a5f1a8a67730",
     "kind": "ui fixes"
+=======
+    "source_commit": "4c9cc11b4dc02bed16f88646c1e4aca3bf70029c",
+    "kind": "r6 audio"
+>>>>>>> origin/main
   },
   "historical_bindings": [
     {

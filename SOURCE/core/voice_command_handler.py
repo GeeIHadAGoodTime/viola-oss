@@ -145,6 +145,41 @@ def _is_wake_undo(transcript: str) -> bool:
     return bool(_NO_COMMAND_RE.match(text) or _WAKE_UNDO_RE.match(text))
 
 
+_ECHO_WORD_RE = re.compile(r"[a-z0-9']+")
+# A transcript this short is too easy to match by accident ("jazz" after
+# "jazz or rock?"), so it is never called an echo.
+_ECHO_MIN_WORDS = 3
+# Share of the transcript's words that must line up, in order, with the reply.
+_ECHO_MATCH_RATIO = 0.75
+# How long after a reply its echo can still turn up in a recording.
+_ECHO_WINDOW_SEC = 30.0
+
+
+def _echo_words(text: str) -> list[str]:
+    return _ECHO_WORD_RE.findall((text or "").lower().replace("\u2019", "'"))
+
+
+def _is_echo_of_reply(transcript: str, reply: str) -> bool:
+    """True when a "user" transcript is really Viola's own reply heard back.
+
+    1.0.5 laptop: with echo cancellation not removing Viola's voice, barge-in
+    recorded the reply "That one tripped me up, try again in a sec?", Whisper
+    returned "That one tripped me up." and Viola answered it as a command. A
+    person's words almost never repeat most of the reply in the same order.
+    """
+    heard = _echo_words(transcript)
+    if len(heard) < _ECHO_MIN_WORDS:
+        return False
+    spoken = _echo_words(reply)
+    if not spoken:
+        return False
+    from difflib import SequenceMatcher
+
+    matcher = SequenceMatcher(a=heard, b=spoken, autojunk=False)
+    matched = sum(block.size for block in matcher.get_matching_blocks())
+    return matched / len(heard) >= _ECHO_MATCH_RATIO
+
+
 def _update_state_hub_voice_mode(mode_name: str, *, user_id: str) -> None:
     """
     Update the central StateHub with voice mode change.
@@ -368,6 +403,9 @@ class VoiceCommandHandler:
         self._wake_timestamp: float | None = None  # Track when wake was detected
         self._wake_perf_counter: float | None = None  # High-precision wake timing
         self._continuous_capture: Any | None = None  # ContinuousMicCapture instance
+        # The last reply spoken aloud and when (time.monotonic()), so a
+        # recording of Viola's own voice is not run as the user's next command.
+        self._last_spoken_reply: tuple[str, float] | None = None
         # Same-class fallback when no running app holds the desktop's command service.
         self._local_command_service: Any | None = None
 
@@ -496,6 +534,9 @@ class VoiceCommandHandler:
             if not transcript:
                 exit_reason = "empty_transcript"
                 break
+            if turn > 1 and self._transcript_is_own_reply(transcript):
+                exit_reason = "self_echo"
+                break
 
             # Heuristic FP detection: wake fired but STT returned only filler
             if transcript.strip() in ("", ".", "...", "hmm", "um", "uh"):
@@ -621,6 +662,9 @@ class VoiceCommandHandler:
                     transcript = await self._transcribe_audio_with_timeout(ctx)
                     if not transcript:
                         exit_reason = "empty_transcript"
+                        break
+                    if self._transcript_is_own_reply(transcript):
+                        exit_reason = "self_echo"
                         break
 
                     # Dismiss detection: if the user interrupted with a
@@ -1370,6 +1414,7 @@ class VoiceCommandHandler:
         if self.tts and message and not already_spoken and tts_enabled:
             try:
                 logger.info("Speaking response: %s...", message[:100])
+                self._last_spoken_reply = (message, time.monotonic())
                 _update_state_hub_voice_mode("speaking", user_id=user_id)
 
                 # Try interruptible TTS if continuous capture is available
@@ -1496,6 +1541,23 @@ class VoiceCommandHandler:
             # switch to paused to stop VAD processing
             if capture.mode == "vad_monitor":
                 capture.set_mode("paused")
+
+    def _transcript_is_own_reply(self, transcript: str) -> bool:
+        """True (and logged) when ``transcript`` is Viola's last reply heard back."""
+        last = self._last_spoken_reply
+        if last is None:
+            return False
+        reply, spoken_at = last
+        if time.monotonic() - spoken_at > _ECHO_WINDOW_SEC:
+            return False
+        if not _is_echo_of_reply(transcript, reply):
+            return False
+        logger.warning(
+            "Ignored a recording of Viola's own reply (%d words matched the reply just spoken); "
+            "not running it as a command",
+            len(_echo_words(transcript)),
+        )
+        return True
 
     async def _do_speak(self, message: str) -> None:
         """Execute TTS speak (wrapper for cancellation support)."""

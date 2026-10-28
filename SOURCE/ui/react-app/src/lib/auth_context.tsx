@@ -857,10 +857,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         if (!ownsInteractiveSignIn(loginTicket)) return { success: false, error: 'The account action was superseded. Please sign in again.' };
         admitWrite();
+        // Stop waiting on the browser the moment this app is signed in some
+        // other way: the poll has nothing left to wait for then.
+        const sessionAtStart = sessionRef.current;
         const outcome = await completeDesktopOAuth(
           provider,
           (url: string) => openExternalAuthUrl(externalOAuthAuthorizeUrl(url)),
+          { isSignedIn: () => sessionRef.current !== null && sessionRef.current !== sessionAtStart },
         );
+        if (outcome.status === 'already_signed_in') return { success: true };
         if (outcome.status !== 'signed_in') {
           setError(outcome.message);
           setErrorDetails({ code: outcome.code, status: 0, retryAfter: null, details: null });
