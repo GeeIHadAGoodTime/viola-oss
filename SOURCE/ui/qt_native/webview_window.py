@@ -690,6 +690,27 @@ _FRONTEND_ERROR_BRIDGE_SCRIPT = r"""
 """
 
 
+def _external_url_log_summary(url: str) -> str:
+    """Where an external URL goes, for the log, without its query values.
+
+    The old line logged ``url[:100]``. A Google sign-in URL is
+    ``https://api.useviola.com/auth/v1/authorize?provider=google&redirect_to=https%3A%2F%2Fuseviola.com%2F...``
+    and the 100th character falls right after ``useviola.com%2F``, so the log
+    read as if sign-in redirected to the website root (1.0.5 laptop report,
+    2026-10-28). Log the target and, for OAuth, where it returns to instead;
+    never the PKCE challenge, state or codes.
+    """
+    from urllib.parse import parse_qs
+
+    parts = urlparse(url)
+    summary = "%s://%s%s" % (parts.scheme, parts.netloc, parts.path)
+    redirect = (parse_qs(parts.query).get("redirect_to") or [""])[0]
+    if redirect:
+        target = urlparse(redirect)
+        summary += " (returns to %s://%s%s)" % (target.scheme, target.netloc, target.path)
+    return summary
+
+
 class ViolaBridge(QObject):
     """Qt/JS bridge for system browser OAuth and other native operations.
 
@@ -754,7 +775,7 @@ class ViolaBridge(QObject):
             return json.dumps(validation, sort_keys=True)
 
         safe_url = str(validation["url"])
-        logger.info("[ViolaBridge] Opening external URL: %s", safe_url[:100])
+        logger.info("[ViolaBridge] Opening external URL: %s", _external_url_log_summary(safe_url))
         opened = bool(QDesktopServices.openUrl(QUrl(safe_url)))
         if not opened:
             result = _external_url_result(

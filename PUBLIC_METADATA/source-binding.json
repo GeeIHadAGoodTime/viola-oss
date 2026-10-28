@@ -30,10 +30,10 @@
   },
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "bce35bb1518b7907c3e8173710fb4df7941801fcc1b4be84256cf61185bec399",
-  "source_tree_sha256": "17e00defec567666d80432f90d80a814d08d3bb696e9c4cdefecad5cc6676472",
+  "source_manifest_sha256": "78b2eb1af20660746fb1e0bee43be243b7dc78284e053cbb0617ae2715e959d0",
+  "source_tree_sha256": "06fa21c7605d676a14096f8a5a64bdc25686cec3b5b43c151680ca4da2e57a99",
   "source_file_count": 2743,
-  "source_revision": "02eee42cbdb6b5dcf71056d933f4deb6200f8978",
+  "source_revision": "bdc3dbd80457dcf33158b9912d1cef7e03f44873",
   "comparison_public_revision": "ecab2772465fcc89ae6645b028af1c2273b9199f",
   "changed_source_paths": [
     "audio_core/aec_reference_base.py",
@@ -43,6 +43,7 @@
     "auth/desktop_session.py",
     "auth/middleware.py",
     "backend/fastapi_app.py",
+    "backend/ip_rate_limiter.py",
     "backend/weather_fetch.py",
     "chat/channel.py",
     "config/defaults.py",
@@ -91,6 +92,7 @@
     "intent/tools/vision_tools.py",
     "mcp_hub/approval_bridge.py",
     "mcp_hub/client_hub.py",
+    "mcp_hub/inprocess.py",
     "mcp_servers/browser/server.py",
     "mcp_servers/browser_cdp/server.py",
     "mcp_servers/core_tools/server.py",
@@ -182,6 +184,8 @@
     "ui/react-app/src/__tests__/hooks/useVoiceOnboarding.micPermissionGuidance.test.jsx",
     "ui/react-app/src/__tests__/hooks/useVoiceOnboarding.phaseResume.test.jsx",
     "ui/react-app/src/__tests__/hooks/useVoiceOnboarding.test.jsx",
+    "ui/react-app/src/auth/desktopOAuth.test.ts",
+    "ui/react-app/src/auth/desktopOAuth.ts",
     "ui/react-app/src/components/AccountTab.jsx",
     "ui/react-app/src/components/AccountTab.test.jsx",
     "ui/react-app/src/components/BugReportModal.jsx",
@@ -240,6 +244,7 @@
     "ui/react-app/src/hooks/useVideoFullscreen.test.jsx",
     "ui/react-app/src/hooks/useVoiceOnboarding.js",
     "ui/react-app/src/i18n/en.json",
+    "ui/react-app/src/lib/auth_context.tsx",
     "ui/react-app/src/lib/billingEntitlement.mountedRoute.test.ts",
     "ui/react-app/src/lib/billingEntitlement.test.ts",
     "ui/react-app/src/lib/billingEntitlement.ts",
@@ -360,8 +365,8 @@
     "historical_inventory_limits": "This renderer correction changes no dependency or workflow inputs. All six retained SBOMs and their complete status objects stay historical and unchanged; no current installed inventory qualification is claimed."
   },
   "qualification": {
-    "source_commit": "02eee42cbdb6b5dcf71056d933f4deb6200f8978",
-    "kind": "music"
+    "source_commit": "bdc3dbd80457dcf33158b9912d1cef7e03f44873",
+    "kind": "r6 hub"
   },
   "historical_bindings": [
     {
