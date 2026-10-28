@@ -95,7 +95,7 @@ vi.mock('../hooks/usePlayerState', () => ({
     // SmartDisplay's `wsSend` is this `send` (see SmartDisplay.jsx:434), so
     // recording here is how a test sees what it told the backend.
     send: vi.fn((message) => { wsHarness.sent.push(message); }),
-    connectCount: 0,
+    connectCount: playerHarness.state?.connectCount ?? 0,
     setLocalIsPlaying: playerHarness.setLocalIsPlaying,
     setDiagnosticRequestCallback: vi.fn(),
     setErrorCallback: vi.fn(),
@@ -107,7 +107,7 @@ vi.mock('../hooks/usePlayerState', () => ({
     setPlaybackCommandCallback: vi.fn((callback) => { playerHarness.playbackCommandCallback = callback; }),
     setChatResponseCallback: vi.fn((callback) => { playerHarness.chatResponseCallback = callback; }),
     setCalendarUpdateCallback: vi.fn(),
-    setDisconnectCallback: vi.fn(),
+    setDisconnectCallback: vi.fn((callback) => { playerHarness.disconnectCallback = callback; }),
     getWsDebug: vi.fn(() => ({})),
   }),
 }));
@@ -374,6 +374,7 @@ beforeEach(async () => {
   wsHarness.sent = [];
   playerHarness.overlayCallback = null;
   playerHarness.progressCallback = null;
+  playerHarness.disconnectCallback = null;
   playerHarness.state = null;
   playerHarness.setLocalIsPlaying.mockReset();
   apiHarness.pause.mockReset().mockResolvedValue({ ok: true });
@@ -555,6 +556,47 @@ describe('Help keyboard isolation', () => {
 
     expect(voiceHarness.stopRecording).toHaveBeenCalledTimes(1);
     expect(dialog).toBeInTheDocument();
+  });
+});
+
+// 1.0.5 build-5 laptop (X10.4): waking from sleep dropped the UI socket for a
+// moment and Jay saw "lost connection". A drop that heals on its own is quiet.
+describe('SmartDisplay connection-lost notice', () => {
+  it('stays quiet when the socket reconnects within the grace period', async () => {
+    vi.useFakeTimers();
+    try {
+      playerHarness.state = { connectCount: 1 };
+      const { rerender } = render(<SmartDisplay />);
+      await act(async () => { await Promise.resolve(); });
+      expect(playerHarness.disconnectCallback).toBeTypeOf('function');
+
+      act(() => { playerHarness.disconnectCallback(); });
+      playerHarness.state = { connectCount: 2 };
+      rerender(<SmartDisplay />);
+      await act(async () => { await vi.advanceTimersByTimeAsync(7000); });
+
+      expect(screen.queryByText('Connection lost. Reconnecting...')).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('still tells the user when the connection stays down', async () => {
+    vi.useFakeTimers();
+    try {
+      playerHarness.state = { connectCount: 1 };
+      render(<SmartDisplay />);
+      await act(async () => { await Promise.resolve(); });
+
+      act(() => { playerHarness.disconnectCallback(); });
+      await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
+      expect(screen.queryByText('Connection lost. Reconnecting...')).not.toBeInTheDocument();
+      await act(async () => { await vi.advanceTimersByTimeAsync(1500); });
+
+      expect(screen.getByText('Connection lost. Reconnecting...')).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

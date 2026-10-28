@@ -334,6 +334,61 @@ def build_browser_diagnostic_minimum(
     return {key: value for key, value in scrubbed.items() if key in _ALLOWED_TOP_LEVEL_KEYS}
 
 
+def build_native_crash_minimum(
+    *,
+    error_type: Any,
+    error_value: Any,
+    frames: Any = None,
+    app_version: str | None = None,
+    surface: str | None = None,
+    os_info: Mapping[str, str] | None = None,
+) -> dict[str, Any]:
+    """Return the anonymized minimum for a NATIVE crash read back from a
+    faulthandler run log on the next launch.
+
+    Same output contract as :func:`build_diagnostic_minimum`. The input comes
+    from a file on disk rather than a live exception, so it is treated like
+    the browser path: every field is rebuilt. ``frames`` is a sequence of
+    ``(filename, lineno, function)`` tuples, OLDEST first; filenames go through
+    the same ``_module_from_filename`` reduction as a Python traceback, so no
+    absolute path (and no username inside one) leaves the machine.
+    """
+    os_slice = _os_slice(os_info)
+    project_root = _project_root_str()
+    stack: list[dict[str, Any]] = []
+    if isinstance(frames, (list, tuple)):
+        for frame in list(frames)[-_MAX_STACK_FRAMES:]:
+            if not isinstance(frame, (list, tuple)) or len(frame) != 3:
+                continue
+            filename, lineno, function = frame
+            stack.append(
+                {
+                    "module": _module_from_filename(filename, project_root),
+                    "function": _safe_enum(function, limit=_MAX_FUNCTION_LEN) or "<unknown>",
+                    "lineno": _safe_int(lineno) if isinstance(lineno, int) else None,
+                }
+            )
+
+    payload: dict[str, Any] = {
+        "schema_version": SCHEMA_VERSION,
+        "report_kind": "crash",
+        "app_version": _safe_enum(app_version) or _detect_app_version(),
+        "surface": _safe_enum(surface, limit=_MAX_SURFACE_LEN) or "unknown",
+        "os_family": os_slice["os_family"],
+        "os_version": os_slice["os_version"],
+        "arch": os_slice["arch"],
+        "python_version": _python_version(),
+        "error_type": _safe_enum(error_type, limit=_MAX_FUNCTION_LEN) or "NativeCrash",
+        "error_value": _safe_error_text(error_value),
+        "stack": stack,
+        "error_location": stack[-1] if stack else {},
+        "app_state": {},
+    }
+
+    scrubbed = _defense_in_depth_scrub(payload)
+    return {key: value for key, value in scrubbed.items() if key in _ALLOWED_TOP_LEVEL_KEYS}
+
+
 def _browser_structured_stack(frames: Any) -> list[dict[str, Any]]:
     """Rebuild a browser stack as bounded ``{module, function, lineno}`` frames.
 
@@ -696,5 +751,6 @@ __all__ = [
     "SCHEMA_VERSION",
     "build_browser_diagnostic_minimum",
     "build_diagnostic_minimum",
+    "build_native_crash_minimum",
     "sanitize_untrusted_minimum",
 ]

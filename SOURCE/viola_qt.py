@@ -279,6 +279,28 @@ def _mark_release_health_clean_exit(exit_code: int = 0) -> None:
     return None
 
 
+def _relay_previous_native_crash() -> None:
+    """Report an earlier run's native crash dump (background thread, never raises)."""
+    forensics = globals().get("_crash_forensics")
+    if forensics is None:
+        return
+    from diagnostics.native_crash_relay import relay_previous_native_crashes
+
+    relay_previous_native_crashes("viola_qt", current_log=forensics.log_path)
+
+
+def _arm_exit_watchdog() -> None:
+    """Bound how long shutdown may take once quitting starts (never raises)."""
+    try:
+        from core.crash_forensics import arm_exit_watchdog
+
+        arm_exit_watchdog()
+    except Exception:  # noqa: BLE001, RUF100 - a quit must never fail on its watchdog
+        import logging
+
+        logging.getLogger(__name__).debug("Exit watchdog not armed", exc_info=True)
+
+
 def _start_sentry_session_for_active() -> None:
     return None
 
@@ -530,10 +552,14 @@ import faulthandler
 # process's own crash log — silently destroying the artifact this whole change
 # exists to preserve. Separate bucket, same diagnostics, no eviction.
 try:
+    from core.crash_forensics import faulthandler_all_threads as _faulthandler_all_threads
     from core.crash_forensics import install_crash_forensics as _install_crash_forensics
 
     _crash_forensics = _install_crash_forensics("viola_qt_mp_child" if _suppress_import_console_output else "viola_qt")
-    faulthandler.enable(file=_crash_forensics.stream, all_threads=True)
+    # Windows: faulting thread only. Dumping every thread from the vectored
+    # handler on a handled first-chance COM exception crashed the app
+    # (see core.crash_forensics.faulthandler_all_threads).
+    faulthandler.enable(file=_crash_forensics.stream, all_threads=_faulthandler_all_threads())
 except BaseException as _boot_exc:  # noqa: BLE001, RUF100 - last-resort boot guard; surface, never silently die
     _fatal_boot_unless_clean_exit("crash-handler setup", _boot_exc)
 _boot_checkpoint("08-faulthandler-enabled")
@@ -1429,6 +1455,17 @@ def main():
     if not guard.try_acquire():
         _mark_release_health_clean_exit(0)
         sys.exit(0)
+
+    # Now that this is the one running Viola: if an earlier run died in native
+    # code, its faulthandler dump is still on disk. Report it (anonymized, same
+    # consent as every crash report) so a native crash reaches GlitchTip with a
+    # stack instead of only a faulting offset in the Windows event log.
+    run_in_background("native_crash_relay", _relay_previous_native_crash)
+
+    # Every way out (window X, tray Quit, Ctrl+Q, in-app Quit, Windows logoff)
+    # ends with aboutToQuit. Put a deadline on the rest of the shutdown so a
+    # stuck thread or a native modal dialog cannot keep the process alive.
+    app.aboutToQuit.connect(_arm_exit_watchdog)
 
     try:
         from backend.ports import PortSelectionError, resolve_listen_port
