@@ -1283,9 +1283,13 @@ class AIController:
         manager = self._voice_conversation_manager_for_user(user_id)
         session_id = manager.session_id if manager is not None else ""
         frame = current_voice_turn_frame(text, session_id=session_id)
-        if frame is not None:
-            context_bundle.current_user_frame = frame
-        return context_bundle
+        if frame is None:
+            return context_bundle
+        # Never assign ``context_bundle.current_user_frame`` in place: the
+        # ContextBuilder bundle carries an explicit ``frames`` chain, and a
+        # current turn missing from it makes prompt setup reject the bundle as
+        # ambiguous (every AI-bound voice command failed that way in build 5).
+        return context_bundle.with_current_user_frame(frame)
 
     async def record_voice_event(
         self,
