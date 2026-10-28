@@ -57,6 +57,7 @@ _EXTENDED_STARTUPINFO_PRESENT = 0x00080000
 _CREATE_NO_WINDOW = 0x08000000
 _PROC_THREAD_ATTRIBUTE_PARENT_PROCESS = 0x00020000
 _PROCESS_CREATE_PROCESS = 0x0080
+_PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
 _STILL_ACTIVE = 259
 _WAIT_TIMEOUT = 0x00000102
 _INFINITE = 0xFFFFFFFF
@@ -213,6 +214,107 @@ def _pythonw_executable() -> str:
     return sys.executable
 
 
+# The installed (PyInstaller) app has no python/pythonw.exe and cannot run a
+# .py file: ``ViolaApp.exe <script.py>`` just boots a second Viola. Its entry
+# script emulates ``python -c CODE`` instead (viola_qt._run_frozen_dash_c_and_exit),
+# so the worker is started as ``ViolaApp.exe -c <this> --port N --pid P``.
+_FROZEN_WORKER_CODE = "from audio_core.capture._proctap_worker_entry import main; main()"
+
+
+def _worker_command(*, listener_port: int, target_pid: int, use_system_loopback: bool) -> list[str]:
+    """Command line that starts the ProcTap worker in this kind of install."""
+    if getattr(sys, "frozen", False):
+        cmd = [sys.executable, "-c", _FROZEN_WORKER_CODE]
+    else:
+        cmd = [_pythonw_executable(), str(Path(__file__).with_name("_proctap_worker_entry.py"))]
+    cmd += ["--port", str(listener_port), "--pid", str(target_pid)]
+    if use_system_loopback:
+        cmd.append("--system-loopback")
+    return cmd
+
+
+def _process_creation_time(kernel32: ctypes.WinDLL, pid: int) -> int | None:
+    """Creation time (FILETIME ticks) of a RUNNING process, or None.
+
+    None when the process is gone, cannot be opened, or has already exited.
+    """
+    kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+    kernel32.OpenProcess.restype = wintypes.HANDLE
+    kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+    kernel32.CloseHandle.restype = wintypes.BOOL
+    handle = kernel32.OpenProcess(_PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+    if not handle:
+        return None
+    try:
+        exit_code = wintypes.DWORD()
+        if not kernel32.GetExitCodeProcess(handle, ctypes.byref(exit_code)) or exit_code.value != _STILL_ACTIVE:
+            return None
+        times = [wintypes.FILETIME() for _ in range(4)]
+        if not kernel32.GetProcessTimes(handle, *(ctypes.byref(t) for t in times)):
+            return None
+        created = times[0]
+        return (int(created.dwHighDateTime) << 32) | int(created.dwLowDateTime)
+    finally:
+        kernel32.CloseHandle(handle)
+
+
+def _shell_process_id() -> int | None:
+    """PID of the interactive desktop shell (explorer.exe), or None."""
+    try:
+        user32 = ctypes.WinDLL("user32", use_last_error=True)
+        user32.GetShellWindow.restype = wintypes.HWND
+        hwnd = user32.GetShellWindow()
+        if not hwnd:
+            return None
+        pid = wintypes.DWORD()
+        user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+        return int(pid.value) or None
+    except (AttributeError, OSError):
+        return None
+
+
+def _reparent_candidates(kernel32: ctypes.WinDLL, own_pid: int) -> list[tuple[int, str]]:
+    """Processes the worker may be re-parented under, best first.
+
+    The worker must sit OUTSIDE the tapped process tree (see
+    _proctap_worker_entry). Our own parent is the natural choice from a dev
+    launcher, but an installed build is started by the tiny Viola.exe shim (or
+    Velopack), which exits right after starting ViolaApp.exe. Its PID is then
+    stale (gone, or reused by an unrelated process) and
+    OpenProcess(PROCESS_CREATE_PROCESS) on it failed on every attempt (1.0.5
+    laptop: 159 failures, multiroom speakers got only silence). So our parent
+    is used only while it is still running and older than us, and the user's
+    desktop shell is the fallback.
+    """
+    candidates: list[tuple[int, str]] = []
+    own_created = _process_creation_time(kernel32, own_pid)
+    parent_pid = os.getppid()
+    if parent_pid and parent_pid != own_pid:
+        parent_created = _process_creation_time(kernel32, parent_pid)
+        if parent_created is not None and (own_created is None or parent_created <= own_created):
+            candidates.append((parent_pid, "launcher"))
+        else:
+            logger.debug("ProcTap: launcher PID %d has exited (or was reused); not re-parenting under it", parent_pid)
+    shell_pid = _shell_process_id()
+    if shell_pid and shell_pid != own_pid and all(pid != shell_pid for pid, _ in candidates):
+        candidates.append((shell_pid, "desktop shell"))
+    return candidates
+
+
+def _open_reparent_target(kernel32: ctypes.WinDLL) -> tuple[int, int, str]:
+    """Open a parent for the worker: ``(handle, pid, label)``. Raises OSError if none."""
+    kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+    kernel32.OpenProcess.restype = wintypes.HANDLE
+    failures: list[str] = []
+    for pid, label in _reparent_candidates(kernel32, os.getpid()):
+        handle = kernel32.OpenProcess(_PROCESS_CREATE_PROCESS, False, pid)
+        if handle:
+            return int(handle), pid, label
+        failures.append("%s pid %d: Win32 error %d" % (label, pid, ctypes.get_last_error()))
+    detail = "; ".join(failures) if failures else "no running launcher or desktop shell"
+    raise OSError(0, "OpenProcess(PROCESS_CREATE_PROCESS) found no usable parent for the ProcTap worker (%s)" % detail)
+
+
 def _accept_worker_connection(
     listener: multiprocessing.connection.Listener,
     timeout_sec: float,
@@ -230,7 +332,6 @@ def _accept_worker_connection(
 def _create_reparented_worker_process(
     *,
     target_pid: int,
-    parent_pid: int,
     listener_port: int,
     use_system_loopback: bool,
 ) -> _Win32ProcTapWorker:
@@ -238,11 +339,7 @@ def _create_reparented_worker_process(
         raise RuntimeError("reparented ProcTap worker launch is Windows-only")
 
     kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
-    kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
-    kernel32.OpenProcess.restype = wintypes.HANDLE
-    parent_handle = kernel32.OpenProcess(_PROCESS_CREATE_PROCESS, False, parent_pid)
-    if not parent_handle:
-        _raise_last_win32_error("OpenProcess(PROCESS_CREATE_PROCESS)")
+    parent_handle, parent_pid, parent_label = _open_reparent_target(kernel32)
 
     kernel32.InitializeProcThreadAttributeList.argtypes = [
         ctypes.c_void_p,
@@ -303,17 +400,11 @@ def _create_reparented_worker_process(
         ):
             _raise_last_win32_error("UpdateProcThreadAttribute(PARENT_PROCESS)")
 
-        worker_entry = str(Path(__file__).with_name("_proctap_worker_entry.py"))
-        cmd = [
-            _pythonw_executable(),
-            worker_entry,
-            "--port",
-            str(listener_port),
-            "--pid",
-            str(target_pid),
-        ]
-        if use_system_loopback:
-            cmd.append("--system-loopback")
+        cmd = _worker_command(
+            listener_port=listener_port,
+            target_pid=target_pid,
+            use_system_loopback=use_system_loopback,
+        )
         cmdline = ctypes.create_unicode_buffer(subprocess.list2cmdline(cmd))
         cwd = str(Path(__file__).resolve().parents[2])
 
@@ -334,10 +425,11 @@ def _create_reparented_worker_process(
 
         kernel32.CloseHandle(proc_info.hThread)
         logger.info(
-            "ProcTap: launched reparented worker pid=%d target_pid=%d parent_pid=%d",
+            "ProcTap: launched reparented worker pid=%d target_pid=%d parent_pid=%d (%s)",
             proc_info.dwProcessId,
             target_pid,
             parent_pid,
+            parent_label,
         )
         return _Win32ProcTapWorker(int(proc_info.dwProcessId), int(proc_info.hProcess))
     finally:
@@ -365,14 +457,12 @@ def _start_worker_process(
         child_conn.close()
         return process, parent_conn
 
-    parent_pid = os.getppid()
     listener = multiprocessing.connection.Listener(("127.0.0.1", 0), authkey=None)
     worker: _Win32ProcTapWorker | None = None
     try:
         listener_port = int(listener.address[1])
         worker = _create_reparented_worker_process(
             target_pid=pid,
-            parent_pid=parent_pid,
             listener_port=listener_port,
             use_system_loopback=use_system_loopback,
         )
@@ -396,6 +486,20 @@ def _start_worker_process(
         raise
     finally:
         listener.close()
+
+
+_LAUNCH_FAILURES_LOGGED = 0
+
+
+def _log_launch_failure(exc: BaseException) -> None:
+    """Log a worker launch refusal: in full the 1st, 2nd, 4th, 8th ... time, quietly otherwise."""
+    global _LAUNCH_FAILURES_LOGGED
+    _LAUNCH_FAILURES_LOGGED += 1
+    count = _LAUNCH_FAILURES_LOGGED
+    if count & (count - 1) == 0:
+        logger.error("ProcTap subprocess launch failed (%d so far): %s", count, exc)
+    else:
+        logger.debug("ProcTap subprocess launch failed (%d so far): %s", count, exc)
 
 
 def _worker_main(
@@ -630,6 +734,9 @@ class SubprocessProcTap:
         self._actual_sr: int = PROCTAP_RATE  # updated by MSG_FMT from child
         self._discont_count: int = 0
         self._lock = threading.Lock()
+        # Why the last start() returned False: "launch" (the OS would not start
+        # the worker) or "ready" (it started but never became ready).
+        self.last_start_failure: str | None = None
 
     def set_callback(self, fn: Callable[[bytes, int, int, int], None]) -> None:
         self._callback = fn
@@ -643,13 +750,21 @@ class SubprocessProcTap:
             self.stop()
 
         self._stop_event.clear()
+        self.last_start_failure = None
         try:
             if sys.platform != "win32":
                 _configure_windows_no_console_spawn()
             self._process, parent_conn = _start_worker_process(pid, use_system_loopback)
             self._parent_conn = parent_conn
-        except (EOFError, OSError, RuntimeError, TimeoutError, ValueError) as exc:
+        except TimeoutError as exc:
+            # Started but never dialled back: a readiness problem, not a refusal.
+            self.last_start_failure = "ready"
             logger.error("ProcTap subprocess launch failed: %s", exc)
+            return False
+        except (EOFError, OSError, RuntimeError, ValueError) as exc:
+            self.last_start_failure = "launch"
+            # The provider rate-limits the repeat of this; log the cause in full.
+            _log_launch_failure(exc)
             return False
 
         # Wait for the ready signals: MSG_FMT (format) then MSG_LOG (ready)
@@ -660,6 +775,7 @@ class SubprocessProcTap:
             while not got_ready:
                 if not parent_conn.poll(timeout=deadline):
                     logger.error("ProcTap subprocess: timeout waiting for ready signal")
+                    self.last_start_failure = "ready"
                     self.stop()
                     return False
                 data = parent_conn.recv_bytes()

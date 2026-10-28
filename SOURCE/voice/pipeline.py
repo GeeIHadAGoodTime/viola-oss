@@ -663,6 +663,10 @@ class VoicePipeline:
             raw_listener = getattr(self.wake_detector, "_raw_listener", None)
             if raw_listener is not None:
                 aec_proc = getattr(raw_listener, "_aec_processor", None)
+                if aec_ref is None:
+                    listener_ref = getattr(raw_listener, "_aec_reference_source", None)
+                    if callable(listener_ref):
+                        aec_ref = listener_ref
 
             # Get device index from the raw wake listener
             device_index = None
@@ -683,6 +687,18 @@ class VoicePipeline:
                 # so we don't open a second PyAudio stream (segfaults on Windows).
                 if raw_listener is not None and hasattr(raw_listener, "set_frame_tap"):
                     raw_listener.set_frame_tap(capture.feed_audio)
+                    # Barge-in listens to the listener's own echo-cancelled
+                    # copy; running the shared canceller twice per chunk drained
+                    # its reference queue at double speed and diverged it.
+                    if hasattr(raw_listener, "set_processed_frame_tap"):
+                        raw_listener.set_processed_frame_tap(capture.feed_processed_audio)
+                        capture.set_processed_feed_enabled(True)
+                        capture.set_aec_state_source(
+                            lambda: (
+                                getattr(raw_listener, "_aec_processor", None),
+                                getattr(raw_listener, "_aec_reference_source", None),
+                            )
+                        )
                     logger.info("Continuous mic capture started (fed via wake detector frame tap)")
                 else:
                     logger.info("Continuous mic capture started (paused, ready for conversations)")

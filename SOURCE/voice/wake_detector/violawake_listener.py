@@ -421,6 +421,8 @@ class ViolaWakeListener:
             )
             # Engine will be None - _init() will handle the error
         self._streaming = False
+        # (sensitivity level, Stage 2 on) the wake rule was last logged for.
+        self._logged_wake_rule: tuple[float, bool] | None = None
         self._configure_cadence()
 
         # --- Passive AEC delay calibration ---
@@ -491,6 +493,8 @@ class ViolaWakeListener:
         # Frame tap: external consumers (e.g. ContinuousMicCapture) receive
         # a copy of every raw audio chunk without opening their own stream.
         self._frame_tap: Callable[[bytes], None] | None = None
+        # Same chunk after echo cancellation; see set_processed_frame_tap.
+        self._processed_frame_tap: Callable[[bytes], None] | None = None
 
         # Liveness that cannot be faked: advanced ONLY by run()'s loop body, once
         # per audio frame actually read off the device. Every consumer that wants
@@ -554,15 +558,23 @@ class ViolaWakeListener:
         self._streaming = bool(engine is not None and getattr(engine, "supports_streaming", False) is True)
         if self._streaming:
             self._infer_interval = 1
+            # The rule depends on the Stage 2 check (STREAM_OPERATING_POINTS_CHECKED).
+            # The loop sets engine.checked before every chunk; set it here too, or
+            # this line reports the unchecked rule (1.0.5: "7 of 7 at 0.79" at
+            # Balanced while 6 of 7 at 0.85 was the rule actually applied).
+            checked = self._stage2_check_on()
+            engine.checked = checked
             k, n = engine.agreement
             logger.info(
                 "Wake scoring cadence: every chunk (80 ms, streaming embeddings), wake on %d of %d frames "
-                "at frame threshold %.2f (sensitivity level %.2f)",
+                "at frame threshold %.2f (sensitivity level %.2f, Stage 2 check %s)",
                 k,
                 n,
                 engine.stream_threshold,
                 engine.threshold,
+                "on" if checked else "off",
             )
+            self._logged_wake_rule = (round(float(engine.threshold), 4), checked)
         else:
             logger.info(
                 "Wake scoring cadence: every %d chunks (%d ms), single frame",
@@ -619,6 +631,26 @@ class ViolaWakeListener:
     def set_frame_tap(self, callback: Callable[[bytes], None] | None) -> None:
         """Register a callback that receives every raw audio chunk."""
         self._frame_tap = callback
+
+    def set_processed_frame_tap(self, callback: Callable[[bytes], None] | None) -> None:
+        """Register a callback that receives every chunk AFTER echo cancellation.
+
+        The echo canceller and its reference buffer belong to this listener and
+        run exactly once per chunk. A consumer that needs echo-cancelled audio
+        (the barge-in monitor) must take it from here rather than run the
+        shared canceller a second time: the reference is a queue, so a second
+        reader steals half of it and the adaptive filter diverges.
+        """
+        self._processed_frame_tap = callback
+
+    def _emit_processed_frame(self, processed_int16: np.ndarray) -> None:
+        tap = self._processed_frame_tap
+        if tap is None:
+            return
+        try:
+            tap(processed_int16.astype(np.int16, copy=False).tobytes())
+        except Exception:  # noqa: BLE001, RUF100 - never let a tap error stop the wake loop
+            pass
 
     def _init_aec_processor(self) -> None:
         """Initialize AEC processor based on config."""
@@ -2697,6 +2729,7 @@ class ViolaWakeListener:
 
                 # Apply AEC frame-by-frame
                 processed_int16 = self._apply_aec_to_chunk(mic_int16, frame_count)
+                self._emit_processed_frame(processed_int16)
 
                 # WARNING: Do NOT apply noise suppression here.
                 # ViolaWake's MLP was trained on raw (post-AEC) audio.
@@ -2767,6 +2800,8 @@ class ViolaWakeListener:
                         )
                         effective_threshold = self._policy.effective_threshold(context)
                         stage2_checked = self._stage2_check_on()
+                        if self._streaming:
+                            self._log_wake_rule_change(self._base_threshold, stage2_checked)
 
                     # DIAGNOSTIC: Check audio buffer health before engine
                     if frame_count % 125 == 5:  # Log occasionally
@@ -2944,6 +2979,31 @@ class ViolaWakeListener:
         except Exception as exc:  # noqa: BLE001, RUF100 - the check is optional; wakes pass without it
             logger.warning("[WAKE_VERIFY] could not start the verifier warm-up: %s", exc)
 
+    def _log_wake_rule_change(self, level: float, checked: bool) -> None:
+        """Log the base wake rule again when the saved level or the Stage 2 switch changes.
+
+        Only the user's base level is tracked: the temporary boosts during
+        playback and quiet hours would otherwise log on every song.
+        """
+        key = (round(float(level), 4), bool(checked))
+        if key == self._logged_wake_rule:
+            return
+        self._logged_wake_rule = key
+        try:
+            from violawake.config import stream_operating_point
+
+            k, n, frame_threshold = stream_operating_point(level, checked=checked)
+        except (ImportError, TypeError, ValueError):
+            return
+        logger.info(
+            "Wake rule now: wake on %d of %d frames at frame threshold %.2f (sensitivity level %.2f, Stage 2 check %s)",
+            k,
+            n,
+            frame_threshold,
+            level,
+            "on" if checked else "off",
+        )
+
     def _stage2_check_on(self) -> bool:
         """The opt-in Stage 2 check is on (and FORCE_WAKE, which skips it, is not)."""
         if self._force_wake:
@@ -3071,6 +3131,7 @@ class ViolaWakeListener:
         mic_int16 = np.frombuffer(audio_data, dtype=np.int16)
         self._verify_frame_count += 1
         processed = self._apply_aec_to_chunk(mic_int16, self._verify_frame_count)
+        self._emit_processed_frame(processed)
         return WakeChunk(raw=audio_data, audio=processed.astype(np.float32) * (1.0 / AUDIO_INT16_SCALE))
 
     def _start_command_preroll(self, frames: list[bytes]) -> None:

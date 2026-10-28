@@ -141,14 +141,14 @@ def pending_pairing_codes() -> list[dict[str, Any]]:
 def _display_pairing_code(code: str, client_ip: str) -> None:
     """Display the pairing code on the main Viola device.
 
-    Uses multiple channels:
-    - Console/log output (always available)
-    - EventBus notification (picked up by Qt UI and WebSocket clients)
+    Shown through the EventBus (picked up by the Qt UI and WebSocket clients).
+    The code itself is never written to the log: it is a live credential for
+    pairing a speaker, and log files are read by support tools, bug reports and
+    anyone with access to the profile folder (1.0.5 laptop report A7.3).
     """
     logger.info(
-        "PAIRING CODE for device %s: [ %s ]  (expires in %d seconds)",
+        "Pairing code shown on screen for device %s (expires in %d seconds)",
         client_ip,
-        code,
         _PAIRING_EXPIRY_SECONDS,
     )
 

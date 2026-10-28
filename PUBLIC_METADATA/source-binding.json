@@ -30,13 +30,15 @@
   },
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "78b2eb1af20660746fb1e0bee43be243b7dc78284e053cbb0617ae2715e959d0",
-  "source_tree_sha256": "06fa21c7605d676a14096f8a5a64bdc25686cec3b5b43c151680ca4da2e57a99",
+  "source_manifest_sha256": "dc2a09b2e522ec0a78cfb132c0d192694cfa51d53c50bfe2ef4f8844cbd09815",
+  "source_tree_sha256": "e21956ae03f62149a248365cf6942426ba1494dae6475d24d10c7c73c4efe90e",
   "source_file_count": 2743,
-  "source_revision": "bdc3dbd80457dcf33158b9912d1cef7e03f44873",
+  "source_revision": "4c9cc11b4dc02bed16f88646c1e4aca3bf70029c",
   "comparison_public_revision": "ecab2772465fcc89ae6645b028af1c2273b9199f",
   "changed_source_paths": [
     "audio_core/aec_reference_base.py",
+    "audio_core/capture/_proctap_subprocess.py",
+    "audio_core/capture/proctap_provider.py",
     "audio_core/wasapi/aec_reference_adapter.py",
     "audio_core/wasapi/capture_module.py",
     "auth/database.py",
@@ -194,6 +196,7 @@
     "ui/react-app/src/components/CallBriefing.test.jsx",
     "ui/react-app/src/components/ConnectSpeakerPanel.jsx",
     "ui/react-app/src/components/ConnectSpeakerPanel.test.jsx",
+    "ui/react-app/src/components/DeviceDiscoveryPanel.jsx",
     "ui/react-app/src/components/DiagnosticsDisclosureNotice.jsx",
     "ui/react-app/src/components/DiagnosticsDisclosureNotice.test.jsx",
     "ui/react-app/src/components/GoogleConnectSettings.test.jsx",
@@ -238,6 +241,8 @@
     "ui/react-app/src/components/voice/PTTButton.module.css",
     "ui/react-app/src/components/voice/PTTButton.touch.test.jsx",
     "ui/react-app/src/hooks/useCalendarProviders.js",
+    "ui/react-app/src/hooks/useDeviceDiscovery.js",
+    "ui/react-app/src/hooks/useDeviceDiscovery.test.jsx",
     "ui/react-app/src/hooks/usePlayerState.unmount.test.js",
     "ui/react-app/src/hooks/usePressAndHold.js",
     "ui/react-app/src/hooks/useVideoFullscreen.js",
@@ -263,6 +268,7 @@
     "ui/react-app/src/utils/weatherLocation.js",
     "ui/react-app/src/utils/weatherLocation.test.js",
     "ui/react-app/tests/touch_modality_css.test.js",
+    "ui/security/bootstrap.py",
     "ui/server.py",
     "ui/settings_api.py",
     "ui/settings_effects.py",
@@ -277,6 +283,7 @@
     "viola_qt.py",
     "violawake/config.py",
     "violawake/engine.py",
+    "voice/continuous_capture.py",
     "voice/customer_pronunciation.py",
     "voice/pipeline.py",
     "voice/pipeline_wake_callback.py",
@@ -284,6 +291,7 @@
     "voice/synthesis/text_normalizer.py",
     "voice/transcription/whisper.py",
     "voice/wake_chime.py",
+    "voice/wake_detector/aec_processor.py",
     "voice/wake_detector/device_profile_manager.py",
     "voice/wake_detector/facade.py",
     "voice/wake_detector/violawake_listener.py",
@@ -365,8 +373,8 @@
     "historical_inventory_limits": "This renderer correction changes no dependency or workflow inputs. All six retained SBOMs and their complete status objects stay historical and unchanged; no current installed inventory qualification is claimed."
   },
   "qualification": {
-    "source_commit": "bdc3dbd80457dcf33158b9912d1cef7e03f44873",
-    "kind": "r6 hub"
+    "source_commit": "4c9cc11b4dc02bed16f88646c1e4aca3bf70029c",
+    "kind": "r6 audio"
   },
   "historical_bindings": [
     {
