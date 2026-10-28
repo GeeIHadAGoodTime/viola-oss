@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "11ffdfab7f515a2fd192a5078726d51508706ccb",
-  "sha256": "beed45709753fd30f97405d0f2a82b102a80fd66285da09eaa961a5a355b54b0",
+  "revision": "02eee42cbdb6b5dcf71056d933f4deb6200f8978",
+  "sha256": "17e00defec567666d80432f90d80a814d08d3bb696e9c4cdefecad5cc6676472",
   "files": [
     {
       "path": ".env.example",
@@ -180,8 +180,8 @@
     },
     {
       "path": "audio_core/capture/_proctap_subprocess.py",
-      "sha256": "2a86d8cdca1b33c4aa22438c66682ee213e134b1a5596d24931ad1c2046e7d69",
-      "bytes": 36815
+      "sha256": "4ca75e22029eb49d5390f25e7ac4ad82e600501594e1445316db04058dffe834",
+      "bytes": 31189
     },
     {
       "path": "audio_core/capture/_proctap_worker_entry.py",
@@ -215,8 +215,8 @@
     },
     {
       "path": "audio_core/capture/proctap_provider.py",
-      "sha256": "75c8507a7302e4eace05e617aa6adda6f07b1371c3a0af29cf5ab89298819ace",
-      "bytes": 47428
+      "sha256": "a5b29d9ab0fd358ab4a29f425a054df3750c29368a530ee2fdc585c397e8f920",
+      "bytes": 45350
     },
     {
       "path": "audio_core/capture/pulse_monitor.py",
@@ -1065,8 +1065,8 @@
     },
     {
       "path": "core/hub_state_authority.py",
-      "sha256": "0ea4e1f2f10abb6085b228b0b25ddbcebba5aef59ca0a86eec57067795f117b9",
-      "bytes": 40860
+      "sha256": "ed66d6f9206894217c47b119f9e3ea7388aeab8fd8ff85fc6e2f9c385ad41e10",
+      "bytes": 42813
     },
     {
       "path": "core/json_types.py",
@@ -1240,8 +1240,8 @@
     },
     {
       "path": "core/voice_command_handler.py",
-      "sha256": "f972184fb482defc7b2ebb6853f74e4faff59fb9719c40d48e1f72a685ed98fc",
-      "bytes": 73463
+      "sha256": "bcaedccc2500f80fecdd58b1472669a1cfdc517faecc5cf81fd5003fcb5062b9",
+      "bytes": 70800
     },
     {
       "path": "core/voice_orchestrator.py",
@@ -3250,8 +3250,8 @@
     },
     {
       "path": "music/runtime/worker_manager.py",
-      "sha256": "defb5c4f3321a485808d5c78667226b4b97793c6ce2d33184e8ea49d2a1ccc2f",
-      "bytes": 55499
+      "sha256": "e05613037babc92235be90f74de04f05f476eb5f90d7025d62ecbe7beccd5449",
+      "bytes": 59863
     },
     {
       "path": "music/shuffle_control.py",
@@ -10015,8 +10015,8 @@
     },
     {
       "path": "ui/react-app/src/SmartDisplay.jsx",
-      "sha256": "54f44ee0957358e8d695139bc4496bb51a8ea2f3a01d5c975b39a77860c7c84a",
-      "bytes": 179017
+      "sha256": "0f7cf9e0df938ec9a83cce8a900f9269c02c800f082c0362da7f5dd12ffc6372",
+      "bytes": 180069
     },
     {
       "path": "ui/react-app/src/SmartDisplay.spokePolicy.test.jsx",
@@ -10045,8 +10045,8 @@
     },
     {
       "path": "ui/react-app/src/__tests__/SmartDisplay.test.jsx",
-      "sha256": "7fe3f571bcfe520bebd2bb959426d85d84cc32ac4bc70ce70fb33e54588bcbef",
-      "bytes": 135655
+      "sha256": "645ffd2b6fd3f39760e484fc75773e1504daee0efb26101bcead6edb2a7ab2a9",
+      "bytes": 138922
     },
     {
       "path": "ui/react-app/src/__tests__/hooks/useEventBus.test.jsx",
@@ -10565,8 +10565,8 @@
     },
     {
       "path": "ui/react-app/src/components/DeviceDiscoveryPanel.jsx",
-      "sha256": "326689da3e60b76848e51d9a85439f7f876dc8c0a01fe3fe956c474dfa9c12e6",
-      "bytes": 20001
+      "sha256": "eb85d721407e3076c1852332588ffae85375840d6a2c383b7c63c6d4162539f7",
+      "bytes": 19961
     },
     {
       "path": "ui/react-app/src/components/DiagnosticsDisclosureNotice.jsx",
@@ -10825,13 +10825,13 @@
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.desktopOnlyPanels.test.jsx",
-      "sha256": "5b675f318aa0e3c04c4cd5d18390ffe63f340c5249fc9b538e29abeeb06ca25e",
-      "bytes": 33758
+      "sha256": "de9e9d0a7a380fa17884219932384c4b11cf36d181d55295e6365b12f57de36e",
+      "bytes": 34726
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.jsx",
-      "sha256": "1713dd04c70a42a9ee3ab3283a62e0558d5a2cc2b39bed3fd844e3316f97c876",
-      "bytes": 217613
+      "sha256": "09c24277a37d52a77db7a9921e28825c0c250636ee96db9cefe8972d95c1a58f",
+      "bytes": 218415
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.localDiscovery.test.jsx",
@@ -11180,18 +11180,18 @@
     },
     {
       "path": "ui/react-app/src/components/player/PlayerSection.jsx",
-      "sha256": "9f31939c2f91214d748e6ae5823bcb48a6b03fcf47541a6b09cf0c1fec631eda",
-      "bytes": 6911
+      "sha256": "2bc40f8ecf97ebfffd2b92773319cc301abee3e8257dded56aa8c73e86c5610e",
+      "bytes": 7013
     },
     {
       "path": "ui/react-app/src/components/player/PlayerSection.module.css",
-      "sha256": "a3c5d78933da5cfcaba0c912fd110b75b887f6ee3548e895767f3022bb81e67a",
-      "bytes": 3097
+      "sha256": "1ca765877a78fef38f55d37518fcda7179d996ce838c10912b5bddd38f224fa0",
+      "bytes": 3694
     },
     {
       "path": "ui/react-app/src/components/player/PlayerSection.test.jsx",
-      "sha256": "48852450bec93753b98852b302ec384a4fe2c66d550cfc62ea82ff93da844d4c",
-      "bytes": 2614
+      "sha256": "2f301e176fb9727f6467f4fd9bf8af5a922c6e7789e8255f2b78bad6265ca15e",
+      "bytes": 4092
     },
     {
       "path": "ui/react-app/src/components/player/ProgressBar.jsx",
@@ -11235,8 +11235,8 @@
     },
     {
       "path": "ui/react-app/src/components/player/VolumeControl.jsx",
-      "sha256": "06cd43e0644299ef20136ad65114934bed1893e208e0518f49dceea245410332",
-      "bytes": 9813
+      "sha256": "7a4878db98f9f7db2b7d42df4c772f560bc5029799382372847fe61eac2e9a04",
+      "bytes": 10586
     },
     {
       "path": "ui/react-app/src/components/player/VolumeControl.module.css",
@@ -11245,8 +11245,8 @@
     },
     {
       "path": "ui/react-app/src/components/player/VolumeControl.test.jsx",
-      "sha256": "0586fc4dd0052705721e8edc2e3af656cec7c0a5a29f84c257aefb77f5d03609",
-      "bytes": 15979
+      "sha256": "f1cfb50aa0af028b8cca47ab39bbf53a6ae0e5ba01db82114cb780afc53f5e51",
+      "bytes": 16773
     },
     {
       "path": "ui/react-app/src/components/settings/AccountRow.jsx",
@@ -11855,13 +11855,13 @@
     },
     {
       "path": "ui/react-app/src/hooks/useDeviceDiscovery.js",
-      "sha256": "73a0e94651007a30e1ef53f1d022199ed4c07006d21a87215c1dad13a14f1c61",
-      "bytes": 7757
+      "sha256": "cc6e7270cb18f20427f3fbb27c3044d5c71691eaaaacb7b68e4deb96abbd0f73",
+      "bytes": 5300
     },
     {
       "path": "ui/react-app/src/hooks/useDeviceDiscovery.test.jsx",
-      "sha256": "ddebb9e64a896392521ff6714e716e6bd75506489d006902e10628e6278a08ba",
-      "bytes": 7179
+      "sha256": "b17c35159a79d70a5d733c26d6ad2f7716912f1e2961a5417b3361913ef7231b",
+      "bytes": 4815
     },
     {
       "path": "ui/react-app/src/hooks/useEventBus.js",
@@ -12565,8 +12565,8 @@
     },
     {
       "path": "ui/security/bootstrap.py",
-      "sha256": "dd41284e4f42449cb480a241fe8e53195c64ee0f09564dd1dcb4f3941ddd2175",
-      "bytes": 37964
+      "sha256": "8d550a654df6dc02b03802143fd4efc7cb44cc596c7e9c56e5829335e7073031",
+      "bytes": 37805
     },
     {
       "path": "ui/security/config.py",
@@ -12720,8 +12720,8 @@
     },
     {
       "path": "ui/websocket/command_handlers.py",
-      "sha256": "8e98b09c95fe1d2fdcbe58bcc478b062b411fc4ab3965b077c6a1853c4f064cd",
-      "bytes": 49546
+      "sha256": "530de68dfabde85190dd8bc3a836baf9be813a66b883a253611fcb724a2cf65d",
+      "bytes": 50798
     },
     {
       "path": "ui/websocket/event_hub.py",
@@ -13220,8 +13220,8 @@
     },
     {
       "path": "voice/continuous_capture.py",
-      "sha256": "401d873e07aeb6d7d0ed742ce581e2866728a007d2fd25a3abc66fb5be832f79",
-      "bytes": 24670
+      "sha256": "4af6a2e285a0d141beecaed41d1e7af67659db418bb1fec18973b7030619eade",
+      "bytes": 19230
     },
     {
       "path": "voice/customer_composition.py",
@@ -13400,8 +13400,8 @@
     },
     {
       "path": "voice/pipeline.py",
-      "sha256": "02f401726b0c0316a40fff17b7d9ec3d359955d0e039b1a67af65e40c6af8368",
-      "bytes": 45876
+      "sha256": "b7709034460376bcc80af2706c72cb6809083997c9a55602f4df08a1ae6a1450",
+      "bytes": 44884
     },
     {
       "path": "voice/pipeline_initialization.py",
@@ -13550,8 +13550,8 @@
     },
     {
       "path": "voice/wake_detector/aec_processor.py",
-      "sha256": "041cf2ba0211b0d285a468c4950643fd3a56239d64359d79ce77e2f95ddcda09",
-      "bytes": 46486
+      "sha256": "7136aa4260163a3d083caaa8695560d41f6057403eca7eee0f2c48d2c3c810dd",
+      "bytes": 43289
     },
     {
       "path": "voice/wake_detector/aec_viola.py",
@@ -13680,8 +13680,8 @@
     },
     {
       "path": "voice/wake_detector/violawake_listener.py",
-      "sha256": "7e9f612cedfee186974d7e0509b6e895bf684e41b3dd57920b9931906c3cc15b",
-      "bytes": 156133
+      "sha256": "2aed784cc20afa752536f5ee7622b0368481a234586d3c96429aa58524af3bfd",
+      "bytes": 153109
     },
     {
       "path": "voice/wake_detector/wake/__init__.py",

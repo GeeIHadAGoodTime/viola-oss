@@ -172,6 +172,23 @@ class _WorkerTakeMeta(TypedDict, total=False):
 # still logs immediately regardless of this floor.
 _IDLE_DEBUG_KEEPALIVE_TICKS = 100
 
+# Embedded (React iframe) safety watchdog. Budgets are PLAYING time: the
+# watchdog ticks, adds only the time the track was not paused, and never
+# force-skips a paused track.
+EMBEDDED_WATCHDOG_GRACE_S = 60.0
+EMBEDDED_WATCHDOG_UNKNOWN_DURATION_S = 600.0
+EMBEDDED_WATCHDOG_TICK_S = 5.0
+EMBEDDED_WATCHDOG_MIN_TICK_S = 0.05
+
+
+@dataclass
+class _EmbeddedWatchdogState:
+    generation: int
+    item_id: str | None
+    budget_s: float
+    played_s: float
+    last_tick: float
+
 
 @dataclass
 class PlaybackResult:
@@ -224,6 +241,8 @@ class RuntimeWorkerManager:
         self._start_playback_cb = start_playback or player._start_and_monitor_playback
         self._stop_backend_cb = stop_backend or player._stop_backend_locked
         self._embedded_watchdog: Timer | None = None
+        self._embedded_watchdog_state: _EmbeddedWatchdogState | None = None
+        self._embedded_watchdog_generation = 0
         self._deferred_autoplay_timer: Timer | None = None
 
     # ------------------------------------------------------------------ #
@@ -546,41 +565,111 @@ class RuntimeWorkerManager:
     # ------------------------------------------------------------------ #
 
     def _start_embedded_watchdog(self, item: QueueItem) -> None:
-        """Start safety watchdog for embedded playback.
+        """Start the safety watchdog for embedded (React iframe) playback.
 
-        If no YT_TRACK_ENDED arrives within timeout, force-skip the track.
-        Timeout = track duration + 60s, or 10 minutes if duration unknown.
+        If no YT_TRACK_ENDED arrives after the track has PLAYED for its
+        budget, force-skip it. Budget = track duration + 60s, or 10 minutes
+        when the duration is unknown; a duration the iframe reports later
+        extends the budget.
+
+        Only playing time counts. The watchdog used to be one wall-clock
+        Timer armed when the track started, so pausing a track and leaving it
+        paused fired ``QUEUE_ADVANCE complete_current`` 600s after the track
+        STARTED and the next track began playing on its own (1.0.5 build 5:
+        "November" paused at 23:43, next track at 23:52:26). It now ticks,
+        adds only the time spent not paused, and never skips while paused.
         """
         self._cancel_embedded_watchdog()
         duration_ms = getattr(item, "duration_ms", None) or getattr(item, "duration", None)
         if duration_ms and isinstance(duration_ms, (int, float)) and duration_ms > 0:
             # duration_ms > 1000 ⇒ assume milliseconds, else seconds
             duration_s = duration_ms / 1000 if duration_ms > 1000 else duration_ms
-            timeout = duration_s + 60
+            timeout = duration_s + EMBEDDED_WATCHDOG_GRACE_S
         else:
-            timeout = 600  # 10 minutes
-        self._embedded_watchdog = Timer(timeout, self._embedded_watchdog_fire)
-        self._embedded_watchdog.daemon = True
-        self._embedded_watchdog.start()
+            timeout = EMBEDDED_WATCHDOG_UNKNOWN_DURATION_S
+        self._embedded_watchdog_generation += 1
+        self._embedded_watchdog_state = _EmbeddedWatchdogState(
+            generation=self._embedded_watchdog_generation,
+            item_id=getattr(item, "id", None),
+            budget_s=float(timeout),
+            played_s=0.0,
+            last_tick=time.monotonic(),
+        )
+        self._arm_embedded_watchdog_tick(self._embedded_watchdog_state)
         self._logger.info(
-            "EMBEDDED_WATCHDOG: Set %ds timeout for track %s",
+            "EMBEDDED_WATCHDOG: Set %ds playing-time budget for track %s",
             int(timeout),
             getattr(item, "id", "unknown"),
         )
 
+    def _arm_embedded_watchdog_tick(self, watchdog: _EmbeddedWatchdogState) -> None:
+        remaining = max(0.0, watchdog.budget_s - watchdog.played_s)
+        delay = min(EMBEDDED_WATCHDOG_TICK_S, max(EMBEDDED_WATCHDOG_MIN_TICK_S, remaining))
+        timer = Timer(delay, self._embedded_watchdog_tick, args=(watchdog.generation,))
+        timer.daemon = True
+        self._embedded_watchdog = timer
+        timer.start()
+
     def _cancel_embedded_watchdog(self) -> None:
         """Cancel the embedded watchdog timer if running."""
+        self._embedded_watchdog_generation += 1
+        self._embedded_watchdog_state = None
         if self._embedded_watchdog is not None:
             self._embedded_watchdog.cancel()
             self._embedded_watchdog = None
 
-    def _embedded_watchdog_fire(self) -> None:
-        """Safety timeout fired — force-advance past stuck embedded track."""
+    def _embedded_playback_paused_locked(self) -> bool:
+        """True while the user (or the iframe) has the current track paused."""
         player = self._player
-        self._logger.warning(
-            "EMBEDDED_WATCHDOG: No YT_TRACK_ENDED received — forcing skip",
-        )
+        if getattr(player, "_user_paused", False) or getattr(player, "_paused", False):
+            return True
+        sm = getattr(player, "_playback_sm", None)
+        return sm is not None and getattr(sm, "phase", None) == PlaybackPhase.PAUSED
+
+    def _embedded_watchdog_item_is_current_locked(self, item_id: str | None) -> bool:
+        if item_id is None:
+            return True
+        player = self._player
+        current = player._playlist.current()
+        if current is not None and getattr(current, "id", None) == item_id:
+            return True
+        state = getattr(player, "_state", None)
+        now_playing = getattr(state, "now_playing", None)
+        return now_playing is not None and getattr(now_playing, "id", None) == item_id
+
+    def _embedded_watchdog_tick(self, generation: int) -> None:
+        """Count playing time; force-advance only past a stuck PLAYING track."""
+        player = self._player
         with player._cv:
+            watchdog = self._embedded_watchdog_state
+            if watchdog is None or generation != watchdog.generation:
+                return  # Cancelled or superseded by a newer track.
+            now = time.monotonic()
+            elapsed = max(0.0, now - watchdog.last_tick)
+            watchdog.last_tick = now
+            paused = self._embedded_playback_paused_locked()
+            if not paused:
+                watchdog.played_s += elapsed
+            reported_ms = getattr(player, "_duration_ms", 0)
+            if isinstance(reported_ms, (int, float)) and reported_ms > 0:
+                watchdog.budget_s = max(watchdog.budget_s, reported_ms / 1000 + EMBEDDED_WATCHDOG_GRACE_S)
+            if not self._embedded_watchdog_item_is_current_locked(watchdog.item_id):
+                # The track already ended or was replaced; a skip now would
+                # advance a track the watchdog never watched.
+                self._embedded_watchdog_state = None
+                self._embedded_watchdog = None
+                return
+            if paused or watchdog.played_s < watchdog.budget_s:
+                self._arm_embedded_watchdog_tick(watchdog)
+                return
+            self._embedded_watchdog_state = None
+            self._embedded_watchdog = None
+            self._logger.warning(
+                "EMBEDDED_WATCHDOG: No YT_TRACK_ENDED after %ds of playing time (budget %ds) for track %s — forcing skip",
+                int(watchdog.played_s),
+                int(watchdog.budget_s),
+                watchdog.item_id,
+            )
             player._pending_skip_tokens += 1
             player._cv.notify_all()
 
