@@ -224,6 +224,9 @@ export function truncateForResponseLine(text) {
 }
 
 const WEATHER_FORECAST_TTL_MS = 30 * 60 * 1000;
+// How long the UI socket may be down before "Connection lost" is shown. The
+// socket retries after 2 s, so a quick drop (e.g. waking from sleep) stays quiet.
+const DISCONNECT_TOAST_GRACE_MS = 6000;
 
 function hasForecastPayload(data) {
   const hourly = data?.hourly_forecast || data?.hourly;
@@ -1759,11 +1762,29 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
     return () => setErrorCallback(null);
   }, [setErrorCallback, addToast]);
 
+  // A dropped socket that comes back on its own (waking from sleep, a brief
+  // backend stall) reconnects quietly: "Connection lost" only shows when it is
+  // still down after DISCONNECT_TOAST_GRACE_MS (1.0.5 build-5 laptop, X10.4).
+  const wsConnectCountRef = useRef(playerState.connectCount);
+  wsConnectCountRef.current = playerState.connectCount;
   useEffect(() => {
     if (!setDisconnectCallback) return;
-    const handleDisconnect = () => { addToast({ message: 'Connection lost. Reconnecting...', level: 'warning' }); };
+    let noticeTimer = null;
+    const handleDisconnect = () => {
+      if (noticeTimer) return;
+      const connectCountAtDrop = wsConnectCountRef.current;
+      noticeTimer = setTimeout(() => {
+        noticeTimer = null;
+        if (wsConnectCountRef.current === connectCountAtDrop) {
+          addToast({ message: 'Connection lost. Reconnecting...', level: 'warning' });
+        }
+      }, DISCONNECT_TOAST_GRACE_MS);
+    };
     setDisconnectCallback(handleDisconnect);
-    return () => setDisconnectCallback(null);
+    return () => {
+      setDisconnectCallback(null);
+      if (noticeTimer) clearTimeout(noticeTimer);
+    };
   }, [setDisconnectCallback, addToast]);
 
   // =========================================================================
