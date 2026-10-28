@@ -125,6 +125,7 @@ function ChatModeInner({
   handlePTTEnd = () => {},
   onOpenSettings = () => {},
   profileName,
+  profileDetail = '',
   commandRegistry = null,
   commandScopeActive = false,
   // Identity of the signed-in account (or 'device' when signed out / running
@@ -1388,6 +1389,7 @@ function ChatModeInner({
         onExport={exportThread}
         onOpenSettings={onOpenSettings}
         profileName={profileName}
+        profileDetail={profileDetail}
       />
       <main className="chat-main">
         {threadActionError && <div className="chat-upload-status is-error" role="alert">{threadActionError}</div>}
@@ -1499,6 +1501,7 @@ ChatModeInner.propTypes = {
   handlePTTEnd: PropTypes.func,
   onOpenSettings: PropTypes.func,
   profileName: PropTypes.string,
+  profileDetail: PropTypes.string,
   commandRegistry: PropTypes.shape({
     registerCommands: PropTypes.func.isRequired,
   }),

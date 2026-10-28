@@ -2,6 +2,10 @@ import { useState, useRef, useCallback, useEffect, useLayoutEffect } from 'react
 import { describeError, describeMicError, ERROR_CODE_MESSAGES } from '../utils/describeError';
 import { authFetch } from './useViolaApi';
 
+// Speech on a working microphone peaks far above this (raw float RMS); a take
+// whose loudest frame stays below it was silence from the device.
+const SILENT_MIC_PEAK_RMS = 0.003;
+
 function getSupportedMimeType() {
   const candidates = [
     'audio/webm;codecs=opus',
@@ -40,6 +44,17 @@ export function useVoice(onCommandResult, { existingStream, executeCommand = tru
   const enabledRef = useRef(enabled);
   enabledRef.current = enabled;
   const captureGenerationRef = useRef(0);
+  // Hold-to-talk: the user's release ends the turn, so the 1.5 s silence
+  // auto-stop (meant for tap-to-talk) must not cut a deliberate hold short.
+  const silenceStopArmedRef = useRef(true);
+  // A release that arrives while the microphone is still opening.
+  const startPendingRef = useRef(false);
+  const stopRequestedRef = useRef(false);
+  // Loudest frame of the current take, to tell "silent microphone" apart from
+  // "nothing recognised" (1.0.5 build 5: two held clips came back empty).
+  const peakRmsRef = useRef(0);
+  const recordStartedAtRef = useRef(0);
+  const analyserMeasuredRef = useRef(false);
 
   // Keep existingStreamRef current without retriggering effects
   useEffect(() => {
@@ -86,6 +101,7 @@ export function useVoice(onCommandResult, { existingStream, executeCommand = tru
 
       analyser.fftSize = 256;
       source.connect(analyser);
+      analyserMeasuredRef.current = false;
 
       analyserRef.current = analyser;
       audioCtxRef.current = audioCtx;
@@ -105,6 +121,7 @@ export function useVoice(onCommandResult, { existingStream, executeCommand = tru
         }
 
         analyserRef.current.getFloatTimeDomainData(dataArray);
+        analyserMeasuredRef.current = true;
 
         let sumSquares = 0;
         for (let i = 0; i < dataArray.length; i += 1) {
@@ -114,7 +131,10 @@ export function useVoice(onCommandResult, { existingStream, executeCommand = tru
         const rms = Math.sqrt(sumSquares / dataArray.length);
         const now = window.performance.now();
 
-        if (rms < silenceThreshold) {
+        if (rms > peakRmsRef.current) peakRmsRef.current = rms;
+        if (rms < silenceThreshold && !silenceStopArmedRef.current) {
+          silenceTimerRef.current = null;
+        } else if (rms < silenceThreshold) {
           if (silenceTimerRef.current === null) {
             silenceTimerRef.current = now;
           } else if (now - silenceTimerRef.current >= silenceDurationMs) {
@@ -140,9 +160,13 @@ export function useVoice(onCommandResult, { existingStream, executeCommand = tru
   }, [_stopVAD]);
 
   // Start recording
-  const startRecording = useCallback(async () => {
+  const startRecording = useCallback(async (options = {}) => {
     if (!enabledRef.current) return;
     const generation = ++captureGenerationRef.current;
+    silenceStopArmedRef.current = options?.holdToTalk !== true;
+    startPendingRef.current = true;
+    stopRequestedRef.current = false;
+    peakRmsRef.current = 0;
     try {
       setError(null);
       setTranscript('');
@@ -212,6 +236,16 @@ export function useVoice(onCommandResult, { existingStream, executeCommand = tru
         if (!borrowedStream) stream.getTracks().forEach(track => track.stop());
         return;
       }
+      startPendingRef.current = false;
+      // The button was released before the microphone opened. Recording now
+      // would capture only the silence after the release (and auto-stop 1.5 s
+      // later with an empty transcript), so say what happened instead.
+      if (stopRequestedRef.current) {
+        stopRequestedRef.current = false;
+        if (!borrowedStream) stream.getTracks().forEach(track => track.stop());
+        setError('The microphone took a moment to start. Hold the mic button until it says recording, then speak.');
+        return;
+      }
       usingSharedStreamRef.current = borrowedStream;
       streamRef.current = stream;
 
@@ -231,6 +265,7 @@ export function useVoice(onCommandResult, { existingStream, executeCommand = tru
       };
 
       mediaRecorder.start(100); // Collect data every 100ms
+      recordStartedAtRef.current = window.performance.now();
       _startVAD(stream);
       setIsRecording(true);
 
@@ -242,6 +277,10 @@ export function useVoice(onCommandResult, { existingStream, executeCommand = tru
       }
 
     } catch (err) {
+      if (generation === captureGenerationRef.current) {
+        startPendingRef.current = false;
+        stopRequestedRef.current = false;
+      }
       if (!enabledRef.current || generation !== captureGenerationRef.current) return;
       // Log the actual error for debugging
       if (import.meta.env.DEV) {
@@ -256,6 +295,11 @@ export function useVoice(onCommandResult, { existingStream, executeCommand = tru
 
   // Stop recording and process
   const stopRecording = useCallback(async () => {
+    if (startPendingRef.current && mediaRecorderRef.current?.state !== 'recording') {
+      // Released while the microphone is still opening: honoured once it opens.
+      stopRequestedRef.current = true;
+      return;
+    }
     if (!mediaRecorderRef.current || !isRecording) return;
 
     return new Promise((resolve) => {
@@ -283,6 +327,21 @@ export function useVoice(onCommandResult, { existingStream, executeCommand = tru
         // Create blob from chunks
         const audioBlob = new Blob(audioChunksRef.current, { type: mimeTypeRef.current || 'audio/webm' });
         audioChunksRef.current = [];
+        const takeSeconds = (window.performance.now() - recordStartedAtRef.current) / 1000;
+        const peakRms = peakRmsRef.current;
+        if (import.meta.env.DEV) {
+          console.log('[useVoice] take', { bytes: audioBlob.size, seconds: takeSeconds, peakRms });
+        }
+        // The analyser saw a level the whole time (it runs on the same stream)
+        // and it never rose above the silence floor: the microphone delivered
+        // silence. Sending it would only come back as "I didn't catch that".
+        if (analyserMeasuredRef.current && peakRms < SILENT_MIC_PEAK_RMS && takeSeconds >= 1) {
+          try { await authFetch('/v1/audio/unduck', { method: 'POST' }); } catch { /* best effort */ }
+          setError("Viola didn't hear anything from the microphone. Check the microphone in Settings > Voice, then try again.");
+          setIsProcessing(false);
+          resolve(null);
+          return;
+        }
 
         if (audioBlob.size < 100) {
           setError('Recording too short');
@@ -387,9 +446,18 @@ export function useVoice(onCommandResult, { existingStream, executeCommand = tru
 
   stopRecordingRef.current = stopRecording;
 
+  // A tap (released quickly) hands the end of the turn to the silence
+  // auto-stop; a hold keeps recording until release.
+  const armSilenceStop = useCallback(() => {
+    silenceStopArmedRef.current = true;
+    silenceTimerRef.current = null;
+  }, []);
+
   // Cancel recording without processing
   const cancelRecording = useCallback(() => {
     captureGenerationRef.current += 1;
+    startPendingRef.current = false;
+    stopRequestedRef.current = false;
     _stopVAD();
     const recorder = mediaRecorderRef.current;
     mediaRecorderRef.current = null;
@@ -436,6 +504,7 @@ export function useVoice(onCommandResult, { existingStream, executeCommand = tru
     startRecording,
     stopRecording,
     cancelRecording,
+    armSilenceStop,
     clearError: () => setError(null),
   };
 }

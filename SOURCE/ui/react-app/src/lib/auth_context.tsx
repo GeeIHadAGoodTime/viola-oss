@@ -105,6 +105,7 @@ type AuthContextValue = {
   updatePassword: (password: string) => Promise<AuthActionResult>;
   startOAuthFlow: (provider: string) => Promise<AuthActionResult>;
   refreshUser: () => Promise<void>;
+  restoreDesktopSession: () => Promise<boolean>;
   clearError: () => void;
 };
 
@@ -118,6 +119,16 @@ const DEFAULT_PLAN: PlanState = {
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+
+// A cookie read that failed for a reason other than "no session" (backend not
+// up yet, network or cloud blip, rate limit) is retried on this schedule.
+const DESKTOP_RESTORE_RETRY_DELAYS_MS = [1000, 2000, 4000, 8000, 15000];
+
+function isTransientHydrationError(error: unknown): boolean {
+  const status = (error as { status?: unknown } | null)?.status;
+  if (typeof status !== 'number') return false;
+  return status === 0 || status === 408 || status === 429 || status >= 500;
+}
 
 function metadataString(metadata: Record<string, unknown>, key: string, fallback = ''): string {
   const value = metadata[key];
@@ -457,65 +468,125 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => clearTimeout(timer);
   }, [plan.currentPeriodEnd, plan.hasPaidAccess, plan.entitlement, refreshUser]);
 
+  // #2604 — persistent desktop sign-in. SEC-017 keeps the webview's GoTrue
+  // tokens in memory only (never localStorage), so a fresh launch has no
+  // in-memory session and getSession() returns null. On the desktop app the
+  // session is persisted server-side (encrypted at rest) behind the opaque
+  // httpOnly viola_session cookie that survives the relaunch; hydrate the
+  // client from it before deciding signed-out, so the user is not forced to
+  // re-enter credentials every launch. Any real signed-out state (no cookie /
+  // after sign-out) resolves to null exactly as before. Never runs on the
+  // cloud surface (no desktop session store there).
+  //
+  // Also reports whether a miss was transient (backend still starting, network
+  // or cloud blip, rate limit). Those are retried, so one failed read at launch
+  // can no longer leave the Account page on the Sign In form for the whole run
+  // while the backend is signed in (1.0.5 build 5, A2.7).
+  const restoreDesktopCookieSession = useCallback(async (
+    restoration: ReturnType<typeof captureSessionRestoration>,
+    isMounted: () => boolean,
+  ): Promise<{ session: Session | null; transient: boolean }> => {
+    if (!mayRestoreSession(restoration)) return { session: null, transient: false };
+    const { data } = await gotrueClient.getSession();
+    if (!mayRestoreSession(restoration)) return { session: null, transient: false };
+    if (data.session) return { session: data.session, transient: false };
+    if (!isDesktopApp()) return { session: null, transient: false };
+    let hydrated;
+    try {
+      hydrated = await hydrateDesktopSessionFromCookie();
+    } catch {
+      return { session: null, transient: true };
+    }
+    if (!hydrated.ok || !hydrated.session) {
+      return { session: null, transient: isTransientHydrationError(hydrated.error) };
+    }
+    const pair = hydrated.session;
+    // Seed the auth-js client so its normal auto-refresh lifecycle takes over
+    // (the returned pair is already rotated/valid from the store).
+    const session = await runSessionRestoration(async () => {
+      if (!isMounted() || !mayRestoreSession(restoration)) return null;
+      let restoredSession: Session | null;
+      try {
+        const { data: setData, error: restoreError } = await gotrueClient.setSession({
+          access_token: pair.access_token,
+          refresh_token: pair.refresh_token,
+        });
+        if (restoreError) throw restoreError;
+        restoredSession = setData.session || null;
+      } catch (restoreError) {
+        // Both thrown notifications and returned SDK errors can follow a
+        // write. Preserve that uncertainty across later unrelated work.
+        // An empty store remains a recoverable miss, not a poisoned drain.
+        if (sdkSessionPresent()) retainSessionUncertainty(sdkSessionPresent);
+        if (isMounted() && mayRestoreSession(restoration)) setAuthError(restoreError);
+        return null;
+      }
+      if (!mayRestoreSession(restoration)) {
+        // Explicit login/logout waits for this admitted write and cleanup.
+        // Do not leave a late cookie restoration in the singleton SDK.
+        const cleanup = () => cleanupMatchingSdkPair(pair);
+        try { await cleanup(); } catch (cleanupError) {
+          retainRestorationCleanup(cleanup, sdkSessionPresent);
+          throw cleanupError;
+        }
+        return null;
+      }
+      return restoredSession;
+    }, restoration);
+    return { session, transient: false };
+  }, [setAuthError]);
+
+  const mountedRef = useRef(true);
+
+  // Re-read the desktop session on request (the Account page asks when the
+  // backend reports a signed-in account but this page has none). Resolves true
+  // when this page ends up signed in.
+  const restoreDesktopSession = useCallback(async (): Promise<boolean> => {
+    if (sessionRef.current) return true;
+    if (!isDesktopApp()) return false;
+    const restoration = captureSessionRestoration();
+    const epoch = billingEpoch.current;
+    const { session: restored } = await restoreDesktopCookieSession(restoration, () => mountedRef.current);
+    if (sessionRef.current) return true;
+    if (!restored || !mountedRef.current || !mayRestoreSession(restoration) || billingEpoch.current !== epoch) {
+      return false;
+    }
+    applySession(restored);
+    return true;
+  }, [applySession, restoreDesktopCookieSession]);
+
   useEffect(() => {
     let mounted = true;
+    mountedRef.current = true;
     const restoration = captureSessionRestoration();
     const initialEpoch = billingEpoch.current;
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
+    let attempt = 0;
 
-    // #2604 — persistent desktop sign-in. SEC-017 keeps the webview's GoTrue
-    // tokens in memory only (never localStorage), so a fresh launch has no
-    // in-memory session and getSession() returns null. On the desktop app the
-    // session is persisted server-side (encrypted at rest) behind the opaque
-    // httpOnly viola_session cookie that survives the relaunch; hydrate the
-    // client from it before deciding signed-out, so the user is not forced to
-    // re-enter credentials every launch. Any real signed-out state (no cookie /
-    // after sign-out) resolves to null exactly as before. Never runs on the
-    // cloud surface (no desktop session store there).
-    const resolveInitialSession = async (): Promise<Session | null> => {
-      if (!mayRestoreSession(restoration)) return null;
-      const { data } = await gotrueClient.getSession();
-      if (!mayRestoreSession(restoration)) return null;
-      if (data.session) return data.session;
-      if (!isDesktopApp()) return null;
-      const hydrated = await hydrateDesktopSessionFromCookie();
-      if (!hydrated.ok || !hydrated.session) return null;
-      // Seed the auth-js client so its normal auto-refresh lifecycle takes over
-      // (the returned pair is already rotated/valid from the store).
-      return runSessionRestoration(async () => {
-        if (!mounted || !mayRestoreSession(restoration)) return null;
-        let restoredSession: Session | null;
-        try {
-          const { data: setData, error: restoreError } = await gotrueClient.setSession({
-            access_token: hydrated.session.access_token,
-            refresh_token: hydrated.session.refresh_token,
-          });
-          if (restoreError) throw restoreError;
-          restoredSession = setData.session || null;
-        } catch (restoreError) {
-          // Both thrown notifications and returned SDK errors can follow a
-          // write. Preserve that uncertainty across later unrelated work.
-          // An empty store remains a recoverable miss, not a poisoned drain.
-          if (sdkSessionPresent()) retainSessionUncertainty(sdkSessionPresent);
-          if (mounted && mayRestoreSession(restoration)) setAuthError(restoreError);
-          return null;
-        }
-        if (!mayRestoreSession(restoration)) {
-          // Explicit login/logout waits for this admitted write and cleanup.
-          // Do not leave a late cookie restoration in the singleton SDK.
-          const cleanup = () => cleanupMatchingSdkPair(hydrated.session);
-          try { await cleanup(); } catch (cleanupError) {
-            retainRestorationCleanup(cleanup, sdkSessionPresent);
-            throw cleanupError;
-          }
-          return null;
-        }
-        return restoredSession;
-      }, restoration);
+    const retryTransientMiss = () => {
+      if (attempt >= DESKTOP_RESTORE_RETRY_DELAYS_MS.length) return;
+      const delay = DESKTOP_RESTORE_RETRY_DELAYS_MS[attempt];
+      attempt += 1;
+      retryTimer = setTimeout(() => {
+        if (!mounted || sessionRef.current || !mayRestoreSession(restoration)) return;
+        const epoch = billingEpoch.current;
+        restoreDesktopCookieSession(restoration, () => mounted)
+          .then(({ session: restored, transient }) => {
+            if (!mounted || sessionRef.current || !mayRestoreSession(restoration)) return;
+            if (restored) {
+              if (billingEpoch.current === epoch) applySession(restored);
+            } else if (transient) {
+              retryTransientMiss();
+            }
+          })
+          .catch(() => { if (mounted) retryTransientMiss(); });
+      }, delay);
     };
 
-    resolveInitialSession()
-      .then((initialSession) => {
+    restoreDesktopCookieSession(restoration, () => mounted)
+      .then(({ session: initialSession, transient }) => {
         if (mounted && mayRestoreSession(restoration) && billingEpoch.current === initialEpoch) applySession(initialSession);
+        if (mounted && !initialSession && transient) retryTransientMiss();
       })
       .catch((err) => {
         if (mounted) setAuthError(err);
@@ -537,10 +608,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     return () => {
       mounted = false;
+      mountedRef.current = false;
+      clearTimeout(retryTimer);
       billingEpoch.current += 1;
       data.subscription.unsubscribe();
     };
-  }, [applySession, setAuthError]);
+  }, [applySession, restoreDesktopCookieSession, setAuthError]);
 
   const clearError = useCallback(() => {
     setError(null);
@@ -830,6 +903,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     updatePassword,
     startOAuthFlow,
     refreshUser,
+    restoreDesktopSession,
     clearError,
   }), [
     user,
@@ -853,6 +927,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     updatePassword,
     startOAuthFlow,
     refreshUser,
+    restoreDesktopSession,
     clearError,
   ]);
 

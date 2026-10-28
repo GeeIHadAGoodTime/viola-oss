@@ -4,6 +4,7 @@ import { THEME } from '../config';
 import { authFetch } from '../hooks/useViolaApi';
 import { openSafeExternalUrl } from '../lib/safeUrl';
 import { useCloudConsentGate } from '../hooks/cloudConsentGate';
+import { renderStageMarkdown } from '../utils/stageMarkdown';
 
 const AUTO_DISMISS_BASE_MS = 12000;
 const AUTO_DISMISS_PER_CHAR_MS = 40;
@@ -75,6 +76,9 @@ const URL_REGEX = /https?:\/\/[^\s)]+/g;
 
 function renderTextWithLinks(text) {
   if (typeof text !== 'string') return text;
+  // Markdown links and emphasis from the model render as text, not syntax.
+  if (/\*\*|__|`|\[[^\]
+]+\]\(/.test(text)) return renderStageMarkdown(text);
 
   const parts = [];
   let lastIndex = 0;

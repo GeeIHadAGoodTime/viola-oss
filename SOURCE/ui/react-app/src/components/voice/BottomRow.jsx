@@ -12,6 +12,7 @@ import PTTButton from './PTTButton';
 import { describeError } from '../../utils/describeError';
 import styles from './BottomRow.module.css';
 import '../../i18n';
+import { renderStageMarkdown } from '../../utils/stageMarkdown';
 
 // The little label under the push-to-talk button. `wakeStatus` is a state name
 // SmartDisplay picks for its own logic, so it is mapped to words rather than
@@ -125,7 +126,7 @@ const BottomRow = ({
                 */
                 <span style={{ color: `${THEME.colors.statusRed}CC` }}>{describeError(voice.error)}</span>
               ) : (
-                <span>{lastResponse}</span>
+                <span>{renderStageMarkdown(lastResponse)}</span>
               )}
             </div>
           )}

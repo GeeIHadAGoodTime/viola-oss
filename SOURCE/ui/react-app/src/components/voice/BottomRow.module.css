@@ -51,18 +51,32 @@
 }
 
 /* PTT container */
+/* Fixed box: the status label under the mic changes length as the state
+   changes ("listening for wake word" -> "recording"). With an auto-width grid
+   column the column shrank when recording started and the mic button slid
+   about 45px right under the user's finger (1.0.5 build 5 touch report). */
 .pttContainer {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 8px;
   flex-shrink: 0;
+  width: 176px;
+  max-width: 100%;
 }
 
 .pttLabel {
+  display: block;
+  width: 100%;
+  height: 12px;
+  line-height: 12px;
   font-size: 9px;
+  text-align: center;
   text-transform: uppercase;
   letter-spacing: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   transition: color 0.15s ease;
 }
 

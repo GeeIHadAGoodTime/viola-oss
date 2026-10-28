@@ -683,9 +683,12 @@ class SchedulerService:
             try:
                 from services.agent_runtime.registry import AgentRegistryError
 
+                from services.scheduler.actions import describe_tool_action
+
                 agent_id, _cancel_event, _background_signal = await registry.register_foreground(
                     user_id=schedule.user_id,
-                    task=schedule.action,
+                    # The card shows this: a readable title, never the encoded action.
+                    task=describe_tool_action(schedule.action, schedule.label),
                     reason="scheduler:%d" % schedule.id,
                     subagent_type="scheduler",
                     name=schedule.label or None,

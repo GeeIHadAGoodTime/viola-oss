@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { apiFetch } from './useViolaApi';
+import { isDesktopApp } from '../utils/runtimeSurface';
 
 const BASE = '/v1/billing/capacity';
 const TERMINAL = new Set(['applied', 'scheduled', 'succeeded', 'failed', 'expired', 'canceled']);
@@ -32,12 +33,47 @@ function savedAttempt(key) {
   } catch { return null; }
 }
 
+// Last good billing read per account, so reopening Settings shows the card at
+// once instead of "Loading billing..." for several seconds while the cloud
+// answers. Shown only for the same account id, always refreshed, and every
+// change control stays disabled until the fresh read lands. Kept in memory on
+// every surface; also on disk on the desktop app (a single-user install), never
+// in a shared browser profile.
+const SNAPSHOT_PREFIX = 'viola:billing-snapshot:v1:';
+const snapshots = new Map();
+
+export function readBillingSnapshot(accountId) {
+  if (!accountId) return null;
+  if (snapshots.has(accountId)) return snapshots.get(accountId);
+  if (!isDesktopApp()) return null;
+  try {
+    const value = JSON.parse(localStorage.getItem(SNAPSHOT_PREFIX + accountId) || 'null');
+    if (!value || typeof value !== 'object' || !value.account || !value.catalog) return null;
+    if (!Number.isSafeInteger(value.account.monthly_price_cents)) return null;
+    snapshots.set(accountId, value);
+    return value;
+  } catch { return null; }
+}
+
+function writeBillingSnapshot(accountId, catalog, account) {
+  if (!accountId) return;
+  const value = { catalog, account };
+  snapshots.set(accountId, value);
+  if (!isDesktopApp()) return;
+  try { localStorage.setItem(SNAPSHOT_PREFIX + accountId, JSON.stringify(value)); } catch { /* memory copy remains */ }
+}
+
+/** Test seam. */
+export function clearBillingSnapshots() {
+  snapshots.clear();
+}
+
 // Only opaque operation/quote IDs and the customer's consent request are saved.
 // The backend owns account identity, prices, payment and entitlement application.
 export function useBillingCapacity({ accountId, refreshUser }) {
   const storageKey = accountId ? `viola:billing-capacity:${accountId}` : '';
-  const [catalog, setCatalog] = useState(null);
-  const [account, setAccount] = useState(null);
+  const [catalog, setCatalog] = useState(() => readBillingSnapshot(accountId)?.catalog || null);
+  const [account, setAccount] = useState(() => readBillingSnapshot(accountId)?.account || null);
   const [quote, setQuote] = useState(null);
   const [attempt, setAttempt] = useState(() => savedAttempt(storageKey));
   const [operation, setOperation] = useState(null);
@@ -75,6 +111,7 @@ export function useBillingCapacity({ accountId, refreshUser }) {
       }
       setCatalog(nextCatalog);
       setAccount(nextAccount);
+      writeBillingSnapshot(accountId, nextCatalog, nextAccount);
       const pendingId = nextAccount.pending_change?.operation_id || nextAccount.pending_change?.id;
       if (pendingId && !latestAttempt.current) {
         saveAttempt({ operation_id: pendingId, idempotency_key: '', request: {} });
@@ -83,7 +120,7 @@ export function useBillingCapacity({ accountId, refreshUser }) {
     } catch (failure) {
       if (mounted.current) setError(failure.message || 'Billing could not be loaded.');
     } finally { if (mounted.current) setLoading(false); }
-  }, [saveAttempt]);
+  }, [accountId, saveAttempt]);
 
   const acceptOperation = useCallback(async (next, currentAttempt) => {
     if (!mounted.current) return;

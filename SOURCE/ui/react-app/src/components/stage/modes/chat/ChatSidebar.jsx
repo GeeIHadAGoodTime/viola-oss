@@ -41,6 +41,7 @@ export default function ChatSidebar({
   onExport,
   onOpenSettings = () => {},
   profileName,
+  profileDetail = '',
 }) {
   const [menuThreadId, setMenuThreadId] = useState(null);
   const searchStatusId = useId();
@@ -124,7 +125,7 @@ export default function ChatSidebar({
         <div className="chat-profile-avatar">{(profileName || 'U').slice(0, 1).toUpperCase()}</div>
         <div>
           <span>{profileName || 'Local user'}</span>
-          <small>Chat workspace</small>
+          <small>{profileDetail || 'Chat workspace'}</small>
         </div>
         <button type="button" onClick={onOpenSettings} aria-label="Open settings">Settings</button>
       </div>
@@ -148,4 +149,5 @@ ChatSidebar.propTypes = {
   onExport: PropTypes.func.isRequired,
   onOpenSettings: PropTypes.func,
   profileName: PropTypes.string,
+  profileDetail: PropTypes.string,
 };

@@ -6,6 +6,7 @@ import { useOrderedPreference } from './hooks/useOrderedPreference';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useViolaApi, authFetch, apiFetch } from './hooks/useViolaApi';
 import { useAuth } from './hooks/useAuth';
+import { useDesktopAccount } from './hooks/useDesktopAccount';
 import { useAgentRegistry } from './hooks/useAgentRegistry';
 import { useVoice } from './hooks/useVoice';
 import { useVoiceWs } from './hooks/useVoiceWs';
@@ -544,6 +545,8 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
   // derive the profile name from the signed-in account first and only fall
   // back to the local device display name when signed out (issue #772).
   const { user: accountUser } = useAuth();
+  // The backend's own sign-in state, for labels when this page has no session.
+  const desktopAccount = useDesktopAccount({ enabled: !accountUser, refreshKey: accountUser?.id || '' });
 
   useEffect(() => {
     syncSentrySettings(userSettings);
@@ -659,6 +662,11 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
   const stageRef = useRef(null);
   const mediaAreaRef = useRef(null);
   const [browserOverlayVisible, setBrowserOverlayVisible] = useState(false);
+  // Mode of the native browser overlay ('agentic', 'login', 'music', ...).
+  const browserOverlayModeRef = useRef('');
+  // The page the agent last browsed, so its view can be reopened after the
+  // task ends or the view was closed (pill / Ctrl+K "Open Agent Browser").
+  const [lastAgentBrowserUrl, setLastAgentBrowserUrl] = useState('');
 
   // Modal state
   // TopBar's expanded-calendar modal (CalendarView.jsx, compact mode) is
@@ -916,11 +924,28 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
       setCalendarModeActive(false);
       if (browserModeActive || browserUrl) {
         setDisplayMode('browser');
+      } else if (lastAgentBrowserUrl) {
+        // Reopen the page the agent left: show the native view again and the
+        // browser stage that positions it.
+        setBrowserUrl(lastAgentBrowserUrl);
+        setBrowserModeActive(true);
+        setDisplayMode('browser');
+        if (typeof window !== 'undefined' && typeof window.viola?.showBrowserOverlay === 'function') {
+          window.viola.showBrowserOverlay();
+        }
       } else {
         setDisplayMode('agentic_task');
       }
     }
-  }, [activateMusicMode, browserModeActive, browserUrl, displayMode, handleTogglePhoneMode]);
+  }, [activateMusicMode, browserModeActive, browserUrl, displayMode, handleTogglePhoneMode, lastAgentBrowserUrl]);
+  // Leaving a reopened (idle) agent browser hides the native view; while the
+  // agent is still working the view keeps running behind the music stage.
+  const handleBrowserExit = useCallback(() => {
+    if (!agentTaskActive && typeof window !== 'undefined' && typeof window.viola?.hideBrowserOverlay === 'function') {
+      window.viola.hideBrowserOverlay();
+    }
+    activateMusicMode();
+  }, [activateMusicMode, agentTaskActive]);
   const handleConsultationTakeover = useCallback(async (callId) => {
     if (!callId || callOwnerTakeoverPending) return;
     setCallOwnerTakeoverPending(true);
@@ -1503,13 +1528,17 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
 
   // Browser-auth overlays are connection UI, not playback UI. A stale overlay
   // must never cover the YouTube iframe, which is the active playback engine.
+  // The agent's own browser is NOT a stale connection overlay: hiding it here
+  // closed the agent view about a second after it opened whenever a video was
+  // loaded, so Take over / Hand back / Stop were unreachable (1.0.5 build 5, A5.2).
   useEffect(() => {
     if (!playerState.now_playing?.video_id || !browserOverlayVisible) return;
+    if (browserOverlayModeRef.current === 'agentic' || agentTaskActive) return;
     setBrowserOverlayVisible(false);
     if (typeof window !== 'undefined' && window.viola?.hideBrowserOverlay) {
       window.viola.hideBrowserOverlay();
     }
-  }, [browserOverlayVisible, playerState.now_playing?.video_id]);
+  }, [agentTaskActive, browserOverlayVisible, playerState.now_playing?.video_id]);
 
   // Expose browser mode controls to Qt/Python
   useEffect(() => {
@@ -1545,9 +1574,11 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
       const url = msg.url || msg.payload?.url || '';
       const agentTask = msg.agent_task || msg.payload?.agent_task;
       if (visible !== undefined) { setBrowserOverlayVisible(!!visible); }
+      browserOverlayModeRef.current = visible === false ? '' : mode;
       if (mode === 'agentic') {
         setAgentTaskActive(true);
         setBrowserUrl(url);
+        if (url && url !== 'about:blank') setLastAgentBrowserUrl(url);
         if (agentTask) {
           setAgentTaskDescription(agentTask.description || '');
           setAgentTaskStatus(agentTask.status || 'working');
@@ -2370,7 +2401,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
   const pttPressStartRef = useRef(0);
   const TAP_THRESHOLD_MS = 250;
 
-  const beginVoiceTurn = useCallback(() => {
+  const beginVoiceTurn = useCallback((recordingOptions) => {
     // Shared by PTT, hotkeys, browser wake and resumed consent actions.
     if (!voiceCaptureEnabled) {
       addToast({ message: userSettings?.voice_mode === 'disabled'
@@ -2379,7 +2410,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
       return;
     }
     pttPressStartRef.current = (typeof performance !== 'undefined' ? performance.now() : Date.now());
-    voice.startRecording();
+    voice.startRecording(recordingOptions);
     setChatHistory(prev => [...prev, { role: 'user', content: '(listening...)', timestamp: new Date().toISOString(), pending: true }]);
   }, [voice, voiceCaptureEnabled, userSettings?.voice_mode, addToast]);
 
@@ -2419,7 +2450,9 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
       pttPressStartRef.current = 0;
       return;
     }
-    beginVoiceTurn();
+    // Held press: the release ends the turn, not 1.5 s of quiet. A quick tap
+    // re-arms the silence auto-stop in handlePTTEnd.
+    beginVoiceTurn({ holdToTalk: true });
   }, [voice, beginVoiceTurn, interceptCloudConsent, userSettings?.mic_muted, userSettings?.voice_mode, addToast]);
 
   const handlePTTEnd = useCallback(() => {
@@ -2428,6 +2461,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
     const now = (typeof performance !== 'undefined' ? performance.now() : Date.now());
     pttPressStartRef.current = 0;
     if (now - pressedAt < TAP_THRESHOLD_MS) {
+      voice.armSilenceStop?.();
       return;
     }
     voice.stopRecording();
@@ -3288,7 +3322,9 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
     },
     { id: 'chat', label: 'Chat', icon: 'chat', ariaLabel: 'Open chat mode' },
   ];
-  const contextualStageItems = agentContextPillVisible ? [{
+  // The globe pill stays while there is an agent page to reopen, so a touch
+  // user (no Ctrl+K) can get back to it after the task ends.
+  const contextualStageItems = (agentContextPillVisible || lastAgentBrowserUrl) ? [{
     id: 'agent',
     label: getAgentPillLabel(agentTaskStatus, agentTaskPhase, agentTaskActive),
     icon: 'globe',
@@ -3452,7 +3488,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
       streamStatus={browserStreamStatus}
       streamError={browserStreamError}
       onTakeoverChange={setAgentTakeoverActive}
-      onExit={activateMusicMode}
+      onExit={handleBrowserExit}
       onPTTStart={handlePTTStart}
       onPTTEnd={handlePTTEnd}
       commandRegistry={stageCommandRegistry}
@@ -3471,7 +3507,10 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
           setSettingsInitialSection(null);
           setSettingsOpen(true);
         }}
-        profileName={accountUser?.user_metadata?.full_name || accountUser?.user_metadata?.name || accountUser?.email || userSettings?.display_name || userSettings?.name || 'Local user'}
+        profileName={accountUser?.user_metadata?.full_name || accountUser?.user_metadata?.name || accountUser?.email
+          || (desktopAccount?.signed_in ? desktopAccount.email : '')
+          || userSettings?.display_name || userSettings?.name || 'Local user'}
+        profileDetail={accountUser || desktopAccount?.signed_in ? 'Signed in to Viola' : 'Not signed in'}
         commandRegistry={stageCommandRegistry}
         commandScopeActive={stageContentMode === 'chat'}
         principalKey={accountUser?.id || 'device'}

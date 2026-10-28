@@ -143,9 +143,9 @@ export default function BillingCapacityPanel({ accountId, refreshUser, fallback 
       </>}
 
       <button type="button" className="billing-capacity-primary" onClick={() => openSelector()}
-        disabled={!available || !(account?.actions?.increase || account?.actions?.checkout) || pending || changing}
+        disabled={loading || !available || !(account?.actions?.increase || account?.actions?.checkout) || pending || changing}
         aria-expanded={expanded} aria-controls={`${id}-selector`}>Add more usage</button>
-      {account?.actions?.lower && <button type="button" onClick={() => openSelector(true)} disabled={!available || pending || changing}>
+      {account?.actions?.lower && <button type="button" onClick={() => openSelector(true)} disabled={loading || !available || pending || changing}>
         Lower my monthly capacity</button>}
       {!available && !loading && <p>Capacity changes are currently unavailable. You can keep using local models or your own provider key on their existing terms.</p>}
 
