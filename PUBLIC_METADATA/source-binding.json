@@ -30,17 +30,10 @@
   },
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-<<<<<<< HEAD
-  "source_manifest_sha256": "752dab9c80e944380a3995eefa690fb57b0f81a39b676840b58c7b32b58c1f17",
-  "source_tree_sha256": "16bcdb54f3d4c1040cd520c36badde84bbd1072ee65a25b93677844a92f748a0",
+  "source_manifest_sha256": "78b2eb1af20660746fb1e0bee43be243b7dc78284e053cbb0617ae2715e959d0",
+  "source_tree_sha256": "06fa21c7605d676a14096f8a5a64bdc25686cec3b5b43c151680ca4da2e57a99",
   "source_file_count": 2743,
-  "source_revision": "8140d1b740d37b40a2e1a0a62c18b92e2cd725b1",
-=======
-  "source_manifest_sha256": "bce35bb1518b7907c3e8173710fb4df7941801fcc1b4be84256cf61185bec399",
-  "source_tree_sha256": "17e00defec567666d80432f90d80a814d08d3bb696e9c4cdefecad5cc6676472",
-  "source_file_count": 2743,
-  "source_revision": "02eee42cbdb6b5dcf71056d933f4deb6200f8978",
->>>>>>> origin/main
+  "source_revision": "bdc3dbd80457dcf33158b9912d1cef7e03f44873",
   "comparison_public_revision": "ecab2772465fcc89ae6645b028af1c2273b9199f",
   "changed_source_paths": [
     "audio_core/aec_reference_base.py",
@@ -372,13 +365,8 @@
     "historical_inventory_limits": "This renderer correction changes no dependency or workflow inputs. All six retained SBOMs and their complete status objects stay historical and unchanged; no current installed inventory qualification is claimed."
   },
   "qualification": {
-<<<<<<< HEAD
-    "source_commit": "8140d1b740d37b40a2e1a0a62c18b92e2cd725b1",
+    "source_commit": "bdc3dbd80457dcf33158b9912d1cef7e03f44873",
     "kind": "r6 hub"
-=======
-    "source_commit": "02eee42cbdb6b5dcf71056d933f4deb6200f8978",
-    "kind": "music"
->>>>>>> origin/main
   },
   "historical_bindings": [
     {
