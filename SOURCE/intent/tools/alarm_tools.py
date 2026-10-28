@@ -210,6 +210,10 @@ async def list_alarms_handler(user_id: str = "") -> ToolResult:
         return ToolResult(ok=False, data=None, error="list_alarms failed: %s" % exc)
 
 
+# Room for "Your alarm is going off." before the first beep.
+_RING_AFTER_SPEECH_SECONDS = 3.5
+
+
 def _start_alarm_ring(user_id: str, alarm_id: str, label: str) -> bool:
     """Start the repeating alarm tone on this desktop. Returns whether it started.
 
@@ -225,7 +229,7 @@ def _start_alarm_ring(user_id: str, alarm_id: str, label: str) -> bool:
             return False
         from services.alarm_ringer import get_alarm_ringer
 
-        return get_alarm_ringer().start(user_id, alarm_id, label)
+        return get_alarm_ringer().start(user_id, alarm_id, label, initial_delay_seconds=_RING_AFTER_SPEECH_SECONDS)
     except Exception:  # noqa: BLE001, RUF100 - a ringer failure must not hide the spoken alarm
         _log.warning("Alarm ring could not start", exc_info=True)
         return False
@@ -258,6 +262,10 @@ async def play_alarm_sound_handler(
     from services.alarm_ringer import alarm_message
 
     notification = alarm_message(alarm_label)
+    # Start the ring first (it waits a few seconds for the spoken line), so a
+    # slow or hung TTS call cannot hold the alarm back. On a dev box the TTS
+    # call timed out after 30 s and the ring only began after it.
+    ringing = _start_alarm_ring(uid, str(alarm_id or "now"), alarm_label)
     spoken = False
 
     if tts is not None:
@@ -302,7 +310,6 @@ async def play_alarm_sound_handler(
     # notify's queued-vs-sent distinction). If TTS raised/never ran AND
     # delivery failed or was only queued, the user got nothing and the tool
     # must say so instead of unconditionally reporting success (#2774).
-    ringing = _start_alarm_ring(uid, str(alarm_id or "now"), alarm_label)
     alarm_fired = spoken or delivered or ringing
 
     return ToolResult(

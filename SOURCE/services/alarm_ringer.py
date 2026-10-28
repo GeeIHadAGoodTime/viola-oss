@@ -184,8 +184,20 @@ class AlarmRinger:
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
-    def start(self, user_id: str, alarm_id: str | int, label: str = "Alarm") -> bool:
-        """Start ringing ``label`` for ``user_id``. Returns False when it cannot start."""
+    def start(
+        self,
+        user_id: str,
+        alarm_id: str | int,
+        label: str = "Alarm",
+        *,
+        initial_delay_seconds: float = 0.0,
+    ) -> bool:
+        """Start ringing ``label`` for ``user_id``. Returns False when it cannot start.
+
+        ``initial_delay_seconds`` leaves room for the spoken line before the
+        first beep without making the ring wait on the speech engine (a TTS
+        call that hangs must not delay the alarm).
+        """
         uid = str(user_id or "").strip()
         if not uid:
             logger.warning("Alarm ring refused: no user_id")
@@ -205,7 +217,9 @@ class AlarmRinger:
             # A second alarm firing while one rings takes over the speaker and
             # the card; the first one ends as "replaced".
             self._finish(previous, "replaced")
-        thread = threading.Thread(target=self._run, args=(ring,), daemon=True, name="alarm-ringer")
+        thread = threading.Thread(
+            target=self._run, args=(ring, max(0.0, float(initial_delay_seconds))), daemon=True, name="alarm-ringer"
+        )
         ring.thread = thread
         logger.info(
             "Alarm ringing: id=%s label=%r user=%s (auto-stop after %ds)",
@@ -275,7 +289,9 @@ class AlarmRinger:
             {"alarm_id": ring.alarm_id, "label": ring.label, "reason": reason, "rang_seconds": int(elapsed)},
         )
 
-    def _run(self, ring: _Ring) -> None:
+    def _run(self, ring: _Ring, initial_delay: float = 0.0) -> None:
+        if initial_delay and ring.stop_event.wait(initial_delay):
+            return
         failures = 0
         while not ring.stop_event.is_set():
             if self._clock() - ring.started_monotonic >= ring.max_seconds:
