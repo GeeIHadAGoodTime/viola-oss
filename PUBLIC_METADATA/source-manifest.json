@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "4c9cc11b4dc02bed16f88646c1e4aca3bf70029c",
-  "sha256": "e21956ae03f62149a248365cf6942426ba1494dae6475d24d10c7c73c4efe90e",
+  "revision": "aab050c3ad26cf604ac3189b6dd7e823436da754",
+  "sha256": "1986cfabf2cbe2c6559600a8506297f813a39e684cea2b7c577baf4383fec624",
   "files": [
     {
       "path": ".env.example",
@@ -1235,8 +1235,8 @@
     },
     {
       "path": "core/voice_canonical_carrier.py",
-      "sha256": "50d07252a0914b0f8776f6bd801991878f6af186ade21ee9f40ef7c9545023a2",
-      "bytes": 5600
+      "sha256": "18349d7d6d0021c656479a93213a00dcfd00d7798ab51f84329a7f21662e4151",
+      "bytes": 6008
     },
     {
       "path": "core/voice_command_handler.py",
@@ -1605,8 +1605,8 @@
     },
     {
       "path": "intent/ai_controller.py",
-      "sha256": "745949241cc3da2b7a60d564eb2e841878ec58439a20f431a099c2796e965a06",
-      "bytes": 166634
+      "sha256": "405e45835f90261487e72f3a241d3f21cc445a222489ab1461021ef9136e8f6d",
+      "bytes": 166950
     },
     {
       "path": "intent/ai_interpreter.py",
@@ -1840,8 +1840,8 @@
     },
     {
       "path": "intent/instant_commands_patterns.py",
-      "sha256": "7d262dce3d94439a6594b68579990a843b5542346fae2b48f43c335caa7cbebd",
-      "bytes": 10345
+      "sha256": "acfe9441664a55cdcae6c7ef1681bf5bf4178b56164d417aec59726f09a32b3b",
+      "bytes": 12894
     },
     {
       "path": "intent/interpreter.py",
@@ -1885,8 +1885,8 @@
     },
     {
       "path": "intent/pipeline.py",
-      "sha256": "a1919a1e0c77e0d8f7d8f876fd37c4418e24ec24ea036d78915e59f995710078",
-      "bytes": 99696
+      "sha256": "1d14176c7be28a640e97a2f9df3e91d86a27a921a65e372dbca70d33d0f9d42f",
+      "bytes": 110284
     },
     {
       "path": "intent/pipeline_contracts.py",
@@ -1895,8 +1895,8 @@
     },
     {
       "path": "intent/pipeline_processors.py",
-      "sha256": "e9ce8ba23f63564b1dfe4590c29f30ff54b504eb9fc8c70d812e98a105ea3f1f",
-      "bytes": 24120
+      "sha256": "d9a1ad9d7e26494fa9fd22506996b639df6401d9ceb838797be01dab2174bcd8",
+      "bytes": 24432
     },
     {
       "path": "intent/pipeline_room_tracking.py",
@@ -4400,8 +4400,8 @@
     },
     {
       "path": "services/conversation/context_frames.py",
-      "sha256": "f17457bd55549b30e0b12c7e6c4eb7880c08e7cd505bfc9f5331c096cfddac19",
-      "bytes": 10981
+      "sha256": "9f89a33ea59e3bd47672cbc893a53e7de8b89dd5f3662ce7b812dd56870658df",
+      "bytes": 12707
     },
     {
       "path": "services/conversation/frame_rendering.py",
