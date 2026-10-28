@@ -979,6 +979,10 @@ class SchedulerService:
         """
         with user_scope(schedule.user_id):
             structured_action = decode_tool_action(schedule.action)
+            if structured_action is None and str(schedule.action or "").strip().lower() == "play alarm sound":
+                # Legacy alarm rows store this plain text. Ring them directly
+                # instead of sending the words through the model.
+                structured_action = {"tool": "alarm", "args": {"action": "sound", "label": schedule.label or "Alarm"}}
             if structured_action is not None:
                 return await self._dispatch_structured_action(schedule, structured_action)
 
@@ -1006,6 +1010,7 @@ class SchedulerService:
                 label=str(args.get("label") or schedule.label or "Alarm"),
                 tts=tts,
                 user_id=schedule.user_id,
+                alarm_id=str(schedule.id),
             )
             return _tool_result_to_schedule_result(result)
 
@@ -1102,6 +1107,11 @@ def get_scheduler_service(store: ScheduleStore | None = None) -> SchedulerServic
         with _SERVICE_LOCK:
             if _SERVICE_SINGLETON is None:
                 _SERVICE_SINGLETON = SchedulerService(store=store)
+    return _SERVICE_SINGLETON
+
+
+def peek_scheduler_service() -> SchedulerService | None:
+    """Return the scheduler singleton if one exists, without creating it."""
     return _SERVICE_SINGLETON
 
 

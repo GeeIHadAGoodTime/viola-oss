@@ -38,6 +38,7 @@ The audible announcement (TTS) and the cloud web-push path stay where they are
 from __future__ import annotations
 
 import asyncio
+import datetime
 import math
 from typing import TYPE_CHECKING, Any
 
@@ -109,6 +110,69 @@ def _default_service() -> Any | None:
     return get_timer_service()
 
 
+def sleep_timer_entries(user_id: str | None, *, now: datetime.datetime | None = None) -> list[dict[str, Any]]:
+    """This user's pending sleep timers, shaped like countdown-chip entries.
+
+    A sleep timer is a one-shot scheduler row (``timer_tools.set_sleep_timer_handler``),
+    not a ``TimerService`` timer, so the countdown chip never saw it: "sleep
+    timer set" left nothing on screen while a regular timer showed a chip
+    (laptop report X1.3). Desktop only; the cloud scheduler store cannot be read
+    synchronously from here. Never raises.
+    """
+    if not user_id:
+        return []
+    try:
+        from core.user_context import is_cloud_surface
+
+        if is_cloud_surface():
+            return []
+        from intent.tools.timer_tools import _is_sleep_timer_schedule
+        from services.scheduler.service import peek_scheduler_service
+
+        scheduler = peek_scheduler_service()
+        if scheduler is None:
+            return []
+        schedules = scheduler.list_schedules(user_id, enabled_only=True)
+    except Exception as exc:  # noqa: BLE001, RUF100 - a chip read must never break a timer event
+        logger.debug("Sleep timers unavailable for user=%s: %s", user_id, exc)
+        return []
+    moment = now or datetime.datetime.now(datetime.UTC)
+    entries: list[dict[str, Any]] = []
+    for schedule in schedules:
+        if not _is_sleep_timer_schedule(schedule):
+            continue
+        raw_at = getattr(schedule, "one_shot_at", None) or getattr(schedule, "next_run_at", None)
+        try:
+            fire_at = datetime.datetime.fromisoformat(str(raw_at))
+        except (TypeError, ValueError):
+            continue
+        if fire_at.tzinfo is None:
+            fire_at = fire_at.replace(tzinfo=datetime.UTC)
+        remaining = (fire_at - moment).total_seconds()
+        if remaining <= 0:
+            continue
+        entries.append(
+            {
+                "timer_id": "sleep-%s" % schedule.id,
+                "label": str(getattr(schedule, "label", "") or "Sleep timer"),
+                "remaining_seconds": max(0, math.ceil(remaining)),
+                "end_time": fire_at.isoformat(),
+                "kind": "sleep",
+            }
+        )
+    return entries
+
+
+def broadcast_timer_snapshot(user_id: str | None) -> None:
+    """Push this user's current countdown chips (timers + sleep timers) to the UI. Never raises."""
+    if not user_id:
+        return
+    try:
+        TimerNotifier()._broadcast_snapshot(user_id)
+    except _BRIDGE_ERRORS:
+        logger.debug("Timer snapshot broadcast failed for user=%s", user_id, exc_info=True)
+
+
 class TimerNotifier(TimerEventListener):
     """Broadcast timer countdown + expiry events to the desktop webview.
 
@@ -169,13 +233,13 @@ class TimerNotifier(TimerEventListener):
     # ------------------------------------------------------------------
     def _active_timers(self, user_id: str) -> list[dict[str, Any]]:
         service = self._service_getter()
-        if service is None:
-            return []
-        try:
-            timers = service.get_all_timers(user_id=user_id)
-        except _BRIDGE_ERRORS as exc:
-            logger.debug("TimerNotifier could not read timers for user=%s: %s", user_id, exc)
-            return []
+        timers: list[Any] = []
+        if service is not None:
+            try:
+                timers = list(service.get_all_timers(user_id=user_id))
+            except _BRIDGE_ERRORS as exc:
+                logger.debug("TimerNotifier could not read timers for user=%s: %s", user_id, exc)
+                timers = []
         snapshot: list[dict[str, Any]] = []
         for timer in timers:
             if getattr(timer, "is_expired", False):
@@ -189,6 +253,7 @@ class TimerNotifier(TimerEventListener):
                     "end_time": timer.end_time.isoformat(),
                 }
             )
+        snapshot.extend(sleep_timer_entries(user_id))
         return snapshot
 
     def _broadcast_snapshot(self, user_id: str | None) -> None:
@@ -214,4 +279,10 @@ class TimerNotifier(TimerEventListener):
             logger.exception("Timer %s broadcast failed for user=%s", event_type, user_id)
 
 
-__all__ = ["TIMER_COMPLETED_EVENT", "TIMER_UPDATE_EVENT", "TimerNotifier"]
+__all__ = [
+    "TIMER_COMPLETED_EVENT",
+    "TIMER_UPDATE_EVENT",
+    "TimerNotifier",
+    "broadcast_timer_snapshot",
+    "sleep_timer_entries",
+]
