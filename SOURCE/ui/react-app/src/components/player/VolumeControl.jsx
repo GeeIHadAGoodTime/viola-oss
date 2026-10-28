@@ -100,14 +100,21 @@ const VolumeControl = ({ volume, onVolumeChange, onVolumeError }) => {
     const finish = (result, error = null, synchronous = false) => {
       if (!session.active || sessionRef.current !== session || session.request !== request) return;
       const expired = performance.now() >= request.deadline;
+      // api.setVolume resolves with apiFetch's unwrapped `data` -- `{ volume }`,
+      // with no `ok` key -- while an envelope carries `{ ok, volume }`. Requiring
+      // `ok === true` rejected every real success as "unconfirmed" and showed
+      // "Couldn't change the volume" after a change that had been applied.
+      // `ok` is either absent (unwrapped data) or exactly true.
+      const ackVolume = Number.isFinite(result?.volume) ? result.volume : result?.data?.volume;
       const accepted = !error && !expired && (
         (synchronous && result === undefined)
-        || (result?.ok === true && Number.isFinite(result.volume) && result.volume >= 0 && result.volume <= 100)
+        || (result != null && (result.ok === true || !('ok' in result))
+          && Number.isFinite(ackVolume) && ackVolume >= 0 && ackVolume <= 100)
       );
       clearTimeout(request.timer);
       session.request = null;
       if (accepted && serverSeqRef.current <= request.seq) {
-        confirmedVolumeRef.current = result?.volume ?? value;
+        confirmedVolumeRef.current = ackVolume ?? value;
       }
       const current = version === inputVersionRef.current;
       if (current) {

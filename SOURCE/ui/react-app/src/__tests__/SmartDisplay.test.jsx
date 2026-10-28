@@ -2805,7 +2805,7 @@ describe('Embedded YouTube volume drag', () => {
 
   it('keeps a long drag to a few requests a second', async () => {
     playerHarness.state = playingVideo;
-    apiHarness.setVolume.mockImplementation(level => Promise.resolve({ ok: true, volume: level }));
+    apiHarness.setVolume.mockImplementation(level => Promise.resolve({ volume: level }));
     render(<SmartDisplay />);
     vi.useFakeTimers();
     try {
@@ -2818,6 +2818,8 @@ describe('Embedded YouTube volume drag', () => {
       await act(async () => vi.advanceTimersByTimeAsync(0));
       expect(apiHarness.setVolume.mock.calls.length).toBeLessThanOrEqual(10);
       expect(apiHarness.setVolume).toHaveBeenLastCalledWith(99);
+      // apiFetch resolves with the unwrapped `{ volume }`; that is a success.
+      expect(screen.queryByText("Couldn't change the volume. Please try again.")).not.toBeInTheDocument();
     } finally {
       vi.useRealTimers();
     }
@@ -2828,7 +2830,7 @@ describe('Embedded YouTube volume drag', () => {
     let rejectFirst;
     apiHarness.setVolume
       .mockReturnValueOnce(new Promise((_, reject) => { rejectFirst = reject; }))
-      .mockImplementation(level => Promise.resolve({ ok: true, volume: level }));
+      .mockImplementation(level => Promise.resolve({ volume: level }));
     render(<SmartDisplay />);
     vi.useFakeTimers();
     try {

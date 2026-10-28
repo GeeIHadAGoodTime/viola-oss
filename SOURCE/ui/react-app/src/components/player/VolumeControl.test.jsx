@@ -237,6 +237,19 @@ describe('VolumeControl native acknowledgement ownership', () => {
     expect(error).toHaveBeenCalledTimes(1);
   });
 
+  // apiFetch unwraps the /v1/volume envelope to its `data`: the slider sees
+  // `{ volume: 30 }` with no `ok` key. Requiring `ok === true` turned every
+  // applied change into "Couldn't change the volume" (found live on 1.0.5).
+  it.each([{ volume: 30 }, { ok: true, volume: 30 }, { ok: true, data: { volume: 30 } }])(
+    'accepts the real applied-volume response %j without an error', async value => {
+      const error = vi.fn();
+      render(<VolumeControl volume={60} onVolumeChange={() => Promise.resolve(value)} onVolumeError={error} />);
+      await act(async () => drag(30));
+      expect(getSlider()).toHaveValue('30');
+      expect(error).not.toHaveBeenCalled();
+    },
+  );
+
   it('owns a synchronous callback exception', () => {
     const error = vi.fn();
     render(<VolumeControl volume={60} onVolumeChange={() => { throw new Error('refused'); }} onVolumeError={error} />);

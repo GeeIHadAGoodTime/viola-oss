@@ -98,6 +98,6 @@ describe('PlayerSection long titles keep the controls on the stage (A3.7)', () =
     const titleRule = css.match(/\.trackTitle\s*\{[^}]*\}/)[0];
     expect(titleRule).toMatch(/-webkit-line-clamp:\s*2/);
     expect(titleRule).toMatch(/overflow:\s*hidden/);
-    expect(css).toMatch(/@media \(max-height: 760px\)\s*\{\s*\.trackTitle\s*\{[^}]*-webkit-line-clamp:\s*1/);
+    expect(css).toMatch(/@media \(max-height: 820px\)\s*\{\s*\.trackTitle\s*\{[^}]*-webkit-line-clamp:\s*1/);
   });
 });

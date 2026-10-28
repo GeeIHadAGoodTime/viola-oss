@@ -92,7 +92,7 @@
 
 /* Short stages (landscape tablet, small window): one line is all the room
    the controls can spare. */
-@media (max-height: 760px) {
+@media (max-height: 820px) {
   .trackTitle {
     -webkit-line-clamp: 1;
     line-clamp: 1;
