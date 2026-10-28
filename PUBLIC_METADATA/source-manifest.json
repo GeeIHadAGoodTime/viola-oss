@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "0c7c48ca18c64d4c114b1b0fd871b19940e6e98d",
-  "sha256": "ee092b3453378db1fc2003dd1b6823d9bea3999079d836fe5b50e935da3dae3a",
+  "revision": "02eee42cbdb6b5dcf71056d933f4deb6200f8978",
+  "sha256": "17e00defec567666d80432f90d80a814d08d3bb696e9c4cdefecad5cc6676472",
   "files": [
     {
       "path": ".env.example",
@@ -115,8 +115,8 @@
     },
     {
       "path": "START_WEB_INTERFACE.py",
-      "sha256": "447895ff1193d1a5b637f1e9bcc9f41ab05446af0030a69d94f970f3a482de46",
-      "bytes": 10395
+      "sha256": "21b9bce0c1419db5a03b1c6f6fdc9f3cdd7f204bfd430f08fcbab547bc06c096",
+      "bytes": 10218
     },
     {
       "path": "ViolaWebsite/embed.html",
@@ -1010,8 +1010,8 @@
     },
     {
       "path": "core/crash_forensics.py",
-      "sha256": "a3a742b089b4d7609a927b8a1d946321779df17c8337059dbb3e0663dfd56bdd",
-      "bytes": 51287
+      "sha256": "b7f70c3100ac8337499d90a34800c2733987d5134e5e3e705c56495937ba0c09",
+      "bytes": 45743
     },
     {
       "path": "core/database_strategy.py",
@@ -1065,8 +1065,8 @@
     },
     {
       "path": "core/hub_state_authority.py",
-      "sha256": "0ea4e1f2f10abb6085b228b0b25ddbcebba5aef59ca0a86eec57067795f117b9",
-      "bytes": 40860
+      "sha256": "ed66d6f9206894217c47b119f9e3ea7388aeab8fd8ff85fc6e2f9c385ad41e10",
+      "bytes": 42813
     },
     {
       "path": "core/json_types.py",
@@ -1345,13 +1345,13 @@
     },
     {
       "path": "diagnostics/diagnostic_dispatch.py",
-      "sha256": "6282470d083fddde9a663296c4da051c1660e9316d51c43a4cc21d73124ac63a",
-      "bytes": 11035
+      "sha256": "0dc19e173e217c5ca424fb2aa5d762272163739811123b3afc03461e601b1507",
+      "bytes": 10046
     },
     {
       "path": "diagnostics/diagnostic_minimum.py",
-      "sha256": "501d7158e5dfd1d06a9e84c614b36caeb89c7368123378c07585b2e0ed947893",
-      "bytes": 30820
+      "sha256": "9c4fb2139e0bb1fae5997352c07d7b894091aded15d41c58495afc7fbd00db2e",
+      "bytes": 28459
     },
     {
       "path": "diagnostics/diagnostic_spool.py",
@@ -1377,11 +1377,6 @@
       "path": "diagnostics/latency_spans.py",
       "sha256": "5f7c50686c86f42a7bbca7fc86c489c5ea48c616bad4a64fc276ca92b417fda3",
       "bytes": 9412
-    },
-    {
-      "path": "diagnostics/native_crash_relay.py",
-      "sha256": "b76c2f6787dd1475d393724527c0874cef72d20ed485c6f6b548fe2a69958c50",
-      "bytes": 11521
     },
     {
       "path": "diagnostics/observability_logging.py",
@@ -3255,8 +3250,8 @@
     },
     {
       "path": "music/runtime/worker_manager.py",
-      "sha256": "defb5c4f3321a485808d5c78667226b4b97793c6ce2d33184e8ea49d2a1ccc2f",
-      "bytes": 55499
+      "sha256": "e05613037babc92235be90f74de04f05f476eb5f90d7025d62ecbe7beccd5449",
+      "bytes": 59863
     },
     {
       "path": "music/shuffle_control.py",
@@ -4470,8 +4465,8 @@
     },
     {
       "path": "services/daemon/viola_daemon.py",
-      "sha256": "5a5d0fe8b52706cfcd546c3d634ec0a5f1dbab9c1d41e9563b9d35b882d95d16",
-      "bytes": 15571
+      "sha256": "9188d0935b097cb90cb02ea58b28fb32e9a572b759e964b92eb5e209494f2e1e",
+      "bytes": 15318
     },
     {
       "path": "services/health/__init__.py",
@@ -6159,16 +6154,6 @@
       "bytes": 50667
     },
     {
-      "path": "tests/public/test_exit_watchdog.py",
-      "sha256": "8214db6e5f1fdfd6446cb8703fa84809d0b74e41dd69f14e9f783a794a7bfa98",
-      "bytes": 4511
-    },
-    {
-      "path": "tests/public/test_faulthandler_first_chance_race.py",
-      "sha256": "498d54d0eaa56aae508c77929762e8a90f792976e155e74efaf165923d9f39df",
-      "bytes": 4847
-    },
-    {
       "path": "tests/public/test_italian_hindi_qualification_packet.py",
       "sha256": "92fc2fc9ef5f049ffa7659ccf9a55dbf12bd8673686f2b61f6ed297a8bdb0b43",
       "bytes": 10454
@@ -6217,11 +6202,6 @@
       "path": "tests/public/test_music_state_identity.py",
       "sha256": "766a361eb7cd729ded5ec7f04d96af306062c9014174ea9c37f549add0ebfcd2",
       "bytes": 6965
-    },
-    {
-      "path": "tests/public/test_native_crash_relay.py",
-      "sha256": "951df3c1bbe0551a597a565727ef11bdccba3b1e766dd5bd06f8912eddc7f050",
-      "bytes": 8870
     },
     {
       "path": "tests/public/test_native_titlebar_resize.py",
@@ -9885,8 +9865,8 @@
     },
     {
       "path": "ui/qt_native/webview_window.py",
-      "sha256": "6aea4db930cac393e51744a48d52b5fe97c6b6929d6c02969a1341efbb1a6bda",
-      "bytes": 240795
+      "sha256": "e67b2f53762baeb3e028c436e4766b09a85fa757cb95f91bde94b9b3e5f1d3f9",
+      "bytes": 240165
     },
     {
       "path": "ui/qt_native/widgets/connectivity_status.py",
@@ -10035,8 +10015,8 @@
     },
     {
       "path": "ui/react-app/src/SmartDisplay.jsx",
-      "sha256": "c3e1332af875c00f3451b77d301d25efe3484f87248eb1e213109ed7aa570a7e",
-      "bytes": 179947
+      "sha256": "0f7cf9e0df938ec9a83cce8a900f9269c02c800f082c0362da7f5dd12ffc6372",
+      "bytes": 180069
     },
     {
       "path": "ui/react-app/src/SmartDisplay.spokePolicy.test.jsx",
@@ -10065,8 +10045,8 @@
     },
     {
       "path": "ui/react-app/src/__tests__/SmartDisplay.test.jsx",
-      "sha256": "6cc943573aa052809c842fa6c324b9a4fd07ce45eb155092795eb4da0cc6d434",
-      "bytes": 137429
+      "sha256": "645ffd2b6fd3f39760e484fc75773e1504daee0efb26101bcead6edb2a7ab2a9",
+      "bytes": 138922
     },
     {
       "path": "ui/react-app/src/__tests__/hooks/useEventBus.test.jsx",
@@ -10105,8 +10085,8 @@
     },
     {
       "path": "ui/react-app/src/__tests__/hooks/useVoiceOnboarding.test.jsx",
-      "sha256": "142ed31cdd9ea5004d056a5e074bdb0c4e9dcfd1c883d9379c23a7565f21b624",
-      "bytes": 17168
+      "sha256": "fd39caa843faab78ef9515ceb3d37834a9493495c966704fa3de9602ec0649e2",
+      "bytes": 15936
     },
     {
       "path": "ui/react-app/src/__tests__/integration/ErrorBoundary.test.jsx",
@@ -10845,13 +10825,13 @@
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.desktopOnlyPanels.test.jsx",
-      "sha256": "5b675f318aa0e3c04c4cd5d18390ffe63f340c5249fc9b538e29abeeb06ca25e",
-      "bytes": 33758
+      "sha256": "de9e9d0a7a380fa17884219932384c4b11cf36d181d55295e6365b12f57de36e",
+      "bytes": 34726
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.jsx",
-      "sha256": "1713dd04c70a42a9ee3ab3283a62e0558d5a2cc2b39bed3fd844e3316f97c876",
-      "bytes": 217613
+      "sha256": "09c24277a37d52a77db7a9921e28825c0c250636ee96db9cefe8972d95c1a58f",
+      "bytes": 218415
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.localDiscovery.test.jsx",
@@ -11200,18 +11180,18 @@
     },
     {
       "path": "ui/react-app/src/components/player/PlayerSection.jsx",
-      "sha256": "9f31939c2f91214d748e6ae5823bcb48a6b03fcf47541a6b09cf0c1fec631eda",
-      "bytes": 6911
+      "sha256": "2bc40f8ecf97ebfffd2b92773319cc301abee3e8257dded56aa8c73e86c5610e",
+      "bytes": 7013
     },
     {
       "path": "ui/react-app/src/components/player/PlayerSection.module.css",
-      "sha256": "a3c5d78933da5cfcaba0c912fd110b75b887f6ee3548e895767f3022bb81e67a",
-      "bytes": 3097
+      "sha256": "1ca765877a78fef38f55d37518fcda7179d996ce838c10912b5bddd38f224fa0",
+      "bytes": 3694
     },
     {
       "path": "ui/react-app/src/components/player/PlayerSection.test.jsx",
-      "sha256": "48852450bec93753b98852b302ec384a4fe2c66d550cfc62ea82ff93da844d4c",
-      "bytes": 2614
+      "sha256": "2f301e176fb9727f6467f4fd9bf8af5a922c6e7789e8255f2b78bad6265ca15e",
+      "bytes": 4092
     },
     {
       "path": "ui/react-app/src/components/player/ProgressBar.jsx",
@@ -11255,8 +11235,8 @@
     },
     {
       "path": "ui/react-app/src/components/player/VolumeControl.jsx",
-      "sha256": "06cd43e0644299ef20136ad65114934bed1893e208e0518f49dceea245410332",
-      "bytes": 9813
+      "sha256": "7a4878db98f9f7db2b7d42df4c772f560bc5029799382372847fe61eac2e9a04",
+      "bytes": 10586
     },
     {
       "path": "ui/react-app/src/components/player/VolumeControl.module.css",
@@ -11265,8 +11245,8 @@
     },
     {
       "path": "ui/react-app/src/components/player/VolumeControl.test.jsx",
-      "sha256": "0586fc4dd0052705721e8edc2e3af656cec7c0a5a29f84c257aefb77f5d03609",
-      "bytes": 15979
+      "sha256": "f1cfb50aa0af028b8cca47ab39bbf53a6ae0e5ba01db82114cb780afc53f5e51",
+      "bytes": 16773
     },
     {
       "path": "ui/react-app/src/components/settings/AccountRow.jsx",
@@ -12020,8 +12000,8 @@
     },
     {
       "path": "ui/react-app/src/hooks/useVoiceOnboarding.js",
-      "sha256": "bfb4dcbfead26c8d33b1778e892603fc3b8e7da04f251e24b7bbe45df7d3a625",
-      "bytes": 39515
+      "sha256": "50d2fccaed896ce1447f14e152ab59a02e265d24004bed63b84368794176af24",
+      "bytes": 38274
     },
     {
       "path": "ui/react-app/src/hooks/useVoiceStream.captureLifecycle.test.jsx",
@@ -12740,8 +12720,8 @@
     },
     {
       "path": "ui/websocket/command_handlers.py",
-      "sha256": "8e98b09c95fe1d2fdcbe58bcc478b062b411fc4ab3965b077c6a1853c4f064cd",
-      "bytes": 49546
+      "sha256": "530de68dfabde85190dd8bc3a836baf9be813a66b883a253611fcb724a2cf65d",
+      "bytes": 50798
     },
     {
       "path": "ui/websocket/event_hub.py",
@@ -13045,8 +13025,8 @@
     },
     {
       "path": "utils/velopack_updater.py",
-      "sha256": "2603dedae93de609276b879916d9038770f4615abe8d6dbfb439d34bc95a86b2",
-      "bytes": 30394
+      "sha256": "dcf56c1627d6d3ee99bc69c23ecec0f6d63cbfa82ce1f08edb8b1e05e9e37e1b",
+      "bytes": 28347
     },
     {
       "path": "utils/wake_word/__init__.py",
@@ -13110,13 +13090,13 @@
     },
     {
       "path": "viola_qt.py",
-      "sha256": "1f2cf1c499a50ce06bc25a16ca88b70aa12bbae38ade6e4dadb747125485d184",
-      "bytes": 88424
+      "sha256": "fa064aef9ffe8b8f28dadf683523accb5c11f9a80f37ebdf53041bc4eb5788ff",
+      "bytes": 86651
     },
     {
       "path": "viola_spoke.py",
-      "sha256": "a37a07c427297436a2102c65ef121a2e235dc5275243d1ff7ea7c718df9e38fa",
-      "bytes": 12658
+      "sha256": "a0fc2db54a55505f2b8543be6ee5991afd812b2cd0c29c43d5b6cee80e4978a0",
+      "bytes": 12405
     },
     {
       "path": "violawake/__init__.py",

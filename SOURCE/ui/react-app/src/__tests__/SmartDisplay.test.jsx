@@ -2742,7 +2742,7 @@ describe('Native music committed-volume recovery', () => {
     vi.useFakeTimers();
     try {
       fireEvent.change(slider, { target: { value: '0' } });
-      await act(async () => vi.advanceTimersByTimeAsync(50));
+      await act(async () => vi.advanceTimersByTimeAsync(250));
       expect(apiHarness.setVolume).toHaveBeenCalledExactlyOnceWith(0);
       fireEvent.pointerUp(slider);
       await act(async () => reject(Object.assign(new Error('synthetic refusal'), { status: 503, code: 'volume_failed' })));
@@ -2825,8 +2825,70 @@ describe('Native music volume response and target ownership', () => {
     const send = vi.spyOn(frame.contentWindow, 'postMessage');
     await act(async () => drag(0));
     expect(send).toHaveBeenCalledWith({ type: 'control', command: 'setVolume', level: 0 }, window.location.origin);
-    expect(screen.getByRole('slider', { name: 'Volume' })).toHaveValue('0');
+    // The server refused the final value: the slider shows the confirmed
+    // level again and the iframe is put back on it, so they never disagree.
+    expect(screen.getByRole('slider', { name: 'Volume' })).toHaveValue('60');
+    expect(send).toHaveBeenLastCalledWith({ type: 'control', command: 'setVolume', level: 60 }, window.location.origin);
     expect(screen.getByText("Couldn't change the volume. Please try again.")).toBeInTheDocument();
+  });
+});
+
+// 1.0.5 build 5: dragging the volume slider while YouTube played fired about
+// ten POSTs a second and showed "Couldn't change the volume" although every
+// ADAPTER_SET_VOLUME the server ran had succeeded. The iframe branch returned
+// nothing to VolumeControl (so every call counted as instantly done and the
+// next one went out 50 ms later) and toasted every rejected request itself.
+// /v1/volume is rate limited, so some of those overlapping requests were
+// refused. A drag must stay a few requests a second, and only a refusal of
+// the value the user let go on may reach the user.
+describe('Embedded YouTube volume drag', () => {
+  const playingVideo = { is_playing: true, now_playing: { id: 'synthetic-video', provider: 'youtube_iframe', video_id: 'fJ9rUzIMcZQ' }, volume: 60 };
+  const slider = () => screen.getByRole('slider', { name: 'Volume' });
+
+  it('keeps a long drag to a few requests a second', async () => {
+    playerHarness.state = playingVideo;
+    apiHarness.setVolume.mockImplementation(level => Promise.resolve({ volume: level }));
+    render(<SmartDisplay />);
+    vi.useFakeTimers();
+    try {
+      // Two seconds of dragging, one input tick every 20 ms.
+      for (let tick = 0; tick < 100; tick += 1) {
+        fireEvent.change(slider(), { target: { value: String(tick % 100) } });
+        await act(async () => vi.advanceTimersByTimeAsync(20));
+      }
+      fireEvent.pointerUp(slider());
+      await act(async () => vi.advanceTimersByTimeAsync(0));
+      expect(apiHarness.setVolume.mock.calls.length).toBeLessThanOrEqual(10);
+      expect(apiHarness.setVolume).toHaveBeenLastCalledWith(99);
+      // apiFetch resolves with the unwrapped `{ volume }`; that is a success.
+      expect(screen.queryByText("Couldn't change the volume. Please try again.")).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('stays quiet when a superseded drag value is refused but the final value lands', async () => {
+    playerHarness.state = playingVideo;
+    let rejectFirst;
+    apiHarness.setVolume
+      .mockReturnValueOnce(new Promise((_, reject) => { rejectFirst = reject; }))
+      .mockImplementation(level => Promise.resolve({ volume: level }));
+    render(<SmartDisplay />);
+    vi.useFakeTimers();
+    try {
+      fireEvent.change(slider(), { target: { value: '40' } });
+      await act(async () => vi.advanceTimersByTimeAsync(300));
+      expect(apiHarness.setVolume).toHaveBeenCalledTimes(1);
+      fireEvent.change(slider(), { target: { value: '30' } });
+      fireEvent.pointerUp(slider());
+      await act(async () => rejectFirst(Object.assign(new Error('rate limited'), { status: 429 })));
+      await act(async () => vi.advanceTimersByTimeAsync(0));
+      expect(apiHarness.setVolume).toHaveBeenLastCalledWith(30);
+      expect(screen.queryByText("Couldn't change the volume. Please try again.")).not.toBeInTheDocument();
+      expect(slider()).toHaveValue('30');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
