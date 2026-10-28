@@ -28,6 +28,7 @@ def _register_utility_endpoints(app: FastAPI) -> None:
     from fastapi import Depends
 
     from contracts.api_response import success_response
+    from ui.api.routes.auth_dependencies import get_current_user_id as get_auth_user_id
     from ui.api.routes.auth_dependencies import require_auth
 
     @app.get("/v1/version", dependencies=[Depends(require_auth)])
@@ -39,8 +40,16 @@ def _register_utility_endpoints(app: FastAPI) -> None:
     @app.get("/v1/timers", dependencies=[Depends(require_auth)])
     async def _timers() -> dict[str, Any]:
         from core.state_selectors import get_active_timers
+        from core.user_context import get_current_user_id, user_id_or_none
+        from services.notifications.timer_notifier import sleep_timer_entries
 
         timers = get_active_timers()
+        # Pending sleep timers ride along as chips too (kind="sleep").
+        try:
+            current_user = user_id_or_none(get_current_user_id())
+        except LookupError:
+            current_user = None
+        timers = [*timers, *sleep_timer_entries(current_user)]
         return success_response(
             {
                 "ok": True,
@@ -48,6 +57,29 @@ def _register_utility_endpoints(app: FastAPI) -> None:
                 "count": len(timers),
             }
         )
+
+    @app.get("/v1/alarms/ringing", dependencies=[Depends(require_auth)])
+    async def _alarms_ringing(user_id: str = Depends(get_auth_user_id)) -> dict[str, Any]:
+        """The alarm ringing right now for this user, so a late webview can show its Stop card."""
+        from services.alarm_ringer import get_alarm_ringer
+
+        alarms = get_alarm_ringer().active_rings(user_id)
+        return success_response({"alarms": alarms, "count": len(alarms)})
+
+    @app.post("/v1/alarms/stop", dependencies=[Depends(require_auth)])
+    async def _alarms_stop(request: Request, user_id: str = Depends(get_auth_user_id)) -> dict[str, Any]:
+        """Stop this user's ringing alarm (the Stop button on the alarm card)."""
+        from services.alarm_ringer import stop_ringing_alarm
+
+        alarm_id = None
+        try:
+            body = await request.json()
+        except ValueError:
+            body = None
+        if isinstance(body, dict) and body.get("alarm_id") not in (None, ""):
+            alarm_id = str(body.get("alarm_id"))
+        stopped = stop_ringing_alarm(user_id, alarm_id, reason="stopped")
+        return success_response({"stopped": stopped})
 
     @app.post("/v1/ws/auth", dependencies=[Depends(require_auth)])
     async def _ws_auth(request: Request) -> dict[str, Any]:

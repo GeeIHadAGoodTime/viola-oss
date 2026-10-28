@@ -71,6 +71,13 @@ _CLOUD_BILLING_PROXY_EXACT = (
     "/v1/billing/capacity",
 )
 _CLOUD_BILLING_PROXY_PREFIXES = ("/v1/billing/capacity/",)
+# Settings > Account > Text messages: the desktop forwards the cloud's own
+# /api/account/sms/* JSON verbatim (telephony/routes.py::_proxy_account_sms) and
+# AccountTab.jsx reads that raw shape on both surfaces. The cloud's
+# GET /api/account/sms/status body has no ``ok`` key, so enforcing the desktop
+# envelope turned every phone-status read into a "Missing 'ok' key" 500 and the
+# panel showed an error instead of the phone state (laptop report, build 5).
+_CLOUD_ACCOUNT_SMS_PROXY_PREFIXES = ("/v1/phone/sms/",)
 _COMPRESSED_CONTENT_ENCODINGS = {b"gzip", b"br", b"deflate"}
 
 
@@ -108,6 +115,8 @@ class _ResponseEnvelopeMiddleware:
         if path in _CLOUD_BILLING_PROXY_EXACT:
             return True
         if any(path.startswith(prefix) for prefix in _CLOUD_BILLING_PROXY_PREFIXES):
+            return True
+        if any(path.startswith(prefix) for prefix in _CLOUD_ACCOUNT_SMS_PROXY_PREFIXES):
             return True
         if any(path.startswith(prefix) for prefix in _HEALTH_PROBE_PREFIXES):
             return True

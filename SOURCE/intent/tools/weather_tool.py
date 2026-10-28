@@ -27,6 +27,7 @@ _TRAILING_DATE_SUFFIXES = (
         r"(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)\s*$",
         re.IGNORECASE,
     ),
+    re.compile(r"\s+(?:(?:on|for|over)\s+)?(?:(?:this|next|the)\s+)?weekend\s*$", re.IGNORECASE),
 )
 
 
@@ -260,6 +261,59 @@ def _normalize_daily_forecast(
     return days
 
 
+def _short_date(value: datetime.date) -> str:
+    return "%s, %s %d" % (value.strftime("%A"), value.strftime("%b"), value.day)
+
+
+def _weekend_note(
+    days: list[dict[str, Any]],
+    ref_date: datetime.date | None,
+) -> tuple[str, dict[str, Any]] | None:
+    """Say which days "this weekend" means, on the forecast location's calendar.
+
+    On a Sunday "what's the weather this weekend" got only today plus "I don't
+    have a forecast for next weekend yet" (A11.2): nothing told the model that
+    today IS the weekend. On Saturday or Sunday "this weekend" is the current
+    one (today, plus tomorrow on a Saturday); on a weekday it is the coming
+    Saturday and Sunday. The note says so plainly and says whether those days
+    are in the forecast.
+    """
+    if ref_date is None:
+        return None
+    weekday = ref_date.weekday()  # Monday=0 .. Sunday=6
+    if weekday == 5:
+        weekend = [ref_date, ref_date + datetime.timedelta(days=1)]
+    elif weekday == 6:
+        weekend = [ref_date]
+    else:
+        saturday = ref_date + datetime.timedelta(days=5 - weekday)
+        weekend = [saturday, saturday + datetime.timedelta(days=1)]
+    forecast_dates = {str(day.get("date") or "") for day in days}
+    covered = [value for value in weekend if value.isoformat() in forecast_dates]
+
+    if weekday == 5:
+        text = "Weekend: today is Saturday, so this weekend is today and tomorrow (Sunday)."
+    elif weekday == 6:
+        next_saturday = ref_date + datetime.timedelta(days=6)
+        text = (
+            "Weekend: today is Sunday, the last day of this weekend, so this weekend means today "
+            "(Saturday is already over). Next weekend is %s and %s."
+            % (_short_date(next_saturday), _short_date(next_saturday + datetime.timedelta(days=1)))
+        )
+    else:
+        text = "Weekend: this weekend is %s and %s." % (_short_date(weekend[0]), _short_date(weekend[1]))
+        if not covered:
+            text += " Those days are not in this forecast yet."
+        elif len(covered) < len(weekend):
+            text += " Only %s is in this forecast so far." % covered[0].strftime("%A")
+    data = {
+        "today_is_weekend": weekday >= 5,
+        "this_weekend_dates": [value.isoformat() for value in weekend],
+        "dates_in_forecast": [value.isoformat() for value in covered],
+    }
+    return text, data
+
+
 def _format_forecast_summary(days: list[dict[str, Any]]) -> str:
     parts: list[str] = []
     for day in days:
@@ -282,7 +336,12 @@ def _format_forecast_summary(days: list[dict[str, Any]]) -> str:
     return "; ".join(parts)
 
 
-def _result_from_weather_payload(payload: Mapping[str, Any], city: str) -> ToolResult:
+def _result_from_weather_payload(
+    payload: Mapping[str, Any],
+    city: str,
+    *,
+    now: datetime.datetime | None = None,
+) -> ToolResult:
     location = payload.get("location") or payload.get("city") or city or "your location"
     temp_f = _payload_temperature(payload)
     condition = _payload_condition(payload)
@@ -301,7 +360,8 @@ def _result_from_weather_payload(payload: Mapping[str, Any], city: str) -> ToolR
         forecast_high = forecast_high if forecast_high is not None else today.get("high_f") or today.get("high")
         forecast_low = forecast_low if forecast_low is not None else today.get("low_f") or today.get("low")
 
-    daily = _normalize_daily_forecast(forecast, payload)
+    daily = _normalize_daily_forecast(forecast, payload, now=now)
+    weekend = _weekend_note(daily, _forecast_reference_date(payload, now=now)) if daily else None
 
     parts = []
     if temp_f is not None and condition:
@@ -326,6 +386,8 @@ def _result_from_weather_payload(payload: Mapping[str, Any], city: str) -> ToolR
 
     if daily:
         parts.append("Forecast: " + _format_forecast_summary(daily) + ".")
+        if weekend is not None:
+            parts.append(weekend[0])
     elif forecast_high is not None and forecast_low is not None:
         parts.append(
             "Today: high %s degrees F, low %s degrees F." % (round(float(forecast_high)), round(float(forecast_low)))
@@ -346,6 +408,7 @@ def _result_from_weather_payload(payload: Mapping[str, Any], city: str) -> ToolR
             "forecast_high_f": forecast_high,
             "forecast_low_f": forecast_low,
             "daily_forecast": daily,
+            **({"weekend": weekend[1]} if weekend is not None else {}),
         },
     )
 
