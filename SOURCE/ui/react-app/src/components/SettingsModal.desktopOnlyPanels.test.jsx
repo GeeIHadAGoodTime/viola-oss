@@ -248,6 +248,21 @@ describe('SettingsModal desktop-only panels (#4226)', () => {
       expect(screen.getByText('Local Files')).toBeInTheDocument();
     });
 
+    // 1.0.5 build 5 (A10.4): the media tool and the no-sign-in fallback save
+    // "youtube_iframe" (older settings hold "youtube"), which matched none of
+    // the cards, so Music Source showed nothing selected while YouTube played.
+    it.each(['youtube_iframe', 'youtube', 'youtube_music'])('marks the YouTube card selected for saved source %j', async (saved) => {
+      settingsHarness.settings = { ...baseSettings, active_music_provider_id: saved };
+      render(<SettingsModal isOpen onClose={vi.fn()} />);
+      openTab('Music');
+
+      const youtube = (await screen.findByText('YouTube')).closest('button');
+      expect(youtube).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.getByText('Spotify').closest('button')).toHaveAttribute('aria-pressed', 'false');
+      expect(screen.getByText('Local Files').closest('button')).toHaveAttribute('aria-pressed', 'false');
+      expect(screen.queryByText('Unsaved music source')).toBeNull();
+    });
+
     it.each([
       ['', 'Set Folder'],
       ['C:/QA Music', 'Change Folder'],
