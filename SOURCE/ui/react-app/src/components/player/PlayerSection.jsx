@@ -73,7 +73,11 @@ const PlayerSection = ({
           {/* Track Info Row with Rating */}
           <div className={`track-info-row ${styles.trackInfoRow}`}>
             <div className={styles.trackTextCol}>
-              <div className={`track-title ${styles.trackTitle}`} style={{ color: THEME.colors.textBright }}>
+              <div
+                className={`track-title ${styles.trackTitle}`}
+                style={{ color: THEME.colors.textBright }}
+                title={nowPlaying?.title || undefined}
+              >
                 {nowPlaying?.title || 'Nothing playing'}
               </div>
               <div className={`track-artist ${styles.trackArtist}`} style={{ color: THEME.colors.textMuted }}>

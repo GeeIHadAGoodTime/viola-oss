@@ -2053,6 +2053,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
   // VOLUME SYNC TO IFRAME
   // =========================================================================
   const lastSyncedVolumeRef = useRef(volume);
+  const embeddedVolumeRequestRef = useRef(0);
   useEffect(() => {
     if (volume !== lastSyncedVolumeRef.current) {
       if (import.meta.env.DEV) {
@@ -3352,15 +3353,30 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
         sendToIframe('seekTo', { seconds: seekPos });
       }}
       onVolumeChange={(newVol) => {
-        const result = api.setVolume(newVol);
-        if (!iframeRef.current) return result;
-        // Embedded volume also has a direct message route. Preserve that
-        // existing behavior separately from the native API-owned control.
-        result.catch((err) => notifyTransportFailure(err, {
-          refused: "Can't change the volume right now.",
-          failed: "Couldn't change the volume. Please try again.",
-        }));
-        sendToIframe('setVolume', { level: newVol });
+        // Embedded YouTube also takes the level straight away over its
+        // message route, so the change is audible before the server answers.
+        if (iframeRef.current) sendToIframe('setVolume', { level: newVol });
+        // Always hand the request back to VolumeControl. It keeps one request
+        // in flight, coalesces the drag to the latest value, and reports a
+        // failure only when the value the user let go on was refused. The
+        // iframe branch used to return nothing and attach its own toast to
+        // every request: VolumeControl then treated each call as instantly
+        // done, a drag fired about 10 POSTs a second, /v1/volume's rate limit
+        // refused some of them, and "Couldn't change the volume" appeared
+        // although every admitted change had been applied (1.0.5 build 5).
+        const request = api.setVolume(newVol);
+        if (iframeRef.current) {
+          const requestId = ++embeddedVolumeRequestRef.current;
+          Promise.resolve(request).catch(() => {
+            // The server refused the value the user let go on: put the
+            // iframe back on the level the slider now shows again. A refusal
+            // of an older, superseded drag value must not touch it.
+            if (requestId === embeddedVolumeRequestRef.current) {
+              sendToIframe('setVolume', { level: ytHubMutedRef.current || isSpoke ? 0 : lastSyncedVolumeRef.current });
+            }
+          });
+        }
+        return request;
       }}
       onVolumeError={(err) => notifyTransportFailure(err, {
         refused: "Can't change the volume right now.",
