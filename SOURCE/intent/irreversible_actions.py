@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import re
+from collections.abc import Callable
 from typing import Any, Mapping
+from urllib.parse import urlparse
 
 _META_TRUE_VALUES = {True, "true", "1", "yes"}
 
@@ -181,6 +184,46 @@ def irreversible_action_class(
     return None
 
 
+def _is_read_only_shell_call(args: Mapping[str, Any] | None) -> bool:
+    """A shell call the safety parser proves read-only (echo, dir, git status)."""
+    params = args or {}
+    command = params.get("command") or params.get("cmd") or params.get("script")
+    if not command:
+        return False
+    from intent.tools.shell import is_read_only_command
+
+    return is_read_only_command(command, params.get("working_directory") or "")
+
+
+def gate_action_class(
+    tool_name: str,
+    args: Mapping[str, Any] | None = None,
+    schema: Mapping[str, Any] | None = None,
+    *,
+    tainted: bool,
+) -> str | None:
+    """The class the confirm-or-cancel gate asks about, or None to just do it.
+
+    ``irreversible_action_class`` names what a call IS (and drives the taint
+    gate, which must keep seeing every shell command). The gate then lets two
+    harmless cases through when no untrusted content is in the conversation
+    (founder rule: confirm only at crucial moments):
+
+    * a shell command the parser proves read-only (``echo``, ``dir``,
+      ``git status``); it used to ask every time (1.0.5 laptop X8.1);
+    * saving an answer as a NEW file (share_response never replaces a file),
+      like creating any new file with the file tools.
+    """
+    action_class = irreversible_action_class(tool_name, args, schema)
+    if action_class is None or tainted:
+        return action_class
+    if action_class == "shell_command" and _is_read_only_shell_call(args):
+        return None
+    if action_class == "share_response_file":
+        return None
+    return action_class
+
+
 def is_irreversible_tool_call(
     tool_name: str,
     args: Mapping[str, Any] | None = None,
@@ -294,3 +337,104 @@ def _share_response_class(args: Mapping[str, Any] | None) -> str:
     if kind == "file":
         return "share_response_file"
     return "share_response"
+
+
+# ---------------------------------------------------------------------------
+# Sending through a website in the agent browser (1.0.5 laptop A6.5).
+# ---------------------------------------------------------------------------
+# A message sent by clicking Send in webmail, a chat app or a social site is as
+# final as one sent by a messaging tool, so it asks first too. Only the act
+# that sends asks: typing a draft does not. The page URL comes from the agent's
+# own browser results, never from the model's arguments.
+BROWSER_SEND_CLASS = "browser_send"
+_MESSAGING_HOSTS = (
+    "mail.google.com",
+    "chat.google.com",
+    "messages.google.com",
+    "outlook.live.com",
+    "outlook.office.com",
+    "outlook.office365.com",
+    "mail.yahoo.com",
+    "mail.aol.com",
+    "mail.proton.me",
+    "mail.zoho.com",
+    "fastmail.com",
+    "icloud.com",
+    "web.whatsapp.com",
+    "web.telegram.org",
+    "messenger.com",
+    "facebook.com",
+    "instagram.com",
+    "x.com",
+    "twitter.com",
+    "linkedin.com",
+    "reddit.com",
+    "discord.com",
+    "slack.com",
+    "teams.microsoft.com",
+    "teams.live.com",
+    "bsky.app",
+    "threads.net",
+)
+_SEND_WORD_RE = re.compile(
+    r"\b(?:send|sent|post|publish|reply|tweet|share|submit|comment|message)\b",
+    re.IGNORECASE,
+)
+_SEND_KEYS = {"enter", "return", "numpadenter"}
+_OPAQUE_REF_RE = re.compile(r"^@?e\d+$", re.IGNORECASE)
+
+
+def messaging_host(page_url: str | None) -> str | None:
+    """The webmail / chat / social host of ``page_url``, or None."""
+    try:
+        host = (urlparse(str(page_url or "")).hostname or "").lower()
+    except ValueError:
+        return None
+    for known in _MESSAGING_HOSTS:
+        if host == known or host.endswith("." + known):
+            return host
+    return None
+
+
+def browser_send_action_class(
+    tool_name: str,
+    args: Mapping[str, Any] | None,
+    page_url: str | None,
+    describe_target: Callable[[str], str | None] | None = None,
+) -> str | None:
+    """``browser_send`` when this browser action would send a message, else None.
+
+    ``describe_target`` turns a snapshot ref (``@e12``) into its accessible
+    role and name. A ref that cannot be described is treated as a send on a
+    messaging site (fails closed).
+    """
+    if messaging_host(page_url) is None:
+        return None
+    name = _clean(tool_name)
+    params = args or {}
+    action = _action(params)
+    if name in {"browser_evaluate", "browser_run_script"}:
+        return BROWSER_SEND_CLASS
+    if name == "browser_press_key" or (name == "browser_interact" and action == "press_key"):
+        key = _clean(params.get("key")).lower().replace(" ", "")
+        parts = set(key.split("+"))
+        return BROWSER_SEND_CLASS if parts & _SEND_KEYS else None
+    if name == "browser_click" or (name == "browser_interact" and action == "click"):
+        target = _clean(params.get("selector") or params.get("ref") or params.get("element"))
+        label = " ".join(part for part in (target, _clean(params.get("text"))) if part)
+        if target and _OPAQUE_REF_RE.match(target):
+            described = describe_target(target) if describe_target is not None else None
+            if not described:
+                return BROWSER_SEND_CLASS
+            label = "%s %s" % (label, described)
+        return BROWSER_SEND_CLASS if _SEND_WORD_RE.search(label) else None
+    if name == "browser_fill_form":
+        for field in params.get("fields") or ():
+            if isinstance(field, Mapping) and _SEND_WORD_RE.search(_clean(field.get("name"))):
+                return BROWSER_SEND_CLASS
+    return None
+
+
+def describe_browser_send(page_url: str | None) -> str:
+    host = messaging_host(page_url) or "this website"
+    return "send a message from %s in the browser" % host

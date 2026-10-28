@@ -14,6 +14,50 @@ from services.cdp_target import get_preferred_target_id, is_local_target_url, ta
 
 logger = get_logger(__name__)
 
+# The agent browser must never open the operating system's passkey / security
+# key dialog. On Windows that dialog (CredentialUIBroker) sits on top of every
+# window and takes the keyboard: opening mail.google.com raised "Choose a
+# passkey" over Viola and it stayed there for hours (1.0.5 laptop A6.5). Sites
+# then fall back to their password or code sign-in, which the user can do when
+# they take over the browser. The script runs in every frame before the page's
+# own scripts, while the agent is attached.
+_NO_OS_CREDENTIAL_UI_SCRIPT = """
+(() => {
+  try {
+    const refuse = () => Promise.reject(new DOMException(
+      'Passkeys are not available in the Viola agent browser', 'NotAllowedError'));
+    const creds = navigator.credentials;
+    if (creds) {
+      const originalGet = creds.get ? creds.get.bind(creds) : null;
+      const originalCreate = creds.create ? creds.create.bind(creds) : null;
+      Object.defineProperty(creds, 'get', {
+        configurable: true,
+        value: (options) => (options && (options.publicKey || options.mediation === 'conditional'))
+          ? refuse() : (originalGet ? originalGet(options) : refuse()),
+      });
+      Object.defineProperty(creds, 'create', {
+        configurable: true,
+        value: (options) => (options && options.publicKey)
+          ? refuse() : (originalCreate ? originalCreate(options) : refuse()),
+      });
+    }
+    const pkc = window.PublicKeyCredential;
+    if (pkc) {
+      const no = () => Promise.resolve(false);
+      for (const name of ['isConditionalMediationAvailable',
+                          'isUserVerifyingPlatformAuthenticatorAvailable']) {
+        try { Object.defineProperty(pkc, name, {configurable: true, value: no}); } catch (e) {}
+      }
+      try {
+        Object.defineProperty(pkc, 'getClientCapabilities', {
+          configurable: true, value: () => Promise.resolve({}),
+        });
+      } catch (e) {}
+    }
+  } catch (e) {}
+})();
+"""
+
 try:
     from playwright.async_api import Error as PlaywrightError, TimeoutError as PlaywrightTimeoutError
 except ImportError:  # pragma: no cover - exercised by connect() error handling
@@ -157,6 +201,20 @@ class _DriverLoop:
                 await asyncio.get_running_loop().run_in_executor(None, thread.join, 10.0)
 
 
+async def _install_no_os_credential_ui(page: Any) -> None:
+    """Keep passkey / security-key prompts off this page (agent page only).
+
+    Page-scoped on purpose: the main Viola window and the Google sign-in
+    popup share this browser, and there the user may want their passkey.
+    A failure is logged and never blocks the attach.
+    """
+    try:
+        await page.add_init_script(_NO_OS_CREDENTIAL_UI_SCRIPT)
+        await page.evaluate(_NO_OS_CREDENTIAL_UI_SCRIPT)
+    except Exception as exc:  # noqa: BLE001, RUF100 - the browser still works without the guard
+        logger.warning("Agent browser passkey guard could not be installed: %s", exc)
+
+
 class PlaywrightCDPClient:
     """Playwright-backed controller for the visible Qt WebEngine CDP page."""
 
@@ -207,6 +265,7 @@ class PlaywrightCDPClient:
                     timeout=int(self._command_timeout * 1000),
                 )
                 self._page = await self._select_page(target_url_filter=target_url_filter)
+                await _install_no_os_credential_ui(self._page)
                 self._target_id = await self._target_id_for_page(self._page)
                 self._cdp_session = await self._page.context.new_cdp_session(self._page)
 

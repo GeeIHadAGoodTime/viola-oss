@@ -1516,8 +1516,8 @@ class MCPClientHub:
     # Defense-in-depth: tools that must never appear under solo/ensemble even
     # if accidentally added to the allow-lists. Keep this list minimal.
     _TIER_HIDDEN_TOOL_MAP: dict[str, frozenset[str]] = {
-        "solo": frozenset({"computer", "desktop_volume"}),
-        "ensemble": frozenset({"computer", "desktop_volume"}),
+        "solo": frozenset({"computer", "desktop_volume", "view_screen"}),
+        "ensemble": frozenset({"computer", "desktop_volume", "view_screen"}),
         "symphony": frozenset(),
     }
 

@@ -71,6 +71,8 @@ CONSENT_GATED_RELAY_TOOLS: frozenset[str] = frozenset(
         # if it is not listed here, so a future alias cannot reopen this.
         "desktop_interact",
         "desktop_volume",
+        # `view_screen` reads the screen through computer(action=analyze_screen).
+        "view_screen",
         # smart_home.ha_control -- acting on the user's home.
         "smart_home",
         # Desktop Add Room pairing drives the local hub's audio devices.

@@ -1065,6 +1065,34 @@ async def desktop_volume(
     )
 
 
+@server.tool(
+    name="view_screen",
+    annotations=_CONFIRM,
+    meta={"risk": "confirm", "anthropic/alwaysLoad": True},
+    description=(
+        "Look at the user's computer screen and answer a question about it ('what's on my screen?', "
+        "'what does this error say?', 'which window is open?'). Captures the active window or the whole "
+        "screen and describes it. For clicking, typing or opening apps, use the computer tool."
+    ),
+)
+async def view_screen(
+    question: Annotated[
+        str,
+        Field(description="What to find out from the screen, in the user's words."),
+    ] = "What is on the screen?",
+    capture_mode: Annotated[
+        Literal["active_window", "full_screen"],
+        Field(description="active_window (default) or full_screen when the user asks about the whole screen."),
+    ] = "active_window",
+) -> str:
+    """Describe the screen via the computer-use safety path (same checks as computer)."""
+    return await computer(
+        action="analyze_screen",
+        question=question,
+        capture_mode=capture_mode,
+    )
+
+
 def create_computer_use_server() -> FastMCP:
     """Return the FastMCP server instance for in-process registration."""
     return server

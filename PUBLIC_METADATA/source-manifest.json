@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "26bc06bcebb0846705136fbc8973e4a8456c4259",
-  "sha256": "81dbdcb116acec0cdb3b5f35ae26a80c033a7e28ea74b87e99813631329f4e6c",
+  "revision": "68f24f8a42ddf1bd761f2bb5edd714135332be42",
+  "sha256": "c906a11073e5082abcd2d9c72064c9f93b8996a16ed28ca94eb838a4fbedfb0b",
   "files": [
     {
       "path": ".env.example",
@@ -1580,8 +1580,8 @@
     },
     {
       "path": "intent/agent_executor.py",
-      "sha256": "9c79e560515d352e324dae4b03e257c16f4054684e5d909bff45cd8770a0a896",
-      "bytes": 583791
+      "sha256": "5d1daa7ad66c23c81c45123132eefac3a382bca39f0ddab967c75a0f5f1df7fb",
+      "bytes": 586662
     },
     {
       "path": "intent/agent_loop.py",
@@ -1620,8 +1620,8 @@
     },
     {
       "path": "intent/approval.py",
-      "sha256": "3044e3cd7d311d51ac75b939479222827cf68adb842c5d39a9bf60daa5f08fde",
-      "bytes": 53189
+      "sha256": "920db74d2af83c4e9d59b2385fe632961012c6a616093f12b0b2d06198486c87",
+      "bytes": 54987
     },
     {
       "path": "intent/capability_resolver.py",
@@ -1690,8 +1690,8 @@
     },
     {
       "path": "intent/file_gates.py",
-      "sha256": "09feb91c16f89817761885a6828425b3329915aea574786105ec40ee22633768",
-      "bytes": 17799
+      "sha256": "481bd0b40ea9bcf63dbb9809441f430c5f373fb94025ada88ffce9077521c4c8",
+      "bytes": 19252
     },
     {
       "path": "intent/gate_protocol.py",
@@ -1860,8 +1860,8 @@
     },
     {
       "path": "intent/irreversible_actions.py",
-      "sha256": "ed7161d8d5faae1a6acc964093db6436f6c6baca9099204b9aa243e4e5982c22",
-      "bytes": 13222
+      "sha256": "f51d571406cdd8183c085d1a830dcf4ac73d923923c35de43f2c638d0ea2fbca",
+      "bytes": 18636
     },
     {
       "path": "intent/json_utils.py",
@@ -1880,8 +1880,8 @@
     },
     {
       "path": "intent/permissions/remote_relay.py",
-      "sha256": "77d2a5f92ff4169ac7c7dfd2ad6c265565bc248fcc24247777dd380313a4dff2",
-      "bytes": 5534
+      "sha256": "7105efbe8bcc40eb13a621c892118041b16b4563416dea581734ae9cabde99db",
+      "bytes": 5639
     },
     {
       "path": "intent/permissions/shell_safety.py",
@@ -2045,8 +2045,8 @@
     },
     {
       "path": "intent/tools/deferred_tool_schemas.py",
-      "sha256": "590e7a8e108c3be8c5746c2caacaa91cb306f40b8eb5138e2e7ac9f6300dc9f4",
-      "bytes": 35663
+      "sha256": "b745e18eb8004caf6fc554048e59841e018587478a8ab166b26fe05325f844ad",
+      "bytes": 35994
     },
     {
       "path": "intent/tools/delegation.py",
@@ -2070,13 +2070,13 @@
     },
     {
       "path": "intent/tools/email.py",
-      "sha256": "e95a8d0465c43bcbd4d82e98b890b1b91bb03200da526f8e77d1fc3479d948c6",
-      "bytes": 25743
+      "sha256": "d785640d1907d2f7dbe8b52115486f2425429d7722917153172edb947691e25e",
+      "bytes": 27789
     },
     {
       "path": "intent/tools/filesystem.py",
-      "sha256": "7e551e417a1234e00d804b159f31d515c113861382d5ff1bc8aecc7057c35a19",
-      "bytes": 77508
+      "sha256": "bf38789ca2c2c1a3583ea0e58e4d2c34ed03681dd5c34a2a23c6bb6d3478eef8",
+      "bytes": 83327
     },
     {
       "path": "intent/tools/knowledge.py",
@@ -2155,8 +2155,8 @@
     },
     {
       "path": "intent/tools/shell.py",
-      "sha256": "76d93c07db315ae7a401e0fb47157a0ce94e13324ff75f13d14e607b5d832c8f",
-      "bytes": 16571
+      "sha256": "0ceddc21d51d21f64a196200ecc9ce1dc6c47ebb9c5cd29587ee84f19cd9b4fc",
+      "bytes": 20227
     },
     {
       "path": "intent/tools/system_state.py",
@@ -2245,13 +2245,13 @@
     },
     {
       "path": "mcp_hub/approval_bridge.py",
-      "sha256": "c3c5cda2508c2f6b90e442a433f3319e73781717b79e159581a58968859445db",
-      "bytes": 57714
+      "sha256": "8dd57ad3d03886a9b65d2be189050239f801b3ed3dc538ef1db5fc6277eee5eb",
+      "bytes": 59676
     },
     {
       "path": "mcp_hub/client_hub.py",
-      "sha256": "44b25df14e017512d0fd47038a2eac88d737643d6877f174b3869bb67a162f87",
-      "bytes": 130915
+      "sha256": "51a792d96188988f6af1eb82e65eddaaf698f1af4d7322458ee6f8d7ca3eb65f",
+      "bytes": 130945
     },
     {
       "path": "mcp_hub/compound_tools.py",
@@ -2355,8 +2355,8 @@
     },
     {
       "path": "mcp_servers/computer_use/server.py",
-      "sha256": "99842977132761c8ab91a4971b893c292ad05a129cda9d93be69d21e1fbc1d14",
-      "bytes": 46149
+      "sha256": "b75fb4826c81e51c5a5d598a6eb40ff5e0b2f38a58ea4c0080faf8fdcfc95a02",
+      "bytes": 47229
     },
     {
       "path": "mcp_servers/core_tools/__init__.py",
@@ -2370,8 +2370,8 @@
     },
     {
       "path": "mcp_servers/core_tools/server.py",
-      "sha256": "f183521b0b7cbba7f9fa3ccf8ce6ca8b59bd9b39114437c63b36d08c1bda4c70",
-      "bytes": 254070
+      "sha256": "aad1657828cb178b0e8d22c0b4b26b1abf6ee1ff790b4ed90c4077be8659190d",
+      "bytes": 257079
     },
     {
       "path": "mcp_servers/phone_tool_descriptions.py",
@@ -4315,8 +4315,8 @@
     },
     {
       "path": "services/computer_use/cloud_guard.py",
-      "sha256": "13f178622cbea5210caae48d338cd3043e90155e539552a234c290a868926708",
-      "bytes": 1845
+      "sha256": "d3cf6278c7e57e365bf2f6f0023d5d491033969cf49f44a6489cd8504afebf7f",
+      "bytes": 3342
     },
     {
       "path": "services/computer_use/input.py",
@@ -4640,8 +4640,8 @@
     },
     {
       "path": "services/llm/prompts/viola_unified.py",
-      "sha256": "6071cfd60be60e6bc5d72f743bc6d55aa1aaeaa94eaa77c165ca4a8b324e1093",
-      "bytes": 17163
+      "sha256": "04e835b87946d45b0363b94b0146a24aa6d29616b38d738cc1f63d9a9688856f",
+      "bytes": 17755
     },
     {
       "path": "services/llm/provider_fallback.py",
@@ -5105,8 +5105,8 @@
     },
     {
       "path": "services/playwright_cdp_client.py",
-      "sha256": "ff7b1961de1beb207f0a42dd88fdb5b03aad3c8b4dc886a8d582392a1c03f16f",
-      "bytes": 20369
+      "sha256": "24c5bb6a4f80c038709fc25e246fd0c713560c5548a916e4a10f4b89d8003f6a",
+      "bytes": 23034
     },
     {
       "path": "services/profile/__init__.py",
@@ -13065,8 +13065,8 @@
     },
     {
       "path": "utils/self_knowledge.py",
-      "sha256": "41ac25aa367a7865d1f24a34036d120b399e5d7440c5bd1eac0c100080ed3c04",
-      "bytes": 17380
+      "sha256": "cf2b43e136472942c44c1929181d95d4d86bbf2fb1a874f7abc50690bafe7d88",
+      "bytes": 18632
     },
     {
       "path": "utils/service_registry.py",

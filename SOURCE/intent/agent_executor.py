@@ -59,8 +59,10 @@ from intent.gate_protocol import (
 )
 from intent.hooks import HookEvent, dispatch as _dispatch_hook, hook_result_frames
 from intent.irreversible_actions import (
+    browser_send_action_class,
+    describe_browser_send,
     describe_irreversible_action,
-    irreversible_action_class,
+    gate_action_class,
 )
 from intent.log_redaction import redact_card_data, redact_pii
 from intent.post_answer_teardown import (
@@ -1102,8 +1104,26 @@ _PER_TOOL_TIMEOUT_OVERRIDES_SECS: dict[str, float] = {
 _LOCAL_SIDE_EFFECT_TOOLS: frozenset[str] = frozenset({"timer"})
 _LOCAL_SIDE_EFFECT_TIMEOUT_GRACE_SECS: float = 5.0
 
+
+def _describe_browser_ref(ref: str) -> str | None:
+    """Accessible role and name behind an agent-browser snapshot ref, if known."""
+    try:
+        from mcp_servers.browser_cdp.server import _CDP_REF_LOCATOR_MAP
+    except ImportError:
+        return None
+    normalized = str(ref or "").strip().lstrip("@")
+    entry = _CDP_REF_LOCATOR_MAP.get(normalized) or _CDP_REF_LOCATOR_MAP.get("@" + normalized)
+    if not isinstance(entry, dict):
+        return None
+    name = str(entry.get("name") or "").strip()
+    if not name:
+        return None  # an unnamed control on a messaging site is treated as Send
+    return ("%s %s" % (entry.get("role") or "", name)).strip()
+
+
 _ONE_SHOT_IRREVERSIBLE_CONFIRMATION_CLASSES: frozenset[str] = frozenset(
     {
+        "browser_send",
         "file_delete",
         "file_write",
         "file_move",
@@ -8119,11 +8139,22 @@ class AgentExecutor:
         return schema if isinstance(schema, dict) else {}
 
     def _irreversible_confirmation_class(self, tool_name: str, tool_args: dict[str, Any]) -> str | None:
-        return irreversible_action_class(
+        action_class = gate_action_class(
             tool_name,
             tool_args,
             self._irreversible_tool_schema(tool_name),
+            tainted=_content_context_is_tainted(),
         )
+        if action_class is None and str(tool_name or "").startswith("browser_"):
+            # Clicking Send in webmail / chat / social sites in the agent
+            # browser sends a message too, so it asks first (1.0.5 A6.5).
+            action_class = browser_send_action_class(
+                tool_name,
+                tool_args,
+                getattr(self, "_last_page_url", None),
+                _describe_browser_ref,
+            )
+        return action_class
 
     @staticmethod
     def _payment_fill_payload(result: Any) -> dict[str, Any] | None:
@@ -8339,6 +8370,31 @@ class AgentExecutor:
         except Exception as exc:
             logger.debug("Consult-user WS broadcast failed for %s: %s", tool_name, exc)
 
+    async def _email_send_unavailable(self, tool_name: str, tool_args: dict[str, Any]) -> ToolResult | None:
+        """Say "no email account is connected" before asking to confirm a send.
+
+        Asking "send this email?" when nothing can send it wastes the user's
+        yes, and the model then reached for Gmail in the agent browser, which
+        popped a Windows passkey dialog over Viola (1.0.5 laptop A6.5).
+        Desktop only: the cloud sends through its own path.
+        """
+        if self._irreversible_confirmation_class(tool_name, tool_args) != "send_email":
+            return None
+        try:
+            from services.computer_use.cloud_guard import is_cloud_surface
+
+            if is_cloud_surface():
+                return None
+            from intent.tools.email import email_send_unavailable
+
+            result = await email_send_unavailable(self._get_effective_user_id())
+        except Exception:  # noqa: BLE001, RUF100 - a failed check never blocks the normal gate
+            logger.debug("Email readiness check failed for %s", tool_name, exc_info=True)
+            return None
+        if result is not None:
+            logger.info("Email send skipped before confirmation: no email account is connected (tool=%s)", tool_name)
+        return result
+
     async def _confirm_irreversible_tool_call(self, tool_name: str, tool_args: dict[str, Any]) -> bool:
         action_class = self._irreversible_confirmation_class(tool_name, tool_args)
         if action_class is None:
@@ -8368,7 +8424,10 @@ class AgentExecutor:
             event_label = await calendar_event_label_for_confirmation(self._get_effective_user_id(), tool_args)
             if event_label:
                 describe_args = {**tool_args, "title": event_label}
-        planned_action = describe_irreversible_action(tool_name, describe_args)
+        if action_class == "browser_send":
+            planned_action = describe_browser_send(getattr(self, "_last_page_url", None))
+        else:
+            planned_action = describe_irreversible_action(tool_name, describe_args)
         if action_class == "phone_call" and _content_context_is_tainted():
             planned_action = "%s (this number came from a search result or other outside content, so please check it is the right one)" % planned_action
         await self._broadcast_consult_user_event(
@@ -8648,6 +8707,10 @@ class AgentExecutor:
                     return ToolResult(ok=True, data=payload)
             except Exception:
                 logger.debug("Action idempotency check skipped for %s", tool_name, exc_info=True)
+
+        email_unavailable = await self._email_send_unavailable(tool_name, tool_args)
+        if email_unavailable is not None:
+            return email_unavailable
 
         irreversible_action = self._irreversible_confirmation_class(tool_name, tool_args)
         irreversible_confirmation_granted = False

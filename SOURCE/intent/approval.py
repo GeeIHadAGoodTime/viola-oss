@@ -197,6 +197,20 @@ def should_defer_confirmation_on_empty_response(channel: Any | None) -> bool:
     return getattr(channel, "defer_confirmation_on_ask_none", False) is True
 
 
+def _carries_confirmation_token(tool_args: dict[str, Any]) -> bool:
+    """True when the call carries this layer's own cross-turn confirmation fields.
+
+    A bare ``confirmed`` is also an ordinary parameter of some tools
+    (``self_manage(confirmed=False)`` is its preview step), and strict tool
+    schemas make the model send it on every call. Read as a confirmation token
+    with no id, it turned every such call into a silent "rejected": the tool
+    was refused as "not approved by the user" and no prompt was ever shown
+    (1.0.5 laptop X8.9). Only an explicit id or ``_approval_confirmed`` is a
+    token; a bare ``confirmed`` goes through the normal match-or-ask path.
+    """
+    return any(key in tool_args for key in _CONFIRMATION_ARG_KEYS if key != "confirmed")
+
+
 class ConfirmationDeferred(RuntimeError):
     """Raised when approval must continue through the conversational surface."""
 
@@ -556,16 +570,18 @@ class ApprovalManager:
         tool_args: dict[str, Any],
         task_id: str | None = None,
         allow_implicit_match: bool = False,
+        action_description: str | None = None,
     ) -> Literal["missing", "accepted", "rejected"]:
         """Validate and consume a structured cross-turn confirmation."""
 
-        if not isinstance(tool_args, dict) or not any(key in tool_args for key in _CONFIRMATION_ARG_KEYS):
+        if not isinstance(tool_args, dict) or not _carries_confirmation_token(tool_args):
             if allow_implicit_match:
                 return self._consume_matching_deferred_confirmation(
                     tool_name=tool_name,
                     risk=risk,
                     tool_args=tool_args,
                     task_id=task_id,
+                    action_description=action_description,
                 )
             return "missing"
 
@@ -615,6 +631,7 @@ class ApprovalManager:
         risk: RiskLevel,
         tool_args: dict[str, Any],
         task_id: str | None = None,
+        action_description: str | None = None,
     ) -> Literal["missing", "accepted"]:
         """Consume a pending confirmation when the later tool call exactly matches.
 
@@ -632,6 +649,8 @@ class ApprovalManager:
         args_fingerprint = self._args_fingerprint_for_tool(tool_name_value, tool_args)
         current_task_id = str(task_id) if task_id else None
         scope = current_confirmation_conversation_scope()
+        described = str(action_description or "").strip()
+        new_args = self._stored_tool_args_for_tool(tool_name_value, tool_args) if described else {}
         matching_ids: list[str] = []
         store = self._pending_store()
         with store.lock:
@@ -641,11 +660,21 @@ class ApprovalManager:
                     continue
                 if pending.created_task_id and pending.created_task_id == current_task_id:
                     continue
-                if (
-                    pending.tool_name == tool_name_value
-                    and pending.risk == risk
-                    and pending.args_fingerprint == args_fingerprint
+                if pending.tool_name != tool_name_value or pending.risk != risk:
+                    continue
+                if pending.args_fingerprint == args_fingerprint:
+                    matching_ids.append(confirmation_id)
+                elif (
+                    described
+                    and pending.action_description == described
+                    and all(new_args.get(key) == value for key, value in pending.tool_args.items())
                 ):
+                    # The user said yes to exactly this description, and the
+                    # re-issued call keeps every argument they were asked
+                    # about, only adding optional fields (computer:
+                    # app_executable, axis ...). The exact-args match asked
+                    # the same question again after every "yes" (1.0.5 r6
+                    # live repro, X8.1 family).
                     matching_ids.append(confirmation_id)
             if not matching_ids:
                 return "missing"
@@ -787,6 +816,7 @@ class ApprovalManager:
             tool_args=tool_args or {},
             task_id=task_id,
             allow_implicit_match=True,
+            action_description=action_description,
         )
         if confirmation_state == "accepted":
             if not await self.confirmation_holds_under_taint(action_description, risk):

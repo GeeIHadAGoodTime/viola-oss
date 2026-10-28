@@ -62,6 +62,20 @@ def sanitize_for_prompt(text: str, max_len: int = 80) -> str:
 # ---------------------------------------------------------------------------
 
 
+# What each lower tool-permission level leaves out (mcp_hub.client_hub tier maps).
+_TIER_NEEDS_SYMPHONY: dict[str, str] = {
+    "solo": (
+        "email, reading files and the agent browser need Ensemble or Symphony; phone calls, text messages, "
+        "changing or saving files, shell commands and desktop control (seeing the screen, mouse, keyboard, "
+        "computer volume) need Symphony"
+    ),
+    "ensemble": (
+        "phone calls, text messages, changing or saving files, shell commands and desktop control (seeing the "
+        "screen, mouse, keyboard, computer volume) need Symphony"
+    ),
+}
+
+
 class SelfKnowledgeBuilder:
     """Assembles a minimal snapshot of Viola's state for LLM prompts.
 
@@ -367,6 +381,16 @@ class SelfKnowledgeBuilder:
                 "Every plan can use Solo, Ensemble or Symphony; the user switches it in Settings > AI & Agents > "
                 "Agent Autonomy (you cannot change it from chat)." % (tier, description)
             )
+            unavailable = _TIER_NEEDS_SYMPHONY.get(tier)
+            if unavailable:
+                # At Ensemble "can you make phone calls for me?" got "Yes. Tell
+                # me who to call..." with no phone tool in reach (1.0.5 laptop
+                # A5.5). Name what this level leaves out, and where to switch.
+                lines.append(
+                    "Not available at this level: %s. If the user asks for one of these, say which level it "
+                    "needs and that they can switch in Settings > AI & Agents > Agent Autonomy; do not say you "
+                    "can do it." % unavailable
+                )
             if bool(sm.get("auto_propose_shortcuts", False, user_id=user_id)):
                 lines.append(
                     "Proactive shortcut proposals are enabled — feel free to offer shortcut creation "
