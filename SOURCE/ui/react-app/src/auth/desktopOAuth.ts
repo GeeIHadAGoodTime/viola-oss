@@ -49,13 +49,31 @@ const DEFAULT_DESKTOP_PORT = '8756';
  * under the server's own flow TTL (auth/desktop_oauth_callback.FLOW_TTL_SECONDS)
  * so the server, not the client, is the thing that expires a stale code.
  */
-export const OAUTH_WAIT_TIMEOUT_MS = 240_000;
+export const OAUTH_WAIT_TIMEOUT_MS = 180_000;
 
-/** Poll cadence while the human is still in the browser. */
-export const OAUTH_POLL_INTERVAL_MS = 1_200;
+/**
+ * Poll cadence while the human is still in the browser: quick at first (a
+ * Google account that already consented comes back in a few seconds), then
+ * backing off so a long wait costs a request every few seconds, not every one.
+ *
+ * The old fixed 1.2 s cadence was 50 requests a minute against a 30-a-minute
+ * local limiter that also counts rejected requests, so after 36 s every poll was
+ * refused, the finished result could never be read, and the button sat on
+ * "Please wait..." (Viola 1.0.5 laptop report, 2026-10-28).
+ */
+export const OAUTH_POLL_INTERVAL_MS = 1_000;
+export const OAUTH_POLL_BACKOFF = 1.5;
+export const OAUTH_POLL_MAX_INTERVAL_MS = 4_000;
+/** After a 429 from the local server: wait at least this long before asking again. */
+export const OAUTH_POLL_RATE_LIMITED_INTERVAL_MS = 8_000;
+/** One poll request may not hang the loop past its deadline. */
+export const OAUTH_POLL_REQUEST_TIMEOUT_MS = 5_000;
+/** The code exchange is one request to the account service; it gets a bound too. */
+export const OAUTH_EXCHANGE_TIMEOUT_MS = 30_000;
 
 export type DesktopOAuthOutcome =
   | { status: 'signed_in'; session: Session }
+  | { status: 'already_signed_in' }
   | { status: 'failed'; message: string; code: string };
 
 type ResultPayload = {
@@ -64,6 +82,12 @@ type ResultPayload = {
   error?: string;
   error_description?: string;
 };
+
+/** What one poll learned. `rate_limited` and `unavailable` mean "ask again later". */
+type PollRead =
+  | { kind: 'result'; payload: ResultPayload }
+  | { kind: 'rate_limited' }
+  | { kind: 'unavailable' };
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => { setTimeout(resolve, ms); });
@@ -108,32 +132,69 @@ export function buildDesktopRedirectUrl(flowId: string, port = desktopServerPort
  * payload is under `data`. A bare body is tolerated too, so an envelope change
  * degrades to "keep polling" rather than to a false verdict.
  */
-async function readFlowResult(flowId: string): Promise<ResultPayload | null> {
+async function readFlowResult(flowId: string): Promise<PollRead> {
+  const controller = typeof AbortController === 'function' ? new AbortController() : null;
+  const timer = controller ? setTimeout(() => controller.abort(), OAUTH_POLL_REQUEST_TIMEOUT_MS) : null;
   try {
     const response = await fetch(
       `${DESKTOP_OAUTH_RESULT_PATH}?flow=${encodeURIComponent(flowId)}`,
-      { credentials: 'same-origin' },
+      { credentials: 'same-origin', ...(controller ? { signal: controller.signal } : {}) },
     );
-    if (!response.ok) return null;
+    if (response.status === 429) return { kind: 'rate_limited' };
+    if (!response.ok) return { kind: 'unavailable' };
     const body = (await response.json()) as { data?: ResultPayload } & ResultPayload;
-    return body?.data ?? body ?? null;
+    const payload = body?.data ?? body ?? null;
+    return payload ? { kind: 'result', payload } : { kind: 'unavailable' };
   } catch {
     // A transient local fetch failure is not a verdict — keep polling until
     // the deadline rather than calling the whole sign-in dead.
-    return null;
+    return { kind: 'unavailable' };
+  } finally {
+    if (timer !== null) clearTimeout(timer);
   }
 }
+
+/** Resolve `work`, or `null` if it takes longer than `ms`. */
+async function withTimeout<T>(work: Promise<T>, ms: number): Promise<T | null> {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const expired = new Promise<null>((resolve) => { timer = setTimeout(() => resolve(null), ms); });
+  try {
+    return await Promise.race([work, expired]);
+  } finally {
+    if (timer !== null) clearTimeout(timer);
+  }
+}
+
+async function safelySignedIn(isSignedIn?: () => boolean | Promise<boolean>): Promise<boolean> {
+  if (!isSignedIn) return false;
+  try {
+    return Boolean(await isSignedIn());
+  } catch {
+    return false;
+  }
+}
+
+const TIMEOUT_MESSAGE = 'Sign-in timed out. Finish the browser page within a few minutes, or use email and password.';
 
 /**
  * Wait for the browser leg, then redeem the code for a real session.
  *
  * `openBrowser` is injected so the caller owns how an external URL is opened
  * (the Qt bridge, or window.open) and so this is testable without a browser.
+ * `isSignedIn` lets the caller stop the wait the moment the app is signed in
+ * some other way; the poll has nothing left to wait for then.
+ *
+ * Always settles by `OAUTH_WAIT_TIMEOUT_MS` (plus one bounded exchange), so
+ * the button that started it can never stay on "Please wait..." for good.
  */
 export async function completeDesktopOAuth(
   provider: string,
   openBrowser: (url: string) => void,
-  options: { now?: () => number; wait?: (ms: number) => Promise<void> } = {},
+  options: {
+    now?: () => number;
+    wait?: (ms: number) => Promise<void>;
+    isSignedIn?: () => boolean | Promise<boolean>;
+  } = {},
 ): Promise<DesktopOAuthOutcome> {
   const now = options.now || (() => Date.now());
   const wait = options.wait || sleep;
@@ -162,23 +223,52 @@ export async function completeDesktopOAuth(
   openBrowser(data.url);
 
   const deadline = now() + OAUTH_WAIT_TIMEOUT_MS;
+  let interval = OAUTH_POLL_INTERVAL_MS;
   for (;;) {
     if (now() >= deadline) {
+      return { status: 'failed', message: TIMEOUT_MESSAGE, code: 'oauth_timeout' };
+    }
+    await wait(Math.max(0, Math.min(interval, deadline - now())));
+    if (await safelySignedIn(options.isSignedIn)) return { status: 'already_signed_in' };
+    if (now() >= deadline) {
+      return { status: 'failed', message: TIMEOUT_MESSAGE, code: 'oauth_timeout' };
+    }
+
+    const read = await readFlowResult(flowId);
+    if (read.kind === 'rate_limited') {
+      interval = Math.max(interval, OAUTH_POLL_RATE_LIMITED_INTERVAL_MS);
+      continue;
+    }
+    if (read.kind === 'unavailable' || read.payload.status === 'pending') {
+      interval = Math.min(OAUTH_POLL_MAX_INTERVAL_MS, Math.max(OAUTH_POLL_INTERVAL_MS, interval * OAUTH_POLL_BACKOFF));
+      continue;
+    }
+    const result = read.payload;
+
+    if (result.status === 'consumed') {
+      // Something already redeemed this flow's code. Polling longer cannot
+      // produce it again; say so and let the human retry.
+      if (await safelySignedIn(options.isSignedIn)) return { status: 'already_signed_in' };
       return {
         status: 'failed',
-        message: 'Sign-in timed out. Finish the browser page within a few minutes, or use email and password.',
-        code: 'oauth_timeout',
+        message: 'That sign-in was already used. Please try again.',
+        code: 'oauth_consumed',
       };
     }
-    await wait(OAUTH_POLL_INTERVAL_MS);
-
-    const result = await readFlowResult(flowId);
-    if (!result || result.status === 'pending') continue;
 
     if (result.status === 'ready' && result.code) {
-      const { data: exchanged, error: exchangeError } = await gotrueClient.exchangeCodeForSession(
-        result.code,
+      const exchange = await withTimeout(
+        gotrueClient.exchangeCodeForSession(result.code),
+        OAUTH_EXCHANGE_TIMEOUT_MS,
       );
+      if (exchange === null) {
+        return {
+          status: 'failed',
+          message: 'Viola could not reach the account service to finish that sign-in. Please try again.',
+          code: 'oauth_exchange_timeout',
+        };
+      }
+      const { data: exchanged, error: exchangeError } = exchange;
       if (exchangeError) {
         return {
           status: 'failed',
