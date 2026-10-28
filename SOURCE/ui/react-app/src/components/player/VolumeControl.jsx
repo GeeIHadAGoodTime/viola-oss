@@ -22,8 +22,11 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { VolumeIcon } from './TransportIcons';
 import styles from './VolumeControl.module.css';
 
-// Trailing-edge throttle window for the outbound commit.
-const COMMIT_THROTTLE_MS = 50;
+// Trailing-edge throttle window for the outbound commit. A drag sends at most
+// one request per window (plus the final value the moment it is released),
+// and only one request is ever in flight. 50 ms let a drag reach about ten
+// requests a second, enough to trip /v1/volume's rate limit (1.0.5 build 5).
+export const COMMIT_THROTTLE_MS = 250;
 // Safety net: if the browser never fires pointerup/keyup/blur for this drag
 // (e.g. the pointer is released outside the window), stop treating the
 // slider as "mid-drag" after this many idle ms so it can't wedge stale and

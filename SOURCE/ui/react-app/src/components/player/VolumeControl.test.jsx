@@ -1,7 +1,7 @@
 import { StrictMode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, cleanup } from '@testing-library/react';
-import VolumeControl from './VolumeControl';
+import VolumeControl, { COMMIT_THROTTLE_MS } from './VolumeControl';
 
 // #2772: the volume slider was jumpy — no optimistic local state and no
 // throttle, so the thumb re-pinned to the last server `volume` prop on every
@@ -60,7 +60,7 @@ describe('VolumeControl optimistic state + throttle (#2772)', () => {
     // Nothing has committed yet — still inside the throttle window.
     expect(onVolumeChange).not.toHaveBeenCalled();
 
-    act(() => { vi.advanceTimersByTime(50); });
+    act(() => { vi.advanceTimersByTime(COMMIT_THROTTLE_MS); });
 
     // Exactly one trailing-edge commit for the whole burst, carrying the
     // latest (final) value from the burst — not one per tick.
@@ -109,7 +109,7 @@ describe('VolumeControl optimistic state + throttle (#2772)', () => {
 
     fireEvent.change(getSlider(), { target: { value: '60' } });
     // No pointerup — e.g. the pointer was released outside the window.
-    act(() => { vi.advanceTimersByTime(50); });
+    act(() => { vi.advanceTimersByTime(COMMIT_THROTTLE_MS); });
     expect(onVolumeChange).toHaveBeenCalledWith(60);
 
     // Idle-release window elapses; the guard clears on its own.
@@ -131,7 +131,7 @@ describe('VolumeControl optimistic state + throttle (#2772)', () => {
     const { rerender } = render(<VolumeControl volume={50} onVolumeChange={onVolumeChange} />);
 
     fireEvent.change(getSlider(), { target: { value: '11' } });
-    act(() => { vi.advanceTimersByTime(50); });            // our own commit goes out
+    act(() => { vi.advanceTimersByTime(COMMIT_THROTTLE_MS); });            // our own commit goes out
     expect(onVolumeChange).toHaveBeenCalledWith(11);
 
     // Somebody else sets 42 while we are still inside the drag window.
@@ -156,7 +156,7 @@ describe('VolumeControl optimistic state + throttle (#2772)', () => {
     // Stale echo of the pre-drag value arrives BEFORE we commit anything.
     rerender(<VolumeControl volume={50} onVolumeChange={onVolumeChange} />);
     fireEvent.change(getSlider(), { target: { value: '80' } });
-    act(() => { vi.advanceTimersByTime(50); });
+    act(() => { vi.advanceTimersByTime(COMMIT_THROTTLE_MS); });
     expect(onVolumeChange).toHaveBeenCalledWith(80);
 
     // Drag settles with the server still reporting the old 50 (our write has
@@ -197,7 +197,7 @@ describe('VolumeControl native acknowledgement ownership', () => {
     const write = pending(); const error = vi.fn();
     render(<VolumeControl volume={60} onVolumeChange={() => write.promise} onVolumeError={error} />);
     fireEvent.change(getSlider(), { target: { value: '0' } });
-    await act(async () => vi.advanceTimersByTimeAsync(50));
+    await act(async () => vi.advanceTimersByTimeAsync(COMMIT_THROTTLE_MS));
     fireEvent.pointerUp(getSlider());
     await act(async () => write.reject(new Error('refused')));
     expect(getSlider()).toHaveValue('60');

@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Any
 from core.logging_config import get_logger
 from fastapi import WebSocket
 from music.player.playback_state import PlaybackPhase
+from music.runtime.embedded_playback import backend_drives_embedded_video, is_react_iframe_item
 from music.runtime.worker_manager import record_finished_track_recents
 from ui.core.player_state import to_player_state
 
@@ -391,6 +392,29 @@ async def handle_youtube_state(
         logger.exception("YouTube state update failed: %s", e)
 
 
+def _stream_backend_should_play(next_track: Any, backend: Any) -> bool:
+    """True when the track that follows an iframe ENDED belongs to ``backend``.
+
+    A YouTube track the React iframe plays must never reach the stream
+    backend: SimpleBackend cannot decode a YouTube watch URL. This path is the
+    natural end of a track (autoplay queue advance); it handed every next
+    video to SimpleBackend, which logged "AVDecodeSession: decode failed" and
+    "SimpleBackend start failure: Playback produced no audio" once per track
+    (1.0.5 build 5, A3.10: 16 of each overnight) while the iframe played it.
+    A first play never did this: it goes through the worker's EMBEDDED_DEFER
+    route, and user skip/autoplay start already had the same guard.
+    """
+    if backend is None or not hasattr(backend, "play"):
+        return False
+    if is_react_iframe_item(next_track) and not backend_drives_embedded_video(backend):
+        logger.info(
+            "TRACK_ENDED: %s plays in the React iframe; stream backend not started",
+            getattr(next_track, "id", "unknown"),
+        )
+        return False
+    return True
+
+
 async def _handle_track_ended(
     player: Any,
     hub: EventHub,
@@ -498,7 +522,7 @@ async def _handle_track_ended(
                         player_state.is_playing = True
                         _sm_transition(actual_player, PlaybackPhase.PLAYING)
                         backend = getattr(actual_player, "_backend", None)
-                        if backend and hasattr(backend, "play"):
+                        if _stream_backend_should_play(next_track, backend):
                             deferred_backend = backend
                             deferred_url = getattr(next_track, "url", None) or ""
                     cv.notify_all()
@@ -597,7 +621,7 @@ async def _handle_track_ended(
                         player_state.is_playing = True
                         _sm_transition(actual_player, PlaybackPhase.PLAYING)
                         backend = getattr(actual_player, "_backend", None)
-                        if backend and hasattr(backend, "play"):
+                        if _stream_backend_should_play(next_track, backend):
                             deferred_backend = backend
                             deferred_url = getattr(next_track, "url", None) or ""
                     else:
