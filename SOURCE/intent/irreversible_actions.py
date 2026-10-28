@@ -239,10 +239,14 @@ def describe_irreversible_action(tool_name: str, args: Mapping[str, Any] | None 
             return "register an MCP server which runs: %s" % full_cmd
         return "register an MCP server"
     if action_class == "calendar_delete":
-        event = _clean(params.get("event_id") or params.get("title") or params.get("summary"))
-        return "delete the calendar event %s" % event if event else "delete the calendar event"
+        # Name the event by its title, never by its storage id: "delete the
+        # calendar event local-f21bb6d4-..." told the user nothing (X1.4). The
+        # agent executor looks the title and time up before asking; a bare id
+        # with no title falls back to the generic wording.
+        event = _clean(params.get("title") or params.get("summary"))
+        return "delete the calendar event %s" % event if event else "delete that calendar event"
     if action_class == "calendar_write":
-        event = _clean(params.get("title") or params.get("summary") or params.get("event_id"))
+        event = _clean(params.get("title") or params.get("summary"))
         action = _clean(params.get("action")).lower()
         verb = {
             "add": "create",

@@ -477,12 +477,16 @@ class IntentPipeline:
                 1 for step in steps if isinstance(step, Mapping) and step.get("status") in {"pending", "in_progress"}
             )
             status = str(active_plan.get("status") or "active")
-            message = "Session status: %s, %d pending step(s)." % (
+            # "Plan" here is the agent's multi-step task plan, never the user's
+            # subscription. "Session status: no active plan." read like "you have
+            # no plan" to a Pro user (X2.5), so name it a task plan.
+            message = "Task plan: %s, %d step%s left." % (
                 status,
                 pending_count,
+                "" if pending_count == 1 else "s",
             )
         else:
-            message = "Session status: no active plan."
+            message = "No task plan running."
         return {"message": message}
 
     def _record_command_invocation_frame(self, invocation: CommandInvocation) -> None:

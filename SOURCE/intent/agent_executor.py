@@ -8358,7 +8358,17 @@ class AgentExecutor:
             )
             return True
 
-        planned_action = describe_irreversible_action(tool_name, tool_args)
+        describe_args = tool_args
+        if action_class in {"calendar_delete", "calendar_write"} and not (
+            isinstance(tool_args, dict) and (tool_args.get("title") or tool_args.get("summary"))
+        ):
+            # Ask about the event by its title and time, not its storage id (X1.4).
+            from intent.tools.calendar_tools import calendar_event_label_for_confirmation
+
+            event_label = await calendar_event_label_for_confirmation(self._get_effective_user_id(), tool_args)
+            if event_label:
+                describe_args = {**tool_args, "title": event_label}
+        planned_action = describe_irreversible_action(tool_name, describe_args)
         if action_class == "phone_call" and _content_context_is_tainted():
             planned_action = "%s (this number came from a search result or other outside content, so please check it is the right one)" % planned_action
         await self._broadcast_consult_user_event(

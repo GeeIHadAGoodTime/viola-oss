@@ -35,6 +35,47 @@ _REDIRECT_STATUS_CODES = frozenset({301, 302, 303, 307, 308})
 _USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0 Safari/537.36"
 )
+# Wikimedia's User-Agent policy (https://w.wiki/4wJS) answers a generic browser
+# string from a non-browser client with HTTP 403 ("Please respect our robot
+# policy"), so every Wikipedia web_read failed and Viola fell back to search
+# (laptop report X1.1). Those sites want a client that names itself and gives a
+# contact, so web_read identifies as Viola there, and retries any other 403 with
+# the same honest string once.
+_IDENTIFYING_USER_AGENT_TEMPLATE = "Viola/%s (+https://useviola.com; hello@useviola.com) web_read"
+_WIKIMEDIA_HOST_SUFFIXES = (
+    "wikipedia.org",
+    "wikimedia.org",
+    "wiktionary.org",
+    "wikidata.org",
+    "wikibooks.org",
+    "wikiquote.org",
+    "wikisource.org",
+    "wikinews.org",
+    "wikiversity.org",
+    "wikivoyage.org",
+    "wikifunctions.org",
+    "mediawiki.org",
+)
+
+
+def _identifying_user_agent() -> str:
+    try:
+        from bootstrap import __version__ as version
+    except ImportError:
+        version = "1"
+    return _IDENTIFYING_USER_AGENT_TEMPLATE % (str(version or "1").strip() or "1")
+
+
+def _is_wikimedia_host(url: str) -> bool:
+    try:
+        host = (urlparse(url).hostname or "").lower().rstrip(".")
+    except ValueError:
+        return False
+    return any(host == suffix or host.endswith("." + suffix) for suffix in _WIKIMEDIA_HOST_SUFFIXES)
+
+
+def _user_agent_for(url: str) -> str:
+    return _identifying_user_agent() if _is_wikimedia_host(url) else _USER_AGENT
 _NOISE_TAGS = (
     "script",
     "style",
@@ -118,6 +159,18 @@ async def _get_validated_response(client: httpx.AsyncClient, url: str) -> httpx.
         current_url = _ensure_external_fetch_url(urljoin(str(response.url), location))
 
     raise httpx.TooManyRedirects("Exceeded maximum redirects")
+
+
+async def _fetch_with_user_agent(url: str, user_agent: str) -> httpx.Response:
+    async with httpx.AsyncClient(
+        timeout=_READ_TIMEOUT,
+        follow_redirects=False,
+        headers={
+            "User-Agent": user_agent,
+            "Accept": "text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.8",
+        },
+    ) as client:
+        return await _get_validated_response(client, url)
 
 
 def _read_limits(max_chars: int | None) -> tuple[int, int]:
@@ -501,16 +554,14 @@ async def web_read(url: str, max_chars: int | None = None, offset: int = 0) -> T
         logger.debug("Telemetry record_feature_used (web_read) failed, continuing")
 
     try:
-        async with httpx.AsyncClient(
-            timeout=_READ_TIMEOUT,
-            follow_redirects=False,
-            headers={
-                "User-Agent": _USER_AGENT,
-                "Accept": "text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.8",
-            },
-        ) as client:
-            response = await _get_validated_response(client, normalized_url)
-            response.raise_for_status()
+        user_agent = _user_agent_for(normalized_url)
+        response = await _fetch_with_user_agent(normalized_url, user_agent)
+        if int(getattr(response, "status_code", 0) or 0) == 403 and user_agent == _USER_AGENT:
+            # A bot policy refused the browser string; ask once more as Viola.
+            retry = await _fetch_with_user_agent(normalized_url, _identifying_user_agent())
+            if int(getattr(retry, "status_code", 0) or 0) < 400:
+                response = retry
+        response.raise_for_status()
     except _WebReadUrlRefused:
         return ToolResult(ok=False, error=_URL_REFUSED_ERROR)
     except httpx.TooManyRedirects:

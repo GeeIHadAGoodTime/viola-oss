@@ -208,6 +208,16 @@ async def cancel_all_timers_handler(user_id: str = "") -> ToolResult:
         return ToolResult(ok=False, data=None, error="cancel_all_timers failed: %s" % exc)
 
 
+def _refresh_countdown_chips(user_id: str) -> None:
+    """Show (or drop) the sleep-timer chip next to the timer chips right away."""
+    try:
+        from services.notifications.timer_notifier import broadcast_timer_snapshot
+
+        broadcast_timer_snapshot(user_id)
+    except ImportError:
+        return
+
+
 def _is_sleep_timer_schedule(schedule: object) -> bool:
     decoded = decode_tool_action(getattr(schedule, "action", ""))
     if not decoded:
@@ -250,6 +260,7 @@ async def set_sleep_timer_handler(minutes: float, label: str = "", user_id: str 
             ),
             one_shot_at=fire_at.isoformat(),
         )
+        _refresh_countdown_chips(uid)
         return ToolResult(
             ok=True,
             data={
@@ -325,6 +336,8 @@ async def cancel_sleep_timers_handler(schedule_id: str = "", user_id: str = "") 
             else:
                 not_cancelled.append(current_id)
 
+        if cancelled:
+            _refresh_countdown_chips(uid)
         data: dict[str, object] = {
             "cancelled_count": len(cancelled),
             "cancelled_sleep_timer_ids": cancelled,

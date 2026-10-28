@@ -3,12 +3,16 @@
 from __future__ import annotations
 
 import inspect
+import os
 from datetime import datetime
 from typing import Any
 
+from core.logging_config import get_logger
 from intent.tool_types import ToolResult
 from intent.tools._schedule_time import parse_schedule_time
 from services.scheduler.actions import decode_tool_action, encode_tool_action
+
+_log = get_logger(__name__)
 
 
 def _resolve_user_id(user_id: str | None = None) -> str:
@@ -100,6 +104,10 @@ async def cancel_alarm_handler(
 ) -> ToolResult:
     """Cancel pending alarms by id, label, or all when requested."""
     uid = _resolve_user_id(user_id)
+    # "Turn off the alarm" while it is ringing means the ringing one: the fired
+    # one-shot schedule is already disabled, so without this the agent found
+    # "no alarms" and the tone kept going.
+    stopped_ringing = _stop_alarm_ring(uid, "" if cancel_all else alarm_id)
     try:
         from services.scheduler.service import get_scheduler_service
 
@@ -107,8 +115,13 @@ async def cancel_alarm_handler(
         alarms = [
             schedule for schedule in scheduler.list_schedules(uid, enabled_only=True) if _is_alarm_schedule(schedule)
         ]
+        if stopped_ringing and not (cancel_all or label or alarm_id):
+            # The user meant the alarm that is going off; leave pending ones alone.
+            return ToolResult(ok=True, data={"cancelled_count": 0, "stopped_ringing": True, "alarms": []})
         if not alarms:
-            return ToolResult(ok=True, data={"cancelled_count": 0, "alarms": []})
+            return ToolResult(
+                ok=True, data={"cancelled_count": 0, "stopped_ringing": bool(stopped_ringing), "alarms": []}
+            )
 
         if cancel_all:
             matches = alarms
@@ -197,15 +210,54 @@ async def list_alarms_handler(user_id: str = "") -> ToolResult:
         return ToolResult(ok=False, data=None, error="list_alarms failed: %s" % exc)
 
 
+def _start_alarm_ring(user_id: str, alarm_id: str, label: str) -> bool:
+    """Start the repeating alarm tone on this desktop. Returns whether it started.
+
+    Desktop only: the cloud surface has no speaker. Under pytest the real
+    speaker is never opened unless a test opts in (tests patch this function).
+    """
+    if os.environ.get("PYTEST_CURRENT_TEST") and not os.environ.get("VIOLA_ALLOW_ALARM_RING_IN_TESTS"):
+        return False
+    try:
+        from core.user_context import is_cloud_surface
+
+        if is_cloud_surface():
+            return False
+        from services.alarm_ringer import get_alarm_ringer
+
+        return get_alarm_ringer().start(user_id, alarm_id, label)
+    except Exception:  # noqa: BLE001, RUF100 - a ringer failure must not hide the spoken alarm
+        _log.warning("Alarm ring could not start", exc_info=True)
+        return False
+
+
+def _stop_alarm_ring(user_id: str, alarm_id: str = "") -> int:
+    try:
+        from services.alarm_ringer import stop_ringing_alarm
+
+        return stop_ringing_alarm(user_id, alarm_id or None, reason="cancelled")
+    except ImportError:
+        return 0
+
+
 async def play_alarm_sound_handler(
     label: str = "",
     tts: Any | None = None,
     user_id: str = "",
+    alarm_id: str = "",
 ) -> ToolResult:
-    """Fire the alarm notification through TTS and local messaging."""
+    """Fire the alarm: say it once, show it, then ring until stopped (X1.3).
+
+    Before, an alarm was one TTS line ("Alarm alarm") and nothing else, so it
+    spoke for three seconds and was over. Now it also starts the repeating
+    alarm tone (``services.alarm_ringer``) that rings until the user says
+    "stop", taps Stop on the alarm card, or the ten-minute limit passes.
+    """
     uid = _resolve_user_id(user_id)
     alarm_label = " ".join((label or "Alarm").strip().split()) or "Alarm"
-    notification = "%s alarm" % alarm_label
+    from services.alarm_ringer import alarm_message
+
+    notification = alarm_message(alarm_label)
     spoken = False
 
     if tts is not None:
@@ -250,7 +302,8 @@ async def play_alarm_sound_handler(
     # notify's queued-vs-sent distinction). If TTS raised/never ran AND
     # delivery failed or was only queued, the user got nothing and the tool
     # must say so instead of unconditionally reporting success (#2774).
-    alarm_fired = spoken or delivered
+    ringing = _start_alarm_ring(uid, str(alarm_id or "now"), alarm_label)
+    alarm_fired = spoken or delivered or ringing
 
     return ToolResult(
         ok=alarm_fired,
@@ -259,6 +312,7 @@ async def play_alarm_sound_handler(
             "label": alarm_label,
             "spoken": spoken,
             "delivered": delivered,
+            "ringing": ringing,
             "broadcast": False,
         },
         error=None if alarm_fired else "Alarm could not be spoken or delivered through any channel.",

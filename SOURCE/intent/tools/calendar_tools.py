@@ -422,6 +422,44 @@ async def calendar_list_calendars_handler(
     return ToolResult(ok=True, data=data)
 
 
+async def calendar_event_label_for_confirmation(user_id: str | None, args: dict[str, Any] | None) -> str | None:
+    """Return '"Title" on <date> at <time>' for the event a confirmation is about.
+
+    The model passes only ``event_id`` to delete/update an event, and the
+    confirmation used to read that id back to the user ("delete the calendar
+    event local-f21bb6d4-...", X1.4). This looks the event up in the user's own
+    calendar so the question names what will be deleted. Returns ``None`` when
+    the event cannot be read, so the caller keeps its generic wording.
+    """
+    params = args if isinstance(args, dict) else {}
+    event_id = str(params.get("event_id") or "").strip()
+    if not event_id or not user_id:
+        return None
+    try:
+        async with user_timezone_scope(user_id):
+            from services.calendar.manager import get_calendar_manager
+
+            result = await get_calendar_manager().get_event(
+                event_id=event_id,
+                calendar=str(params.get("provider") or "auto"),
+                calendar_id=str(params.get("calendar_id") or "") or None,
+                user_id=user_id,
+            )
+    except Exception:  # noqa: BLE001, RUF100 - a failed lookup only loses the nicer wording
+        logger.debug("Calendar confirmation lookup failed for id=%s", event_id, exc_info=True)
+        return None
+    event = result.get("event") if isinstance(result, dict) and result.get("ok") else None
+    if not isinstance(event, dict):
+        return None
+    title = " ".join(str(event.get("title") or "").split())
+    if not title:
+        return None
+    when = str(event.get("display_local") or "").strip()
+    if when and when != "Unknown":
+        return '"%s" on %s' % (title, when)
+    return '"%s"' % title
+
+
 async def calendar_get_event_handler(
     user_id: str,
     event_id: str,
