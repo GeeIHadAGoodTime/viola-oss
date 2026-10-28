@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "883b5d59649b309ce353e8ec08ec48bb2628a8a1",
-  "sha256": "cdb29ae39e70fec193fa53f96d1807e5e2c791935486a2878e41e95d231eed2e",
+  "revision": "11ffdfab7f515a2fd192a5078726d51508706ccb",
+  "sha256": "beed45709753fd30f97405d0f2a82b102a80fd66285da09eaa961a5a355b54b0",
   "files": [
     {
       "path": ".env.example",
@@ -9560,8 +9560,8 @@
     },
     {
       "path": "ui/api/routes/rooms.py",
-      "sha256": "89d356452df30746ceb5770e8e0f50b96d7715f49f24d5076317b0f1b23d75a0",
-      "bytes": 24428
+      "sha256": "ef2997b430f9c52abd5f36816d3ac7fe661e6694fe730d4784860c8cc24775a0",
+      "bytes": 22767
     },
     {
       "path": "ui/api/routes/runtime.py",
@@ -11860,8 +11860,8 @@
     },
     {
       "path": "ui/react-app/src/hooks/useDeviceDiscovery.test.jsx",
-      "sha256": "b17c35159a79d70a5d733c26d6ad2f7716912f1e2961a5417b3361913ef7231b",
-      "bytes": 4815
+      "sha256": "ddebb9e64a896392521ff6714e716e6bd75506489d006902e10628e6278a08ba",
+      "bytes": 7179
     },
     {
       "path": "ui/react-app/src/hooks/useEventBus.js",

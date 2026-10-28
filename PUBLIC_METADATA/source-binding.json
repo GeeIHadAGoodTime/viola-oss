@@ -30,10 +30,10 @@
   },
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "e8f2b6413188ff761e9c9062f3bc371997bebd6c9398d282d6ce85e6dc293a6b",
-  "source_tree_sha256": "cdb29ae39e70fec193fa53f96d1807e5e2c791935486a2878e41e95d231eed2e",
+  "source_manifest_sha256": "23a2b95e2eb1c5c5120a38a5e98e2d68af28963412892f43af0f8b0d10f94f02",
+  "source_tree_sha256": "beed45709753fd30f97405d0f2a82b102a80fd66285da09eaa961a5a355b54b0",
   "source_file_count": 2743,
-  "source_revision": "883b5d59649b309ce353e8ec08ec48bb2628a8a1",
+  "source_revision": "11ffdfab7f515a2fd192a5078726d51508706ccb",
   "comparison_public_revision": "ecab2772465fcc89ae6645b028af1c2273b9199f",
   "changed_source_paths": [
     "audio_core/aec_reference_base.py",
@@ -165,7 +165,6 @@
     "ui/api/routes/onboarding.py",
     "ui/api/routes/rating.py",
     "ui/api/routes/regression_stubs.py",
-    "ui/api/routes/rooms.py",
     "ui/api/routes/voice_stream.py",
     "ui/core/security.py",
     "ui/customer_speech_settings.py",
@@ -232,6 +231,7 @@
     "ui/react-app/src/components/voice/PTTButton.touch.test.jsx",
     "ui/react-app/src/hooks/useCalendarProviders.js",
     "ui/react-app/src/hooks/useDeviceDiscovery.js",
+    "ui/react-app/src/hooks/useDeviceDiscovery.test.jsx",
     "ui/react-app/src/hooks/usePlayerState.unmount.test.js",
     "ui/react-app/src/hooks/usePressAndHold.js",
     "ui/react-app/src/hooks/useVideoFullscreen.js",
@@ -360,7 +360,7 @@
     "historical_inventory_limits": "This renderer correction changes no dependency or workflow inputs. All six retained SBOMs and their complete status objects stay historical and unchanged; no current installed inventory qualification is claimed."
   },
   "qualification": {
-    "source_commit": "883b5d59649b309ce353e8ec08ec48bb2628a8a1",
+    "source_commit": "11ffdfab7f515a2fd192a5078726d51508706ccb",
     "kind": "r6 audio"
   },
   "historical_bindings": [
