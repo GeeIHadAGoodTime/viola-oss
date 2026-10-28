@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "ad085ddffe3bf719c036bcb5988d3a673af5763c",
-  "sha256": "3896e96a5880ebfbea7e06f28e6fd04f052f3621d257d11172f7eed3d1480cf3",
+  "revision": "912b1ad54feb3e97950468d3a566a25e8efc2613",
+  "sha256": "fa512266ecacd524a922da1c868471fa33abde6d494c20f10c0d997a6acca88b",
   "files": [
     {
       "path": ".env.example",
@@ -705,8 +705,8 @@
     },
     {
       "path": "backend/ip_rate_limiter.py",
-      "sha256": "556de179d287bf1e89682390a17e3765518625abf8e33eb380f8c285f9655c4a",
-      "bytes": 17088
+      "sha256": "992464deb53ce8245450adc6f8ed5a299c3ae2f336da864e7dd02cc90a6398d4",
+      "bytes": 17659
     },
     {
       "path": "backend/launch_kill_switches.py",
@@ -2245,8 +2245,8 @@
     },
     {
       "path": "mcp_hub/client_hub.py",
-      "sha256": "f8f42b16646dd426cac1bfb20802093c97b2ce4c367252734135a2463a847c72",
-      "bytes": 111229
+      "sha256": "44b25df14e017512d0fd47038a2eac88d737643d6877f174b3869bb67a162f87",
+      "bytes": 130915
     },
     {
       "path": "mcp_hub/compound_tools.py",
@@ -2260,8 +2260,8 @@
     },
     {
       "path": "mcp_hub/inprocess.py",
-      "sha256": "071bac66eb1690f84f997c43fdd6aab847d0cc20e95985c258da890653c6e634",
-      "bytes": 3139
+      "sha256": "75eab40eef7cc54dbaf0ee8b2b8e68924b36ce0e1ed6ec9abd69af8dc9bd6a2c",
+      "bytes": 4481
     },
     {
       "path": "mcp_hub/launcher.py",
@@ -9865,8 +9865,8 @@
     },
     {
       "path": "ui/qt_native/webview_window.py",
-      "sha256": "e67b2f53762baeb3e028c436e4766b09a85fa757cb95f91bde94b9b3e5f1d3f9",
-      "bytes": 240165
+      "sha256": "a7f455553b51d28933004bd85b27491c4d7bf5160883ed1a76602ec0c1d28ff7",
+      "bytes": 241137
     },
     {
       "path": "ui/qt_native/widgets/connectivity_status.py",
@@ -10310,8 +10310,8 @@
     },
     {
       "path": "ui/react-app/src/auth/desktopOAuth.ts",
-      "sha256": "39499cc2d08ec3eea33d1e4172ede59ddefb90714451e2af2b7285c520f1563e",
-      "bytes": 8279
+      "sha256": "595093c232fe8a32e35494f27f09adb5c28c52df8b51409576189654c88025c8",
+      "bytes": 12332
     },
     {
       "path": "ui/react-app/src/auth/legalVersions.js",
@@ -12085,8 +12085,8 @@
     },
     {
       "path": "ui/react-app/src/lib/auth_context.tsx",
-      "sha256": "6800ef874e370b2f07caac258c9b469fe5e94bd4cbd296a11eb4499869e84aae",
-      "bytes": 36058
+      "sha256": "06e5f1420493b04195a435f88bf666e3abefda939a917f10db9174596801db56",
+      "bytes": 36432
     },
     {
       "path": "ui/react-app/src/lib/billingEntitlement.mountedRoute.test.ts",
