@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor } from '../test/test-utils';
+import { act, fireEvent, render, screen, waitFor } from '../test/test-utils';
 import ContentCard from './ContentCard';
 
 describe('ContentCard gate review cards', () => {
@@ -120,4 +120,41 @@ describe('ContentCard gate review cards', () => {
     );
     openSpy.mockRestore();
   }, 7000);
+});
+
+// 1.0.5 build 5: after a typed command, the reply card's full-screen backdrop
+// swallowed the next tap, so the top bar's "..." menu ignored the first click.
+describe('ContentCard does not swallow taps outside the card', () => {
+  it('dismisses on an outside tap and lets that tap reach the control under it', async () => {
+    vi.useFakeTimers();
+    try {
+      const onDismiss = vi.fn();
+      const onMenu = vi.fn();
+      render(
+        <>
+          <button type="button" onClick={onMenu}>Open menu</button>
+          <ContentCard data={{ type: 'detail', title: 'Answer', body: 'Long answer' }} onDismiss={onDismiss} />
+        </>,
+      );
+      expect(screen.getByTestId('content-card-backdrop').style.pointerEvents).toBe('none');
+      expect(screen.getByRole('dialog').style.pointerEvents).toBe('auto');
+
+      const menu = screen.getByRole('button', { name: 'Open menu' });
+      fireEvent.pointerDown(menu);
+      fireEvent.click(menu);
+
+      expect(onMenu).toHaveBeenCalledTimes(1);
+      act(() => { vi.advanceTimersByTime(1000); });
+      expect(onDismiss).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('a tap inside the card does not count as outside', () => {
+    const onDismiss = vi.fn();
+    render(<ContentCard data={{ type: 'account_required', title: 'Account required', body: 'Sign in' }} onDismiss={onDismiss} />);
+    fireEvent.pointerDown(screen.getByRole('dialog'));
+    expect(onDismiss).not.toHaveBeenCalled();
+  });
 });
