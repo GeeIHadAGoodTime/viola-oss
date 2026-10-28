@@ -12,6 +12,7 @@ import {
   isToday,
   isBefore,
   startOfDay,
+  parseISO,
 } from 'date-fns';
 import { useCalendarEvents } from '../hooks/useCalendarEvents';
 import { apiFetch } from '../hooks/useViolaApi';
@@ -59,7 +60,9 @@ function CalendarViewInner({ theme, timeFormat = 'auto', compact: compactProp = 
     calendarStatus,
     navigateMonth,
     goToToday,
+    ensureDay,
     refetch,
+    todayKey,
   } = useCalendarEvents();
 
   const [selectedDay, setSelectedDay] = useState(null);
@@ -177,14 +180,24 @@ function CalendarViewInner({ theme, timeFormat = 'auto', compact: compactProp = 
     return { weeks: wks, allDays: days };
   }, [viewDate]);
 
-  // Current week for compact mode
+  // Current week for compact mode: always the Sun-Sat week holding today,
+  // whatever month the full view is showing, and recomputed when the day
+  // changes (it was frozen at mount and fell back to the first week of the
+  // viewed month, so a long-running app showed the wrong week, no today).
   const currentWeek = useMemo(() => {
-    const today = new Date();
-    for (const week of weeks) {
-      if (week.some((d) => isSameDay(d, today))) return week;
+    const today = todayKey ? parseISO(todayKey) : new Date();
+    const first = startOfWeek(today, { weekStartsOn: 0 });
+    return Array.from({ length: 7 }, (_, index) => addDays(first, index));
+  }, [todayKey]);
+
+  // The week can span two months; load the other one too.
+  useEffect(() => {
+    if (!ensureDay || currentWeek.length === 0) return;
+    const last = currentWeek[currentWeek.length - 1];
+    if (!isSameMonth(currentWeek[0], last)) {
+      void ensureDay(isSameMonth(currentWeek[0], viewDate) ? last : currentWeek[0], { maxAgeMs: 5 * 60 * 1000 });
     }
-    return weeks[0] || [];
-  }, [weeks]);
+  }, [currentWeek, ensureDay, viewDate]);
 
   const compactDay = selectedDay || new Date();
   const compactDateKey = format(compactDay, 'yyyy-MM-dd');
@@ -194,6 +207,9 @@ function CalendarViewInner({ theme, timeFormat = 'auto', compact: compactProp = 
   const selectedDayEvents = selectedDateKey ? (eventsByDate[selectedDateKey] || []) : [];
 
   const handleDayClick = useCallback((day) => {
+    // Re-read the tapped day's month if our copy is not recent, so a local or
+    // Google event added a moment ago (by voice, say) is listed.
+    if (ensureDay) void ensureDay(day);
     if (!expanded) {
       setSelectedDay(day);
       return;
@@ -203,7 +219,7 @@ function CalendarViewInner({ theme, timeFormat = 'auto', compact: compactProp = 
     } else {
       setSelectedDay(day);
     }
-  }, [expanded, selectedDay]);
+  }, [ensureDay, expanded, selectedDay]);
 
   const handleExpandToggle = useCallback(() => {
     if (compactProp) {
@@ -468,7 +484,8 @@ function CalendarViewInner({ theme, timeFormat = 'auto', compact: compactProp = 
     const dateKey = format(day, 'yyyy-MM-dd');
     const dayEvents = eventsByDate[dateKey] || [];
     const hasEvents = dayEvents.length > 0;
-    const inMonth = isSameMonth(day, viewDate);
+    // The week strip always shows real days of this week, never dimmed.
+    const inMonth = isCompactRow || isSameMonth(day, viewDate);
     const today = isToday(day);
     const isPast = isBefore(startOfDay(day), startOfDay(new Date())) && !today;
     const isSelected = selectedDay && isSameDay(selectedDay, day);
@@ -476,6 +493,7 @@ function CalendarViewInner({ theme, timeFormat = 'auto', compact: compactProp = 
       <div
         key={dateKey}
         data-testid={`calendar-day-${dateKey}`}
+        aria-current={today ? 'date' : undefined}
         className={styles.dayCell}
         onClick={() => handleDayClick(day)}
         style={{

@@ -13,12 +13,13 @@ import React, { useState, useCallback, useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
 import { useAuth } from '../hooks/useAuth';
 import { useAuth as useCloudAuth } from '../auth/useAuth';
-import { enabledAuthProviders } from '../auth/authProviders';
+import { enabledAuthProviders, expectedAuthProviderCount, peekEnabledAuthProviders } from '../auth/authProviders';
 import { isDesktopApp } from '../utils/runtimeSurface';
 import { isCloudSurface } from './auth/cloudSurface';
 import { authErrorMessage } from './auth/authValidation';
 import { useCalendarProviders } from '../hooks/useCalendarProviders';
 import { useUsage } from '../hooks/useUsage';
+import { useDesktopAccount } from '../hooks/useDesktopAccount';
 import BillingCapacityPanel from './BillingCapacityPanel';
 import MonthGiftSummary from './MonthGiftSummary';
 import { apiFetch, authFetch } from '../hooks/useViolaApi';
@@ -50,6 +51,19 @@ const Icons = {
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
       <rect x="3" y="11" width="18" height="11" rx="2"/>
       <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+    </svg>
+  ),
+  Eye: () => (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/>
+      <circle cx="12" cy="12" r="3"/>
+    </svg>
+  ),
+  EyeOff: () => (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+      <path d="M9.9 4.24A9.1 9.1 0 0 1 12 4c6.5 0 10 7 10 7a17.6 17.6 0 0 1-2.16 3.19M6.6 6.6A17.4 17.4 0 0 0 2 12s3.5 7 10 7a9.7 9.7 0 0 0 5.4-1.6"/>
+      <path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/>
+      <line x1="2" y1="2" x2="22" y2="22"/>
     </svg>
   ),
   Google: () => (
@@ -131,8 +145,19 @@ Section.propTypes = {
 };
 
 // Input Component
-const Input = ({ type = 'text', placeholder, value, onChange, icon: Icon, ...inputProps }) => (
+const Input = ({ type = 'text', placeholder, value, onChange, icon: Icon, trailing = null, ...inputProps }) => (
   <div style={{ position: 'relative' }}>
+    {trailing && (
+      <div style={{
+        position: 'absolute',
+        right: '2px',
+        top: '50%',
+        transform: 'translateY(-50%)',
+        display: 'flex',
+      }}>
+        {trailing}
+      </div>
+    )}
     {Icon && (
       <div style={{
         position: 'absolute',
@@ -152,7 +177,7 @@ const Input = ({ type = 'text', placeholder, value, onChange, icon: Icon, ...inp
       {...inputProps}
       style={{
         width: '100%',
-        padding: Icon ? '14px 16px 14px 48px' : '14px 16px',
+        padding: `14px ${trailing ? '52px' : '16px'} 14px ${Icon ? '48px' : '16px'}`,
         borderRadius: '12px',
         border: `1px solid ${theme.colors.borderLight}`,
         backgroundColor: theme.colors.bgCard,
@@ -174,6 +199,39 @@ Input.propTypes = {
   value: PropTypes.string,
   onChange: PropTypes.func,
   icon: PropTypes.elementType,
+  trailing: PropTypes.node,
+};
+
+// Password field with a show/hide toggle. The toggle is a 44px touch target
+// inside the field, so revealing the password never moves the layout.
+const PasswordInput = (props) => {
+  const [visible, setVisible] = useState(false);
+  const toggle = (
+    <button
+      type="button"
+      onClick={() => setVisible((value) => !value)}
+      aria-label={visible ? 'Hide password' : 'Show password'}
+      aria-pressed={visible}
+      title={visible ? 'Hide password' : 'Show password'}
+      style={{
+        width: '44px',
+        height: '44px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        border: 'none',
+        borderRadius: '10px',
+        background: 'transparent',
+        color: theme.colors.textSecondary,
+        cursor: 'pointer',
+        padding: 0,
+        touchAction: 'manipulation',
+      }}
+    >
+      {visible ? <Icons.EyeOff /> : <Icons.Eye />}
+    </button>
+  );
+  return <Input {...props} type={visible ? 'text' : 'password'} trailing={toggle} />;
 };
 
 // Button Component
@@ -832,7 +890,12 @@ const AuthForm = ({ onSuccess }) => {
   const [message, setMessage] = useState(null);
   const [localError, setLocalError] = useState(null);
   const [showErrorDetails, setShowErrorDetails] = useState(false);
-  const [oauthProviders, setOauthProviders] = useState([]);
+  // null = the desktop is still asking the auth service; the form reserves the
+  // buttons' space meanwhile so the email field never moves under a finger.
+  const [oauthProviders, setOauthProviders] = useState(() => (
+    isDesktopApp() ? peekEnabledAuthProviders() : []
+  ));
+  const [reservedProviderCount] = useState(() => expectedAuthProviderCount());
 
   const {
     login,
@@ -1078,7 +1141,19 @@ const AuthForm = ({ onSuccess }) => {
           surface where the flow can complete. See auth/authProviders.ts and
           auth/desktopOAuth.ts — an offered button that cannot work is the bug
           this replaces, not a feature. */}
-      {oauthProviders.length > 0 && mode !== 'forgot-password' && mode !== 'reset-confirm' && mode !== 'mfa' && (
+      {oauthProviders === null && reservedProviderCount > 0 && mode !== 'forgot-password' && mode !== 'reset-confirm' && mode !== 'mfa' && (
+        <div data-testid="oauth-provider-reservation" aria-hidden="true" style={{ visibility: 'hidden' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
+            {Array.from({ length: reservedProviderCount }, (_, index) => (
+              <Button key={index} variant="oauth" fullWidth disabled icon={Icons.Google}>
+                Continue with Google
+              </Button>
+            ))}
+          </div>
+          <Divider text="or" />
+        </div>
+      )}
+      {oauthProviders?.length > 0 && mode !== 'forgot-password' && mode !== 'reset-confirm' && mode !== 'mfa' && (
         <>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
             {oauthProviders.map((provider) => (
@@ -1128,8 +1203,7 @@ const AuthForm = ({ onSuccess }) => {
           )}
 
           {!isPasswordlessMode && (
-            <Input
-              type="password"
+            <PasswordInput
               placeholder={mode === 'reset-confirm' ? 'New password' : 'Password'}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -1140,8 +1214,7 @@ const AuthForm = ({ onSuccess }) => {
           )}
 
           {mode === 'reset-confirm' && (
-            <Input
-              type="password"
+            <PasswordInput
               placeholder="Confirm new password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
@@ -2192,7 +2265,7 @@ export function AccountTab({
   isDeletingCallData = false,
   callDataDeleteStatus = '',
 }) {
-  const { user, subscription, billingStatus = 'ready', loading, isLoggedIn, logout, passwordRecovery, mfaPending, refreshUser } = useAuth();
+  const { user, subscription, billingStatus = 'ready', loading, isLoggedIn, logout, passwordRecovery, mfaPending, refreshUser, restoreDesktopSession } = useAuth();
   const { toasts, addToast, removeToast } = useToast();
 
   // Cloud surface (api.useviola.com/app) authenticates through TWO GoTrue
@@ -2243,6 +2316,27 @@ export function AccountTab({
   useEffect(() => {
     if (isLoggedIn) refreshUser();
   }, [isLoggedIn, refreshUser]);
+
+  // The desktop backend is the authority on whether this computer is signed
+  // in (wake word and the agent read the same store). When this page has no
+  // session but the backend has an account, re-read the desktop session; if
+  // that still fails, say so instead of showing a bare Sign In form as if
+  // nothing were signed in (1.0.5 build 5, A2.7, after an upgrade).
+  const needsBackendCheck = !loading && !effectiveIsLoggedIn && isDesktopApp();
+  const desktopAccount = useDesktopAccount({ enabled: needsBackendCheck });
+  const [backendAccount, setBackendAccount] = useState(null);
+  useEffect(() => {
+    if (!needsBackendCheck || !desktopAccount?.signed_in) {
+      setBackendAccount(null);
+      return undefined;
+    }
+    let cancelled = false;
+    (async () => {
+      const restored = restoreDesktopSession ? await restoreDesktopSession() : false;
+      if (!cancelled && !restored) setBackendAccount({ email: desktopAccount.email || null });
+    })();
+    return () => { cancelled = true; };
+  }, [needsBackendCheck, desktopAccount, restoreDesktopSession]);
 
   // On cloud the front door owns the SDK bridge and its cleanup. A second
   // direct SDK logout would bypass that ownership queue. Desktop retains its
@@ -2338,6 +2432,22 @@ export function AccountTab({
     <>
       <Section title="Account">
         {logoutNotice}
+        {backendAccount && (
+          <div role="status" data-testid="backend-account-notice" style={{
+            margin: '20px 24px 0',
+            padding: '12px 14px',
+            borderRadius: '10px',
+            border: `1px solid ${theme.colors.borderLight}`,
+            color: theme.colors.textPrimary,
+            fontSize: '14px',
+            lineHeight: 1.5,
+          }}>
+            {backendAccount.email
+              ? `Viola is signed in on this computer as ${backendAccount.email}, but this page could not load that sign-in.`
+              : 'Viola is signed in on this computer, but this page could not load that sign-in.'}
+            {' '}Sign in again below to manage your account here.
+          </div>
+        )}
         <AuthForm />
       </Section>
 

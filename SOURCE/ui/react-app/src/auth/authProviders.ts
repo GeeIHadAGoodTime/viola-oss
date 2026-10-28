@@ -29,6 +29,31 @@ export type SupportedProvider = (typeof SUPPORTED_PROVIDERS)[number];
 type GoTrueSettings = { external?: Record<string, unknown> };
 
 let cached: Promise<SupportedProvider[]> | null = null;
+let resolved: SupportedProvider[] | null = null;
+
+// The last answer is remembered (non-secret: provider names only) so the
+// sign-in form can reserve exactly the space the buttons will take before the
+// settings round trip finishes. Without it the buttons appeared about a second
+// late and pushed the email field down under the user's finger.
+const LAST_KNOWN_KEY = 'viola-auth-providers-v1';
+
+function readLastKnown(): SupportedProvider[] | null {
+  try {
+    const raw = globalThis.localStorage?.getItem(LAST_KNOWN_KEY);
+    if (!raw) return null;
+    const value = JSON.parse(raw);
+    if (!Array.isArray(value)) return null;
+    return SUPPORTED_PROVIDERS.filter((provider) => value.includes(provider));
+  } catch {
+    return null;
+  }
+}
+
+function writeLastKnown(providers: SupportedProvider[]): void {
+  try {
+    globalThis.localStorage?.setItem(LAST_KNOWN_KEY, JSON.stringify(providers));
+  } catch { /* the reservation falls back to one button */ }
+}
 
 async function readEnabledProviders(): Promise<SupportedProvider[]> {
   try {
@@ -49,13 +74,37 @@ async function readEnabledProviders(): Promise<SupportedProvider[]> {
  * under a running auth service.
  */
 export function enabledAuthProviders(): Promise<SupportedProvider[]> {
-  if (!cached) cached = readEnabledProviders();
+  if (!cached) {
+    cached = readEnabledProviders().then((providers) => {
+      resolved = providers;
+      writeLastKnown(providers);
+      return providers;
+    });
+  }
   return cached;
+}
+
+/** The answer if this page already has it, else null (still loading). */
+export function peekEnabledAuthProviders(): SupportedProvider[] | null {
+  return resolved;
+}
+
+/**
+ * How many provider buttons to reserve room for while the answer loads: the
+ * last answer this install saw, or one (Google) on a first run.
+ */
+export function expectedAuthProviderCount(): number {
+  const lastKnown = readLastKnown();
+  return lastKnown ? lastKnown.length : 1;
 }
 
 /** Test seam: drop the memoised answer. */
 export function resetEnabledAuthProvidersCache(): void {
   cached = null;
+  resolved = null;
 }
 
-export default { enabledAuthProviders, resetEnabledAuthProvidersCache, SUPPORTED_PROVIDERS };
+export default {
+  enabledAuthProviders, peekEnabledAuthProviders, expectedAuthProviderCount,
+  resetEnabledAuthProvidersCache, SUPPORTED_PROVIDERS,
+};

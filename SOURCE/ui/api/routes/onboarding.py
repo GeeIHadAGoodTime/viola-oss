@@ -68,8 +68,41 @@ async def _cut_current_narration() -> bool:
     return True
 
 
+def desktop_account_status() -> dict[str, object]:
+    """The Viola account this desktop is signed in to, read from the backend.
+
+    The same local read wake word and the agent use, so the Account page can
+    show the backend's real sign-in state instead of only what the webview
+    happened to restore (1.0.5 build 5, A2.7: the page showed the Sign In form
+    while the backend was signed in). No network call, no token refresh.
+    """
+    try:
+        from core.user_context import is_cloud_surface
+
+        if is_cloud_surface():
+            # One desktop install has one account store; the cloud has none.
+            return {"ok": True, "signed_in": False, "email": None}
+        from auth.desktop_session import get_desktop_account_identity
+
+        identity = get_desktop_account_identity()
+    except Exception:  # noqa: BLE001, RUF100 - an unreadable store reads as signed out
+        log.debug("Desktop account identity unreadable", exc_info=True)
+        return {"ok": True, "signed_in": False, "email": None}
+    if not getattr(identity, "signed_in", False):
+        return {"ok": True, "signed_in": False, "email": None}
+    email = getattr(identity, "email", None)
+    return {"ok": True, "signed_in": True, "email": email if isinstance(email, str) and email else None}
+
+
 def register_onboarding_routes(context: ApiContext, toolbox: RouteToolbox) -> None:
     router = context.router
+
+    @router.get("/v1/onboarding/account", dependencies=[Depends(require_auth)])
+    async def get_desktop_account():
+        async def _inner():
+            return await asyncio.to_thread(desktop_account_status)
+
+        return await toolbox.record_and_call(_inner, route="/v1/onboarding/account", method="GET")
 
     @router.get("/v1/onboarding/status", dependencies=[Depends(require_auth)])
     async def get_onboarding_status():

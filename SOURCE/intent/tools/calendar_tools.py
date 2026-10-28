@@ -20,6 +20,59 @@ _CENTRAL_TZ = ZoneInfo("America/Chicago")
 _DATETIME_UTILS = CalendarDateTimeUtils()
 
 
+_CALENDAR_NOTIFY_TASKS: set[Any] = set()
+
+
+def notify_calendar_changed(user_id: str | None, action: str) -> int:
+    """Tell this user's open UI that their calendar changed.
+
+    The REST routes and instant commands already send ``calendar_updated``;
+    the agent's calendar tool did not, so an event added by voice ("add Viola
+    test tomorrow at 3pm") never reached the top-bar calendar, which kept
+    showing "No events" for that day (1.0.5 build 5, X1.4). Sent only to this
+    user's own principals; best effort, never fails the tool. Returns the
+    number of principals a frame was scheduled for.
+    """
+    try:
+        import asyncio
+
+        from ui.websocket.event_hub import get_event_hub, transport_command_recipients
+
+        hub = get_event_hub()
+        if hub is None:
+            return 0
+        recipients = transport_command_recipients(user_id)
+        if not recipients:
+            return 0
+        body = {"action": action, "source": "agent"}
+        loop = getattr(hub, "_main_loop", None)
+        try:
+            from core.asyncio_safe import get_main_loop
+
+            loop = get_main_loop() or loop
+        except ImportError:
+            pass
+        try:
+            running = asyncio.get_running_loop()
+        except RuntimeError:
+            running = None
+        for recipient in recipients:
+            coro = hub.broadcast("calendar_updated", dict(body), user_id=recipient, force=True)
+            if running is not None and (loop is None or loop is running):
+                task = running.create_task(coro)
+                _CALENDAR_NOTIFY_TASKS.add(task)
+                task.add_done_callback(_CALENDAR_NOTIFY_TASKS.discard)
+            elif loop is not None and loop.is_running():
+                asyncio.run_coroutine_threadsafe(coro, loop)
+            else:
+                coro.close()
+                return 0
+        return len(recipients)
+    except Exception:  # noqa: BLE001, RUF100 - a UI refresh hint must never fail the calendar write
+        logger.debug("calendar_updated broadcast failed (non-critical)", exc_info=True)
+        return 0
+
+
 def _calendar_connection_fields(result: dict[str, Any]) -> dict[str, object]:
     providers = result.get("connected_providers")
     connected_providers = [str(provider) for provider in providers] if isinstance(providers, list) else []
@@ -322,6 +375,7 @@ async def calendar_add_event_handler(
             else:
                 data[_REMINDER_SYNC_FIELD] = _reminder_note("schedule", _REMINDER_COMPLETED)
 
+        notify_calendar_changed(user_id, "created")
         return ToolResult(ok=True, data=data)
 
 
@@ -562,6 +616,7 @@ async def calendar_update_event_handler(
             else:
                 data[_REMINDER_SYNC_FIELD] = _reminder_note("reschedule", _REMINDER_COMPLETED)
 
+        notify_calendar_changed(user_id, "updated")
         return ToolResult(ok=True, data=data)
 
 
@@ -603,6 +658,7 @@ async def calendar_delete_event_handler(
     else:
         data[_REMINDER_SYNC_FIELD] = _reminder_note("cancel", _REMINDER_REQUESTED)
 
+    notify_calendar_changed(user_id, "deleted")
     return ToolResult(ok=True, data=data)
 
 

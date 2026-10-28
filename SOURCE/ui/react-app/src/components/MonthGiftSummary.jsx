@@ -1,5 +1,6 @@
 import React from 'react';
 import PropTypes from 'prop-types';
+import { THEME } from '../config';
 
 const planName = (plan) => plan?.startsWith('max') ? 'Max' : plan?.startsWith('pro') ? 'Pro' : 'Free';
 const date = (value) => value ? new Date(value).toLocaleString() : 'Unavailable';
@@ -12,8 +13,12 @@ export default function MonthGiftSummary({ entitlement }) {
   const base = entitlement.base_subscription;
   const gift = entitlement.active_gift;
   const returning = entitlement.return_after_gift;
-  return <section aria-label="Complimentary month access">
-    <h4>Complimentary access</h4>
+  // Explicit theme colours: with none set, this text inherited the browser's
+  // default black and was unreadable on the dark Account card (1.0.5 build 5).
+  const colors = THEME.colors;
+  return <section aria-label="Complimentary month access" data-testid="month-gift-summary"
+    style={{ color: colors.textSecondary, fontSize: '14px', lineHeight: 1.5 }}>
+    <h4 style={{ color: colors.textPrimary, margin: '0 0 8px' }}>Complimentary access</h4>
     <p>Base subscription: {planName(base.plan_id)} · {base.status}.
       {base.funded_paid_through_at && <> Paid through {date(base.funded_paid_through_at)}.</>}</p>
     {base.current_period_start && Date.parse(base.current_period_start) > Date.now()

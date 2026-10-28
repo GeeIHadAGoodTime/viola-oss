@@ -35,6 +35,11 @@ export function useAgentRegistry({ onAgentResult } = {}) {
   const [streamStates, setStreamStates] = useState({});
   const sourcesRef = useRef(new Map());
   const onAgentResultRef = useRef(onAgentResult);
+  // Agents whose final event this page has already read (never read twice).
+  const handledRef = useRef(new Set());
+  // Agents that were already finished when this page first looked; their
+  // results belong to an earlier session and must not be replayed.
+  const baselineRef = useRef(null);
 
   useEffect(() => {
     onAgentResultRef.current = onAgentResult;
@@ -73,6 +78,9 @@ export function useAgentRegistry({ onAgentResult } = {}) {
     const data = json?.data || json || {};
     const nextActive = normalizeAgentList(data.active);
     const nextRecentCompleted = normalizeAgentList(data.recent_completed);
+    if (baselineRef.current === null) {
+      baselineRef.current = new Set(nextRecentCompleted.map((agent) => agent.agent_id));
+    }
     setActive(nextActive);
     setRecentCompleted(nextRecentCompleted);
     pruneStreamStates(nextActive, nextRecentCompleted);
@@ -114,8 +122,18 @@ export function useAgentRegistry({ onAgentResult } = {}) {
   }, [refreshAgents]);
 
   useEffect(() => {
-    const streamableAgents = active
-      .filter((agent) => agent.agent_id && agent.stream_id)
+    // An agent that finishes between two polls is never seen as active
+    // (1.0.5 build 5, X8.8: a quick background agent's result never reached
+    // Chat History). Its stream keeps the final event, so read it once from
+    // the recently-completed list too.
+    const baseline = baselineRef.current || new Set();
+    const finishedUnread = recentCompleted.filter((agent) => agent.agent_id && agent.stream_id
+      && !baseline.has(agent.agent_id) && !handledRef.current.has(agent.agent_id));
+    const streamableAgents = [
+      ...active.filter((agent) => agent.agent_id && agent.stream_id),
+      ...finishedUnread,
+    ]
+      .filter((agent, index, all) => all.findIndex((other) => other.agent_id === agent.agent_id) === index)
       .slice(0, MAX_AGENT_STREAMS);
     const desiredAgentIds = new Set(streamableAgents.map((agent) => agent.agent_id));
 
@@ -160,6 +178,8 @@ export function useAgentRegistry({ onAgentResult } = {}) {
 
           const terminalStatus = terminalStatusFromPayload(payload);
           if (terminalStatus) {
+            if (handledRef.current.has(agent.agent_id)) return;
+            handledRef.current.add(agent.agent_id);
             source.close();
             sourcesRef.current.delete(agent.agent_id);
             const content = typeof payload.content === 'string' ? payload.content : '';
@@ -183,9 +203,12 @@ export function useAgentRegistry({ onAgentResult } = {}) {
         source.onerror = () => {
           source.close();
           sourcesRef.current.delete(agent.agent_id);
+          // A finished agent whose stream is gone (expired) is not retried.
+          if (!active.some((item) => item.agent_id === agent.agent_id)) handledRef.current.add(agent.agent_id);
         };
       }).catch(() => {
         sourcesRef.current.delete(agent.agent_id);
+        if (!active.some((item) => item.agent_id === agent.agent_id)) handledRef.current.add(agent.agent_id);
       });
     });
 
@@ -195,7 +218,7 @@ export function useAgentRegistry({ onAgentResult } = {}) {
         sourcesRef.current.delete(agentId);
       }
     });
-  }, [active]);
+  }, [active, recentCompleted]);
 
   useEffect(() => () => {
     sourcesRef.current.forEach(closeSource);

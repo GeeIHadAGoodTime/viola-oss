@@ -4,6 +4,7 @@ import { THEME } from '../config';
 import { authFetch } from '../hooks/useViolaApi';
 import { openSafeExternalUrl } from '../lib/safeUrl';
 import { useCloudConsentGate } from '../hooks/cloudConsentGate';
+import { renderStageMarkdown } from '../utils/stageMarkdown';
 
 const AUTO_DISMISS_BASE_MS = 12000;
 const AUTO_DISMISS_PER_CHAR_MS = 40;
@@ -75,6 +76,8 @@ const URL_REGEX = /https?:\/\/[^\s)]+/g;
 
 function renderTextWithLinks(text) {
   if (typeof text !== 'string') return text;
+  // Markdown links and emphasis from the model render as text, not syntax.
+  if (/\*\*|__|`|\[[^\]\n]+\]\(/.test(text)) return renderStageMarkdown(text);
 
   const parts = [];
   let lastIndex = 0;
@@ -560,6 +563,7 @@ function ContentCardInner({ data, onDismiss }) {
   const startTimeRef = useRef(null);
   const exitingRef = useRef(false);
   const onDismissRef = useRef(onDismiss);
+  const dialogRef = useRef(null);
 
   useEffect(() => { onDismissRef.current = onDismiss; }, [onDismiss]);
 
@@ -625,6 +629,20 @@ function ContentCardInner({ data, onDismiss }) {
     };
   }, [dismissDuration, handleDismiss, suppressAutoDismiss]);
 
+  // A tap outside the card dismisses it AND still reaches what was tapped.
+  // The full-screen backdrop used to swallow that tap, so after a typed
+  // command the first tap on the top bar's "..." (or any control) only closed
+  // the card (1.0.5 build 5: the menu "ignores the first click").
+  useEffect(() => {
+    const handleOutside = (event) => {
+      const dialog = dialogRef.current;
+      if (dialog && event.target instanceof Node && dialog.contains(event.target)) return;
+      handleDismiss();
+    };
+    document.addEventListener('pointerdown', handleOutside, true);
+    return () => document.removeEventListener('pointerdown', handleOutside, true);
+  }, [handleDismiss]);
+
   // Dismiss on Escape
   useEffect(() => {
     const handleKey = (e) => {
@@ -660,7 +678,7 @@ function ContentCardInner({ data, onDismiss }) {
 
   return (
     <div
-      onClick={handleDismiss}
+      data-testid="content-card-backdrop"
       style={{
         position: 'fixed',
         bottom: 0,
@@ -672,7 +690,8 @@ function ContentCardInner({ data, onDismiss }) {
         alignItems: 'center',
         justifyContent: 'center',
         padding: '24px',
-        pointerEvents: 'auto',
+        // Taps pass through to the app; the outside-tap listener dismisses.
+        pointerEvents: 'none',
         // Semi-transparent backdrop
         backgroundColor: exiting ? 'transparent' : 'rgba(0,0,0,0.45)',
         transition: `background-color ${SLIDE_ANIMATION_MS}ms ease`,
@@ -681,12 +700,14 @@ function ContentCardInner({ data, onDismiss }) {
       {/* The untitled fallback used to be "Content card" — this component's own
           name, read aloud to screen readers. Plain words instead. */}
       <div
+        ref={dialogRef}
         onClick={handleDismiss}
         role="dialog"
         aria-label={data.title || "Viola's response"}
         style={{
           width: '100%',
           maxWidth: 'min(720px, 92vw)',
+          pointerEvents: 'auto',
           display: 'flex',
           flexDirection: 'column',
           backgroundColor: THEME.colors.bgElevated,
