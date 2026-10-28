@@ -30,10 +30,10 @@
   },
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "78b2eb1af20660746fb1e0bee43be243b7dc78284e053cbb0617ae2715e959d0",
-  "source_tree_sha256": "06fa21c7605d676a14096f8a5a64bdc25686cec3b5b43c151680ca4da2e57a99",
+  "source_manifest_sha256": "bc784d35f7b1fd221b2128e2e19e99afe6e50c3e535711688b5386a16971d123",
+  "source_tree_sha256": "8f4a20ec745fa46ad423413f1a58da9f126c6a24db55ac471606fcfb681c1cd7",
   "source_file_count": 2743,
-  "source_revision": "bdc3dbd80457dcf33158b9912d1cef7e03f44873",
+  "source_revision": "b9c1b734b8f8f7318ccde11b3324a8e117a7ea6e",
   "comparison_public_revision": "ecab2772465fcc89ae6645b028af1c2273b9199f",
   "changed_source_paths": [
     "audio_core/aec_reference_base.py",
@@ -60,6 +60,7 @@
     "core/server_factory.py",
     "core/single_instance.py",
     "core/user_context.py",
+    "core/voice_canonical_carrier.py",
     "core/voice_command_handler.py",
     "core/voice_orchestrator.py",
     "core/voice_wake_processor.py",
@@ -78,6 +79,7 @@
     "intent/instant_commands/music.py",
     "intent/instant_commands_patterns.py",
     "intent/irreversible_actions.py",
+    "intent/pipeline.py",
     "intent/pipeline_processors.py",
     "intent/tools/calendar_tools.py",
     "intent/tools/deferred_tool_schemas.py",
@@ -119,6 +121,7 @@
     "services/browser/qt_cdp_bridge.py",
     "services/capability_registry.py",
     "services/computer_use/safety.py",
+    "services/conversation/context_frames.py",
     "services/llm/factory.py",
     "services/llm/prompts/builder.py",
     "services/llm/prompts/constants.py",
@@ -365,8 +368,8 @@
     "historical_inventory_limits": "This renderer correction changes no dependency or workflow inputs. All six retained SBOMs and their complete status objects stay historical and unchanged; no current installed inventory qualification is claimed."
   },
   "qualification": {
-    "source_commit": "bdc3dbd80457dcf33158b9912d1cef7e03f44873",
-    "kind": "r6 hub"
+    "source_commit": "b9c1b734b8f8f7318ccde11b3324a8e117a7ea6e",
+    "kind": "voice prompt + busy queue"
   },
   "historical_bindings": [
     {
