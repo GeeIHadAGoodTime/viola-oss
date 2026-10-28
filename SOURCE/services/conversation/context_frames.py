@@ -197,6 +197,42 @@ class PromptFrameBundle:
             return list(self.frames)
         return self._legacy_message_frames()
 
+    def with_current_user_frame(self, frame: Frame) -> PromptFrameBundle:
+        """Return a copy whose current user turn is ``frame``.
+
+        This is the only supported way to set the current user turn on a
+        bundle that already exists. Assigning ``bundle.current_user_frame``
+        directly leaves ``frames`` (the canonical message chain) without the
+        new turn, and the next copy of the bundle then fails the
+        "frames must be the complete message chain" check above. That is how
+        every AI-bound wake-word command failed in 1.0.5 build 5: the voice
+        path set ``current_user_frame`` on the ContextBuilder bundle, whose
+        ``frames`` already held the runtime context and history, and prompt
+        setup raised. Typed commands never set it, so only voice broke.
+
+        The new frame becomes the last message of the chain, replacing a
+        previous current user frame if the chain ended with it.
+        """
+
+        chain: Sequence[Frame] | object = _UNSET
+        if self.frames:
+            messages = list(self.frames)
+            previous = self.current_user_frame
+            if previous is not None and messages and messages[-1] == previous:
+                messages.pop()
+            messages.append(frame)
+            chain = messages
+        return PromptFrameBundle(
+            system_static_blocks=self.system_static_blocks,
+            system_dynamic_blocks=self.system_dynamic_blocks,
+            meta_user_frames=self.meta_user_frames,
+            history_frames=self.history_frames,
+            current_user_frame=frame,
+            cache_boundary_present=self.cache_boundary_present,
+            frames=chain,
+            provider_normalized=False,
+        )
+
 
 # ----- Sentinels -----
 

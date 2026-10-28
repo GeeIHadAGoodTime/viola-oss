@@ -85,6 +85,36 @@ describe('useVoiceOnboarding first-run trigger', () => {
     expect(result.current.isOnboarding).toBe(false);
   });
 
+  // 1.0.5 build-5 laptop report, X10.4: on wake from sleep the page came back
+  // while the backend was still reconnecting, the status call failed, and a
+  // signed-in user saw the onboarding screen flash. A failed status call is
+  // "no answer", never "not finished".
+  it('does not start onboarding when the status call fails (resume from sleep)', async () => {
+    apiFetch.mockRejectedValue(new Error('backend reconnecting'));
+
+    const { result } = renderHook(() => useVoiceOnboarding());
+
+    await waitFor(() => {
+      expect(apiFetch).toHaveBeenCalledWith('/v1/onboarding/status');
+    });
+    await waitMs(1200);
+    expect(result.current.isOnboarding).toBe(false);
+  });
+
+  it('asks again after a failed status call and still opens first run for a new user', async () => {
+    apiFetch
+      .mockRejectedValueOnce(new Error('backend starting'))
+      .mockResolvedValueOnce({ completed: false });
+
+    const { result } = renderHook(() => useVoiceOnboarding());
+
+    await waitFor(() => {
+      expect(result.current.isOnboarding).toBe(true);
+    }, { timeout: 4000 });
+    const statusCalls = apiFetch.mock.calls.filter(([path]) => path === '/v1/onboarding/status');
+    expect(statusCalls).toHaveLength(2);
+  });
+
   it('never starts device-pairing onboarding on the cloud web build', async () => {
     // No window.viola bridge -> cloud surface. The guided flow must not run and
     // must not touch the desktop-only /v1/onboarding/* route.

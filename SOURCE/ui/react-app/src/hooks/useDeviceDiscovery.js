@@ -4,6 +4,27 @@ import { isFeatureAvailable } from '../utils/featureSurface';
 
 const errorMessage = (error, fallback) => error?.message || (typeof error === 'string' ? error : fallback);
 
+// Speakers paired to this hub (a phone or browser that joined with a pairing
+// code) are rooms in the hub's registry, not devices found by LAN discovery,
+// so the discovery list alone never showed them: a joined "Default" speaker
+// was missing from Rooms and could not be removed (1.0.5 laptop A7.6).
+const pairedSpeakersFrom = (data) => {
+  const rooms = Array.isArray(data?.rooms) ? data.rooms : (Array.isArray(data) ? data : []);
+  return rooms
+    .filter((room) => room && !room.is_local && !room.is_hub && (room.id || room.room_id))
+    .map((room) => {
+      const id = room.id || room.room_id;
+      return {
+        device_id: id,
+        name: room.name || room.room_name || id,
+        host: room.host || null,
+        is_connected: true,
+        kind: 'speaker',
+        status: room.status || 'unknown',
+      };
+    });
+};
+
 /**
  * Custom hook for device discovery and connection management.
  *
@@ -18,6 +39,8 @@ export function useDeviceDiscovery(enabled = false) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const intervalRef = useRef(null);
+  // device_id -> 'speaker' for paired speakers, so removal uses the room route.
+  const kindsRef = useRef(new Map());
 
   // Fetch discovered devices
   const fetchDevices = useCallback(async () => {
@@ -32,7 +55,19 @@ export function useDeviceDiscovery(enabled = false) {
     try {
       const data = await apiFetch('/api/v1/devices/discovered');
       if (data?.ok !== false && Array.isArray(data?.devices)) {
-        setDevices(data.devices);
+        const discovered = data.devices;
+        let roomsData = null;
+        try {
+          roomsData = await apiFetch('/api/v1/rooms');
+        } catch {
+          roomsData = null; // paired speakers are extra; discovery still shows
+        }
+        const seen = new Set(discovered.map((d) => d.device_id));
+        const speakers = roomsData?.ok === false
+          ? []
+          : pairedSpeakersFrom(roomsData).filter((s) => !seen.has(s.device_id));
+        kindsRef.current = new Map(speakers.map((s) => [s.device_id, 'speaker']));
+        setDevices([...discovered, ...speakers]);
         setError(null);
       } else {
         setError(errorMessage(data?.error, "Couldn't load rooms. Check your connection and try again."));
@@ -70,8 +105,33 @@ export function useDeviceDiscovery(enabled = false) {
     }
   }, []);
 
+  // Remove a paired speaker: deletes its room and revokes its pairing.
+  const removeSpeaker = useCallback(async (deviceId) => {
+    try {
+      setError(null);
+      const data = await apiFetch(`/api/v1/rooms/${encodeURIComponent(deviceId)}`, {
+        method: 'DELETE',
+      });
+      if (data?.ok !== false && data?.deleted === deviceId) {
+        kindsRef.current.delete(deviceId);
+        setDevices(prev => prev.filter(d => d.device_id !== deviceId));
+        return { ok: true };
+      }
+      const message = errorMessage(data?.error, "Couldn't remove this speaker. Try again.");
+      setError(message);
+      return { ok: false, error: message };
+    } catch {
+      const message = "Couldn't remove this speaker. Try again.";
+      setError(message);
+      return { ok: false, error: message };
+    }
+  }, []);
+
   // Disconnect a device
   const disconnectDevice = useCallback(async (deviceId) => {
+    if (kindsRef.current.get(deviceId) === 'speaker') {
+      return removeSpeaker(deviceId);
+    }
     try {
       setError(null);
       const data = await apiFetch(`/api/v1/devices/${deviceId}/disconnect`, {
@@ -93,7 +153,7 @@ export function useDeviceDiscovery(enabled = false) {
       setError(message);
       return { ok: false, error: message };
     }
-  }, []);
+  }, [removeSpeaker]);
 
   // Rename a connected room
   const renameRoom = useCallback(async (deviceId, newName) => {

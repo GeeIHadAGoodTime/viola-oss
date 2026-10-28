@@ -63,6 +63,12 @@ _POST_AUDIO_RESCAN_SEC = 3.0
 # Hard timeout: give up on a silent PID entirely after this long.
 _POST_AUDIO_HARD_TIMEOUT_SEC = 15.0
 
+# When the worker process cannot even be launched (an OS refusal, not a
+# silent capture), retrying every second only repeats the same error: the
+# 1.0.5 laptop logged it 159 times. Back off 2, 4, 8 ... up to this many
+# seconds; a new play command (request_rescan) still retries at once.
+_LAUNCH_FAILURE_BACKOFF_MAX_SEC = 60.0
+
 
 def find_audio_child_pid() -> int | None:
     """Find a child process of the current process that has an active audio session.
@@ -114,6 +120,8 @@ class ProcTapProvider(AudioCaptureProvider):
 
         # Subprocess capture handle
         self._subprocess = None
+        # Consecutive worker LAUNCH failures (see _LAUNCH_FAILURE_BACKOFF_MAX_SEC).
+        self._consecutive_launch_failures = 0
 
         # Runtime capture format (set after subprocess starts)
         self._capture_sw: int = 2  # sample width in bytes (2=int16, 4=float32)
@@ -339,13 +347,29 @@ class ProcTapProvider(AudioCaptureProvider):
                     # Skip backoff delay after a rescan — play command just
                     # fired so re-discovery should happen immediately.
                     if not after_rescan:
-                        self._stop_event.wait(1.0)
+                        self._wait_before_retry(self._retry_delay_sec())
                 else:
                     after_rescan = False
         except Exception:
             logger.exception("ProcTap capture loop failed")
         finally:
             self._running = False
+
+    def _retry_delay_sec(self) -> float:
+        """Pause before the next discovery: 1 s, or a growing backoff after launch failures."""
+        failures = self._consecutive_launch_failures
+        if failures <= 0:
+            return 1.0
+        return min(_LAUNCH_FAILURE_BACKOFF_MAX_SEC, float(2 ** min(failures, 10)))
+
+    def _wait_before_retry(self, delay_sec: float) -> None:
+        """Sleep ``delay_sec``, ending early on stop() or a new play command."""
+        deadline = time.monotonic() + delay_sec
+        while not self._stop_event.is_set() and not self._rescan_event.is_set():
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return
+            self._stop_event.wait(min(remaining, 0.5))
 
     def _wait_for_audio_pid(self) -> int | None:
         """Wait for a child process with an active audio session.
@@ -509,14 +533,29 @@ class ProcTapProvider(AudioCaptureProvider):
             self._subprocess = sub
 
             if not sub.start(pid, use_system_loopback=use_system_loopback):
-                logger.error(
-                    "%s: subprocess failed to start for PID %d (%s)",
-                    label,
-                    pid,
-                    "system loopback" if use_system_loopback else "per-process",
-                )
+                if getattr(sub, "last_start_failure", None) == "launch":
+                    # The OS refused to start the worker. Same PID, same error
+                    # on every retry: back off (see _retry_delay_sec).
+                    self._consecutive_launch_failures += 1
+                    failures = self._consecutive_launch_failures
+                    log_fn = logger.error if failures & (failures - 1) == 0 else logger.debug
+                    log_fn(
+                        "%s: capture worker could not be launched for PID %d (%d in a row); next try in %.0fs",
+                        label,
+                        pid,
+                        failures,
+                        self._retry_delay_sec(),
+                    )
+                else:
+                    logger.error(
+                        "%s: subprocess failed to start for PID %d (%s)",
+                        label,
+                        pid,
+                        "system loopback" if use_system_loopback else "per-process",
+                    )
                 self._subprocess = None
                 return False
+            self._consecutive_launch_failures = 0
             with self._lock:
                 self._active_capture_mode = _capture_mode_label(use_system_loopback)
 

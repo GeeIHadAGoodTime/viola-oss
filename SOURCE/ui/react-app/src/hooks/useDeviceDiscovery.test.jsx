@@ -70,4 +70,43 @@ describe('device discovery through the real apiFetch envelope contract', () => {
     expect(result.current.error).toBeTruthy();
   });
 
+  it('lists a speaker paired to this hub and removes it through the room route (1.0.5 A7.6)', async () => {
+    const calls = [];
+    fetch.mockImplementation(async (url, init = {}) => {
+      const path = String(url).replace(/^https?:\/\/[^/]+/, '');
+      calls.push(`${init.method || 'GET'} ${path}`);
+      if (path.endsWith('/api/v1/devices/discovered')) return response({ ok: true, data: { devices: [] } });
+      if (path.endsWith('/api/v1/rooms') && !init.method) {
+        return response({ ok: true, data: { rooms: [
+          { id: 'local', name: 'DESKTOP', is_local: true, is_hub: true, status: 'online' },
+          { id: 'default', name: 'Default', is_local: false, is_hub: false, status: 'online', host: '192.168.1.20' },
+        ], count: 2 } });
+      }
+      if (path.endsWith('/api/v1/rooms/default') && init.method === 'DELETE') {
+        return response({ ok: true, data: { deleted: 'default', revoked_devices: 1 } });
+      }
+      return response({ ok: false, error: { message: `unexpected ${path}` } }, 404);
+    });
+    const { result } = renderHook(() => useDeviceDiscovery(true));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.error).toBeNull();
+    expect(result.current.devices).toEqual([
+      expect.objectContaining({ device_id: 'default', name: 'Default', is_connected: true, kind: 'speaker' }),
+    ]);
+    let outcome;
+    await act(async () => { outcome = await result.current.disconnectDevice('default'); });
+    expect(outcome.ok).toBe(true);
+    expect(calls).toContain('DELETE /api/v1/rooms/default');
+    expect(calls.some((c) => c.includes('/api/v1/devices/default/disconnect'))).toBe(false);
+    expect(result.current.devices).toEqual([]);
+  });
+  it('still shows discovery results when the room list cannot be read', async () => {
+    fetch.mockImplementation(async (url) => (String(url).endsWith('/api/v1/rooms')
+      ? response({ ok: false, error: { message: 'nope' } }, 500)
+      : response({ ok: true, data: { devices: [{ device_id: 'synthetic-room', name: 'Test room' }] } })));
+    const { result } = renderHook(() => useDeviceDiscovery(true));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.error).toBeNull();
+    expect(result.current.devices).toEqual([{ device_id: 'synthetic-room', name: 'Test room' }]);
+  });
 });
