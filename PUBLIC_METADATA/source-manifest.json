@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "912b1ad54feb3e97950468d3a566a25e8efc2613",
-  "sha256": "fa512266ecacd524a922da1c868471fa33abde6d494c20f10c0d997a6acca88b",
+  "revision": "8140d1b740d37b40a2e1a0a62c18b92e2cd725b1",
+  "sha256": "16bcdb54f3d4c1040cd520c36badde84bbd1072ee65a25b93677844a92f748a0",
   "files": [
     {
       "path": ".env.example",
@@ -10305,8 +10305,8 @@
     },
     {
       "path": "ui/react-app/src/auth/desktopOAuth.test.ts",
-      "sha256": "edbe4fdcb8c1506d8ec16f7fb548847ddcd7c20633b306d14f638898edc3aa43",
-      "bytes": 7090
+      "sha256": "617e62539da71eda5a28a4f955ad85aa0c7ad5a399929308947e8f889593f68e",
+      "bytes": 13013
     },
     {
       "path": "ui/react-app/src/auth/desktopOAuth.ts",
