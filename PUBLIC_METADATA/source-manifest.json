@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "ad085ddffe3bf719c036bcb5988d3a673af5763c",
-  "sha256": "3896e96a5880ebfbea7e06f28e6fd04f052f3621d257d11172f7eed3d1480cf3",
+  "revision": "474e32666517b1364ff9fa5c54ff785feaa6cafe",
+  "sha256": "10c9a70034b9dde51f6a4e0c71470554ff40bb8f04d08a72bbcbd73ff9b2b7f6",
   "files": [
     {
       "path": ".env.example",
@@ -925,8 +925,8 @@
     },
     {
       "path": "contracts/fastapi.py",
-      "sha256": "4e45300a61e4e5ce6326c3cc7cce25e32cf7f9006275f63b22a5988a893494a2",
-      "bytes": 10066
+      "sha256": "7e937fa75e76cdbf96a6e087e09c3606431b005424f6b1bc5b80772ba58cf068",
+      "bytes": 10695
     },
     {
       "path": "contracts/fastapi_helpers.py",
@@ -1575,8 +1575,8 @@
     },
     {
       "path": "intent/agent_executor.py",
-      "sha256": "6df1f58965169e3c951c7ad3a3fa6c2ecc9869b582fc8c74ccc72ab0d71a6300",
-      "bytes": 583187
+      "sha256": "9c79e560515d352e324dae4b03e257c16f4054684e5d909bff45cd8770a0a896",
+      "bytes": 583791
     },
     {
       "path": "intent/agent_loop.py",
@@ -1825,8 +1825,8 @@
     },
     {
       "path": "intent/instant_commands/system.py",
-      "sha256": "67e01203e8d9f870221e8bd06706d7a4d81f59e7d85db967b554dacda9466a56",
-      "bytes": 37563
+      "sha256": "fde6300feb4247c707359ee8af6487883313828ec9cfecd3025e12f1fb813cc8",
+      "bytes": 38140
     },
     {
       "path": "intent/instant_commands/timers.py",
@@ -1855,8 +1855,8 @@
     },
     {
       "path": "intent/irreversible_actions.py",
-      "sha256": "71562b1345c96d94e684760d770fc81942f513ce2f50f76f7e6b2b9016eccf01",
-      "bytes": 12981
+      "sha256": "ed7161d8d5faae1a6acc964093db6436f6c6baca9099204b9aa243e4e5982c22",
+      "bytes": 13222
     },
     {
       "path": "intent/json_utils.py",
@@ -1885,8 +1885,8 @@
     },
     {
       "path": "intent/pipeline.py",
-      "sha256": "a1919a1e0c77e0d8f7d8f876fd37c4418e24ec24ea036d78915e59f995710078",
-      "bytes": 99696
+      "sha256": "c5ccfb01ad6fd07163c7ddc4f0eeb86833f2f2b1d6f5cd08080b04c1aafed022",
+      "bytes": 99959
     },
     {
       "path": "intent/pipeline_contracts.py",
@@ -2005,8 +2005,8 @@
     },
     {
       "path": "intent/tools/alarm_tools.py",
-      "sha256": "034d523722175a12cf90dbed972f0e64a6827ec99147fb215ad9ae59c7e7d6d3",
-      "bytes": 10677
+      "sha256": "5729467aae5f7ada7f4c2cce9f7c6cec99bc41691fc86cb4a74cb31f81d8d278",
+      "bytes": 13011
     },
     {
       "path": "intent/tools/api_registry_tool.py",
@@ -2030,8 +2030,8 @@
     },
     {
       "path": "intent/tools/calendar_tools.py",
-      "sha256": "4daf1ce99c7d046b052ed81f6f0ae04865a4d7e5787d55d0c6c1077078026426",
-      "bytes": 27905
+      "sha256": "49834a31ebcecaf339895be427f9d105aa9235cf954a4cf799aa4697cdcf0c89",
+      "bytes": 29684
     },
     {
       "path": "intent/tools/contacts_tools.py",
@@ -2170,8 +2170,8 @@
     },
     {
       "path": "intent/tools/timer_tools.py",
-      "sha256": "b1d89ce31d66b2fdb9d2354928993db076b18d4acb5a5cfba9771deb4e552456",
-      "bytes": 13751
+      "sha256": "75e6a29148d40624152b6085c721998040f43c078ca583fc3920afa4de02ef76",
+      "bytes": 14163
     },
     {
       "path": "intent/tools/toll_fraud_prefixes.py",
@@ -2195,13 +2195,13 @@
     },
     {
       "path": "intent/tools/weather_tool.py",
-      "sha256": "f65a112054ce166b8edc88340bcad8769023f7fd4631b90f660f9dd408361c61",
-      "bytes": 13849
+      "sha256": "5f85f698bab82d32ceb76533cd1dc632cb229c305bc351b853b0fa8e11c30fec",
+      "bytes": 16608
     },
     {
       "path": "intent/tools/web_read.py",
-      "sha256": "8bcbece11ef38679f17a02549ace8e8b20a7ffef8ebd25acfe0cdda497ef9cf9",
-      "bytes": 20564
+      "sha256": "f7eb17a994a46824d0c96c0bf14fb368c6ee0081ce6c125fc866b8d3b93b5cf9",
+      "bytes": 22512
     },
     {
       "path": "intent/tools/web_search.py",
@@ -3944,6 +3944,11 @@
       "bytes": 35868
     },
     {
+      "path": "services/alarm_ringer.py",
+      "sha256": "cc151ee3da9b9b1809e8acf76ba902e2e78912e0f0fa729800b8740a2ae62fff",
+      "bytes": 13364
+    },
+    {
       "path": "services/api_cache.py",
       "sha256": "8e3aead7b11d4c39bf0e8faf2114fa255d16f16bf7abecc0f85b761d57a0747c",
       "bytes": 13673
@@ -4950,8 +4955,8 @@
     },
     {
       "path": "services/notifications/timer_notifier.py",
-      "sha256": "dff4d6a57ffc556e1ce7fea56d6557cae434143621066e824900a58e763b2c75",
-      "bytes": 8634
+      "sha256": "6dec7436fa373acd614fedbd3be854d208006f9c7940961d1b43c78559cae39a",
+      "bytes": 11418
     },
     {
       "path": "services/notifications/web_push.py",
@@ -5135,8 +5140,8 @@
     },
     {
       "path": "services/scheduler/service.py",
-      "sha256": "31b8ff57a303f38f0cf0ac56ecfbe96476101ee5673ec6c1d4bf4ad3b63daadc",
-      "bytes": 44176
+      "sha256": "428e76ca6585af05469c9c45aeac08942d22dc0f4df0c3ccf9a208183173ee45",
+      "bytes": 44759
     },
     {
       "path": "services/scheduler/store.py",
@@ -9325,8 +9330,8 @@
     },
     {
       "path": "ui/api/routes/__init__.py",
-      "sha256": "66157ce9b4f63fb249a8b101bb9d1d835f71414c103cc6ca6f1b69056c45b0e4",
-      "bytes": 29631
+      "sha256": "b4a6b0f58ebda3978bd2a2abb972c83541e2ed3a392a22e7025dd813760df10e",
+      "bytes": 31306
     },
     {
       "path": "ui/api/routes/_guards.py",
@@ -10880,8 +10885,13 @@
     },
     {
       "path": "ui/react-app/src/components/TimerCountdown.jsx",
-      "sha256": "53ef37e895241d1f67bb7e225a88e735d40b42a11db3f18f39d02948632cf64c",
-      "bytes": 5976
+      "sha256": "fad29940b3df6a0a9e8d2c5cc173cd065d150fce290a0cca0aa22389985749ad",
+      "bytes": 10905
+    },
+    {
+      "path": "ui/react-app/src/components/TimerCountdown.test.jsx",
+      "sha256": "9e90353fb1d8387fb6da0a2a2f4bb07acfcc1951eb1e7183be7f51c300b43daa",
+      "bytes": 3725
     },
     {
       "path": "ui/react-app/src/components/Toast.jsx",
