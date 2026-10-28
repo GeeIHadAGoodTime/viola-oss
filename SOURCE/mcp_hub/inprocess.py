@@ -61,6 +61,44 @@ class InProcessConnection:
             if isinstance(exc, (KeyboardInterrupt, SystemExit)):
                 raise
 
+    def is_alive(self) -> bool:
+        """True while the owner task still holds the server session open.
+
+        A finished owner means the in-process server is gone: every call on
+        its session would wait for a reply that can never come.
+        """
+        owner = self._owner
+        return owner is not None and not owner.done()
+
+    def abandon(self) -> None:
+        """Stop a wedged owner without waiting for it.
+
+        Used by the hub's stall watchdog. The owner may live on a loop that is
+        blocked or gone, so this never awaits: it asks the owner's loop (when
+        it is still running) to cancel the task and returns at once.
+        """
+        owner = self._owner
+        self._owner = None
+        if owner is None or owner.done():
+            return
+        try:
+            owner_loop = owner.get_loop()
+        except RuntimeError:
+            return
+        if owner_loop.is_closed():
+            return
+        try:
+            running = asyncio.get_running_loop()
+        except RuntimeError:
+            running = None
+        try:
+            if running is owner_loop:
+                owner.cancel()
+            else:
+                owner_loop.call_soon_threadsafe(owner.cancel)
+        except RuntimeError:
+            logger.debug("In-process MCP owner for '%s' could not be cancelled", self.name)
+
     async def close(self) -> None:
         if self._owner is None:
             return

@@ -392,6 +392,24 @@ function validationSummary(profile) {
 }
 
 // Main Settings Component
+// The backend saves several ids for the same Music Source card: the agent's
+// media tool and the no-sign-in fallback store "youtube_iframe", older
+// settings hold "youtube", and Spotify can be "spotify_cdp". The cards only
+// know youtube_music / spotify / local, so an exact match left NO card
+// selected while YouTube was in use (1.0.5 build 5, A10.4).
+const MUSIC_SOURCE_CARD_ALIASES = {
+  youtube: 'youtube_music',
+  youtube_iframe: 'youtube_music',
+  youtube_music: 'youtube_music',
+  spotify_cdp: 'spotify',
+};
+
+export function musicSourceCardId(providerId) {
+  const raw = String(providerId || '').trim().toLowerCase().replace(/-/g, '_');
+  if (!raw) return 'youtube_music';
+  return MUSIC_SOURCE_CARD_ALIASES[raw] || raw;
+}
+
 function assistantVolumePercent(value) {
   const raw = Number(value ?? 1);
   const normalized = Number.isFinite(raw) ? (raw > 1 ? raw / 100 : raw) : 1;
@@ -1663,7 +1681,7 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
         cookie_bridge_cached: false,
       }));
       setShowSpotifyLogin(false);
-      if ((localSettings.active_music_provider_id || 'youtube_music') === 'spotify') {
+      if (musicSourceCardId(localSettings.active_music_provider_id) === 'spotify') {
         stageMusicProvider('youtube_music');
       }
     } catch {
@@ -2765,8 +2783,8 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
       // TAB 2: MUSIC & VOICE
       // ═══════════════════════════════════════════════════════════════
       case 'music': {
-        const activeProvider = localSettings.active_music_provider_id || 'youtube_music';
-        const savedProvider = settings?.active_music_provider_id || 'youtube_music';
+        const activeProvider = musicSourceCardId(localSettings.active_music_provider_id);
+        const savedProvider = musicSourceCardId(settings?.active_music_provider_id);
         const providerHasPendingChange = activeProvider !== savedProvider;
         // #4226: on the cloud SPA neither of these two sources can work —
         // Spotify sign-in drives a real browser on the user's machine
@@ -2838,6 +2856,7 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
                         key={opt.id}
                         onClick={() => handleSwitchProvider(opt.id)}
                         disabled={isSwitchingSource}
+                        aria-pressed={isActive}
                         style={{
                           flex: 1,
                           display: 'flex',
