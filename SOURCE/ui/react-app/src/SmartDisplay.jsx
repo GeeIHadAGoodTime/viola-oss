@@ -62,7 +62,7 @@ import WorkbenchDropZone from './components/WorkbenchDropZone';
 import MemoryPanel from './components/MemoryPanel';
 import { dispatchUiActions } from './utils/uiActions';
 import { extractCapDenial } from './utils/capDenial';
-import { isWebClient, shouldStreamBrowserView } from './utils/runtimeSurface';
+import { isDesktopApp, isWebClient, shouldStreamBrowserView } from './utils/runtimeSurface';
 import { isCloudSurface } from './components/auth/cloudSurface';
 import CloudLlmConsentModal from './components/CloudLlmConsentModal';
 import { useCloudLlmConsent } from './hooks/useCloudLlmConsent';
@@ -924,7 +924,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
       setCalendarModeActive(false);
       if (browserModeActive || browserUrl) {
         setDisplayMode('browser');
-      } else if (lastAgentBrowserUrl) {
+      } else if (lastAgentBrowserUrl && isDesktopApp()) {
         // Reopen the page the agent left: show the native view again and the
         // browser stage that positions it.
         setBrowserUrl(lastAgentBrowserUrl);
@@ -3322,9 +3322,11 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
     },
     { id: 'chat', label: 'Chat', icon: 'chat', ariaLabel: 'Open chat mode' },
   ];
-  // The globe pill stays while there is an agent page to reopen, so a touch
-  // user (no Ctrl+K) can get back to it after the task ends.
-  const contextualStageItems = (agentContextPillVisible || lastAgentBrowserUrl) ? [{
+  // On the desktop app the globe pill stays while there is an agent page to
+  // reopen (the native view still holds it), so a touch user with no Ctrl+K
+  // can get back to it after the task ends.
+  const agentPageReopenable = Boolean(lastAgentBrowserUrl) && isDesktopApp();
+  const contextualStageItems = (agentContextPillVisible || agentPageReopenable) ? [{
     id: 'agent',
     label: getAgentPillLabel(agentTaskStatus, agentTaskPhase, agentTaskActive),
     icon: 'globe',

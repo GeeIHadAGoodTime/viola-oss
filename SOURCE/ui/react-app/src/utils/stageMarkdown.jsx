@@ -9,6 +9,7 @@
  * or turned into a bullet. Anything unsafe stays plain text: only http(s)
  * links are ever made clickable.
  */
+import PropTypes from 'prop-types';
 import { THEME } from '../config';
 
 const INLINE = /(\*\*[^*\n]+\*\*|__[^_\n]+__|`[^`\n]+`|\[[^\]\n]+\]\([^)\s]+\)|https?:\/\/[^\s)<>]+|\*[^*\s][^*\n]*\*|(?<![\w])_[^_\s][^_\n]*_(?![\w]))/g;
@@ -55,6 +56,11 @@ function StageLink({ href, children }) {
     </a>
   );
 }
+
+StageLink.propTypes = {
+  href: PropTypes.string.isRequired,
+  children: PropTypes.node,
+};
 
 /** Remove block-level markers a one-line reply area cannot show. */
 function stripBlockMarkers(line) {

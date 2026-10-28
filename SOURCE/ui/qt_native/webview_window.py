@@ -314,7 +314,7 @@ def mark_taskbar_fullscreen(hwnd: int, fullscreen: bool) -> bool:
         return False
 
 
-def _mark_taskbar_fullscreen_com(ctypes, wintypes, ole32, hwnd: int, fullscreen: bool) -> bool:  # noqa: ANN001
+def _mark_taskbar_fullscreen_com(ctypes, wintypes, ole32, hwnd: int, fullscreen: bool) -> bool:
     """CoCreate ITaskbarList2 and call MarkFullscreenWindow (COM already initialised)."""
 
     class _GUID(ctypes.Structure):

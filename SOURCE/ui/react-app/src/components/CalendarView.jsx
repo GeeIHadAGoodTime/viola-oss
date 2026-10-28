@@ -493,6 +493,7 @@ function CalendarViewInner({ theme, timeFormat = 'auto', compact: compactProp = 
       <div
         key={dateKey}
         data-testid={`calendar-day-${dateKey}`}
+        aria-current={today ? 'date' : undefined}
         className={styles.dayCell}
         onClick={() => handleDayClick(day)}
         style={{

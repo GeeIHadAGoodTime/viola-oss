@@ -77,8 +77,7 @@ const URL_REGEX = /https?:\/\/[^\s)]+/g;
 function renderTextWithLinks(text) {
   if (typeof text !== 'string') return text;
   // Markdown links and emphasis from the model render as text, not syntax.
-  if (/\*\*|__|`|\[[^\]
-]+\]\(/.test(text)) return renderStageMarkdown(text);
+  if (/\*\*|__|`|\[[^\]\n]+\]\(/.test(text)) return renderStageMarkdown(text);
 
   const parts = [];
   let lastIndex = 0;

@@ -682,7 +682,6 @@ class SchedulerService:
         if registry is not None:
             try:
                 from services.agent_runtime.registry import AgentRegistryError
-
                 from services.scheduler.actions import describe_tool_action
 
                 agent_id, _cancel_event, _background_signal = await registry.register_foreground(
