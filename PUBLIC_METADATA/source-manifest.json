@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "ad085ddffe3bf719c036bcb5988d3a673af5763c",
-  "sha256": "3896e96a5880ebfbea7e06f28e6fd04f052f3621d257d11172f7eed3d1480cf3",
+  "revision": "0be4de4dd130bb9b18400618e133754663129012",
+  "sha256": "dab9a1a54453a637c97bf232f1de2d2a0b489fd5268b6e43ca529a6274bef7b9",
   "files": [
     {
       "path": ".env.example",
@@ -2030,8 +2030,8 @@
     },
     {
       "path": "intent/tools/calendar_tools.py",
-      "sha256": "4daf1ce99c7d046b052ed81f6f0ae04865a4d7e5787d55d0c6c1077078026426",
-      "bytes": 27905
+      "sha256": "c65f2736e85fd42b8cbe624ad2563aaa8522dc2d19c9a2bcfc74a89a7b605157",
+      "bytes": 30157
     },
     {
       "path": "intent/tools/contacts_tools.py",
@@ -5125,8 +5125,8 @@
     },
     {
       "path": "services/scheduler/actions.py",
-      "sha256": "768fc450950376de9e7a43db9862bf26a7726966033de64bb883f5b0bada63a7",
-      "bytes": 1448
+      "sha256": "d5ffca6e626e024c46520a640b27488a29a2aee4997dc0863bef6c32ff1d1392",
+      "bytes": 2995
     },
     {
       "path": "services/scheduler/proactive_scheduler.py",
@@ -5135,8 +5135,8 @@
     },
     {
       "path": "services/scheduler/service.py",
-      "sha256": "31b8ff57a303f38f0cf0ac56ecfbe96476101ee5673ec6c1d4bf4ad3b63daadc",
-      "bytes": 44176
+      "sha256": "1e0e768b59e3ad1301ff55e119e17d42e998a53eaae94d03c4568fe3f3167207",
+      "bytes": 44378
     },
     {
       "path": "services/scheduler/store.py",
@@ -9340,8 +9340,8 @@
     },
     {
       "path": "ui/api/routes/agents.py",
-      "sha256": "e509a24eeb76e3de0607587e251789062193909c290cff6a58fe81c3aa0153b8",
-      "bytes": 11933
+      "sha256": "149f46fbf9a13bf951cd4bbfb8d1d76401b694c208726347b64a68076521ca93",
+      "bytes": 12004
     },
     {
       "path": "ui/api/routes/audio_stream.py",
@@ -9515,8 +9515,8 @@
     },
     {
       "path": "ui/api/routes/onboarding.py",
-      "sha256": "b9c49e66afdec0827da10ed4be1093bcb90229ba2c22c4a7652f1b5186fdbb06",
-      "bytes": 18989
+      "sha256": "14139d80de827841027f89e3929f40014750c65ddc73ad6c0b0cb69db5b3a1aa",
+      "bytes": 20593
     },
     {
       "path": "ui/api/routes/playlists.py",
@@ -9865,8 +9865,8 @@
     },
     {
       "path": "ui/qt_native/webview_window.py",
-      "sha256": "e67b2f53762baeb3e028c436e4766b09a85fa757cb95f91bde94b9b3e5f1d3f9",
-      "bytes": 240165
+      "sha256": "b6e19ba08d798b8f68cf5d39135ab8d979e5088940af0188e7ea65ce7ecc26ea",
+      "bytes": 245092
     },
     {
       "path": "ui/qt_native/widgets/connectivity_status.py",
@@ -10015,8 +10015,8 @@
     },
     {
       "path": "ui/react-app/src/SmartDisplay.jsx",
-      "sha256": "54f44ee0957358e8d695139bc4496bb51a8ea2f3a01d5c975b39a77860c7c84a",
-      "bytes": 179017
+      "sha256": "1025d6549b3dab3f8f84a0efd54e21c050bda5b142c36fc7d128c7416d17c9a8",
+      "bytes": 181545
     },
     {
       "path": "ui/react-app/src/SmartDisplay.spokePolicy.test.jsx",
@@ -10300,8 +10300,8 @@
     },
     {
       "path": "ui/react-app/src/auth/authProviders.ts",
-      "sha256": "39b8caf65c9d5842ad83b22569d91db4842b87d74e197824413ddf5cda1414ae",
-      "bytes": 2442
+      "sha256": "aeb6ef74f8e32edce9d9dd50ad795aec68a3d226fea03eea29798613b98d6b0d",
+      "bytes": 4064
     },
     {
       "path": "ui/react-app/src/auth/desktopOAuth.test.ts",
@@ -10360,8 +10360,8 @@
     },
     {
       "path": "ui/react-app/src/components/AccountTab.jsx",
-      "sha256": "2c2e09c7bfb3d135bc903243aab8cc2d93028d111722179342ed7c6d0b7183ed",
-      "bytes": 84743
+      "sha256": "b70148bae32d444e43443ce57451cffc4c3ba3c88941e6db338110cda634184d",
+      "bytes": 89600
     },
     {
       "path": "ui/react-app/src/components/AccountTab.legacy.jsx",
@@ -10400,8 +10400,8 @@
     },
     {
       "path": "ui/react-app/src/components/AgentCard.jsx",
-      "sha256": "1cd4cf34b4926daf6cc44eba4fdacfc91c4bd1a1fcc3cd124ae565d6f389c2a0",
-      "bytes": 4938
+      "sha256": "df0227ed6eb8bdb1db51b57ff4b3618baef455b192a074e6076f734f9338da02",
+      "bytes": 6411
     },
     {
       "path": "ui/react-app/src/components/AgentCard.test.jsx",
@@ -10420,8 +10420,8 @@
     },
     {
       "path": "ui/react-app/src/components/BillingCapacityPanel.jsx",
-      "sha256": "c28320e4bb0cb672b54944bd63132fd18a27c4afa036ff40f0d00090a0c3858a",
-      "bytes": 19049
+      "sha256": "d38d729572a1f612ed1a7f567b70eb5e9acc61a0eec7eee6f4b210c6c957d9e1",
+      "bytes": 19071
     },
     {
       "path": "ui/react-app/src/components/BillingCapacityPanel.test.jsx",
@@ -10435,8 +10435,8 @@
     },
     {
       "path": "ui/react-app/src/components/CalendarView.jsx",
-      "sha256": "5803a2de5e58a70d41d06116d77cb5fb5d635447b7cfe8e10bade7b3dc2adbb3",
-      "bytes": 45924
+      "sha256": "de8b836a7b6d543b1ee782ac35b38f8eb7707ac370c6839926e2dcd8d09c7f5e",
+      "bytes": 46955
     },
     {
       "path": "ui/react-app/src/components/CalendarView.module.css",
@@ -10530,8 +10530,8 @@
     },
     {
       "path": "ui/react-app/src/components/ContentCard.jsx",
-      "sha256": "d813a36ba9242db8cb2cf5c69f74fd93be3a2e9fdcd29cbea216b735f127bcde",
-      "bytes": 26996
+      "sha256": "3c206bbd5eb49dbf3073673d60f43532459bfc28d41ee4cf4a59ffde94e67552",
+      "bytes": 27212
     },
     {
       "path": "ui/react-app/src/components/ContentCard.test.jsx",
@@ -10675,8 +10675,8 @@
     },
     {
       "path": "ui/react-app/src/components/MonthGiftSummary.jsx",
-      "sha256": "f1415036265860a25119dd89b8af534f2e7439563e4407a348c72c296f64aae5",
-      "bytes": 2588
+      "sha256": "4fffe2f1ee9a168c184579fe52db476de4276f7f6f41f170c7068879694ac9aa",
+      "bytes": 2981
     },
     {
       "path": "ui/react-app/src/components/MonthGiftSummary.test.jsx",
@@ -11550,8 +11550,8 @@
     },
     {
       "path": "ui/react-app/src/components/stage/modes/chat/ChatMode.jsx",
-      "sha256": "2afa4cc6d3c2171bfdca21c413f88dedfbe43f54755b335413d244419df7caad",
-      "bytes": 65093
+      "sha256": "943e4645dc38745d8031db89773404b810fdc165f840fe90bd4fefd5a232afcf",
+      "bytes": 65188
     },
     {
       "path": "ui/react-app/src/components/stage/modes/chat/ChatMode.modelRecovery.test.jsx",
@@ -11575,8 +11575,8 @@
     },
     {
       "path": "ui/react-app/src/components/stage/modes/chat/ChatSidebar.jsx",
-      "sha256": "03f13e2f41e88e6acbb5131c1d82a108d0ee0cb7db9a34734e5deef35d1b0644",
-      "bytes": 5766
+      "sha256": "2db5b0a2ea7fd6cbf9b09a8fe913033101f0d4737113e49f30d18a42eb5baee0",
+      "bytes": 5844
     },
     {
       "path": "ui/react-app/src/components/stage/modes/chat/ChatThread.jsx",
@@ -11670,13 +11670,13 @@
     },
     {
       "path": "ui/react-app/src/components/voice/BottomRow.jsx",
-      "sha256": "0c2f8907d5f3e7fdb0306e9ab30b1e4a08990686974ac719f3cdfee0af817934",
-      "bytes": 8916
+      "sha256": "7a58bb61e92a6d636711266f91cbe7c8c4e6ad3dececa277aeed42b673dbd55e",
+      "bytes": 9002
     },
     {
       "path": "ui/react-app/src/components/voice/BottomRow.module.css",
-      "sha256": "7b26289d3361b576544990672a701c8f08c4458e6818b050805b8d46a01e468c",
-      "bytes": 3541
+      "sha256": "2dfda4ac0439147e9e68fe930282db1b8340929382a532df604e3090b9e70503",
+      "bytes": 4042
     },
     {
       "path": "ui/react-app/src/components/voice/HandsFreeMicIndicator.jsx",
@@ -11760,8 +11760,8 @@
     },
     {
       "path": "ui/react-app/src/hooks/useBillingCapacity.js",
-      "sha256": "8c0b0bcc215dff7234a9c9c44428412bb7ec36dbaf03cccd2a35779bdd149c86",
-      "bytes": 9006
+      "sha256": "2182f45d67e72879991809f75d96ccec199cbb5266b31cd8b27165ec42144ab7",
+      "bytes": 10679
     },
     {
       "path": "ui/react-app/src/hooks/useBrowserAuth.js",
@@ -11790,8 +11790,8 @@
     },
     {
       "path": "ui/react-app/src/hooks/useCalendarEvents.js",
-      "sha256": "b84972dc8b4be7e9348e6282c2f43d2e1978a639812b19fa056d878b25168828",
-      "bytes": 5977
+      "sha256": "bad62a094cce1847d348ef6d49b6ec20c04b2d6cffa6e599e9ae2eb2f538ce1e",
+      "bytes": 8791
     },
     {
       "path": "ui/react-app/src/hooks/useCalendarProviders.js",
@@ -11852,6 +11852,11 @@
       "path": "ui/react-app/src/hooks/useCloudWelcome.test.jsx",
       "sha256": "2405570bcce76fb54bc58eb3d68229356c0b374b36eaeb0bd20651e59b245cf9",
       "bytes": 2768
+    },
+    {
+      "path": "ui/react-app/src/hooks/useDesktopAccount.js",
+      "sha256": "609c7dc08a0ffb988ee37e922d7cd258eb8c64726ee8583df821add470c8ad0a",
+      "bytes": 1440
     },
     {
       "path": "ui/react-app/src/hooks/useDeviceDiscovery.js",
@@ -11995,8 +12000,8 @@
     },
     {
       "path": "ui/react-app/src/hooks/useVoice.js",
-      "sha256": "bbe0324e11d5ec6a0b4652a277481a1940cb9b74145ac52e5693353dd8dc1c1a",
-      "bytes": 15490
+      "sha256": "c463bdc7372ee1a4be7412f26f4347e89c462fe6b98de804a3c1d31d147604af",
+      "bytes": 19024
     },
     {
       "path": "ui/react-app/src/hooks/useVoiceOnboarding.js",
@@ -12085,8 +12090,8 @@
     },
     {
       "path": "ui/react-app/src/lib/auth_context.tsx",
-      "sha256": "6800ef874e370b2f07caac258c9b469fe5e94bd4cbd296a11eb4499869e84aae",
-      "bytes": 36058
+      "sha256": "f9b9b36d9c67e379cc533567136186ea03c7cbbd41292aa2767a58b56496b1f4",
+      "bytes": 39440
     },
     {
       "path": "ui/react-app/src/lib/billingEntitlement.mountedRoute.test.ts",
@@ -12437,6 +12442,11 @@
       "path": "ui/react-app/src/utils/spokeAudioEngine.js",
       "sha256": "f3e97cca11c427fe2d03dfa80e54369745adaa3e6122d9d81aba0f21d9261902",
       "bytes": 144704
+    },
+    {
+      "path": "ui/react-app/src/utils/stageMarkdown.jsx",
+      "sha256": "7f73182e1fdbdf598b88db9943d62451c3e7459d6617af51e49a03150d75699b",
+      "bytes": 4561
     },
     {
       "path": "ui/react-app/src/utils/syncQuality.test.js",
