@@ -943,6 +943,20 @@ class ApprovalBridge:
                 return "register an MCP server which runs: %s" % full_cmd
             return "perform mcp_servers action '%s'" % (action or "list")
 
+        if tool_name == "computer":
+            # Name what is acted on, so a "yes" covers this app/window/text
+            # and not any later action of the same kind.
+            action = str(args.get("action") or "").strip() or "action"
+            target = ""
+            for key in ("app_name", "app_executable", "target_window", "window_title", "title", "name", "text", "key"):
+                value = str(args.get(key) or "").strip()
+                if value:
+                    target = value[:80]
+                    break
+            if target:
+                return "perform desktop computer action '%s' on '%s'" % (action, target)
+            return "perform desktop computer action '%s'" % action
+
         resolved_args = _resolve_path_like_args(args)
         template = _DESCRIPTION_TEMPLATES.get(tool_name)
         if template is None:
@@ -1064,6 +1078,7 @@ class ApprovalBridge:
                 tool_args=args,
                 task_id=task_id,
                 allow_implicit_match=True,
+                action_description=description,
             )
             if confirmation_state == "accepted":
                 # Under taint, a re-issued call alone is not consent: the

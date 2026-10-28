@@ -570,6 +570,7 @@ class ApprovalManager:
         tool_args: dict[str, Any],
         task_id: str | None = None,
         allow_implicit_match: bool = False,
+        action_description: str | None = None,
     ) -> Literal["missing", "accepted", "rejected"]:
         """Validate and consume a structured cross-turn confirmation."""
 
@@ -580,6 +581,7 @@ class ApprovalManager:
                     risk=risk,
                     tool_args=tool_args,
                     task_id=task_id,
+                    action_description=action_description,
                 )
             return "missing"
 
@@ -629,6 +631,7 @@ class ApprovalManager:
         risk: RiskLevel,
         tool_args: dict[str, Any],
         task_id: str | None = None,
+        action_description: str | None = None,
     ) -> Literal["missing", "accepted"]:
         """Consume a pending confirmation when the later tool call exactly matches.
 
@@ -646,6 +649,7 @@ class ApprovalManager:
         args_fingerprint = self._args_fingerprint_for_tool(tool_name_value, tool_args)
         current_task_id = str(task_id) if task_id else None
         scope = current_confirmation_conversation_scope()
+        described = str(action_description or "").strip()
         matching_ids: list[str] = []
         store = self._pending_store()
         with store.lock:
@@ -655,11 +659,16 @@ class ApprovalManager:
                     continue
                 if pending.created_task_id and pending.created_task_id == current_task_id:
                     continue
-                if (
-                    pending.tool_name == tool_name_value
-                    and pending.risk == risk
-                    and pending.args_fingerprint == args_fingerprint
-                ):
+                if pending.tool_name != tool_name_value or pending.risk != risk:
+                    continue
+                if pending.args_fingerprint == args_fingerprint:
+                    matching_ids.append(confirmation_id)
+                elif described and pending.action_description == described:
+                    # The user said yes to exactly this description. The model
+                    # re-issued the call with extra or reordered optional
+                    # fields (computer: app_executable, axis ...), and the
+                    # exact-args match then asked the same question again
+                    # after every "yes" (1.0.5 r6 live repro, X8.1 family).
                     matching_ids.append(confirmation_id)
             if not matching_ids:
                 return "missing"
@@ -801,6 +810,7 @@ class ApprovalManager:
             tool_args=tool_args or {},
             task_id=task_id,
             allow_implicit_match=True,
+            action_description=action_description,
         )
         if confirmation_state == "accepted":
             if not await self.confirmation_holds_under_taint(action_description, risk):
