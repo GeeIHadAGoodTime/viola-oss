@@ -223,6 +223,9 @@ export function truncateForResponseLine(text) {
 }
 
 const WEATHER_FORECAST_TTL_MS = 30 * 60 * 1000;
+// How long the UI socket may be down before "Connection lost" is shown. The
+// socket retries after 2 s, so a quick drop (e.g. waking from sleep) stays quiet.
+const DISCONNECT_TOAST_GRACE_MS = 6000;
 
 function hasForecastPayload(data) {
   const hourly = data?.hourly_forecast || data?.hourly;
@@ -1728,11 +1731,29 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
     return () => setErrorCallback(null);
   }, [setErrorCallback, addToast]);
 
+  // A dropped socket that comes back on its own (waking from sleep, a brief
+  // backend stall) reconnects quietly: "Connection lost" only shows when it is
+  // still down after DISCONNECT_TOAST_GRACE_MS (1.0.5 build-5 laptop, X10.4).
+  const wsConnectCountRef = useRef(playerState.connectCount);
+  wsConnectCountRef.current = playerState.connectCount;
   useEffect(() => {
     if (!setDisconnectCallback) return;
-    const handleDisconnect = () => { addToast({ message: 'Connection lost. Reconnecting...', level: 'warning' }); };
+    let noticeTimer = null;
+    const handleDisconnect = () => {
+      if (noticeTimer) return;
+      const connectCountAtDrop = wsConnectCountRef.current;
+      noticeTimer = setTimeout(() => {
+        noticeTimer = null;
+        if (wsConnectCountRef.current === connectCountAtDrop) {
+          addToast({ message: 'Connection lost. Reconnecting...', level: 'warning' });
+        }
+      }, DISCONNECT_TOAST_GRACE_MS);
+    };
     setDisconnectCallback(handleDisconnect);
-    return () => setDisconnectCallback(null);
+    return () => {
+      setDisconnectCallback(null);
+      if (noticeTimer) clearTimeout(noticeTimer);
+    };
   }, [setDisconnectCallback, addToast]);
 
   // =========================================================================
@@ -2053,6 +2074,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
   // VOLUME SYNC TO IFRAME
   // =========================================================================
   const lastSyncedVolumeRef = useRef(volume);
+  const embeddedVolumeRequestRef = useRef(0);
   useEffect(() => {
     if (volume !== lastSyncedVolumeRef.current) {
       if (import.meta.env.DEV) {
@@ -3352,15 +3374,30 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
         sendToIframe('seekTo', { seconds: seekPos });
       }}
       onVolumeChange={(newVol) => {
-        const result = api.setVolume(newVol);
-        if (!iframeRef.current) return result;
-        // Embedded volume also has a direct message route. Preserve that
-        // existing behavior separately from the native API-owned control.
-        result.catch((err) => notifyTransportFailure(err, {
-          refused: "Can't change the volume right now.",
-          failed: "Couldn't change the volume. Please try again.",
-        }));
-        sendToIframe('setVolume', { level: newVol });
+        // Embedded YouTube also takes the level straight away over its
+        // message route, so the change is audible before the server answers.
+        if (iframeRef.current) sendToIframe('setVolume', { level: newVol });
+        // Always hand the request back to VolumeControl. It keeps one request
+        // in flight, coalesces the drag to the latest value, and reports a
+        // failure only when the value the user let go on was refused. The
+        // iframe branch used to return nothing and attach its own toast to
+        // every request: VolumeControl then treated each call as instantly
+        // done, a drag fired about 10 POSTs a second, /v1/volume's rate limit
+        // refused some of them, and "Couldn't change the volume" appeared
+        // although every admitted change had been applied (1.0.5 build 5).
+        const request = api.setVolume(newVol);
+        if (iframeRef.current) {
+          const requestId = ++embeddedVolumeRequestRef.current;
+          Promise.resolve(request).catch(() => {
+            // The server refused the value the user let go on: put the
+            // iframe back on the level the slider now shows again. A refusal
+            // of an older, superseded drag value must not touch it.
+            if (requestId === embeddedVolumeRequestRef.current) {
+              sendToIframe('setVolume', { level: ytHubMutedRef.current || isSpoke ? 0 : lastSyncedVolumeRef.current });
+            }
+          });
+        }
+        return request;
       }}
       onVolumeError={(err) => notifyTransportFailure(err, {
         refused: "Can't change the volume right now.",

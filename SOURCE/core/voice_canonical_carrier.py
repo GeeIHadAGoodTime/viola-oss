@@ -168,6 +168,10 @@ def get_current_voice_turn_context() -> VoiceTurnContext | None:
     return _current_voice_turn.get()
 
 
+def _match_key(text: str) -> str:
+    return str(text or "").strip().rstrip("?!").strip()
+
+
 def current_voice_turn_frame(text: str, *, session_id: str | None = None) -> Frame | None:
     """Return a voice input frame when ``text`` is the active transcript."""
 
@@ -175,7 +179,11 @@ def current_voice_turn_frame(text: str, *, session_id: str | None = None) -> Fra
     if ctx is None:
         return None
     transcript = str(text or "").strip()
-    if not transcript or transcript != ctx.transcript:
+    # The pipeline trims trailing "?" / "!" before the AI sees the text
+    # (IntentPipeline._normalize_input). Compare the same way, so a spoken
+    # question ("Did you tell me?") is still recognised as this voice turn
+    # instead of silently taking a different path from "Play Drake.".
+    if not transcript or _match_key(transcript) != _match_key(ctx.transcript):
         return None
     return VoiceTurnFrameFactory.from_transcript(
         transcript,

@@ -546,7 +546,7 @@ export default function DeviceDiscoveryPanel({ localDevice, enabled }) {
           onConnect={connectDevice}
           onDisconnect={disconnectDevice}
           onRename={renameRoom}
-          onCalibrate={handleCalibrate}
+          onCalibrate={device.kind === 'speaker' ? undefined : handleCalibrate}
           isCalibrating={calibratingRoom === device.device_id}
         />
       ))}

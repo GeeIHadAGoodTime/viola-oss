@@ -552,12 +552,47 @@ def uninstall_entry_values(
         "InstallLocation": (layout.root_dir, "sz"),
         "Publisher": (layout.authors, "sz"),
         "QuietUninstallString": ('"%s" --uninstall --silent' % update, "sz"),
-        "UninstallString": ('"%s" --uninstall' % update, "sz"),
+        # Silent on purpose: see _ensure_silent_uninstall.
+        "UninstallString": ('"%s" --uninstall --silent' % update, "sz"),
         "EstimatedSize": (int(size_kb), "dword"),
         "NoModify": (1, "dword"),
         "NoRepair": (1, "dword"),
         "Language": (0x0409, "dword"),
     }
+
+
+def _ensure_silent_uninstall(winreg: Any, key_path: str, current: str) -> str:
+    """Make Settings > Apps > Uninstall run Velopack's uninstall with ``--silent``.
+
+    Settings runs ``UninstallString``, which Velopack writes as
+    ``"<root>\\Update.exe" --uninstall`` (and rewrites after every update).
+    Without ``--silent``, Update.exe does all the work and then waits on a
+    "Viola Uninstall" message box ("The application was successfully
+    uninstalled.", or its with-errors variant) before it schedules deleting
+    the install folder. On the 1.0.5 build-5 laptop that box opened off screen
+    at -32000,-32000, so Update.exe sat there for 10 minutes, was killed, and
+    left Update.exe and Viola.exe behind; the next setup then offered
+    Repair / Cancel. Settings already asks the user to confirm before it starts
+    the uninstall, so the box adds nothing, and Velopack stops a running Viola
+    itself before removing files.
+
+    Returns ``"present"`` (already silent, or not a Velopack command),
+    ``"silenced"`` or ``"failed"``. Never raises.
+    """
+    if "--uninstall" not in current or "--silent" in current:
+        return "present"
+    silent = current.rstrip() + " --silent"
+    try:
+        key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path, 0, winreg.KEY_WRITE)
+        try:
+            winreg.SetValueEx(key, "UninstallString", 0, winreg.REG_SZ, silent)
+        finally:
+            winreg.CloseKey(key)
+    except Exception as exc:  # noqa: BLE001, RUF100 - best effort, never a startup failure
+        logger.warning("Could not make the Settings > Apps uninstall silent (HKCU\\%s): %s", key_path, exc)
+        return "failed"
+    logger.info("Settings > Apps uninstall now runs silently (HKCU\\%s)", key_path)
+    return "silenced"
 
 
 def ensure_uninstall_entry(
@@ -568,10 +603,11 @@ def ensure_uninstall_entry(
 ) -> str:
     """Recreate the per-user Settings > Apps entry if Velopack's key is missing.
 
-    Returns what happened: ``"not_velopack"``, ``"present"``, ``"repaired"`` or
-    ``"failed"``. Never raises, never touches HKLM, and never rewrites a key
-    that already has an UninstallString (Velopack owns it then, and refreshes
-    it on every update).
+    Returns what happened: ``"not_velopack"``, ``"present"``, ``"silenced"``,
+    ``"repaired"`` or ``"failed"``. Never raises and never touches HKLM. A key
+    that already has an UninstallString is Velopack's (it refreshes it on every
+    update); the only change made to it is adding ``--silent`` to that value
+    (see :func:`_ensure_silent_uninstall`).
     """
     if winreg_module is None:
         if sys.platform != "win32":
@@ -591,15 +627,16 @@ def ensure_uninstall_entry(
         return "failed"
     if existing is not None:
         try:
-            winreg.QueryValueEx(existing, "UninstallString")
-            return "present"
+            current, _kind = winreg.QueryValueEx(existing, "UninstallString")
         except FileNotFoundError:
-            pass  # an empty shell of a key shows nothing in Settings; fill it in
+            current = None  # an empty shell of a key shows nothing in Settings; fill it in
         except OSError as exc:
             logger.warning("Uninstall entry read failed for HKCU\\%s: %s", key_path, exc)
             return "failed"
         finally:
             winreg.CloseKey(existing)
+        if current is not None:
+            return _ensure_silent_uninstall(winreg, key_path, str(current))
     try:
         values = uninstall_entry_values(layout, size_kb=(size_kb or _directory_size_kb)(layout.root_dir))
         key = winreg.CreateKeyEx(winreg.HKEY_CURRENT_USER, key_path, 0, winreg.KEY_WRITE)

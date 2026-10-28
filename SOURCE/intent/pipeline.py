@@ -139,6 +139,47 @@ def _input_exceeds_length_cap(text: str) -> bool:
     return len(text or "") > _MAX_PIPELINE_INPUT_CHARS
 
 
+# Spoken when a voice command arrives while the previous command is still
+# running: the command is not dropped, it runs as soon as the session frees up.
+QUEUED_COMMAND_MESSAGE = "Got it. I'll do that as soon as I finish what I'm working on."
+
+_SESSION_BUSY_MESSAGES = {
+    "command_in_progress": (
+        "I'm still working on your previous request. Please wait for it to finish, then try again."
+    ),
+    "command_lock_unavailable": "I'm still working on another request. Please wait for it to finish, then try again.",
+}
+
+
+def _session_busy_result(error: str) -> PipelineResult:
+    """The plain "still busy" reply, used only when a queued command cannot run."""
+
+    return PipelineResult(
+        ok=False,
+        intent="command_in_progress",
+        data={"message": _SESSION_BUSY_MESSAGES[error], "retryable": True},
+        error=error,
+        source="session_lock",
+        bypass_ai=True,
+        policy_flags=["session_busy"],
+    )
+
+
+def _is_wake_voice_turn() -> bool:
+    """True inside a desktop wake-word turn (wake, follow-up or barge-in).
+
+    That handler keeps the wake detector paused until the turn returns, so a
+    queued command must not make it wait. Only ``VoiceCommandHandler``
+    publishes the voice-turn context; push-to-talk, touch hold-to-talk, typed
+    input and the cloud voice sessions do not hold the wake detector, so they
+    wait in the queue and get their reply on their own request.
+    """
+
+    from core.voice_canonical_carrier import get_current_voice_turn_context
+
+    return get_current_voice_turn_context() is not None
+
+
 # ============================================================================
 # UNIFIED INTENT PIPELINE
 # ============================================================================
@@ -274,9 +315,16 @@ class IntentPipeline:
         # C2: Session lane queuing — one lock per session key
         self._session_locks: dict[str, asyncio.Lock] = {}
         self._session_lock_guard = asyncio.Lock()  # protects the dict itself
-        # No durable per-user command queue exists here. Fail fast instead of
-        # letting a second command hang or eventually run unlocked.
+        # A command that arrives while the same user's previous command still
+        # holds the lock: instant transport commands (pause, next, stop...)
+        # run right away without the lock; anything else waits its turn in
+        # FIFO order (asyncio.Lock) and then runs. Nothing is refused unless
+        # the wait passes ``_session_queue_timeout``. ``_session_lock_timeout``
+        # is how long we wait before treating the session as busy.
         self._session_lock_timeout: float = 1.0
+        self._session_queue_timeout: float = 1800.0
+        # Strong references to voice commands queued behind a busy session.
+        self._queued_command_tasks: set[asyncio.Task[None]] = set()
 
         # Track in-flight work for cancellation
         self._active_stt_task: asyncio.Task | None = None
@@ -477,12 +525,16 @@ class IntentPipeline:
                 1 for step in steps if isinstance(step, Mapping) and step.get("status") in {"pending", "in_progress"}
             )
             status = str(active_plan.get("status") or "active")
-            message = "Session status: %s, %d pending step(s)." % (
+            # "Plan" here is the agent's multi-step task plan, never the user's
+            # subscription. "Session status: no active plan." read like "you have
+            # no plan" to a Pro user (X2.5), so name it a task plan.
+            message = "Task plan: %s, %d step%s left." % (
                 status,
                 pending_count,
+                "" if pending_count == 1 else "s",
             )
         else:
-            message = "Session status: no active plan."
+            message = "No task plan running."
         return {"message": message}
 
     def _record_command_invocation_frame(self, invocation: CommandInvocation) -> None:
@@ -1446,6 +1498,21 @@ class IntentPipeline:
         # user id already validated above.
         session_key = request_user_key
         session_lock = await self._get_session_lock(session_key)
+
+        # Instant transport commands (pause, resume, next, stop...) never wait
+        # behind a running agent task. 1.0.5 build 5: "Next!" by voice while a
+        # typed "what's on my screen" ran got "I'm still working on your
+        # previous request" instead of skipping the track.
+        if session_lock.locked():
+            busy_instant = await self._run_instant_while_busy(
+                text=text,
+                channel=channel,
+                request_manager=request_manager,
+                request_user_key=request_user_key,
+            )
+            if busy_instant is not None:
+                return busy_instant
+
         acquired = False
         try:
             acquired = await asyncio.wait_for(
@@ -1453,37 +1520,42 @@ class IntentPipeline:
                 timeout=self._session_lock_timeout,
             )
         except TimeoutError:
-            logger.warning(
-                "Session lock timeout for key=%s after %.0fs; rejecting concurrent command",
+            # The session is busy. Queue the command instead of refusing it.
+            if _is_wake_voice_turn():
+                # A wake-word turn keeps the wake detector paused until it
+                # returns, so waiting here would leave Viola deaf (even to
+                # "stop") until the earlier task ends. Acknowledge now and run
+                # the command in order in the background.
+                return self._queue_voice_command(
+                    text=text,
+                    force_ai=force_ai,
+                    channel=channel,
+                    request_manager=request_manager,
+                    request_user_key=request_user_key,
+                    session_lock=session_lock,
+                )
+            logger.info(
+                "Session busy for key=%s; queuing command behind the running one",
                 session_key,
-                self._session_lock_timeout,
             )
-            return PipelineResult(
-                ok=False,
-                intent="command_in_progress",
-                data={
-                    "message": "I'm still working on your previous request. Please wait for it to finish, then try again.",
-                    "retryable": True,
-                },
-                error="command_in_progress",
-                source="session_lock",
-                bypass_ai=True,
-                policy_flags=["session_busy"],
-            )
+            try:
+                acquired = await asyncio.wait_for(
+                    session_lock.acquire(),
+                    timeout=self._session_queue_timeout,
+                )
+            except TimeoutError:
+                logger.warning(
+                    "Queued command for key=%s waited %.0fs without the session freeing up; giving up",
+                    session_key,
+                    self._session_queue_timeout,
+                )
+                return _session_busy_result("command_in_progress")
+            except Exception:  # noqa: BLE001, RUF100 - lock-acquisition failure reports busy, never runs unlocked
+                logger.debug("Queued session lock acquisition failed for key=%s", session_key, exc_info=True)
+                return _session_busy_result("command_lock_unavailable")
         except Exception:  # noqa: BLE001, RUF100 - pre-existing lock-acquisition fail-open, unchanged by #1907
             logger.debug("Session lock acquisition failed for key=%s", session_key, exc_info=True)
-            return PipelineResult(
-                ok=False,
-                intent="command_in_progress",
-                data={
-                    "message": "I'm still working on another request. Please wait for it to finish, then try again.",
-                    "retryable": True,
-                },
-                error="command_lock_unavailable",
-                source="session_lock",
-                bypass_ai=True,
-                policy_flags=["session_busy"],
-            )
+            return _session_busy_result("command_lock_unavailable")
 
         try:
             # CHAN-R7: publish the caller's channel via a contextvar so
@@ -1505,6 +1577,184 @@ class IntentPipeline:
         finally:
             if acquired:
                 session_lock.release()
+
+    async def _run_instant_while_busy(
+        self,
+        *,
+        text: str,
+        channel: object | None,
+        request_manager: ConversationStateManager,
+        request_user_key: str,
+    ) -> PipelineResult | None:
+        """Run an instant transport command without waiting for the session lock.
+
+        Returns ``None`` when ``text`` is not an instant command, so the caller
+        queues it normally. Instant commands are anchored exact control phrases
+        ("pause", "next", "stop"...), so they skip the prefilters and the
+        conversation-history write that the locked path does: writing the turn
+        into history in the middle of the running task's turn would interleave
+        the two. The command itself runs exactly as it does when idle.
+
+        Besides INSTANT_PATTERNS, the exact busy-only transport phrases
+        (previous, mute, unmute, volume up/down: BUSY_TRANSPORT_PATTERNS) run
+        here too; when idle those still go to the model.
+        """
+        normalized = self._normalize_input(text)
+        if not normalized or _input_exceeds_length_cap(normalized):
+            return None
+        handler = getattr(self, "instant_handler", None)
+        if handler is None:
+            return None
+        from messaging.channel import use_request_channel
+
+        from intent.instant_commands_patterns import match_busy_transport_command
+
+        instant_match = handler.check_instant_command(normalized) or match_busy_transport_command(normalized)
+        if not instant_match:
+            return None
+        with use_request_manager(request_manager), use_request_channel(channel):
+            result = await self._processors.try_instant(
+                normalized,
+                user_key=request_user_key,
+                instant_match=instant_match,
+            )
+        if result is None:
+            return None
+        logger.info("Instant command %s ran while another command was in progress", result.intent)
+        if "ran_while_busy" not in result.policy_flags:
+            result.policy_flags.append("ran_while_busy")
+        return result
+
+    def _queue_voice_command(
+        self,
+        *,
+        text: str,
+        force_ai: bool,
+        channel: object | None,
+        request_manager: ConversationStateManager,
+        request_user_key: str,
+        session_lock: asyncio.Lock,
+    ) -> PipelineResult:
+        """Run a voice command after the busy session frees up; acknowledge it now."""
+
+        logger.info("Session busy for key=%s; queued voice command to run next", request_user_key)
+        task = asyncio.create_task(
+            self._run_queued_voice_command(
+                text=text,
+                force_ai=force_ai,
+                channel=channel,
+                request_manager=request_manager,
+                request_user_key=request_user_key,
+                session_lock=session_lock,
+            )
+        )
+        self._queued_command_tasks.add(task)
+        task.add_done_callback(self._queued_command_tasks.discard)
+        return PipelineResult(
+            ok=True,
+            intent="command_queued",
+            data={"message": QUEUED_COMMAND_MESSAGE, "queued": True, "continue_listening": False},
+            source="session_queue",
+            bypass_ai=True,
+            policy_flags=["session_busy", "queued"],
+        )
+
+    async def _run_queued_voice_command(
+        self,
+        *,
+        text: str,
+        force_ai: bool,
+        channel: object | None,
+        request_manager: ConversationStateManager,
+        request_user_key: str,
+        session_lock: asyncio.Lock,
+    ) -> None:
+        """Wait for the session, run the queued voice command, then deliver its reply."""
+
+        from messaging.channel import use_request_channel
+
+        from core.user_context import reset_current_user_id, set_current_user_id
+
+        user_context_token = set_current_user_id(request_user_key)
+        try:
+            try:
+                await asyncio.wait_for(session_lock.acquire(), timeout=self._session_queue_timeout)
+            except TimeoutError:
+                logger.warning(
+                    "Queued voice command for key=%s waited %.0fs without the session freeing up",
+                    request_user_key,
+                    self._session_queue_timeout,
+                )
+                await self._deliver_queued_voice_result(
+                    _session_busy_result("command_in_progress"),
+                    channel=channel,
+                    request_user_key=request_user_key,
+                )
+                return
+            try:
+                with use_request_manager(request_manager), use_request_channel(channel):
+                    result = await self._process_inner(
+                        text=text,
+                        force_ai=force_ai,
+                        channel=channel,
+                        user_key=request_user_key,
+                    )
+            finally:
+                session_lock.release()
+            await self._deliver_queued_voice_result(result, channel=channel, request_user_key=request_user_key)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception("Queued voice command failed for key=%s", request_user_key)
+        finally:
+            reset_current_user_id(user_context_token)
+
+    async def _deliver_queued_voice_result(
+        self,
+        result: PipelineResult,
+        *,
+        channel: object | None,
+        request_user_key: str,
+    ) -> None:
+        """Show and speak a queued voice command's reply (the voice turn already ended)."""
+
+        from messaging.channel import use_request_channel
+
+        raw_message = result.data.get("message")
+        message = raw_message.strip() if isinstance(raw_message, str) else ""
+        if not message and not result.ok:
+            message = "Sorry, I couldn't finish that one."
+        if not message:
+            return
+        try:
+            import time as _time
+
+            from ui.websocket.event_hub import get_event_hub
+
+            hub = get_event_hub()
+            if hub is not None:
+                payload: dict[str, object] = {
+                    "text": message,
+                    "intent": result.intent,
+                    "timestamp": _time.time(),
+                }
+                card = result.data.get("card")
+                if isinstance(card, dict):
+                    payload["card"] = card
+                await hub.broadcast("chat_response", payload, user_id=request_user_key, force=True)
+        except Exception:  # noqa: BLE001, RUF100 - showing the reply must not stop it being spoken
+            logger.debug("Queued voice reply broadcast failed", exc_info=True)
+        if result.data.get("spoken") or result.data.get("already_spoken"):
+            return
+        try:
+            from ui.settings_manager import get_settings_manager
+
+            if get_settings_manager().get("voice_muted", False, user_id=request_user_key):
+                return
+        except Exception:  # noqa: BLE001, RUF100 - a settings hiccup must not silently mute Viola
+            logger.debug("Could not read voice_muted for queued reply", exc_info=True)
+        with use_request_channel(channel):
+            await self._tts_speaker.speak(message)
 
     async def _get_session_lock(self, session_key: str) -> asyncio.Lock:
         """Return the per-session lock, creating it if needed."""

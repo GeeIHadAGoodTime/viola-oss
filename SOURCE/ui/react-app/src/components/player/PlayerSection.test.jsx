@@ -75,3 +75,29 @@ describe('PlayerSection music command input surface gating (#1504)', () => {
     expect(screen.queryByPlaceholderText('Ask Viola to play something')).toBeNull();
   });
 });
+
+// A3.7 (1.0.5 build 5): a long YouTube title wrapped to several lines and
+// pushed play/pause below the stage on the Surface. The title is clamped to
+// two lines (one on short stages) and the full text stays reachable as the
+// element's tooltip.
+describe('PlayerSection long titles keep the controls on the stage (A3.7)', () => {
+  const longTitle = 'Miles Davis Quintet - Live at the Plugged Nickel 1965 (Complete Second Set, Remastered Edition) [Full Album, Official Audio]';
+
+  it('keeps the full title as a tooltip on the clamped title element', () => {
+    renderPlayerSection({ nowPlaying: { id: 't1', title: longTitle, artist: 'Miles Davis' } });
+    const title = screen.getByText(longTitle);
+    expect(title).toHaveAttribute('title', longTitle);
+    expect(screen.getByRole('button', { name: 'Play' })).toBeInTheDocument();
+  });
+
+  it('clamps the title in the stylesheet', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { fileURLToPath } = await import('node:url');
+    const { dirname, join } = await import('node:path');
+    const css = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'PlayerSection.module.css'), 'utf8');
+    const titleRule = css.match(/\.trackTitle\s*\{[^}]*\}/)[0];
+    expect(titleRule).toMatch(/-webkit-line-clamp:\s*2/);
+    expect(titleRule).toMatch(/overflow:\s*hidden/);
+    expect(css).toMatch(/@media \(max-height: 820px\)\s*\{\s*\.trackTitle\s*\{[^}]*-webkit-line-clamp:\s*1/);
+  });
+});

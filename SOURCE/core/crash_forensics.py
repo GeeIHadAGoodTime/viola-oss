@@ -129,7 +129,10 @@ from typing import IO, Any
 
 __all__ = [
     "CRASH_ARTIFACT_SCHEMA_VERSION",
+    "EXIT_WATCHDOG_MARK",
     "CrashForensics",
+    "arm_exit_watchdog",
+    "faulthandler_all_threads",
     "install_crash_forensics",
     "snapshot_loaded_modules",
     "suppress_native_crash_dialogs",
@@ -184,6 +187,114 @@ _WER_FAULT_REPORTING_FLAG_NOHEAP = 0x0001
 _WER_FAULT_REPORTING_FLAG_QUEUE = 0x0002
 _WER_FAULT_REPORTING_FLAG_DISABLE_THREAD_SUSPENSION = 0x0004
 _WER_FAULT_REPORTING_ALWAYS_SHOW_UI = 0x0010
+
+# Written into the run log when quitting starts (see arm_exit_watchdog). A
+# "Timeout (...)!" dump below it means the quit hung and the watchdog ended it.
+EXIT_WATCHDOG_MARK = "==== VIOLA EXIT WATCHDOG ARMED ===="
+_EXIT_WATCHDOG_ENV = "VIOLA_EXIT_WATCHDOG_S"
+_DEFAULT_EXIT_WATCHDOG_S = 8.0
+
+# The run log of the last install_crash_forensics() in this process, so the
+# exit watchdog can write its dump next to the crash dumps.
+_ACTIVE_STREAM: IO[str] | None = None
+# Set once the exit watchdog is armed; quitting never pushes the deadline out.
+_EXIT_WATCHDOG_ARMED = False
+
+
+def faulthandler_all_threads() -> bool:
+    """Whether ``faulthandler.enable`` may dump EVERY thread on this platform.
+
+    False on Windows, and this is a crash fix, not a preference (1.0.5 build-5
+    laptop report: two APPCRASHes in ViolaApp.exe, python311.dll 3.11.9150.1013,
+    0xc0000005 at offsets 0x259cc4 and 0x259d41).
+
+    Both offsets fall inside the python311.dll function at RVA 0x259cac-0x259e0e,
+    the one that writes ``  File "``, ``, line `` and `` in `` and calls
+    ``PyCode_Addr2Line``: ``dump_frame`` in Python/traceback.c, i.e. the
+    traceback printer faulthandler itself uses. The crash was faulthandler's
+    own dump, not the code it was reporting on.
+
+    Why: on Windows faulthandler is a vectored exception handler, so it runs on
+    FIRST-CHANCE exceptions, including ones the code that raised them goes on
+    to handle (COM's ``RPC_E_DISCONNECTED`` 0x80010108 is the usual one; it is
+    routine when a COM peer goes away, e.g. audio endpoints and webview
+    accessibility on sleep, resume and window hide). With ``all_threads=True``
+    every such event walks every OTHER thread's interpreter frames without the
+    GIL while those threads keep running; a frame popped mid-walk is freed
+    memory, and reading it is an access violation inside the vectored handler.
+    COM's exception filter does not swallow access violations, so a harmless,
+    handled COM exception turns into a dead process. The dev box's old shared
+    faulthandler.log holds 35+ of these half-written ``  File "...``
+    lines followed by a nested ``access violation``, each right after a
+    ``code 0x80010108`` / ``0x8001010d`` dump, and
+    ``tests/public/test_faulthandler_first_chance_race.py`` reproduces the
+    nested fault with a plain handled ``RaiseException``.
+
+    Dumping only the faulting thread reads frames that thread owns and that
+    cannot change while it is stopped in the handler, so it is safe, and it is
+    the stack that matters for a real crash. Off Windows, faulthandler only
+    runs on fatal signals, where the process is dying anyway, so all threads
+    stay on there.
+    """
+    return sys.platform != "win32"
+
+
+def arm_exit_watchdog(timeout_s: float | None = None, *, file: IO[str] | None = None) -> bool:
+    """Make sure this process is gone within ``timeout_s`` once quitting starts.
+
+    Quitting has hung for over a minute behind a Windows passkey dialog that
+    the agent browser opened (1.0.5 build-5 laptop report: "Window closed:
+    quitting Viola", then ``RuntimeError: cannot schedule new futures after
+    shutdown`` until the process was force-stopped). A hang can sit anywhere
+    after the event loop is asked to stop: a native modal loop, a thread-pool
+    worker that ``concurrent.futures`` joins at exit with no timeout, a Qt or
+    Chromium destructor. So this does not try to fix each one; it puts a
+    deadline on all of them.
+
+    It uses ``faulthandler.dump_traceback_later(..., exit=True)``, whose
+    watchdog is a C thread that needs neither the GIL nor a running event
+    loop: if the process is still here after the deadline it writes every
+    thread's stack into the crash log (so the next hang names its culprit) and
+    calls ``_exit``. Normal quits finish well inside the deadline (about 3 s on
+    the laptop), and the watchdog dies with the process. Only the first call arms
+    it, so later steps of the same quit cannot push the deadline out. Never
+    raises; returns whether the watchdog is armed.
+    """
+    import faulthandler
+
+    global _EXIT_WATCHDOG_ARMED
+    if _EXIT_WATCHDOG_ARMED:
+        return True
+    if file is None and os.environ.get("PYTEST_CURRENT_TEST"):
+        # In-process unit tests drive the real quit path; a live watchdog
+        # would _exit the test worker a few seconds later. Tests that exercise
+        # the watchdog pass ``file=`` and run it in a child process.
+        return False
+    if timeout_s is None:
+        try:
+            timeout_s = float(os.environ.get(_EXIT_WATCHDOG_ENV, "") or _DEFAULT_EXIT_WATCHDOG_S)
+        except ValueError:
+            timeout_s = _DEFAULT_EXIT_WATCHDOG_S
+    if timeout_s <= 0:
+        return False
+    stream = file if file is not None else _ACTIVE_STREAM
+    if stream is None:
+        stream = sys.__stderr__
+    if stream is None:
+        return False
+    try:
+        try:
+            stream.write(
+                "\n%s\nexit_requested_utc: %s\ndeadline_s: %.1f\n" % (EXIT_WATCHDOG_MARK, _utc_now()[1], timeout_s)
+            )
+            stream.flush()
+        except (OSError, ValueError):
+            pass
+        faulthandler.dump_traceback_later(timeout_s, repeat=False, file=stream, exit=True)
+    except (OSError, ValueError, RuntimeError, AttributeError):
+        return False
+    _EXIT_WATCHDOG_ARMED = True
+    return True
 
 
 @dataclass
@@ -859,7 +970,7 @@ def install_crash_forensics(
     The caller enables faulthandler on the returned stream::
 
         forensics = install_crash_forensics("viola_qt")
-        faulthandler.enable(file=forensics.stream, all_threads=True)
+        faulthandler.enable(file=forensics.stream, all_threads=faulthandler_all_threads())
 
     The enable() call stays at the call site on purpose: the crash handler is
     stdlib ``faulthandler`` and nothing else, and keeping that visible in each
@@ -951,6 +1062,9 @@ def install_crash_forensics(
         _register_clean_exit_marker(stream)
     except Exception:  # noqa: BLE001, RUF100 - never let a diagnostic hook fail the boot
         notes.append("clean-exit-marker-unregistered")
+
+    global _ACTIVE_STREAM
+    _ACTIVE_STREAM = stream
 
     _write_header(
         stream,

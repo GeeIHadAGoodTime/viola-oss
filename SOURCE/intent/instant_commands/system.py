@@ -770,6 +770,13 @@ class SystemHandlersMixin:
             )
 
             user_id, session_id, task_id = self._active_executor_scope(params)
+            # A ringing alarm is the loudest thing going: "stop" silences it first
+            # (X1.3). Only this user's alarm, never another account's.
+            if user_id:
+                from services.alarm_ringer import stop_ringing_alarm
+
+                if stop_ringing_alarm(user_id):
+                    return {"ok": True, "message": "Alarm off.", "data": {"stopped": "alarm"}}
             tracker = get_activity_tracker()
             most_recent = tracker.most_recent_active(user_id=user_id)
 
@@ -817,6 +824,11 @@ class SystemHandlersMixin:
         stopped = []
         try:
             user_id, session_id, task_id = self._active_executor_scope(params)
+            if user_id:
+                from services.alarm_ringer import stop_ringing_alarm
+
+                if stop_ringing_alarm(user_id):
+                    stopped.append("alarm")
             # Stop agent task if running
             try:
                 from intent.agent_executor import get_active_executor

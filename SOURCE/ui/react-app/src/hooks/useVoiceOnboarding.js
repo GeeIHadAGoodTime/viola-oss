@@ -229,12 +229,25 @@ function speakText(text) {
   };
 }
 
+// Waits between /v1/onboarding/status attempts when the answer is unknown.
+export const ONBOARDING_STATUS_RETRY_DELAYS_MS = [1000, 2000, 4000, 8000, 15000];
+
+// Returns true (finished), false (not finished) or null (no answer).
+//
+// Only an explicit `completed: false` from the backend starts first run. A
+// failed request is NOT "not finished": after the laptop woke from sleep the
+// page came back while the backend was still reconnecting, the status call
+// failed, and an existing, signed-in user saw the onboarding screen flash up
+// (1.0.5 build-5 laptop report, X10.4). The backend already answers its own
+// failures with completed=true for the same reason.
 async function checkOnboardingStatus() {
   try {
     const data = await apiFetch('/v1/onboarding/status');
-    return data?.completed === true;
+    if (data?.completed === true) return true;
+    if (data?.completed === false) return false;
+    return null;
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -957,11 +970,21 @@ export function useVoiceOnboarding() {
     initStartedRef.current = true;
 
     let mounted = true;
+    let retryTimer = null;
 
-    const init = async () => {
+    const init = async (attempt) => {
       const completed = await checkOnboardingStatus();
       if (!mounted) return;
-      if (!completed && mounted) {
+      if (completed === null) {
+        // No answer yet (backend starting or reconnecting): ask again later
+        // and keep the normal screen up meanwhile. Never guess "not finished".
+        const delay = ONBOARDING_STATUS_RETRY_DELAYS_MS[attempt];
+        if (delay !== undefined) {
+          retryTimer = setTimeout(() => { retryTimer = null; init(attempt + 1); }, delay);
+        }
+        return;
+      }
+      if (completed === false) {
         timeoutRef.current = setTimeout(() => {
           if (!skipRef.current && mounted) {
             setIsOnboarding(true);
@@ -970,10 +993,11 @@ export function useVoiceOnboarding() {
       }
     };
 
-    init();
+    init(0);
 
     return () => {
       mounted = false;
+      if (retryTimer) clearTimeout(retryTimer);
     };
   }, [onboardingAvailable]);
 

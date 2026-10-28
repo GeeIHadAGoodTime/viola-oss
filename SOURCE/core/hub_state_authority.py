@@ -106,6 +106,11 @@ class StateReconciliationResult:
 # =============================================================================
 
 
+# Resolutions under which the merge takes the provider's value. A conflict that
+# resolves this way is a state transition, not a disagreement the hub overrode.
+_PROVIDER_ADOPTED_RESOLUTIONS = frozenset({"provider_authoritative", "provider_newer"})
+
+
 class _ConflictDetector:
     """Handles conflict detection logic for state reconciliation."""
 
@@ -131,9 +136,9 @@ class _ConflictDetector:
                     provider_value=(
                         getattr(provider_state.now_playing, "id", None) if provider_state.now_playing else None
                     ),
-                    severity=StateConflictSeverity.WARNING,
-                    resolution="hub_authoritative",
-                    description="Now playing tracks differ",
+                    severity=StateConflictSeverity.INFO,
+                    resolution="provider_authoritative",
+                    description="Now playing tracks differ (provider authoritative)",
                 )
             )
 
@@ -227,8 +232,15 @@ class _ConflictDetector:
                     len(provider_queue),
                 )
             else:
-                resolution = "hub_authoritative"
-                description = "Queue lengths differ"
+                # The track ended (queue advanced) AND autoplay appended in the
+                # same window, so the queue is neither a superset nor a subset
+                # of the hub copy. The hub has no queue of its own -- every
+                # canonical queue is an earlier copy of this provider's -- so
+                # keeping the hub copy here froze a stale "Up next" and logged
+                # "State conflict detected: queue" on every broadcast until
+                # the lengths happened to match again.
+                resolution = "provider_authoritative"
+                description = "Queue replaced (advance plus autoplay, provider authoritative)"
 
             conflicts.append(
                 StateConflict(
@@ -254,7 +266,7 @@ class _ConflictDetector:
                         hub_value=hub_id,
                         provider_value=provider_id,
                         severity=StateConflictSeverity.INFO,
-                        resolution="hub_authoritative",
+                        resolution="provider_authoritative",
                         description=f"Queue item {i} differs",
                     )
                 )
@@ -272,9 +284,13 @@ class _ConflictDetector:
                     field="is_playing",
                     hub_value=hub_state.is_playing,
                     provider_value=provider_state.is_playing,
-                    severity=StateConflictSeverity.ERROR,
-                    resolution="hub_authoritative",
-                    description="Playback state differs",
+                    # The merge has always taken the player's is_playing (the
+                    # player is the source of truth for playing vs paused).
+                    # A difference is an ordinary transition the hub has not
+                    # heard about yet (iframe pause, track end), not a fault.
+                    severity=StateConflictSeverity.INFO,
+                    resolution="provider_authoritative",
+                    description="Playback state changed (provider authoritative)",
                 )
             )
 
@@ -989,6 +1005,19 @@ class HubStateAuthority:
 
             if conflicts:
                 for conflict in conflicts:
+                    if conflict.resolution in _PROVIDER_ADOPTED_RESOLUTIONS:
+                        # The canonical state simply adopted the player's newer
+                        # value. That is how every pause, track end and
+                        # autoplay append reaches the hub, so it is not a
+                        # failure; it was 74 false "State conflict detected"
+                        # lines in one overnight 1.0.5 run.
+                        logger.debug(
+                            "Hub state adopted provider %s: hub=%s provider=%s",
+                            conflict.field,
+                            conflict.hub_value,
+                            conflict.provider_value,
+                        )
+                        continue
                     if emit_failure:
                         try:
                             emit_failure(
