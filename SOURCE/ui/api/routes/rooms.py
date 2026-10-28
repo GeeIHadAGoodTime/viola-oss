@@ -206,58 +206,14 @@ def _get_discovered_rooms() -> list[RoomResponse]:
     return rooms
 
 
-def _install_principals(user_id: str) -> list[str]:
-    """Registries a request may use: its own, then the install's other local principal.
-
-    A paired speaker's socket carries no signed-in session, so its room is
-    registered under the hub's DEVICE principal, while a signed-in desktop UI
-    asks as the ACCOUNT principal. On a one-user-per-install desktop those are
-    the same person (core.user_context.get_desktop_local_principals), but the
-    room list only read the account's registry, so a joined speaker never
-    showed in Rooms and could not be removed (1.0.5 laptop A7.6). Never widened
-    on cloud surfaces, and only when the requester is one of THIS install's two
-    principals.
-    """
-    principals = [user_id]
-    try:
-        from core.user_context import get_desktop_local_principals, is_cloud_surface
-
-        if is_cloud_surface():
-            return principals
-        local = get_desktop_local_principals()
-    except (ImportError, LookupError, OSError, RuntimeError, ValueError):
-        return principals
-    if user_id not in local:
-        return principals
-    return principals + [principal for principal in local if principal != user_id]
-
-
-def _registry_holding_room(user_id: str, room_id: str) -> Any:
-    """The room registry (among this install's principals) that holds ``room_id``."""
-    from services.multiroom.room_registry import get_room_registry
-
-    for principal in _install_principals(user_id):
-        registry = get_room_registry(user_id=principal)
-        if registry.get_room(room_id) is not None:
-            return registry
-    return get_room_registry(user_id=user_id)
-
-
 def _get_registered_multiroom_rooms(user_id: str) -> list[RoomResponse]:
     """Get durable rooms registered by in-house spoke pairing."""
     rooms: list[RoomResponse] = []
     try:
         from services.multiroom.room_registry import get_room_registry
 
-        remote_rooms = []
-        seen_ids: set[str] = set()
-        for principal in _install_principals(user_id):
-            for room in get_room_registry(user_id=principal).get_remote_rooms():
-                if room.id in seen_ids:
-                    continue
-                seen_ids.add(room.id)
-                remote_rooms.append(room)
-        for room in remote_rooms:
+        registry = get_room_registry(user_id=user_id)
+        for room in registry.get_remote_rooms():
             rooms.append(
                 RoomResponse(
                     id=room.id,
@@ -461,7 +417,9 @@ async def rename_room(
     Updates the display name of a room via StateHub's RenameRoom command.
     """
     try:
-        registry = _registry_holding_room(user_id, room_id)
+        from services.multiroom.room_registry import get_room_registry
+
+        registry = get_room_registry(user_id=user_id)
         room = registry.get_room(room_id)
         if room is None:
             return JSONResponse(
@@ -497,9 +455,11 @@ async def set_room_volume(
 ) -> JSONResponse:
     """Set per-room volume through the durable registry and live spoke path."""
     try:
+        from services.multiroom.room_registry import get_room_registry
+
         live_room_id, live_control = await _mirror_live_spoke_volume(room_id, body.volume)
         registry_room_id = live_room_id or room_id
-        registry = _registry_holding_room(user_id, registry_room_id)
+        registry = get_room_registry(user_id=user_id)
         updated = registry.set_room_volume(registry_room_id, body.volume)
         if updated is None and live_control is not True:
             return JSONResponse(
@@ -536,9 +496,11 @@ async def set_room_mute(
 ) -> JSONResponse:
     """Set per-room mute through the durable registry and live spoke path."""
     try:
+        from services.multiroom.room_registry import get_room_registry
+
         live_room_id, live_control = await _mirror_live_spoke_mute(room_id, body.muted)
         registry_room_id = live_room_id or room_id
-        registry = _registry_holding_room(user_id, registry_room_id)
+        registry = get_room_registry(user_id=user_id)
         updated = registry.set_room_mute(registry_room_id, body.muted)
         if updated is None and live_control is not True:
             return JSONResponse(
@@ -616,7 +578,9 @@ async def delete_room(
     Unregisters a non-local room via RoomRegistry. Cannot delete the local room.
     """
     try:
-        registry = _registry_holding_room(user_id, room_id)
+        from services.multiroom.room_registry import get_room_registry
+
+        registry = get_room_registry(user_id=user_id)
         room = registry.get_room(room_id)
         if room is None:
             return JSONResponse(
