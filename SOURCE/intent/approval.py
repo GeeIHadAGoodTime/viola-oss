@@ -650,6 +650,7 @@ class ApprovalManager:
         current_task_id = str(task_id) if task_id else None
         scope = current_confirmation_conversation_scope()
         described = str(action_description or "").strip()
+        new_args = self._stored_tool_args_for_tool(tool_name_value, tool_args) if described else {}
         matching_ids: list[str] = []
         store = self._pending_store()
         with store.lock:
@@ -663,12 +664,17 @@ class ApprovalManager:
                     continue
                 if pending.args_fingerprint == args_fingerprint:
                     matching_ids.append(confirmation_id)
-                elif described and pending.action_description == described:
-                    # The user said yes to exactly this description. The model
-                    # re-issued the call with extra or reordered optional
-                    # fields (computer: app_executable, axis ...), and the
-                    # exact-args match then asked the same question again
-                    # after every "yes" (1.0.5 r6 live repro, X8.1 family).
+                elif (
+                    described
+                    and pending.action_description == described
+                    and all(new_args.get(key) == value for key, value in pending.tool_args.items())
+                ):
+                    # The user said yes to exactly this description, and the
+                    # re-issued call keeps every argument they were asked
+                    # about, only adding optional fields (computer:
+                    # app_executable, axis ...). The exact-args match asked
+                    # the same question again after every "yes" (1.0.5 r6
+                    # live repro, X8.1 family).
                     matching_ids.append(confirmation_id)
             if not matching_ids:
                 return "missing"
