@@ -71,6 +71,18 @@ MODE_PAUSED = "paused"
 _VALID_MODES = frozenset({MODE_WAKE, MODE_RECORD, MODE_VAD_MONITOR, MODE_PAUSED})
 
 
+def barge_in_aec_degraded_reason(
+    aec_processor: AECProcessor | None,
+    aec_reference_source: object | None,
+) -> str | None:
+    """Why barge-in must not fire right now (echo canceller degraded), or None."""
+    try:
+        from voice.wake_detector.aec_processor import echo_cancellation_degraded_reason
+    except ImportError:
+        return "the echo canceller is not installed"
+    return echo_cancellation_degraded_reason(aec_processor, aec_reference_source)
+
+
 class CrossUserCaptureError(RuntimeError):
     """Raised when a capture buffer bound to user A is accessed by user B."""
 
@@ -153,6 +165,16 @@ class ContinuousMicCapture:
         self._on_interrupt: Callable[[], None] | None = None
         self._interrupt_fired = False
 
+        # Barge-in audio comes from the wake listener's echo-cancelled feed
+        # (set_processed_feed_enabled) instead of a second canceller pass.
+        self._processed_feed_enabled = False
+        # Returns the listener's live (aec_processor, aec_reference_source).
+        self._aec_state_source: Callable[[], tuple[object | None, object | None]] | None = None
+        # Barge-in is refused while the echo canceller cannot remove Viola's
+        # own voice; the reason is logged once per distinct cause.
+        self._aec_degraded_reasons_logged: set[str] = set()
+        self._barge_in_suppressed_this_turn = False
+
     # -------------------------------------------------------------------
     # Lifecycle
     # -------------------------------------------------------------------
@@ -202,14 +224,19 @@ class ContinuousMicCapture:
 
         audio_int16 = np.frombuffer(audio_bytes, dtype=np.int16)
 
-        # Apply AEC if available and in VAD monitor mode
         with self._mode_lock:
             current_mode = self._mode
             aec_proc = self._aec_processor
             aec_ref = self._aec_reference_source
+            processed_feed = self._processed_feed_enabled
 
-        if aec_proc is not None and aec_ref is not None and current_mode == MODE_VAD_MONITOR:
-            audio_int16 = self._apply_aec(audio_int16, aec_proc, aec_ref)
+        if current_mode == MODE_VAD_MONITOR:
+            if processed_feed:
+                # The wake listener hands over its own echo-cancelled copy of
+                # this chunk through feed_processed_audio(); see there.
+                return
+            if aec_proc is not None and aec_ref is not None:
+                audio_int16 = self._apply_aec(audio_int16, aec_proc, aec_ref)
 
         # Route audio based on mode
         if current_mode == MODE_WAKE:
@@ -219,6 +246,46 @@ class ContinuousMicCapture:
         elif current_mode == MODE_VAD_MONITOR:
             self._handle_vad_monitor_audio(audio_int16)
         # MODE_PAUSED: discard
+
+    def set_processed_feed_enabled(self, enabled: bool) -> None:
+        """Take the barge-in audio from the wake listener's echo-cancelled feed.
+
+        The wake listener already runs every microphone chunk through the echo
+        canceller. This capture shares that canceller AND its reference buffer,
+        and the reference buffer is a queue: every frame read is removed. When
+        both ran the canceller on the same chunk while Viola was speaking, the
+        reference drained twice as fast as it filled, each reader got a
+        misaligned half of Viola's speech, and the shared adaptive filter was
+        fed every microphone frame twice against two different references. It
+        diverged (ERLE of -26 to -44 dB on the 1.0.5 laptop: the "cancelled"
+        signal was louder than the microphone), the barge-in VAD heard Viola's
+        own reply, and Viola answered itself.
+
+        With this on, the capture never touches the canceller; it uses the copy
+        the listener already cleaned (see :meth:`feed_processed_audio`).
+        """
+        with self._mode_lock:
+            self._processed_feed_enabled = bool(enabled)
+
+    def set_aec_state_source(self, source: Callable[[], tuple[object | None, object | None]] | None) -> None:
+        """Where the barge-in health check reads the live canceller and reference."""
+        with self._mode_lock:
+            self._aec_state_source = source
+
+    def feed_processed_audio(self, audio_bytes: bytes) -> None:
+        """Receive the wake listener's echo-cancelled copy of a chunk.
+
+        Only the barge-in monitor (vad_monitor mode) uses it; the other modes
+        keep the raw chunk from :meth:`feed_audio`.
+        """
+        if not self._running:
+            return
+        with self._mode_lock:
+            current_mode = self._mode
+            processed_feed = self._processed_feed_enabled
+        if not processed_feed or current_mode != MODE_VAD_MONITOR:
+            return
+        self._handle_vad_monitor_audio(np.frombuffer(audio_bytes, dtype=np.int16))
 
     @property
     def is_running(self) -> bool:
@@ -270,6 +337,7 @@ class ContinuousMicCapture:
                 self._recording_user_id = _current_user_id()
                 self._vad_consecutive_speech = 0
                 self._interrupt_fired = False
+                self._barge_in_suppressed_this_turn = False
                 self._on_interrupt = kwargs.get("on_interrupt")
                 if self._vad_model is not None:
                     try:
@@ -428,9 +496,46 @@ class ContinuousMicCapture:
             else:
                 self._vad_consecutive_speech = 0
 
-            if self._vad_consecutive_speech >= VAD_INTERRUPT_WINDOWS:
-                self._interrupt_fired = True
-                callback = self._on_interrupt
+            reached = self._vad_consecutive_speech >= VAD_INTERRUPT_WINDOWS
+            aec_proc = self._aec_processor
+            aec_ref = self._aec_reference_source
+            aec_source = self._aec_state_source
+
+        if reached:
+            if aec_source is not None:
+                # The listener owns the live canceller; it can be wired (or
+                # rewired after a device change) after this capture started.
+                try:
+                    aec_proc, aec_ref = aec_source()
+                except Exception:  # noqa: BLE001, RUF100 - unreadable state counts as degraded below
+                    aec_proc, aec_ref = None, None
+            # Only now (rare: sustained speech while Viola talks) is the
+            # canceller's health read, so the per-chunk path stays cheap.
+            degraded_reason = barge_in_aec_degraded_reason(aec_proc, aec_ref)
+            with self._mode_lock:
+                if self._interrupt_fired:
+                    return
+                if degraded_reason is None:
+                    self._interrupt_fired = True
+                    callback = self._on_interrupt
+                else:
+                    # Viola's own voice would look exactly like this. Keep
+                    # talking; the user can still say the wake word or tap stop.
+                    self._vad_consecutive_speech = 0
+                    first_this_turn = not self._barge_in_suppressed_this_turn
+                    self._barge_in_suppressed_this_turn = True
+                    first_ever = degraded_reason not in self._aec_degraded_reasons_logged
+                    self._aec_degraded_reasons_logged.add(degraded_reason)
+            if degraded_reason is not None:
+                if first_ever:
+                    logger.warning(
+                        "AEC degraded: %s. Interrupting Viola by talking over it is off while this lasts, "
+                        "so Viola cannot hear its own reply as a new command.",
+                        degraded_reason,
+                    )
+                elif first_this_turn:
+                    logger.debug("Barge-in suppressed (AEC degraded: %s)", degraded_reason)
+                return
 
         if callback is not None:
             logger.info(

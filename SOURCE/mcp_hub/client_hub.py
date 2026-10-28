@@ -272,6 +272,121 @@ def _codex_arg_sandbox_refusal(name: str, args: dict[str, Any]) -> dict[str, Any
     }
 
 
+# --- Event-loop affinity and stall watchdog --------------------------------
+#
+# Every MCP session (in-process memory transport or stdio) is built from AnyIO
+# streams that belong to the event loop that connected it. A call made from a
+# DIFFERENT loop writes into those streams without waking the owning loop, so
+# the request is never processed and the caller simply waits out its timeout.
+# On the desktop, typed commands run on the server loop and voice commands on
+# the wake callback loop, both sharing one hub: whichever ran first owned every
+# server, and every tool call from the other side hung for the full 121 s
+# (Viola 1.0.5 laptop report, 2026-10-28). The hub therefore has one home loop
+# and runs every session operation there, whichever loop the caller is on.
+#
+# The watchdog is the second line: if a call has not returned after
+# ``_STALL_PROBE_AFTER_SECONDS`` the hub pings the server. A server that cannot
+# answer a ping within ``_STALL_PING_TIMEOUT_SECONDS`` is wedged, not busy: the
+# hub restarts it and fails (or, for read-only tools, retries) at once instead
+# of letting the caller sit out the full tool timeout.
+_STALL_PROBE_AFTER_SECONDS = 5.0
+_STALL_PING_TIMEOUT_SECONDS = 3.0
+_STALL_REPROBE_INTERVAL_SECONDS = 15.0
+_SERVER_RESTART_TIMEOUT_SECONDS = 30.0
+_CANCEL_SETTLE_SECONDS = 2.0
+
+# Tools the hub answers itself. ToolSearch only reads the hub's own registry,
+# so it must never wait on an MCP server round trip.
+_LOCAL_TOOL_NAMES: frozenset[str] = frozenset({CANONICAL_TOOL_SEARCH_NAME, LEGACY_TOOL_SEARCH_NAME})
+
+
+class McpServerStalledError(RuntimeError):
+    """An MCP server stopped answering, even to a ping."""
+
+    def __init__(self, server_name: str) -> None:
+        super().__init__("MCP server '%s' is not responding" % server_name)
+        self.server_name = server_name
+
+
+def _running_loop_or_none() -> asyncio.AbstractEventLoop | None:
+    try:
+        return asyncio.get_running_loop()
+    except RuntimeError:
+        return None
+
+
+def _loop_is_live(loop: asyncio.AbstractEventLoop | None) -> bool:
+    return loop is not None and not loop.is_closed() and loop.is_running()
+
+
+def _preferred_home_loop() -> asyncio.AbstractEventLoop | None:
+    """The loop that should own MCP sessions in this process.
+
+    On the desktop that is the local server's loop (registered with
+    ``core.asyncio_safe.set_main_loop``): it lives as long as the app and it is
+    where typed commands, background agents and the UI already run. Elsewhere,
+    and whenever no live main loop is registered, the caller's own loop.
+    """
+    current = _running_loop_or_none()
+    try:
+        from core.user_context import is_cloud_surface
+
+        if is_cloud_surface():
+            return current
+        from core.asyncio_safe import get_main_loop
+
+        main_loop = get_main_loop()
+    except Exception:  # noqa: BLE001, RUF100 - surface lookup must never break tool dispatch
+        return current
+    if _loop_is_live(main_loop):
+        return main_loop
+    return current
+
+
+def _on_caller_loop(callback: Any) -> Any:
+    """Wrap a sync callback so it always runs on the loop that created it.
+
+    Progress notifications arrive on the hub's home loop; the agent loop that
+    passed ``callback`` may be on another one.
+    """
+    caller_loop = _running_loop_or_none()
+    if caller_loop is None:
+        return callback
+
+    def _forward(event: Any) -> None:
+        if _running_loop_or_none() is caller_loop:
+            callback(event)
+            return
+        try:
+            caller_loop.call_soon_threadsafe(callback, event)
+        except RuntimeError:
+            logger.debug("Dropped MCP progress event: caller loop is closed")
+
+    return _forward
+
+
+def _stalled_server_result(server_name: str | None, tool_name: str, *, restarted: bool) -> dict[str, Any]:
+    """The fast, honest failure for a call on a server that stopped answering."""
+    if restarted:
+        message = (
+            "The '%s' tool could not run because Viola's tool service (%s) stopped responding. "
+            "Viola restarted it; please try again." % (tool_name, server_name)
+        )
+    else:
+        message = (
+            "The '%s' tool could not run because Viola's tool service (%s) stopped responding "
+            "and could not be restarted. Restart Viola if this keeps happening." % (tool_name, server_name)
+        )
+    return {
+        "success": False,
+        "data": None,
+        "display": "",
+        "error": message,
+        "error_category": "TOOL_SERVICE_STALLED",
+        "retryable": restarted,
+    }
+
+
 def _session_call_tool_compat(
     session: Any,
     wire_name: str,
@@ -439,6 +554,53 @@ class MCPClientHub:
         self._lazy_init_lock: asyncio.Lock = asyncio.Lock()
         self._warned_phantom_tool_maps: set[tuple[str, tuple[str, ...]]] = set()
         self._warned_schema_issues: set[tuple[str, str, str]] = set()
+        # The one event loop every session operation runs on (see the
+        # loop-affinity note at the top of this module). Chosen at first use.
+        self._home_loop: asyncio.AbstractEventLoop | None = None
+        # Servers whose sessions belong to a home loop that has since died;
+        # they are reconnected before their next call.
+        self._stale_servers: set[str] = set()
+        # Stall-watchdog restarts, by server (exposed for diagnostics).
+        self.stall_restarts: dict[str, int] = {}
+
+    # ------------------------------------------------------------------
+    # Home-loop dispatch
+    # ------------------------------------------------------------------
+
+    def _current_home_loop(self) -> asyncio.AbstractEventLoop | None:
+        """Return the live home loop, choosing (or re-choosing) one if needed."""
+        home = self._home_loop
+        if _loop_is_live(home):
+            return home
+        new_home = _preferred_home_loop()
+        if home is not None and new_home is not home:
+            # The loop that owned every session is gone. Their streams can
+            # never be serviced again, so each one is reconnected on first use.
+            self._stale_servers.update(self._sessions.keys())
+            logger.error(
+                "MCP hub home event loop stopped; moving to a new loop and reconnecting %d server(s)",
+                len(self._stale_servers),
+            )
+        self._home_loop = new_home
+        return new_home
+
+    async def _on_home_loop(self, factory: Any) -> Any:
+        """Await ``factory()`` on the home loop, from whichever loop calls.
+
+        ``factory`` is a zero-argument callable returning a coroutine; it is
+        only invoked on the loop that will run it. Cancelling the caller
+        cancels the work on the home loop too.
+        """
+        home = self._current_home_loop()
+        current = _running_loop_or_none()
+        if home is None or home is current:
+            return await factory()
+
+        async def _run() -> Any:
+            return await factory()
+
+        future = asyncio.run_coroutine_threadsafe(_run(), home)
+        return await asyncio.wrap_future(future)
 
     async def initialize(self, configs: list[ServerConfig] | None = None) -> None:
         """Connect to all configured MCP servers.
@@ -525,8 +687,11 @@ class MCPClientHub:
         """Connect a deferred server on first access.
 
         Returns True if the server was successfully connected, False otherwise.
-        Thread-safe via ``_lazy_init_lock``.
+        Serialized via ``_lazy_init_lock``, which lives on the home loop.
         """
+        return await self._on_home_loop(lambda: self._lazy_connect_deferred_on_home(server_name))
+
+    async def _lazy_connect_deferred_on_home(self, server_name: str) -> bool:
         async with self._lazy_init_lock:
             # Double-check — another coroutine may have connected it
             if server_name in self._sessions:
@@ -603,6 +768,9 @@ class MCPClientHub:
     async def connect_server(self, name: str, config: ServerConfig) -> None:
         """Connect to a single MCP server.
 
+        Runs on the hub's home loop whichever loop calls it, so the session's
+        streams belong to the loop that will service every later call.
+
         Args:
             name: Logical server name.
             config: Server connection configuration.
@@ -610,13 +778,19 @@ class MCPClientHub:
         Raises:
             ValueError: If transport type is unsupported.
         """
+        await self._on_home_loop(lambda: self._connect_server_on_home(name, config))
+
+    async def _connect_server_on_home(self, name: str, config: ServerConfig) -> None:
         if name == "google-workspace" and "google_workspace" in _launch_gated_tool_names():
             logger.info("Skipping google-workspace MCP connection because restricted Google features are disabled")
             return
 
+        if name in self._stale_servers:
+            # Its streams belong to a dead loop: nothing there can be closed.
+            self._forget_server(name)
         if name in self._sessions:
             logger.warning("Server '%s' already connected, disconnecting first", name)
-            await self.disconnect_server(name)
+            await self._disconnect_server_on_home(name)
 
         if config.transport == "inprocess":
             session = await self._connect_inprocess(name, config)
@@ -636,7 +810,7 @@ class MCPClientHub:
         try:
             await self._discover_tools(name, session)
         except BaseException:
-            await self.disconnect_server(name)
+            await self._disconnect_server_on_home(name)
             raise
 
         # Google Workspace compound tool consolidation:
@@ -963,6 +1137,32 @@ class MCPClientHub:
 
     async def disconnect_server(self, name: str) -> None:
         """Disconnect from a server and remove its tools."""
+        self._current_home_loop()
+        if name in self._stale_servers:
+            self._forget_server(name)
+            return
+        await self._on_home_loop(lambda: self._disconnect_server_on_home(name))
+
+    def _forget_server(self, name: str) -> None:
+        """Drop a server without awaiting its transport.
+
+        For a server that cannot be closed politely: its loop is gone, or it
+        stopped answering. The owner task is asked to stop without waiting.
+        """
+        self._stale_servers.discard(name)
+        connection = self._inprocess_connections.pop(name, None)
+        if connection is not None:
+            connection.abandon()
+        self._streams_contexts.pop(name, None)
+        self._launchers.pop(name, None)
+        for tool_name in [tool for tool, server in self._tool_routes.items() if server == name]:
+            self._forget_tool_name(tool_name)
+        if name == "google-workspace":
+            for tool_name in [tool for tool, server in self._tool_routes.items() if server == "_compound"]:
+                self._forget_tool_name(tool_name)
+        self._sessions.pop(name, None)
+
+    async def _disconnect_server_on_home(self, name: str) -> None:
         if name not in self._sessions:
             logger.warning("Server '%s' not connected", name)
             return
@@ -1788,7 +1988,8 @@ class MCPClientHub:
             except (OSError, RuntimeError, TypeError, ValueError) as _recon_err:
                 logger.warning("Browser reconnection failed: %s", _recon_err)
 
-        if server_name is None:
+        local_tool = name in _LOCAL_TOOL_NAMES
+        if server_name is None and not local_tool:
             return {
                 "success": False,
                 "data": None,
@@ -1796,8 +1997,10 @@ class MCPClientHub:
                 "error": "Unknown tool: %s. Available: %s" % (name, ", ".join(sorted(self._tool_routes.keys()))),
             }
 
-        session = self._sessions.get(server_name)
-        if session is None:
+        if server_name is not None and not local_tool:
+            await self._recover_dead_server_before_call(server_name)
+        session = self._sessions.get(server_name) if server_name is not None else None
+        if session is None and not local_tool:
             # If browser server was connected but session is gone (subprocess
             # crashed), try reconnection before returning an error.
             if name.startswith("browser_") and self._browser_reconnect_cb is not None:
@@ -1908,6 +2111,16 @@ class MCPClientHub:
             call_meta["claudecode/toolUseId"] = tool_use_id
         if not call_meta:
             call_meta = None
+        if local_tool:
+            return await self._call_local_tool(
+                name,
+                args,
+                call_meta,
+                on_progress=on_progress,
+                tool_use_id=tool_use_id,
+                server_name=server_name,
+                call_start=_call_start,
+            )
         if name in self._PHONE_TOOLS:
             timeout = 660.0  # 11 min — covers max_call_duration (600s) + dial/summary
         elif name in self._GATE_RESUME_TOOLS:
@@ -1937,6 +2150,7 @@ class MCPClientHub:
 
         progress_callback = None
         if on_progress is not None and tool_use_id:
+            on_progress = _on_caller_loop(on_progress)
 
             async def progress_callback(progress: float, total: float | None, message: str | None) -> None:
                 try:
@@ -1971,16 +2185,21 @@ class MCPClientHub:
         _call_task: asyncio.Task[Any] | None = None
         _abort_waiter: asyncio.Task[Any] | None = None
 
+        def _session_call(active_session: Any) -> Any:
+            return self._on_home_loop(
+                lambda: _session_call_tool_compat(
+                    active_session,
+                    wire_name,
+                    args,
+                    read_timeout_seconds=read_timeout_seconds,
+                    progress_callback=progress_callback,
+                    meta=call_meta,
+                )
+            )
+
         async def _run_with_abort() -> Any:
             nonlocal _call_task, _abort_waiter
-            inner = _session_call_tool_compat(
-                session,
-                wire_name,
-                args,
-                read_timeout_seconds=read_timeout_seconds,
-                progress_callback=progress_callback,
-                meta=call_meta,
-            )
+            inner = _session_call(session)
             if abort_signal is None:
                 return await inner
             _call_task = asyncio.ensure_future(inner)
@@ -2012,9 +2231,40 @@ class MCPClientHub:
                     await _abort_waiter
             return _call_task.result()
 
-        # Call the tool via MCP session with timeout enforcement
+        # Call the tool via MCP session with timeout enforcement and the
+        # stall watchdog (a wedged server is detected in seconds, not minutes).
         try:
-            result = await asyncio.wait_for(_run_with_abort(), timeout=timeout)
+            try:
+                result = await self._await_with_stall_watchdog(server_name, session, _run_with_abort(), timeout)
+            except McpServerStalledError:
+                restarted = await self._restart_stalled_server(server_name, tool_name=name)
+                new_session = self._sessions.get(server_name) if restarted else None
+                if new_session is None or risk != RiskLevel.SAFE:
+                    self._emit_mcp_terminal_progress(
+                        on_progress=on_progress,
+                        tool_use_id=tool_use_id,
+                        server=server_name,
+                        tool=name,
+                        status="failed",
+                        elapsed_ms=int((time.monotonic() - _call_start) * 1000),
+                    )
+                    return _stalled_server_result(server_name, name, restarted=restarted)
+                # Read-only tool: a wedged server never ran it, or running it
+                # again is harmless. One retry on the fresh session.
+                logger.info("Retrying read-only tool '%s' on restarted server '%s'", name, server_name)
+                session = new_session
+                remaining = max(1.0, timeout - (time.monotonic() - _call_start))
+                result = await self._await_with_stall_watchdog(server_name, session, _session_call(session), remaining)
+        except McpServerStalledError:
+            self._emit_mcp_terminal_progress(
+                on_progress=on_progress,
+                tool_use_id=tool_use_id,
+                server=server_name,
+                tool=name,
+                status="failed",
+                elapsed_ms=int((time.monotonic() - _call_start) * 1000),
+            )
+            return _stalled_server_result(server_name, name, restarted=False)
         except TimeoutError:
             logger.warning("MCP tool '%s' timed out after %.0fs", name, timeout)
             error_msg = "Tool '%s' timed out after %.0f seconds" % (name, timeout)
@@ -2084,17 +2334,7 @@ class MCPClientHub:
                         await self.connect_server(server_name, config)
                         new_session = self._sessions.get(server_name)
                         if new_session is not None:
-                            result = await asyncio.wait_for(
-                                _session_call_tool_compat(
-                                    new_session,
-                                    wire_name,
-                                    args,
-                                    read_timeout_seconds=read_timeout_seconds,
-                                    progress_callback=progress_callback,
-                                    meta=call_meta,
-                                ),
-                                timeout=timeout,
-                            )
+                            result = await asyncio.wait_for(_session_call(new_session), timeout=timeout)
                             # Skip to result conversion below
                             converted = self._convert_result(result)
                             elapsed_ms = int((time.monotonic() - _call_start) * 1000)
@@ -2163,6 +2403,207 @@ class MCPClientHub:
             elapsed_ms,
             converted.get("success", True),
         )
+        return converted
+
+    # ------------------------------------------------------------------
+    # Stall watchdog
+    # ------------------------------------------------------------------
+
+    async def _await_with_stall_watchdog(
+        self,
+        server_name: str | None,
+        session: Any,
+        call: Any,
+        timeout: float,
+    ) -> Any:
+        """Await ``call`` for at most ``timeout`` seconds, probing the server.
+
+        A call still running after ``_STALL_PROBE_AFTER_SECONDS`` triggers a
+        ping. A server that answers is merely busy (a slow tool), so the wait
+        continues, re-probing every ``_STALL_REPROBE_INTERVAL_SECONDS``. A
+        server that cannot answer a ping is wedged: the call is cancelled and
+        :class:`McpServerStalledError` is raised.
+
+        Raises ``TimeoutError`` when the overall budget runs out.
+        """
+        loop = asyncio.get_running_loop()
+        task = asyncio.ensure_future(call)
+        started = loop.time()
+        deadline = started + timeout
+        next_probe = _STALL_PROBE_AFTER_SECONDS
+        try:
+            while True:
+                remaining = deadline - loop.time()
+                if remaining <= 0:
+                    raise TimeoutError
+                done, _pending = await asyncio.wait({task}, timeout=min(remaining, next_probe))
+                if done:
+                    return task.result()
+                if loop.time() >= deadline:
+                    raise TimeoutError
+                if not await self._server_responds(server_name, session):
+                    logger.error(
+                        "MCP server '%s' did not answer a ping %.1fs into a tool call; treating it as stalled",
+                        server_name,
+                        loop.time() - started,
+                    )
+                    raise McpServerStalledError(server_name or "")
+                next_probe = _STALL_REPROBE_INTERVAL_SECONDS
+        finally:
+            if not task.done():
+                task.cancel()
+                await asyncio.wait({task}, timeout=_CANCEL_SETTLE_SECONDS)
+            if task.done() and not task.cancelled():
+                task.exception()  # mark retrieved; the outcome was already reported
+
+    async def _server_responds(self, server_name: str | None, session: Any) -> bool:
+        """Liveness probe: can this server still answer anything at all?"""
+        connection = self._inprocess_connections.get(server_name or "")
+        if connection is not None and not connection.is_alive():
+            return False
+        send_ping = getattr(session, "send_ping", None)
+        if not callable(send_ping):
+            return True  # cannot judge; let the overall timeout decide
+        try:
+            await asyncio.wait_for(self._on_home_loop(send_ping), timeout=_STALL_PING_TIMEOUT_SECONDS)
+        except TimeoutError:
+            return False
+        except Exception as exc:  # noqa: BLE001, RUF100 - a broken transport is a dead server
+            from anyio import BrokenResourceError, ClosedResourceError
+
+            if isinstance(exc, (BrokenResourceError, ClosedResourceError)):
+                return False
+            logger.debug("MCP ping to '%s' failed inconclusively: %r", server_name, exc)
+            return True
+        return True
+
+    async def _restart_stalled_server(self, server_name: str | None, *, tool_name: str = "") -> bool:
+        """Drop a wedged server and connect a fresh one. Never raises."""
+        if not server_name:
+            return False
+        config = self._configs.get(server_name)
+        self.stall_restarts[server_name] = self.stall_restarts.get(server_name, 0) + 1
+        logger.error(
+            "Restarting MCP server '%s' after it stalled (tool=%s, restart #%d)",
+            server_name,
+            tool_name,
+            self.stall_restarts[server_name],
+        )
+        self._forget_server(server_name)
+        if config is None:
+            return False
+        try:
+            await asyncio.wait_for(self.connect_server(server_name, config), timeout=_SERVER_RESTART_TIMEOUT_SECONDS)
+        except Exception:  # noqa: BLE001, RUF100 - report the failure as a tool result, never crash the turn
+            logger.exception("Restart of stalled MCP server '%s' failed", server_name)
+            return False
+        except BaseException as exc:
+            if not self._contain_leaked_connect_cancellation(server_name, exc):
+                raise
+            return False
+        connected = server_name in self._sessions
+        if connected:
+            logger.info("MCP server '%s' restarted after a stall", server_name)
+        return connected
+
+    async def _recover_dead_server_before_call(self, server_name: str) -> None:
+        """Reconnect a server known to be dead before routing a call to it."""
+        self._current_home_loop()
+        connection = self._inprocess_connections.get(server_name)
+        owner_dead = connection is not None and not connection.is_alive()
+        if server_name not in self._stale_servers and not owner_dead:
+            return
+        logger.warning(
+            "MCP server '%s' is gone (%s); reconnecting before the call",
+            server_name,
+            "loop stopped" if server_name in self._stale_servers else "owner task ended",
+        )
+        await self._restart_stalled_server(server_name, tool_name="")
+
+    # ------------------------------------------------------------------
+    # Hub-local tools
+    # ------------------------------------------------------------------
+
+    async def _call_local_tool(
+        self,
+        name: str,
+        args: dict[str, Any],
+        call_meta: dict[str, Any] | None,
+        *,
+        on_progress: Any,
+        tool_use_id: str | None,
+        server_name: str | None,
+        call_start: float,
+    ) -> dict[str, Any]:
+        """Answer ToolSearch in the hub itself, with no MCP round trip.
+
+        Same inputs (the request's deferred pool and user scope, carried on
+        ``call_meta``), same handler and same text payload as the core-tools
+        server's ToolSearch, so the agent loop sees an identical result.
+        """
+        from mcp import types as mcp_types
+
+        from intent.tool_types import ToolResult
+        from intent.tools.deferred_tool_schemas import deferred_tool_pool_from_payload
+        from intent.tools.tool_search import (
+            reset_deferred_tool_pool,
+            set_deferred_tool_pool,
+            tool_search_handler,
+        )
+
+        meta = call_meta or {}
+        query = str(args.get("query") or "")
+        try:
+            top_n = int(args.get("top_n") or 7)
+        except (TypeError, ValueError):
+            top_n = 7
+        user_context = meta.get("viola_user_context")
+        user_id = user_context.get("user_id") if isinstance(user_context, dict) else None
+        pool_token = None
+        try:
+            pool_payload = meta.get("viola_deferred_tool_pool")
+            if isinstance(pool_payload, dict):
+                pool_token = set_deferred_tool_pool(deferred_tool_pool_from_payload(pool_payload))
+            try:
+                if isinstance(user_id, str) and user_id:
+                    from core.user_context import user_scope
+
+                    with user_scope(user_id):
+                        outcome = await tool_search_handler(query, top_n)
+                else:
+                    outcome = await tool_search_handler(query, top_n)
+            finally:
+                if pool_token is not None:
+                    reset_deferred_tool_pool(pool_token)
+        except Exception as exc:  # noqa: BLE001, RUF100 - same contract as the server-side handler
+            logger.exception("ToolSearch failed for query_chars=%d", len(query))
+            outcome = ToolResult(ok=False, error=str(exc))
+
+        if getattr(outcome, "ok", False):
+            data = getattr(outcome, "data", None)
+            if isinstance(data, (dict, list)):
+                text = json.dumps(data, default=str, ensure_ascii=False)
+            else:
+                text = str(data) if data is not None else "OK"
+        else:
+            text = json.dumps({"error": getattr(outcome, "error", None) or "Unknown error"})
+        converted = self._convert_result(
+            mcp_types.CallToolResult(
+                content=[mcp_types.TextContent(type="text", text=text)],
+                structuredContent={"result": text},
+                isError=False,
+            )
+        )
+        elapsed_ms = int((time.monotonic() - call_start) * 1000)
+        self._emit_mcp_terminal_progress(
+            on_progress=on_progress,
+            tool_use_id=tool_use_id,
+            server=server_name,
+            tool=name,
+            status="completed" if converted.get("success", True) else "failed",
+            elapsed_ms=elapsed_ms,
+        )
+        logger.info("Hub-local tool %s completed in %dms (ok=%s)", name, elapsed_ms, converted.get("success"))
         return converted
 
     @staticmethod

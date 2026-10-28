@@ -15,6 +15,7 @@ Per-path limits:
   /v1/command        -- 30 req/min  (LLM cost protection)
   /v1/telemetry/send -- 5 req/min   (admin-triggered external telemetry send)
   /auth/oauth/poll   -- 120 req/min (OAuth status polling)
+  /auth/desktop/oauth/* -- 120 req/min (desktop Google sign-in result polling, own bucket)
   /auth/oauth/*      -- 30 req/min  (OAuth start/callback/preflight)
   /auth/register     -- 20 req/min  (registration has deeper 5/hr/IP + 3/hr/email gates)
   /auth/login        -- 20 req/min  (login has deeper brute-force guards)
@@ -91,6 +92,11 @@ _PATH_LIMITS: tuple[tuple[str, int, int], ...] = (
     ("/v1/command", 30, 60),  # 30 req/min -- protect LLM quota
     ("/v1/telemetry/send", 5, 60),  # 5 req/min -- manual admin external send trigger
     ("/v1/auth/oauth/poll", 120, 60),  # OAuth poll loops must not starve signup/login.
+    # Desktop provider sign-in: the webview polls the loopback result route while
+    # the human is in the system browser. Sharing the 30/min "/auth/" bucket (which
+    # also counts rejected requests) starved it forever after ~36 s of polling and
+    # left the button on "Please wait..." (1.0.5 laptop report, 2026-10-28).
+    ("/auth/desktop/oauth/", 120, 60),
     ("/auth/oauth/poll", 120, 60),
     ("/v1/auth/oauth/start", 30, 60),
     ("/auth/oauth/start", 30, 60),
@@ -126,6 +132,7 @@ _REDIS_CLEAR_BUCKET_SUFFIXES: tuple[str, ...] = (
     "auth:oauth",
     "auth:oauth:start",
     "auth:oauth:poll",
+    "auth:desktop_oauth",
     "auth:resend_verification",
     "auth:misc",
     "admin:api",
@@ -271,6 +278,8 @@ def _auth_bucket_suffix_for_path(path: str) -> str | None:
         return None
     if auth_path.startswith("/auth/oauth/poll"):
         return "auth:oauth:poll"
+    if auth_path.startswith("/auth/desktop/oauth/"):
+        return "auth:desktop_oauth"
     if auth_path.startswith("/auth/oauth/start"):
         return "auth:oauth:start"
     if auth_path.startswith("/auth/oauth/"):
