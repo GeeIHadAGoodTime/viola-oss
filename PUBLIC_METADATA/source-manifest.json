@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "68f24f8a42ddf1bd761f2bb5edd714135332be42",
-  "sha256": "c906a11073e5082abcd2d9c72064c9f93b8996a16ed28ca94eb838a4fbedfb0b",
+  "revision": "ef77890d7918b9ce10e984df27ecce90e5e18146",
+  "sha256": "1174843ba6018971c70acc30d6d7b9dcdf363bd35a243ec66260ca6b6a20d81b",
   "files": [
     {
       "path": ".env.example",
@@ -3270,8 +3270,8 @@
     },
     {
       "path": "music/spotify/cdp_controller.py",
-      "sha256": "e49cdcb70165b019dd20e428abc20331696a25df6213a91ab0f1bcd58142726e",
-      "bytes": 149217
+      "sha256": "2c2861da394ee581d3b80ee23855891abfa670f3233e5af80abadde70e916298",
+      "bytes": 154514
     },
     {
       "path": "music/spotify/cookie_bridge.py",
@@ -10870,8 +10870,8 @@
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.jsx",
-      "sha256": "09c24277a37d52a77db7a9921e28825c0c250636ee96db9cefe8972d95c1a58f",
-      "bytes": 218415
+      "sha256": "086104326832333e4c45e41a23cd45f0c8d1a4b91352b1dd9c91be1dee782607",
+      "bytes": 218420
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.localDiscovery.test.jsx",
@@ -10885,8 +10885,8 @@
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.sidebar.test.jsx",
-      "sha256": "2230c3cfdc6c8819ef2e010b0d378dddfa077a4635ed5e112f1fa05a8a548b6a",
-      "bytes": 31927
+      "sha256": "8995800765db92fe3f9f4315ab52e985eef0ebab526ebae3aac1f5f98fe70fbf",
+      "bytes": 33501
     },
     {
       "path": "ui/react-app/src/components/SpokePairingGate.jsx",
