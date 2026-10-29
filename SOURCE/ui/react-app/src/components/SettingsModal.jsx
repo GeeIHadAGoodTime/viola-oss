@@ -3082,7 +3082,7 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
                           Connect your Spotify account
                         </div>
                         <div style={{ color: theme.colors.textMuted, fontSize: '13px', marginTop: '2px' }}>
-                          A secure Chrome window will open for you to sign in to Spotify.
+                          You'll sign in to Spotify in a secure window inside Viola.
                         </div>
                       </div>
                     </div>
@@ -3109,7 +3109,7 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
                           animation: 'spin 0.8s linear infinite',
                           flexShrink: 0,
                         }} />
-                        Waiting for login in Chrome...
+                        Waiting for you to sign in to Spotify...
                       </div>
                     )}
 
