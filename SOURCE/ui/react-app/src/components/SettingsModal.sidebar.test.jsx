@@ -442,6 +442,38 @@ describe('SettingsModal sidebar shell', () => {
       expect(screen.getByText(/Spotify rejected that login identifier/i)).toBeInTheDocument();
     }, { timeout: 4000 });
   }, 10000);
+  it('describes Spotify sign-in without naming a browser Viola may not use', async () => {
+    // Spotify sign-in happens in Viola's own window, and playback runs in
+    // whichever supported browser is installed (Edge on PCs without Chrome).
+    apiFetchMock.mockImplementation((path, options = {}) => {
+      if (path === '/v1/connectors?category=llm') {
+        return Promise.resolve({ connectors: [] });
+      }
+      if (path === '/v1/spotify/status') {
+        return Promise.resolve({ logged_in: false, connected: false, auth_state: 'login_required' });
+      }
+      if (path === '/v1/browser/auth/login/spotify' && options.method === 'POST') {
+        return Promise.resolve({ login_url: 'https://accounts.spotify.com/login', provider: 'spotify', controller_attached: true });
+      }
+      return Promise.resolve({
+        json: () => Promise.resolve({ devices: [] }),
+      });
+    });
+
+    render(<SettingsModal isOpen onClose={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Music' }));
+    fireEvent.click(screen.getByRole('button', { name: /Spotify/i }));
+
+    const intro = await screen.findByText(/sign in to Spotify in a secure window inside Viola/i);
+    const panel = intro.closest('div[style]').parentElement.parentElement;
+    expect(panel.textContent).not.toMatch(/Chrome/);
+
+    fireEvent.click(screen.getByRole('button', { name: /Sign In with Spotify/i }));
+
+    expect(await screen.findByText(/Waiting for you to sign in to Spotify/i)).toBeInTheDocument();
+    expect(panel.textContent).not.toMatch(/Chrome/);
+  }, 10000);
   it.each([[1, '100'], [0.8, '80'], [80, '80'], [0, '0']])('displays stored TTS volume %s as percent %s', async (stored, shown) => {
     settingsHarness.settings = {...settingsHarness.settings, tts_volume: stored};
     render(<SettingsModal isOpen onClose={vi.fn()} initialTab="voice" />);

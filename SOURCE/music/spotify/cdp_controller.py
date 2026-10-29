@@ -165,14 +165,49 @@ async ({method, url, token}) => {
     }
 }
 """
-_NOW_PLAYING_ADD_BUTTON = '[data-testid="now-playing-widget"] button[data-testid="add-button"]'
-_NOW_PLAYING_ADD_STATE_JS = r"""
+# The player bar's song widget comes in two shapes. The older
+# now-playing-widget has context-item-* testids, a title link to /track/<id>
+# and a data-testid="add-button". now-playing-widget-v2 (seen 2026-10 on both
+# Chrome and Edge) links its title to the album, keeps the artist in
+# now-playing-widget-v2-byline, has an unnamed aria-checked add button, and has
+# no track link at all; the song's track link is then the Now Playing view's
+# title link (".../track/<id>?uid=...&uri=spotify%3Atrack%3A<id>") with the same
+# text, present while that panel is open.
+# JS: the track link for the v2 widget's song title. The Now Playing view's
+# title link carries the track uri; on a playlist, album or Liked Songs page the
+# song's own row links to /track/<id> (used only when exactly one row matches).
+_V2_TRACK_LINK_JS = r"""
+const violaV2TrackLink = (title) => {
+    if (!title) return null;
+    const same = (a) => (a.textContent || '').trim() === title;
+    const npv = Array.from(document.querySelectorAll('a[href*="uri=spotify%3Atrack%3A"]')).find(same);
+    if (npv) return npv;
+    const rows = Array.from(document.querySelectorAll('[data-testid="tracklist-row"] a[href*="/track/"]')).filter(same);
+    return rows.length === 1 ? rows[0] : null;
+};
+"""
+_NOW_PLAYING_ADD_BUTTON = (
+    '[data-testid="now-playing-widget"] button[data-testid="add-button"], '
+    '[data-testid="now-playing-widget-v2"] button[aria-checked]'
+)
+_NOW_PLAYING_ADD_STATE_JS = (
+    r"""
 ((trackId) => {
-    const widget = document.querySelector('[data-testid="now-playing-widget"]');
+"""
+    + _V2_TRACK_LINK_JS
+    + r"""
+    const widget = document.querySelector('[data-testid="now-playing-widget"]') ||
+                   document.querySelector('[data-testid="now-playing-widget-v2"]');
     if (!widget) return {present: false, on_target: false, checked: null};
     const link = widget.querySelector('[data-testid="context-item-link"]') || widget.querySelector('a[href*="track"]');
-    const href = (link && link.getAttribute('href')) || '';
-    const button = widget.querySelector('button[data-testid="add-button"]');
+    let href = (link && link.getAttribute('href')) || '';
+    if (!href) {
+        const title = Array.from(widget.querySelectorAll('a[href]'))
+            .find(a => !/\/artist\//.test(a.getAttribute('href') || ''));
+        const v2Link = violaV2TrackLink(title ? (title.textContent || '').trim() : '');
+        href = (v2Link && v2Link.getAttribute('href')) || '';
+    }
+    const button = widget.querySelector('button[data-testid="add-button"]') || widget.querySelector('button[aria-checked]');
     return {
         present: !!button,
         on_target: !!trackId && href.indexOf(trackId) >= 0,
@@ -180,17 +215,21 @@ _NOW_PLAYING_ADD_STATE_JS = r"""
     };
 })
 """
+)
 # Once a track is saved, the now-playing add button opens a "Saved in" popover
-# listing Liked Songs and playlists with checkboxes plus a Done button.
+# listing Liked Songs and playlists with checkboxes plus a Done button. The
+# 2026-10 "Add to playlist" popover (opened by the now-playing-widget-v2 add
+# button) uses role="menuitemcheckbox" rows with aria-checked instead.
 _LIKED_SONGS_CHECKBOX_JS = r"""
 (() => {
     const roots = Array.from(document.querySelectorAll('[role="dialog"], [data-testid="context-menu"], #context-menu'));
     for (const root of roots) {
-        const rows = Array.from(root.querySelectorAll('li, [role="row"], [role="menuitem"], label, div'));
+        const rows = Array.from(root.querySelectorAll('li, [role="row"], [role="menuitem"], [role="menuitemcheckbox"], label, div'));
         for (const row of rows) {
             const text = (row.textContent || '').trim();
             if (!text.startsWith('Liked Songs')) continue;
-            const box = row.querySelector('[role="checkbox"], input[type="checkbox"]');
+            const box = row.matches('[role="menuitemcheckbox"]') ? row
+                : row.querySelector('[role="checkbox"], [role="menuitemcheckbox"], input[type="checkbox"]');
             if (!box) continue;
             const checked = box.getAttribute('aria-checked') === 'true' || box.checked === true;
             return {found: true, checked: checked};
@@ -203,10 +242,11 @@ _LIKED_SONGS_CHECKBOX_CLICK_JS = r"""
 (() => {
     const roots = Array.from(document.querySelectorAll('[role="dialog"], [data-testid="context-menu"], #context-menu'));
     for (const root of roots) {
-        const rows = Array.from(root.querySelectorAll('li, [role="row"], [role="menuitem"], label, div'));
+        const rows = Array.from(root.querySelectorAll('li, [role="row"], [role="menuitem"], [role="menuitemcheckbox"], label, div'));
         for (const row of rows) {
             if (!((row.textContent || '').trim().startsWith('Liked Songs'))) continue;
-            const box = row.querySelector('[role="checkbox"], input[type="checkbox"]');
+            const box = row.matches('[role="menuitemcheckbox"]') ? row
+                : row.querySelector('[role="checkbox"], [role="menuitemcheckbox"], input[type="checkbox"]');
             if (box) { box.click(); return true; }
         }
     }
@@ -373,7 +413,7 @@ def _same_path(left: str, right: str | os.PathLike[str]) -> bool:
     return os.path.normcase(os.path.abspath(left)) == os.path.normcase(os.path.abspath(os.fspath(right)))
 
 
-SPOTIFY_RECONNECTING_TOAST = "Spotify Chrome closed unexpectedly — reconnecting."
+SPOTIFY_RECONNECTING_TOAST = "Spotify's playback window closed unexpectedly. Reconnecting."
 SPOTIFY_RECONNECT_FAILED_TOAST = "Reconnect failed — open Settings → Music to relink Spotify."
 
 
@@ -498,6 +538,37 @@ _EDGE_PATHS_WIN = [
     r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
     r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
 ]
+
+# Shown when no supported browser is installed. Spotify's web player needs
+# Widevine copy protection, which Viola's built-in browser does not have.
+NO_SPOTIFY_BROWSER_MESSAGE = (
+    "Spotify needs Microsoft Edge or Google Chrome to play music, and neither was found "
+    "on this computer. Install one of them, then try Spotify again."
+)
+
+# Microsoft Edge specifics (every Windows 10/11 PC has Edge, and it ships
+# Widevine, so it is the Spotify browser on PCs without Chrome):
+# * A Windows compatibility layer in the environment (__COMPAT_LAYER, which
+#   Windows or the launching app can set and every child inherits) makes
+#   msedge.exe relaunch itself without it and exit with code 0 at once, so the
+#   process Viola launched is gone before it opens its DevTools port and the
+#   real browser runs untracked. The playback browser is started without it.
+# * On a fresh profile Edge signs in with the Windows Microsoft account on its
+#   own ("implicit sign-in") and turns on sync, which pulls the user's
+#   extensions (e.g. password managers, wallets), passwords and history into
+#   Viola's playback profile. msImplicitSignin and --disable-sync stop that;
+#   --disable-extensions keeps extensions synced into an existing playback
+#   profile by older Viola builds from running there.
+_BROWSER_ENV_DROP = ("__COMPAT_LAYER",)
+_EDGE_DISABLED_FEATURES = ("msImplicitSignin", "msEdgeFirstSyncOnFirstRun")
+_EDGE_EXTRA_ARGS = ("--disable-extensions",)
+
+
+def _browser_launch_env() -> dict[str, str]:
+    """Environment for the playback browser: Viola's, minus compatibility layers."""
+    drop = {name.upper() for name in _BROWSER_ENV_DROP}
+    return {key: value for key, value in os.environ.items() if key.upper() not in drop}
+
 
 # Browser search paths — Linux
 _CHROME_PATHS_LINUX = [
@@ -695,9 +766,13 @@ _ACCOUNT_TIER_JS = r"""
 })();
 """
 
-_NOW_PLAYING_JS = r"""
+_NOW_PLAYING_JS = (
+    r"""
 (() => {
     const result = {};
+"""
+    + _V2_TRACK_LINK_JS
+    + r"""
 
     // Track name — these testids live inside [data-testid="now-playing-widget"]
     // and only populate when a track is actively playing.
@@ -706,6 +781,18 @@ _NOW_PLAYING_JS = r"""
     result.track = (trackName && trackName.textContent && trackName.textContent.trim()) ||
                    (trackLink && trackLink.textContent && trackLink.textContent.trim()) || null;
     result.track_url = trackLink && trackLink.href ? trackLink.href : null;
+    // now-playing-widget-v2 (see _NOW_PLAYING_ADD_BUTTON): title links to the
+    // album; the track link, when present, is the Now Playing view's title.
+    const widgetV2 = document.querySelector('[data-testid="now-playing-widget-v2"]');
+    if (!result.track && widgetV2) {
+        const v2Title = Array.from(widgetV2.querySelectorAll('a[href]'))
+            .find(a => !/\/artist\//.test(a.getAttribute('href') || ''));
+        result.track = (v2Title && v2Title.textContent && v2Title.textContent.trim()) || null;
+        if (!result.track_url) {
+            const v2Link = widgetV2.querySelector('a[href*="/track/"]') || violaV2TrackLink(result.track);
+            result.track_url = v2Link && v2Link.href ? v2Link.href : null;
+        }
+    }
     result.track_id = null;
     if (result.track_url) {
         const trackMatch = result.track_url.match(/\/track\/([A-Za-z0-9]+)/);
@@ -715,8 +802,10 @@ _NOW_PLAYING_JS = r"""
     // Artist — "context-item-info-subtitles" (note plural) is the 2026 testid
     const artistEl = document.querySelector('[data-testid="context-item-info-artist"]');
     const artistSub = document.querySelector('[data-testid="context-item-info-subtitles"]');
+    const artistV2 = document.querySelector('[data-testid="now-playing-widget-v2-byline"]');
     result.artist = (artistEl && artistEl.textContent && artistEl.textContent.trim()) ||
-                    (artistSub && artistSub.textContent && artistSub.textContent.trim()) || null;
+                    (artistSub && artistSub.textContent && artistSub.textContent.trim()) ||
+                    (artistV2 && artistV2.textContent && artistV2.textContent.trim()) || null;
 
     // Artwork — prefer highest resolution available
     // Spotify CDN URL pattern: https://i.scdn.co/image/ab67616d{SIZE}{HASH}
@@ -796,6 +885,7 @@ _NOW_PLAYING_JS = r"""
     return JSON.stringify(result);
 })();
 """
+)
 
 _SEARCH_RESULTS_JS = r"""
 (() => {
@@ -1261,9 +1351,7 @@ class SpotifyCDPController:
             if found:
                 return (name, found)
 
-        raise SpotifyCDPError(
-            "No Chrome, Edge, or Chromium browser found. " "Install Chrome or Edge to use Spotify integration."
-        )
+        raise SpotifyCDPError(NO_SPOTIFY_BROWSER_MESSAGE)
 
     # ------------------------------------------------------------------
     # Port check
@@ -1607,7 +1695,13 @@ class SpotifyCDPController:
             "--disable-backgrounding-occluded-windows",
             "--disable-renderer-backgrounding",
             "--disable-background-timer-throttling",
+            # The playback profile is Viola's alone: never sync an account into it.
+            "--disable-sync",
         ]
+        disabled_features: list[str] = []
+        if browser_name == "Edge":
+            chrome_args.extend(_EDGE_EXTRA_ARGS)
+            disabled_features.extend(_EDGE_DISABLED_FEATURES)
         if sys.platform == "win32":
             # Multi-room, WINDOWS-ONLY (#2533, same rationale as
             # #2423's viola_qt.py fix, different process topology):
@@ -1636,10 +1730,10 @@ class SpotifyCDPController:
             # them. Linux/macOS therefore keep Chromium's upstream
             # default (out-of-process, sandboxed) audio service.
             # Chrome honors only the last --disable-features, so occlusion
-            # tracking is switched off in the same flag.
-            chrome_args.append(
-                "--disable-features=AudioServiceSandbox,AudioServiceOutOfProcess,CalculateNativeWinOcclusion"
-            )
+            # tracking (and Edge's features above) go in the same flag.
+            disabled_features[:0] = ["AudioServiceSandbox", "AudioServiceOutOfProcess", "CalculateNativeWinOcclusion"]
+        if disabled_features:
+            chrome_args.append("--disable-features=" + ",".join(disabled_features))
         logger.info("Launching %s via subprocess (random loopback DevTools port, offscreen=True)", browser_name)
 
         # CREATE_NO_WINDOW on Windows prevents a console flash
@@ -1651,6 +1745,7 @@ class SpotifyCDPController:
             "stdout": subprocess.DEVNULL,
             "stderr": subprocess.DEVNULL,
             "creationflags": creation_flags,
+            "env": _browser_launch_env(),
         }
         startupinfo = _hidden_startupinfo()
         if startupinfo is not None:
@@ -1662,7 +1757,7 @@ class SpotifyCDPController:
         except Exception:
             focus_guard.unlock()
             raise
-        logger.info("Chrome PID: %d", self._chrome_proc.pid)
+        logger.info("%s PID: %d", browser_name, self._chrome_proc.pid)
         self._start_cloak_watchdog(self._chrome_proc, focus_guard)
 
         # Bind Chrome to the Viola-lifetime Job Object so the OS
