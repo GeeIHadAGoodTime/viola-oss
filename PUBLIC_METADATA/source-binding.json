@@ -30,10 +30,10 @@
   },
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "dfaeab297291e86ec4d680e97974d9e2243ce76c5dc92cbff6c37d74390a22cd",
-  "source_tree_sha256": "1174843ba6018971c70acc30d6d7b9dcdf363bd35a243ec66260ca6b6a20d81b",
+  "source_manifest_sha256": "fd791f7c90d1cba03d6b9d9d301d852d25f6e294ddab51bf21e84f61b3ba08fc",
+  "source_tree_sha256": "a630ba1f3443bfae17f948664c291341b911438040ee2725cd67f099084467f0",
   "source_file_count": 2759,
-  "source_revision": "ef77890d7918b9ce10e984df27ecce90e5e18146",
+  "source_revision": "cdf99243c2cf97d12215316d8fcbedf3ce18d4ac",
   "comparison_public_revision": "ecab2772465fcc89ae6645b028af1c2273b9199f",
   "changed_source_paths": [
     "START_WEB_INTERFACE.py",
@@ -117,6 +117,7 @@
     "music/autoplay_controller.py",
     "music/consent/adapters/google_calendar.py",
     "music/consent/providers.py",
+    "music/consent/service.py",
     "music/player/playback.py",
     "music/player/state.py",
     "music/playlist_manager.py",
@@ -196,6 +197,7 @@
     "ui/api/routes/rating.py",
     "ui/api/routes/regression_stubs.py",
     "ui/api/routes/voice_stream.py",
+    "ui/consent_api.py",
     "ui/core/security.py",
     "ui/customer_speech_settings.py",
     "ui/onboarding.py",
@@ -430,8 +432,8 @@
     "historical_inventory_limits": "This renderer correction changes no dependency or workflow inputs. All six retained SBOMs and their complete status objects stay historical and unchanged; no current installed inventory qualification is claimed."
   },
   "qualification": {
-    "source_commit": "ef77890d7918b9ce10e984df27ecce90e5e18146",
-    "kind": "r6/spotify-edge"
+    "source_commit": "cdf99243c2cf97d12215316d8fcbedf3ce18d4ac",
+    "kind": "gmail mailbox"
   },
   "historical_bindings": [
     {
