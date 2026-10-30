@@ -550,25 +550,15 @@ class LLMProviderFactory:
     def _create_managed_provider(cls, settings: Any) -> BaseLLMProvider | None:
         """Create an OpenAI provider using Viola's managed business API key."""
         try:
-            from config.defaults import DEFAULT_AI_SOURCE, resolve_effective_model
+            from config.defaults import DEFAULT_MANAGED_MODEL
             from config.settings import settings as app_settings
 
-            ai_source_raw = settings.get("ai_source", DEFAULT_AI_SOURCE)
-            ai_source = ai_source_raw if isinstance(ai_source_raw, str) else DEFAULT_AI_SOURCE
-            # Candidate precedence: per-user llm_model from SettingsManager
-            # first, then the AppConfig.gpt_model (VIOLA_GPT_MODEL env var
-            # override). This lets cloud deployments pick a model the
-            # OPENAI_API_KEY's project actually has access to without
-            # touching every user's settings.
-            model = resolve_effective_model(
-                ai_source=ai_source,
-                provider=LLMProviderType.OPENAI.value,
-                agent=False,
-                candidates=(
-                    settings.get("llm_model", ""),
-                    getattr(app_settings, "gpt_model", "") or "",
-                ),
-            )
+            # Managed AI runs on Viola's key, so Viola picks the model: always
+            # DEFAULT_MANAGED_MODEL (founder direction 2026-10-30). A stale
+            # per-user llm_model or the legacy VIOLA_GPT_MODEL env value no
+            # longer changes it; the cloud /v1/llm/native route applies the
+            # same rule to requests from already-installed desktops.
+            model = DEFAULT_MANAGED_MODEL
             # Desktop-to-cloud managed forward: a REAL customer install ships no
             # OpenAI key (the installer is byte-scanned clean), so the direct
             # ``openai_api_key`` path below has managed AI dead after sign-in.

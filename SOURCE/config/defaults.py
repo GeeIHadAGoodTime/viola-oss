@@ -153,9 +153,15 @@ VOICE_MUTED_DEFAULT = False
 # self-hosted phone defaults remain separate so BYOK/local choices do not change.
 DEFAULT_MANAGED_MODEL = "gpt-6-luna"
 
-# Low-cost internal background model for summarization / extraction /
-# compaction. This is not the user-facing route or agent default.
-DEFAULT_BACKGROUND_TASK_MODEL = "gpt-5-nano"
+# Model requested for internal background work (summaries, extraction,
+# compaction, memory). Founder direction 2026-10-30: every Viola-managed call,
+# background included, runs on the managed model; there is no separate cheaper
+# background model. services/openai_background.py resolves the real model per
+# AI source: managed always uses DEFAULT_MANAGED_MODEL, BYOK uses the user's
+# own selected model (never a model forced onto their key), Codex keeps its
+# subscription model. The cloud managed route also ignores the requested model,
+# so installed builds that still ask for gpt-5-nano are served on Luna.
+DEFAULT_BACKGROUND_TASK_MODEL = DEFAULT_MANAGED_MODEL
 
 # General OpenAI/BYOK fallback. Managed subscriptions use DEFAULT_MANAGED_MODEL.
 DEFAULT_GPT_MODEL = "gpt-5.4-mini"

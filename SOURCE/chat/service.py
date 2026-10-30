@@ -22,7 +22,7 @@ from typing import Any
 
 import httpx
 
-from config.defaults import DEFAULT_GPT_MODEL
+from config.defaults import DEFAULT_MANAGED_MODEL, DEFAULT_ROUTING_REASONING_EFFORT, resolve_reasoning_effort
 from core.logging_config import get_logger
 from services.persistence.cloud_channel_store import CHANNEL_KINDS, CloudChannelStore
 
@@ -188,7 +188,11 @@ async def _call_llm(
     if not api_key:
         return "AI is temporarily unavailable. Try a specific command like 'what's the weather?'"
 
-    model = os.environ.get("VIOLA_CHAT_LLM_MODEL") or os.environ.get("VIOLA_TELEGRAM_LLM_MODEL", DEFAULT_GPT_MODEL)
+    # This fallback runs on Viola's server key, so it is managed AI and uses the
+    # managed model. The old VIOLA_CHAT_LLM_MODEL / VIOLA_TELEGRAM_LLM_MODEL env
+    # overrides are no longer read (founder direction 2026-10-30: every managed
+    # call runs on gpt-6-luna).
+    model = DEFAULT_MANAGED_MODEL
 
     if isinstance(channel, Mapping):
         channel_key = str(
@@ -223,11 +227,14 @@ async def _call_llm(
         messages.extend(history)
     messages.append({"role": "user", "content": text})
 
-    payload = {
+    # The managed model is a reasoning model: Chat Completions rejects
+    # max_tokens and a non-default temperature for it. Short conversational
+    # replies use the routing tier (no hidden thinking).
+    payload: dict[str, Any] = {
         "model": model,
         "messages": messages,
-        "max_tokens": 300,
-        "temperature": 0.7,
+        "max_completion_tokens": 300,
+        "reasoning_effort": resolve_reasoning_effort(DEFAULT_ROUTING_REASONING_EFFORT, model),
     }
 
     from services.llm.spend_accounting import (
