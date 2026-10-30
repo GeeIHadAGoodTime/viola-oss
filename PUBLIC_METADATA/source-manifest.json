@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "ef77890d7918b9ce10e984df27ecce90e5e18146",
-  "sha256": "1174843ba6018971c70acc30d6d7b9dcdf363bd35a243ec66260ca6b6a20d81b",
+  "revision": "ad068b4ee59f682d0a4c1734f86f889df98c027b",
+  "sha256": "44a8a04c235cda2525d617224a4643379490f268f2a9bea4cf1af371456a5d3a",
   "files": [
     {
       "path": ".env.example",
@@ -825,8 +825,8 @@
     },
     {
       "path": "chat/service.py",
-      "sha256": "7865d310c702239b0e4a310088326d4f7432e389d67e742f4deef5e8db564d9f",
-      "bytes": 21329
+      "sha256": "c35922398d092d7ce328650909cd3c6010ec1eaed70c0331587aed0e4f9183e2",
+      "bytes": 21883
     },
     {
       "path": "config/__init__.py",
@@ -850,8 +850,8 @@
     },
     {
       "path": "config/defaults.py",
-      "sha256": "e7ce28a4009a0b0e69217ba397a84470bcd688b81c2da5597d22e966880059eb",
-      "bytes": 23576
+      "sha256": "4df63117105c6ad717a4f03802e2ca3ccd38ae1dbb29774bcb388118d1d56c70",
+      "bytes": 24061
     },
     {
       "path": "config/env.py",
@@ -1585,8 +1585,8 @@
     },
     {
       "path": "intent/agent_loop.py",
-      "sha256": "014491bbd1e4941f9203080f5f1162d90ddf086004398616e4da60a0516a9f95",
-      "bytes": 251632
+      "sha256": "2fa53648635efb9a57a54be1b3df54a4b155c50e71dabc5de7030b7cdaf9baf4",
+      "bytes": 251641
     },
     {
       "path": "intent/agent_message_manager.py",
@@ -4545,8 +4545,8 @@
     },
     {
       "path": "services/llm/factory.py",
-      "sha256": "9862bf21e58cd17c108ff791f05dce6f43dae9f8e738100f1ea7390ee1859552",
-      "bytes": 59362
+      "sha256": "831524a43499345a512bb2282e53a6c3ff0a00c926132f02acd8c9297e3a3837",
+      "bytes": 58909
     },
     {
       "path": "services/llm/hook_llm.py",
@@ -4585,8 +4585,8 @@
     },
     {
       "path": "services/llm/openai_direct.py",
-      "sha256": "c7090f4c32560b379f26b252212c8ba8b3971ef7db8dff9206f35612968a662d",
-      "bytes": 82787
+      "sha256": "5d7613fcc7deb72a6278d0f10e81e5a99802eb6f4a498a9d2e8e80eb0d5ce493",
+      "bytes": 82790
     },
     {
       "path": "services/llm/openai_utils.py",
@@ -5005,8 +5005,8 @@
     },
     {
       "path": "services/openai_background.py",
-      "sha256": "6ec5bd4195e93ee8930ec2973a6a44c82761ed6d2eec7cf69cb72748b1092531",
-      "bytes": 33867
+      "sha256": "997eace98ef542933eda5a35165f3695b816e86b00f5c2af6d757a954a8ba3cf",
+      "bytes": 34890
     },
     {
       "path": "services/operator_controls.py",
@@ -5710,8 +5710,8 @@
     },
     {
       "path": "telephony/call_manager.py",
-      "sha256": "5867fc346d073f598807aaad19f84b3c366aa3c19a47a074c62c9091d07168bb",
-      "bytes": 380962
+      "sha256": "ba5864fc808200df886df9228fb80883bee6e38ded7852bca0f18afd17eb68ac",
+      "bytes": 381015
     },
     {
       "path": "telephony/call_queue.py",
@@ -5835,8 +5835,8 @@
     },
     {
       "path": "telephony/openai_chat.py",
-      "sha256": "f30933f5d02799c00353ecc1d98fd8f1120384aabda545910523b8ebc7a9d93e",
-      "bytes": 919
+      "sha256": "20bc2ff4954bb7e07b7d90c6459d52ebdfbb3135693d67ab0eb38c06808ff367",
+      "bytes": 922
     },
     {
       "path": "telephony/opt_out.py",
@@ -5915,8 +5915,8 @@
     },
     {
       "path": "telephony/post_call_actions.py",
-      "sha256": "fee97d0b1c3879e34dcd582fcc7ebd58fdceb29c8c4c609a5c00b535bd546b25",
-      "bytes": 13781
+      "sha256": "7e474a23ba2c0fb42e997d7991d306bdeba6c63d8ce53a0e98d441c1bd406926",
+      "bytes": 14033
     },
     {
       "path": "telephony/precall_planner.py",
