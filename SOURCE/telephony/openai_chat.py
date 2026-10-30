@@ -7,7 +7,7 @@ from typing import Any
 
 from config.defaults import get_configured_reasoning_effort
 
-_REASONING_MODEL_RE = re.compile(r"^(?:o[134](?:[-\d]|$)|gpt-5)", re.IGNORECASE)
+_REASONING_MODEL_RE = re.compile(r"^(?:o[134](?:[-\d]|$)|gpt-[56])", re.IGNORECASE)
 
 
 def is_reasoning_chat_model(model: str | None) -> bool:

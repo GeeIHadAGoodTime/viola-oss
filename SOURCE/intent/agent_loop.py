@@ -98,7 +98,7 @@ def _trace_safe_copy(value: Any) -> Any:
             return "<%s>" % type(value).__name__
 
 
-_REASONING_MODEL_TAGS = ("o1", "o3", "o4-", "gpt-5")
+_REASONING_MODEL_TAGS = ("o1", "o3", "o4-", "gpt-5", "gpt-6")
 # Mirror Claude Code's MAX_OUTPUT_TOKENS_RECOVERY_LIMIT (query.ts:164). Allows up
 # to 3 successive "max output tokens" / context-window incomplete continuations
 # before surfacing the withheld error.

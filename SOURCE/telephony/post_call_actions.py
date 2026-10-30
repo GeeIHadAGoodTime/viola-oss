@@ -24,10 +24,19 @@ logger = get_logger(__name__)
 _MID_CALL_DURABLE_ACTION_TYPES = frozenset({"calendar_event", "owner_notification", "callback_note"})
 
 
-async def extract_call_data(transcript: str, task: str, api_key: str, *, user_id: str = "") -> CallExtraction:
+async def extract_call_data(
+    transcript: str,
+    task: str,
+    api_key: str,
+    *,
+    user_id: str = "",
+    model: str | None = None,
+) -> CallExtraction:
     """Extract structured data from a completed call transcript.
 
-    One LLM call using the canonical phone model.
+    One LLM call on the call's own model (``model``, the CallManager's
+    ``config.llm_model``: the managed model on cloud calls), falling back to
+    the canonical phone model for standalone callers such as the simulator.
     """
     prompt = (
         "Extract structured data from this phone call transcript.\n"
@@ -45,7 +54,7 @@ async def extract_call_data(transcript: str, task: str, api_key: str, *, user_id
 
     data = await create_accounted_openai_chat_completion(
         api_key=api_key,
-        model=DEFAULT_PHONE_MODEL,
+        model=(model or "").strip() or DEFAULT_PHONE_MODEL,
         messages=[{"role": "user", "content": prompt}],
         max_output_tokens=500,
         user_id=user_id,
