@@ -75,6 +75,21 @@ def _generate_state_token() -> str:
 TOKEN_REFRESH_SKEW_SECONDS = 180
 GOOGLE_CALENDAR_PROVIDER_ID = "google_calendar"
 
+
+def _allowed_additional_scopes(requested: Sequence[str] | None) -> tuple[str, ...]:
+    """Keep only the extra scopes a consent session may ask for.
+
+    Today that is the Gmail mailbox scope set (incremental consent the first
+    time the user asks Viola to read or organize their mail). Any other value
+    is dropped, so a caller cannot widen the Google consent request.
+    """
+    if not requested:
+        return ()
+    from services.oauth.google import GMAIL_MAILBOX_SCOPES
+
+    allowed = set(GMAIL_MAILBOX_SCOPES)
+    return tuple(dict.fromkeys(str(scope).strip() for scope in requested if str(scope).strip() in allowed))
+
 # ===================================================================
 # CONSENT_FLOW_NOTES: End-to-End YouTube Music Linking Flow
 # ===================================================================
@@ -342,18 +357,27 @@ class ConsentService:
         providers_to_link: Sequence[str] | None = None,
         include_calendar: bool = False,
         redirect_uri: str | None = None,
+        additional_scopes: Sequence[str] | None = None,
     ) -> ConsentSession:
         """
         Start a new progressive consent session.
 
         If an active session already exists for this user, it will be reused
         (idempotent behavior) instead of creating a duplicate.
+
+        ``additional_scopes`` asks a provider for extra permissions on top of
+        its base scopes (incremental consent). Only scopes the provider allows
+        as extras are used (for Google: the Gmail mailbox scopes); anything else
+        is dropped. A request with extras never reuses an older session, since
+        that session's sign-in link asks for the base scopes only.
         """
         self._effective_user_id(user_id)
+        extra_scopes = _allowed_additional_scopes(additional_scopes)
         if self._request_includes_google_calendar(providers_to_link, include_calendar):
             self._set_google_calendar_enabled(user_id, True)
 
         # Check for existing active session for this user
+        superseded_session_id: str | None = None
         with self._session_lock:
             now = datetime.now(UTC)
             existing_session = None
@@ -366,6 +390,10 @@ class ConsentService:
                     existing_session = session
                     break
 
+            if existing_session is not None and extra_scopes:
+                superseded_session_id = existing_session.session_id
+                existing_session = None
+
             if existing_session is not None:
                 # Mark session as reused for diagnostic logging
                 existing_session._reused = True
@@ -375,6 +403,12 @@ class ConsentService:
                     user_id,
                 )
                 return existing_session
+
+        if superseded_session_id is not None:
+            try:
+                self.cancel_session(superseded_session_id)
+            except Exception:
+                logger.debug("Could not cancel the older consent session", exc_info=True)
 
         # No active session found - create a new one
         available_providers = self._resolve_providers(providers_to_link, include_calendar)
@@ -391,11 +425,14 @@ class ConsentService:
             try:
                 # Use provided redirect_uri, metadata default, or runtime base URL
                 effective_redirect_uri = redirect_uri or metadata.default_redirect_uri or default_redirect_uri
+                step_scopes = tuple(metadata.scopes)
+                if extra_scopes and metadata.provider_id == GOOGLE_CALENDAR_PROVIDER_ID:
+                    step_scopes = tuple(dict.fromkeys((*step_scopes, *extra_scopes)))
                 with user_scope(user_id):
                     authorization_url = adapter.authorization_url(
                         redirect_uri=effective_redirect_uri,
                         state=state_token,
-                        scopes=metadata.scopes,
+                        scopes=step_scopes,
                     )
                 # Log expected redirect URI for this session
                 if metadata.provider_id == "youtube_music":

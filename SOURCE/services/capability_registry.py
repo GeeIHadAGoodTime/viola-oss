@@ -378,33 +378,14 @@ def _register_all_domains(
     )
 
     # -- Email --
-    try:
-        from services.oauth.google import is_google_restricted_features_enabled
-
-        google_email_available = is_google_restricted_features_enabled(cfg)
-    except (AttributeError, ImportError, TypeError, ValueError) as exc:
-        logger.debug("Google restricted feature gate lookup failed closed for email capability: %s", exc)
-        google_email_available = False
-
-    email_description = (
-        "Read, compose, and manage email"
-        if google_email_available
-        else "Send email from your own Gmail (connect Google in Settings > Connections)"
-    )
-    email_setup_guide = (
-        SetupGuide(
-            orthodox_path="Connect an email account (Gmail, Outlook, or IMAP/SMTP)",
-            auto_setup_possible=True,
-            requirements=["An email account with API or IMAP access"],
-            estimated_effort="5 minutes",
-        )
-        if google_email_available
-        else SetupGuide(
-            orthodox_path="Connect your Google account in Settings > Connections",
-            auto_setup_possible=True,
-            requirements=["A Google account"],
-            estimated_effort="2 minutes",
-        )
+    # Gmail read, search, organize and send are on by default (founder decision
+    # 2026-10-30); the first mailbox action asks Google for the Gmail permission.
+    email_description = "Read, search, organize and send email from your own Gmail (connect Google in Settings > Connections)"
+    email_setup_guide = SetupGuide(
+        orthodox_path="Connect your Google account in Settings > Connections",
+        auto_setup_possible=True,
+        requirements=["A Google account"],
+        estimated_effort="2 minutes",
     )
     registry.register_domain(
         CapabilityDomain(

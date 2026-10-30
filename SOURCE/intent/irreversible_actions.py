@@ -60,7 +60,24 @@ _DIRECT_ACTION_CLASSES: dict[str, str] = {
     "connect_music_provider": "oauth_connect",
 }
 
-_SEND_EMAIL_ACTIONS = {"send", "send_draft"}
+_SEND_EMAIL_ACTIONS = {"send", "send_draft", "reply"}
+# Gmail organize actions that change labels. One to five messages just happen
+# (all reversible); more than five is a bulk change and asks first.
+_GMAIL_ORGANIZE_ACTIONS = {
+    "mark_read",
+    "mark_unread",
+    "star",
+    "unstar",
+    "archive",
+    "unarchive",
+    "mark_important",
+    "mark_not_important",
+    "label",
+    "unlabel",
+    "untrash",
+    "batch_modify",
+}
+GMAIL_BULK_CHANGE_THRESHOLD = 5
 _FILE_DELETE_ACTIONS = {"delete", "forget", "trash"}
 _CALENDAR_DELETE_ACTIONS = {"delete", "delete_event", "remove", "cancel"}
 _CALENDAR_WRITE_ACTIONS = {
@@ -117,6 +134,8 @@ def irreversible_action_class(
         return None
 
     action = _action(args)
+    if name == "gmail":
+        return _gmail_action_class(action, args)
     meta = _meta(schema)
     if _meta_marks_irreversible(meta, action):
         if name == "smart_home":
@@ -142,8 +161,6 @@ def irreversible_action_class(
         return "mcp_register"
     if name == "phone" and action == "call":
         return "phone_call"
-    if name == "gmail" and action in _SEND_EMAIL_ACTIONS:
-        return "send_email"
     if name == "file_write":
         # Targeted gates (founder rule 2026-10-24): deletes, changes to files the
         # user never referred to, bulk moves and autostart/program locations
@@ -181,6 +198,39 @@ def irreversible_action_class(
     if name in {"oauth", "music_accounts"} and action in _OAUTH_CONNECT_ACTIONS:
         return "oauth_connect"
 
+    return None
+
+
+def _gmail_message_count(args: Mapping[str, Any] | None) -> int:
+    params = args or {}
+    ids: set[str] = set()
+    raw_ids = params.get("message_ids") or params.get("ids")
+    if isinstance(raw_ids, str):
+        ids.update(part.strip() for part in raw_ids.replace(";", ",").split(",") if part.strip())
+    elif isinstance(raw_ids, (list, tuple, set, frozenset)):
+        ids.update(str(item).strip() for item in raw_ids if str(item).strip())
+    single = _clean(params.get("message_id"))
+    if single:
+        ids.add(single)
+    return len(ids)
+
+
+def _gmail_action_class(action: str, args: Mapping[str, Any] | None) -> str | None:
+    """Confirm class for one ``gmail`` call (the core tool and the workspace compound).
+
+    Sending (new mail, a draft, or a reply) is ``send_email``; moving mail to
+    the trash is ``email_trash``; changing labels on more than five messages at
+    once is ``email_bulk``. Reading, searching, drafting and small reversible
+    changes (archive, star, mark read on a few emails) just happen.
+    """
+    if action in _SEND_EMAIL_ACTIONS:
+        return "send_email"
+    if action == "trash":
+        return "email_trash"
+    if action in _GMAIL_ORGANIZE_ACTIONS and _gmail_message_count(args) > GMAIL_BULK_CHANGE_THRESHOLD:
+        return "email_bulk"
+    if action == "batch_modify":
+        return "email_bulk"
     return None
 
 
@@ -247,7 +297,35 @@ def describe_irreversible_action(tool_name: str, args: Mapping[str, Any] | None 
         return "call %s" % number if number else "place the phone call"
     if action_class == "send_email":
         recipient = _clean(params.get("to") or params.get("recipient") or params.get("destination"))
+        if name == "gmail" and _action(params) == "reply":
+            return "send your reply to everyone on that email" if params.get("reply_all") else "send your reply to that email"
+        if name == "gmail" and _action(params) == "send_draft":
+            return "send the Gmail draft"
         return "send the email to %s" % recipient if recipient else "send the email"
+    if action_class == "email_trash":
+        count = _gmail_message_count(params)
+        return "move %d emails to the trash" % count if count > 1 else "move that email to the trash"
+    if action_class == "email_bulk":
+        count = _gmail_message_count(params)
+        verb = {
+            "mark_read": "mark %d emails as read",
+            "mark_unread": "mark %d emails as unread",
+            "star": "star %d emails",
+            "unstar": "unstar %d emails",
+            "archive": "archive %d emails",
+            "unarchive": "move %d emails back to the inbox",
+            "mark_important": "mark %d emails as important",
+            "mark_not_important": "mark %d emails as not important",
+            "untrash": "take %d emails out of the trash",
+        }.get(_action(params))
+        if verb:
+            return verb % count
+        label = _clean(params.get("label"))
+        if _action(params) == "label" and label:
+            return "add the label %s to %d emails" % (label, count)
+        if _action(params) == "unlabel" and label:
+            return "remove the label %s from %d emails" % (label, count)
+        return "change %d emails" % count if count else "change those emails"
     if action_class == "send_sms":
         recipient = _clean(params.get("to") or params.get("phone_number") or params.get("destination"))
         return "send the text message to %s" % recipient if recipient else "send the text message"

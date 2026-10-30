@@ -149,6 +149,9 @@ class StartSessionRequest(BaseModel):
     providers: list[str] | None = None
     include_calendar: bool = False
     redirect_uri: str | None = None
+    # True asks Google for Gmail mailbox access (read, search, organize) on
+    # top of the base Calendar + send connection (incremental consent).
+    gmail_mailbox: bool = False
 
 
 class StartSessionResponse(BaseModel):
@@ -171,6 +174,12 @@ class ConsentStatusResponse(BaseModel):
 
 class RevokeRequest(BaseModel):
     provider_id: str
+
+
+def _gmail_mailbox_scopes() -> list[str]:
+    from services.oauth.google import get_gmail_mailbox_scopes
+
+    return get_gmail_mailbox_scopes()
 
 
 def _canonical_response(payload: Any) -> dict[str, Any]:
@@ -209,6 +218,7 @@ async def start_session(request: Request, body: StartSessionRequest) -> StartSes
             providers_to_link=body.providers,
             include_calendar=body.include_calendar,
             redirect_uri=body.redirect_uri,
+            additional_scopes=_gmail_mailbox_scopes() if body.gmail_mailbox else None,
         )
 
         # Check if session was reused (marked by service.start_session)
