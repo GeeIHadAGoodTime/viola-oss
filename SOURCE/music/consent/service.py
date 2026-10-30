@@ -90,6 +90,7 @@ def _allowed_additional_scopes(requested: Sequence[str] | None) -> tuple[str, ..
     allowed = set(GMAIL_MAILBOX_SCOPES)
     return tuple(dict.fromkeys(str(scope).strip() for scope in requested if str(scope).strip() in allowed))
 
+
 # ===================================================================
 # CONSENT_FLOW_NOTES: End-to-End YouTube Music Linking Flow
 # ===================================================================

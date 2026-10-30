@@ -213,12 +213,15 @@ async def start_session(request: Request, body: StartSessionRequest) -> StartSes
     try:
         # Check if session exists before calling start_session (for diagnostic logging)
         # Note: start_session is idempotent and will reuse existing sessions
+        start_kwargs: dict[str, Any] = {}
+        if body.gmail_mailbox:
+            start_kwargs["additional_scopes"] = _gmail_mailbox_scopes()
         session = service.start_session(
             user_id=user_id,
             providers_to_link=body.providers,
             include_calendar=body.include_calendar,
             redirect_uri=body.redirect_uri,
-            additional_scopes=_gmail_mailbox_scopes() if body.gmail_mailbox else None,
+            **start_kwargs,
         )
 
         # Check if session was reused (marked by service.start_session)
@@ -583,7 +586,7 @@ async def oauth_callback(
         logger.exception("Failed to extract request info for logging: %s", e)
 
     logger.info(
-        "Consent callback hit: path=%s, client=%s, code_present=%s, " "state_present=%s, has_error=%s",
+        "Consent callback hit: path=%s, client=%s, code_present=%s, state_present=%s, has_error=%s",
         path,
         client_host,
         bool(code),

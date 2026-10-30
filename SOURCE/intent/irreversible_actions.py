@@ -298,7 +298,11 @@ def describe_irreversible_action(tool_name: str, args: Mapping[str, Any] | None 
     if action_class == "send_email":
         recipient = _clean(params.get("to") or params.get("recipient") or params.get("destination"))
         if name == "gmail" and _action(params) == "reply":
-            return "send your reply to everyone on that email" if params.get("reply_all") else "send your reply to that email"
+            return (
+                "send your reply to everyone on that email"
+                if params.get("reply_all")
+                else "send your reply to that email"
+            )
         if name == "gmail" and _action(params) == "send_draft":
             return "send the Gmail draft"
         return "send the email to %s" % recipient if recipient else "send the email"

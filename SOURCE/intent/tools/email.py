@@ -264,9 +264,7 @@ def _get_configured_system_email_service():
     return services[0] if services else None
 
 
-GOOGLE_NOT_CONNECTED_MESSAGE = (
-    "To send email, connect your Google account in Settings > Connections. Nothing was sent."
-)
+GOOGLE_NOT_CONNECTED_MESSAGE = "To send email, connect your Google account in Settings > Connections. Nothing was sent."
 GOOGLE_SEND_PERMISSION_MISSING_MESSAGE = (
     "Your Google account is connected, but Viola was not given permission to send email, so nothing was sent. "
     "Reconnect Google in Settings > Connections and allow 'Send email on your behalf'."
@@ -1383,7 +1381,10 @@ async def _reply_headers(token: str, user_id: str, message_id: str) -> dict[str,
         user_id,
         params=[
             ("format", "metadata"),
-            *[("metadataHeaders", name) for name in ("From", "Reply-To", "To", "Cc", "Subject", "Message-ID", "References")],
+            *[
+                ("metadataHeaders", name)
+                for name in ("From", "Reply-To", "To", "Cc", "Subject", "Message-ID", "References")
+            ],
         ],
     )
     headers = _header_map(_as_dict(original.get("payload")))
@@ -1400,9 +1401,7 @@ async def _reply_headers(token: str, user_id: str, message_id: str) -> dict[str,
     }
 
 
-def _raw_message(
-    *, to: str, subject: str, body: str, in_reply_to: str = "", references: str = "", cc: str = ""
-) -> str:
+def _raw_message(*, to: str, subject: str, body: str, in_reply_to: str = "", references: str = "", cc: str = "") -> str:
     message = EmailMessage()
     if to:
         message["To"] = to
