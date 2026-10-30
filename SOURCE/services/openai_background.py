@@ -36,6 +36,9 @@ from config.defaults import (
     DEFAULT_AI_SOURCE,
     DEFAULT_BACKGROUND_TASK_MODEL,
     DEFAULT_CODEX_MODEL,
+    DEFAULT_GPT_MODEL,
+    DEFAULT_MANAGED_MODEL,
+    get_provider_default_model,
 )
 from config.settings import settings
 from core.logging_config import get_logger
@@ -125,7 +128,7 @@ class BackgroundRoute:
 
 def _is_reasoning_model(model: str) -> bool:
     normalized = model.lower()
-    return any(tag in normalized for tag in ("gpt-5", "o1", "o3", "o4-"))
+    return any(tag in normalized for tag in ("gpt-5", "gpt-6", "o1", "o3", "o4-"))
 
 
 def _settings_manager_value(key: str, default: Any, *, user_id: str = "") -> Any:
@@ -199,10 +202,30 @@ def _default_codex_background_model(user_id: str) -> str:
     return DEFAULT_CODEX_MODEL
 
 
+def _default_byok_background_model(user_id: str) -> str:
+    """The user's own selected model, else their provider's default model."""
+    selected_model = _selected_llm_model(user_id)
+    if selected_model:
+        return selected_model
+    return get_provider_default_model(_byok_provider_name(user_id)) or DEFAULT_GPT_MODEL
+
+
 def _resolve_background_model(*, ai_source: str, requested_model: str | None, user_id: str) -> str:
+    """Pick the model a background request runs on for this AI source.
+
+    - managed (Viola's key): always ``DEFAULT_MANAGED_MODEL``, whatever the
+      caller asked for. The cloud route enforces the same rule server-side.
+    - byok: the user's own selected model (their key, their choice); a
+      caller's generic background request never forces a model onto it.
+    - codex: the user's Codex subscription model, as before.
+    """
     requested = requested_model.strip() if isinstance(requested_model, str) else ""
+    if ai_source in _OPENAI_DIRECT_AI_SOURCES:
+        return DEFAULT_MANAGED_MODEL
     if ai_source == "codex" and requested in {"", DEFAULT_BACKGROUND_TASK_MODEL}:
         return _default_codex_background_model(user_id)
+    if ai_source == "byok":
+        return _default_byok_background_model(user_id)
     return requested or DEFAULT_BACKGROUND_TASK_MODEL
 
 

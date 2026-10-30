@@ -7328,6 +7328,7 @@ class CallManager:
                         record.task,
                         self.config.openai_api_key,
                         user_id=record.user_id,
+                        model=self.config.llm_model,
                     )
                     action_runner = PostCallActionRunner()
                     actions = await action_runner.run(extraction, record, record.user_id)

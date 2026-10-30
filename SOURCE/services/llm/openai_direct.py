@@ -49,7 +49,7 @@ from utils.failfast import ValidationError
 
 logger = get_logger(__name__)
 
-_REASONING_MODEL_RE = re.compile(r"^(?:o[134](?:[-\d]|$)|gpt-5)", re.IGNORECASE)
+_REASONING_MODEL_RE = re.compile(r"^(?:o[134](?:[-\d]|$)|gpt-[56])", re.IGNORECASE)
 
 
 def _find_unescaped_quote(text: str) -> int:
