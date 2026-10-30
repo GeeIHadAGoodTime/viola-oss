@@ -1132,6 +1132,8 @@ _ONE_SHOT_IRREVERSIBLE_CONFIRMATION_CLASSES: frozenset[str] = frozenset(
         "file_executable",
         "calendar_delete",
         "calendar_write",
+        "email_bulk",
+        "email_trash",
         "send_email",
         "send_message",
         "send_sms",

@@ -14,36 +14,60 @@ GOOGLE_SIGN_IN_SCOPES = [
     "https://www.googleapis.com/auth/userinfo.profile",
 ]
 
+CALENDAR_READONLY_SCOPE = "https://www.googleapis.com/auth/calendar.readonly"
+CALENDAR_EVENTS_SCOPE = "https://www.googleapis.com/auth/calendar.events"
+
+# What the calendar tools use: the calendar list and events (read), and
+# creating, changing and deleting events. The broader "calendar" scope (manage
+# calendars themselves) is not used, so it is not requested.
 CALENDAR_SCOPES = [
-    "https://www.googleapis.com/auth/calendar",
-    "https://www.googleapis.com/auth/calendar.events",
-    "https://www.googleapis.com/auth/calendar.readonly",
+    CALENDAR_READONLY_SCOPE,
+    CALENDAR_EVENTS_SCOPE,
 ]
 
 GMAIL_SEND_SCOPE = "https://www.googleapis.com/auth/gmail.send"
 GMAIL_READONLY_SCOPE = "https://www.googleapis.com/auth/gmail.readonly"
+# Read, search and organize the mailbox: list and read messages and threads,
+# change labels (archive, star, mark read), move to and from the trash, and
+# create, edit and send drafts. It never deletes mail permanently.
+GMAIL_MODIFY_SCOPE = "https://www.googleapis.com/auth/gmail.modify"
+
+# The extra Gmail permission Viola asks for the first time the user wants it to
+# read, search or organize their mail (incremental consent, with
+# include_granted_scopes). It is kept out of the base connection while Google
+# reviews the restricted Gmail scope, so connecting Calendar never shows the
+# "Google hasn't verified this app" screen for it. Once Google approves the
+# scope, fold this into GOOGLE_CONNECTION_SCOPES and every user gets it on
+# their first connect.
+GMAIL_MAILBOX_SCOPES: tuple[str, ...] = (GMAIL_MODIFY_SCOPE,)
 
 GMAIL_SCOPES = [
     GMAIL_SEND_SCOPE,
-    GMAIL_READONLY_SCOPE,
+    *GMAIL_MAILBOX_SCOPES,
 ]
 
-# Scopes one desktop "Connect Google" asks for. All are Google *sensitive*
-# scopes (not restricted): Calendar read + event write, and send-only Gmail.
-# gmail.send cannot read, list or search the mailbox. Tokens for this
-# connection live only in the desktop's encrypted consent vault (storage
-# tier 3); the cloud never sees them.
+# Scopes the first desktop "Connect Google" asks for: Calendar read + event
+# write, and Gmail send. gmail.send stays in the base connection (and is kept
+# alongside gmail.modify) so a user who never grants mailbox access can still
+# send mail they ask for. Tokens for this connection live only in the
+# desktop's encrypted consent vault (storage tier 3); the cloud never sees them.
 GOOGLE_CONNECTION_SCOPES = (
-    "https://www.googleapis.com/auth/calendar.readonly",
-    "https://www.googleapis.com/auth/calendar.events",
+    CALENDAR_READONLY_SCOPE,
+    CALENDAR_EVENTS_SCOPE,
     GMAIL_SEND_SCOPE,
 )
 
-# Least-privilege: every Workspace scope must be read-only ("*.readonly" suffix)
-# or a strictly-read scope (openid, userinfo.profile, userinfo.email). The
-# public privacy disclosure tells users Workspace data "may be read only as
-# needed" — requesting any write-capable Workspace scope here would put the
-# product out of sync with the consent screen and the privacy page.
+# Everything the desktop Google connection can hold once the user has also
+# allowed mailbox access. This is the full list to register on the Google
+# Cloud consent screen (plus the sign-in scopes above).
+GOOGLE_CONNECTION_ALL_SCOPES = (*GOOGLE_CONNECTION_SCOPES, *GMAIL_MAILBOX_SCOPES)
+
+# Scope policy (founder decision 2026-10-30): Gmail gets full mailbox access
+# within what Google allows without permanent deletion (gmail.modify, plus
+# gmail.send). Every other Workspace scope stays read-only ("*.readonly"
+# suffix) or a strictly-read scope (openid, userinfo.profile, userinfo.email),
+# matching the public privacy page. Drive/Docs/Sheets/Chat/Admin remain behind
+# ``google_restricted_features_enabled``.
 WORKSPACE_SCOPES = [
     "https://www.googleapis.com/auth/drive.readonly",
     "https://www.googleapis.com/auth/documents.readonly",
@@ -55,10 +79,19 @@ WORKSPACE_SCOPES = [
 ]
 
 # Scopes Google classes as *restricted* (CASA security assessment when the
-# data touches a server). gmail.send is *sensitive*, not restricted, so it is
-# not in this set and is not behind ``google_restricted_features_enabled``.
+# data touches a server). gmail.send is *sensitive*, not restricted. The Gmail
+# mailbox scopes are restricted, but Viola's Gmail data never touches a Viola
+# server (desktop-only token, desktop-to-Google calls), and Gmail is not behind
+# ``google_restricted_features_enabled``: that flag now gates only the
+# Drive/Docs/Sheets/Chat/Admin workspace bridge.
 RESTRICTED_GOOGLE_SCOPES = tuple(
-    sorted({GMAIL_READONLY_SCOPE, *(s for s in WORKSPACE_SCOPES if not s.endswith("/userinfo.profile"))})
+    sorted(
+        {
+            GMAIL_READONLY_SCOPE,
+            GMAIL_MODIFY_SCOPE,
+            *(s for s in WORKSPACE_SCOPES if not s.endswith("/userinfo.profile")),
+        }
+    )
 )
 
 
@@ -92,11 +125,24 @@ def get_enabled_gmail_send_scopes(settings_obj: object | None = None) -> list[st
 
 
 def get_enabled_gmail_scopes(settings_obj: object | None = None) -> list[str]:
-    """Return Gmail scopes: send always, read only when the restricted gate is on."""
-    scopes = [GMAIL_SEND_SCOPE]
-    if is_google_restricted_features_enabled(settings_obj):
-        scopes.append(GMAIL_READONLY_SCOPE)
-    return scopes
+    """Return every Gmail scope Viola uses: send plus full mailbox access.
+
+    Gmail reading and organizing are on by default (founder decision
+    2026-10-30); they are not behind the restricted-features gate.
+    """
+    del settings_obj
+    return list(GMAIL_SCOPES)
+
+
+def get_gmail_mailbox_scopes() -> list[str]:
+    """Scopes a read, search or organize Gmail action needs."""
+    return list(GMAIL_MAILBOX_SCOPES)
+
+
+def missing_gmail_mailbox_scopes(granted: list[str] | tuple[str, ...] | set[str] | None) -> list[str]:
+    """Mailbox scopes not yet in *granted* (empty when mailbox access is allowed)."""
+    have = set(granted or ())
+    return [scope for scope in GMAIL_MAILBOX_SCOPES if scope not in have]
 
 
 def get_enabled_workspace_scopes(settings_obj: object | None = None) -> list[str]:

@@ -1772,7 +1772,7 @@ export const CalendarSettings = () => {
                 </>
               ) : (
                 <span style={{ color: theme.colors.textMuted, fontSize: '13px' }}>
-                  Not connected. Lets Viola use your calendar and send email you ask it to send.
+                  Not connected. Lets Viola use your calendar and your Gmail: read, organize, and send email when you ask.
                 </span>
               )}
             </div>
@@ -1877,7 +1877,7 @@ export const CalendarSettings = () => {
             marginBottom: '16px',
             lineHeight: '1.4',
           }}>
-            Viola will stop using your Google Calendar and can no longer send email from your Gmail. You can reconnect anytime.
+            Viola will stop using your Google Calendar and can no longer read, organize, or send email in your Gmail. You can reconnect anytime.
           </div>
           <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
             <button

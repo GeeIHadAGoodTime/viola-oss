@@ -65,7 +65,10 @@ def _launch_gated_tool_names() -> set[str]:
             return set()
     except (AttributeError, ImportError, TypeError, ValueError) as exc:
         logger.debug("Restricted Google launch-gate lookup failed closed: %s", exc)
-    return {"gmail", "google_workspace"}
+    # Gmail is not gated: reading and organizing the user's own Gmail is on by
+    # default (founder decision 2026-10-30). Only the Drive/Docs/Sheets/Chat
+    # workspace bridge stays behind the restricted-features flag.
+    return {"google_workspace"}
 
 
 def _is_exit_stack_cancel_cleanup_error(exc: BaseException) -> bool:

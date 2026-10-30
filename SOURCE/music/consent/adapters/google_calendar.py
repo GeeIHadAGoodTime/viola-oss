@@ -1,5 +1,5 @@
 """
-Google account OAuth provider adapter (Calendar + send-only Gmail).
+Google account OAuth provider adapter (Calendar + Gmail).
 
 This is the desktop "Connect Google" flow in Settings > Connections. It is an
 installed-app OAuth flow (RFC 8252 + RFC 7636):
@@ -42,6 +42,14 @@ from core.logging_config import get_logger
 from music.consent import providers as consent_providers
 from music.consent.models import ProviderCapability, ProviderMetadata, TokenBundle
 from music.consent.provider_config import OAuthClientConfig, get_provider_config_loader
+from services.oauth.google import (
+    CALENDAR_EVENTS_SCOPE,
+    CALENDAR_READONLY_SCOPE,  # noqa: F401, RUF100 - re-exported for callers and tests
+    GMAIL_MAILBOX_SCOPES,
+    GMAIL_MODIFY_SCOPE,
+    GMAIL_SEND_SCOPE,  # noqa: F401, RUF100 - re-exported for callers and tests
+    GOOGLE_CONNECTION_SCOPES,
+)
 
 logger = get_logger(__name__)
 
@@ -50,18 +58,14 @@ GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
 GOOGLE_REVOKE_URL = "https://oauth2.googleapis.com/revoke"
 
-# Scopes for the desktop Google connection. All three are Google "sensitive"
-# scopes (OAuth verification, no CASA assessment). gmail.send is send-only:
-# it cannot read, list or search mail.
-CALENDAR_READONLY_SCOPE = "https://www.googleapis.com/auth/calendar.readonly"
-CALENDAR_EVENTS_RW_SCOPE = "https://www.googleapis.com/auth/calendar.events"
-GMAIL_SEND_SCOPE = "https://www.googleapis.com/auth/gmail.send"
-
-DEFAULT_SCOPES = (
-    CALENDAR_READONLY_SCOPE,
-    CALENDAR_EVENTS_RW_SCOPE,
-    GMAIL_SEND_SCOPE,
-)
+# Scopes for the desktop Google connection come from services.oauth.google so
+# there is one list. The first connect asks for Calendar (read + events) and
+# Gmail send; Gmail mailbox access (read, search, organize: gmail.modify) is
+# asked for the first time the user wants it (incremental consent, see
+# GMAIL_MAILBOX_SCOPES). Every authorization request sets
+# include_granted_scopes=true, so the new token keeps what was granted before.
+CALENDAR_EVENTS_RW_SCOPE = CALENDAR_EVENTS_SCOPE
+DEFAULT_SCOPES = tuple(GOOGLE_CONNECTION_SCOPES)
 
 LOOPBACK_HOST = "127.0.0.1"
 # Matches the consent session TTL: a sign-in left open longer than this has
@@ -127,7 +131,21 @@ def _complete_via_consent_service(state: str, code: str | None, error: str | Non
             "Google not connected",
             "Viola could not finish connecting Google. In Viola, click Connect again.",
         )
-    return True, "Google connected", "Viola can now use your Google Calendar and send email you ask it to send."
+    return True, "Google connected", _connected_message(service, session_id)
+
+
+def _connected_message(service: object, session_id: str) -> str:
+    """Say what the new Google token lets Viola do (read from the stored token)."""
+    granted: set[str] = set()
+    try:
+        session = service.get_session(session_id)
+        bundle = service._vault.get_token("google_calendar", user_id=session.user_id)
+        granted = set(getattr(bundle, "scopes", None) or ())
+    except Exception:
+        logger.debug("Could not read the new Google token's scopes", exc_info=True)
+    if all(scope in granted for scope in GMAIL_MAILBOX_SCOPES):
+        return "Viola can now use your Google Calendar, and read, organize and send your Gmail when you ask."
+    return "Viola can now use your Google Calendar and send email you ask it to send."
 
 
 CompletionCallback = Callable[[str, "str | None", "str | None"], "tuple[bool, str, str]"]
@@ -336,10 +354,13 @@ class GoogleCalendarOAuthAdapter:
                 supports_offline=True,
                 max_bitrate_kbps=None,
                 supports_lyrics=False,
-                extras={"calendar_provider": True, "gmail_send": True},
+                extras={"calendar_provider": True, "gmail_send": True, "gmail_mailbox_scope": GMAIL_MODIFY_SCOPE},
             ),
             can_rotate=True,
-            notes="Google Calendar events and send-only Gmail via installed-app OAuth (PKCE, loopback).",
+            notes=(
+                "Google Calendar events and Gmail (send, plus read and organize once the user allows it) "
+                "via installed-app OAuth (PKCE, loopback)."
+            ),
             is_music_provider=False,
         )
 
@@ -391,6 +412,10 @@ class GoogleCalendarOAuthAdapter:
             "scope": scope_string,
             "state": state,
             "access_type": "offline",
+            # Incremental consent: the new token also carries every scope the
+            # user granted earlier, so asking for Gmail mailbox access later
+            # never drops Calendar or send.
+            "include_granted_scopes": "true",
             "prompt": "consent",
             "code_challenge": challenge,
             "code_challenge_method": "S256",

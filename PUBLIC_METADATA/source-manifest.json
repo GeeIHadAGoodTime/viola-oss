@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "ad068b4ee59f682d0a4c1734f86f889df98c027b",
-  "sha256": "44a8a04c235cda2525d617224a4643379490f268f2a9bea4cf1af371456a5d3a",
+  "revision": "866684ebbf0583839a79aa8c8d1a73925a4a6387",
+  "sha256": "a5bc28973b34785e37a82e5e70c8537cd9b5e71d6d26360e59cee483f27ffb87",
   "files": [
     {
       "path": ".env.example",
@@ -1580,8 +1580,8 @@
     },
     {
       "path": "intent/agent_executor.py",
-      "sha256": "5d1daa7ad66c23c81c45123132eefac3a382bca39f0ddab967c75a0f5f1df7fb",
-      "bytes": 586662
+      "sha256": "e13707f50edfbe06d11c03f5075dfdbefffaf9a4c74a34df7449b87d87fb4aa5",
+      "bytes": 586707
     },
     {
       "path": "intent/agent_loop.py",
@@ -1860,8 +1860,8 @@
     },
     {
       "path": "intent/irreversible_actions.py",
-      "sha256": "f51d571406cdd8183c085d1a830dcf4ac73d923923c35de43f2c638d0ea2fbca",
-      "bytes": 18636
+      "sha256": "6fc6d7f53716f893770b94d0efb8d21b0548f94608960a49ced4a6fed337a3d7",
+      "bytes": 21977
     },
     {
       "path": "intent/json_utils.py",
@@ -2070,8 +2070,8 @@
     },
     {
       "path": "intent/tools/email.py",
-      "sha256": "d785640d1907d2f7dbe8b52115486f2425429d7722917153172edb947691e25e",
-      "bytes": 27789
+      "sha256": "47958a4f63728f71ab0bc9326d77b82e263eec7c4de0e830fa3412bbd120a80d",
+      "bytes": 63687
     },
     {
       "path": "intent/tools/filesystem.py",
@@ -2245,13 +2245,13 @@
     },
     {
       "path": "mcp_hub/approval_bridge.py",
-      "sha256": "8dd57ad3d03886a9b65d2be189050239f801b3ed3dc538ef1db5fc6277eee5eb",
-      "bytes": 59676
+      "sha256": "eebeab28505f9c275143e3f69fc9dead99fac4b6affcd86ed67e9590e119f5e7",
+      "bytes": 60339
     },
     {
       "path": "mcp_hub/client_hub.py",
-      "sha256": "51a792d96188988f6af1eb82e65eddaaf698f1af4d7322458ee6f8d7ca3eb65f",
-      "bytes": 130945
+      "sha256": "86d3ef4f687058422cdf95aa00936112c096405e0c8cad6f02d0f18fa09fb0d7",
+      "bytes": 131158
     },
     {
       "path": "mcp_hub/compound_tools.py",
@@ -2370,8 +2370,8 @@
     },
     {
       "path": "mcp_servers/core_tools/server.py",
-      "sha256": "aad1657828cb178b0e8d22c0b4b26b1abf6ee1ff790b4ed90c4077be8659190d",
-      "bytes": 257079
+      "sha256": "40caf6998eb4f71ca129f781ca8d92288679cfe14df85ab6d782226eaf75600d",
+      "bytes": 259950
     },
     {
       "path": "mcp_servers/phone_tool_descriptions.py",
@@ -2670,8 +2670,8 @@
     },
     {
       "path": "music/consent/adapters/google_calendar.py",
-      "sha256": "4d99002b987a11cd10558bdfc352c0e4776b5e41e677eb0a684e7c31be4471c5",
-      "bytes": 19725
+      "sha256": "e1a2ead81007e241d771465f28f764f829d9f35b1b73c99520d5cd53d8a134c7",
+      "bytes": 21153
     },
     {
       "path": "music/consent/adapters/microsoft_calendar.py",
@@ -2720,8 +2720,8 @@
     },
     {
       "path": "music/consent/service.py",
-      "sha256": "901b31b3ba53b88d232e9d37a28eaf956a5710aa8631cf46f9f47c45ad67bbf0",
-      "bytes": 29521
+      "sha256": "91045133feb52684fa25775090724db79f273197877b542e300b628ef5c7518f",
+      "bytes": 31351
     },
     {
       "path": "music/consent/session_manager.py",
@@ -4175,8 +4175,8 @@
     },
     {
       "path": "services/capability_registry.py",
-      "sha256": "18eaa2845622de8f07ec6bdb4de6b8fa8e70042bd9fffaa87abd3c9ae11de5f7",
-      "bytes": 24401
+      "sha256": "74a56601fb6417a085334c2b594f5e6ce860fcb9a62049a10e5114abdc754450",
+      "bytes": 23781
     },
     {
       "path": "services/cdp_target.py",
@@ -4995,8 +4995,8 @@
     },
     {
       "path": "services/oauth/google.py",
-      "sha256": "79199753f6328841bd6acf36f02fe227e69d721a834a60c84208f2793e00a1cc",
-      "bytes": 4936
+      "sha256": "72add175eede825d0c65ab93ea7b7b6f2854130780c55901877c89fb7f629e13",
+      "bytes": 7111
     },
     {
       "path": "services/oauth/workspace_bridge.py",
@@ -9715,8 +9715,8 @@
     },
     {
       "path": "ui/consent_api.py",
-      "sha256": "0833bf529f801387761a2d2096e862c6d43f0e356846ab1611362d226cc62037",
-      "bytes": 28611
+      "sha256": "16d12f41a5be7fabbc6a0bf2135554f5573aeacb958d7381cfffe5e10c524de0",
+      "bytes": 29107
     },
     {
       "path": "ui/core/bindings.py",
@@ -10390,8 +10390,8 @@
     },
     {
       "path": "ui/react-app/src/components/AccountTab.jsx",
-      "sha256": "b70148bae32d444e43443ce57451cffc4c3ba3c88941e6db338110cda634184d",
-      "bytes": 89600
+      "sha256": "511dd63b2b4c13af3a0d891ffb53dc5ac10c2d0c814c1d10438f5a7654d03a2b",
+      "bytes": 89643
     },
     {
       "path": "ui/react-app/src/components/AccountTab.legacy.jsx",

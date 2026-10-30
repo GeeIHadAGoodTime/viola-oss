@@ -58,9 +58,34 @@ _PATH_LIKE_ARG_NAMES: frozenset[str] = frozenset(
 
 _PLAYLIST_SAFE_ACTIONS: frozenset[str] = frozenset({"list"})
 _PLAYLIST_CONFIRM_ACTIONS: frozenset[str] = frozenset({"play", "play_favorites"})
-_GMAIL_SAFE_ACTIONS: frozenset[str] = frozenset({"inbox", "read", "search", "daily_summary", "list_labels"})
-_GMAIL_CONFIRM_ACTIONS: frozenset[str] = frozenset({"draft", "draft_reply", "download_attachment", "create_label"})
-_GMAIL_DANGEROUS_ACTIONS: frozenset[str] = frozenset({"send", "send_draft", "modify", "batch_modify", "modify_thread"})
+_GMAIL_SAFE_ACTIONS: frozenset[str] = frozenset(
+    {"inbox", "read", "search", "thread", "daily_summary", "labels", "list_labels", "allow_access"}
+)
+# Drafts and small reversible changes (archive, star, mark read, labels on a
+# few emails) are allowed without a prompt; more than five emails at once is a
+# bulk change (email_bulk) and asks first, like sending and trash.
+_GMAIL_CONFIRM_ACTIONS: frozenset[str] = frozenset(
+    {
+        "draft",
+        "draft_reply",
+        "download_attachment",
+        "create_label",
+        "mark_read",
+        "mark_unread",
+        "star",
+        "unstar",
+        "archive",
+        "unarchive",
+        "mark_important",
+        "mark_not_important",
+        "label",
+        "unlabel",
+        "untrash",
+    }
+)
+_GMAIL_DANGEROUS_ACTIONS: frozenset[str] = frozenset(
+    {"send", "send_draft", "reply", "trash", "modify", "batch_modify", "modify_thread"}
+)
 _WORKBENCH_SAFE_ACTIONS: frozenset[str] = frozenset({"", "list", "open_folder", "path_for", "read", "search"})
 _WORKBENCH_CONFIRM_ACTIONS: frozenset[str] = frozenset({"remember"})
 _WORKBENCH_DANGEROUS_ACTIONS: frozenset[str] = frozenset({"delete", "forget", "remove"})
@@ -449,6 +474,8 @@ def _derive_call_risk_from_args(tool_name: str, args: Mapping[str, Any] | None) 
         if not action or action in _GMAIL_SAFE_ACTIONS:
             return RiskLevel.SAFE
         if action in _GMAIL_CONFIRM_ACTIONS:
+            if is_irreversible_tool_call("gmail", args):
+                return RiskLevel.DANGEROUS
             return RiskLevel.CONFIRM
         if action in _GMAIL_DANGEROUS_ACTIONS:
             return RiskLevel.DANGEROUS
