@@ -189,7 +189,50 @@ def _should_speak_reply(channel_value: Any, user_id: str) -> bool:
     return bool(settings_mgr.get("tts_enabled", TTS_ENABLED_DEFAULT, user_id=user_id))
 
 
-def _speak_reply_now(context: ApiContext, envelope: Any, *, channel_value: Any, user_id: str) -> None:
+def _new_streamed_reply(
+    context: ApiContext,
+    *,
+    channel_value: Any,
+    user_id: str,
+    stream_id: str | None,
+) -> Any | None:
+    """A reply that may start speaking while the model still writes it, or None.
+
+    Only when this reply would be spoken at all (``_should_speak_reply``) and
+    the engine can speak a stream. Push-to-talk and touch turns post here.
+    """
+    try:
+        if not _should_speak_reply(channel_value, user_id):
+            return None
+        engine = _reply_tts_engine(context)
+        from voice.streamed_reply import new_streamed_reply
+
+        def _start(reply: Any) -> Any:
+            async def _run() -> None:
+                try:
+                    await asyncio.wait_for(reply.speak(), timeout=_SPEAK_REPLY_TIMEOUT_SECONDS)
+                except TimeoutError:
+                    log.warning("Spoken reply exceeded %.0fs; abandoning", _SPEAK_REPLY_TIMEOUT_SECONDS)
+                except Exception as exc:  # noqa: BLE001, RUF100 - a reply that cannot be spoken is still a reply
+                    log.warning("Streamed spoken reply failed: %s", exc)
+
+            return _reply_speech_tasks.create_task(_run())
+
+        return new_streamed_reply(engine, user_id=user_id, stream_id=stream_id, start_speaking=_start)
+    # Deciding whether to speak must never change what the caller gets back.
+    except Exception as exc:  # noqa: BLE001, RUF100
+        log.debug("Streamed spoken reply skipped: %s", exc)
+        return None
+
+
+def _speak_reply_now(
+    context: ApiContext,
+    envelope: Any,
+    *,
+    channel_value: Any,
+    user_id: str,
+    streamed_reply: Any | None = None,
+) -> None:
     """Speak the reply aloud when the user has asked for every reply to be spoken.
 
     Fire-and-forget on purpose. The caller already has the reply text -- it is
@@ -197,14 +240,23 @@ def _speak_reply_now(context: ApiContext, envelope: Any, *, channel_value: Any, 
     before this runs -- so holding the HTTP response open for the length of the
     speech would only add latency and put long replies past client budgets
     (``ui/qt_native/window_core.py`` posts with 10s).
+
+    With a ``streamed_reply`` that already started speaking, only the part of
+    the final reply not yet spoken is added to it.
     """
+    message = _command_stream_message(envelope)
+    data = envelope.get("data") if isinstance(envelope, dict) else None
+    already_spoken = bool(isinstance(data, dict) and data.get("spoken"))
+    if streamed_reply is not None:
+        started = bool(streamed_reply.started)
+        streamed_reply.finish(message, already_spoken=already_spoken or not started)
+        if started:
+            return
     if not _should_speak_reply(channel_value, user_id):
         return
-    message = _command_stream_message(envelope)
     if not message:
         return
-    data = envelope.get("data") if isinstance(envelope, dict) else None
-    if isinstance(data, dict) and data.get("spoken"):
+    if already_spoken:
         # Something upstream already voiced this turn; speaking it again would
         # double it. Same contract the voice handler reads.
         return
@@ -238,7 +290,14 @@ def _speak_reply_now(context: ApiContext, envelope: Any, *, channel_value: Any, 
     _reply_speech_tasks.create_task(_run())
 
 
-def _speak_reply(context: ApiContext, envelope: Any, *, channel_value: Any, user_id: str) -> None:
+def _speak_reply(
+    context: ApiContext,
+    envelope: Any,
+    *,
+    channel_value: Any,
+    user_id: str,
+    streamed_reply: Any | None = None,
+) -> None:
     """Speak the reply if configured to, and never let that break the reply.
 
     Speech is a side effect of answering, so a failure to speak must not change
@@ -247,7 +306,13 @@ def _speak_reply(context: ApiContext, envelope: Any, *, channel_value: Any, user
     run the command the gate just refused.
     """
     try:
-        _speak_reply_now(context, envelope, channel_value=channel_value, user_id=user_id)
+        _speak_reply_now(
+            context,
+            envelope,
+            channel_value=channel_value,
+            user_id=user_id,
+            streamed_reply=streamed_reply,
+        )
     # Deciding whether to speak must never change what the caller gets back.
     except Exception as exc:  # noqa: BLE001, RUF100
         log.debug("Spoken reply skipped: %s", exc)
@@ -512,8 +577,21 @@ def register_command_routes(context: ApiContext) -> None:
                 stream_context = command_stream_context(stream_id)
             else:
                 stream_context = contextlib.nullcontext()
-            with stream_context:
-                result = await command_service.execute(command_request)
+            # Speak the reply while the model writes it (when it is spoken at all).
+            streamed_reply = _new_streamed_reply(
+                context,
+                channel_value=channel_value,
+                user_id=user_id,
+                stream_id=stream_id,
+            )
+            reply_context = streamed_reply.attached() if streamed_reply is not None else contextlib.nullcontext()
+            try:
+                with stream_context, reply_context:
+                    result = await command_service.execute(command_request)
+            except BaseException:
+                if streamed_reply is not None:
+                    streamed_reply.cancel()
+                raise
 
             if "rate_limited" in result.policy_flags:
                 if idempotency_claim is not None and idempotency_claim.is_owner:
@@ -528,6 +606,8 @@ def register_command_routes(context: ApiContext) -> None:
                         error=True,
                         message=str(result.data.get("message") or "Rate limit exceeded."),
                     )
+                if streamed_reply is not None:
+                    streamed_reply.cancel()
                 return build_429_response(result)
 
             envelope = result.to_envelope()
@@ -599,7 +679,13 @@ def register_command_routes(context: ApiContext) -> None:
                 from services.llm.stream_bus import finalize_stream
 
                 finalize_stream(stream_id, content=_command_stream_message(envelope))
-            _speak_reply(context, envelope, channel_value=channel_value, user_id=user_id)
+            _speak_reply(
+                context,
+                envelope,
+                channel_value=channel_value,
+                user_id=user_id,
+                streamed_reply=streamed_reply,
+            )
             return envelope
         except Exception as exc:
             log.exception("Command execution failed")
