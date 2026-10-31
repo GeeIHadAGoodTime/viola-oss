@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "866684ebbf0583839a79aa8c8d1a73925a4a6387",
-  "sha256": "a5bc28973b34785e37a82e5e70c8537cd9b5e71d6d26360e59cee483f27ffb87",
+  "revision": "5dd12fc840aa314d8d4e289a5b5372f92629e34f",
+  "sha256": "78878aa49150245c7fdb041cd659634428445547603e8ca6c99959a248eac46a",
   "files": [
     {
       "path": ".env.example",
@@ -1375,8 +1375,8 @@
     },
     {
       "path": "diagnostics/latency_spans.py",
-      "sha256": "5f7c50686c86f42a7bbca7fc86c489c5ea48c616bad4a64fc276ca92b417fda3",
-      "bytes": 9412
+      "sha256": "ea295f5a58ac7ce7d5a868a390eafa77683692b4c98ab68bae858eee6d71409d",
+      "bytes": 11899
     },
     {
       "path": "diagnostics/native_crash_relay.py",
@@ -2045,8 +2045,8 @@
     },
     {
       "path": "intent/tools/deferred_tool_schemas.py",
-      "sha256": "b745e18eb8004caf6fc554048e59841e018587478a8ab166b26fe05325f844ad",
-      "bytes": 35994
+      "sha256": "6660e84d58292985526196f0a079a6abd1bfea9efa44e0733d63eb4143850f58",
+      "bytes": 36582
     },
     {
       "path": "intent/tools/delegation.py",
@@ -4640,8 +4640,8 @@
     },
     {
       "path": "services/llm/prompts/viola_unified.py",
-      "sha256": "04e835b87946d45b0363b94b0146a24aa6d29616b38d738cc1f63d9a9688856f",
-      "bytes": 17755
+      "sha256": "e5ae8c601f7338fd0f255e20a772c80b89965e9f36b338dd2177190de7064651",
+      "bytes": 18184
     },
     {
       "path": "services/llm/provider_fallback.py",
@@ -4760,8 +4760,8 @@
     },
     {
       "path": "services/memory/dir.py",
-      "sha256": "8b86c736314e5af043314429c13670c1fef92f56264244ea795dfa5ee2318310",
-      "bytes": 98339
+      "sha256": "98ab3610a0bd2296341d35e7d4392e6bac3fca0ca3ae47da86e222c26765ac92",
+      "bytes": 99563
     },
     {
       "path": "services/memory/extract_memories.py",
@@ -5100,8 +5100,8 @@
     },
     {
       "path": "services/persistence/trace_keys.py",
-      "sha256": "b04e494be1c583e973e22322745ac99fb934a0d2b837e8aee88c233034540a1f",
-      "bytes": 28908
+      "sha256": "f26dbbbabc1136fdea14d1c8ecf62ce7466eefe3d0a84dad17927fd33d547087",
+      "bytes": 31311
     },
     {
       "path": "services/playwright_cdp_client.py",
@@ -13125,8 +13125,8 @@
     },
     {
       "path": "utils/weather_normalization.py",
-      "sha256": "626642ae46f99b6ca25e1b8d9703942f781dbb94799fb69f877e50ea96fde209",
-      "bytes": 13408
+      "sha256": "457f30d81eadaf8e6dd8c73e9d1de3d74cc2ca445bbb712a86ca6541e5ff4c67",
+      "bytes": 14069
     },
     {
       "path": "utils/weather_payload.py",
