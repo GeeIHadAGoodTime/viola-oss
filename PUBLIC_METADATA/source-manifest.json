@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "457f86e3ec5fa4394fd9b13e604f2ab9dd342a4d",
-  "sha256": "d68938cb9696b186f86c53eb923e69f3f768eb5b196db31154bc64d9c3d77ea3",
+  "revision": "1f1fc68491149d7ca8373676922cd68683280a75",
+  "sha256": "3300d77bd39e080d44cfb638bb4d148656783c08cd5e8c51af351decf1be121b",
   "files": [
     {
       "path": ".env.example",
@@ -1585,8 +1585,8 @@
     },
     {
       "path": "intent/agent_loop.py",
-      "sha256": "2fa53648635efb9a57a54be1b3df54a4b155c50e71dabc5de7030b7cdaf9baf4",
-      "bytes": 251641
+      "sha256": "4cfea712bf6692cc7ae1965a6607def5beb7c6a7468561f0e3fed90988e57faf",
+      "bytes": 254782
     },
     {
       "path": "intent/agent_message_manager.py",
@@ -1610,8 +1610,8 @@
     },
     {
       "path": "intent/ai_controller.py",
-      "sha256": "405e45835f90261487e72f3a241d3f21cc445a222489ab1461021ef9136e8f6d",
-      "bytes": 166950
+      "sha256": "96f54dd3c699de0bdf92b76e926d0fd907dfb9eaa777a58e16ca76b334513232",
+      "bytes": 167359
     },
     {
       "path": "intent/ai_interpreter.py",
@@ -1900,8 +1900,8 @@
     },
     {
       "path": "intent/pipeline_processors.py",
-      "sha256": "d9a1ad9d7e26494fa9fd22506996b639df6401d9ceb838797be01dab2174bcd8",
-      "bytes": 24432
+      "sha256": "32aaffd3182851bbbc44fdf668ea6e14c7c93fb71c9394444827eacdfc437a09",
+      "bytes": 24655
     },
     {
       "path": "intent/pipeline_room_tracking.py",
@@ -2115,8 +2115,8 @@
     },
     {
       "path": "intent/tools/music_tools.py",
-      "sha256": "297e7c2bf1af68a517b6c2047ffc3229f7ebe22b4c5608770ec631c873539d54",
-      "bytes": 66475
+      "sha256": "4cc81ee844b0d80edbee1ecb755a8675cca32ff31fa81d789cc720788ff6d356",
+      "bytes": 67485
     },
     {
       "path": "intent/tools/notification_tools.py",
@@ -3205,8 +3205,8 @@
     },
     {
       "path": "music/runtime/control_surface.py",
-      "sha256": "1fe6294e58dc902fb0c41ad77a8c6e46b7f504039c57387cb2254495f9b10374",
-      "bytes": 43365
+      "sha256": "9f8fe0985e8acb385c3fec9f305463230ec191ebd85bcadf43d2b95cec2880c2",
+      "bytes": 45065
     },
     {
       "path": "music/runtime/embedded_playback.py",

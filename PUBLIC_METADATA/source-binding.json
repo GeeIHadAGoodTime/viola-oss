@@ -30,10 +30,10 @@
   },
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "fd4b159f943427378d5f3f339bbd5e07d21f4b834782ab19dcf1c6b831579d3a",
-  "source_tree_sha256": "d68938cb9696b186f86c53eb923e69f3f768eb5b196db31154bc64d9c3d77ea3",
+  "source_manifest_sha256": "bcc6acd07f849ddb5921f797c8068901962e96e0533e100ce9c90dc2d1f661a6",
+  "source_tree_sha256": "3300d77bd39e080d44cfb638bb4d148656783c08cd5e8c51af351decf1be121b",
   "source_file_count": 2760,
-  "source_revision": "457f86e3ec5fa4394fd9b13e604f2ab9dd342a4d",
+  "source_revision": "1f1fc68491149d7ca8373676922cd68683280a75",
   "comparison_public_revision": "ecab2772465fcc89ae6645b028af1c2273b9199f",
   "changed_source_paths": [
     "START_WEB_INTERFACE.py",
@@ -441,7 +441,7 @@
     "historical_inventory_limits": "This renderer correction changes no dependency or workflow inputs. All six retained SBOMs and their complete status objects stay historical and unchanged; no current installed inventory qualification is claimed."
   },
   "qualification": {
-    "source_commit": "457f86e3ec5fa4394fd9b13e604f2ab9dd342a4d",
+    "source_commit": "1f1fc68491149d7ca8373676922cd68683280a75",
     "kind": "latency"
   },
   "historical_bindings": [
