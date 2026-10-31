@@ -161,11 +161,11 @@ def _spotify_signed_in(user_id: str | None) -> bool:
         return True
 
 
-def _notify_spotify_not_connected() -> None:
+def _notify_spotify_not_connected(user_id: str | None) -> None:
     try:
         from music.providers.browser.auth_manager import notify_spotify_not_connected
 
-        notify_spotify_not_connected()
+        notify_spotify_not_connected(user_id)
     except Exception as exc:
         logger.debug("Spotify fallback notice failed: %s", exc)
 
@@ -187,7 +187,7 @@ def select_first_run_music_provider(query: str) -> MusicProviderSelection:
                 "Music source is Spotify but Spotify isn't connected; playing on YouTube instead (query=%s)",
                 query[:50],
             )
-            _notify_spotify_not_connected()
+            _notify_spotify_not_connected(_current_user_id())
             return MusicProviderSelection(
                 provider_id=ANONYMOUS_YOUTUBE_PROVIDER_ID,
                 source="ytsearch1",

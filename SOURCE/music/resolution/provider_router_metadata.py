@@ -313,9 +313,16 @@ class ProviderRouterMetadataResolver:
                 query[:50] if query else "",
             )
 
-        # Spotify CDP — resolve via CDP provider, not YouTube
+        # Spotify CDP — resolve via CDP provider, not YouTube. A signed-in
+        # Spotify reaches the router as source="spotify_cdp" and never gets
+        # here; "ytsearch1" here is a deliberate YouTube search (the music
+        # source is Spotify but Spotify isn't signed in, or the user asked for
+        # YouTube). Re-routing that to Spotify launched a signed-out Spotify
+        # and failed with "Spotify login required".
         if active_provider_id in ("spotify", "spotify_cdp"):
-            return self._resolve_spotify_cdp_search(query, source)
+            if source != "ytsearch1":
+                return self._resolve_spotify_cdp_search(query, source)
+            active_provider_id = "youtube_iframe"
 
         # Validate provider for YouTube path
         if active_provider_id not in ("youtube_music", "youtube_iframe"):

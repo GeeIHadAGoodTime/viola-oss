@@ -71,11 +71,11 @@ _LOCAL_FILE_EXTENSIONS = (
 )
 
 
-def _notify_spotify_not_connected() -> None:
+def _notify_spotify_not_connected(user_id: str = "") -> None:
     try:
         from music.providers.browser.auth_manager import notify_spotify_not_connected
 
-        notify_spotify_not_connected()
+        notify_spotify_not_connected(user_id or None)
     except Exception:
         logger.debug("media could not show the Spotify fallback notice", exc_info=True)
 
@@ -670,7 +670,7 @@ async def _handle_search_play_mode(
             if _field in play_data and _field not in data:
                 data[_field] = play_data[_field]
     if play_result.ok and data.get("fallback_reason") == "spotify_not_connected" and data["playback_started"]:
-        _notify_spotify_not_connected()
+        _notify_spotify_not_connected(user_id)
     if play_result.ok:
         fallback_message = (
             ("Playing some music." if generic_request else "Playing %s." % query)

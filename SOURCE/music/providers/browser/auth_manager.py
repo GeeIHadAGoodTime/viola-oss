@@ -837,26 +837,50 @@ def is_spotify_signed_in(user_id: str | None = None) -> bool:
     return bool(manager.refresh_spotify_sign_in())
 
 
-def notify_spotify_not_connected() -> bool:
+def notify_spotify_not_connected(user_id: str | None = None) -> bool:
     """Tell the user on screen that Spotify was skipped because it isn't connected.
 
     The music source is Spotify but Spotify cannot play, so Viola plays on
     YouTube instead. Saying so on screen (as well as in the tool result the
-    reply is written from) means the switch is never silent. Returns True when
-    the notice went out.
+    reply is written from) means the switch is never silent. Sent as the
+    ``error`` frame React's toast handler reads (``usePlayerState``), at
+    ``info`` level, to this install's UI only. Returns True when it went out.
     """
     global _last_notice_at
     now = time.monotonic()
     if _last_notice_at and now - _last_notice_at < _NOTICE_REPEAT_SECONDS:
         return False
     try:
-        from core.state_hub import SetToastMessage, get_state_hub
+        from ui.websocket.event_hub import get_event_hub, transport_command_recipients
 
-        get_state_hub().dispatch(SetToastMessage(message=SPOTIFY_NOT_CONNECTED_NOTICE))
+        hub = get_event_hub()
+        if hub is None:
+            logger.debug("Spotify fallback notice skipped (no event hub)")
+            return False
+        recipients = transport_command_recipients(_resolve_sign_in_user_id(user_id))
+        if not recipients:
+            return False
+        payload = {"user_message": SPOTIFY_NOT_CONNECTED_NOTICE, "level": "info", "code": "spotify_not_connected"}
+
+        async def _send() -> None:
+            for recipient in recipients:
+                await hub.broadcast("error", payload, user_id=recipient, force=True)
+
+        try:
+            asyncio.get_running_loop().create_task(_send())
+        except RuntimeError:
+            from core.asyncio_safe import get_main_loop
+
+            loop = get_main_loop()
+            if loop is None or not loop.is_running() or loop.is_closed():
+                logger.debug("Spotify fallback notice skipped (no running event loop)")
+                return False
+            asyncio.run_coroutine_threadsafe(_send(), loop)
     except Exception:
-        logger.debug("Spotify fallback notice skipped (state hub not initialized)")
+        logger.debug("Spotify fallback notice failed", exc_info=True)
         return False
     _last_notice_at = now
+    logger.info("Told the user Spotify isn't connected and YouTube is playing instead")
     return True
 
 
