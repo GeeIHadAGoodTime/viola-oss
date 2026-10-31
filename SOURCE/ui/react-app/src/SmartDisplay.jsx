@@ -519,6 +519,11 @@ ProviderEmbed.propTypes = {
 // END OF MODULE-SCOPE COMPONENTS
 // =========================================================================
 
+// The stage's reply line before any reply (and on a speaker page once a reply
+// has been up for SPOKE_REPLY_HOLD_MS).
+export const IDLE_RESPONSE_LINE = '"Hi! Ask me anything or tell me to play some music."';
+export const SPOKE_REPLY_HOLD_MS = 60000;
+
 // Longest text the stage type-anywhere box takes (typed or pasted).
 const STAGE_TYPING_MAX_CHARS = 4000;
 
@@ -1028,7 +1033,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
     rememberRecentActivityCleared(historyPrincipalKey);
     setChatHistory([]);
   }, [historyPrincipalKey]);
-  const [lastResponse, setLastResponse] = useState('"Hi! Ask me anything or tell me to play some music."');
+  const [lastResponse, setLastResponse] = useState(IDLE_RESPONSE_LINE);
   const [mainThinking, setMainThinking] = useState('');
   // Managed-AI usage cap (C-077). Non-null for as long as the plan allowance is
   // spent, so the response area can offer a route to the upgrade surface rather
@@ -1807,6 +1812,26 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
   // still down after DISCONNECT_TOAST_GRACE_MS (1.0.5 build-5 laptop, X10.4).
   const wsConnectCountRef = useRef(playerState.connectCount);
   wsConnectCountRef.current = playerState.connectCount;
+
+  // Speaker page (multiroom spoke): its reply line follows the hub's replies
+  // over the socket, and kept an old reply on screen (1.0.5 build 7, A7.3-A7.6):
+  // replies sent while the speaker's tab was in the background or its socket
+  // was down never arrive. So on a speaker a reply goes back to the idle line
+  // after a while, and a reconnect drops whatever reply was showing.
+  const spokeConnectCountRef = useRef(playerState.connectCount);
+  useEffect(() => {
+    if (!isSpoke) return;
+    const previous = spokeConnectCountRef.current;
+    spokeConnectCountRef.current = playerState.connectCount;
+    if (previous && playerState.connectCount && playerState.connectCount !== previous) {
+      setLastResponse(IDLE_RESPONSE_LINE);
+    }
+  }, [isSpoke, playerState.connectCount]);
+  useEffect(() => {
+    if (!isSpoke || lastResponse === IDLE_RESPONSE_LINE) return undefined;
+    const timer = setTimeout(() => setLastResponse(IDLE_RESPONSE_LINE), SPOKE_REPLY_HOLD_MS);
+    return () => clearTimeout(timer);
+  }, [isSpoke, lastResponse]);
   useEffect(() => {
     if (!setDisconnectCallback) return;
     let noticeTimer = null;

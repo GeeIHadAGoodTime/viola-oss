@@ -4,12 +4,13 @@
  *    real text field, so the paste went nowhere).
  *  - Chat History lost earlier turns across a restart (A10.4, A11.6): the
  *    list was only what this launch had added.
+ *  - The multiroom speaker page kept an old reply on screen (A7.3-A7.6).
  */
 import { act, render, screen, waitFor, cleanup } from './test/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import SmartDisplay, { stagePasteText } from './SmartDisplay';
+import SmartDisplay, { IDLE_RESPONSE_LINE, SPOKE_REPLY_HOLD_MS, stagePasteText } from './SmartDisplay';
 
-const harness = vi.hoisted(() => ({ player: null }));
+const harness = vi.hoisted(() => ({ player: null, chatResponse: null }));
 
 vi.mock('./hooks/usePlayerState', () => ({
   usePlayerState: () => harness.player,
@@ -51,7 +52,7 @@ function makePlayer() {
     setDisplayPriorityCallback: noop,
     setAgentFrameCallback: noop,
     setPlaybackCommandCallback: noop,
-    setChatResponseCallback: noop,
+    setChatResponseCallback: (cb) => { harness.chatResponse = cb; },
     setCalendarUpdateCallback: noop,
     setDisconnectCallback: noop,
     getWsDebug: () => ({}),
@@ -109,5 +110,49 @@ describe('Chat History across a restart', () => {
     render(<SmartDisplay isSpoke />);
     await act(async () => { await new Promise((resolve) => setTimeout(resolve, 30)); });
     expect(requested.some((url) => url.includes('/v1/chat/recent-activity'))).toBe(false);
+  });
+});
+
+describe('speaker page reply line (A7.3-A7.6)', () => {
+  it('goes back to the idle line after a while instead of keeping an old reply', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      render(<SmartDisplay isSpoke />);
+      await waitFor(() => expect(harness.chatResponse).toBeTypeOf('function'));
+      await act(async () => { harness.chatResponse({ text: 'Playing relaxing jazz.' }); });
+      expect(screen.getByText(/Playing relaxing jazz\./)).toBeInTheDocument();
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(SPOKE_REPLY_HOLD_MS + 100); });
+
+      expect(screen.queryByText(/Playing relaxing jazz\./)).not.toBeInTheDocument();
+      expect(screen.getByText(IDLE_RESPONSE_LINE.replaceAll('"', ''), { exact: false })).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('drops the shown reply when its socket reconnects (replies sent meanwhile were missed)', async () => {
+    const { rerender } = render(<SmartDisplay isSpoke />);
+    await waitFor(() => expect(harness.chatResponse).toBeTypeOf('function'));
+    await act(async () => { harness.chatResponse({ text: 'Account required.' }); });
+    expect(screen.getByText(/Account required\./)).toBeInTheDocument();
+
+    harness.player = { ...harness.player, connectCount: 2 };
+    rerender(<SmartDisplay isSpoke />);
+
+    await waitFor(() => expect(screen.queryByText(/Account required\./)).not.toBeInTheDocument());
+  });
+
+  it('keeps the reply on the main stage (not a speaker page)', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      render(<SmartDisplay />);
+      await waitFor(() => expect(harness.chatResponse).toBeTypeOf('function'));
+      await act(async () => { harness.chatResponse({ text: 'Heads.' }); });
+      await act(async () => { await vi.advanceTimersByTimeAsync(SPOKE_REPLY_HOLD_MS + 100); });
+      expect(screen.getByText(/Heads\./)).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
