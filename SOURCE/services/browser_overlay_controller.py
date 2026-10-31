@@ -176,6 +176,9 @@ class BrowserOverlayController:
         self._agent_busy: bool = False
         # The last real page the agent browsed, so the view can be reopened.
         self._last_agentic_url: str = ""
+        # Told (previous_state, target) when the user closes the view; target
+        # is the provider for a sign-in view, so a sign-in watcher can stop.
+        self._user_close_listeners: list[Callable[[str, str], None]] = []
 
     # ------------------------------------------------------------------
     # Public API
@@ -236,9 +239,26 @@ class BrowserOverlayController:
         reopened after the agent finished. Returns the state the view was in.
         """
         previous = self._state
+        target = self._current_url
         self.hide()
         logger.info("Browser overlay closed by the user (was %s)", previous.value)
+        if previous != OverlayState.HIDDEN:
+            for listener in list(self._user_close_listeners):
+                try:
+                    listener(previous.value, target)
+                except Exception:
+                    logger.exception("Browser overlay user-close listener failed")
         return previous.value
+
+    def add_user_close_listener(self, listener: Callable[[str, str], None]) -> None:
+        """Call ``listener(previous_state, target)`` when the user closes the view.
+
+        For a sign-in view ``previous_state`` is ``"login"`` and ``target`` the
+        provider, so the sign-in flow can stop waiting for a login that the
+        user walked away from.
+        """
+        if listener not in self._user_close_listeners:
+            self._user_close_listeners.append(listener)
 
     def update_agentic_status(
         self,
