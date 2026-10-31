@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "866684ebbf0583839a79aa8c8d1a73925a4a6387",
-  "sha256": "a5bc28973b34785e37a82e5e70c8537cd9b5e71d6d26360e59cee483f27ffb87",
+  "revision": "774e318a0acd8885bb7dce999e27a49e95240e64",
+  "sha256": "74f6727b44e90ac485bd8b9cd875932e9597012ac2d677d7ea6eba5d060a969d",
   "files": [
     {
       "path": ".env.example",
@@ -750,8 +750,8 @@
     },
     {
       "path": "backend/weather_fetch.py",
-      "sha256": "1c81ee6c8fcd2b1162edcc7525cf92d43d72dde66405c6be9bf43a9f66a09b00",
-      "bytes": 74920
+      "sha256": "e1417da620c3f27588d7da4fa698c2c92afc8ad8597be22217520bf73801f32c",
+      "bytes": 75304
     },
     {
       "path": "backend/webhooks/__init__.py",
@@ -1160,8 +1160,8 @@
     },
     {
       "path": "core/single_instance.py",
-      "sha256": "2afbcff7a0def5968ba99e355b23c7aa92a966d6d7c36c63bbb3a35bce4b4b72",
-      "bytes": 24744
+      "sha256": "38b1b26490cf97758b7ba3f149043a806319c49fb8551ecb465b617500b2e1b2",
+      "bytes": 25923
     },
     {
       "path": "core/state_hub.py",
@@ -4445,8 +4445,8 @@
     },
     {
       "path": "services/conversation/state_manager.py",
-      "sha256": "fc921b932d0324026ebfc48a03aa5f467b01aaf64c475a9cc4c4b6223f6219e9",
-      "bytes": 138317
+      "sha256": "48ef2b11c3d7528ebb72a5908924f4cb60a381dad0eb09eae1462905639100fa",
+      "bytes": 143937
     },
     {
       "path": "services/conversation/tool_result_storage.py",
@@ -4565,8 +4565,8 @@
     },
     {
       "path": "services/llm/managed_budget.py",
-      "sha256": "ab9269a9e24407bbcea3006ab0c547be0dd32162178ecd4f984e363ef787c414",
-      "bytes": 13891
+      "sha256": "851cdcf5782ea820130c5658cf2f8794e7ed3696ee19a00e628f9d20ee8d136a",
+      "bytes": 15523
     },
     {
       "path": "services/llm/model_fallback.py",
@@ -9400,8 +9400,8 @@
     },
     {
       "path": "ui/api/routes/chat_mode.py",
-      "sha256": "86a76a0610cfcfed1845c15b62eea30cbd2b12abd917afd3f44c9c67c85631b7",
-      "bytes": 40666
+      "sha256": "5b71ad567d013679811639115152d39c5eeb7ce80392bce5fe32d812a7d8395d",
+      "bytes": 42347
     },
     {
       "path": "ui/api/routes/clock.py",
@@ -9890,8 +9890,8 @@
     },
     {
       "path": "ui/qt_native/webview_window.py",
-      "sha256": "ea8aaba8923639fe17ca92d5c91c76a7adbf3ff2b97d120f193ab3fbb197af23",
-      "bytes": 246678
+      "sha256": "0dd791ce67838131c8a110ca6e68d8bd09492c801540788f98c17d6832a36f29",
+      "bytes": 250497
     },
     {
       "path": "ui/qt_native/widgets/connectivity_status.py",
@@ -10045,13 +10045,18 @@
     },
     {
       "path": "ui/react-app/src/SmartDisplay.jsx",
-      "sha256": "1c8458ea4031c7f0d9d2325ff732774286af1383f717498d2b57e427143e24fe",
-      "bytes": 183697
+      "sha256": "dd159533a5249cd1e99f72f277a6b148c391f72bf47c2f0dbd06c0a74d601e22",
+      "bytes": 186163
     },
     {
       "path": "ui/react-app/src/SmartDisplay.spokePolicy.test.jsx",
       "sha256": "e15f07073f7d9a3c568c77b88ecf085185185c65fb238d68108c8415118a16c6",
       "bytes": 3782
+    },
+    {
+      "path": "ui/react-app/src/SmartDisplay.stageInputHistory.test.jsx",
+      "sha256": "f0fbc405c6a8b0259a0cc1ccdee20913416b756e08fb7ff0fc4854af9cc8dd75",
+      "bytes": 4483
     },
     {
       "path": "ui/react-app/src/SmartDisplay.stageRouting.test.jsx",
@@ -10390,8 +10395,8 @@
     },
     {
       "path": "ui/react-app/src/components/AccountTab.jsx",
-      "sha256": "511dd63b2b4c13af3a0d891ffb53dc5ac10c2d0c814c1d10438f5a7654d03a2b",
-      "bytes": 89643
+      "sha256": "0a6d6b8bf5ac6e129d1206f3584cf05fe801c363f0d7af5cebfe1e6a9dce2c47",
+      "bytes": 90174
     },
     {
       "path": "ui/react-app/src/components/AccountTab.legacy.jsx",
@@ -10430,8 +10435,8 @@
     },
     {
       "path": "ui/react-app/src/components/AccountTab.usageCloudAuth.test.jsx",
-      "sha256": "d4863aaf277d02dcd3accc3a9d0e69b9300248f94f596660c252385e59fc9fcd",
-      "bytes": 6293
+      "sha256": "b7b0d452861f64d485a34dce5836ce5661361cd4bf1814723879e59460353e3d",
+      "bytes": 8288
     },
     {
       "path": "ui/react-app/src/components/AgentCard.jsx",
@@ -10455,13 +10460,13 @@
     },
     {
       "path": "ui/react-app/src/components/BillingCapacityPanel.jsx",
-      "sha256": "d38d729572a1f612ed1a7f567b70eb5e9acc61a0eec7eee6f4b210c6c957d9e1",
-      "bytes": 19071
+      "sha256": "85d3ad1ab0b5b6690cae4be7e34b75fd353be450c8327411f05f970710a07d37",
+      "bytes": 19458
     },
     {
       "path": "ui/react-app/src/components/BillingCapacityPanel.test.jsx",
-      "sha256": "4c07f69369f884670c47e122d06199db483ad514dc7aa8ac2849528712258358",
-      "bytes": 19352
+      "sha256": "db937c37a8cb7decf034d7ab5b51b4ca792719717e4052e47ba5743f56a0b787",
+      "bytes": 20063
     },
     {
       "path": "ui/react-app/src/components/BugReportModal.jsx",
@@ -10870,8 +10875,8 @@
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.jsx",
-      "sha256": "086104326832333e4c45e41a23cd45f0c8d1a4b91352b1dd9c91be1dee782607",
-      "bytes": 218420
+      "sha256": "d6afd9c30d214241f49a1cb062d2a7b21575f47a11be65d78d9f28298ec25df6",
+      "bytes": 216959
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.localDiscovery.test.jsx",
@@ -10920,18 +10925,23 @@
     },
     {
       "path": "ui/react-app/src/components/TimerCountdown.jsx",
-      "sha256": "91658c6c6fb7e6effc9bd969f3ebd577b15bc102fc89c5a09cf2bd78113d4e28",
-      "bytes": 11299
+      "sha256": "5c405e89b841f85757d5d6b684ad7ae2538179a83b90eb2d73a02e95933dedc9",
+      "bytes": 11565
     },
     {
       "path": "ui/react-app/src/components/TimerCountdown.test.jsx",
-      "sha256": "9e90353fb1d8387fb6da0a2a2f4bb07acfcc1951eb1e7183be7f51c300b43daa",
-      "bytes": 3725
+      "sha256": "228d76e3619003fe9a1d3abc425e52874bcc1b95fdeff32d8096bdb0066d74fd",
+      "bytes": 4384
     },
     {
       "path": "ui/react-app/src/components/Toast.jsx",
-      "sha256": "703058568beea41a0e956ddfef1ee3a4ba74627dcce3ad1b95f5a02d8e1c98c9",
-      "bytes": 8251
+      "sha256": "cfc07ca17503c39c826af389d409a0690483357a1c9667b1826cd62967f7819b",
+      "bytes": 8626
+    },
+    {
+      "path": "ui/react-app/src/components/Toast.test.jsx",
+      "sha256": "40b38db96d749cbf694ba8c8a6fdc2ad5a94d388b928785c7955cc969810c134",
+      "bytes": 1255
     },
     {
       "path": "ui/react-app/src/components/UsageBadge.test.jsx",
@@ -10965,8 +10975,8 @@
     },
     {
       "path": "ui/react-app/src/components/WeatherForecast.jsx",
-      "sha256": "baf49b2ef58a1d3971afbf35cc5e704e884e3842cff6b8f4e549d85404089dbc",
-      "bytes": 31827
+      "sha256": "c1a66e06748f137d2207d84671dbc81092b291a753f4363f8a716cebf7891f16",
+      "bytes": 32553
     },
     {
       "path": "ui/react-app/src/components/WeatherForecast.module.css",
@@ -10975,8 +10985,8 @@
     },
     {
       "path": "ui/react-app/src/components/WeatherForecast.test.jsx",
-      "sha256": "86aff294a0ff2a30449450065021514afd7ca27110a896c956885663229b16cb",
-      "bytes": 9497
+      "sha256": "4259c9f5b02d674ac8212ee34620c6c23de819d1117b4aa9eaef3196ae76b99e",
+      "bytes": 10732
     },
     {
       "path": "ui/react-app/src/components/WorkbenchComponents.test.jsx",
@@ -11355,8 +11365,13 @@
     },
     {
       "path": "ui/react-app/src/components/settings/Select.jsx",
-      "sha256": "6fc97d279d346c84dce5fc990267a73bfc75cf72eb561c75b4875bc2028109d9",
-      "bytes": 6722
+      "sha256": "33027c6bc2e2c20629cb564e9ffd175db4aa0f140e7cb5ca333c9fa38d377c45",
+      "bytes": 8851
+    },
+    {
+      "path": "ui/react-app/src/components/settings/Select.test.jsx",
+      "sha256": "b6ec2f136d25cf0ee71134367bdeca6b271f7ea3f6c7736e619ddafd0d22cfeb",
+      "bytes": 2247
     },
     {
       "path": "ui/react-app/src/components/settings/SettingRow.jsx",
@@ -11427,6 +11442,16 @@
       "path": "ui/react-app/src/components/settings/index.js",
       "sha256": "7a5f8a95516e333e66b47a492498ded72153e829ae89fea389afa2861a17012f",
       "bytes": 1280
+    },
+    {
+      "path": "ui/react-app/src/components/settingsSearch.js",
+      "sha256": "50018f7576d869281904e6e5baabc884e730f876c49292cdf5f914b1ad12e551",
+      "bytes": 4241
+    },
+    {
+      "path": "ui/react-app/src/components/settingsSearch.test.js",
+      "sha256": "c52a69b90daae95707c69b9dc61fdef782a45504b7d6deab7c43bcc5459e556b",
+      "bytes": 2907
     },
     {
       "path": "ui/react-app/src/components/shared/LoadingSkeleton.jsx",
@@ -12380,13 +12405,13 @@
     },
     {
       "path": "ui/react-app/src/utils/chatHistory.js",
-      "sha256": "5464cbbed021b93f5e036732bf8e023a815b35ea47c1950f9b929557ac29e86b",
-      "bytes": 1012
+      "sha256": "22338c1752fe0f1d4c470061068f83b9822ed2be8c7b6f5a8190c5d5432d35fd",
+      "bytes": 3383
     },
     {
       "path": "ui/react-app/src/utils/chatHistory.test.js",
-      "sha256": "8bc6686e7a574b8bf72c171724cb04348d3efc9fc65efbac7a5cc54f25353c89",
-      "bytes": 1293
+      "sha256": "fbf1138d50040ebab8ecaf6462008b84a5bfb6dc3b756a2d450f0c4430f66a6d",
+      "bytes": 3118
     },
     {
       "path": "ui/react-app/src/utils/clockSync.js",
@@ -12725,8 +12750,8 @@
     },
     {
       "path": "ui/settings_schema.py",
-      "sha256": "d40a058f4b824f123524202186bf5e72d018b6f00538e1cf8e97889cce127e92",
-      "bytes": 9846
+      "sha256": "78e5d87a90ba04c306577622bd9960c7835869bf3b0cf088b3fbcd4c8e47f12a",
+      "bytes": 10506
     },
     {
       "path": "ui/static/README_WEB_UI.txt",
