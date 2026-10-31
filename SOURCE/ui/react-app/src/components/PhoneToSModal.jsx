@@ -33,7 +33,14 @@ export default function PhoneToSModal({ isOpen, onClose, onAccepted = null, payl
     setSubmitting(true);
     setError('');
     try {
-      const response = await authFetch('/v1/phone/accept-tos', { method: 'POST' });
+      // This window lists the call permissions above, so its "I agree" asks for
+      // them too. The web app's cloud handler records them for this user; the
+      // desktop backend ignores the body and grants them through its own proxy.
+      const response = await authFetch('/v1/phone/accept-tos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ grant_call_permissions: true }),
+      });
       const json = await response.json().catch(() => null);
       // The endpoint returns a canonical success envelope after saving consent.
       // HTTP success alone (including an empty or malformed body) is not acknowledgment.

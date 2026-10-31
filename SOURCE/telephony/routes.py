@@ -348,6 +348,54 @@ async def _with_phone_cloud_consent_status(request: Request, proxied: JSONRespon
     return JSONResponse(success_response({**data, "missing_consents": missing}))
 
 
+def _is_cloud_surface_request() -> bool:
+    from config.settings import get_settings
+
+    return str(getattr(get_settings(), "app_surface", "desktop")).strip().lower() == "cloud"
+
+
+async def _request_grants_call_permissions(request: Request) -> bool:
+    """True only when the client that showed the call-permission list asks for the grant.
+
+    The Phone Calling Terms window sends ``{"grant_call_permissions": true}``.
+    The desktop's own proxy forwards no body (it grants through the consent API
+    itself, tagged ``desktop_phone_terms``), so a desktop acceptance is never
+    granted twice or tagged as a web one.
+    """
+    try:
+        raw = await request.body()
+        body = json.loads(raw) if raw else {}
+    except (ValueError, TypeError, RuntimeError):
+        return False
+    return isinstance(body, dict) and body.get("grant_call_permissions") is True
+
+
+async def _grant_web_phone_consents_after_terms(user_id: str) -> JSONResponse | list[str]:
+    """Web app twin of :func:`_grant_phone_cloud_consents_after_terms`, in process.
+
+    The cloud web app's "I agree" accepted the terms only, so a browser user
+    could never place a call: the dial still 403'd for voice_recording /
+    cloud_llm / data_retention (follow-up to 1.0.5 laptop A6.6a). This records
+    whichever of them the signed-in user is missing, tagged ``web_phone_terms``.
+    """
+    from intent.tools.phone_call import fetch_cloud_surface_phone_readiness, grant_cloud_surface_phone_consents
+
+    try:
+        readiness = await fetch_cloud_surface_phone_readiness(user_id)
+        missing = (readiness or {}).get("missing_consents")
+        return await grant_cloud_surface_phone_consents(user_id, missing) if missing else []
+    except Exception as exc:
+        logger.warning("Web phone terms accepted but the call permissions were not saved: %s", exc)
+        return JSONResponse(
+            failure_response(
+                "phone_consent_not_saved",
+                "The phone terms were accepted, but Viola couldn't turn on call recording and cloud AI "
+                "for your account. Choose I agree again.",
+            ),
+            status_code=500,
+        )
+
+
 @tos_router.post("/accept-tos")
 async def accept_phone_tos(
     request: Request,
@@ -385,6 +433,13 @@ async def accept_phone_tos(
             failure_response("authentication_required", str(exc)),
             status_code=401,
         )
+    if _is_cloud_surface_request() and await _request_grants_call_permissions(request):
+        granted = await _grant_web_phone_consents_after_terms(user_id)
+        if isinstance(granted, JSONResponse):
+            return granted
+        if granted:
+            logger.info("Web phone terms accepted; recorded cloud phone consents: %s", ",".join(granted))
+        return JSONResponse(success_response({"accepted": True, "cloud_consents_granted": granted}))
     return JSONResponse(success_response({"accepted": True}))
 
 
@@ -409,7 +464,20 @@ async def get_tos_status(
     if proxied is not None:
         return await _with_phone_cloud_consent_status(request, proxied)
     tos = get_phone_tos()
-    return JSONResponse(success_response(await tos.get_status(user_id)))
+    status = await tos.get_status(user_id)
+    if _is_cloud_surface_request() and isinstance(status, dict):
+        # The web Phone tab asks for missing call permissions too, not only for unaccepted terms.
+        try:
+            from intent.tools.phone_call import fetch_cloud_surface_phone_readiness
+
+            readiness = await fetch_cloud_surface_phone_readiness(user_id)
+        except Exception:
+            logger.debug("Web phone consent status lookup failed", exc_info=True)
+            readiness = None
+        missing = (readiness or {}).get("missing_consents")
+        if missing is not None:
+            status = {**status, "missing_consents": missing}
+    return JSONResponse(success_response(status))
 
 
 @phone_calls_router.delete("/calls/{call_id}")

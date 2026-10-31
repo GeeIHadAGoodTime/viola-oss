@@ -652,6 +652,7 @@ _PHONE_CONSENT_LABELS = {
     "data_retention": "keep call recordings and transcripts in your account",
 }
 _PHONE_CONSENT_SOURCE = "desktop_phone_terms"
+WEB_PHONE_CONSENT_SOURCE = "web_phone_terms"
 _PHONE_READINESS_TIMEOUT_SECONDS = 5.0
 
 
@@ -820,16 +821,94 @@ async def fetch_cloud_phone_readiness(
     return {"tos_accepted": tos_accepted, "missing_consents": missing}
 
 
+def _is_cloud_surface() -> bool:
+    return str(getattr(settings, "app_surface", "desktop") or "desktop").strip().lower() == "cloud"
+
+
+async def fetch_cloud_surface_phone_readiness(user_id: str) -> dict[str, Any] | None:
+    """The same readiness answer on the cloud surface, read in process for ``user_id``.
+
+    The web app's agent runs inside the cloud, which owns both stores, so it
+    asks them directly instead of calling itself over HTTP. Same shape and same
+    "None when unknown" contract as :func:`fetch_cloud_phone_readiness`.
+    """
+    user_id = str(user_id or "").strip()
+    if not user_id:
+        return None
+    tos_accepted: bool | None = None
+    missing: list[str] | None = None
+    try:
+        from telephony.phone_tos import get_phone_tos
+
+        status = await get_phone_tos().get_status(user_id)
+        if isinstance(status, dict) and isinstance(status.get("accepted"), bool):
+            tos_accepted = status["accepted"]
+    except Exception:
+        logger.debug("Phone readiness (cloud): terms status read failed", exc_info=True)
+    try:
+        from services.cloud_consent import get_cloud_consent_service
+
+        check = await get_cloud_consent_service().can_start_voice_session(user_id)
+        if check.allowed:
+            missing = []
+        else:
+            missing = _ordered_phone_consents(list(check.missing)) or list(PHONE_CLOUD_CONSENTS)
+    except Exception:
+        logger.debug("Phone readiness (cloud): consent check failed", exc_info=True)
+    if tos_accepted is None and missing is None:
+        return None
+    return {"tos_accepted": tos_accepted, "missing_consents": missing}
+
+
+async def grant_cloud_surface_phone_consents(
+    user_id: str,
+    consent_types: Any,
+    *,
+    source: str = WEB_PHONE_CONSENT_SOURCE,
+) -> list[str]:
+    """Record the phone consents ``user_id`` just agreed to, on the cloud surface itself.
+
+    Same consent records, same audit trail and the same source-tag contract as
+    the ``PUT /api/v1/consent/{type}`` route, written for exactly the
+    authenticated user. Raises ``RuntimeError`` naming the first consent that
+    did not stick.
+    """
+    user_id = str(user_id or "").strip()
+    wanted = [consent for consent in _ordered_phone_consents(consent_types) if consent in PHONE_CLOUD_CONSENTS]
+    if not wanted:
+        return []
+    if not user_id:
+        raise RuntimeError("no authenticated user")
+    from services.cloud_consent import get_cloud_consent_service
+
+    service = get_cloud_consent_service()
+    granted: list[str] = []
+    for consent in wanted:
+        await service.set_consent(user_id, consent, True, metadata={"source": source})
+        record = await service.get_consent(user_id, consent)
+        if record is None or not bool(getattr(record, "granted", False)):
+            raise RuntimeError("cloud did not record the %s consent" % consent)
+        granted.append(consent)
+    return granted
+
+
 async def phone_call_readiness_result() -> ToolResult | None:
     """Return why a call cannot be placed yet, BEFORE the user is asked to confirm it.
 
     ``None`` means "go ahead and ask": the account looks ready, or readiness
-    could not be determined (the dial path still enforces every gate). Only the
-    hosted desktop path is checked; the cloud surface and independent local
-    installs have their own gates.
+    could not be determined (the dial path still enforces every gate). The
+    hosted desktop asks the cloud over HTTP; the cloud surface (the web app)
+    reads its own stores for the signed-in user. Independent local installs have
+    their own gates.
     """
-    if str(getattr(settings, "app_surface", "desktop") or "desktop").strip().lower() == "cloud":
-        return None
+    if _is_cloud_surface():
+        # The web app: same gate before its confirm step (follow-up to A6.6a).
+        try:
+            readiness = await fetch_cloud_surface_phone_readiness(_resolve_user_id())
+        except Exception:
+            logger.debug("Phone readiness (cloud) check failed; leaving it to the dial", exc_info=True)
+            return None
+        return _readiness_gate_result(readiness)
     try:
         if _uses_independent_local_phone():
             return None
@@ -845,6 +924,10 @@ async def phone_call_readiness_result() -> ToolResult | None:
     except Exception:
         logger.debug("Phone readiness check failed; leaving it to the dial", exc_info=True)
         return None
+    return _readiness_gate_result(readiness)
+
+
+def _readiness_gate_result(readiness: dict[str, Any] | None) -> ToolResult | None:
     if readiness is None:
         return None
     missing = readiness.get("missing_consents") or []
