@@ -382,6 +382,26 @@ async def _store() -> ChatStore:
     return store
 
 
+async def _recent_activity_items(user_id: str, limit: int) -> list[dict[str, object]]:
+    """This user's recent stage turns for Chat History, Chat mode threads left out."""
+    thread_ids: list[str] = []
+    try:
+        chat_store = await _store()
+        threads = await chat_store.list_threads(user_id, limit=200)
+        thread_ids = [str(thread.id) for thread in threads]
+    except Exception:  # noqa: BLE001, RUF100 - no thread list means nothing to leave out
+        logger.debug("Recent activity: chat threads unavailable", exc_info=True)
+    from services.conversation.state_manager import get_conversation_persistence
+
+    persistence = get_conversation_persistence()
+    return await asyncio.to_thread(
+        persistence.load_recent_exchanges,
+        user_id,
+        limit,
+        exclude_session_ids=thread_ids,
+    )
+
+
 async def _clear_chat_thread_conversation_mirror(user_id: str, thread_id: str) -> int:
     from services.conversation.state_manager import get_conversation_persistence
 
@@ -629,6 +649,24 @@ def register_chat_mode_routes(context: ApiContext, toolbox: RouteToolbox) -> Non
             return success_response(_chat_model_catalog(user_id))
 
         return await toolbox.record_and_call(_inner, route="/v1/chat/models", method="GET")
+
+    @router.get("/v1/chat/recent-activity", dependencies=[Depends(require_auth)])
+    async def recent_activity(
+        request: Request,
+        limit: int = Query(default=50, ge=1, le=200),
+    ) -> Any:
+        """Recent stage turns (voice and typed) with Viola's replies, kept across restarts.
+
+        Chat History listed only the turns since the last launch (1.0.5 build-7
+        laptop report). Read from this user's own encrypted conversation log;
+        Chat mode threads are left out because "Saved chats" lists them.
+        """
+
+        async def _inner() -> dict[str, Any]:
+            user_id = _require_request_user_id(request)
+            return success_response({"items": await _recent_activity_items(user_id, limit)})
+
+        return await toolbox.record_and_call(_inner, route="/v1/chat/recent-activity", method="GET")
 
     @router.get("/v1/chat/threads", dependencies=[Depends(require_auth)])
     async def list_threads(

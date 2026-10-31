@@ -26,7 +26,12 @@ function SummaryRow({ label, children }) {
 }
 SummaryRow.propTypes = { label: PropTypes.string.isRequired, children: PropTypes.node.isRequired };
 
-export default function BillingCapacityPanel({ accountId, refreshUser, fallback = null, entitlement = null }) {
+// `managedUsagePercent`: when the page passes its own usage read (the Account
+// page does), the card shows that number, so the page never shows two
+// different percentages; null hides the row until that read arrives.
+export default function BillingCapacityPanel({
+  accountId, refreshUser, fallback = null, entitlement = null, managedUsagePercent,
+}) {
   const billing = useBillingCapacity({ accountId, refreshUser });
   const { catalog, account, quote, attempt, operation, loading, quoting, changing, error } = billing;
   const id = useId();
@@ -48,6 +53,7 @@ export default function BillingCapacityPanel({ accountId, refreshUser, fallback 
   const status = billingOperationStatus(operation);
   const pending = Boolean(attempt || account?.pending_change);
   const operationUrl = billingPaymentUrl(operation?.authentication_url || operation?.checkout_url);
+  const shownUsagePercent = managedUsagePercent === undefined ? account?.usage_percent : managedUsagePercent;
 
   useEffect(() => {
     if (!account || initialized.current) return;
@@ -118,7 +124,7 @@ export default function BillingCapacityPanel({ accountId, refreshUser, fallback 
           {entitlement?.active_gift && <SummaryRow label="Effective complimentary capacity">
             {entitlement.active_gift.capacity_multiplier}× Pro through {capacityDate(entitlement.active_gift.end_at)}
           </SummaryRow>}
-          {typeof account.usage_percent === 'number' && <SummaryRow label="Managed usage">{account.usage_percent}% used</SummaryRow>}
+          {typeof shownUsagePercent === 'number' && <SummaryRow label="Managed usage">{shownUsagePercent}% used</SummaryRow>}
           <SummaryRow label="Usage resets">{capacityDate(account.usage_resets_at)}</SummaryRow>
           {account.billing_review_required && typeof account.effective_capacity_multiplier === 'number'
             && <SummaryRow label="Available managed capacity">{account.effective_capacity_multiplier}× Pro</SummaryRow>}
@@ -249,4 +255,5 @@ BillingCapacityPanel.propTypes = {
   refreshUser: PropTypes.func,
   fallback: PropTypes.node,
   entitlement: PropTypes.object,
+  managedUsagePercent: PropTypes.number,
 };

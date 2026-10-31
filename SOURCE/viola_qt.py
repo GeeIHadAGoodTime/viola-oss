@@ -9,6 +9,24 @@ import sys as _sys
 _DESKTOP_CUSTOMER_PROFILE_AT_IMPORT = os.getenv("VIOLA_KOKORO_PHONEMIZER") == "misaki-en"
 
 
+def _cap_blas_threads() -> None:
+    """Give numpy's and scipy's OpenBLAS one worker thread unless the user chose otherwise.
+
+    Each OpenBLAS copy commits a ~32 MB buffer per worker thread the moment the
+    library loads, and the desktop loads two copies (numpy and scipy). On an
+    8-thread laptop that is about 0.5 GB of private memory for thread pools the
+    app never uses: Viola's numpy work is 1-D dots and norms on audio frames,
+    the models run in ONNX Runtime and CTranslate2 with their own thread pools,
+    and spaCy uses BLIS. OpenBLAS reads the variable only when its DLL loads,
+    so this must run before anything imports numpy. ``setdefault`` keeps an
+    explicit user or deployment value.
+    """
+    os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
+
+
+_cap_blas_threads()
+
+
 def _install_frozen_safe_stdio() -> None:
     """Install discard streams for frozen windowed builds with no console."""
     if not getattr(_sys, "frozen", False):
@@ -915,8 +933,16 @@ def _ensure_qt_file_logging() -> None:
         # itself into DEBUG for targeted debugging) — this does NOT force
         # DEBUG output on its own; only the logger's own level does that.
         handler.setLevel(_logging.DEBUG)
+        # Redact at the file too, like every other Viola log handler: records
+        # from plain ``logging`` loggers and exception text never pass the
+        # structured logger's own redaction, and this file is what users attach
+        # to bug reports.
+        try:
+            from diagnostics.observability_logging import RedactingFormatter as _LogFormatter
+        except ImportError:
+            _LogFormatter = _logging.Formatter
         handler.setFormatter(
-            _logging.Formatter(
+            _LogFormatter(
                 "%(asctime)s [%(levelname)s] %(name)s: %(message)s",
                 datefmt="%Y-%m-%dT%H:%M:%S",
             )
@@ -1081,6 +1107,7 @@ def _wire_browser_overlay_controller(window: "ViolaWebViewWindow", bootstrap) ->
     try:
         from services.browser_overlay_controller import (
             BrowserOverlayController,
+            overlay_state_recipients,
             set_overlay_controller,
         )
 
@@ -1099,34 +1126,29 @@ def _wire_browser_overlay_controller(window: "ViolaWebViewWindow", bootstrap) ->
             default_user_id = get_current_or_device_user_id()
 
             def _broadcast_overlay(payload: dict, *, user_id: str | None = None) -> None:
-                target_user_id = user_id or default_user_id
                 send_payload = dict(payload)
                 send_payload.pop("type", None)
+                recipients = overlay_state_recipients(user_id or default_user_id)
+
+                async def _send_all() -> None:
+                    for recipient in recipients:
+                        await event_hub.broadcast(
+                            "browser_overlay_state",
+                            send_payload,
+                            user_id=recipient,
+                            force=True,
+                        )
+
                 try:
                     running_loop = asyncio.get_running_loop()
                 except RuntimeError:
                     running_loop = None
                 if running_loop is not None:
-                    running_loop.create_task(
-                        event_hub.broadcast(
-                            "browser_overlay_state",
-                            send_payload,
-                            user_id=target_user_id,
-                            force=True,
-                        )
-                    )
+                    running_loop.create_task(_send_all())
                     return
                 loop = get_main_loop()
                 if loop is not None and loop.is_running() and not loop.is_closed():
-                    asyncio.run_coroutine_threadsafe(
-                        event_hub.broadcast(
-                            "browser_overlay_state",
-                            send_payload,
-                            user_id=target_user_id,
-                            force=True,
-                        ),
-                        loop,
-                    )
+                    asyncio.run_coroutine_threadsafe(_send_all(), loop)
                     return
                 logger.debug("No running EventHub loop for browser overlay broadcast")
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import re
 from collections.abc import Callable
 from typing import Any
@@ -68,6 +69,15 @@ _LOCAL_FILE_EXTENSIONS = (
     ".flv",
     ".webm",
 )
+
+
+def _notify_spotify_not_connected(user_id: str = "") -> None:
+    try:
+        from music.providers.browser.auth_manager import notify_spotify_not_connected
+
+        notify_spotify_not_connected(user_id or None)
+    except Exception:
+        logger.debug("media could not show the Spotify fallback notice", exc_info=True)
 
 
 def _clean_provider(value: str | None, default: str = "auto") -> str:
@@ -326,8 +336,43 @@ def _infer_play_provider(provider: str | None, track_uri: str) -> str:
     return "youtube"
 
 
+async def _spotify_signed_in(user_id: str) -> bool:
+    try:
+        from music.providers.browser.auth_manager import is_spotify_signed_in
+
+        return bool(await asyncio.to_thread(is_spotify_signed_in, user_id or None))
+    except Exception:
+        # Unknown is not "signed out": keep the user's music source.
+        logger.debug("media could not check the Spotify sign-in", exc_info=True)
+        return True
+
+
+async def _source_fallback(requested_provider: str, search_provider: str, user_id: str) -> dict[str, Any] | None:
+    """Music source is Spotify but Spotify isn't signed in: use YouTube, as data.
+
+    Only for ``auto`` (the user's music source). An explicitly requested
+    provider is never swapped here. The returned fields go into the tool
+    result so the reply can say what happened.
+    """
+    if requested_provider != "auto" or search_provider != "spotify":
+        return None
+    if await _spotify_signed_in(user_id):
+        return None
+    logger.info("media: music source is Spotify but Spotify isn't connected; using YouTube")
+    return {
+        "fallback_used": True,
+        "fallback_from_provider": "spotify",
+        "fallback_to_provider": "youtube",
+        "fallback_reason": "spotify_not_connected",
+        "connect_tool": "connect_music_provider",
+    }
+
+
 async def _handle_search_mode(query: str, provider: str, limit: int, user_id: str) -> ToolResult:
     requested_provider, search_provider, filter_provider = _resolve_search_provider(provider, user_id)
+    source_fallback = await _source_fallback(requested_provider, search_provider, user_id)
+    if source_fallback is not None:
+        search_provider = filter_provider = "youtube"
     result = await _search_tracks_handler(query, limit=limit, provider=search_provider, user_id=user_id)
     if not result.ok:
         return result
@@ -352,6 +397,8 @@ async def _handle_search_mode(query: str, provider: str, limit: int, user_id: st
         }
     )
     data.setdefault("recently_played", [])
+    if source_fallback is not None:
+        data.update(source_fallback)
     return ToolResult(ok=True, data=data)
 
 
@@ -508,6 +555,42 @@ def _select_playable_index(query: str, tracks: list[dict[str, Any]], *, generic_
     return None
 
 
+# A search hit can still be unplayable when the player resolves it (deleted,
+# private or not embeddable: the oEmbed availability check runs at play time,
+# not at search time). 1.0.5 build 7: "play calm solo piano music" got 10
+# results, the player tried only the first (Wrhm-esOwEs), failed with "No
+# playable YouTube results found for 'Wrhm-esOwEs'", and the model had to run
+# a third query. The next confident candidates are tried before giving up.
+_MAX_PLAY_CANDIDATES = 3
+_UNPLAYABLE_CANDIDATE_EXCEPTIONS = frozenset({"MusicTrackNotFoundError"})
+_UNPLAYABLE_CANDIDATE_TEXT = ("no playable youtube results",)
+
+
+def _candidate_indices(query: str, tracks: list[dict[str, Any]], *, generic_request: bool) -> list[int]:
+    """Playable-candidate order: every result for a generic request, else the confident ones."""
+    if generic_request:
+        return list(range(len(tracks)))
+    return [index for index, track in enumerate(tracks) if _media_match_is_confident(query, track)]
+
+
+def _candidate_was_unplayable(play_result: ToolResult) -> bool:
+    """True when the player refused THIS candidate (not the provider or the runtime)."""
+    if play_result.ok:
+        return False
+    data = play_result.data if isinstance(play_result.data, dict) else {}
+    error = data.get("error")
+    texts = [str(play_result.error or "")]
+    if isinstance(error, dict):
+        details = error.get("details")
+        if isinstance(details, dict) and details.get("exception_type") in _UNPLAYABLE_CANDIDATE_EXCEPTIONS:
+            return True
+        texts.append(str(error.get("message") or ""))
+    elif error:
+        texts.append(str(error))
+    combined = " ".join(texts).casefold()
+    return any(marker in combined for marker in _UNPLAYABLE_CANDIDATE_TEXT)
+
+
 async def _handle_search_play_mode(
     query: str,
     provider: str,
@@ -597,6 +680,32 @@ async def _handle_search_play_mode(
         selected.get("playback_provider") or selected.get("provider") or data.get("playback_provider") or provider
     ).strip()
     play_result = await _handle_play_mode(selected_track_uri, selected_provider, target_room, user_id)
+    unplayable: list[str] = []
+    later_indices = [
+        index for index in _candidate_indices(query, tracks, generic_request=generic_request) if index > selected_index
+    ]
+    for next_index in later_indices:
+        if not _candidate_was_unplayable(play_result) or len(unplayable) + 1 >= _MAX_PLAY_CANDIDATES:
+            break
+        candidate = dict(tracks[next_index])
+        candidate_uri = str(candidate.get("track_uri") or "").strip()
+        if not candidate_uri:
+            continue
+        unplayable.append(selected_track_uri)
+        logger.info(
+            "media search_play: candidate %s was not playable; trying result %d (%s)",
+            selected_track_uri,
+            next_index + 1,
+            candidate_uri,
+        )
+        selected = candidate
+        selected_track_uri = candidate_uri
+        selected_provider = str(
+            selected.get("playback_provider") or selected.get("provider") or data.get("playback_provider") or provider
+        ).strip()
+        play_result = await _handle_play_mode(selected_track_uri, selected_provider, target_room, user_id)
+    if unplayable:
+        data["unplayable_candidates"] = unplayable
     play_data = dict(play_result.data or {}) if isinstance(play_result.data, dict) else play_result.data
     data.update(
         {
@@ -622,6 +731,8 @@ async def _handle_search_play_mode(
         ):
             if _field in play_data and _field not in data:
                 data[_field] = play_data[_field]
+    if play_result.ok and data.get("fallback_reason") == "spotify_not_connected" and data["playback_started"]:
+        _notify_spotify_not_connected(user_id)
     if play_result.ok:
         fallback_message = (
             ("Playing some music." if generic_request else "Playing %s." % query)

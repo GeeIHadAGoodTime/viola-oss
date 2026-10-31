@@ -153,6 +153,33 @@ def _legacy_socket_name(port: str) -> str:
     return f"viola-instance-lock-{port}"
 
 
+def _allow_running_viola_to_take_focus(state: dict | None) -> bool:
+    """Let the running Viola bring its window to the front (Windows only).
+
+    This second launch owns the foreground (the user just clicked the Start
+    menu or a shortcut); the running Viola does not, so Windows' foreground
+    lock refuses its ``activateWindow`` and the window it shows stays behind
+    focus. ``AllowSetForegroundWindow`` hands that right to the running
+    process, the documented way for one app to activate another. Returns True
+    when Windows accepted it. Never raises.
+    """
+    if os.name != "nt":
+        return False
+    try:
+        pid = int((state or {}).get("pid", -1))
+    except (TypeError, ValueError):
+        pid = -1
+    try:
+        import ctypes
+
+        # ASFW_ANY (-1) when the running process' id is unknown.
+        target = pid if pid > 0 else -1
+        return bool(ctypes.windll.user32.AllowSetForegroundWindow(ctypes.c_uint32(target & 0xFFFFFFFF)))
+    except (AttributeError, OSError, ValueError):
+        logger.debug("AllowSetForegroundWindow unavailable", exc_info=True)
+        return False
+
+
 class SingleInstanceGuard(QObject):
     """Manages single-instance enforcement.
 
@@ -500,6 +527,7 @@ class SingleInstanceGuard(QObject):
             client.connectToServer(name)
             if client.waitForConnected(500):
                 logger.info("Viola already running. Focusing existing window.")
+                _allow_running_viola_to_take_focus(state)
                 client.write(RAISE_CMD)
                 client.waitForBytesWritten(500)
                 client.waitForReadyRead(_HANDSHAKE_WAIT_MS)

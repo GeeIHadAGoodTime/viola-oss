@@ -14,3 +14,57 @@ export function appendAssistantEntry(prev, content, timestamp = new Date().toISO
   if (last && last.role === 'assistant' && last.content === content) return list;
   return [...list, { role: 'assistant', content, timestamp }];
 }
+
+// Chat History used to list only the turns since the last launch: the list
+// lived in memory and a restart emptied it (1.0.5 build-7 laptop report). The
+// backend keeps every turn in the user's encrypted conversation log and
+// serves the recent ones from /v1/chat/recent-activity; this puts them in
+// front of what this launch has already added.
+//
+// A turn can be in both lists (it was saved before the read came back). One
+// is dropped when role and text match an entry this launch already has within
+// two minutes. Entries from before "Clear Recent Activity" (`clearedAt`, an
+// ISO time) stay cleared.
+const SAME_TURN_WINDOW_MS = 2 * 60 * 1000;
+
+function entryTime(entry) {
+  const ms = Date.parse(entry?.timestamp || '');
+  return Number.isNaN(ms) ? null : ms;
+}
+
+export function mergeRestoredHistory(prev, restored, clearedAt = null) {
+  const list = Array.isArray(prev) ? prev : [];
+  if (!Array.isArray(restored) || restored.length === 0) return list;
+  const clearedMs = clearedAt ? Date.parse(clearedAt) : NaN;
+  const live = list.filter((entry) => !entry?.restored);
+  const kept = restored.filter((entry) => {
+    if (!entry || (entry.role !== 'user' && entry.role !== 'assistant')) return false;
+    if (typeof entry.content !== 'string' || !entry.content.trim()) return false;
+    const at = entryTime(entry);
+    if (!Number.isNaN(clearedMs) && (at === null || at <= clearedMs)) return false;
+    return !live.some((current) => {
+      if (current?.role !== entry.role || current?.content !== entry.content) return false;
+      const currentAt = entryTime(current);
+      return at === null || currentAt === null || Math.abs(currentAt - at) <= SAME_TURN_WINDOW_MS;
+    });
+  }).map((entry) => ({ role: entry.role, content: entry.content, timestamp: entry.timestamp, restored: true }));
+  return [...kept, ...live];
+}
+
+const CLEARED_AT_KEY_PREFIX = 'viola_recent_activity_cleared_at:';
+
+export function readRecentActivityClearedAt(principalKey) {
+  try {
+    return window.localStorage.getItem(CLEARED_AT_KEY_PREFIX + principalKey) || null;
+  } catch {
+    return null;
+  }
+}
+
+export function rememberRecentActivityCleared(principalKey, at = new Date().toISOString()) {
+  try {
+    window.localStorage.setItem(CLEARED_AT_KEY_PREFIX + principalKey, at);
+  } catch {
+    // Private window or blocked storage: the list is still cleared for now.
+  }
+}

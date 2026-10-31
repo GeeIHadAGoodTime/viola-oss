@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import os
+import re
 import time
 from collections.abc import Mapping
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any
 
 from core.logging_config import get_logger
@@ -53,7 +54,18 @@ _BLOCKED_KEY_PART_SETS: tuple[frozenset[str], ...] = (
     frozenset({"alt", "f4"}),
 )
 
-UAC_EXECUTABLES: frozenset[str] = frozenset({"consent.exe"})
+UAC_EXECUTABLES: frozenset[str] = frozenset({"consent.exe", "consent"})
+# Viola's own desktop process. A mutating desktop action aimed at it would type
+# into or click Viola's own window (1.0.5 laptop A6.3: "type hello in the open
+# notepad" typed at violaapp.exe), so those are refused with a hint to name the
+# app. Dev runs are caught by the process-id check in ``is_viola_window``.
+VIOLA_APP_EXECUTABLES: frozenset[str] = frozenset({"violaapp"})
+# Actions whose consent target is the app they name, not the window in front:
+# launch_app opens an app that is not running yet.
+ACTIONS_WITHOUT_FOREGROUND_TARGET: frozenset[str] = frozenset(
+    {"launch_app", "volume", "analyze_screen", "list_windows"}
+)
+_PATH_SEPARATORS_RE = re.compile(r"[\\/]")
 UAC_CLASS_MARKERS: tuple[str, ...] = ("credential dialog xaml host",)
 PASSWORD_MARKERS: tuple[str, ...] = (
     "password",
@@ -132,8 +144,142 @@ class ComputerUseControlSession:
 
 
 def normalize_executable_name(value: str | None) -> str:
-    """Normalize app executable names for whitelist and approval keys."""
-    return Path(str(value or "").strip()).name.lower()
+    """Normalize app executable names for whitelist and approval keys.
+
+    One spelling per app, whoever names it: "Notepad" (the model's launch_app
+    name), "notepad.exe" (the process of the window in front) and
+    "C:\\Windows\\notepad.exe" all become "notepad". Before this, a grant
+    recorded under one spelling could be looked up under another and read as
+    "no consent" (1.0.5 laptop A6.3). Both path separators are split on every
+    OS so a Windows path normalizes the same everywhere.
+    """
+    name = _PATH_SEPARATORS_RE.split(str(value or "").strip())[-1].strip().lower()
+    if name.endswith(".exe"):
+        name = name[: -len(".exe")].strip()
+    return name
+
+
+def grant_session_id(user_context: Mapping[str, Any] | None, user_id: str) -> str:
+    """Session key for desktop-control grants, from a tool call's user context.
+
+    The approval bridge (which records a "yes") and the computer tool (which
+    checks for it) must derive the same key from the same call, or a granted
+    app still reads as "needs consent" (1.0.5 laptop A6.3: four "Granted ...
+    consent for 'notepad'" lines, each followed by a refusal).
+    """
+    if isinstance(user_context, Mapping):
+        for key in ("session_id", "request_id", "gate_session_id"):
+            value = user_context.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+    from core.user_context import is_device_user_id
+
+    if not user_id or is_device_user_id(user_id):
+        return "local-session"
+    return str(user_id)
+
+
+def find_window_executable(window_title: str) -> tuple[str, int]:
+    """Return (normalized executable, process id) of the window with this title, or ("", 0)."""
+    title = str(window_title or "").strip()
+    if not title:
+        return "", 0
+    try:
+        from services.computer_use import window_manager
+
+        executable, process_id = window_manager.find_window_process(title)
+    except Exception:  # noqa: BLE001, RUF100 - a lookup failure means "unknown", never a crash
+        logger.debug("Could not resolve the executable of a window by title")
+        return "", 0
+    return normalize_executable_name(executable), int(process_id or 0)
+
+
+def resolve_action_target_app(
+    action: str,
+    *,
+    app_executable: str = "",
+    app_name: str = "",
+    window_title: str = "",
+    target_window: str = "",
+    title: str = "",
+) -> str:
+    """The app a computer action acts on, used for consent and logging.
+
+    The approval bridge and the computer tool both call this with the same
+    arguments, so the app a "yes" was given for is the app checked later.
+    Named app first (``app_executable`` or ``app_name``), then the process
+    of a named window, and only with nothing named, the window in front.
+    """
+    normalized_action = str(action or "").strip().lower()
+    window = str(target_window or window_title or title or "").strip()
+    if normalized_action in ACTIONS_WITHOUT_FOREGROUND_TARGET:
+        return normalize_executable_name(app_executable or app_name or window)
+    named = normalize_executable_name(app_executable or app_name)
+    if named:
+        return named
+    if window:
+        executable, _process_id = find_window_executable(window)
+        return executable or normalize_executable_name(window)
+    try:
+        from services.computer_use import window_manager
+
+        return normalize_executable_name(window_manager.get_foreground_app_executable_name())
+    except Exception:  # noqa: BLE001, RUF100 - unknown foreground means no target
+        logger.debug("Could not resolve the foreground app for a computer action")
+        return ""
+
+
+def is_viola_window(executable: str, process_id: int = 0) -> bool:
+    """True when the window belongs to Viola itself (packaged exe or this process)."""
+    if normalize_executable_name(executable) in VIOLA_APP_EXECUTABLES:
+        return True
+    return bool(process_id) and int(process_id) == os.getpid()
+
+
+def targets_viola_itself(
+    action: str,
+    *,
+    app_executable: str = "",
+    app_name: str = "",
+    window_title: str = "",
+    target_window: str = "",
+    title: str = "",
+) -> bool:
+    """True when a mutating action would land in Viola's own window.
+
+    launch_app opens another app, focus_window only brings a window forward
+    and observation actions change nothing, so only input actions are checked.
+    """
+    normalized_action = str(action or "").strip().lower()
+    if normalized_action in {"launch_app", "focus_window"} or not is_mutating_action(normalized_action):
+        return False
+    named = normalize_executable_name(app_executable or app_name)
+    if named:
+        return named in VIOLA_APP_EXECUTABLES
+    window = str(target_window or window_title or title or "").strip()
+    if window:
+        executable, process_id = find_window_executable(window)
+        return is_viola_window(executable, process_id)
+    try:
+        from services.computer_use import window_manager
+
+        foreground = window_manager.get_foreground_window_info()
+    except Exception:  # noqa: BLE001, RUF100 - unknown foreground is not Viola
+        logger.debug("Could not read the foreground window for the Viola self-target check")
+        return False
+    if foreground is None:
+        return False
+    return is_viola_window(
+        str(getattr(foreground, "executable", "") or ""),
+        int(getattr(foreground, "process_id", 0) or 0),
+    )
+
+
+VIOLA_SELF_TARGET_REASON = (
+    "That would type or click in Viola's own window, so nothing was done. Name the app to use: call the "
+    "computer tool again with app_executable (for example 'notepad') or window_title set to that app's "
+    "window; Viola brings that window to the front first."
+)
 
 
 def _resolve_local_user_id(user_id: str | None) -> str:
@@ -297,7 +443,11 @@ def require_action_consent(
         return
     raise ComputerUseRefusal(
         error_category="COMPUTER_USE_APP_CONSENT_REQUIRED",
-        reason="Desktop mutation requires approval for this application in the current session.",
+        reason=(
+            "The user has not approved desktop control of this app in this conversation yet. Call the "
+            "computer tool again with the same arguments: Viola then asks the user to confirm. Do not tell "
+            "the user to approve a prompt that has not been shown."
+        ),
         action=action,
         target_app_executable=target,
     )
@@ -563,7 +713,8 @@ def is_uac_window(window_info: Mapping[str, Any] | Any | None) -> bool:
     else:
         executable = normalize_executable_name(str(getattr(window_info, "executable", "")))
         class_name = str(getattr(window_info, "class_name", "") or "").lower()
-    return executable in UAC_EXECUTABLES or any(marker in class_name for marker in UAC_CLASS_MARKERS)
+    uac_names = {normalize_executable_name(name) for name in UAC_EXECUTABLES}
+    return executable in uac_names or any(marker in class_name for marker in UAC_CLASS_MARKERS)
 
 
 def require_not_uac(action: str, *, target_app_executable: str = "") -> None:

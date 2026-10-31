@@ -520,6 +520,7 @@ class KokoroStopTests(unittest.IsolatedAsyncioTestCase):
         self.sd.stop.assert_not_called()
 
     async def test_capture_thread_barge_in_reaches_facade_and_owned_audio(self):
+        import core.voice_command_handler as vch
         from core.voice_command_handler import VoiceCommandHandler
 
         class Capture:
@@ -531,15 +532,38 @@ class KokoroStopTests(unittest.IsolatedAsyncioTestCase):
                 if on_interrupt is not None:
                     self.interrupt = on_interrupt
 
+            def get_recent_recording(self, seconds):
+                return b"\0" * 32000
+
+            def rearm_interrupt(self):
+                pass
+
+            def seconds_since_speech(self):
+                return 10.0
+
         capture = Capture()
         handler = VoiceCommandHandler.__new__(VoiceCommandHandler)
         handler.tts = self.facade
         handler._record_voice_event = AsyncMock()
+        # Since round 7 a barge-in candidate stops Viola only when what was
+        # heard over her reply contains the wake word.
+        from voice.transcription.whisper import WhisperTranscriber
+
+        local_stt = Mock(spec=WhisperTranscriber)
+        local_stt.is_available.return_value = True
+        local_stt.transcribe.return_value = "Viola, stop."
+        handler.voice_pipeline = Mock(transcriber=local_stt)
+        handler._barge_in_decision = None
+        handler._barge_in_window_end = None
+        timing = patch.multiple(vch, _BARGE_IN_SETTLE_SEC=0.05, _BARGE_IN_USER_DONE_SEC=0.05)
+        timing.start()
+        self.addCleanup(timing.stop)
         task = asyncio.create_task(handler._speak_response_interruptible("First.", capture, user_id="synthetic-user"))
         try:
             await self.until(self.playing.is_set)
             await asyncio.to_thread(capture.interrupt)
-            self.assertTrue(await asyncio.wait_for(task, 1))
+            self.assertTrue(await asyncio.wait_for(task, 5))
+            self.assertEqual(handler._take_barge_in_decision().kind, "stop")
             await self.until(self.stopped.is_set)
             self.assertEqual(capture.mode, "paused")
             self.assertEqual(capture.recording, b"synthetic recording")

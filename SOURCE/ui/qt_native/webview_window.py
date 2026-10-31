@@ -46,8 +46,10 @@ from PySide6.QtGui import (
     QDropEvent,
     QIcon,
     QKeyEvent,
+    QKeySequence,
     QMouseEvent,
     QPixmap,
+    QShortcut,
 )
 from PySide6.QtWebEngineCore import (
     QWebEnginePage,
@@ -108,7 +110,10 @@ _LOCAL_CERTIFICATE_URL_HOSTS = frozenset({LOCALHOST_NAME, LOCALHOST, "::1"})
 
 _FULLSCREEN_HINT_TEXT = "Press Esc or F11 to exit fullscreen"
 # On a touch screen there may be no keyboard at all (a Surface in tablet mode).
-_FULLSCREEN_HINT_TEXT_TOUCH = "Tap the top edge to show the exit button"
+# The label on the title bar's fullscreen button while fullscreen; the touch
+# hint names it, so the two must say the same thing.
+FULLSCREEN_EXIT_BUTTON_TEXT = "Exit full screen"
+_FULLSCREEN_HINT_TEXT_TOUCH = "Tap the top edge, then Exit full screen"
 # A finger tap near the top reveals the hidden fullscreen title bar and keeps
 # it up this long: a finger has no hover, so the cursor poll that hides the bar
 # when the mouse moves away must not hide it before the user can tap Exit.
@@ -118,6 +123,9 @@ _FULLSCREEN_TOUCH_REVEAL_HOLD_S = 5.0
 _TOUCH_KEYBOARD_POLL_MS = 250
 _TOUCH_KEYBOARD_IDLE_POLLS = 12
 _FULLSCREEN_HINT_VISIBLE_MS = 3000
+# After the window comes back from the tray or the taskbar, wait this long for
+# it to be on screen before asking the page for a fresh frame.
+_RESTORE_SURFACE_REFRESH_MS = 250
 _FULLSCREEN_HINT_FADE_MS = 180
 _FULLSCREEN_HINT_TOP_MARGIN = 18
 _FULLSCREEN_TITLE_BAR_REVEAL_PX = 30
@@ -867,10 +875,20 @@ class ViolaBridge(QObject):
 
     @Slot()
     def hideBrowserOverlay(self) -> None:
-        """Called from React when the user clicks the overlay close button."""
+        """React closed the browser view (close / Done / Esc / another pill).
+
+        Goes through the overlay controller so it leaves "agentic"/"login"
+        and React hears the hidden state; a sign-in closed this way is a
+        cancelled sign-in.
+        """
+        if not self._caller_page_is_local():
+            logger.warning("[ViolaBridge] Refused hideBrowserOverlay from non-local caller page")
+            return
         if self._window is not None:
             overlay = getattr(self._window, "_overlay_controller", None)
-            if overlay is not None:
+            if overlay is not None and hasattr(overlay, "close_by_user"):
+                overlay.close_by_user()
+            elif overlay is not None:
                 overlay.hide()
             else:
                 self._window.hide_browser_overlay()
@@ -884,13 +902,36 @@ class ViolaBridge(QObject):
         publishes its bounds. It does not start or resume an agent task; the
         page the agent left open is simply visible again (1.0.5 build 5, A5.2:
         "Open Agent Browser" showed nothing once the view had been hidden).
+        Goes through the overlay controller when there is one, so every close
+        path (and React) knows the view is up again (build 7, A5.2: a reopened
+        view could not be closed).
         """
         if not self._caller_page_is_local():
             logger.warning("[ViolaBridge] Refused showBrowserOverlay from non-local caller page")
             return
         if self._window is not None:
-            self._window.show_browser_overlay("agentic")
+            overlay = getattr(self._window, "_overlay_controller", None)
+            if overlay is not None and hasattr(overlay, "reopen_agentic"):
+                if not overlay.reopen_agentic():
+                    logger.info("[ViolaBridge] showBrowserOverlay: no agent page to reopen")
+                    return
+            else:
+                self._window.show_browser_overlay("agentic")
             logger.info("[ViolaBridge] showBrowserOverlay called from React")
+
+    @Slot(bool)
+    def setBrowserSurfaceActive(self, active: bool) -> None:
+        """React: its browser stage surface is (not) on screen, uncovered.
+
+        The native view may only sit on screen while this is true; otherwise
+        it is parked so the music stage, the Ctrl+K palette and dialogs stay
+        visible and clickable.
+        """
+        if not self._caller_page_is_local():
+            logger.warning("[ViolaBridge] Refused setBrowserSurfaceActive from non-local caller page")
+            return
+        if self._window is not None and hasattr(self._window, "set_browser_surface_active"):
+            self._window.set_browser_surface_active(bool(active))
 
     @Slot(result=str)
     def quitApp(self) -> str:
@@ -2105,6 +2146,25 @@ class CustomTitleBar(QWidget):
         self.btn_fullscreen.setAccessibleName("Enter fullscreen")
         self.btn_fullscreen.setToolTip("Enter fullscreen (F11)")
         self.btn_fullscreen.setStyleSheet(btn_style_base(hover_bg="rgba(255, 255, 255, 0.1)"))
+        self._fullscreen_btn_style = btn_style_base(hover_bg="rgba(255, 255, 255, 0.1)")
+        # In fullscreen the button carries words, so the "exit button" the
+        # touch hint names is plain to see (1.0.5 build 7, A11.3: the hint
+        # promised an exit button and only the small arrows glyph appeared).
+        self._fullscreen_btn_style_active = f"""
+            QPushButton {{
+                background: rgba(255, 255, 255, 0.08);
+                border: none;
+                color: white;
+                min-height: {bar_height}px;
+                max-height: {bar_height}px;
+                padding: 0 14px;
+                font-size: 13px;
+                font-weight: 600;
+            }}
+            QPushButton:hover {{
+                background: rgba(255, 255, 255, 0.16);
+            }}
+        """
         self._set_fullscreen_icon(False)
         self.btn_fullscreen.setIconSize(QSize(12, 12))
         self.btn_fullscreen.clicked.connect(self._toggle_fullscreen)
@@ -2380,9 +2440,13 @@ class CustomTitleBar(QWidget):
         if is_fullscreen:
             self.btn_fullscreen.setAccessibleName("Exit fullscreen")
             self.btn_fullscreen.setToolTip("Exit fullscreen (Esc or F11)")
+            self.btn_fullscreen.setText(FULLSCREEN_EXIT_BUTTON_TEXT)
+            self.btn_fullscreen.setStyleSheet(getattr(self, "_fullscreen_btn_style_active", ""))
         else:
             self.btn_fullscreen.setAccessibleName("Enter fullscreen")
             self.btn_fullscreen.setToolTip("Enter fullscreen (F11)")
+            self.btn_fullscreen.setText("")
+            self.btn_fullscreen.setStyleSheet(getattr(self, "_fullscreen_btn_style", ""))
 
     def set_maximized_active(self, is_maximized: bool) -> None:
         """Update maximize/restore icon for externally changed window state."""
@@ -2807,13 +2871,51 @@ class ViolaWebViewWindow(QMainWindow):
         save_window_state((geo.x(), geo.y(), geo.width(), geo.height()), maximized)
 
     def restore_window(self) -> None:
-        """Bring the window back (tray, second launch) without dropping maximized."""
+        """Bring the window back (tray, second launch) without dropping maximized.
+
+        A window coming back from the tray (hidden) or the taskbar (minimized)
+        also gets its page surface refreshed shortly after it is on screen:
+        1.0.5 build 7 showed an all-black window for 20+ s after a second
+        launch brought it back from the tray, a click did not repaint it and
+        only a size change (maximize) did. ``_refresh_page_surface`` makes that
+        size change itself.
+        """
+        was_off_screen = not self.isVisible() or self.isMinimized()
         if self.windowState() & Qt.WindowState.WindowMaximized:
             self.showMaximized()
         else:
             self.showNormal()
         self.raise_()
         self.activateWindow()
+        if was_off_screen:
+            QTimer.singleShot(_RESTORE_SURFACE_REFRESH_MS, self._refresh_page_surface)
+
+    def _refresh_page_surface(self) -> None:
+        """Make the web page draw a fresh frame, the way a resize does.
+
+        The page view is shrunk by one pixel and handed straight back its
+        layout geometry. Chromium treats that as a new surface size and sends
+        a new frame, which replaces a black or stale picture left from while
+        the window was hidden. Never raises.
+        """
+        view = getattr(self, "webview", None)
+        if view is None or not self.isVisible() or self.isMinimized():
+            return
+        try:
+            width, height = view.width(), view.height()
+            if width < 2 or height < 2:
+                return
+            view.resize(width, height - 1)
+            stack = getattr(self, "_content_stack", None)
+            layout = stack.layout() if stack is not None else None
+            if layout is not None:
+                layout.setGeometry(stack.contentsRect())
+            else:
+                view.resize(width, height)
+            view.update()
+            logger.info("Window restored: page surface refreshed (%dx%d)", width, height)
+        except RuntimeError:
+            logger.debug("Page surface refresh skipped", exc_info=True)
 
     def _sync_title_bar_window_state(self) -> None:
         """Make the maximize/restore and fullscreen glyphs match the window now."""
@@ -2959,7 +3061,11 @@ class ViolaWebViewWindow(QMainWindow):
         self._browser_overlay_rect: QRect | None = None
         self._browser_overlay_user_visible: bool = False
         self._browser_overlay_mode: str = ""
-        self._browser_login_chrome_hook_connected: bool = False
+        # React's browser stage surface is on screen with nothing above it.
+        self._browser_overlay_surface_active: bool = False
+        # The view sits at the stage rect (not parked off screen).
+        self._browser_overlay_placed: bool = False
+        self._browser_overlay_shortcuts: tuple = ()
         try:
             # Desktop agentic browsing always uses the embedded CDP browser,
             # so the overlay webview is created unconditionally.
@@ -2987,9 +3093,10 @@ class ViolaWebViewWindow(QMainWindow):
 
             self._browser_webview.page().setBackgroundColor(Qt.GlobalColor.black)
             # "Done" button in injected login chrome calls window.close()
-            browser_page.windowCloseRequested.connect(self.hide_browser_overlay)
+            browser_page.windowCloseRequested.connect(self.request_browser_overlay_close)
             # Hidden by default — shown via show_browser_overlay()
             self._browser_webview.hide()
+            self._install_browser_overlay_shortcuts()
             # STAGE-CDP-TARGET-ID: capture the overlay page's exact Chromium
             # target id so the Playwright CDP client can bind to THIS
             # overlay's target instead of guessing among non-local page targets. The
@@ -4141,182 +4248,165 @@ class ViolaWebViewWindow(QMainWindow):
             self._cef_widget.hide()
             logger.info("CEF overlay hidden")
 
-    def _log_browser_overlay_debug(self, source: str) -> None:
-        """Temporary BLACK_DEBUG instrumentation for the browser overlay."""
-        browser = self._browser_webview
-        if browser is None:
-            logger.info("BLACK_DEBUG %s browser=None", source)
-            return
-
-        parent = browser.parentWidget()
-
-        def _widget_summary(widget: QWidget | None) -> dict:
-            if widget is None:
-                return {"widget": None}
-            rect = widget.geometry()
-            global_pos = widget.mapToGlobal(QPoint(0, 0))
-            return {
-                "class": widget.metaObject().className(),
-                "object": widget.objectName(),
-                "geometry": (rect.x(), rect.y(), rect.width(), rect.height()),
-                "visible": widget.isVisible(),
-                "global": (global_pos.x(), global_pos.y()),
-            }
-
-        parent_children: list[dict] = []
-        if parent is not None:
-            for child in parent.children():
-                if isinstance(child, QWidget):
-                    child_rect = child.geometry()
-                    parent_children.append(
-                        {
-                            "class": child.metaObject().className(),
-                            "object": child.objectName(),
-                            "geometry": (
-                                child_rect.x(),
-                                child_rect.y(),
-                                child_rect.width(),
-                                child_rect.height(),
-                            ),
-                            "visible": child.isVisible(),
-                            "is_browser": child is browser,
-                            "win_id": int(child.winId()) if child is browser else None,
-                        }
-                    )
-                else:
-                    parent_children.append(
-                        {
-                            "class": (
-                                child.metaObject().className() if hasattr(child, "metaObject") else type(child).__name__
-                            ),
-                            "object": (child.objectName() if hasattr(child, "objectName") else ""),
-                            "is_browser": child is browser,
-                        }
-                    )
-
-        logger.info(
-            "BLACK_DEBUG %s browser=%s isVisibleToParent=%s winId=%s parent=%s parent_children=%s",
-            source,
-            _widget_summary(browser),
-            browser.isVisibleTo(parent) if parent is not None else None,
-            int(browser.winId()),
-            _widget_summary(parent),
-            parent_children,
-        )
-
     def show_browser_overlay(self, mode: str = "") -> None:
-        """Show browser webview overlaid on the media area."""
+        """The overlay controller wants the browser view up (agent / login).
+
+        The view is only placed on screen where React's browser stage says it
+        may go (``set_browser_surface_active`` + ``update_browser_overlay_bounds``).
+        Until then it is parked off screen: still shown, so the agent's page
+        keeps rendering for automation, but never over the music stage, the
+        Ctrl+K palette or a dialog. A native child view always paints above the
+        React page, so this is the only way React UI can stay on top of it.
+        """
         self._browser_overlay_user_visible = True
         self._browser_overlay_mode = mode or ""
-        self._log_browser_overlay_debug("show_browser_overlay.before")
-        self._apply_browser_overlay_geometry("show_browser_overlay.after")
-        if self._browser_overlay_rect_is_usable():
-            logger.info("Browser overlay shown at %s", self._browser_overlay_rect)
+        if self._browser_webview is not None:
+            # The view has always been a native window once shown (the old
+            # show path read winId()); keep that so its paint path is unchanged.
+            self._browser_webview.winId()
+        self._apply_browser_overlay_geometry("show_browser_overlay")
+        if self._browser_overlay_placed:
+            logger.info("Browser overlay shown at %s (mode=%s)", self._browser_overlay_rect, self._browser_overlay_mode)
+        else:
+            logger.info(
+                "Browser overlay parked until the browser stage is on screen (mode=%s)",
+                self._browser_overlay_mode,
+            )
 
     def _browser_overlay_rect_is_usable(self) -> bool:
         rect = self._browser_overlay_rect
         return rect is not None and rect.width() > 0 and rect.height() > 0
 
-    def _arm_login_chrome(self) -> None:
-        page = self._browser_webview.page() if self._browser_webview else None
-        if page is None:
+    def set_browser_surface_active(self, active: bool) -> None:
+        """React: its browser stage surface is (not) on screen with nothing above it.
+
+        False when another pill is active, or a dialog, the Ctrl+K palette or
+        a menu is open. The view is parked then and placed again on True.
+        """
+        active = bool(active)
+        changed = active != self._browser_overlay_surface_active
+        self._browser_overlay_surface_active = active
+        if changed:
+            logger.info("Browser stage surface %s", "on screen" if active else "covered or gone")
+        self._apply_browser_overlay_geometry("set_browser_surface_active")
+
+    def _park_browser_overlay(self) -> None:
+        """Keep the view alive but out of sight (left of the content area)."""
+        browser = self._browser_webview
+        if browser is None:
             return
-        if not self._browser_login_chrome_hook_connected:
-            page.loadFinished.connect(self._inject_login_chrome)
-            self._browser_login_chrome_hook_connected = True
-        QTimer.singleShot(1500, lambda: self._inject_login_chrome(True))
+        rect = self._browser_overlay_rect
+        width = rect.width() if rect is not None and rect.width() > 0 else 1280
+        height = rect.height() if rect is not None and rect.height() > 0 else 800
+        browser.setGeometry(QRect(-width - 64, 0, width, height))
+        if not browser.isVisible():
+            browser.show()
+        browser.lower()
+        if browser.hasFocus() and getattr(self, "webview", None) is not None:
+            self.webview.setFocus()
+        self._browser_overlay_placed = False
 
     def _apply_browser_overlay_geometry(self, source: str) -> None:
-        if self._browser_webview is None or not self._browser_overlay_user_visible:
+        browser = self._browser_webview
+        if browser is None or not self._browser_overlay_user_visible:
             return
-        if not self._browser_overlay_rect_is_usable():
-            logger.info("Browser overlay show deferred until React publishes staging bounds")
+        if not self._browser_overlay_surface_active or not self._browser_overlay_rect_is_usable():
+            if not self._browser_overlay_rect_is_usable():
+                logger.debug("Browser overlay show deferred until React publishes staging bounds")
+            self._park_browser_overlay()
             return
 
-        self._browser_webview.setGeometry(self._browser_overlay_rect)
-        if not self._browser_webview.isVisible():
-            self._browser_webview.show()
-        self._browser_webview.raise_()
-        self._browser_webview.setFocus()
-        self._browser_webview.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
-        self._log_browser_overlay_debug(source)
-        # Inject login chrome bar only for login/music-provider flows.
-        # Agentic browsing uses React Stage controls and should leave the
-        # page viewport untouched for accurate automation.
-        if self._browser_overlay_mode in {"login", "music"}:
-            self._arm_login_chrome()
+        browser.setGeometry(self._browser_overlay_rect)
+        if not browser.isVisible():
+            browser.show()
+        browser.raise_()
+        if not self._browser_overlay_placed:
+            browser.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+            browser.setFocus()
+        self._browser_overlay_placed = True
+        logger.debug("Browser overlay placed (%s) at %s", source, self._browser_overlay_rect)
 
-    def _inject_login_chrome(self, ok: bool) -> None:
-        """Inject a floating 'Done' bar into the login page after load."""
-        if not ok or not self._browser_overlay_user_visible:
+    def _install_browser_overlay_shortcuts(self) -> None:
+        """Esc closes the view; Ctrl+K still opens the palette from inside it.
+
+        Keys pressed while the native view has focus never reach React, so the
+        stage's own Esc / Ctrl+K handlers cannot see them (1.0.5 build 7, A5.2).
+        """
+        browser = self._browser_webview
+        if browser is None:
             return
-        # Disconnect to avoid re-injection on subsequent navigations within the page
-        page = self._browser_webview.page() if self._browser_webview else None
-        if page is not None:
+        esc = QShortcut(QKeySequence(Qt.Key.Key_Escape), browser)
+        esc.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
+        esc.activated.connect(self.request_browser_overlay_close)
+        palette = QShortcut(QKeySequence("Ctrl+K"), browser)
+        palette.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
+        palette.activated.connect(self._open_command_palette_from_browser)
+        self._browser_overlay_shortcuts = (esc, palette)
+
+    def _open_command_palette_from_browser(self) -> None:
+        webview = getattr(self, "webview", None)
+        if webview is None:
+            return
+        webview.setFocus()
+        webview.page().runJavaScript("window.dispatchEvent(new CustomEvent('viola:open-command-palette'));")
+
+    def request_browser_overlay_close(self) -> None:
+        """The user closed the view from Qt (Esc, or the page called window.close()).
+
+        While the agent is still driving the page this leaves the browser stage
+        instead (the same as the stage's Close button); otherwise it closes.
+
+        Goes through the overlay controller so its state, React and the
+        sign-in flow all hear it; hiding only the widget left the controller
+        in "login"/"agentic" and React showing a stage for a view that was gone.
+        """
+        if not self._browser_overlay_user_visible:
+            return
+        overlay = getattr(self, "_overlay_controller", None)
+        if overlay is not None and getattr(overlay, "agent_busy", False):
+            # The agent is still working in this page: leave the browser stage
+            # like the stage's Close button does (the page keeps running off
+            # screen, the globe pill brings it back) instead of killing it.
+            self.set_browser_surface_active(False)
+            webview = getattr(self, "webview", None)
+            if webview is not None:
+                webview.page().runJavaScript("window.dispatchEvent(new CustomEvent('viola:browser-exit'));")
+            return
+        if overlay is not None and hasattr(overlay, "close_by_user"):
             try:
-                page.loadFinished.disconnect(self._inject_login_chrome)
-            except TypeError:
-                logger.debug("loadFinished.disconnect raised TypeError — signal was already disconnected")
-                pass  # Already disconnected
-        js = (
-            "(function() {"
-            "  if (document.getElementById('viola-login-bar')) return;"
-            "  var bar = document.createElement('div');"
-            "  bar.id = 'viola-login-bar';"
-            "  bar.style.cssText = 'position:fixed;top:0;left:0;right:0;height:44px;"
-            "background:rgba(0,0,0,0.85);backdrop-filter:blur(12px);display:flex;"
-            "align-items:center;justify-content:space-between;padding:0 16px;z-index:999999;"
-            "font-family:-apple-system,BlinkMacSystemFont,sans-serif;';"
-            '  bar.innerHTML = \'<span style="color:#fff;font-size:14px;font-weight:500;">'
-            "Sign in to your music account</span>"
-            '<button id="viola-done-btn" style="background:rgba(255,255,255,0.15);'
-            "border:none;color:#fff;padding:6px 16px;border-radius:8px;font-size:13px;"
-            "font-weight:500;cursor:pointer;\">Done</button>';"
-            "  document.body.prepend(bar);"
-            "  document.body.style.paddingTop = '44px';"
-            "  document.getElementById('viola-done-btn').addEventListener('click', function() {"
-            "    window.close();"
-            "  });"
-            "})();"
-        )
-        if page is not None:
-            page.runJavaScript(js)
+                overlay.close_by_user()
+                return
+            except Exception:
+                logger.exception("Overlay controller close failed; hiding the view directly")
+        self.hide_browser_overlay()
 
     def hide_browser_overlay(self) -> None:
         """Hide browser webview — React media area shows through."""
         self._browser_overlay_user_visible = False
         self._browser_overlay_mode = ""
-        if self._browser_webview is not None:
-            # Disconnect login chrome injection if still connected
-            page = self._browser_webview.page()
-            if page is not None and self._browser_login_chrome_hook_connected:
-                try:
-                    page.loadFinished.disconnect(self._inject_login_chrome)
-                except TypeError:
-                    logger.debug(
-                        "loadFinished.disconnect raised TypeError — signal was already disconnected during hide"
-                    )
-                    pass  # Not connected
-                self._browser_login_chrome_hook_connected = False
-            self._browser_webview.hide()
+        self._browser_overlay_placed = False
+        browser = self._browser_webview
+        if browser is not None:
+            if browser.hasFocus() and getattr(self, "webview", None) is not None:
+                self.webview.setFocus()
+            browser.hide()
             logger.info("Browser overlay hidden")
 
     def update_browser_overlay_bounds(self, x: int, y: int, w: int, h: int) -> None:
-        """Called from React via JS bridge when the media area resizes.
+        """Called from React via JS bridge when the browser stage surface moves.
 
         Coordinates are relative to the React webview (index 0 in the stack),
         which is the same coordinate space as _content_stack since the webview
         fills the entire stack area.
         """
         self._browser_overlay_rect = QRect(x, y, w, h)
-        self._log_browser_overlay_debug("update_browser_overlay_bounds.before")
         # Only reposition if overlay is intentionally visible to the user
         if self._browser_webview is not None and self._browser_overlay_user_visible:
-            self._apply_browser_overlay_geometry("update_browser_overlay_bounds.after")
-            logger.debug("Browser overlay bounds updated: %s", self._browser_overlay_rect)
+            self._apply_browser_overlay_geometry("update_browser_overlay_bounds")
         # Also update CEF overlay if visible
-        if self._cef_widget is not None and self._cef_widget.isVisible():
-            self._cef_widget.setGeometry(self._browser_overlay_rect)
+        cef = getattr(self, "_cef_widget", None)
+        if cef is not None and cef.isVisible():
+            cef.setGeometry(self._browser_overlay_rect)
 
     @property
     def is_browser_overlay_visible(self) -> bool:
@@ -4703,12 +4793,19 @@ class ViolaWebViewWindow(QMainWindow):
             return
 
         keep_in_tray = False
+        # Say which rule decided, so a log never leaves "quit while the tray
+        # was on" open to guessing. The tray icon itself always shows (the
+        # settings.json ``features.tray_icon.enabled`` flag is that icon, not
+        # this choice); only ``minimize_to_tray`` keeps Viola running.
+        reason = "no tray icon is showing"
         if hasattr(self, "_tray_icon") and self._tray_icon.isVisible():
             try:
                 from ui.settings_manager import get_settings_manager
 
                 keep_in_tray = get_settings_manager().get("minimize_to_tray", False) is True
+                reason = "Keep Viola running in the tray is off (minimize_to_tray is not true)"
             except Exception:
+                reason = "the keep-in-tray setting could not be read"
                 logger.warning("Could not read the keep-in-tray setting; closing quits Viola", exc_info=True)
 
         if keep_in_tray:
@@ -4718,7 +4815,7 @@ class ViolaWebViewWindow(QMainWindow):
             logger.info("Window hidden to the tray (the user chose to keep Viola running there)")
             return
 
-        logger.info("Window closed: quitting Viola")
+        logger.info("Window closed: quitting Viola (%s)", reason)
         self._quit_app()
         super().closeEvent(event)
 

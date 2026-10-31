@@ -149,12 +149,50 @@ def is_youtube_anonymous_search_available() -> bool:
     return True
 
 
+def _spotify_signed_in(user_id: str | None) -> bool:
+    try:
+        from music.providers.browser.auth_manager import is_spotify_signed_in
+
+        return is_spotify_signed_in(user_id)
+    except Exception as exc:
+        # Unknown is not "signed out": keep the user's choice and let the
+        # Spotify path report its own error.
+        logger.debug("Spotify sign-in check failed: %s", exc)
+        return True
+
+
+def _notify_spotify_not_connected(user_id: str | None) -> None:
+    try:
+        from music.providers.browser.auth_manager import notify_spotify_not_connected
+
+        notify_spotify_not_connected(user_id)
+    except Exception as exc:
+        logger.debug("Spotify fallback notice failed: %s", exc)
+
+
 def select_first_run_music_provider(query: str) -> MusicProviderSelection:
     """Select a provider for a generic music query before resolution starts."""
 
     active_provider_id = _configured_active_provider_id()
     if active_provider_id:
         source = _source_for_provider(active_provider_id)
+        if (
+            source == "spotify_cdp"
+            and not _spotify_signed_in(_current_user_id())
+            and is_youtube_anonymous_search_available()
+        ):
+            # The music source is Spotify but Spotify isn't signed in: play on
+            # YouTube and say so, instead of failing or switching silently.
+            logger.info(
+                "Music source is Spotify but Spotify isn't connected; playing on YouTube instead (query=%s)",
+                query[:50],
+            )
+            _notify_spotify_not_connected(_current_user_id())
+            return MusicProviderSelection(
+                provider_id=ANONYMOUS_YOUTUBE_PROVIDER_ID,
+                source="ytsearch1",
+                reason="configured_provider_not_connected",
+            )
         if source is not None:
             return MusicProviderSelection(
                 provider_id=active_provider_id,

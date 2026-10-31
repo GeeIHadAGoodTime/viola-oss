@@ -3395,6 +3395,12 @@ class AIController:
                 result["message"] = cleaned_answer
                 result["data"]["answer"] = cleaned_answer
                 result["response"] = cleaned_answer
+                if isinstance(agent_result.params, dict) and agent_result.params.get("silent_reply"):
+                    # A confirmed track change the user hears: show the text,
+                    # do not speak it (same "spoken" contract the voice and
+                    # typed reply paths already honour).
+                    result["spoken"] = True
+                    result["data"]["spoken"] = True
                 logger.info(
                     "Agent loop completed with answer after %d iterations (tools: %s)",
                     agent_result.iterations_used,

@@ -13,6 +13,7 @@ Not redacted by default:
 
 from __future__ import annotations
 
+import itertools
 import re
 from collections.abc import Mapping
 from pathlib import Path
@@ -56,6 +57,20 @@ _PHONE_RE = re.compile(r"(?<![\w/-])(?:\+?1[-.\s]?)?(?:\(\d{3}\)|\d{3})[-.\s]?\d
 _SSN_RE = re.compile(r"(?<![\w-])\d{3}-\d{2}-\d{4}(?![\w-])")
 _IPV4_RE = re.compile(r"(?<![\w.])(?:\d{1,3}\.){3}\d{1,3}(?![\w.])")
 _PHONE_CONTEXT_CHARS = frozenset("0123456789+().- ")
+# A phone number as speech-to-text writes it when Viola reads one back ("plus 1,
+# 4, 1, 4, 5, 5, 5, ...", "+1, 414, 555, 1234", "four one four five five five
+# ...") or as an E.164 string outside the US layout ("+447946095812"). The plain
+# US pattern above misses every one of these, and a self-heard confirm prompt put
+# a full number into viola-qt.log that way (1.0.5 laptop, session 4).
+_SPOKEN_PHONE_TOKEN = r"(?:\d{1,4}|zero|oh|one|two|three|four|five|six|seven|eight|nine)"
+_SPOKEN_PHONE_RUN_RE = re.compile(
+    r"(?i)(?<![\w.:/+-])(?P<prefix>(?:\+|\bplus\b)[\s,]*)?"
+    r"(?P<body>%s(?:(?:[\s,]+|\s*-\s*|\.\s+)%s)+)"
+    r"(?![\w:/-]|\.\d)" % (_SPOKEN_PHONE_TOKEN, _SPOKEN_PHONE_TOKEN)
+)
+_E164_PHONE_RE = re.compile(r"(?<![\w+])\+\d{8,15}(?!\d)")
+_THOUSANDS_NUMBER_RE = re.compile(r"^\d{1,3}(?:,\d{3})+$")
+_SPOKEN_PHONE_TOKEN_SPLIT_RE = re.compile(r"[\s,.-]+")
 _REDACTED_EMAIL = "[REDACTED:EMAIL]"
 _REDACTED_PHONE = "[REDACTED:PHONE]"
 _REDACTED_SSN = "[REDACTED:SSN]"
@@ -394,9 +409,47 @@ def _replace_ipv4(match: re.Match[str]) -> str:
     return match.group(0)
 
 
+def _spoken_phone_digits(tokens: list[str]) -> str:
+    return "".join(token if token.isdigit() else _SPOKEN_DIGIT_WORDS[token.lower()] for token in tokens)
+
+
+def _is_counting_sequence(tokens: list[str]) -> bool:
+    """``1, 2, 3, ... 10`` is a list, not a phone number."""
+    if not all(token.isdigit() for token in tokens):
+        return False
+    values = [int(token) for token in tokens]
+    return all(later == earlier + 1 for earlier, later in itertools.pairwise(values))
+
+
+def _replace_spoken_phone(match: re.Match[str]) -> str:
+    body = match.group("body")
+    tokens = [token for token in _SPOKEN_PHONE_TOKEN_SPLIT_RE.split(body) if token]
+    if not tokens:
+        return match.group(0)
+    digits = _spoken_phone_digits(tokens)
+    if match.group("prefix"):
+        # "+" or "plus" in front of the run: any E.164 length.
+        return _REDACTED_PHONE if 8 <= len(digits) <= 15 else match.group(0)
+    if not 10 <= len(digits) <= 15:
+        return match.group(0)
+    if _THOUSANDS_NUMBER_RE.match(body.strip()) or _is_counting_sequence(tokens):
+        return match.group(0)
+    if all(token.isdigit() for token in tokens) and not re.search(r"[,\s]", body):
+        # Only hyphens/dots between groups: dates and ids, and the US pattern
+        # above already covers hyphenated phone numbers.
+        return match.group(0)
+    return _REDACTED_PHONE
+
+
+def _redact_spoken_phone(value: str) -> str:
+    redacted = _E164_PHONE_RE.sub(_REDACTED_PHONE, value)
+    return _SPOKEN_PHONE_RUN_RE.sub(_replace_spoken_phone, redacted)
+
+
 def _redact_pii_string(value: str) -> str:
     redacted = _EMAIL_RE.sub(_REDACTED_EMAIL, value)
     redacted = _PHONE_RE.sub(_replace_phone, redacted)
+    redacted = _redact_spoken_phone(redacted)
     redacted = _SSN_RE.sub(_REDACTED_SSN, redacted)
     return mask_secrets_in_text(_IPV4_RE.sub(_replace_ipv4, redacted), include_card_data=False)
 

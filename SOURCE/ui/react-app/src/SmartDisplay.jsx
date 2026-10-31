@@ -98,7 +98,19 @@ import ModalLoadingSpinner from './components/shared/ModalLoadingSpinner';
 import ProviderBadge from './components/shared/ProviderBadge';
 import AgentDrawer from './components/AgentDrawer';
 import { clampWakeThreshold } from './utils/wakeSensitivity';
-import { appendAssistantEntry } from './utils/chatHistory';
+import {
+  browserLeaveAction,
+  escapeClosesBrowser,
+  nativeBrowserSurfaceActive,
+  requestNativeBrowserClose,
+  stageForOverlayState,
+} from './utils/nativeBrowserView';
+import {
+  appendAssistantEntry,
+  mergeRestoredHistory,
+  readRecentActivityClearedAt,
+  rememberRecentActivityCleared,
+} from './utils/chatHistory';
 import { autoDetectedWeatherLocation } from './utils/weatherLocation';
 
 // Shared CSS: animations + variables (replaces all inline <style> tags)
@@ -263,6 +275,10 @@ const SETTINGS_TAB_ALIASES = {
 };
 
 export const AGENT_CONTEXT_PILL_COOLDOWN_MS = 12000;
+
+// Sent for the user after they accept the Phone Calling Terms from a call that
+// was stopped for them, so the agent picks the same call back up.
+export const PHONE_TERMS_RESUME_COMMAND = 'I accepted the phone terms. Go ahead with the call I asked for.';
 
 function getStageContentMode(displayMode) {
   if (displayMode === 'phone_tab' || displayMode === 'phone_call') return 'phone';
@@ -514,6 +530,25 @@ ProviderEmbed.propTypes = {
 // END OF MODULE-SCOPE COMPONENTS
 // =========================================================================
 
+// The stage's reply line before any reply (and on a speaker page once a reply
+// has been up for SPOKE_REPLY_HOLD_MS).
+export const IDLE_RESPONSE_LINE = '"Hi! Ask me anything or tell me to play some music."';
+export const SPOKE_REPLY_HOLD_MS = 60000;
+
+// Longest text the stage type-anywhere box takes (typed or pasted).
+const STAGE_TYPING_MAX_CHARS = 4000;
+
+// Plain text from a paste on the stage, newlines and tabs turned into spaces.
+export function stagePasteText(clipboardData) {
+  let text = '';
+  try {
+    text = clipboardData?.getData('text/plain') || clipboardData?.getData('text') || '';
+  } catch {
+    text = '';
+  }
+  return String(text).replace(/[\r\n\t]+/g, ' ').replace(/ {2,}/g, ' ');
+}
+
 export default function SmartDisplay(props) {
   const { user } = useAuth();
   // A principal owns every pending turn and its UI state. Replacing that
@@ -666,7 +701,9 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
   const mediaAreaRef = useRef(null);
   const [browserOverlayVisible, setBrowserOverlayVisible] = useState(false);
   // Mode of the native browser overlay ('agentic', 'login', 'music', ...).
-  const browserOverlayModeRef = useRef('');
+  const [browserOverlayMode, setBrowserOverlayMode] = useState('');
+  // Provider whose sign-in page the native view shows (mode 'login').
+  const [loginProvider, setLoginProvider] = useState('');
   // The page the agent last browsed, so its view can be reopened after the
   // task ends or the view was closed (pill / Ctrl+K "Open Agent Browser").
   const [lastAgentBrowserUrl, setLastAgentBrowserUrl] = useState('');
@@ -859,10 +896,14 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
       if (!response.ok) return;
       const json = await response.json();
       const status = json?.data || json || {};
-      if (status.accepted === false) {
+      const missingConsents = Array.isArray(status.missing_consents) ? status.missing_consents : [];
+      if (status.accepted === false || missingConsents.length > 0) {
         setPhoneTosPayload({
           error_code: 'phone_tos_required',
-          message: 'Accept the Phone Calling Terms of Service before making calls.',
+          message: status.accepted === false
+            ? 'Accept the Phone Calling Terms of Service before making calls.'
+            : 'Phone calls need a few permissions on your account before Viola can place them.',
+          missing_consents: missingConsents,
         });
       }
     } catch {
@@ -934,6 +975,8 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
         setBrowserModeActive(true);
         setDisplayMode('browser');
         if (typeof window !== 'undefined' && typeof window.viola?.showBrowserOverlay === 'function') {
+          setBrowserOverlayVisible(true);
+          setBrowserOverlayMode('agentic');
           window.viola.showBrowserOverlay();
         }
       } else {
@@ -941,14 +984,12 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
       }
     }
   }, [activateMusicMode, browserModeActive, browserUrl, displayMode, handleTogglePhoneMode, lastAgentBrowserUrl]);
-  // Leaving a reopened (idle) agent browser hides the native view; while the
-  // agent is still working the view keeps running behind the music stage.
+  // Close / Done / Esc on the browser stage: go back to the music stage. The
+  // stage-leave effect below closes the native view, or parks it off screen
+  // while the agent is still working in it (the globe pill brings it back).
   const handleBrowserExit = useCallback(() => {
-    if (!agentTaskActive && typeof window !== 'undefined' && typeof window.viola?.hideBrowserOverlay === 'function') {
-      window.viola.hideBrowserOverlay();
-    }
     activateMusicMode();
-  }, [activateMusicMode, agentTaskActive]);
+  }, [activateMusicMode]);
   const handleConsultationTakeover = useCallback(async (callId) => {
     if (!callId || callOwnerTakeoverPending) return;
     setCallOwnerTakeoverPending(true);
@@ -988,7 +1029,28 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
 
   // Chat state
   const [chatHistory, setChatHistory] = useState([]);
-  const [lastResponse, setLastResponse] = useState('"Hi! Ask me anything or tell me to play some music."');
+  const historyPrincipalKey = accountUser?.id || 'device';
+  // Chat History keeps earlier turns across a restart: read this user's
+  // recent turns from the backend once per principal (this component is
+  // keyed by the account, so a sign-in or switch reads again).
+  useEffect(() => {
+    if (isSpoke) return undefined;
+    let cancelled = false;
+    apiFetch('/v1/chat/recent-activity?limit=50').then((data) => {
+      const items = data?.items ?? data?.data?.items;
+      if (cancelled || !Array.isArray(items)) return;
+      const clearedAt = readRecentActivityClearedAt(historyPrincipalKey);
+      setChatHistory((prev) => mergeRestoredHistory(prev, items, clearedAt));
+    }).catch(() => {
+      // Best effort: without it the list starts with this launch, as before.
+    });
+    return () => { cancelled = true; };
+  }, [isSpoke, historyPrincipalKey]);
+  const clearRecentActivity = useCallback(() => {
+    rememberRecentActivityCleared(historyPrincipalKey);
+    setChatHistory([]);
+  }, [historyPrincipalKey]);
+  const [lastResponse, setLastResponse] = useState(IDLE_RESPONSE_LINE);
   const [mainThinking, setMainThinking] = useState('');
   // Managed-AI usage cap (C-077). Non-null for as long as the plan allowance is
   // spent, so the response area can offer a route to the upgrade surface rather
@@ -1049,7 +1111,10 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
   // useCloudLlmConsent below.
   const [cloudLlmConsentOpen, setCloudLlmConsentOpen] = useState(false);
   const [cloudWelcomeOpen, setCloudWelcomeOpen] = useState(false);
-  const siblingModalOpen = settingsOpen || queueOpen || historyOpen || roomsOpen || helpOpen
+  // While a sign-in page from Settings is up, Settings steps aside (kept
+  // mounted, so its sign-in check keeps running) and comes back on Done.
+  const settingsSuspendedForLogin = settingsOpen && browserOverlayVisible && browserOverlayMode === 'login';
+  const siblingModalOpen = (settingsOpen && !settingsSuspendedForLogin) || queueOpen || historyOpen || roomsOpen || helpOpen
     || bugReportOpen || workbenchPanelOpen || !!loginPromptPayload || !!phoneTosPayload
     || cloudWelcomeOpen || cloudLlmConsentOpen;
   // The calendar is nested inside the card: pause onboarding for it, but
@@ -1338,6 +1403,17 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
     return api.sendCommand(text).then(handleCommandResult);
   }, [interceptCloudConsent, api, handleCommandResult]);
 
+  // Accepting the Phone Calling Terms from a call that was stopped for them
+  // picks that call back up (1.0.5 laptop A6.6a), instead of leaving the user to
+  // ask again. It still goes through the normal confirm card: accepting the
+  // terms is not a yes to this particular call.
+  const handlePhoneTermsAccepted = useCallback((pendingPayload) => {
+    addToast({ message: 'Phone terms accepted.', level: 'success' });
+    if (pendingPayload?.resume_after_accept === true) {
+      void submitTextCommand(PHONE_TERMS_RESUME_COMMAND);
+    }
+  }, [addToast, submitTextCommand]);
+
   // A call asked for in a saved chat is pending in that chat only, so the
   // card's Approve / Cancel go to that chat's thread (answerCallBriefing).
   const answerCallBriefingInItsChat = useCallback((text) => answerCallBriefing(callBriefing, text, {
@@ -1534,14 +1610,16 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
   // The agent's own browser is NOT a stale connection overlay: hiding it here
   // closed the agent view about a second after it opened whenever a video was
   // loaded, so Take over / Hand back / Stop were unreachable (1.0.5 build 5, A5.2).
+  // A sign-in page is not stale either: it only ever shows on the browser
+  // stage now, never over the music stage, so only the legacy 'music' mode
+  // overlay is cleared here.
   useEffect(() => {
     if (!playerState.now_playing?.video_id || !browserOverlayVisible) return;
-    if (browserOverlayModeRef.current === 'agentic' || agentTaskActive) return;
+    if (browserOverlayMode !== 'music' || agentTaskActive) return;
     setBrowserOverlayVisible(false);
-    if (typeof window !== 'undefined' && window.viola?.hideBrowserOverlay) {
-      window.viola.hideBrowserOverlay();
-    }
-  }, [agentTaskActive, browserOverlayVisible, playerState.now_playing?.video_id]);
+    setBrowserOverlayMode('');
+    requestNativeBrowserClose();
+  }, [agentTaskActive, browserOverlayMode, browserOverlayVisible, playerState.now_playing?.video_id]);
 
   // Expose browser mode controls to Qt/Python
   useEffect(() => {
@@ -1576,10 +1654,18 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
       const mode = msg.mode || msg.payload?.mode || '';
       const url = msg.url || msg.payload?.url || '';
       const agentTask = msg.agent_task || msg.payload?.agent_task;
+      const agentBusy = (msg.agent_busy ?? msg.payload?.agent_busy) !== false;
       if (visible !== undefined) { setBrowserOverlayVisible(!!visible); }
-      browserOverlayModeRef.current = visible === false ? '' : mode;
+      setBrowserOverlayMode(visible === false ? '' : mode);
+      setLoginProvider(visible !== false && mode === 'login' ? url : '');
+      if (stageForOverlayState({ visible: visible !== false, mode }) === 'browser') {
+        // The sign-in page needs the browser stage: its Done button lives there.
+        setBrowserModeActive(true);
+        setDisplayMode('browser');
+      }
       if (mode === 'agentic') {
-        setAgentTaskActive(true);
+        // A reopened page (globe pill) is not a running task: no Stop button.
+        setAgentTaskActive(agentBusy);
         setBrowserUrl(url);
         if (url && url !== 'about:blank') setLastAgentBrowserUrl(url);
         if (agentTask) {
@@ -1767,6 +1853,26 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
   // still down after DISCONNECT_TOAST_GRACE_MS (1.0.5 build-5 laptop, X10.4).
   const wsConnectCountRef = useRef(playerState.connectCount);
   wsConnectCountRef.current = playerState.connectCount;
+
+  // Speaker page (multiroom spoke): its reply line follows the hub's replies
+  // over the socket, and kept an old reply on screen (1.0.5 build 7, A7.3-A7.6):
+  // replies sent while the speaker's tab was in the background or its socket
+  // was down never arrive. So on a speaker a reply goes back to the idle line
+  // after a while, and a reconnect drops whatever reply was showing.
+  const spokeConnectCountRef = useRef(playerState.connectCount);
+  useEffect(() => {
+    if (!isSpoke) return;
+    const previous = spokeConnectCountRef.current;
+    spokeConnectCountRef.current = playerState.connectCount;
+    if (previous && playerState.connectCount && playerState.connectCount !== previous) {
+      setLastResponse(IDLE_RESPONSE_LINE);
+    }
+  }, [isSpoke, playerState.connectCount]);
+  useEffect(() => {
+    if (!isSpoke || lastResponse === IDLE_RESPONSE_LINE) return undefined;
+    const timer = setTimeout(() => setLastResponse(IDLE_RESPONSE_LINE), SPOKE_REPLY_HOLD_MS);
+    return () => clearTimeout(timer);
+  }, [isSpoke, lastResponse]);
   useEffect(() => {
     if (!setDisconnectCallback) return;
     let noticeTimer = null;
@@ -1869,6 +1975,9 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
   // its retries (measured: 11 posts in 15s, and it never clears _wantsToPlay),
   // so the report has to be deduped per video or it becomes a 1 Hz broadcast.
   const notStartedReportedRef = useRef(null);
+  // Last YouTube player state the hub iframe reported for the loaded video
+  // (-1 unstarted, 0 ended, 1 playing, 2 paused, 3 buffering, 5 cued).
+  const iframeStateRef = useRef(null);
 
   // Wake selection is only configuration. Report detection from this
   // surface's live signal, with Disabled/mute taking precedence over stale
@@ -2664,6 +2773,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
         if (stateVideoId && currentVideoId && stateVideoId !== currentVideoId) return;
         const stateMap = { '-1': 'UNSTARTED', '0': 'ENDED', '1': 'PLAYING', '2': 'PAUSED', '3': 'BUFFERING', '5': 'CUED' };
         const stateString = stateMap[String(ytState)] || 'UNKNOWN';
+        iframeStateRef.current = ytState;
         if (wsSend) { wsSend({ action: 'youtube_state', payload: { state: stateString, position: iframePositionRef.current, duration: iframeDurationRef.current, video_id: currentVideoId } }); }
         if (ytState === 1 && ytHubMutedRef.current && !isSpoke) { sendToIframe('setVolume', { level: 0 }); }
         if (ytState === 1 && isSpoke) { sendToIframe('setVolume', { level: 0 }); }
@@ -2728,7 +2838,29 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
     spokeInitialSyncDoneRef.current = false;
     // A new track gets its own chance to fail; the dedupe is per video.
     notStartedReportedRef.current = null;
+    iframeStateRef.current = null;
   }, [playerState?.now_playing?.video_id]);
+
+  // A new play request for the video that is ALREADY loaded. The embed is
+  // keyed on the video id, so it is not reloaded and its autoplay never runs
+  // again: a paused video stayed paused while the backend said "playing"
+  // (1.0.5 build 7, session 4: "play Drake" picked the paused Drake video,
+  // nothing reached the iframe, position stuck at 21.7 s for 10+ minutes).
+  // The queue item id is new for every play request, so a new id with the
+  // same video means "start this video again": seek to the start and play.
+  // Left alone when the player is already playing it.
+  const prevHubItemRef = useRef({ id: null, videoId: null });
+  useEffect(() => {
+    const itemId = playerState?.now_playing?.id || null;
+    const videoId = playerState?.now_playing?.video_id || null;
+    const prev = prevHubItemRef.current;
+    prevHubItemRef.current = { id: itemId, videoId };
+    if (isSpoke || !itemId || !videoId) return;
+    if (!prev.id || prev.id === itemId || prev.videoId !== videoId) return;
+    if (iframeStateRef.current === 1) return;
+    sendToIframe('seekTo', { seconds: 0 });
+    sendToIframe('play');
+  }, [isSpoke, playerState?.now_playing?.id, playerState?.now_playing?.video_id, sendToIframe]);
 
   // The hub position as a ref, so interval callbacks (drift correction below)
   // read the CURRENT position instead of a stale render's closure.
@@ -3107,9 +3239,27 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
         handlePTTEnd();
       }
     };
+    // Ctrl+V on the stage: the type-anywhere box has no real text field, so
+    // the browser's paste had nowhere to go and was dropped (1.0.5 build-7
+    // laptop report). Pasted text joins what is being typed, on one line.
+    const handlePaste = (e) => {
+      if (settingsOpen || queueOpen || historyOpen || roomsOpen || helpOpen || bugReportOpen || workbenchPanelOpen || commandPaletteOpen) return;
+      const target = e.target;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return;
+      const pasted = stagePasteText(e.clipboardData);
+      if (!pasted) return;
+      e.preventDefault();
+      setIsTyping(true);
+      setTypingInput(prev => (prev + pasted).slice(0, STAGE_TYPING_MAX_CHARS));
+    };
     document.addEventListener('keydown', handleKeyDown);
     document.addEventListener('keyup', handleKeyUp);
-    return () => { document.removeEventListener('keydown', handleKeyDown); document.removeEventListener('keyup', handleKeyUp); };
+    document.addEventListener('paste', handlePaste);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('keyup', handleKeyUp);
+      document.removeEventListener('paste', handlePaste);
+    };
   }, [isTyping, typingInput, settingsOpen, queueOpen, historyOpen, roomsOpen, helpOpen, bugReportOpen, workbenchPanelOpen, commandPaletteOpen, pttHotkey, muteHotkey, toggleMicMuted, api, handlePTTStart, handlePTTEnd, handleCommandResult, interceptCloudConsent]);
 
   const formatTime = (date) => formatTimeDisplay(date, userSettings.time_display_format || 'auto');
@@ -3122,6 +3272,65 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
     browserUrl,
   });
   const isChatStageActive = stageContentMode === 'chat';
+
+  // Native browser view (desktop): it may only sit on the browser stage with
+  // nothing React draws above it (dialogs, Ctrl+K palette, the menu).
+  const browserBlockingUiOpen = siblingModalOpen || calendarModalOpen || commandPaletteOpen || menuOpen;
+  const browserNativeSurfaceActive = nativeBrowserSurfaceActive({
+    stageContentMode,
+    blockingUiOpen: browserBlockingUiOpen,
+  });
+
+  // Leaving the browser stage by any route (another pill, Close/Done, Esc,
+  // Ctrl+K "Open Music") closes the view, or parks it while the agent works.
+  const previousStageContentModeRef = useRef(stageContentMode);
+  useEffect(() => {
+    const previous = previousStageContentModeRef.current;
+    previousStageContentModeRef.current = stageContentMode;
+    if (previous !== 'browser' || stageContentMode === 'browser') return;
+    const action = browserLeaveAction({
+      overlayVisible: browserOverlayVisible,
+      overlayMode: browserOverlayMode,
+      agentBusy: agentTaskActive,
+    });
+    if (action !== 'close') return;
+    setBrowserOverlayVisible(false);
+    setBrowserOverlayMode('');
+    setLoginProvider('');
+    requestNativeBrowserClose();
+  }, [agentTaskActive, browserOverlayMode, browserOverlayVisible, stageContentMode]);
+
+  // Esc on the browser stage closes it (dialogs and the palette take Esc
+  // first). Keys typed inside the native view are handled by the desktop
+  // shell, which closes the view the same way.
+  useEffect(() => {
+    const handleBrowserEscape = (event) => {
+      if (!escapeClosesBrowser({
+        key: event.key,
+        overlayVisible: browserOverlayVisible,
+        stageContentMode,
+        blockingUiOpen: browserBlockingUiOpen,
+      })) return;
+      event.preventDefault();
+      event.stopPropagation();
+      handleBrowserExit();
+    };
+    window.addEventListener('keydown', handleBrowserEscape, true);
+    return () => window.removeEventListener('keydown', handleBrowserEscape, true);
+  }, [browserBlockingUiOpen, browserOverlayVisible, handleBrowserExit, stageContentMode]);
+
+  // Ctrl+K / Esc pressed inside the native view (the desktop shell forwards
+  // them: keys typed there never reach this page).
+  useEffect(() => {
+    const openPalette = () => setCommandPaletteOpen(true);
+    const exitBrowser = () => handleBrowserExit();
+    window.addEventListener('viola:open-command-palette', openPalette);
+    window.addEventListener('viola:browser-exit', exitBrowser);
+    return () => {
+      window.removeEventListener('viola:open-command-palette', openPalette);
+      window.removeEventListener('viola:browser-exit', exitBrowser);
+    };
+  }, [handleBrowserExit, setCommandPaletteOpen]);
 
   // Voice "full screen" (desktop app): the video on the Music stage fills the
   // screen; leaving puts the stage that was showing back exactly as it was.
@@ -3390,7 +3599,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
       nowPlaying={nowPlaying}
       isPlaying={isPlaying}
       isSpoke={isSpoke}
-      browserOverlayVisible={browserOverlayVisible}
+      browserOverlayVisible={browserOverlayVisible && browserOverlayMode === 'music'}
       displayProgress={displayProgress}
       displayPosition={displayPosition}
       displayDuration={displayDuration}
@@ -3532,6 +3741,8 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
       onPTTEnd={handlePTTEnd}
       commandRegistry={stageCommandRegistry}
       commandScopeActive={stageContentMode === 'browser'}
+      nativeSurfaceActive={browserNativeSurfaceActive}
+      loginProvider={browserOverlayVisible && browserOverlayMode === 'login' ? (loginProvider || 'music') : ''}
     />
   );
   const stageModeRenderers = {
@@ -3881,12 +4092,19 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
       {settingsOpen && (
         <ChunkLoadErrorBoundary name="Settings">
           <Suspense fallback={<ModalLoadingSpinner />}>
-            <SettingsModal
-              isOpen={settingsOpen}
-              onClose={handleSettingsClose}
-              initialTab={settingsInitialTab}
-              initialSection={settingsInitialSection}
-            />
+            {/* Stepped aside (not closed) while its sign-in page is up. */}
+            <div
+              style={settingsSuspendedForLogin ? { display: 'none' } : undefined}
+              data-testid="settings-modal-host"
+              data-suspended={settingsSuspendedForLogin ? 'true' : undefined}
+            >
+              <SettingsModal
+                isOpen={settingsOpen}
+                onClose={handleSettingsClose}
+                initialTab={settingsInitialTab}
+                initialSection={settingsInitialSection}
+              />
+            </div>
           </Suspense>
         </ChunkLoadErrorBoundary>
       )}
@@ -3900,7 +4118,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
       {historyOpen && (
         <ChunkLoadErrorBoundary name="History">
           <Suspense fallback={<ModalLoadingSpinner />}>
-            <HistoryModal principalKey={accountUser?.id || 'device'} isOpen={historyOpen} onClose={() => setHistoryOpen(false)} history={chatHistory} onClearHistory={() => setChatHistory([])} timeFormat={userSettings.time_display_format || 'auto'} />
+            <HistoryModal principalKey={accountUser?.id || 'device'} isOpen={historyOpen} onClose={() => setHistoryOpen(false)} history={chatHistory} onClearHistory={clearRecentActivity} timeFormat={userSettings.time_display_format || 'auto'} />
           </Suspense>
         </ChunkLoadErrorBoundary>
       )}
@@ -4015,7 +4233,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
         isOpen={!!phoneTosPayload}
         payload={phoneTosPayload}
         onClose={() => setPhoneTosPayload(null)}
-        onAccepted={() => addToast({ message: 'Phone terms accepted.', level: 'success' })}
+        onAccepted={() => handlePhoneTermsAccepted(phoneTosPayload)}
       />
       <CloudLlmConsentModal
         isOpen={cloudLlmConsentOpen}

@@ -27,6 +27,8 @@ from intent.tools.deferred_tool_schemas import (
 
 from .approval_bridge import (
     ApprovalBridge,
+    computer_use_call_scope,
+    computer_use_self_target_refusal,
     recompute_auto_approve,
     set_tool_annotations,
     validate_risk_map,
@@ -1433,6 +1435,8 @@ class MCPClientHub:
             "web_search",
             "web_read",
             "weather",
+            # --- Dice, coin flips, random numbers and picks (read-only) ---
+            "random_pick",
             # --- Music & playback (UI: Music & playback) ---
             "media",
             "playback",
@@ -2030,6 +2034,14 @@ class MCPClientHub:
         if codex_refusal is not None:
             return codex_refusal
 
+        # Typing or clicking into Viola's own window is refused before any
+        # prompt: asking the user to confirm an action the tool then refuses
+        # was a prompt for nothing (1.0.5 laptop A6.3).
+        self_target_refusal = computer_use_self_target_refusal(name, args)
+        if self_target_refusal is not None:
+            self.last_approval_path = "computer_self_target_refused"
+            return self_target_refusal
+
         # Check approval. ``approval_already_granted`` is reserved for narrow
         # code-owned continuations after the hosted confirmation page or the
         # irreversible-action runtime gate has already collected explicit user
@@ -2053,7 +2065,10 @@ class MCPClientHub:
             try:
                 from intent.approval import ConfirmationDeferred
 
-                approved = await self._bridge.check_approval(name, args, channel=channel)
+                # A desktop-control "yes" is recorded under this call's own
+                # identity, the one the computer tool checks it under.
+                with computer_use_call_scope(user_context):
+                    approved = await self._bridge.check_approval(name, args, channel=channel)
             except ConfirmationDeferred as deferred:
                 self.last_approval_path = "confirmation_required"
                 return _confirmation_required_result(deferred)

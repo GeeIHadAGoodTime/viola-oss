@@ -116,6 +116,26 @@
   transition: background 0.16s ease, color 0.16s ease, border-color 0.16s ease;
 }
 
+.labelledButton {
+  width: auto;
+  gap: 6px;
+  padding: 0 10px;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .labelledButton {
+    width: 32px;
+    padding: 0;
+  }
+
+  .labelledButton span {
+    display: none;
+  }
+}
+
 .controlButton:hover,
 .controlButton[aria-pressed='true'] {
   color: #ffffff;

@@ -21,6 +21,7 @@ import uuid
 from collections import OrderedDict
 from collections.abc import Callable, Generator, Iterable, Sequence
 from dataclasses import replace
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, TypedDict
 
@@ -1185,6 +1186,134 @@ class ConversationPersistence:
                 )
             )
         return result
+
+    def load_recent_exchanges(
+        self,
+        user_id: str,
+        limit: int = 50,
+        *,
+        exclude_session_ids: Iterable[str] = (),
+    ) -> list[dict[str, object]]:
+        """Return the user's latest spoken/typed turns and Viola's replies.
+
+        This is what the Chat History "Recent voice and command activity" list
+        shows, and it has to survive a restart (1.0.5 build-7 laptop report:
+        after a restart only the turns since then were listed). Only plain
+        user input and assistant text from this user's own rows are returned,
+        across sessions, oldest first; tool calls, tool results, reminders,
+        compaction summaries and internal protocol fragments never are.
+        ``exclude_session_ids`` drops sessions shown elsewhere (Chat mode
+        threads are listed under "Saved chats").
+        """
+        uid = str(user_id or "").strip()
+        if not uid:
+            return []
+        capped = max(1, min(int(limit or 50), 200))
+        excluded = {str(item) for item in exclude_session_ids if item}
+        # Read a few more rows than asked for: rows dropped below (tool
+        # fragments, excluded threads) must not shorten the list.
+        scan_limit = capped * 4 + len(excluded) * 20
+        with self._lock:
+            rows = self._conn.execute(
+                """
+                SELECT
+                    role,
+                    content,
+                    timestamp,
+                    metadata_json,
+                    frame_kind,
+                    origin,
+                    is_meta,
+                    is_compact_summary,
+                    task_id,
+                    tool_use_id,
+                    schema_version,
+                    frame_uuid,
+                    parent_uuid,
+                    logical_parent_uuid,
+                    source_tool_assistant_uuid,
+                    permission_mode,
+                    session_id
+                FROM conversation_log
+                WHERE user_id = ?
+                  AND role IN ('user', 'assistant')
+                  AND COALESCE(is_meta, 0) = 0
+                  AND COALESCE(is_compact_summary, 0) = 0
+                ORDER BY timestamp DESC, id DESC
+                LIMIT ?
+                """,
+                (uid, scan_limit),
+            ).fetchall()
+        if not rows:
+            return []
+        try:
+            enc = _get_conversation_encryption(self._db_path)
+        except ConversationEncryptionUnavailableError:
+            logger.warning("Conversation history encryption unavailable; recent activity not loaded")
+            return []
+        exchanges: list[dict[str, object]] = []
+        for row in rows:
+            if row["session_id"] in excluded:
+                continue
+            raw_content = row["content"]
+            if enc is not None:
+                try:
+                    raw_content = enc.decrypt(raw_content)
+                except Exception:  # noqa: BLE001, RUF100 - legacy plaintext row, same as load_recent_turns
+                    pass
+            metadata: dict[str, object] = {}
+            if row["metadata_json"]:
+                try:
+                    parsed = json.loads(row["metadata_json"])
+                    if isinstance(parsed, dict):
+                        metadata = parsed
+                except (json.JSONDecodeError, TypeError):
+                    pass
+            try:
+                frame = _hydrate_frame_from_storage(
+                    role=row["role"],
+                    content=str(raw_content or ""),
+                    timestamp=row["timestamp"],
+                    metadata=metadata,
+                    frame_kind=row["frame_kind"],
+                    origin=row["origin"],
+                    is_meta=row["is_meta"],
+                    is_compact_summary=row["is_compact_summary"],
+                    task_id=row["task_id"],
+                    tool_use_id=row["tool_use_id"],
+                    schema_version=row["schema_version"],
+                    frame_uuid=row["frame_uuid"],
+                    parent_uuid=row["parent_uuid"],
+                    logical_parent_uuid=row["logical_parent_uuid"],
+                    source_tool_assistant_uuid=row["source_tool_assistant_uuid"],
+                    permission_mode=row["permission_mode"],
+                    session_id=row["session_id"],
+                )
+            except Exception:  # noqa: BLE001, RUF100 - one unreadable row must not hide the rest
+                logger.debug("Skipping an unreadable conversation row in recent activity", exc_info=True)
+                continue
+            if frame.is_meta or frame.is_compact_summary:
+                continue
+            if frame.kind not in (FrameKind.USER_INPUT, FrameKind.ASSISTANT_TEXT):
+                continue
+            if not all(isinstance(block, TextBlock) for block in frame.blocks):
+                continue
+            role = "user" if frame.role == FrameRole.USER else "assistant" if frame.role == FrameRole.ASSISTANT else ""
+            text = _frame_text(frame).strip()
+            if not role or not text or _is_internal_history_artifact(role, text):
+                continue
+            stamp = float(row["timestamp"] or 0.0)
+            exchanges.append(
+                {
+                    "role": role,
+                    "content": text,
+                    "timestamp": datetime.fromtimestamp(stamp, tz=UTC).isoformat().replace("+00:00", "Z"),
+                }
+            )
+            if len(exchanges) >= capped:
+                break
+        exchanges.reverse()
+        return exchanges
 
     def load_session_frames(
         self,

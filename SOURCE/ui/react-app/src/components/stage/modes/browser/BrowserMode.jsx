@@ -3,6 +3,7 @@ import PropTypes from 'prop-types';
 import { THEME } from '../../../../config';
 import styles from './BrowserMode.module.css';
 import { usePressAndHold } from '../../../../hooks/usePressAndHold';
+import { sendBrowserSurfaceActive } from '../../../../utils/nativeBrowserView';
 
 const DEFAULT_AGENT_TASK = {
   description: '',
@@ -36,6 +37,21 @@ function streamWaitingMessage(streamStatus, streamError) {
   return 'Waiting for browser view';
 }
 
+const PROVIDER_NAMES = {
+  spotify: 'Spotify',
+  youtube_music: 'YouTube Music',
+  apple_music: 'Apple Music',
+  amazon_music: 'Amazon Music',
+  soundcloud: 'SoundCloud',
+  tidal: 'TIDAL',
+  deezer: 'Deezer',
+};
+
+function providerDisplayName(provider) {
+  if (!provider) return 'your music service';
+  return PROVIDER_NAMES[provider] || provider;
+}
+
 function hostFromUrl(url) {
   if (!url) return 'about:blank';
   try {
@@ -46,10 +62,25 @@ function hostFromUrl(url) {
   }
 }
 
+// The native view paints above everything, so it must never extend past the
+// stage: on a short window the browser panel (min-height) can overflow the
+// stage and the view then covered the reply text below it.
+function clipToStage(element, rect) {
+  const stage = typeof element.closest === 'function' ? element.closest('[data-testid="viola-stage"]') : null;
+  if (!stage) return rect;
+  const bounds = stage.getBoundingClientRect();
+  if (!bounds || bounds.width <= 0 || bounds.height <= 0) return rect;
+  const left = Math.max(rect.x, bounds.x);
+  const top = Math.max(rect.y, bounds.y);
+  const right = Math.min(rect.x + rect.width, bounds.x + bounds.width);
+  const bottom = Math.min(rect.y + rect.height, bounds.y + bounds.height);
+  return { x: left, y: top, width: right - left, height: bottom - top };
+}
+
 function sendBrowserBoundsFor(element) {
   if (!element) return;
   if (!window.viola || typeof window.viola.setBrowserOverlayBounds !== 'function') return;
-  const rect = element.getBoundingClientRect();
+  const rect = clipToStage(element, element.getBoundingClientRect());
   if (rect.width <= 0 || rect.height <= 0) return;
   window.viola.setBrowserOverlayBounds(
     Math.round(rect.x),
@@ -79,6 +110,8 @@ export default function BrowserMode({
   onPTTEnd = null,
   commandRegistry = null,
   commandScopeActive = false,
+  nativeSurfaceActive = false,
+  loginProvider = '',
 }) {
   const surfaceRef = useRef(null);
   // Push-to-talk hold: pointer capture + cancel handling (see usePressAndHold).
@@ -100,15 +133,18 @@ export default function BrowserMode({
   const phase = agentTask?.phase || '';
   const status = agentTask?.status || '';
   const description = agentTask?.description || '';
+  const loginMode = Boolean(loginProvider);
+  const loginName = providerDisplayName(loginProvider);
 
   const statusLabel = useMemo(() => {
+    if (loginMode) return `Sign in to ${loginName}`;
     if (takeoverActive) return 'Your turn';
     if (status === 'payment_review') return 'Review needed';
     if (phase === 'thinking') return 'Viola is thinking';
     if (agentBusy) return 'Viola is browsing';
     if (recentlyActive) return 'Recent browser';
     return 'Browser';
-  }, [agentBusy, phase, recentlyActive, status, takeoverActive]);
+  }, [agentBusy, loginMode, loginName, phase, recentlyActive, status, takeoverActive]);
 
   useEffect(() => {
     wsSendRef.current = wsSend;
@@ -160,6 +196,20 @@ export default function BrowserMode({
     };
   }, []);
 
+  // The desktop's native view may only sit on this surface while it is the
+  // visible stage with nothing drawn above it; otherwise the shell parks it.
+  // Bounds go first so the view lands on this surface, not a stale rect.
+  useEffect(() => {
+    if (streamMode) return undefined;
+    const publish = () => {
+      if (nativeSurfaceActive) sendBrowserBoundsFor(surfaceRef.current);
+      sendBrowserSurfaceActive(nativeSurfaceActive);
+    };
+    publish();
+    window.addEventListener('viola-bridge-ready', publish);
+    return () => window.removeEventListener('viola-bridge-ready', publish);
+  }, [nativeSurfaceActive, streamMode]);
+
   const sendTakeover = useCallback(() => {
     if (takeoverActive) {
       releaseTakeover();
@@ -175,6 +225,16 @@ export default function BrowserMode({
   const registerCommands = commandRegistry?.registerCommands;
   const activeBrowserCommands = useMemo(() => {
     const commands = [];
+    if (onExit) {
+      commands.push({
+        id: 'browser.close',
+        label: loginMode ? 'Close sign-in' : 'Close browser',
+        group: 'Browser',
+        keywords: ['exit', 'hide', 'dismiss', 'done', 'browser'],
+        perform: onExit,
+      });
+    }
+    if (loginMode) return commands;
     if (takeoverActive) {
       commands.push({
         id: 'browser.hand-back',
@@ -204,6 +264,8 @@ export default function BrowserMode({
     return commands;
   }, [
     agentBusy,
+    loginMode,
+    onExit,
     releaseTakeover,
     requestTakeover,
     sendCancel,
@@ -279,7 +341,7 @@ export default function BrowserMode({
               <path d="M7 11V8a5 5 0 0 1 10 0v3" />
             </svg>
           </span>
-          <span className={styles.urlText}>{host}</span>
+          <span className={styles.urlText}>{loginMode ? loginName : host}</span>
         </div>
 
         <div className={styles.activityPill} data-active={agentBusy || takeoverActive || recentlyActive}>
@@ -288,9 +350,10 @@ export default function BrowserMode({
         </div>
 
         <div className={styles.controls}>
+          {!loginMode && (
           <button
             type="button"
-            className={styles.controlButton}
+            className={`${styles.controlButton} ${styles.labelledButton}`}
             onClick={sendTakeover}
             aria-pressed={takeoverActive}
             aria-label={takeoverActive ? 'Hand browser back to Viola' : 'Take over browser'}
@@ -307,20 +370,22 @@ export default function BrowserMode({
                 <path d="M12 11V5a3 3 0 0 0-6 0v9a6 6 0 0 0 12 0v-3" />
               </svg>
             )}
+            <span>{takeoverActive ? 'Hand back' : 'Take over'}</span>
           </button>
+          )}
 
-          {agentBusy && (
+          {agentBusy && !loginMode && (
             <button
               type="button"
-              className={styles.controlButton}
+              className={`${styles.controlButton} ${styles.labelledButton}`}
               onClick={sendCancel}
               aria-label="Stop agent task"
               title="Stop"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-                <path d="M18 6 6 18" />
-                <path d="m6 6 12 12" />
+                <rect x="6" y="6" width="12" height="12" rx="2" />
               </svg>
+              <span>Stop</span>
             </button>
           )}
 
@@ -345,15 +410,17 @@ export default function BrowserMode({
           {onExit && (
             <button
               type="button"
-              className={styles.controlButton}
+              className={`${styles.controlButton} ${styles.labelledButton}`}
               onClick={onExit}
-              aria-label="Exit browser mode"
-              title="Close"
+              aria-label={loginMode ? `Done signing in to ${loginName}` : 'Exit browser mode'}
+              title={loginMode ? 'Done' : 'Close'}
+              data-testid="browser-close"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
                 <path d="M18 6 6 18" />
                 <path d="m6 6 12 12" />
               </svg>
+              <span>{loginMode ? 'Done' : 'Close'}</span>
             </button>
           )}
         </div>
@@ -425,4 +492,6 @@ BrowserMode.propTypes = {
     registerCommands: PropTypes.func.isRequired,
   }),
   commandScopeActive: PropTypes.bool,
+  nativeSurfaceActive: PropTypes.bool,
+  loginProvider: PropTypes.string,
 };

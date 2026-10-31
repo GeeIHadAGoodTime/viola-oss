@@ -227,12 +227,51 @@ STREAM_OPERATING_POINTS: tuple[tuple[float, int, int, float], ...] = (
 # check removes most speech false wakes either way; this rule lets far fewer
 # through to it over music from another device (92 vs 141 in 42.6 h of MUSAN
 # music), confirms about 65 ms sooner, and with the check keeps at least 90% of
-# real wakes in every recorded set (build-5 wake-opt measurement note). Every
-# other level, and quiet hours, are unchanged.
+# real wakes in every recorded set (build-5 wake-opt measurement note).
+#
+# A stricter level must stay stricter than that Balanced rule. "Slightly
+# stricter" used to keep its unchecked 7 of 7 at 0.83, which the log showed as
+# the frame threshold going DOWN from 0.85 (1.0.5 build-7 laptop report, A10.6),
+# and which is not a subset of Balanced: seven frames at 0.84 woke it but not
+# Balanced. With the check on, a stricter level now never uses a frame
+# threshold below Balanced's 0.85 (so 7 of 7 at 0.85 there: every wake it
+# allows, Balanced allows too). Wake-opt data (49.9 h speech, 42.6 h music):
+# 7/7@0.85 gives 12 speech / 54 music candidates, 6/7@0.85 gives 22 / 92 and
+# the old 7/7@0.83 gave 15 / 83. More sensitive levels and quiet hours are
+# unchanged.
+_CHECKED_BALANCED_RULE = (6, 7, 0.85)
+
+
+def _checked_row(level: float, k: int, n: int, frame: float) -> tuple[float, int, int, float]:
+    bk, _bn, bframe = _CHECKED_BALANCED_RULE
+    if level == DEFAULT_THRESHOLD:
+        return (level, *_CHECKED_BALANCED_RULE)
+    if level > DEFAULT_THRESHOLD:
+        return (level, max(k, bk), n, max(frame, bframe))
+    return (level, k, n, frame)
+
+
 STREAM_OPERATING_POINTS_CHECKED: tuple[tuple[float, int, int, float], ...] = tuple(
-    (level, 6, 7, 0.85) if level == DEFAULT_THRESHOLD else (level, k, n, frame)
-    for level, k, n, frame in STREAM_OPERATING_POINTS
+    _checked_row(level, k, n, frame) for level, k, n, frame in STREAM_OPERATING_POINTS
 )
+
+# Music path (1.0.5 build-7 laptop report, A0.6 and "wake vs music"): with
+# vocal music playing at volume 80 the real "Viola" topped out at 0.815-0.896
+# per frame, so 6 of 7 frames at 0.85 never agreed (instrumental music or
+# silence: 0.95-0.995). While Viola's own music plays and the Stage 2 check is
+# on, the engine also wakes on this looser rule, but such a wake passes Stage 2
+# only when Whisper confidently hears a Viola-like word (``require_token``;
+# doubt rejects). A candidate the normal rule also confirms within its own
+# window takes the normal path. Measured on the wake-opt data: 321 music
+# candidates in 42.6 h, 0 passed (6 decoded a bare "Viola," echo of the prompt,
+# all with no_speech >= 0.6 and logprob <= -1.0, which the check does not
+# trust); 103 room-speech candidates in 49.9 h, 2 passed ("Rubiola", "Fula").
+# On real recordings over music it detects 95-99% and Whisper hears the token
+# in about 62% of them, so a masked "Viola" now wakes about 6 times in 10
+# instead of never. 4 of 5 at 0.74 was also measured and let 8 music
+# candidates through, so it was not chosen. Only at Balanced or more sensitive
+# levels and outside quiet hours (stricter choices keep their own rule).
+MUSIC_WAKE_RULE: tuple[int, int, float] = (5, 6, 0.78)
 
 
 def stream_operating_point(level: float, *, checked: bool = False) -> tuple[int, int, float]:

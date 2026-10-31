@@ -164,7 +164,7 @@ vi.mock('../hooks/useViolaApi', () => ({
     getQueue: apiHarness.getQueue,
     playQueueItem: apiHarness.playQueueItem,
     clearQueue: vi.fn(),
-    sendCommand: vi.fn(() => Promise.resolve({ message: 'ok' })),
+    sendCommand: apiHarness.sendCommand || (apiHarness.sendCommand = vi.fn(() => Promise.resolve({ message: 'ok' }))),
     sendCommandStreaming: apiHarness.sendCommandStreaming,
     getWeather: apiHarness.getWeather,
     submitBugReport: apiHarness.submitBugReport || (apiHarness.submitBugReport = vi.fn(() => Promise.resolve({ bug_ticket_id: 42 }))),
@@ -361,6 +361,7 @@ vi.mock('../components/CalendarView', () => ({
 // Dynamically import SmartDisplay AFTER mocks are set up
 let SmartDisplay;
 let agentContextPillCooldownMs;
+let PHONE_TERMS_RESUME_COMMAND;
 
 beforeEach(async () => {
   apiHarness.savedThreads = [];
@@ -406,6 +407,7 @@ beforeEach(async () => {
   const mod = await import('../SmartDisplay');
   SmartDisplay = mod.default;
   agentContextPillCooldownMs = mod.AGENT_CONTEXT_PILL_COOLDOWN_MS;
+  PHONE_TERMS_RESUME_COMMAND = mod.PHONE_TERMS_RESUME_COMMAND;
 });
 
 describe('Help keyboard isolation', () => {
@@ -641,6 +643,66 @@ describe('SmartDisplay', () => {
 
     expect(await screen.findByText('Sign in required')).toBeInTheDocument();
     expect(screen.getByText('Sign in to continue')).toBeInTheDocument();
+  });
+
+  describe('Phone Calling Terms window', () => {
+    afterEach(async () => {
+      delete window.viola;
+      const { authFetch } = await import('../hooks/useViolaApi');
+      authFetch.mockImplementation(() => Promise.resolve({ ok: true, json: () => Promise.resolve({}) }));
+    });
+
+    it('picks a stopped call back up after the Phone Calling Terms are accepted (1.0.5 A6.6a)', async () => {
+      const { authFetch } = await import('../hooks/useViolaApi');
+      authFetch.mockImplementation((url) => Promise.resolve(url === '/v1/phone/accept-tos'
+        ? { ok: true, status: 200, json: () => Promise.resolve({ ok: true, error: null, data: { accepted: true } }) }
+        : { ok: true, json: () => Promise.resolve({}) }));
+      apiHarness.sendCommand = null;
+      // The desktop app (the Qt bridge is present), where the cloud first-run
+      // consent gate never intercepts a turn.
+      window.viola = {};
+      const { user } = render(<SmartDisplay />);
+
+      act(() => {
+        window.dispatchEvent(new CustomEvent('viola:phone-tos-required', {
+          detail: {
+            error_code: 'phone_tos_required',
+            message: "Nothing was dialed: phone calls aren't set up on this account yet.",
+            missing_consents: ['voice_recording', 'data_retention'],
+            resume_after_accept: true,
+          },
+        }));
+      });
+
+      expect(await screen.findByText('Phone Calling Terms')).toBeInTheDocument();
+      expect(screen.getByText(/Record the call audio \(not on yet\)/)).toBeInTheDocument();
+      expect(screen.getByText(/Use Viola's cloud AI to talk on the call$/)).toBeInTheDocument();
+
+      await user.click(screen.getByRole('button', { name: /i agree/i }));
+
+      await waitFor(() => expect(apiHarness.sendCommand).toHaveBeenCalledWith(PHONE_TERMS_RESUME_COMMAND));
+    });
+
+    it('does not start a call when the Phone Calling Terms are accepted from the Phone tab', async () => {
+      const { authFetch } = await import('../hooks/useViolaApi');
+      authFetch.mockImplementation((url) => Promise.resolve(url === '/v1/phone/accept-tos'
+        ? { ok: true, status: 200, json: () => Promise.resolve({ ok: true, error: null, data: { accepted: true } }) }
+        : { ok: true, json: () => Promise.resolve({}) }));
+      apiHarness.sendCommand = null;
+      window.viola = {};
+      const { user } = render(<SmartDisplay />);
+
+      act(() => {
+        window.dispatchEvent(new CustomEvent('viola:phone-tos-required', {
+          detail: { error_code: 'phone_tos_required', missing_consents: ['cloud_llm'] },
+        }));
+      });
+
+      await user.click(await screen.findByRole('button', { name: /i agree/i }));
+
+      await waitFor(() => expect(screen.queryByText('Phone Calling Terms')).not.toBeInTheDocument());
+      expect(apiHarness.sendCommand).not.toHaveBeenCalledWith(PHONE_TERMS_RESUME_COMMAND);
+    });
   });
 
   it('should show idle state when nothing is playing', async () => {
@@ -1550,6 +1612,80 @@ describe('YouTube iframe playback honesty (#2757)', () => {
     });
     await waitFor(() => expect(youtubeStateMessages()).toHaveLength(2));
     expect(youtubeStateMessages().at(-1).payload.video_id).toBe('vid-b');
+  });
+});
+
+describe('Re-playing the video that is already loaded (1.0.5 build 7)', () => {
+  // Session 4: "play Drake" picked the Drake video that was loaded and paused
+  // at 21.7 s. The backend made a new queue item for the same video; the embed
+  // is keyed on the video id, so it was not reloaded, nothing was sent to it,
+  // and it stayed paused while Viola said "playing".
+  const iframeMessage = (type, payload) =>
+    new MessageEvent('message', { data: { type, payload }, origin: window.location.origin });
+  const track = (id, videoId = 'drake-quebec') => ({
+    is_playing: true,
+    now_playing: { id, title: 'DRAKE - QUEBEC', artist: 'Drake', provider: 'youtube_iframe', video_id: videoId },
+    queue: [],
+  });
+  const commands = (send) => send.mock.calls.map(([message]) => message.command).filter(Boolean);
+
+  const mountPaused = async () => {
+    playerHarness.state = track('item-1');
+    const view = render(<SmartDisplay />);
+    await waitFor(() => expect(wsHarness.handler).toBeTypeOf('function'));
+    act(() => {
+      window.dispatchEvent(iframeMessage('yt_iframe_state', { state: 2, videoId: 'drake-quebec' }));
+    });
+    return view;
+  };
+
+  it('seeks to the start and plays when a new play request names the paused video', async () => {
+    const view = await mountPaused();
+    const iframe = view.container.querySelector('iframe');
+    const send = vi.spyOn(iframe.contentWindow, 'postMessage');
+    try {
+      playerHarness.state = track('item-2');
+      await act(async () => { view.rerender(<SmartDisplay />); });
+      const sent = commands(send);
+      expect(sent).toContain('seekTo');
+      expect(sent).toContain('play');
+      expect(sent.indexOf('seekTo')).toBeLessThan(sent.lastIndexOf('play'));
+      const seek = send.mock.calls.map(([m]) => m).find((m) => m.command === 'seekTo');
+      expect(seek.seconds).toBe(0);
+    } finally {
+      send.mockRestore();
+    }
+  });
+
+  it('leaves a video that is already playing alone', async () => {
+    const view = await mountPaused();
+    act(() => {
+      window.dispatchEvent(iframeMessage('yt_iframe_state', { state: 1, videoId: 'drake-quebec' }));
+    });
+    const iframe = view.container.querySelector('iframe');
+    const send = vi.spyOn(iframe.contentWindow, 'postMessage');
+    try {
+      playerHarness.state = track('item-2');
+      await act(async () => { view.rerender(<SmartDisplay />); });
+      expect(commands(send)).not.toContain('seekTo');
+    } finally {
+      send.mockRestore();
+    }
+  });
+
+  it('sends nothing for an ordinary state refresh of the same queue item', async () => {
+    const view = await mountPaused();
+    const iframe = view.container.querySelector('iframe');
+    const send = vi.spyOn(iframe.contentWindow, 'postMessage');
+    try {
+      playerHarness.state = { ...track('item-1'), position: 21.7 };
+      await act(async () => { view.rerender(<SmartDisplay />); });
+      const sent = commands(send);
+      expect(sent).not.toContain('seekTo');
+      expect(sent).not.toContain('play');
+    } finally {
+      send.mockRestore();
+    }
   });
 });
 

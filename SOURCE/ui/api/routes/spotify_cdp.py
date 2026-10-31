@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import shutil
+import time
 from pathlib import Path
 from typing import Any
 
@@ -27,6 +28,11 @@ logger = get_logger(__name__)
 router = APIRouter(prefix="/v1/spotify/cdp", tags=["spotify-cdp"])
 status_router = APIRouter(prefix="/v1/spotify", tags=["spotify"])
 _cdp_disconnect_in_progress = False
+
+# When nothing else says Spotify is signed in, read the in-app browser's
+# sign-in cookie at most this often (it costs about a second). This is what
+# finds an earlier sign-in after Viola restarts.
+_BROWSER_AUTH_RECHECK_SECONDS = 30.0
 
 
 def _get_controller(user_id: str) -> Any:
@@ -129,6 +135,35 @@ def _get_browser_auth_snapshot(user_id: str) -> dict[str, Any]:
         }
 
 
+async def _refresh_browser_auth_sign_in(user_id: str) -> None:
+    """Re-read the in-app browser's Spotify sign-in, unless that just happened."""
+    try:
+        from music.providers.browser.auth_manager import get_browser_auth_manager
+
+        manager = get_browser_auth_manager(user_id)
+        if manager.is_login_watch_active("spotify"):
+            return  # the sign-in watch is already checking every few seconds
+        status = manager.get_provider_status("spotify")
+        last_checked = status.last_checked or 0.0
+        if time.time() - last_checked < _BROWSER_AUTH_RECHECK_SECONDS:
+            return
+        await manager.check_login_state("spotify")
+    except Exception:
+        logger.exception("Spotify BrowserAuth sign-in refresh failed")
+
+
+def _cancel_browser_auth_login_watch(user_id: str) -> None:
+    from music.providers.browser.auth_manager import get_browser_auth_manager
+
+    get_browser_auth_manager(user_id).cancel_login_watch("spotify")
+
+
+def _forget_browser_auth_sign_in(user_id: str) -> None:
+    from music.providers.browser.auth_manager import get_browser_auth_manager
+
+    get_browser_auth_manager(user_id).forget_spotify_sign_in()
+
+
 async def _build_cdp_status_payload(user_id: str) -> tuple[dict[str, Any], dict[str, Any]]:
     """Build the CDP status payload plus optional controller detail fields."""
     try:
@@ -224,6 +259,10 @@ async def get_spotify_status(user_id: str = Depends(get_current_user_id)) -> Any
 
     browser_auth = _get_browser_auth_snapshot(user_id)
     cookie_bridge_cached = _get_cached_cookie_bridge_status(user_id)
+    if not (cdp_status.get("logged_in") or browser_auth.get("logged_in") or cookie_bridge_cached):
+        await _refresh_browser_auth_sign_in(user_id)
+        browser_auth = _get_browser_auth_snapshot(user_id)
+        cookie_bridge_cached = _get_cached_cookie_bridge_status(user_id)
     browser_logged_in = bool(browser_auth.get("logged_in"))
     cdp_logged_in = bool(cdp_status.get("logged_in"))
     logged_in = cdp_logged_in or browser_logged_in or cookie_bridge_cached
@@ -289,6 +328,13 @@ async def disconnect_spotify_cdp(user_id: str = Depends(get_current_user_id)) ->
     _mark_cdp_session_cookies_stale()
     try:
         await asyncio.to_thread(controller.disconnect)
+        # Sign Viola's in-app browser out too, or the next status check finds
+        # its Spotify cookie and reports Spotify connected again.
+        try:
+            _cancel_browser_auth_login_watch(user_id)
+            await asyncio.to_thread(_forget_browser_auth_sign_in, user_id)
+        except Exception:
+            logger.exception("Spotify disconnect: in-app browser sign-out failed")
         if profile_path.exists():
             await asyncio.to_thread(shutil.rmtree, profile_path, True)
         return success_response({"message": "Spotify disconnected"})

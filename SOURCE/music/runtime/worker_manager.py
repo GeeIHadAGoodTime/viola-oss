@@ -175,10 +175,25 @@ _IDLE_DEBUG_KEEPALIVE_TICKS = 100
 # Embedded (React iframe) safety watchdog. Budgets are PLAYING time: the
 # watchdog ticks, adds only the time the track was not paused, and never
 # force-skips a paused track.
+#
+# "Playing" means the player position moved forward since the last tick. The
+# phase alone is not evidence: 1.0.5 build 7 (session 4) had the phase at
+# PLAYING for 10+ minutes while the iframe sat paused at 21.7 s, and the
+# watchdog skipped to the next song out loud, unasked.
 EMBEDDED_WATCHDOG_GRACE_S = 60.0
 EMBEDDED_WATCHDOG_UNKNOWN_DURATION_S = 600.0
 EMBEDDED_WATCHDOG_TICK_S = 5.0
 EMBEDDED_WATCHDOG_MIN_TICK_S = 0.05
+# The one stuck state the watchdog still recovers: the position reached the
+# reported end of the track and stays there without a YT_TRACK_ENDED.
+EMBEDDED_WATCHDOG_END_TOLERANCE_MS = 3000
+EMBEDDED_WATCHDOG_END_STALL_S = 30.0
+
+# Labels for the PLAY_SKIP_CALLED queue event. A watchdog advance is not a
+# user skip (the build-7 log said reason=user_skip for one).
+SKIP_REASON_USER = "user_skip"
+SKIP_REASON_WATCHDOG_BUDGET = "watchdog_no_track_end"
+SKIP_REASON_WATCHDOG_END_STALL = "watchdog_stalled_at_end"
 
 
 @dataclass
@@ -188,6 +203,8 @@ class _EmbeddedWatchdogState:
     budget_s: float
     played_s: float
     last_tick: float
+    last_position_ms: int | None = None
+    end_stall_s: float = 0.0
 
 
 @dataclass
@@ -578,6 +595,14 @@ class RuntimeWorkerManager:
         STARTED and the next track began playing on its own (1.0.5 build 5:
         "November" paused at 23:43, next track at 23:52:26). It now ticks,
         adds only the time spent not paused, and never skips while paused.
+
+        Playing time is the distance the player position actually moved,
+        capped by wall time. Build 7 (session 4) had a track whose phase said
+        PLAYING while the iframe sat paused at 21.7 s; the watchdog counted
+        those 10 minutes as playing and started the next song out loud. A
+        track whose position does not move is never skipped for its budget;
+        the only stuck track it still advances is one parked at its reported
+        end without a YT_TRACK_ENDED.
         """
         self._cancel_embedded_watchdog()
         duration_ms = getattr(item, "duration_ms", None) or getattr(item, "duration", None)
@@ -594,6 +619,7 @@ class RuntimeWorkerManager:
             budget_s=float(timeout),
             played_s=0.0,
             last_tick=time.monotonic(),
+            last_position_ms=self._player_position_ms(),
         )
         self._arm_embedded_watchdog_tick(self._embedded_watchdog_state)
         self._logger.info(
@@ -603,8 +629,10 @@ class RuntimeWorkerManager:
         )
 
     def _arm_embedded_watchdog_tick(self, watchdog: _EmbeddedWatchdogState) -> None:
-        remaining = max(0.0, watchdog.budget_s - watchdog.played_s)
-        delay = min(EMBEDDED_WATCHDOG_TICK_S, max(EMBEDDED_WATCHDOG_MIN_TICK_S, remaining))
+        # A fixed cadence: playing time only grows when the position moves,
+        # so shortening the tick near the budget would spin on a stalled
+        # track. The budget is honoured to within one tick.
+        delay = max(EMBEDDED_WATCHDOG_MIN_TICK_S, EMBEDDED_WATCHDOG_TICK_S)
         timer = Timer(delay, self._embedded_watchdog_tick, args=(watchdog.generation,))
         timer.daemon = True
         self._embedded_watchdog = timer
@@ -637,8 +665,14 @@ class RuntimeWorkerManager:
         now_playing = getattr(state, "now_playing", None)
         return now_playing is not None and getattr(now_playing, "id", None) == item_id
 
+    def _player_position_ms(self) -> int | None:
+        position = getattr(self._player, "_position_ms", None)
+        if isinstance(position, bool) or not isinstance(position, (int, float)):
+            return None
+        return int(position)
+
     def _embedded_watchdog_tick(self, generation: int) -> None:
-        """Count playing time; force-advance only past a stuck PLAYING track."""
+        """Count real playing time; advance only a track stuck PLAYING or at its end."""
         player = self._player
         with player._cv:
             watchdog = self._embedded_watchdog_state
@@ -648,8 +682,16 @@ class RuntimeWorkerManager:
             elapsed = max(0.0, now - watchdog.last_tick)
             watchdog.last_tick = now
             paused = self._embedded_playback_paused_locked()
+            position_ms = self._player_position_ms()
+            previous_ms = watchdog.last_position_ms
+            watchdog.last_position_ms = position_ms
+            advanced_s = 0.0
+            if position_ms is not None and previous_ms is not None and position_ms > previous_ms:
+                # A forward seek moves the position further than the time
+                # that passed; only wall time can have been played.
+                advanced_s = min(elapsed, (position_ms - previous_ms) / 1000.0)
             if not paused:
-                watchdog.played_s += elapsed
+                watchdog.played_s += advanced_s
             reported_ms = getattr(player, "_duration_ms", 0)
             if isinstance(reported_ms, (int, float)) and reported_ms > 0:
                 watchdog.budget_s = max(watchdog.budget_s, reported_ms / 1000 + EMBEDDED_WATCHDOG_GRACE_S)
@@ -659,17 +701,38 @@ class RuntimeWorkerManager:
                 self._embedded_watchdog_state = None
                 self._embedded_watchdog = None
                 return
-            if paused or watchdog.played_s < watchdog.budget_s:
+            at_end = (
+                not paused
+                and advanced_s == 0.0
+                and position_ms is not None
+                and isinstance(reported_ms, (int, float))
+                and reported_ms > 0
+                and position_ms >= reported_ms - EMBEDDED_WATCHDOG_END_TOLERANCE_MS
+            )
+            watchdog.end_stall_s = watchdog.end_stall_s + elapsed if at_end else 0.0
+            if watchdog.end_stall_s >= EMBEDDED_WATCHDOG_END_STALL_S:
+                reason = SKIP_REASON_WATCHDOG_END_STALL
+                self._logger.warning(
+                    "EMBEDDED_WATCHDOG: track %s has sat at its end (%ds of %ds) for %ds with no YT_TRACK_ENDED — advancing",
+                    watchdog.item_id,
+                    int((position_ms or 0) / 1000),
+                    int(reported_ms / 1000),
+                    int(watchdog.end_stall_s),
+                )
+            elif not paused and watchdog.played_s >= watchdog.budget_s:
+                reason = SKIP_REASON_WATCHDOG_BUDGET
+                self._logger.warning(
+                    "EMBEDDED_WATCHDOG: No YT_TRACK_ENDED after %ds of playing time (budget %ds) for track %s — forcing skip",
+                    int(watchdog.played_s),
+                    int(watchdog.budget_s),
+                    watchdog.item_id,
+                )
+            else:
                 self._arm_embedded_watchdog_tick(watchdog)
                 return
             self._embedded_watchdog_state = None
             self._embedded_watchdog = None
-            self._logger.warning(
-                "EMBEDDED_WATCHDOG: No YT_TRACK_ENDED after %ds of playing time (budget %ds) for track %s — forcing skip",
-                int(watchdog.played_s),
-                int(watchdog.budget_s),
-                watchdog.item_id,
-            )
+            player._pending_skip_reason = reason
             player._pending_skip_tokens += 1
             player._cv.notify_all()
 
@@ -815,6 +878,10 @@ class RuntimeWorkerManager:
             player._pending_skip_tokens -= 1
             return True  # Skip was already processed
 
+        # A watchdog advance says why; every other pending skip is the user's.
+        skip_reason = getattr(player, "_pending_skip_reason", None) or SKIP_REASON_USER
+        player._pending_skip_reason = None
+
         # Log the skip event BEFORE processing
         log_queue_event(
             QueueEventType.PLAY_SKIP_CALLED,
@@ -823,7 +890,7 @@ class RuntimeWorkerManager:
             from_id=from_id,
             to_id=to_id,
             correlation_id=corr_id,
-            reason="user_skip",
+            reason=skip_reason,
             outcome="skip",
             queue_length=player._playlist.queue_size(),
         )

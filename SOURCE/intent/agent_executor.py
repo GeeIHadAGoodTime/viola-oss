@@ -7425,6 +7425,49 @@ class AgentExecutor:
             self._last_page_url = url
             self._update_overlay_for_browser(url)
 
+    def _close_browser_view_after_tool(self, result: ToolResult) -> ToolResult:
+        """Make ``browser_close`` also take the browser view off the stage.
+
+        The browser server only drops its CDP connection; the native view the
+        user sees stayed up and the model still replied "Browser closed."
+        (1.0.5 build 7, A5.2). Hide it through the overlay controller, which
+        also covers a view shown by an earlier task or reopened from the
+        globe pill, and tell the model whether the view is really gone so the
+        reply only says closed when it is.
+        """
+        overlay = self._overlay
+        if overlay is None:
+            # Headless / cloud executor: there is no on-screen view to close.
+            return result
+        try:
+            if getattr(overlay, "state", "hidden") != "hidden":
+                close = getattr(overlay, "close_by_user", None)
+                if callable(close):
+                    close()
+                else:
+                    overlay.hide()
+            view_closed = getattr(overlay, "state", "hidden") == "hidden"
+        except Exception as exc:
+            logger.warning("Closing the browser view after browser_close failed: %s", exc)
+            view_closed = False
+        if view_closed:
+            self._overlay_shown = False
+        data = dict(result.data) if isinstance(result.data, dict) else {}
+        data.setdefault("closed", bool(result.ok))
+        data["view_closed"] = view_closed
+        if not view_closed:
+            data["closed"] = False
+            return ToolResult(
+                ok=False,
+                data=data,
+                error="The browser view is still on the screen; it could not be closed.",
+                error_category=result.error_category,
+            )
+        if not result.ok:
+            # The connection close failed but the view is gone from the screen.
+            return ToolResult(ok=False, data=data, error=result.error, error_category=result.error_category)
+        return ToolResult(ok=True, data=data)
+
     def _update_overlay_for_browser(self, url: str) -> None:
         """Show or update the agentic overlay when browser tools are used."""
         if self._overlay is None:
@@ -8397,6 +8440,28 @@ class AgentExecutor:
             logger.info("Email send skipped before confirmation: no email account is connected (tool=%s)", tool_name)
         return result
 
+    async def _phone_call_unavailable(self, tool_name: str, tool_args: dict[str, Any]) -> ToolResult | None:
+        """Check the account can place a call BEFORE asking the user to confirm it.
+
+        1.0.5 laptop A6.6a: Viola asked "confirm?", the user said yes, and only
+        then did the cloud refuse the dial for missing phone consents. The user
+        confirmed a call that could never be placed. Now a missing consent or
+        unaccepted Phone Calling Terms comes back first, as the structured
+        ``phone_tos_required`` gate that opens the Phone Calling Terms window.
+        """
+        if self._irreversible_confirmation_class(tool_name, tool_args) != "phone_call":
+            return None
+        try:
+            from intent.tools.phone_call import phone_call_readiness_result
+
+            result = await phone_call_readiness_result()
+        except Exception:  # noqa: BLE001, RUF100 - a failed check never blocks the normal gate
+            logger.debug("Phone readiness check failed for %s", tool_name, exc_info=True)
+            return None
+        if result is not None:
+            await self._broadcast_paid_action_gate(tool_name, result)
+        return result
+
     async def _confirm_irreversible_tool_call(self, tool_name: str, tool_args: dict[str, Any]) -> bool:
         action_class = self._irreversible_confirmation_class(tool_name, tool_args)
         if action_class is None:
@@ -8714,6 +8779,10 @@ class AgentExecutor:
         if email_unavailable is not None:
             return email_unavailable
 
+        phone_unavailable = await self._phone_call_unavailable(tool_name, tool_args)
+        if phone_unavailable is not None:
+            return phone_unavailable
+
         irreversible_action = self._irreversible_confirmation_class(tool_name, tool_args)
         irreversible_confirmation_granted = False
         if irreversible_action is not None:
@@ -8942,6 +9011,8 @@ class AgentExecutor:
             # before gate detection so trace/checkpoint artifacts point at the
             # actual boundary page, not the previous page.
             self._track_page_url(tool_name, result)
+            if tool_name == "browser_close":
+                result = self._close_browser_view_after_tool(result)
             self._record_memory_all_scope_no_match(tool_name, tool_args, result)
 
             if tool_name == "fill_payment_details":

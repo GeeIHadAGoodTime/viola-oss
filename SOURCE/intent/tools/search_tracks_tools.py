@@ -8,6 +8,7 @@ Wired into ``mcp_servers/core_tools/server.py``.
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 from intent.tool_types import ToolResult
@@ -183,7 +184,12 @@ async def search_tracks_handler(
     searched_providers = _providers_for_request(requested_provider, user_id=user_id)
     for provider_id in searched_providers:
         try:
-            provider_tracks = _search_provider_tracks(provider_id, query, limit=limit, user_id=user_id)
+            # Provider search is blocking (an HTTP GET to YouTube plus a SQLite
+            # cache write); run it in a worker thread so it never holds the
+            # event loop (round-7 latency: 0.5-0.8 s of loop stall per "play").
+            provider_tracks = await asyncio.to_thread(
+                _search_provider_tracks, provider_id, query, limit=limit, user_id=user_id
+            )
         except MusicTrackNotFoundError:
             provider_tracks = []
         except (MusicProviderUnavailableError, ValueError) as exc:

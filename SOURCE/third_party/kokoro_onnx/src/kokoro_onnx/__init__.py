@@ -56,6 +56,25 @@ from .log import log  # noqa: E402
 from .tokenizer import Tokenizer  # noqa: E402
 from .trim import trim as trim_audio  # noqa: E402
 
+# Viola: hand the CPU arena back after every synthesis. ONNX Runtime's arena
+# keeps the peak of every run for the life of the session, and Kokoro's peak
+# grows with sentence length: seven ordinary replies grew a desktop process by
+# about 500 MB that never came back. With shrinkage the arena returns to its
+# initial chunk at the end of each run; measured synthesis time is unchanged.
+# VIOLA_KOKORO_ARENA_SHRINK=0 restores the old behaviour.
+_ARENA_SHRINK_KEY = "memory.enable_memory_arena_shrinkage"
+
+
+def _synthesis_run_options() -> "rt.RunOptions | None":
+    if os.getenv("VIOLA_KOKORO_ARENA_SHRINK", "1").strip().lower() in {"0", "false", "no", "off"}:
+        return None
+    run_options_class = getattr(rt, "RunOptions", None)
+    if run_options_class is None:  # a stand-in runtime without run options
+        return None
+    options = run_options_class()
+    options.add_run_config_entry(_ARENA_SHRINK_KEY, "cpu:0")
+    return options
+
 
 class Kokoro:
     def __init__(
@@ -168,7 +187,11 @@ class Kokoro:
                 "speed": np.ones(1, dtype=np.float32) * speed,
             }
 
-        audio = self.sess.run(None, inputs)[0]
+        run_options = _synthesis_run_options()
+        if run_options is None:
+            audio = self.sess.run(None, inputs)[0]
+        else:
+            audio = self.sess.run(None, inputs, run_options)[0]
         audio_duration = len(audio) / SAMPLE_RATE
         create_duration = time.time() - start_t
         rtf = create_duration / audio_duration

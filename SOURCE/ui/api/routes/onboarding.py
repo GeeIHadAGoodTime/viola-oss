@@ -94,6 +94,30 @@ def desktop_account_status() -> dict[str, object]:
     return {"ok": True, "signed_in": True, "email": email if isinstance(email, str) and email else None}
 
 
+async def _record_onboarding_cloud_llm_consent() -> None:
+    """Record the cloud-AI consent the user just gave on their Viola account.
+
+    The "Choose AI processing" step asks permission to send request text and
+    conversation context to cloud AI, which is exactly the account's
+    ``cloud_llm`` consent, but it only saved ``ai_source`` on this computer. The
+    account kept no record, so cloud features gated on it (phone calls, 1.0.5
+    laptop A6.6a) refused a user who had already said yes. Best effort: a
+    failure here never blocks onboarding, and the Phone Calling Terms window
+    asks again before a call.
+    """
+    try:
+        from config.settings import get_settings
+
+        if str(getattr(get_settings(), "app_surface", "desktop") or "desktop").strip().lower() != "desktop":
+            return
+        from intent.tools.phone_call import grant_cloud_consents
+
+        await grant_cloud_consents(["cloud_llm"], source="desktop_onboarding")
+        log.info("Onboarding: recorded the cloud AI consent on the Viola account")
+    except Exception as exc:
+        log.warning("Onboarding: could not record the cloud AI consent on the Viola account: %s", exc)
+
+
 def register_onboarding_routes(context: ApiContext, toolbox: RouteToolbox) -> None:
     router = context.router
 
@@ -209,6 +233,8 @@ def register_onboarding_routes(context: ApiContext, toolbox: RouteToolbox) -> No
                     settings_mgr.set("ai_enabled", True)
                     settings_mgr.set("enable_gpt", True)
                     log.info("BYOK api key stored via SettingsManager -> llm_api_key")
+                elif step_id == OnboardingStep.AI_SETUP and data.get("cloud_llm_consent") is True:
+                    await _record_onboarding_cloud_llm_consent()
 
                 return {"ok": True}
             except Exception as exc:

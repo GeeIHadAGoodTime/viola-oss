@@ -879,10 +879,15 @@ class MusicHandlersMixin:
             if _nothing_playing(self.controller.music):
                 return {"ok": True, "message": _NOTHING_PLAYING_MESSAGE, "data": {"noop": True}}
             await _call_maybe_async(self.controller.music, "skip")
+            # The track change is the answer; no spoken reply. Jay (1.0.5
+            # build 7, A0.1): the spoken "Now playing" after "next" arrived
+            # late and talked over the new song; he wants a silent change.
+            # ``spoken`` is the contract the voice handler, the typed-reply
+            # speaker and queued replies all read as "do not speak this".
             return {
                 "ok": True,
                 "message": "Skipped to next track",
-                "data": {},
+                "data": {"spoken": True, "quiet_reply": True},
             }
         except Exception:
             log.exception("Command 'skip' failed")

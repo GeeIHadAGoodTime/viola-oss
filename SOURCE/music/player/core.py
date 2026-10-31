@@ -232,7 +232,15 @@ class MusicPlayer:
         try:
             if value:
                 sm.transition(PlaybackPhase.PLAYING, force=True)
-            elif sm.phase in (PlaybackPhase.PLAYING, PlaybackPhase.PAUSED):
+            elif sm.phase == PlaybackPhase.PLAYING:
+                # "Not playing" from PAUSED is still PAUSED. Mapping it to
+                # STOPPED sent every pause through STOPPED: pause() and the
+                # iframe PAUSED handler write ``_paused = True`` and
+                # ``_is_playing = False`` together, so the phase went
+                # PAUSED -> STOPPED -> PAUSED (or PLAYING -> STOPPED -> PAUSED)
+                # and logged "Forced transition STOPPED -> PAUSED (not in
+                # VALID_TRANSITIONS)" on every pause (1.0.5 build 7, session 4
+                # and A0.3). A real stop transitions to STOPPED explicitly.
                 sm.transition(PlaybackPhase.STOPPED, force=True)
         except Exception:
             self._logger.debug("State machine transition failed in _is_playing setter (non-critical)")

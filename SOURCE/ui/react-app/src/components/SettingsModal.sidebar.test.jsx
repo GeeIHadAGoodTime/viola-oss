@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import SettingsModal from './SettingsModal';
 import { applyTheme, getCurrentThemeMode, setAccent, THEME } from '../config';
@@ -435,12 +435,89 @@ describe('SettingsModal sidebar shell', () => {
     fireEvent.click(screen.getByRole('button', { name: /Sign In with Spotify/i }));
 
     await waitFor(() => {
-      expect(apiFetchMock).toHaveBeenCalledWith('/v1/browser/auth/login/spotify', { method: 'POST' });
+      expect(apiFetchMock).toHaveBeenCalledWith('/v1/browser/auth/login/spotify', expect.objectContaining({ method: 'POST' }));
     });
 
     await waitFor(() => {
       expect(screen.getByText(/Spotify rejected that login identifier/i)).toBeInTheDocument();
     }, { timeout: 4000 });
+  }, 10000);
+  it('asks the desktop to make Spotify the music source once the sign-in lands', async () => {
+    // Build 7: picking Spotify as the Music Source only opened the sign-in
+    // panel; the choice was never saved, so "play Drake" went to YouTube.
+    // The desktop now saves it when it detects the sign-in, even if this
+    // window is closed by then.
+    let signInStarted = false;
+    apiFetchMock.mockImplementation((path, options = {}) => {
+      if (path === '/v1/connectors?category=llm') {
+        return Promise.resolve({ connectors: [] });
+      }
+      if (path === '/v1/spotify/status') {
+        return Promise.resolve(
+          signInStarted
+            ? { logged_in: true, connected: true, auth_state: 'authenticated_cookie', auth_source: 'browser_auth' }
+            : { logged_in: false, connected: false, auth_state: 'login_required' },
+        );
+      }
+      if (path === '/v1/browser/auth/login/spotify' && options.method === 'POST') {
+        signInStarted = true;
+        return Promise.resolve({ login_url: 'https://open.spotify.com', provider: 'spotify', controller_attached: true });
+      }
+      return Promise.resolve({
+        json: () => Promise.resolve({ devices: [] }),
+      });
+    });
+
+    render(<SettingsModal isOpen onClose={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Music' }));
+    fireEvent.click(screen.getByRole('button', { name: /Spotify/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /Sign In with Spotify/i }));
+
+    await waitFor(() => {
+      expect(apiFetchMock).toHaveBeenCalledWith('/v1/browser/auth/login/spotify', expect.objectContaining({ method: 'POST' }));
+    });
+    const loginCall = apiFetchMock.mock.calls.find(([path]) => path === '/v1/browser/auth/login/spotify');
+    expect(JSON.parse(loginCall[1].body)).toEqual({ select_as_music_source: true });
+
+    // Once signed in, the panel closes and Spotify shows as connected.
+    expect((await screen.findAllByText('Connected', {}, { timeout: 4000 })).length).toBeGreaterThan(0);
+    await waitFor(() => {
+      expect(screen.queryByText(/Waiting for you to sign in to Spotify/i)).not.toBeInTheDocument();
+    }, { timeout: 4000 });
+  }, 10000);
+  it('Cancel stops the Spotify sign-in on the desktop too, which closes the sign-in view', async () => {
+    apiFetchMock.mockImplementation((path, options = {}) => {
+      if (path === '/v1/connectors?category=llm') {
+        return Promise.resolve({ connectors: [] });
+      }
+      if (path === '/v1/spotify/status') {
+        return Promise.resolve({ logged_in: false, connected: false, auth_state: 'login_required' });
+      }
+      if (path === '/v1/browser/auth/login/spotify' && options.method === 'POST') {
+        return Promise.resolve({ login_url: 'https://open.spotify.com', provider: 'spotify', controller_attached: true });
+      }
+      if (path === '/v1/browser/auth/cancel/spotify' && options.method === 'POST') {
+        return Promise.resolve({ provider: 'spotify', cancelled: true });
+      }
+      return Promise.resolve({
+        json: () => Promise.resolve({ devices: [] }),
+      });
+    });
+
+    render(<SettingsModal isOpen onClose={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Music' }));
+    fireEvent.click(screen.getByRole('button', { name: /Spotify/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /Sign In with Spotify/i }));
+    const waiting = await screen.findByText(/Waiting for you to sign in to Spotify/i);
+
+    fireEvent.click(within(waiting.parentElement).getByRole('button', { name: 'Cancel' }));
+
+    await waitFor(() => {
+      expect(apiFetchMock).toHaveBeenCalledWith('/v1/browser/auth/cancel/spotify', { method: 'POST' });
+    });
+    expect(screen.queryByText(/Waiting for you to sign in to Spotify/i)).not.toBeInTheDocument();
   }, 10000);
   it('describes Spotify sign-in without naming a browser Viola may not use', async () => {
     // Spotify sign-in happens in Viola's own window, and playback runs in
