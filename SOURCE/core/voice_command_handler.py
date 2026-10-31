@@ -153,10 +153,43 @@ _ECHO_MIN_WORDS = 3
 _ECHO_MATCH_RATIO = 0.75
 # How long after a reply its echo can still turn up in a recording.
 _ECHO_WINDOW_SEC = 30.0
+# Two words this similar are the same word misheard ("playin"/"playing",
+# "relaxin"/"relaxing"); "toe"/"tokyo" is not.
+_FUZZY_WORD_RATIO = 0.8
 
 
 def _echo_words(text: str) -> list[str]:
-    return _ECHO_WORD_RE.findall((text or "").lower().replace("\u2019", "'"))
+    return _ECHO_WORD_RE.findall((text or "").lower().replace("’", "'"))
+
+
+def _same_word(heard: str, spoken: str) -> bool:
+    """True when ``heard`` is plausibly ``spoken`` as Whisper heard it back."""
+    if heard == spoken:
+        return True
+    a, b = heard.replace("'", ""), spoken.replace("'", "")
+    if a == b:
+        return True
+    if min(len(a), len(b)) < 4:
+        return False
+    if a.startswith(b) or b.startswith(a):
+        return True
+    from difflib import SequenceMatcher
+
+    return SequenceMatcher(a=a, b=b, autojunk=False).ratio() >= _FUZZY_WORD_RATIO
+
+
+def _canonical_words(heard: list[str], spoken: list[str]) -> list[str]:
+    """Rewrite each heard word as the spoken word it is a mishearing of, if any."""
+    vocabulary = list(dict.fromkeys(spoken))
+    return [next((w for w in vocabulary if _same_word(word, w)), word) for word in heard]
+
+
+def _matched_in_order(heard: list[str], spoken: list[str]) -> list[tuple[int, int]]:
+    """Matching blocks (start in ``heard``, size) of ``heard`` against ``spoken``, in order."""
+    from difflib import SequenceMatcher
+
+    matcher = SequenceMatcher(a=_canonical_words(heard, spoken), b=spoken, autojunk=False)
+    return [(block.a, block.size) for block in matcher.get_matching_blocks() if block.size]
 
 
 def _is_echo_of_reply(transcript: str, reply: str) -> bool:
@@ -166,6 +199,8 @@ def _is_echo_of_reply(transcript: str, reply: str) -> bool:
     recorded the reply "That one tripped me up, try again in a sec?", Whisper
     returned "That one tripped me up." and Viola answered it as a command. A
     person's words almost never repeat most of the reply in the same order.
+    Words are compared loosely ("playin" for "playing", "4.55pm" for "4:55
+    PM"), because Whisper rarely hears a speaker's echo word for word.
     """
     heard = _echo_words(transcript)
     if len(heard) < _ECHO_MIN_WORDS:
@@ -173,11 +208,134 @@ def _is_echo_of_reply(transcript: str, reply: str) -> bool:
     spoken = _echo_words(reply)
     if not spoken:
         return False
+    matched = sum(size for _start, size in _matched_in_order(heard, spoken))
+    return matched / len(heard) >= _ECHO_MATCH_RATIO
+
+
+# --------------------------------------------------------------------------- #
+# Barge-in while Viola is speaking                                             #
+# --------------------------------------------------------------------------- #
+#
+# Build-7 laptop (1.0.5): 4 of 4 spoken replies were cut off 2-5 s in by "TTS
+# interrupt detected" on Viola's OWN voice, and the partial transcript ran as a
+# command ("Playing relaxing." -> a different song, "tomorrow" -> the weather
+# again, "Now play great." -> a second skip, a second phone call). The echo
+# canceller reported 3-19 dB of echo reduction: working, but with the speaker a
+# few centimetres from the microphone the rest of Viola's voice is still
+# "speech" to the VAD. No canceller setting makes that safe on every laptop, so
+# the VAD only raises a CANDIDATE. Viola keeps talking while the last few
+# seconds are transcribed, and she stops only when that transcript is clearly
+# the user:
+#
+# * it contains the wake word ("Viola, stop", "Viola, play rock instead") and
+#   what follows it is not Viola's own sentence; or
+# * it is nothing but a stop phrase ("stop", "be quiet") that Viola is not
+#   herself saying.
+#
+# Anything else (her own words, however garbled, music, a TV) is ignored, the
+# monitor re-arms, and the reply plays to the end. The command that runs is the
+# part after the wake word, with any run of Viola's own words taken out.
+
+# After the VAD's 0.3 s of speech, how long to let the phrase finish before
+# checking it ("Viola, stop" takes about a second to say).
+_BARGE_IN_SETTLE_SEC = 0.8
+# How much of the most recent audio is transcribed per check.
+_BARGE_IN_WINDOW_SEC = 3.0
+# Checks per reply. A canceller that leaves all of Viola's voice in raises a
+# candidate every couple of seconds; this bounds the speech-to-text work.
+_BARGE_IN_MAX_CHECKS = 8
+# A check that takes longer than this counts as "not the user".
+_BARGE_IN_STT_TIMEOUT_SEC = 5.0
+# A run of this many consecutive words of the reply, in order, inside the
+# transcript is Viola's voice, not the user's.
+_BARGE_IN_ECHO_RUN = 2
+
+# The wake word as Whisper writes it. Stricter than the wake Stage 2 list on
+# purpose: here a false match stops Viola mid-sentence.
+_BARGE_IN_WAKE_WORDS = frozenset({"viola", "violas", "vyola", "viyola", "voila", "fiola", "biola"})
+_BARGE_IN_STOP_RE = re.compile(
+    r"^(?:(?:ok|okay|hey|please|no)\s+)*"
+    r"(?:stop(?:\s+(?:it|talking|now|please))*|be\s+quiet|quiet|shut\s+up|enough|that'?s\s+enough)"
+    r"(?:\s+(?:please|now|thanks|thank\s+you))*$"
+)
+_BARGE_IN_STOP_WORDS = frozenset({"stop", "quiet", "shut", "enough"})
+_BARGE_IN_TOKEN_RE = re.compile(r"[A-Za-z0-9']+")
+
+
+@dataclass(frozen=True)
+class BargeInDecision:
+    """What a transcript heard while Viola was speaking means.
+
+    ``kind`` is "ignore" (Viola keeps talking), "stop" (stop talking, nothing
+    else), "listen" (the user said only the wake word: stop and listen) or
+    "command" (stop and run ``command``).
+    """
+
+    kind: str
+    reason: str
+    command: str = ""
+
+    @property
+    def interrupts(self) -> bool:
+        return self.kind != "ignore"
+
+
+def _is_barge_in_wake_word(word: str) -> bool:
+    w = word.lower().replace("'", "")
+    if w in _BARGE_IN_WAKE_WORDS:
+        return True
+    if not 4 <= len(w) <= 6 or w[0] not in "vbf":
+        return False
     from difflib import SequenceMatcher
 
-    matcher = SequenceMatcher(a=heard, b=spoken, autojunk=False)
-    matched = sum(block.size for block in matcher.get_matching_blocks())
-    return matched / len(heard) >= _ECHO_MATCH_RATIO
+    # One letter away from "viola" (vila, vioala, violah).
+    return SequenceMatcher(a=w, b="viola", autojunk=False).ratio() >= 0.8
+
+
+def _drop_reply_runs(tokens: list[str], spoken: list[str]) -> list[str]:
+    """Remove every run of >= 2 consecutive reply words (Viola's voice) from ``tokens``."""
+    if not tokens or not spoken:
+        return list(tokens)
+    lowered = [t.lower() for t in tokens]
+    drop: set[int] = set()
+    for start, size in _matched_in_order(lowered, spoken):
+        if size >= _BARGE_IN_ECHO_RUN:
+            drop.update(range(start, start + size))
+    return [t for i, t in enumerate(tokens) if i not in drop]
+
+
+def classify_barge_in_transcript(transcript: str, reply: str) -> BargeInDecision:
+    """Decide whether what was heard while Viola spoke ``reply`` should stop her."""
+    tokens = _BARGE_IN_TOKEN_RE.findall((transcript or "").replace("’", "'"))
+    if not tokens:
+        return BargeInDecision("ignore", "nothing_heard")
+    spoken = _echo_words(reply)
+    wake_at = max((i for i, t in enumerate(tokens) if _is_barge_in_wake_word(t)), default=None)
+
+    if wake_at is None:
+        rest = _drop_reply_runs(tokens, spoken)
+        phrase = " ".join(t.lower() for t in rest)
+        if rest and _BARGE_IN_STOP_RE.match(phrase):
+            reply_stop_words = [w for w in spoken if w in _BARGE_IN_STOP_WORDS or w.startswith("stop")]
+            if reply_stop_words:
+                return BargeInDecision("ignore", "stop_word_is_in_the_reply")
+            return BargeInDecision("stop", "stop_phrase")
+        if len(rest) < len(tokens) or _is_echo_of_reply(transcript, reply):
+            return BargeInDecision("ignore", "viola_own_words")
+        return BargeInDecision("ignore", "no_wake_word")
+
+    after = _drop_reply_runs(tokens[wake_at + 1 :], spoken)
+    if any(_is_barge_in_wake_word(w) for w in spoken):
+        # Viola says her own name in this reply ("I'm Viola, ..."): the name in
+        # the transcript may be hers. Only a clear request after it counts.
+        if not after or _is_echo_of_reply(" ".join(after), reply):
+            return BargeInDecision("ignore", "reply_says_viola")
+    if not after:
+        return BargeInDecision("listen", "wake_word")
+    command = " ".join(after)
+    if _BARGE_IN_STOP_RE.match(command.lower()):
+        return BargeInDecision("stop", "wake_word_stop", command)
+    return BargeInDecision("command", "wake_word_command", command)
 
 
 def _update_state_hub_voice_mode(mode_name: str, *, user_id: str) -> None:
@@ -406,6 +564,9 @@ class VoiceCommandHandler:
         # The last reply spoken aloud and when (time.monotonic()), so a
         # recording of Viola's own voice is not run as the user's next command.
         self._last_spoken_reply: tuple[str, float] | None = None
+        # What the user said over Viola's last reply, once it was checked to be
+        # the user (see _speak_response_interruptible).
+        self._barge_in_decision: BargeInDecision | None = None
         # Same-class fallback when no running app holds the desktop's command service.
         self._local_command_service: Any | None = None
 
@@ -630,86 +791,76 @@ class VoiceCommandHandler:
             _broadcast_chat_response(result)
 
             # --- Handle TTS interruption ---
-            # If user interrupted TTS, save captured audio as next turn's input
-            if result.get("_interrupted"):
-                # User speech is in the continuous capture buffer — get as buffer
-                interrupted_buf = self._get_interrupted_audio_buffer()
-                if interrupted_buf is not None and conversation_enabled:
-                    # Skip follow-up recording: we already have the audio
-                    self._cleanup_audio_file(ctx)
-                    ctx.clear_audio_buffer()
-                    ctx.audio_buffer = interrupted_buf
-                    ctx.audio_sample_rate = SAMPLE_RATE_16K
-                    ctx.audio_file = "buffer"
-                    await self._record_voice_event(
-                        "barge_in_resume",
-                        {
-                            "source": "barge_in",
-                            "barge_in": True,
-                            "resume_target": "captured_audio",
-                            "sample_rate": SAMPLE_RATE_16K,
-                        },
+            # The user talked over the reply and the check in
+            # _speak_response_interruptible found it was really the user (the
+            # wake word or a bare "stop"); Viola's own voice never gets here.
+            # The checked transcript is used as is; nothing is re-transcribed.
+            barge_in_exit: str | None = None
+            listen_after_barge_in = False
+            while result.get("_interrupted"):
+                decision = self._take_barge_in_decision()
+                if decision is None or not conversation_enabled:
+                    logger.info("TTS interrupted; ending the conversation")
+                    barge_in_exit = "interrupted_no_audio" if decision is None else "interrupted"
+                    break
+                if decision.kind == "listen":
+                    # "Viola" alone over the reply: stop talking and listen.
+                    listen_after_barge_in = True
+                    break
+                turn += 1
+                if turn > max_turns:
+                    barge_in_exit = "max_turns"
+                    break
+                _update_state_hub_voice_mode("conversing", user_id=ctx.user_id)
+                transcript = decision.command
+                # Dismiss detection: "Viola, stop" / "stop" / "never mind"
+                # over the reply ends the turn silently instead of running as
+                # a new command, like telling a real assistant to stop.
+                if decision.kind == "stop" or _is_dismiss_phrase(transcript):
+                    logger.info("Interrupt dismiss detected - silently exiting")
+                    barge_in_exit = "dismissed"
+                    break
+                await self._record_voice_event(
+                    "barge_in_resume",
+                    {
+                        "source": "barge_in",
+                        "barge_in": True,
+                        "resume_target": "checked_transcript",
+                        "sample_rate": SAMPLE_RATE_16K,
+                    },
+                    user_id=ctx.user_id,
+                )
+                logger.info("TTS interrupted by a request after the wake word; running it as the next turn")
+                if not self._validate_transcript(transcript):
+                    barge_in_exit = "invalid_transcript"
+                    break
+                with use_voice_turn_context(
+                    self._voice_turn_metadata(ctx, source="barge_in", barge_in=True),
+                    transcript=transcript,
+                ):
+                    result = await self._interpret_and_dispatch(
+                        transcript,
+                        is_follow_up=True,
                         user_id=ctx.user_id,
                     )
-                    logger.info("TTS interrupted — using captured speech for next turn")
-                    # Continue loop: skip recording, go straight to transcription
-                    turn += 1
-                    if turn > max_turns:
-                        exit_reason = "max_turns"
-                        break
-                    _update_state_hub_voice_mode("conversing", user_id=ctx.user_id)
-                    # Transcribe the interrupted audio directly
-                    transcript = await self._transcribe_audio_with_timeout(ctx)
-                    if not transcript:
-                        exit_reason = "empty_transcript"
-                        break
-                    if self._transcript_is_own_reply(transcript):
-                        exit_reason = "self_echo"
-                        break
-
-                    # Dismiss detection: if the user interrupted with a
-                    # stop/cancel/dismiss phrase, silently exit instead of
-                    # processing it as a new command.  This makes
-                    # interrupting feel natural — like telling a real
-                    # assistant "stop" or "never mind".
-                    if _is_dismiss_phrase(transcript):
-                        logger.info("Interrupt dismiss detected - silently exiting")
-                        exit_reason = "dismissed"
-                        break
-
-                    if not self._validate_transcript(transcript):
-                        exit_reason = "invalid_transcript"
-                        break
-                    with use_voice_turn_context(
-                        self._voice_turn_metadata(ctx, source="barge_in", barge_in=True),
-                        transcript=transcript,
-                    ):
-                        result = await self._interpret_and_dispatch(
-                            transcript,
-                            is_follow_up=True,
-                            user_id=ctx.user_id,
-                        )
-                    if result is None:
-                        exit_reason = "interpret_failed"
-                        break
-                    if result.get("intent") == "ignore":
-                        exit_reason = "ignore"
-                        break
-                    await self._speak_response(result, user_id=ctx.user_id)
-                    _broadcast_chat_response(result)
-                    # Fall through to continuation logic below
-                else:
-                    # Interrupt fired but no captured audio — just exit
-                    # cleanly (TTS was already stopped).
-                    logger.info("TTS interrupted but no audio captured — exiting")
-                    exit_reason = "interrupted_no_audio"
+                if result is None:
+                    barge_in_exit = "interpret_failed"
                     break
+                if result.get("intent") == "ignore":
+                    barge_in_exit = "ignore"
+                    break
+                await self._speak_response(result, user_id=ctx.user_id)
+                _broadcast_chat_response(result)
+                # That reply can be interrupted too: the loop checks again.
+            if barge_in_exit is not None:
+                exit_reason = barge_in_exit
+                break
 
             # --- Decide whether to continue ---
             if not conversation_enabled:
                 break
 
-            if not result.get("continue_listening", False):
+            if not listen_after_barge_in and not result.get("continue_listening", False):
                 exit_reason = "llm_done"
                 break
 
@@ -1454,22 +1605,22 @@ class VoiceCommandHandler:
         *,
         user_id: str,
     ) -> bool:
-        """Speak with interrupt monitoring via continuous capture VAD.
+        """Speak with barge-in monitoring via the continuous capture's VAD.
 
-        Sets the continuous capture to vad_monitor mode during TTS playback.
-        If the user speaks for >300ms (detected by VAD on AEC'd audio), TTS
-        is cancelled and the method returns True.
+        Sets the capture to vad_monitor mode while ``message`` plays. Sustained
+        speech on the echo-cancelled microphone is only a CANDIDATE: Viola keeps
+        talking while the last few seconds are transcribed, and she stops only
+        when :func:`classify_barge_in_transcript` says it was the user (the wake
+        word, or a bare stop phrase she is not saying herself). Her own voice,
+        music or a TV re-arm the monitor and the reply plays to the end.
 
-        The captured speech audio is preserved in the capture's recording
-        buffer for immediate transcription.
-
-        Args:
-            message: Text to speak via TTS.
-            capture: Active ContinuousMicCapture instance.
+        The accepted decision is left in ``self._barge_in_decision`` for the
+        conversation loop, so the audio is not transcribed a second time.
 
         Returns:
-            True if user interrupted, False if TTS completed normally.
+            True if the user interrupted, False if TTS completed normally.
         """
+        self._barge_in_decision = None
         interrupt_event = asyncio.Event()
         loop = asyncio.get_running_loop()
 
@@ -1485,54 +1636,84 @@ class VoiceCommandHandler:
         # Start VAD monitoring (also accumulates audio in buffer)
         capture.set_mode("vad_monitor", on_interrupt=_on_interrupt)
 
+        tts_task: asyncio.Future | None = None
         try:
-            # Race TTS against interrupt
             tts_task = asyncio.ensure_future(self._do_speak(message))
-            interrupt_task = asyncio.ensure_future(interrupt_event.wait())
-
-            done, pending = await asyncio.wait(
-                {tts_task, interrupt_task},
-                return_when=asyncio.FIRST_COMPLETED,
-            )
-
-            if interrupt_task in done:
-                # Stop the TTS engine immediately so audio output ceases
-                # without waiting for the async task to cancel gracefully.
-                if self.tts and hasattr(self.tts, "stop"):
-                    try:
-                        self.tts.stop()
-                    except Exception:
-                        pass
-
-            for task in pending:
-                task.cancel()
-                try:
-                    await task
-                except asyncio.CancelledError:
-                    pass
-
-            if interrupt_task in done:
-                # User interrupted — preserve the accumulated VAD buffer
-                # (it contains the speech that triggered the interrupt).
-                # Do NOT call set_mode(MODE_RECORD) here because that
-                # clears the recording buffer.  Instead switch to paused
-                # so no more frames are appended, and let the caller
-                # retrieve the buffer via get_recording().
-                capture.set_mode("paused")
-                await self._record_voice_event(
-                    "tts_interrupted",
-                    {
-                        "source": "barge_in",
-                        "barge_in": True,
-                        "message_chars": len(message),
-                    },
-                    user_id=user_id,
+            checks = 0
+            ignored: dict[str, int] = {}
+            while True:
+                interrupt_task = asyncio.ensure_future(interrupt_event.wait())
+                done, _pending = await asyncio.wait(
+                    {tts_task, interrupt_task},
+                    return_when=asyncio.FIRST_COMPLETED,
                 )
-                logger.info("TTS interrupted by user speech (buffer preserved)")
-                return True
+                if tts_task in done:
+                    interrupt_task.cancel()
+                    try:
+                        await interrupt_task
+                    except asyncio.CancelledError:
+                        pass
+                    if ignored:
+                        logger.info(
+                            "Viola finished her reply; %d sound(s) heard while she spoke were not the user (%s)",
+                            sum(ignored.values()),
+                            ", ".join(f"{reason} x{count}" for reason, count in sorted(ignored.items())),
+                        )
+                    tts_task.result()
+                    return False
 
-            return False
+                interrupt_event.clear()
+                checks += 1
+                decision = await self._check_barge_in(capture, message, tts_task)
+                if decision is None:
+                    # Viola finished while the check ran; the loop sees tts_task done.
+                    continue
+                if decision.interrupts:
+                    # Stop the TTS engine immediately so audio output ceases
+                    # without waiting for the async task to cancel gracefully.
+                    if self.tts and hasattr(self.tts, "stop"):
+                        try:
+                            self.tts.stop()
+                        except Exception:
+                            pass
+                    tts_task.cancel()
+                    try:
+                        await tts_task
+                    except (asyncio.CancelledError, Exception):  # noqa: BLE001, RUF100 - TTS is being cut off
+                        pass
+                    capture.set_mode("paused")
+                    self._barge_in_decision = decision
+                    await self._record_voice_event(
+                        "tts_interrupted",
+                        {
+                            "source": "barge_in",
+                            "barge_in": True,
+                            "message_chars": len(message),
+                            "reason": decision.reason,
+                        },
+                        user_id=user_id,
+                    )
+                    logger.info(
+                        "TTS interrupted by the user (%s, check %d of this reply)",
+                        decision.reason,
+                        checks,
+                    )
+                    return True
 
+                ignored[decision.reason] = ignored.get(decision.reason, 0) + 1
+                if checks >= _BARGE_IN_MAX_CHECKS:
+                    logger.info(
+                        "Barge-in: %d checks this reply were all Viola's own voice or other sound; "
+                        "not checking again until she finishes",
+                        checks,
+                    )
+                    continue  # not re-armed: only tts_task can finish the wait now
+                capture.rearm_interrupt()
+
+        except asyncio.CancelledError:
+            if tts_task is not None and not tts_task.done():
+                tts_task.cancel()
+            raise
         except Exception as exc:
             logger.warning("Interruptible TTS error: %s", exc)
             return False
@@ -1541,6 +1722,51 @@ class VoiceCommandHandler:
             # switch to paused to stop VAD processing
             if capture.mode == "vad_monitor":
                 capture.set_mode("paused")
+
+    async def _check_barge_in(
+        self,
+        capture: Any,
+        message: str,
+        tts_task: asyncio.Future,
+    ) -> BargeInDecision | None:
+        """Transcribe the last few seconds heard while Viola speaks and classify them.
+
+        Viola keeps talking during the check. Returns None when she finished
+        speaking first (nothing to interrupt any more).
+        """
+        try:
+            await asyncio.wait_for(asyncio.shield(tts_task), timeout=_BARGE_IN_SETTLE_SEC)
+        except TimeoutError:
+            pass
+        except (asyncio.CancelledError, Exception):  # noqa: BLE001, RUF100 - the speak loop reads tts_task itself
+            pass
+        if tts_task.done():
+            return None
+
+        try:
+            import numpy as np
+
+            pcm = capture.get_recent_recording(_BARGE_IN_WINDOW_SEC)
+            if not pcm or len(pcm) < 3200:  # < 100 ms
+                return BargeInDecision("ignore", "too_short")
+            audio = np.frombuffer(pcm, dtype=np.int16).copy()
+            transcript = await asyncio.wait_for(
+                asyncio.to_thread(self.voice_pipeline.transcribe_audio, audio, False, False),
+                timeout=_BARGE_IN_STT_TIMEOUT_SEC,
+            )
+        except TimeoutError:
+            return BargeInDecision("ignore", "check_timed_out")
+        except Exception as exc:  # noqa: BLE001, RUF100 - a failed check must never cut Viola off
+            logger.debug("Barge-in check failed: %s", exc)
+            return BargeInDecision("ignore", "check_failed")
+        if tts_task.done():
+            return None
+        return classify_barge_in_transcript(transcript or "", message)
+
+    def _take_barge_in_decision(self) -> BargeInDecision | None:
+        decision = getattr(self, "_barge_in_decision", None)
+        self._barge_in_decision = None
+        return decision
 
     def _transcript_is_own_reply(self, transcript: str) -> bool:
         """True (and logged) when ``transcript`` is Viola's last reply heard back."""

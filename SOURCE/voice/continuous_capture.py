@@ -170,10 +170,11 @@ class ContinuousMicCapture:
         self._processed_feed_enabled = False
         # Returns the listener's live (aec_processor, aec_reference_source).
         self._aec_state_source: Callable[[], tuple[object | None, object | None]] | None = None
-        # Barge-in is refused while the echo canceller cannot remove Viola's
-        # own voice; the reason is logged once per distinct cause.
+        # Why the echo canceller cannot remove Viola's own voice, logged once
+        # per distinct cause.
         self._aec_degraded_reasons_logged: set[str] = set()
-        self._barge_in_suppressed_this_turn = False
+        # Barge-in candidates raised in the current TTS turn (logging only).
+        self._candidates_this_turn = 0
 
     # -------------------------------------------------------------------
     # Lifecycle
@@ -337,7 +338,7 @@ class ContinuousMicCapture:
                 self._recording_user_id = _current_user_id()
                 self._vad_consecutive_speech = 0
                 self._interrupt_fired = False
-                self._barge_in_suppressed_this_turn = False
+                self._candidates_this_turn = 0
                 self._on_interrupt = kwargs.get("on_interrupt")
                 if self._vad_model is not None:
                     try:
@@ -474,12 +475,15 @@ class ContinuousMicCapture:
                 self._recording_buffer.extend(raw_bytes[:remaining])
 
     def _handle_vad_monitor_audio(self, audio_int16: np.ndarray) -> None:
-        """Run VAD on AEC'd audio and fire interrupt on sustained speech."""
+        """Run VAD on AEC'd audio and raise a barge-in candidate on sustained speech."""
         raw_bytes = audio_int16.tobytes()
         with self._mode_lock:
-            remaining = self._max_buffer_bytes - len(self._recording_buffer)
-            if remaining > 0:
-                self._recording_buffer.extend(raw_bytes[:remaining])
+            # Rolling: the barge-in check reads the LAST few seconds, so a
+            # reply longer than the cap must keep the newest audio.
+            self._recording_buffer.extend(raw_bytes)
+            overflow = len(self._recording_buffer) - self._max_buffer_bytes
+            if overflow > 0:
+                del self._recording_buffer[:overflow]
 
             if self._interrupt_fired:
                 return
@@ -487,6 +491,8 @@ class ContinuousMicCapture:
         speech_detected_in_chunk = self._run_vad_on_chunk(audio_int16)
 
         callback = None
+        degraded_reason: str | None = None
+        candidate_number = 0
         with self._mode_lock:
             if self._interrupt_fired:
                 return
@@ -510,42 +516,65 @@ class ContinuousMicCapture:
                 except Exception:  # noqa: BLE001, RUF100 - unreadable state counts as degraded below
                     aec_proc, aec_ref = None, None
             # Only now (rare: sustained speech while Viola talks) is the
-            # canceller's health read, so the per-chunk path stays cheap.
+            # canceller's health read, so the per-chunk path stays cheap. It
+            # is a diagnostic: sustained "speech" here is only ever a
+            # CANDIDATE. Viola keeps talking while the voice handler checks
+            # what was said (see VoiceCommandHandler._speak_response_interruptible);
+            # on a laptop speaker even a working canceller leaves enough of
+            # Viola's voice for the VAD to call it speech.
             degraded_reason = barge_in_aec_degraded_reason(aec_proc, aec_ref)
+            first_ever = False
             with self._mode_lock:
                 if self._interrupt_fired:
                     return
-                if degraded_reason is None:
-                    self._interrupt_fired = True
-                    callback = self._on_interrupt
-                else:
-                    # Viola's own voice would look exactly like this. Keep
-                    # talking; the user can still say the wake word or tap stop.
-                    self._vad_consecutive_speech = 0
-                    first_this_turn = not self._barge_in_suppressed_this_turn
-                    self._barge_in_suppressed_this_turn = True
+                self._interrupt_fired = True
+                callback = self._on_interrupt
+                self._candidates_this_turn += 1
+                candidate_number = self._candidates_this_turn
+                if degraded_reason is not None:
                     first_ever = degraded_reason not in self._aec_degraded_reasons_logged
                     self._aec_degraded_reasons_logged.add(degraded_reason)
-            if degraded_reason is not None:
-                if first_ever:
-                    logger.warning(
-                        "AEC degraded: %s. Interrupting Viola by talking over it is off while this lasts, "
-                        "so Viola cannot hear its own reply as a new command.",
-                        degraded_reason,
-                    )
-                elif first_this_turn:
-                    logger.debug("Barge-in suppressed (AEC degraded: %s)", degraded_reason)
-                return
+            if first_ever:
+                logger.warning(
+                    "AEC degraded: %s. Viola's own voice reaches the barge-in monitor; "
+                    "only a check of what was said (the wake word) can interrupt Viola.",
+                    degraded_reason,
+                )
 
         if callback is not None:
-            logger.info(
-                "TTS interrupt detected: %d consecutive speech windows",
+            log = logger.info if candidate_number == 1 else logger.debug
+            log(
+                "TTS interrupt candidate: %d consecutive speech windows (aec=%s); "
+                "checking what was said before stopping Viola",
                 VAD_INTERRUPT_WINDOWS,
+                "degraded" if degraded_reason is not None else "ok",
             )
             try:
                 callback()
             except Exception as exc:
                 logger.warning("Interrupt callback error: %s", exc)
+
+    def rearm_interrupt(self) -> None:
+        """Listen for the next barge-in candidate in this TTS turn.
+
+        Called after a candidate turned out to be Viola's own voice (or noise):
+        the speech count starts over, and the recording keeps growing so a
+        later "Viola, stop" is still in it.
+        """
+        with self._mode_lock:
+            if self._mode != MODE_VAD_MONITOR:
+                return
+            self._vad_consecutive_speech = 0
+            self._interrupt_fired = False
+
+    def get_recent_recording(self, seconds: float) -> bytes:
+        """Return the last ``seconds`` of the recording buffer (16-bit mono)."""
+        with self._mode_lock:
+            self._enforce_recording_owner_locked()
+            wanted = max(0, int(seconds * self._sample_rate)) * 2
+            if wanted <= 0:
+                return b""
+            return bytes(self._recording_buffer[-wanted:])
 
     def _run_vad_on_chunk(self, audio_int16: np.ndarray) -> bool:
         """Run SileroVAD on the audio chunk. Returns True if speech detected."""

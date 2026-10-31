@@ -1130,6 +1130,12 @@ def create_aec_processor(
 # Below this ERLE the canceller's output is louder than the microphone: it is
 # adding a (misaligned) copy of the reference instead of removing it.
 _DEGRADED_ERLE_DB = -6.0
+# Below this ERLE (but above the negative case) the canceller is working, just
+# not well enough: with a laptop speaker a few centimetres from the microphone,
+# 3-19 dB of echo reduction (the 1.0.5 build-7 laptop) still leaves Viola's
+# reply loud enough for the barge-in VAD to call it speech. This used to count
+# as healthy, so "AEC degraded" never appeared while Viola heard herself.
+_WEAK_ERLE_DB = 20.0
 
 
 def echo_cancellation_degraded_reason(
@@ -1162,8 +1168,11 @@ def echo_cancellation_degraded_reason(
     if gate_open is False:
         return "the echo-cancellation reference is silent while Viola is speaking"
     erle = diagnostics.get("erle_db")
-    if isinstance(erle, (int, float)) and erle == erle and erle < _DEGRADED_ERLE_DB:
-        return "the echo canceller is adding signal instead of removing it (negative ERLE)"
+    if isinstance(erle, (int, float)) and erle == erle:
+        if erle < _DEGRADED_ERLE_DB:
+            return "the echo canceller is adding signal instead of removing it (negative ERLE)"
+        if erle < _WEAK_ERLE_DB:
+            return "the echo canceller removes too little of Viola's voice (ERLE below 20 dB)"
     return None
 
 
