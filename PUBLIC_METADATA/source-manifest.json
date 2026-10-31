@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "2e4a0bef692a5a02957649cca3120fe168d0a326",
-  "sha256": "2a4cc45597da4f226e1fe75d78ff57353ae19d74e282955f96b425e12629a220",
+  "revision": "6e5aceb8ff3f6abab809b8e44bb1676beae44a3f",
+  "sha256": "65e4fbcf18519809d8fbb673fefd4c8efa0158dfea7b64635294e5d989188d46",
   "files": [
     {
       "path": ".env.example",
@@ -1240,8 +1240,8 @@
     },
     {
       "path": "core/voice_command_handler.py",
-      "sha256": "dd615f5b9e30dede6f250b31a1e7982cda45ed56f125c26650c23de7470c9b1d",
-      "bytes": 92913
+      "sha256": "8c945a6b7e1d475399b42bbb87e093f95e3b74c48123a8fd53d9517ca97dc466",
+      "bytes": 99055
     },
     {
       "path": "core/voice_orchestrator.py",
@@ -4534,6 +4534,11 @@
       "bytes": 3697
     },
     {
+      "path": "services/llm/answer_stream.py",
+      "sha256": "866d19454d9906f5b5ae8811346ebbe26e4884bd58f491f6495170861e35df86",
+      "bytes": 16516
+    },
+    {
       "path": "services/llm/anthropic_cache.py",
       "sha256": "1fac4628d42d9aab89b5a8a73d1a2798ea8c8bd8b188bd4267f39a2ef73aba8f",
       "bytes": 13618
@@ -4695,8 +4700,8 @@
     },
     {
       "path": "services/llm/providers/openai_compatible.py",
-      "sha256": "fcf9744b71490d7734a7d797a35b71e934e3ce89829e764c7594776f97787ee0",
-      "bytes": 179186
+      "sha256": "ef0663d79fd738bc0fe835d179d588e20a346cba244f1c34c8ac0c5200cf9167",
+      "bytes": 180969
     },
     {
       "path": "services/llm/quota_repository.py",
@@ -4730,8 +4735,8 @@
     },
     {
       "path": "services/llm/stream_bus.py",
-      "sha256": "59f7059948e118f9bcd5d25ae656cf73d1e0c0bddaefc2fe4c6be6868cf09723",
-      "bytes": 13320
+      "sha256": "eb60222016bc819822c4edc0ec55db731523be07200b4d662330530f4308e8dc",
+      "bytes": 14956
     },
     {
       "path": "services/llm/stream_capture.py",
@@ -9440,8 +9445,8 @@
     },
     {
       "path": "ui/api/routes/command.py",
-      "sha256": "a9e101bb45adca5b938766d095a5ed37bbdbc63e092e1134f3fa99f20592cc17",
-      "bytes": 28030
+      "sha256": "18960d0d73a0e194f7fc78a78606e2cc58fb64156ace29f2ab2d0be040b9aa4b",
+      "bytes": 30923
     },
     {
       "path": "ui/api/routes/common.py",
@@ -13582,6 +13587,11 @@
       "path": "voice/spoke_handler.py",
       "sha256": "0b42790618eb906ab41074af7008bc2ab92e51756ba07e020130b8e8233b64a6",
       "bytes": 12078
+    },
+    {
+      "path": "voice/streamed_reply.py",
+      "sha256": "236d6f534ae4e761e242a14e0785ca33aab7e99324d31f5e434a5882e4a4751b",
+      "bytes": 9067
     },
     {
       "path": "voice/synthesis/__init__.py",
