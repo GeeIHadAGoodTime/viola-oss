@@ -8,6 +8,7 @@ Endpoints:
     GET  /v1/browser/auth/status                  - All providers auth status
     GET  /v1/browser/auth/status/{provider_name}  - Single provider auth status
     POST /v1/browser/auth/login/{provider_name}   - Initiate login flow
+    POST /v1/browser/auth/cancel/{provider_name}  - Cancel login, close the view
     POST /v1/browser/auth/refresh/{provider_name} - Force re-check auth state
 """
 
@@ -30,6 +31,12 @@ router = APIRouter(prefix="/v1/browser/auth", tags=["browser-auth"])
 
 class DefaultProviderRequest(BaseModel):
     provider: str
+
+
+class LoginRequest(BaseModel):
+    # Settings > Music Source: the user picked this provider and has to sign
+    # in first. Save it as the music source once the sign-in is detected.
+    select_as_music_source: bool = False
 
 
 def _get_auth_manager(user_id: str) -> Any:
@@ -186,7 +193,11 @@ async def get_provider_status(provider_name: str, user_id: str = Depends(get_cur
     "/login/{provider_name}",
     dependencies=[Depends(require_auth)],
 )
-async def initiate_login(provider_name: str, user_id: str = Depends(get_current_user_id)) -> Any:
+async def initiate_login(
+    provider_name: str,
+    body: LoginRequest | None = None,
+    user_id: str = Depends(get_current_user_id),
+) -> Any:
     """Navigate QWebEngineView to provider login page.
 
     Response::
@@ -211,12 +222,14 @@ async def initiate_login(provider_name: str, user_id: str = Depends(get_current_
         )
 
     try:
-        login_url = mgr.initiate_login(provider_name)
+        select_as_music_source = bool(body.select_as_music_source) if body is not None else False
+        login_url = mgr.initiate_login(provider_name, select_as_music_source=select_as_music_source)
         return success_response(
             {
                 "provider": provider_name,
                 "login_url": login_url,
                 "controller_attached": mgr._controller is not None,
+                "watching_for_sign_in": mgr.is_login_watch_active(provider_name),
                 "message": "Navigate to the login page in the browser view",
             }
         )
@@ -247,6 +260,43 @@ async def initiate_login(provider_name: str, user_id: str = Depends(get_current_
                 "Couldn't start the sign-in process. Please try again.",
             ),
         )
+
+
+@router.post(
+    "/cancel/{provider_name}",
+    dependencies=[Depends(require_auth)],
+)
+async def cancel_login(provider_name: str, user_id: str = Depends(get_current_user_id)) -> Any:
+    """Cancel a sign-in the user started: stop waiting for it and close the view."""
+    mgr = _get_auth_manager(user_id)
+    if mgr is None:
+        return JSONResponse(
+            status_code=503,
+            content=failure_response(
+                "service_unavailable",
+                "Browser auth manager is not available",
+            ),
+        )
+    try:
+        was_waiting = mgr.cancel_login(provider_name)
+    except KeyError:
+        return JSONResponse(
+            status_code=404,
+            content=failure_response(
+                "provider_not_found",
+                "Unknown provider: %s" % provider_name,
+            ),
+        )
+    except Exception:
+        logger.exception("Failed to cancel login for %s", provider_name)
+        return JSONResponse(
+            status_code=500,
+            content=failure_response(
+                "login_cancel_failed",
+                "Couldn't cancel the sign-in. Please try again.",
+            ),
+        )
+    return success_response({"provider": provider_name, "cancelled": True, "was_waiting": was_waiting})
 
 
 @router.post(

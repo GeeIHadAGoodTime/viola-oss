@@ -16,6 +16,9 @@ SPOTIFY_COOKIE_URLS = [
     "https://www.spotify.com",
 ]
 
+# Spotify's sign-in cookie: set on .spotify.com only after a real sign-in.
+SPOTIFY_AUTH_COOKIE = "sp_dc"
+
 _LOAD_TIMEOUT_SECONDS = 1.0
 _cookie_lock = threading.RLock()
 _cookie_cache_by_user: dict[str, dict[tuple[str, str, str], dict[str, Any]]] = {}
@@ -216,6 +219,77 @@ def _collect_qt_profile_cookies(profile: Any, timeout_seconds: float) -> list[di
     return [dict(cookie) for cookie in collected.values()]
 
 
+def has_spotify_auth_cookie(cookies: list[Mapping[str, Any]] | None) -> bool:
+    """Return True when *cookies* hold Spotify's sign-in cookie.
+
+    Spotify sets ``sp_dc`` on ``.spotify.com`` only after a successful sign-in
+    (the CDP side checks the same cookie, see ``has_cdp_session_cookies``).
+    Anonymous visits get other cookies (``sp_t``, ``sp_landing``), so "some
+    Spotify cookies exist" is not proof of a sign-in; this is.
+    """
+    for cookie in cookies or []:
+        if not isinstance(cookie, Mapping):
+            continue
+        if str(cookie.get("name") or "") != SPOTIFY_AUTH_COOKIE:
+            continue
+        if not str(cookie.get("value") or ""):
+            continue
+        if _is_spotify_domain(str(cookie.get("domain") or "")):
+            return True
+    return False
+
+
+def read_spotify_cookies_from_qweb(
+    webview_controller: Any | None = None,
+    *,
+    dispatch_to_main: Callable[[Callable[[], None]], bool] | None = None,
+    timeout_seconds: float = _LOAD_TIMEOUT_SECONDS,
+) -> list[dict[str, Any]] | None:
+    """Read Spotify cookies from the QWebEngine profile WITHOUT caching them.
+
+    Returns the cookies (possibly an empty list when the store has none), or
+    ``None`` when the store could not be read at all (no webview, no Qt
+    dispatcher, timeout). Callers use ``None`` to mean "unknown", never
+    "signed out".
+
+    The Qt cookie store must be read on the Qt main thread. Runtime callers
+    pass BrowserPlaybackController._post_to_main as dispatch_to_main. This
+    blocks the calling thread for about ``timeout_seconds``; async callers run
+    it in a worker thread.
+    """
+    profile = _profile_from_webview(webview_controller)
+    if profile is None:
+        return None
+
+    if _on_qt_main_thread():
+        return _collect_qt_profile_cookies(profile, timeout_seconds)
+    if dispatch_to_main is None:
+        logger.debug("Spotify cookie bridge: no Qt dispatcher for QWebEngine extraction")
+        return None
+
+    done = threading.Event()
+    result: dict[str, Any] = {}
+
+    def _collect_on_main() -> None:
+        try:
+            result["cookies"] = _collect_qt_profile_cookies(profile, timeout_seconds)
+        except Exception as exc:
+            result["error"] = exc
+        finally:
+            done.set()
+
+    if not dispatch_to_main(_collect_on_main):
+        logger.debug("Spotify cookie bridge: Qt main-thread dispatch unavailable")
+        return None
+    if not done.wait(timeout_seconds + 2.0):
+        logger.warning("Spotify cookie bridge: timed out reading QWebEngine cookies")
+        return None
+    if result.get("error") is not None:
+        logger.debug("Spotify cookie bridge extraction failed: %s", result["error"])
+        return None
+    return list(result.get("cookies") or [])
+
+
 def extract_spotify_cookies_from_qweb(
     webview_controller: Any | None = None,
     *,
@@ -228,43 +302,95 @@ def extract_spotify_cookies_from_qweb(
     The Qt cookie store must be read on the Qt main thread.  Runtime callers
     pass BrowserPlaybackController._post_to_main as dispatch_to_main.
     """
-    profile = _profile_from_webview(webview_controller)
-    if profile is None:
-        return []
-
-    if _on_qt_main_thread():
-        cookies = _collect_qt_profile_cookies(profile, timeout_seconds)
-    elif dispatch_to_main is not None:
-        done = threading.Event()
-        result: dict[str, Any] = {}
-
-        def _collect_on_main() -> None:
-            try:
-                result["cookies"] = _collect_qt_profile_cookies(profile, timeout_seconds)
-            except Exception as exc:
-                result["error"] = exc
-            finally:
-                done.set()
-
-        if not dispatch_to_main(_collect_on_main):
-            logger.debug("Spotify cookie bridge: Qt main-thread dispatch unavailable")
-            return []
-        if not done.wait(timeout_seconds + 2.0):
-            logger.warning("Spotify cookie bridge: timed out reading QWebEngine cookies")
-            return []
-        if result.get("error") is not None:
-            logger.debug("Spotify cookie bridge extraction failed: %s", result["error"])
-            return []
-        cookies = list(result.get("cookies") or [])
-    else:
-        logger.debug("Spotify cookie bridge: no Qt dispatcher for QWebEngine extraction")
-        return []
-
+    cookies = read_spotify_cookies_from_qweb(
+        webview_controller,
+        dispatch_to_main=dispatch_to_main,
+        timeout_seconds=timeout_seconds,
+    )
     if not cookies:
         return []
     if not user_id:
         raise ValueError("user_id is required to cache Spotify cookies")
     return cache_spotify_cookies(cookies, user_id=user_id)
+
+
+def clear_cached_spotify_cookies(*, user_id: str) -> None:
+    """Forget the cached Spotify cookies for one user (Disconnect)."""
+    if not user_id:
+        raise ValueError("user_id is required to clear cached Spotify cookies")
+    with _cookie_lock:
+        _cookie_cache_by_user.pop(user_id, None)
+
+
+def _delete_qt_profile_spotify_cookies(profile: Any, timeout_seconds: float) -> int:
+    from PySide6.QtCore import QEventLoop, QTimer
+
+    cookie_store = profile.cookieStore()
+    found: list[Any] = []
+
+    def _on_cookie_added(cookie: Any) -> None:
+        domain_fn = getattr(cookie, "domain", None)
+        if callable(domain_fn) and _is_spotify_domain(_to_text(domain_fn())):
+            found.append(cookie)
+
+    cookie_store.cookieAdded.connect(_on_cookie_added)
+    try:
+        cookie_store.loadAllCookies()
+        loop = QEventLoop()
+        QTimer.singleShot(max(1, int(timeout_seconds * 1000)), loop.quit)
+        loop.exec()
+    finally:
+        try:
+            cookie_store.cookieAdded.disconnect(_on_cookie_added)
+        except Exception:
+            logger.debug("Spotify cookie bridge: cookieAdded disconnect skipped")
+
+    for cookie in found:
+        cookie_store.deleteCookie(cookie)
+    return len(found)
+
+
+def delete_spotify_cookies_from_qweb(
+    webview_controller: Any | None = None,
+    *,
+    dispatch_to_main: Callable[[Callable[[], None]], bool] | None = None,
+    timeout_seconds: float = _LOAD_TIMEOUT_SECONDS,
+) -> int | None:
+    """Sign Viola's in-app browser out of Spotify by deleting its Spotify cookies.
+
+    Disconnect must reach this store too: the sign-in check reads it, so a
+    Disconnect that only cleared the playback browser's profile would be undone
+    by the next status check. Returns how many cookies were deleted, or
+    ``None`` when the store could not be reached.
+    """
+    profile = _profile_from_webview(webview_controller)
+    if profile is None:
+        return None
+    if _on_qt_main_thread():
+        return _delete_qt_profile_spotify_cookies(profile, timeout_seconds)
+    if dispatch_to_main is None:
+        return None
+
+    done = threading.Event()
+    result: dict[str, Any] = {}
+
+    def _delete_on_main() -> None:
+        try:
+            result["count"] = _delete_qt_profile_spotify_cookies(profile, timeout_seconds)
+        except Exception as exc:
+            result["error"] = exc
+        finally:
+            done.set()
+
+    if not dispatch_to_main(_delete_on_main):
+        return None
+    if not done.wait(timeout_seconds + 2.0):
+        logger.warning("Spotify cookie bridge: timed out deleting QWebEngine cookies")
+        return None
+    if result.get("error") is not None:
+        logger.debug("Spotify cookie bridge delete failed: %s", result["error"])
+        return None
+    return int(result.get("count") or 0)
 
 
 def inject_spotify_cookies_into_playwright(playwright_context: Any, *, user_id: str) -> int:
@@ -303,9 +429,14 @@ def inject_spotify_cookies_into_playwright(playwright_context: Any, *, user_id: 
 
 
 __all__ = [
+    "SPOTIFY_AUTH_COOKIE",
     "SPOTIFY_COOKIE_URLS",
     "cache_spotify_cookies",
+    "clear_cached_spotify_cookies",
+    "delete_spotify_cookies_from_qweb",
     "extract_spotify_cookies_from_qweb",
     "get_cached_spotify_cookies",
+    "has_spotify_auth_cookie",
     "inject_spotify_cookies_into_playwright",
+    "read_spotify_cookies_from_qweb",
 ]

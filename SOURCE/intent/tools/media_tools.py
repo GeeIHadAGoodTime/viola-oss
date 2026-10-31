@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import re
 from collections.abc import Callable
 from typing import Any
@@ -68,6 +69,15 @@ _LOCAL_FILE_EXTENSIONS = (
     ".flv",
     ".webm",
 )
+
+
+def _notify_spotify_not_connected() -> None:
+    try:
+        from music.providers.browser.auth_manager import notify_spotify_not_connected
+
+        notify_spotify_not_connected()
+    except Exception:
+        logger.debug("media could not show the Spotify fallback notice", exc_info=True)
 
 
 def _clean_provider(value: str | None, default: str = "auto") -> str:
@@ -326,8 +336,43 @@ def _infer_play_provider(provider: str | None, track_uri: str) -> str:
     return "youtube"
 
 
+async def _spotify_signed_in(user_id: str) -> bool:
+    try:
+        from music.providers.browser.auth_manager import is_spotify_signed_in
+
+        return bool(await asyncio.to_thread(is_spotify_signed_in, user_id or None))
+    except Exception:
+        # Unknown is not "signed out": keep the user's music source.
+        logger.debug("media could not check the Spotify sign-in", exc_info=True)
+        return True
+
+
+async def _source_fallback(requested_provider: str, search_provider: str, user_id: str) -> dict[str, Any] | None:
+    """Music source is Spotify but Spotify isn't signed in: use YouTube, as data.
+
+    Only for ``auto`` (the user's music source). An explicitly requested
+    provider is never swapped here. The returned fields go into the tool
+    result so the reply can say what happened.
+    """
+    if requested_provider != "auto" or search_provider != "spotify":
+        return None
+    if await _spotify_signed_in(user_id):
+        return None
+    logger.info("media: music source is Spotify but Spotify isn't connected; using YouTube")
+    return {
+        "fallback_used": True,
+        "fallback_from_provider": "spotify",
+        "fallback_to_provider": "youtube",
+        "fallback_reason": "spotify_not_connected",
+        "connect_tool": "connect_music_provider",
+    }
+
+
 async def _handle_search_mode(query: str, provider: str, limit: int, user_id: str) -> ToolResult:
     requested_provider, search_provider, filter_provider = _resolve_search_provider(provider, user_id)
+    source_fallback = await _source_fallback(requested_provider, search_provider, user_id)
+    if source_fallback is not None:
+        search_provider = filter_provider = "youtube"
     result = await _search_tracks_handler(query, limit=limit, provider=search_provider, user_id=user_id)
     if not result.ok:
         return result
@@ -352,6 +397,8 @@ async def _handle_search_mode(query: str, provider: str, limit: int, user_id: st
         }
     )
     data.setdefault("recently_played", [])
+    if source_fallback is not None:
+        data.update(source_fallback)
     return ToolResult(ok=True, data=data)
 
 
@@ -622,6 +669,8 @@ async def _handle_search_play_mode(
         ):
             if _field in play_data and _field not in data:
                 data[_field] = play_data[_field]
+    if play_result.ok and data.get("fallback_reason") == "spotify_not_connected" and data["playback_started"]:
+        _notify_spotify_not_connected()
     if play_result.ok:
         fallback_message = (
             ("Playing some music." if generic_request else "Playing %s." % query)

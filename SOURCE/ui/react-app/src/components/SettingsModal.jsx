@@ -129,7 +129,10 @@ function LanAccessSettingRow() {
 
 const MODAL_OPEN_DEFER_MS = 50;
 const SPOTIFY_LOGIN_POLL_MS = 2000;
-const SPOTIFY_LOGIN_TIMEOUT_MS = 120000;
+// Matches the desktop's own wait for the sign-in (LOGIN_WATCH_TIMEOUT_SECONDS
+// in music/providers/browser/auth_manager.py): typing a password, a 2-step
+// code or a password reset easily takes longer than two minutes.
+const SPOTIFY_LOGIN_TIMEOUT_MS = 600000;
 
 // Searchable settings scopes.
 const TABS = [
@@ -1609,18 +1612,26 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
   }, [activeTab, isOpen, refreshSpotifyStatus]);
 
   // Handle "Connect with Spotify" click inside the login overlay
+  const spotifyLoginAttemptRef = useRef(0);
   const handleSpotifyConnect = useCallback(async () => {
     if (isFeatureHidden('music_services')) return;
+    const attempt = spotifyLoginAttemptRef.current + 1;
+    spotifyLoginAttemptRef.current = attempt;
     setSpotifyLoginInProgress(true);
     setSpotifyStatusError(null);
     setSwitchError(null);
     try {
       // Sign in through the in-app BrowserAuth overlay so the Spotify login
-      // renders inside Viola's stage (QWebEngine + login overlay) — NOT a
-      // separate Chrome window. Cookies are bridged to the CDP playback
-      // profile, so the existing /v1/spotify/cdp/status poll below still
-      // detects success.
-      const loginResult = await apiFetch('/v1/browser/auth/login/spotify', { method: 'POST' });
+      // renders inside Viola's stage (QWebEngine + login overlay), NOT a
+      // separate browser window. The desktop watches that view for the
+      // sign-in, closes it when it lands and, because the user picked
+      // Spotify as the Music Source, saves Spotify as the music source then
+      // (select_as_music_source). That works even if this window is closed
+      // meanwhile; the poll below only updates this panel.
+      const loginResult = await apiFetch('/v1/browser/auth/login/spotify', {
+        method: 'POST',
+        body: JSON.stringify({ select_as_music_source: true }),
+      });
       if (loginResult?.controller_attached === false) {
         setSpotifyStatusError('Spotify sign-in needs the Viola desktop app. Open Viola and try again.');
         return;
@@ -1629,6 +1640,7 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
       const startedAt = Date.now();
       while (Date.now() - startedAt < SPOTIFY_LOGIN_TIMEOUT_MS) {
         await new Promise(resolve => setTimeout(resolve, SPOTIFY_LOGIN_POLL_MS));
+        if (spotifyLoginAttemptRef.current !== attempt) return; // cancelled
         const status = await refreshSpotifyStatus({ silent: true });
         if (status?.logged_in) {
           stageMusicProvider('spotify');
@@ -1649,15 +1661,22 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
     } catch {
       setSpotifyStatusError("Couldn't open Spotify sign in. Try again.");
     } finally {
-      setSpotifyLoginInProgress(false);
+      if (spotifyLoginAttemptRef.current === attempt) setSpotifyLoginInProgress(false);
     }
   }, [refreshSpotifyStatus, stageMusicProvider]);
 
-  // Handle cancel from the Spotify login overlay
+  // Handle cancel from the Spotify login overlay: stop waiting here AND on
+  // the desktop, which also closes the in-app sign-in view.
   const handleSpotifyLoginCancel = useCallback(() => {
+    const wasSigningIn = spotifyLoginInProgress;
+    spotifyLoginAttemptRef.current += 1;
+    setSpotifyLoginInProgress(false);
     setShowSpotifyLogin(false);
     setSpotifyStatusError(null);
-  }, []);
+    if (wasSigningIn && !isFeatureHidden('music_services')) {
+      apiFetch('/v1/browser/auth/cancel/spotify', { method: 'POST' }).catch(() => {});
+    }
+  }, [spotifyLoginInProgress]);
 
   const handleSpotifyDisconnect = useCallback(async () => {
     if (isFeatureHidden('music_services')) return;
