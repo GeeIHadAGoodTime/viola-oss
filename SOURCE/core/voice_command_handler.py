@@ -244,7 +244,7 @@ _BARGE_IN_SETTLE_SEC = 0.8
 _BARGE_IN_WINDOW_SEC = 3.0
 # Checks per reply. A canceller that leaves all of Viola's voice in raises a
 # candidate every couple of seconds; this bounds the speech-to-text work.
-_BARGE_IN_MAX_CHECKS = 8
+_BARGE_IN_MAX_CHECKS = 12
 # A check that takes longer than this counts as "not the user".
 _BARGE_IN_STT_TIMEOUT_SEC = 5.0
 # A run of this many consecutive words of the reply, in order, inside the
@@ -309,6 +309,18 @@ def _drop_reply_runs(tokens: list[str], spoken: list[str]) -> list[str]:
         if size >= _BARGE_IN_ECHO_RUN:
             drop.update(range(start, start + size))
     return [t for i, t in enumerate(tokens) if i not in drop]
+
+
+def _extends(checked: list[str], longer: list[str]) -> bool:
+    """True when ``longer`` starts with ``checked`` (its last word may have been cut: "so" -> "some")."""
+    if len(longer) < len(checked):
+        return False
+    for i, word in enumerate(checked):
+        other = longer[i]
+        last = i == len(checked) - 1
+        if not (_same_word(word, other) or (last and other.startswith(word))):
+            return False
+    return True
 
 
 def classify_barge_in_transcript(transcript: str, reply: str) -> BargeInDecision:
@@ -1784,7 +1796,9 @@ class VoiceCommandHandler:
         The check window can end in the middle of the request ("Viola, play
         so-"). With Viola quiet the VAD is trustworthy again, so wait until it
         hears no speech, then transcribe from the start of the check window to
-        now. If that somehow loses the wake word, the checked decision stands.
+        now. A "stop" from either transcription stops. A request runs only when
+        both transcriptions agree on it (the longer one extends the checked
+        one); otherwise Viola, who has stopped talking, listens for it again.
         """
         started = time.monotonic()
         while time.monotonic() - started < _BARGE_IN_USER_MAX_SEC:
@@ -1797,10 +1811,21 @@ class VoiceCommandHandler:
         window_end = getattr(self, "_barge_in_window_end", None) or started
         seconds = min(_BARGE_IN_WINDOW_SEC + (time.monotonic() - window_end), 30.0)
         transcript = await self._transcribe_recent(capture, seconds)
-        if not transcript:
-            return decision
-        full = classify_barge_in_transcript(transcript, message)
-        return full if full.interrupts else decision
+        full = classify_barge_in_transcript(transcript or "", message)
+        if decision.kind == "stop" or full.kind == "stop":
+            return decision if decision.kind == "stop" else full
+        if decision.kind == "command" and full.kind == "command":
+            checked, longer = _echo_words(decision.command), _echo_words(full.command)
+            if len(checked) >= 2 and _extends(checked, longer):
+                return full
+        # Whatever the user asked for was heard over Viola's own voice and the
+        # two transcriptions do not agree (replayed through the real models:
+        # "Sky I have", "has a"). Running that would put half-heard words, some
+        # of them hers, into a command. She has stopped; listen for the request
+        # again on clean audio instead.
+        if decision.kind == "command" or full.kind == "command":
+            logger.info("Barge-in request was not heard clearly over Viola's voice; listening for it again")
+        return BargeInDecision("listen", "wake_word_request_unclear" if decision.kind == "command" else decision.reason)
 
     def _take_barge_in_decision(self) -> BargeInDecision | None:
         decision = getattr(self, "_barge_in_decision", None)

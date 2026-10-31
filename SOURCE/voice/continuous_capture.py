@@ -56,6 +56,11 @@ VAD_INTERRUPT_WINDOWS: int = 10
 # SileroVAD window size (fixed by the model)
 SILERO_WINDOW_SAMPLES: int = 512
 
+# After a candidate turned out not to be the user, the next one needs only
+# this many speech chunks (Viola is still talking, so the VAD rarely rests):
+# a "Viola, stop" said between two checks is heard ~1 s later, not ~2 s.
+VAD_REARM_WINDOWS: int = 4
+
 # Speech probability threshold for interrupt detection
 VAD_SPEECH_THRESHOLD: float = 0.5
 
@@ -178,6 +183,8 @@ class ContinuousMicCapture:
         self._candidates_this_turn = 0
         # time.monotonic() of the last chunk the VAD called speech this turn.
         self._last_speech_at: float | None = None
+        # Speech chunks needed for the next candidate (VAD_REARM_WINDOWS after a re-arm).
+        self._interrupt_windows = VAD_INTERRUPT_WINDOWS
 
     # -------------------------------------------------------------------
     # Lifecycle
@@ -343,6 +350,7 @@ class ContinuousMicCapture:
                 self._interrupt_fired = False
                 self._candidates_this_turn = 0
                 self._last_speech_at = None
+                self._interrupt_windows = VAD_INTERRUPT_WINDOWS
                 self._on_interrupt = kwargs.get("on_interrupt")
                 if self._vad_model is not None:
                     try:
@@ -507,7 +515,7 @@ class ContinuousMicCapture:
             else:
                 self._vad_consecutive_speech = 0
 
-            reached = self._vad_consecutive_speech >= VAD_INTERRUPT_WINDOWS
+            reached = self._vad_consecutive_speech >= self._interrupt_windows
             aec_proc = self._aec_processor
             aec_ref = self._aec_reference_source
             aec_source = self._aec_state_source
@@ -551,7 +559,7 @@ class ContinuousMicCapture:
             log(
                 "TTS interrupt candidate: %d consecutive speech windows (aec=%s); "
                 "checking what was said before stopping Viola",
-                VAD_INTERRUPT_WINDOWS,
+                VAD_INTERRUPT_WINDOWS if candidate_number == 1 else VAD_REARM_WINDOWS,
                 "degraded" if degraded_reason is not None else "ok",
             )
             try:
@@ -570,6 +578,7 @@ class ContinuousMicCapture:
             if self._mode != MODE_VAD_MONITOR:
                 return
             self._vad_consecutive_speech = 0
+            self._interrupt_windows = VAD_REARM_WINDOWS
             self._interrupt_fired = False
 
     def seconds_since_speech(self) -> float:
