@@ -584,6 +584,7 @@ class VoiceCommandHandler:
         self._barge_in_decision: BargeInDecision | None = None
         # time.monotonic() when the last barge-in check took its audio window.
         self._barge_in_window_end: float | None = None
+        self._barge_in_no_local_stt_logged = False
         # Same-class fallback when no running app holds the desktop's command service.
         self._local_command_service: Any | None = None
 
@@ -1767,8 +1768,52 @@ class VoiceCommandHandler:
             return BargeInDecision("ignore", "check_failed")
         return classify_barge_in_transcript(transcript, message)
 
+    def _local_barge_in_transcriber(self) -> Any | None:
+        """The on-device faster-whisper transcriber for barge-in checks, or None.
+
+        Barge-in checks transcribe up to 12 clips of mostly Viola's OWN voice
+        per reply. They never go to Cloud Speech-to-Text, even when the user
+        turned it on for commands: that would be a cost, a delay, and a privacy
+        surprise. Only the local WhisperTranscriber (also the one a cloud
+        transcriber falls back to) is used; anything else means no check, and
+        then Viola is simply not interrupted by voice.
+        """
+        import sys
+
+        # Only already-loaded modules: if no local Whisper was ever built, there
+        # is nothing to use, and importing faster-whisper here would stall the
+        # event loop for seconds mid-reply.
+        whisper_module = sys.modules.get("voice.transcription.whisper")
+        WhisperTranscriber = getattr(whisper_module, "WhisperTranscriber", None)
+        if WhisperTranscriber is None:
+            return None
+        CloudWhisperTranscriber = getattr(sys.modules.get("voice.transcriber"), "CloudWhisperTranscriber", None)
+        transcriber = getattr(self.voice_pipeline, "transcriber", None)
+        impl = getattr(transcriber, "_impl", transcriber)
+        if CloudWhisperTranscriber is not None and isinstance(impl, CloudWhisperTranscriber):
+            impl = getattr(impl, "_local", None)
+        if not isinstance(impl, WhisperTranscriber):
+            return None
+        try:
+            return impl if impl.is_available() else None
+        except Exception:  # noqa: BLE001, RUF100 - unknown health counts as unavailable
+            return None
+
     async def _transcribe_recent(self, capture: Any, seconds: float) -> str | None:
-        """Transcribe the last ``seconds`` the barge-in monitor heard; None if that failed."""
+        """Transcribe the last ``seconds`` the barge-in monitor heard, on device only.
+
+        Returns None when that failed or no local transcriber exists (the
+        caller then does not interrupt Viola).
+        """
+        local = self._local_barge_in_transcriber()
+        if local is None:
+            if not getattr(self, "_barge_in_no_local_stt_logged", False):
+                self._barge_in_no_local_stt_logged = True
+                logger.info(
+                    "Barge-in checks need on-device speech-to-text, which is not available; "
+                    "Viola will not be interrupted by voice while she speaks (never sent to cloud)"
+                )
+            return None
         try:
             import numpy as np
 
@@ -1777,7 +1822,7 @@ class VoiceCommandHandler:
                 return ""
             audio = np.frombuffer(pcm, dtype=np.int16).copy()
             transcript = await asyncio.wait_for(
-                asyncio.to_thread(self.voice_pipeline.transcribe_audio, audio, False, False),
+                asyncio.to_thread(local.transcribe, audio, False),
                 timeout=_BARGE_IN_STT_TIMEOUT_SEC,
             )
         except Exception as exc:  # noqa: BLE001, RUF100 - a failed check must never cut Viola off

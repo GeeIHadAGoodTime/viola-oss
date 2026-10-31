@@ -547,7 +547,12 @@ class KokoroStopTests(unittest.IsolatedAsyncioTestCase):
         handler._record_voice_event = AsyncMock()
         # Since round 7 a barge-in candidate stops Viola only when what was
         # heard over her reply contains the wake word.
-        handler.voice_pipeline = Mock(transcribe_audio=Mock(return_value="Viola, stop."))
+        from voice.transcription.whisper import WhisperTranscriber
+
+        local_stt = Mock(spec=WhisperTranscriber)
+        local_stt.is_available.return_value = True
+        local_stt.transcribe.return_value = "Viola, stop."
+        handler.voice_pipeline = Mock(transcriber=local_stt)
         handler._barge_in_decision = None
         handler._barge_in_window_end = None
         timing = patch.multiple(vch, _BARGE_IN_SETTLE_SEC=0.05, _BARGE_IN_USER_DONE_SEC=0.05)
