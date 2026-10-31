@@ -98,6 +98,13 @@ import ModalLoadingSpinner from './components/shared/ModalLoadingSpinner';
 import ProviderBadge from './components/shared/ProviderBadge';
 import AgentDrawer from './components/AgentDrawer';
 import { clampWakeThreshold } from './utils/wakeSensitivity';
+import {
+  browserLeaveAction,
+  escapeClosesBrowser,
+  nativeBrowserSurfaceActive,
+  requestNativeBrowserClose,
+  stageForOverlayState,
+} from './utils/nativeBrowserView';
 import { appendAssistantEntry } from './utils/chatHistory';
 import { autoDetectedWeatherLocation } from './utils/weatherLocation';
 
@@ -666,7 +673,9 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
   const mediaAreaRef = useRef(null);
   const [browserOverlayVisible, setBrowserOverlayVisible] = useState(false);
   // Mode of the native browser overlay ('agentic', 'login', 'music', ...).
-  const browserOverlayModeRef = useRef('');
+  const [browserOverlayMode, setBrowserOverlayMode] = useState('');
+  // Provider whose sign-in page the native view shows (mode 'login').
+  const [loginProvider, setLoginProvider] = useState('');
   // The page the agent last browsed, so its view can be reopened after the
   // task ends or the view was closed (pill / Ctrl+K "Open Agent Browser").
   const [lastAgentBrowserUrl, setLastAgentBrowserUrl] = useState('');
@@ -934,6 +943,8 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
         setBrowserModeActive(true);
         setDisplayMode('browser');
         if (typeof window !== 'undefined' && typeof window.viola?.showBrowserOverlay === 'function') {
+          setBrowserOverlayVisible(true);
+          setBrowserOverlayMode('agentic');
           window.viola.showBrowserOverlay();
         }
       } else {
@@ -941,14 +952,12 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
       }
     }
   }, [activateMusicMode, browserModeActive, browserUrl, displayMode, handleTogglePhoneMode, lastAgentBrowserUrl]);
-  // Leaving a reopened (idle) agent browser hides the native view; while the
-  // agent is still working the view keeps running behind the music stage.
+  // Close / Done / Esc on the browser stage: go back to the music stage. The
+  // stage-leave effect below closes the native view, or parks it off screen
+  // while the agent is still working in it (the globe pill brings it back).
   const handleBrowserExit = useCallback(() => {
-    if (!agentTaskActive && typeof window !== 'undefined' && typeof window.viola?.hideBrowserOverlay === 'function') {
-      window.viola.hideBrowserOverlay();
-    }
     activateMusicMode();
-  }, [activateMusicMode, agentTaskActive]);
+  }, [activateMusicMode]);
   const handleConsultationTakeover = useCallback(async (callId) => {
     if (!callId || callOwnerTakeoverPending) return;
     setCallOwnerTakeoverPending(true);
@@ -1049,7 +1058,10 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
   // useCloudLlmConsent below.
   const [cloudLlmConsentOpen, setCloudLlmConsentOpen] = useState(false);
   const [cloudWelcomeOpen, setCloudWelcomeOpen] = useState(false);
-  const siblingModalOpen = settingsOpen || queueOpen || historyOpen || roomsOpen || helpOpen
+  // While a sign-in page from Settings is up, Settings steps aside (kept
+  // mounted, so its sign-in check keeps running) and comes back on Done.
+  const settingsSuspendedForLogin = settingsOpen && browserOverlayVisible && browserOverlayMode === 'login';
+  const siblingModalOpen = (settingsOpen && !settingsSuspendedForLogin) || queueOpen || historyOpen || roomsOpen || helpOpen
     || bugReportOpen || workbenchPanelOpen || !!loginPromptPayload || !!phoneTosPayload
     || cloudWelcomeOpen || cloudLlmConsentOpen;
   // The calendar is nested inside the card: pause onboarding for it, but
@@ -1534,14 +1546,16 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
   // The agent's own browser is NOT a stale connection overlay: hiding it here
   // closed the agent view about a second after it opened whenever a video was
   // loaded, so Take over / Hand back / Stop were unreachable (1.0.5 build 5, A5.2).
+  // A sign-in page is not stale either: it only ever shows on the browser
+  // stage now, never over the music stage, so only the legacy 'music' mode
+  // overlay is cleared here.
   useEffect(() => {
     if (!playerState.now_playing?.video_id || !browserOverlayVisible) return;
-    if (browserOverlayModeRef.current === 'agentic' || agentTaskActive) return;
+    if (browserOverlayMode !== 'music' || agentTaskActive) return;
     setBrowserOverlayVisible(false);
-    if (typeof window !== 'undefined' && window.viola?.hideBrowserOverlay) {
-      window.viola.hideBrowserOverlay();
-    }
-  }, [agentTaskActive, browserOverlayVisible, playerState.now_playing?.video_id]);
+    setBrowserOverlayMode('');
+    requestNativeBrowserClose();
+  }, [agentTaskActive, browserOverlayMode, browserOverlayVisible, playerState.now_playing?.video_id]);
 
   // Expose browser mode controls to Qt/Python
   useEffect(() => {
@@ -1576,10 +1590,18 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
       const mode = msg.mode || msg.payload?.mode || '';
       const url = msg.url || msg.payload?.url || '';
       const agentTask = msg.agent_task || msg.payload?.agent_task;
+      const agentBusy = (msg.agent_busy ?? msg.payload?.agent_busy) !== false;
       if (visible !== undefined) { setBrowserOverlayVisible(!!visible); }
-      browserOverlayModeRef.current = visible === false ? '' : mode;
+      setBrowserOverlayMode(visible === false ? '' : mode);
+      setLoginProvider(visible !== false && mode === 'login' ? url : '');
+      if (stageForOverlayState({ visible: visible !== false, mode }) === 'browser') {
+        // The sign-in page needs the browser stage: its Done button lives there.
+        setBrowserModeActive(true);
+        setDisplayMode('browser');
+      }
       if (mode === 'agentic') {
-        setAgentTaskActive(true);
+        // A reopened page (globe pill) is not a running task: no Stop button.
+        setAgentTaskActive(agentBusy);
         setBrowserUrl(url);
         if (url && url !== 'about:blank') setLastAgentBrowserUrl(url);
         if (agentTask) {
@@ -3123,6 +3145,65 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
   });
   const isChatStageActive = stageContentMode === 'chat';
 
+  // Native browser view (desktop): it may only sit on the browser stage with
+  // nothing React draws above it (dialogs, Ctrl+K palette, the menu).
+  const browserBlockingUiOpen = siblingModalOpen || calendarModalOpen || commandPaletteOpen || menuOpen;
+  const browserNativeSurfaceActive = nativeBrowserSurfaceActive({
+    stageContentMode,
+    blockingUiOpen: browserBlockingUiOpen,
+  });
+
+  // Leaving the browser stage by any route (another pill, Close/Done, Esc,
+  // Ctrl+K "Open Music") closes the view, or parks it while the agent works.
+  const previousStageContentModeRef = useRef(stageContentMode);
+  useEffect(() => {
+    const previous = previousStageContentModeRef.current;
+    previousStageContentModeRef.current = stageContentMode;
+    if (previous !== 'browser' || stageContentMode === 'browser') return;
+    const action = browserLeaveAction({
+      overlayVisible: browserOverlayVisible,
+      overlayMode: browserOverlayMode,
+      agentBusy: agentTaskActive,
+    });
+    if (action !== 'close') return;
+    setBrowserOverlayVisible(false);
+    setBrowserOverlayMode('');
+    setLoginProvider('');
+    requestNativeBrowserClose();
+  }, [agentTaskActive, browserOverlayMode, browserOverlayVisible, stageContentMode]);
+
+  // Esc on the browser stage closes it (dialogs and the palette take Esc
+  // first). Keys typed inside the native view are handled by the desktop
+  // shell, which closes the view the same way.
+  useEffect(() => {
+    const handleBrowserEscape = (event) => {
+      if (!escapeClosesBrowser({
+        key: event.key,
+        overlayVisible: browserOverlayVisible,
+        stageContentMode,
+        blockingUiOpen: browserBlockingUiOpen,
+      })) return;
+      event.preventDefault();
+      event.stopPropagation();
+      handleBrowserExit();
+    };
+    window.addEventListener('keydown', handleBrowserEscape, true);
+    return () => window.removeEventListener('keydown', handleBrowserEscape, true);
+  }, [browserBlockingUiOpen, browserOverlayVisible, handleBrowserExit, stageContentMode]);
+
+  // Ctrl+K / Esc pressed inside the native view (the desktop shell forwards
+  // them: keys typed there never reach this page).
+  useEffect(() => {
+    const openPalette = () => setCommandPaletteOpen(true);
+    const exitBrowser = () => handleBrowserExit();
+    window.addEventListener('viola:open-command-palette', openPalette);
+    window.addEventListener('viola:browser-exit', exitBrowser);
+    return () => {
+      window.removeEventListener('viola:open-command-palette', openPalette);
+      window.removeEventListener('viola:browser-exit', exitBrowser);
+    };
+  }, [handleBrowserExit, setCommandPaletteOpen]);
+
   // Voice "full screen" (desktop app): the video on the Music stage fills the
   // screen; leaving puts the stage that was showing back exactly as it was.
   const captureStageForVideoFullscreen = useCallback(() => ({
@@ -3390,7 +3471,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
       nowPlaying={nowPlaying}
       isPlaying={isPlaying}
       isSpoke={isSpoke}
-      browserOverlayVisible={browserOverlayVisible}
+      browserOverlayVisible={browserOverlayVisible && browserOverlayMode === 'music'}
       displayProgress={displayProgress}
       displayPosition={displayPosition}
       displayDuration={displayDuration}
@@ -3532,6 +3613,8 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
       onPTTEnd={handlePTTEnd}
       commandRegistry={stageCommandRegistry}
       commandScopeActive={stageContentMode === 'browser'}
+      nativeSurfaceActive={browserNativeSurfaceActive}
+      loginProvider={browserOverlayVisible && browserOverlayMode === 'login' ? (loginProvider || 'music') : ''}
     />
   );
   const stageModeRenderers = {
@@ -3881,12 +3964,19 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
       {settingsOpen && (
         <ChunkLoadErrorBoundary name="Settings">
           <Suspense fallback={<ModalLoadingSpinner />}>
-            <SettingsModal
-              isOpen={settingsOpen}
-              onClose={handleSettingsClose}
-              initialTab={settingsInitialTab}
-              initialSection={settingsInitialSection}
-            />
+            {/* Stepped aside (not closed) while its sign-in page is up. */}
+            <div
+              style={settingsSuspendedForLogin ? { display: 'none' } : undefined}
+              data-testid="settings-modal-host"
+              data-suspended={settingsSuspendedForLogin ? 'true' : undefined}
+            >
+              <SettingsModal
+                isOpen={settingsOpen}
+                onClose={handleSettingsClose}
+                initialTab={settingsInitialTab}
+                initialSection={settingsInitialSection}
+              />
+            </div>
           </Suspense>
         </ChunkLoadErrorBoundary>
       )}

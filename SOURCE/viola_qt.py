@@ -1081,6 +1081,7 @@ def _wire_browser_overlay_controller(window: "ViolaWebViewWindow", bootstrap) ->
     try:
         from services.browser_overlay_controller import (
             BrowserOverlayController,
+            overlay_state_recipients,
             set_overlay_controller,
         )
 
@@ -1099,34 +1100,29 @@ def _wire_browser_overlay_controller(window: "ViolaWebViewWindow", bootstrap) ->
             default_user_id = get_current_or_device_user_id()
 
             def _broadcast_overlay(payload: dict, *, user_id: str | None = None) -> None:
-                target_user_id = user_id or default_user_id
                 send_payload = dict(payload)
                 send_payload.pop("type", None)
+                recipients = overlay_state_recipients(user_id or default_user_id)
+
+                async def _send_all() -> None:
+                    for recipient in recipients:
+                        await event_hub.broadcast(
+                            "browser_overlay_state",
+                            send_payload,
+                            user_id=recipient,
+                            force=True,
+                        )
+
                 try:
                     running_loop = asyncio.get_running_loop()
                 except RuntimeError:
                     running_loop = None
                 if running_loop is not None:
-                    running_loop.create_task(
-                        event_hub.broadcast(
-                            "browser_overlay_state",
-                            send_payload,
-                            user_id=target_user_id,
-                            force=True,
-                        )
-                    )
+                    running_loop.create_task(_send_all())
                     return
                 loop = get_main_loop()
                 if loop is not None and loop.is_running() and not loop.is_closed():
-                    asyncio.run_coroutine_threadsafe(
-                        event_hub.broadcast(
-                            "browser_overlay_state",
-                            send_payload,
-                            user_id=target_user_id,
-                            force=True,
-                        ),
-                        loop,
-                    )
+                    asyncio.run_coroutine_threadsafe(_send_all(), loop)
                     return
                 logger.debug("No running EventHub loop for browser overlay broadcast")
 

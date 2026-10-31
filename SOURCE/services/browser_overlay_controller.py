@@ -21,6 +21,13 @@ State machine::
     LOGIN_VISIBLE
       -> HIDDEN:  login detected or cancelled
 
+    Every visible state also goes to HIDDEN through ``close_by_user()``: the
+    stage close / Done button, Esc in the view, leaving the browser stage for
+    another pill, or the agent's ``browser_close`` tool. React never shows the
+    native view anywhere but its browser stage (see ``webview_window``), so a
+    hidden or parked view can never sit over the music stage, the Ctrl+K
+    palette or a dialog.
+
 Module-level singleton:
     Use ``set_overlay_controller()`` / ``get_overlay_controller()`` to wire
     the instance created in ``viola_qt.py`` so that other subsystems (e.g.
@@ -55,6 +62,28 @@ def set_overlay_controller(controller: BrowserOverlayController) -> None:
 def get_overlay_controller() -> BrowserOverlayController | None:
     """Return the overlay controller singleton, or None if not yet wired."""
     return _instance
+
+
+def overlay_state_recipients(user_id: str | None) -> list[str]:
+    """Principals whose UI must hear ``browser_overlay_state``.
+
+    The desktop UI socket binds under whichever of this install's two
+    principals (signed-in account or device identity) resolved when it
+    connected. The controller's default user is captured at startup, often
+    before sign-in, and the agent sends its effective user; sending to only
+    one of them left React unaware of the native view (1.0.5 build 7, A5.2:
+    no Take over / Stop / Exit controls; A8: the sign-in view never left
+    "login"). Same recipients as playback transport commands: the request's
+    own user plus this desktop's local principals, never another install.
+    """
+    try:
+        from ui.websocket.event_hub import transport_command_recipients
+
+        recipients = transport_command_recipients(user_id)
+    except Exception:  # noqa: BLE001 - a lookup failure must not drop the caller's own user
+        logger.debug("Overlay recipient lookup failed", exc_info=True)
+        recipients = [user_id.strip()] if isinstance(user_id, str) and user_id.strip() else []
+    return recipients
 
 
 def _dispatch_to_main_thread(fn: Callable[[], None]) -> None:
@@ -141,6 +170,12 @@ class BrowserOverlayController:
         self._hide_outcome: str = ""  # done, error, cancelled
         # Frame streamer lifecycle: start when AGENTIC + spokes, stop when not
         self._frame_streamer_active: bool = False
+        # True while an agent task drives the AGENTIC view; False when the
+        # user reopened the page the agent left (globe pill / Ctrl+K). React
+        # shows Stop only while busy and treats leaving an idle view as close.
+        self._agent_busy: bool = False
+        # The last real page the agent browsed, so the view can be reopened.
+        self._last_agentic_url: str = ""
 
     # ------------------------------------------------------------------
     # Public API
@@ -151,6 +186,11 @@ class BrowserOverlayController:
         """Current overlay state as a string."""
         return self._state.value
 
+    @property
+    def agent_busy(self) -> bool:
+        """True while an agent task drives the AGENTIC view."""
+        return self._state == OverlayState.AGENTIC and self._agent_busy
+
     def show_music(self) -> None:
         """Show overlay for music playback."""
         self._transition(OverlayState.MUSIC)
@@ -160,10 +200,45 @@ class BrowserOverlayController:
         if user_id:
             self._broadcast_user_id = user_id
         self._current_url = url
+        if url and url != "about:blank":
+            self._last_agentic_url = url
         self._agent_task_description = task_description
         self._agent_task_status = "working"
         self._agent_phase = "acting"
+        self._agent_busy = True
         self._transition(OverlayState.AGENTIC)
+
+    def reopen_agentic(self) -> bool:
+        """Show the page the agent left open again (globe pill / Ctrl+K).
+
+        Goes through the state machine (not straight to Qt) so the view can be
+        closed again by every close path and React hears the state. Returns
+        False when there is no page to reopen. An AGENTIC view that is already
+        up (agent still working) is just shown again.
+        """
+        if self._state == OverlayState.AGENTIC:
+            self._transition(OverlayState.AGENTIC)
+            return True
+        if not self._last_agentic_url:
+            return False
+        self._current_url = self._last_agentic_url
+        self._agent_task_description = ""
+        self._agent_task_status = ""
+        self._agent_phase = ""
+        self._agent_busy = False
+        self._transition(OverlayState.AGENTIC)
+        return True
+
+    def close_by_user(self) -> str:
+        """The user closed the view (close / Done button, Esc, another pill).
+
+        Hides the view in every state, including a sign-in view and a view
+        reopened after the agent finished. Returns the state the view was in.
+        """
+        previous = self._state
+        self.hide()
+        logger.info("Browser overlay closed by the user (was %s)", previous.value)
+        return previous.value
 
     def update_agentic_status(
         self,
@@ -188,6 +263,8 @@ class BrowserOverlayController:
             return
         if url is not None:
             self._current_url = url
+            if url and url != "about:blank":
+                self._last_agentic_url = url
         if status is not None:
             self._agent_task_status = status
         if description is not None:
@@ -215,6 +292,7 @@ class BrowserOverlayController:
         self._agent_task_status = ""
         self._agent_phase = ""
         self._current_url = ""
+        self._agent_busy = False
         self._hide_outcome = outcome
         self._transition(OverlayState.HIDDEN)
 
@@ -308,9 +386,9 @@ class BrowserOverlayController:
                 "visible": self._state != OverlayState.HIDDEN,
                 "mode": self._state.value,
                 "url": self._current_url,
-                "agent_busy": self._state == OverlayState.AGENTIC,
+                "agent_busy": self._state == OverlayState.AGENTIC and self._agent_busy,
                 "browser_activity": {
-                    "active": self._state == OverlayState.AGENTIC,
+                    "active": self._state == OverlayState.AGENTIC and self._agent_busy,
                     "recently_active": False,
                     "mode": self._state.value,
                     "url": self._current_url,
