@@ -34,11 +34,14 @@ GMAIL_MODIFY_SCOPE = "https://www.googleapis.com/auth/gmail.modify"
 
 # The extra Gmail permission Viola asks for the first time the user wants it to
 # read, search or organize their mail (incremental consent, with
-# include_granted_scopes). It is kept out of the base connection while Google
-# reviews the restricted Gmail scope, so connecting Calendar never shows the
-# "Google hasn't verified this app" screen for it. Once Google approves the
-# scope, fold this into GOOGLE_CONNECTION_SCOPES and every user gets it on
-# their first connect.
+# include_granted_scopes). gmail.modify is a *restricted* scope and is not part
+# of Google's verification of Viola (see GOOGLE_VERIFIED_SCOPES), so Google
+# still shows its "Google hasn't verified this app" screen at this step and
+# caps it at 100 users. Keeping it out of the base connection means the first
+# "Connect Google" asks only for verified scopes and shows no warning. Fold it
+# into GOOGLE_CONNECTION_SCOPES only after Google approves gmail.modify (that
+# needs the restricted-scope review, normally with a CASA assessment), and add
+# it to GOOGLE_VERIFIED_SCOPES in the same change.
 GMAIL_MAILBOX_SCOPES: tuple[str, ...] = (GMAIL_MODIFY_SCOPE,)
 
 GMAIL_SCOPES = [
@@ -61,6 +64,26 @@ GOOGLE_CONNECTION_SCOPES = (
 # allowed mailbox access. This is the full list to register on the Google
 # Cloud consent screen (plus the sign-in scopes above).
 GOOGLE_CONNECTION_ALL_SCOPES = (*GOOGLE_CONNECTION_SCOPES, *GMAIL_MAILBOX_SCOPES)
+
+# The scopes Google verified for Viola's OAuth app (Google Cloud project
+# optimum-octane-478214-d6): the sign-in scopes plus the three sensitive scopes
+# submitted on 2026-10-26. A request made only of these scopes gets Google's
+# normal consent screen with no "unverified app" warning and no user cap. The
+# sign-in flow and the first desktop "Connect Google" must stay inside this
+# list (tests enforce it). Any new scope means a new Google review before it
+# can go into either flow.
+GOOGLE_VERIFIED_SCOPES: tuple[str, ...] = (
+    *GOOGLE_SIGN_IN_SCOPES,
+    CALENDAR_READONLY_SCOPE,
+    CALENDAR_EVENTS_SCOPE,
+    GMAIL_SEND_SCOPE,
+)
+
+
+def unverified_google_scopes(scopes: list[str] | tuple[str, ...] | set[str] | None) -> list[str]:
+    """Scopes in *scopes* that Google has not verified for Viola (keeps order)."""
+    verified = set(GOOGLE_VERIFIED_SCOPES)
+    return [scope for scope in dict.fromkeys(scopes or ()) if scope not in verified]
 
 # Scope policy (founder decision 2026-10-30): Gmail gets full mailbox access
 # within what Google allows without permanent deletion (gmail.modify, plus
@@ -132,6 +155,23 @@ def get_enabled_gmail_scopes(settings_obj: object | None = None) -> list[str]:
     """
     del settings_obj
     return list(GMAIL_SCOPES)
+
+
+def is_gmail_mailbox_enabled(settings_obj: object | None = None) -> bool:
+    """Whether Viola may ask Google for Gmail mailbox access (gmail.modify).
+
+    On by default (founder decision 2026-10-31: full Gmail in 1.0.5 while
+    Google reviews the restricted scope). Set ``google_gmail_mailbox_enabled``
+    to False (env ``VIOLA_GOOGLE_GMAIL_MAILBOX_ENABLED=false``) to keep every Google
+    request inside ``GOOGLE_VERIFIED_SCOPES``: Viola then never asks for
+    gmail.modify, and the read and organize tools say the feature is off.
+    """
+    try:
+        settings = _load_settings(settings_obj)
+        return bool(getattr(settings, "google_gmail_mailbox_enabled", True))
+    except (AttributeError, ImportError, TypeError, ValueError) as exc:
+        logger.debug("Gmail mailbox setting lookup failed, keeping the default: %s", exc)
+        return True
 
 
 def get_gmail_mailbox_scopes() -> list[str]:
