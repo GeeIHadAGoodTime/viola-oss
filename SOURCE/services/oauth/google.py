@@ -34,7 +34,8 @@ GMAIL_MODIFY_SCOPE = "https://www.googleapis.com/auth/gmail.modify"
 
 # The extra Gmail permission Viola asks for the first time the user wants it to
 # read, search or organize their mail (incremental consent, with
-# include_granted_scopes). gmail.modify is a *restricted* scope and is not part
+# include_granted_scopes), and only while ``is_gmail_mailbox_enabled()`` is on
+# (off by default for 1.0.5). gmail.modify is a *restricted* scope and is not part
 # of Google's verification of Viola (see GOOGLE_VERIFIED_SCOPES), so Google
 # still shows its "Google hasn't verified this app" screen at this step and
 # caps it at 100 users. Keeping it out of the base connection means the first
@@ -88,7 +89,8 @@ def unverified_google_scopes(scopes: list[str] | tuple[str, ...] | set[str] | No
 
 # Scope policy (founder decision 2026-10-30): Gmail gets full mailbox access
 # within what Google allows without permanent deletion (gmail.modify, plus
-# gmail.send). Every other Workspace scope stays read-only ("*.readonly"
+# gmail.send), once Google approves gmail.modify (2026-10-31: mailbox access is
+# off by default until then, see is_gmail_mailbox_enabled). Every other Workspace scope stays read-only ("*.readonly"
 # suffix) or a strictly-read scope (openid, userinfo.profile, userinfo.email),
 # matching the public privacy page. Drive/Docs/Sheets/Chat/Admin remain behind
 # ``google_restricted_features_enabled``.
@@ -149,10 +151,10 @@ def get_enabled_gmail_send_scopes(settings_obj: object | None = None) -> list[st
 
 
 def get_enabled_gmail_scopes(settings_obj: object | None = None) -> list[str]:
-    """Return every Gmail scope Viola uses: send plus full mailbox access.
+    """Return every Gmail scope Viola's code knows: send plus full mailbox access.
 
-    Gmail reading and organizing are on by default (founder decision
-    2026-10-30); they are not behind the restricted-features gate.
+    This is the full list, not what Viola asks for: mailbox access is asked
+    for only while ``is_gmail_mailbox_enabled()`` is on (off by default).
     """
     del settings_obj
     return list(GMAIL_SCOPES)
@@ -161,18 +163,20 @@ def get_enabled_gmail_scopes(settings_obj: object | None = None) -> list[str]:
 def is_gmail_mailbox_enabled(settings_obj: object | None = None) -> bool:
     """Whether Viola may ask Google for Gmail mailbox access (gmail.modify).
 
-    On by default (founder decision 2026-10-31: full Gmail in 1.0.5 while
-    Google reviews the restricted scope). Set ``google_gmail_mailbox_enabled``
-    to False (env ``VIOLA_GOOGLE_GMAIL_MAILBOX_ENABLED=false``) to keep every Google
-    request inside ``GOOGLE_VERIFIED_SCOPES``: Viola then never asks for
-    gmail.modify, and the read and organize tools say the feature is off.
+    Off by default (founder decision 2026-10-31: 1.0.5 never asks Google for
+    a scope Google has not approved). While it is off, every Google request
+    stays inside ``GOOGLE_VERIFIED_SCOPES``: Viola never asks for gmail.modify,
+    and the read and organize tools say reading Gmail is not available yet.
+    Set ``google_gmail_mailbox_enabled`` to True (env
+    ``VIOLA_GOOGLE_GMAIL_MAILBOX_ENABLED=true``) only once Google has approved
+    gmail.modify, or for an internal test build.
     """
     try:
         settings = _load_settings(settings_obj)
-        return bool(getattr(settings, "google_gmail_mailbox_enabled", True))
+        return bool(getattr(settings, "google_gmail_mailbox_enabled", False))
     except (AttributeError, ImportError, TypeError, ValueError) as exc:
-        logger.debug("Gmail mailbox setting lookup failed, keeping the default: %s", exc)
-        return True
+        logger.debug("Gmail mailbox setting lookup failed, keeping it off: %s", exc)
+        return False
 
 
 def get_gmail_mailbox_scopes() -> list[str]:

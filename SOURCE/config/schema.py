@@ -333,8 +333,8 @@ class SettingsSchema:
     google_restricted_features_enabled: bool = False
     """Enable restricted-scope Google Workspace features (Drive, Docs, Sheets, Chat) after verification."""
 
-    google_gmail_mailbox_enabled: bool = True
-    """Ask Google for Gmail mailbox access (gmail.modify, not yet verified by Google)."""
+    google_gmail_mailbox_enabled: bool = False
+    """Ask Google for Gmail mailbox access (gmail.modify, not yet verified by Google). Off for 1.0.5."""
 
     # =====================================================================
     # Billing Settings

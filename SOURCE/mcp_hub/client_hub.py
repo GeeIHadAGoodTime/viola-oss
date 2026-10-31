@@ -67,8 +67,10 @@ def _launch_gated_tool_names() -> set[str]:
             return set()
     except (AttributeError, ImportError, TypeError, ValueError) as exc:
         logger.debug("Restricted Google launch-gate lookup failed closed: %s", exc)
-    # Gmail is not gated: reading and organizing the user's own Gmail is on by
-    # default (founder decision 2026-10-30). Only the Drive/Docs/Sheets/Chat
+    # Gmail is not gated here: the gmail tool stays listed and, while Gmail
+    # mailbox access is off (google_gmail_mailbox_enabled, off by default until
+    # Google approves gmail.modify), its read and organize actions answer
+    # GMAIL_MAILBOX_OFF without asking Google. Only the Drive/Docs/Sheets/Chat
     # workspace bridge stays behind the restricted-features flag.
     return {"google_workspace"}
 

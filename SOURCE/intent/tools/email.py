@@ -748,6 +748,10 @@ GMAIL_MAILBOX_PERMISSION_NEEDED_MESSAGE = (
 GMAIL_MAILBOX_OFF_MESSAGE = (
     "Reading and organizing your Gmail is not available in Viola yet. Viola can still send an email you ask for."
 )
+GMAIL_DRAFT_OFF_MESSAGE = (
+    "Saving drafts in your Gmail is not available in Viola yet. Viola can still write the email here and send it "
+    "after you say yes."
+)
 GMAIL_DESKTOP_ONLY_MESSAGE = (
     "Reading and organizing Gmail works in the Viola desktop app, where your Google connection lives."
 )
@@ -873,11 +877,11 @@ def request_gmail_mailbox_access(user_id: str, *, connected: bool) -> bool:
     return opened
 
 
-def _gmail_mailbox_off_result() -> ToolResult:
+def _gmail_mailbox_off_result(message: str = GMAIL_MAILBOX_OFF_MESSAGE) -> ToolResult:
     """Gmail mailbox access is switched off for this build: never ask Google for it."""
     return ToolResult(
         ok=False,
-        error=GMAIL_MAILBOX_OFF_MESSAGE,
+        error=message,
         error_category="GMAIL_MAILBOX_OFF",
         data={"provider": "gmail", "gmail_mailbox_enabled": False},
     )
@@ -1474,6 +1478,8 @@ async def gmail_create_draft(
             message_body["threadId"] = thread_id
         created = await _gmail_request("POST", "drafts", token, scoped, json_body={"message": message_body})
     except GmailMailboxError as exc:
+        if exc.result.error_category == "GMAIL_MAILBOX_OFF" and not reply_to_message_id:
+            return _gmail_mailbox_off_result(GMAIL_DRAFT_OFF_MESSAGE)
         return exc.result
     return ToolResult(
         ok=True,
