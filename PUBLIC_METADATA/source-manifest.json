@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "1f1fc68491149d7ca8373676922cd68683280a75",
-  "sha256": "3300d77bd39e080d44cfb638bb4d148656783c08cd5e8c51af351decf1be121b",
+  "revision": "8920b2c3a838871148e72f9fc6a917302698da5e",
+  "sha256": "619e3a725ad5818fc59af415192f5f322172b046fadd001b3b629954d0df1ea9",
   "files": [
     {
       "path": ".env.example",
@@ -1585,8 +1585,8 @@
     },
     {
       "path": "intent/agent_loop.py",
-      "sha256": "4cfea712bf6692cc7ae1965a6607def5beb7c6a7468561f0e3fed90988e57faf",
-      "bytes": 254782
+      "sha256": "55426cad4952c334e874c38f6863400a9d5ee739c33eb21a45ebc371b2ec7fb3",
+      "bytes": 258756
     },
     {
       "path": "intent/agent_message_manager.py",
@@ -2145,8 +2145,8 @@
     },
     {
       "path": "intent/tools/search_tracks_tools.py",
-      "sha256": "f261dda23f8501a6380ca722ff973f9efcaaa7514c718598b7ff980ab8008b1e",
-      "bytes": 9215
+      "sha256": "1a1b964bec456dc3134326e47b7f8f0a656234131952f1893e99705b916a0612",
+      "bytes": 9521
     },
     {
       "path": "intent/tools/self_management.py",
@@ -3215,8 +3215,8 @@
     },
     {
       "path": "music/runtime/play_command.py",
-      "sha256": "430be95cd06fcac96af85dc479cbd2465609976a2218a2b57a534d01e4a22448",
-      "bytes": 19226
+      "sha256": "6bd2c1fa90358ce282a752aa80c43469925428614be6b36f44fb5d0580af8307",
+      "bytes": 20078
     },
     {
       "path": "music/runtime/playback_executor.py",
