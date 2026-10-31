@@ -80,7 +80,7 @@ def overlay_state_recipients(user_id: str | None) -> list[str]:
         from ui.websocket.event_hub import transport_command_recipients
 
         recipients = transport_command_recipients(user_id)
-    except Exception:  # noqa: BLE001 - a lookup failure must not drop the caller's own user
+    except Exception:  # a lookup failure must not drop the caller's own user
         logger.debug("Overlay recipient lookup failed", exc_info=True)
         recipients = [user_id.strip()] if isinstance(user_id, str) and user_id.strip() else []
     return recipients
