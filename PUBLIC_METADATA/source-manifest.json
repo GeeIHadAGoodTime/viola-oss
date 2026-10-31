@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "a89bd0a4f3ac7186968fd48a78c3f347520e05fd",
-  "sha256": "699e646eb8d4f48e09bd718a6e31d9326cc0754300bedf751890521ed56ccc78",
+  "revision": "ce730347bdef99de755ba17196e8977197f24833",
+  "sha256": "99d96c1a98cecd8e3f70f71836042d7a6b006d9076a4dd56d3e34169a3399b5c",
   "files": [
     {
       "path": ".env.example",
@@ -880,8 +880,8 @@
     },
     {
       "path": "config/schema.py",
-      "sha256": "673b90c887627243462b8c0eb05435e939bcf2fa18335819e62b99bca8ce252e",
-      "bytes": 20816
+      "sha256": "4d4ad03554b17dc3c32228edbc8cd45c34922e0c54da8e7170b2bfb4539e1818",
+      "bytes": 20832
     },
     {
       "path": "config/searxng/render-settings.sh",
@@ -895,8 +895,8 @@
     },
     {
       "path": "config/settings.py",
-      "sha256": "1fe72efa1b7d1c3e9e679681be49bd50580fbd503ad6f278fc5f7510ae760020",
-      "bytes": 74654
+      "sha256": "fc28c39416e729090eb866c2d5121d90ef0e074937b8d587761ce74dcd1c42b0",
+      "bytes": 74733
     },
     {
       "path": "config/settings_validation.py",
@@ -2070,8 +2070,8 @@
     },
     {
       "path": "intent/tools/email.py",
-      "sha256": "33a4dcc363ad07a52b0841f2dac10a83100d673d864c3a8d8667ea1744d955a3",
-      "bytes": 65169
+      "sha256": "a5e5b0c86b75a2676f2a62ff5f6c1063b657a71adafa946fc2533df0d77dbf16",
+      "bytes": 65520
     },
     {
       "path": "intent/tools/filesystem.py",
@@ -2255,8 +2255,8 @@
     },
     {
       "path": "mcp_hub/client_hub.py",
-      "sha256": "35bd55a8ccef52a304b3628b67aace4a640f21fa95496ead322048a74a1e7cd2",
-      "bytes": 131976
+      "sha256": "e703a863b09812f47f4571d599d53eea5422f0b5bd7a5e3d4476d6ba882327bf",
+      "bytes": 132129
     },
     {
       "path": "mcp_hub/compound_tools.py",
@@ -2375,8 +2375,8 @@
     },
     {
       "path": "mcp_servers/core_tools/server.py",
-      "sha256": "f6729ab8f04a34315e9065e58f95331c0f8e6b9bfda530ee585b6fb0971a0658",
-      "bytes": 263042
+      "sha256": "7cbfe843cd4fbd9870d8c2b07c4670dccc6e659c4ce146ef5ebcf2c2557624a2",
+      "bytes": 263259
     },
     {
       "path": "mcp_servers/phone_tool_descriptions.py",
@@ -2675,8 +2675,8 @@
     },
     {
       "path": "music/consent/adapters/google_calendar.py",
-      "sha256": "e1a2ead81007e241d771465f28f764f829d9f35b1b73c99520d5cd53d8a134c7",
-      "bytes": 21153
+      "sha256": "c7e73dda3497ddf8449b583414c77458dbb1f287a49b3a893279d161046f0245",
+      "bytes": 21256
     },
     {
       "path": "music/consent/adapters/microsoft_calendar.py",
@@ -4185,8 +4185,8 @@
     },
     {
       "path": "services/capability_registry.py",
-      "sha256": "74a56601fb6417a085334c2b594f5e6ce860fcb9a62049a10e5114abdc754450",
-      "bytes": 23781
+      "sha256": "b814c8b31fea86881c4763102bc932f015b1379bcba9ea90728ed0a8558d26cd",
+      "bytes": 24280
     },
     {
       "path": "services/cdp_target.py",
@@ -5015,8 +5015,8 @@
     },
     {
       "path": "services/oauth/google.py",
-      "sha256": "628981615180be39906bc56ec7e9e79096d3e8374f4ac9a7426e00c704765e93",
-      "bytes": 9195
+      "sha256": "899ad251197874401a1d2346fc6a1fa2b7c08523aa720041922bbf750e9192c7",
+      "bytes": 9527
     },
     {
       "path": "services/oauth/workspace_bridge.py",
@@ -10435,8 +10435,8 @@
     },
     {
       "path": "ui/react-app/src/components/AccountTab.jsx",
-      "sha256": "5848a5929c38ed8d5125b26e6ec7b896db5025faf9d116c852afcfe69ad9cd7f",
-      "bytes": 90358
+      "sha256": "742f7b59f0280f5d94f894a6d39ef3b39ea40e5c0e3fef215aba0a82fd5bb54c",
+      "bytes": 90144
     },
     {
       "path": "ui/react-app/src/components/AccountTab.legacy.jsx",
@@ -10680,8 +10680,8 @@
     },
     {
       "path": "ui/react-app/src/components/GoogleConnectSettings.test.jsx",
-      "sha256": "9bb3387c8416128c36112547337cf38bdcce5e057f65610eb6dc1b07577fc47c",
-      "bytes": 3615
+      "sha256": "d52acbc1a72cd3bceff973b2f86f4d858509ba0f08fa0a4993ec4f2b2bd71b9c",
+      "bytes": 3725
     },
     {
       "path": "ui/react-app/src/components/HelpModal.jsx",
