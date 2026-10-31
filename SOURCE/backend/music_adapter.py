@@ -202,6 +202,29 @@ class MusicControllerAdapter:
         # ResponseEnvelope is a TypedDict; return a plain dict for legacy callers.
         return dict(envelope)
 
+    @staticmethod
+    def _expected_failure(
+        intent: str,
+        exc: Exception,
+        **extra: ExtraValue,
+    ) -> dict[str, object]:
+        """The same failure envelope as ``_failure``, without a diagnostics event.
+
+        For an ordinary outcome the caller handles (a search hit YouTube will
+        not embed), not a fault: ``emit_failure`` logs at ERROR with the
+        traceback, which made each unplayable candidate look like a crash in
+        the 1.0.5 build-7 log.
+        """
+        payload: dict[str, object] = {"intent": intent}
+        payload.update(extra)
+        envelope = failure_response(
+            f"{intent}_failed",
+            str(exc) or f"{intent} failed",
+            data=to_json_value(payload),
+            details={"exception_type": type(exc).__name__},
+        )
+        return dict(envelope)
+
     def _status_payload(self) -> dict[str, ExtraValue]:
         """Get status payload for response inclusion."""
         status = self.status()
@@ -424,7 +447,7 @@ class MusicControllerAdapter:
             # the next search result; a traceback at ERROR here made one
             # unplayable search hit look like a crash (1.0.5 build 7).
             logger.warning("UI: play_async found nothing playable for query=%s: %s", query[:50] if query else None, exc)
-            return self._failure("play", exc, query=query)
+            return self._expected_failure("play", exc, query=query)
         except Exception as exc:
             logger.exception("UI: play_async failed with exception: %s", exc)
             return self._failure("play", exc, query=query)
