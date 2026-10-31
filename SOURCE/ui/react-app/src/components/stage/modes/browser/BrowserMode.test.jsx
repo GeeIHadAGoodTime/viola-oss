@@ -140,6 +140,19 @@ describe('BrowserMode', () => {
     expect(window.viola.setBrowserSurfaceActive).toHaveBeenLastCalledWith(false);
   });
 
+  it('never sends bounds that reach past the stage (the view would cover the reply text)', () => {
+    window.viola = { setBrowserOverlayBounds: vi.fn(), setBrowserSurfaceActive: vi.fn() };
+    const { container } = render(
+      <section data-testid="viola-stage"><BrowserMode browserUrl="https://example.com" /></section>
+    );
+    container.querySelector('[data-testid="viola-stage"]').getBoundingClientRect = () => ({
+      x: 0, y: 0, width: 900, height: 400, top: 0, left: 0, right: 900, bottom: 400, toJSON: () => {},
+    });
+    stubSurfaceRect(screen.getByTestId('browser-surface'));
+    act(() => { window.dispatchEvent(new Event('resize')); });
+    expect(window.viola.setBrowserOverlayBounds).toHaveBeenLastCalledWith(0, 0, 900, 400);
+  });
+
   it('re-sends the surface state when the bridge becomes ready', () => {
     render(<BrowserMode browserUrl="https://example.com" nativeSurfaceActive />);
     window.viola = { setBrowserOverlayBounds: vi.fn(), setBrowserSurfaceActive: vi.fn() };

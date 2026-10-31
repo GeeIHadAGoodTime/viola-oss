@@ -62,10 +62,25 @@ function hostFromUrl(url) {
   }
 }
 
+// The native view paints above everything, so it must never extend past the
+// stage: on a short window the browser panel (min-height) can overflow the
+// stage and the view then covered the reply text below it.
+function clipToStage(element, rect) {
+  const stage = typeof element.closest === 'function' ? element.closest('[data-testid="viola-stage"]') : null;
+  if (!stage) return rect;
+  const bounds = stage.getBoundingClientRect();
+  if (!bounds || bounds.width <= 0 || bounds.height <= 0) return rect;
+  const left = Math.max(rect.x, bounds.x);
+  const top = Math.max(rect.y, bounds.y);
+  const right = Math.min(rect.x + rect.width, bounds.x + bounds.width);
+  const bottom = Math.min(rect.y + rect.height, bounds.y + bounds.height);
+  return { x: left, y: top, width: right - left, height: bottom - top };
+}
+
 function sendBrowserBoundsFor(element) {
   if (!element) return;
   if (!window.viola || typeof window.viola.setBrowserOverlayBounds !== 'function') return;
-  const rect = element.getBoundingClientRect();
+  const rect = clipToStage(element, element.getBoundingClientRect());
   if (rect.width <= 0 || rect.height <= 0) return;
   window.viola.setBrowserOverlayBounds(
     Math.round(rect.x),
