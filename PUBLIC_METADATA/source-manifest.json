@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "39d5065c8697dcc377e7d2350897dd9dd1b77d70",
-  "sha256": "83757975671a8283650d642cb0e79fed7d3c496eb40b779a73c41c421a781374",
+  "revision": "000b0d45a06c51f86aff7b1097899ec5443e87b9",
+  "sha256": "786a56854397c6e45551f1e90f83882acd5cc31a409b19d7e2c3205eeb3b1b63",
   "files": [
     {
       "path": ".env.example",
@@ -1690,8 +1690,8 @@
     },
     {
       "path": "intent/file_gates.py",
-      "sha256": "481bd0b40ea9bcf63dbb9809441f430c5f373fb94025ada88ffce9077521c4c8",
-      "bytes": 19252
+      "sha256": "6f33a1f8eecd9192474032f8965ad17775b77687cbca0d2bf143698ff6f8d947",
+      "bytes": 19835
     },
     {
       "path": "intent/gate_protocol.py",
@@ -2360,8 +2360,8 @@
     },
     {
       "path": "mcp_servers/computer_use/server.py",
-      "sha256": "e275516443ac7009faaae3ccefcc0ad5cd1da447f99fbd007cfee8ef7d69c46c",
-      "bytes": 49767
+      "sha256": "58cfa3db77937c250f74a7c65c12be93bd1a80693281a523dbd72cff18ebbe83",
+      "bytes": 50124
     },
     {
       "path": "mcp_servers/core_tools/__init__.py",
