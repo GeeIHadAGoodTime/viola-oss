@@ -1214,6 +1214,12 @@ class BootstrapFactory:
             voice_orch = None  # Created post-startup in startup_controller
             register_post_bind_initializer(app, "music", music.materialize)
             register_post_bind_initializer(app, "llm", intent.materialize)
+            # Background thread: pays the OpenAI SDK's lazy resource import and
+            # the TLS context build once, so the first command after launch
+            # does not pay them on the event loop (round-8 cold start).
+            from services.llm.warmup import warm_llm_runtime
+
+            register_post_bind_initializer(app, "llm_warmup", warm_llm_runtime)
 
             # ----------------------------------------------------------
             # Startup health check: verify critical subsystems
