@@ -23,12 +23,158 @@ Fail-safe posture (mirrors the rest of the companion client):
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
+import contextvars
+import threading
+import uuid
+from collections.abc import Awaitable, Callable, Iterator
 from typing import Any
 
 from core.logging_config import get_logger
 from core.user_context import get_current_or_desktop_active_user_id
+from services.companion.protocol import RELAY_STREAM_KEY, RELAY_STREAM_REQUEST_FLAG
 
 logger = get_logger(__name__)
+
+RelayProgressSender = Callable[[dict[str, Any]], Awaitable[None]]
+
+# Set by the companion client while it runs one ``agent.dispatch`` command:
+# sends a ``progress`` frame for THAT command's request id. Unset elsewhere.
+relay_progress_sender: contextvars.ContextVar[RelayProgressSender | None] = contextvars.ContextVar(
+    "companion_relay_progress_sender",
+    default=None,
+)
+
+# Tokens are batched: the first goes out at once, later ones at most every
+# _STREAM_FLUSH_SECONDS, so a fast model does not become one frame per token.
+_STREAM_FLUSH_SECONDS = 0.08
+_MAX_STREAM_FRAME_CHARS = 4000
+# How long the final result may wait for the last stream frames to go out.
+_STREAM_CLOSE_TIMEOUT_SECONDS = 2.0
+
+
+class _RelayStreamForwarder:
+    """Forward a relayed turn's on-screen tokens to the cloud while it runs.
+
+    The turn runs under its own local command stream (the same mechanism the
+    desktop's typed-command route uses), so the providers publish their token
+    events there. This listener batches the tokens and sends them as progress
+    frames. :meth:`close` flushes before the handler returns, so every token
+    frame reaches the cloud before the final result frame.
+    """
+
+    def __init__(self, sender: RelayProgressSender, *, owner_id: str) -> None:
+        self._sender = sender
+        self._owner_id = owner_id
+        self.stream_id = "relay-%s" % uuid.uuid4().hex
+        self._loop = asyncio.get_running_loop()
+        self._loop_thread = threading.get_ident()
+        self._pending: list[str] = []
+        self._wake = asyncio.Event()
+        self._closing = asyncio.Event()
+        self._task: asyncio.Task[None] | None = None
+        self._registered = False
+
+    @contextlib.contextmanager
+    def attached(self) -> Iterator[None]:
+        from services.llm.stream_bus import (
+            add_stream_listener,
+            bind_stream_producer,
+            command_stream_context,
+            remove_stream_listener,
+        )
+
+        attached = False
+        try:
+            bind_stream_producer(self.stream_id, owner_id=self._owner_id)
+            self._registered = True
+            attached = add_stream_listener(self.stream_id, self._on_event)
+        except Exception:  # noqa: BLE001, RUF100 - no live text is the safe fallback
+            logger.debug("Relay stream could not attach; the answer is sent whole", exc_info=True)
+        if not attached:
+            yield
+            return
+        self._task = asyncio.create_task(self._pump(), name="companion-relay-stream")
+        try:
+            with command_stream_context(self.stream_id):
+                yield
+        finally:
+            remove_stream_listener(self.stream_id, self._on_event)
+
+    def _on_event(self, event: dict[str, Any]) -> None:
+        """Stream-bus listener; may run on any thread."""
+        token = event.get("token") if isinstance(event, dict) else None
+        if not isinstance(token, str) or not token:
+            return
+        if threading.get_ident() == self._loop_thread:
+            self._push(token)
+            return
+        with contextlib.suppress(RuntimeError):
+            self._loop.call_soon_threadsafe(self._push, token)
+
+    def _push(self, token: str) -> None:
+        if self._closing.is_set():
+            return
+        self._pending.append(token)
+        self._wake.set()
+
+    async def _flush(self) -> None:
+        text = "".join(self._pending)
+        self._pending.clear()
+        for start in range(0, len(text), _MAX_STREAM_FRAME_CHARS):
+            chunk = text[start : start + _MAX_STREAM_FRAME_CHARS]
+            await self._sender({RELAY_STREAM_KEY: {"token": chunk}})
+
+    async def _pump(self) -> None:
+        while True:
+            await self._wake.wait()
+            self._wake.clear()
+            await self._flush()
+            if self._closing.is_set():
+                return
+            with contextlib.suppress(TimeoutError):
+                await asyncio.wait_for(self._closing.wait(), timeout=_STREAM_FLUSH_SECONDS)
+
+    async def close(self) -> None:
+        """Send what is still pending, then forget the local stream."""
+        self._closing.set()
+        self._wake.set()
+        task = self._task
+        if task is not None:
+            try:
+                await asyncio.wait_for(task, timeout=_STREAM_CLOSE_TIMEOUT_SECONDS)
+            except Exception:  # noqa: BLE001, RUF100 - the final result must still go out
+                task.cancel()
+        self._forget()
+
+    def abort(self) -> None:
+        """Stop forwarding without waiting (the turn was cancelled)."""
+        self._closing.set()
+        if self._task is not None:
+            self._task.cancel()
+        self._forget()
+
+    def _forget(self) -> None:
+        if self._registered:
+            from services.llm.stream_bus import remove_stream
+
+            remove_stream(self.stream_id)
+            self._registered = False
+
+
+def _relay_stream_forwarder(payload: dict[str, Any], *, owner_id: str) -> _RelayStreamForwarder | None:
+    """A forwarder when the cloud asked for live text and a sender is wired."""
+    if payload.get(RELAY_STREAM_REQUEST_FLAG) is not True:
+        return None
+    sender = relay_progress_sender.get()
+    if sender is None or not owner_id:
+        return None
+    try:
+        return _RelayStreamForwarder(sender, owner_id=owner_id)
+    except Exception:  # noqa: BLE001, RUF100 - no live text is the safe fallback
+        logger.debug("Relay stream forwarder unavailable", exc_info=True)
+        return None
 
 
 def _error(reason: str) -> dict[str, Any]:
@@ -152,8 +298,20 @@ async def handle_agent_dispatch(payload: dict[str, Any]) -> dict[str, Any]:
         # asking for the whole turn is a way to get strictly more than the
         # bounded, consent-gated request would have granted. See
         # ``intent/permissions/remote_relay.py``.
-        with unconsented_remote_relay():
-            result = await service.execute(command_request)
+        # When the cloud asked for it (an older cloud never does), stream the
+        # on-screen text back while the turn runs. The final result below is
+        # unchanged either way.
+        forwarder = _relay_stream_forwarder(payload, owner_id=command_request.user_id)
+        stream_scope = forwarder.attached() if forwarder is not None else contextlib.nullcontext()
+        try:
+            with unconsented_remote_relay(), stream_scope:
+                result = await service.execute(command_request)
+        except BaseException:
+            if forwarder is not None:
+                forwarder.abort()
+            raise
+        if forwarder is not None:
+            await forwarder.close()
     except Exception:
         logger.exception("Companion agent.dispatch failed running the desktop pipeline")
         return _error("The desktop could not complete that request.")

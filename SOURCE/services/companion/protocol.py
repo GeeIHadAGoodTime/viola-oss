@@ -154,6 +154,20 @@ RELAY_TURN_CLOUD_PATIENCE_SECONDS = 75.0
 # stops listening. Measured unwind + round-trip on the failing runs was ~1.4 s.
 RELAY_TURN_CLOUD_MARGIN_SECONDS = RELAY_TURN_CLOUD_PATIENCE_SECONDS - RELAY_TURN_DESKTOP_BUDGET_SECONDS
 
+# ---------------------------------------------------------------- relay stream
+#
+# A relayed turn can stream its on-screen text back while the desktop runs it.
+# The cloud ASKS for it per turn by setting ``RELAY_STREAM_REQUEST_FLAG`` in the
+# ``agent.dispatch`` payload, and only when someone is reading the turn's
+# stream. The desktop then sends ``progress`` frames whose payload is
+# ``{RELAY_STREAM_KEY: {"token": "<text>"}}`` before its final ``result``.
+#
+# The opt-in is what keeps mixed versions safe: an older cloud never sets the
+# flag, so a newer desktop sends nothing extra; an older desktop ignores the
+# unknown payload key and answers whole, exactly as before.
+RELAY_STREAM_REQUEST_FLAG = "stream_events"
+RELAY_STREAM_KEY = "relay_stream"
+
 COMMAND_TYPES = frozenset(_COMMAND_TYPE_ALIASES.values())
 MESSAGE_TYPES = (
     COMMAND_TYPES

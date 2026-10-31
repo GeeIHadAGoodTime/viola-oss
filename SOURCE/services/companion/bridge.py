@@ -4,6 +4,7 @@ import asyncio
 import base64
 import contextlib
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -12,6 +13,7 @@ from core.logging_config import get_logger
 from fastapi import WebSocket, WebSocketDisconnect
 
 from .protocol import (
+    RELAY_STREAM_KEY,
     CompanionBinaryFrame,
     CompanionMessage,
     message_scope,
@@ -41,6 +43,21 @@ from .security import (
 logger = get_logger(__name__)
 
 _BRIDGE_SINGLETON: CompanionBridge | None = None
+
+# Upper bound on the text one relay-stream frame may carry. The desktop batches
+# tokens every ~80 ms, so a real frame is a few words; anything larger is cut.
+_MAX_RELAY_STREAM_TOKEN_CHARS = 8192
+
+RelayStreamCallback = Callable[[dict[str, Any]], None]
+
+
+@dataclass(frozen=True, slots=True)
+class _RelayStreamListener:
+    """Who may feed a relayed turn's live text, and where it goes."""
+
+    user_id: str
+    device_id: str
+    callback: RelayStreamCallback
 
 
 @dataclass(slots=True)
@@ -88,6 +105,43 @@ class CompanionBridge:
         self._pending_waiters: dict[str, asyncio.Future[CompanionCommand | None]] = {}
         self._timeout_tasks: dict[str, asyncio.Task[None]] = {}
         self._dispatch_started_at: dict[str, float] = {}
+        # Live text of relayed turns, keyed by the cloud's own turn id (the
+        # ``request_id`` inside the agent.dispatch payload). In memory only:
+        # stream frames are never persisted.
+        self._relay_stream_listeners: dict[str, _RelayStreamListener] = {}
+        # companion request_id -> turn id, filled once a frame was verified
+        # against the persisted command, so later frames skip the lookup.
+        self._relay_stream_routes: dict[str, str] = {}
+
+    def add_relay_stream_listener(
+        self,
+        turn_id: str,
+        *,
+        user_id: str,
+        device_id: str,
+        listener: RelayStreamCallback,
+    ) -> bool:
+        """Receive the live text a desktop streams back for one relayed turn.
+
+        Only frames from ``device_id`` of ``user_id``, for a command that
+        device owns and whose payload carries ``turn_id``, ever reach
+        ``listener``. Returns False when the arguments are unusable.
+        """
+        turn = str(turn_id or "").strip()
+        owner = str(user_id or "").strip()
+        device = str(device_id or "").strip()
+        if not turn or not owner or not device or not callable(listener):
+            return False
+        self._relay_stream_listeners[turn] = _RelayStreamListener(user_id=owner, device_id=device, callback=listener)
+        return True
+
+    def remove_relay_stream_listener(self, turn_id: str) -> None:
+        """Stop delivering live text for ``turn_id`` (no-op when unknown)."""
+        turn = str(turn_id or "").strip()
+        self._relay_stream_listeners.pop(turn, None)
+        for request_id, mapped in list(self._relay_stream_routes.items()):
+            if mapped == turn:
+                self._relay_stream_routes.pop(request_id, None)
 
     def set_rate_limiter_redis(self, redis_backend: Any | None) -> None:
         self._security.set_rate_limiter_redis(redis_backend)
@@ -495,6 +549,9 @@ class CompanionBridge:
         if not message.request_id:
             logger.warning("Discarding companion message without request_id: %s", message.type)
             return
+        if message.type == "progress" and isinstance(message.payload.get(RELAY_STREAM_KEY), dict):
+            await self._handle_relay_stream_frame(device=device, message=message)
+            return
         if (
             await self._resolve_inbound_command(
                 device=device,
@@ -550,6 +607,48 @@ class CompanionBridge:
             device_id=device.device_id,
         )
         await self._finish_waiter(message.request_id, completed)
+
+    async def _handle_relay_stream_frame(
+        self,
+        *,
+        device: CompanionDevice,
+        message: CompanionMessage,
+    ) -> None:
+        """Hand one relay-stream frame to the turn's listener, or drop it.
+
+        Never persisted and never completes the command. A frame is delivered
+        only when the command it names belongs to this connected device of this
+        user, and the listener registered for that command's turn is for the
+        same user and device. Anything else is dropped silently.
+        """
+        request_id = str(message.request_id or "")
+        turn_id = self._relay_stream_routes.get(request_id)
+        if turn_id is None:
+            if not any(
+                listener.user_id == device.user_id and listener.device_id == device.device_id
+                for listener in self._relay_stream_listeners.values()
+            ):
+                return
+            command = await self._resolve_inbound_command(
+                device=device,
+                request_id=request_id,
+                message_type=message.type,
+            )
+            if command is None or command.user_id != device.user_id or command.device_id != device.device_id:
+                return
+            turn_id = str((command.payload or {}).get("request_id") or "")
+        listener = self._relay_stream_listeners.get(turn_id) if turn_id else None
+        if listener is None or listener.user_id != device.user_id or listener.device_id != device.device_id:
+            return
+        self._relay_stream_routes[request_id] = turn_id
+        frame = message.payload.get(RELAY_STREAM_KEY) or {}
+        token = frame.get("token")
+        if not isinstance(token, str) or not token:
+            return
+        try:
+            listener.callback({"token": token[:_MAX_RELAY_STREAM_TOKEN_CHARS]})
+        except Exception:  # noqa: BLE001, RUF100 - a listener must never break the companion socket
+            logger.debug("Relay stream listener failed", exc_info=True)
 
     async def _resolve_inbound_command(
         self,
