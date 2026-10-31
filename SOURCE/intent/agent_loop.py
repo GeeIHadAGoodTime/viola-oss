@@ -1323,6 +1323,72 @@ def _playback_terminal_response(tool_name: str, tool_result: Any) -> tuple[str, 
     return message, action in _PLAYBACK_SILENT_ACTIONS
 
 
+_TITLE_BRACKETS_RE = re.compile(r"[\(\[\{][^\)\]\}]*[\)\]\}]")
+_TITLE_TAIL_SEPARATORS_RE = re.compile(r"\s*[|~•]\s*|\s+:\s+")
+_TITLE_DASH_RE = re.compile(r"\s+-\s+")
+_SHORT_TITLE_MAX_WORDS = 8
+
+
+def _short_track_title(title: str, artist: str) -> str:
+    """A speakable title: no bracketed tags, emoji or "| Official Video" tails.
+
+    "Jazz Relaxing Music for Stress Relief <emoji> Happy Fall Jazz in the Cozy
+    Atmosphere of A Lake View Cafe" -> "Jazz Relaxing Music for Stress Relief";
+    "DRAKE - QUEBEC" by Drake -> "QUEBEC".
+    """
+    text = (title or "").replace("–", "-").replace("—", "-").replace("’", "'")
+    text = _TITLE_BRACKETS_RE.sub(" ", text)
+    head = next((part.strip() for part in _TITLE_TAIL_SEPARATORS_RE.split(text) if part and part.strip()), "")
+    # "Artist - Title": drop the artist when it is the first half.
+    halves = [part.strip() for part in _TITLE_DASH_RE.split(head) if part.strip()]
+    artist_key = (artist or "").strip().casefold()
+    if len(halves) == 2 and artist_key and artist_key in halves[0].casefold():
+        head = halves[1]
+    # An emoji or symbol run usually starts a decorative tail; keep what precedes it.
+    head = re.sub(r"^[^\w]+", "", head)
+    head = re.split(r"[^\w\s'&.,!?/-]", head, maxsplit=1)[0]
+    words = head.split()
+    return " ".join(words[:_SHORT_TITLE_MAX_WORDS]).strip(" -,.")
+
+
+def _media_play_terminal_response(tool_name: str, tool_result: Any) -> str | None:
+    """Short reply when ``media search_play`` confirmed the track is playing.
+
+    The follow-up model turn only restated the tool's own result (round-7
+    latency: 1.5-2.4 s of model time for "Now playing relaxing jazz by Jazz
+    Horizon"). Anything the user should hear about -- an unconfirmed start, a
+    provider fallback, a sign-in link, a candidate list, an unrelated match --
+    still goes back to the model.
+    """
+    if tool_name != "media" or tool_result is None or not getattr(tool_result, "ok", False):
+        return None
+    if getattr(tool_result, "unverified", False):
+        return None
+    data = getattr(tool_result, "data", None)
+    if not isinstance(data, dict):
+        return None
+    if str(data.get("action") or data.get("mode") or "") != "search_play":
+        return None
+    if data.get("playback_started") is not True or data.get("needs_selection"):
+        return None
+    if data.get("warnings") or data.get("fallback_used") or data.get("login_url_to_show_user"):
+        return None
+    play = data.get("play_result")
+    if not isinstance(play, dict) or play.get("playback_verified") is not True:
+        return None
+    if play.get("fallback_used") or play.get("query_match") == "fallback_unrelated":
+        return None
+    selected = data.get("selected_track") if isinstance(data.get("selected_track"), dict) else {}
+    title = str(play.get("title") or selected.get("title") or "").strip()
+    artist = str(play.get("artist") or selected.get("artist") or "").strip()
+    short = _short_track_title(title, artist)
+    if not short:
+        return None
+    if artist and artist.casefold() not in {"youtube", "unknown artist"} and artist.casefold() not in short.casefold():
+        return "Playing %s by %s." % (short, artist)
+    return "Playing %s." % short
+
+
 def _set_final_response(
     executor: AgentExecutor,
     answer: str | None,
@@ -4553,6 +4619,20 @@ async def run_agent_loop(
                         str((tool_result.data or {}).get("action") or ""),
                         _playback_silent,
                     )
+                _media_terminal = _media_play_terminal_response(tc_name, tool_result)
+                if (
+                    _media_terminal is not None
+                    and len(all_tool_calls) == 1
+                    and all(name in _DISCOVERY_TOOL_NAMES for name in tools_called[:-1])
+                ):
+                    _set_final_response(
+                        executor,
+                        _media_terminal,
+                        continue_listening=False,
+                        params={"terminal_tool": "media"},
+                    )
+                    _media_terminal_fired = True
+                    logger.info("Agent loop: confirmed media play ends the turn without another model call")
 
                 # Surface ui_action hints (e.g. knowledge open_folder) so the
                 # ai_controller can merge them into the response envelope and

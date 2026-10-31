@@ -275,17 +275,36 @@ class PlayCommandService:
         if player._telemetry is not None:
             player._telemetry.record_play_request()
 
+        # Publish the new track BEFORE topping up the autoplay radio queue. The
+        # refill fetches a YouTube Music radio list (2-3 s); done first, it held
+        # back the state broadcast, so the player did not even load the track
+        # until the radio list arrived (round-7 latency: "play some jazz" spent
+        # 2.3 s here before the iframe started).
+        if emit:
+            player._emit()
+
+        # For embedded playback modes, set now_playing immediately
+        self._set_embedded_now_playing(item, emit)
+
+        if player._test_mode:
+            self._ensure_now_playing_state(item)
+
         autoplay = getattr(player, "autoplay", None)
         logger.info(
             "🔄 PlayCommand: autoplay=%s appended_to_queue=%s",
             autoplay is not None,
             appended_to_queue,
         )
+        added = 0
         if autoplay and not appended_to_queue:
             try:
                 autoplay.cancel_pending()
                 autoplay.set_anchor(item)
-                ensure_blocking = getattr(autoplay, "ensure_buffer_blocking", None)
+                # The radio refill does not change what is playing now, so it
+                # runs in the background when the controller offers that;
+                # waiting for it added 2-3 s to every "play X" reply.
+                refill_async = getattr(autoplay, "check_and_run_async", None)
+                ensure_blocking = None if callable(refill_async) else getattr(autoplay, "ensure_buffer_blocking", None)
                 if callable(ensure_blocking):
                     logger.debug("[QUEUE_TRACE] PlayCommandService.play() calling ensure_buffer_blocking")
                     added = int(ensure_blocking(current_track=item, timeout_seconds=6.0))
@@ -306,14 +325,9 @@ class PlayCommandService:
                 appended_to_queue,
             )
 
-        if emit:
+        if emit and added:
+            # The radio tracks joined the queue after the first broadcast.
             player._emit()
-
-        # For embedded playback modes, set now_playing immediately
-        self._set_embedded_now_playing(item, emit)
-
-        if player._test_mode:
-            self._ensure_now_playing_state(item)
 
         return return_item
 
