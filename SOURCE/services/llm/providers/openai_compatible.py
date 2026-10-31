@@ -34,6 +34,7 @@ from services.conversation.frame_rendering import (
     render_for_openai_responses,
     render_openai_responses_instructions,
 )
+from services.llm.answer_stream import AnswerAttempt, observe_openai_responses_event
 from services.llm.model_fallback import FALLBACK_MODEL
 from services.llm.no_result import (
     NO_RESULT_RETRY_INSTRUCTION,
@@ -759,7 +760,7 @@ def _drop_unsupported_chat_tool_reasoning(
     if "reasoning_effort" in api_kwargs:
         api_kwargs.pop("reasoning_effort", None)
         logger.debug(
-            "Dropping reasoning_effort for reasoning-model chat.completions " "tool call: model=%s",
+            "Dropping reasoning_effort for reasoning-model chat.completions tool call: model=%s",
             model,
         )
 
@@ -2882,6 +2883,7 @@ class OpenAICompatibleProvider(BaseLLMProvider):
                             fallback_kwargs,
                         )
 
+                    answer_attempt: AnswerAttempt | None = None
                     try:
                         if stream_capture is None:
                             return await _responses_create_with_storage_consent(
@@ -2904,6 +2906,10 @@ class OpenAICompatibleProvider(BaseLLMProvider):
                         captured_output_items: list[Any] = []
                         stream_kwargs = copy.deepcopy(api_kwargs)
                         stream_kwargs["stream"] = True
+                        # Final-answer events for streamed speech (see
+                        # services/llm/answer_stream.py): which text is the
+                        # answer and which is a preamble to a tool call.
+                        answer_attempt = AnswerAttempt.begin(command_stream_id)
                         stream = await _responses_create_with_storage_consent(
                             self._client,
                             self.config,
@@ -2911,6 +2917,7 @@ class OpenAICompatibleProvider(BaseLLMProvider):
                         )
                         async for event in stream:
                             capture_openai_responses_stream_event(stream_capture, event)
+                            observe_openai_responses_event(answer_attempt, event)
                             event_type = str(_stream_event_field(event, "type", "") or "")
                             if event_type == "response.output_item.done":
                                 _item = _stream_event_field(event, "item")
@@ -2937,6 +2944,18 @@ class OpenAICompatibleProvider(BaseLLMProvider):
                         stream_capture.emit_terminal("stop", summarize_openai_response(completed_response))
                         if completed_response is None:
                             raise _ResponsesStreamFallbackError("stream_completed_without_final_response")
+                        if answer_attempt is not None:
+                            answer_attempt.end(
+                                status=(
+                                    "incomplete"
+                                    if str(getattr(completed_response, "status", "") or "") == "incomplete"
+                                    else "completed"
+                                ),
+                                tool_calls=any(
+                                    str(_stream_event_field(item, "type", "") or "") == "function_call"
+                                    for item in (getattr(completed_response, "output", None) or captured_output_items)
+                                ),
+                            )
                         if captured_output_items and not (getattr(completed_response, "output", None) or []):
                             try:
                                 completed_response.output = captured_output_items
@@ -2949,8 +2968,12 @@ class OpenAICompatibleProvider(BaseLLMProvider):
                     except _ResponsesStreamFallbackError as exc:
                         if stream_capture is not None:
                             stream_capture.emit_terminal("error", summarize_stream_error(exc))
+                        if answer_attempt is not None:
+                            answer_attempt.end(status="failed")
                         return await _retry_non_streaming_after_stream_error(exc)
                     except Exception as exc:
+                        if answer_attempt is not None:
+                            answer_attempt.end(status="failed")
                         if stream_capture is not None:
                             stream_capture.emit_terminal("error", summarize_stream_error(exc))
                         failure = self._responses_failure_metadata(
@@ -2965,6 +2988,11 @@ class OpenAICompatibleProvider(BaseLLMProvider):
                             exc=exc,
                             fingerprint=responses_request_fingerprint,
                         )
+                        raise
+                    except BaseException:
+                        # Cancelled (the user stopped the reply): this call's text is not an answer.
+                        if answer_attempt is not None:
+                            answer_attempt.end(status="failed")
                         raise
 
                 return await _do_third_party_chat_native_call()

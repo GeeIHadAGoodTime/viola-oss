@@ -28,11 +28,13 @@ import importlib
 import json
 import os
 import time
+from collections.abc import AsyncIterator
 from types import ModuleType
 from typing import TYPE_CHECKING, Any, Callable, Mapping, Protocol, cast
 
 from core.logging_config import get_logger
 from services.conversation.frame_rendering import render_for_anthropic
+from services.llm.answer_stream import AnswerAttempt, observe_anthropic_stream_event
 from services.llm.anthropic_cache import (
     AnthropicCachePolicy,
     adjust_params_for_non_streaming,
@@ -404,6 +406,14 @@ def _policy_fallback_model(model_name: str) -> str | None:
     return FALLBACK_MODEL if effective_model and effective_model != FALLBACK_MODEL else None
 
 
+async def _observed_stream(stream: Any, attempt: AnswerAttempt) -> AsyncIterator[Any]:
+    """Pass an Anthropic event stream through, reporting it as answer events."""
+    iterator = stream.__aiter__() if hasattr(stream, "__aiter__") else aiter(stream)
+    async for event in iterator:
+        observe_anthropic_stream_event(attempt, event)
+        yield event
+
+
 class AnthropicProvider(BaseLLMProvider):
     """
     LLM provider for Anthropic's Claude models.
@@ -599,6 +609,7 @@ class AnthropicProvider(BaseLLMProvider):
         client: Any = None,
         prefer_stream: bool | None = None,
         idle_timeout_s: float | None = None,
+        answer_events: bool = False,
     ) -> Any:
         """Stream-first wire send with bounded non-streaming recovery.
 
@@ -642,9 +653,24 @@ class AnthropicProvider(BaseLLMProvider):
             stream = None
 
         if stream is not None:
+            attempt = AnswerAttempt.begin() if answer_events else None
             try:
+                if attempt is not None:
+                    response = await consume_stream(_observed_stream(stream, attempt), idle_timeout_s=idle_timeout_s)
+                    attempt.end(
+                        status="incomplete" if getattr(response, "stop_reason", None) == "max_tokens" else "completed",
+                        tool_calls=any(
+                            getattr(block, "type", None) == "tool_use"
+                            for block in getattr(response, "content", None) or []
+                        ),
+                    )
+                    return response
                 return await consume_stream(stream, idle_timeout_s=idle_timeout_s)
-            except StreamConsumerError as exc:
+            except BaseException as exc:
+                if attempt is not None:
+                    attempt.end(status="failed")
+                if not isinstance(exc, StreamConsumerError):
+                    raise
                 if self._nonstreaming_fallback_disabled():
                     logger.warning(
                         "Anthropic stream failed (%s) and non-streaming fallback is disabled",
@@ -1166,7 +1192,9 @@ class AnthropicProvider(BaseLLMProvider):
             )
 
             async def _do_native_call() -> Any:
-                return await self._send_request(api_kwargs)
+                # The agent turn's text may be spoken while it streams
+                # (services/llm/answer_stream.py); other requests never are.
+                return await self._send_request(api_kwargs, answer_events=True)
 
             _native_result = await execute_with_policy(
                 _do_native_call,

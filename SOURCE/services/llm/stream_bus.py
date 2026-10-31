@@ -8,7 +8,7 @@ import contextvars
 import re
 import threading
 import time
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from typing import Any
 
 from core.logging_config import get_logger
@@ -20,6 +20,7 @@ _STREAM_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$")
 
 StreamEvent = dict[str, Any]
 StreamQueue = asyncio.Queue[StreamEvent | None]
+StreamListener = Callable[[StreamEvent], None]
 
 _current_command_stream_id: contextvars.ContextVar[str | None] = contextvars.ContextVar(
     "current_command_stream_id",
@@ -39,6 +40,9 @@ _stream_viewer_counts: dict[str, int] = {}
 _stream_token_counts: dict[str, int] = {}
 _stream_tool_events: dict[str, list[StreamEvent]] = {}
 _stream_event_history: dict[str, list[StreamEvent | None]] = {}
+# In-process subscribers (the streamed-speech sink). Called synchronously, in
+# publish order, on the publisher's thread; they must not block.
+_stream_listeners: dict[str, list[StreamListener]] = {}
 _streams_lock = threading.RLock()
 
 
@@ -140,6 +144,35 @@ def remove_stream(stream_id: str) -> None:
         _stream_token_counts.pop(normalized, None)
         _stream_tool_events.pop(normalized, None)
         _stream_event_history.pop(normalized, None)
+        _stream_listeners.pop(normalized, None)
+
+
+def add_stream_listener(stream_id: str | None, listener: StreamListener) -> bool:
+    """Call ``listener`` with every event later published to ``stream_id``.
+
+    In-process only (the SSE route keeps using the queue). Returns False when
+    the stream is not registered.
+    """
+    normalized = normalize_stream_id(stream_id)
+    if normalized is None:
+        return False
+    with _streams_lock:
+        if normalized not in _active_streams:
+            return False
+        _stream_listeners.setdefault(normalized, []).append(listener)
+    return True
+
+
+def remove_stream_listener(stream_id: str | None, listener: StreamListener) -> None:
+    """Stop calling ``listener`` for ``stream_id`` (no-op when not registered)."""
+    normalized = normalize_stream_id(stream_id)
+    if normalized is None:
+        return
+    with _streams_lock:
+        listeners = _stream_listeners.get(normalized)
+        if not listeners:
+            return
+        _stream_listeners[normalized] = [fn for fn in listeners if fn is not listener]
 
 
 def stream_has_producer(stream_id: str) -> bool:
@@ -272,7 +305,13 @@ def publish_stream_event(stream_id: str | None, event: StreamEvent | None) -> bo
         if payload.get("token"):
             _stream_token_counts[normalized] = _stream_token_counts.get(normalized, 0) + 1
         _stream_event_history.setdefault(normalized, []).append(payload)
+        listeners = list(_stream_listeners.get(normalized, ()))
     queue.put_nowait(payload)
+    for listener in listeners:
+        try:
+            listener(payload)
+        except Exception:  # noqa: BLE001, RUF100 - a listener must never break the provider stream
+            logger.debug("Stream listener failed", exc_info=True)
     return True
 
 
