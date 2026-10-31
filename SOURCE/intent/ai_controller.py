@@ -1754,7 +1754,8 @@ class AIController:
                                 channel_type=_ch_type,
                             )
                     finally:
-                        self._context_builder.clear_prefetched_account_identity(_identity_token)
+                        if _identity_token is not None:
+                            type(self._context_builder).clear_prefetched_account_identity(_identity_token)
                     context_bundle = self._apply_voice_current_user_frame(
                         context_bundle,
                         text=text,
