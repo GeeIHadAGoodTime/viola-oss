@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "8920b2c3a838871148e72f9fc6a917302698da5e",
-  "sha256": "619e3a725ad5818fc59af415192f5f322172b046fadd001b3b629954d0df1ea9",
+  "revision": "102415d01e8225af8ff3955495462d7d69488237",
+  "sha256": "acd022000f7e060aa710f340b4ae1b93b390dbed0c9e3397ca21af6da9fdb01b",
   "files": [
     {
       "path": ".env.example",
@@ -1585,8 +1585,8 @@
     },
     {
       "path": "intent/agent_loop.py",
-      "sha256": "55426cad4952c334e874c38f6863400a9d5ee739c33eb21a45ebc371b2ec7fb3",
-      "bytes": 258756
+      "sha256": "d68539a05193f3ef32dd8fa38b0da95513862ca0283b06538ee6f244963529e2",
+      "bytes": 259492
     },
     {
       "path": "intent/agent_message_manager.py",
@@ -2375,8 +2375,8 @@
     },
     {
       "path": "mcp_servers/core_tools/server.py",
-      "sha256": "42511b1316e4f66f8bb9c471f7b342b3983f8c9a198fc276aedf709ff3113ba4",
-      "bytes": 261354
+      "sha256": "f6729ab8f04a34315e9065e58f95331c0f8e6b9bfda530ee585b6fb0971a0658",
+      "bytes": 263042
     },
     {
       "path": "mcp_servers/phone_tool_descriptions.py",
