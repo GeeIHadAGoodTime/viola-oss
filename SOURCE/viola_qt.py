@@ -9,6 +9,24 @@ import sys as _sys
 _DESKTOP_CUSTOMER_PROFILE_AT_IMPORT = os.getenv("VIOLA_KOKORO_PHONEMIZER") == "misaki-en"
 
 
+def _cap_blas_threads() -> None:
+    """Give numpy's and scipy's OpenBLAS one worker thread unless the user chose otherwise.
+
+    Each OpenBLAS copy commits a ~32 MB buffer per worker thread the moment the
+    library loads, and the desktop loads two copies (numpy and scipy). On an
+    8-thread laptop that is about 0.5 GB of private memory for thread pools the
+    app never uses: Viola's numpy work is 1-D dots and norms on audio frames,
+    the models run in ONNX Runtime and CTranslate2 with their own thread pools,
+    and spaCy uses BLIS. OpenBLAS reads the variable only when its DLL loads,
+    so this must run before anything imports numpy. ``setdefault`` keeps an
+    explicit user or deployment value.
+    """
+    os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
+
+
+_cap_blas_threads()
+
+
 def _install_frozen_safe_stdio() -> None:
     """Install discard streams for frozen windowed builds with no console."""
     if not getattr(_sys, "frozen", False):
