@@ -371,6 +371,22 @@ def redact_card_data(blob: Any) -> Any:
         return _REDACTED_SANITIZER_ERROR
 
 
+def redact_card_field(key: Any, value: Any) -> Any:
+    """Redact one top-level field exactly as ``redact_card_data({key: value, ...})`` would.
+
+    Lets a caller redact a large field once and reuse the result (the agent
+    step log memoizes its static tool-schema fields). Raises what the sanitizer
+    raises, so the caller can fall back to redacting the whole mapping.
+    """
+    normalized = _normalize_key(key)
+    child_path = (normalized,)
+    if normalized in _CVC_KEYS:
+        return None if value is None else "***"
+    if normalized in _CARD_NUMBER_KEYS and not _has_phone_context(()):
+        return _mask_card_field_value(value, child_path, set(), 1)
+    return _redact_card_any(value, child_path, set(), 1)
+
+
 def _match_inside_url_token(value: str, start: int, end: int) -> bool:
     left = start
     while left > 0 and not value[left - 1].isspace():

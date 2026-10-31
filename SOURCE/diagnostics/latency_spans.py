@@ -61,7 +61,8 @@ def _write_row(row: dict[str, Any]) -> None:
     try:
         with _lock:
             path = _spans_file()
-            path.parent.mkdir(parents=True, exist_ok=True)
+            if not _anchor_written:
+                path.parent.mkdir(parents=True, exist_ok=True)
             with path.open("a", encoding="utf-8") as fh:
                 if not _anchor_written:
                     _anchor_written = True
@@ -193,7 +194,15 @@ def start_event_loop_heartbeat() -> None:
 # LOOP_STALL_STACK event with the innermost frames (file:line function).
 # ---------------------------------------------------------------------------
 
-_STALL_THRESHOLD_S = 0.2
+
+def _stall_threshold_s() -> float:
+    try:
+        return max(0.03, float(config_env.get("VIOLA_LATENCY_STALL_MS") or 200) / 1000.0)
+    except ValueError:
+        return 0.2
+
+
+_STALL_THRESHOLD_S = _stall_threshold_s()
 _STALL_SAMPLE_S = 0.1
 
 
@@ -225,6 +234,28 @@ def _start_loop_stall_sampler() -> None:
             frame = frame.f_back
         return out
 
+    idle_functions = {
+        "wait",
+        "_wait_for_tstate_lock",
+        "select",
+        "_worker",
+        "get",
+        "sleep",
+        "_watch",
+        "accept",
+        "recv",
+        "readinto",
+    }
+
+    def _busy_other_threads(frames: dict[int, Any], skip: int) -> list[dict[str, Any]]:
+        names = {thread.ident: thread.name for thread in threading.enumerate()}
+        busy: list[dict[str, Any]] = []
+        for ident, other in frames.items():
+            if ident in (skip, threading.get_ident()) or other.f_code.co_name in idle_functions:
+                continue
+            busy.append({"thread": names.get(ident, str(ident)), "stack": _frames_text(other)[:10]})
+        return busy[:6]
+
     def _watch() -> None:
         reported_for = 0.0
         while not loop.is_closed():
@@ -235,7 +266,8 @@ def _start_loop_stall_sampler() -> None:
             stalled = time.perf_counter() - last
             if stalled < _STALL_THRESHOLD_S:
                 continue
-            frame = sys._current_frames().get(loop_thread_id)
+            frames = sys._current_frames()
+            frame = frames.get(loop_thread_id)
             if frame is None:
                 continue
             _write_row(
@@ -248,6 +280,10 @@ def _start_loop_stall_sampler() -> None:
                         "stalled_ms": round(stalled * 1000.0, 1),
                         "new_stall": last != reported_for,
                         "stack": _frames_text(frame),
+                        # A loop thread parked inside a trivial syscall (open,
+                        # mkdir, read_text) is usually waiting for the GIL that
+                        # another thread holds: record the other busy threads.
+                        "other_threads": _busy_other_threads(frames, loop_thread_id),
                     },
                 }
             )

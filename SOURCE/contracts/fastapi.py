@@ -138,16 +138,28 @@ class _ResponseEnvelopeMiddleware:
             return
 
         # Buffer outgoing messages so we can inspect the full body before
-        # forwarding any of them to the real send.
+        # forwarding any of them to the real send. Only JSON bodies are
+        # validated, so a server-sent event stream (text/event-stream: the
+        # streamed answer tokens) is passed straight through as it is
+        # produced. Buffering it held a whole streamed answer back until the
+        # stream closed, so on-screen words appeared only when the reply was
+        # final.
         start_message: dict | None = None
         body_chunks: list[bytes] = []
         finished = False
+        passthrough = False
 
         async def buffer_send(message: dict) -> None:
-            nonlocal start_message, finished
+            nonlocal start_message, finished, passthrough
+            if passthrough:
+                await send(message)
+                return
             mtype = message.get("type")
             if mtype == "http.response.start":
                 start_message = message
+                if _is_unvalidated_stream(message):
+                    passthrough = True
+                    await send(message)
             elif mtype == "http.response.body":
                 body_chunks.append(message.get("body", b"") or b"")
                 if not message.get("more_body", False):
@@ -155,7 +167,7 @@ class _ResponseEnvelopeMiddleware:
 
         await self.app(scope, receive, buffer_send)
 
-        if start_message is None:
+        if start_message is None or passthrough:
             return
 
         headers = list(start_message.get("headers", []))
@@ -210,6 +222,18 @@ class _ResponseEnvelopeMiddleware:
 
         await send(start_message)
         await _replay_chunks(send, body_chunks)
+
+
+def _is_unvalidated_stream(start_message: dict) -> bool:
+    """True for a streaming response the envelope check never inspects.
+
+    Only ``text/event-stream`` passes through unbuffered: every other
+    non-JSON response keeps the existing buffer-and-replay path.
+    """
+    for name, value in start_message.get("headers", []) or []:
+        if name.lower() == b"content-type":
+            return (value or b"").lower().split(b";", 1)[0].strip() == b"text/event-stream"
+    return False
 
 
 async def _replay_chunks(send, chunks: list[bytes]) -> None:
