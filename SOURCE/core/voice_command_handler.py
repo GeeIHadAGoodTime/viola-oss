@@ -7,6 +7,7 @@ Extracted from voice_orchestrator.py to comply with code constraints.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import os
 import re
 import secrets
@@ -25,6 +26,8 @@ if TYPE_CHECKING:
     # the class-level annotation needs the name available to mypy without
     # forcing a top-level import (keeps numpy an optional runtime dep).
     import numpy as np
+
+    from voice.streamed_reply import StreamedReply
 
 logger = get_logger(__name__)
 
@@ -768,7 +771,10 @@ class VoiceCommandHandler:
                 break
 
             # --- Interpret and dispatch ---
+            # The reply may start speaking while the model is still writing it
+            # (voice/streamed_reply.py); speech decisions stay with the result.
             turn_source = "follow_up" if turn > 1 else "wake"
+            streamed = self._new_streamed_reply(ctx.user_id)
             with use_voice_turn_context(
                 self._voice_turn_metadata(ctx, source=turn_source),
                 transcript=transcript,
@@ -777,8 +783,10 @@ class VoiceCommandHandler:
                     transcript,
                     is_follow_up=(turn > 1),
                     user_id=ctx.user_id,
+                    streamed_reply=streamed,
                 )
             if result is None:
+                await self._end_streamed_reply(streamed)
                 if turn == 1:
                     _notify_data_collector("nlu_fail", ctx.data_clip_id)
                 exit_reason = "interpret_failed"
@@ -804,14 +812,17 @@ class VoiceCommandHandler:
 
             # Check for ignore intent — conversation over
             if result.get("intent") == "ignore":
+                await self._end_streamed_reply(streamed)
                 exit_reason = "ignore"
                 break
 
-            # --- Speak response ---
-            await self._speak_response(result, user_id=ctx.user_id)
-
             # --- Broadcast response text to WS clients (GAP-1 fix) ---
+            # Before the speech finishes: the text is final now, and with a
+            # streamed reply Viola is usually already speaking it.
             _broadcast_chat_response(result)
+
+            # --- Speak response ---
+            await self._speak_response(result, user_id=ctx.user_id, streamed_reply=streamed)
 
             # --- Handle TTS interruption ---
             # The user talked over the reply and the check in
@@ -857,6 +868,7 @@ class VoiceCommandHandler:
                 if not self._validate_transcript(transcript):
                     barge_in_exit = "invalid_transcript"
                     break
+                streamed = self._new_streamed_reply(ctx.user_id)
                 with use_voice_turn_context(
                     self._voice_turn_metadata(ctx, source="barge_in", barge_in=True),
                     transcript=transcript,
@@ -865,15 +877,18 @@ class VoiceCommandHandler:
                         transcript,
                         is_follow_up=True,
                         user_id=ctx.user_id,
+                        streamed_reply=streamed,
                     )
                 if result is None:
+                    await self._end_streamed_reply(streamed)
                     barge_in_exit = "interpret_failed"
                     break
                 if result.get("intent") == "ignore":
+                    await self._end_streamed_reply(streamed)
                     barge_in_exit = "ignore"
                     break
-                await self._speak_response(result, user_id=ctx.user_id)
                 _broadcast_chat_response(result)
+                await self._speak_response(result, user_id=ctx.user_id, streamed_reply=streamed)
                 # That reply can be interrupted too: the loop checks again.
             if barge_in_exit is not None:
                 exit_reason = barge_in_exit
@@ -1331,6 +1346,7 @@ class VoiceCommandHandler:
         *,
         is_follow_up: bool = False,
         user_id: str,
+        streamed_reply: StreamedReply | None = None,
     ) -> dict | None:
         """Run a spoken command through the same command path as push-to-talk.
 
@@ -1356,6 +1372,9 @@ class VoiceCommandHandler:
         Returns the result dict the rest of the voice turn reads (``message``,
         ``spoken``, ``continue_listening``, ``card``...), or ``None`` when the
         command failed or hit the hard outer timeout.
+
+        With ``streamed_reply`` the command runs on that reply's stream, so
+        final-answer sentences can be spoken while the model still writes.
         """
         _update_state_hub_voice_mode("processing", user_id=user_id)
 
@@ -1373,10 +1392,12 @@ class VoiceCommandHandler:
             user_id=user_id,
         )
         logger.debug("Voice turn via command service (follow_up=%s)", is_follow_up)
-        command_result = await self._run_command_bounded(
-            self._command_service().execute(request),
-            transcript,
-        )
+        attached = streamed_reply.attached() if streamed_reply is not None else contextlib.nullcontext()
+        with attached:
+            command_result = await self._run_command_bounded(
+                self._command_service().execute(request),
+                transcript,
+            )
         if command_result is None:
             return None
         return self._voice_result_from_command(command_result)
@@ -1608,12 +1629,94 @@ class VoiceCommandHandler:
             logger.debug("Could not read voice_muted; assuming not muted", exc_info=True)
             return False
 
-    async def _speak_response(self, result: dict, *, user_id: str) -> None:
+    def _new_streamed_reply(self, user_id: str) -> StreamedReply | None:
+        """A reply that may start speaking before the command returns, or None.
+
+        None (speak the finished reply, as before) when the voice is muted,
+        TTS is off, the engine cannot speak a stream, or streamed speech is
+        switched off. The live part only ever holds final-answer sentences
+        that no answer-changing guard can still alter
+        (services/llm/answer_stream.py).
+        """
+        if not self.tts or not self.capabilities.get("enable_tts", True):
+            return None
+        if self._voice_output_muted(user_id):
+            return None
+        try:
+            from voice.streamed_reply import new_streamed_reply
+        except Exception:  # noqa: BLE001, RUF100 - no streamed speech is the safe fallback
+            logger.debug("Streamed speech unavailable", exc_info=True)
+            return None
+
+        def _start(reply: StreamedReply) -> asyncio.Future[Any]:
+            _update_state_hub_voice_mode("speaking", user_id=user_id)
+            capture = self._get_continuous_capture()
+            if capture is not None and capture.is_running:
+                return asyncio.ensure_future(self._speak_response_interruptible(reply, capture, user_id=user_id))
+            return asyncio.ensure_future(self._speak_streamed_plain(reply))
+
+        return new_streamed_reply(self.tts, user_id=user_id, start_speaking=_start)
+
+    async def _speak_streamed_plain(self, reply: StreamedReply) -> bool:
+        await self._do_speak(reply)
+        return False
+
+    async def _end_streamed_reply(self, reply: StreamedReply | None) -> None:
+        """No reply will be spoken for this turn: stop queueing and let any started sentence end."""
+        if reply is None:
+            return
+        reply.cancel()
+        task = reply.speaking_task
+        if task is not None:
+            try:
+                await task
+            except (asyncio.CancelledError, Exception):  # noqa: BLE001, RUF100 - nothing left to say
+                logger.debug("Streamed reply ended with an error", exc_info=True)
+
+    async def _finish_streamed_reply(self, result: dict, reply: StreamedReply) -> None:
+        """The command returned while its reply was already being spoken: say only the rest."""
+        message = result.get("message", "") or ""
+        reply.finish(message, already_spoken=bool(result.get("spoken", False)))
+        self._last_spoken_reply = (message or reply.gate.spoken_text, time.monotonic())
+        task = reply.speaking_task
+        interrupted = False
+        try:
+            interrupted = bool(await task) if task is not None else False
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:  # noqa: BLE001, RUF100 - a reply that cannot be spoken is still a reply
+            logger.warning("TTS failed to speak streamed response: %s", exc)
+        if interrupted:
+            result["_interrupted"] = True
+            return
+        try:
+            from admin.instrumentation import record_feature_used
+
+            record_feature_used("tts")
+        except Exception:
+            logger.debug("TTS feature usage instrumentation skipped")
+
+    async def _speak_response(
+        self,
+        result: dict,
+        *,
+        user_id: str,
+        streamed_reply: StreamedReply | None = None,
+    ) -> None:
         """Speak the response if appropriate. Awaits TTS directly so ducking stays active.
 
         When continuous capture is available and conversational mode is active,
         uses interruptible TTS that monitors for user speech via VAD.
+
+        With a ``streamed_reply`` that already started speaking, only the part
+        of the final answer not yet spoken is added (never a sentence twice).
         """
+        if streamed_reply is not None:
+            if streamed_reply.started:
+                await self._finish_streamed_reply(result, streamed_reply)
+                return
+            # Nothing was spoken live: close it and speak the whole reply below.
+            streamed_reply.finish(result.get("message", "") or "", already_spoken=True)
         message = result.get("message", "")
         already_spoken = result.get("spoken", False)
         tts_enabled = self.capabilities.get("enable_tts", True)
@@ -1672,7 +1775,7 @@ class VoiceCommandHandler:
 
     async def _speak_response_interruptible(
         self,
-        message: str,
+        message: str | StreamedReply,
         capture: Any,
         *,
         user_id: str,
@@ -1688,6 +1791,10 @@ class VoiceCommandHandler:
 
         The accepted decision is left in ``self._barge_in_decision`` for the
         conversation loop, so the audio is not transcribed a second time.
+
+        ``message`` may be a :class:`voice.streamed_reply.StreamedReply` whose
+        text is still growing; each check compares what was heard with the
+        reply text queued so far.
 
         Returns:
             True if the user interrupted, False if TTS completed normally.
@@ -1743,6 +1850,9 @@ class VoiceCommandHandler:
                     checks += 1
                     decision = await self._check_barge_in(capture, message, tts_task)
                 if decision.interrupts:
+                    # A streamed reply queues nothing more once the user cut in.
+                    if not isinstance(message, str):
+                        message.cancel()
                     # Stop the TTS engine immediately so audio output ceases
                     # without waiting for the async task to cancel gracefully.
                     if self.tts and hasattr(self.tts, "stop"):
@@ -1763,7 +1873,7 @@ class VoiceCommandHandler:
                         {
                             "source": "barge_in",
                             "barge_in": True,
-                            "message_chars": len(message),
+                            "message_chars": len(self._reply_text(message)),
                             "reason": decision.reason,
                         },
                         user_id=user_id,
@@ -1802,7 +1912,7 @@ class VoiceCommandHandler:
     async def _check_barge_in(
         self,
         capture: Any,
-        message: str,
+        message: str | StreamedReply,
         tts_task: asyncio.Future,
     ) -> BargeInDecision:
         """Transcribe the last few seconds heard while Viola speaks and classify them.
@@ -1820,7 +1930,16 @@ class VoiceCommandHandler:
         transcript = await self._transcribe_recent(capture, _BARGE_IN_WINDOW_SEC)
         if transcript is None:
             return BargeInDecision("ignore", "check_failed")
-        return classify_barge_in_transcript(transcript, message)
+        # Read the reply text now, not when speaking started: a streamed reply
+        # grows while it is spoken, and the heard words may be its newest ones.
+        return classify_barge_in_transcript(transcript, self._reply_text(message))
+
+    @staticmethod
+    def _reply_text(message: str | StreamedReply) -> str:
+        """The text of the reply being spoken (so far, for a streamed reply)."""
+        if isinstance(message, str):
+            return message
+        return message.heard_text
 
     def _local_barge_in_transcriber(self) -> Any | None:
         """The on-device faster-whisper transcriber for barge-in checks, or None.
@@ -1887,7 +2006,7 @@ class VoiceCommandHandler:
     async def _complete_barge_in(
         self,
         capture: Any,
-        message: str,
+        message: str | StreamedReply,
         decision: BargeInDecision,
     ) -> BargeInDecision:
         """Viola has stopped for the user: let them finish, then hear the whole request.
@@ -1910,7 +2029,7 @@ class VoiceCommandHandler:
         window_end = getattr(self, "_barge_in_window_end", None) or started
         seconds = min(_BARGE_IN_WINDOW_SEC + (time.monotonic() - window_end), 30.0)
         transcript = await self._transcribe_recent(capture, seconds)
-        full = classify_barge_in_transcript(transcript or "", message)
+        full = classify_barge_in_transcript(transcript or "", self._reply_text(message))
         if decision.kind == "stop" or full.kind == "stop":
             return decision if decision.kind == "stop" else full
         if decision.kind == "command" and full.kind == "command":
@@ -1948,8 +2067,11 @@ class VoiceCommandHandler:
         )
         return True
 
-    async def _do_speak(self, message: str) -> None:
+    async def _do_speak(self, message: str | StreamedReply) -> None:
         """Execute TTS speak (wrapper for cancellation support)."""
+        if not isinstance(message, str):
+            await message.speak()
+            return
         speak_coro = self.tts.speak(message)
         if asyncio.iscoroutine(speak_coro):
             await speak_coro
