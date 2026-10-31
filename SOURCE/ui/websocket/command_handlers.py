@@ -16,6 +16,7 @@ from core.logging_config import get_logger
 from fastapi import WebSocket
 from music.player.playback_state import PlaybackPhase
 from music.runtime.embedded_playback import backend_drives_embedded_video, is_react_iframe_item
+from music.runtime.iframe_playback_report import record_iframe_position, record_iframe_state
 from music.runtime.worker_manager import record_finished_track_recents
 from ui.core.player_state import to_player_state
 
@@ -38,6 +39,31 @@ def _sm_transition(player, phase: PlaybackPhase, *, user_initiated: bool = False
         sm.transition(phase, user_initiated=user_initiated, force=True)
     except Exception:
         logger.debug("State machine transition failed for phase %s", phase)
+
+
+def _apply_iframe_phase_locked(player: Any, yt_state: str) -> None:
+    """Move the playback phase to what the iframe reported, in one step.
+
+    This used to write the legacy flags first (``_is_playing = False`` then
+    ``_paused = True``) and only then the phase. Through the legacy setters a
+    PAUSED report went PLAYING -> STOPPED -> PAUSED, which logged "Forced
+    transition STOPPED -> PAUSED (not in VALID_TRANSITIONS)" for every
+    on-screen pause and made the player look STOPPED while the song was only
+    paused (1.0.5 build 7, session 4, 18:37:58). ``_is_playing`` and
+    ``_paused`` are read from the phase, so one transition sets both.
+    Must be called with ``player._cv`` held.
+    """
+    phase = _YT_PHASE_MAP.get(yt_state)
+    if phase is not None and getattr(player, "_playback_sm", None) is not None:
+        _sm_transition(player, phase)
+        return
+    # ENDED / UNKNOWN (or a player without a state machine): legacy flags.
+    if hasattr(player, "_is_playing"):
+        player._is_playing = yt_state == "PLAYING"
+    if hasattr(player, "_paused"):
+        player._paused = yt_state == "PAUSED"
+    if phase is not None:
+        _sm_transition(player, phase)
 
 
 from utils.api_helpers import broadcast_state
@@ -268,25 +294,8 @@ async def handle_youtube_state(
                         player._position_ms = position_ms
                     if hasattr(player, "_duration_ms") and duration_ms > 0:
                         player._duration_ms = duration_ms
-                    if hasattr(player, "_is_playing"):
-                        old_is_playing = player._is_playing
-                        player._is_playing = yt_state == "PLAYING"
-                        logger.info(
-                            "  Set _is_playing: %s -> %s",
-                            old_is_playing,
-                            player._is_playing,
-                        )
-                    # CRITICAL: Also update _paused flag so state formula works correctly
-                    # State formula is: is_playing = _is_playing AND NOT _paused
-                    if hasattr(player, "_paused"):
-                        old_paused = player._paused
-                        player._paused = yt_state == "PAUSED"
-                        logger.info("  Set _paused: %s -> %s", old_paused, player._paused)
-
-                    # State machine dual-write
-                    _yt_phase = _YT_PHASE_MAP.get(yt_state)
-                    if _yt_phase is not None:
-                        _sm_transition(player, _yt_phase)
+                    record_iframe_state(player, yt_state, video_id, position_ms)
+                    _apply_iframe_phase_locked(player, yt_state)
 
                     # CRITICAL FIX: Mark track as having reached PLAYING state.
                     # This enables silence detection for tracks that actually started.
@@ -322,14 +331,8 @@ async def handle_youtube_state(
                     player._position_ms = position_ms
                 if hasattr(player, "_duration_ms") and duration_ms > 0:
                     player._duration_ms = duration_ms
-                if hasattr(player, "_is_playing"):
-                    player._is_playing = yt_state == "PLAYING"
-                if hasattr(player, "_paused"):
-                    player._paused = yt_state == "PAUSED"
-                # State machine dual-write (fallback path)
-                _yt_phase = _YT_PHASE_MAP.get(yt_state)
-                if _yt_phase is not None:
-                    _sm_transition(player, _yt_phase)
+                record_iframe_state(player, yt_state, video_id, position_ms)
+                _apply_iframe_phase_locked(player, yt_state)
                 # NOTE: _state.is_playing NOT updated - state() computes via formula
 
             # Emit debug event with results
@@ -777,6 +780,7 @@ async def handle_position_update(
             cv = getattr(player, "_cv", None)
             if cv is not None:
                 with cv:
+                    record_iframe_position(player, position_ms)
                     if hasattr(player, "_position_ms"):
                         player._position_ms = position_ms
                         logger.info("Set player._position_ms = %sms", position_ms)
@@ -790,6 +794,7 @@ async def handle_position_update(
                     # Note: Don't notify_all() for position updates - not a state change
             else:
                 # Fallback for players without condition variable
+                record_iframe_position(player, position_ms)
                 if hasattr(player, "_position_ms"):
                     player._position_ms = position_ms
                 if hasattr(player, "_duration_ms") and duration_ms > 0:

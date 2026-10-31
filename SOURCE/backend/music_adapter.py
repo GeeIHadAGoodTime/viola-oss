@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from typing import TYPE_CHECKING, TypedDict, cast
 
 from contracts.api_response import failure_response, success_response
 from core.json_types import JsonDict, to_json_value
 from core.logging_config import get_logger
 from diagnostics.failure_envelope import emit_failure
+from music.providers.errors import MusicTrackNotFoundError
 from music.runtime import PlayerControlSurface
 
 if TYPE_CHECKING:
@@ -350,6 +352,7 @@ class MusicControllerAdapter:
         )
 
         queue_item = None
+        requested_at = time.monotonic()
         try:
             if hasattr(self.player, "play_async"):
                 logger.info("UI: Calling player.play_async")
@@ -396,20 +399,149 @@ class MusicControllerAdapter:
                     queue_item.get("error"),
                 )
                 return queue_item
+            playback_confirmed = await self._confirm_iframe_playback(
+                requested_at,
+                queue_item,
+                interrupt=interrupt,
+            )
             payload_extra: dict[str, ExtraValue] = {"query": query}
             if source:
                 payload_extra["source"] = source
             if queue_item:
                 payload_extra["now_playing"] = queue_item
+            if playback_confirmed is not None:
+                payload_extra["playback_confirmed"] = playback_confirmed
             payload_extra.update(self._status_payload())
             logger.info(
-                "UI: play_async success, returning payload with now_playing=%s",
+                "UI: play_async success, returning payload with now_playing=%s playback_confirmed=%s",
                 bool(queue_item),
+                playback_confirmed,
             )
             return self._success("play", **payload_extra)
+        except MusicTrackNotFoundError as exc:
+            # An ordinary "this candidate cannot be played" answer (deleted,
+            # private or non-embeddable video). The caller falls through to
+            # the next search result; a traceback at ERROR here made one
+            # unplayable search hit look like a crash (1.0.5 build 7).
+            logger.warning("UI: play_async found nothing playable for query=%s: %s", query[:50] if query else None, exc)
+            return self._failure("play", exc, query=query)
         except Exception as exc:
             logger.exception("UI: play_async failed with exception: %s", exc)
             return self._failure("play", exc, query=query)
+
+    async def _confirm_iframe_playback(
+        self,
+        requested_at: float,
+        queue_item: object,
+        *,
+        interrupt: bool,
+    ) -> bool | None:
+        """Wait for the React iframe to confirm a play request actually plays.
+
+        Returns True when the iframe reported PLAYING for the requested video,
+        False when it did not within the confirmation window, and None when
+        there is nothing to confirm (a queued item, a non-iframe track, test
+        mode, or a newer request took over).
+
+        1.0.5 build 7, session 4: "play Drake" picked the video that was
+        already loaded and paused. The backend marked it playing and Viola
+        said so, but the iframe never got a command and stayed paused for 10+
+        minutes. A play request for an iframe track now waits for the
+        iframe's own PLAYING report, re-sends ``play`` once if it is slow,
+        and otherwise puts the player back to what the iframe last reported,
+        so /v1/player/state (which the media tool reads to verify playback)
+        no longer says playing.
+        """
+        if not interrupt or not isinstance(queue_item, dict):
+            return None
+        video_id = queue_item.get("video_id")
+        if not isinstance(video_id, str) or not video_id:
+            return None
+        player = self.player
+        if player is None or getattr(player, "_test_mode", False):
+            return None
+        try:
+            from music.runtime.embedded_playback import react_iframe_owns_playback
+            from music.runtime.iframe_playback_report import (
+                CONFIRMED,
+                UNCONFIRMED,
+                await_iframe_playback,
+            )
+        except ImportError:
+            return None
+        try:
+            now_playing = getattr(getattr(player, "_state", None), "now_playing", None)
+            if getattr(now_playing, "video_id", None) != video_id or not react_iframe_owns_playback(player):
+                return None
+        except Exception:
+            logger.debug("PLAY_CONFIRM: ownership check failed", exc_info=True)
+            return None
+
+        try:
+            from core.user_context import get_current_user_id
+
+            user_id: str | None = get_current_user_id()
+        except (ImportError, LookupError):
+            user_id = None
+
+        async def _resend_play() -> None:
+            from ui.websocket.event_hub import broadcast_transport_command
+
+            logger.warning("PLAY_CONFIRM: player has not reported PLAYING for %s yet; re-sending play", video_id)
+            await broadcast_transport_command("play", {"source": "play_confirm"}, user_id=user_id)
+
+        verdict = await await_iframe_playback(
+            player,
+            since=requested_at,
+            video_id=video_id,
+            nudge=_resend_play,
+        )
+        if verdict == CONFIRMED:
+            logger.info("PLAY_CONFIRM: player reported PLAYING for %s", video_id)
+            return True
+        if verdict != UNCONFIRMED:
+            return None
+        self._mark_iframe_not_playing(player, video_id)
+        return False
+
+    @staticmethod
+    def _mark_iframe_not_playing(player: object, video_id: str) -> None:
+        """Make the reported state match an iframe that never started."""
+        from music.player.playback_state import PlaybackPhase
+
+        cv = getattr(player, "_cv", None)
+        if cv is None:
+            return
+        with cv:
+            now_playing = getattr(getattr(player, "_state", None), "now_playing", None)
+            sm = getattr(player, "_playback_sm", None)
+            if getattr(now_playing, "video_id", None) != video_id or sm is None:
+                return
+            if sm.phase != PlaybackPhase.PLAYING:
+                return
+            reported = getattr(player, "_iframe_state", None)
+            reported_video = getattr(player, "_iframe_state_video_id", None)
+            target = (
+                PlaybackPhase.PAUSED
+                if reported == "PAUSED" and reported_video in (None, video_id)
+                else PlaybackPhase.LOADING
+            )
+            sm.transition(target, force=True)
+            state = getattr(player, "_state", None)
+            if state is not None:
+                state.is_playing = False
+            cv.notify_all()
+        logger.warning(
+            "PLAY_CONFIRM: player never reported PLAYING for %s; reporting %s instead of playing",
+            video_id,
+            target.name,
+        )
+        emit = getattr(player, "_emit", None)
+        if callable(emit):
+            try:
+                emit()
+            except Exception:
+                logger.debug("PLAY_CONFIRM: state emit failed", exc_info=True)
 
     def pause(self) -> dict[str, object]:
         try:

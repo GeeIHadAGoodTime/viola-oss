@@ -1553,6 +1553,80 @@ describe('YouTube iframe playback honesty (#2757)', () => {
   });
 });
 
+describe('Re-playing the video that is already loaded (1.0.5 build 7)', () => {
+  // Session 4: "play Drake" picked the Drake video that was loaded and paused
+  // at 21.7 s. The backend made a new queue item for the same video; the embed
+  // is keyed on the video id, so it was not reloaded, nothing was sent to it,
+  // and it stayed paused while Viola said "playing".
+  const iframeMessage = (type, payload) =>
+    new MessageEvent('message', { data: { type, payload }, origin: window.location.origin });
+  const track = (id, videoId = 'drake-quebec') => ({
+    is_playing: true,
+    now_playing: { id, title: 'DRAKE - QUEBEC', artist: 'Drake', provider: 'youtube_iframe', video_id: videoId },
+    queue: [],
+  });
+  const commands = (send) => send.mock.calls.map(([message]) => message.command).filter(Boolean);
+
+  const mountPaused = async () => {
+    playerHarness.state = track('item-1');
+    const view = render(<SmartDisplay />);
+    await waitFor(() => expect(wsHarness.handler).toBeTypeOf('function'));
+    act(() => {
+      window.dispatchEvent(iframeMessage('yt_iframe_state', { state: 2, videoId: 'drake-quebec' }));
+    });
+    return view;
+  };
+
+  it('seeks to the start and plays when a new play request names the paused video', async () => {
+    const view = await mountPaused();
+    const iframe = view.container.querySelector('iframe');
+    const send = vi.spyOn(iframe.contentWindow, 'postMessage');
+    try {
+      playerHarness.state = track('item-2');
+      await act(async () => { view.rerender(<SmartDisplay />); });
+      const sent = commands(send);
+      expect(sent).toContain('seekTo');
+      expect(sent).toContain('play');
+      expect(sent.indexOf('seekTo')).toBeLessThan(sent.lastIndexOf('play'));
+      const seek = send.mock.calls.map(([m]) => m).find((m) => m.command === 'seekTo');
+      expect(seek.seconds).toBe(0);
+    } finally {
+      send.mockRestore();
+    }
+  });
+
+  it('leaves a video that is already playing alone', async () => {
+    const view = await mountPaused();
+    act(() => {
+      window.dispatchEvent(iframeMessage('yt_iframe_state', { state: 1, videoId: 'drake-quebec' }));
+    });
+    const iframe = view.container.querySelector('iframe');
+    const send = vi.spyOn(iframe.contentWindow, 'postMessage');
+    try {
+      playerHarness.state = track('item-2');
+      await act(async () => { view.rerender(<SmartDisplay />); });
+      expect(commands(send)).not.toContain('seekTo');
+    } finally {
+      send.mockRestore();
+    }
+  });
+
+  it('sends nothing for an ordinary state refresh of the same queue item', async () => {
+    const view = await mountPaused();
+    const iframe = view.container.querySelector('iframe');
+    const send = vi.spyOn(iframe.contentWindow, 'postMessage');
+    try {
+      playerHarness.state = { ...track('item-1'), position: 21.7 };
+      await act(async () => { view.rerender(<SmartDisplay />); });
+      const sent = commands(send);
+      expect(sent).not.toContain('seekTo');
+      expect(sent).not.toContain('play');
+    } finally {
+      send.mockRestore();
+    }
+  });
+});
+
 describe('SmartDisplay shuffle toggle', () => {
   // #4214. The button flips optimistically, which is the right feel -- but the
   // pre-fix call was `setShuffleOn(next); api.setShuffle(next);` with the

@@ -1869,6 +1869,9 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
   // its retries (measured: 11 posts in 15s, and it never clears _wantsToPlay),
   // so the report has to be deduped per video or it becomes a 1 Hz broadcast.
   const notStartedReportedRef = useRef(null);
+  // Last YouTube player state the hub iframe reported for the loaded video
+  // (-1 unstarted, 0 ended, 1 playing, 2 paused, 3 buffering, 5 cued).
+  const iframeStateRef = useRef(null);
 
   // Wake selection is only configuration. Report detection from this
   // surface's live signal, with Disabled/mute taking precedence over stale
@@ -2664,6 +2667,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
         if (stateVideoId && currentVideoId && stateVideoId !== currentVideoId) return;
         const stateMap = { '-1': 'UNSTARTED', '0': 'ENDED', '1': 'PLAYING', '2': 'PAUSED', '3': 'BUFFERING', '5': 'CUED' };
         const stateString = stateMap[String(ytState)] || 'UNKNOWN';
+        iframeStateRef.current = ytState;
         if (wsSend) { wsSend({ action: 'youtube_state', payload: { state: stateString, position: iframePositionRef.current, duration: iframeDurationRef.current, video_id: currentVideoId } }); }
         if (ytState === 1 && ytHubMutedRef.current && !isSpoke) { sendToIframe('setVolume', { level: 0 }); }
         if (ytState === 1 && isSpoke) { sendToIframe('setVolume', { level: 0 }); }
@@ -2728,7 +2732,29 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
     spokeInitialSyncDoneRef.current = false;
     // A new track gets its own chance to fail; the dedupe is per video.
     notStartedReportedRef.current = null;
+    iframeStateRef.current = null;
   }, [playerState?.now_playing?.video_id]);
+
+  // A new play request for the video that is ALREADY loaded. The embed is
+  // keyed on the video id, so it is not reloaded and its autoplay never runs
+  // again: a paused video stayed paused while the backend said "playing"
+  // (1.0.5 build 7, session 4: "play Drake" picked the paused Drake video,
+  // nothing reached the iframe, position stuck at 21.7 s for 10+ minutes).
+  // The queue item id is new for every play request, so a new id with the
+  // same video means "start this video again": seek to the start and play.
+  // Left alone when the player is already playing it.
+  const prevHubItemRef = useRef({ id: null, videoId: null });
+  useEffect(() => {
+    const itemId = playerState?.now_playing?.id || null;
+    const videoId = playerState?.now_playing?.video_id || null;
+    const prev = prevHubItemRef.current;
+    prevHubItemRef.current = { id: itemId, videoId };
+    if (isSpoke || !itemId || !videoId) return;
+    if (!prev.id || prev.id === itemId || prev.videoId !== videoId) return;
+    if (iframeStateRef.current === 1) return;
+    sendToIframe('seekTo', { seconds: 0 });
+    sendToIframe('play');
+  }, [isSpoke, playerState?.now_playing?.id, playerState?.now_playing?.video_id, sendToIframe]);
 
   // The hub position as a ref, so interval callbacks (drift correction below)
   // read the CURRENT position instead of a stale render's closure.

@@ -508,6 +508,42 @@ def _select_playable_index(query: str, tracks: list[dict[str, Any]], *, generic_
     return None
 
 
+# A search hit can still be unplayable when the player resolves it (deleted,
+# private or not embeddable: the oEmbed availability check runs at play time,
+# not at search time). 1.0.5 build 7: "play calm solo piano music" got 10
+# results, the player tried only the first (Wrhm-esOwEs), failed with "No
+# playable YouTube results found for 'Wrhm-esOwEs'", and the model had to run
+# a third query. The next confident candidates are tried before giving up.
+_MAX_PLAY_CANDIDATES = 3
+_UNPLAYABLE_CANDIDATE_EXCEPTIONS = frozenset({"MusicTrackNotFoundError"})
+_UNPLAYABLE_CANDIDATE_TEXT = ("no playable youtube results",)
+
+
+def _candidate_indices(query: str, tracks: list[dict[str, Any]], *, generic_request: bool) -> list[int]:
+    """Playable-candidate order: every result for a generic request, else the confident ones."""
+    if generic_request:
+        return list(range(len(tracks)))
+    return [index for index, track in enumerate(tracks) if _media_match_is_confident(query, track)]
+
+
+def _candidate_was_unplayable(play_result: ToolResult) -> bool:
+    """True when the player refused THIS candidate (not the provider or the runtime)."""
+    if play_result.ok:
+        return False
+    data = play_result.data if isinstance(play_result.data, dict) else {}
+    error = data.get("error")
+    texts = [str(play_result.error or "")]
+    if isinstance(error, dict):
+        details = error.get("details")
+        if isinstance(details, dict) and details.get("exception_type") in _UNPLAYABLE_CANDIDATE_EXCEPTIONS:
+            return True
+        texts.append(str(error.get("message") or ""))
+    elif error:
+        texts.append(str(error))
+    combined = " ".join(texts).casefold()
+    return any(marker in combined for marker in _UNPLAYABLE_CANDIDATE_TEXT)
+
+
 async def _handle_search_play_mode(
     query: str,
     provider: str,
@@ -597,6 +633,32 @@ async def _handle_search_play_mode(
         selected.get("playback_provider") or selected.get("provider") or data.get("playback_provider") or provider
     ).strip()
     play_result = await _handle_play_mode(selected_track_uri, selected_provider, target_room, user_id)
+    unplayable: list[str] = []
+    later_indices = [
+        index for index in _candidate_indices(query, tracks, generic_request=generic_request) if index > selected_index
+    ]
+    for next_index in later_indices:
+        if not _candidate_was_unplayable(play_result) or len(unplayable) + 1 >= _MAX_PLAY_CANDIDATES:
+            break
+        candidate = dict(tracks[next_index])
+        candidate_uri = str(candidate.get("track_uri") or "").strip()
+        if not candidate_uri:
+            continue
+        unplayable.append(selected_track_uri)
+        logger.info(
+            "media search_play: candidate %s was not playable; trying result %d (%s)",
+            selected_track_uri,
+            next_index + 1,
+            candidate_uri,
+        )
+        selected = candidate
+        selected_track_uri = candidate_uri
+        selected_provider = str(
+            selected.get("playback_provider") or selected.get("provider") or data.get("playback_provider") or provider
+        ).strip()
+        play_result = await _handle_play_mode(selected_track_uri, selected_provider, target_room, user_id)
+    if unplayable:
+        data["unplayable_candidates"] = unplayable
     play_data = dict(play_result.data or {}) if isinstance(play_result.data, dict) else play_result.data
     data.update(
         {
