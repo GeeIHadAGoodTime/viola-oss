@@ -57,6 +57,18 @@ CRITICAL_ALWAYS_LOAD_TOOLS = frozenset(
         "view_screen",
         "media",
         "memory",
+        # Everyday voice commands: "next track", "skip to 2 minutes", "set a
+        # timer", "wake me at 7", "remind me to...", "what's on my calendar".
+        # Deferred, each one cost a ToolSearch model round trip before the real
+        # call (1.0.5 build-7 laptop: "next track" 27 s with ToolSearch first,
+        # "skip to 2 minutes" ToolSearch x2; dev PC spans: timer 3 model calls
+        # instead of 2). Still filtered by autonomy tier and still
+        # confirm-gated per action.
+        "playback",
+        "timer",
+        "alarm",
+        "notify",
+        "calendar",
         "payment",
         # After the user approves a purchase on the payment gate, the
         # continuation's first step is filling the approved card. Deferred, it

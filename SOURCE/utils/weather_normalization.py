@@ -107,15 +107,26 @@ def _timestamp_offset_zone(payload: Mapping[str, Any]) -> datetime.tzinfo | None
         rows = payload.get(rows_key)
         if isinstance(rows, list):
             candidates.extend(row.get("time") for row in rows[:1] if isinstance(row, Mapping))
+    # NWS stamps its *observation* in UTC ("...+00:00") but its forecast rows on
+    # the location's wall clock ("...-05:00"). A UTC stamp says nothing about the
+    # location, so it must not win over a real local offset: taking it labelled
+    # Saturday's forecast "Tomorrow" on a Friday evening in Milwaukee, and the
+    # model then called weather a second time to resolve the clash (1.0.5
+    # build-7 laptop A0.1; dev PC 2026-10-30, one extra 4.7 s model step).
+    zero_offset: datetime.tzinfo | None = None
     for candidate in candidates:
         if not isinstance(candidate, str):
             continue
         parsed = parse_timestamp(candidate)
         if parsed is not None and parsed.tzinfo is not None:
             offset = parsed.utcoffset()
-            if offset is not None:
+            if offset is None:
+                continue
+            if offset:
                 return datetime.timezone(offset)
-    return None
+            if zero_offset is None:
+                zero_offset = datetime.timezone(offset)
+    return zero_offset
 
 
 def payload_timezone(payload: Mapping[str, Any]) -> datetime.tzinfo:

@@ -74,6 +74,23 @@ _RECENT_MEMORY_LINES: dict[str, list[tuple[float, str]]] = {}
 _ARCHIVE_NOTICE_TTL_SECONDS = 300.0  # 5 minutes — long enough to span a conversation
 _archive_notices_lock = threading.Lock()
 _archive_notices: dict[str, dict[str, Any]] = {}
+# Windows: directories this process has already made private with icacls, keyed by
+# path and the directory's file id + creation time. ``MemoryDir`` is built several
+# times per turn (memory prefetch, session memory, extraction); running three icacls
+# processes each time blocked the event loop for 1-2 s per voice turn (latency spans,
+# 2026-10-30). The ACL lives on the directory, so it only needs setting once per
+# directory instance; a deleted and recreated directory gets a new identity and is
+# made private again.
+_PRIVATE_ACL_DONE: set[tuple[str, int, int]] = set()
+_PRIVATE_ACL_LOCK = threading.Lock()
+
+
+def _private_acl_identity(path: Path) -> tuple[str, int, int] | None:
+    try:
+        st = path.stat()
+    except OSError:
+        return None
+    return (os.path.normcase(str(path)), int(st.st_ino), int(st.st_ctime_ns))
 
 
 class MemoryDecryptionError(ValueError):
@@ -615,28 +632,7 @@ class MemoryDir:
 
     def _chmod_private(self) -> None:
         if os.name == "nt":
-            username = os.environ.get("USERNAME", "")
-            userdomain = os.environ.get("USERDOMAIN", "")
-            if username:
-                principal = "%s\\%s" % (userdomain, username) if userdomain else username
-                try:
-                    from core.subprocess_utils import run_silent
-
-                    for path in (self.account_dir, self.root, self.topics_dir):
-                        run_silent(
-                            [
-                                "icacls",
-                                str(path),
-                                "/inheritance:r",
-                                "/grant:r",
-                                "%s:(OI)(CI)F" % principal,
-                            ],
-                            capture_output=True,
-                            timeout=10,
-                            check=False,
-                        )  # proc-tree-ok: single icacls binary, no shell, no grandchildren
-                except Exception:
-                    logger.debug("Could not set private ACL on memory directory")
+            self._set_private_acl_windows()
             return
         try:
             self.account_dir.chmod(0o700)
@@ -644,6 +640,39 @@ class MemoryDir:
             self.topics_dir.chmod(0o700)
         except OSError:
             logger.debug("Could not set private mode on memory directory")
+
+    def _set_private_acl_windows(self) -> None:
+        username = os.environ.get("USERNAME", "")
+        userdomain = os.environ.get("USERDOMAIN", "")
+        if not username:
+            return
+        principal = "%s\\%s" % (userdomain, username) if userdomain else username
+        try:
+            from core.subprocess_utils import run_silent
+
+            for path in (self.account_dir, self.root, self.topics_dir):
+                identity = _private_acl_identity(path)
+                if identity is not None:
+                    with _PRIVATE_ACL_LOCK:
+                        if identity in _PRIVATE_ACL_DONE:
+                            continue
+                result = run_silent(
+                    [
+                        "icacls",
+                        str(path),
+                        "/inheritance:r",
+                        "/grant:r",
+                        "%s:(OI)(CI)F" % principal,
+                    ],
+                    capture_output=True,
+                    timeout=10,
+                    check=False,
+                )  # proc-tree-ok: single icacls binary, no shell, no grandchildren
+                if identity is not None and getattr(result, "returncode", 1) == 0:
+                    with _PRIVATE_ACL_LOCK:
+                        _PRIVATE_ACL_DONE.add(identity)
+        except Exception:
+            logger.debug("Could not set private ACL on memory directory")
 
     def _merge_or_move_file(self, source: Path, target: Path, label: str, operations: list[str]) -> None:
         if not source.exists() or source.resolve() == target.resolve():
