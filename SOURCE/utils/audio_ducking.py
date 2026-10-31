@@ -56,6 +56,11 @@ class AudioDucker:
         # Volume an in-flight un-duck fade is restoring to. A duck that starts
         # during that fade must restore to it, not to the half-faded level.
         self._restore_target: int | None = None
+        # The current duck session actually lowered the volume. False while
+        # nothing was playing when it began: that duck is a no-op (it used to
+        # set the idle player to 20 and back, 1.0.5 build-7 laptop report),
+        # and a nested duck applies it once music has started.
+        self._duck_applied = False
 
         logger.info(
             "AudioDucker initialized: duck_level=%s, fade_duration=%ss",
@@ -63,87 +68,123 @@ class AudioDucker:
             self.fade_duration,
         )
 
+    @staticmethod
+    def _reported_playing(state: Any) -> bool | None:
+        """The player's own is_playing (None when it does not say)."""
+        value = getattr(state, "is_playing", None)
+        if value is None and isinstance(state, dict):
+            value = state.get("is_playing")
+        return None if value is None else bool(value)
+
     def duck(self) -> None:
         """
         Duck (lower) the audio volume.
         Can be called multiple times (nested) - volume restored only when all ducks end.
+        A duck that starts while the player reports nothing playing changes
+        nothing; a nested duck after music started applies it then.
         """
         import threading as th
 
         with self._lock:
             self._duck_count += 1
 
-            if self._duck_count == 1:
-                # First duck request - save current volume and fade down
+            if self._duck_count > 1 and not self._duck_applied:
+                # The session began with nothing playing; music may have
+                # started since (e.g. "Viola, play jazz" then the spoken reply).
                 try:
-                    state = self.music_player.state()
-                    if hasattr(state, "volume"):
-                        current_volume = state.volume
-                    elif isinstance(state, dict):
-                        current_volume = state.get("volume", 50)
-                    else:
-                        current_volume = 50
-                    restoring = self._restore_target is not None and (
-                        self._fade_thread is not None and self._fade_thread.is_alive()
-                    )
-                    # Back-to-back replies duck again while the previous
-                    # un-duck is still fading up. Reading the live volume then
-                    # saved a half-faded level (e.g. 26) as the "original" and
-                    # every later un-duck restored to it: music sank from 80 to
-                    # ~22-30 over a few replies (1.0.5 laptop test, item 10).
-                    self._original_volume = self._restore_target if restoring else current_volume
-                    self._restore_target = None
-                    # Ducking is attenuation, never amplification.  A user
-                    # already listening below the configured duck level must
-                    # stay at that quieter volume during voice activity.
-                    self._active_duck_level = min(self._original_volume, self.duck_level)
-
-                    # Detailed logging for debugging
-                    player_type = type(self.music_player).__name__
-                    has_set_volume = hasattr(self.music_player, "set_volume")
-                    is_playing = getattr(state, "is_playing", None) or (
-                        state.get("is_playing") if isinstance(state, dict) else None
-                    )
-
-                    logger.info(
-                        "🔉 DUCK_START: %d → %d (player=%s, has_set_volume=%s, " "is_playing=%s, thread=%s)",
-                        self._original_volume,
-                        self._active_duck_level,
-                        player_type,
-                        has_set_volume,
-                        is_playing,
-                        th.current_thread().name,
-                    )
-
-                    # Cancel any ongoing fade
-                    if self._fade_thread and self._fade_thread.is_alive():
-                        self._fade_cancel.set()
-                        self._fade_thread.join(timeout=TIMEOUT_MEDIUM)
-
-                    # Drop straight to the duck level: no fade down. Wake
-                    # feedback is the chime, and the music has to dip at the
-                    # same moment. A 300 ms fade down was ~7 volume steps, and
-                    # each one is a player state change the UI's 200 ms
-                    # broadcast debounce coalesces, so the final duck level
-                    # reached the YouTube player only with the next position
-                    # tick, about 1 s after the chime (1.0.5 build-4 laptop
-                    # test). The restore still fades up.
-                    self._fade_cancel.clear()
-                    self._fade_thread = threading.Thread(
-                        target=self._set_final_volume,
-                        args=(self._active_duck_level,),
-                        daemon=True,
-                        name="audio-duck-down",
-                    )
-                    self._fade_thread.start()
-
-                    # Start timeout safety net
-                    self._start_timeout_timer()
-
+                    if self._reported_playing(self.music_player.state()) is False:
+                        logger.debug("🔉 Nested duck: still nothing playing (count: %s)", self._duck_count)
+                        return
                 except Exception as e:
-                    logger.warning("Failed to duck audio: %s", e)
+                    logger.debug("Nested duck could not read the player state: %s", e)
+                    return
+                self._apply_duck_locked(th.current_thread().name)
+                return
+
+            if self._duck_count == 1:
+                try:
+                    if self._reported_playing(self.music_player.state()) is False and not (
+                        self._fade_thread is not None and self._fade_thread.is_alive()
+                    ):
+                        self._duck_applied = False
+                        self._start_timeout_timer()
+                        logger.info("🔉 DUCK_SKIPPED: nothing is playing, volume left as it is")
+                        return
+                except Exception as e:
+                    logger.debug("Duck could not read the player state: %s", e)
+                self._apply_duck_locked(th.current_thread().name)
             else:
                 logger.debug("🔉 Nested duck request (count: %s)", self._duck_count)
+
+    def _apply_duck_locked(self, thread_name: str) -> None:
+        """Save the current volume and drop to the duck level (caller holds the lock)."""
+        # First applied duck - save current volume and drop
+        try:
+            state = self.music_player.state()
+            if hasattr(state, "volume"):
+                current_volume = state.volume
+            elif isinstance(state, dict):
+                current_volume = state.get("volume", 50)
+            else:
+                current_volume = 50
+            restoring = self._restore_target is not None and (
+                self._fade_thread is not None and self._fade_thread.is_alive()
+            )
+            # Back-to-back replies duck again while the previous
+            # un-duck is still fading up. Reading the live volume then
+            # saved a half-faded level (e.g. 26) as the "original" and
+            # every later un-duck restored to it: music sank from 80 to
+            # ~22-30 over a few replies (1.0.5 laptop test, item 10).
+            self._original_volume = self._restore_target if restoring else current_volume
+            self._restore_target = None
+            # Ducking is attenuation, never amplification.  A user
+            # already listening below the configured duck level must
+            # stay at that quieter volume during voice activity.
+            self._active_duck_level = min(self._original_volume, self.duck_level)
+
+            # Detailed logging for debugging
+            player_type = type(self.music_player).__name__
+            has_set_volume = hasattr(self.music_player, "set_volume")
+            is_playing = self._reported_playing(state)
+
+            logger.info(
+                "🔉 DUCK_START: %d → %d (player=%s, has_set_volume=%s, " "is_playing=%s, thread=%s)",
+                self._original_volume,
+                self._active_duck_level,
+                player_type,
+                has_set_volume,
+                is_playing,
+                thread_name,
+            )
+
+            # Cancel any ongoing fade
+            if self._fade_thread and self._fade_thread.is_alive():
+                self._fade_cancel.set()
+                self._fade_thread.join(timeout=TIMEOUT_MEDIUM)
+
+            # Drop straight to the duck level: no fade down. Wake
+            # feedback is the chime, and the music has to dip at the
+            # same moment. A 300 ms fade down was ~7 volume steps, and
+            # each one is a player state change the UI's 200 ms
+            # broadcast debounce coalesces, so the final duck level
+            # reached the YouTube player only with the next position
+            # tick, about 1 s after the chime (1.0.5 build-4 laptop
+            # test). The restore still fades up.
+            self._fade_cancel.clear()
+            self._fade_thread = threading.Thread(
+                target=self._set_final_volume,
+                args=(self._active_duck_level,),
+                daemon=True,
+                name="audio-duck-down",
+            )
+            self._fade_thread.start()
+
+            self._duck_applied = True
+            # Start timeout safety net
+            self._start_timeout_timer()
+
+        except Exception as e:
+            logger.warning("Failed to duck audio: %s", e)
 
     def unduck(self) -> None:
         """
@@ -160,6 +201,11 @@ class AudioDucker:
             if self._duck_count == 0:
                 # Cancel timeout timer since we're properly undocking
                 self._cancel_timeout_timer()
+                applied = self._duck_applied
+                self._duck_applied = False
+                if not applied:
+                    logger.debug("🔊 Un-duck: the duck was a no-op (nothing was playing)")
+                    return
 
                 # Last duck request ended - restore original volume
                 if self._original_volume is not None:
@@ -317,6 +363,7 @@ class AudioDucker:
         with self._lock:
             if self._duck_count > 0:
                 self._duck_count = 0
+                self._duck_applied = False
                 if self._original_volume is not None:
                     try:
                         self.music_player.set_volume(self._original_volume)

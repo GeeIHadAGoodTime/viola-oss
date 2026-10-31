@@ -29,6 +29,8 @@ class WakeContext:
     # violawake.config.stream_operating_point). None = compare the score to
     # the effective threshold itself (single-frame paths).
     score_threshold: float | None = None
+    # The (k, n) agreement rule that went with ``score_threshold`` (logging only).
+    agreement: tuple[int, int] | None = None
 
     # Audio metrics (kept for diagnostics and AEC tracking)
     mic_rms: float = 0.0

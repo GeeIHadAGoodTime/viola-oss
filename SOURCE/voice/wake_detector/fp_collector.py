@@ -153,6 +153,13 @@ class FPCollector:
             return False
         return _MARKER_FILE.exists()
 
+    def run_periodic_cleanup(self) -> None:
+        """Delete expired captures when the cleanup interval has passed (blocking; call off the wake loop)."""
+        now = time.time()
+        if now - self._last_cleanup_time > self._cleanup_interval:
+            self._last_cleanup_time = now
+            cleanup_old_audio()
+
     def check_and_save(
         self,
         score: float,

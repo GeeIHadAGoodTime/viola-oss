@@ -508,12 +508,30 @@ class WakeDecisionPolicy:
             self._last_trigger_time = now
 
         result.should_trigger = True
-        logger.info(
-            "Wake trigger approved: score=%.3f, threshold=%.3f, layers=%s",
-            context.wake_score,
-            threshold,
-            result.layers_passed,
-        )
+        # Log the threshold that actually decided. On the streaming path that is
+        # the per-frame threshold of the k-of-n rule (the score is one of the k
+        # agreeing frames), not the sensitivity level: the build-7 log printed
+        # "score=0.885, threshold=0.900" for a wake the 0.85 frame rule allowed.
+        if context.score_threshold is None:
+            logger.info(
+                "Wake trigger approved: score=%.3f, threshold=%.3f, layers=%s",
+                context.wake_score,
+                threshold,
+                result.layers_passed,
+            )
+        else:
+            k, n = context.agreement or (1, 1)
+            logger.info(
+                "Wake trigger approved: score=%.3f, threshold=%.3f (frame rule %d of %d at %.3f; "
+                "sensitivity level %.3f), layers=%s",
+                context.wake_score,
+                context.score_threshold,
+                k,
+                n,
+                context.score_threshold,
+                threshold,
+                result.layers_passed,
+            )
         return result
 
     # ------------------------------------------------------------------ #

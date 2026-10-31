@@ -36,8 +36,12 @@ _cached_chime: np.ndarray | None = None
 _cache_lock = threading.Lock()
 
 
-def generate_wake_chime(sample_rate: int = CHIME_SAMPLE_RATE) -> np.ndarray:
-    """Return the chime as mono float32 in [-CHIME_PEAK, CHIME_PEAK] (about 155 ms)."""
+def generate_wake_chime(sample_rate: int = CHIME_SAMPLE_RATE, notes_hz: tuple[float, ...] = _NOTES_HZ) -> np.ndarray:
+    """Return the chime as mono float32 in [-CHIME_PEAK, CHIME_PEAK] (about 155 ms).
+
+    ``notes_hz``: the notes in order (rising for the wake chime; the
+    nothing-heard tone plays them falling).
+    """
     note_len = int(sample_rate * _NOTE_SECONDS)
     t = np.arange(note_len, dtype=np.float32) / float(sample_rate)
     # Fast attack, smooth exponential decay: soft, no click at either end.
@@ -47,10 +51,10 @@ def generate_wake_chime(sample_rate: int = CHIME_SAMPLE_RATE) -> np.ndarray:
     envelope[-attack:] *= np.linspace(1.0, 0.0, attack, dtype=np.float32)
     gap = np.zeros(int(sample_rate * _GAP_SECONDS), dtype=np.float32)
     parts: list[np.ndarray] = []
-    for index, freq in enumerate(_NOTES_HZ):
+    for index, freq in enumerate(notes_hz):
         tone = np.sin(2.0 * np.pi * freq * t).astype(np.float32) * envelope
         parts.append(tone)
-        if index < len(_NOTES_HZ) - 1:
+        if index < len(notes_hz) - 1:
             parts.append(gap)
     chime = np.concatenate(parts)
     peak = float(np.max(np.abs(chime))) or 1.0
@@ -136,4 +140,28 @@ def play_wake_chime() -> bool:
     return True
 
 
-__all__ = ["generate_wake_chime", "play_wake_chime", "wake_chime_volume"]
+# The wake's notes falling: "I stopped listening and heard nothing". Played
+# when a wake ends without a command (1.0.5 build-7 laptop report, A0.6: the
+# turn used to end in silence), a little quieter than the wake chime.
+_NOTHING_HEARD_NOTES_HZ = tuple(reversed(_NOTES_HZ))
+_NOTHING_HEARD_GAIN = 0.8
+
+
+def play_nothing_heard_tone() -> bool:
+    """Start the nothing-heard tone without blocking. Returns False when muted."""
+    volume = wake_chime_volume()
+    if volume <= 0.0:
+        logger.debug("Nothing-heard tone skipped: Viola's voice is muted")
+        return False
+    samples = generate_wake_chime(CHIME_SAMPLE_RATE, _NOTHING_HEARD_NOTES_HZ)
+    samples = (samples * min(1.0, volume) * _NOTHING_HEARD_GAIN).astype(np.float32)
+    threading.Thread(
+        target=_play_blocking,
+        args=(samples, CHIME_SAMPLE_RATE),
+        daemon=True,
+        name="wake-nothing-heard",
+    ).start()
+    return True
+
+
+__all__ = ["generate_wake_chime", "play_nothing_heard_tone", "play_wake_chime", "wake_chime_volume"]
