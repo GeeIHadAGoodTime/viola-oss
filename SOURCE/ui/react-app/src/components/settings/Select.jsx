@@ -5,6 +5,35 @@ import { Icons } from './Icons';
 
 const theme = THEME;
 
+const MENU_MAX_HEIGHT = 200;
+const OPTION_HEIGHT = 44;
+const MENU_GAP = 4;
+
+// The visible box the open menu has to fit in: the nearest ancestor that
+// scrolls or clips (the Settings dialog body), else the window.
+function clipBoxFor(element) {
+  let node = element?.parentElement;
+  while (node && node !== document.body && node !== document.documentElement) {
+    const overflowY = window.getComputedStyle(node).overflowY;
+    if (overflowY === 'auto' || overflowY === 'scroll' || overflowY === 'hidden') {
+      const rect = node.getBoundingClientRect();
+      return { top: rect.top, bottom: rect.bottom };
+    }
+    node = node.parentElement;
+  }
+  return { top: 0, bottom: window.innerHeight };
+}
+
+// Open upward when the menu would be cut off below and there is more room
+// above. The voice list in Settings > Voice opened past the bottom of the
+// dialog and was clipped until the page was scrolled (1.0.5 build 7, X4.1).
+export function shouldOpenUpward(triggerRect, clipBox, optionCount) {
+  const needed = Math.min(MENU_MAX_HEIGHT, optionCount * OPTION_HEIGHT + 2) + MENU_GAP;
+  const below = clipBox.bottom - triggerRect.bottom;
+  const above = triggerRect.top - clipBox.top;
+  return below < needed && above > below;
+}
+
 /**
  * A fully custom dropdown select component (no native select element).
  * @param {Object} props
@@ -17,7 +46,10 @@ const theme = THEME;
 const Select = React.memo(({ value, onChange, options, label, tooltip }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [hoveredIndex, setHoveredIndex] = useState(-1);
+  const [openUpward, setOpenUpward] = useState(false);
   const containerRef = useRef(null);
+  const triggerRef = useRef(null);
+  const listboxRef = useRef(null);
   const listboxId = React.useId();
 
   const selectedOption = options.find(opt => opt.value === value);
@@ -32,6 +64,23 @@ const Select = React.memo(({ value, onChange, options, label, tooltip }) => {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  const openMenu = () => {
+    const trigger = triggerRef.current;
+    if (trigger) {
+      setOpenUpward(shouldOpenUpward(trigger.getBoundingClientRect(), clipBoxFor(trigger), options.length));
+    }
+    setIsOpen(true);
+  };
+
+  // Whatever the direction, bring the whole open menu into view.
+  useEffect(() => {
+    if (!isOpen) return;
+    const listbox = listboxRef.current;
+    if (listbox && typeof listbox.scrollIntoView === 'function') {
+      listbox.scrollIntoView({ block: 'nearest' });
+    }
+  }, [isOpen, openUpward]);
 
   // Close on escape
   useEffect(() => {
@@ -60,7 +109,8 @@ const Select = React.memo(({ value, onChange, options, label, tooltip }) => {
         {/* Trigger Button */}
         <button
           type="button"
-          onClick={() => setIsOpen(!isOpen)}
+          ref={triggerRef}
+          onClick={() => (isOpen ? setIsOpen(false) : openMenu())}
           aria-label={label ? `${label}: ${selectedOption?.label || 'Select...'}` : `Select ${selectedOption?.label || 'option'}`}
           aria-haspopup="listbox"
           aria-expanded={isOpen}
@@ -69,7 +119,7 @@ const Select = React.memo(({ value, onChange, options, label, tooltip }) => {
           onKeyDown={(e) => {
             if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
               e.preventDefault();
-              setIsOpen(true);
+              if (!isOpen) openMenu();
             }
           }}
           style={{
@@ -105,12 +155,14 @@ const Select = React.memo(({ value, onChange, options, label, tooltip }) => {
         {isOpen && (
           <div
             id={listboxId}
+            ref={listboxRef}
             role="listbox"
+            data-placement={openUpward ? 'above' : 'below'}
             aria-label={label || 'Options'}
             className="viola-scrollbar"
             style={{
               position: 'absolute',
-              top: 'calc(100% + 4px)',
+              ...(openUpward ? { bottom: `calc(100% + ${MENU_GAP}px)` } : { top: `calc(100% + ${MENU_GAP}px)` }),
               left: 0,
               right: 0,
               backgroundColor: theme.colors.bgElevated,
@@ -119,7 +171,7 @@ const Select = React.memo(({ value, onChange, options, label, tooltip }) => {
               boxShadow: `0 16px 48px ${theme.colors.shadowMedium}`,
               zIndex: 1000,
               overflow: 'hidden',
-              maxHeight: '200px',
+              maxHeight: `${MENU_MAX_HEIGHT}px`,
               overflowY: 'auto',
             }}
           >

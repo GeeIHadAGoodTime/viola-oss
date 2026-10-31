@@ -178,3 +178,44 @@ describe('useUsage — reconciled auth state via AccountTab (#1175)', () => {
     expect(screen.queryByText(/used this month/i)).not.toBeInTheDocument();
   });
 });
+
+describe('one usage number on the Account page (1.0.5 build 7)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it('shows the same percentage in the bar and the Managed usage card', async () => {
+    // The laptop showed "14% used this month" next to a card saying "0% used":
+    // two reads of the same number taken at different times.
+    hooksAuthMock.value = reconciledHooksAuth();
+    cloudAuthMock.value = baseCloudAuth({ status: 'signedIn', user: { id: 'cloud-1', email: 'cloud-only@example.com' } });
+    vi.stubGlobal('fetch', vi.fn(async (input) => {
+      const url = typeof input === 'string' ? input : input?.url || '';
+      if (url.endsWith('/billing/usage')) {
+        return { ok: true, status: 200, json: () => Promise.resolve({
+          monthly_percent: 14, weekly_percent: 0, monthly_capped: true, weekly_capped: false,
+          resets_monthly: '2026-11-23T15:07:01Z', resets_weekly: '2026-11-02T00:00:00Z',
+        }) };
+      }
+      if (url.endsWith('/v1/billing/capacity/catalog')) {
+        return { ok: true, status: 200, json: () => Promise.resolve({
+          available: true, allowed_monthly_price_cents: [2000], selections: [{ monthly_price_cents: 2000, annual_price_cents: 20000, capacity_multiplier: 1 }],
+        }) };
+      }
+      if (url.endsWith('/v1/billing/capacity')) {
+        return { ok: true, status: 200, json: () => Promise.resolve({
+          available: true, monthly_price_cents: 2000, interval: 'month', capacity_multiplier: 1,
+          usage_percent: 0, usage_resets_at: '2026-11-23T15:07:01Z', actions: {},
+        }) };
+      }
+      return { ok: true, status: 200, json: () => Promise.resolve({}) };
+    }));
+
+    render(<AccountTab />);
+
+    await waitFor(() => expect(screen.getByText(/14% used this month/i)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('14% used')).toBeInTheDocument());
+    expect(screen.queryByText('0% used')).not.toBeInTheDocument();
+  });
+});

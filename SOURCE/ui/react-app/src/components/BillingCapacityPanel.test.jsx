@@ -59,6 +59,19 @@ describe('in-app capacity billing', () => {
     expect(screen.getByLabelText('Monthly dollars')).toHaveValue('20');
   });
 
+  it('shows the Account page usage number, not its own older read (1.0.5 build 7)', async () => {
+    // The bar said "14% used this month" while this card said "0% used".
+    render(<BillingCapacityPanel accountId="account-1" managedUsagePercent={14} />);
+    expect(await screen.findByText('14% used')).toBeInTheDocument();
+    expect(screen.queryByText('49% used')).not.toBeInTheDocument();
+  });
+
+  it('hides the usage row until the page has its usage read', async () => {
+    render(<BillingCapacityPanel accountId="account-1" managedUsagePercent={null} />);
+    expect(await screen.findByText('Usage resets')).toBeInTheDocument();
+    expect(screen.queryByText(/% used$/)).not.toBeInTheDocument();
+  });
+
   it('rejects fractional, exponent and $22 input without rounding or quote requests', async () => {
     render(<BillingCapacityPanel accountId="account-1" />);
     await selectForty();

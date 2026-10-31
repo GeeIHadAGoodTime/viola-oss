@@ -105,7 +105,12 @@ import {
   requestNativeBrowserClose,
   stageForOverlayState,
 } from './utils/nativeBrowserView';
-import { appendAssistantEntry } from './utils/chatHistory';
+import {
+  appendAssistantEntry,
+  mergeRestoredHistory,
+  readRecentActivityClearedAt,
+  rememberRecentActivityCleared,
+} from './utils/chatHistory';
 import { autoDetectedWeatherLocation } from './utils/weatherLocation';
 
 // Shared CSS: animations + variables (replaces all inline <style> tags)
@@ -524,6 +529,25 @@ ProviderEmbed.propTypes = {
 // =========================================================================
 // END OF MODULE-SCOPE COMPONENTS
 // =========================================================================
+
+// The stage's reply line before any reply (and on a speaker page once a reply
+// has been up for SPOKE_REPLY_HOLD_MS).
+export const IDLE_RESPONSE_LINE = '"Hi! Ask me anything or tell me to play some music."';
+export const SPOKE_REPLY_HOLD_MS = 60000;
+
+// Longest text the stage type-anywhere box takes (typed or pasted).
+const STAGE_TYPING_MAX_CHARS = 4000;
+
+// Plain text from a paste on the stage, newlines and tabs turned into spaces.
+export function stagePasteText(clipboardData) {
+  let text = '';
+  try {
+    text = clipboardData?.getData('text/plain') || clipboardData?.getData('text') || '';
+  } catch {
+    text = '';
+  }
+  return String(text).replace(/[\r\n\t]+/g, ' ').replace(/ {2,}/g, ' ');
+}
 
 export default function SmartDisplay(props) {
   const { user } = useAuth();
@@ -1005,7 +1029,28 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
 
   // Chat state
   const [chatHistory, setChatHistory] = useState([]);
-  const [lastResponse, setLastResponse] = useState('"Hi! Ask me anything or tell me to play some music."');
+  const historyPrincipalKey = accountUser?.id || 'device';
+  // Chat History keeps earlier turns across a restart: read this user's
+  // recent turns from the backend once per principal (this component is
+  // keyed by the account, so a sign-in or switch reads again).
+  useEffect(() => {
+    if (isSpoke) return undefined;
+    let cancelled = false;
+    apiFetch('/v1/chat/recent-activity?limit=50').then((data) => {
+      const items = data?.items ?? data?.data?.items;
+      if (cancelled || !Array.isArray(items)) return;
+      const clearedAt = readRecentActivityClearedAt(historyPrincipalKey);
+      setChatHistory((prev) => mergeRestoredHistory(prev, items, clearedAt));
+    }).catch(() => {
+      // Best effort: without it the list starts with this launch, as before.
+    });
+    return () => { cancelled = true; };
+  }, [isSpoke, historyPrincipalKey]);
+  const clearRecentActivity = useCallback(() => {
+    rememberRecentActivityCleared(historyPrincipalKey);
+    setChatHistory([]);
+  }, [historyPrincipalKey]);
+  const [lastResponse, setLastResponse] = useState(IDLE_RESPONSE_LINE);
   const [mainThinking, setMainThinking] = useState('');
   // Managed-AI usage cap (C-077). Non-null for as long as the plan allowance is
   // spent, so the response area can offer a route to the upgrade surface rather
@@ -1808,6 +1853,26 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
   // still down after DISCONNECT_TOAST_GRACE_MS (1.0.5 build-5 laptop, X10.4).
   const wsConnectCountRef = useRef(playerState.connectCount);
   wsConnectCountRef.current = playerState.connectCount;
+
+  // Speaker page (multiroom spoke): its reply line follows the hub's replies
+  // over the socket, and kept an old reply on screen (1.0.5 build 7, A7.3-A7.6):
+  // replies sent while the speaker's tab was in the background or its socket
+  // was down never arrive. So on a speaker a reply goes back to the idle line
+  // after a while, and a reconnect drops whatever reply was showing.
+  const spokeConnectCountRef = useRef(playerState.connectCount);
+  useEffect(() => {
+    if (!isSpoke) return;
+    const previous = spokeConnectCountRef.current;
+    spokeConnectCountRef.current = playerState.connectCount;
+    if (previous && playerState.connectCount && playerState.connectCount !== previous) {
+      setLastResponse(IDLE_RESPONSE_LINE);
+    }
+  }, [isSpoke, playerState.connectCount]);
+  useEffect(() => {
+    if (!isSpoke || lastResponse === IDLE_RESPONSE_LINE) return undefined;
+    const timer = setTimeout(() => setLastResponse(IDLE_RESPONSE_LINE), SPOKE_REPLY_HOLD_MS);
+    return () => clearTimeout(timer);
+  }, [isSpoke, lastResponse]);
   useEffect(() => {
     if (!setDisconnectCallback) return;
     let noticeTimer = null;
@@ -3174,9 +3239,27 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
         handlePTTEnd();
       }
     };
+    // Ctrl+V on the stage: the type-anywhere box has no real text field, so
+    // the browser's paste had nowhere to go and was dropped (1.0.5 build-7
+    // laptop report). Pasted text joins what is being typed, on one line.
+    const handlePaste = (e) => {
+      if (settingsOpen || queueOpen || historyOpen || roomsOpen || helpOpen || bugReportOpen || workbenchPanelOpen || commandPaletteOpen) return;
+      const target = e.target;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return;
+      const pasted = stagePasteText(e.clipboardData);
+      if (!pasted) return;
+      e.preventDefault();
+      setIsTyping(true);
+      setTypingInput(prev => (prev + pasted).slice(0, STAGE_TYPING_MAX_CHARS));
+    };
     document.addEventListener('keydown', handleKeyDown);
     document.addEventListener('keyup', handleKeyUp);
-    return () => { document.removeEventListener('keydown', handleKeyDown); document.removeEventListener('keyup', handleKeyUp); };
+    document.addEventListener('paste', handlePaste);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('keyup', handleKeyUp);
+      document.removeEventListener('paste', handlePaste);
+    };
   }, [isTyping, typingInput, settingsOpen, queueOpen, historyOpen, roomsOpen, helpOpen, bugReportOpen, workbenchPanelOpen, commandPaletteOpen, pttHotkey, muteHotkey, toggleMicMuted, api, handlePTTStart, handlePTTEnd, handleCommandResult, interceptCloudConsent]);
 
   const formatTime = (date) => formatTimeDisplay(date, userSettings.time_display_format || 'auto');
@@ -4035,7 +4118,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
       {historyOpen && (
         <ChunkLoadErrorBoundary name="History">
           <Suspense fallback={<ModalLoadingSpinner />}>
-            <HistoryModal principalKey={accountUser?.id || 'device'} isOpen={historyOpen} onClose={() => setHistoryOpen(false)} history={chatHistory} onClearHistory={() => setChatHistory([])} timeFormat={userSettings.time_display_format || 'auto'} />
+            <HistoryModal principalKey={accountUser?.id || 'device'} isOpen={historyOpen} onClose={() => setHistoryOpen(false)} history={chatHistory} onClearHistory={clearRecentActivity} timeFormat={userSettings.time_display_format || 'auto'} />
           </Suspense>
         </ChunkLoadErrorBoundary>
       )}

@@ -27,6 +27,9 @@ import { apiFetch } from '../hooks/useViolaApi';
 // shows immediately, before the next WS event arrives.
 // =========================================================================
 
+// How long the "Your timer is done!" toast stays on screen.
+export const TIMER_DONE_TOAST_MS = 30000;
+
 function normalizeTimer(raw) {
   if (!raw || !raw.timer_id) return null;
   let endMs = null;
@@ -119,7 +122,9 @@ export default function TimerCountdown({ addToast }) {
       if (timerId) firedRef.current.add(timerId);
       const message = msg.payload.message
         || (msg.payload.label ? `Your ${msg.payload.label} is done!` : 'Your timer is done!');
-      if (addToast) addToast({ message, level: 'info', persist: true });
+      // Leaves on its own: it stayed up for minutes when it persisted (1.0.5
+      // build-7 laptop report). The timer also rings and speaks.
+      if (addToast) addToast({ message, level: 'info', durationMs: TIMER_DONE_TOAST_MS });
       setTimers((prev) => prev.filter((t) => t.timer_id !== timerId));
     } else if (msg.type === 'alarm_ringing' && msg.payload) {
       liveAlarmsRef.current = true;

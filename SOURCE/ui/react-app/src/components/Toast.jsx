@@ -64,7 +64,7 @@ function getLevelStyles(level) {
 // -------------------------------------------------------------------------
 // Individual Toast item
 // -------------------------------------------------------------------------
-const ToastItem = ({ id, message, level, persist, onDismiss }) => {
+const ToastItem = ({ id, message, level, persist, durationMs, onDismiss }) => {
   const [visible, setVisible] = useState(false);
   const [exiting, setExiting] = useState(false);
   const timerRef = useRef(null);
@@ -88,14 +88,17 @@ const ToastItem = ({ id, message, level, persist, onDismiss }) => {
     return () => cancelAnimationFrame(frameId);
   }, []);
 
-  // Auto-dismiss timer (skipped when persist=true)
+  // Auto-dismiss timer (skipped when persist=true). `durationMs` lets a toast
+  // that matters a little longer than usual (a finished timer) stay up longer
+  // and still leave on its own.
   useEffect(() => {
     if (persist) return;
-    timerRef.current = setTimeout(handleDismiss, getAutoDismissMs(level));
+    const ms = Number.isFinite(durationMs) && durationMs > 0 ? durationMs : getAutoDismissMs(level);
+    timerRef.current = setTimeout(handleDismiss, ms);
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [handleDismiss, level, persist]);
+  }, [handleDismiss, level, persist, durationMs]);
 
   return (
     <div
@@ -169,6 +172,7 @@ ToastItem.propTypes = {
   message: PropTypes.string.isRequired,
   level: PropTypes.oneOf(['error', 'warning', 'info']).isRequired,
   persist: PropTypes.bool,
+  durationMs: PropTypes.number,
   onDismiss: PropTypes.func.isRequired,
 };
 
@@ -202,6 +206,7 @@ const ToastContainer = ({ toasts, onDismiss }) => {
           message={toast.message}
           level={toast.level}
           persist={toast.persist}
+          durationMs={toast.durationMs}
           onDismiss={onDismiss}
         />
       ))}
@@ -216,6 +221,7 @@ ToastContainer.propTypes = {
       message: PropTypes.string.isRequired,
       level: PropTypes.oneOf(['error', 'warning', 'info']).isRequired,
       persist: PropTypes.bool,
+      durationMs: PropTypes.number,
     })
   ).isRequired,
   onDismiss: PropTypes.func.isRequired,
@@ -233,14 +239,14 @@ export function useToast() {
     setToasts(prev => prev.filter(t => t.id !== id));
   }, []);
 
-  const addToast = useCallback(({ message, level = 'info', persist = false }) => {
+  const addToast = useCallback(({ message, level = 'info', persist = false, durationMs }) => {
     if (!message) return;
 
     const id = _nextToastId++;
     setToasts(prev => {
       // Limit stack size - drop oldest if at max
       const updated = prev.length >= MAX_TOASTS ? prev.slice(1) : prev;
-      return [...updated, { id, message, level, persist }];
+      return [...updated, { id, message, level, persist, durationMs }];
     });
 
     return id;

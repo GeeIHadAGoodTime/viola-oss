@@ -110,7 +110,10 @@ _LOCAL_CERTIFICATE_URL_HOSTS = frozenset({LOCALHOST_NAME, LOCALHOST, "::1"})
 
 _FULLSCREEN_HINT_TEXT = "Press Esc or F11 to exit fullscreen"
 # On a touch screen there may be no keyboard at all (a Surface in tablet mode).
-_FULLSCREEN_HINT_TEXT_TOUCH = "Tap the top edge to show the exit button"
+# The label on the title bar's fullscreen button while fullscreen; the touch
+# hint names it, so the two must say the same thing.
+FULLSCREEN_EXIT_BUTTON_TEXT = "Exit full screen"
+_FULLSCREEN_HINT_TEXT_TOUCH = "Tap the top edge, then Exit full screen"
 # A finger tap near the top reveals the hidden fullscreen title bar and keeps
 # it up this long: a finger has no hover, so the cursor poll that hides the bar
 # when the mouse moves away must not hide it before the user can tap Exit.
@@ -120,6 +123,9 @@ _FULLSCREEN_TOUCH_REVEAL_HOLD_S = 5.0
 _TOUCH_KEYBOARD_POLL_MS = 250
 _TOUCH_KEYBOARD_IDLE_POLLS = 12
 _FULLSCREEN_HINT_VISIBLE_MS = 3000
+# After the window comes back from the tray or the taskbar, wait this long for
+# it to be on screen before asking the page for a fresh frame.
+_RESTORE_SURFACE_REFRESH_MS = 250
 _FULLSCREEN_HINT_FADE_MS = 180
 _FULLSCREEN_HINT_TOP_MARGIN = 18
 _FULLSCREEN_TITLE_BAR_REVEAL_PX = 30
@@ -2140,6 +2146,25 @@ class CustomTitleBar(QWidget):
         self.btn_fullscreen.setAccessibleName("Enter fullscreen")
         self.btn_fullscreen.setToolTip("Enter fullscreen (F11)")
         self.btn_fullscreen.setStyleSheet(btn_style_base(hover_bg="rgba(255, 255, 255, 0.1)"))
+        self._fullscreen_btn_style = btn_style_base(hover_bg="rgba(255, 255, 255, 0.1)")
+        # In fullscreen the button carries words, so the "exit button" the
+        # touch hint names is plain to see (1.0.5 build 7, A11.3: the hint
+        # promised an exit button and only the small arrows glyph appeared).
+        self._fullscreen_btn_style_active = f"""
+            QPushButton {{
+                background: rgba(255, 255, 255, 0.08);
+                border: none;
+                color: white;
+                min-height: {bar_height}px;
+                max-height: {bar_height}px;
+                padding: 0 14px;
+                font-size: 13px;
+                font-weight: 600;
+            }}
+            QPushButton:hover {{
+                background: rgba(255, 255, 255, 0.16);
+            }}
+        """
         self._set_fullscreen_icon(False)
         self.btn_fullscreen.setIconSize(QSize(12, 12))
         self.btn_fullscreen.clicked.connect(self._toggle_fullscreen)
@@ -2415,9 +2440,13 @@ class CustomTitleBar(QWidget):
         if is_fullscreen:
             self.btn_fullscreen.setAccessibleName("Exit fullscreen")
             self.btn_fullscreen.setToolTip("Exit fullscreen (Esc or F11)")
+            self.btn_fullscreen.setText(FULLSCREEN_EXIT_BUTTON_TEXT)
+            self.btn_fullscreen.setStyleSheet(getattr(self, "_fullscreen_btn_style_active", ""))
         else:
             self.btn_fullscreen.setAccessibleName("Enter fullscreen")
             self.btn_fullscreen.setToolTip("Enter fullscreen (F11)")
+            self.btn_fullscreen.setText("")
+            self.btn_fullscreen.setStyleSheet(getattr(self, "_fullscreen_btn_style", ""))
 
     def set_maximized_active(self, is_maximized: bool) -> None:
         """Update maximize/restore icon for externally changed window state."""
@@ -2842,13 +2871,51 @@ class ViolaWebViewWindow(QMainWindow):
         save_window_state((geo.x(), geo.y(), geo.width(), geo.height()), maximized)
 
     def restore_window(self) -> None:
-        """Bring the window back (tray, second launch) without dropping maximized."""
+        """Bring the window back (tray, second launch) without dropping maximized.
+
+        A window coming back from the tray (hidden) or the taskbar (minimized)
+        also gets its page surface refreshed shortly after it is on screen:
+        1.0.5 build 7 showed an all-black window for 20+ s after a second
+        launch brought it back from the tray, a click did not repaint it and
+        only a size change (maximize) did. ``_refresh_page_surface`` makes that
+        size change itself.
+        """
+        was_off_screen = not self.isVisible() or self.isMinimized()
         if self.windowState() & Qt.WindowState.WindowMaximized:
             self.showMaximized()
         else:
             self.showNormal()
         self.raise_()
         self.activateWindow()
+        if was_off_screen:
+            QTimer.singleShot(_RESTORE_SURFACE_REFRESH_MS, self._refresh_page_surface)
+
+    def _refresh_page_surface(self) -> None:
+        """Make the web page draw a fresh frame, the way a resize does.
+
+        The page view is shrunk by one pixel and handed straight back its
+        layout geometry. Chromium treats that as a new surface size and sends
+        a new frame, which replaces a black or stale picture left from while
+        the window was hidden. Never raises.
+        """
+        view = getattr(self, "webview", None)
+        if view is None or not self.isVisible() or self.isMinimized():
+            return
+        try:
+            width, height = view.width(), view.height()
+            if width < 2 or height < 2:
+                return
+            view.resize(width, height - 1)
+            stack = getattr(self, "_content_stack", None)
+            layout = stack.layout() if stack is not None else None
+            if layout is not None:
+                layout.setGeometry(stack.contentsRect())
+            else:
+                view.resize(width, height)
+            view.update()
+            logger.info("Window restored: page surface refreshed (%dx%d)", width, height)
+        except RuntimeError:
+            logger.debug("Page surface refresh skipped", exc_info=True)
 
     def _sync_title_bar_window_state(self) -> None:
         """Make the maximize/restore and fullscreen glyphs match the window now."""
@@ -4726,12 +4793,19 @@ class ViolaWebViewWindow(QMainWindow):
             return
 
         keep_in_tray = False
+        # Say which rule decided, so a log never leaves "quit while the tray
+        # was on" open to guessing. The tray icon itself always shows (the
+        # settings.json ``features.tray_icon.enabled`` flag is that icon, not
+        # this choice); only ``minimize_to_tray`` keeps Viola running.
+        reason = "no tray icon is showing"
         if hasattr(self, "_tray_icon") and self._tray_icon.isVisible():
             try:
                 from ui.settings_manager import get_settings_manager
 
                 keep_in_tray = get_settings_manager().get("minimize_to_tray", False) is True
+                reason = "Keep Viola running in the tray is off (minimize_to_tray is not true)"
             except Exception:
+                reason = "the keep-in-tray setting could not be read"
                 logger.warning("Could not read the keep-in-tray setting; closing quits Viola", exc_info=True)
 
         if keep_in_tray:
@@ -4741,7 +4815,7 @@ class ViolaWebViewWindow(QMainWindow):
             logger.info("Window hidden to the tray (the user chose to keep Viola running there)")
             return
 
-        logger.info("Window closed: quitting Viola")
+        logger.info("Window closed: quitting Viola (%s)", reason)
         self._quit_app()
         super().closeEvent(event)
 
