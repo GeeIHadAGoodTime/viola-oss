@@ -128,6 +128,23 @@ class PlayerControlService(PlayerControlSurface):
         except (AttributeError, RuntimeError, TypeError, ValueError) as exc:
             self._logger.warning("Autoplay skip backend play failed: %s", exc)
 
+    def _refill_autoplay_in_background(self, anchor: QueueItem | None) -> dict[str, Any]:
+        """Top up the autoplay queue without waiting (the non-blocking entry point)."""
+        autoplay = getattr(self._player, "autoplay", None)
+        if autoplay is None:
+            return {"triggered": False, "added": 0, "available": False}
+        try:
+            set_anchor = getattr(autoplay, "set_anchor", None)
+            if callable(set_anchor):
+                set_anchor(anchor)
+            check_and_run = getattr(autoplay, "check_and_run_async", None)
+            if callable(check_and_run):
+                check_and_run()
+                return {"triggered": True, "added": 0, "available": True, "background": True}
+        except (AttributeError, RuntimeError, TypeError, ValueError) as exc:
+            self._logger.debug("Background autoplay refill failed after skip: %s", exc)
+        return {"triggered": False, "added": 0, "available": True}
+
     def _ensure_autoplay_buffer(
         self,
         anchor: QueueItem | None,
@@ -524,7 +541,17 @@ class PlayerControlService(PlayerControlSurface):
             self._play_queued_provider_backend(backend, next_track, upcoming)
 
         autoplay_result = {"triggered": False, "added": 0, "available": bool(getattr(self._player, "autoplay", None))}
-        if run_autoplay_refill:
+        with self._cv:
+            still_has_upcoming = bool(self._queue_engine.upcoming())
+        if run_autoplay_refill and next_track_id is not None and not start_autoplay_if_idle and still_has_upcoming:
+            # The next track is already playing and more are queued after it,
+            # so topping up the radio queue does not change this result. The
+            # blocking refill ran on the caller's thread -- the event loop for
+            # "next" -- for 0.7-1.0 s on every skip (round-7 latency spans).
+            # Skipping onto the last queued track still refills before
+            # answering, so the next "next" has somewhere to go.
+            autoplay_result = self._refill_autoplay_in_background(autoplay_anchor)
+        elif run_autoplay_refill:
             autoplay_result = self._ensure_autoplay_buffer(
                 autoplay_anchor,
                 start_if_idle=start_autoplay_if_idle,

@@ -4839,7 +4839,9 @@ async def get_liked_songs(
         "selected candidate; include target_room for Viola's in-house "
         "multi-room playback, room_route facts, and Add Speaker pairing_flow fallback. Use pair_speaker_setup "
         "for speaker setup without playback. Active provider from settings drives where to search; pass "
-        "provider explicitly to override. Transport controls use playback."
+        "provider explicitly to override. Transport controls use playback. "
+        "Set completes_request=true only when this one call is the user's whole request; Viola then answers "
+        "from the confirmed result without another turn."
     ),
     annotations=_CONFIRM,
     meta={"risk": "confirm"},
@@ -4887,8 +4889,22 @@ async def media(
         str,
         Field(description="Optional Viola room or paired Spoke speaker for playback mode."),
     ] = "",
+    completes_request: Annotated[
+        bool,
+        Field(
+            description=(
+                "true only if this call by itself fully answers everything the user asked in this turn; "
+                "false if the user asked for anything else too (another action, a question, a joke, an "
+                "explanation), even if that part needs no tool, and always false when you make any other "
+                "tool call for this request, in this response or later. Default false."
+            )
+        ),
+    ] = False,
 ) -> str:
     """Search media candidates, then play an exact selected candidate."""
+    # Read by the agent loop from the call arguments (it decides whether a
+    # confirmed play can end the turn); the media handler does not use it.
+    del completes_request
     try:
         required_user_id = _require_call_user_id("media")
         result = await _call_with_required_user_id(
@@ -5143,7 +5159,9 @@ async def pair_speaker_setup(
         "louder, quieter, or volume up/down should use playback's music player volume actions. "
         "Machine-wide OS/system output volume belongs to desktop_volume only when the user explicitly asks for system, OS, desktop, speaker, computer, or master output volume. "
         "Does not start new music, choose tracks, add rooms, or pair speakers; media and "
-        "playlist cover starting playback, and pair_speaker_setup covers Add Room setup."
+        "playlist cover starting playback, and pair_speaker_setup covers Add Room setup. "
+        "Set completes_request=true only when this one call is the user's whole request; Viola then answers "
+        "from the confirmed result without another turn."
     ),
     annotations=_CONFIRM,
     meta={"risk": "confirm"},
@@ -5184,8 +5202,21 @@ async def playback(
         int | None,
         Field(description="Music player volume step percent for action='volume_up' or action='volume_down'."),
     ] = None,
+    completes_request: Annotated[
+        bool,
+        Field(
+            description=(
+                "true only if this call by itself fully answers everything the user asked in this turn; "
+                "false if the user asked for anything else too (another action, a question, a joke, an "
+                "explanation), even if that part needs no tool, and always false when you make any other "
+                "tool call for this request, in this response or later. Default false."
+            )
+        ),
+    ] = False,
 ) -> str:
     """Control current playback through Viola's canonical runtime APIs."""
+    # Read by the agent loop from the call arguments; the handler ignores it.
+    del completes_request
     try:
         required_user_id = _require_call_user_id("playback")
         from core.user_context import user_scope
@@ -5322,6 +5353,37 @@ async def weather(
     except Exception as exc:
         logger.exception("weather failed for city_chars=%d", len(city or ""))
         return json.dumps({"error": str(exc)})
+
+
+@server.tool(
+    description=(
+        "Real randomness: roll dice, flip a coin, pick a random number in a range, or choose randomly "
+        "from a list. Use it for every dice roll, coin flip, random number or random pick; never make "
+        "the result up yourself."
+    ),
+    annotations=_SAFE,
+    # Loaded on the first turn: "roll a dice" should be one tool step, not a
+    # ToolSearch round trip plus a tool step.
+    meta={"risk": "safe", "anthropic/alwaysLoad": True},
+)
+async def random_pick(
+    kind: Annotated[
+        str,
+        Field(description="dice | coin | number | choose"),
+    ] = "dice",
+    count: Annotated[int, Field(description="How many dice, flips, numbers or picks (1-100).")] = 1,
+    sides: Annotated[int, Field(description="Sides per die for kind=dice (default 6).")] = 6,
+    low: Annotated[int, Field(description="Lowest number for kind=number.")] = 1,
+    high: Annotated[int, Field(description="Highest number for kind=number.")] = 100,
+    options: Annotated[
+        list[str] | None,
+        Field(description="The items to choose from for kind=choose."),
+    ] = None,
+) -> str:
+    """Roll dice, flip coins, pick numbers or choose from a list with a real random source."""
+    from intent.tools.random_pick import random_pick as _random_pick
+
+    return _format_result(_random_pick(kind, count=count, sides=sides, low=low, high=high, options=options))
 
 
 @server.tool(

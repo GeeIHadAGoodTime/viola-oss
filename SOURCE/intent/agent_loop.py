@@ -1275,6 +1275,143 @@ def _payload_signals_refs_invalidated(payload: Any) -> bool:
 
 _MEMORY_ID_RE = re.compile(r"\bid=(\d+)\b")
 
+# Transport controls the model already chose: when ``playback`` confirms the
+# change itself, the follow-up model turn only restated the tool's own sentence
+# (1.0.5 build 7: the spoken "Now playing" came 14 s after the track changed;
+# dev PC r7 spans: 3 s of model time to write "X is playing now"). The turn ends
+# on the confirmed tool result instead. An unconfirmed or failed result still
+# goes back to the model exactly as before.
+_PLAYBACK_TERMINAL_ACTIONS = frozenset(
+    {
+        "next",
+        "skip",
+        "previous",
+        "pause",
+        "resume",
+        "stop",
+        "seek_to",
+        "seek_relative",
+        "restart",
+        "volume_set",
+        "volume_up",
+        "volume_down",
+        "mute",
+        "unmute",
+    }
+)
+# A track change is heard; Jay prefers no spoken "Now playing" on top of it.
+# The chat still shows the tool's text.
+_PLAYBACK_SILENT_ACTIONS = frozenset({"next", "skip", "previous"})
+_DISCOVERY_TOOL_NAMES = frozenset({"ToolSearch", "tool_search"})
+
+
+def _playback_terminal_response(tool_name: str, tool_result: Any) -> tuple[str, bool] | None:
+    """Return ``(text, silent)`` when a confirmed playback control can end the turn."""
+    if tool_name != "playback" or tool_result is None or not getattr(tool_result, "ok", False):
+        return None
+    if getattr(tool_result, "unverified", False):
+        return None
+    data = getattr(tool_result, "data", None)
+    if not isinstance(data, dict) or data.get("verified") is False:
+        return None
+    action = str(data.get("action") or "").strip().lower()
+    if action not in _PLAYBACK_TERMINAL_ACTIONS:
+        return None
+    message = str(data.get("message") or "").strip()
+    if not message:
+        return None
+    return message, action in _PLAYBACK_SILENT_ACTIONS
+
+
+_TITLE_BRACKETS_RE = re.compile(r"[\(\[\{][^\)\]\}]*[\)\]\}]")
+_TITLE_TAIL_SEPARATORS_RE = re.compile(r"\s*[|~•]\s*|\s+:\s+")
+_TITLE_DASH_RE = re.compile(r"\s+-\s+")
+_SHORT_TITLE_MAX_WORDS = 8
+
+
+def _short_track_title(title: str, artist: str) -> str:
+    """A speakable title: no bracketed tags, emoji or "| Official Video" tails.
+
+    "Jazz Relaxing Music for Stress Relief <emoji> Happy Fall Jazz in the Cozy
+    Atmosphere of A Lake View Cafe" -> "Jazz Relaxing Music for Stress Relief";
+    "DRAKE - QUEBEC" by Drake -> "QUEBEC".
+    """
+    text = (title or "").replace("–", "-").replace("—", "-").replace("’", "'")
+    text = _TITLE_BRACKETS_RE.sub(" ", text)
+    head = next((part.strip() for part in _TITLE_TAIL_SEPARATORS_RE.split(text) if part and part.strip()), "")
+    # "Artist - Title": drop the artist when it is the first half.
+    halves = [part.strip() for part in _TITLE_DASH_RE.split(head) if part.strip()]
+    artist_key = (artist or "").strip().casefold()
+    if len(halves) == 2 and artist_key and artist_key in halves[0].casefold():
+        head = halves[1]
+    # An emoji or symbol run usually starts a decorative tail; keep what precedes it.
+    head = re.sub(r"^[^\w]+", "", head)
+    head = re.split(r"[^\w\s'&.,!?/-]", head, maxsplit=1)[0]
+    words = head.split()
+    return " ".join(words[:_SHORT_TITLE_MAX_WORDS]).strip(" -,.")
+
+
+def _model_declared_request_complete(
+    tool_args: Any,
+    all_tool_calls: list[dict[str, Any]],
+    tools_called: list[str],
+) -> bool:
+    """True when the model marked this call ``completes_request`` and it is the turn's only action.
+
+    The flag defaults to false, so a prompt or model that ignores it keeps the
+    normal model turn. "Only action" means no other non-discovery call in this
+    response and none earlier in the turn.
+    """
+    if not isinstance(tool_args, dict):
+        return False
+    flag = tool_args.get("completes_request")
+    if not (flag is True or (isinstance(flag, str) and flag.strip().lower() == "true")):
+        return False
+    actions = [
+        call for call in all_tool_calls if str((call or {}).get("tool") or "") not in _DISCOVERY_TOOL_NAMES
+    ]
+    if len(actions) != 1:
+        return False
+    return all(name in _DISCOVERY_TOOL_NAMES for name in tools_called[:-1])
+
+
+def _media_play_terminal_response(tool_name: str, tool_result: Any) -> str | None:
+    """Short reply when ``media search_play`` confirmed the track is playing.
+
+    The follow-up model turn only restated the tool's own result (round-7
+    latency: 1.5-2.4 s of model time for "Now playing relaxing jazz by Jazz
+    Horizon"). Anything the user should hear about -- an unconfirmed start, a
+    provider fallback, a sign-in link, a candidate list, an unrelated match --
+    still goes back to the model.
+    """
+    if tool_name != "media" or tool_result is None or not getattr(tool_result, "ok", False):
+        return None
+    if getattr(tool_result, "unverified", False):
+        return None
+    data = getattr(tool_result, "data", None)
+    if not isinstance(data, dict):
+        return None
+    if str(data.get("action") or data.get("mode") or "") != "search_play":
+        return None
+    if data.get("playback_started") is not True or data.get("needs_selection"):
+        return None
+    if data.get("warnings") or data.get("fallback_used") or data.get("login_url_to_show_user"):
+        return None
+    play = data.get("play_result")
+    if not isinstance(play, dict) or play.get("playback_verified") is not True:
+        return None
+    if play.get("fallback_used") or play.get("query_match") == "fallback_unrelated":
+        return None
+    selected = data.get("selected_track") if isinstance(data.get("selected_track"), dict) else {}
+    title = str(play.get("title") or selected.get("title") or "").strip()
+    artist = str(play.get("artist") or selected.get("artist") or "").strip()
+    short = _short_track_title(title, artist)
+    if not short:
+        return None
+    if artist and artist.casefold() not in {"youtube", "unknown artist"} and artist.casefold() not in short.casefold():
+        return "Playing %s by %s." % (short, artist)
+    return "Playing %s." % short
+
 
 def _set_final_response(
     executor: AgentExecutor,
@@ -4482,6 +4619,38 @@ async def run_agent_loop(
                 if _terminal_tool_response is not None and len(all_tool_calls) == 1:
                     _set_final_response(executor, _terminal_tool_response, continue_listening=False)
                     _media_terminal_fired = True
+                # The model itself declared (completes_request=true) that this
+                # one call is the user's whole request, the tool confirmed it,
+                # and no other action ran this turn: end on the tool's own
+                # result. Anything else goes back to the model as before.
+                _sole_declared_complete = _model_declared_request_complete(
+                    tc_args, all_tool_calls, tools_called
+                )
+                _playback_terminal = _playback_terminal_response(tc_name, tool_result)
+                if _playback_terminal is not None and _sole_declared_complete:
+                    _playback_text, _playback_silent = _playback_terminal
+                    _set_final_response(
+                        executor,
+                        _playback_text,
+                        continue_listening=False,
+                        params={"silent_reply": _playback_silent, "terminal_tool": "playback"},
+                    )
+                    _media_terminal_fired = True
+                    logger.info(
+                        "Agent loop: confirmed playback %s ends the turn without another model call (silent=%s)",
+                        str((tool_result.data or {}).get("action") or ""),
+                        _playback_silent,
+                    )
+                _media_terminal = _media_play_terminal_response(tc_name, tool_result)
+                if _media_terminal is not None and _sole_declared_complete:
+                    _set_final_response(
+                        executor,
+                        _media_terminal,
+                        continue_listening=False,
+                        params={"terminal_tool": "media"},
+                    )
+                    _media_terminal_fired = True
+                    logger.info("Agent loop: confirmed media play ends the turn without another model call")
 
                 # Surface ui_action hints (e.g. knowledge open_folder) so the
                 # ai_controller can merge them into the response envelope and

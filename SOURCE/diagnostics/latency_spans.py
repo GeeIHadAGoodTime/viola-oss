@@ -182,6 +182,78 @@ def start_event_loop_heartbeat() -> None:
                 )
 
     loop.create_task(_sample())
+    _start_loop_stall_sampler()
+
+
+# ---------------------------------------------------------------------------
+# Loop stall sampler: LOOP_LAG says *that* the event loop was blocked; this says
+# *what* blocked it. A daemon thread watches the loop's last tick and, while the
+# loop thread has not ticked for longer than the threshold, samples that thread's
+# Python stack every 100 ms. Each distinct stall is written once as a
+# LOOP_STALL_STACK event with the innermost frames (file:line function).
+# ---------------------------------------------------------------------------
+
+_STALL_THRESHOLD_S = 0.2
+_STALL_SAMPLE_S = 0.1
+
+
+def _start_loop_stall_sampler() -> None:
+    import asyncio
+    import sys
+
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        return
+    loop_thread_id = threading.get_ident()
+    last_tick = [time.perf_counter()]
+
+    async def _tick() -> None:
+        while True:
+            last_tick[0] = time.perf_counter()
+            await asyncio.sleep(0.02)
+
+    loop.create_task(_tick())
+
+    def _frames_text(frame: Any) -> list[str]:
+        out: list[str] = []
+        while frame is not None and len(out) < 14:
+            code = frame.f_code
+            fname = code.co_filename.replace("\\", "/")
+            parts = fname.split("/")
+            out.append("%s:%d %s" % ("/".join(parts[-2:]), frame.f_lineno, code.co_name))
+            frame = frame.f_back
+        return out
+
+    def _watch() -> None:
+        reported_for = 0.0
+        while not loop.is_closed():
+            time.sleep(_STALL_SAMPLE_S)
+            if not loop.is_running():
+                continue
+            last = last_tick[0]
+            stalled = time.perf_counter() - last
+            if stalled < _STALL_THRESHOLD_S:
+                continue
+            frame = sys._current_frames().get(loop_thread_id)
+            if frame is None:
+                continue
+            _write_row(
+                {
+                    "kind": "event",
+                    "turn": "",
+                    "name": "LOOP_STALL_STACK",
+                    "t": time.perf_counter(),
+                    "meta": {
+                        "stalled_ms": round(stalled * 1000.0, 1),
+                        "new_stall": last != reported_for,
+                        "stack": _frames_text(frame),
+                    },
+                }
+            )
+            reported_for = last
+
+    threading.Thread(target=_watch, name="latency-stall-sampler", daemon=True).start()
 
 
 # ---------------------------------------------------------------------------

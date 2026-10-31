@@ -90,9 +90,57 @@ class KeyProvider:
         worker loop from itself")``. Async callers should use
         :meth:`unwrap_trace_key_async` instead.
         """
+        cached = self._cached_routine_trace_key()
+        if cached is not None:
+            return cached
         trace_key = self._unwrap_trace_key()
         self._audit_unwrap()
+        self._remember_routine_trace_key(trace_key)
         return trace_key
+
+    # Desktop: the unwrapped per-user trace key, reused for routine trace writes
+    # within this process. Every agent turn opens a new trace writer and blob
+    # store, and each one resolved the master key through the hardware-wrapped
+    # local vault (Windows NCrypt) on the event loop before the first model call:
+    # 0.2-2 s per turn in the 2026-10-30 latency spans. The entry is keyed by the
+    # sealed key file's identity, so a re-sealed or replaced key file is read
+    # again. Break-glass reads never use it, explicit master keys never use it,
+    # and the cloud surface never uses it.
+    _ROUTINE_KEY_CACHE: dict[tuple[str, str, int, int, int], bytes] = {}
+    _ROUTINE_KEY_CACHE_MAX: Final[int] = 64
+
+    def _routine_key_cache_id(self) -> tuple[str, str, int, int, int] | None:
+        if self._master_key_source == MASTER_KEY_SOURCE_EXPLICIT:
+            return None
+        try:
+            if is_cloud_surface():
+                return None
+            st = self.trace_key_path.stat()
+        except Exception:  # noqa: BLE001, RUF100 - a cache miss is always safe
+            return None
+        return (self.user_id, str(self.trace_key_path), int(st.st_ino), int(st.st_mtime_ns), int(st.st_size))
+
+    def _cached_routine_trace_key(self) -> bytes | None:
+        cache_id = self._routine_key_cache_id()
+        if cache_id is None:
+            return None
+        return KeyProvider._ROUTINE_KEY_CACHE.get(cache_id)
+
+    def _remember_routine_trace_key(self, trace_key: bytes) -> None:
+        cache_id = self._routine_key_cache_id()
+        if cache_id is None:
+            return
+        cache = KeyProvider._ROUTINE_KEY_CACHE
+        for stale in [key for key in cache if key[:2] == cache_id[:2]]:
+            cache.pop(stale, None)
+        while len(cache) >= KeyProvider._ROUTINE_KEY_CACHE_MAX:
+            cache.pop(next(iter(cache)))
+        cache[cache_id] = bytes(trace_key)
+
+    @classmethod
+    def clear_routine_key_cache(cls) -> None:
+        """Forget every cached routine trace key (tests, sign-out)."""
+        cls._ROUTINE_KEY_CACHE.clear()
 
     async def unwrap_trace_key_async(self) -> bytes:
         """Async-native variant of :meth:`unwrap_trace_key`.
@@ -103,8 +151,12 @@ class KeyProvider:
         writes during a request handler) to avoid the ASYNC-1 cross-loop
         recursion-into-self failure on cloud.
         """
+        cached = self._cached_routine_trace_key()
+        if cached is not None:
+            return cached
         trace_key = await self._unwrap_trace_key_async()
         self._audit_unwrap()
+        self._remember_routine_trace_key(trace_key)
         return trace_key
 
     def engineer_break_glass_unwrap(self, *, task_id: str, reason: str, actor: str) -> bytes:
