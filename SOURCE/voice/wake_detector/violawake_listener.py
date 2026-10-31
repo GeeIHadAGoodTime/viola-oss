@@ -124,6 +124,12 @@ _DEVICE_CHANGE_QUIESCE_TIMEOUT = 12.0
 _DEVICE_CHANGE_RESUME_TIMEOUT = 15.0
 
 
+try:
+    from voice.wake_detector.wake_decision_policy import VAD_BLOCK_THRESHOLD as _VAD_GATE_STOP_AT
+except ImportError:  # a stubbed policy module (tests)
+    _VAD_GATE_STOP_AT = 0.05
+
+
 def _fp_collecting_and_cleanup(collector: Any) -> bool:
     """The false-positive collector's switch; also runs its hourly retention cleanup."""
     cleanup = getattr(collector, "run_periodic_cleanup", None)
@@ -594,6 +600,7 @@ class ViolaWakeListener:
         self._loop_flag_queue: deque[tuple[str, Callable[[], Any]]] = deque()
         self._loop_flag_wake = threading.Event()
         self._loop_flag_thread: threading.Thread | None = None
+        self._loop_tasks: deque[Callable[[], None]] = deque()
         self._is_initialized = False
         # _init() may call cleanup() on failure while already holding this
         # lock. Keep teardown exclusive without deadlocking that same thread.
@@ -2406,7 +2413,8 @@ class ViolaWakeListener:
             _buf_int16 = (np.clip(audio_buffer, -1.0, 1.0) * 32767).astype(np.int16)
             _buf_float32 = _buf_int16.astype(np.float32)
             policy_mic_rms = max(last_mic_rms, float(np.sqrt(np.mean(_buf_float32 * _buf_float32))))
-            vad_on_buffer = self._policy.compute_vad_confidence(audio_int16=_buf_int16)
+            # Stop scanning the 1.5 s buffer once the VAD gate is satisfied.
+            vad_on_buffer = self._policy.compute_vad_confidence(audio_int16=_buf_int16, stop_at=_VAD_GATE_STOP_AT)
             vad_on_chunk = self._policy.estimate_vad_from_audio(
                 audio_int16=last_processed_int16,
                 mic_rms=last_mic_rms,
@@ -2437,6 +2445,7 @@ class ViolaWakeListener:
                 self_speech_active=_viola_self_speech_active(),
                 score_threshold=frame_threshold,
                 agreement=agreement_rule,
+                effective_threshold=effective_threshold,
             )
 
             # Use policy for authoritative decision
@@ -2508,7 +2517,9 @@ class ViolaWakeListener:
                 logger.debug("Decision trace recording failed: %s", diag_err)
 
             # --- Diagnostic: Capture audio on trigger ---
-            if (decision.should_trigger or actual_score > 0.6) and _is_wake_audio_logging_enabled():
+            if (decision.should_trigger or actual_score > 0.6) and self._loop_flag(
+                "wake_audio_logging", _is_wake_audio_logging_enabled
+            ):
                 try:
                     audio_buf = get_wake_audio_buffer()
                     event_type = "trigger" if decision.should_trigger else "near_miss"
@@ -2574,13 +2585,20 @@ class ViolaWakeListener:
                 " (music path)" if music_path else "",
             )
 
-            # Telemetry: record wake activation
-            try:
-                from admin.instrumentation import record_wake_activation
+            # Telemetry: record wake activation, off the wake path (it is a
+            # counter, and on a busy machine its imports and file reads delayed
+            # the chime).
+            during_playback = bool(self._policy.is_playback_active)
 
-                record_wake_activation(during_playback=self._policy.is_playback_active)
-            except Exception:
-                logger.debug("Wake activation telemetry recording failed (non-critical)")
+            def _record_activation() -> None:
+                try:
+                    from admin.instrumentation import record_wake_activation
+
+                    record_wake_activation(during_playback=during_playback)
+                except Exception:
+                    logger.debug("Wake activation telemetry recording failed (non-critical)")
+
+            self._run_off_loop(_record_activation)
 
             # Emit event with full metrics
             self._emit_status_event(
@@ -3333,10 +3351,22 @@ class ViolaWakeListener:
         self._loop_flag_thread = threading.Thread(target=self._flag_refresher, name="wake-flag-refresh", daemon=True)
         self._loop_flag_thread.start()
 
+    def _run_off_loop(self, task: Callable[[], None]) -> None:
+        """Run ``task`` on the long-lived refresher thread (no thread start on the wake path)."""
+        self._loop_tasks.append(task)
+        self._ensure_flag_refresher()
+        self._loop_flag_wake.set()
+
     def _flag_refresher(self) -> None:
         while True:
             self._loop_flag_wake.wait(30.0)
             self._loop_flag_wake.clear()
+            while self._loop_tasks:
+                task = self._loop_tasks.popleft()
+                try:
+                    task()
+                except Exception:  # noqa: BLE001, RUF100 - background bookkeeping only
+                    logger.debug("Wake background task failed", exc_info=True)
             while self._loop_flag_queue:
                 name, read = self._loop_flag_queue.popleft()
                 try:
@@ -3397,6 +3427,49 @@ class ViolaWakeListener:
             warm_wake_verifier()
         except Exception as exc:  # noqa: BLE001, RUF100 - the check is optional; wakes pass without it
             logger.warning("[WAKE_VERIFY] could not start the verifier warm-up: %s", exc)
+        threading.Thread(target=self._prewarm_wake_path, name="wake-prewarm", daemon=True).start()
+
+    def _prewarm_wake_path(self) -> None:
+        """Pay the wake path's one-time costs at start-up, not on the first "Viola".
+
+        The first wake used to import modules (instrumentation, data
+        collection, ducking, the chime), build the settings manager and load
+        the policy's Silero VAD inside the detection callback. On a busy
+        machine every file read of an import waits for the GIL, and the first
+        chime came about 2.7 s after the confirming frame (wake latency
+        harness, 2 busy threads) against about 0.2 s for later wakes.
+        """
+        import importlib
+
+        started = time.perf_counter()
+        for name in (
+            "admin.instrumentation",
+            "config.settings",
+            "voice.wake_detector.data_collection.collector",
+            "utils.audio_ducking",
+            "voice.wake_chime",
+            "core.state_hub",
+            "core.unified_state",
+            "telemetry.accumulator",
+        ):
+            try:
+                importlib.import_module(name)
+            except Exception:  # noqa: BLE001, RUF100 - optional pieces; the wake path handles their absence
+                logger.debug("Wake pre-warm could not import %s", name, exc_info=True)
+        try:
+            ensure_vad = getattr(self._policy, "_ensure_vad_model", None)
+            if callable(ensure_vad) and ensure_vad():
+                # First inference of the ONNX session (one silent window).
+                self._policy.compute_vad_confidence(audio_int16=np.zeros(512, dtype=np.int16))
+            from voice.wake_detector.wake_decision_policy import _check_state_hub_listening
+
+            _check_state_hub_listening()  # builds the state hub the listening gate reads
+            self._loop_flag("wake_audio_logging", _is_wake_audio_logging_enabled)
+            get_wake_analytics()
+            get_decision_tracer()
+        except Exception:  # noqa: BLE001, RUF100 - a warm-up must never break listening
+            logger.debug("Wake pre-warm step failed", exc_info=True)
+        logger.info("Wake path warmed in %.0f ms", (time.perf_counter() - started) * 1000)
 
     def _log_wake_rule_change(self, level: float, checked: bool) -> None:
         """Log the base wake rule again when the saved level or the Stage 2 switch changes.

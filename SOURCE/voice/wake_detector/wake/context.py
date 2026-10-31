@@ -31,6 +31,9 @@ class WakeContext:
     score_threshold: float | None = None
     # The (k, n) agreement rule that went with ``score_threshold`` (logging only).
     agreement: tuple[int, int] | None = None
+    # The effective (level) threshold the listener's loop already computed
+    # (quiet hours, playback); None = the policy computes it.
+    effective_threshold: float | None = None
 
     # Audio metrics (kept for diagnostics and AEC tracking)
     mic_rms: float = 0.0

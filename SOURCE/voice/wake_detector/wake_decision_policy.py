@@ -59,6 +59,7 @@ logger = get_logger(__name__)
 # guardrail, not a speech-quality gate: real short "Viola" fixtures can produce
 # low Silero probabilities even when the wake model score is strong.
 _VAD_BLOCK_THRESHOLD: float = 0.05
+VAD_BLOCK_THRESHOLD = _VAD_BLOCK_THRESHOLD
 # Silero VAD accepts 512 samples at 16 kHz (32 ms window)
 _SILERO_WINDOW_SAMPLES: int = 512
 
@@ -278,7 +279,9 @@ class WakeDecisionPolicy:
                 self._vad_load_failed = True
                 return False
 
-    def compute_vad_confidence(self, audio_int16: np.ndarray | None = None, **kwargs: Any) -> float:
+    def compute_vad_confidence(
+        self, audio_int16: np.ndarray | None = None, *, stop_at: float = 0.5, **kwargs: Any
+    ) -> float:
         """Run Silero VAD on an int16 audio chunk and return speech probability.
 
         For short inputs (<= 1536 samples), scores a single window.
@@ -319,13 +322,19 @@ class WakeDecisionPolicy:
             if len(audio_f32) <= W * 3:
                 return self._vad_model(audio_f32[-W:], SAMPLE_RATE_16K)
 
-            # Long input (e.g. 24000-sample wake buffer): slide and take max.
+            # Long input (e.g. 24000-sample wake buffer): slide and take max,
+            # stopping once a window reaches ``stop_at``. The wake path passes
+            # the gate's own threshold: past it the gate's answer cannot
+            # change, and each further ONNX call cost a GIL wait on a busy
+            # machine (wake latency harness: most of the time between the
+            # confirming frame and the Stage 2 verdict). The windows before the
+            # stop are the same, so the gate decides exactly as before.
             best = 0.0
             for start in range(0, len(audio_f32) - W + 1, W):
                 prob = self._vad_model(audio_f32[start : start + W], SAMPLE_RATE_16K)
                 if prob > best:
                     best = prob
-                    if best >= 0.5:
+                    if best >= stop_at:
                         break
             return best
         except Exception:
@@ -405,7 +414,13 @@ class WakeDecisionPolicy:
         Gate 4: Cooldown           - debounce between triggers
         Gate 5: Listening Gate     - block during voice command processing
         """
-        threshold = self.effective_threshold(context)
+        # The listener passes the threshold its loop already applied (re-read
+        # from settings at most once a second); else compute it here.
+        threshold = (
+            context.effective_threshold
+            if context.effective_threshold is not None
+            else self.effective_threshold(context)
+        )
         result = WakeDecisionResult(
             should_trigger=False,
             effective_threshold=threshold,
