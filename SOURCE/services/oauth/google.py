@@ -85,6 +85,7 @@ def unverified_google_scopes(scopes: list[str] | tuple[str, ...] | set[str] | No
     verified = set(GOOGLE_VERIFIED_SCOPES)
     return [scope for scope in dict.fromkeys(scopes or ()) if scope not in verified]
 
+
 # Scope policy (founder decision 2026-10-30): Gmail gets full mailbox access
 # within what Google allows without permanent deletion (gmail.modify, plus
 # gmail.send). Every other Workspace scope stays read-only ("*.readonly"

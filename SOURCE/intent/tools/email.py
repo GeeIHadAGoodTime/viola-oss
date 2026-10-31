@@ -732,13 +732,13 @@ GMAIL_MAILBOX_NOT_CONNECTED_MESSAGE = (
 GMAIL_MAILBOX_CONNECT_OPENED_MESSAGE = (
     "To read or organize your email, Viola needs to connect to your Google account. A Google sign-in page "
     "just opened in your browser: approve it there, then ask again and Viola will carry on. Google has not "
-    "verified the Gmail reading permission for Viola yet, so it may show a \"Google hasn't verified this app\" "
+    'verified the Gmail reading permission for Viola yet, so it may show a "Google hasn\'t verified this app" '
     "screen first: click Advanced, then Go to Viola."
 )
 GMAIL_MAILBOX_PERMISSION_OPENED_MESSAGE = (
     "Viola needs your OK in Google to read and organize your Gmail. A Google permission page just opened in "
     "your browser: approve it there, then ask again and Viola will carry on. Google has not verified this "
-    "permission for Viola yet, so it may show a \"Google hasn't verified this app\" screen first: click Advanced, "
+    'permission for Viola yet, so it may show a "Google hasn\'t verified this app" screen first: click Advanced, '
     "then Go to Viola."
 )
 GMAIL_MAILBOX_PERMISSION_NEEDED_MESSAGE = (
