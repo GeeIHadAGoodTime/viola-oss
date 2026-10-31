@@ -191,7 +191,7 @@ def _is_home_or_above(folder: Path, home: Path | None) -> bool:
 def _ancestors_below_home(p: Path) -> list[Path]:
     """Folders above ``p`` up to (not including) home, or up to the drive root outside home.
 
-    Home and the folders that contain it (/home, C:\Users) are never part
+    Home and the folders that contain it (/home, C:/Users) are never part
     of the walk: with home at /home/runner, "list my home folder" named
     /home as "home folder" and so made ~ count as user-named.
     """
