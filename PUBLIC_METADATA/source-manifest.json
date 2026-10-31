@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "205bec04e75764fa5f62353efbe9e810d28f22a7",
-  "sha256": "f7ed972ccbbb9563a8ab550bbc78db16ca172563c68f90963aa6fb21e175761d",
+  "revision": "7158ce9934670532e184f73713beb47ab05f6605",
+  "sha256": "1732b4e3a3522dbaeadfc2ee5ca1c9b4c4da9652aa0040e2a0c49351ce7f66c6",
   "files": [
     {
       "path": ".env.example",
@@ -6450,8 +6450,8 @@
     },
     {
       "path": "third_party/kokoro_onnx.patch",
-      "sha256": "eab192e230a2a0a032d1ceb9514b95ca2a6d3ce3ad2afbdda070215ccd4ed209",
-      "bytes": 16900
+      "sha256": "a900c8e6fb4209374d82777eb144c566b14d6ea72dd50fa8994a2fba17f708c1",
+      "bytes": 18380
     },
     {
       "path": "third_party/kokoro_onnx/LICENSE",
@@ -9235,7 +9235,7 @@
     },
     {
       "path": "third_party/sources.toml",
-      "sha256": "bf7d015be536f225c22c3a83cee709af75244b30a378750abe7a871ecaaf7c31",
+      "sha256": "4a28de47112d4ad69c212ac9b5b3a5685218531bc1002d2caabd776ee20ffda1",
       "bytes": 211050
     },
     {
