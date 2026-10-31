@@ -128,6 +128,7 @@ class BrowserAuthManager:
             if mgr is not self and mgr._controller is None:
                 mgr._controller = controller
         logger.info("BrowserAuthManager controller attached")
+        self._watch_spotify_cookies()
 
     def set_overlay_controller(self, overlay_controller: Any) -> None:
         """Attach the overlay controller for showing/hiding the login overlay.
@@ -276,11 +277,21 @@ class BrowserAuthManager:
         dispatch_to_main = getattr(controller, "_post_to_main", None)
         return webview_controller, dispatch_to_main if callable(dispatch_to_main) else None
 
+    def _watch_spotify_cookies(self) -> None:
+        try:
+            from music.spotify.cookie_bridge import ensure_spotify_cookie_tracker
+
+            webview_controller, dispatch_to_main = self._webview_and_dispatcher()
+            ensure_spotify_cookie_tracker(webview_controller, dispatch_to_main=dispatch_to_main, wait_seconds=0)
+        except Exception:
+            logger.exception("Could not start watching the in-app browser's Spotify cookies")
+
     def refresh_spotify_sign_in(self) -> bool | None:
         """Read Spotify's sign-in cookie from the in-app browser and update status.
 
-        Blocks for about a second (the Qt cookie store is read on the Qt main
-        thread); async callers run it with ``asyncio.to_thread``.
+        May block briefly (the first call attaches the cookie tracker on the Qt
+        main thread, and the profile's cookie database is read from disk);
+        async callers run it with ``asyncio.to_thread``.
 
         Returns:
             ``True`` when the in-app browser is signed in to Spotify, ``False``
@@ -609,6 +620,10 @@ class BrowserAuthManager:
             raise RuntimeError("No login URL available for provider: %s" % provider_name)
 
         if self._controller is not None:
+            if provider_name == "spotify":
+                # Watch the in-app browser's cookies before Spotify can set the
+                # sign-in cookie, so the sign-in is seen when it happens.
+                self._watch_spotify_cookies()
             self._controller.navigate(login_url)
             logger.info("Navigated to login page for %s", provider_name)
             # Show the overlay so the user can interact with the login page
