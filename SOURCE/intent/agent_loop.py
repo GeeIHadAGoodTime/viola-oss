@@ -1351,6 +1351,30 @@ def _short_track_title(title: str, artist: str) -> str:
     return " ".join(words[:_SHORT_TITLE_MAX_WORDS]).strip(" -,.")
 
 
+def _model_declared_request_complete(
+    tool_args: Any,
+    all_tool_calls: list[dict[str, Any]],
+    tools_called: list[str],
+) -> bool:
+    """True when the model marked this call ``completes_request`` and it is the turn's only action.
+
+    The flag defaults to false, so a prompt or model that ignores it keeps the
+    normal model turn. "Only action" means no other non-discovery call in this
+    response and none earlier in the turn.
+    """
+    if not isinstance(tool_args, dict):
+        return False
+    flag = tool_args.get("completes_request")
+    if not (flag is True or (isinstance(flag, str) and flag.strip().lower() == "true")):
+        return False
+    actions = [
+        call for call in all_tool_calls if str((call or {}).get("tool") or "") not in _DISCOVERY_TOOL_NAMES
+    ]
+    if len(actions) != 1:
+        return False
+    return all(name in _DISCOVERY_TOOL_NAMES for name in tools_called[:-1])
+
+
 def _media_play_terminal_response(tool_name: str, tool_result: Any) -> str | None:
     """Short reply when ``media search_play`` confirmed the track is playing.
 
@@ -4595,17 +4619,15 @@ async def run_agent_loop(
                 if _terminal_tool_response is not None and len(all_tool_calls) == 1:
                     _set_final_response(executor, _terminal_tool_response, continue_listening=False)
                     _media_terminal_fired = True
-                # A confirmed playback control as the only call, with nothing
-                # but tool discovery before it this turn: the user asked for
-                # one transport change and it is done, so end here. A compound
-                # request keeps going (the model issued other calls before or
-                # alongside it).
+                # The model itself declared (completes_request=true) that this
+                # one call is the user's whole request, the tool confirmed it,
+                # and no other action ran this turn: end on the tool's own
+                # result. Anything else goes back to the model as before.
+                _sole_declared_complete = _model_declared_request_complete(
+                    tc_args, all_tool_calls, tools_called
+                )
                 _playback_terminal = _playback_terminal_response(tc_name, tool_result)
-                if (
-                    _playback_terminal is not None
-                    and len(all_tool_calls) == 1
-                    and all(name in _DISCOVERY_TOOL_NAMES for name in tools_called[:-1])
-                ):
+                if _playback_terminal is not None and _sole_declared_complete:
                     _playback_text, _playback_silent = _playback_terminal
                     _set_final_response(
                         executor,
@@ -4620,11 +4642,7 @@ async def run_agent_loop(
                         _playback_silent,
                     )
                 _media_terminal = _media_play_terminal_response(tc_name, tool_result)
-                if (
-                    _media_terminal is not None
-                    and len(all_tool_calls) == 1
-                    and all(name in _DISCOVERY_TOOL_NAMES for name in tools_called[:-1])
-                ):
+                if _media_terminal is not None and _sole_declared_complete:
                     _set_final_response(
                         executor,
                         _media_terminal,
