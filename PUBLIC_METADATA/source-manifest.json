@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "866684ebbf0583839a79aa8c8d1a73925a4a6387",
-  "sha256": "a5bc28973b34785e37a82e5e70c8537cd9b5e71d6d26360e59cee483f27ffb87",
+  "revision": "31d1f35f4aebad41c2abf559b9a102ee3fc8de23",
+  "sha256": "5110cef06d070f6e1dedf44819eb8d010c37745f693aa1613a2a9e7cb9707e24",
   "files": [
     {
       "path": ".env.example",
@@ -1580,8 +1580,8 @@
     },
     {
       "path": "intent/agent_executor.py",
-      "sha256": "e13707f50edfbe06d11c03f5075dfdbefffaf9a4c74a34df7449b87d87fb4aa5",
-      "bytes": 586707
+      "sha256": "1a154d762331db34dd525b85c997c39317138aab42e418cb9a3b63984595fa16",
+      "bytes": 588063
     },
     {
       "path": "intent/agent_loop.py",
@@ -1870,8 +1870,8 @@
     },
     {
       "path": "intent/log_redaction.py",
-      "sha256": "ef949c4e67f17c470241edf29369e9db65deb89452a35680af7dafb2c07d092e",
-      "bytes": 16904
+      "sha256": "b0218dd471fa07bc6070a835b141afee421b736f77f3d7057241f45016f16b8b",
+      "bytes": 19376
     },
     {
       "path": "intent/permissions/policy.py",
@@ -2125,8 +2125,8 @@
     },
     {
       "path": "intent/tools/phone_call.py",
-      "sha256": "8616fe44bb40c195bd264a4d74e6648ff90401a28eb56395affb540b9d12cf9b",
-      "bytes": 56833
+      "sha256": "fc60ee61ae9dd99208c424d8fca98e2574cb799af2ecf4e951e1f247ae29a7ae",
+      "bytes": 70879
     },
     {
       "path": "intent/tools/playlist_tools.py",
@@ -5935,8 +5935,8 @@
     },
     {
       "path": "telephony/routes.py",
-      "sha256": "0f8b91ab3917e51c130e710afc3fc88f417dcb123839d0e9922c2f5522ac51bf",
-      "bytes": 52989
+      "sha256": "d3ff93ef89070941827283d53e03444b7b3691bea53fc3890c950b4cd2e0cab4",
+      "bytes": 56596
     },
     {
       "path": "telephony/streaming_stt_model.py",
@@ -9540,8 +9540,8 @@
     },
     {
       "path": "ui/api/routes/onboarding.py",
-      "sha256": "14139d80de827841027f89e3929f40014750c65ddc73ad6c0b0cb69db5b3a1aa",
-      "bytes": 20593
+      "sha256": "ace9632268b121e68552633eeed1d6fa53e8c5f0183fddf340d1af8f112180c5",
+      "bytes": 21937
     },
     {
       "path": "ui/api/routes/playlists.py",
@@ -10045,8 +10045,8 @@
     },
     {
       "path": "ui/react-app/src/SmartDisplay.jsx",
-      "sha256": "1c8458ea4031c7f0d9d2325ff732774286af1383f717498d2b57e427143e24fe",
-      "bytes": 183697
+      "sha256": "9e55893169d77fe9dc34d39511557c127c931efb90f5ba643f811ac7e7bc73b8",
+      "bytes": 184825
     },
     {
       "path": "ui/react-app/src/SmartDisplay.spokePolicy.test.jsx",
@@ -10765,8 +10765,8 @@
     },
     {
       "path": "ui/react-app/src/components/PhoneToSModal.jsx",
-      "sha256": "503980ff70aa5b8d46083c2e56dd075597866981e1ba2c0d4e5e34216a6e0c92",
-      "bytes": 6338
+      "sha256": "639cb482a45cbb95ab3e8862417d64feee1f3a0644de304eb1da589c279f371f",
+      "bytes": 7695
     },
     {
       "path": "ui/react-app/src/components/PhoneToSModal.test.jsx",
