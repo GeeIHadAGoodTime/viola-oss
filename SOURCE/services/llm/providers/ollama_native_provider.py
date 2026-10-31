@@ -24,6 +24,7 @@ from core.constants import (
 from core.logging_config import get_logger
 from intent.token_budget import context_window_for_model
 from services.conversation.frame_rendering import render_for_openai_responses
+from services.llm.answer_stream import AnswerAttempt
 from services.llm.no_result import build_ai_no_result
 from services.llm.prompts import build_provider_prompt_bundle
 from services.llm.providers.base import BaseLLMProvider, LLMConfig, LLMTestResult
@@ -181,6 +182,15 @@ def _ollama_history_tool_calls(calls: list[dict[str, Any]]) -> list[dict[str, An
             }
         )
     return converted
+
+
+def _publish_screen_token(text: str, stream_id: str) -> None:
+    try:
+        from services.llm.stream_bus import publish_text_delta
+
+        publish_text_delta(text, stream_id)
+    except Exception:  # noqa: BLE001, RUF100 - on-screen tokens are best effort
+        logger.debug("Ollama token publish failed", exc_info=True)
 
 
 def _context_window_from_ollama_show(data: dict[str, Any]) -> int | None:
@@ -912,19 +922,26 @@ For questions: {"type": "answer", "answer": "<your response>"}
                 }
                 return adjusted_payload
 
-            response = await self._request_with_policy(
-                "post",
-                "/api/chat",
-                source="agent_loop",
-                request_id_prefix="ollama_native_agent_turn",
-                model_name=effective_model,
-                payload_factory=_payload_factory,
-                timeout=TIMEOUT_HOUR,
-                abort_signal=kwargs.get("abort_signal") or kwargs.get("cancel_event"),
-                max_retries=1,
-            )
-
-            result = response.json()
+            # With a command stream the answer streams onto it (on-screen
+            # tokens and speech); a stream that cannot finish falls back to
+            # the plain request below.
+            result: dict[str, Any] | None = None
+            answer_attempt = AnswerAttempt.begin()
+            if answer_attempt is not None:
+                result = await self._stream_native_chat(payload, answer_attempt, timeout=TIMEOUT_HOUR)
+            if result is None:
+                response = await self._request_with_policy(
+                    "post",
+                    "/api/chat",
+                    source="agent_loop",
+                    request_id_prefix="ollama_native_agent_turn",
+                    model_name=effective_model,
+                    payload_factory=_payload_factory,
+                    timeout=TIMEOUT_HOUR,
+                    abort_signal=kwargs.get("abort_signal") or kwargs.get("cancel_event"),
+                    max_retries=1,
+                )
+                result = response.json()
             self.last_latency_ms = round((time.time() - start_time) * 1000)
 
             parsed = self._parse_native_response(result)
@@ -945,6 +962,87 @@ For questions: {"type": "answer", "answer": "<your response>"}
             # Re-raise so the agent executor/fallback chain can tell a real
             # provider failure apart from a legitimate model answer.
             raise
+
+    async def _stream_native_chat(
+        self,
+        payload: dict[str, Any],
+        attempt: AnswerAttempt,
+        *,
+        timeout: float,
+    ) -> dict[str, Any] | None:
+        """Stream one /api/chat agent turn; return the same dict a plain request returns.
+
+        Text goes out as on-screen tokens and phase-less answer events while
+        it arrives; tool calls (whole, in a message chunk) mark the attempt so
+        no preamble is spoken. Returns ``None`` after ending the attempt as
+        failed when the stream cannot finish; the caller then sends the plain
+        request once.
+        """
+        if self._client is None:
+            attempt.end(status="failed")
+            return None
+        content_parts: list[str] = []
+        thinking_parts: list[str] = []
+        tool_calls: list[Any] = []
+        role = "assistant"
+        final: dict[str, Any] | None = None
+        try:
+            async with self._client.stream(
+                "POST",
+                "/api/chat",
+                json={**payload, "stream": True},
+                timeout=timeout,
+            ) as response:
+                response.raise_for_status()
+                async for line in response.aiter_lines():
+                    if not line.strip():
+                        continue
+                    chunk = json.loads(line)
+                    if not isinstance(chunk, dict):
+                        continue
+                    if chunk.get("error"):
+                        raise RuntimeError("ollama_stream_error")
+                    message = chunk.get("message")
+                    if isinstance(message, dict):
+                        role = str(message.get("role") or role)
+                        text = message.get("content")
+                        if isinstance(text, str) and text:
+                            if not content_parts:
+                                attempt.item("message-0", kind="message")
+                            content_parts.append(text)
+                            attempt.text("message-0", text)
+                            _publish_screen_token(text, attempt.stream_id)
+                        thinking = message.get("thinking")
+                        if isinstance(thinking, str) and thinking:
+                            thinking_parts.append(thinking)
+                        calls = message.get("tool_calls")
+                        if isinstance(calls, list):
+                            for call in calls:
+                                attempt.item("call-%d" % len(tool_calls), kind="function_call")
+                                tool_calls.append(call)
+                    if chunk.get("done"):
+                        final = chunk
+                        break
+            if final is None:
+                raise RuntimeError("ollama_stream_ended_without_done")
+        except Exception as exc:
+            attempt.end(status="failed")
+            logger.warning("Ollama stream failed (%s); retrying once without streaming", type(exc).__name__)
+            return None
+        except BaseException:
+            # Cancelled (the user stopped the reply): this call's text is not an answer.
+            attempt.end(status="failed")
+            raise
+        merged_message: dict[str, Any] = {"role": role, "content": "".join(content_parts)}
+        if thinking_parts:
+            merged_message["thinking"] = "".join(thinking_parts)
+        if tool_calls:
+            merged_message["tool_calls"] = tool_calls
+        attempt.end(
+            status="incomplete" if str(final.get("done_reason") or "") == "length" else "completed",
+            tool_calls=bool(tool_calls),
+        )
+        return {**final, "message": merged_message}
 
     def _convert_messages_to_ollama(
         self,

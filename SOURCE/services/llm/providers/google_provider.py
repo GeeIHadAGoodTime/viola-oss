@@ -17,6 +17,7 @@ import httpx
 
 from core.logging_config import get_logger
 from services.conversation.frame_rendering import render_for_openai_responses
+from services.llm.answer_stream import AnswerAttempt
 from services.llm.model_fallback import FALLBACK_MODEL
 from services.llm.no_result import build_ai_no_result
 from services.llm.prompts import build_provider_prompt_bundle
@@ -323,6 +324,23 @@ def _record_google_usage(
         logger.debug("Google usage instrumentation skipped", exc_info=True)
 
 
+def _is_plain_text_part(part: Mapping[str, Any]) -> bool:
+    return (
+        isinstance(part.get("text"), str)
+        and not part.get("thought")
+        and not isinstance(part.get("functionCall") or part.get("function_call"), Mapping)
+    )
+
+
+def _publish_screen_token(text: str, stream_id: str) -> None:
+    try:
+        from services.llm.stream_bus import publish_text_delta
+
+        publish_text_delta(text, stream_id)
+    except Exception:  # noqa: BLE001, RUF100 - on-screen tokens are best effort
+        logger.debug("Gemini token publish failed", exc_info=True)
+
+
 class GoogleProvider(BaseLLMProvider):
     """
     LLM provider for Google's Gemini models.
@@ -363,6 +381,105 @@ class GoogleProvider(BaseLLMProvider):
             _GOOGLE_API_BASE,
             _normalize_model_name(model_name or self.config.model),
         )
+
+    def _stream_generate_content_url(self, model_name: str | None = None) -> str:
+        return "%s/models/%s:streamGenerateContent" % (
+            _GOOGLE_API_BASE,
+            _normalize_model_name(model_name or self.config.model),
+        )
+
+    async def _stream_native_generate(
+        self,
+        *,
+        model_name: str,
+        payload: dict[str, Any],
+        attempt: AnswerAttempt,
+    ) -> dict[str, Any] | None:
+        """Stream one Gemini agent turn; return the same payload generateContent returns.
+
+        Text parts go out as on-screen tokens and phase-less answer events as
+        they arrive; function_call parts mark the attempt so no preamble is
+        spoken. Chunks are merged (consecutive text joined, usage from the
+        last chunk). Returns ``None`` after ending the attempt as failed when
+        the stream cannot finish; the caller then sends the plain request once.
+        """
+        parts: list[dict[str, Any]] = []
+        candidate_fields: dict[str, Any] = {}
+        top_fields: dict[str, Any] = {}
+        role = "model"
+        saw_text = False
+        try:
+            async with (
+                httpx.AsyncClient(timeout=_HTTP_TIMEOUT) as client,
+                client.stream(
+                    "POST",
+                    self._stream_generate_content_url(model_name),
+                    params={"key": self.config.api_key, "alt": "sse"},
+                    json=payload,
+                ) as response,
+            ):
+                response.raise_for_status()
+                async for line in response.aiter_lines():
+                    if not line.startswith("data:"):
+                        continue
+                    data = line[len("data:") :].strip()
+                    if not data:
+                        continue
+                    chunk = json.loads(data)
+                    if not isinstance(chunk, Mapping):
+                        continue
+                    if chunk.get("error"):
+                        raise RuntimeError("google_stream_error")
+                    top_fields.update({key: value for key, value in chunk.items() if key != "candidates"})
+                    candidates = chunk.get("candidates")
+                    if not isinstance(candidates, list) or not candidates or not isinstance(candidates[0], Mapping):
+                        continue
+                    candidate = candidates[0]
+                    candidate_fields.update({key: value for key, value in candidate.items() if key != "content"})
+                    content = candidate.get("content")
+                    if not isinstance(content, Mapping):
+                        continue
+                    role = str(content.get("role") or role)
+                    for part in content.get("parts") or []:
+                        if not isinstance(part, Mapping):
+                            continue
+                        if isinstance(part.get("functionCall") or part.get("function_call"), Mapping):
+                            attempt.item("part-%d" % len(parts), kind="function_call")
+                            parts.append(dict(part))
+                            continue
+                        text = part.get("text")
+                        if isinstance(text, str) and not part.get("thought"):
+                            if text:
+                                if not saw_text:
+                                    saw_text = True
+                                    attempt.item("message-0", kind="message")
+                                attempt.text("message-0", text)
+                                _publish_screen_token(text, attempt.stream_id)
+                            previous = parts[-1] if parts else None
+                            if previous is not None and _is_plain_text_part(previous):
+                                previous["text"] += text
+                                for key, value in part.items():
+                                    previous.setdefault(key, value)
+                            else:
+                                parts.append(dict(part))
+                            continue
+                        parts.append(dict(part))
+            if not candidate_fields.get("finishReason"):
+                raise RuntimeError("google_stream_ended_without_finish_reason")
+        except Exception as exc:
+            # Never log the exception text: the request URL carries the key.
+            attempt.end(status="failed")
+            logger.warning("Gemini stream failed (%s); retrying once without streaming", type(exc).__name__)
+            return None
+        except BaseException:
+            # Cancelled (the user stopped the reply): this call's text is not an answer.
+            attempt.end(status="failed")
+            raise
+        attempt.end(
+            status="completed" if str(candidate_fields.get("finishReason")) == "STOP" else "incomplete",
+            tool_calls=any(isinstance(p.get("functionCall") or p.get("function_call"), Mapping) for p in parts),
+        )
+        return {**top_fields, "candidates": [{**candidate_fields, "content": {"role": role, "parts": parts}}]}
 
     def _build_generation_payload(self, prompt: str, *, max_output_tokens: int, temperature: float) -> dict[str, Any]:
         return {
@@ -880,21 +997,33 @@ class GoogleProvider(BaseLLMProvider):
                     first_turn=first_turn,
                 )
 
-            response = await self._generate_content_with_policy(
-                model_name=effective_model,
-                payload_factory=_payload_factory,
-                source="agent_loop",
-                request_id_prefix="google_native_agent_turn",
-                abort_signal=kwargs.get("abort_signal") or kwargs.get("cancel_event"),
-                timeout_s=60.0,
-                max_retries=2,
-            )
+            # With a command stream the answer streams onto it (on-screen
+            # tokens and speech); a stream that cannot finish falls back to
+            # the plain request below.
+            data: dict[str, Any] | None = None
+            answer_attempt = AnswerAttempt.begin()
+            if answer_attempt is not None:
+                data = await self._stream_native_generate(
+                    model_name=effective_model,
+                    payload=_payload_factory(None),
+                    attempt=answer_attempt,
+                )
+            if data is None:
+                response = await self._generate_content_with_policy(
+                    model_name=effective_model,
+                    payload_factory=_payload_factory,
+                    source="agent_loop",
+                    request_id_prefix="google_native_agent_turn",
+                    abort_signal=kwargs.get("abort_signal") or kwargs.get("cancel_event"),
+                    timeout_s=60.0,
+                    max_retries=2,
+                )
+                try:
+                    data = response.json()
+                except ValueError as exc:
+                    raise RuntimeError("unknown_error||Google AI returned invalid JSON") from exc
 
             self.last_latency_ms = round((time.time() - start_time) * 1000)
-            try:
-                data = response.json()
-            except ValueError as exc:
-                raise RuntimeError("unknown_error||Google AI returned invalid JSON") from exc
 
             parsed = self._parse_native_response(data)
             parsed["_model_name"] = effective_model
