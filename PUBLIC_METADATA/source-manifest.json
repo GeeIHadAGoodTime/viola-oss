@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "c28d1fde794d27825ee6ad921776c97c9286d15f",
-  "sha256": "d38e0d09ba478a8340fe4657a8fad4119cee6319987e8b341f9a93ec1cf45dcd",
+  "revision": "4dcc4defae80bfb8536cb2f50071785382220bb3",
+  "sha256": "5e53506d58c84657b077cb80c42bd5e2658cc3ed866482bfe95dbf9043077a38",
   "files": [
     {
       "path": ".env.example",
@@ -2244,11 +2244,6 @@
       "bytes": 10792
     },
     {
-      "path": "logs/structured/viola-20261031.jsonl",
-      "sha256": "fb27a3625fee98be25aa23a3b1803e01cd4f51665a07183bc4a16b4ec30238ed",
-      "bytes": 1617
-    },
-    {
       "path": "mcp_hub/__init__.py",
       "sha256": "fcd9a4ca3f575ec84adea8dfd2ec035c991ad113008637f67687fc8fb2625041",
       "bytes": 380
@@ -3877,11 +3872,6 @@
       "path": "run_viola.py",
       "sha256": "a4db05281e59c39609e0622b3a662cf86991c5f42679951824f963f692d3f160",
       "bytes": 2255
-    },
-    {
-      "path": "scripts/ai_debug_session.log",
-      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "bytes": 0
     },
     {
       "path": "scripts/build_youtube_embed.py",
