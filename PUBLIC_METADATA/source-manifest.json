@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "866684ebbf0583839a79aa8c8d1a73925a4a6387",
-  "sha256": "a5bc28973b34785e37a82e5e70c8537cd9b5e71d6d26360e59cee483f27ffb87",
+  "revision": "36a7b4e0f22752ba9680b72b9685169ef6501fa7",
+  "sha256": "882aa03964f59b58b15693ae3a463045be2fc7fc5d51b5e3553033cb8c4b1dbe",
   "files": [
     {
       "path": ".env.example",
@@ -150,8 +150,8 @@
     },
     {
       "path": "audio_core/aec_reference_base.py",
-      "sha256": "a9e7ad58fdbe3b77beff78d921e858cd6fbbf5261d66b76f8b7c21fab7e16270",
-      "bytes": 20132
+      "sha256": "cba6c33f399659d793d0258703d91a33ba1a6ed4b0dd89c4951552355b8ef457",
+      "bytes": 23487
     },
     {
       "path": "audio_core/calibration/__init__.py",
@@ -1240,8 +1240,8 @@
     },
     {
       "path": "core/voice_command_handler.py",
-      "sha256": "f972184fb482defc7b2ebb6853f74e4faff59fb9719c40d48e1f72a685ed98fc",
-      "bytes": 73463
+      "sha256": "06ac7c65ea7755b88a26ed6319fbb1b5674d8c642ece006b098930b590cf78be",
+      "bytes": 84230
     },
     {
       "path": "core/voice_orchestrator.py",
@@ -13300,8 +13300,8 @@
     },
     {
       "path": "voice/continuous_capture.py",
-      "sha256": "401d873e07aeb6d7d0ed742ce581e2866728a007d2fd25a3abc66fb5be832f79",
-      "bytes": 24670
+      "sha256": "3c90fa8034d50b7dfc4a5e04ae00d2c2367414a291c9424aa885e5258865fede",
+      "bytes": 25980
     },
     {
       "path": "voice/customer_composition.py",
@@ -13630,8 +13630,8 @@
     },
     {
       "path": "voice/wake_detector/aec_processor.py",
-      "sha256": "041cf2ba0211b0d285a468c4950643fd3a56239d64359d79ce77e2f95ddcda09",
-      "bytes": 46486
+      "sha256": "e8657788107d2fc05fbfa566709cb39c34335339466b06ddc66d64d22fba04aa",
+      "bytes": 47035
     },
     {
       "path": "voice/wake_detector/aec_viola.py",
