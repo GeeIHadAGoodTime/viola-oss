@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "866684ebbf0583839a79aa8c8d1a73925a4a6387",
-  "sha256": "a5bc28973b34785e37a82e5e70c8537cd9b5e71d6d26360e59cee483f27ffb87",
+  "revision": "65fe01c098d2275fb697942eb34a79011a389b6f",
+  "sha256": "c49eea27763a00f2bdc812a05361dc512481971ced0618ecdf9df13a2c22518e",
   "files": [
     {
       "path": ".env.example",
@@ -9930,13 +9930,13 @@
     },
     {
       "path": "ui/react-app/package-lock.json",
-      "sha256": "e76ddb664f72ec19005bc95e80ccba83e4b54b86ab11dd8bf4d8dc4f8581abf3",
-      "bytes": 236775
+      "sha256": "90600c6250e13c89de549e8b8fcf0fe44f646cd25adf968300faaa9cec6b1a55",
+      "bytes": 237202
     },
     {
       "path": "ui/react-app/package.json",
-      "sha256": "14257976de460d1bad9c4cf88a362e656370f74b50f605f4ae6097770105c21e",
-      "bytes": 1250
+      "sha256": "95bcfc06a0ef196caa2f7b405a2dc3793d26bdf4f8a49ecaf03f85099e348812",
+      "bytes": 1272
     },
     {
       "path": "ui/react-app/patches/minimatch+3.1.5.patch",
@@ -10007,6 +10007,11 @@
       "path": "ui/react-app/public/wake/NOTICE-violawake.txt",
       "sha256": "03503955445e4253c2796b2167e086d353849b0bd2041e685000ae8fe04f29f2",
       "bytes": 1369
+    },
+    {
+      "path": "ui/react-app/scripts/audit-gate.mjs",
+      "sha256": "3cfea2bb59fb00921f31c195c97154177082f9d01545b0c931046df9990484af",
+      "bytes": 4916
     },
     {
       "path": "ui/react-app/scripts/patch-minimatch-interop.mjs",
@@ -12587,6 +12592,11 @@
       "path": "ui/react-app/src/utils/youtubeEmbed.test.js",
       "sha256": "6c1d8c82bc1ba42e05e90384fe6e977e54e20ecb5cd56aed342caa164cce8fb7",
       "bytes": 2491
+    },
+    {
+      "path": "ui/react-app/tests/audit_gate.test.js",
+      "sha256": "850a0d205e68dd8d1ada7b8f54f2ae4c867ca31cc9a3a63fd54bfb3cf228f006",
+      "bytes": 3851
     },
     {
       "path": "ui/react-app/tests/minimatch_interop.test.js",

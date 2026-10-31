@@ -67,7 +67,7 @@ jobs:
         run: npm ci --no-fund
       - name: Verify dependency advisory scan
         working-directory: SOURCE/ui/react-app
-        run: npm audit
+        run: node scripts/audit-gate.mjs
       - name: Generate installed frontend inventory
         working-directory: SOURCE/ui/react-app
         run: npm sbom --sbom-format cyclonedx | Out-File -Encoding utf8 "$env:RUNNER_TEMP/frontend.sbom.json"
