@@ -224,17 +224,18 @@ def _is_echo_of_reply(transcript: str, reply: str) -> bool:
 # few centimetres from the microphone the rest of Viola's voice is still
 # "speech" to the VAD. No canceller setting makes that safe on every laptop, so
 # the VAD only raises a CANDIDATE. Viola keeps talking while the last few
-# seconds are transcribed, and she stops only when that transcript is clearly
-# the user:
+# seconds are transcribed, and she stops only when that transcript contains the
+# wake word ("Viola, stop", "Viola, play rock instead") and what follows it is
+# not Viola's own sentence. Anything else (her own words, however garbled,
+# music, a TV) is ignored, the monitor re-arms, and the reply plays to the end.
 #
-# * it contains the wake word ("Viola, stop", "Viola, play rock instead") and
-#   what follows it is not Viola's own sentence; or
-# * it is nothing but a stop phrase ("stop", "be quiet") that Viola is not
-#   herself saying.
-#
-# Anything else (her own words, however garbled, music, a TV) is ignored, the
-# monitor re-arms, and the reply plays to the end. The command that runs is the
-# part after the wake word, with any run of Viola's own words taken out.
+# A bare "stop" without the wake word does not interrupt: replayed through the
+# real models (Kokoro reply, laptop echo path, Silero VAD, faster-whisper
+# tiny.en), a check window that ended mid-word turned "Tokyo, Sa-" into
+# "Tokyo. Stop." For the same reason a wake word that is the LAST word of a
+# window is checked once more on a later window before Viola stops, and once
+# she has stopped, the user's whole request is transcribed again after they
+# finish, so the command is never a half-heard phrase cut at a window edge.
 
 # After the VAD's 0.3 s of speech, how long to let the phrase finish before
 # checking it ("Viola, stop" takes about a second to say).
@@ -249,6 +250,10 @@ _BARGE_IN_STT_TIMEOUT_SEC = 5.0
 # A run of this many consecutive words of the reply, in order, inside the
 # transcript is Viola's voice, not the user's.
 _BARGE_IN_ECHO_RUN = 2
+# Once Viola has stopped for the user: how long without speech means they
+# finished their request, and the longest she waits for that.
+_BARGE_IN_USER_DONE_SEC = 0.7
+_BARGE_IN_USER_MAX_SEC = 5.0
 
 # The wake word as Whisper writes it. Stricter than the wake Stage 2 list on
 # purpose: here a false match stops Viola mid-sentence.
@@ -258,7 +263,6 @@ _BARGE_IN_STOP_RE = re.compile(
     r"(?:stop(?:\s+(?:it|talking|now|please))*|be\s+quiet|quiet|shut\s+up|enough|that'?s\s+enough)"
     r"(?:\s+(?:please|now|thanks|thank\s+you))*$"
 )
-_BARGE_IN_STOP_WORDS = frozenset({"stop", "quiet", "shut", "enough"})
 _BARGE_IN_TOKEN_RE = re.compile(r"[A-Za-z0-9']+")
 
 
@@ -274,6 +278,9 @@ class BargeInDecision:
     kind: str
     reason: str
     command: str = ""
+    # The wake word was the last word heard: the window may have cut a word of
+    # Viola's own ("Vio-lin") or the user may still be talking. Check again.
+    wake_at_end: bool = False
 
     @property
     def interrupts(self) -> bool:
@@ -314,14 +321,10 @@ def classify_barge_in_transcript(transcript: str, reply: str) -> BargeInDecision
 
     if wake_at is None:
         rest = _drop_reply_runs(tokens, spoken)
-        phrase = " ".join(t.lower() for t in rest)
-        if rest and _BARGE_IN_STOP_RE.match(phrase):
-            reply_stop_words = [w for w in spoken if w in _BARGE_IN_STOP_WORDS or w.startswith("stop")]
-            if reply_stop_words:
-                return BargeInDecision("ignore", "stop_word_is_in_the_reply")
-            return BargeInDecision("stop", "stop_phrase")
         if len(rest) < len(tokens) or _is_echo_of_reply(transcript, reply):
             return BargeInDecision("ignore", "viola_own_words")
+        if rest and _BARGE_IN_STOP_RE.match(" ".join(t.lower() for t in rest)):
+            return BargeInDecision("ignore", "stop_without_wake_word")
         return BargeInDecision("ignore", "no_wake_word")
 
     after = _drop_reply_runs(tokens[wake_at + 1 :], spoken)
@@ -331,7 +334,7 @@ def classify_barge_in_transcript(transcript: str, reply: str) -> BargeInDecision
         if not after or _is_echo_of_reply(" ".join(after), reply):
             return BargeInDecision("ignore", "reply_says_viola")
     if not after:
-        return BargeInDecision("listen", "wake_word")
+        return BargeInDecision("listen", "wake_word", wake_at_end=wake_at == len(tokens) - 1)
     command = " ".join(after)
     if _BARGE_IN_STOP_RE.match(command.lower()):
         return BargeInDecision("stop", "wake_word_stop", command)
@@ -567,6 +570,8 @@ class VoiceCommandHandler:
         # What the user said over Viola's last reply, once it was checked to be
         # the user (see _speak_response_interruptible).
         self._barge_in_decision: BargeInDecision | None = None
+        # time.monotonic() when the last barge-in check took its audio window.
+        self._barge_in_window_end: float | None = None
         # Same-class fallback when no running app holds the desktop's command service.
         self._local_command_service: Any | None = None
 
@@ -1610,9 +1615,9 @@ class VoiceCommandHandler:
         Sets the capture to vad_monitor mode while ``message`` plays. Sustained
         speech on the echo-cancelled microphone is only a CANDIDATE: Viola keeps
         talking while the last few seconds are transcribed, and she stops only
-        when :func:`classify_barge_in_transcript` says it was the user (the wake
-        word, or a bare stop phrase she is not saying herself). Her own voice,
-        music or a TV re-arm the monitor and the reply plays to the end.
+        when :func:`classify_barge_in_transcript` finds the user's wake word.
+        Her own voice, music or a TV re-arm the monitor and the reply plays to
+        the end.
 
         The accepted decision is left in ``self._barge_in_decision`` for the
         conversation loop, so the audio is not transcribed a second time.
@@ -1665,9 +1670,11 @@ class VoiceCommandHandler:
                 interrupt_event.clear()
                 checks += 1
                 decision = await self._check_barge_in(capture, message, tts_task)
-                if decision is None:
-                    # Viola finished while the check ran; the loop sees tts_task done.
-                    continue
+                if decision.wake_at_end:
+                    # "...Viola" at the very end of the window: a word of her
+                    # own cut in half, or the user still talking. Look again.
+                    checks += 1
+                    decision = await self._check_barge_in(capture, message, tts_task)
                 if decision.interrupts:
                     # Stop the TTS engine immediately so audio output ceases
                     # without waiting for the async task to cancel gracefully.
@@ -1681,6 +1688,7 @@ class VoiceCommandHandler:
                         await tts_task
                     except (asyncio.CancelledError, Exception):  # noqa: BLE001, RUF100 - TTS is being cut off
                         pass
+                    decision = await self._complete_barge_in(capture, message, decision)
                     capture.set_mode("paused")
                     self._barge_in_decision = decision
                     await self._record_voice_event(
@@ -1708,7 +1716,8 @@ class VoiceCommandHandler:
                         checks,
                     )
                     continue  # not re-armed: only tts_task can finish the wait now
-                capture.rearm_interrupt()
+                if not tts_task.done():
+                    capture.rearm_interrupt()
 
         except asyncio.CancelledError:
             if tts_task is not None and not tts_task.done():
@@ -1728,11 +1737,11 @@ class VoiceCommandHandler:
         capture: Any,
         message: str,
         tts_task: asyncio.Future,
-    ) -> BargeInDecision | None:
+    ) -> BargeInDecision:
         """Transcribe the last few seconds heard while Viola speaks and classify them.
 
-        Viola keeps talking during the check. Returns None when she finished
-        speaking first (nothing to interrupt any more).
+        Viola keeps talking during the check (a "Viola, ..." said just as she
+        finishes is still heard).
         """
         try:
             await asyncio.wait_for(asyncio.shield(tts_task), timeout=_BARGE_IN_SETTLE_SEC)
@@ -1740,28 +1749,58 @@ class VoiceCommandHandler:
             pass
         except (asyncio.CancelledError, Exception):  # noqa: BLE001, RUF100 - the speak loop reads tts_task itself
             pass
-        if tts_task.done():
-            return None
+        self._barge_in_window_end = time.monotonic()
+        transcript = await self._transcribe_recent(capture, _BARGE_IN_WINDOW_SEC)
+        if transcript is None:
+            return BargeInDecision("ignore", "check_failed")
+        return classify_barge_in_transcript(transcript, message)
 
+    async def _transcribe_recent(self, capture: Any, seconds: float) -> str | None:
+        """Transcribe the last ``seconds`` the barge-in monitor heard; None if that failed."""
         try:
             import numpy as np
 
-            pcm = capture.get_recent_recording(_BARGE_IN_WINDOW_SEC)
+            pcm = capture.get_recent_recording(seconds)
             if not pcm or len(pcm) < 3200:  # < 100 ms
-                return BargeInDecision("ignore", "too_short")
+                return ""
             audio = np.frombuffer(pcm, dtype=np.int16).copy()
             transcript = await asyncio.wait_for(
                 asyncio.to_thread(self.voice_pipeline.transcribe_audio, audio, False, False),
                 timeout=_BARGE_IN_STT_TIMEOUT_SEC,
             )
-        except TimeoutError:
-            return BargeInDecision("ignore", "check_timed_out")
         except Exception as exc:  # noqa: BLE001, RUF100 - a failed check must never cut Viola off
-            logger.debug("Barge-in check failed: %s", exc)
-            return BargeInDecision("ignore", "check_failed")
-        if tts_task.done():
+            logger.debug("Barge-in transcription failed: %s", exc)
             return None
-        return classify_barge_in_transcript(transcript or "", message)
+        return transcript or ""
+
+    async def _complete_barge_in(
+        self,
+        capture: Any,
+        message: str,
+        decision: BargeInDecision,
+    ) -> BargeInDecision:
+        """Viola has stopped for the user: let them finish, then hear the whole request.
+
+        The check window can end in the middle of the request ("Viola, play
+        so-"). With Viola quiet the VAD is trustworthy again, so wait until it
+        hears no speech, then transcribe from the start of the check window to
+        now. If that somehow loses the wake word, the checked decision stands.
+        """
+        started = time.monotonic()
+        while time.monotonic() - started < _BARGE_IN_USER_MAX_SEC:
+            await asyncio.sleep(0.1)
+            if (
+                time.monotonic() - started >= _BARGE_IN_USER_DONE_SEC
+                and capture.seconds_since_speech() >= _BARGE_IN_USER_DONE_SEC
+            ):
+                break
+        window_end = getattr(self, "_barge_in_window_end", None) or started
+        seconds = min(_BARGE_IN_WINDOW_SEC + (time.monotonic() - window_end), 30.0)
+        transcript = await self._transcribe_recent(capture, seconds)
+        if not transcript:
+            return decision
+        full = classify_barge_in_transcript(transcript, message)
+        return full if full.interrupts else decision
 
     def _take_barge_in_decision(self) -> BargeInDecision | None:
         decision = getattr(self, "_barge_in_decision", None)

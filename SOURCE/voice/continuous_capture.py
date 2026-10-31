@@ -25,6 +25,7 @@ Memory:
 from __future__ import annotations
 
 import threading
+import time
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
@@ -175,6 +176,8 @@ class ContinuousMicCapture:
         self._aec_degraded_reasons_logged: set[str] = set()
         # Barge-in candidates raised in the current TTS turn (logging only).
         self._candidates_this_turn = 0
+        # time.monotonic() of the last chunk the VAD called speech this turn.
+        self._last_speech_at: float | None = None
 
     # -------------------------------------------------------------------
     # Lifecycle
@@ -339,6 +342,7 @@ class ContinuousMicCapture:
                 self._vad_consecutive_speech = 0
                 self._interrupt_fired = False
                 self._candidates_this_turn = 0
+                self._last_speech_at = None
                 self._on_interrupt = kwargs.get("on_interrupt")
                 if self._vad_model is not None:
                     try:
@@ -485,15 +489,16 @@ class ContinuousMicCapture:
             if overflow > 0:
                 del self._recording_buffer[:overflow]
 
-            if self._interrupt_fired:
-                return
-
+        # The VAD keeps running after a candidate fired: once Viola has stopped
+        # for the user, it is how the voice handler knows they finished talking.
         speech_detected_in_chunk = self._run_vad_on_chunk(audio_int16)
 
         callback = None
         degraded_reason: str | None = None
         candidate_number = 0
         with self._mode_lock:
+            if speech_detected_in_chunk:
+                self._last_speech_at = time.monotonic()
             if self._interrupt_fired:
                 return
 
@@ -566,6 +571,12 @@ class ContinuousMicCapture:
                 return
             self._vad_consecutive_speech = 0
             self._interrupt_fired = False
+
+    def seconds_since_speech(self) -> float:
+        """Seconds since the barge-in monitor last heard speech (inf if never this turn)."""
+        with self._mode_lock:
+            last = self._last_speech_at
+        return float("inf") if last is None else time.monotonic() - last
 
     def get_recent_recording(self, seconds: float) -> bytes:
         """Return the last ``seconds`` of the recording buffer (16-bit mono)."""
