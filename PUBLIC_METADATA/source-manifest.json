@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "866684ebbf0583839a79aa8c8d1a73925a4a6387",
-  "sha256": "a5bc28973b34785e37a82e5e70c8537cd9b5e71d6d26360e59cee483f27ffb87",
+  "revision": "205bec04e75764fa5f62353efbe9e810d28f22a7",
+  "sha256": "f7ed972ccbbb9563a8ab550bbc78db16ca172563c68f90963aa6fb21e175761d",
   "files": [
     {
       "path": ".env.example",
@@ -6044,6 +6044,11 @@
       "bytes": 7986
     },
     {
+      "path": "tests/public/test_blas_thread_cap.py",
+      "sha256": "499140a2a7409d041e1caf8be14e0c0c1de3599c021ae4b5f4a1200004913654",
+      "bytes": 3448
+    },
+    {
       "path": "tests/public/test_browser_cdp_key_action.py",
       "sha256": "debc10a8ed822fde0b872c29d1247744ce74726cc6ece09549bdcafde174ce1a",
       "bytes": 12905
@@ -6177,6 +6182,11 @@
       "path": "tests/public/test_italian_hindi_qualification_packet.py",
       "sha256": "92fc2fc9ef5f049ffa7659ccf9a55dbf12bd8673686f2b61f6ed297a8bdb0b43",
       "bytes": 10454
+    },
+    {
+      "path": "tests/public/test_kokoro_arena_shrink.py",
+      "sha256": "efcef6ffb1e968c769d7bdde5e0c85a14b8bda5430fb3dcf823d92c894f50274",
+      "bytes": 3961
     },
     {
       "path": "tests/public/test_kokoro_chunking.py",
@@ -6460,8 +6470,8 @@
     },
     {
       "path": "third_party/kokoro_onnx/src/kokoro_onnx/__init__.py",
-      "sha256": "6763c9819a6a26f08e1f707b1e0f05aeba4e86a1ce15c50900af5f0c1c677051",
-      "bytes": 12334
+      "sha256": "05ab929e2919f2a4f33fdf42d23341e5ca4bd37ede4d70a9b4bbe1021dc57591",
+      "bytes": 13444
     },
     {
       "path": "third_party/kokoro_onnx/src/kokoro_onnx/config.json",
@@ -13170,8 +13180,8 @@
     },
     {
       "path": "viola_qt.py",
-      "sha256": "1f2cf1c499a50ce06bc25a16ca88b70aa12bbae38ade6e4dadb747125485d184",
-      "bytes": 88424
+      "sha256": "dadf555950a7611f8c1fe6de88bc52fe28b54745c8c5aec06a5e28f40c72e16a",
+      "bytes": 89225
     },
     {
       "path": "viola_spoke.py",
