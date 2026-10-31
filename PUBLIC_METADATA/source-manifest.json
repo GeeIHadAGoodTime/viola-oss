@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "76b25eef6aa87dc1e233124e555d5d41d23cbd6e",
-  "sha256": "da44de4b98f1d640786fccfff48abd72e8b0e4d11e28d1defceb36225ee2738f",
+  "revision": "4d7ae4524c9ecbe3cf6e0de49f16ef6c6a6f7d34",
+  "sha256": "a604f0592903f7e0949a29a47a79c77663ca42941c32dc8660ee02d08f877fe3",
   "files": [
     {
       "path": ".env.example",
@@ -10070,13 +10070,13 @@
     },
     {
       "path": "ui/react-app/src/SmartDisplay.jsx",
-      "sha256": "7dcba484982f2c924dc8bdd9fd2286fbb4584874bbc41b81d68c4717ccf5f76f",
-      "bytes": 194440
+      "sha256": "4e24a97267f758c40cc5b47b4aab80793d9b5455a3ab2cde0cc88113ec8b0b13",
+      "bytes": 194662
     },
     {
       "path": "ui/react-app/src/SmartDisplay.overlayLifecycle.test.jsx",
-      "sha256": "fe46c08acbe1726706d156ea22ff0329825c9275342dad07d9f1bf8bad298fb0",
-      "bytes": 10798
+      "sha256": "795c71964b5ad35fc4d6eab5ac273a1e535d5f361969261d99df5c4732d12811",
+      "bytes": 13408
     },
     {
       "path": "ui/react-app/src/SmartDisplay.spokePolicy.test.jsx",
@@ -11550,8 +11550,8 @@
     },
     {
       "path": "ui/react-app/src/components/stage/CommandPalette.jsx",
-      "sha256": "a04efadfb10742f71da8ffa3b64920474c6929d1d068bcbf3082fc1d7fcc0410",
-      "bytes": 5521
+      "sha256": "11094bc804b2554ae34654a26becb960a8e2232bd4ae8f4f2395ca0d6553e82a",
+      "bytes": 5758
     },
     {
       "path": "ui/react-app/src/components/stage/CommandPalette.module.css",
@@ -11560,8 +11560,8 @@
     },
     {
       "path": "ui/react-app/src/components/stage/CommandPalette.test.jsx",
-      "sha256": "2e0ee037eff8187c8960e46d619b3866a2149b44a1f253eda4514196764b363f",
-      "bytes": 2901
+      "sha256": "c8ecb7c06cca2a144d038e6bc71e287f6c8bf7653b7ba86ccf0a7c3fdb485620",
+      "bytes": 3481
     },
     {
       "path": "ui/react-app/src/components/stage/PillBar.jsx",

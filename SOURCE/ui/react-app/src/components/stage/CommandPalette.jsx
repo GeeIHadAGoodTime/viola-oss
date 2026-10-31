@@ -87,7 +87,11 @@ export default function CommandPalette({
       return;
     }
     if (event.key === 'Escape') {
+      // Esc closes only the topmost layer: without this the same key also
+      // reached a document-level Esc handler underneath (Settings that had
+      // stepped aside for a sign-in page closed too).
       event.preventDefault();
+      event.stopPropagation();
       onClose();
       return;
     }
