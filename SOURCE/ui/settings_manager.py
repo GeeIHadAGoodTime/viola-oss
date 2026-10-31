@@ -209,7 +209,7 @@ ONBOARDING_CARRY_OVER_KEYS = frozenset(
 # was at Ensemble or Symphony (1.0.5 laptop A10.4 NOTE). A value equal to the
 # default carries no information, so it is left out of the file; a real
 # signed-out choice is still saved there.
-ACCOUNT_SETTINGS_NOT_MIRRORED_AT_DEFAULT = frozenset({"agent_autonomy", "browser_session_mode"})
+ACCOUNT_SETTINGS_NOT_MIRRORED_AT_DEFAULT = frozenset({"agent_autonomy"})
 LEGACY_USER_SETTINGS_SCRUB_KEEP_KEYS = frozenset(
     {
         _USER_SETTINGS_MIGRATION_MARKER,
@@ -1428,7 +1428,7 @@ class SettingsManager:
                 try:
                     backup_file = self.settings_file.with_suffix(".json.bak")
                     self.settings_file.parent.mkdir(parents=True, exist_ok=True)
-                    _atomic_write_json(backup_file, pending)
+                    _atomic_write_json(backup_file, self._settings_file_payload(pending))
                     logger.info("Settings saved to backup file %s", backup_file)
                     return self._accept_settings_fallback(
                         pending, required_keys, require_full_snapshot=require_full_snapshot
@@ -1490,6 +1490,11 @@ class SettingsManager:
         Saving encrypted fields alone cannot persist requested non-secret values.
         """
         if required_keys or require_full_snapshot:
+            # Compare with what the file is meant to hold (see
+            # _settings_file_payload): an account key left out at its default
+            # is not a lost value.
+            expected = self._settings_file_payload(pending)
+            required_keys = frozenset(key for key in required_keys if key in expected)
             try:
                 try:
                     with self.settings_file.open(encoding="utf-8") as handle:
@@ -1506,7 +1511,7 @@ class SettingsManager:
             )
             if (
                 not isinstance(durable, dict)
-                or any(key not in durable or durable[key] != pending[key] for key in required_keys)
+                or any(key not in durable or durable[key] != expected[key] for key in required_keys)
                 or (require_full_snapshot and durable_keys != required_keys)
             ):
                 logger.error(

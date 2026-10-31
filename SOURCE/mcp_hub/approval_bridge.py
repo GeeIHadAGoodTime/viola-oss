@@ -220,9 +220,7 @@ def _computer_use_whitelist_allows(args: Mapping[str, Any] | None) -> bool:
 # identity is the conversation's, which is not guaranteed to be the same
 # string, and a grant recorded under one identity and checked under another
 # reads as "no consent" (1.0.5 laptop A6.3).
-_COMPUTER_USE_CALL_IDENTITY: ContextVar[tuple[str, str] | None] = ContextVar(
-    "computer_use_call_identity", default=None
-)
+_COMPUTER_USE_CALL_IDENTITY: ContextVar[tuple[str, str] | None] = ContextVar("computer_use_call_identity", default=None)
 
 
 def computer_use_call_identity(user_context: Any) -> tuple[str, str]:
@@ -234,8 +232,7 @@ def computer_use_call_identity(user_context: Any) -> tuple[str, str]:
         source: Mapping[str, Any] = user_context
     elif user_context is not None:
         source = {
-            key: getattr(user_context, key, None)
-            for key in ("user_id", "session_id", "request_id", "gate_session_id")
+            key: getattr(user_context, key, None) for key in ("user_id", "session_id", "request_id", "gate_session_id")
         }
     else:
         source = {}
@@ -901,7 +898,8 @@ def describe_computer_action(args: Mapping[str, Any]) -> str:
     if action == "launch_app":
         return "open %s" % (app or "an app")
     if action in {"type", "background_type"}:
-        return 'type "%s"%s' % (text, (" into %s" % app) if app else " into the window in front")
+        into = (" into %s" % app) if app else " into the window in front"
+        return ('type "%s"%s' % (text, into)) if text else ("type%s" % into)
     if action in {"key", "key_down", "key_hold"}:
         return "press %s%s" % (keys or "a key", where)
     if action == "key_up":
