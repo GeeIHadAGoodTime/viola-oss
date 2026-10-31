@@ -30,10 +30,10 @@
   },
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "e76ef542e903a79c98ef705303167edc809bce2bcebdd1e656e6e38920a0cd6a",
-  "source_tree_sha256": "36b0669d0a3c493ac9015a462773f214bddb902b057dfbf1b68302e590626481",
+  "source_manifest_sha256": "fa7fdd90074c45e4491734a7db4d6842d7e345761938b574af6a6540ebcbfaf4",
+  "source_tree_sha256": "bc4755f6c6d9dfaf7eff708cb547f04aea537eb158b1691c2dbe6c23ce4c2129",
   "source_file_count": 2759,
-  "source_revision": "1631a199515406580319e1bae0d723fe251fe727",
+  "source_revision": "b07b0e3c16fcbee3df27b5c109443ba005ebcfbe",
   "comparison_public_revision": "ecab2772465fcc89ae6645b028af1c2273b9199f",
   "changed_source_paths": [
     "START_WEB_INTERFACE.py",
@@ -127,6 +127,7 @@
     "music/providers/selection.py",
     "music/providers/spotify_cdp.py",
     "music/resolution/provider_router.py",
+    "music/resolution/provider_router_metadata.py",
     "music/runtime/backend_manager.py",
     "music/runtime/control_surface.py",
     "music/runtime/embedded_playback.py",
@@ -443,7 +444,7 @@
     "historical_inventory_limits": "This renderer correction changes no dependency or workflow inputs. All six retained SBOMs and their complete status objects stay historical and unchanged; no current installed inventory qualification is claimed."
   },
   "qualification": {
-    "source_commit": "1631a199515406580319e1bae0d723fe251fe727",
+    "source_commit": "b07b0e3c16fcbee3df27b5c109443ba005ebcfbe",
     "kind": "spotify sign-in"
   },
   "historical_bindings": [

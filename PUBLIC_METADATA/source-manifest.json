@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "1631a199515406580319e1bae0d723fe251fe727",
-  "sha256": "36b0669d0a3c493ac9015a462773f214bddb902b057dfbf1b68302e590626481",
+  "revision": "b07b0e3c16fcbee3df27b5c109443ba005ebcfbe",
+  "sha256": "bc4755f6c6d9dfaf7eff708cb547f04aea537eb158b1691c2dbe6c23ce4c2129",
   "files": [
     {
       "path": ".env.example",
@@ -2100,8 +2100,8 @@
     },
     {
       "path": "intent/tools/media_tools.py",
-      "sha256": "21020679310c7be32fddd910c55762d6cb100f5f4612dcedda5b1a03605f7fca",
-      "bytes": 31576
+      "sha256": "06602c6c196eae4b82d8dc2f2d459bbab378ffe2632abc022c2b4bbf64221b77",
+      "bytes": 31615
     },
     {
       "path": "intent/tools/memory.py",
@@ -2935,8 +2935,8 @@
     },
     {
       "path": "music/providers/browser/auth_manager.py",
-      "sha256": "c62b654e8740dfd1da2b2acef58cba9a2bb0aa3e684ac82581d6421e474b86ff",
-      "bytes": 34486
+      "sha256": "66e8e1306c32ab6c0459f0329c15d5e3222767f5b732099271a43c183a98f5ce",
+      "bytes": 35653
     },
     {
       "path": "music/providers/browser/content_id.py",
@@ -3050,8 +3050,8 @@
     },
     {
       "path": "music/providers/selection.py",
-      "sha256": "7b1f8b3271480bfefe5f90101d7c180efeb55fdc5896cf95b65e73564e6d5c87",
-      "bytes": 8561
+      "sha256": "efcf0cb3efcdd39f0602c7c2bdf90db30024f7bce4d5cb76e02034e092950c2b",
+      "bytes": 8605
     },
     {
       "path": "music/providers/source_protocol.py",
@@ -3160,8 +3160,8 @@
     },
     {
       "path": "music/resolution/provider_router_metadata.py",
-      "sha256": "cc6f27ee55bf2f510292bfadca0259cdcdc714105184d79a2cbd818672c10c8e",
-      "bytes": 15877
+      "sha256": "9e4dad178b1e61926f9f1ed5a37253edf165cb6cdf8c2b24e74475621cb0c26f",
+      "bytes": 16341
     },
     {
       "path": "music/resolution/youtube_resolver.py",
