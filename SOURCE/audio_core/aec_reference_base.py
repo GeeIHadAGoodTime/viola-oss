@@ -49,13 +49,26 @@ MIN_READY_SAMPLES = 800
 # attenuated loopback reads exactly 0 or single digits.
 LOOPBACK_SILENT_RMS = 50.0
 
+# Viola's own playback this loud (int16 RMS) is evidence about the loopback: if
+# the loopback can hear the speakers at all, it hears this.
+LOCAL_LOUD_RMS = 300.0
+# 10 ms frames of loud own playback with a silent loopback before the loopback
+# is judged unable to hear Viola (0.5 s; the mixer lag at an onset is far less).
+LOOPBACK_DEAF_FRAMES = 50
+# 10 ms frames of loud own playback that the loopback also hears before it is
+# judged to hear Viola (0.2 s).
+LOOPBACK_HEARS_FRAMES = 20
+
 # Most of Viola's own playback the reference keeps queued (250ms at 16kHz). The
 # wake listener drains it in real time; the cap only bounds the backlog when the
 # listener pauses (for example while a command is being recorded).
 LOCAL_PLAYBACK_BUFFER_SAMPLES = 4000
 
 __all__ = [
+    "LOCAL_LOUD_RMS",
     "LOCAL_PLAYBACK_BUFFER_SAMPLES",
+    "LOOPBACK_DEAF_FRAMES",
+    "LOOPBACK_HEARS_FRAMES",
     "LOOPBACK_SILENT_RMS",
     "MIN_READY_SAMPLES",
     "LocalPlaybackAECReferenceAdapter",
@@ -175,7 +188,11 @@ class RingBufferAECReferenceAdapter:
         # Viola's own playback (TTS), pushed by the output path. Served in place
         # of the device loopback whenever the loopback cannot hear it.
         self._local_buffer: deque[np.int16] = deque(maxlen=LOCAL_PLAYBACK_BUFFER_SAMPLES)
-        self._local_reference_logged = False
+        # Does the device loopback hear Viola's own playback? None until there
+        # is evidence (see _learn_loopback_hearing); then sticky.
+        self._loopback_hears_viola: bool | None = None
+        self._loopback_heard_run = 0
+        self._loopback_silent_run = 0
         with _LOCAL_PLAYBACK_SINKS_LOCK:
             _LOCAL_PLAYBACK_SINKS.add(self)
 
@@ -281,19 +298,13 @@ class RingBufferAECReferenceAdapter:
 
         if local_frame is not None:
             loopback_rms = float(np.sqrt(np.mean(frame_data.astype(np.float32) ** 2))) if len(frame_data) else 0.0
-            if loopback_rms < LOOPBACK_SILENT_RMS:
+            local_rms = float(np.sqrt(np.mean(local_frame.astype(np.float32) ** 2)))
+            hears = self._learn_loopback_hearing(loopback_rms, local_rms)
+            if hears is False or (hears is None and loopback_rms < LOOPBACK_SILENT_RMS):
                 # The loopback is not hearing Viola's own playback (silent,
                 # offloaded, or attenuated to nothing). Use what Viola knows it
                 # is playing instead, so the echo canceller still has a
                 # reference while Viola speaks.
-                if not self._local_reference_logged:
-                    self._local_reference_logged = True
-                    logger.info(
-                        "AEC_LOCAL_REFERENCE: serving Viola's own playback as the AEC reference "
-                        "(device loopback rms=%.1f is below %.0f)",
-                        loopback_rms,
-                        LOOPBACK_SILENT_RMS,
-                    )
                 frame_data = local_frame
 
         # Resample if rate doesn't match
@@ -328,6 +339,55 @@ class RingBufferAECReferenceAdapter:
         # Save as last good frame for underrun protection
         self._last_frame = frame_data.copy()
         return frame_data
+
+    def _learn_loopback_hearing(self, loopback_rms: float, local_rms: float) -> bool | None:
+        """Learn, from frames where Viola is audibly playing, whether the loopback hears her.
+
+        This used to be decided frame by frame: any 10 ms loopback frame below
+        LOOPBACK_SILENT_RMS was swapped for Viola's own playback. A working
+        loopback lags Viola's own playback by the mixer latency and is quiet in
+        every gap between words, so the reference became a splice of two copies
+        of Viola's voice at two different delays, switching at every word onset
+        and gap; the echo canceller cannot converge on that. And the one-shot
+        "AEC_LOCAL_REFERENCE ... rms=0.0" line (1.0.5 build 7, logged once at
+        sign-in) read like a sign-in decision that was never revisited, while
+        it only described the first frame of the first sound Viola played.
+
+        Now: only frames where Viola's own playback is loud count as evidence.
+        0.5 s of them with a silent loopback means the loopback cannot hear
+        Viola (use her own playback from then on); 0.2 s with the loopback
+        hearing them means it can (keep the loopback, it also carries music).
+        The answer is kept and re-learned whenever the evidence changes, and
+        each change is logged with the levels that decided it.
+        """
+        if local_rms < LOCAL_LOUD_RMS:
+            return self._loopback_hears_viola
+        if loopback_rms >= LOOPBACK_SILENT_RMS:
+            self._loopback_heard_run += 1
+            self._loopback_silent_run = 0
+        else:
+            self._loopback_silent_run += 1
+            self._loopback_heard_run = 0
+        if self._loopback_silent_run >= LOOPBACK_DEAF_FRAMES and self._loopback_hears_viola is not False:
+            self._loopback_hears_viola = False
+            logger.info(
+                "AEC_LOCAL_REFERENCE: the device loopback stayed silent (rms=%.1f, below %.0f) for %.1f s "
+                "while Viola played audio at rms=%.0f; serving Viola's own playback as the echo reference "
+                "while she plays (re-checked continuously)",
+                loopback_rms,
+                LOOPBACK_SILENT_RMS,
+                LOOPBACK_DEAF_FRAMES * 0.01,
+                local_rms,
+            )
+        elif self._loopback_heard_run >= LOOPBACK_HEARS_FRAMES and self._loopback_hears_viola is not True:
+            self._loopback_hears_viola = True
+            logger.info(
+                "AEC_LOOPBACK_REFERENCE: the device loopback hears Viola's own playback (rms=%.0f while she "
+                "played at rms=%.0f); keeping it as the echo reference (it also carries music)",
+                loopback_rms,
+                local_rms,
+            )
+        return self._loopback_hears_viola
 
     def _next_local_frame_locked(self, frame_samples: int) -> np.ndarray | None:
         """Next frame of Viola's own playback, or None when nothing is queued.
