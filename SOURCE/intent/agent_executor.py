@@ -7881,13 +7881,19 @@ class AgentExecutor:
             # the single canonical loop. Direct-answer children must receive
             # the same finalization, usage settlement, compaction, and terminal
             # hook behavior as tool-using children.
-            child_result = await child.run(
-                user_text=task,
-                initial_tool_call=None,
-                system_context=child_system,
-                restored_native_messages=child_messages,
-                restored_messages_include_user_text=True,
-            )
+            # A child's model text is its report to the parent, never the
+            # parent's spoken answer: no final-answer events from its calls
+            # (services/llm/answer_stream.py).
+            from services.llm.answer_stream import answer_events_muted
+
+            with answer_events_muted():
+                child_result = await child.run(
+                    user_text=task,
+                    initial_tool_call=None,
+                    system_context=child_system,
+                    restored_native_messages=child_messages,
+                    restored_messages_include_user_text=True,
+                )
             if not child_result.ok:
                 child_error = str(child_result.error or child_result.answer or "Child agent failed.").strip()
                 try:

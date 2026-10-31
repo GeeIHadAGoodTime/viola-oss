@@ -36,8 +36,11 @@ What may be spoken while the model is still writing (design, 2026-10-31):
 
 from __future__ import annotations
 
+import contextlib
+import contextvars
 import re
 import uuid
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -57,6 +60,9 @@ MAX_LIVE_CHARS = 360
 MAX_SPOKEN_CHARS = 500
 SUMMARY_SUFFIX = "I'll send the full details in chat."
 
+# Set while a child agent runs inside a turn: its text is never the answer.
+_answer_events_muted: contextvars.ContextVar[bool] = contextvars.ContextVar("answer_events_muted", default=False)
+
 _SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])[\"')\]]*\s+|\n+")
 _WORD_RE = re.compile(r"[a-z0-9']+")
 
@@ -64,6 +70,20 @@ _WORD_RE = re.compile(r"[a-z0-9']+")
 # --------------------------------------------------------------------------- #
 # Provider side                                                               #
 # --------------------------------------------------------------------------- #
+
+
+@contextlib.contextmanager
+def answer_events_muted() -> Iterator[None]:
+    """Model calls inside this block publish no answer events (child agents)."""
+    token = _answer_events_muted.set(True)
+    try:
+        yield
+    finally:
+        _answer_events_muted.reset(token)
+
+
+def answer_events_are_muted() -> bool:
+    return _answer_events_muted.get()
 
 
 class AnswerAttempt:
@@ -79,7 +99,7 @@ class AnswerAttempt:
     def begin(cls, stream_id: str | None = None) -> AnswerAttempt | None:
         """Start an attempt on ``stream_id`` (default: the current command stream)."""
         sid = stream_id or get_current_command_stream_id()
-        if not sid:
+        if not sid or _answer_events_muted.get():
             return None
         attempt = cls(sid)
         attempt._publish({"op": "start"})
@@ -133,6 +153,37 @@ def observe_openai_responses_event(attempt: AnswerAttempt | None, event: Any) ->
             attempt.item(_field(item, "id"), kind="function_call")
     elif event_type == "response.output_text.delta":
         attempt.text(_field(event, "item_id"), str(_field(event, "delta", "") or ""))
+
+
+def observe_anthropic_stream_event(attempt: AnswerAttempt | None, event: Any) -> None:
+    """Map one Anthropic Messages stream event onto ``attempt``.
+
+    Anthropic text blocks carry no phase: like any phase-less text they are
+    held by the speech gate until the call ends without a tool call.
+    """
+    if attempt is None:
+        return
+    event_type = str(_field(event, "type", "") or "")
+    if event_type == "content_block_start":
+        index = _field(event, "index", 0)
+        block = _field(event, "content_block")
+        block_type = str(_field(block, "type", "text") or "text")
+        if block_type == "text":
+            attempt.item("block-%s" % index, kind="message")
+        elif block_type in {"tool_use", "server_tool_use"}:
+            attempt.item("block-%s" % index, kind="function_call")
+    elif event_type == "content_block_delta":
+        delta = _field(event, "delta")
+        if str(_field(delta, "type", "") or "") == "text_delta":
+            text = str(_field(delta, "text", "") or "")
+            attempt.text("block-%s" % _field(event, "index", 0), text)
+            if text:
+                try:
+                    from services.llm.stream_bus import publish_text_delta
+
+                    publish_text_delta(text, attempt.stream_id)
+                except Exception:  # noqa: BLE001, RUF100 - on-screen tokens are best effort
+                    logger.debug("Anthropic token publish failed", exc_info=True)
 
 
 # --------------------------------------------------------------------------- #
@@ -408,7 +459,10 @@ __all__ = [
     "AnswerAttempt",
     "FinalAnswerSpeechGate",
     "all_sentences",
+    "answer_events_are_muted",
+    "answer_events_muted",
     "hold_reason",
+    "observe_anthropic_stream_event",
     "observe_openai_responses_event",
     "same_sentence",
     "split_sentences",
