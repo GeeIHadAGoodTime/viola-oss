@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "1f250d619b66394251b4af7a1c3c2a2a8a80a5fd",
-  "sha256": "cabb5d23075b4486ab70f17164fdcf65dadf91d6fc5beb54d3498cd0c9ead24e",
+  "revision": "b97f5f4f3a2a87752e77197b079c20db8c90d4e9",
+  "sha256": "7d27ee484740d8d4c1e3c8dce14bd59ea5a91b474323d883e91df1ecb4e36229",
   "files": [
     {
       "path": ".env.example",
@@ -11555,8 +11555,8 @@
     },
     {
       "path": "ui/react-app/src/components/stage/modes/browser/BrowserMode.jsx",
-      "sha256": "c7f585ca4f591ea09562f18745bb276599a0d2d1296b668ffd457fdd3fc22dfd",
-      "bytes": 17287
+      "sha256": "c3addc4669781b4fd47756cfabad3c8638d7180d3266a92f31f925b83eb23e51",
+      "bytes": 18125
     },
     {
       "path": "ui/react-app/src/components/stage/modes/browser/BrowserMode.module.css",
@@ -11565,8 +11565,8 @@
     },
     {
       "path": "ui/react-app/src/components/stage/modes/browser/BrowserMode.test.jsx",
-      "sha256": "d53fcc00dc43bd30a562354a058cff4a84d5db0c544fcf444e7a9c917579ba7b",
-      "bytes": 15597
+      "sha256": "20bd9bb82c59acd8561fb162f05e63a51556745a2b7e629c63a837a9dbcf7b33",
+      "bytes": 16352
     },
     {
       "path": "ui/react-app/src/components/stage/modes/chat/ChatInput.jsx",
