@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "54b5d53fad4c8b22d26e7ffab104d7355a330858",
-  "sha256": "8537c6ed4ea6ba2d8ff734e19577f5cf239ec28a9f788fca06de36d6dcbb0393",
+  "revision": "ecc6cd5258eab03c7bc71c93f5f574509be56210",
+  "sha256": "a0353bbccce6acc34e2f204e75bd160e936de8253f6ff7f090f927ae54bf258d",
   "files": [
     {
       "path": ".env.example",
@@ -2245,8 +2245,8 @@
     },
     {
       "path": "mcp_hub/approval_bridge.py",
-      "sha256": "9fa524c0ff59d99cc11e916ca55f054569e85960866be922909d2b283df0a9bb",
-      "bytes": 68402
+      "sha256": "54a7d0d2adad147ba65f3dfe68e72420f804e907e6672d3479c983f42ec869fb",
+      "bytes": 68435
     },
     {
       "path": "mcp_hub/client_hub.py",
@@ -12720,8 +12720,8 @@
     },
     {
       "path": "ui/settings_manager.py",
-      "sha256": "c54329b937de2f380b0644790a608cd159351169242dc73c1e495b1b2d01b9f4",
-      "bytes": 180271
+      "sha256": "1655a1e19641230fa6a3b398ff9c3cba9ebed1a6a4baf720bb8b19bd3f61f693",
+      "bytes": 180605
     },
     {
       "path": "ui/settings_schema.py",
