@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "8016f8eca50970bc87640053eedb3e5ece694ae2",
-  "sha256": "26ddc00656003de591a5906b7f58a265e44224277a7d68864c5bd6f042e8153f",
+  "revision": "39d5065c8697dcc377e7d2350897dd9dd1b77d70",
+  "sha256": "83757975671a8283650d642cb0e79fed7d3c496eb40b779a73c41c421a781374",
   "files": [
     {
       "path": ".env.example",
@@ -1610,8 +1610,8 @@
     },
     {
       "path": "intent/ai_controller.py",
-      "sha256": "eeb8848db6637fe81131479f70a226bcd08d1fc975345d85696c3c64624a5c77",
-      "bytes": 167785
+      "sha256": "43bc3c20f31293be128be6cf6232071ac34cfa9d1f4cc5db5f840408c87d5f39",
+      "bytes": 167851
     },
     {
       "path": "intent/ai_interpreter.py",
