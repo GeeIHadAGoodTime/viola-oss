@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "1f2bcf500896b65dc81584ba163b0149666ecf37",
-  "sha256": "22c6307f715f2685a2c40f8043c0470c0ba233fc7f5ee2a9b44271cc357881b4",
+  "revision": "aa1f3a223f5af0a45f9d7762e6037a267fbce061",
+  "sha256": "ec36af9dbde82bd4485d24ce7e87c3288f82d1c4cd8e2a4572eb03ded6412287",
   "files": [
     {
       "path": ".env.example",
@@ -6185,8 +6185,8 @@
     },
     {
       "path": "tests/public/test_kokoro_stop.py",
-      "sha256": "08d31a4bcffcccf6cf2916af5548babf42edf7234cf34c308503256989b57361",
-      "bytes": 23289
+      "sha256": "4caee1755767f8276fe9180112244e2d37d141d489b047ed48dbaf2a5d15f109",
+      "bytes": 24101
     },
     {
       "path": "tests/public/test_lan_discovery.py",
