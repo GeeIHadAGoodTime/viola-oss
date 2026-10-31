@@ -38,17 +38,23 @@ describe('Settings > Connections > Google', () => {
     delete window.viola;
   });
 
-  it('explains the unverified-app screen and what Viola can do before connecting', async () => {
+  it('says what Viola asks for, and that only the Gmail reading step can show the unverified screen', async () => {
     mockBackend({ connected: false });
 
     render(<CalendarSettings />);
 
     expect(await screen.findByText('Google')).toBeInTheDocument();
-    const note = screen.getByTestId('google-unverified-note');
-    expect(note).toHaveTextContent("Google hasn't verified this app");
-    expect(note).toHaveTextContent('Advanced');
-    expect(note).toHaveTextContent('cannot read your inbox');
+    const note = screen.getByTestId('google-connect-note');
+    expect(note).toHaveTextContent('calendar events');
+    expect(note).toHaveTextContent('send email you approve');
     expect(note).toHaveTextContent('stays on this computer');
+    // Google verified Calendar and Gmail sending: connecting is no longer "under review".
+    expect(note).not.toHaveTextContent('still reviewing Viola');
+    expect(note).not.toHaveTextContent('limits how many people can connect');
+    // Gmail reading is a separate, unverified permission, and Viola can read mail once allowed.
+    expect(note).toHaveTextContent('Reading and organizing your Gmail is a separate permission');
+    expect(note).toHaveTextContent("Google hasn't verified this app");
+    expect(note).not.toHaveTextContent('cannot read your inbox');
     expect(GOOGLE_CONNECT_NOTE).not.toMatch(/—/);
   });
 
@@ -58,7 +64,7 @@ describe('Settings > Connections > Google', () => {
     render(<CalendarSettings />);
 
     expect(await screen.findByText('Connected: Calendar and email')).toBeInTheDocument();
-    expect(screen.queryByTestId('google-unverified-note')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('google-connect-note')).not.toBeInTheDocument();
   });
 
   it('says the build has no Google sign-in instead of a generic retry message', async () => {

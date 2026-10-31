@@ -731,15 +731,22 @@ GMAIL_MAILBOX_NOT_CONNECTED_MESSAGE = (
 )
 GMAIL_MAILBOX_CONNECT_OPENED_MESSAGE = (
     "To read or organize your email, Viola needs to connect to your Google account. A Google sign-in page "
-    "just opened in your browser: approve it there, then ask again and Viola will carry on."
+    "just opened in your browser: approve it there, then ask again and Viola will carry on. Google has not "
+    'verified the Gmail reading permission for Viola yet, so it may show a "Google hasn\'t verified this app" '
+    "screen first: click Advanced, then Go to Viola."
 )
 GMAIL_MAILBOX_PERMISSION_OPENED_MESSAGE = (
     "Viola needs your OK in Google to read and organize your Gmail. A Google permission page just opened in "
-    "your browser: approve it there, then ask again and Viola will carry on."
+    "your browser: approve it there, then ask again and Viola will carry on. Google has not verified this "
+    'permission for Viola yet, so it may show a "Google hasn\'t verified this app" screen first: click Advanced, '
+    "then Go to Viola."
 )
 GMAIL_MAILBOX_PERMISSION_NEEDED_MESSAGE = (
     "Viola needs your OK in Google to read and organize your Gmail, but could not open the Google permission "
     "page just now. Ask again in a moment; if it keeps happening, check Google in Settings > Connections."
+)
+GMAIL_MAILBOX_OFF_MESSAGE = (
+    "Reading and organizing your Gmail is not available in Viola yet. Viola can still send an email you ask for."
 )
 GMAIL_DESKTOP_ONLY_MESSAGE = (
     "Reading and organizing Gmail works in the Viola desktop app, where your Google connection lives."
@@ -768,7 +775,11 @@ def _google_token_scopes(user_id: str) -> set[str] | None:
 
 
 def gmail_mailbox_access_state(user_id: str | None) -> str:
-    """``not_connected``, ``needs_permission`` or ``allowed`` for this user's Google token."""
+    """``disabled``, ``not_connected``, ``needs_permission`` or ``allowed`` for this user's Google token."""
+    from services.oauth.google import is_gmail_mailbox_enabled
+
+    if not is_gmail_mailbox_enabled():
+        return "disabled"
     scoped = _effective_send_user_id(user_id)
     if not scoped:
         return "not_connected"
@@ -812,6 +823,10 @@ def request_gmail_mailbox_access(user_id: str, *, connected: bool) -> bool:
     """
     scoped = str(user_id or "").strip()
     if not scoped or _is_cloud_runtime():
+        return False
+    from services.oauth.google import is_gmail_mailbox_enabled
+
+    if not is_gmail_mailbox_enabled():
         return False
     try:
         from config.settings import settings as _app_config
@@ -858,8 +873,22 @@ def request_gmail_mailbox_access(user_id: str, *, connected: bool) -> bool:
     return opened
 
 
+def _gmail_mailbox_off_result() -> ToolResult:
+    """Gmail mailbox access is switched off for this build: never ask Google for it."""
+    return ToolResult(
+        ok=False,
+        error=GMAIL_MAILBOX_OFF_MESSAGE,
+        error_category="GMAIL_MAILBOX_OFF",
+        data={"provider": "gmail", "gmail_mailbox_enabled": False},
+    )
+
+
 def _gmail_permission_result(user_id: str, *, connected: bool) -> ToolResult:
     """The user still has to allow Gmail mailbox access: ask Google for it."""
+    from services.oauth.google import is_gmail_mailbox_enabled
+
+    if not is_gmail_mailbox_enabled():
+        return _gmail_mailbox_off_result()
     opened = request_gmail_mailbox_access(user_id, connected=connected)
     if connected:
         message = GMAIL_MAILBOX_PERMISSION_OPENED_MESSAGE if opened else GMAIL_MAILBOX_PERMISSION_NEEDED_MESSAGE
@@ -894,6 +923,10 @@ async def _gmail_mailbox_token(user_id: str | None) -> tuple[str, str]:
         raise GmailMailboxError(
             ToolResult(ok=False, error=GMAIL_DESKTOP_ONLY_MESSAGE, error_category="GMAIL_DESKTOP_ONLY")
         )
+    from services.oauth.google import is_gmail_mailbox_enabled
+
+    if not is_gmail_mailbox_enabled():
+        raise GmailMailboxError(_gmail_mailbox_off_result())
     if not scoped:
         raise GmailMailboxError(
             ToolResult(
@@ -1583,6 +1616,8 @@ def gmail_allow_access(user_id: str | None) -> ToolResult:
     state = gmail_mailbox_access_state(user_id)
     if state == "allowed":
         return ToolResult(ok=True, data={"provider": "gmail", "gmail_access": "allowed"})
+    if state == "disabled":
+        return _gmail_mailbox_off_result()
     scoped = _effective_send_user_id(user_id) or ""
     if _is_cloud_runtime():
         return ToolResult(ok=False, error=GMAIL_DESKTOP_ONLY_MESSAGE, error_category="GMAIL_DESKTOP_ONLY")
