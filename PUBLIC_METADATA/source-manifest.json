@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "a7827aea735643f36f05f10c5b53c4fab7f77a72",
-  "sha256": "89e63b84c949213d2b3c3b5a40f22f33a12fdc702569e0b076112590c45db506",
+  "revision": "c404d5eaf88a1207f6e04aaba702c9bdfdee3339",
+  "sha256": "8b8a970e15e8b26055e1ed6312d74677bc01c4d0153c1d0bbf150ed0aac1877a",
   "files": [
     {
       "path": ".env.example",
@@ -13610,8 +13610,8 @@
     },
     {
       "path": "voice/wake_chime.py",
-      "sha256": "b6f1ceb43634a2ba40ab18c60e649cd0af097f5dd8189d5181bce5b19a7c688a",
-      "bytes": 6597
+      "sha256": "d06f34a1d2b424c178ed2797cf3c8305dbb8273e8faf97fef38fd490eef3b879",
+      "bytes": 6918
     },
     {
       "path": "voice/wake_detector/__init__.py",
@@ -13760,8 +13760,8 @@
     },
     {
       "path": "voice/wake_detector/violawake_listener.py",
-      "sha256": "041d06ca3b99f25fd998e64d9f1a28448e27445d462b0b260bf6f43e4e9e8c4c",
-      "bytes": 180192
+      "sha256": "8f24853771ec34e714965e37ceefb84a781c473291a0c3aebb8184636ca6f94e",
+      "bytes": 183774
     },
     {
       "path": "voice/wake_detector/wake/__init__.py",
@@ -13775,13 +13775,13 @@
     },
     {
       "path": "voice/wake_detector/wake/context.py",
-      "sha256": "72eb7525b21ae29d4cfff9a6c47d82e904e3011a0a2adbc3c189a325269138aa",
-      "bytes": 2238
+      "sha256": "12001f7a6cae0831a8377f9ddc38f758b8e523125c8b9c6e509d0f32133a07fb",
+      "bytes": 2420
     },
     {
       "path": "voice/wake_detector/wake_decision_policy.py",
-      "sha256": "2b16bcf74aeb8125c968f5cad6a5228d77d7bb852814ecfc3f53e7af3d9bf6c4",
-      "bytes": 28018
+      "sha256": "de924237cc01291268583253c3d056dc9287f6187aab1b520bb5f6174609f23d",
+      "bytes": 28844
     },
     {
       "path": "voice/wake_detector/wake_factory.py",
