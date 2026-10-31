@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "866684ebbf0583839a79aa8c8d1a73925a4a6387",
-  "sha256": "a5bc28973b34785e37a82e5e70c8537cd9b5e71d6d26360e59cee483f27ffb87",
+  "revision": "1f250d619b66394251b4af7a1c3c2a2a8a80a5fd",
+  "sha256": "cabb5d23075b4486ab70f17164fdcf65dadf91d6fc5beb54d3498cd0c9ead24e",
   "files": [
     {
       "path": ".env.example",
@@ -1580,8 +1580,8 @@
     },
     {
       "path": "intent/agent_executor.py",
-      "sha256": "e13707f50edfbe06d11c03f5075dfdbefffaf9a4c74a34df7449b87d87fb4aa5",
-      "bytes": 586707
+      "sha256": "2379197091fda9a05baf65f60554f39c7652237db305ea011b156412e035320c",
+      "bytes": 588867
     },
     {
       "path": "intent/agent_loop.py",
@@ -4060,8 +4060,8 @@
     },
     {
       "path": "services/browser_overlay_controller.py",
-      "sha256": "2230a2881ff1c1ae8a3d2707bfbf010f5a22b95eef293cfe9bd56a0be1e9b624",
-      "bytes": 13137
+      "sha256": "606d98280ca9023e40c60334c7e2d10f29ffc6ddafed71f006c051f0ec640995",
+      "bytes": 17886
     },
     {
       "path": "services/cache/__init__.py",
@@ -9890,8 +9890,8 @@
     },
     {
       "path": "ui/qt_native/webview_window.py",
-      "sha256": "ea8aaba8923639fe17ca92d5c91c76a7adbf3ff2b97d120f193ab3fbb197af23",
-      "bytes": 246678
+      "sha256": "5a82a42a06a66f16084bada9f3a51303038789761ada7ee9099c2f3dff0e1e78",
+      "bytes": 247963
     },
     {
       "path": "ui/qt_native/widgets/connectivity_status.py",
@@ -10030,8 +10030,8 @@
     },
     {
       "path": "ui/react-app/src/SmartDisplay.agentBrowser.test.jsx",
-      "sha256": "7da19234d102dbe7337f1ddf21a35a1ae1ee6ad2a4e3c2dac2007ea5b20debbf",
-      "bytes": 5167
+      "sha256": "d8693dfa8b239aa03458e1e116993091a522926a562be6508500dcf63d375428",
+      "bytes": 5400
     },
     {
       "path": "ui/react-app/src/SmartDisplay.browserUrlReset.test.jsx",
@@ -10045,8 +10045,13 @@
     },
     {
       "path": "ui/react-app/src/SmartDisplay.jsx",
-      "sha256": "1c8458ea4031c7f0d9d2325ff732774286af1383f717498d2b57e427143e24fe",
-      "bytes": 183697
+      "sha256": "4711428f090e5a52b56cc655613ef22fe6c3fc36669ed50c034ca06d6caa7137",
+      "bytes": 188094
+    },
+    {
+      "path": "ui/react-app/src/SmartDisplay.overlayLifecycle.test.jsx",
+      "sha256": "fe46c08acbe1726706d156ea22ff0329825c9275342dad07d9f1bf8bad298fb0",
+      "bytes": 10798
     },
     {
       "path": "ui/react-app/src/SmartDisplay.spokePolicy.test.jsx",
@@ -11550,18 +11555,18 @@
     },
     {
       "path": "ui/react-app/src/components/stage/modes/browser/BrowserMode.jsx",
-      "sha256": "939232c7c8a414c8b5f1c789b0bd3d25b94853c42c6952d19c81b79ea0282c4a",
-      "bytes": 15158
+      "sha256": "c7f585ca4f591ea09562f18745bb276599a0d2d1296b668ffd457fdd3fc22dfd",
+      "bytes": 17287
     },
     {
       "path": "ui/react-app/src/components/stage/modes/browser/BrowserMode.module.css",
-      "sha256": "98fe2e60c176b82cd4e0ffd36b2c5115a23ecb2d8303c0ce0153d777891f14d2",
-      "bytes": 4703
+      "sha256": "c064fac8742e8032acf487dc347bcf9a2aa0529243c9cff0eabf222639412073",
+      "bytes": 4969
     },
     {
       "path": "ui/react-app/src/components/stage/modes/browser/BrowserMode.test.jsx",
-      "sha256": "1e7f4ea3739f924aa667fad43e734b2b1bec0057fa51eb0bca9b573c7f6f6bba",
-      "bytes": 12098
+      "sha256": "d53fcc00dc43bd30a562354a058cff4a84d5db0c544fcf444e7a9c917579ba7b",
+      "bytes": 15597
     },
     {
       "path": "ui/react-app/src/components/stage/modes/chat/ChatInput.jsx",
@@ -12464,6 +12469,16 @@
       "bytes": 7281
     },
     {
+      "path": "ui/react-app/src/utils/nativeBrowserView.js",
+      "sha256": "9c188b38acf98edd193d3a1794b7afba3e617b48a15d8fee4145b6597f307705",
+      "bytes": 3272
+    },
+    {
+      "path": "ui/react-app/src/utils/nativeBrowserView.test.js",
+      "sha256": "94be4d4184d3f49ed7e13613e8ecacfae6902ab7681ed554c6a1d8d63fc7b76f",
+      "bytes": 3377
+    },
+    {
       "path": "ui/react-app/src/utils/notifications.js",
       "sha256": "3bea7a933b108fd354585858542ed156f9f85e51ac150b4569016242ff8e0e38",
       "bytes": 2017
@@ -13170,8 +13185,8 @@
     },
     {
       "path": "viola_qt.py",
-      "sha256": "1f2cf1c499a50ce06bc25a16ca88b70aa12bbae38ade6e4dadb747125485d184",
-      "bytes": 88424
+      "sha256": "6a8b81ab35ce5e1c364277f486e25575eb3082711e6d077486f643fee9cfe4f2",
+      "bytes": 88280
     },
     {
       "path": "viola_spoke.py",

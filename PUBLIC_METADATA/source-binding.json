@@ -30,10 +30,10 @@
   },
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "c8a88047186cbaf78297b0dad9988f2699477304ab65e142071915a77c90d886",
-  "source_tree_sha256": "a5bc28973b34785e37a82e5e70c8537cd9b5e71d6d26360e59cee483f27ffb87",
-  "source_file_count": 2759,
-  "source_revision": "866684ebbf0583839a79aa8c8d1a73925a4a6387",
+  "source_manifest_sha256": "9f6236f206d2d413cdef69506de752460b002f12b5329af61b6c987061b3b50d",
+  "source_tree_sha256": "cabb5d23075b4486ab70f17164fdcf65dadf91d6fc5beb54d3498cd0c9ead24e",
+  "source_file_count": 2762,
+  "source_revision": "1f250d619b66394251b4af7a1c3c2a2a8a80a5fd",
   "comparison_public_revision": "ecab2772465fcc89ae6645b028af1c2273b9199f",
   "changed_source_paths": [
     "START_WEB_INTERFACE.py",
@@ -136,6 +136,7 @@
     "playback/engines/spotify_cdp.py",
     "services/alarm_ringer.py",
     "services/browser/qt_cdp_bridge.py",
+    "services/browser_overlay_controller.py",
     "services/capability_registry.py",
     "services/computer_use/cloud_guard.py",
     "services/computer_use/safety.py",
@@ -214,6 +215,7 @@
     "ui/react-app/package.json",
     "ui/react-app/src/SmartDisplay.agentBrowser.test.jsx",
     "ui/react-app/src/SmartDisplay.jsx",
+    "ui/react-app/src/SmartDisplay.overlayLifecycle.test.jsx",
     "ui/react-app/src/SmartDisplay.wakeStatus.test.jsx",
     "ui/react-app/src/__tests__/SmartDisplay.test.jsx",
     "ui/react-app/src/__tests__/hooks/useVoiceOnboarding.micCaptureProbe.test.jsx",
@@ -279,6 +281,7 @@
     "ui/react-app/src/components/settings/WakeSensitivitySlider.test.jsx",
     "ui/react-app/src/components/stage/modes/browser/BrowserMode.jsx",
     "ui/react-app/src/components/stage/modes/browser/BrowserMode.module.css",
+    "ui/react-app/src/components/stage/modes/browser/BrowserMode.test.jsx",
     "ui/react-app/src/components/stage/modes/chat/ChatInput.jsx",
     "ui/react-app/src/components/stage/modes/chat/ChatMode.css",
     "ui/react-app/src/components/stage/modes/chat/ChatMode.jsx",
@@ -323,6 +326,8 @@
     "ui/react-app/src/utils/customerSpeechSelection.js",
     "ui/react-app/src/utils/inputModality.js",
     "ui/react-app/src/utils/inputModality.test.js",
+    "ui/react-app/src/utils/nativeBrowserView.js",
+    "ui/react-app/src/utils/nativeBrowserView.test.js",
     "ui/react-app/src/utils/runtimeSurface.js",
     "ui/react-app/src/utils/runtimeSurface.test.js",
     "ui/react-app/src/utils/stageMarkdown.jsx",
@@ -437,8 +442,8 @@
     "historical_inventory_limits": "This renderer correction changes no dependency or workflow inputs. All six retained SBOMs and their complete status objects stay historical and unchanged; no current installed inventory qualification is claimed."
   },
   "qualification": {
-    "source_commit": "866684ebbf0583839a79aa8c8d1a73925a4a6387",
-    "kind": "gmail mailbox"
+    "source_commit": "1f250d619b66394251b4af7a1c3c2a2a8a80a5fd",
+    "kind": "r7 overlay"
   },
   "historical_bindings": [
     {
