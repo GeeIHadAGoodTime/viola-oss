@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "b95ef09ae30ff3f9a78f95706ae40c5aee62aad0",
-  "sha256": "df37d8c6c6b1def9178bd3d6c0b64fbee3b31176c7b0d65552371a6e0e7ff0bb",
+  "revision": "1631a199515406580319e1bae0d723fe251fe727",
+  "sha256": "36b0669d0a3c493ac9015a462773f214bddb902b057dfbf1b68302e590626481",
   "files": [
     {
       "path": ".env.example",
@@ -2935,8 +2935,8 @@
     },
     {
       "path": "music/providers/browser/auth_manager.py",
-      "sha256": "8025c188684c14426e1a9fc50828c13b60dfbd722033a3ebd883a1df7247c4d0",
-      "bytes": 33679
+      "sha256": "c62b654e8740dfd1da2b2acef58cba9a2bb0aa3e684ac82581d6421e474b86ff",
+      "bytes": 34486
     },
     {
       "path": "music/providers/browser/content_id.py",
@@ -3275,8 +3275,8 @@
     },
     {
       "path": "music/spotify/cookie_bridge.py",
-      "sha256": "e30f3591c9c81037ba5fc2c323b715a73f7a8390f72b6a86ad95e5f31985ca05",
-      "bytes": 15365
+      "sha256": "f8136a2792700abcfda0738e93b778fc532460fb4a1d95f74f29b39a7982712b",
+      "bytes": 21754
     },
     {
       "path": "music/youtube_embed.py",
