@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "774e318a0acd8885bb7dce999e27a49e95240e64",
-  "sha256": "74f6727b44e90ac485bd8b9cd875932e9597012ac2d677d7ea6eba5d060a969d",
+  "revision": "2c44c83f5aba4db1632f49ffce14d3bb80441d78",
+  "sha256": "9141a5d528fb3d6beed8350b6af43b3d44f0a0f93bf980f70c7e252413cfe8f3",
   "files": [
     {
       "path": ".env.example",
@@ -10045,8 +10045,8 @@
     },
     {
       "path": "ui/react-app/src/SmartDisplay.jsx",
-      "sha256": "dd159533a5249cd1e99f72f277a6b148c391f72bf47c2f0dbd06c0a74d601e22",
-      "bytes": 186163
+      "sha256": "075df8136ec438151a2242041bb28f90086208c4e7af3d543e1373b1dc5ede52",
+      "bytes": 187430
     },
     {
       "path": "ui/react-app/src/SmartDisplay.spokePolicy.test.jsx",
@@ -10055,8 +10055,8 @@
     },
     {
       "path": "ui/react-app/src/SmartDisplay.stageInputHistory.test.jsx",
-      "sha256": "f0fbc405c6a8b0259a0cc1ccdee20913416b756e08fb7ff0fc4854af9cc8dd75",
-      "bytes": 4483
+      "sha256": "5f29ea3da5c593c2c6982798aba33034ac3022ad21f625bd414adac444fadad3",
+      "bytes": 6658
     },
     {
       "path": "ui/react-app/src/SmartDisplay.stageRouting.test.jsx",
