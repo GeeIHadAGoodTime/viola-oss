@@ -13,6 +13,7 @@ Not redacted by default:
 
 from __future__ import annotations
 
+import itertools
 import re
 from collections.abc import Mapping
 from pathlib import Path
@@ -417,7 +418,7 @@ def _is_counting_sequence(tokens: list[str]) -> bool:
     if not all(token.isdigit() for token in tokens):
         return False
     values = [int(token) for token in tokens]
-    return all(later == earlier + 1 for earlier, later in zip(values, values[1:], strict=False))
+    return all(later == earlier + 1 for earlier, later in itertools.pairwise(values))
 
 
 def _replace_spoken_phone(match: re.Match[str]) -> str:

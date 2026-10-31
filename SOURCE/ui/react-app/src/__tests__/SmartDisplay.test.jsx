@@ -164,7 +164,7 @@ vi.mock('../hooks/useViolaApi', () => ({
     getQueue: apiHarness.getQueue,
     playQueueItem: apiHarness.playQueueItem,
     clearQueue: vi.fn(),
-    sendCommand: vi.fn(() => Promise.resolve({ message: 'ok' })),
+    sendCommand: apiHarness.sendCommand || (apiHarness.sendCommand = vi.fn(() => Promise.resolve({ message: 'ok' }))),
     sendCommandStreaming: apiHarness.sendCommandStreaming,
     getWeather: apiHarness.getWeather,
     submitBugReport: apiHarness.submitBugReport || (apiHarness.submitBugReport = vi.fn(() => Promise.resolve({ bug_ticket_id: 42 }))),
@@ -361,6 +361,7 @@ vi.mock('../components/CalendarView', () => ({
 // Dynamically import SmartDisplay AFTER mocks are set up
 let SmartDisplay;
 let agentContextPillCooldownMs;
+let PHONE_TERMS_RESUME_COMMAND;
 
 beforeEach(async () => {
   apiHarness.savedThreads = [];
@@ -406,6 +407,7 @@ beforeEach(async () => {
   const mod = await import('../SmartDisplay');
   SmartDisplay = mod.default;
   agentContextPillCooldownMs = mod.AGENT_CONTEXT_PILL_COOLDOWN_MS;
+  PHONE_TERMS_RESUME_COMMAND = mod.PHONE_TERMS_RESUME_COMMAND;
 });
 
 describe('Help keyboard isolation', () => {
@@ -641,6 +643,66 @@ describe('SmartDisplay', () => {
 
     expect(await screen.findByText('Sign in required')).toBeInTheDocument();
     expect(screen.getByText('Sign in to continue')).toBeInTheDocument();
+  });
+
+  describe('Phone Calling Terms window', () => {
+    afterEach(async () => {
+      delete window.viola;
+      const { authFetch } = await import('../hooks/useViolaApi');
+      authFetch.mockImplementation(() => Promise.resolve({ ok: true, json: () => Promise.resolve({}) }));
+    });
+
+    it('picks a stopped call back up after the Phone Calling Terms are accepted (1.0.5 A6.6a)', async () => {
+      const { authFetch } = await import('../hooks/useViolaApi');
+      authFetch.mockImplementation((url) => Promise.resolve(url === '/v1/phone/accept-tos'
+        ? { ok: true, status: 200, json: () => Promise.resolve({ ok: true, error: null, data: { accepted: true } }) }
+        : { ok: true, json: () => Promise.resolve({}) }));
+      apiHarness.sendCommand = null;
+      // The desktop app (the Qt bridge is present), where the cloud first-run
+      // consent gate never intercepts a turn.
+      window.viola = {};
+      const { user } = render(<SmartDisplay />);
+
+      act(() => {
+        window.dispatchEvent(new CustomEvent('viola:phone-tos-required', {
+          detail: {
+            error_code: 'phone_tos_required',
+            message: "Nothing was dialed: phone calls aren't set up on this account yet.",
+            missing_consents: ['voice_recording', 'data_retention'],
+            resume_after_accept: true,
+          },
+        }));
+      });
+
+      expect(await screen.findByText('Phone Calling Terms')).toBeInTheDocument();
+      expect(screen.getByText(/Record the call audio \(not on yet\)/)).toBeInTheDocument();
+      expect(screen.getByText(/Use Viola's cloud AI to talk on the call$/)).toBeInTheDocument();
+
+      await user.click(screen.getByRole('button', { name: /i agree/i }));
+
+      await waitFor(() => expect(apiHarness.sendCommand).toHaveBeenCalledWith(PHONE_TERMS_RESUME_COMMAND));
+    });
+
+    it('does not start a call when the Phone Calling Terms are accepted from the Phone tab', async () => {
+      const { authFetch } = await import('../hooks/useViolaApi');
+      authFetch.mockImplementation((url) => Promise.resolve(url === '/v1/phone/accept-tos'
+        ? { ok: true, status: 200, json: () => Promise.resolve({ ok: true, error: null, data: { accepted: true } }) }
+        : { ok: true, json: () => Promise.resolve({}) }));
+      apiHarness.sendCommand = null;
+      window.viola = {};
+      const { user } = render(<SmartDisplay />);
+
+      act(() => {
+        window.dispatchEvent(new CustomEvent('viola:phone-tos-required', {
+          detail: { error_code: 'phone_tos_required', missing_consents: ['cloud_llm'] },
+        }));
+      });
+
+      await user.click(await screen.findByRole('button', { name: /i agree/i }));
+
+      await waitFor(() => expect(screen.queryByText('Phone Calling Terms')).not.toBeInTheDocument());
+      expect(apiHarness.sendCommand).not.toHaveBeenCalledWith(PHONE_TERMS_RESUME_COMMAND);
+    });
   });
 
   it('should show idle state when nothing is playing', async () => {

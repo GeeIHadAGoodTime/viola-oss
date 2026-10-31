@@ -252,6 +252,49 @@ def _request_cloud_bearer(request: Request) -> str:
     return str(getattr(request.state, "gotrue_access_token", "") or "").strip()
 
 
+async def _missing_phone_cloud_consents(bearer: str) -> list[str] | None:
+    """The phone consents the account still lacks, or None when the cloud could not say.
+
+    Read through the same desktop-to-cloud proxy, with the same account's bearer,
+    as the terms calls themselves.
+    """
+    from intent.tools.phone_call import PHONE_CLOUD_CONSENTS, _ordered_phone_consents
+
+    response = await _maybe_proxy_phone_to_cloud("GET", "/api/v1/consent/checks/voice-session", bearer_token=bearer)
+    body = _proxied_envelope(response) if response is not None else None
+    if response is None or response.status_code != 200 or body is None:
+        return None
+    data = body.get("data")
+    if not isinstance(data, dict) or not isinstance(data.get("allowed"), bool):
+        return None
+    if data["allowed"]:
+        return []
+    return _ordered_phone_consents(data.get("missing")) or list(PHONE_CLOUD_CONSENTS)
+
+
+async def _grant_phone_cloud_consents(bearer: str, consents: list[str]) -> list[str]:
+    from intent.tools.phone_call import PHONE_CLOUD_CONSENTS
+
+    granted: list[str] = []
+    for consent in consents:
+        if consent not in PHONE_CLOUD_CONSENTS:
+            continue
+        response = await _maybe_proxy_phone_to_cloud(
+            "PUT",
+            "/api/v1/consent/%s" % consent,
+            json_body={"granted": True, "metadata": {"source": "desktop_phone_terms"}},
+            bearer_token=bearer,
+        )
+        body = _proxied_envelope(response) if response is not None else None
+        data = body.get("data") if body is not None else None
+        record = data.get("record") if isinstance(data, dict) else None
+        if response is None or response.status_code != 200 or not (isinstance(record, dict) and record.get("granted")):
+            status = response.status_code if response is not None else 0
+            raise RuntimeError("cloud did not record the %s consent (HTTP %d)" % (consent, status))
+        granted.append(consent)
+    return granted
+
+
 async def _grant_phone_cloud_consents_after_terms(request: Request, proxied: JSONResponse) -> JSONResponse:
     """Accepting the Phone Calling Terms also turns on the call permissions it discloses.
 
@@ -262,24 +305,17 @@ async def _grant_phone_cloud_consents_after_terms(request: Request, proxied: JSO
     accepted the terms still got "HTTP 403 cloud_consent_required" on its first
     call (1.0.5 laptop A6.6a). The Phone Calling Terms window names all three,
     so its "I agree" records whichever ones the account is missing.
+
+    When the cloud cannot say what is missing, the acceptance still stands and
+    nothing is guessed: the next dial re-checks and asks again if it must.
     """
     body = _proxied_envelope(proxied)
     if proxied.status_code != 200 or body is None or body.get("ok") is not True:
         return proxied
-    from intent.tools.phone_call import (
-        PHONE_CLOUD_CONSENTS,
-        fetch_cloud_phone_readiness,
-        grant_cloud_consents,
-    )
-
     bearer = _request_cloud_bearer(request)
     try:
-        readiness = await fetch_cloud_phone_readiness(bearer_token=bearer)
-        missing = (readiness or {}).get("missing_consents")
-        if missing is None:
-            # Unknown: grant the whole disclosed set (each write is idempotent).
-            missing = list(PHONE_CLOUD_CONSENTS)
-        granted = await grant_cloud_consents(missing, bearer_token=bearer) if missing else []
+        missing = await _missing_phone_cloud_consents(bearer)
+        granted = await _grant_phone_cloud_consents(bearer, missing) if missing else []
     except Exception as exc:
         logger.warning("Phone terms accepted but the call permissions were not saved: %s", exc)
         return JSONResponse(
@@ -303,13 +339,10 @@ async def _with_phone_cloud_consent_status(request: Request, proxied: JSONRespon
     if proxied.status_code != 200 or body is None or body.get("ok") is not True or not isinstance(data, dict):
         return proxied
     try:
-        from intent.tools.phone_call import fetch_cloud_phone_readiness
-
-        readiness = await fetch_cloud_phone_readiness(bearer_token=_request_cloud_bearer(request))
+        missing = await _missing_phone_cloud_consents(_request_cloud_bearer(request))
     except Exception:
         logger.debug("Phone consent status lookup failed", exc_info=True)
         return proxied
-    missing = (readiness or {}).get("missing_consents")
     if missing is None:
         return proxied
     return JSONResponse(success_response({**data, "missing_consents": missing}))

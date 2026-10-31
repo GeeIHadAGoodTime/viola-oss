@@ -837,10 +837,9 @@ async def phone_call_readiness_result() -> ToolResult | None:
         logger.debug("Phone readiness: phone mode lookup failed", exc_info=True)
         return None
 
-    account_gate_result = _paid_phone_call_account_gate_result()
-    if account_gate_result is not None:
-        return account_gate_result
-
+    # No sign-in check here: a signed-out desktop has no cloud bearer, so the
+    # readiness read below comes back unknown and the dial path's own account
+    # gate answers, exactly as before.
     try:
         readiness = await fetch_cloud_phone_readiness()
     except Exception:

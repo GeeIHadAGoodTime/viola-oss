@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, render, screen, waitFor } from '../test/test-utils';
 import { clearCachedClientApiKey, setCloudSession } from '../config';
-import PhoneToSModal, { PHONE_TOS_AUDIT_NOTICE } from './PhoneToSModal';
+import PhoneToSModal, { PHONE_CLOUD_CONSENT_LABELS, PHONE_TOS_AUDIT_NOTICE } from './PhoneToSModal';
 
 // Keep PhoneToSModal, authFetch, and the CSRF helper real. Only the network
 // boundary is stubbed so these checks catch a missing header in the actual path.
@@ -371,5 +371,22 @@ describe('PhoneToSModal', () => {
     expect(PHONE_TOS_AUDIT_NOTICE).toContain('recorded and transcribed by default for your audit trail');
     expect(PHONE_TOS_AUDIT_NOTICE).toContain('proactive AI announcement');
     expect(PHONE_TOS_AUDIT_NOTICE).toContain('Phone Settings');
+  });
+
+  it('discloses every call permission that I agree turns on, marking the missing ones', () => {
+    render(
+      <PhoneToSModal
+        isOpen={true}
+        onClose={vi.fn()}
+        payload={{ error_code: 'phone_tos_required', missing_consents: ['voice_recording', 'data_retention'] }}
+      />
+    );
+
+    const permissions = screen.getByLabelText('Phone call permissions');
+    expect(permissions).toHaveTextContent('Choosing I agree also allows Viola');
+    expect(permissions).toHaveTextContent('Record the call audio (not on yet)');
+    expect(permissions).toHaveTextContent('Keep call recordings and transcripts in your account (not on yet)');
+    expect(screen.getByText("Use Viola's cloud AI to talk on the call")).toBeInTheDocument();
+    expect(Object.keys(PHONE_CLOUD_CONSENT_LABELS)).toEqual(['voice_recording', 'cloud_llm', 'data_retention']);
   });
 });
