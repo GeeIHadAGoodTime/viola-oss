@@ -2621,7 +2621,7 @@
 "LICENSE" = "f61fdd0217de9ece8fa699912848d91187d84879fc2e689f0906d0c1299e955e" # pragma: allowlist secret (public artifact checksum)
 "README.md" = "38e418ec238e3bcbf791c65fb499bac6a22a8e409756605f8c6a9e4507f1b5c1" # pragma: allowlist secret (public artifact checksum)
 "pyproject.toml" = "b2e2372490e606a53820c8f1220158e7e6680b9ee248373bf88f12766068ee56" # pragma: allowlist secret (public artifact checksum)
-"src/kokoro_onnx/__init__.py" = "6763c9819a6a26f08e1f707b1e0f05aeba4e86a1ce15c50900af5f0c1c677051" # pragma: allowlist secret (public artifact checksum)
+"src/kokoro_onnx/__init__.py" = "05ab929e2919f2a4f33fdf42d23341e5ca4bd37ede4d70a9b4bbe1021dc57591" # pragma: allowlist secret (public artifact checksum)
 "src/kokoro_onnx/config.json" = "5abb01e2403b072bf03d04fde160443e209d7a0dad49a423be15196b9b43c17f" # pragma: allowlist secret (public artifact checksum)
 "src/kokoro_onnx/config.py" = "0f50f15f7c362a04ec62345f6ec53535194136417cea39912d412fef70661f11" # pragma: allowlist secret (public artifact checksum)
 "src/kokoro_onnx/log.py" = "2c56e73146eac2aa3e47b144ec53ae28964b41c06095975a606a53466218863c" # pragma: allowlist secret (public artifact checksum)
