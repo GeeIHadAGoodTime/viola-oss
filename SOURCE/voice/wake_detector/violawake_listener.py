@@ -2809,7 +2809,12 @@ class ViolaWakeListener:
                             pump_epoch = pump.drop_epoch
                             stream_gap = True
                         backlog = pump.available_chunks()
-                        if backlog * 0.08 >= 1.0 and time.monotonic() - last_backlog_warning > 30.0:
+                        # (not during start-up: the first chunks pay one-time imports)
+                        if (
+                            frame_count > 125
+                            and backlog * 0.08 >= 1.0
+                            and time.monotonic() - last_backlog_warning > 30.0
+                        ):
                             last_backlog_warning = time.monotonic()
                             logger.warning(
                                 "[TIMING] Wake detection is %.1f s behind the microphone (busy machine); "
