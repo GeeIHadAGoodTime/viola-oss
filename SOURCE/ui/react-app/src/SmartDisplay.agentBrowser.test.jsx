@@ -89,11 +89,14 @@ describe('agent browser stays up while the agent works', () => {
     expect(window.viola.hideBrowserOverlay).not.toHaveBeenCalled();
   });
 
-  it('still clears a stale login overlay from over the video', async () => {
+  // Build 7: a sign-in page only ever shows on the browser stage now (with its
+  // own Done button), so only the legacy music-mode overlay is cleared here;
+  // see SmartDisplay.overlayLifecycle.test.jsx for the sign-in page.
+  it('still clears a stale music-mode overlay from over the video', async () => {
     render(<SmartDisplay />);
     await waitFor(() => expect(harness.overlay).toBeTypeOf('function'));
 
-    await act(async () => { harness.overlay({ type: 'browser_overlay_state', visible: true, mode: 'login', url: '' }); });
+    await act(async () => { harness.overlay({ type: 'browser_overlay_state', visible: true, mode: 'music', url: '' }); });
 
     await waitFor(() => expect(window.viola.hideBrowserOverlay).toHaveBeenCalled());
   });

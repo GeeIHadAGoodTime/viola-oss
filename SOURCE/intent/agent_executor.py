@@ -7425,6 +7425,49 @@ class AgentExecutor:
             self._last_page_url = url
             self._update_overlay_for_browser(url)
 
+    def _close_browser_view_after_tool(self, result: ToolResult) -> ToolResult:
+        """Make ``browser_close`` also take the browser view off the stage.
+
+        The browser server only drops its CDP connection; the native view the
+        user sees stayed up and the model still replied "Browser closed."
+        (1.0.5 build 7, A5.2). Hide it through the overlay controller, which
+        also covers a view shown by an earlier task or reopened from the
+        globe pill, and tell the model whether the view is really gone so the
+        reply only says closed when it is.
+        """
+        overlay = self._overlay
+        if overlay is None:
+            # Headless / cloud executor: there is no on-screen view to close.
+            return result
+        try:
+            if getattr(overlay, "state", "hidden") != "hidden":
+                close = getattr(overlay, "close_by_user", None)
+                if callable(close):
+                    close()
+                else:
+                    overlay.hide()
+            view_closed = getattr(overlay, "state", "hidden") == "hidden"
+        except Exception as exc:
+            logger.warning("Closing the browser view after browser_close failed: %s", exc)
+            view_closed = False
+        if view_closed:
+            self._overlay_shown = False
+        data = dict(result.data) if isinstance(result.data, dict) else {}
+        data.setdefault("closed", bool(result.ok))
+        data["view_closed"] = view_closed
+        if not view_closed:
+            data["closed"] = False
+            return ToolResult(
+                ok=False,
+                data=data,
+                error="The browser view is still on the screen; it could not be closed.",
+                error_category=result.error_category,
+            )
+        if not result.ok:
+            # The connection close failed but the view is gone from the screen.
+            return ToolResult(ok=False, data=data, error=result.error, error_category=result.error_category)
+        return ToolResult(ok=True, data=data)
+
     def _update_overlay_for_browser(self, url: str) -> None:
         """Show or update the agentic overlay when browser tools are used."""
         if self._overlay is None:
@@ -8968,6 +9011,8 @@ class AgentExecutor:
             # before gate detection so trace/checkpoint artifacts point at the
             # actual boundary page, not the previous page.
             self._track_page_url(tool_name, result)
+            if tool_name == "browser_close":
+                result = self._close_browser_view_after_tool(result)
             self._record_memory_all_scope_no_match(tool_name, tool_args, result)
 
             if tool_name == "fill_payment_details":

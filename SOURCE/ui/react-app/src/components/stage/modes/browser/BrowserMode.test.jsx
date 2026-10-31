@@ -120,6 +120,89 @@ describe('BrowserMode', () => {
     expect(wsSend).toHaveBeenCalledWith({ action: 'agent_cancel', payload: {} });
   });
 
+  // ---- Native view lifecycle (1.0.5 build 7, A5.2 / A8) ---- //
+
+  it('tells the desktop the surface is on screen only while nativeSurfaceActive, bounds first', async () => {
+    const calls = [];
+    window.viola = {
+      setBrowserOverlayBounds: vi.fn(() => calls.push('bounds')),
+      setBrowserSurfaceActive: vi.fn((active) => calls.push(active ? 'active' : 'inactive')),
+    };
+    const { rerender } = render(<BrowserMode browserUrl="https://example.com" />);
+    stubSurfaceRect(screen.getByTestId('browser-surface'));
+    expect(window.viola.setBrowserSurfaceActive).toHaveBeenLastCalledWith(false);
+
+    calls.length = 0;
+    rerender(<BrowserMode browserUrl="https://example.com" nativeSurfaceActive />);
+    expect(calls).toEqual(['bounds', 'active']);
+
+    rerender(<BrowserMode browserUrl="https://example.com" nativeSurfaceActive={false} />);
+    expect(window.viola.setBrowserSurfaceActive).toHaveBeenLastCalledWith(false);
+  });
+
+  it('never sends bounds that reach past the stage (the view would cover the reply text)', () => {
+    window.viola = { setBrowserOverlayBounds: vi.fn(), setBrowserSurfaceActive: vi.fn() };
+    const { container } = render(
+      <section data-testid="viola-stage"><BrowserMode browserUrl="https://example.com" /></section>
+    );
+    container.querySelector('[data-testid="viola-stage"]').getBoundingClientRect = () => ({
+      x: 0, y: 0, width: 900, height: 400, top: 0, left: 0, right: 900, bottom: 400, toJSON: () => {},
+    });
+    stubSurfaceRect(screen.getByTestId('browser-surface'));
+    act(() => { window.dispatchEvent(new Event('resize')); });
+    expect(window.viola.setBrowserOverlayBounds).toHaveBeenLastCalledWith(0, 0, 900, 400);
+  });
+
+  it('re-sends the surface state when the bridge becomes ready', () => {
+    render(<BrowserMode browserUrl="https://example.com" nativeSurfaceActive />);
+    window.viola = { setBrowserOverlayBounds: vi.fn(), setBrowserSurfaceActive: vi.fn() };
+    stubSurfaceRect(screen.getByTestId('browser-surface'));
+    act(() => { window.dispatchEvent(new Event('viola-bridge-ready')); });
+    expect(window.viola.setBrowserSurfaceActive).toHaveBeenLastCalledWith(true);
+    expect(window.viola.setBrowserOverlayBounds).toHaveBeenCalledWith(0, 0, 900, 520);
+  });
+
+  it('never signals the native surface on a streamed (spoke / web) client', () => {
+    window.viola = { setBrowserOverlayBounds: vi.fn(), setBrowserSurfaceActive: vi.fn() };
+    render(<BrowserMode browserUrl="https://example.com" streamFrames nativeSurfaceActive />);
+    expect(window.viola.setBrowserSurfaceActive).not.toHaveBeenCalled();
+  });
+
+  it('labels Take over, Stop and Close so they read as controls', () => {
+    render(<BrowserMode browserUrl="https://example.com" agentBusy onExit={vi.fn()} />);
+    expect(screen.getByRole('button', { name: 'Take over browser' })).toHaveTextContent('Take over');
+    expect(screen.getByRole('button', { name: 'Stop agent task' })).toHaveTextContent('Stop');
+    expect(screen.getByRole('button', { name: 'Exit browser mode' })).toHaveTextContent('Close');
+  });
+
+  it('a sign-in page shows Done (no agent controls) and Done exits', () => {
+    const onExit = vi.fn();
+    render(<BrowserMode loginProvider="spotify" agentBusy onExit={onExit} />);
+    expect(screen.getByText('Sign in to Spotify')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Take over browser' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Stop agent task' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Done signing in to Spotify' }));
+    expect(onExit).toHaveBeenCalledTimes(1);
+  });
+
+  it('registers a Close browser palette command', async () => {
+    const registerCommands = vi.fn(() => vi.fn());
+    const onExit = vi.fn();
+    render(
+      <BrowserMode
+        browserUrl="https://example.com"
+        commandScopeActive
+        commandRegistry={{ registerCommands }}
+        onExit={onExit}
+      />
+    );
+    await waitFor(() => {
+      expect(findRegisteredCommand(registerCommands, 'Close browser')).toBeTruthy();
+    });
+    act(() => { findRegisteredCommand(registerCommands, 'Close browser').perform(); });
+    expect(onExit).toHaveBeenCalledTimes(1);
+  });
+
   // ---- Cloud-web client streamed-frame path (streamFrames prop) ---- //
 
   it('renders the streamed agent frame for a cloud web client', () => {
