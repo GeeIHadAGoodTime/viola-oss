@@ -121,8 +121,8 @@ async def await_iframe_playback(
     *,
     since: float,
     video_id: str | None,
-    timeout_s: float = PLAY_CONFIRM_TIMEOUT_S,
-    nudge_after_s: float = PLAY_CONFIRM_NUDGE_AFTER_S,
+    timeout_s: float | None = None,
+    nudge_after_s: float | None = None,
     nudge: Callable[[], Awaitable[Any]] | None = None,
 ) -> str:
     """Wait until the iframe confirms ``video_id`` is playing.
@@ -132,6 +132,10 @@ async def await_iframe_playback(
     ``timeout_s``. ``nudge`` (re-send ``play`` to the iframe) runs once after
     ``nudge_after_s`` without confirmation.
     """
+    if timeout_s is None:
+        timeout_s = PLAY_CONFIRM_TIMEOUT_S
+    if nudge_after_s is None:
+        nudge_after_s = PLAY_CONFIRM_NUDGE_AFTER_S
     cv = getattr(player, "_cv", None)
     started = _now()
     nudged = False
