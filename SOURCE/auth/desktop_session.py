@@ -264,7 +264,10 @@ class DesktopSessionStore:
         acting for one user never picks up another signed-in account's token.
         """
         try:
-            rows = self._session_rows_by_recent_use()
+            # SQLite on a worker thread: the managed AI bearer is resolved on
+            # every model call and memory-extraction call, and a busy database
+            # (another thread holding it) must not stall the event loop.
+            rows = await asyncio.to_thread(self._session_rows_by_recent_use)
         except (
             DesktopSessionError,
             OSError,
@@ -389,7 +392,8 @@ class DesktopSessionStore:
             row, access_token = refresh_result
             refreshed = True
 
-        self._touch_session(session_hash)
+        # The last-used UPDATE commits (fsync): keep it off the event loop.
+        await asyncio.to_thread(self._touch_session, session_hash)
         user = _row_to_user(row)
         session = _row_to_session(row)
         return DesktopSessionValidation(

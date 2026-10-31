@@ -169,7 +169,9 @@ export function useVoiceStream({
       ws.onopen = () => {
         if (!ownsSocket() || ws.readyState !== WebSocket.OPEN) return;
         // Actual wire PCM is 16 kHz, including resampled iOS hardware audio.
-        ws.send(JSON.stringify({ type: 'start_listening', sample_rate: SAMPLE_RATE }));
+        // tts_stream: playTtsPcm queues frames back to back, so a reply may
+        // arrive one sentence per frame while the model is still writing.
+        ws.send(JSON.stringify({ type: 'start_listening', sample_rate: SAMPLE_RATE, tts_stream: true }));
         setIsStreaming(true);
         processor.onaudioprocess = (e) => {
           if (!ownsSocket() || ws.readyState !== WebSocket.OPEN) return;

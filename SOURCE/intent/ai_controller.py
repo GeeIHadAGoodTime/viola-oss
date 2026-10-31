@@ -1742,12 +1742,20 @@ class AIController:
                     from diagnostics import latency_spans
 
                     _ch_type = getattr(self._channel, "channel_type", "none") if self._channel is not None else "none"
-                    with latency_spans.span("CONTEXT_BUILD_FRAMES"):
-                        context_bundle = self._context_builder.build_frames(
-                            user_id=resolved_user_id,
-                            user_text=text,
-                            channel_type=_ch_type,
-                        )
+                    _identity_token = None
+                    _prefetch = getattr(type(self._context_builder), "prefetch_account_identity", None)
+                    if callable(_prefetch):
+                        _identity_token = await _prefetch()
+                    try:
+                        with latency_spans.span("CONTEXT_BUILD_FRAMES"):
+                            context_bundle = self._context_builder.build_frames(
+                                user_id=resolved_user_id,
+                                user_text=text,
+                                channel_type=_ch_type,
+                            )
+                    finally:
+                        if _identity_token is not None:
+                            type(self._context_builder).clear_prefetched_account_identity(_identity_token)
                     context_bundle = self._apply_voice_current_user_frame(
                         context_bundle,
                         text=text,

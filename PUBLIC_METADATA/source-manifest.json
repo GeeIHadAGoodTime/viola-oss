@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "ce730347bdef99de755ba17196e8977197f24833",
-  "sha256": "99d96c1a98cecd8e3f70f71836042d7a6b006d9076a4dd56d3e34169a3399b5c",
+  "revision": "39d5065c8697dcc377e7d2350897dd9dd1b77d70",
+  "sha256": "83757975671a8283650d642cb0e79fed7d3c496eb40b779a73c41c421a781374",
   "files": [
     {
       "path": ".env.example",
@@ -540,8 +540,8 @@
     },
     {
       "path": "auth/desktop_session.py",
-      "sha256": "4ec0397d4db9f1b215112666002b047949fc1e2263dc8491454cbaf16d6aa232",
-      "bytes": 50714
+      "sha256": "c02e6b9e6986367b9fd577b3531b82022eadce40f4ebaf0e96f206432aea20c5",
+      "bytes": 51072
     },
     {
       "path": "auth/entitlement_projection.py",
@@ -570,8 +570,8 @@
     },
     {
       "path": "auth/middleware.py",
-      "sha256": "fea9e3b05ecfde81ba787f8925d87945b7a4243be776d15b989f6c8bc16f1507",
-      "bytes": 51650
+      "sha256": "8055efb2777f3e40c3710341bfe948a958c99e839b4f246c9187a861e146e8d2",
+      "bytes": 52729
     },
     {
       "path": "auth/migrations/__init__.py",
@@ -925,8 +925,8 @@
     },
     {
       "path": "contracts/fastapi.py",
-      "sha256": "7e937fa75e76cdbf96a6e087e09c3606431b005424f6b1bc5b80772ba58cf068",
-      "bytes": 10695
+      "sha256": "6617750781e6d0022d3072163c14110bbfafebb68ed7ef0318ba51f8f821286f",
+      "bytes": 11797
     },
     {
       "path": "contracts/fastapi_helpers.py",
@@ -1375,8 +1375,8 @@
     },
     {
       "path": "diagnostics/latency_spans.py",
-      "sha256": "ea295f5a58ac7ce7d5a868a390eafa77683692b4c98ab68bae858eee6d71409d",
-      "bytes": 11899
+      "sha256": "d87a56b9856f242c1e077011840129d77fb8133b4faaa3c8390d30a3f7fbd9dc",
+      "bytes": 13207
     },
     {
       "path": "diagnostics/native_crash_relay.py",
@@ -1580,8 +1580,8 @@
     },
     {
       "path": "intent/agent_executor.py",
-      "sha256": "9f882c07678a68e29c96391f4438561b5045f7c019318a900567991b535ce3fb",
-      "bytes": 590560
+      "sha256": "22b1dfa60ab157c69f22b2e8b1296d8b76952d7ceafb57be5fde429b5878cd10",
+      "bytes": 596261
     },
     {
       "path": "intent/agent_loop.py",
@@ -1610,8 +1610,8 @@
     },
     {
       "path": "intent/ai_controller.py",
-      "sha256": "96f54dd3c699de0bdf92b76e926d0fd907dfb9eaa777a58e16ca76b334513232",
-      "bytes": 167359
+      "sha256": "43bc3c20f31293be128be6cf6232071ac34cfa9d1f4cc5db5f840408c87d5f39",
+      "bytes": 167851
     },
     {
       "path": "intent/ai_interpreter.py",
@@ -1680,8 +1680,8 @@
     },
     {
       "path": "intent/context_builder.py",
-      "sha256": "ed2ccc4b27dc5a4c6f0330b8939d5c3c0d20569f4df15c09e8b9680a7b86fbc7",
-      "bytes": 119262
+      "sha256": "36dead764d65fa08fde4d18ae73fcdf2b489bf0d869a3cbc22959c13247917c3",
+      "bytes": 120948
     },
     {
       "path": "intent/context_compaction.py",
@@ -1870,8 +1870,8 @@
     },
     {
       "path": "intent/log_redaction.py",
-      "sha256": "87dc57683b1d55aea07dd23598204f8b834fdec2e9d695add97b865d5893974d",
-      "bytes": 19382
+      "sha256": "b11aff58176c3f2bb1ee499d4f0830ce9875a60b0a75feae62e48ff153b3f5a7",
+      "bytes": 22063
     },
     {
       "path": "intent/permissions/policy.py",
@@ -4235,13 +4235,13 @@
     },
     {
       "path": "services/companion/bridge.py",
-      "sha256": "a6895e199ded386ea25de36714004b120fb03a4324ad6a5f815ca263d0f3dc27",
-      "bytes": 28949
+      "sha256": "95f5fd4d5ca3772e2cebe00cc718675a2a456fb1c26032bdc042233b94b481da",
+      "bytes": 33407
     },
     {
       "path": "services/companion/protocol.py",
-      "sha256": "d77612406dab0c9345faa954c4071c381917d5837ef8b05616dacb93a4289b1b",
-      "bytes": 13907
+      "sha256": "cddf1f74d71c4986d1a72cadb82803e26d6d7c787c438d8911d437ae200c276d",
+      "bytes": 14664
     },
     {
       "path": "services/companion/registry.py",
@@ -4270,8 +4270,8 @@
     },
     {
       "path": "services/companion_client/agent_handler.py",
-      "sha256": "02e45efb29f114d09b4d8b50d7aa9017d1fd69f1baa78886ecaa60bd2ebeca08",
-      "bytes": 10053
+      "sha256": "928c7642b77a98d6fc0090d1a8c4bf9e565bd42baa701b5361a80634fa22b8e1",
+      "bytes": 16361
     },
     {
       "path": "services/companion_client/capabilities.py",
@@ -4280,8 +4280,8 @@
     },
     {
       "path": "services/companion_client/client.py",
-      "sha256": "f4fb546253e1482cb331c184652d813f75cf28a38fe878b86274678c7fd91b19",
-      "bytes": 30885
+      "sha256": "0cee5d4fbafd7d683e9a5c1d7fc0867905c20f0ed00bbbdcb4e21c54cd963934",
+      "bytes": 31732
     },
     {
       "path": "services/companion_client/config.py",
@@ -4415,8 +4415,8 @@
     },
     {
       "path": "services/conversation/content_normalization.py",
-      "sha256": "afd602abef67194449c6eb5ba5fcaf8f6603a6fbb1c967389716d04f4acaa40a",
-      "bytes": 29336
+      "sha256": "6aeb02e1365ab7751552214017d82387530f8f0fe294558f5fad80b6c4769961",
+      "bytes": 31085
     },
     {
       "path": "services/conversation/context_frames.py",
@@ -4685,13 +4685,13 @@
     },
     {
       "path": "services/llm/providers/google_provider.py",
-      "sha256": "91f9b734c9ce8f03e9c1ce89238e5c285a4e8045692587da647998c64f77955a",
-      "bytes": 48038
+      "sha256": "a04ee44bc3438d3dbb3ef30ca79b81c2bb2fedc7f55765729fd5a88c95a8c6c5",
+      "bytes": 54413
     },
     {
       "path": "services/llm/providers/ollama_native_provider.py",
-      "sha256": "3c726cb151b099ebb52178a57bbd419094fe7c64b2ffc9eef0246f2c0c78951e",
-      "bytes": 42610
+      "sha256": "f39dc5c56e1e780dc038b372e12acd1a57111248ae6e21e4b0a752b30e2fb08c",
+      "bytes": 47206
     },
     {
       "path": "services/llm/providers/openai_agents_provider.py",
@@ -4700,8 +4700,8 @@
     },
     {
       "path": "services/llm/providers/openai_compatible.py",
-      "sha256": "ef0663d79fd738bc0fe835d179d588e20a346cba244f1c34c8ac0c5200cf9167",
-      "bytes": 180969
+      "sha256": "a17bba1e3e613b449e277135c1b704a0e7ab209f16a36dce62068ff68aa0d664",
+      "bytes": 189765
     },
     {
       "path": "services/llm/quota_repository.py",
@@ -4785,8 +4785,8 @@
     },
     {
       "path": "services/memory/extract_memories.py",
-      "sha256": "1fdeedba276c8b2229b80b4b49dd47f8d14d4c9c9941c6d35df49d333043d8ba",
-      "bytes": 17100
+      "sha256": "7ccd5d69935a99aa3a866692109a4b72e4ae6330b3d1e509a895e95563d2d6b9",
+      "bytes": 17750
     },
     {
       "path": "services/memory/hygiene.py",
@@ -5640,13 +5640,13 @@
     },
     {
       "path": "spoke/mic_streamer.py",
-      "sha256": "833b83261e1595d5eb22b848c96d60831bf5d9a04d97d4f1144e4c555f13d1f3",
-      "bytes": 10434
+      "sha256": "6271ba5b1864391219b5405db50f539771634d168edab72287afb57735d12450",
+      "bytes": 10901
     },
     {
       "path": "spoke/tts_receiver.py",
-      "sha256": "dfa9b7035e0f789c13508768e68d5d8ca72df519b0bf6051d09414488583c465",
-      "bytes": 4090
+      "sha256": "65dffdf25c51979d3b98e9680a688854094215bdba3b69752ac832f97d778a11",
+      "bytes": 8319
     },
     {
       "path": "telemetry/__init__.py",
@@ -9690,8 +9690,8 @@
     },
     {
       "path": "ui/api/routes/voice_stream.py",
-      "sha256": "44dedab845aa5d936739294777fe64c2fa568d435502cc5755d78628f49240b9",
-      "bytes": 53245
+      "sha256": "caf7d533e7944b8eeb9a8e9657582877b6889e39def0c7e2fc980ee6c55c47e1",
+      "bytes": 66441
     },
     {
       "path": "ui/api/routes/wake_diagnostics.py",
@@ -12140,8 +12140,8 @@
     },
     {
       "path": "ui/react-app/src/hooks/useVoiceStream.js",
-      "sha256": "08dd2cc967e2f5dccfe855aae18714eeb47101571704f7a13769edd183d2ca53",
-      "bytes": 9295
+      "sha256": "f9e1d3f1ea4e5c01a95809971e26a6bfb4b77bb5978020181f948d56a7f4395d",
+      "bytes": 9465
     },
     {
       "path": "ui/react-app/src/hooks/useVoiceWs.captureLifecycle.test.jsx",
@@ -12155,13 +12155,18 @@
     },
     {
       "path": "ui/react-app/src/hooks/useVoiceWs.js",
-      "sha256": "854e5f027b4c2a79f143550795befc0f51e950ff21b1198201e7fc62f7ab3019",
-      "bytes": 36619
+      "sha256": "fb5434fbab4a56adfd6edbce5ad9c9db83f4487264076042b86f7025ea65be55",
+      "bytes": 37411
     },
     {
       "path": "ui/react-app/src/hooks/useVoiceWs.rapidPress.test.jsx",
       "sha256": "99c0c9c87d53b215e1b47d69315610b29dc3e45208bb9cf27e6afff28d7b7745",
       "bytes": 10394
+    },
+    {
+      "path": "ui/react-app/src/hooks/useVoiceWs.sentenceTts.test.jsx",
+      "sha256": "d0e92c32943fe5c1a46603323eda36c3d3dbc493e070af620a75831212d81803",
+      "bytes": 8080
     },
     {
       "path": "ui/react-app/src/hooks/useVoiceWs.slowTurnTts.test.jsx",

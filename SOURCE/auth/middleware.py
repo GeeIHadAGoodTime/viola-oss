@@ -25,6 +25,7 @@ Integration with Existing Auth:
 
 from __future__ import annotations
 
+import asyncio
 import hmac
 import threading
 import time
@@ -535,8 +536,16 @@ class AuthMiddleware:
             # token was presented. A presented-but-invalid account cookie must remain
             # terminal-unauthenticated (it still gets cleared via clear_invalid_session_cookie
             # below), never silently downgraded to the shared install device principal.
-            if not spoke_attempted and not token:
-                self._maybe_inject_local_user(request)
+            if not spoke_attempted and not token and self._local_user_injection_applies(request):
+                # Resolving the active desktop principal reads the desktop
+                # session SQLite under the session store's lock, which a
+                # background thread can hold for seconds: do it on a worker
+                # thread so it never stalls the event loop (and with it every
+                # streaming response).
+                from core.user_context import get_desktop_active_user_id
+
+                local_user_id = await asyncio.to_thread(get_desktop_active_user_id)
+                self._maybe_inject_local_user(request, local_user_id=local_user_id)
 
         # Set request_context contextvar so downstream code sees it.
         token_ctx = None
@@ -1059,7 +1068,29 @@ class AuthMiddleware:
             trust_level=trust_level,
         )
 
-    def _maybe_inject_local_user(self, request: Request) -> None:
+    def _local_user_injection_applies(self, request: Request) -> bool:
+        """True when ``_maybe_inject_local_user`` would bind the desktop principal."""
+        from config.settings import settings
+        from ui.security.config import get_security_config
+
+        config = get_security_config()
+        if str(getattr(settings, "app_surface", "desktop")).lower() == "cloud":
+            return False
+
+        client_host = request.client.host if request.client is not None else None
+        if not _is_loopback_client_host(client_host):
+            return False
+
+        api_key = request.headers.get("X-API-Key")
+        api_key_matches = bool(api_key and config.auth_api_key and hmac.compare_digest(api_key, config.auth_api_key))
+
+        if not api_key_matches:
+            return False
+
+        # Already authenticated via another mechanism when a user is set.
+        return request.state.user is None
+
+    def _maybe_inject_local_user(self, request: Request, *, local_user_id: str | None = None) -> None:
         """Attach the trusted desktop *active* principal for local API-key requests.
 
         The desktop API-key path (the CLAUDE.md-canonical viola-runner
@@ -1080,26 +1111,11 @@ class AuthMiddleware:
         provider router/factory — it returns the signed-in GoTrue account when a
         valid desktop session row exists and falls back to the device id otherwise,
         so signed-out installs still gate exactly as before.
+
+        ``local_user_id`` is the already-resolved active principal (the request
+        path resolves it on a worker thread); when omitted it is resolved here.
         """
-        from config.settings import settings
-        from ui.security.config import get_security_config
-
-        config = get_security_config()
-        if str(getattr(settings, "app_surface", "desktop")).lower() == "cloud":
-            return
-
-        client_host = request.client.host if request.client is not None else None
-        if not _is_loopback_client_host(client_host):
-            return
-
-        api_key = request.headers.get("X-API-Key")
-        api_key_matches = bool(api_key and config.auth_api_key and hmac.compare_digest(api_key, config.auth_api_key))
-
-        if not api_key_matches:
-            return
-
-        if request.state.user is not None:
-            # Already authenticated via another mechanism
+        if not self._local_user_injection_applies(request):
             return
 
         from core.user_context import get_desktop_active_user_id, set_current_user_id
@@ -1107,7 +1123,8 @@ class AuthMiddleware:
         # mt-ok: desktop API-key auth injects the install's active principal —
         # the signed-in GoTrue account when one exists, else the bootstrap device
         # id (never a caller-supplied header). See #2646 in the docstring above.
-        local_user_id = get_desktop_active_user_id()
+        if local_user_id is None:
+            local_user_id = get_desktop_active_user_id()
         request.state.current_user_context_token = set_current_user_id(local_user_id)
         request.state.user = _LocalUser(local_user_id)
         request.state.user_id = local_user_id

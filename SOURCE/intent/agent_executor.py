@@ -26,7 +26,9 @@ import tempfile
 import threading
 import time
 import uuid
-from collections.abc import Iterable, Mapping
+from collections import OrderedDict
+from collections.abc import Callable, Iterable, Mapping
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -64,7 +66,7 @@ from intent.irreversible_actions import (
     describe_irreversible_action,
     gate_action_class,
 )
-from intent.log_redaction import redact_card_data, redact_pii
+from intent.log_redaction import redact_card_data, redact_card_field, redact_pii
 from intent.post_answer_teardown import (
     drain_owner as _drain_post_answer_owner,
     schedule_post_answer_coro,
@@ -1822,6 +1824,118 @@ def _atomic_write_json_restricted(path: Path, payload: Any) -> None:
                 tmp_path.unlink()
 
 
+# ---------------------------------------------------------------------------
+# Task-log I/O off the event loop.
+#
+# The agent's own execution log (one JSONL line per step, the task_complete
+# line, and logs/agent_tasks/<task_id>.json) was written synchronously from
+# run_agent_loop. The task-log JSON is written with fsync, which took 0.4-1.3 s
+# on Windows (live stall sampler, 2026-10-31), and it ran right after the final
+# model call: the streamed answer was already published, but its SSE write sat
+# behind the fsync, so the words reached the screen only when the reply was
+# final. The same bytes are now written, in order, by one background thread
+# whenever an event loop runs on the calling thread; with no running loop
+# (synchronous callers, tests) they are written inline exactly as before.
+# Clean shutdown drains the queue (concurrent.futures joins its workers).
+# ---------------------------------------------------------------------------
+
+_TASK_LOG_IO_LOCK = threading.Lock()
+_TASK_LOG_IO_EXECUTOR: ThreadPoolExecutor | None = None
+
+
+def _task_log_io_executor() -> ThreadPoolExecutor:
+    global _TASK_LOG_IO_EXECUTOR
+    with _TASK_LOG_IO_LOCK:
+        if _TASK_LOG_IO_EXECUTOR is None:
+            _TASK_LOG_IO_EXECUTOR = ThreadPoolExecutor(max_workers=1, thread_name_prefix="agent-task-log-io")
+        return _TASK_LOG_IO_EXECUTOR
+
+
+def _guarded_task_log_io(write: Callable[[], None]) -> None:
+    try:
+        write()
+    except Exception:  # noqa: BLE001, RUF100 - a log write must never surface into a turn
+        logger.debug("Agent task log write failed", exc_info=True)
+
+
+def _run_task_log_io(write: Callable[[], None]) -> None:
+    """Run ``write`` off the event loop (in order), or inline when no loop runs here."""
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        _guarded_task_log_io(write)
+        return
+    try:
+        _task_log_io_executor().submit(_guarded_task_log_io, write)
+    except RuntimeError:
+        # Interpreter shutdown refuses new work: write inline rather than lose it.
+        _guarded_task_log_io(write)
+
+
+def flush_agent_task_log_io(timeout: float | None = 10.0) -> bool:
+    """Wait until every queued task-log write has hit disk (read-your-writes barrier)."""
+    with _TASK_LOG_IO_LOCK:
+        executor = _TASK_LOG_IO_EXECUTOR
+    if executor is None:
+        return True
+    try:
+        executor.submit(lambda: None).result(timeout=timeout)
+    except Exception:  # noqa: BLE001, RUF100 - a barrier timeout is reported, not raised
+        return False
+    return True
+
+
+def _write_structured_log_line(path: Path, line: str) -> None:
+    with open(path, "a", encoding="utf-8") as f:
+        f.write(line)
+
+
+def _append_structured_log_line(jsonl_dir: Path, path: Path, line: str) -> None:
+    jsonl_dir.mkdir(parents=True, exist_ok=True)
+    _write_structured_log_line(path, line)
+
+
+# The step log's tool-schema fields are ~170 KB and identical turn after turn.
+# Redacting them took ~200 ms of regex work on the event loop on every turn's
+# first step. Card redaction is a pure function of (key, value), so a value
+# seen before reuses its earlier redaction (a deep copy of it).
+_STEP_LOG_STATIC_FIELDS = ("tool_schemas", "tool_surface", "tool_schema_fingerprint")
+_STEP_LOG_REDACTION_MEMO: OrderedDict[tuple[str, str, str], Any] = OrderedDict()
+_STEP_LOG_REDACTION_MEMO_MAX = 8
+_STEP_LOG_REDACTION_MEMO_LOCK = threading.Lock()
+
+
+def _redacted_static_step_field(key: str, value: Any) -> Any:
+    encoded = json.dumps(value, ensure_ascii=False, default=repr).encode("utf-8")
+    memo_key = (key, type(value).__name__, hashlib.sha256(encoded).hexdigest())
+    with _STEP_LOG_REDACTION_MEMO_LOCK:
+        cached = _STEP_LOG_REDACTION_MEMO.get(memo_key)
+        if cached is not None:
+            _STEP_LOG_REDACTION_MEMO.move_to_end(memo_key)
+    if cached is None:
+        cached = redact_card_field(key, value)
+        with _STEP_LOG_REDACTION_MEMO_LOCK:
+            _STEP_LOG_REDACTION_MEMO[memo_key] = cached
+            while len(_STEP_LOG_REDACTION_MEMO) > _STEP_LOG_REDACTION_MEMO_MAX:
+                _STEP_LOG_REDACTION_MEMO.popitem(last=False)
+    return copy.deepcopy(cached)
+
+
+def _redact_step_data(step_data: dict[str, Any]) -> Any:
+    """``redact_card_data(step_data)``, reusing the redaction of unchanged tool-schema fields."""
+    static_keys = [key for key in _STEP_LOG_STATIC_FIELDS if isinstance(step_data.get(key), (dict, list))]
+    if not static_keys:
+        return redact_card_data(step_data)
+    try:
+        redacted_static = {key: _redacted_static_step_field(key, step_data[key]) for key in static_keys}
+        rest = redact_card_data({key: value for key, value in step_data.items() if key not in redacted_static})
+    except Exception:  # noqa: BLE001, RUF100 - any surprise falls back to the plain whole-mapping redaction
+        return redact_card_data(step_data)
+    if not isinstance(rest, dict):
+        return redact_card_data(step_data)
+    return {key: redacted_static[key] if key in redacted_static else rest[key] for key in step_data}
+
+
 _TOOL_PROGRESS_PHRASES: dict[str, str] = {
     "file_read": "Reading files...",
     "file_write": "Writing files...",
@@ -2173,13 +2287,26 @@ class AgentTaskLog:
         self.completed_at = datetime.now(tz=UTC).isoformat()
 
     def write_to_disk(self) -> None:
-        """Persist the task log as JSON to logs/agent_tasks/<task_id>.json."""
+        """Persist the task log as JSON to logs/agent_tasks/<task_id>.json.
+
+        The log is snapshotted now; redaction and the fsync'd write run off the
+        event loop when one runs on this thread (see ``_run_task_log_io``).
+        """
         try:
             path = _AGENT_TASK_LOG_DIR / ("%s.json" % self.task_id)
-            _atomic_write_json_restricted(path, redact_card_data(asdict(self)))
-            logger.debug("Agent task log written to %s", path)
+            snapshot = asdict(self)
         except Exception as exc:
             logger.warning("Failed to write agent task log: %s", exc)
+            return
+
+        def _write() -> None:
+            try:
+                _atomic_write_json_restricted(path, redact_card_data(snapshot))
+                logger.debug("Agent task log written to %s", path)
+            except Exception as exc:
+                logger.warning("Failed to write agent task log: %s", exc)
+
+        _run_task_log_io(_write)
 
 
 @dataclass(frozen=True, slots=True)
@@ -5363,8 +5490,10 @@ class AgentExecutor:
         except Exception:
             logger.debug("Task trace stop event write failed, continuing", exc_info=True)
         try:
-            with open(self._get_structured_step_log_path(), "a", encoding="utf-8") as f:
-                f.write(json.dumps(redact_card_data(stop_data), default=str) + "\n")
+            line = json.dumps(redact_card_data(stop_data), default=str) + "\n"
+            step_log_path = self._get_structured_step_log_path()
+            # Same ordered writer as the step and task_complete lines.
+            _run_task_log_io(lambda: _write_structured_log_line(step_log_path, line))
         except Exception:
             logger.debug("JSONL agent_stop write failed, continuing")
 
@@ -5607,7 +5736,6 @@ class AgentExecutor:
         # Emit the task-complete structured event with outcome and final answer.
         try:
             jsonl_dir = get_logs_dir() / "structured"
-            jsonl_dir.mkdir(parents=True, exist_ok=True)
             today = datetime.now(UTC).strftime("%Y%m%d")
             jsonl_path = jsonl_dir / ("agent-steps-%s.jsonl" % today)
             suspicious_short = (
@@ -5655,8 +5783,8 @@ class AgentExecutor:
                 "responses_continuity_mode": getattr(self, "_last_continuity_mode", None),
             }
             line = json.dumps(complete_data, default=str) + "\n"
-            with open(self._get_structured_step_log_path(), "a", encoding="utf-8") as f:
-                f.write(line)
+            step_log_path = self._get_structured_step_log_path()
+            _run_task_log_io(lambda: _append_structured_log_line(jsonl_dir, step_log_path, line))
         except Exception:
             logger.debug("JSONL task_complete write failed, continuing")
 
@@ -5881,7 +6009,7 @@ class AgentExecutor:
             step_data["screenshots_evicted"] = self._pending_trim_stats.get("screenshots_evicted", 0)
             self._pending_trim_stats = None
 
-        step_data = redact_card_data(step_data)
+        step_data = _redact_step_data(step_data)
 
         # Zero-tools monitoring: warn when agent has no tools available.
         # This was the root cause of the March 23 collapse (326 blocked calls).
@@ -5935,12 +6063,11 @@ class AgentExecutor:
         # Direct JSONL file write (works in both Qt and backend processes)
         try:
             jsonl_dir = get_logs_dir() / "structured"
-            jsonl_dir.mkdir(parents=True, exist_ok=True)
             today = datetime.now(UTC).strftime("%Y%m%d")
             jsonl_path = jsonl_dir / ("agent-steps-%s.jsonl" % today)
             line = json.dumps(step_data, default=str) + "\n"
-            with open(self._get_structured_step_log_path(), "a", encoding="utf-8") as f:
-                f.write(line)
+            step_log_path = self._get_structured_step_log_path()
+            _run_task_log_io(lambda: _append_structured_log_line(jsonl_dir, step_log_path, line))
             self._step_log_metadata_emitted = True
         except Exception:
             logger.debug("JSONL step log write failed, continuing")  # Never let JSONL writing break the agent loop

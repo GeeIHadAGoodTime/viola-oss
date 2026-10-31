@@ -643,6 +643,143 @@ async def _chat_create_resilient(client: Any, config: LLMConfig, api_kwargs: dic
         raise
 
 
+# An endpoint that refuses ``stream`` / ``stream_options`` answers one of these
+# before any chunk arrives; the plain request is then tried once.
+_CHAT_STREAM_REFUSED_STATUS = frozenset({400, 404, 405, 415, 422, 501})
+
+
+class _ChatStreamIncompleteError(RuntimeError):
+    """A Chat Completions stream ended without a finish reason."""
+
+
+def _chat_stream_was_refused(exc: BaseException) -> bool:
+    status = _responses_error_status_code(exc)
+    if status in _CHAT_STREAM_REFUSED_STATUS:
+        return True
+    message = str(getattr(exc, "message", "") or exc).lower()
+    return "stream" in message and (status is None or 400 <= status < 500)
+
+
+async def _close_stream_quietly(stream: Any) -> None:
+    close = getattr(stream, "close", None)
+    if not callable(close):
+        return
+    with suppress(Exception):
+        result = close()
+        if asyncio.iscoroutine(result):
+            await result
+
+
+class _ChatStreamAccumulator:
+    """Rebuild a Chat Completions response from its stream chunks.
+
+    Text goes out as it arrives (on-screen tokens plus phase-less answer
+    events); tool-call deltas are joined by index. :meth:`response` returns an
+    object ``_parse_native_response`` reads exactly like the plain response.
+    """
+
+    def __init__(self, attempt: AnswerAttempt) -> None:
+        self._attempt = attempt
+        self._text_parts: list[str] = []
+        self._text_item_open = False
+        self._tool_calls: dict[int, dict[str, Any]] = {}
+        self.finish_reason: str | None = None
+        self.usage: Any = None
+        self._meta: dict[str, Any] = {}
+
+    @property
+    def has_tool_calls(self) -> bool:
+        return bool(self._tool_calls)
+
+    def add(self, chunk: Any) -> None:
+        usage = _usage_field(chunk, "usage")
+        if usage:
+            self.usage = usage
+        for key in ("id", "model", "created", "system_fingerprint"):
+            value = _usage_field(chunk, key)
+            if value is not None and key not in self._meta:
+                self._meta[key] = value
+        for choice in _usage_field(chunk, "choices") or []:
+            if int(_usage_field(choice, "index") or 0) != 0:
+                continue
+            finish_reason = _usage_field(choice, "finish_reason")
+            if finish_reason:
+                self.finish_reason = str(finish_reason)
+            delta = _usage_field(choice, "delta")
+            if delta is None:
+                continue
+            text = _usage_field(delta, "content")
+            if isinstance(text, str) and text:
+                self._add_text(text)
+            for position, call_delta in enumerate(_usage_field(delta, "tool_calls") or []):
+                self._add_tool_call_delta(position, call_delta)
+
+    def _add_text(self, text: str) -> None:
+        if not self._text_item_open:
+            self._text_item_open = True
+            self._attempt.item("message-0", kind="message")
+        self._text_parts.append(text)
+        self._attempt.text("message-0", text)
+        try:
+            from services.llm.stream_bus import publish_text_delta
+
+            publish_text_delta(text, self._attempt.stream_id)
+        except Exception:  # noqa: BLE001, RUF100 - on-screen tokens are best effort
+            logger.debug("Chat Completions token publish failed", exc_info=True)
+
+    def _add_tool_call_delta(self, position: int, call_delta: Any) -> None:
+        raw_index = _usage_field(call_delta, "index")
+        index = raw_index if isinstance(raw_index, int) else position
+        entry = self._tool_calls.get(index)
+        if entry is None:
+            entry = {"id": "", "type": "function", "name": "", "arguments": ""}
+            self._tool_calls[index] = entry
+            self._attempt.item("call-%d" % index, kind="function_call")
+        call_id = _usage_field(call_delta, "id")
+        if call_id and not entry["id"]:
+            entry["id"] = str(call_id)
+        call_type = _usage_field(call_delta, "type")
+        if call_type:
+            entry["type"] = str(call_type)
+        function = _usage_field(call_delta, "function")
+        if function is None:
+            return
+        name = _usage_field(function, "name")
+        if isinstance(name, str) and name and name != entry["name"]:
+            entry["name"] += name
+        arguments = _usage_field(function, "arguments")
+        if isinstance(arguments, str) and isinstance(entry["arguments"], str):
+            entry["arguments"] += arguments
+        elif arguments is not None and arguments != "":
+            # Some local servers send already-parsed arguments in one piece.
+            entry["arguments"] = arguments
+
+    def response(self) -> Any:
+        if self.finish_reason is None:
+            raise _ChatStreamIncompleteError("chat_stream_ended_without_finish_reason")
+        from types import SimpleNamespace
+
+        tool_calls = [
+            SimpleNamespace(
+                id=entry["id"],
+                type=entry["type"],
+                function=SimpleNamespace(name=entry["name"], arguments=entry["arguments"]),
+            )
+            for _index, entry in sorted(self._tool_calls.items())
+        ]
+        message = SimpleNamespace(
+            role="assistant",
+            content="".join(self._text_parts) or None,
+            tool_calls=tool_calls or None,
+        )
+        return SimpleNamespace(
+            object="chat.completion",
+            choices=[SimpleNamespace(index=0, message=message, finish_reason=self.finish_reason)],
+            usage=self.usage,
+            **self._meta,
+        )
+
+
 # Viola's agent system prompt + tool schemas run ~2600 tokens; with output and
 # a little conversation history a local model needs noticeably more than that.
 # Below this floor, local commands fail with an opaque context-overflow 400, so
@@ -2606,6 +2743,68 @@ class OpenAICompatibleProvider(BaseLLMProvider):
     # Native tool calling (OpenAI function calling API)
     # ------------------------------------------------------------------
 
+    async def _chat_create_streamed(self, api_kwargs: dict[str, Any]) -> Any:
+        """One Chat Completions agent turn, streamed onto the command stream.
+
+        Text is published as on-screen tokens and phase-less answer events
+        while it arrives (see services/llm/answer_stream.py); the returned
+        object parses exactly like the plain response. Without a command
+        stream, or for a muted child agent, this is the plain request.
+
+        - An endpoint that refuses the streamed request gets the plain request
+          once, and no stream for the rest of this provider's life.
+        - A stream that breaks part way ends its attempt as failed (the speech
+          gate then skips sentences the plain retry repeats) and the plain
+          request runs once.
+        """
+        attempt = AnswerAttempt.begin()
+        if attempt is None:
+            return await _chat_create_resilient(self._client, self.config, api_kwargs)
+        stream_kwargs = dict(api_kwargs)
+        stream_kwargs["stream"] = True
+        stream_kwargs["stream_options"] = {"include_usage": True}
+        try:
+            try:
+                stream = await _chat_create_resilient(self._client, self.config, stream_kwargs)
+            except Exception as exc:
+                if not _chat_stream_was_refused(exc):
+                    raise
+                attempt.end(status="failed")
+                if "response_format" not in stream_kwargs:
+                    api_kwargs.pop("response_format", None)
+                logger.warning(
+                    "Chat Completions endpoint refused a streamed request (%s); using a plain request",
+                    type(exc).__name__,
+                )
+                response = await _chat_create_resilient(self._client, self.config, api_kwargs)
+                self._chat_streaming_refused = True
+                return response
+            accumulator = _ChatStreamAccumulator(attempt)
+            try:
+                async for chunk in stream:
+                    accumulator.add(chunk)
+                response = accumulator.response()
+            except Exception as exc:
+                attempt.end(status="failed")
+                await _close_stream_quietly(stream)
+                logger.warning(
+                    "Chat Completions stream failed (%s); retrying once without streaming",
+                    type(exc).__name__,
+                )
+                return await _chat_create_resilient(self._client, self.config, api_kwargs)
+            attempt.end(
+                status="incomplete" if accumulator.finish_reason == "length" else "completed",
+                tool_calls=accumulator.has_tool_calls,
+            )
+            if accumulator.usage is None:
+                logger.info("Chat Completions stream carried no usage (endpoint ignores stream_options)")
+            return response
+        except BaseException:
+            # Cancelled (the user stopped the reply) or a failure the retry
+            # policy handles: this call's text is not an answer.
+            attempt.end(status="failed")
+            raise
+
     def _build_chat_native_kwargs(
         self,
         *,
@@ -2733,6 +2932,8 @@ class OpenAICompatibleProvider(BaseLLMProvider):
                     tools=tools,
                     tool_choice=tool_choice,
                 )
+                if get_current_command_stream_id() and not getattr(self, "_chat_streaming_refused", False):
+                    return await self._chat_create_streamed(api_kwargs)
                 return await _chat_create_resilient(self._client, self.config, api_kwargs)
 
             async def _do_oai_compat_call() -> Any:

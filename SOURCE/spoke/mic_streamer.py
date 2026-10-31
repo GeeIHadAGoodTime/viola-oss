@@ -136,12 +136,15 @@ class MicStreamer:
                     delay = RECONNECT_DELAY_S  # reset backoff on success
                     logger.info("Connected to hub voice stream (room=%s)", self._room)
 
-                    # Tell hub to start wake detection on our stream
+                    # Tell hub to start wake detection on our stream.
+                    # tts_stream: the TTSReceiver queues frames back to back,
+                    # so the hub may send a reply one sentence per frame.
                     await ws.send(
                         json.dumps(
                             {
                                 "type": "start_listening",
                                 "sample_rate": SAMPLE_RATE_16K,
+                                "tts_stream": True,
                             }
                         )
                     )
@@ -247,6 +250,11 @@ class MicStreamer:
                     data.get("score", 0),
                     self._room,
                 )
+                # Barge-in: a new command cuts the reply still playing here
+                # (the hub stops sending its remaining frames too).
+                stop = getattr(self._tts, "stop", None)
+                if callable(stop):
+                    stop()
             elif msg_type == "command_result":
                 transcript = data.get("transcript", "")
                 response = data.get("response", "")

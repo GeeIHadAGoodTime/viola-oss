@@ -276,6 +276,20 @@ class ExtractMemoriesService:
     def _write_cursor(self, payload: dict[str, Any]) -> None:
         self.cursor_path.write_text(json.dumps(payload, sort_keys=True, indent=2) + "\n", encoding="utf-8")
 
+    def _store_extracted(self, extracted: Sequence[ExtractedMemory], digest: str, task_id: str) -> int:
+        written = 0
+        for memory in extracted:
+            try:
+                result = self.memory_dir.store_semantic_memory(memory.content, category=memory.category)
+            except (OSError, ValueError) as exc:
+                logger.debug("Extracted memory write skipped: %s", exc)
+                continue
+            if not result.get("deduped"):
+                written += 1
+
+        self._write_cursor({"last_hash": digest, "last_task_id": task_id, "written": written})
+        return written
+
     async def _extract(self, transcript: str) -> list[ExtractedMemory]:
         if self.extractor is None:
             return await _default_extractor(transcript, user_id=self.user_id)
@@ -307,7 +321,10 @@ class ExtractMemoriesService:
             return {"ok": True, "skipped": "memory_tool_used", "written": 0}
 
         digest = _transcript_hash(clean_transcript)
-        cursor = self._read_cursor()
+        # File reads and writes run off the event loop: this job runs in the
+        # background right after a turn, while that turn's answer is still
+        # streaming to the screen and into speech.
+        cursor = await asyncio.to_thread(self._read_cursor)
         if cursor.get("last_hash") == digest:
             return {"ok": True, "skipped": "already_processed", "written": 0}
 
@@ -317,17 +334,7 @@ class ExtractMemoriesService:
             logger.debug("Post-turn memory extraction failed: %s", exc)
             return {"ok": False, "error": str(exc), "written": 0}
 
-        written = 0
-        for memory in extracted:
-            try:
-                result = self.memory_dir.store_semantic_memory(memory.content, category=memory.category)
-            except (OSError, ValueError) as exc:
-                logger.debug("Extracted memory write skipped: %s", exc)
-                continue
-            if not result.get("deduped"):
-                written += 1
-
-        self._write_cursor({"last_hash": digest, "last_task_id": task_id, "written": written})
+        written = await asyncio.to_thread(self._store_extracted, extracted, digest, task_id)
         dream_result: dict[str, Any] = {}
         try:
             from services.memory.auto_dream import AutoDreamService
@@ -359,8 +366,11 @@ def _extraction_key(user_id: str) -> str:
 
 async def _run_extraction_job(job: _ExtractionJob) -> None:
     try:
+        # Opening the user's memory folder creates and migrates directories
+        # (and on first use sets their ACLs): keep that off the event loop.
+        service = await asyncio.to_thread(ExtractMemoriesService, user_id=job.user_id)
         await asyncio.wait_for(
-            ExtractMemoriesService(user_id=job.user_id).extract_after_turn(
+            service.extract_after_turn(
                 transcript=job.transcript,
                 task_id=job.task_id,
                 tools_called=job.tools_called,

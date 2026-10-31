@@ -536,6 +536,21 @@ class CompanionClient:
             # reply expected; anything else without a request_id is ignored.
             return
 
+        progress_token = None
+        if message.type == AGENT_DISPATCH_TYPE:
+            # A relayed turn may stream its text back as progress frames for
+            # this request (only when the cloud asked; see agent_handler).
+            from .agent_handler import relay_progress_sender
+
+            request_id = message.request_id
+
+            async def _send_progress(progress: dict[str, Any]) -> None:
+                await self._send(
+                    connection,
+                    CompanionMessage(type="progress", payload=progress, request_id=request_id),
+                )
+
+            progress_token = relay_progress_sender.set(_send_progress)
         try:
             if message_scope(message.type) is None:
                 raise KeyError(message.type)
@@ -558,6 +573,11 @@ class CompanionClient:
             logger.exception("Companion handler crashed for %s", message.type)
             await self._send_error(connection, message.request_id, "Desktop handler failed")
             return
+        finally:
+            if progress_token is not None:
+                from .agent_handler import relay_progress_sender
+
+                relay_progress_sender.reset(progress_token)
 
         # A handler may surface an expected failure as {"error": ...}.
         if isinstance(result, dict) and "error" in result and len(result) == 1:
