@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "aa1f3a223f5af0a45f9d7762e6037a267fbce061",
-  "sha256": "ec36af9dbde82bd4485d24ce7e87c3288f82d1c4cd8e2a4572eb03ded6412287",
+  "revision": "2cd6d7dc4c92789f51abab18dbb9c05aef666e90",
+  "sha256": "6bc2cc68a1ff5a91a8d5a2cf6ed54f80d2a1ae918f624b5825acd4e789f8efe5",
   "files": [
     {
       "path": ".env.example",
@@ -1240,8 +1240,8 @@
     },
     {
       "path": "core/voice_command_handler.py",
-      "sha256": "8a27dcefb5f11aece00cded48c587de7767a5247719e09d865fb1f7040b37361",
-      "bytes": 88047
+      "sha256": "61bb5830ba0fb303eb7259573c2d70899d59fed52b6a5035d9974044fd529870",
+      "bytes": 90397
     },
     {
       "path": "core/voice_orchestrator.py",
@@ -6185,8 +6185,8 @@
     },
     {
       "path": "tests/public/test_kokoro_stop.py",
-      "sha256": "4caee1755767f8276fe9180112244e2d37d141d489b047ed48dbaf2a5d15f109",
-      "bytes": 24101
+      "sha256": "e3361aeee370c81d8795e6bbc25a79121bf68f3786844c14bbb023b5637eeac4",
+      "bytes": 24300
     },
     {
       "path": "tests/public/test_lan_discovery.py",
