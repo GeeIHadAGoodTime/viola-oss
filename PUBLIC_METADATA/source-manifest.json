@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "4d68f87b36e6c0160722e1f39744a76726f087ac",
-  "sha256": "3785bae5db5d374276cb5bfc3d033c134495350fcc8287aaf724ec2a1cfa6cbe",
+  "revision": "a7827aea735643f36f05f10c5b53c4fab7f77a72",
+  "sha256": "89e63b84c949213d2b3c3b5a40f22f33a12fdc702569e0b076112590c45db506",
   "files": [
     {
       "path": ".env.example",
@@ -13760,8 +13760,8 @@
     },
     {
       "path": "voice/wake_detector/violawake_listener.py",
-      "sha256": "7b950d58265b62f0f8a63a3fedcae7cddf9a6df05a0fc6a2da4ed8ddcc1796a2",
-      "bytes": 179971
+      "sha256": "041d06ca3b99f25fd998e64d9f1a28448e27445d462b0b260bf6f43e4e9e8c4c",
+      "bytes": 180192
     },
     {
       "path": "voice/wake_detector/wake/__init__.py",
