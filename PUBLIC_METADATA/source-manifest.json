@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "76b25eef6aa87dc1e233124e555d5d41d23cbd6e",
-  "sha256": "da44de4b98f1d640786fccfff48abd72e8b0e4d11e28d1defceb36225ee2738f",
+  "revision": "2e4a0bef692a5a02957649cca3120fe168d0a326",
+  "sha256": "2a4cc45597da4f226e1fe75d78ff57353ae19d74e282955f96b425e12629a220",
   "files": [
     {
       "path": ".env.example",
@@ -780,8 +780,8 @@
     },
     {
       "path": "bootstrap/factory.py",
-      "sha256": "094b90b3910911ab83807fd39222a094da53ba88d367e046b6bda2c1d9173525",
-      "bytes": 81875
+      "sha256": "39636163efe784c0dbe83ab9b72380e5a99369bf0551ee3b42d160694b9d4ac6",
+      "bytes": 82245
     },
     {
       "path": "bootstrap/lazy_intent.py",
@@ -2115,8 +2115,8 @@
     },
     {
       "path": "intent/tools/music_tools.py",
-      "sha256": "4cc81ee844b0d80edbee1ecb755a8675cca32ff31fa81d789cc720788ff6d356",
-      "bytes": 67485
+      "sha256": "53c5bb89c5cd26e66c1d87ab28a34a05b15b902f6c23a9bf59c0af3d695f2664",
+      "bytes": 67963
     },
     {
       "path": "intent/tools/notification_tools.py",
@@ -4747,6 +4747,11 @@
       "path": "services/llm/tool_arg_retry.py",
       "sha256": "84a4266387052f3c6fe278232d2d4493c26ec0e9d7cbb713c32b54a212ed0045",
       "bytes": 10079
+    },
+    {
+      "path": "services/llm/warmup.py",
+      "sha256": "220d7a73532e35b3a60891580d527260a3af899955844444fdded218cd6d9736",
+      "bytes": 4379
     },
     {
       "path": "services/maintenance/__init__.py",
@@ -10070,13 +10075,13 @@
     },
     {
       "path": "ui/react-app/src/SmartDisplay.jsx",
-      "sha256": "7dcba484982f2c924dc8bdd9fd2286fbb4584874bbc41b81d68c4717ccf5f76f",
-      "bytes": 194440
+      "sha256": "4e24a97267f758c40cc5b47b4aab80793d9b5455a3ab2cde0cc88113ec8b0b13",
+      "bytes": 194662
     },
     {
       "path": "ui/react-app/src/SmartDisplay.overlayLifecycle.test.jsx",
-      "sha256": "fe46c08acbe1726706d156ea22ff0329825c9275342dad07d9f1bf8bad298fb0",
-      "bytes": 10798
+      "sha256": "795c71964b5ad35fc4d6eab5ac273a1e535d5f361969261d99df5c4732d12811",
+      "bytes": 13408
     },
     {
       "path": "ui/react-app/src/SmartDisplay.spokePolicy.test.jsx",
@@ -11550,8 +11555,8 @@
     },
     {
       "path": "ui/react-app/src/components/stage/CommandPalette.jsx",
-      "sha256": "a04efadfb10742f71da8ffa3b64920474c6929d1d068bcbf3082fc1d7fcc0410",
-      "bytes": 5521
+      "sha256": "11094bc804b2554ae34654a26becb960a8e2232bd4ae8f4f2395ca0d6553e82a",
+      "bytes": 5758
     },
     {
       "path": "ui/react-app/src/components/stage/CommandPalette.module.css",
@@ -11560,8 +11565,8 @@
     },
     {
       "path": "ui/react-app/src/components/stage/CommandPalette.test.jsx",
-      "sha256": "2e0ee037eff8187c8960e46d619b3866a2149b44a1f253eda4514196764b363f",
-      "bytes": 2901
+      "sha256": "c8ecb7c06cca2a144d038e6bc71e287f6c8bf7653b7ba86ccf0a7c3fdb485620",
+      "bytes": 3481
     },
     {
       "path": "ui/react-app/src/components/stage/PillBar.jsx",

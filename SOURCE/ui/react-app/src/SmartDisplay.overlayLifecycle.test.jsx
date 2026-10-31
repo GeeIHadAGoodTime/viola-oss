@@ -27,6 +27,21 @@ vi.mock('./hooks/useVoiceOnboarding', () => ({ useVoiceOnboarding: () => ({ isAc
 vi.mock('./hooks/useHandsFreeWake', () => ({ useHandsFreeWake: () => [false, vi.fn()] }));
 vi.mock('./hooks/useBrowserWakeWord', () => ({ useBrowserWakeWord: () => ({ status: 'off' }) }));
 vi.mock('./sentryClient', () => ({ syncSentrySettings: vi.fn(), openSentryUserFeedback: vi.fn() }));
+// A light Settings with the real modal's keyboard contract: a document-level
+// Escape listener that closes it (SettingsModal.jsx "Escape key closes the modal").
+vi.mock('./components/SettingsModal', async () => {
+  const { useEffect } = await import('react');
+  function SettingsStub({ isOpen, onClose }) {
+    useEffect(() => {
+      if (!isOpen) return undefined;
+      const onKey = (event) => { if (event.key === 'Escape') onClose(); };
+      document.addEventListener('keydown', onKey);
+      return () => document.removeEventListener('keydown', onKey);
+    }, [isOpen, onClose]);
+    return isOpen ? <div role="dialog" aria-label="Settings" data-testid="settings-modal" /> : null;
+  }
+  return { default: SettingsStub };
+});
 
 function makePlayer() {
   const noop = () => {};
@@ -247,5 +262,43 @@ describe('embedded sign-in page', () => {
     await send(hidden());
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Done signing in to Spotify' })).not.toBeInTheDocument());
     await waitFor(() => expect(lastSurfaceActive()).toBe(false));
+  });
+});
+
+describe('sign-in started from Settings (Settings steps aside)', () => {
+  async function openSettingsThenSignIn() {
+    await mount();
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent('viola:ui-action', { detail: { action: 'open_settings', payload: {} } }));
+    });
+    await screen.findByTestId('settings-modal-host', {}, { timeout: 10000 });
+    await send(login('spotify'));
+    await screen.findByRole('button', { name: 'Done signing in to Spotify' });
+    await waitFor(() => expect(screen.getByTestId('settings-modal-host')).toHaveAttribute('data-suspended', 'true'));
+  }
+
+  it('Ctrl+K opens the palette over the sign-in page', async () => {
+    await openSettingsThenSignIn();
+
+    await act(async () => { fireEvent.keyDown(document.body, { key: 'k', ctrlKey: true }); });
+
+    expect(await screen.findByRole('dialog', { name: 'Command palette' })).toBeInTheDocument();
+  });
+
+  it('Esc closes only the palette; Settings stays for after the sign-in', async () => {
+    await openSettingsThenSignIn();
+    await act(async () => { fireEvent.keyDown(document.body, { key: 'k', ctrlKey: true }); });
+    const palette = await screen.findByRole('dialog', { name: 'Command palette' });
+
+    await act(async () => { fireEvent.keyDown(palette, { key: 'Escape' }); });
+
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Command palette' })).not.toBeInTheDocument());
+    expect(screen.getByTestId('settings-modal-host')).toHaveAttribute('data-suspended', 'true');
+    expect(window.viola.hideBrowserOverlay).not.toHaveBeenCalled();
+
+    // The sign-in closes: the user is back in Settings, not on the music stage.
+    await send(hidden());
+    await waitFor(() => expect(screen.getByTestId('settings-modal-host')).not.toHaveAttribute('data-suspended'));
+    expect(screen.getByTestId('settings-modal')).toBeInTheDocument();
   });
 });

@@ -3107,7 +3107,10 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
       if (!isCommandPaletteShortcut(event)) return;
       if (shouldIgnoreCommandPaletteShortcut(event, {
         commandPaletteOpen,
-        modalOpen: settingsOpen || queueOpen || historyOpen || roomsOpen || helpOpen || bugReportOpen || workbenchPanelOpen,
+        // Settings that stepped aside for a sign-in page is not on screen, so
+        // it does not block the palette (1.0.5 round 7 integration run).
+        modalOpen: (settingsOpen && !settingsSuspendedForLogin) || queueOpen || historyOpen || roomsOpen || helpOpen
+          || bugReportOpen || workbenchPanelOpen,
       })) {
         return;
       }
@@ -3116,7 +3119,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
     };
     document.addEventListener('keydown', handleCommandPaletteShortcut);
     return () => document.removeEventListener('keydown', handleCommandPaletteShortcut);
-  }, [bugReportOpen, commandPaletteOpen, helpOpen, historyOpen, queueOpen, roomsOpen, settingsOpen, workbenchPanelOpen]);
+  }, [bugReportOpen, commandPaletteOpen, helpOpen, historyOpen, queueOpen, roomsOpen, settingsOpen, settingsSuspendedForLogin, workbenchPanelOpen]);
 
   // Keyboard input handling
   const pttHotkeyHeldRef = React.useRef('');
