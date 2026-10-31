@@ -30,10 +30,10 @@
   },
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "48b97573d41b66476b68133d7d9e73cefde709acd62b9f406e690e0903c61a2e",
-  "source_tree_sha256": "feb19f022cd97c0e695cf243388c5dbc9754b274a9d734742ae19f1cbfc43eda",
+  "source_manifest_sha256": "8ca07979e034f961086dfa238476d7b7d34706ee927bbed641dc7659c6e4ea57",
+  "source_tree_sha256": "e3859297ee9445260ccaa03f19403e2ef060738c0319d7cf305798a0272a45ec",
   "source_file_count": 2776,
-  "source_revision": "070124ebddba39d25e259239a332c817a6a692c6",
+  "source_revision": "c045c9b438bd80a0644925606222c49870400109",
   "comparison_public_revision": "ecab2772465fcc89ae6645b028af1c2273b9199f",
   "changed_source_paths": [
     "START_WEB_INTERFACE.py",
@@ -53,6 +53,7 @@
     "chat/channel.py",
     "chat/service.py",
     "config/defaults.py",
+    "config/schema.py",
     "config/searxng/render-settings.sh",
     "config/settings.py",
     "config/settings_validation.py",
@@ -490,8 +491,8 @@
     "historical_inventory_limits": "This renderer correction changes no dependency or workflow inputs. All six retained SBOMs and their complete status objects stay historical and unchanged; no current installed inventory qualification is claimed."
   },
   "qualification": {
-    "source_commit": "070124ebddba39d25e259239a332c817a6a692c6",
-    "kind": "round 8 streaming"
+    "source_commit": "c045c9b438bd80a0644925606222c49870400109",
+    "kind": "google verified scopes"
   },
   "historical_bindings": [
     {
