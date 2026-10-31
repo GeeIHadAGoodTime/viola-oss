@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "c045c9b438bd80a0644925606222c49870400109",
-  "sha256": "e3859297ee9445260ccaa03f19403e2ef060738c0319d7cf305798a0272a45ec",
+  "revision": "eb178efb0abb7d7ad633e5c2c8c4886641484f91",
+  "sha256": "7dfa433e265daf5eaa247ab28daf6017f9d12217f95cb48135bb254fbe64774b",
   "files": [
     {
       "path": ".env.example",
@@ -2070,8 +2070,8 @@
     },
     {
       "path": "intent/tools/email.py",
-      "sha256": "ecdf9036611e5ee036238900a6019f1f482ae849c3ff56c5eb5df7c8ee2ba0eb",
-      "bytes": 65171
+      "sha256": "33a4dcc363ad07a52b0841f2dac10a83100d673d864c3a8d8667ea1744d955a3",
+      "bytes": 65169
     },
     {
       "path": "intent/tools/filesystem.py",
@@ -5015,8 +5015,8 @@
     },
     {
       "path": "services/oauth/google.py",
-      "sha256": "8d60a77b8cbefdcbc25ff3d75b6ad3613de9d785652e3c166edfb4ea2ffb09d8",
-      "bytes": 9194
+      "sha256": "628981615180be39906bc56ec7e9e79096d3e8374f4ac9a7426e00c704765e93",
+      "bytes": 9195
     },
     {
       "path": "services/oauth/workspace_bridge.py",
