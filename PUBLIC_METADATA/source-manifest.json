@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "6e5aceb8ff3f6abab809b8e44bb1676beae44a3f",
-  "sha256": "65e4fbcf18519809d8fbb673fefd4c8efa0158dfea7b64635294e5d989188d46",
+  "revision": "070124ebddba39d25e259239a332c817a6a692c6",
+  "sha256": "feb19f022cd97c0e695cf243388c5dbc9754b274a9d734742ae19f1cbfc43eda",
   "files": [
     {
       "path": ".env.example",
@@ -1580,8 +1580,8 @@
     },
     {
       "path": "intent/agent_executor.py",
-      "sha256": "a4acabf02abb48687e108ce173b23f2e195b358b80f9230ad3a7a292181b4ebf",
-      "bytes": 590223
+      "sha256": "9f882c07678a68e29c96391f4438561b5045f7c019318a900567991b535ce3fb",
+      "bytes": 590560
     },
     {
       "path": "intent/agent_loop.py",
@@ -4535,8 +4535,8 @@
     },
     {
       "path": "services/llm/answer_stream.py",
-      "sha256": "866d19454d9906f5b5ae8811346ebbe26e4884bd58f491f6495170861e35df86",
-      "bytes": 16516
+      "sha256": "41dc4489bcd413e10bab70d3c533c5c93afeec2c1cc655beff5fabca6a521797",
+      "bytes": 18717
     },
     {
       "path": "services/llm/anthropic_cache.py",
@@ -4675,8 +4675,8 @@
     },
     {
       "path": "services/llm/providers/anthropic_provider.py",
-      "sha256": "273ba8ed3e556cb7b7457075433e5762d507efbd65146f7ad7e32957f6da5e05",
-      "bytes": 60210
+      "sha256": "f327ae676606a825e07b84d93b8beda378c94303b7c41238f0ac4010a3b505fc",
+      "bytes": 61735
     },
     {
       "path": "services/llm/providers/base.py",
