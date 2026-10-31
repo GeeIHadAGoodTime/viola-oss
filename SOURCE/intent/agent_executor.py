@@ -8397,6 +8397,28 @@ class AgentExecutor:
             logger.info("Email send skipped before confirmation: no email account is connected (tool=%s)", tool_name)
         return result
 
+    async def _phone_call_unavailable(self, tool_name: str, tool_args: dict[str, Any]) -> ToolResult | None:
+        """Check the account can place a call BEFORE asking the user to confirm it.
+
+        1.0.5 laptop A6.6a: Viola asked "confirm?", the user said yes, and only
+        then did the cloud refuse the dial for missing phone consents. The user
+        confirmed a call that could never be placed. Now a missing consent or
+        unaccepted Phone Calling Terms comes back first, as the structured
+        ``phone_tos_required`` gate that opens the Phone Calling Terms window.
+        """
+        if self._irreversible_confirmation_class(tool_name, tool_args) != "phone_call":
+            return None
+        try:
+            from intent.tools.phone_call import phone_call_readiness_result
+
+            result = await phone_call_readiness_result()
+        except Exception:  # noqa: BLE001, RUF100 - a failed check never blocks the normal gate
+            logger.debug("Phone readiness check failed for %s", tool_name, exc_info=True)
+            return None
+        if result is not None:
+            await self._broadcast_paid_action_gate(tool_name, result)
+        return result
+
     async def _confirm_irreversible_tool_call(self, tool_name: str, tool_args: dict[str, Any]) -> bool:
         action_class = self._irreversible_confirmation_class(tool_name, tool_args)
         if action_class is None:
@@ -8713,6 +8735,10 @@ class AgentExecutor:
         email_unavailable = await self._email_send_unavailable(tool_name, tool_args)
         if email_unavailable is not None:
             return email_unavailable
+
+        phone_unavailable = await self._phone_call_unavailable(tool_name, tool_args)
+        if phone_unavailable is not None:
+            return phone_unavailable
 
         irreversible_action = self._irreversible_confirmation_class(tool_name, tool_args)
         irreversible_confirmation_granted = False

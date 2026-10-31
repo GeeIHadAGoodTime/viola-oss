@@ -933,8 +933,16 @@ def _ensure_qt_file_logging() -> None:
         # itself into DEBUG for targeted debugging) — this does NOT force
         # DEBUG output on its own; only the logger's own level does that.
         handler.setLevel(_logging.DEBUG)
+        # Redact at the file too, like every other Viola log handler: records
+        # from plain ``logging`` loggers and exception text never pass the
+        # structured logger's own redaction, and this file is what users attach
+        # to bug reports.
+        try:
+            from diagnostics.observability_logging import RedactingFormatter as _LogFormatter
+        except ImportError:
+            _LogFormatter = _logging.Formatter
         handler.setFormatter(
-            _logging.Formatter(
+            _LogFormatter(
                 "%(asctime)s [%(levelname)s] %(name)s: %(message)s",
                 datefmt="%Y-%m-%dT%H:%M:%S",
             )

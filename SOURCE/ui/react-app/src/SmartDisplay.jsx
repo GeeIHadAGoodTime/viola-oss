@@ -264,6 +264,10 @@ const SETTINGS_TAB_ALIASES = {
 
 export const AGENT_CONTEXT_PILL_COOLDOWN_MS = 12000;
 
+// Sent for the user after they accept the Phone Calling Terms from a call that
+// was stopped for them, so the agent picks the same call back up.
+export const PHONE_TERMS_RESUME_COMMAND = 'I accepted the phone terms. Go ahead with the call I asked for.';
+
 function getStageContentMode(displayMode) {
   if (displayMode === 'phone_tab' || displayMode === 'phone_call') return 'phone';
   if (displayMode === 'chat') return 'chat';
@@ -859,10 +863,14 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
       if (!response.ok) return;
       const json = await response.json();
       const status = json?.data || json || {};
-      if (status.accepted === false) {
+      const missingConsents = Array.isArray(status.missing_consents) ? status.missing_consents : [];
+      if (status.accepted === false || missingConsents.length > 0) {
         setPhoneTosPayload({
           error_code: 'phone_tos_required',
-          message: 'Accept the Phone Calling Terms of Service before making calls.',
+          message: status.accepted === false
+            ? 'Accept the Phone Calling Terms of Service before making calls.'
+            : 'Phone calls need a few permissions on your account before Viola can place them.',
+          missing_consents: missingConsents,
         });
       }
     } catch {
@@ -1337,6 +1345,17 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
     if (interceptCloudConsent({ kind: 'text', text })) return Promise.resolve();
     return api.sendCommand(text).then(handleCommandResult);
   }, [interceptCloudConsent, api, handleCommandResult]);
+
+  // Accepting the Phone Calling Terms from a call that was stopped for them
+  // picks that call back up (1.0.5 laptop A6.6a), instead of leaving the user to
+  // ask again. It still goes through the normal confirm card: accepting the
+  // terms is not a yes to this particular call.
+  const handlePhoneTermsAccepted = useCallback((pendingPayload) => {
+    addToast({ message: 'Phone terms accepted.', level: 'success' });
+    if (pendingPayload?.resume_after_accept === true) {
+      void submitTextCommand(PHONE_TERMS_RESUME_COMMAND);
+    }
+  }, [addToast, submitTextCommand]);
 
   // A call asked for in a saved chat is pending in that chat only, so the
   // card's Approve / Cancel go to that chat's thread (answerCallBriefing).
@@ -4015,7 +4034,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
         isOpen={!!phoneTosPayload}
         payload={phoneTosPayload}
         onClose={() => setPhoneTosPayload(null)}
-        onAccepted={() => addToast({ message: 'Phone terms accepted.', level: 'success' })}
+        onAccepted={() => handlePhoneTermsAccepted(phoneTosPayload)}
       />
       <CloudLlmConsentModal
         isOpen={cloudLlmConsentOpen}
