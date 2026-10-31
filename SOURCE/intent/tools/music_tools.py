@@ -539,6 +539,27 @@ async def _read_live_playback_state() -> dict[str, Any]:
     return state
 
 
+# A track change in the YouTube iframe takes a moment to report PLAYING: the
+# read straight after /v1/next saw the new track loading, so the tool said
+# "not confirmed" and the model spent another step calling playback(resume)
+# (dev PC r7 spans: +1 playback call and +1 model call on every "next track").
+_TRACK_CHANGE_CONFIRM_SECONDS = 3.0
+_TRACK_CHANGE_POLL_SECONDS = 0.2
+
+
+async def _await_track_change_playing(state: dict[str, Any]) -> dict[str, Any]:
+    """Re-read the player briefly until the new track reports playing.
+
+    Returns the first state that is playing, or the last one read when the
+    window passes. Never waits when the player could not be reached at all.
+    """
+    deadline = time.monotonic() + _TRACK_CHANGE_CONFIRM_SECONDS
+    while state.get("probe_ok") and not state.get("is_playing") and time.monotonic() < deadline:
+        await asyncio.sleep(_TRACK_CHANGE_POLL_SECONDS)
+        state = await _read_live_playback_state()
+    return state
+
+
 def _live_verification(state: dict[str, Any]) -> str:
     if not state.get("probe_ok"):
         return VERIFY_UNAVAILABLE
@@ -1351,7 +1372,7 @@ async def playback_control_handler(
             endpoint = "/v1/skip" if action_name == "skip" else "/v1/%s" % action_name
             data = await _post_runtime(endpoint, {}, timeout=10.0)
             if data.get("ok"):
-                live_state = await _read_live_playback_state()
+                live_state = await _await_track_change_playing(await _read_live_playback_state())
                 response_data = data.get("data")
                 if isinstance(response_data, dict):
                     source_state = response_data

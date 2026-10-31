@@ -1275,6 +1275,53 @@ def _payload_signals_refs_invalidated(payload: Any) -> bool:
 
 _MEMORY_ID_RE = re.compile(r"\bid=(\d+)\b")
 
+# Transport controls the model already chose: when ``playback`` confirms the
+# change itself, the follow-up model turn only restated the tool's own sentence
+# (1.0.5 build 7: the spoken "Now playing" came 14 s after the track changed;
+# dev PC r7 spans: 3 s of model time to write "X is playing now"). The turn ends
+# on the confirmed tool result instead. An unconfirmed or failed result still
+# goes back to the model exactly as before.
+_PLAYBACK_TERMINAL_ACTIONS = frozenset(
+    {
+        "next",
+        "skip",
+        "previous",
+        "pause",
+        "resume",
+        "stop",
+        "seek_to",
+        "seek_relative",
+        "restart",
+        "volume_set",
+        "volume_up",
+        "volume_down",
+        "mute",
+        "unmute",
+    }
+)
+# A track change is heard; Jay prefers no spoken "Now playing" on top of it.
+# The chat still shows the tool's text.
+_PLAYBACK_SILENT_ACTIONS = frozenset({"next", "skip", "previous"})
+_DISCOVERY_TOOL_NAMES = frozenset({"ToolSearch", "tool_search"})
+
+
+def _playback_terminal_response(tool_name: str, tool_result: Any) -> tuple[str, bool] | None:
+    """Return ``(text, silent)`` when a confirmed playback control can end the turn."""
+    if tool_name != "playback" or tool_result is None or not getattr(tool_result, "ok", False):
+        return None
+    if getattr(tool_result, "unverified", False):
+        return None
+    data = getattr(tool_result, "data", None)
+    if not isinstance(data, dict) or data.get("verified") is False:
+        return None
+    action = str(data.get("action") or "").strip().lower()
+    if action not in _PLAYBACK_TERMINAL_ACTIONS:
+        return None
+    message = str(data.get("message") or "").strip()
+    if not message:
+        return None
+    return message, action in _PLAYBACK_SILENT_ACTIONS
+
 
 def _set_final_response(
     executor: AgentExecutor,
@@ -4482,6 +4529,30 @@ async def run_agent_loop(
                 if _terminal_tool_response is not None and len(all_tool_calls) == 1:
                     _set_final_response(executor, _terminal_tool_response, continue_listening=False)
                     _media_terminal_fired = True
+                # A confirmed playback control as the only call, with nothing
+                # but tool discovery before it this turn: the user asked for
+                # one transport change and it is done, so end here. A compound
+                # request keeps going (the model issued other calls before or
+                # alongside it).
+                _playback_terminal = _playback_terminal_response(tc_name, tool_result)
+                if (
+                    _playback_terminal is not None
+                    and len(all_tool_calls) == 1
+                    and all(name in _DISCOVERY_TOOL_NAMES for name in tools_called[:-1])
+                ):
+                    _playback_text, _playback_silent = _playback_terminal
+                    _set_final_response(
+                        executor,
+                        _playback_text,
+                        continue_listening=False,
+                        params={"silent_reply": _playback_silent, "terminal_tool": "playback"},
+                    )
+                    _media_terminal_fired = True
+                    logger.info(
+                        "Agent loop: confirmed playback %s ends the turn without another model call (silent=%s)",
+                        str((tool_result.data or {}).get("action") or ""),
+                        _playback_silent,
+                    )
 
                 # Surface ui_action hints (e.g. knowledge open_folder) so the
                 # ai_controller can merge them into the response envelope and

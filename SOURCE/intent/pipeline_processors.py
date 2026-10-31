@@ -391,6 +391,10 @@ class IntentPipelineProcessors:
                 _tc = ai_result.get("task_category")
                 if _tc:
                     _answer_data["task_category"] = _tc
+                # A reply that must be shown but not spoken (a confirmed track
+                # change the user already hears).
+                if ai_result.get("spoken"):
+                    _answer_data["spoken"] = True
                 # Propagate content card for UI display
                 _card = ai_result.get("card")
                 if _card and isinstance(_card, dict):
