@@ -63,15 +63,20 @@ def sanitize_for_prompt(text: str, max_len: int = 80) -> str:
 
 
 # What each lower tool-permission level leaves out (mcp_hub.client_hub tier maps).
+# Symphony-only items come first and name Symphony alone: at Solo the model
+# read "Ensemble or Symphony" from the email clause and refused screen viewing
+# with "Switch to Ensemble or Symphony", though Ensemble cannot see the screen
+# (1.0.5 laptop A6.7).
 _TIER_NEEDS_SYMPHONY: dict[str, str] = {
     "solo": (
-        "email, reading files and the agent browser need Ensemble or Symphony; phone calls, text messages, "
-        "changing or saving files, shell commands and desktop control (seeing the screen, mouse, keyboard, "
-        "computer volume) need Symphony"
+        "seeing or describing the screen, desktop control (mouse, keyboard, opening apps, computer volume), "
+        "phone calls, text messages, changing or saving files and shell commands need Symphony (Ensemble is "
+        "not enough: name only Symphony for these); email, reading files and the agent browser need "
+        "Ensemble or Symphony"
     ),
     "ensemble": (
-        "phone calls, text messages, changing or saving files, shell commands and desktop control (seeing the "
-        "screen, mouse, keyboard, computer volume) need Symphony"
+        "seeing or describing the screen, desktop control (mouse, keyboard, opening apps, computer volume), "
+        "phone calls, text messages, changing or saving files and shell commands need Symphony"
     ),
 }
 

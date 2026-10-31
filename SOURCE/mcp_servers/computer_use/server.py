@@ -65,8 +65,12 @@ ComputerAction = Literal[
     "mouse_move_angle",
 ]
 
-_ACTIONS_WITHOUT_FOREGROUND_TARGET: frozenset[str] = frozenset(
-    {"launch_app", "volume", "analyze_screen", "list_windows"}
+_ACTIONS_WITHOUT_FOREGROUND_TARGET: frozenset[str] = safety.ACTIONS_WITHOUT_FOREGROUND_TARGET
+# Input actions that bring a NAMED app's window to the front before acting.
+# Without this, "type hello in the open notepad" typed into whatever was in
+# front, which was Viola's own window (1.0.5 laptop A6.3).
+_FOCUS_NAMED_APP_FIRST_ACTIONS: frozenset[str] = frozenset(
+    {"type", "key", "click", "double_click", "right_click", "scroll", "drag"}
 )
 
 
@@ -113,16 +117,42 @@ def _get_chain_key(user_id: str) -> str:
 
 
 def _get_call_session_id(user_id: str) -> str:
+    # Same derivation as the approval bridge's grant (safety.grant_session_id),
+    # so a "yes" recorded there is found here.
     meta = _get_call_meta()
     user_context = meta.get("viola_user_context")
-    if isinstance(user_context, dict):
-        for key in ("session_id", "request_id", "gate_session_id"):
-            value = user_context.get(key)
-            if isinstance(value, str) and value:
-                return value
-    from core.user_context import is_device_user_id
+    return safety.grant_session_id(user_context if isinstance(user_context, dict) else None, user_id)
 
-    return "local-session" if is_device_user_id(user_id) else user_id
+
+def _focus_named_app(
+    action: str,
+    *,
+    app_executable: str,
+    app_name: str,
+    window_title: str,
+    target_window: str,
+    title: str,
+) -> dict[str, object] | None:
+    """Bring a named app's window to the front before an input action.
+
+    Returns the focus result (with the window title) when an app or window
+    was named, ``None`` when nothing was named. A failed focus is returned
+    as-is so the caller refuses instead of typing into the wrong window.
+    """
+    if action not in _FOCUS_NAMED_APP_FIRST_ACTIONS:
+        return None
+    window = (window_title or title or "").strip()
+    if action == "type":
+        window = (target_window or window).strip()
+    elif target_window:
+        # click/key/scroll already focus target_window themselves.
+        return None
+    named_app = (app_executable or app_name or "").strip()
+    if not window and not named_app:
+        return None
+    if window:
+        return window_manager.focus_window(title=window)
+    return window_manager.focus_window(app_executable=named_app)
 
 
 def _next_chain_status(user_id: str) -> dict[str, object]:
@@ -517,13 +547,15 @@ def _merge_action_metadata(
         "Click — variants: click(x,y|name) / click_ref(ref, background, return_diff) / "
         "double_click(x,y) / right_click(x,y) / drag(start,end) / "
         "mouse_button_down(button) / mouse_button_up(button) / mouse_button_hold(button, duration_ms). "
-        "Key press — variants: key(keys) / type(text, target_window, respect_focus) / "
+        "Key press — variants: key(keys, app_executable) / type(text, app_executable|target_window, respect_focus) / "
         "background_type(text, target_window) / key_down(key) / key_up(key) / "
         "key_hold(key, duration_ms). "
         "Mouse motion — variants: mouse_move(x,y) / mouse_move_relative(dx,dy,duration_ms) / "
         "mouse_move_angle(degrees,axis,duration_ms) / scroll(direction,amount). "
         "System: volume(volume_action, level). "
         "Use browser_navigate only for URLs/web pages; use launch_app for any installed native desktop application. "
+        "To type, press keys or click in an app, name it with app_executable (for example 'notepad') or "
+        "window_title: Viola brings that window to the front first. Viola's own window is never a target. "
         "For pointer coordinates use the screenshot's logical 1024x768 coordinate plane unless coordinate_mode='physical'."
     ),
 )
@@ -658,13 +690,23 @@ async def computer(
         session_id = _get_call_session_id(user_id)
         assert_local_user(user_id)
         safety.require_enabled(action, user_id=user_id)
-        if action in _ACTIONS_WITHOUT_FOREGROUND_TARGET:
-            target_app = safety.normalize_executable_name(app_executable or app_name)
-        else:
-            target_app = (
-                safety.normalize_executable_name(app_executable) or window_manager.get_foreground_app_executable_name()
-            )
+        target_args = {
+            "app_executable": app_executable,
+            "app_name": app_name,
+            "window_title": window_title,
+            "target_window": target_window,
+            "title": title,
+        }
+        target_app = safety.resolve_action_target_app(action, **target_args)
+        if action not in _ACTIONS_WITHOUT_FOREGROUND_TARGET:
             safety.require_not_uac(action, target_app_executable=target_app)
+        if safety.targets_viola_itself(action, **target_args):
+            raise safety.ComputerUseRefusal(
+                error_category="COMPUTER_USE_TARGET_IS_VIOLA",
+                reason=safety.VIOLA_SELF_TARGET_REASON,
+                action=action,
+                target_app_executable=target_app,
+            )
         chain_status = _next_chain_status(user_id)
         if chain_status.get("ok") is False:
             _release_held_low_level_input(user_id)
@@ -676,6 +718,18 @@ async def computer(
             session_id=session_id,
         )
         control_token = safety.acquire_control_session(user_id=user_id, session_id=session_id, action=action)
+        focused = _focus_named_app(action, **target_args)
+        if focused is not None:
+            refusal = _focus_precondition(focused, action=action)
+            if refusal is not None:
+                refusal["target_app_executable"] = target_app
+                return _json(refusal)
+            if action == "type" and not _target_window_title(
+                target_window=target_window, window_title=window_title, title=title
+            ):
+                # Type into the window just brought forward, by title, so a
+                # click elsewhere in the meantime cannot redirect the text.
+                window_title = str(focused.get("window_title") or "")
 
         if action == "launch_app":
             result = app_launcher.launch_app(app_name or title or window_title, bring_to_front=bring_to_front)

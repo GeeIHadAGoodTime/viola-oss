@@ -201,6 +201,15 @@ ONBOARDING_CARRY_OVER_KEYS = frozenset(
         "browser_session_mode",  # derived from agent_autonomy alongside it
     }
 )
+# Account settings that settings.json must not show a stale copy of. With an
+# account signed in, Agent Autonomy is read from and saved to that account's
+# own settings (what the Settings page shows and what the agent, desktop
+# control and phone gates enforce). settings.json only holds the signed-out
+# install's choice, and wrote out the "solo" default even while the account
+# was at Ensemble or Symphony (1.0.5 laptop A10.4 NOTE). A value equal to the
+# default carries no information, so it is left out of the file; a real
+# signed-out choice is still saved there.
+ACCOUNT_SETTINGS_NOT_MIRRORED_AT_DEFAULT = frozenset({"agent_autonomy", "browser_session_mode"})
 LEGACY_USER_SETTINGS_SCRUB_KEEP_KEYS = frozenset(
     {
         _USER_SETTINGS_MIGRATION_MARKER,
@@ -1407,7 +1416,7 @@ class SettingsManager:
 
                 # Write settings atomically (temp file + os.replace) so a crash/kill
                 # mid-write can never leave a truncated/corrupt primary settings.json.
-                _atomic_write_json(self.settings_file, pending)
+                _atomic_write_json(self.settings_file, self._settings_file_payload(pending))
 
                 logger.info("Settings saved to %s", self.settings_file)
                 self.settings = pending
@@ -1451,6 +1460,21 @@ class SettingsManager:
                     # All methods failed
                     logger.error("All save methods failed: primary=%s, backup=%s", e, e2)
                     return False
+
+    def _settings_file_payload(self, pending: dict[str, object]) -> dict[str, object]:
+        """What settings.json holds: the settings minus account keys left at their default.
+
+        See ``ACCOUNT_SETTINGS_NOT_MIRRORED_AT_DEFAULT``. load() merges the
+        same defaults back, so reading the file gives the same values as
+        before; only the misleading on-disk "solo" goes away. The cloud keeps
+        its file as is.
+        """
+        present = [key for key in ACCOUNT_SETTINGS_NOT_MIRRORED_AT_DEFAULT if key in pending]
+        if not present or _is_cloud_deployment():
+            return dict(pending)
+        base = self._default_settings_base()
+        dropped = {key for key in present if key in base and pending.get(key) == base[key]}
+        return {key: value for key, value in pending.items() if key not in dropped}
 
     def _accept_settings_fallback(
         self,
@@ -2578,11 +2602,19 @@ class SettingsManager:
             if not updates:
                 return True
 
-        return self._write_user_settings_values(
+        written = self._write_user_settings_values(
             user_id,
             updates,
             save_immediately=save_immediately,
         )
+        if written and "agent_autonomy" in updates:
+            # Where the value lives, so nobody reads settings.json for it.
+            logger.info(
+                "Agent autonomy is now %s for the signed-in account (saved in the account's settings, "
+                "which is what Viola enforces; settings.json only holds the signed-out choice)",
+                updates.get("agent_autonomy"),
+            )
+        return written
 
     def _write_user_settings_values(
         self,

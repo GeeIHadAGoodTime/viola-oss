@@ -13,6 +13,9 @@ Risk derivation priority (2026-04-08):
 from __future__ import annotations
 
 import os
+from collections.abc import Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, Mapping, cast
 
@@ -211,30 +214,103 @@ def _computer_use_whitelist_allows(args: Mapping[str, Any] | None) -> bool:
         return False
 
 
+# The identity of the tool call being approved: (user_id, grant session id).
+# Set by MCPClientHub.call_tool from the call's own user context, the same
+# context the computer tool reads its identity from. The bridge's permission
+# identity is the conversation's, which is not guaranteed to be the same
+# string, and a grant recorded under one identity and checked under another
+# reads as "no consent" (1.0.5 laptop A6.3).
+_COMPUTER_USE_CALL_IDENTITY: ContextVar[tuple[str, str] | None] = ContextVar(
+    "computer_use_call_identity", default=None
+)
+
+
+def computer_use_call_identity(user_context: Any) -> tuple[str, str]:
+    """(user_id, grant session id) the computer tool will see for this call's context."""
+    from core.user_context import get_current_or_device_user_id, user_id_or_none
+    from services.computer_use.safety import grant_session_id
+
+    if isinstance(user_context, Mapping):
+        source: Mapping[str, Any] = user_context
+    elif user_context is not None:
+        source = {
+            key: getattr(user_context, key, None)
+            for key in ("user_id", "session_id", "request_id", "gate_session_id")
+        }
+    else:
+        source = {}
+    user_id = user_id_or_none(source.get("user_id")) or get_current_or_device_user_id()
+    return user_id, grant_session_id(source, user_id)
+
+
+@contextmanager
+def computer_use_call_scope(user_context: Any) -> Iterator[None]:
+    """Bind the identity of the computer tool call being approved."""
+    try:
+        identity: tuple[str, str] | None = computer_use_call_identity(user_context)
+    except (AttributeError, ImportError, RuntimeError, TypeError, ValueError):
+        logger.debug("Could not resolve the computer-use call identity")
+        identity = None
+    token = _COMPUTER_USE_CALL_IDENTITY.set(identity)
+    try:
+        yield
+    finally:
+        _COMPUTER_USE_CALL_IDENTITY.reset(token)
+
+
+def _computer_use_grant_identity(user_id: str, session_id: str) -> tuple[str, str]:
+    identity = _COMPUTER_USE_CALL_IDENTITY.get()
+    if identity is not None:
+        return identity
+    return user_id, session_id
+
+
+def _computer_use_target_args(args: Mapping[str, Any]) -> dict[str, str]:
+    return {
+        key: str(args.get(key) or "")
+        for key in ("app_executable", "app_name", "window_title", "target_window", "title")
+    }
+
+
 def _computer_use_target_app(args: Mapping[str, Any] | None) -> str:
     if args is None:
         return ""
     try:
-        from services.computer_use.safety import normalize_executable_name
-        from services.computer_use.window_manager import (
-            get_foreground_app_executable_name,
-        )
+        from services.computer_use.safety import resolve_action_target_app
 
-        target = normalize_executable_name(
-            str(
-                args.get("app_executable")
-                or args.get("app_name")
-                or args.get("title")
-                or args.get("window_title")
-                or ""
-            )
-        )
-        if not target:
-            target = normalize_executable_name(get_foreground_app_executable_name())
-        return target
+        # Same resolver as the computer tool, so a "yes" is recorded for the
+        # app that the tool will check.
+        return resolve_action_target_app(str(args.get("action") or ""), **_computer_use_target_args(args))
     except (AttributeError, ImportError, OSError, RuntimeError, TypeError, ValueError):
         logger.debug("Could not resolve computer-use target app")
         return ""
+
+
+def computer_use_self_target_refusal(tool_name: str, args: Mapping[str, Any] | None) -> dict[str, Any] | None:
+    """Refuse, before any prompt, a computer action that would land in Viola's own window.
+
+    Asking the user to confirm typing into Viola itself and then refusing it
+    in the tool would be a prompt for nothing; the model is told instead to
+    name the app.
+    """
+    if tool_name != "computer" or not isinstance(args, Mapping):
+        return None
+    try:
+        from services.computer_use.safety import VIOLA_SELF_TARGET_REASON, targets_viola_itself
+
+        if not targets_viola_itself(str(args.get("action") or ""), **_computer_use_target_args(args)):
+            return None
+    except (AttributeError, ImportError, OSError, RuntimeError, TypeError, ValueError):
+        logger.debug("Could not run the computer-use self-target check")
+        return None
+    return {
+        "success": False,
+        "data": None,
+        "display": "",
+        "error": VIOLA_SELF_TARGET_REASON,
+        "error_category": "COMPUTER_USE_TARGET_IS_VIOLA",
+        "retryable": True,
+    }
 
 
 def _computer_use_action_requires_app_consent(args: Mapping[str, Any] | None) -> bool:
@@ -259,6 +335,7 @@ def _computer_use_session_grant_allows(
     try:
         from services.computer_use.safety import has_session_app_grant
 
+        user_id, session_id = _computer_use_grant_identity(user_id, session_id)
         return has_session_app_grant(_computer_use_target_app(args), user_id=user_id, session_id=session_id)
     except (AttributeError, ImportError, RuntimeError, TypeError, ValueError):
         return False
@@ -276,6 +353,7 @@ def _grant_computer_use_session_app(
         from services.computer_use.safety import grant_session_app
 
         target = _computer_use_target_app(args)
+        user_id, session_id = _computer_use_grant_identity(user_id, session_id)
         if grant_session_app(target, user_id=user_id, session_id=session_id):
             logger.info("Granted computer-use session app consent for '%s'", target)
     except (AttributeError, ImportError, RuntimeError, TypeError, ValueError):
@@ -796,6 +874,65 @@ def recompute_auto_approve() -> None:
     )
 
 
+def _computer_app_label(args: Mapping[str, Any]) -> str:
+    for key in ("app_name", "target_window", "window_title", "title"):
+        value = str(args.get(key) or "").strip()
+        if value:
+            return value[:80]
+    executable = str(args.get("app_executable") or "").strip()
+    if executable:
+        name = executable.replace("\\", "/").rsplit("/", 1)[-1]
+        if name.lower().endswith(".exe"):
+            name = name[:-4]
+        return (name[:1].upper() + name[1:])[:80]
+    return ""
+
+
+def describe_computer_action(args: Mapping[str, Any]) -> str:
+    """Plain-words description of a desktop action for the confirm prompt."""
+    action = str(args.get("action") or "").strip().lower()
+    app = _computer_app_label(args)
+    where = (" in %s" % app) if app else ""
+    text = " ".join(str(args.get("text") or "").split())
+    if len(text) > 80:
+        text = text[:77] + "..."
+    keys = str(args.get("keys") or args.get("key") or "").strip()[:40]
+    name = str(args.get("name") or "").strip()[:60]
+    if action == "launch_app":
+        return "open %s" % (app or "an app")
+    if action in {"type", "background_type"}:
+        return 'type "%s"%s' % (text, (" into %s" % app) if app else " into the window in front")
+    if action in {"key", "key_down", "key_hold"}:
+        return "press %s%s" % (keys or "a key", where)
+    if action == "key_up":
+        return "release %s%s" % (keys or "a key", where)
+    if action in {"click", "double_click", "right_click", "click_ref"}:
+        verb = {"double_click": "double-click", "right_click": "right-click"}.get(action, "click")
+        thing = ('"%s"' % name) if name else ""
+        if thing:
+            return "%s %s%s" % (verb, thing, where)
+        return "%s%s" % (verb, where or " on your screen")
+    if action == "focus_window":
+        return "bring %s to the front" % (app or "a window")
+    if action == "scroll":
+        return "scroll%s" % (where or " on your screen")
+    if action == "drag":
+        return "drag with the mouse%s" % (where or " on your screen")
+    if action in {"mouse_move", "mouse_move_relative", "mouse_move_angle"}:
+        return "move the mouse%s" % (where or " on your screen")
+    if action in {"mouse_button_down", "mouse_button_up", "mouse_button_hold"}:
+        return "press the mouse button%s" % (where or " on your screen")
+    if action in {"screenshot", "observe_region", "analyze_screen", "background_screenshot"}:
+        return "look at your screen"
+    if action in {"read_window", "inspect_window"}:
+        return "read %s" % (app or "the window in front")
+    if action == "list_windows":
+        return "list your open windows"
+    if action == "volume":
+        return "change your computer's volume"
+    return "control %s on your desktop" % (app or "an app")
+
+
 # Human-readable description templates per tool.
 # {args} is replaced with a formatted argument summary.
 _DESCRIPTION_TEMPLATES: dict[str, str] = {
@@ -810,7 +947,6 @@ _DESCRIPTION_TEMPLATES: dict[str, str] = {
     "web_search": "search the web for: {query}",
     "web_read": "read the web page: {url}",
     "system_info": "check system information",
-    "computer": "perform desktop computer action '{action}'",
     "self_manage": "perform self_manage action '{action}'",
     "mcp_servers": "perform mcp_servers action '{action}'",
     "delegate_to_provider": "delegate a task to external provider",
@@ -971,18 +1107,11 @@ class ApprovalBridge:
             return "perform mcp_servers action '%s'" % (action or "list")
 
         if tool_name == "computer":
-            # Name what is acted on, so a "yes" covers this app/window/text
-            # and not any later action of the same kind.
-            action = str(args.get("action") or "").strip() or "action"
-            target = ""
-            for key in ("app_name", "app_executable", "target_window", "window_title", "title", "name", "text", "key"):
-                value = str(args.get(key) or "").strip()
-                if value:
-                    target = value[:80]
-                    break
-            if target:
-                return "perform desktop computer action '%s' on '%s'" % (action, target)
-            return "perform desktop computer action '%s'" % action
+            # Plain words that name what is acted on, so a "yes" covers this
+            # app/window/text and not any later action of the same kind. The
+            # raw tool name ("desktop computer action 'launch_app'") reached
+            # the user in 1.0.5 (laptop A6.3).
+            return describe_computer_action(args)
 
         resolved_args = _resolve_path_like_args(args)
         template = _DESCRIPTION_TEMPLATES.get(tool_name)
@@ -1337,7 +1466,16 @@ class ApprovalBridge:
 
             manager = get_request_conversation_manager()
             if manager is not None:
-                return manager.user_id(), manager.session_id()
+                # ``user_id``/``session_id`` are properties on the
+                # conversation manager. Calling them raised TypeError, which
+                # the except below swallowed, so every permission check ran
+                # as the bridge's default identity ("local-session").
+                user_id = getattr(manager, "user_id", None)
+                session_id = getattr(manager, "session_id", None)
+                user_id = user_id() if callable(user_id) else user_id
+                session_id = session_id() if callable(session_id) else session_id
+                if isinstance(user_id, str) and user_id.strip():
+                    return user_id, str(session_id or "").strip() or "local-session"
         except Exception as exc:
             logger.debug(
                 "Could not resolve request conversation manager for permission policy: %s",

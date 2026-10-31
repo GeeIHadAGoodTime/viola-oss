@@ -516,6 +516,70 @@ def get_foreground_window_info() -> WindowInfo | None:
         return None
 
 
+def _normalize_executable(value: str | None) -> str:
+    """Same spelling as safety.normalize_executable_name: "Notepad.exe" -> "notepad"."""
+    name = str(value or "").strip().replace("\\", "/").rsplit("/", 1)[-1].strip().lower()
+    if name.endswith(".exe"):
+        name = name[: -len(".exe")].strip()
+    return name
+
+
+def _resolve_hwnd_by_executable_fast(app_executable: str) -> int:
+    """Top-most visible, titled top-level window owned by this executable (0 if none).
+
+    EnumWindows walks in Z order, so the first match is the window the user
+    last had in front. Microseconds per window, unlike the UIA fallback.
+    """
+    target = _normalize_executable(app_executable)
+    if not target or not _IS_WINDOWS:
+        return 0
+    found_hwnd = [0]
+
+    @_ENUMWINDOWSPROC
+    def _enum_proc(hwnd: int, _lparam: int) -> bool:
+        if not _user32.IsWindowVisible(hwnd) or _user32.IsIconic(hwnd):
+            return True
+        if not _get_window_title_fast(int(hwnd)):
+            return True
+        try:
+            name = _process_name(_process_id_for_handle(int(hwnd)))
+        except Exception:  # noqa: BLE001, RUF100 - unreadable window: keep looking
+            return True
+        if _normalize_executable(name) == target:
+            found_hwnd[0] = int(hwnd)
+            return False
+        return True
+
+    try:
+        _user32.EnumWindows(_enum_proc, 0)
+    except Exception:
+        logger.debug("EnumWindows failed; executable hwnd resolve aborted")
+    return found_hwnd[0]
+
+
+def find_window_process(title: str) -> tuple[str, int]:
+    """Return (executable, process id) of the visible window whose title matches, or ("", 0).
+
+    Used to tell which app a named window belongs to before acting on it, so
+    consent is asked for that app rather than for whatever window is in front.
+    """
+    target_title = str(title or "").strip()
+    if not target_title:
+        return "", 0
+    if _IS_WINDOWS:
+        hwnd = _hwnd_cache_get(target_title) or _resolve_hwnd_fast(target_title)
+        if not hwnd:
+            return "", 0
+        process_id = _process_id_for_handle(int(hwnd))
+        return _process_name(process_id), process_id
+    if _IS_DARWIN:
+        listed = _list_windows_darwin(include_minimized=True, include_titles=True)
+        for window in listed.get("windows", []) or []:
+            if isinstance(window, dict) and _window_title_matches(target_title, str(window.get("title") or "")):
+                return str(window.get("executable") or ""), int(window.get("process_id") or 0)
+    return "", 0
+
+
 def get_foreground_app_executable_name() -> str:
     """Return the foreground executable name, lower-case when available."""
     info = get_foreground_window_info()
@@ -544,8 +608,9 @@ def _matches_window(
         return True
     if title and _window_title_matches(title, info.title):
         return True
-    normalized_executable = Path(app_executable or "").name.lower()
-    return bool(normalized_executable and info.executable == normalized_executable)
+    # "notepad", "Notepad.exe" and a full path all name the same app.
+    normalized_executable = _normalize_executable(app_executable)
+    return bool(normalized_executable and _normalize_executable(info.executable) == normalized_executable)
 
 
 def _focus_window_unsupported() -> dict[str, object]:
@@ -812,6 +877,18 @@ def focus_window(
                 "no_op": True,
                 "foreground_verified": True,
             }
+        if not target_handle and not target_title and app_executable:
+            fg_executable = _normalize_executable(_process_name(_process_id_for_handle(fg_hwnd)))
+            if fg_executable and fg_executable == _normalize_executable(app_executable):
+                return {
+                    "ok": True,
+                    "action": "focus_window",
+                    "window_handle": fg_hwnd,
+                    "window_title": _get_window_title_fast(fg_hwnd),
+                    "target_app_executable": fg_executable,
+                    "no_op": True,
+                    "foreground_verified": True,
+                }
         if target_title:
             fg_title = _get_window_title_fast(fg_hwnd)
             if fg_title and _window_title_matches(target_title, fg_title):
@@ -837,6 +914,15 @@ def focus_window(
 
     if resolved_hwnd:
         return _apply_foreground(int(resolved_hwnd))
+
+    # By executable name ("focus Notepad"): EnumWindows + process name, so the
+    # common case does not pay the 10-20 s UIA walk below.
+    if not target_handle and not target_title and app_executable:
+        resolved_hwnd = _resolve_hwnd_by_executable_fast(app_executable)
+        if resolved_hwnd:
+            outcome = _apply_foreground(int(resolved_hwnd))
+            outcome.setdefault("target_app_executable", _normalize_executable(app_executable))
+            return outcome
 
     # 4. UIA fallback — needed when the caller is matching by executable
     # name (we need process_id resolution from the UIA window) or when the
