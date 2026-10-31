@@ -5,6 +5,8 @@ from __future__ import annotations
 import copy
 import json
 import re
+import threading
+from collections import OrderedDict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from typing import Any
@@ -116,7 +118,43 @@ DEFAULT_MEDIA_LIMIT_POLICY = MediaLimitPolicy(
 STORAGE_MEDIA_LIMIT_POLICY = MediaLimitPolicy(max_images=0, max_bytes=0)
 
 
+# Every turn re-normalizes the same system prompt, context frames and prior
+# messages before the model call, and the secret-rule regexes over them took
+# 0.25-0.47 s on the event loop (live stall sampler, 2026-10-31). The result is
+# a pure function of (text, diagnostic) -- the rule set is a fixed module
+# tuple -- so an identical text reuses its earlier (immutable) result. Bounded
+# by entry count and total characters.
+_SCAN_MEMO: OrderedDict[tuple[bool, str], SecretScanResult] = OrderedDict()
+_SCAN_MEMO_LOCK = threading.Lock()
+_SCAN_MEMO_MAX_ENTRIES = 512
+_SCAN_MEMO_MAX_CHARS = 8_000_000
+_SCAN_MEMO_MIN_CHARS = 64
+_scan_memo_chars = 0
+
+
 def scan_and_redact_text(text: str, *, diagnostic: bool = False) -> SecretScanResult:
+    """``_scan_and_redact_text_uncached`` with reuse of identical earlier results."""
+    global _scan_memo_chars
+    if not text or len(text) < _SCAN_MEMO_MIN_CHARS or len(text) > _SCAN_MEMO_MAX_CHARS // 4:
+        return _scan_and_redact_text_uncached(text, diagnostic=diagnostic)
+    key = (bool(diagnostic), text)
+    with _SCAN_MEMO_LOCK:
+        cached = _SCAN_MEMO.get(key)
+        if cached is not None:
+            _SCAN_MEMO.move_to_end(key)
+            return cached
+    result = _scan_and_redact_text_uncached(text, diagnostic=diagnostic)
+    with _SCAN_MEMO_LOCK:
+        if key not in _SCAN_MEMO:
+            _SCAN_MEMO[key] = result
+            _scan_memo_chars += len(text)
+            while _SCAN_MEMO and (len(_SCAN_MEMO) > _SCAN_MEMO_MAX_ENTRIES or _scan_memo_chars > _SCAN_MEMO_MAX_CHARS):
+                (_diag, old_text), _old = _SCAN_MEMO.popitem(last=False)
+                _scan_memo_chars -= len(old_text)
+    return result
+
+
+def _scan_and_redact_text_uncached(text: str, *, diagnostic: bool = False) -> SecretScanResult:
     """Return text with high-confidence secrets (and inline media) redacted.
 
     F-034 (R3-A): provider-bound normalization (``diagnostic=False``) only

@@ -17,6 +17,7 @@ unavailable — they return ``""`` on failure and log at DEBUG level.
 
 from __future__ import annotations
 
+import asyncio
 import contextvars
 import inspect
 import json
@@ -50,6 +51,11 @@ if TYPE_CHECKING:
     from services.conversation.state_manager import ConversationStateManager
 
 logger = get_logger(__name__)
+
+# Sign-in state read off the event loop for the current turn (see prefetch_account_identity).
+_PREFETCHED_ACCOUNT_IDENTITY: contextvars.ContextVar[Any] = contextvars.ContextVar(
+    "prefetched_account_identity", default=None
+)
 
 
 @dataclass(frozen=True)
@@ -1841,6 +1847,34 @@ class ContextBuilder:
             logger.debug("Account owner context failed (non-fatal): %s", exc)
             return []
 
+    @staticmethod
+    async def prefetch_account_identity() -> contextvars.Token[Any] | None:
+        """Read this device's Viola sign-in state on a worker thread for the next build.
+
+        The read takes the desktop session store's lock and opens its SQLite
+        database; another thread can hold that lock for seconds (2.4 s once,
+        live), which used to stall the event loop while the turn's context was
+        built. The same read, done here first, is what the VIOLA ACCOUNT block
+        then uses. Returns a token for ``clear_prefetched_account_identity``.
+        """
+        try:
+            from ui.core.security import is_desktop_surface
+
+            if not is_desktop_surface():
+                return None
+            from auth.desktop_session import get_desktop_account_identity
+
+            identity = await asyncio.to_thread(get_desktop_account_identity)
+        except (ImportError, OSError, RuntimeError, TypeError, ValueError) as exc:
+            logger.debug("Account status prefetch failed (the build reads it inline): %s", exc)
+            return None
+        return _PREFETCHED_ACCOUNT_IDENTITY.set(identity)
+
+    @staticmethod
+    def clear_prefetched_account_identity(token: contextvars.Token[Any] | None) -> None:
+        if token is not None:
+            _PREFETCHED_ACCOUNT_IDENTITY.reset(token)
+
     def _build_account_status_context(self) -> list[Frame]:
         """Build the VIOLA ACCOUNT sign-in status block.
 
@@ -1852,13 +1886,15 @@ class ContextBuilder:
         manually-entered display name/address used for form-filling and says
         nothing about whether a Viola account is actually signed in.
         """
-        try:
-            from auth.desktop_session import get_desktop_account_identity
+        identity = _PREFETCHED_ACCOUNT_IDENTITY.get()
+        if identity is None:
+            try:
+                from auth.desktop_session import get_desktop_account_identity
 
-            identity = get_desktop_account_identity()
-        except (ImportError, OSError, RuntimeError, TypeError, ValueError) as exc:
-            logger.debug("Account status context lookup failed (non-fatal): %s", exc)
-            return []
+                identity = get_desktop_account_identity()
+            except (ImportError, OSError, RuntimeError, TypeError, ValueError) as exc:
+                logger.debug("Account status context lookup failed (non-fatal): %s", exc)
+                return []
 
         header = "VIOLA ACCOUNT (this Viola app's own sign-in state on this device):"
         if identity.signed_in:

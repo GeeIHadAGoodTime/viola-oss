@@ -15,6 +15,8 @@ from __future__ import annotations
 
 import itertools
 import re
+import threading
+from collections import OrderedDict
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
@@ -191,13 +193,54 @@ def _mask_card_field_value(value: Any, key_path: tuple[str, ...], seen: set[int]
     return _redact_card_any(value, key_path, seen, depth)
 
 
+# The trace writer, the step log and the task log redact the same strings
+# (system prompt, tool schemas, earlier messages) on every turn: about 0.6 s of
+# regex work per turn in the trace writer alone. That work held the GIL while
+# the first spoken sentence was being synthesized (live, 2026-10-31). A string's
+# redaction depends only on the string and on whether it sits under a phone
+# field, so an identical string reuses its earlier result. Bounded.
+_CARD_STRING_MEMO: OrderedDict[tuple[bool, str], str] = OrderedDict()
+_CARD_STRING_MEMO_LOCK = threading.Lock()
+_CARD_STRING_MEMO_MIN_CHARS = 24
+_CARD_STRING_MEMO_MAX_ENTRIES = 20_000
+_CARD_STRING_MEMO_MAX_CHARS = 16_000_000
+_card_string_memo_chars = 0
+
+
 def _redact_card_string(value: str, key_path: tuple[str, ...]) -> str:
+    global _card_string_memo_chars
+    phone_context = _has_phone_context(key_path)
+    if len(value) < _CARD_STRING_MEMO_MIN_CHARS or len(value) > _CARD_STRING_MEMO_MAX_CHARS // 8:
+        return _redact_card_string_uncached(value, phone_context)
+    key = (phone_context, value)
+    with _CARD_STRING_MEMO_LOCK:
+        cached = _CARD_STRING_MEMO.get(key)
+        if cached is not None:
+            _CARD_STRING_MEMO.move_to_end(key)
+            return cached
+    redacted = _redact_card_string_uncached(value, phone_context)
+    if redacted == _REDACTED_SANITIZER_ERROR:
+        return redacted
+    with _CARD_STRING_MEMO_LOCK:
+        if key not in _CARD_STRING_MEMO:
+            _CARD_STRING_MEMO[key] = redacted
+            _card_string_memo_chars += len(value)
+            while _CARD_STRING_MEMO and (
+                len(_CARD_STRING_MEMO) > _CARD_STRING_MEMO_MAX_ENTRIES
+                or _card_string_memo_chars > _CARD_STRING_MEMO_MAX_CHARS
+            ):
+                (_phone, old_value), _old = _CARD_STRING_MEMO.popitem(last=False)
+                _card_string_memo_chars -= len(old_value)
+    return redacted
+
+
+def _redact_card_string_uncached(value: str, phone_context: bool) -> str:
     try:
         redacted = _CVC_INLINE_RE.sub(r"\1***\3", value)
         redacted = _redact_spoken_cvc(redacted)
     except _SANITIZER_EXCEPTIONS:
         return _REDACTED_SANITIZER_ERROR
-    if _has_phone_context(key_path):
+    if phone_context:
         try:
             return mask_secrets_in_text(redacted, include_card_data=False)
         except _SANITIZER_EXCEPTIONS:
