@@ -30,10 +30,10 @@
   },
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "58e866101441131820c5fef0c5ca21dab04362d776f0c6dc7ce6b98b56883c03",
-  "source_tree_sha256": "da44de4b98f1d640786fccfff48abd72e8b0e4d11e28d1defceb36225ee2738f",
+  "source_manifest_sha256": "8ed4ab8fa9bbec62631fb7d48220da0d4a052f1d1e3c87d0b646155dfa557065",
+  "source_tree_sha256": "a604f0592903f7e0949a29a47a79c77663ca42941c32dc8660ee02d08f877fe3",
   "source_file_count": 2773,
-  "source_revision": "76b25eef6aa87dc1e233124e555d5d41d23cbd6e",
+  "source_revision": "4d7ae4524c9ecbe3cf6e0de49f16ef6c6a6f7d34",
   "comparison_public_revision": "ecab2772465fcc89ae6645b028af1c2273b9199f",
   "changed_source_paths": [
     "START_WEB_INTERFACE.py",
@@ -314,6 +314,8 @@
     "ui/react-app/src/components/settings/WakeSensitivitySlider.test.jsx",
     "ui/react-app/src/components/settingsSearch.js",
     "ui/react-app/src/components/settingsSearch.test.js",
+    "ui/react-app/src/components/stage/CommandPalette.jsx",
+    "ui/react-app/src/components/stage/CommandPalette.test.jsx",
     "ui/react-app/src/components/stage/modes/browser/BrowserMode.jsx",
     "ui/react-app/src/components/stage/modes/browser/BrowserMode.module.css",
     "ui/react-app/src/components/stage/modes/browser/BrowserMode.test.jsx",
@@ -481,8 +483,8 @@
     "historical_inventory_limits": "This renderer correction changes no dependency or workflow inputs. All six retained SBOMs and their complete status objects stay historical and unchanged; no current installed inventory qualification is claimed."
   },
   "qualification": {
-    "source_commit": "76b25eef6aa87dc1e233124e555d5d41d23cbd6e",
-    "kind": "round 7 integration"
+    "source_commit": "4d7ae4524c9ecbe3cf6e0de49f16ef6c6a6f7d34",
+    "kind": "r8 overlay polish"
   },
   "historical_bindings": [
     {
