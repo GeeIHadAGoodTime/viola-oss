@@ -70,8 +70,11 @@ describe('PhoneToSModal', () => {
         'X-CSRF-Token': 'desktop-csrf-token',
       }),
     }));
-    const [, { headers }] = fetchSpy.mock.calls[0];
+    const [, { headers, body }] = fetchSpy.mock.calls[0];
     expect(Object.keys(headers).some((name) => name.toLowerCase() === 'authorization')).toBe(false);
+    // The window lists the call permissions, so I agree asks for them too; the
+    // web app's cloud handler records them (the desktop backend ignores it).
+    expect(JSON.parse(body)).toEqual({ grant_call_permissions: true });
     expect(onAccepted).toHaveBeenCalledWith({ accepted: true });
     expect(onClose).toHaveBeenCalledTimes(1);
   });

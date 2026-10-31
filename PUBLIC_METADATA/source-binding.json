@@ -30,10 +30,10 @@
   },
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "0fe37b41dfd1d000482d521a52b93b879ae2faf67aaa9bb4649886e41c9ff9f2",
-  "source_tree_sha256": "da0d091b7f3e49a19afa2a1780cc4635b2b7fcc0d8ff09d29ca7f3364540657d",
+  "source_manifest_sha256": "17a5f2dfd0f1e9d85e3b5a22a2fd2b90b0aa3bf80bd7ccc8d5740d570caa9560",
+  "source_tree_sha256": "699e646eb8d4f48e09bd718a6e31d9326cc0754300bedf751890521ed56ccc78",
   "source_file_count": 2776,
-  "source_revision": "b9adf0e50d7b90f7b0f4f92640fcb2e0ead48c80",
+  "source_revision": "a89bd0a4f3ac7186968fd48a78c3f347520e05fd",
   "comparison_public_revision": "ecab2772465fcc89ae6645b028af1c2273b9199f",
   "changed_source_paths": [
     "START_WEB_INTERFACE.py",
@@ -491,8 +491,8 @@
     "historical_inventory_limits": "This renderer correction changes no dependency or workflow inputs. All six retained SBOMs and their complete status objects stay historical and unchanged; no current installed inventory qualification is claimed."
   },
   "qualification": {
-    "source_commit": "b9adf0e50d7b90f7b0f4f92640fcb2e0ead48c80",
-    "kind": "gmail mailbox off by default"
+    "source_commit": "a89bd0a4f3ac7186968fd48a78c3f347520e05fd",
+    "kind": "r8/phone-web"
   },
   "historical_bindings": [
     {
