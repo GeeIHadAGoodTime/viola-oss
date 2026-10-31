@@ -6,11 +6,22 @@ import { authFetch } from '../hooks/useViolaApi';
 
 export const PHONE_TOS_AUDIT_NOTICE = 'Phone calls placed through Viola are recorded and transcribed by default for your audit trail, so Viola is not a black box: you can review what it said and did on your behalf. By default, the called party hears at the start of every call that the call may be recorded and transcribed for your records. You can change call recording, transcript retention, and proactive AI announcement at any time in Phone Settings.';
 
+// What "I agree" also turns on for the account (telephony/routes.py grants
+// whichever of these the cloud says are missing). Keep in sync with
+// intent/tools/phone_call.py::PHONE_CLOUD_CONSENTS.
+export const PHONE_CLOUD_CONSENT_LABELS = {
+  voice_recording: 'Record the call audio',
+  cloud_llm: "Use Viola's cloud AI to talk on the call",
+  data_retention: 'Keep call recordings and transcripts in your account',
+};
+const PHONE_CLOUD_CONSENT_ORDER = ['voice_recording', 'cloud_llm', 'data_retention'];
+
 export default function PhoneToSModal({ isOpen, onClose, onAccepted = null, payload = null }) {
   const [submitting, setSubmitting] = useState(false);
   const submissionInFlight = useRef(false);
   const [error, setError] = useState('');
   const message = payload?.message || 'Accept the Phone Calling Terms of Service before making calls.';
+  const missingConsents = Array.isArray(payload?.missing_consents) ? payload.missing_consents : [];
 
   const handleClose = () => {
     if (!submissionInFlight.current) onClose();
@@ -106,6 +117,19 @@ export default function PhoneToSModal({ isOpen, onClose, onAccepted = null, payl
               {PHONE_TOS_AUDIT_NOTICE}
             </p>
           </div>
+          <div aria-label="Phone call permissions" style={{ margin: '0 0 14px' }}>
+            <p style={{ margin: '0 0 6px', color: THEME.colors.textPrimary, fontWeight: 700 }}>
+              Choosing I agree also allows Viola, for the calls you ask it to place, to:
+            </p>
+            <ul style={{ margin: '0 0 0 18px', padding: 0 }}>
+              {PHONE_CLOUD_CONSENT_ORDER.map((consent) => (
+                <li key={consent}>
+                  {PHONE_CLOUD_CONSENT_LABELS[consent]}
+                  {missingConsents.includes(consent) ? ' (not on yet)' : ''}
+                </li>
+              ))}
+            </ul>
+          </div>
           <p style={{ margin: '0 0 10px' }}>
             You authorize Viola to place user-initiated phone calls on your behalf. You are the principal and responsible party for the purpose, content, and legality of each call you direct Viola to place.
           </p>
@@ -149,5 +173,7 @@ PhoneToSModal.propTypes = {
   onAccepted: PropTypes.func,
   payload: PropTypes.shape({
     message: PropTypes.string,
+    missing_consents: PropTypes.arrayOf(PropTypes.string),
+    resume_after_accept: PropTypes.bool,
   }),
 };

@@ -636,6 +636,289 @@ def _cloud_error_payload(response: httpx.Response) -> dict[str, Any]:
     return payload if isinstance(payload, dict) else {}
 
 
+# ---------------------------------------------------------------------------
+# Cloud phone consents
+# ---------------------------------------------------------------------------
+# The cloud refuses to place an AI call until the account holds these three
+# consent records (services/cloud_consent.py::can_start_voice_session). The
+# desktop used to find that out only from the dial's HTTP 403, AFTER asking the
+# user to confirm the call, and then handed the agent nothing but "Cloud phone
+# call failed (HTTP 403)" (1.0.5 laptop A6.6a). Keep the order: it is the order
+# the Phone Calling Terms window and the agent's sentence list them in.
+PHONE_CLOUD_CONSENTS: tuple[str, ...] = ("voice_recording", "cloud_llm", "data_retention")
+_PHONE_CONSENT_LABELS = {
+    "voice_recording": "record the call audio",
+    "cloud_llm": "use Viola's cloud AI to talk on the call",
+    "data_retention": "keep call recordings and transcripts in your account",
+}
+_PHONE_CONSENT_SOURCE = "desktop_phone_terms"
+_PHONE_READINESS_TIMEOUT_SECONDS = 5.0
+
+
+def _ordered_phone_consents(consents: Any) -> list[str]:
+    """Known consents first in the disclosure order, then anything new the cloud adds."""
+    if not isinstance(consents, list | tuple | set | frozenset):
+        return []
+    wanted = [str(item).strip() for item in consents if str(item).strip()]
+    ordered = [consent for consent in PHONE_CLOUD_CONSENTS if consent in wanted]
+    ordered.extend(consent for consent in wanted if consent not in ordered)
+    return ordered
+
+
+def _join_phrases(phrases: list[str]) -> str:
+    if len(phrases) <= 1:
+        return "".join(phrases)
+    return "%s and %s" % (", ".join(phrases[:-1]), phrases[-1])
+
+
+def _phone_consent_message(missing_consents: list[str], tos_accepted: bool | None) -> str:
+    needs: list[str] = []
+    if tos_accepted is False:
+        needs.append("the Phone Calling Terms accepted")
+    labels = [_PHONE_CONSENT_LABELS.get(consent, consent.replace("_", " ")) for consent in missing_consents]
+    if labels:
+        needs.append("your permission to %s" % _join_phrases(labels))
+    if not needs:
+        needs.append("the Phone Calling Terms accepted")
+    return (
+        "Nothing was dialed: phone calls aren't set up on this account yet. They need %s. "
+        "I opened the Phone Calling Terms window. Choose I agree there and I'll pick the call back up. "
+        "The same window opens from the Phone tab." % _join_phrases(needs)
+    )
+
+
+def _phone_consent_required_result(
+    *,
+    missing_consents: Any,
+    tos_accepted: bool | None,
+) -> ToolResult:
+    """A structured, user-readable "accept the phone terms first" result.
+
+    Reuses the ``phone_tos_required`` gate code on purpose: the agent executor
+    already broadcasts that code to the desktop, and the desktop already opens
+    the Phone Calling Terms window for it. That window now also grants the
+    missing cloud consents (``telephony/routes.py::accept_phone_tos``).
+    """
+    from core.account_gate import PHONE_TOS_REQUIRED
+
+    missing = _ordered_phone_consents(missing_consents)
+    message = _phone_consent_message(missing, tos_accepted)
+    return ToolResult(
+        ok=False,
+        error=message,
+        data={
+            "error_code": PHONE_TOS_REQUIRED,
+            "message": message,
+            "action": "phone_call",
+            "call_placed": False,
+            "tos_accepted": tos_accepted,
+            "missing_consents": missing,
+            "resume_after_accept": True,
+            "tos_status_url": "/v1/phone/tos-status",
+            "accept_tos_url": "/v1/phone/accept-tos",
+        },
+        error_category="PHONE_TOS_REQUIRED",
+        retryable=False,
+    )
+
+
+def _cloud_error_parts(payload: dict[str, Any]) -> tuple[str, str, dict[str, Any]]:
+    """Return (code, message, details) from a cloud failure envelope."""
+    error = payload.get("error")
+    code = ""
+    message = ""
+    details: dict[str, Any] = {}
+    if isinstance(error, dict):
+        code = str(error.get("code") or "")
+        message = str(error.get("message") or "")
+        if isinstance(error.get("details"), dict):
+            details = dict(error["details"])
+    elif isinstance(error, str):
+        message = error
+    detail = payload.get("detail")
+    if isinstance(detail, dict):
+        code = code or str(detail.get("error") or detail.get("code") or "")
+        message = message or str(detail.get("message") or "")
+    elif isinstance(detail, str):
+        message = message or detail
+    code = code or str(payload.get("error_code") or payload.get("code") or "")
+    message = message or str(payload.get("message") or "")
+    return code, message, details
+
+
+def _cloud_consent_required_result(payload: dict[str, Any]) -> ToolResult | None:
+    code, message, details = _cloud_error_parts(payload)
+    if code != "cloud_consent_required":
+        return None
+    missing = details.get("missing")
+    if not missing:
+        # Older clouds only name the consents in the message text.
+        prefix = "Missing required cloud consents:"
+        if message.startswith(prefix):
+            missing = [part.strip(" .") for part in message[len(prefix) :].split(",")]
+    return _phone_consent_required_result(missing_consents=missing or list(PHONE_CLOUD_CONSENTS), tos_accepted=None)
+
+
+def _envelope_data(payload: Any) -> dict[str, Any]:
+    if not isinstance(payload, dict):
+        return {}
+    data = payload.get("data")
+    return data if isinstance(data, dict) else payload
+
+
+async def fetch_cloud_phone_readiness(
+    *,
+    cloud_url: str | None = None,
+    bearer_token: str | None = None,
+) -> dict[str, Any] | None:
+    """Ask the cloud whether this account can place an AI call right now.
+
+    Returns ``{"tos_accepted": bool | None, "missing_consents": [...]}``, with
+    ``None`` for a part the cloud did not answer, or ``None`` when neither part
+    could be read (no cloud, no bearer, network down). A failed read never
+    blocks a call: the dial itself still enforces both gates.
+    """
+    cloud_url = (cloud_url or _resolve_cloud_url()).rstrip("/")
+    if not cloud_url:
+        return None
+    token = bearer_token if bearer_token is not None else await _resolve_cloud_bearer_token()
+    token = str(token or "").strip()
+    if not token:
+        return None
+
+    headers = _cloud_headers(token)
+    tos_accepted: bool | None = None
+    missing: list[str] | None = None
+    async with httpx.AsyncClient(timeout=_PHONE_READINESS_TIMEOUT_SECONDS) as client:
+        tos_response, consent_response = await asyncio.gather(
+            client.get("%s/v1/phone/tos-status" % cloud_url, headers=headers),
+            client.get("%s/api/v1/consent/checks/voice-session" % cloud_url, headers=headers),
+            return_exceptions=True,
+        )
+    if isinstance(tos_response, httpx.Response) and tos_response.status_code == 200:
+        try:
+            accepted = _envelope_data(tos_response.json()).get("accepted")
+        except ValueError:
+            accepted = None
+        if isinstance(accepted, bool):
+            tos_accepted = accepted
+    elif isinstance(tos_response, BaseException):
+        logger.debug("Phone readiness: tos-status read failed: %s", type(tos_response).__name__)
+    if isinstance(consent_response, httpx.Response) and consent_response.status_code == 200:
+        try:
+            check = _envelope_data(consent_response.json())
+        except ValueError:
+            check = {}
+        if isinstance(check.get("allowed"), bool):
+            missing = [] if check["allowed"] else _ordered_phone_consents(check.get("missing"))
+            if not check["allowed"] and not missing:
+                missing = list(PHONE_CLOUD_CONSENTS)
+    elif isinstance(consent_response, BaseException):
+        logger.debug("Phone readiness: consent check failed: %s", type(consent_response).__name__)
+    if tos_accepted is None and missing is None:
+        return None
+    return {"tos_accepted": tos_accepted, "missing_consents": missing}
+
+
+async def phone_call_readiness_result() -> ToolResult | None:
+    """Return why a call cannot be placed yet, BEFORE the user is asked to confirm it.
+
+    ``None`` means "go ahead and ask": the account looks ready, or readiness
+    could not be determined (the dial path still enforces every gate). Only the
+    hosted desktop path is checked; the cloud surface and independent local
+    installs have their own gates.
+    """
+    if str(getattr(settings, "app_surface", "desktop") or "desktop").strip().lower() == "cloud":
+        return None
+    try:
+        if _uses_independent_local_phone():
+            return None
+    except Exception:
+        logger.debug("Phone readiness: phone mode lookup failed", exc_info=True)
+        return None
+
+    account_gate_result = _paid_phone_call_account_gate_result()
+    if account_gate_result is not None:
+        return account_gate_result
+
+    try:
+        readiness = await fetch_cloud_phone_readiness()
+    except Exception:
+        logger.debug("Phone readiness check failed; leaving it to the dial", exc_info=True)
+        return None
+    if readiness is None:
+        return None
+    missing = readiness.get("missing_consents") or []
+    tos_accepted = readiness.get("tos_accepted")
+    if tos_accepted is not False and not missing:
+        return None
+    logger.info(
+        "Phone call not offered for confirmation: account not ready (terms_accepted=%s, missing_consents=%s)",
+        tos_accepted,
+        ",".join(missing) or "none",
+    )
+    return _phone_consent_required_result(missing_consents=missing, tos_accepted=tos_accepted)
+
+
+async def grant_cloud_consents(
+    consent_types: Any,
+    *,
+    bearer_token: str | None = None,
+    cloud_url: str | None = None,
+    source: str = _PHONE_CONSENT_SOURCE,
+) -> list[str]:
+    """Record consents the user just gave on their cloud account.
+
+    Callers: the Phone Calling Terms window's "I agree" (which discloses all
+    three) and onboarding's "use Viola-managed AI" choice (``cloud_llm`` only,
+    the one it discloses). Returns the consents granted; raises
+    ``RuntimeError`` naming the first one the cloud did not record.
+    """
+    cloud_url = (cloud_url or _resolve_cloud_url()).rstrip("/")
+    token = bearer_token if bearer_token is not None else await _resolve_cloud_bearer_token()
+    token = str(token or "").strip()
+    wanted = [consent for consent in _ordered_phone_consents(consent_types) if consent in PHONE_CLOUD_CONSENTS]
+    if not wanted:
+        return []
+    if not cloud_url or not token:
+        raise RuntimeError("cloud account unavailable")
+    granted: list[str] = []
+    async with httpx.AsyncClient(timeout=_PHONE_READINESS_TIMEOUT_SECONDS) as client:
+        for consent in wanted:
+            response = await client.put(
+                "%s/api/v1/consent/%s" % (cloud_url, consent),
+                headers=_cloud_headers(token),
+                json={"granted": True, "metadata": {"source": source}},
+            )
+            record: Any = {}
+            if response.status_code == 200:
+                try:
+                    data = _envelope_data(response.json())
+                except ValueError:
+                    data = {}
+                record = data.get("record") if isinstance(data.get("record"), dict) else data
+            if not (isinstance(record, dict) and record.get("granted") is True):
+                raise RuntimeError("cloud did not record the %s consent (HTTP %d)" % (consent, response.status_code))
+            granted.append(consent)
+    return granted
+
+
+async def _release_cloud_event_relay_call_lease() -> None:
+    """Drop the relay's call lease after a dial that placed no call.
+
+    Without this the lease (and the cloud socket) waited out the 180 s
+    "no call_started" grace after every refused dial.
+    """
+    try:
+        from telephony.phone_cloud_event_relay import release_phone_cloud_event_relay_call_lease
+    except ImportError:
+        return
+    try:
+        await release_phone_cloud_event_relay_call_lease()
+    except Exception:
+        logger.debug("Phone cloud-event relay call-lease release failed", exc_info=True)
+
+
 def _resolve_user_tier(user_id: str | None = None) -> str:
     """Resolve the canonical plan family for phone-call billing gates.
 
@@ -1148,9 +1431,31 @@ async def _make_phone_call_cloud(
         )
     except httpx.HTTPStatusError as exc:
         status_code = exc.response.status_code
-        tos_result = _cloud_tos_required_result(_cloud_error_payload(exc.response))
+        # The cloud refused the dial, so no call exists for the relay to wait on.
+        await _release_cloud_event_relay_call_lease()
+        error_payload = _cloud_error_payload(exc.response)
+        tos_result = _cloud_tos_required_result(error_payload)
         if tos_result is not None:
             return tos_result
+        consent_result = _cloud_consent_required_result(error_payload)
+        if consent_result is not None:
+            logger.warning(
+                "Cloud phone call refused: account is missing phone consents (%s)",
+                ",".join(consent_result.data.get("missing_consents") or []),
+            )
+            return consent_result
+        error_code, error_message, _details = _cloud_error_parts(error_payload)
+        if error_code == "cloud_consent_unavailable":
+            return ToolResult(
+                ok=False,
+                error=(
+                    "Nothing was dialed: Viola couldn't check your phone permissions just now. "
+                    "Try the call again in a moment."
+                ),
+                error_category="cloud_consent_unavailable",
+                retryable=True,
+                data={"error_code": error_code, "call_placed": False, "http_status": status_code},
+            )
         if status_code == 401:
             return ToolResult(
                 ok=False,
@@ -1171,11 +1476,24 @@ async def _make_phone_call_cloud(
             status_code,
             exc.response.text[:200],
         )
+        # Hand the agent what the cloud said, not just a status number, so it
+        # can tell the user what went wrong. Nothing was dialed either way.
+        reason = error_message.strip().rstrip(".")
         return ToolResult(
             ok=False,
-            error="Cloud phone call failed (HTTP %d)." % status_code,
+            error=(
+                "Cloud phone call failed (HTTP %d): %s. Nothing was dialed." % (status_code, reason)
+                if reason
+                else "Cloud phone call failed (HTTP %d). Nothing was dialed." % status_code
+            ),
+            data={
+                "error_code": error_code,
+                "http_status": status_code,
+                "call_placed": False,
+            },
         )
     except httpx.ConnectError:
+        await _release_cloud_event_relay_call_lease()
         logger.warning("Cloud phone call: cannot reach %s", cloud_url)
         return ToolResult(
             ok=False,
@@ -1189,6 +1507,7 @@ async def _make_phone_call_cloud(
         # fall through to the optimistic handler below and tell the user their
         # call was connecting -- with no_retry set and an empty call_id, so the
         # user could neither retry nor reference the call that did not exist.
+        await _release_cloud_event_relay_call_lease()
         logger.warning("Cloud phone call: connect timed out reaching %s", cloud_url)
         return ToolResult(
             ok=False,
@@ -1235,9 +1554,13 @@ async def _make_phone_call_cloud(
         )
 
     if not resp.get("ok"):
+        await _release_cloud_event_relay_call_lease()
         tos_result = _cloud_tos_required_result(resp)
         if tos_result is not None:
             return tos_result
+        consent_result = _cloud_consent_required_result(resp)
+        if consent_result is not None:
+            return consent_result
         return ToolResult(
             ok=False,
             error=resp.get("error", "Cloud rejected the call request."),

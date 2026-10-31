@@ -8,6 +8,7 @@ Provides REST endpoints for:
 
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -239,6 +240,81 @@ async def _maybe_proxy_phone_tos(request: Request, method: str, path: str) -> JS
     )
 
 
+def _proxied_envelope(response: JSONResponse) -> dict | None:
+    try:
+        body = json.loads(bytes(response.body))
+    except (TypeError, ValueError):
+        return None
+    return body if isinstance(body, dict) else None
+
+
+def _request_cloud_bearer(request: Request) -> str:
+    return str(getattr(request.state, "gotrue_access_token", "") or "").strip()
+
+
+async def _grant_phone_cloud_consents_after_terms(request: Request, proxied: JSONResponse) -> JSONResponse:
+    """Accepting the Phone Calling Terms also turns on the call permissions it discloses.
+
+    The cloud will not place an AI call until the account holds the
+    voice_recording, cloud_llm and data_retention consents
+    (services/cloud_consent.py::can_start_voice_session), and nothing on the
+    desktop ever recorded them: a Pro account that finished onboarding and
+    accepted the terms still got "HTTP 403 cloud_consent_required" on its first
+    call (1.0.5 laptop A6.6a). The Phone Calling Terms window names all three,
+    so its "I agree" records whichever ones the account is missing.
+    """
+    body = _proxied_envelope(proxied)
+    if proxied.status_code != 200 or body is None or body.get("ok") is not True:
+        return proxied
+    from intent.tools.phone_call import (
+        PHONE_CLOUD_CONSENTS,
+        fetch_cloud_phone_readiness,
+        grant_cloud_consents,
+    )
+
+    bearer = _request_cloud_bearer(request)
+    try:
+        readiness = await fetch_cloud_phone_readiness(bearer_token=bearer)
+        missing = (readiness or {}).get("missing_consents")
+        if missing is None:
+            # Unknown: grant the whole disclosed set (each write is idempotent).
+            missing = list(PHONE_CLOUD_CONSENTS)
+        granted = await grant_cloud_consents(missing, bearer_token=bearer) if missing else []
+    except Exception as exc:
+        logger.warning("Phone terms accepted but the call permissions were not saved: %s", exc)
+        return JSONResponse(
+            failure_response(
+                "phone_consent_not_saved",
+                "The phone terms were accepted, but Viola couldn't turn on call recording and cloud AI "
+                "for your account. Check your connection and choose I agree again.",
+            ),
+            status_code=502,
+        )
+    if granted:
+        logger.info("Phone terms accepted; recorded cloud phone consents: %s", ",".join(granted))
+    data = body.get("data") if isinstance(body.get("data"), dict) else {}
+    return JSONResponse(success_response({**data, "accepted": True, "cloud_consents_granted": granted}))
+
+
+async def _with_phone_cloud_consent_status(request: Request, proxied: JSONResponse) -> JSONResponse:
+    """Report missing call permissions next to the terms status, so the Phone tab can ask for both."""
+    body = _proxied_envelope(proxied)
+    data = body.get("data") if body is not None else None
+    if proxied.status_code != 200 or body is None or body.get("ok") is not True or not isinstance(data, dict):
+        return proxied
+    try:
+        from intent.tools.phone_call import fetch_cloud_phone_readiness
+
+        readiness = await fetch_cloud_phone_readiness(bearer_token=_request_cloud_bearer(request))
+    except Exception:
+        logger.debug("Phone consent status lookup failed", exc_info=True)
+        return proxied
+    missing = (readiness or {}).get("missing_consents")
+    if missing is None:
+        return proxied
+    return JSONResponse(success_response({**data, "missing_consents": missing}))
+
+
 @tos_router.post("/accept-tos")
 async def accept_phone_tos(
     request: Request,
@@ -260,7 +336,7 @@ async def accept_phone_tos(
     await csrf_required(request)
     proxied = await _maybe_proxy_phone_tos(request, "POST", "/v1/phone/accept-tos")
     if proxied is not None:
-        return proxied
+        return await _grant_phone_cloud_consents_after_terms(request, proxied)
     # Capture request provenance for the consent audit. The cloud phone_tos
     # table has ip_address_hash / user_agent_hash columns explicitly for
     # this — matches the shape used by auth_events. Resolved through the
@@ -298,7 +374,7 @@ async def get_tos_status(
     user_id = user.id
     proxied = await _maybe_proxy_phone_tos(request, "GET", "/v1/phone/tos-status")
     if proxied is not None:
-        return proxied
+        return await _with_phone_cloud_consent_status(request, proxied)
     tos = get_phone_tos()
     return JSONResponse(success_response(await tos.get_status(user_id)))
 
