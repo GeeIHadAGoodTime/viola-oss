@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '../../test/test-utils';
+import { fireEvent, render, screen, waitFor } from '../../test/test-utils';
 import CommandPalette from './CommandPalette';
 
 function PaletteHarness({ commands }) {
@@ -18,6 +18,20 @@ function PaletteHarness({ commands }) {
 }
 
 describe('CommandPalette', () => {
+  it('Escape closes only the palette, not a layer listening underneath', async () => {
+    const onClose = vi.fn();
+    const underneath = vi.fn();
+    document.addEventListener('keydown', underneath);
+    try {
+      render(<CommandPalette open commands={[]} onClose={onClose} />);
+      fireEvent.keyDown(screen.getByRole('dialog', { name: 'Command palette' }), { key: 'Escape' });
+      expect(onClose).toHaveBeenCalledTimes(1);
+      expect(underneath).not.toHaveBeenCalled();
+    } finally {
+      document.removeEventListener('keydown', underneath);
+    }
+  });
+
   it('closes with Escape and restores focus to the opener', async () => {
     const { user } = render(
       <PaletteHarness
