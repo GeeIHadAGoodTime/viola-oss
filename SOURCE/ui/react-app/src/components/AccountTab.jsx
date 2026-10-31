@@ -1627,14 +1627,16 @@ const isGoogleCalendarSyncConnected = (statusData) => {
   ));
 };
 
-// Shown under the Google row until Google finishes reviewing Viola's app.
-// Keep it short and literal: what the user will see, and what Viola can do.
+// Shown under the Google row before the user connects. Keep it short and
+// literal: what Viola asks for, and what the user will see. Google verified
+// the Calendar and Gmail-sending permissions, so connecting shows Google's
+// normal screen. Gmail reading (gmail.modify) is asked for separately and is
+// not verified yet, so that one step can still show Google's warning.
 export const GOOGLE_CONNECT_NOTE = (
-  "Google is still reviewing Viola, so you'll see a \"Google hasn't verified this app\" screen. "
-  + 'To continue, click Advanced, then Go to Viola. '
-  + 'Viola asks to see and edit your calendar events and to send email for you. It cannot read your inbox. '
-  + 'Your Google sign-in stays on this computer. '
-  + 'Until the review is done, Google limits how many people can connect; if Google blocks the sign-in, contact support.'
+  'Viola asks to see and edit your calendar events and to send email you approve. '
+  + 'Reading and organizing your Gmail is a separate permission Viola asks for the first time you ask about your email; '
+  + "Google has not verified that one yet, so it may show a \"Google hasn't verified this app\" screen (click Advanced, then Go to Viola). "
+  + 'Your Google sign-in stays on this computer.'
 );
 
 export const CalendarSettings = () => {
@@ -1845,7 +1847,7 @@ export const CalendarSettings = () => {
 
       {!isConnected && (
         <div
-          data-testid="google-unverified-note"
+          data-testid="google-connect-note"
           style={{
             padding: '0 20px 12px',
             color: theme.colors.textMuted,

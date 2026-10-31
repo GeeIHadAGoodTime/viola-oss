@@ -81,11 +81,16 @@ def _allowed_additional_scopes(requested: Sequence[str] | None) -> tuple[str, ..
 
     Today that is the Gmail mailbox scope set (incremental consent the first
     time the user asks Viola to read or organize their mail). Any other value
-    is dropped, so a caller cannot widen the Google consent request.
+    is dropped, so a caller cannot widen the Google consent request. When Gmail
+    mailbox access is switched off (``google_gmail_mailbox_enabled``), nothing
+    may be added, so every request stays inside Google's verified scopes.
     """
     if not requested:
         return ()
-    from services.oauth.google import GMAIL_MAILBOX_SCOPES
+    from services.oauth.google import GMAIL_MAILBOX_SCOPES, is_gmail_mailbox_enabled
+
+    if not is_gmail_mailbox_enabled():
+        return ()
 
     allowed = set(GMAIL_MAILBOX_SCOPES)
     return tuple(dict.fromkeys(str(scope).strip() for scope in requested if str(scope).strip() in allowed))

@@ -331,7 +331,10 @@ class SettingsSchema:
     """USDA FoodData Central API key for nutrition lookups"""
 
     google_restricted_features_enabled: bool = False
-    """Enable restricted-scope Gmail and Google Workspace features after verification."""
+    """Enable restricted-scope Google Workspace features (Drive, Docs, Sheets, Chat) after verification."""
+
+    google_gmail_mailbox_enabled: bool = True
+    """Ask Google for Gmail mailbox access (gmail.modify, not yet verified by Google)."""
 
     # =====================================================================
     # Billing Settings

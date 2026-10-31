@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "070124ebddba39d25e259239a332c817a6a692c6",
-  "sha256": "feb19f022cd97c0e695cf243388c5dbc9754b274a9d734742ae19f1cbfc43eda",
+  "revision": "eb178efb0abb7d7ad633e5c2c8c4886641484f91",
+  "sha256": "7dfa433e265daf5eaa247ab28daf6017f9d12217f95cb48135bb254fbe64774b",
   "files": [
     {
       "path": ".env.example",
@@ -880,8 +880,8 @@
     },
     {
       "path": "config/schema.py",
-      "sha256": "fed7000b08a76fe12b3c0af342223017849a2675434a9b2cbc534784ec321057",
-      "bytes": 20661
+      "sha256": "673b90c887627243462b8c0eb05435e939bcf2fa18335819e62b99bca8ce252e",
+      "bytes": 20816
     },
     {
       "path": "config/searxng/render-settings.sh",
@@ -895,8 +895,8 @@
     },
     {
       "path": "config/settings.py",
-      "sha256": "6d215c19893ae8b7976e230ae067e12236541638bc6e58faff5a443f681863a1",
-      "bytes": 74455
+      "sha256": "1fe72efa1b7d1c3e9e679681be49bd50580fbd503ad6f278fc5f7510ae760020",
+      "bytes": 74654
     },
     {
       "path": "config/settings_validation.py",
@@ -2070,8 +2070,8 @@
     },
     {
       "path": "intent/tools/email.py",
-      "sha256": "47958a4f63728f71ab0bc9326d77b82e263eec7c4de0e830fa3412bbd120a80d",
-      "bytes": 63687
+      "sha256": "33a4dcc363ad07a52b0841f2dac10a83100d673d864c3a8d8667ea1744d955a3",
+      "bytes": 65169
     },
     {
       "path": "intent/tools/filesystem.py",
@@ -2725,8 +2725,8 @@
     },
     {
       "path": "music/consent/service.py",
-      "sha256": "91045133feb52684fa25775090724db79f273197877b542e300b628ef5c7518f",
-      "bytes": 31351
+      "sha256": "4a43a4f9289214cd4a2846c28fb641c09d5eb1107a32327389ac1954e779c3ba",
+      "bytes": 31599
     },
     {
       "path": "music/consent/session_manager.py",
@@ -5015,8 +5015,8 @@
     },
     {
       "path": "services/oauth/google.py",
-      "sha256": "72add175eede825d0c65ab93ea7b7b6f2854130780c55901877c89fb7f629e13",
-      "bytes": 7111
+      "sha256": "628981615180be39906bc56ec7e9e79096d3e8374f4ac9a7426e00c704765e93",
+      "bytes": 9195
     },
     {
       "path": "services/oauth/workspace_bridge.py",
@@ -10435,8 +10435,8 @@
     },
     {
       "path": "ui/react-app/src/components/AccountTab.jsx",
-      "sha256": "0a6d6b8bf5ac6e129d1206f3584cf05fe801c363f0d7af5cebfe1e6a9dce2c47",
-      "bytes": 90174
+      "sha256": "5848a5929c38ed8d5125b26e6ec7b896db5025faf9d116c852afcfe69ad9cd7f",
+      "bytes": 90358
     },
     {
       "path": "ui/react-app/src/components/AccountTab.legacy.jsx",
@@ -10680,8 +10680,8 @@
     },
     {
       "path": "ui/react-app/src/components/GoogleConnectSettings.test.jsx",
-      "sha256": "adc1d75c713e3321687a3e04d143679c78042ff57d27cbc71769715f9a480baa",
-      "bytes": 3100
+      "sha256": "9bb3387c8416128c36112547337cf38bdcce5e057f65610eb6dc1b07577fc47c",
+      "bytes": 3615
     },
     {
       "path": "ui/react-app/src/components/HelpModal.jsx",
