@@ -34,14 +34,30 @@ Protocol — messages to client:
                            client can offer an upgrade route beside a reply it
                            can otherwise only speak aloud (candidate C-077).
   Binary: TTS PCM audio prefixed with b"TTS\\x00" and sample-rate metadata
+  {"type": "tts_end"} -> sent only to clients that declared ``tts_stream``:
+                         the last TTS frame of this turn has been sent.
+
+Per-sentence speech (``tts_stream``): a client that plays several TTS frames
+of one turn back to back says so with ``"tts_stream": true`` on
+start_listening or ptt_start (or ``?tts_stream=1``). Its voice turns get one
+TTS frame per final-answer sentence while the model is still writing (the same
+speech gate as the hub's own voice turns), then command_result, the unspoken
+remainder and ``tts_end``. A client that never declared it (the current iOS
+app, older headless spokes) gets command_result and one whole-reply frame,
+exactly as before. Barge-in (ptt_start, a spoke wake, or ``{"type":
+"tts_stop"}``) stops further frames of the running turn.
 """
 
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import inspect
 import json
 import time
+import uuid
+from collections.abc import Iterator
+from http import HTTPStatus
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -483,8 +499,14 @@ async def _send_command_result(
     transcript: str,
     response_text: str,
     cap_state: dict[str, object] | None = None,
+    speech: _SpokeTurnSpeech | None = None,
 ) -> None:
-    """Send JSON command feedback followed by optional TTS PCM."""
+    """Send JSON command feedback followed by optional TTS PCM.
+
+    With ``speech`` (a per-sentence turn) only the final answer's unspoken part
+    is synthesized here, after the sentences already sent; with nothing spoken
+    live the whole reply is, exactly as without it.
+    """
     frame: dict[str, object] = {
         "type": "command_result",
         "transcript": transcript,
@@ -502,10 +524,30 @@ async def _send_command_result(
         logger.debug("Failed to send command result to voice stream client")
         return
 
+    text_to_speak = response_text
+    if speech is not None:
+        # Queues the unspoken remainder behind the sentences already sent and
+        # waits for the last frame; returns the whole reply when nothing was
+        # spoken live (no answer events, held first sentence).
+        text_to_speak = await speech.finish(response_text)
+
+    await _send_whole_tts(session, text_to_speak)
+    if getattr(session, "tts_stream", False):
+        try:
+            await session.ws.send_text(json.dumps({"type": "tts_end"}))
+        except Exception:
+            logger.debug("Failed to send tts_end to voice stream client")
+
+
+async def _send_whole_tts(session: _SpokeVoiceSession, text: str) -> None:
+    """Synthesize ``text`` and send it as one TTS frame (nothing for empty text)."""
+    if not text or not text.strip():
+        return
+
     from voice.synthesis.spoke_tts_broadcast import suppress_spoke_tts_broadcast
 
     with suppress_spoke_tts_broadcast():
-        pcm, sample_rate = await _synthesize_tts_bytes(session.app, response_text, session.room)
+        pcm, sample_rate = await _synthesize_tts_bytes(session.app, text, session.room)
     if not pcm:
         return
 
@@ -520,6 +562,170 @@ async def _send_command_result(
         )
     except Exception:
         logger.exception("Voice stream: failed to send TTS response (room=%s)", session.room)
+
+
+def _client_declares_tts_stream(value: object) -> bool:
+    """True for ``"tts_stream": true`` in a client message or ``?tts_stream=1``."""
+    if value is True:
+        return True
+    return isinstance(value, str) and value.strip().lower() in {"1", "true", "yes"}
+
+
+class _SpokeTurnSpeech:
+    """One spoke voice turn spoken sentence by sentence as TTS frames.
+
+    The hub's own voice turns speak through :class:`voice.streamed_reply.StreamedReply`
+    into Kokoro's ``speak_streaming``. A spoke turn uses the same reply object
+    (stream listener plus ``FinalAnswerSpeechGate``: only final-answer text no
+    guard can still change, never twice) with a different sink: one ordered
+    sender task that synthesizes each released sentence and sends it to this
+    socket as its own TTS frame. Nothing reaches the hub's speakers or the
+    other spokes (``suppress_spoke_tts_broadcast``).
+    """
+
+    def __init__(self, session: _SpokeVoiceSession, *, user_id: str) -> None:
+        from voice.streamed_reply import StreamedReply
+
+        self._session = session
+        self.user_id = user_id
+        self.stream_id = "spoke-%s" % uuid.uuid4().hex
+        self.stopped = False
+        self.frames_sent = 0
+        self._sender: asyncio.Task[None] | None = None
+        self._registered = False
+        self.reply = StreamedReply(
+            None,
+            user_id=user_id,
+            stream_id=self.stream_id,
+            start_speaking=self._start_sender,
+        )
+
+    @classmethod
+    def for_turn(cls, session: _SpokeVoiceSession, *, user_id: str) -> _SpokeTurnSpeech | None:
+        """Per-sentence speech for this turn, or None (one whole-reply frame as before)."""
+        if not getattr(session, "tts_stream", False):
+            return None
+        try:
+            from voice.streamed_reply import answer_replacing_hooks_registered, streamed_speech_enabled
+
+            if not streamed_speech_enabled():
+                return None
+            if answer_replacing_hooks_registered(user_id):
+                logger.info("Voice stream: per-sentence speech off for this turn; a hook can replace the answer")
+                return None
+            tts = _resolve_voice_stream_tts(session.app)
+            if tts is None or not callable(getattr(tts, "synthesize", None)):
+                return None
+            return cls(session, user_id=user_id)
+        except Exception:  # noqa: BLE001, RUF100 - whole-reply speech is the safe fallback
+            logger.debug("Voice stream: per-sentence speech unavailable", exc_info=True)
+            return None
+
+    @contextlib.contextmanager
+    def listening(self, *, in_process: bool) -> Iterator[str | None]:
+        """Listen for this turn's answer events; yield the stream id the command runs under.
+
+        ``in_process``: the command runs in this task (cloud dispatcher), so the
+        stream is bound and scoped here, as ``StreamedReply`` does for the hub.
+        Otherwise the stream is only registered and its id goes to /v1/command,
+        which binds and scopes it like a typed command's stream. Yields None when
+        the stream could not be set up; the reply is then spoken whole.
+        """
+        from services.llm.stream_bus import bind_stream_producer, command_stream_context, register_stream
+
+        try:
+            if in_process:
+                bind_stream_producer(self.stream_id, owner_id=self.user_id)
+            else:
+                register_stream(self.stream_id, owner_id=self.user_id)
+            self._registered = True
+        except Exception:  # noqa: BLE001, RUF100 - whole-reply speech is the safe fallback
+            logger.debug("Voice stream: per-sentence speech stream setup failed", exc_info=True)
+        if not self._registered:
+            self.reply.gate.stop_live("not_attached")
+            yield None
+            return
+        scope = command_stream_context(self.stream_id) if in_process else contextlib.nullcontext()
+        with self.reply.attached(), scope:
+            yield self.stream_id
+
+    def detach(self, reason: str) -> None:
+        """No live speech for the rest of this turn (the command will not publish on it)."""
+        self.reply.gate.stop_live(reason)
+
+    def _start_sender(self, _reply: object) -> asyncio.Future[None]:
+        self._sender = asyncio.ensure_future(self._send_sentences())
+        return self._sender
+
+    async def _send_sentences(self) -> None:
+        from voice.synthesis.spoke_tts_broadcast import suppress_spoke_tts_broadcast
+
+        session = self._session
+        with suppress_spoke_tts_broadcast():
+            async for sentence in self.reply.sentences():
+                if self.stopped or session.closed:
+                    return
+                pcm, sample_rate = await _synthesize_tts_bytes(session.app, sentence, session.room)
+                if self.stopped or session.closed:
+                    return
+                if not pcm:
+                    continue
+                try:
+                    await session.ws.send_bytes(encode_tts_frame(pcm, sample_rate))
+                except Exception:
+                    logger.debug("Voice stream: failed to send a sentence frame (room=%s)", session.room)
+                    self.stopped = True
+                    return
+                self.frames_sent += 1
+                if self.frames_sent == 1:
+                    logger.info(
+                        "Voice stream: first sentence frame sent %.0f ms after the command started (room=%s)",
+                        (time.monotonic() - self.reply.created_at) * 1000.0,
+                        session.room,
+                    )
+
+    async def finish(self, final_message: str) -> str:
+        """End the turn's speech; return the text still to send as one whole frame.
+
+        After a barge-in nothing more is said. When sentences were sent live,
+        only the final answer's unspoken part is queued behind them (under the
+        same length cap a whole reply gets) and this waits for the last frame.
+        """
+        if self.stopped:
+            self.reply.cancel()
+            return ""
+        whole = self.reply.finish(final_message)
+        sender = self._sender
+        if sender is not None:
+            # wait() rather than await: a sender cancelled by a barge-in must
+            # not look like this task being cancelled, and vice versa.
+            await asyncio.wait({sender})
+        if self.stopped:
+            return ""
+        return whole
+
+    def stop(self, reason: str) -> None:
+        """Barge-in or a retired connection: send no further frames for this turn."""
+        if self.stopped:
+            return
+        self.stopped = True
+        logger.info("Voice stream: per-sentence speech stopped (%s, room=%s)", reason, self._session.room)
+        self.reply.cancel()
+        sender = self._sender
+        if sender is not None and not sender.done():
+            sender.cancel()
+
+    def close(self) -> None:
+        """Release the turn's stream and any sender still running."""
+        sender = self._sender
+        if sender is not None and not sender.done():
+            sender.cancel()
+        if self._registered:
+            from services.llm.stream_bus import remove_stream
+
+            with contextlib.suppress(Exception):
+                remove_stream(self.stream_id)
+            self._registered = False
 
 
 # ---------------------------------------------------------------------------
@@ -582,6 +788,11 @@ class _SpokeVoiceSession:
         # Guard against firing _handle_command twice when both server-side
         # silence detection and an explicit ptt_stop race to end capture.
         self._command_handled: bool = False
+        # The client plays several TTS frames of one turn back to back (it
+        # declared ``tts_stream``), so its turns may be spoken per sentence.
+        self.tts_stream: bool = False
+        # The running turn's per-sentence speech, stopped on barge-in.
+        self.turn_speech: _SpokeTurnSpeech | None = None
 
         # Spoke diagnostics (zero-cost when VIOLA_SPOKE_WAKE_DIAG != 1)
         # Import deferred to avoid pulling in ONNX runtime at module load
@@ -674,6 +885,12 @@ class _SpokeVoiceSession:
         """Return captured command audio as raw int16 PCM."""
         self._capturing_command = False
         return b"".join(self._command_chunks)
+
+    def stop_turn_speech(self, reason: str) -> None:
+        """Barge-in: send no further sentence frames for the running turn."""
+        speech = self.turn_speech
+        if speech is not None:
+            speech.stop(reason)
 
 
 # ---------------------------------------------------------------------------
@@ -794,6 +1011,8 @@ async def _run_voice_stream_connection(
         session_token=session_token,
         wake_engine=wake_engine,
     )
+    query_params = getattr(ws, "query_params", None) or {}
+    session.tts_stream = _client_declares_tts_stream(query_params.get("tts_stream"))
 
     from core.user_context import reset_current_user_id, set_current_user_id
 
@@ -916,6 +1135,9 @@ async def _run_voice_stream_connection(
                                 }
                             )
                         )
+                        # A new command on this spoke is a barge-in on
+                        # the reply still being spoken to it.
+                        session.stop_turn_speech("wake")
                         # Start capturing command audio
                         session.start_command_capture()
 
@@ -926,6 +1148,8 @@ async def _run_voice_stream_connection(
                     continue
 
                 kind = data.get("type")
+                if _client_declares_tts_stream(data.get("tts_stream")):
+                    session.tts_stream = True
                 if kind == "start_listening":
                     session.listening = True
                     # Read and store the PCM sample rate reported by the
@@ -953,6 +1177,7 @@ async def _run_voice_stream_connection(
                     await ws.send_text(json.dumps({"type": "listening_status", "active": False}))
                     logger.info("Voice stream: listening stopped (room=%s)", room)
                 elif kind == "ptt_start":
+                    session.stop_turn_speech("ptt_start")
                     session.start_ptt_capture()
                     await ws.send_text(json.dumps({"type": "ptt_status", "active": True}))
                     logger.info("Voice stream: PTT started (room=%s)", room)
@@ -969,6 +1194,10 @@ async def _run_voice_stream_connection(
                     else:
                         session._ptt_active = False
                         await ws.send_text(json.dumps({"type": "ptt_status", "active": False}))
+                elif kind == "tts_stop":
+                    # The client stopped playback: send no further frames
+                    # for the running turn.
+                    session.stop_turn_speech("tts_stop")
                 elif kind == "ping":
                     # CONFIRM-6 warm-keeping: client-side idle keepalive
                     # (~20s cadence) so this connection stays alive between
@@ -1172,6 +1401,43 @@ async def _handle_command(session: _SpokeVoiceSession, _engine) -> None:
         user_id,
     )
 
+    # Per-sentence speech for clients that declared tts_stream; None keeps the
+    # one whole-reply frame.
+    speech = _SpokeTurnSpeech.for_turn(session, user_id=user_id)
+    if speech is not None:
+        session.turn_speech = speech
+    try:
+        await _run_spoke_command(
+            session,
+            transcript=transcript,
+            user_id=user_id,
+            base=base,
+            headers=headers,
+            verify=verify,
+            cookies=cookies,
+            speech=speech,
+        )
+    finally:
+        if speech is not None:
+            if session.turn_speech is speech:
+                session.turn_speech = None
+            speech.close()
+
+
+async def _run_spoke_command(
+    session: _SpokeVoiceSession,
+    *,
+    transcript: str,
+    user_id: str,
+    base: str,
+    headers: dict[str, str],
+    verify: bool,
+    cookies: dict[str, str] | None,
+    speech: _SpokeTurnSpeech | None,
+) -> None:
+    """Run a transcribed spoke command and send its result (and speech) back."""
+    import httpx
+
     # 2. Execute command. Prefer an in-process command dispatcher (cloud-native
     # path). The /v1/command HTTP loopback cannot authenticate from the WS
     # context: the session token here is a one-shot ws-auth ticket, not a
@@ -1182,13 +1448,15 @@ async def _handle_command(session: _SpokeVoiceSession, _engine) -> None:
     dispatcher = _resolve_voice_stream_command(session.app)
     if dispatcher is not None:
         try:
-            result = await dispatcher.dispatch(
-                transcript,
-                user_id=user_id,
-                device_id="browser",
-                origin_channel="voice",
-                companion_online=False,
-            )
+            listening = speech.listening(in_process=True) if speech is not None else contextlib.nullcontext()
+            with listening:
+                result = await dispatcher.dispatch(
+                    transcript,
+                    user_id=user_id,
+                    device_id="browser",
+                    origin_channel="voice",
+                    companion_online=False,
+                )
             if isinstance(result, dict):
                 response_text = result.get("message", "") or ""
                 cap_state = cap_state_from_response(result)
@@ -1203,12 +1471,34 @@ async def _handle_command(session: _SpokeVoiceSession, _engine) -> None:
                 "user_id": user_id,
             }
 
+            listening = speech.listening(in_process=False) if speech is not None else contextlib.nullcontext()
             async with httpx.AsyncClient(timeout=30.0, verify=verify, cookies=cookies) as client:
-                resp = await client.post(
-                    f"{base}/v1/command",
-                    json=request_body,
-                    headers={**headers, "Content-Type": "application/json"},
-                )
+                with listening as stream_id:
+                    if stream_id:
+                        # /v1/command binds and scopes this stream like a
+                        # typed command's, so its answer events reach us.
+                        request_body["stream_id"] = stream_id
+                    resp = await client.post(
+                        f"{base}/v1/command",
+                        json=request_body,
+                        headers={**headers, "Content-Type": "application/json"},
+                    )
+                    if stream_id and resp.status_code in (HTTPStatus.FORBIDDEN, HTTPStatus.CONFLICT):
+                        # The route refused the stream before running anything
+                        # (its principal differs from this socket's). Run the
+                        # command without it: the reply is spoken whole.
+                        logger.info(
+                            "Voice stream: /v1/command refused the speech stream (%d); running without it (room=%s)",
+                            resp.status_code,
+                            session.room,
+                        )
+                        speech.detach("stream_refused")
+                        request_body.pop("stream_id", None)
+                        resp = await client.post(
+                            f"{base}/v1/command",
+                            json=request_body,
+                            headers={**headers, "Content-Type": "application/json"},
+                        )
                 if resp.status_code == 200:
                     data = resp.json()
                     envelope = data.get("data", {}) if isinstance(data, dict) else {}
@@ -1251,4 +1541,5 @@ async def _handle_command(session: _SpokeVoiceSession, _engine) -> None:
         transcript=transcript,
         response_text=response_text,
         cap_state=cap_state,
+        speech=speech,
     )

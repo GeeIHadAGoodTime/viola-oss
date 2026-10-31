@@ -10,11 +10,18 @@ without the SRAT header are treated as legacy 16 kHz PCM.
 
 This module wraps the canonical decoder in ``voice.synthesis.tts_wire`` so
 both sides of the wire agree on the format.
+
+One reply can arrive as several frames (one per sentence, while the hub's model
+is still writing). ``sd.play`` cuts off whatever it is playing, so frames are
+queued: a frame that arrives while one is playing starts when that one ends.
+``stop()`` (barge-in) silences the current frame and drops the queue.
 """
 
 from __future__ import annotations
 
 import threading
+import time
+from collections import deque
 from typing import Any
 
 from core.logging_config import get_logger
@@ -38,6 +45,15 @@ class TTSReceiver:
         self._device = device
         self._lock = threading.Lock()
         self._sd: Any = None
+        # Playback queue: frames waiting for the current one to end.
+        self._cond = threading.Condition(self._lock)
+        self._queue: deque[tuple[Any, int]] = deque()
+        self._busy = False
+        self._clip_seconds = 0.0
+        self._clip_started = 0.0
+        # Bumped by stop(): the queue worker abandons the clip it waited on.
+        self._generation = 0
+        self._worker: threading.Thread | None = None
 
     def _ensure_sd(self) -> Any:
         """Lazy-import sounddevice to keep module import lightweight."""
@@ -51,8 +67,9 @@ class TTSReceiver:
         """Play raw int16 mono PCM bytes through speakers.
 
         Called from the mic_streamer receive loop when a TTS binary message
-        arrives. Runs in the caller's thread — sounddevice play() is
-        non-blocking by default.
+        arrives. Never blocks: when nothing is playing the clip starts now (in
+        the caller's thread; sounddevice play() is non-blocking), otherwise it
+        is queued and starts as soon as the clips before it have finished.
 
         ``sample_rate`` defaults to ``TTS_SAMPLE_RATE`` (16 kHz) when the
         caller did not parse one from a SRAT frame header.
@@ -64,25 +81,109 @@ class TTSReceiver:
 
         import numpy as np
 
-        sd = self._ensure_sd()
+        self._ensure_sd()
         samples = np.frombuffer(pcm_bytes, dtype=np.int16)
 
+        with self._cond:
+            if self._busy:
+                self._queue.append((samples, rate))
+                return
+            self._start_locked(samples, rate)
+            self._ensure_worker_locked()
+            self._cond.notify_all()
+
+    def stop(self) -> None:
+        """Barge-in: silence the current clip and drop every queued one."""
+        with self._cond:
+            dropped = len(self._queue)
+            self._queue.clear()
+            was_busy = self._busy
+            self._busy = False
+            self._generation += 1
+            self._cond.notify_all()
+            if not was_busy:
+                return
+            # Under the lock, so a clip started right after this call is not
+            # the one silenced.
+            sd = self._sd
+            stop = getattr(sd, "stop", None) if sd is not None else None
+            if callable(stop):
+                try:
+                    stop()
+                except Exception:
+                    logger.debug("TTS stop failed", exc_info=True)
+        logger.debug("TTS playback stopped (%d queued clip(s) dropped)", dropped)
+
+    @property
+    def queued(self) -> int:
+        """Clips waiting behind the one playing now."""
         with self._lock:
+            return len(self._queue)
+
+    def _start_locked(self, samples: Any, rate: int) -> None:
+        """Start one clip; caller holds the lock."""
+        sd = self._ensure_sd()
+        self._busy = True
+        self._clip_seconds = len(samples) / rate
+        self._clip_started = time.monotonic()
+        try:
+            sd.play(
+                samples,
+                samplerate=rate,
+                device=self._device,
+                blocking=False,
+            )
+            logger.debug(
+                "TTS playback started: %d samples @ %d Hz (%.1fs)",
+                len(samples),
+                rate,
+                self._clip_seconds,
+            )
+        except Exception:
+            logger.exception("TTS playback failed")
+            self._clip_seconds = 0.0
+
+    def _ensure_worker_locked(self) -> None:
+        if self._worker is None or not self._worker.is_alive():
+            self._worker = threading.Thread(target=self._run_queue, name="spoke-tts-queue", daemon=True)
+            self._worker.start()
+
+    def _run_queue(self) -> None:
+        """Start each queued clip when the one before it has finished."""
+        while True:
+            with self._cond:
+                while not self._busy:
+                    self._cond.wait()
+                generation = self._generation
+            self._wait_clip_end(generation)
+            with self._cond:
+                if generation != self._generation:
+                    continue  # stop() ran; nothing of that turn plays on
+                if not self._queue:
+                    self._busy = False
+                    continue
+                samples, rate = self._queue.popleft()
+                self._start_locked(samples, rate)
+
+    def _wait_clip_end(self, generation: int) -> None:
+        """Block until the playing clip ends (or stop() abandons it)."""
+        sd = self._sd
+        wait = getattr(sd, "wait", None) if sd is not None else None
+        if callable(wait):
+            # sounddevice's own end-of-playback signal; stop() releases it.
             try:
-                sd.play(
-                    samples,
-                    samplerate=rate,
-                    device=self._device,
-                    blocking=False,
-                )
-                logger.debug(
-                    "TTS playback started: %d samples @ %d Hz (%.1fs)",
-                    len(samples),
-                    rate,
-                    len(samples) / rate,
-                )
+                wait()
             except Exception:
-                logger.exception("TTS playback failed")
+                logger.debug("TTS playback wait failed", exc_info=True)
+        # Timer backstop (and the only signal for an engine without wait()):
+        # never start the next clip before this one's duration has elapsed.
+        with self._cond:
+            end = self._clip_started + self._clip_seconds
+            while generation == self._generation:
+                remaining = end - time.monotonic()
+                if remaining <= 0:
+                    return
+                self._cond.wait(remaining)
 
     @staticmethod
     def is_tts_message(data: bytes) -> bool:

@@ -490,6 +490,18 @@ export function useVoiceWs(onCommandResult, options = {}) {
               _handleCaptureEnded();
               return;
             }
+            if (msg.type === 'tts_end') {
+              // Every TTS frame of this turn has arrived (sentence frames may
+              // come before command_result, the remainder after it). End the
+              // turn now instead of waiting out TTS_WAIT_CAP_MS for a frame
+              // that is not coming; queued audio keeps playing.
+              if (awaitingTtsRef.current) {
+                _clearTtsWaitTimer();
+                awaitingTtsRef.current = false;
+                _endOfTurn();
+              }
+              return;
+            }
             if (msg.type === 'command_result') {
               const text = msg.transcript || '';
               const responseText = msg.response || '';
@@ -613,8 +625,11 @@ export function useVoiceWs(onCommandResult, options = {}) {
 
     source.connect(processor);
     processor.connect(audioContext.destination);
-    // Tell the server this turn is a PTT (skip wake inference).
-    ws.send(JSON.stringify({ type: 'ptt_start' }));
+    // Tell the server this turn is a PTT (skip wake inference). tts_stream:
+    // playTtsPcm queues frames back to back, so the hub may send this turn's
+    // reply one sentence per frame while the model is still writing, and it
+    // marks the last frame with a `tts_end` message.
+    ws.send(JSON.stringify({ type: 'ptt_start', tts_stream: true }));
     setIsRecording(true);
   }, []);
 
