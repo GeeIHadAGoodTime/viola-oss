@@ -10,13 +10,37 @@ up to about one second of the audio that follows, with the hint
 ``initial_prompt="Viola, "``, and asks one question: does the transcript
 contain something that sounds like "Viola"?
 
-It is a *soft* gate. It rejects a wake only when Whisper clearly heard speech
-and none of it sounds like "Viola". Everything uncertain passes: the model not
-loaded yet, an error or timeout, an empty transcript, audio too quiet to judge
-(whispers, far field), a low-confidence or repetitive (hallucinated) decode.
-Viola's own music playing also passes (tiny.en mishears "Viola" over music).
-A missed real "Viola" is as bad as a false wake, so doubt always lets the wake
-through.
+It is a *soft* gate for a confident detector score. It rejects such a wake
+only when Whisper clearly heard speech and none of it sounds like "Viola".
+Everything uncertain passes: the model not loaded yet, an error or timeout, an
+empty transcript, audio too quiet to judge (whispers, far field), a
+low-confidence or repetitive (hallucinated) decode. A missed real "Viola" is as
+bad as a false wake, so doubt lets a confident wake through.
+
+Two cases are stricter (1.0.5 build-7 laptop report):
+
+- A *low-score* wake: the detector's agreement rule allowed it (k of n frames at
+  the lower per-frame threshold) but the confirming frame scored below the
+  sensitivity level. Then any words Whisper decodes must include a Viola-like
+  token, unsure decode or not. Build 7 let "Yo!" from a rap track through at
+  0.885 (level 0.900) as ``unsure_low_confidence``. Wake-opt data: speech false
+  wakes 11 -> 8 of 22 candidates, music 68 -> 35 of 92, for 0 to 2 points of
+  recall on real recordings (2 only over loud music from another device).
+- A *music-path* wake (``require_token``): while Viola's own music plays, the
+  detector may also wake on a looser rule (``violawake.config``
+  ``MUSIC_WAKE_RULE``) because vocal music masks the word; such a wake passes
+  only on a Viola-like token Whisper is confident about. Doubt rejects it.
+
+The check also runs while Viola's own music plays. It used to be skipped then,
+which let room talk over the music wake Viola with nothing checked (build 7,
+11:34:53, "There we go..."). With the decode early start it costs no extra
+wait; over music it keeps about 90% of detected real wakes in the recorded sets.
+
+A Viola-like token is not trusted when Whisper itself says there was no speech
+and the decode is unsure (``no_speech_prob >= 0.6`` and ``avg_logprob <=
+-1.0``): that is the prompt "Viola, " echoed back over music. All 6 music
+false-wake candidates that decoded a token looked like that, and none of 1,491
+token decodes of real "Viola" recordings did.
 
 Early start: the streaming detector confirms a wake only after k agreeing
 80 ms frames (6 of 7 at Balanced while this check is on, see
@@ -207,6 +231,11 @@ class VerifierConfig:
     # (6 of 7 with the check on) the decode gets about 320 ms of lead, enough
     # for tiny.en on this class of PC; the window ends about where the word does.
     early_start_frames: int = 2
+    # A Viola-like token decoded with no_speech_prob at or above this AND
+    # avg_logprob at or below hallucination_logprob is the prompt echoed back,
+    # not a heard word (see module doc).
+    hallucination_no_speech: float = 0.6
+    hallucination_logprob: float = -1.0
 
 
 @dataclass(frozen=True)
@@ -228,17 +257,38 @@ def _word_count(text: str) -> int:
     return len(_WORD_RE.findall(text.lower()))
 
 
-def decide(info: TranscriptInfo | None, config: VerifierConfig | None = None) -> GateDecision:
-    """The soft gate. Reject only clear speech that holds no Viola-like token."""
+def _hallucinated_token(info: TranscriptInfo, cfg: VerifierConfig) -> bool:
+    return info.no_speech_prob >= cfg.hallucination_no_speech and info.avg_logprob <= cfg.hallucination_logprob
+
+
+def decide(
+    info: TranscriptInfo | None,
+    config: VerifierConfig | None = None,
+    *,
+    low_score: bool = False,
+    require_token: bool = False,
+) -> GateDecision:
+    """The gate.
+
+    Default (a confident detector score): reject only clear speech that holds
+    no Viola-like token. ``low_score``: the confirming frame scored below the
+    sensitivity level, so decoded words without a Viola-like token reject even
+    when the decode is unsure. ``require_token``: only a trusted Viola-like
+    token passes (the looser music-path rule).
+    """
     cfg = config or VerifierConfig()
     if info is None:
-        return GateDecision(True, "no_transcript")
+        return GateDecision(not require_token, "no_transcript")
     text = info.text.strip()
     if not text:
-        return GateDecision(True, "empty")
+        return GateDecision(not require_token, "empty")
     token = find_viola_token(text)
-    if token:
+    if token and not _hallucinated_token(info, cfg):
         return GateDecision(True, "token", token)
+    if require_token:
+        return GateDecision(False, "music_rule_without_viola")
+    if low_score:
+        return GateDecision(False, "low_score_without_viola")
     if info.no_speech_prob >= cfg.no_speech_unsure:
         return GateDecision(True, "unsure_no_speech")
     if info.avg_logprob <= cfg.logprob_unsure:
@@ -317,6 +367,13 @@ class VerificationResult:
     # earlier); "serial": window + tail, decoded after the detector confirmed.
     mode: str = "serial"
     lead_ms: float = 0.0
+    # The sensitivity level the score was compared with (None: not known),
+    # whether the stricter low-score / music-path rule applied, and whether
+    # Viola's own music was playing.
+    level: float | None = None
+    low_score: bool = False
+    require_token: bool = False
+    music: bool = False
 
     def log_line(self) -> str:
         transcript = self.transcript.replace("\n", " ")
@@ -324,9 +381,12 @@ class VerificationResult:
             transcript = transcript[:117] + "..."
         nsp = "-" if self.no_speech_prob is None else f"{self.no_speech_prob:.2f}"
         alp = "-" if self.avg_logprob is None else f"{self.avg_logprob:.2f}"
+        level = "-" if self.level is None else f"{self.level:.3f}"
+        rule = "music_path" if self.require_token else ("low_score" if self.low_score else "normal")
         return (
             f"[WAKE_VERIFY] {'PASS' if self.passed else 'REJECT'} reason={self.reason} "
-            f"score={self.score:.3f} token={self.token or '-'} transcript={transcript!r} "
+            f"score={self.score:.3f} level={level} rule={rule} music={'yes' if self.music else 'no'} "
+            f"token={self.token or '-'} transcript={transcript!r} "
             f"mode={self.mode} lead_ms={self.lead_ms:.0f} "
             f"tail_ms={self.tail_ms:.0f} whisper_ms={self.whisper_ms:.0f} total_ms={self.total_ms:.0f} "
             f"no_speech={nsp} logprob={alp}"
@@ -528,15 +588,20 @@ class WakeVerifier:
         *,
         playback_active: bool = False,
         early: EarlyDecode | None = None,
+        level: float | None = None,
+        require_token: bool = False,
     ) -> VerificationResult:
-        """Decide one wake candidate. Never raises; doubt passes.
+        """Decide one wake candidate. Never raises; doubt passes (not on the music path).
 
         ``window`` is the 1.5 s float32 audio the detector scored (oldest
         sample first). ``read_chunk`` pulls the audio that follows, 80 ms at a
         time, from the same stream the command recorder will read next.
-        ``playback_active``: Viola is playing music. tiny.en mishears "Viola"
-        over music too often (the music recordings lost 6-12% of real wakes
-        in the dev pass), so the wake passes unchecked and without delay.
+        ``playback_active``: Viola is playing music (logged; the check runs
+        either way, see the module doc).
+        ``level``: the sensitivity level; a ``score`` below it is a low-score
+        wake (stricter rule). ``require_token``: the wake came from the looser
+        music-path rule; only a trusted Viola-like token passes and every
+        doubt (model not ready, quiet, timeout, error) rejects.
         ``early``: a decode this wake's agreement run started before the
         detector confirmed (the caller checked it belongs to this wake). Its
         result decides; no tail is read, and the microphone is drained only
@@ -548,6 +613,8 @@ class WakeVerifier:
         mode = "serial"
         lead_ms = 0.0
 
+        low_score = level is not None and float(score) < float(level)
+
         def _result(passed: bool, reason: str, **kw: Any) -> VerificationResult:
             res = VerificationResult(
                 passed=passed,
@@ -557,23 +624,29 @@ class WakeVerifier:
                 total_ms=(time.perf_counter() - started) * 1000,
                 mode=mode,
                 lead_ms=lead_ms,
+                level=level,
+                low_score=low_score,
+                require_token=require_token,
+                music=bool(playback_active),
                 **kw,
             )
             return res
 
-        if playback_active:
-            return _result(True, "music_playing")
+        def _doubt(reason: str, **kw: Any) -> VerificationResult:
+            # Doubt lets a normal wake through; a music-path wake needs a heard "Viola".
+            return _result(not require_token, reason, **kw)
+
         if self._model is None:
             # Never load on the wake path: kick the background load and pass.
             self.warm_async()
-            return _result(True, "not_ready")
+            return _doubt("not_ready")
 
         tail_ms = 0.0
         if early is not None:
             mode = "early"
             lead_ms = max(0.0, (started - early.started) * 1000)
             if early.quiet or early.future is None:
-                return _result(True, "quiet_audio")
+                return _doubt("quiet_audio")
             future: Future[TranscriptInfo] = early.future
             whisper_started = early.started
         else:
@@ -581,7 +654,7 @@ class WakeVerifier:
             rms = _chunk_rms(window)
             peak = float(rms.max()) if len(rms) else 0.0
             if peak < cfg.quiet_audio_rms:
-                return _result(True, "quiet_audio")
+                return _doubt("quiet_audio")
 
             # "Quiet" is relative to the speech peak, but never below the room's
             # own noise floor (else a soft voice in a noisy room never pauses and
@@ -618,15 +691,14 @@ class WakeVerifier:
             try:
                 future = self._executor.submit(self.transcribe, audio)
             except RuntimeError as exc:
-                return _result(True, "error", tail_ms=tail_ms, transcript=str(exc)[:60])
+                return _doubt("error", tail_ms=tail_ms, transcript=str(exc)[:60])
         # The time budget runs from now (the detector confirmed), whichever path.
         deadline = time.perf_counter() + cfg.whisper_timeout_s
         # Keep draining the microphone while Whisper runs so nothing the user
         # says meanwhile is lost (and the input buffer never overflows).
         while not future.done():
             if time.perf_counter() >= deadline:
-                return _result(
-                    True,
+                return _doubt(
                     "timeout",
                     tail_ms=tail_ms,
                     whisper_ms=(time.perf_counter() - whisper_started) * 1000,
@@ -645,8 +717,8 @@ class WakeVerifier:
             info = future.result()
         except Exception as exc:  # noqa: BLE001, RUF100 - doubt passes
             logger.debug("[WAKE_VERIFY] Whisper failed: %s", exc)
-            return _result(True, "error", tail_ms=tail_ms, whisper_ms=whisper_ms)
-        verdict = decide(info, cfg)
+            return _doubt("error", tail_ms=tail_ms, whisper_ms=whisper_ms)
+        verdict = decide(info, cfg, low_score=low_score, require_token=require_token)
         return _result(
             verdict.passed,
             verdict.reason,

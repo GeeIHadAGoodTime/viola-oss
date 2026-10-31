@@ -32,6 +32,16 @@ SPEECH_THRESHOLD: float = 0.5
 # Silence endpoint threshold: below this for silence_duration = end of turn
 SILENCE_THRESHOLD: float = 0.3
 
+# The command recording after a wake (1.0.5 build-7 laptop report, A0.6):
+# - pre-speech window: a user who waits for the chime, or thinks for a moment,
+#   has this long to start talking (it used to be 1 s of silence, counted from
+#   the first frame, which ended the turn with an empty transcript);
+# - end-of-speech: this much non-speech after speech ends the recording;
+# - longest command, counted from the speech onset.
+COMMAND_ONSET_TIMEOUT_S: float = 5.0
+COMMAND_END_SILENCE_S: float = 0.8
+COMMAND_MAX_S: float = 8.0
+
 # Singleton instance
 _instance: SileroEndpointDetector | None = None
 _instance_lock = threading.Lock()
@@ -48,11 +58,23 @@ class SileroEndpointDetector:
         self._model = None
         self._load_failed: bool = False
         self._available: bool = False
+        # Samples left over from the last chunk (process_chunk_full keeps the
+        # 32 ms windows contiguous across 80 ms chunks).
+        self._carry = np.zeros(0, dtype=np.float32)
 
     @property
     def is_available(self) -> bool:
-        """True if VAD model loaded successfully."""
+        """True if VAD model loaded successfully.
+
+        False until the model was loaded once: callers that pick VAD vs RMS
+        must call ``ensure_loaded()`` (reading this first meant the command
+        recorder never loaded the VAD and always used RMS, 1.0.5 build 7).
+        """
         return self._available
+
+    def ensure_loaded(self) -> bool:
+        """Load the model if needed (once; a failed load is not retried). True when usable."""
+        return self._ensure_model()
 
     def _ensure_model(self) -> bool:
         """Lazily load SileroVAD ONNX model. Thread-safe, only tries once."""
@@ -114,8 +136,34 @@ class SileroEndpointDetector:
             )
             return -1.0
 
+    def process_chunk_full(self, audio_int16: np.ndarray) -> float:
+        """Speech probability over the WHOLE chunk: the highest of its 32 ms windows.
+
+        ``process_chunk`` scores only the last 512 samples of a chunk, so 60%
+        of an 80 ms chunk was never heard and the model's state saw gaps.
+        Windows stay contiguous across calls (the remainder carries over).
+        Returns -1.0 when the model is unavailable or fails.
+        """
+        if not self._ensure_model():
+            return -1.0
+        try:
+            audio = np.concatenate([self._carry, audio_int16.astype(np.float32) / 32768.0])
+            usable = len(audio) // _SILERO_WINDOW_SAMPLES * _SILERO_WINDOW_SAMPLES
+            self._carry = audio[usable:].copy()
+            if usable == 0:
+                return 0.0
+            best = 0.0
+            for start in range(0, usable, _SILERO_WINDOW_SAMPLES):
+                prob = float(self._model(audio[start : start + _SILERO_WINDOW_SAMPLES], SAMPLE_RATE_16K))
+                best = max(best, prob)
+            return best
+        except Exception:
+            logger.debug("SileroVAD inference failed, signaling fallback", exc_info=True)
+            return -1.0
+
     def reset_state(self) -> None:
         """Reset VAD internal state between recordings."""
+        self._carry = np.zeros(0, dtype=np.float32)
         if self._model is not None:
             try:
                 self._model.reset_states()

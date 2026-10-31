@@ -706,12 +706,16 @@ class VoiceCommandHandler:
 
             if not ctx.has_audio():
                 exit_reason = "no_audio" if turn == 1 else "follow_up_timeout"
+                if turn == 1:
+                    await self._signal_nothing_heard(ctx, exit_reason)
                 break
 
             # --- Transcribe ---
             transcript = await self._transcribe_audio_with_timeout(ctx)
             if not transcript:
                 exit_reason = "empty_transcript"
+                if turn == 1:
+                    await self._signal_nothing_heard(ctx, exit_reason)
                 break
             if turn > 1 and self._transcript_is_own_reply(transcript):
                 exit_reason = "self_echo"
@@ -740,6 +744,7 @@ class VoiceCommandHandler:
                     _notify_data_collector("no_speech", ctx.data_clip_id)
                     self._unduck_audio()
                     ctx.ducking_cleaned_up = True
+                    await self._signal_nothing_heard(ctx, "no_speech")
                 exit_reason = "no_speech"
                 break
 
@@ -976,9 +981,23 @@ class VoiceCommandHandler:
         """
         logger.debug("Recording audio (buffer mode preferred)")
 
+        from voice.wake_detector.silero_endpoint import (
+            COMMAND_END_SILENCE_S,
+            COMMAND_MAX_S,
+            COMMAND_ONSET_TIMEOUT_S,
+        )
+
         try:
+            # A pre-speech window separate from the end-of-speech silence: the
+            # user may wait for the chime (or think) before speaking.
             audio_buf, sample_rate = await asyncio.wait_for(
-                asyncio.to_thread(self.voice_pipeline.listen_and_record_buffer),
+                asyncio.to_thread(
+                    self.voice_pipeline.listen_and_record_buffer,
+                    500,  # RMS speech level, used only without the Silero VAD
+                    COMMAND_END_SILENCE_S,
+                    COMMAND_MAX_S,
+                    COMMAND_ONSET_TIMEOUT_S,
+                ),
                 timeout=VOICE_COMMAND_TIMEOUT,
             )
 
@@ -1414,6 +1433,41 @@ class VoiceCommandHandler:
             continue_listening=bool(result.get("continue_listening", False)),
         )
         return result
+
+    # What the user reads when a wake heard no command (the tone says it too).
+    NOTHING_HEARD_MESSAGE = "I didn't hear anything after the chime. Try again: say Viola, then your request."
+
+    async def _signal_nothing_heard(self, ctx: CommandContext, reason: str) -> None:
+        """Tell the user the wake ended without a command (a soft tone and a toast).
+
+        Build 7 ended these turns in silence: a user who waited for the chime
+        and then spoke got nothing back and no sign that Viola had stopped
+        listening (laptop report A0.6). Never raises.
+        """
+        logger.info("Wake heard no command (%s): playing the nothing-heard tone", reason)
+        try:
+            from voice.wake_chime import play_nothing_heard_tone
+
+            play_nothing_heard_tone()
+        except Exception as exc:  # noqa: BLE001, RUF100 - feedback must never break the turn
+            logger.debug("Nothing-heard tone unavailable: %s", exc)
+        try:
+            from ui.websocket.event_hub import get_event_hub
+
+            hub = get_event_hub()
+            if hub is not None and ctx.user_id:
+                await hub.broadcast(
+                    "error",
+                    {
+                        "code": "wake_no_command",
+                        "user_message": self.NOTHING_HEARD_MESSAGE,
+                        "level": "info",
+                    },
+                    user_id=ctx.user_id,
+                    force=True,
+                )
+        except Exception as exc:  # noqa: BLE001, RUF100 - feedback must never break the turn
+            logger.debug("Nothing-heard notice not sent: %s", exc)
 
     async def _play_follow_up_cue(self) -> None:
         """Play a brief audio cue to signal Viola is listening for follow-up.

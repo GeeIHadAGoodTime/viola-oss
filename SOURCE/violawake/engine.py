@@ -17,7 +17,7 @@ import time
 from collections.abc import Callable
 from pathlib import Path
 from types import ModuleType
-from typing import TYPE_CHECKING, Any, Protocol, cast
+from typing import TYPE_CHECKING, Any, NamedTuple, Protocol, cast
 
 import numpy as np
 
@@ -43,6 +43,22 @@ from violawake.config import (
     STREAM_CHUNK_SAMPLES,
     stream_operating_point,
 )
+
+
+class WakeTrigger(NamedTuple):
+    """What confirmed the last streaming wake (read by the listener in the callback).
+
+    ``score``: the confirming frame's score (normal rule) or, on the music path,
+    the best frame of the looser rule's window. ``frame_threshold``/``k``/``n``:
+    the rule that confirmed it. ``music_path``: the looser music rule confirmed
+    it, so Stage 2 must hear "Viola" (see config.MUSIC_WAKE_RULE).
+    """
+
+    score: float
+    frame_threshold: float
+    k: int
+    n: int
+    music_path: bool = False
 
 if TYPE_CHECKING:
     from violawake.model import WakeWordModel
@@ -471,6 +487,7 @@ class ViolaWake:
         # (set by the listener; see config.STREAM_OPERATING_POINTS_CHECKED).
         self.checked = False
         self._mapped_checked = False
+        self._init_music_path(round(debounce_seconds * SAMPLE_RATE / STREAM_CHUNK_SAMPLES))
         self._chunk_energy: list[float] = []
         self._stream_ring = np.zeros(CLIP_SAMPLES, dtype=np.float32)
         self._stream_ring_idx = 0
@@ -837,6 +854,62 @@ class ViolaWake:
         self._mapped_level = self.threshold
         self._mapped_checked = checked
 
+    def _init_music_path(self, debounce_frames: int) -> None:
+        # The looser rule used while Viola's own music plays (None = off; the
+        # listener sets it, see config.MUSIC_WAKE_RULE), its own k-of-n window,
+        # and the frames waited since it agreed (None = nothing pending).
+        self.music_rule: tuple[int, int, float] | None = None
+        self._music_gate = AgreementGate(5, 6, debounce_frames=debounce_frames)
+        self._music_pending: int | None = None
+        self._music_pending_peak = 0.0
+        self._recent_scores: list[float] = []
+        self.last_trigger: WakeTrigger | None = None
+
+    def _music_rule_now(self) -> tuple[int, int, float] | None:
+        rule = getattr(self, "music_rule", None)
+        if rule is None or self._operating_point_pinned:
+            return None
+        return rule
+
+    def _streaming_trigger(self, score: float) -> WakeTrigger | None:
+        """Apply the normal k-of-n rule and, while set, the music rule to one score."""
+        if not hasattr(self, "_music_gate"):
+            self._init_music_path(self._agreement.debounce_frames)
+        self._recent_scores.append(score)
+        if len(self._recent_scores) > 16:
+            self._recent_scores.pop(0)
+        normal = self._agreement.update(score, self._stream_threshold)
+        rule = self._music_rule_now()
+        music_agreed = False
+        if rule is not None:
+            mk, mn, mthr = rule
+            if (mk, mn) != (self._music_gate.k, self._music_gate.n):
+                self._music_gate.configure(mk, mn)
+            music_agreed = self._music_gate.update(score, mthr)
+        else:
+            self._music_pending = None
+        if normal:
+            # The normal rule decides (normal Stage 2); the music rule shares the debounce.
+            self._music_gate.reset()
+            self._music_gate._frames_since_trigger = 0
+            self._music_pending = None
+            return WakeTrigger(score, self._stream_threshold, self._agreement.k, self._agreement.n)
+        if music_agreed and self._music_pending is None:
+            self._music_pending = 0
+            self._music_pending_peak = max(self._recent_scores[-self._music_gate.n :])
+            return None
+        if self._music_pending is not None and rule is not None:
+            # Give the normal rule its own window to confirm first: a clear
+            # "Viola" over music then keeps the normal (softer) check.
+            self._music_pending += 1
+            if self._music_pending < self._agreement.n:
+                return None
+            self._music_pending = None
+            self._agreement.reset()
+            self._agreement._frames_since_trigger = 0
+            return WakeTrigger(self._music_pending_peak, rule[2], rule[0], rule[1], music_path=True)
+        return None
+
     def reset_stream(self) -> None:
         """Forget streamed audio after a gap (command recording, device change).
 
@@ -847,6 +920,10 @@ class ViolaWake:
         if self._embedder is not None:
             self._embedder.reset()
         self._agreement.reset()
+        if hasattr(self, "_music_gate"):
+            self._music_gate.reset()
+            self._music_pending = None
+            self._recent_scores.clear()
         self._chunk_energy.clear()
         self._stream_ring[:] = 0.0
         self._stream_ring_idx = 0
@@ -911,20 +988,23 @@ class ViolaWake:
             except (RuntimeError, TypeError, ValueError) as exc:
                 _aud_r1_logger.debug("AUD_R1 wake_probe logging failed: %s", exc)
 
-        if self._agreement.update(score, self._stream_threshold):
+        trigger = self._streaming_trigger(score)
+        if trigger is not None:
+            self.last_trigger = trigger
             self._last_trigger_time = time.time()
             if self._fp_logging_enabled:
                 idx = self._stream_ring_idx
                 window = np.concatenate((self._stream_ring[idx:], self._stream_ring[:idx]))
-                self._log_detection(window, score)
+                self._log_detection(window, trigger.score)
             if self._callback is not None:
                 logger.info(
-                    "[STAGE3] threshold_pass: PASS score=%.3f frame_threshold=%.3f rule=%d-of-%d@80ms level=%.3f",
-                    score,
-                    self._stream_threshold,
-                    self._agreement.k,
-                    self._agreement.n,
+                    "[STAGE3] threshold_pass: PASS score=%.3f frame_threshold=%.3f rule=%d-of-%d@80ms level=%.3f%s",
+                    trigger.score,
+                    trigger.frame_threshold,
+                    trigger.k,
+                    trigger.n,
                     self.threshold,
+                    " music_path (Stage 2 must hear Viola)" if trigger.music_path else "",
                 )
                 self._callback()
         return score
@@ -1145,6 +1225,7 @@ class ViolaWake:
         fork._operating_point_pinned = getattr(self, "_operating_point_pinned", False)
         fork.checked = getattr(self, "checked", False)
         fork._mapped_checked = getattr(self, "_mapped_checked", False)
+        fork._init_music_path(fork._agreement.debounce_frames)
         fork._chunk_energy = []
         fork._stream_ring = np.zeros(CLIP_SAMPLES, dtype=np.float32)
         fork._stream_ring_idx = 0

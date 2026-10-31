@@ -41,6 +41,7 @@ except ImportError:
 import logging
 import re
 import secrets
+import sys
 import threading
 import time
 from collections import deque
@@ -121,6 +122,23 @@ _DEVICE_CHANGE_QUIESCE_TIMEOUT = 12.0
 # device table before re-opening anyway. Re-opening early is safe (this binding
 # runs its own fresh Pa_Initialize); waiting forever would not be.
 _DEVICE_CHANGE_RESUME_TIMEOUT = 15.0
+
+
+try:
+    from voice.wake_detector.wake_decision_policy import VAD_BLOCK_THRESHOLD as _VAD_GATE_STOP_AT
+except ImportError:  # a stubbed policy module (tests)
+    _VAD_GATE_STOP_AT = 0.05
+
+
+def _fp_collecting_and_cleanup(collector: Any) -> bool:
+    """The false-positive collector's switch; also runs its hourly retention cleanup."""
+    cleanup = getattr(collector, "run_periodic_cleanup", None)
+    if callable(cleanup):
+        try:
+            cleanup()
+        except Exception:  # noqa: BLE001, RUF100 - cleanup is best effort
+            logger.debug("FP collector cleanup failed", exc_info=True)
+    return bool(collector.is_collecting)
 
 
 def _is_wake_audio_logging_enabled() -> bool:
@@ -269,6 +287,213 @@ class AECFrameMetrics:
 # Call policy.update_audio_context() to update gating state based on loopback RMS and correlation.
 
 
+# --------------------------------------------------------------------------- #
+# Microphone capture thread                                                    #
+# --------------------------------------------------------------------------- #
+
+
+def _begin_fine_timer() -> bool:
+    """Ask Windows for 1 ms timer resolution while the wake loop runs. True when set.
+
+    Under GIL contention every hand-back of the GIL waits on a timed
+    condition, and at the default 15.6 ms timer resolution each wait rounds up
+    to a whole tick. The wake loop gives the GIL up several times per 80 ms
+    chunk (each ONNX call, the blocking read), so with two busy Python threads
+    it ran at 2-3x real time and the microphone dropped 50-67% of the audio
+    (wake capture harness: 0 to 1 of 12 real "Viola" clips woke). With 1 ms
+    resolution the same load dropped nothing once the capture thread was in,
+    and 11 of 12 woke (the 12th falls in the engine warm-up). The multiroom
+    stamper already does this while it plays. Also opts this process out of
+    Windows 11's timer-resolution throttling for hidden windows (Viola runs
+    hidden in the tray).
+    """
+    if sys.platform != "win32":
+        return False
+    try:
+        import ctypes
+
+        ctypes.windll.winmm.timeBeginPeriod(1)
+    except Exception:  # noqa: BLE001, RUF100 - an optimisation
+        logger.debug("timeBeginPeriod(1) unavailable", exc_info=True)
+        return False
+    try:
+        from ctypes import wintypes
+
+        class _PowerThrottlingState(ctypes.Structure):
+            _fields_ = [("Version", wintypes.ULONG), ("ControlMask", wintypes.ULONG), ("StateMask", wintypes.ULONG)]
+
+        # PROCESS_POWER_THROTTLING_IGNORE_TIMER_RESOLUTION = 0x4, ProcessPowerThrottling = 4
+        state = _PowerThrottlingState(1, 0x4, 0)
+        kernel32 = ctypes.windll.kernel32
+        kernel32.SetProcessInformation(kernel32.GetCurrentProcess(), 4, ctypes.byref(state), ctypes.sizeof(state))
+    except Exception:  # noqa: BLE001, RUF100 - older Windows: resolution still requested
+        logger.debug("Timer-resolution throttling opt-out unavailable", exc_info=True)
+    return True
+
+
+def _end_fine_timer(was_set: bool) -> None:
+    if not was_set:
+        return
+    try:
+        import ctypes
+
+        ctypes.windll.winmm.timeEndPeriod(1)
+    except Exception:  # noqa: BLE001, RUF100
+        logger.debug("timeEndPeriod(1) failed", exc_info=True)
+
+
+class _PumpError:
+    """A read error the capture thread hands to the consumer (raised there)."""
+
+    __slots__ = ("exc",)
+
+    def __init__(self, exc: BaseException) -> None:
+        self.exc = exc
+
+
+class _MicPump:
+    """Reads the microphone on its own thread so no audio is dropped while Viola is busy.
+
+    Why (1.0.5 build-7 laptop report, A0.3 run 3): "Viola, pause" / "Viola,
+    next" never woke while a long agent task ran (scores 0.60-0.815 against
+    0.988 idle). The wake loop read the stream and then did all the work for
+    that chunk on the same thread. PortAudio's MME input keeps only 240 ms of
+    audio at this stream's 80 ms buffer size (measured: a longer gap between
+    reads loses the rest, silently, no overflow flag). Every blocking read
+    gives up the GIL, and getting it back while other Python threads are busy
+    took 60-180 ms median and up to 1.3 s on a test PC ("Slow audio read:
+    460ms" on the laptop). So while Viola worked, the loop fell behind and the
+    audio it scored had pieces cut out of it, and a chopped "Viola" scores low.
+
+    This thread only reads (it runs at raised OS priority and holds the GIL
+    for microseconds per chunk) and queues the bytes; the wake loop, the Stage
+    2 check and the command recorder consume the queue. If the consumer falls
+    more than ``MAX_BACKLOG_S`` behind, it skips to the newest
+    ``KEEP_AFTER_DROP_S`` in one jump, counted in ``drop_epoch`` so the
+    consumer treats it as one gap.
+    """
+
+    MAX_BACKLOG_S = 4.0
+    KEEP_AFTER_DROP_S = 1.0
+    STALL_WARN_S = 0.2
+
+    def __init__(self, owner: ViolaWakeListener) -> None:
+        self._owner = owner
+        self._cond = threading.Condition()
+        self._queue: deque[bytes | _PumpError] = deque()
+        self._max_chunks = max(1, round(self.MAX_BACKLOG_S * owner.SAMPLE_RATE / owner.CHUNK_SIZE))
+        self._keep_after_drop = max(1, round(self.KEEP_AFTER_DROP_S * owner.SAMPLE_RATE / owner.CHUNK_SIZE))
+        self._stop = threading.Event()
+        self._thread: threading.Thread | None = None
+        self.drop_epoch = 0
+        self.dropped_chunks = 0
+        self._last_stall_warning = 0.0
+
+    @property
+    def running(self) -> bool:
+        return self._thread is not None and self._thread.is_alive()
+
+    def start(self) -> None:
+        if self.running:
+            return
+        self._stop.clear()
+        self._thread = threading.Thread(target=self._run, name="wake-mic-capture", daemon=True)
+        self._thread.start()
+
+    def stop(self, timeout: float = 1.0) -> None:
+        self._stop.set()
+        with self._cond:
+            self._cond.notify_all()
+        thread = self._thread
+        if thread is not None and thread is not threading.current_thread():
+            thread.join(timeout)
+        self._thread = None
+
+    def flush(self) -> None:
+        """Forget queued audio (the stream was reopened; that audio is stale)."""
+        with self._cond:
+            self._queue.clear()
+
+    def available_chunks(self) -> int:
+        with self._cond:
+            return sum(1 for item in self._queue if not isinstance(item, _PumpError))
+
+    def read(self, block: bool = True, timeout: float = 1.0) -> bytes | None:
+        """The next chunk (raises the stream's read error). None: nothing yet / stopped."""
+        deadline = time.monotonic() + timeout
+        with self._cond:
+            while not self._queue:
+                if not block or self._stop.is_set():
+                    return None
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    return None
+                self._cond.wait(remaining)
+            item = self._queue.popleft()
+        if isinstance(item, _PumpError):
+            raise item.exc
+        return item
+
+    @staticmethod
+    def _raise_priority() -> None:
+        if sys.platform != "win32":
+            return
+        try:
+            import ctypes
+
+            kernel32 = ctypes.windll.kernel32
+            kernel32.SetThreadPriority(kernel32.GetCurrentThread(), 2)  # THREAD_PRIORITY_HIGHEST
+        except Exception:  # noqa: BLE001, RUF100 - priority is an optimisation
+            logger.debug("Could not raise the wake capture thread priority", exc_info=True)
+
+    def _run(self) -> None:
+        self._raise_priority()
+        owner = self._owner
+        last_read = time.monotonic()
+        while not self._stop.is_set():
+            stream = owner._stream
+            if stream is None or owner._device_change_pending.is_set():
+                time.sleep(0.01)
+                last_read = time.monotonic()
+                continue
+            try:
+                data = stream.read(owner.CHUNK_SIZE, exception_on_overflow=False)
+            except Exception as exc:  # noqa: BLE001, RUF100 - the consumer decides (reopen / give up)
+                if self._stop.is_set():
+                    break
+                if owner._stream is stream:
+                    with self._cond:
+                        self._queue.append(_PumpError(exc))
+                        self._cond.notify_all()
+                time.sleep(0.05)
+                last_read = time.monotonic()
+                continue
+            now = time.monotonic()
+            gap = now - last_read
+            last_read = now
+            if gap > self.STALL_WARN_S + 0.08 and now - self._last_stall_warning > 30.0:
+                self._last_stall_warning = now
+                logger.warning(
+                    "[TIMING] Wake capture thread waited %.0f ms between reads; the microphone keeps "
+                    "about 240 ms, so some audio may be missing",
+                    gap * 1000,
+                )
+            if owner._stream is not stream:
+                continue  # read from a stream that was just replaced: stale
+            with self._cond:
+                self._queue.append(data)
+                if len(self._queue) > self._max_chunks:
+                    # Far behind: skip to the newest second in one jump. One
+                    # gap (one engine warm-up) per jump; trimming a chunk at a
+                    # time would make every chunk a gap and nothing would score.
+                    excess = len(self._queue) - self._keep_after_drop
+                    for _ in range(excess):
+                        self._queue.popleft()
+                    self.dropped_chunks += excess
+                    self.drop_epoch += 1
+                self._cond.notify_all()
+
+
 class ViolaWakeListener:
     """
     Standalone wake word listener using ViolaWake engine.
@@ -365,6 +590,17 @@ class ViolaWakeListener:
         # Audio state
         self._audio: pyaudio.PyAudio | None = None
         self._stream: GuardedStream | None = None
+        # Capture thread (see _MicPump): used for real PortAudio streams, or
+        # when a test or harness sets _force_capture_pump.
+        self._mic_pump: _MicPump | None = None
+        self._force_capture_pump = False
+        # Per-loop cache of settings-backed switches (see _loop_flag).
+        self._loop_flags: dict[str, tuple[float, Any]] = {}
+        self._loop_flag_refreshing: set[str] = set()
+        self._loop_flag_queue: deque[tuple[str, Callable[[], Any]]] = deque()
+        self._loop_flag_wake = threading.Event()
+        self._loop_flag_thread: threading.Thread | None = None
+        self._loop_tasks: deque[Callable[[], None]] = deque()
         self._is_initialized = False
         # _init() may call cleanup() on failure while already holding this
         # lock. Keep teardown exclusive without deadlocking that same thread.
@@ -1816,6 +2052,8 @@ class ViolaWakeListener:
                 input_device_index=device_index,
             )
             logger.info("[STREAM_HEALTH] Audio stream reopened successfully")
+            if self._mic_pump is not None:
+                self._mic_pump.flush()
             return True
         except AUDIO_DEVICE_ERRORS as reopen_err:
             logger.exception(
@@ -2107,6 +2345,8 @@ class ViolaWakeListener:
         # The Stage 2 check is on: the engine maps the level with its "checked"
         # operating points (refreshed with the threshold, on the 400 ms grid).
         stage2_checked = False
+        # The looser music rule while Viola's own music plays (None = off).
+        music_rule: tuple[int, int, float] | None = None
         # Any gap in the audio (first frame, command recording, device change,
         # read error) resets the engine's embedding stream so stale audio from
         # before the gap is never scored.
@@ -2134,6 +2374,16 @@ class ViolaWakeListener:
                 # rule used for this level (the policy re-checks against it).
                 streaming_engine = engine is not None and getattr(engine, "supports_streaming", False) is True
                 frame_threshold = engine.stream_threshold if streaming_engine else None
+                agreement_rule = tuple(engine.agreement) if streaming_engine else None
+                # The rule that confirmed this wake: the normal one, or the
+                # looser music rule (then Stage 2 must hear "Viola").
+                trigger = getattr(engine, "last_trigger", None) if streaming_engine else None
+                music_path = False
+                if trigger is not None and isinstance(getattr(trigger, "score", None), float):
+                    actual_score = trigger.score
+                    frame_threshold = trigger.frame_threshold
+                    agreement_rule = (trigger.k, trigger.n)
+                    music_path = bool(trigger.music_path)
 
             # --- Contributor Mode Intercept ---
             # If contributor mode is active, save as sample and DON'T trigger wake
@@ -2163,7 +2413,8 @@ class ViolaWakeListener:
             _buf_int16 = (np.clip(audio_buffer, -1.0, 1.0) * 32767).astype(np.int16)
             _buf_float32 = _buf_int16.astype(np.float32)
             policy_mic_rms = max(last_mic_rms, float(np.sqrt(np.mean(_buf_float32 * _buf_float32))))
-            vad_on_buffer = self._policy.compute_vad_confidence(audio_int16=_buf_int16)
+            # Stop scanning the 1.5 s buffer once the VAD gate is satisfied.
+            vad_on_buffer = self._policy.compute_vad_confidence(audio_int16=_buf_int16, stop_at=_VAD_GATE_STOP_AT)
             vad_on_chunk = self._policy.estimate_vad_from_audio(
                 audio_int16=last_processed_int16,
                 mic_rms=last_mic_rms,
@@ -2193,6 +2444,8 @@ class ViolaWakeListener:
                 frame_count=frame_count,
                 self_speech_active=_viola_self_speech_active(),
                 score_threshold=frame_threshold,
+                agreement=agreement_rule,
+                effective_threshold=effective_threshold,
             )
 
             # Use policy for authoritative decision
@@ -2264,7 +2517,9 @@ class ViolaWakeListener:
                 logger.debug("Decision trace recording failed: %s", diag_err)
 
             # --- Diagnostic: Capture audio on trigger ---
-            if (decision.should_trigger or actual_score > 0.6) and _is_wake_audio_logging_enabled():
+            if (decision.should_trigger or actual_score > 0.6) and self._loop_flag(
+                "wake_audio_logging", _is_wake_audio_logging_enabled
+            ):
                 try:
                     audio_buf = get_wake_audio_buffer()
                     event_type = "trigger" if decision.should_trigger else "near_miss"
@@ -2298,13 +2553,16 @@ class ViolaWakeListener:
                 return
 
             # Stage 2: a second listen (Whisper) before the chime. Runs only
-            # after every policy gate allowed the wake; a soft gate.
+            # after every policy gate allowed the wake. Soft for a confident
+            # score; stricter below the sensitivity level and on the music path.
             if not self._force_wake:
                 reads_before = self._verify_frame_count
                 verified = self._verify_wake_candidate(
                     np.concatenate([audio_buffer[buffer_write_idx:], audio_buffer[:buffer_write_idx]]),
                     actual_score,
                     early=early_decode,
+                    level=decision.effective_threshold if streaming_engine else None,
+                    require_token=music_path,
                 )
                 if self._verify_frame_count != reads_before:
                     # The check read microphone audio this loop never fed the
@@ -2317,18 +2575,30 @@ class ViolaWakeListener:
                     return
 
             logger.info(
-                "🎤 VIOLA detected! (ViolaWake) score=%s threshold=%s",
+                "🎤 VIOLA detected! (ViolaWake) score=%s threshold=%s level=%s%s",
                 format(context.wake_score, ".3f"),
+                format(
+                    context.score_threshold if context.score_threshold is not None else decision.effective_threshold,
+                    ".3f",
+                ),
                 format(decision.effective_threshold, ".3f"),
+                " (music path)" if music_path else "",
             )
 
-            # Telemetry: record wake activation
-            try:
-                from admin.instrumentation import record_wake_activation
+            # Telemetry: record wake activation, off the wake path (it is a
+            # counter, and on a busy machine its imports and file reads delayed
+            # the chime).
+            during_playback = bool(self._policy.is_playback_active)
 
-                record_wake_activation(during_playback=self._policy.is_playback_active)
-            except Exception:
-                logger.debug("Wake activation telemetry recording failed (non-critical)")
+            def _record_activation() -> None:
+                try:
+                    from admin.instrumentation import record_wake_activation
+
+                    record_wake_activation(during_playback=during_playback)
+                except Exception:
+                    logger.debug("Wake activation telemetry recording failed (non-critical)")
+
+            self._run_off_loop(_record_activation)
 
             # Emit event with full metrics
             self._emit_status_event(
@@ -2415,6 +2685,16 @@ class ViolaWakeListener:
         # change must hand off through the flag rather than close the stream
         # from the watcher's thread.
         self._loop_active.set()
+        self._start_capture_pump()
+        fine_timer = _begin_fine_timer()
+        if self._mic_pump is not None and self._mic_pump.running:
+            # The scoring runs three ONNX calls per chunk, and each one gives up
+            # the GIL; at normal priority getting it back while other Python
+            # threads are busy left this loop seconds behind (wake capture
+            # harness, docs in _MicPump). Raised priority gets it back first.
+            _MicPump._raise_priority()
+        pump_epoch = self._mic_pump.drop_epoch if self._mic_pump is not None else 0
+        last_backlog_warning = 0.0
         # #4786: removed a stray `self._register_for_device_changes()` call
         # here -- that method was never defined anywhere in this class (or
         # anywhere else in the repo), so every call to run() crashed the wake
@@ -2511,7 +2791,12 @@ class ViolaWakeListener:
 
                 # Read audio chunk
                 try:
-                    audio_data = self._stream.read(self.CHUNK_SIZE, exception_on_overflow=False)
+                    audio_data = self._mic_read()
+                    if audio_data is None:
+                        # Nothing from the capture thread within a second
+                        # (device change in progress, or stopping).
+                        frame_count -= 1
+                        continue
                     if stop_event.is_set():
                         # A read may complete after cancellation/cleanup. Do
                         # not count or forward that late frame to consumers.
@@ -2534,8 +2819,28 @@ class ViolaWakeListener:
                             read_duration * 1000,
                             len(audio_data) // 2,
                         )
+                    pump = self._mic_pump
+                    if pump is not None and pump.running:
+                        if pump.drop_epoch != pump_epoch:
+                            # The capture thread dropped old audio (this loop
+                            # was more than MAX_BACKLOG_S behind): a gap.
+                            pump_epoch = pump.drop_epoch
+                            stream_gap = True
+                        backlog = pump.available_chunks()
+                        # (not during start-up: the first chunks pay one-time imports)
+                        if (
+                            frame_count > 125
+                            and backlog * 0.08 >= 1.0
+                            and time.monotonic() - last_backlog_warning > 30.0
+                        ):
+                            last_backlog_warning = time.monotonic()
+                            logger.warning(
+                                "[TIMING] Wake detection is %.1f s behind the microphone (busy machine); "
+                                "no audio lost, it is catching up",
+                                backlog * 0.08,
+                            )
                     # TIMING: Warn if read takes too long (expected ~80ms for blocking read)
-                    if read_duration > 0.15 and frame_count > 10:
+                    if read_duration > 0.15 and frame_count > 10 and not (pump is not None and pump.running):
                         logger.warning(
                             "[TIMING] Slow audio read: %.0fms (expected ~80ms) frame=%d",
                             read_duration * 1000,
@@ -2699,15 +3004,18 @@ class ViolaWakeListener:
                             recent_frame_dead.clear()  # Reset tracking after restart
 
                 # --- Diagnostic: Audio pipeline health ---
+                # Sampled every 5th chunk (400 ms): a diagnostic (clipping,
+                # noise floor) that cost a seventh of the loop when busy.
                 try:
-                    audio_health = get_audio_health_monitor()
-                    audio_health.process_frame(audio=mic_int16, timestamp=time.time())
+                    if frame_count % 5 == 0:
+                        audio_health = get_audio_health_monitor()
+                        audio_health.process_frame(audio=mic_int16, timestamp=time.time())
                 except Exception as diag_err:
                     if frame_count == 1:
                         logger.debug("Audio health diagnostics unavailable: %s", diag_err)
 
                 # --- Diagnostic: Continuous audio buffer for captures ---
-                if _is_wake_audio_logging_enabled():
+                if self._loop_flag("wake_audio_logging", _is_wake_audio_logging_enabled):
                     try:
                         diag_audio_buffer = get_wake_audio_buffer()
                         mic_rms_db = 20 * np.log10(max(mic_rms, 1e-10))
@@ -2779,17 +3087,24 @@ class ViolaWakeListener:
                 # (every chunk on the streaming path)
                 if frame_count % self._infer_interval == 0:
                     on_legacy_grid = frame_count % LEGACY_GRID_CHUNKS == 0 or not self._streaming
-                    # Reconstruct contiguous buffer for processing (only when needed)
-                    if buffer_write_idx == 0:
-                        contiguous_buffer = audio_buffer
-                    else:
-                        # Reorder: [write_idx:] + [:write_idx] to get oldest-to-newest
-                        contiguous_buffer = np.concatenate(
-                            [
-                                audio_buffer[buffer_write_idx:],
-                                audio_buffer[:buffer_write_idx],
-                            ]
-                        )
+                    # The 1.5 s window oldest-first, built only when something
+                    # needs it (an early Stage 2 start, a diagnostics capture).
+                    # Copying 24,000 samples every 80 ms was a seventh of this
+                    # loop's time on a busy machine, where every numpy call
+                    # waits for the GIL (wake capture harness, see _MicPump).
+                    contiguous_cache: list[np.ndarray] = []
+
+                    def contiguous(
+                        _idx: int = buffer_write_idx, _cache: list[np.ndarray] = contiguous_cache
+                    ) -> np.ndarray:
+                        if not _cache:
+                            _cache.append(
+                                audio_buffer
+                                if _idx == 0
+                                else np.concatenate([audio_buffer[_idx:], audio_buffer[:_idx]])
+                            )
+                        return _cache[0]
+
                     # Use policy for effective threshold calculation (refreshed
                     # on the 400 ms grid; quiet hours reads settings)
                     if on_legacy_grid or effective_threshold is None:
@@ -2798,13 +3113,27 @@ class ViolaWakeListener:
                             loopback_rms=self._current_loopback_rms,
                             correlation=self._current_correlation,
                         )
-                        effective_threshold = self._policy.effective_threshold(context)
-                        stage2_checked = self._stage2_check_on()
+                        # Quiet hours and the Stage 2 switch come from settings:
+                        # re-read once a second, not every 400 ms. The playback
+                        # state is part of the key, so music starting or stopping
+                        # still applies on the next grid step.
+                        playing_now = bool(self._policy.is_playback_active) or (
+                            context.loopback_rms
+                            > getattr(self._policy._config, "playback_presence_rms_threshold", 150.0)
+                        )
+                        effective_threshold = self._loop_flag(
+                            "effective_threshold_%s_%s" % (playing_now, self._base_threshold),
+                            lambda: self._policy.effective_threshold(context),
+                            ttl=1.0,
+                        ) or self._policy.effective_threshold(context)
+                        stage2_checked = bool(self._loop_flag("stage2_checked", self._stage2_check_on, ttl=1.0))
+                        music_rule = self._music_wake_rule(effective_threshold, stage2_checked)
                         if self._streaming:
                             self._log_wake_rule_change(self._base_threshold, stage2_checked)
 
                     # DIAGNOSTIC: Check audio buffer health before engine
                     if frame_count % 125 == 5:  # Log occasionally
+                        contiguous_buffer = contiguous()
                         buf_rms = float(np.sqrt(np.mean(contiguous_buffer**2)))
                         buf_max = float(np.max(np.abs(contiguous_buffer)))
                         buf_nonzero = np.count_nonzero(contiguous_buffer)
@@ -2852,8 +3181,9 @@ class ViolaWakeListener:
                             else:
                                 engine.threshold = effective_threshold
                                 engine.checked = stage2_checked
+                                engine.music_rule = music_rule
                                 last_wake_score = engine.process_chunk(audio_chunk, suppress=blanked)
-                                self._maybe_start_early_check(engine, last_wake_score, contiguous_buffer, frame_count)
+                                self._maybe_start_early_check(engine, last_wake_score, contiguous, frame_count)
                     elif blanked:
                         last_wake_score = 0.0
                     else:
@@ -2863,7 +3193,7 @@ class ViolaWakeListener:
                                 last_wake_score = 0.0
                             else:
                                 engine.threshold = effective_threshold
-                                last_wake_score = engine.process_audio(contiguous_buffer)
+                                last_wake_score = engine.process_audio(contiguous())
 
                     # Track recent scores for confirmation gate (2-of-3)
                     if last_wake_score is not None:
@@ -2879,17 +3209,21 @@ class ViolaWakeListener:
                             last_wake_score,
                             last_mic_rms / AUDIO_INT16_SCALE,
                             last_wake_score >= effective_threshold,
-                            audio_buffer=contiguous_buffer,
+                            audio_buffer=contiguous(),
                         )
 
                     # --- FP Collector: save high-scoring audio for retraining ---
+                    # Only while collecting: its switch is a settings read plus
+                    # a file check, read off this loop every 2 s together with
+                    # the collector's retention cleanup.
                     if last_wake_score is not None:
                         collector = get_fp_collector()
-                        collector.check_and_save(
-                            score=last_wake_score,
-                            audio_buffer=contiguous_buffer,
-                            ref_buffer=None,  # Reference buffer integration deferred
-                        )
+                        if self._loop_flag("fp_collecting", lambda: _fp_collecting_and_cleanup(collector)):
+                            collector.check_and_save(
+                                score=last_wake_score,
+                                audio_buffer=contiguous(),
+                                ref_buffer=None,  # Reference buffer integration deferred
+                            )
 
                     # --- Data Collection: near-miss capture ---
                     if last_wake_score is not None:
@@ -2899,13 +3233,18 @@ class ViolaWakeListener:
                                 wake_data_collection_allowed,
                             )
 
-                            if _dc_settings.wake_data_collection_enabled and wake_data_collection_allowed():
+                            if self._loop_flag(
+                                "data_collection",
+                                lambda: bool(
+                                    _dc_settings.wake_data_collection_enabled and wake_data_collection_allowed()
+                                ),
+                            ):
                                 from voice.wake_detector.data_collection.collector import (
                                     get_clip_collector,
                                 )
 
                                 get_clip_collector().save_near_miss_clip(
-                                    contiguous_buffer,
+                                    contiguous(),
                                     last_wake_score,
                                 )
                         except Exception:
@@ -2947,7 +3286,7 @@ class ViolaWakeListener:
                     # Check for near-misses during contributor mode
                     if self._contributor_manager.is_active and last_wake_score is not None:
                         self._contributor_manager.on_score_update(
-                            audio=contiguous_buffer.copy(),
+                            audio=contiguous().copy(),
                             score=last_wake_score,
                             threshold=effective_threshold,
                             context={
@@ -2962,6 +3301,9 @@ class ViolaWakeListener:
 
         except Exception as e:
             logger.exception("ViolaWake detection error: %s", e)
+        finally:
+            self._stop_capture_pump()
+            _end_fine_timer(fine_timer)
 
     # ------------------------------------------------------------------ #
     # Stage 2 wake verification (voice/wake_detector/wake_verifier.py)
@@ -2969,6 +3311,113 @@ class ViolaWakeListener:
 
     # A verified wake's held audio is only for the command that wake starts.
     COMMAND_PREROLL_MAX_AGE_S = 4.0
+
+    # How long the wake loop reuses a settings-backed answer. Each settings
+    # read resolves the signed-in account (session database, file stats), and
+    # the loop used to ask several times per 80 ms chunk. Every one of those
+    # blocking calls gives up the GIL, and on a busy machine getting it back
+    # took up to a second, so the loop fell behind the microphone and scored
+    # chopped audio (1.0.5 build-7 laptop report, A0.3 run 3).
+    LOOP_FLAG_TTL_S = 2.0
+
+    def _loop_flag(self, name: str, read: Callable[[], Any], ttl: float | None = None) -> Any:
+        """``read()``'s answer, refreshed at most every ``ttl`` seconds off the wake loop.
+
+        The first call reads synchronously. After that a stale answer is
+        returned at once and a background thread re-reads it, so a slow
+        settings read never stalls the loop that drains the microphone.
+        Errors read as False.
+        """
+        now = time.monotonic()
+        limit = self.LOOP_FLAG_TTL_S if ttl is None else ttl
+        cached = self._loop_flags.get(name)
+        if cached is None:
+            value = self._read_loop_flag(read)
+            self._loop_flags[name] = (now, value)
+            return value
+        if now - cached[0] >= limit and name not in self._loop_flag_refreshing:
+            self._loop_flag_refreshing.add(name)
+            self._loop_flag_queue.append((name, read))
+            self._ensure_flag_refresher()
+            self._loop_flag_wake.set()
+        return cached[1]
+
+    def _ensure_flag_refresher(self) -> None:
+        thread = self._loop_flag_thread
+        if thread is not None and thread.is_alive():
+            return
+        # One long-lived thread: starting a thread per refresh made the wake
+        # loop wait for the new thread to start, which is itself slow when busy.
+        self._loop_flag_thread = threading.Thread(target=self._flag_refresher, name="wake-flag-refresh", daemon=True)
+        self._loop_flag_thread.start()
+
+    def _run_off_loop(self, task: Callable[[], None]) -> None:
+        """Run ``task`` on the long-lived refresher thread (no thread start on the wake path)."""
+        self._loop_tasks.append(task)
+        self._ensure_flag_refresher()
+        self._loop_flag_wake.set()
+
+    def _flag_refresher(self) -> None:
+        while True:
+            self._loop_flag_wake.wait(30.0)
+            self._loop_flag_wake.clear()
+            while self._loop_tasks:
+                task = self._loop_tasks.popleft()
+                try:
+                    task()
+                except Exception:  # noqa: BLE001, RUF100 - background bookkeeping only
+                    logger.debug("Wake background task failed", exc_info=True)
+            while self._loop_flag_queue:
+                name, read = self._loop_flag_queue.popleft()
+                try:
+                    self._loop_flags[name] = (time.monotonic(), self._read_loop_flag(read))
+                finally:
+                    self._loop_flag_refreshing.discard(name)
+
+    @staticmethod
+    def _read_loop_flag(read: Callable[[], Any]) -> Any:
+        try:
+            return read()
+        except Exception:  # noqa: BLE001, RUF100 - a diagnostics switch must never stop the loop
+            return False
+
+    def _start_capture_pump(self) -> None:
+        """Start the capture thread when the stream is a real PortAudio stream."""
+        real_stream = GuardedStream is not object and isinstance(self._stream, GuardedStream)
+        if not (self._force_capture_pump or real_stream):
+            return
+        if self._mic_pump is None:
+            self._mic_pump = _MicPump(self)
+        self._mic_pump.start()
+        logger.info("Wake microphone capture thread started")
+
+    def _stop_capture_pump(self) -> None:
+        pump = self._mic_pump
+        if pump is not None:
+            pump.stop()
+            pump.flush()
+
+    def _mic_read(self, block: bool = True) -> bytes | None:
+        """The next 80 ms of microphone audio, from the capture thread when it runs.
+
+        Raises the stream's read error. None: no audio yet (``block=False``) or
+        none within a second (the device is being changed, or stopped).
+        """
+        pump = self._mic_pump
+        if pump is not None and pump.running:
+            return pump.read(block=block)
+        stream = self._stream
+        if stream is None:
+            if block:
+                raise RuntimeError("audio stream is not open")
+            return None
+        if not block:
+            try:
+                if stream.get_read_available() < self.CHUNK_SIZE:
+                    return None
+            except Exception:  # noqa: BLE001, RUF100 - unknown fill level: a blocking read still drains
+                pass
+        return stream.read(self.CHUNK_SIZE, exception_on_overflow=False)
 
     def _warm_wake_verifier(self) -> None:
         """Load the Whisper check in the background at startup, never on a wake."""
@@ -2978,6 +3427,49 @@ class ViolaWakeListener:
             warm_wake_verifier()
         except Exception as exc:  # noqa: BLE001, RUF100 - the check is optional; wakes pass without it
             logger.warning("[WAKE_VERIFY] could not start the verifier warm-up: %s", exc)
+        threading.Thread(target=self._prewarm_wake_path, name="wake-prewarm", daemon=True).start()
+
+    def _prewarm_wake_path(self) -> None:
+        """Pay the wake path's one-time costs at start-up, not on the first "Viola".
+
+        The first wake used to import modules (instrumentation, data
+        collection, ducking, the chime), build the settings manager and load
+        the policy's Silero VAD inside the detection callback. On a busy
+        machine every file read of an import waits for the GIL, and the first
+        chime came about 2.7 s after the confirming frame (wake latency
+        harness, 2 busy threads) against about 0.2 s for later wakes.
+        """
+        import importlib
+
+        started = time.perf_counter()
+        for name in (
+            "admin.instrumentation",
+            "config.settings",
+            "voice.wake_detector.data_collection.collector",
+            "utils.audio_ducking",
+            "voice.wake_chime",
+            "core.state_hub",
+            "core.unified_state",
+            "telemetry.accumulator",
+        ):
+            try:
+                importlib.import_module(name)
+            except Exception:  # noqa: BLE001, RUF100 - optional pieces; the wake path handles their absence
+                logger.debug("Wake pre-warm could not import %s", name, exc_info=True)
+        try:
+            ensure_vad = getattr(self._policy, "_ensure_vad_model", None)
+            if callable(ensure_vad) and ensure_vad():
+                # First inference of the ONNX session (one silent window).
+                self._policy.compute_vad_confidence(audio_int16=np.zeros(512, dtype=np.int16))
+            from voice.wake_detector.wake_decision_policy import _check_state_hub_listening
+
+            _check_state_hub_listening()  # builds the state hub the listening gate reads
+            self._loop_flag("wake_audio_logging", _is_wake_audio_logging_enabled)
+            get_wake_analytics()
+            get_decision_tracer()
+        except Exception:  # noqa: BLE001, RUF100 - a warm-up must never break listening
+            logger.debug("Wake pre-warm step failed", exc_info=True)
+        logger.info("Wake path warmed in %.0f ms", (time.perf_counter() - started) * 1000)
 
     def _log_wake_rule_change(self, level: float, checked: bool) -> None:
         """Log the base wake rule again when the saved level or the Stage 2 switch changes.
@@ -3004,6 +3496,24 @@ class ViolaWakeListener:
             "on" if checked else "off",
         )
 
+    def _music_wake_rule(self, level: float, checked: bool) -> tuple[int, int, float] | None:
+        """The looser rule for Viola's own music (config.MUSIC_WAKE_RULE), or None.
+
+        Only while Viola's own music plays, the Stage 2 check is on (it is the
+        guard: a music-path wake needs a heard "Viola"), and the level is
+        Balanced or more sensitive with no quiet-hours boost.
+        """
+        if not checked or self._force_wake or not self._policy.is_playback_active:
+            return None
+        try:
+            from violawake.config import DEFAULT_THRESHOLD, MUSIC_WAKE_RULE
+
+            if float(level) > DEFAULT_THRESHOLD + 1e-9 or float(self._base_threshold) > DEFAULT_THRESHOLD + 1e-9:
+                return None
+            return MUSIC_WAKE_RULE
+        except (ImportError, TypeError, ValueError):
+            return None
+
     def _stage2_check_on(self) -> bool:
         """The opt-in Stage 2 check is on (and FORCE_WAKE, which skips it, is not)."""
         if self._force_wake:
@@ -3015,7 +3525,9 @@ class ViolaWakeListener:
         except Exception:  # noqa: BLE001, RUF100 - unreadable switch: the check's own default (off)
             return False
 
-    def _maybe_start_early_check(self, engine: Any, score: float, window: np.ndarray, frame: int) -> None:
+    def _maybe_start_early_check(
+        self, engine: Any, score: float, window: np.ndarray | Callable[[], np.ndarray], frame: int
+    ) -> None:
         """Start the Stage 2 decode early when the agreement run reaches the launch level.
 
         Called after every streaming score. Cheap when nothing launches (a
@@ -3034,12 +3546,14 @@ class ViolaWakeListener:
             k, _n = engine.agreement
             if not tracker.update(float(score), float(engine.stream_threshold), int(k)):
                 return
-            if self._force_wake or self._policy.is_playback_active:
+            if self._force_wake:
                 return  # the check is skipped for these wakes anyway
             from voice.wake_detector.wake_verifier import get_wake_verifier, wake_verification_enabled
 
             if not wake_verification_enabled():
                 return
+            if callable(window):
+                window = window()
             self._early_decode = get_wake_verifier().start_early(window, frame)
         except Exception as exc:  # noqa: BLE001, RUF100 - the early start is an optimisation; the serial check remains
             logger.debug("[WAKE_VERIFY] early start skipped: %s", exc)
@@ -3071,19 +3585,35 @@ class ViolaWakeListener:
             logger.debug("[WAKE_VERIFY] early decode unusable: %s", exc)
         return None
 
-    def _verify_wake_candidate(self, window: np.ndarray, score: float, early: Any = None) -> bool:
+    def _verify_wake_candidate(
+        self,
+        window: np.ndarray,
+        score: float,
+        early: Any = None,
+        *,
+        level: float | None = None,
+        require_token: bool = False,
+    ) -> bool:
         """Second listen before the chime. True lets the wake through.
 
         Runs on the wake loop thread inside the detection callback, so it may
         read the stream itself; the frames it reads are kept for the command.
         ``early``: the decode this wake's agreement run started (or None).
+        ``level``: the sensitivity level (a score below it gets the stricter
+        low-score rule). ``require_token``: the looser music rule confirmed the
+        wake, so only a heard "Viola" lets it through (and doubt does not).
+        It runs while Viola's own music plays too (it used to be skipped).
         """
         try:
             from voice.wake_detector.wake_verifier import get_wake_verifier, wake_verification_enabled
 
             if not wake_verification_enabled():
-                return True
-            extra = {"early": early} if early is not None else {}
+                return not require_token
+            extra: dict[str, Any] = {"early": early} if early is not None else {}
+            if level is not None:
+                extra["level"] = level
+            if require_token:
+                extra["require_token"] = True
             result = get_wake_verifier().verify(
                 window,
                 self._read_verification_chunk,
@@ -3091,9 +3621,11 @@ class ViolaWakeListener:
                 playback_active=bool(self._policy.is_playback_active),
                 **extra,
             )
-        except Exception as exc:  # noqa: BLE001, RUF100 - doubt passes
-            logger.warning("[WAKE_VERIFY] PASS reason=error score=%.3f (%s)", score, exc)
-            return True
+        except Exception as exc:  # noqa: BLE001, RUF100 - doubt passes (not on the music path)
+            logger.warning(
+                "[WAKE_VERIFY] %s reason=error score=%.3f (%s)", "REJECT" if require_token else "PASS", score, exc
+            )
+            return not require_token
         logger.info(result.log_line())
         if result.passed:
             self._start_command_preroll(result.held_frames)
@@ -3107,19 +3639,14 @@ class ViolaWakeListener:
         """
         from voice.wake_detector.wake_verifier import WakeChunk
 
-        stream = self._stream
-        if stream is None:
+        if self._stream is None:
             return None
-        if not block:
-            try:
-                if stream.get_read_available() < self.CHUNK_SIZE:
-                    return None
-            except Exception:  # noqa: BLE001, RUF100 - unknown fill level: a blocking read still drains
-                pass
         try:
-            audio_data = stream.read(self.CHUNK_SIZE, exception_on_overflow=False)
+            audio_data = self._mic_read(block=block)
         except Exception as exc:  # noqa: BLE001, RUF100 - the wake loop's own read handles recovery
             logger.debug("[WAKE_VERIFY] stream read failed: %s", exc)
+            return None
+        if audio_data is None:
             return None
         self.detection_signal.mark()
         tap = self._frame_tap
@@ -3177,18 +3704,30 @@ class ViolaWakeListener:
         """
         Listen for and record a voice command after wake word detection.
 
+        Two separate windows (1.0.5 build-7 laptop report, A0.6 / session 3):
+        a user who waits for the chime used to lose the turn to 1 s of silence
+        (the end-of-speech rule ran from the first frame), and after speech the
+        recording ran on for about 4 s because the neural end-of-speech
+        detector never loaded (``is_available`` is False until first use, and
+        nothing used it first), so a 500 RMS threshold decided, which room
+        noise or ducked music easily exceeds.
+
         Args:
-            silence_threshold: Audio level threshold for silence detection
-            silence_duration: Duration of silence to stop recording
-            timeout: Maximum time to wait for command (after speech starts
-                     when onset_timeout is set, otherwise from method start)
-            onset_timeout: If set, wait up to this many seconds for the user
-                          to start speaking before applying the silence endpoint.
-                          Frames below silence_threshold during onset are discarded.
-                          If None, recording starts immediately (backward-compat).
+            silence_threshold: RMS level used only when the Silero VAD is not
+                available (fallback speech/silence test)
+            silence_duration: End-of-speech: this much non-speech after speech
+                stops the recording
+            timeout: Longest command, counted from the speech onset (or from
+                the start when ``onset_timeout`` is None)
+            onset_timeout: Pre-speech window. If set, wait up to this many
+                seconds for speech to start; silence before it never ends the
+                recording, and a short lead-in before the onset is kept. If
+                None, recording counts as started at once (legacy behaviour).
+                Speech already in the audio the wake check read (a command said
+                straight after "Viola") counts as the onset.
 
         Returns:
-            Path to recorded audio file, or None if failed
+            Path to recorded audio file, or None if failed / nothing was said
         """
         import wave
 
@@ -3203,103 +3742,15 @@ class ViolaWakeListener:
             self._recording_command = True
         logger.debug("[ViolaWake] Wake detection paused for recording")
 
-        # Load SileroVAD for neural endpoint detection (falls back to RMS)
-        from voice.wake_detector.silero_endpoint import (
-            SILENCE_THRESHOLD as _VAD_SILENCE_THRESH,
-            SPEECH_THRESHOLD as _VAD_SPEECH_THRESH,
-            get_silero_endpoint_detector,
-        )
-
-        _vad = get_silero_endpoint_detector()
-        _vad.reset_state()
-        _use_vad = _vad.is_available
-        if _use_vad:
-            logger.debug("[ViolaWake] Using SileroVAD for endpoint detection")
-        else:
-            logger.debug("[ViolaWake] SileroVAD unavailable, using RMS fallback")
-
-        # Audio the wake check already read after the wake word (the start of
-        # a "Viola, ..." said in one breath) opens the command recording.
-        frames = self._take_command_preroll()
-        silence_samples = 0
-        silence_samples_threshold = int(silence_duration * self.SAMPLE_RATE / self.CHUNK_SIZE)
-
-        # Onset detection: when onset_timeout is None, skip onset phase entirely
-        speech_started = onset_timeout is None
-        method_start = time.time()
-        # recording_start tracks when the recording phase began (for timeout).
-        # When there's no onset phase, it equals method_start.
-        recording_start = method_start
-
         try:
-            while True:
-                now = time.time()
-                if speech_started:
-                    # Recording phase: timeout counts from when speech started
-                    if (now - recording_start) >= timeout:
-                        logger.info("[ViolaWake] Recording timeout reached")
-                        break
-                else:
-                    # Onset phase: timeout counts from method start
-                    if (now - method_start) >= onset_timeout:
-                        logger.info(
-                            "[ViolaWake] No speech detected within onset timeout (%.1fs)",
-                            onset_timeout,
-                        )
-                        return None
-
-                try:
-                    audio_data = self._stream.read(self.CHUNK_SIZE, exception_on_overflow=False)
-                    audio_array = np.frombuffer(audio_data, dtype=np.int16)
-                    rms = np.sqrt(np.mean(audio_array.astype(np.float32) ** 2))
-
-                    # Determine speech activity: VAD (neural) or RMS (fallback)
-                    if _use_vad and rms > 1.0:  # Skip VAD on dead silence
-                        speech_prob = _vad.process_chunk(audio_array)
-                        if speech_prob < 0:
-                            # VAD failed mid-recording — fall back to RMS for
-                            # BOTH speech and silence, else is_silence keeps a
-                            # stale value (or is unset on the first frame,
-                            # crashing the endpoint check below).
-                            _use_vad = False
-                            is_speech = rms >= silence_threshold
-                            is_silence = rms < silence_threshold
-                        else:
-                            is_speech = speech_prob > _VAD_SPEECH_THRESH
-                            is_silence = speech_prob < _VAD_SILENCE_THRESH
-                    else:
-                        is_speech = rms >= silence_threshold
-                        is_silence = rms < silence_threshold
-
-                    if not speech_started:
-                        # Onset phase: waiting for speech
-                        if is_speech:
-                            speech_started = True
-                            recording_start = time.time()
-                            logger.debug(
-                                "[ViolaWake] Speech onset detected (RMS=%.0f), recording started",
-                                rms,
-                            )
-                            # Include this frame — don't discard the first speech frame
-                            frames.append(audio_data)
-                        # else: discard silence frame during onset, continue
-                        continue
-
-                    # Recording phase: silence-endpoint logic
-                    frames.append(audio_data)
-
-                    if is_silence:
-                        silence_samples += 1
-                        if silence_samples >= silence_samples_threshold:
-                            logger.info("[ViolaWake] Silence detected, stopping recording")
-                            break
-                    else:
-                        silence_samples = 0
-
-                except Exception as e:
-                    logger.error("[ViolaWake] Recording error: %s", e)
-                    break
-
+            frames, outcome = self._record_command_frames(
+                silence_threshold=silence_threshold,
+                silence_duration=silence_duration,
+                timeout=timeout,
+                onset_timeout=onset_timeout,
+            )
+            if outcome == "no_speech":
+                return None
             if not frames:
                 logger.warning("[ViolaWake] No audio recorded")
                 return None
@@ -3340,8 +3791,152 @@ class ViolaWakeListener:
                 self._recording_command = False
             logger.debug("[ViolaWake] Wake detection resumed")
 
+    # Speech kept before a detected onset (the first syllable is often softer
+    # than the VAD's speech threshold).
+    COMMAND_LEAD_IN_S = 0.4
+
+    def _record_command_frames(
+        self,
+        *,
+        silence_threshold: int,
+        silence_duration: float,
+        timeout: float,
+        onset_timeout: float | None,
+    ) -> tuple[list[bytes], str]:
+        """Read the command audio. Returns (raw frames, outcome).
+
+        outcome: "end_of_speech", "timeout", "no_speech" (nothing said within
+        ``onset_timeout``), "error". Speech/silence is judged on the
+        echo-cancelled audio (ducked music or the chime is not the user), with
+        the Silero VAD over every 32 ms window, falling back to RMS. The raw
+        microphone frames are what is recorded for the transcriber.
+        """
+        from voice.wake_detector.silero_endpoint import (
+            SPEECH_THRESHOLD as _VAD_SPEECH_THRESH,
+            get_silero_endpoint_detector,
+        )
+
+        vad = get_silero_endpoint_detector()
+        vad.reset_state()
+        ensure = getattr(vad, "ensure_loaded", None)
+        use_vad = bool(ensure()) if callable(ensure) else bool(getattr(vad, "is_available", False))
+        logger.debug("[ViolaWake] End-of-speech detection: %s", "Silero VAD" if use_vad else "RMS fallback")
+
+        chunk_s = self.CHUNK_SIZE / float(self.SAMPLE_RATE)
+        silence_needed = max(1, round(silence_duration / chunk_s))
+        lead_in_frames = max(0, round(self.COMMAND_LEAD_IN_S / chunk_s))
+
+        def is_speech(audio_data: bytes, *, from_stream: bool) -> bool:
+            nonlocal use_vad
+            mic = np.frombuffer(audio_data, dtype=np.int16)
+            judged = mic
+            if from_stream:
+                # The same echo cancellation the wake check uses; keeps the
+                # canceller's reference in step while the wake loop is paused.
+                self._verify_frame_count += 1
+                try:
+                    judged = self._apply_aec_to_chunk(mic, self._verify_frame_count)
+                except Exception:  # noqa: BLE001, RUF100 - judge the raw audio instead
+                    judged = mic
+            rms = float(np.sqrt(np.mean(judged.astype(np.float32) ** 2))) if len(judged) else 0.0
+            if use_vad and rms > 1.0:
+                full = getattr(vad, "process_chunk_full", None)
+                prob = full(judged) if callable(full) else vad.process_chunk(judged)
+                if prob >= 0:
+                    return prob > _VAD_SPEECH_THRESH
+                use_vad = False  # VAD failed mid-recording: RMS from here on
+            return rms >= silence_threshold
+
+        frames: list[bytes] = []
+        lead_in: deque[bytes] = deque(maxlen=max(1, lead_in_frames))
+        speech_started = onset_timeout is None
+        speech_frames = 0
+        silent_run = 0
+
+        # Audio the wake check already read after the wake word (the start of
+        # a "Viola, ..." said in one breath) opens the command recording. If
+        # it already holds speech, that is the onset.
+        preroll = self._take_command_preroll()
+        if preroll:
+            heard = [is_speech(f, from_stream=False) for f in preroll]
+            frames.extend(preroll)
+            if any(heard):
+                speech_started = True
+                speech_frames = sum(heard)
+                last = max(i for i, h in enumerate(heard) if h)
+                silent_run = len(heard) - 1 - last
+
+        started = time.monotonic()
+        speech_at = started
+        outcome = "timeout"
+        try:
+            while True:
+                now = time.monotonic()
+                if speech_started:
+                    if now - speech_at >= timeout:
+                        outcome = "timeout"
+                        logger.info("[ViolaWake] Recording timeout reached")
+                        break
+                elif now - started >= float(onset_timeout or 0.0):
+                    outcome = "no_speech"
+                    logger.info(
+                        "[ViolaWake] No speech within %.1f s after the wake; nothing to transcribe",
+                        float(onset_timeout or 0.0),
+                    )
+                    return [], outcome
+
+                try:
+                    audio_data = self._mic_read()
+                except Exception as e:
+                    logger.error("[ViolaWake] Recording error: %s", e)
+                    outcome = "error"
+                    break
+                if audio_data is None:
+                    continue
+                speech = is_speech(audio_data, from_stream=True)
+
+                if not speech_started:
+                    if speech:
+                        speech_started = True
+                        speech_at = time.monotonic()
+                        frames.extend(lead_in)
+                        lead_in.clear()
+                        frames.append(audio_data)
+                        speech_frames += 1
+                        logger.debug("[ViolaWake] Speech onset after %.2f s", speech_at - started)
+                    else:
+                        lead_in.append(audio_data)
+                    continue
+
+                frames.append(audio_data)
+                if speech:
+                    speech_frames += 1
+                    silent_run = 0
+                    continue
+                silent_run += 1
+                if speech_frames > 0 and silent_run >= silence_needed:
+                    outcome = "end_of_speech"
+                    logger.info("[ViolaWake] Silence detected, stopping recording")
+                    break
+                if speech_frames == 0 and silent_run >= silence_needed:
+                    # Legacy mode (no pre-speech window) and nothing said.
+                    outcome = "end_of_speech"
+                    logger.info("[ViolaWake] Silence detected, stopping recording")
+                    break
+        finally:
+            logger.info(
+                "[ViolaWake] Recording ended: outcome=%s speech_ms=%d trailing_silence_ms=%d total_ms=%d vad=%s",
+                outcome,
+                round(speech_frames * chunk_s * 1000),
+                round(silent_run * chunk_s * 1000),
+                round(len(frames) * chunk_s * 1000),
+                "silero" if use_vad else "rms",
+            )
+        return frames, outcome
+
     def cleanup(self) -> None:
         """Clean up resources."""
+        self._stop_capture_pump()
         with self._state_lock:
             if self._stream is not None:
                 try:
