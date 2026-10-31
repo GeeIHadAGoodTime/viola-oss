@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "31d1f35f4aebad41c2abf559b9a102ee3fc8de23",
-  "sha256": "5110cef06d070f6e1dedf44819eb8d010c37745f693aa1613a2a9e7cb9707e24",
+  "revision": "79faba9a3a246be9c59144d9197a11e0f48525ee",
+  "sha256": "fd490dcc84b4497669cb4b66618e6b8ad57692925a705c7a4273feed920acbc5",
   "files": [
     {
       "path": ".env.example",
@@ -1870,8 +1870,8 @@
     },
     {
       "path": "intent/log_redaction.py",
-      "sha256": "b0218dd471fa07bc6070a835b141afee421b736f77f3d7057241f45016f16b8b",
-      "bytes": 19376
+      "sha256": "87dc57683b1d55aea07dd23598204f8b834fdec2e9d695add97b865d5893974d",
+      "bytes": 19382
     },
     {
       "path": "intent/permissions/policy.py",
@@ -2125,8 +2125,8 @@
     },
     {
       "path": "intent/tools/phone_call.py",
-      "sha256": "fc60ee61ae9dd99208c424d8fca98e2574cb799af2ecf4e951e1f247ae29a7ae",
-      "bytes": 70879
+      "sha256": "939086e91262514a4298829db653bbfb75b27d0440986a72198a48b9a1e67ec4",
+      "bytes": 70933
     },
     {
       "path": "intent/tools/playlist_tools.py",
@@ -5935,8 +5935,8 @@
     },
     {
       "path": "telephony/routes.py",
-      "sha256": "d3ff93ef89070941827283d53e03444b7b3691bea53fc3890c950b4cd2e0cab4",
-      "bytes": 56596
+      "sha256": "3543692debfb9fe86eb7e730acda7e5764da4d398554f0a75b0cd1ea11788947",
+      "bytes": 58221
     },
     {
       "path": "telephony/streaming_stt_model.py",
@@ -10075,8 +10075,8 @@
     },
     {
       "path": "ui/react-app/src/__tests__/SmartDisplay.test.jsx",
-      "sha256": "19d17ed7acb17b78b2a67d4abb881182828057252f4f611ba1e28eaf03707cec",
-      "bytes": 140696
+      "sha256": "f945fcec96c6eca67f965baeb013b2b87a918ec14eba0e7ee2c741e0b3e2a6b5",
+      "bytes": 143719
     },
     {
       "path": "ui/react-app/src/__tests__/hooks/useEventBus.test.jsx",
@@ -10770,8 +10770,8 @@
     },
     {
       "path": "ui/react-app/src/components/PhoneToSModal.test.jsx",
-      "sha256": "47df1fd3b5e57167ae73ef6c2549f017d0b3b6c2c9e2b53774015d5c8918029b",
-      "bytes": 16486
+      "sha256": "57f61ded78e63b9f024dd642643078b5836ea6320da17de9003fb3ed9a3ebd28",
+      "bytes": 17381
     },
     {
       "path": "ui/react-app/src/components/QueueModal.actions.test.jsx",
@@ -13170,8 +13170,8 @@
     },
     {
       "path": "viola_qt.py",
-      "sha256": "1f2cf1c499a50ce06bc25a16ca88b70aa12bbae38ade6e4dadb747125485d184",
-      "bytes": 88424
+      "sha256": "2c87d0c72a4d2acf40531d4e72bf96c3e71ff6b433dc6f1226e89bbb90309a3a",
+      "bytes": 88860
     },
     {
       "path": "viola_spoke.py",
