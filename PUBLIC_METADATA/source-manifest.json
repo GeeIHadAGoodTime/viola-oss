@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "5dd12fc840aa314d8d4e289a5b5372f92629e34f",
-  "sha256": "78878aa49150245c7fdb041cd659634428445547603e8ca6c99959a248eac46a",
+  "revision": "ec5acb6cde7a101a3a55f676c395d8653940190e",
+  "sha256": "67305fb3c8e879e3ffed562c9dff7ab8fc41c59d2f08d66af70432996fd57194",
   "files": [
     {
       "path": ".env.example",
@@ -4760,8 +4760,8 @@
     },
     {
       "path": "services/memory/dir.py",
-      "sha256": "98ab3610a0bd2296341d35e7d4392e6bac3fca0ca3ae47da86e222c26765ac92",
-      "bytes": 99563
+      "sha256": "e2bb40a643a20885dcfc6f7a326bbea9142c4ca18588ae1f62f75382791f37cc",
+      "bytes": 99863
     },
     {
       "path": "services/memory/extract_memories.py",
