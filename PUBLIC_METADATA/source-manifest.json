@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "eb178efb0abb7d7ad633e5c2c8c4886641484f91",
-  "sha256": "7dfa433e265daf5eaa247ab28daf6017f9d12217f95cb48135bb254fbe64774b",
+  "revision": "a89bd0a4f3ac7186968fd48a78c3f347520e05fd",
+  "sha256": "699e646eb8d4f48e09bd718a6e31d9326cc0754300bedf751890521ed56ccc78",
   "files": [
     {
       "path": ".env.example",
@@ -2125,8 +2125,8 @@
     },
     {
       "path": "intent/tools/phone_call.py",
-      "sha256": "939086e91262514a4298829db653bbfb75b27d0440986a72198a48b9a1e67ec4",
-      "bytes": 70933
+      "sha256": "049c0c8c59ee8658ff305e810a5cb68823888d0ed117ffa3c9ca48c22aca6959",
+      "bytes": 74381
     },
     {
       "path": "intent/tools/playlist_tools.py",
@@ -5955,8 +5955,8 @@
     },
     {
       "path": "telephony/routes.py",
-      "sha256": "3543692debfb9fe86eb7e730acda7e5764da4d398554f0a75b0cd1ea11788947",
-      "bytes": 58221
+      "sha256": "894d2a85f3629554cea92b9c831499646676e5b2bf744f607e360a85ecb7dadf",
+      "bytes": 61491
     },
     {
       "path": "telephony/streaming_stt_model.py",
@@ -10810,13 +10810,13 @@
     },
     {
       "path": "ui/react-app/src/components/PhoneToSModal.jsx",
-      "sha256": "639cb482a45cbb95ab3e8862417d64feee1f3a0644de304eb1da589c279f371f",
-      "bytes": 7695
+      "sha256": "dbd5528537dccc17b7065d24fc9da7d39e4147ef9c27e779a3d81a373c72e953",
+      "bytes": 8072
     },
     {
       "path": "ui/react-app/src/components/PhoneToSModal.test.jsx",
-      "sha256": "57f61ded78e63b9f024dd642643078b5836ea6320da17de9003fb3ed9a3ebd28",
-      "bytes": 17381
+      "sha256": "50cefd50137e4e74b747d8d2f70e9e4d06a1d0364d60a206a0dc4cc9802ea5b6",
+      "bytes": 17617
     },
     {
       "path": "ui/react-app/src/components/QueueModal.actions.test.jsx",
