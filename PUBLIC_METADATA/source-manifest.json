@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "ecc6cd5258eab03c7bc71c93f5f574509be56210",
-  "sha256": "a0353bbccce6acc34e2f204e75bd160e936de8253f6ff7f090f927ae54bf258d",
+  "revision": "67f0edecd503b6fc9e68c9ca58bbb2581512b063",
+  "sha256": "abf10e4d532b5bc9c99506d2f3a2e0acc18c84988b23b299e6d5d0fae932562b",
   "files": [
     {
       "path": ".env.example",
@@ -2245,13 +2245,13 @@
     },
     {
       "path": "mcp_hub/approval_bridge.py",
-      "sha256": "54a7d0d2adad147ba65f3dfe68e72420f804e907e6672d3479c983f42ec869fb",
-      "bytes": 68435
+      "sha256": "32fa2f04685494b7f58abd092a113dcdc40afdae3ff2e71573837645ca1e77a3",
+      "bytes": 66816
     },
     {
       "path": "mcp_hub/client_hub.py",
-      "sha256": "4a84860ba89b44cddc11d6b53dc295fb93d1adc12024f4c6283b34cca414e610",
-      "bytes": 134922
+      "sha256": "04f00c840886bce492fa5963392efc0d354004b76ea34bbb1ad86b080aac9298",
+      "bytes": 131872
     },
     {
       "path": "mcp_hub/compound_tools.py",
@@ -2355,8 +2355,8 @@
     },
     {
       "path": "mcp_servers/computer_use/server.py",
-      "sha256": "533f9da409b8db455dae0e1b43a472bb3dac1c4b161fd64d167bf623b3b88b69",
-      "bytes": 50926
+      "sha256": "e275516443ac7009faaae3ccefcc0ad5cd1da447f99fbd007cfee8ef7d69c46c",
+      "bytes": 49767
     },
     {
       "path": "mcp_servers/core_tools/__init__.py",
@@ -4325,8 +4325,8 @@
     },
     {
       "path": "services/computer_use/safety.py",
-      "sha256": "fbe07f3af489b00a6ebd9bdc4344b102201221a09b18fab87b38d5d19fc326c3",
-      "bytes": 30270
+      "sha256": "c3652143a9db94cfe84385b86b0ea0af6761173b7f61d59c8d01672a130f4f65",
+      "bytes": 29458
     },
     {
       "path": "services/computer_use/screen.py",
@@ -4335,8 +4335,8 @@
     },
     {
       "path": "services/computer_use/window_manager.py",
-      "sha256": "cc5890f975866db59e0da2044e8e28555f64ce072e73cc654ac6dc42205dbcef",
-      "bytes": 41354
+      "sha256": "17b1df5322f2ae6a83a21c45e217eeaa90e478bcf810a521dc30ef84d0309445",
+      "bytes": 40365
     },
     {
       "path": "services/connectors/__init__.py",
@@ -4640,8 +4640,8 @@
     },
     {
       "path": "services/llm/prompts/viola_unified.py",
-      "sha256": "c6f2efba129e804164e68580236e4003a43e02a173ff36141d43a514b9ac0fc1",
-      "bytes": 17996
+      "sha256": "1ed3d5364e1a68a45cf7c7d755947872e6c414ed5bff33a7e99b4515bfaf80d1",
+      "bytes": 17808
     },
     {
       "path": "services/llm/provider_fallback.py",
@@ -12720,8 +12720,8 @@
     },
     {
       "path": "ui/settings_manager.py",
-      "sha256": "1655a1e19641230fa6a3b398ff9c3cba9ebed1a6a4baf720bb8b19bd3f61f693",
-      "bytes": 180605
+      "sha256": "684bc4574940b2601eb7dcb512f57a4325f0dd82f9fd87ca1ac3be4a53643821",
+      "bytes": 176804
     },
     {
       "path": "ui/settings_schema.py",
@@ -13065,8 +13065,8 @@
     },
     {
       "path": "utils/self_knowledge.py",
-      "sha256": "8eabdcc93fadcf3f1330a80af91419e354710b05e50557bb8611912cf5c40511",
-      "bytes": 19467
+      "sha256": "09d71b21747e4b2e4191acb39a60fb139855aca7386b0e362216cb6e44d71816",
+      "bytes": 19011
     },
     {
       "path": "utils/service_registry.py",
