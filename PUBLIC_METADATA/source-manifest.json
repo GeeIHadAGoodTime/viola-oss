@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "76b25eef6aa87dc1e233124e555d5d41d23cbd6e",
-  "sha256": "da44de4b98f1d640786fccfff48abd72e8b0e4d11e28d1defceb36225ee2738f",
+  "revision": "c28d1fde794d27825ee6ad921776c97c9286d15f",
+  "sha256": "d38e0d09ba478a8340fe4657a8fad4119cee6319987e8b341f9a93ec1cf45dcd",
   "files": [
     {
       "path": ".env.example",
@@ -780,8 +780,8 @@
     },
     {
       "path": "bootstrap/factory.py",
-      "sha256": "094b90b3910911ab83807fd39222a094da53ba88d367e046b6bda2c1d9173525",
-      "bytes": 81875
+      "sha256": "39636163efe784c0dbe83ab9b72380e5a99369bf0551ee3b42d160694b9d4ac6",
+      "bytes": 82245
     },
     {
       "path": "bootstrap/lazy_intent.py",
@@ -2115,8 +2115,8 @@
     },
     {
       "path": "intent/tools/music_tools.py",
-      "sha256": "4cc81ee844b0d80edbee1ecb755a8675cca32ff31fa81d789cc720788ff6d356",
-      "bytes": 67485
+      "sha256": "53c5bb89c5cd26e66c1d87ab28a34a05b15b902f6c23a9bf59c0af3d695f2664",
+      "bytes": 67963
     },
     {
       "path": "intent/tools/notification_tools.py",
@@ -2242,6 +2242,11 @@
       "path": "launcher/viola_launcher.c",
       "sha256": "8aa16aa019e7e1b7246ac48687e3e93f6d3dfec70fa33ad366f5d1e196727993",
       "bytes": 10792
+    },
+    {
+      "path": "logs/structured/viola-20261031.jsonl",
+      "sha256": "fb27a3625fee98be25aa23a3b1803e01cd4f51665a07183bc4a16b4ec30238ed",
+      "bytes": 1617
     },
     {
       "path": "mcp_hub/__init__.py",
@@ -3874,6 +3879,11 @@
       "bytes": 2255
     },
     {
+      "path": "scripts/ai_debug_session.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
       "path": "scripts/build_youtube_embed.py",
       "sha256": "55f1e3163498329da44cbe1eee1f7d301a07910cbb1442af5f66e27c63bf6a56",
       "bytes": 1783
@@ -4747,6 +4757,11 @@
       "path": "services/llm/tool_arg_retry.py",
       "sha256": "84a4266387052f3c6fe278232d2d4493c26ec0e9d7cbb713c32b54a212ed0045",
       "bytes": 10079
+    },
+    {
+      "path": "services/llm/warmup.py",
+      "sha256": "220d7a73532e35b3a60891580d527260a3af899955844444fdded218cd6d9736",
+      "bytes": 4379
     },
     {
       "path": "services/maintenance/__init__.py",
