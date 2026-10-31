@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "ec5acb6cde7a101a3a55f676c395d8653940190e",
-  "sha256": "67305fb3c8e879e3ffed562c9dff7ab8fc41c59d2f08d66af70432996fd57194",
+  "revision": "457f86e3ec5fa4394fd9b13e604f2ab9dd342a4d",
+  "sha256": "d68938cb9696b186f86c53eb923e69f3f768eb5b196db31154bc64d9c3d77ea3",
   "files": [
     {
       "path": ".env.example",
@@ -2134,6 +2134,11 @@
       "bytes": 25083
     },
     {
+      "path": "intent/tools/random_pick.py",
+      "sha256": "a17a73c094dd0c4c284964628419a736ddeb3c7cf815f75a03596c9ea2fc35b8",
+      "bytes": 3110
+    },
+    {
       "path": "intent/tools/scheduling.py",
       "sha256": "d44e5c83c1dcc4ac60a0c083836f5d2cbe0680082e49168034cb8cbf76f60923",
       "bytes": 15891
@@ -2250,8 +2255,8 @@
     },
     {
       "path": "mcp_hub/client_hub.py",
-      "sha256": "86d3ef4f687058422cdf95aa00936112c096405e0c8cad6f02d0f18fa09fb0d7",
-      "bytes": 131158
+      "sha256": "933c2cc81a784bd04d01d1d1766b8d4bddcfb768b94755fff968e9794341f0c6",
+      "bytes": 131262
     },
     {
       "path": "mcp_hub/compound_tools.py",
@@ -2370,8 +2375,8 @@
     },
     {
       "path": "mcp_servers/core_tools/server.py",
-      "sha256": "40caf6998eb4f71ca129f781ca8d92288679cfe14df85ab6d782226eaf75600d",
-      "bytes": 259950
+      "sha256": "42511b1316e4f66f8bb9c471f7b342b3983f8c9a198fc276aedf709ff3113ba4",
+      "bytes": 261354
     },
     {
       "path": "mcp_servers/phone_tool_descriptions.py",
@@ -4640,8 +4645,8 @@
     },
     {
       "path": "services/llm/prompts/viola_unified.py",
-      "sha256": "e5ae8c601f7338fd0f255e20a772c80b89965e9f36b338dd2177190de7064651",
-      "bytes": 18184
+      "sha256": "c18f5417b8c043a33e093f7bb54a34fbf20eec47bc4e7e3563f9154735c663a0",
+      "bytes": 18239
     },
     {
       "path": "services/llm/provider_fallback.py",
