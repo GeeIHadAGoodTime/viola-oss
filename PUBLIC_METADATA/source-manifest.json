@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "866684ebbf0583839a79aa8c8d1a73925a4a6387",
-  "sha256": "a5bc28973b34785e37a82e5e70c8537cd9b5e71d6d26360e59cee483f27ffb87",
+  "revision": "ee5fd327d2641ff7cce6b8c0dae6a0e4a68e6dc6",
+  "sha256": "fe87da4962eb5d00866d7413c34f7ef86178a7ce169c92fe2ed6bc75e4d4fc13",
   "files": [
     {
       "path": ".env.example",
@@ -715,8 +715,8 @@
     },
     {
       "path": "backend/music_adapter.py",
-      "sha256": "0cc2f9f6a9d882b840d40b4e16556150ad28c4d8c29d4b7fd5c3b6f0b72f6d77",
-      "bytes": 27485
+      "sha256": "54e11e4df0734a03cf9ce9a6371daaf529d1afb26d9a387f9e66d414300b161d",
+      "bytes": 33166
     },
     {
       "path": "backend/observability_routes.py",
@@ -1815,8 +1815,8 @@
     },
     {
       "path": "intent/instant_commands/music.py",
-      "sha256": "9b815802d39db0304421913d4e7dfacd9136e22090430765ef8285b4df4174f1",
-      "bytes": 108498
+      "sha256": "a26899cdc7ddfd424bd6a8d5b68ae3def4e0c02ea15b18e7ac41db4ee7ca374b",
+      "bytes": 108908
     },
     {
       "path": "intent/instant_commands/runtime.py",
@@ -2100,8 +2100,8 @@
     },
     {
       "path": "intent/tools/media_tools.py",
-      "sha256": "f4f01262d9a5a0881db0fcf4b9700f955eb13da419812e7af112c788cc6dafda",
-      "bytes": 29562
+      "sha256": "5cec9e097c60b61b14ebff22480d26979c11358bf078a8def9794fc16e22deca",
+      "bytes": 32491
     },
     {
       "path": "intent/tools/memory.py",
@@ -2845,8 +2845,8 @@
     },
     {
       "path": "music/player/core.py",
-      "sha256": "1a51fedd4e44299799bceff4c0bd87a319eaa95d34d216486e0a4adfb421fb3f",
-      "bytes": 42276
+      "sha256": "3ee09ba49d43986ed499b85cf7f5d0e408ec53b3629a7ca05caa2a1c95c68315",
+      "bytes": 42851
     },
     {
       "path": "music/player/fallback.py",
@@ -3209,6 +3209,11 @@
       "bytes": 27086
     },
     {
+      "path": "music/runtime/iframe_playback_report.py",
+      "sha256": "25b244583efe7e7bb15a26d241c595a9cb01c0519fd2844ec6b8c3d96ff24d08",
+      "bytes": 6737
+    },
+    {
       "path": "music/runtime/play_command.py",
       "sha256": "430be95cd06fcac96af85dc479cbd2465609976a2218a2b57a534d01e4a22448",
       "bytes": 19226
@@ -3255,8 +3260,8 @@
     },
     {
       "path": "music/runtime/worker_manager.py",
-      "sha256": "e05613037babc92235be90f74de04f05f476eb5f90d7025d62ecbe7beccd5449",
-      "bytes": 59863
+      "sha256": "2c2ee1cdd64438d5a35c8af83cfc2bf7150752429cf12868a17f3e8562898379",
+      "bytes": 63422
     },
     {
       "path": "music/shuffle_control.py",
@@ -10045,8 +10050,8 @@
     },
     {
       "path": "ui/react-app/src/SmartDisplay.jsx",
-      "sha256": "1c8458ea4031c7f0d9d2325ff732774286af1383f717498d2b57e427143e24fe",
-      "bytes": 183697
+      "sha256": "27ed6ec9f19fa4832cfb5ad4ad73e2a3da93f823523e5dc2b356f27f286daf92",
+      "bytes": 185182
     },
     {
       "path": "ui/react-app/src/SmartDisplay.spokePolicy.test.jsx",
@@ -10075,8 +10080,8 @@
     },
     {
       "path": "ui/react-app/src/__tests__/SmartDisplay.test.jsx",
-      "sha256": "19d17ed7acb17b78b2a67d4abb881182828057252f4f611ba1e28eaf03707cec",
-      "bytes": 140696
+      "sha256": "f2bc3b415d60ed75343c12144ac92572d41bc49f019fd0c6bcfae0fcbf73fd80",
+      "bytes": 143768
     },
     {
       "path": "ui/react-app/src/__tests__/hooks/useEventBus.test.jsx",
@@ -12800,8 +12805,8 @@
     },
     {
       "path": "ui/websocket/command_handlers.py",
-      "sha256": "530de68dfabde85190dd8bc3a836baf9be813a66b883a253611fcb724a2cf65d",
-      "bytes": 50798
+      "sha256": "df7c059646baa16a2c64667173435bceaf7418cdea56232eafb13b12650cc894",
+      "bytes": 51029
     },
     {
       "path": "ui/websocket/event_hub.py",
