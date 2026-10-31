@@ -5326,6 +5326,37 @@ async def weather(
 
 @server.tool(
     description=(
+        "Real randomness: roll dice, flip a coin, pick a random number in a range, or choose randomly "
+        "from a list. Use it for every dice roll, coin flip, random number or random pick; never make "
+        "the result up yourself."
+    ),
+    annotations=_SAFE,
+    # Loaded on the first turn: "roll a dice" should be one tool step, not a
+    # ToolSearch round trip plus a tool step.
+    meta={"risk": "safe", "anthropic/alwaysLoad": True},
+)
+async def random_pick(
+    kind: Annotated[
+        str,
+        Field(description="dice | coin | number | choose"),
+    ] = "dice",
+    count: Annotated[int, Field(description="How many dice, flips, numbers or picks (1-100).")] = 1,
+    sides: Annotated[int, Field(description="Sides per die for kind=dice (default 6).")] = 6,
+    low: Annotated[int, Field(description="Lowest number for kind=number.")] = 1,
+    high: Annotated[int, Field(description="Highest number for kind=number.")] = 100,
+    options: Annotated[
+        list[str] | None,
+        Field(description="The items to choose from for kind=choose."),
+    ] = None,
+) -> str:
+    """Roll dice, flip coins, pick numbers or choose from a list with a real random source."""
+    from intent.tools.random_pick import random_pick as _random_pick
+
+    return _format_result(_random_pick(kind, count=count, sides=sides, low=low, high=high, options=options))
+
+
+@server.tool(
+    description=(
         "Assemble the user's daily briefing: one aggregated summary of today built from current weather, "
         "today's calendar events, and the user's scheduled tasks/reminders due today. "
         "Use for 'give me my daily briefing', 'morning briefing', 'what's my day look like', 'brief me', and similar catch-me-up requests. "

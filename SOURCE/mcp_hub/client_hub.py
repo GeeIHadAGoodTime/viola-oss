@@ -1433,6 +1433,8 @@ class MCPClientHub:
             "web_search",
             "web_read",
             "weather",
+            # --- Dice, coin flips, random numbers and picks (read-only) ---
+            "random_pick",
             # --- Music & playback (UI: Music & playback) ---
             "media",
             "playback",
