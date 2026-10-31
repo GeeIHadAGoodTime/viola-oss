@@ -179,12 +179,27 @@ def _home() -> Path | None:
         return None
 
 
+def _is_home_or_above(folder: Path, home: Path | None) -> bool:
+    """True for the home folder itself and every folder that contains it."""
+    if home is None:
+        return False
+    key = _norm(str(folder)).rstrip("/")
+    home_key = _norm(str(home)).rstrip("/")
+    return home_key == key or home_key.startswith(key + "/")
+
+
 def _ancestors_below_home(p: Path) -> list[Path]:
+    """Folders above ``p`` up to (not including) home, or up to the drive root outside home.
+
+    Home and the folders that contain it (/home, C:\Users) are never part
+    of the walk: with home at /home/runner, "list my home folder" named
+    /home as "home folder" and so made ~ count as user-named.
+    """
     home = _home()
     out: list[Path] = []
     current = p.parent
     while current != current.parent:
-        if home is not None and _norm(str(current)) == _norm(str(home)):
+        if _is_home_or_above(current, home):
             break
         out.append(current)
         current = current.parent
@@ -297,7 +312,7 @@ def user_named_folder_contains(p: Path, user_text: str, *, include_self: bool) -
     home = _home()
     folders = ([p] if include_self else []) + _ancestors_below_home(p)
     for folder in folders:
-        if folder == folder.parent or (home is not None and _norm(str(folder)) == _norm(str(home))):
+        if folder == folder.parent or _is_home_or_above(folder, home):
             continue
         if _folder_named(folder, user_text, text, home, whole=True):
             return True

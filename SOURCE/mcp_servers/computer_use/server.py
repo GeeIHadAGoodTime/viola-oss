@@ -720,13 +720,16 @@ async def computer(
         control_token = safety.acquire_control_session(user_id=user_id, session_id=session_id, action=action)
         focused = _focus_named_app(action, **target_args)
         if focused is not None:
+            named_window = _target_window_title(target_window=target_window, window_title=window_title, title=title)
             refusal = _focus_precondition(focused, action=action)
-            if refusal is not None:
+            if refusal is not None and not (action == "type" and named_window):
                 refusal["target_app_executable"] = target_app
                 return _json(refusal)
-            if action == "type" and not _target_window_title(
-                target_window=target_window, window_title=window_title, title=title
-            ):
+            # Typing into a NAMED window does not need it in front: the text
+            # goes to that window's handle and fails closed if no such window
+            # exists. So a refused focus (Windows' foreground lock, or no
+            # focus support) still types there, as it did before round 7.
+            if action == "type" and not named_window:
                 # Type into the window just brought forward, by title, so a
                 # click elsewhere in the meantime cannot redirect the text.
                 window_title = str(focused.get("window_title") or "")
