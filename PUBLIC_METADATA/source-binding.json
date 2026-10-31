@@ -30,10 +30,10 @@
   },
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "c8a88047186cbaf78297b0dad9988f2699477304ab65e142071915a77c90d886",
-  "source_tree_sha256": "a5bc28973b34785e37a82e5e70c8537cd9b5e71d6d26360e59cee483f27ffb87",
+  "source_manifest_sha256": "cfb3539953e72f38d7fed980a0d31670f2e27c1c7be9bcaf30ea132a61694308",
+  "source_tree_sha256": "3785bae5db5d374276cb5bfc3d033c134495350fcc8287aaf724ec2a1cfa6cbe",
   "source_file_count": 2759,
-  "source_revision": "866684ebbf0583839a79aa8c8d1a73925a4a6387",
+  "source_revision": "4d68f87b36e6c0160722e1f39744a76726f087ac",
   "comparison_public_revision": "ecab2772465fcc89ae6645b028af1c2273b9199f",
   "changed_source_paths": [
     "START_WEB_INTERFACE.py",
@@ -358,6 +358,8 @@
     "voice/wake_detector/aec_processor.py",
     "voice/wake_detector/device_profile_manager.py",
     "voice/wake_detector/facade.py",
+    "voice/wake_detector/fp_collector.py",
+    "voice/wake_detector/silero_endpoint.py",
     "voice/wake_detector/violawake_listener.py",
     "voice/wake_detector/wake/config.py",
     "voice/wake_detector/wake/context.py",
@@ -437,8 +439,8 @@
     "historical_inventory_limits": "This renderer correction changes no dependency or workflow inputs. All six retained SBOMs and their complete status objects stay historical and unchanged; no current installed inventory qualification is claimed."
   },
   "qualification": {
-    "source_commit": "866684ebbf0583839a79aa8c8d1a73925a4a6387",
-    "kind": "gmail mailbox"
+    "source_commit": "4d68f87b36e6c0160722e1f39744a76726f087ac",
+    "kind": "wake fixes"
   },
   "historical_bindings": [
     {
