@@ -1365,6 +1365,12 @@ async def _fetch_nws(lat: float, lon: float) -> dict[str, Any] | None:
             heat_index_f = _celsius_to_fahrenheit(obs.get("heatIndex", {}).get("value"))
             wind_chill_f = _celsius_to_fahrenheit(obs.get("windChill", {}).get("value"))
             feels_like_f = heat_index_f if heat_index_f is not None else wind_chill_f
+            if feels_like_f is None:
+                # NWS reports a heat index only when it is hot and a wind chill
+                # only when it is cold and windy; in between, it feels like the
+                # air temperature. Leaving it empty showed "Feels like --" (1.0.5
+                # build-7 laptop report, A11.1, 57F in Milwaukee).
+                feels_like_f = temp_f
             wind_kmh = _coerce_float(obs.get("windSpeed", {}).get("value"))
             wind_mph = round(wind_kmh * 0.621371, 1) if wind_kmh is not None else None
             wind_direction = _round_value(obs.get("windDirection", {}).get("value"))

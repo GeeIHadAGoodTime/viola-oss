@@ -49,6 +49,19 @@ INFRASTRUCTURE_KEYS: Final[frozenset[str]] = frozenset(
         "mute_hotkey",
         "mute_hotkey_display",
         "network_discovery_enabled",
+        # First-run progress saved per step by /v1/onboarding/save
+        # (ui.onboarding.OnboardingSystem.save_step_data): this machine's own
+        # walkthrough, never synced. Unlisted, each read at sign-in logged
+        # "Unclassified settings key onboarding_step_*" (1.0.5 build 7).
+        # One key per ui.onboarding.OnboardingStep value.
+        "onboarding_step_ai_setup",
+        "onboarding_step_api_access",
+        "onboarding_step_autonomy_tier",
+        "onboarding_step_complete",
+        "onboarding_step_microphone_test",
+        "onboarding_step_quick_tutorial",
+        "onboarding_step_voice_mode",
+        "onboarding_step_welcome",
         "output_device",
         "phone_mode",
         "ptt_enabled",

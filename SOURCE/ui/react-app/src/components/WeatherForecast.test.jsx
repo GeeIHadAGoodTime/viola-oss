@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, within } from '../test/test-utils';
-import WeatherForecast from './WeatherForecast';
+import WeatherForecast, { upcomingHourlyRows } from './WeatherForecast';
 
 const theme = {
   colors: {
@@ -276,5 +276,33 @@ describe('WeatherForecast — an unknown condition stays unknown', () => {
     const hero = screen.getByTestId('weather-hero');
     expect(within(hero).queryByTestId('weather-icon-unknown')).not.toBeInTheDocument();
     expect(screen.getAllByText('Light rain').length).toBeGreaterThan(0);
+  });
+});
+
+describe('WeatherForecast hourly strip starts at the current hour (1.0.5 build 7, A11.1)', () => {
+  it('drops hours that are already over', () => {
+    vi.useFakeTimers({ now: new Date('2026-05-12T14:22:00'), toFake: ['Date'] });
+    try {
+      renderForecast();
+      const entries = screen.getAllByTestId('weather-hourly-entry');
+      // 00:00-13:00 are over at 2:22 PM; the strip starts with the 2 PM hour.
+      expect(entries).toHaveLength(10);
+      expect(within(entries[0]).queryByText('1 PM')).not.toBeInTheDocument();
+      expect(screen.queryByText('1 PM')).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps the current hour and later ones, and keeps everything if all are over', () => {
+    const rows = [
+      { time: '2026-05-12T13:00' },
+      { time: '2026-05-12T14:00' },
+      { time: '2026-05-12T15:00' },
+    ];
+    const now = new Date('2026-05-12T14:22:00').getTime();
+    expect(upcomingHourlyRows(rows, now).map((row) => row.time)).toEqual(['2026-05-12T14:00', '2026-05-12T15:00']);
+    expect(upcomingHourlyRows(rows, new Date('2026-05-13T00:00:00').getTime())).toHaveLength(3);
+    expect(upcomingHourlyRows(null)).toEqual([]);
   });
 });

@@ -388,8 +388,10 @@ UsageRow.propTypes = {
   resetsAt: PropTypes.string,
 };
 
-const UsageSummary = () => {
-  const { usage } = useUsage();
+// `usage` comes from the one useUsage() read on the Account page, which the
+// Managed usage card below shows too: two separate reads at different times
+// put "14% used this month" next to "0% used" (1.0.5 build-7 laptop report).
+const UsageSummary = ({ usage }) => {
   if (!usage) return null;
   const showMonthly = typeof usage.monthlyPercent === 'number';
   const showWeekly = typeof usage.weeklyPercent === 'number';
@@ -424,6 +426,15 @@ const UsageSummary = () => {
       )}
     </div>
   );
+};
+
+UsageSummary.propTypes = {
+  usage: PropTypes.shape({
+    monthlyPercent: PropTypes.number,
+    weeklyPercent: PropTypes.number,
+    monthlyResetsAt: PropTypes.string,
+    weeklyResetsAt: PropTypes.string,
+  }),
 };
 
 const CHECKOUT_UNAVAILABLE = 'Checkout is temporarily unavailable. Please try again shortly.';
@@ -728,6 +739,7 @@ UpgradePanel.propTypes = {
 // User Profile Card
 const ProfileCard = ({ user, subscription, billingStatus = 'ready', onLogout, logoutPending = false, addToast, refreshUser }) => {
   const [portalLoading, setPortalLoading] = useState(false);
+  const { usage } = useUsage();
   const baseSubscription = subscription?.entitlement?.base_subscription;
   const canManageSubscription = Boolean(baseSubscription
     ? baseSubscription.payment_provider === 'stripe' && baseSubscription.plan_id !== 'free'
@@ -822,7 +834,7 @@ const ProfileCard = ({ user, subscription, billingStatus = 'ready', onLogout, lo
 
       <MonthGiftSummary entitlement={subscription?.entitlement} />
 
-      <UsageSummary />
+      <UsageSummary usage={usage} />
 
       {canManageSubscription && (
         <Button
@@ -841,6 +853,7 @@ const ProfileCard = ({ user, subscription, billingStatus = 'ready', onLogout, lo
         accountId={user.id || user.email}
         refreshUser={refreshUser}
         entitlement={subscription?.entitlement}
+        managedUsagePercent={usage?.monthlyPercent ?? null}
         fallback={billingStatus === 'ready' && !subscription?.hasPaidAccess
           ? <UpgradePanel addToast={addToast} refreshUser={refreshUser} /> : null}
       />

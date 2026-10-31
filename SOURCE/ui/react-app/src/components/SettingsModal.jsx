@@ -24,6 +24,7 @@ import { SmartHomeWizard } from './smarthome';
 import { DEFAULT_MUTE_HOTKEY, DEFAULT_PTT_HOTKEY, hotkeyFromKeyboardEvent } from '../utils/hotkeys';
 import { getStartupToggleCopy } from '../utils/platform';
 import CustomizeTab from './CustomizeTab';
+import { matchesSearch } from './settingsSearch';
 
 // The version of the build the user is actually running, injected at build
 // time from core/constants.py (VIOLA_VERSION) by vite.config.js — the same
@@ -169,43 +170,6 @@ const LEGACY_TAB_ALIASES = {
 const normalizeTabId = (tabId) => {
   if (!tabId) return 'account';
   return LEGACY_TAB_ALIASES[tabId] || tabId;
-};
-
-const SECTION_SEARCH_INDEX = {
-  account: [
-    'account profile plan billing payment methods cards usage upgrade sync devices sign out',
-    'phone number recording ai disclosure retention delete call data',
-    'privacy data telemetry usage reports sync error reporting session replay wake-word training',
-  ],
-  ai_agents: [
-    'ai source managed byok chatgpt plus codex local model autonomy solo ensemble symphony browser weekly review',
-    'agent source reasoning provider browser import session',
-  ],
-  music: [
-    'music source youtube spotify local files sign in playlists playback volume autoplay',
-  ],
-  voice: [
-    'voice wake word sensitivity push-to-talk ptt shortcut text to speech tts voice speed volume stt recognition whisper vad advanced',
-  ],
-  connections: [
-    'connections connected services smart home calendar oauth google telegram qr messaging',
-  ],
-  customize: [
-    'customize theme accent color weather location city zip postal code time format wake word selection',
-  ],
-  system: [
-    'system audio devices microphone speaker multi-room rooms notifications updates early access window tray startup network api port advanced settings',
-  ],
-};
-
-const matchesSearch = (tab, query) => {
-  const normalizedQuery = query.trim().toLowerCase();
-  if (!normalizedQuery) return true;
-  const haystack = [
-    tab.label,
-    ...(SECTION_SEARCH_INDEX[tab.id] || []),
-  ].join(' ').toLowerCase();
-  return haystack.includes(normalizedQuery);
 };
 
 // ── Tier system constants ──

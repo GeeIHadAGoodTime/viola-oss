@@ -202,8 +202,61 @@ def managed_llm_budget_message(gate: ManagedLlmBudgetGate) -> str:
         "You've reached your %s managed AI limit for the %s. Choose Add more usage in Billing to continue."
     ) % (period, plan_label)
     if gate.resets_at and gate.retry_after_seconds > 0:
-        message += " Retry after %s." % gate.resets_at
+        when = friendly_reset_time(gate.resets_at)
+        if when:
+            message += " Your usage resets %s." % when
     return message
+
+
+_WEEKDAYS = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+_MONTHS = (
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+)
+
+
+def friendly_reset_time(resets_at: object, *, utc: bool = False) -> str | None:
+    """Say when usage resets the way a person would: "on Monday, November 23 at 9:07 AM".
+
+    The cap message used to print the raw ISO stamp ("Retry after
+    2026-11-23T15:07:01.319869Z.", 1.0.5 build-7 laptop report). The desktop
+    shows this computer's local time; ``utc=True`` (a server that does not
+    know the user's time zone) names the day only. None when unreadable, so
+    the caller leaves the sentence out rather than printing a raw value.
+    """
+    text = str(resets_at or "").strip()
+    if not text:
+        return None
+    try:
+        moment = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=UTC)
+    if utc:
+        moment = moment.astimezone(UTC)
+        return "on %s, %s %d" % (_WEEKDAYS[moment.weekday()], _MONTHS[moment.month - 1], moment.day)
+    moment = moment.astimezone()
+    hour = moment.hour % 12 or 12
+    meridiem = "AM" if moment.hour < 12 else "PM"
+    return "on %s, %s %d at %d:%02d %s" % (
+        _WEEKDAYS[moment.weekday()],
+        _MONTHS[moment.month - 1],
+        moment.day,
+        hour,
+        moment.minute,
+        meridiem,
+    )
 
 
 def per_command_spend_cap_message() -> str:

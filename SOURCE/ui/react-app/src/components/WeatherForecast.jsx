@@ -264,6 +264,22 @@ function parseDateValue(value) {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
+const HOUR_MS = 60 * 60 * 1000;
+
+// Hourly rows from the hour in progress onward. A forecast read earlier (the
+// backend caches it) still starts at the hour it was fetched, so at 2:22 PM
+// the strip began at 1 PM (1.0.5 build-7 laptop report, A11.1). A row whose
+// hour is over is dropped; if every row is over, the rows are kept as they
+// are rather than showing an empty strip.
+export function upcomingHourlyRows(rows, now = Date.now()) {
+  const list = Array.isArray(rows) ? rows : [];
+  const upcoming = list.filter((hour) => {
+    const start = parseDateValue(hour?.time || hour?.hour);
+    return !start || start.getTime() + HOUR_MS > now;
+  });
+  return upcoming.length > 0 ? upcoming : list;
+}
+
 function getAtmosphere(current, firstDay, forecastData) {
   if (current.is_day === false || current.is_night === true) return ATMOSPHERES.night;
   if (current.is_day === true) return ATMOSPHERES.day;
@@ -592,10 +608,10 @@ export default function WeatherForecast({
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [onClose]);
 
-  const hourly = useMemo(() => (
+  const hourly = useMemo(() => upcomingHourlyRows(
     forecastData?.hourly_forecast
     || forecastData?.hourly
-    || []
+    || [],
   ).slice(0, 24), [forecastData]);
 
   const daily = useMemo(() => (

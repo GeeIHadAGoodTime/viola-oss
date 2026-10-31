@@ -93,3 +93,19 @@ describe('TimerCountdown sleep timer chip (X1.3)', () => {
     expect(await screen.findByTestId('sleep-timer-chip')).toHaveTextContent('Sleep timer');
   });
 });
+
+describe('TimerCountdown done toast (1.0.5 build 7, A11.5)', () => {
+  it('raises a toast that dismisses itself instead of persisting for minutes', async () => {
+    routeApi();
+    const addToast = vi.fn();
+    render(<TimerCountdown addToast={addToast} />);
+    await emit('timer_completed', { timer_id: 't1', label: '1-minute timer' });
+
+    expect(addToast).toHaveBeenCalledTimes(1);
+    const toast = addToast.mock.calls[0][0];
+    expect(toast.message).toBe('Your 1-minute timer is done!');
+    expect(toast.persist).not.toBe(true);
+    expect(toast.durationMs).toBeGreaterThan(5000);
+    expect(toast.durationMs).toBeLessThanOrEqual(60000);
+  });
+});
