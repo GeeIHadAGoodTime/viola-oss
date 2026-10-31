@@ -1630,12 +1630,12 @@ const isGoogleCalendarSyncConnected = (statusData) => {
 // Shown under the Google row before the user connects. Keep it short and
 // literal: what Viola asks for, and what the user will see. Google verified
 // the Calendar and Gmail-sending permissions, so connecting shows Google's
-// normal screen. Gmail reading (gmail.modify) is asked for separately and is
-// not verified yet, so that one step can still show Google's warning.
+// normal screen. Gmail reading (gmail.modify) is not verified, so 1.0.5 never
+// asks for it (google_gmail_mailbox_enabled is off) and the note does not
+// promise it.
 export const GOOGLE_CONNECT_NOTE = (
   'Viola asks to see and edit your calendar events and to send email you approve. '
-  + 'Reading and organizing your Gmail is a separate permission Viola asks for the first time you ask about your email; '
-  + "Google has not verified that one yet, so it may show a \"Google hasn't verified this app\" screen (click Advanced, then Go to Viola). "
+  + 'Once connected, Viola can send email you approve and use your calendar. '
   + 'Your Google sign-in stays on this computer.'
 );
 
@@ -1787,7 +1787,7 @@ export const CalendarSettings = () => {
                 </>
               ) : (
                 <span style={{ color: theme.colors.textMuted, fontSize: '13px' }}>
-                  Not connected. Lets Viola use your calendar and your Gmail: read, organize, and send email when you ask.
+                  Not connected. Lets Viola use your calendar and send email you approve.
                 </span>
               )}
             </div>
@@ -1892,7 +1892,7 @@ export const CalendarSettings = () => {
             marginBottom: '16px',
             lineHeight: '1.4',
           }}>
-            Viola will stop using your Google Calendar and can no longer read, organize, or send email in your Gmail. You can reconnect anytime.
+            Viola will stop using your Google Calendar and can no longer send email from your Gmail. You can reconnect anytime.
           </div>
           <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
             <button

@@ -824,8 +824,9 @@ class AppConfig:
     google_redirect_uri: str | None = None
     google_restricted_features_enabled: bool = False
     # Ask Google for Gmail mailbox access (gmail.modify, not yet verified by
-    # Google). False keeps every Google request inside the verified scopes.
-    google_gmail_mailbox_enabled: bool = True
+    # Google). Off by default (founder decision 2026-10-31, 1.0.5): every
+    # Google request stays inside the verified scopes until Google approves it.
+    google_gmail_mailbox_enabled: bool = False
 
     # --- Apple OAuth (Sign in with Apple) ---
     apple_client_id: str | None = None

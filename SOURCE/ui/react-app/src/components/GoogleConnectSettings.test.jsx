@@ -38,7 +38,7 @@ describe('Settings > Connections > Google', () => {
     delete window.viola;
   });
 
-  it('says what Viola asks for, and that only the Gmail reading step can show the unverified screen', async () => {
+  it('says Viola can send email you approve and use your calendar, and does not promise Gmail reading', async () => {
     mockBackend({ connected: false });
 
     render(<CalendarSettings />);
@@ -46,15 +46,16 @@ describe('Settings > Connections > Google', () => {
     expect(await screen.findByText('Google')).toBeInTheDocument();
     const note = screen.getByTestId('google-connect-note');
     expect(note).toHaveTextContent('calendar events');
-    expect(note).toHaveTextContent('send email you approve');
+    expect(note).toHaveTextContent('Viola can send email you approve and use your calendar');
     expect(note).toHaveTextContent('stays on this computer');
     // Google verified Calendar and Gmail sending: connecting is no longer "under review".
     expect(note).not.toHaveTextContent('still reviewing Viola');
     expect(note).not.toHaveTextContent('limits how many people can connect');
-    // Gmail reading is a separate, unverified permission, and Viola can read mail once allowed.
-    expect(note).toHaveTextContent('Reading and organizing your Gmail is a separate permission');
-    expect(note).toHaveTextContent("Google hasn't verified this app");
+    // Gmail reading (gmail.modify) is off in 1.0.5: no later step, no unverified screen promised.
+    expect(note).not.toHaveTextContent(/reading|organizing|read, organize/i);
+    expect(note).not.toHaveTextContent("Google hasn't verified this app");
     expect(note).not.toHaveTextContent('cannot read your inbox');
+    expect(screen.getByText(/^Not connected\./)).not.toHaveTextContent(/read|organize/i);
     expect(GOOGLE_CONNECT_NOTE).not.toMatch(/—/);
   });
 

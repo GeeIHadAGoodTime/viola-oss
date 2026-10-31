@@ -378,11 +378,21 @@ def _register_all_domains(
     )
 
     # -- Email --
-    # Gmail read, search, organize and send are on by default (founder decision
-    # 2026-10-30); the first mailbox action asks Google for the Gmail permission.
-    email_description = (
-        "Read, search, organize and send email from your own Gmail (connect Google in Settings > Connections)"
-    )
+    # Sending email the user approves is always available once Google is
+    # connected. Gmail read, search and organize (gmail.modify) only while the
+    # mailbox switch is on: it is off by default until Google approves that
+    # scope (founder decision 2026-10-31), so the model must not offer it.
+    from services.oauth.google import is_gmail_mailbox_enabled
+
+    if is_gmail_mailbox_enabled(cfg):
+        email_description = (
+            "Read, search, organize and send email from your own Gmail (connect Google in Settings > Connections)"
+        )
+    else:
+        email_description = (
+            "Send email the user approves from their own Gmail (connect Google in Settings > Connections). "
+            "Reading, searching and organizing Gmail is not available in Viola yet."
+        )
     email_setup_guide = SetupGuide(
         orthodox_path="Connect your Google account in Settings > Connections",
         auto_setup_possible=True,

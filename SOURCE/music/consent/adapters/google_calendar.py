@@ -143,7 +143,9 @@ def _connected_message(service: object, session_id: str) -> str:
         granted = set(getattr(bundle, "scopes", None) or ())
     except Exception:
         logger.debug("Could not read the new Google token's scopes", exc_info=True)
-    if all(scope in granted for scope in GMAIL_MAILBOX_SCOPES):
+    from services.oauth.google import is_gmail_mailbox_enabled
+
+    if is_gmail_mailbox_enabled() and all(scope in granted for scope in GMAIL_MAILBOX_SCOPES):
         return "Viola can now use your Google Calendar, and read, organize and send your Gmail when you ask."
     return "Viola can now use your Google Calendar and send email you ask it to send."
 
@@ -358,7 +360,7 @@ class GoogleCalendarOAuthAdapter:
             ),
             can_rotate=True,
             notes=(
-                "Google Calendar events and Gmail (send, plus read and organize once the user allows it) "
+                "Google Calendar events and Gmail (send; read and organize only when Gmail mailbox access is on) "
                 "via installed-app OAuth (PKCE, loopback)."
             ),
             is_music_provider=False,
