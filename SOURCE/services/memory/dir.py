@@ -9,6 +9,7 @@ import re
 import shutil
 import sqlite3
 import subprocess
+import sys
 import threading
 import time
 import uuid
@@ -90,7 +91,12 @@ def _private_acl_identity(path: Path) -> tuple[str, int, int] | None:
         st = path.stat()
     except OSError:
         return None
-    return (os.path.normcase(str(path)), int(st.st_ino), int(st.st_ctime_ns))
+    # Creation time where the platform has one (st_ctime is creation time only on
+    # Windows; elsewhere it changes on every chmod and would defeat the cache).
+    birth = getattr(st, "st_birthtime_ns", None)
+    if birth is None:
+        birth = st.st_ctime_ns if sys.platform == "win32" else 0
+    return (os.path.normcase(str(path)), int(st.st_ino), int(birth))
 
 
 class MemoryDecryptionError(ValueError):
