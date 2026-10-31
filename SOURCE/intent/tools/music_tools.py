@@ -543,8 +543,15 @@ async def _read_live_playback_state() -> dict[str, Any]:
 # read straight after /v1/next saw the new track loading, so the tool said
 # "not confirmed" and the model spent another step calling playback(resume)
 # (dev PC r7 spans: +1 playback call and +1 model call on every "next track").
-_TRACK_CHANGE_CONFIRM_SECONDS = 3.0
-_TRACK_CHANGE_POLL_SECONDS = 0.2
+# It returns on the first read that reports PLAYING; the cap is the same budget
+# music gives a fresh play request, so a slow iframe on "next" is not reported
+# as unconfirmed (and answered with an extra resume step) while "play" waits.
+try:
+    from music.runtime.iframe_playback_report import PLAY_CONFIRM_TIMEOUT_S as _PLAY_CONFIRM_BUDGET
+except ImportError:  # pragma: no cover - the music runtime ships with the tools
+    _PLAY_CONFIRM_BUDGET = 8.0
+_TRACK_CHANGE_CONFIRM_SECONDS = float(_PLAY_CONFIRM_BUDGET)
+_TRACK_CHANGE_POLL_SECONDS = 0.1
 
 
 async def _await_track_change_playing(state: dict[str, Any]) -> dict[str, Any]:

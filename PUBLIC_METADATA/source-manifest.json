@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "4d7ae4524c9ecbe3cf6e0de49f16ef6c6a6f7d34",
-  "sha256": "a604f0592903f7e0949a29a47a79c77663ca42941c32dc8660ee02d08f877fe3",
+  "revision": "2e4a0bef692a5a02957649cca3120fe168d0a326",
+  "sha256": "2a4cc45597da4f226e1fe75d78ff57353ae19d74e282955f96b425e12629a220",
   "files": [
     {
       "path": ".env.example",
@@ -780,8 +780,8 @@
     },
     {
       "path": "bootstrap/factory.py",
-      "sha256": "094b90b3910911ab83807fd39222a094da53ba88d367e046b6bda2c1d9173525",
-      "bytes": 81875
+      "sha256": "39636163efe784c0dbe83ab9b72380e5a99369bf0551ee3b42d160694b9d4ac6",
+      "bytes": 82245
     },
     {
       "path": "bootstrap/lazy_intent.py",
@@ -2115,8 +2115,8 @@
     },
     {
       "path": "intent/tools/music_tools.py",
-      "sha256": "4cc81ee844b0d80edbee1ecb755a8675cca32ff31fa81d789cc720788ff6d356",
-      "bytes": 67485
+      "sha256": "53c5bb89c5cd26e66c1d87ab28a34a05b15b902f6c23a9bf59c0af3d695f2664",
+      "bytes": 67963
     },
     {
       "path": "intent/tools/notification_tools.py",
@@ -4747,6 +4747,11 @@
       "path": "services/llm/tool_arg_retry.py",
       "sha256": "84a4266387052f3c6fe278232d2d4493c26ec0e9d7cbb713c32b54a212ed0045",
       "bytes": 10079
+    },
+    {
+      "path": "services/llm/warmup.py",
+      "sha256": "220d7a73532e35b3a60891580d527260a3af899955844444fdded218cd6d9736",
+      "bytes": 4379
     },
     {
       "path": "services/maintenance/__init__.py",
