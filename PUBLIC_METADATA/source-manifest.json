@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "826e0d426a5c1bcb3eabd8792b310c3102a6f104",
-  "sha256": "ad2448c85d7c24cfb4e31f803127c8762dd8b2f46074ce0c52f36f63ceabff24",
+  "revision": "d650e77095c222025bb31925e7823dcd9c23d97c",
+  "sha256": "2965f1d8c5c56101ed2eb81f4ed1eafab86914995a046b0e07f68d79ad797611",
   "files": [
     {
       "path": ".env.example",
@@ -715,8 +715,8 @@
     },
     {
       "path": "backend/music_adapter.py",
-      "sha256": "54e11e4df0734a03cf9ce9a6371daaf529d1afb26d9a387f9e66d414300b161d",
-      "bytes": 33166
+      "sha256": "744c7bdcdbf8b7969a78ab45c0b615017957081c365b9649e8eb5c75a041bb4d",
+      "bytes": 34018
     },
     {
       "path": "backend/observability_routes.py",
