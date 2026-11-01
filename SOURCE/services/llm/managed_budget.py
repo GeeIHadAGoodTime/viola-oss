@@ -11,7 +11,7 @@ from __future__ import annotations
 import math
 import uuid
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from core.exceptions import LLMQuotaExceededError
@@ -30,7 +30,8 @@ def public_managed_cap_state(value: object) -> dict[str, Any]:
     """Project a denial without exposing the company's provider-cost ledger."""
     if not isinstance(value, dict):
         return {}
-    result = {key: value[key] for key in ("plan", "period", "resets_at", "denial_code")
+    result = {key: value[key] for key in ("plan", "period", "resets_at", "denial_code",
+                                          "complimentary_plan", "complimentary_ends_at")
               if isinstance(value.get(key), str)}
     diagnostic_id = value.get("diagnostic_id")
     if isinstance(diagnostic_id, str):
@@ -38,7 +39,7 @@ def public_managed_cap_state(value: object) -> dict[str, Any]:
             result["diagnostic_id"] = str(uuid.UUID(diagnostic_id))
         except ValueError:
             pass
-    for key in ("usage_percent", "percent_used", "retry_after_seconds"):
+    for key in ("usage_percent", "percent_used", "retry_after_seconds", "complimentary_months"):
         number = value.get(key)
         if type(number) in {int, float} and math.isfinite(number) and number >= 0:
             result[key] = number
@@ -98,6 +99,11 @@ class ManagedLlmBudgetGate:
     reservation: Any | None = None
     public_cap_state: dict[str, Any] | None = None
     estimated_cents: int = 0
+    # Set only when the active complimentary (gifted) plan ends with the
+    # account back on Free; see complimentary_ending_sentence.
+    complimentary_plan: str = ""
+    complimentary_ends_at: str = ""
+    complimentary_months: int = 0
 
     @property
     def denial_code(self) -> str:
@@ -127,6 +133,10 @@ class ManagedLlmBudgetGate:
         }
         if self.budget_cents > 0:
             state["usage_percent"] = min(100, max(0, 100 * self.spent_cents / self.budget_cents))
+        if self.complimentary_ends_at:
+            state["complimentary_plan"] = self.complimentary_plan
+            state["complimentary_ends_at"] = self.complimentary_ends_at
+            state["complimentary_months"] = self.complimentary_months
         return public_managed_cap_state(state)
 
 
@@ -138,6 +148,9 @@ def _public_budget_gate(gate: Any) -> ManagedLlmBudgetGate:
         extra_usage_cents=gate.extra_usage_cents, retry_after_seconds=gate.retry_after_seconds,
         reason=gate.reason, public_message=gate.public_message, reservation=gate.reservation,
         estimated_cents=getattr(gate, "estimated_cents", 0),
+        complimentary_plan=str(getattr(gate, "complimentary_plan", "") or ""),
+        complimentary_ends_at=str(getattr(gate, "complimentary_ends_at", "") or ""),
+        complimentary_months=int(getattr(gate, "complimentary_months", 0) or 0),
     )
 
 
@@ -201,11 +214,60 @@ def managed_llm_budget_message(gate: ManagedLlmBudgetGate) -> str:
     message = (
         "You've reached your %s managed AI limit for the %s. Choose Add more usage in Billing to continue."
     ) % (period, plan_label)
-    if gate.resets_at and gate.retry_after_seconds > 0:
+    ending = complimentary_ending_sentence(gate)
+    if ending:
+        message += " " + ending
+    elif gate.resets_at and gate.retry_after_seconds > 0:
         when = friendly_reset_time(gate.resets_at)
         if when:
             message += " Your usage resets %s." % when
     return message
+
+
+# A gift that ends this close after the usage reset (or any time before it)
+# means the reset does not bring the gifted plan back: the account is on Free.
+# On the 1.0.5 laptop the reset was 15:07:01 and the gift ended 15:45:51 the
+# same day, so "Your usage resets on November 23" promised a Pro month that
+# never came.
+COMPLIMENTARY_RESET_COINCIDENCE = timedelta(days=1)
+
+
+def complimentary_ending_sentence(gate: Any, *, utc: bool = False) -> str | None:
+    """Say that complimentary access ends and Free follows, when that is what the reset means.
+
+    ``gate.complimentary_ends_at`` is filled by the server only when the
+    active gift (plus any gift queued right after it) ends with the account on
+    the Free plan. Returns None when that is unknown, unreadable, or the gift
+    outlasts the next reset by more than ``COMPLIMENTARY_RESET_COINCIDENCE``
+    (then the plain reset sentence is the honest one).
+    """
+    ends_text = str(getattr(gate, "complimentary_ends_at", "") or "").strip()
+    if not ends_text:
+        return None
+    ends = _parse_utc(ends_text)
+    if ends is None:
+        return None
+    resets = _parse_utc(getattr(gate, "resets_at", ""))
+    if resets is not None and ends > resets + COMPLIMENTARY_RESET_COINCIDENCE:
+        return None
+    when = friendly_reset_time(ends_text, utc=utc)
+    if not when:
+        return None
+    plan = str(getattr(gate, "complimentary_plan", "") or "").strip().replace("_", " ").title() or "Pro"
+    span = "month" if int(getattr(gate, "complimentary_months", 0) or 0) <= 1 else "access"
+    zone = " (UTC)" if utc else ""
+    return "Your complimentary %s %s ends %s%s. After that you're on the Free plan." % (plan, span, when, zone)
+
+
+def _parse_utc(value: object) -> datetime | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        moment = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return moment.replace(tzinfo=UTC) if moment.tzinfo is None else moment.astimezone(UTC)
 
 
 _WEEKDAYS = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
@@ -380,6 +442,7 @@ __all__ = [
     "cap_state_from_response",
     "check_managed_llm_spend_cap",
     "check_managed_llm_spend_cap_async",
+    "complimentary_ending_sentence",
     "managed_llm_budget_message",
     "managed_llm_budget_rate_limit_headers",
     "per_command_spend_cap_message",
