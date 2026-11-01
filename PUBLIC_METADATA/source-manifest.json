@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "8c903c76ffeb4cd1e25f43e03c773036ec997aae",
-  "sha256": "d9b5b698a0312d9957986b8a58befa47ccda41396c12c8d8d0059def5b6ee453",
+  "revision": "8f0af6f5fd9200e0c87a5ccb5199b6d52e1b86c4",
+  "sha256": "b2909a0daf045b0ad631146ba4d3ad5c7cb9464b8f6b64744a4c0f3a8ee4759d",
   "files": [
     {
       "path": ".env.example",
@@ -4580,8 +4580,8 @@
     },
     {
       "path": "services/llm/managed_budget.py",
-      "sha256": "851cdcf5782ea820130c5658cf2f8794e7ed3696ee19a00e628f9d20ee8d136a",
-      "bytes": 15523
+      "sha256": "a8952be20569a5f06ddc36f847b7cdafd47b43815447cc8c07e297a43b6e41b8",
+      "bytes": 18557
     },
     {
       "path": "services/llm/model_fallback.py",
