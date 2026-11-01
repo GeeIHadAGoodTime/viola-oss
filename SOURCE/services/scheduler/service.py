@@ -49,6 +49,14 @@ _MAX_CONCURRENT_SUBAGENTS = 3
 _SUBAGENT_TIMEOUT = 60.0  # seconds per sub-agent execution
 _SHUTDOWN_GRACE_PERIOD = 5.0  # seconds to wait for in-flight sub-agents
 _ERROR_BACKOFF_SECONDS = TIMEOUT_5_MINUTES  # 300s backoff after error/timeout
+# A one-shot action (a reminder, alarm or timer set for a moment) that could not
+# run for more than a day is skipped and recorded instead of firing late: an
+# alarm for 7 am going off the next afternoon, or a "remind me at 5" days later,
+# is wrong, not helpful. 24 hours still covers a PC that was off overnight or a
+# server restart, where firing a few hours late is better than never. Recurring
+# actions keep their policy: fire once when due, no catch-up burst.
+ONE_SHOT_STALE_AFTER_SECONDS = 24 * 60 * 60
+ONE_SHOT_STALE_ERROR = "Skipped: it was more than 24 hours late when Viola could run it."
 MIN_SCHEDULE_INTERVAL_SECONDS = TIMEOUT_5_MINUTES
 _CRON_FREQUENCY_SAMPLE_COUNT = 64
 _DANGEROUS_FREQUENCY_PATTERNS = frozenset(
@@ -615,6 +623,11 @@ class SchedulerService:
                 )
                 continue
 
+            # --- One-shot staleness: skip and record, never fire a day late ---
+            if self._is_stale_one_shot(schedule, now):
+                await self._skip_stale_one_shot(schedule, now)
+                continue
+
             # --- Circuit breaker: per-schedule error backoff ---
             if self._should_backoff(schedule):
                 logger.info(
@@ -640,6 +653,38 @@ class SchedulerService:
             )
             self._inflight_tasks.add(task)
             task.add_done_callback(self._inflight_tasks.discard)
+
+    @staticmethod
+    def _is_stale_one_shot(schedule: Schedule, now: datetime) -> bool:
+        """A one-shot whose due time passed more than ONE_SHOT_STALE_AFTER_SECONDS ago."""
+        if schedule.cron_expr:
+            return False
+        try:
+            due = datetime.fromisoformat(str(schedule.next_run_at))
+        except (TypeError, ValueError):
+            return False
+        if due.tzinfo is None:
+            due = due.replace(tzinfo=UTC)
+        return (now - due).total_seconds() > ONE_SHOT_STALE_AFTER_SECONDS
+
+    async def _skip_stale_one_shot(self, schedule: Schedule, now: datetime) -> None:
+        logger.warning(
+            "Schedule id=%d skipped: one-shot was due at %s, more than %d hours ago",
+            schedule.id,
+            schedule.next_run_at,
+            ONE_SHOT_STALE_AFTER_SECONDS // 3600,
+        )
+        try:
+            # next_run_at=None retires the one-shot exactly like a completed run.
+            await self._store.record_execution_async(
+                schedule.user_id,
+                schedule.id,
+                status="skipped",
+                next_run_at=None,
+                error=ONE_SHOT_STALE_ERROR,
+            )
+        except Exception:
+            logger.exception("Could not record skipped stale schedule id=%d", schedule.id)
 
     async def _guarded_execute(self, schedule: Schedule) -> None:
         """Acquire semaphore, execute schedule, release.
