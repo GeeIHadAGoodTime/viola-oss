@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "f475023f56556ce4f5559f30bbdbb6a2d83261bd",
-  "sha256": "11ff8118bc251971abf89613514b5a0bc4d74981d510ae4eff5d75d5a79daaa3",
+  "revision": "738024675a88dfdc5afa07842a1733066e72c882",
+  "sha256": "bc346684cfec596ac65f0d41746bc564698d4e1d4271d84a3742c24438a9467d",
   "files": [
     {
       "path": ".env.example",
@@ -5165,8 +5165,8 @@
     },
     {
       "path": "services/scheduler/service.py",
-      "sha256": "08657b2c873844c6e84944076081a43851c4558348547a9dbfd772b1daf0494c",
-      "bytes": 44960
+      "sha256": "dc95ac0cebd829878bf27e7a7a67e138b42496c800ec0e74a4478d0b087da88a",
+      "bytes": 47086
     },
     {
       "path": "services/scheduler/store.py",
@@ -6362,6 +6362,11 @@
       "path": "tests/public/test_saved_chat_speech_dispatch.py",
       "sha256": "a824628fdd6e8143921186ca46cdcd703816b012794b9b40a84ff183a586d48f",
       "bytes": 12341
+    },
+    {
+      "path": "tests/public/test_scheduler_one_shot_staleness.py",
+      "sha256": "146a25b53eecebd3991855e54c78c513bc64b54aa060df97bf300e59c6c5511e",
+      "bytes": 4329
     },
     {
       "path": "tests/public/test_scheduler_poll_admission.py",

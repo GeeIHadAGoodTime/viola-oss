@@ -30,10 +30,10 @@
   },
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "c2344b313b324f27fb3313fddcd403015be6b737304cfad66611a65448c97d9b",
-  "source_tree_sha256": "11ff8118bc251971abf89613514b5a0bc4d74981d510ae4eff5d75d5a79daaa3",
-  "source_file_count": 2777,
-  "source_revision": "f475023f56556ce4f5559f30bbdbb6a2d83261bd",
+  "source_manifest_sha256": "0c2d2b6c69792b861990123ba0933fbc0f7eec31b0a4537a287876b215272dc0",
+  "source_tree_sha256": "bc346684cfec596ac65f0d41746bc564698d4e1d4271d84a3742c24438a9467d",
+  "source_file_count": 2778,
+  "source_revision": "738024675a88dfdc5afa07842a1733066e72c882",
   "comparison_public_revision": "ecab2772465fcc89ae6645b028af1c2273b9199f",
   "changed_source_paths": [
     "START_WEB_INTERFACE.py",
@@ -219,6 +219,7 @@
     "tests/public/test_phone_locale_normalization.py",
     "tests/public/test_queue_play_selection.py",
     "tests/public/test_request_tool_surface_boundary.py",
+    "tests/public/test_scheduler_one_shot_staleness.py",
     "tests/public/test_source_contract.py",
     "tests/public/test_windows_gpu_compositing.py",
     "tests/public/test_windows_native_startup_order.py",
@@ -504,8 +505,8 @@
     "historical_inventory_limits": "This renderer correction changes no dependency or workflow inputs. All six retained SBOMs and their complete status objects stay historical and unchanged; no current installed inventory qualification is claimed."
   },
   "qualification": {
-    "source_commit": "f475023f56556ce4f5559f30bbdbb6a2d83261bd",
-    "kind": "gift checkout copy"
+    "source_commit": "738024675a88dfdc5afa07842a1733066e72c882",
+    "kind": "scheduler one-shot staleness"
   },
   "historical_bindings": [
     {
