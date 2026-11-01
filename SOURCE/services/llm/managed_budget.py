@@ -203,7 +203,14 @@ def managed_llm_budget_message(gate: ManagedLlmBudgetGate) -> str:
         return "Sign in to use managed AI."
     if gate.denial_code != "managed_llm_spend_cap" or gate.period not in {"weekly", "monthly"} or not gate.plan:
         return "I can't verify your managed usage capacity right now. Please try again shortly."
+    # In the last 48 hours of a complimentary month checkout is refused, so
+    # "Add more usage" would send the user to a button that cannot work.
+    checkout_closed = complimentary_checkout_closed(gate)
     if gate.budget_cents > gate.spent_cents:
+        if checkout_closed:
+            return "This request is larger than your remaining managed usage capacity. Try a shorter request. %s" % (
+                complimentary_billing_sentence(gate, ending_shown=False)
+            )
         return (
             "This request is larger than your remaining managed usage capacity. "
             "Try a shorter request or choose Add more usage in Billing."
@@ -211,9 +218,12 @@ def managed_llm_budget_message(gate: ManagedLlmBudgetGate) -> str:
     period = str(gate.period or "current").strip().lower()
     plan = str(gate.plan or "your").strip().replace("_", " ").title()
     plan_label = "%s plan" % plan if plan != "Your" else "your plan"
-    message = (
-        "You've reached your %s managed AI limit for the %s. Choose Add more usage in Billing to continue."
-    ) % (period, plan_label)
+    if checkout_closed:
+        message = "You've reached your %s managed AI limit for the %s." % (period, plan_label)
+    else:
+        message = (
+            "You've reached your %s managed AI limit for the %s. Choose Add more usage in Billing to continue."
+        ) % (period, plan_label)
     ending = complimentary_ending_sentence(gate)
     if ending:
         message += " " + ending
@@ -221,6 +231,8 @@ def managed_llm_budget_message(gate: ManagedLlmBudgetGate) -> str:
         when = friendly_reset_time(gate.resets_at)
         if when:
             message += " Your usage resets %s." % when
+    if checkout_closed:
+        message += " " + complimentary_billing_sentence(gate, ending_shown=bool(ending))
     return message
 
 
@@ -257,6 +269,49 @@ def complimentary_ending_sentence(gate: Any, *, utc: bool = False) -> str | None
     span = "month" if int(getattr(gate, "complimentary_months", 0) or 0) <= 1 else "access"
     zone = " (UTC)" if utc else ""
     return "Your complimentary %s %s ends %s%s. After that you're on the Free plan." % (plan, span, when, zone)
+
+
+# Checkout cannot start a paid term less than 48 hours out, so while less than
+# this is left of a complimentary month the server refuses it with
+# "gift_checkout_window" (private billing/capacity_service.py, using
+# STRIPE_CHECKOUT_MIN_TRIAL_SECONDS = 48 hours). Usage-limit copy must not
+# point at "Add more usage" during that window.
+COMPLIMENTARY_CHECKOUT_MIN_REMAINING = timedelta(hours=48)
+
+
+def _utcnow() -> datetime:
+    """The current time; one seam so copy tests can pin the clock."""
+    return datetime.now(UTC)
+
+
+def complimentary_checkout_closed(gate: Any, *, now: datetime | None = None) -> bool:
+    """True when the gift on this denial ends too soon for checkout to start.
+
+    Only a gift that ends with the account on Free carries
+    ``complimentary_ends_at``, and that is exactly the case where "Add more
+    usage" is a new checkout. Unknown or unreadable means False, so the usual
+    advice stays.
+    """
+    ends = _parse_utc(getattr(gate, "complimentary_ends_at", ""))
+    if ends is None:
+        return False
+    moment = now or _utcnow()
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=UTC)
+    return ends < moment + COMPLIMENTARY_CHECKOUT_MIN_REMAINING
+
+
+def complimentary_billing_sentence(gate: Any, *, ending_shown: bool, utc: bool = False) -> str:
+    """The Billing advice to give while checkout is closed: wait for the gift to end."""
+    if ending_shown:
+        return "You can add more usage in Billing once it ends."
+    plan = str(getattr(gate, "complimentary_plan", "") or "").strip().replace("_", " ").title() or "Pro"
+    span = "month" if int(getattr(gate, "complimentary_months", 0) or 0) <= 1 else "access"
+    when = friendly_reset_time(getattr(gate, "complimentary_ends_at", ""), utc=utc)
+    if not when:
+        return "You can add more usage in Billing after your complimentary %s %s ends." % (plan, span)
+    zone = " (UTC)" if utc else ""
+    return "You can add more usage in Billing after your complimentary %s %s ends %s%s." % (plan, span, when, zone)
 
 
 def _parse_utc(value: object) -> datetime | None:
