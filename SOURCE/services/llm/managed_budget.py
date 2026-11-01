@@ -203,7 +203,7 @@ def managed_llm_budget_message(gate: ManagedLlmBudgetGate) -> str:
         return "Sign in to use managed AI."
     if gate.denial_code != "managed_llm_spend_cap" or gate.period not in {"weekly", "monthly"} or not gate.plan:
         return "I can't verify your managed usage capacity right now. Please try again shortly."
-    # In the last 48 hours of a complimentary month checkout is refused, so
+    # In the last 35 minutes of a complimentary month checkout is refused, so
     # "Add more usage" would send the user to a button that cannot work.
     checkout_closed = complimentary_checkout_closed(gate)
     if gate.budget_cents > gate.spent_cents:
@@ -271,12 +271,14 @@ def complimentary_ending_sentence(gate: Any, *, utc: bool = False) -> str | None
     return "Your complimentary %s %s ends %s%s. After that you're on the Free plan." % (plan, span, when, zone)
 
 
-# Checkout cannot start a paid term less than 48 hours out, so while less than
-# this is left of a complimentary month the server refuses it with
-# "gift_checkout_window" (private billing/capacity_service.py, using
-# STRIPE_CHECKOUT_MIN_TRIAL_SECONDS = 48 hours). Usage-limit copy must not
-# point at "Add more usage" during that window.
-COMPLIMENTARY_CHECKOUT_MIN_REMAINING = timedelta(hours=48)
+# Checkout started during a complimentary month charges nothing until the gift
+# ends. Inside the last 48 hours it anchors the first charge at the gift end
+# instead of using a trial, which needs the session to close before the gift
+# ends; Stripe sessions stay open at least 30 minutes. So only while less than
+# this is left does the server refuse it with "gift_checkout_window" (private
+# billing/capacity_service.py, GIFT_CHECKOUT_MIN_LEAD_SECONDS = 35 minutes).
+# Usage-limit copy must not point at "Add more usage" during that window.
+COMPLIMENTARY_CHECKOUT_MIN_REMAINING = timedelta(minutes=35)
 
 
 def _utcnow() -> datetime:
