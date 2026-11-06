@@ -20,7 +20,7 @@ import time
 import unicodedata
 import uuid
 from collections.abc import Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, Any, Literal
 
 from openai import OpenAIError
@@ -490,13 +490,15 @@ class ApprovalManager:
         store = self._pending_store()
         with store.lock:
             self._prune_pending_confirmations(store, now)
-            for pending in store.confirmations.values():
+            for pending in list(store.confirmations.values()):
                 if (
                     pending.conversation_scope == scope
                     and pending.tool_name == tool_name_value
                     and pending.risk == risk
                     and pending.args_fingerprint == args_fingerprint
                 ):
+                    # Asked again on this turn, so it is this turn's question now.
+                    store.confirmations[pending.confirmation_id] = replace(pending, created_task_id=created_task_id)
                     return ConfirmationDeferred(
                         confirmation_id=pending.confirmation_id,
                         action_description=pending.action_description,
@@ -682,6 +684,29 @@ class ApprovalManager:
                 store.confirmations.pop(confirmation_id, None)
         self._apply_tool_arg_confirmation_normalization(tool_name_value, tool_args)
         return "accepted"
+
+    def retire_unanswered_confirmations(self, task_id: str | None) -> list[tuple[str, str, dict[str, Any]]]:
+        """Drop confirmations asked on an earlier turn that this turn did not answer.
+
+        A pending yes/no is good for the very next turn. "Cancel" normally ends
+        with the model simply not calling the tool, which used to leave the
+        grant alive for its whole lifetime: an identical call a turn later ran
+        with no question asked (seen live on 2026-11-05). Anything asked during
+        ``task_id`` itself stays. Returns (tool, description, args) for each one dropped.
+        """
+        current_task_id = str(task_id) if task_id else None
+        scope = current_confirmation_conversation_scope()
+        store = self._pending_store()
+        dropped: list[tuple[str, str, dict[str, Any]]] = []
+        with store.lock:
+            for confirmation_id, pending in list(store.confirmations.items()):
+                if pending.conversation_scope != scope or pending.created_task_id == current_task_id:
+                    continue
+                store.confirmations.pop(confirmation_id, None)
+                dropped.append((pending.tool_name, pending.action_description, dict(pending.tool_args)))
+        for _tool_name, description, _args in dropped:
+            logger.info("Unanswered confirmation retired: %s", description)
+        return dropped
 
     def pending_confirmation_args(
         self,

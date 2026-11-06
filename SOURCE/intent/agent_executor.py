@@ -65,6 +65,7 @@ from intent.irreversible_actions import (
     describe_browser_send,
     describe_irreversible_action,
     gate_action_class,
+    irreversible_action_class,
 )
 from intent.log_redaction import redact_card_data, redact_card_field, redact_pii
 from intent.post_answer_teardown import (
@@ -5717,6 +5718,7 @@ class AgentExecutor:
             total_duration,
             outcome,
         )
+        self._retire_unanswered_confirmations()
 
         if not self._agent_chain_metrics_recorded:
             self._agent_chain_metrics_recorded = True
@@ -8547,6 +8549,32 @@ class AgentExecutor:
                 )
         except Exception as exc:
             logger.debug("Consult-user WS broadcast failed for %s: %s", tool_name, exc)
+
+    def _retire_unanswered_confirmations(self) -> None:
+        """A question this turn did not answer ends with this turn (see ApprovalManager)."""
+        retire = getattr(getattr(self, "_approval", None), "retire_unanswered_confirmations", None)
+        if not callable(retire) or getattr(self, "_current_agent_id", None):
+            return  # helpers share the store and must not end their parent's question
+        try:
+            dropped = retire(getattr(self, "task_id", None))
+        except Exception:  # noqa: BLE001, RUF100 - a stale grant then expires on its own timer
+            logger.debug("Retiring unanswered confirmations failed", exc_info=True)
+            return
+        if not dropped:
+            return
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            return
+        for tool_name, description, tool_args in dropped:
+            loop.create_task(
+                self._broadcast_consult_user_event(
+                    tool_name=tool_name,
+                    action_class=irreversible_action_class(tool_name, tool_args) or "tool_action",
+                    planned_action=description,
+                    status="denied",
+                )
+            )
 
     async def _email_send_unavailable(self, tool_name: str, tool_args: dict[str, Any]) -> ToolResult | None:
         """Say "no email account is connected" before asking to confirm a send.

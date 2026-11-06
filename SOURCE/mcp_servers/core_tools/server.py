@@ -4853,6 +4853,8 @@ async def get_liked_songs(
         "multi-room playback, room_route facts, and Add Speaker pairing_flow fallback. Use pair_speaker_setup "
         "for speaker setup without playback. Active provider from settings drives where to search; pass "
         "provider explicitly to override. Transport controls use playback. "
+        "When the user names nothing to go on ('play something', 'put something on'), do not pick for them: "
+        "ask what they are in the mood for and wait for the answer. "
         "Set completes_request=true only when this one call is the user's whole request; Viola then answers "
         "from the confirmed result without another turn."
     ),
