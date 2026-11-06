@@ -1518,7 +1518,14 @@ class MCPClientHub:
             "browser_get_api_log",
         }
     )
+    # Agent Mode off: answers plus the music Viola is for. No browser, no files,
+    # no desktop. Without a tool surface at all the turn had no way to run, so
+    # every command, even "play Drake", answered "I can't prepare the tool loop".
+    _CONVERSATION_TOOLS: frozenset[str] = frozenset(
+        {"think", "ToolSearch", "tool_search", "ask_user", "media", "playback", "playlist", "rate_track", "view_queue"}
+    )
     _TIER_TOOL_MAP: dict[str, set[str] | None] = {
+        "conversation": set(_CONVERSATION_TOOLS),
         "solo": set(_SOLO_TOOLS),
         "ensemble": set(_ENSEMBLE_TOOLS),
         "symphony": None,  # Full access — everything visible
@@ -1526,6 +1533,7 @@ class MCPClientHub:
     # Defense-in-depth: tools that must never appear under solo/ensemble even
     # if accidentally added to the allow-lists. Keep this list minimal.
     _TIER_HIDDEN_TOOL_MAP: dict[str, frozenset[str]] = {
+        "conversation": frozenset({"computer", "desktop_volume", "view_screen"}),
         "solo": frozenset({"computer", "desktop_volume", "view_screen"}),
         "ensemble": frozenset({"computer", "desktop_volume", "view_screen"}),
         "symphony": frozenset(),

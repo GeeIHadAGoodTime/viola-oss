@@ -2262,7 +2262,7 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
                   <SettingRow
                     title="Agent Mode"
                     description="Let Viola use local tools and browser automation when a task needs them."
-                    tooltip="On by default. Turn it off and Viola answers from the conversation alone, without opening a browser or running anything on this computer."
+                    tooltip="On by default. Turn it off and Viola still answers and plays music, without opening a browser or running anything else on this computer."
                   >
                     <Toggle
                       checked={agentModeEnabled}

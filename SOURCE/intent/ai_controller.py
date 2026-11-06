@@ -763,6 +763,10 @@ class AIController:
             logger.exception("Agent mode disabled because user settings could not be loaded")
             return False
 
+    def _tool_tier_for_user_setting(self, agent_autonomy: str) -> str:
+        """The tool tier for this turn: Agent Mode off narrows it, never removes the turn."""
+        return agent_autonomy if self._agent_mode_enabled_by_user_setting() else "conversation"
+
     def set_conversation_state_manager(self, manager: ConversationStateManager) -> None:
         """Inject the default conversation state manager.
 
@@ -2298,9 +2302,6 @@ class AIController:
         if not getattr(settings, "agent_enabled", False):
             return
 
-        if not self._agent_mode_enabled_by_user_setting():
-            return
-
         try:
             hub = await self._ensure_mcp_hub()
             if hub is None:
@@ -2319,6 +2320,7 @@ class AIController:
             except Exception:
                 logger.exception("Agent prompt setup skipped because user settings could not be loaded")
                 return
+            agent_autonomy = self._tool_tier_for_user_setting(agent_autonomy)
 
             tools_list = hub.list_tools(
                 tier=agent_autonomy,
@@ -2897,9 +2899,6 @@ class AIController:
         if self.client is None or not getattr(self.client, "SUPPORTS_NATIVE_TOOLS", False):
             return native_tools, tool_surface, prompt_bundle
 
-        if not self._agent_mode_enabled_by_user_setting():
-            return native_tools, tool_surface, prompt_bundle
-
         hub = self._mcp_hub
         if hub is None:
             return native_tools, tool_surface, prompt_bundle
@@ -2915,6 +2914,7 @@ class AIController:
             )
         except Exception:
             agent_autonomy = DEFAULT_AGENT_AUTONOMY
+        agent_autonomy = self._tool_tier_for_user_setting(agent_autonomy)
 
         interactive_tools = self._channel is not None
         if self._browser_init_task is not None:
@@ -3046,9 +3046,6 @@ class AIController:
         Returns a ProcessResultDict if the agent completes, or None to fall through.
         """
         from config.settings import settings
-
-        if not self._agent_mode_enabled_by_user_setting():
-            return None
 
         # Classifier removed (2026-04-09).  task_category is always "general".
         task_category = "general"
