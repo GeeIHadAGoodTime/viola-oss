@@ -1525,7 +1525,7 @@ class SpotifyCDPController:
         self._unregister_chrome_for_capture()
         try:
             self._chrome_proc.terminate()
-            self._chrome_proc.wait(timeout=5)
+            self._chrome_proc.wait(timeout=2)
             logger.info("Chrome process %d terminated", pid)
         except Exception:
             try:
@@ -3459,9 +3459,9 @@ class SpotifyCDPController:
                 procs.append(proc)
             except (psutil.NoSuchProcess, psutil.AccessDenied):
                 continue
-        _gone, alive = psutil.wait_procs(procs, timeout=5)
+        _gone, alive = psutil.wait_procs(procs, timeout=1)
         if alive:
-            logger.warning("Spotify player: %d process(es) still closing", len(alive))
+            logger.info("Spotify player: %d process(es) still closing", len(alive))
 
     def _close_browser_gracefully(self) -> None:
         """Let the browser write its cookies before it goes.
