@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import Any
 
 from models.player import QueueItem
-from music.player.playback_state import PlaybackPhase
 from music.queue_config import QueueLimits
 
 from .queue_resolver import QueueItemResolver
@@ -33,7 +32,7 @@ class AutoplayService:
 
     def _stopped_by_user(self) -> bool:
         phase = getattr(getattr(self._player, "_playback_sm", None), "phase", None)
-        return phase == PlaybackPhase.STOPPED and bool(getattr(self._player, "_user_paused", False))
+        return getattr(phase, "name", "") == "STOPPED" and bool(getattr(self._player, "_user_paused", False))
 
     def enqueue(self, query: str, *, metadata: dict[str, Any] | None = None) -> QueueItem | None:
         player = self._player
