@@ -213,11 +213,12 @@ function TroubleshootingTab() {
         </ul>
       </AccordionItem>
 
-      <AccordionItem title="Custom wake-word training is unavailable">
+      <AccordionItem title="Custom wake-word training">
         <ul style={{ margin: 0, paddingLeft: 20 }}>
-          <li>Custom wake-word training is currently unavailable.</li>
-          <li>Existing local models can still be selected in desktop Settings → Customize.</li>
-          <li>Use the installed Viola wake word or push-to-talk in Settings → Voice.</li>
+          <li>Train your own wake word in the desktop app: Settings → Customize → Create. You need to be signed in.</li>
+          <li>Pick a word with 2 to 4 syllables that you do not say every day. Viola tells you straight away if a word will not work.</li>
+          <li>Training usually takes about 10 minutes, and you can close Settings while it runs.</li>
+          <li>If training fails, nothing changes: your current wake word keeps working. "Viola" can be chosen again at any time in Settings → Customize.</li>
         </ul>
       </AccordionItem>
 

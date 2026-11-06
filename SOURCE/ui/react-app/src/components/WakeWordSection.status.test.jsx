@@ -40,9 +40,19 @@ describe('wake model selection is not detector liveness', () => {
   });
 
   it.each([false, true])('selection success is truthful when reload.reloaded=%s', async (reloaded) => {
-    authFetch.mockResolvedValueOnce(response({ models: [viola, athena] }))
-      .mockResolvedValueOnce(response({ reload: { reloaded, reason: 'detector_not_running' } }))
-      .mockResolvedValueOnce(response({ models: [{ ...viola, is_active: false }, { ...athena, is_active: true }] }));
+    let switched = false;
+    authFetch.mockImplementation(async (path) => {
+      if (path === '/v1/wake/activate') {
+        switched = true;
+        return response({ reload: { reloaded, reason: 'detector_not_running' } });
+      }
+      if (path === '/v1/wake/models') {
+        return response({
+          models: switched ? [{ ...viola, is_active: false }, { ...athena, is_active: true }] : [viola, athena],
+        });
+      }
+      return response({});
+    });
     render(<WakeWordSection />);
     await screen.findByText('Athena');
     fireEvent.click(screen.getAllByRole('button', { name: 'Switch' }).find((button) => !button.disabled));

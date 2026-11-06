@@ -20,12 +20,12 @@ describe('HelpModal current desktop guidance', () => {
     expect(document.body).not.toHaveTextContent('Settings → Services');
     expect(document.body).not.toHaveTextContent('Settings → Music & Voice');
   });
-  it('explains unavailable training while preserving installed wake-word selection', () => {
+  it('explains how to train a wake word and that a failure changes nothing', () => {
     openTroubleshooting();
     fireEvent.click(screen.getByRole('button', { name: /Custom wake-word training/ }));
-    expect(screen.getByText(/Custom wake-word training is currently unavailable/)).toBeInTheDocument();
-    expect(screen.getByText(/Existing local models/)).toHaveTextContent('Settings → Customize');
-    expect(document.body).not.toHaveTextContent('try training again');
+    expect(screen.getByText(/Train your own wake word/)).toHaveTextContent('Settings → Customize');
+    expect(screen.getByText(/If training fails, nothing changes/)).toBeInTheDocument();
+    expect(document.body).not.toHaveTextContent('currently unavailable');
   });
   it('links documentation, privacy and terms to pages that exist (not the unserved /docs/ paths)', () => {
     render(<HelpModal isOpen onClose={vi.fn()} />);

@@ -80,6 +80,7 @@ import zlib
 from collections.abc import Callable, Sequence
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, field
+from difflib import SequenceMatcher
 from itertools import pairwise
 from typing import Any, Protocol
 
@@ -138,6 +139,11 @@ _VIOLA_EXACT = frozenset(
 
 _TARGET = "viola"
 _WORD_RE = re.compile(r"[a-z]+")
+# How close a decoded word must be to a custom wake word. The exact table above was
+# measured on real recordings of "Viola"; a custom word has no such table, so this is
+# looser on purpose. A wrong pass costs one false wake, a wrong reject means the
+# user's own word does not work. Measured in the release 1.0.5 custom-word run.
+_CUSTOM_MATCH_RATIO = 0.55
 
 
 def _edit_distance(a: str, b: str, limit: int = 2) -> int:
@@ -185,6 +191,41 @@ def find_viola_token(text: str) -> str | None:
     for first, second in pairwise(words):
         joined = first + second
         if len(joined) <= 8 and _is_viola_like_word(joined):
+            return f"{first} {second}"
+    return None
+
+
+def _sound_key(word: str) -> str:
+    """Fold spellings of the same sound together, so "kuhpree" can meet "capri"."""
+    folded = word.replace("ph", "f").replace("ck", "k").replace("qu", "k").replace("x", "ks")
+    folded = folded.translate(str.maketrans("zcqvwy", "skkfui"))
+    return re.sub(r"(.)\1+", r"\1", folded)
+
+
+def _sounds_like(heard: str, target: str) -> bool:
+    if heard == target:
+        return True
+    heard_key, target_key = _sound_key(heard), _sound_key(target)
+    return SequenceMatcher(None, heard_key, target_key).ratio() >= _CUSTOM_MATCH_RATIO
+
+
+def find_target_token(text: str, target: str) -> str | None:
+    """Return the first word in ``text`` that sounds like a custom wake word.
+
+    A phrase is judged by its longest word, or all of it joined: "hey jarvis" is
+    heard when "jarvis" is, and "hey" alone must not count. Adjacent words are also
+    tried joined, because Whisper splits a word it does not know ("zef ira").
+    """
+    target_words = _WORD_RE.findall(target.lower().replace("'", ""))
+    if not target_words:
+        return None
+    keys = {max(target_words, key=len), "".join(target_words)}
+    words = _WORD_RE.findall(text.lower().replace("'", ""))
+    for word in words:
+        if any(_sounds_like(word, key) for key in keys):
+            return word
+    for first, second in pairwise(words):
+        if any(_sounds_like(first + second, key) for key in keys):
             return f"{first} {second}"
     return None
 
@@ -267,6 +308,7 @@ def decide(
     *,
     low_score: bool = False,
     require_token: bool = False,
+    target: str | None = None,
 ) -> GateDecision:
     """The gate.
 
@@ -274,7 +316,8 @@ def decide(
     no Viola-like token. ``low_score``: the confirming frame scored below the
     sensitivity level, so decoded words without a Viola-like token reject even
     when the decode is unsure. ``require_token``: only a trusted Viola-like
-    token passes (the looser music-path rule).
+    token passes (the looser music-path rule). ``target``: the user's custom wake
+    word, heard instead of "Viola".
     """
     cfg = config or VerifierConfig()
     if info is None:
@@ -282,7 +325,7 @@ def decide(
     text = info.text.strip()
     if not text:
         return GateDecision(not require_token, "empty")
-    token = find_viola_token(text)
+    token = find_target_token(text, target) if target else find_viola_token(text)
     if token and not _hallucinated_token(info, cfg):
         return GateDecision(True, "token", token)
     if require_token:
@@ -463,6 +506,25 @@ class WakeVerifier:
         self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="wake-verify")
         # The newest early decode (start_early cancels it if it has not started).
         self._early_pending: Future[TranscriptInfo] | None = None
+        # The user's custom wake word, or None for "Viola".
+        self._target: str | None = None
+
+    def set_target(self, word: str | None) -> None:
+        """Listen for this custom wake word instead of "Viola" (None: back to "Viola").
+
+        Both the prompt and the token check follow it. Left on "Viola", the check
+        rejected the user's own word as "speech without Viola", and the prompt nudged
+        Whisper to hear Viola instead.
+        """
+        cleaned = " ".join((word or "").split())
+        self._target = cleaned or None
+
+    @property
+    def target(self) -> str | None:
+        return self._target
+
+    def _prompt(self) -> str:
+        return "%s, " % self._target.capitalize() if self._target else self.config.prompt
 
     # -- model lifecycle ----------------------------------------------------
 
@@ -522,7 +584,7 @@ class WakeVerifier:
             temperature=0.0,
             condition_on_previous_text=False,
             without_timestamps=True,
-            initial_prompt=self.config.prompt,
+            initial_prompt=self._prompt(),
             vad_filter=False,
             no_speech_threshold=None,
         )
@@ -718,7 +780,7 @@ class WakeVerifier:
         except Exception as exc:  # noqa: BLE001, RUF100 - doubt passes
             logger.debug("[WAKE_VERIFY] Whisper failed: %s", exc)
             return _doubt("error", tail_ms=tail_ms, whisper_ms=whisper_ms)
-        verdict = decide(info, cfg, low_score=low_score, require_token=require_token)
+        verdict = decide(info, cfg, low_score=low_score, require_token=require_token, target=self._target)
         return _result(
             verdict.passed,
             verdict.reason,

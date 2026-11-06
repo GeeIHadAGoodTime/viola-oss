@@ -13,7 +13,7 @@ from typing import Any
 
 from config.wake_config import get_violawake_model_path
 from core.logging_config import get_logger
-from core.platform import get_project_root
+from core.platform import get_data_dir, get_project_root
 from services.memory.dir import safe_account_id
 
 logger = get_logger(__name__)
@@ -75,15 +75,20 @@ class WakeTrainingJobRecord:
 
 
 def trained_models_dir(root: Path | None = None) -> Path:
-    """Return the directory used for trained ONNX models."""
+    """Return the directory used for a user's trained ONNX models.
 
-    return (root or get_project_root()) / "violawake_data" / "trained_models"
+    In the data directory, never under the app: an installed build's project root
+    is its install folder, which the updater replaces, so a model stored there
+    would vanish with the next update.
+    """
+
+    return (root or get_data_dir()) / "violawake_data" / "trained_models"
 
 
 def wake_jobs_dir(root: Path | None = None) -> Path:
     """Return the directory used for per-user wake training job records."""
 
-    return (root or get_project_root()) / "violawake_data" / "wake_jobs"
+    return (root or get_data_dir()) / "violawake_data" / "wake_jobs"
 
 
 def wake_word_slug(wake_word: str) -> str:
@@ -123,7 +128,7 @@ def default_model_path(root: Path | None = None) -> Path:
         detected = get_violawake_model_path()
         if detected is not None:
             return detected
-    return trained_models_dir(root) / "temporal_cnn.onnx"
+    return (root or get_project_root()) / "violawake_data" / "trained_models" / "temporal_cnn.onnx"
 
 
 def write_job_record(record: WakeTrainingJobRecord, root: Path | None = None) -> None:
@@ -144,6 +149,43 @@ def read_job_record(user_id: str, job_id: str, root: Path | None = None) -> Wake
     if data.get("user_id") != user_id:
         return None
     return WakeTrainingJobRecord(**data)
+
+
+def latest_open_job_for_user(user_id: str, root: Path | None = None) -> WakeTrainingJobRecord | None:
+    """Return this user's newest job that has not finished importing.
+
+    Training takes minutes and people close Settings. Without this the model is
+    never imported, because the import happens while the UI polls.
+    """
+
+    jobs_dir = wake_jobs_dir(root) / safe_account_id(user_id)
+    if not jobs_dir.is_dir():
+        return None
+    newest: WakeTrainingJobRecord | None = None
+    for path in jobs_dir.glob("*.json"):
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            record = WakeTrainingJobRecord(**data)
+        except (OSError, TypeError, ValueError):
+            continue
+        if record.user_id != user_id or record.status in {"done", "failed"}:
+            continue
+        if newest is None or record.created_at > newest.created_at:
+            newest = record
+    return newest
+
+
+def custom_wake_word_for_model(model_path: Path | str | None) -> str | None:
+    """Return the word a custom model listens for, or None for the built-in model.
+
+    The sidecar is written only by ``store_trained_model``, so its presence is what
+    makes a model custom.
+    """
+
+    if not model_path:
+        return None
+    word = _read_model_metadata(Path(model_path)).get("wake_word")
+    return word.strip() if isinstance(word, str) and word.strip() else None
 
 
 def store_trained_model(
@@ -609,9 +651,11 @@ __all__ = [
     "WakeModelInspection",
     "WakeModelRecord",
     "WakeTrainingJobRecord",
+    "custom_wake_word_for_model",
     "delete_model_for_user",
     "inspect_wake_model",
     "job_path_for_user",
+    "latest_open_job_for_user",
     "list_models_for_user",
     "model_id_for",
     "model_path_for_user",

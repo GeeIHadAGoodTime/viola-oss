@@ -189,6 +189,25 @@ def _resolve_custom_wake_model_path() -> Path | None:
     return None
 
 
+def _point_verifier_at(model_path: Path) -> str | None:
+    """Tell the Stage 2 check which word this model listens for; return that word."""
+
+    word: str | None = None
+    try:
+        from services.wake_word.custom_models import custom_wake_word_for_model
+
+        word = custom_wake_word_for_model(model_path)
+    except Exception as exc:  # noqa: BLE001, RUF100 - an unreadable sidecar means the built-in word
+        logger.warning("Could not read the wake word for %s: %s", model_path, exc)
+    try:
+        from voice.wake_detector.wake_verifier import get_wake_verifier
+
+        get_wake_verifier().set_target(word)
+    except Exception as exc:  # noqa: BLE001, RUF100 - the check is optional; the detector is not
+        logger.warning("[WAKE_VERIFY] could not set the wake word: %s", exc)
+    return word
+
+
 from voice.wake_detector.aec_processor import (
     AEC_FRAME_SAMPLES,
     AEC_SAMPLE_RATE,
@@ -578,6 +597,7 @@ class ViolaWakeListener:
         else:
             logger.info("Using ViolaWake model: %s", model_path)
         self._model_path = Path(model_path)
+        self._custom_wake_word = _point_verifier_at(self._model_path)
         # Inference interval: how many audio chunks between inference runs
         # MLP models can use interval=2 (faster inference), others use 5
         if infer_interval is not None:
@@ -655,7 +675,8 @@ class ViolaWakeListener:
                 e,
                 type(e).__name__,
             )
-            # Engine will be None - _init() will handle the error
+            self._fall_back_to_builtin_model()
+            # Engine may still be None - _init() will handle the error
         self._streaming = False
         # (sensitivity level, Stage 2 on) the wake rule was last logged for.
         self._logged_wake_rule: tuple[float, bool] | None = None
@@ -770,6 +791,27 @@ class ViolaWakeListener:
             self._policy._config.cooldown_ms,
         )
 
+    def _fall_back_to_builtin_model(self) -> None:
+        """A custom model that will not load must not cost the user their wake word."""
+
+        if not self._custom_wake_word:
+            return
+        try:
+            from config.wake_config import get_violawake_model_path
+            from violawake.config import DEFAULT_MODEL_PATH
+
+            builtin = Path(get_violawake_model_path(None) or DEFAULT_MODEL_PATH)
+            logger.error(
+                'Custom wake word "%s" would not load (%s); listening for "Viola" instead',
+                self._custom_wake_word,
+                self._model_path,
+            )
+            self._engine = self._load_engine(builtin)
+            self._model_path = builtin
+            self._custom_wake_word = _point_verifier_at(builtin)
+        except Exception as exc:  # noqa: BLE001, RUF100 - _init() reports the missing engine
+            logger.exception("Could not fall back to the built-in wake model: %s", exc)
+
     def _load_engine(self, model_path: Path) -> Any:
         """Create a ViolaWake engine for an already selected model path."""
 
@@ -845,6 +887,7 @@ class ViolaWakeListener:
             previous_path = self._model_path
             self._engine = new_engine
             self._model_path = candidate
+            self._custom_wake_word = _point_verifier_at(candidate)
             model_name = candidate.name.lower()
             self._infer_interval = 2 if "mlp" in model_name else 5
             self._configure_cadence()
@@ -3504,6 +3547,9 @@ class ViolaWakeListener:
         Balanced or more sensitive with no quiet-hours boost.
         """
         if not checked or self._force_wake or not self._policy.is_playback_active:
+            return None
+        # Measured on "Viola" only, and it passes only on a heard "Viola"-like word.
+        if self._custom_wake_word:
             return None
         try:
             from violawake.config import DEFAULT_THRESHOLD, MUSIC_WAKE_RULE
