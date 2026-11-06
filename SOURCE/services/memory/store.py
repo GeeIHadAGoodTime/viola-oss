@@ -67,6 +67,15 @@ _PII_CONTENT_RE = re.compile(
     r"|(?P<ssn>\b\d{3}[\-\s]\d{2}[\-\s]\d{4}\b|(?<=\bssn\s)\d{9}|(?<=\bssn:\s)\d{9})"
     r"|(?P<cc>\b\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b)"
     r"|(?P<phone>\b\d{3}[-.]?\d{3}[-.]?\d{4}\b)"
+    # A house number, up to five name words, a street type. Treated like a phone
+    # number: a street address is never kept in or shown from memory. Quantities
+    # ("3 miles down the road") are not addresses. Every quantifier is bounded.
+    r"|(?P<street>\b\d{1,6}[a-z]?\s+"
+    r"(?:(?!(?:seconds?|minutes?|mins?|hours?|days?|weeks?|months?|years?|miles?|blocks?|times?|km|feet|steps?)\b)"
+    r"[a-z0-9.'\-]{1,30}\s+){1,5}"
+    r"(?<!\bmy\s)(?<!\bthe\s)(?<!\bour\s)(?<!\bthis\s)"
+    r"(?:street|st|avenue|ave|road|rd|boulevard|blvd|lane|ln|drive|dr|court|ct|circle|cir|way|place|pl"
+    r"|parkway|pkwy|highway|hwy|terrace|ter|trail|trl)\b\.?)"
 )
 _PROMPT_SENSITIVE_RE = re.compile(
     r"(?i)"
@@ -484,6 +493,19 @@ def _utcnow_iso() -> str:
 
 def redact_pii_output(text: str) -> str:
     return _PII_CONTENT_RE.sub("[redacted]", text)
+
+
+def redact_street_addresses(text: str) -> str:
+    """Mask only street addresses, leaving the rest of the line as written."""
+    return _PII_CONTENT_RE.sub(
+        lambda match: "[redacted]" if match.lastgroup == "street" else match.group(0),
+        str(text or ""),
+    )
+
+
+def contains_street_address(text: str) -> bool:
+    """True when ``text`` holds a house number and street."""
+    return any(match.lastgroup == "street" for match in _PII_CONTENT_RE.finditer(str(text or "")))
 
 
 def redact_sensitive_prompt_text(text: str) -> str:
@@ -932,7 +954,9 @@ __all__ = [
     "_MemoryEncryption",
     "_get_memory_encryption",
     "get_memory_store",
+    "contains_street_address",
     "redact_pii_output",
+    "redact_street_addresses",
     "redact_sensitive_prompt_text",
     "reset_memory_store_for_tests",
 ]

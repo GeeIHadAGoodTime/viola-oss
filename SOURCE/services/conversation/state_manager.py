@@ -20,7 +20,7 @@ import time
 import uuid
 from collections import OrderedDict
 from collections.abc import Callable, Generator, Iterable, Sequence
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, TypedDict
@@ -116,6 +116,27 @@ _MESSAGE_TOKEN_OVERHEAD = 4
 # Soft checkpoint threshold for recent legacy history and post-compact frame
 # replay. Canonical frames are never raw-FIFO deleted before a compact boundary.
 MAX_HISTORY = 200
+
+# What one command sends of the conversation so far. The always-on conversation
+# (stage, voice) never ends, so without a boundary every command carried up to
+# MAX_HISTORY frames of unrelated turns. The boundary is structural: time and
+# size, never the words of the request. The newest exchange is always sent, so
+# "what did you just say" works after any gap; the running playback, pending
+# gates and paused tasks reach the model through their own context providers.
+PROMPT_WINDOW_MAX_TOKENS = 4_000
+# When the window overflows it drops back to this size, then stays put until it
+# overflows again. A window that slid one exchange per command would change the
+# start of the history every time and no history would ever be cached.
+PROMPT_WINDOW_TRIM_TO_TOKENS = 2_000
+# A silence this long starts a new topic. Same envelope as the implicit-resume
+# window below.
+PROMPT_WINDOW_IDLE_GAP_SECONDS = 600
+# A saved chat thread is a boundary the user drew, so it keeps its context.
+PROMPT_WINDOW_THREAD_MAX_TOKENS = 24_000
+PROMPT_WINDOW_THREAD_TRIM_TO_TOKENS = 16_000
+# One reply that is longer than this is shortened in the prompt, never in storage.
+PROMPT_WINDOW_REPLY_MAX_CHARS = 8_000
+_PROMPT_WINDOW_SHORTENED_NOTE = "\n[The rest of this reply is not shown here.]"
 
 # Conversation persistence defaults (A2)
 _DEFAULT_RESTORE_TURNS = 20
@@ -497,6 +518,17 @@ def _frame_with_defaults(
     )
 
 
+def _shorten_frame_for_prompt(frame: Frame) -> Frame:
+    """Cap one long reply in the prompt. The stored frame is not touched."""
+    if frame.role is not FrameRole.ASSISTANT or len(frame.blocks) != 1:
+        return frame
+    block = frame.blocks[0]
+    if not isinstance(block, TextBlock) or len(block.text) <= PROMPT_WINDOW_REPLY_MAX_CHARS:
+        return frame
+    shortened = block.text[:PROMPT_WINDOW_REPLY_MAX_CHARS].rstrip() + _PROMPT_WINDOW_SHORTENED_NOTE
+    return replace(frame, blocks=(TextBlock(text=shortened),))
+
+
 def _frame_with_timestamp(frame: Frame, timestamp_ms: int) -> Frame:
     return _frame_with_defaults(frame, timestamp_ms)
 
@@ -824,6 +856,14 @@ def _frame_chain_fingerprint(frames: Iterable[Frame]) -> tuple[tuple[object, ...
 
 
 # Type-only persistence contracts kept for conversation and plan annotations.
+@dataclass(frozen=True)
+class PromptWindow:
+    """The part of the conversation one command sends, and what it left out."""
+
+    frames: list[Frame]
+    omitted_exchanges: int = 0
+
+
 class ConversationMessage(TypedDict, total=False):
     """Stored conversation message with token metadata."""
 
@@ -1752,6 +1792,10 @@ class ConversationStateManager:
         # durable transcript stays intact.
         self._snipped_frame_uuids: set[str] = set()
 
+        # First frame of the prompt window. Sticky so the history prefix stays
+        # byte-identical between commands; see PROMPT_WINDOW_TRIM_TO_TOKENS.
+        self._prompt_window_start_uuid: str | None = None
+
         # Restore recent turns from persistence (A2)
         self._restore_from_persistence()
 
@@ -2271,6 +2315,54 @@ class ConversationStateManager:
             frames = list(self.conversation_frames)
             chain = self._project_prompt_frame_chain_locked(frames, behavioral_only=behavioral_only)
         return chain[-max_frames:]
+
+    def get_prompt_window(self, limit: int = MAX_HISTORY, *, now_ms: int | None = None) -> PromptWindow:
+        """Return the bounded slice of the conversation for the next command."""
+
+        max_frames = max(1, int(limit or 1))
+        now = int(now_ms if now_ms is not None else time.time() * 1000)
+        explicit_thread = self._session_explicit is not None
+        max_tokens = PROMPT_WINDOW_THREAD_MAX_TOKENS if explicit_thread else PROMPT_WINDOW_MAX_TOKENS
+        trim_to = PROMPT_WINDOW_THREAD_TRIM_TO_TOKENS if explicit_thread else PROMPT_WINDOW_TRIM_TO_TOKENS
+        with self._lock:
+            chain = self._project_prompt_frame_chain_locked(self.conversation_frames, behavioral_only=True)
+            chain = chain[-max_frames:]
+            exchange_starts = [index for index, frame in enumerate(chain) if frame.role is FrameRole.USER]
+            if not exchange_starts:
+                return PromptWindow(frames=chain)
+            start = 0
+            sticky = self._prompt_window_start_uuid
+            if sticky:
+                for index in exchange_starts:
+                    if chain[index].uuid == sticky:
+                        start = index
+                        break
+
+            if not explicit_thread:
+                idle_gap_ms = PROMPT_WINDOW_IDLE_GAP_SECONDS * 1000
+                for index in exchange_starts:
+                    if index <= start or index == 0:
+                        continue
+                    if (chain[index].timestamp_ms or 0) - (chain[index - 1].timestamp_ms or 0) > idle_gap_ms:
+                        start = index
+                if now - (chain[-1].timestamp_ms or now) > idle_gap_ms:
+                    start = exchange_starts[-1]
+
+            tokens = self._conversation_frame_tokens(chain[start:])
+            if tokens > max_tokens:
+                for index in exchange_starts:
+                    if index <= start:
+                        continue
+                    tokens -= self._conversation_frame_tokens(chain[start:index])
+                    start = index
+                    if tokens <= trim_to:
+                        break
+
+            self._prompt_window_start_uuid = chain[start].uuid
+            return PromptWindow(
+                frames=[_shorten_frame_for_prompt(frame) for frame in chain[start:]],
+                omitted_exchanges=sum(1 for index in exchange_starts if index < start),
+            )
 
     def _project_prompt_frame_chain_locked(
         self,

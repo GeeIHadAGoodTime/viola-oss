@@ -6,6 +6,7 @@ import asyncio
 import copy
 import hashlib
 import json
+import re
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -16,8 +17,10 @@ from core.constants import TIMEOUT_MINUTE
 from core.logging_config import get_logger
 from core.secrets_mask import mask_secrets_in_text, scan_secrets_in_text
 from services.memory.dir import MemoryDir, get_memory_dir
+from services.memory.hygiene import is_junk_memory_line
 from services.memory.store import (
     SENSITIVE_CONTENT_RE,
+    contains_street_address,
     redact_pii_output,
     redact_sensitive_prompt_text,
 )
@@ -128,15 +131,75 @@ def model_visible_messages_to_transcript(messages: Sequence[Mapping[str, Any]]) 
     return "\n".join(lines).strip()
 
 
+_SYSTEM_REMINDER_RE = re.compile(r"<system-reminder>.*?</system-reminder>", re.DOTALL)
+_SPOKEN_TEXT_BLOCK_TYPES = frozenset({"text", "input_text", "output_text"})
+_RESULT_KEYS = ("tool_results", "tool_result", "model_visible_result")
+# Enough of a result to carry a fact about the user, not a whole page.
+_TOOL_RESULT_CHARS = 1_000
+
+
+def _spoken_text(content: Any) -> str:
+    """Only what was said in a message: no runtime reminders, no tool blocks."""
+    if isinstance(content, str):
+        return _SYSTEM_REMINDER_RE.sub("", content).strip()
+    if isinstance(content, Sequence) and not isinstance(content, (bytes, bytearray)):
+        parts: list[str] = []
+        for block in content:
+            if isinstance(block, Mapping) and block.get("type") in _SPOKEN_TEXT_BLOCK_TYPES:
+                parts.append(_spoken_text(block.get("text")))
+            elif isinstance(block, str):
+                parts.append(_spoken_text(block))
+        return "\n".join(part for part in parts if part)
+    return ""
+
+
+def _tool_result_text(message: Mapping[str, Any]) -> str:
+    parts: list[str] = []
+    content = message.get("content")
+    if isinstance(content, Sequence) and not isinstance(content, (str, bytes, bytearray)):
+        parts.extend(
+            _content_to_text(block.get("content"))
+            for block in content
+            if isinstance(block, Mapping) and block.get("type") == "tool_result"
+        )
+    parts.extend(_content_to_text(message.get(key)) for key in _RESULT_KEYS if key in message)
+    return "\n".join(part[:_TOOL_RESULT_CHARS] for part in parts if part.strip())
+
+
+def current_turn_transcript(messages: Sequence[Mapping[str, Any]]) -> str:
+    """Return only the latest turn, for the memory extractor.
+
+    The extractor used to read every model-visible message: the runtime reminder,
+    all the history in the prompt and cursor lines carrying task ids. That made
+    each command's extraction grow with the session, and is where "System reminder
+    indicates..." and raw ids in saved memory came from.
+    """
+    start = 0
+    for index in range(len(messages) - 1, -1, -1):
+        message = messages[index]
+        if str(message.get("role") or "").lower() == "user" and _spoken_text(message.get("content")):
+            start = index
+            break
+    lines: list[str] = []
+    for message in messages[start:]:
+        role = str(message.get("role") or "").lower()
+        if role not in {"user", "assistant"}:
+            continue
+        body = "\n".join(part for part in (_spoken_text(message.get("content")), _tool_result_text(message)) if part)
+        if body:
+            lines.append("%s: %s" % (role, body))
+    return "\n".join(lines)
+
+
 def _coerce_extraction_transcript(
     *,
     transcript: str,
     model_visible_messages: Sequence[Mapping[str, Any]] | None = None,
 ) -> str:
     if model_visible_messages is not None:
-        history = model_visible_messages_to_transcript(model_visible_messages).strip()
-        if history:
-            return history
+        current_turn = current_turn_transcript(model_visible_messages).strip()
+        if current_turn:
+            return current_turn
     return (transcript or "").strip()
 
 
@@ -149,6 +212,10 @@ def sanitize_memory_candidate_text(content: str) -> str | None:
     if scan_secrets_in_text(clean):
         return None
     if mask_secrets_in_text(clean) != clean:
+        return None
+    # A heard house number can be a digit off, and nothing here can check it. A
+    # street address is saved by typing it in Settings, never picked up from a turn.
+    if contains_street_address(clean) or is_junk_memory_line(clean):
         return None
     redacted = redact_pii_output(clean).strip()
     return redacted if len(redacted) >= 5 else None
@@ -238,8 +305,12 @@ async def _default_extractor(transcript: str, *, user_id: str) -> list[Extracted
             "Conversation transcript:\n%s\n\n"
             "Return a JSON array of objects like "
             '[{"content":"User prefers jazz music","category":"preference"}]. '
-            "Only include stable user facts, preferences, corrections, routines, or project context. "
-            "Exclude secrets, payment data, one-off task details, greetings, and obvious filler."
+            "Most turns hold nothing lasting: return [] for them. "
+            "Only include a fact about the user that will still be true and useful next month, "
+            "stated as the fact itself. Never describe the conversation: no 'User asked', "
+            "no questions, requests, commands, or what was played, searched or answered. "
+            "Exclude secrets, payment data, street addresses, one-off task details, greetings, "
+            "system or runtime text, identifiers, and obvious filler."
         )
         % safe_transcript,
         max_output_tokens=500,
@@ -446,6 +517,7 @@ async def drain_pending_extractions(*, timeout_s: float = TIMEOUT_MINUTE) -> dic
 __all__ = [
     "ExtractMemoriesService",
     "ExtractedMemory",
+    "current_turn_transcript",
     "drain_pending_extractions",
     "extract_memories_after_turn",
     "model_visible_messages_to_transcript",

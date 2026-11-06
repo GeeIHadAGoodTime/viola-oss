@@ -3941,10 +3941,11 @@ async def check_pending_tasks(
         "The account has VIOLA.md (read-only user instructions), memory/MEMORY.md, and memory/topics/*.md. "
         "Use for user-specific facts and preferences; it does not search the public web and is not for calendar, weather, or runtime settings. "
         "It is not a general contacts directory or business lookup; when an external destination such as a business phone number is missing from the current request, ask the user or use the appropriate public-search/contact tool instead of enumerating memory topics. "
-        "Actions: recall, read, search, write, edit, delete, list, stats, audit. You decide what is worth remembering. "
+        "Actions: recall, read, search, write, edit, delete, list, stats, audit, conversation. You decide what is worth remembering. "
+        "action='conversation' reads what was said earlier in this conversation, oldest first, optionally matching query. "
         "Deterministic hygiene skips duplicate writes, rejects oversized entries, rotates audit logs, "
         "and reports counts via stats. "
-        "Do not store passwords, API keys, tokens, card numbers, SSNs, PINs, or bank details. "
+        "Do not store passwords, API keys, tokens, card numbers, SSNs, PINs, bank details, or street addresses. "
         "When the user explicitly asks you to remember something, write it and briefly acknowledge. "
         "When you decide to remember something on your own, write silently. "
         "Does not search the public web or manage calendar events; use web_search or calendar for those. "
@@ -3961,7 +3962,7 @@ async def check_pending_tasks(
 async def memory(
     action: Annotated[
         str,
-        Field(description="Action: recall, read, search, write, edit, delete, list, stats, audit"),
+        Field(description="Action: recall, read, search, write, edit, delete, list, stats, audit, conversation"),
     ] = "read",
     path: Annotated[
         str,
@@ -3974,7 +3975,7 @@ async def memory(
     ] = "MEMORY.md",
     query: Annotated[
         str,
-        Field(description="Query for action='recall' or explicit body search text for action='search'."),
+        Field(description="Query for action='recall' or 'conversation', or explicit body search text for action='search'."),
     ] = "",
     content: Annotated[
         str,

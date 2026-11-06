@@ -3125,6 +3125,8 @@ class AgentExecutor:
         self._llm_cumulative_total_tokens: int = 0
         self._llm_total_input_tokens_seen: int = 0
         self._llm_total_output_tokens_seen: int = 0
+        # This task's own model turns, by model. See _record_task_turn_usage.
+        self._task_turn_usage: dict[str, dict[str, int | float]] = {}
         self._llm_last_input_tokens: int = 0
         self._llm_last_output_tokens: int = 0
         self._llm_context_usage_pct: float = 0.0
@@ -4883,6 +4885,7 @@ class AgentExecutor:
         self._llm_cumulative_total_tokens = 0
         self._llm_total_input_tokens_seen = 0
         self._llm_total_output_tokens_seen = 0
+        self._task_turn_usage = {}
         self._llm_last_input_tokens = 0
         self._llm_last_output_tokens = 0
         self._llm_context_usage_pct = 0.0
@@ -6270,7 +6273,24 @@ class AgentExecutor:
         }
 
     def _build_task_usage_summary(self) -> dict[str, Any]:
-        """Return task-level token/cost totals from the active cost tracker."""
+        """Return this task's token and cost totals.
+
+        The task's own model turns are the answer whichever provider ran them.
+        The session cost tracker cannot be: it totals the whole session, so every
+        task reported everything before it, and on a managed desktop it never saw
+        the turns at all (the cloud runs them) and held only background calls.
+        That is how "what is 7 times 6" came to log 187,714 input tokens and a
+        28-step helper logged 466,685 tokens at cost 0. The tracker stays the
+        source only for a task that observed no turn of its own.
+        """
+        own_turns = _normalize_model_totals(getattr(self, "_task_turn_usage", None))
+        if own_turns:
+            return {
+                "usage": _task_usage_from_model_totals(own_turns),
+                "total_cost_usd": sum(float(row.get("cost_usd") or 0.0) for row in own_turns.values()),
+                "model_totals": own_turns,
+            }
+
         usage = _empty_task_usage()
         total_cost_usd = 0.0
         model_totals: dict[str, dict[str, int | float]] = {}
@@ -6345,6 +6365,7 @@ class AgentExecutor:
         if total_tokens <= 0:
             total_tokens = input_tokens + output_tokens
 
+        self._record_task_turn_usage(usage, input_tokens, output_tokens)
         self._llm_last_input_tokens = input_tokens
         self._llm_last_output_tokens = output_tokens
         self._last_server_context_tokens = input_tokens
@@ -6369,6 +6390,66 @@ class AgentExecutor:
             self._llm_context_usage_pct = self._llm_last_input_tokens / float(context_window)
         else:
             self._llm_context_usage_pct = 0.0
+
+    def _record_task_turn_usage(self, usage: dict[str, Any], input_tokens: int, output_tokens: int) -> None:
+        """Add one model turn to this task's totals, priced like every other usage row."""
+        cached_tokens = self._usage_int(usage, "cache_read_tokens", "cached_tokens", "cache_read_input_tokens")
+        cache_write_tokens = self._usage_int(
+            usage,
+            "cache_write_tokens",
+            "cache_creation_tokens",
+            "cache_creation_input_tokens",
+        )
+        web_search_requests = self._usage_int(usage, "web_search_requests")
+        if not (input_tokens or output_tokens or cached_tokens or cache_write_tokens or web_search_requests):
+            return
+        model = str(getattr(self, "_last_model_name", "") or "").strip() or "unknown"
+        try:
+            from services.llm.pricing import calculate_cost_usd
+
+            cost_usd = calculate_cost_usd(
+                model,
+                input_tokens,
+                output_tokens,
+                cached_tokens,
+                cache_write_tokens=cache_write_tokens,
+                web_search_requests=web_search_requests,
+            )
+        except (ImportError, KeyError, TypeError, ValueError):
+            logger.debug("Task usage cost lookup failed for model %s", model, exc_info=True)
+            cost_usd = 0.0
+        totals = self.__dict__.setdefault("_task_turn_usage", {})
+        row = totals.setdefault(
+            model,
+            {
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "cache_read_input_tokens": 0,
+                "cache_creation_input_tokens": 0,
+                "web_search_requests": 0,
+                "cost_usd": 0.0,
+            },
+        )
+        row["input_tokens"] += input_tokens
+        row["output_tokens"] += output_tokens
+        row["cache_read_input_tokens"] += cached_tokens
+        row["cache_creation_input_tokens"] += cache_write_tokens
+        row["web_search_requests"] += web_search_requests
+        row["cost_usd"] += float(cost_usd)
+
+    def _prompt_cache_key(self) -> str | None:
+        """One opaque cache key per account, the same for every command.
+
+        The key decides which cache machines a request can reach. It used to be
+        the task id, new on every command, so a command's first model call could
+        never land where the previous command had left the shared prefix. Hashed
+        so no account id leaves the device, and per account so one person's
+        traffic never shares a routing key with another's.
+        """
+        user_id = str(getattr(self, "_user_id", "") or "").strip()
+        if not user_id:
+            return None
+        return hashlib.sha256(("viola-prompt-cache:%s" % user_id).encode("utf-8")).hexdigest()[:32]
 
     def _reset_llm_usage_compaction_window(self) -> None:
         """Reset the usage window that drives the next compaction threshold."""
@@ -11099,10 +11180,10 @@ class AgentExecutor:
             self._last_no_result_reasoning = "provider_returned_non_dict_response"
             return None
         self._last_usage = _normalize_usage(response)
-        self._record_llm_usage_for_context(self._last_usage)
         self._last_model_name = (
             str(response.get("_model_name") or self._get_model_name_safe()) if isinstance(response, dict) else "unknown"
         )
+        self._record_llm_usage_for_context(self._last_usage)
         if isinstance(response, dict):
             context_window = response.get("_context_window")
             if isinstance(context_window, int) and context_window > 0:
