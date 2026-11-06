@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "8c981e7ef623f810217595b66e8d14e6f7eb96bb",
-  "sha256": "b24663c5603d4c60e3816a24ab9deaa1d58ef0f38e5c32a247fa43b679848045",
+  "revision": "083e645154dc81eef0a5df012c36921f371ac8a5",
+  "sha256": "4c0e11433bb117422513121596f80f68bdc0ee444f85d4e92a8693186e24847e",
   "files": [
     {
       "path": ".env.example",
@@ -1079,6 +1079,11 @@
       "bytes": 2971
     },
     {
+      "path": "core/live_call_state.py",
+      "sha256": "eebe9f73b66802d48944066cb2a51648b5c768327dd460db4ffc0d093953398b",
+      "bytes": 1481
+    },
+    {
       "path": "core/logging_config.py",
       "sha256": "04087915b3c03a09daea073913fa3d44bb8bd9f58b4732497b0821bafab0b30b",
       "bytes": 17464
@@ -1580,13 +1585,13 @@
     },
     {
       "path": "intent/agent_executor.py",
-      "sha256": "f6e6f92a2f46644b3c5f0ab4cdaa9d601e72405263a3e584a6ce1626a30a89a2",
-      "bytes": 596877
+      "sha256": "fd0954b3fe09c2483b01c2b1e7345d86ffc52d876a45f2e3d3b2a36bbb46059b",
+      "bytes": 596853
     },
     {
       "path": "intent/agent_loop.py",
-      "sha256": "d68539a05193f3ef32dd8fa38b0da95513862ca0283b06538ee6f244963529e2",
-      "bytes": 259492
+      "sha256": "124a80a4e3c360157daf2731b4d70b7fac6790c7d62d09973800506dd288e32b",
+      "bytes": 260796
     },
     {
       "path": "intent/agent_message_manager.py",
@@ -1860,8 +1865,8 @@
     },
     {
       "path": "intent/irreversible_actions.py",
-      "sha256": "ec5f0a16d6936d515d46d0445e29e11738cc053a3876ca512ed06a3c9be5ea88",
-      "bytes": 22370
+      "sha256": "6fc6d7f53716f893770b94d0efb8d21b0548f94608960a49ced4a6fed337a3d7",
+      "bytes": 21977
     },
     {
       "path": "intent/json_utils.py",
@@ -2125,8 +2130,8 @@
     },
     {
       "path": "intent/tools/phone_call.py",
-      "sha256": "0deee85c6013f666e37bc8ef071fcd7fadc33e371ed13a52d2cf9f6a77e1fbe3",
-      "bytes": 77896
+      "sha256": "80ef989760330ec18c8692514de635dcd6d798ee875b10b211b3c111481c184d",
+      "bytes": 79283
     },
     {
       "path": "intent/tools/playlist_tools.py",
@@ -2380,8 +2385,8 @@
     },
     {
       "path": "mcp_servers/phone_tool_descriptions.py",
-      "sha256": "352b5ec13056a715221e3821023c3dd2b86e50b4e9235641a887f20a87b1157d",
-      "bytes": 3433
+      "sha256": "352c0f8b79318e0bc66c2d2ab76a601c9c3f4afff820baf2135e4e54f932e047",
+      "bytes": 3464
     },
     {
       "path": "messaging/__init__.py",
@@ -5730,8 +5735,8 @@
     },
     {
       "path": "telephony/call_manager.py",
-      "sha256": "2afe54faa99a2ecd1687dd717da9b8e269cbc586eb3b5a80eae77a9e62402f2c",
-      "bytes": 388285
+      "sha256": "791057fa0fdd180a66c23a5e524b044294b4f4e2130243c506e8e323006636a5",
+      "bytes": 389172
     },
     {
       "path": "telephony/call_queue.py",
@@ -5907,6 +5912,11 @@
       "path": "telephony/phone_simulator.py",
       "sha256": "4b762cc213875476c94828d5c89970aa8a4732fb417763f1feadba043a27f73a",
       "bytes": 83172
+    },
+    {
+      "path": "telephony/phone_stt_background.py",
+      "sha256": "f1cf1cd315b6475019d8242c85d92bf5526cfe6a3ac3f6281e1c49536cdf0e3c",
+      "bytes": 2353
     },
     {
       "path": "telephony/phone_stt_options.py",
@@ -13610,8 +13620,8 @@
     },
     {
       "path": "voice/streamed_reply.py",
-      "sha256": "236d6f534ae4e761e242a14e0785ca33aab7e99324d31f5e434a5882e4a4751b",
-      "bytes": 9067
+      "sha256": "146ba6abf8907944119e9f57238064340ae3f9e6c196f51136735a184555a361",
+      "bytes": 9281
     },
     {
       "path": "voice/synthesis/__init__.py",
@@ -13640,8 +13650,8 @@
     },
     {
       "path": "voice/synthesis/lazy_engine.py",
-      "sha256": "ee40cfe9b91e25ab2c940fe26ab6ab02fd22a44de4adb97f4f3d605f5ba6a016",
-      "bytes": 4088
+      "sha256": "b55a636eef35e9a9820906c7f5c21abd71f5bd2af227851c4c99f775c8283ea6",
+      "bytes": 4260
     },
     {
       "path": "voice/synthesis/opener_cache.py",
@@ -13665,8 +13675,8 @@
     },
     {
       "path": "voice/synthesizer.py",
-      "sha256": "af45916204870150db90f9620b0e3cf2929e22f2566c41dd4b47061f6bf0cc4f",
-      "bytes": 7914
+      "sha256": "855e7d8ad3ca2a88ad613980d7f51adf075fedc72ff1a48f0b5054e159b5db6f",
+      "bytes": 8122
     },
     {
       "path": "voice/transcriber.py",
