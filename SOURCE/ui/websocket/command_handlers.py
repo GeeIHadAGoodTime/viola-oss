@@ -54,7 +54,13 @@ def _apply_iframe_phase_locked(player: Any, yt_state: str) -> None:
     Must be called with ``player._cv`` held.
     """
     phase = _YT_PHASE_MAP.get(yt_state)
-    if phase is not None and getattr(player, "_playback_sm", None) is not None:
+    sm = getattr(player, "_playback_sm", None)
+    if phase is not None and sm is not None:
+        # STOPPED -> PLAYING is not a transition: a track that starts from
+        # stopped loads first. Going through LOADING keeps the machine honest
+        # and ends "Forced transition STOPPED -> PLAYING" in the log.
+        if phase == PlaybackPhase.PLAYING and getattr(sm, "phase", None) == PlaybackPhase.STOPPED:
+            _sm_transition(player, PlaybackPhase.LOADING)
         _sm_transition(player, phase)
         return
     # ENDED / UNKNOWN (or a player without a state machine): legacy flags.
@@ -64,6 +70,48 @@ def _apply_iframe_phase_locked(player: Any, yt_state: str) -> None:
         player._paused = yt_state == "PAUSED"
     if phase is not None:
         _sm_transition(player, phase)
+
+
+# getPlayerState() codes the iframe sends with its position, and how many
+# reports in a row must disagree before the iframe wins. One report can simply
+# have crossed a pause or resume on the wire.
+_IFRAME_STATE_CODES = {1: "PLAYING", 2: "PAUSED"}
+_IFRAME_DISAGREEMENTS_BEFORE_CORRECTING = 2
+
+
+def _reconcile_phase_with_iframe_locked(player: Any, payload: dict[str, Any]) -> bool:
+    """Correct the phase when the iframe keeps reporting something else. True if it moved.
+
+    The state events that normally carry this can be dropped: anything tagged
+    with the previous video is ignored as stale, and nothing resends it. The
+    Play/Pause button then stayed wrong for the rest of the track (1.0.5 laptop:
+    Play shown while audio ran, Pause shown after pausing). The position report
+    states what the iframe is doing every time, so it is the safety net.
+    Must be called with ``player._cv`` held.
+    """
+    yt_state = _IFRAME_STATE_CODES.get(payload.get("state"))
+    sm = getattr(player, "_playback_sm", None)
+    if yt_state is None or sm is None:
+        return False
+    phase = getattr(sm, "phase", None)
+    if phase not in (PlaybackPhase.PLAYING, PlaybackPhase.PAUSED, PlaybackPhase.LOADING):
+        return False
+    now_playing = getattr(getattr(player, "_state", None), "now_playing", None)
+    current_video_id = getattr(now_playing, "video_id", None)
+    reported_video_id = payload.get("video_id")
+    if reported_video_id and current_video_id and reported_video_id != current_video_id:
+        player._iframe_phase_disagreements = 0
+        return False
+    if _YT_PHASE_MAP.get(yt_state) == phase:
+        player._iframe_phase_disagreements = 0
+        return False
+    player._iframe_phase_disagreements = getattr(player, "_iframe_phase_disagreements", 0) + 1
+    if player._iframe_phase_disagreements < _IFRAME_DISAGREEMENTS_BEFORE_CORRECTING:
+        return False
+    player._iframe_phase_disagreements = 0
+    logger.info("Player said %s but the iframe keeps reporting %s; following the iframe", phase.name, yt_state)
+    _apply_iframe_phase_locked(player, yt_state)
+    return True
 
 
 from utils.api_helpers import broadcast_state
@@ -241,7 +289,8 @@ async def handle_youtube_state(
         current_video_id = getattr(current_track, "video_id", None) if current_track else None
 
         if video_id and current_video_id and video_id != current_video_id:
-            logger.warning(
+            # Normal around a track change, and handled: not worth a warning.
+            logger.debug(
                 "STALE_EVENT: Ignoring YouTube state from old video. " "event_video=%s, current_video=%s, state=%s",
                 video_id,
                 current_video_id,
@@ -750,8 +799,8 @@ async def handle_position_update(
     position = payload.get("position", 0)
     duration = payload.get("duration", 0)  # Default to 0 like position
 
-    # Debug: Log that we received the position update
-    logger.info(
+    # Debug only: this arrives every couple of seconds for the whole of a song.
+    logger.debug(
         "Position update received: %.1fs / %ss from %s",
         position,
         duration,
@@ -780,18 +829,24 @@ async def handle_position_update(
             cv = getattr(player, "_cv", None)
             if cv is not None:
                 with cv:
+                    unchanged = (
+                        position_ms == getattr(player, "_position_ms", None)
+                        and duration_ms in (0, getattr(player, "_duration_ms", None))
+                    )
                     record_iframe_position(player, position_ms)
                     if hasattr(player, "_position_ms"):
                         player._position_ms = position_ms
-                        logger.info("Set player._position_ms = %sms", position_ms)
                     else:
                         logger.warning("Player missing _position_ms attribute")
                     if hasattr(player, "_duration_ms") and duration_ms > 0:
                         player._duration_ms = duration_ms
-                        logger.info("Set player._duration_ms = %sms", duration_ms)
                     elif duration_ms > 0:
                         logger.warning("Player missing _duration_ms attribute")
+                    corrected = _reconcile_phase_with_iframe_locked(player, payload)
                     # Note: Don't notify_all() for position updates - not a state change
+                # Nothing moved (paused): no point telling every client so.
+                if unchanged and not corrected:
+                    return
             else:
                 # Fallback for players without condition variable
                 record_iframe_position(player, position_ms)

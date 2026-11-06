@@ -557,6 +557,10 @@ export default function SmartDisplay(props) {
   return <PrincipalSmartDisplay key={user?.id || 'device'} {...props} />;
 }
 
+// How often the backend hears where the song is, and the jump that is a seek.
+const POSITION_REPORT_MS = 2000;
+const POSITION_JUMP_SECONDS = 3;
+
 function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null, onVoiceCaptureEnabledChange }) {
   const mountedRef = useRef(true);
   useLayoutEffect(() => {
@@ -1972,6 +1976,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
   const iframePositionRef = useRef(0);
   const iframeDurationRef = useRef(0);
   const lastPositionUpdateRef = useRef(0);
+  const lastPositionSentRef = useRef({ position: 0, state: null, repeats: 0 });
   const ytHubMutedRef = useRef(false);
   // Which video we have already told the backend failed to start. The player
   // re-posts yt_iframe_autoplay_blocked once a second forever once it exhausts
@@ -2765,10 +2770,23 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
         iframeDurationRef.current = duration;
         setIframePosition(position);
         setIframeDuration(duration);
+        // The progress bar above runs off the iframe. The backend needs far
+        // less: where the song is every couple of seconds, a seek at once, and
+        // a state change. A paused song says so twice (the backend wants two
+        // reports before it overrides its own phase), then stays silent.
         const now = Date.now();
-        if (now - lastPositionUpdateRef.current >= 1000) {
+        const sent = lastPositionSentRef.current;
+        const moved = Math.abs(position - sent.position);
+        const stateChanged = payload.state !== sent.state;
+        if (stateChanged) sent.repeats = 0;
+        const idle = moved < 0.25 && !stateChanged;
+        const due = now - lastPositionUpdateRef.current >= POSITION_REPORT_MS;
+        if ((due && (!idle || sent.repeats < 1)) || moved >= POSITION_JUMP_SECONDS || stateChanged) {
+          sent.repeats = idle ? sent.repeats + 1 : 0;
+          sent.position = position;
+          sent.state = payload.state;
           lastPositionUpdateRef.current = now;
-          if (wsSend) { wsSend({ action: 'position_update', payload: { position, duration, state: payload.state, source: 'youtube_iframe' } }); }
+          if (wsSend) { wsSend({ action: 'position_update', payload: { position, duration, state: payload.state, video_id: payload.videoId, source: 'youtube_iframe' } }); }
         }
       }
       if (type === 'yt_iframe_state') {
@@ -2840,6 +2858,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
   useEffect(() => {
     setIframePosition(0); setIframeDuration(0);
     iframePositionRef.current = 0; iframeDurationRef.current = 0; lastPositionUpdateRef.current = 0;
+    lastPositionSentRef.current = { position: 0, state: null, repeats: 0 };
     spokeInitialSyncDoneRef.current = false;
     // A new track gets its own chance to fail; the dedupe is per video.
     notStartedReportedRef.current = null;

@@ -612,7 +612,10 @@ async def _prefer_resolved_now_playing(
         # A room-route / pairing answer makes no playback claim to verify.
         return result
 
-    live = await _read_live_playback_state()
+    # A local file takes a moment to open and report PLAYING; the first read
+    # came too soon and the reply was "hasn't confirmed playback yet" over the
+    # music (1.0.5 laptop, Local Files). Same short wait as a track change.
+    live = await _await_track_change_playing(await _read_live_playback_state())
     verification = _live_verification(live)
     result["verification"] = verification
     result["playback_verified"] = verification == VERIFY_PLAYING
