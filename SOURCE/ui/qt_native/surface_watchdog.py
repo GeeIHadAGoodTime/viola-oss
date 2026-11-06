@@ -23,6 +23,7 @@ all until it has seen the canary land at least once in this run.
 from __future__ import annotations
 
 import ctypes
+import json
 import sys
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -63,10 +64,11 @@ PROBE_SCRIPT = """
     document.documentElement.appendChild(dot);
   }
   dot.style.backgroundColor = shade;
-  return {
+  // A string: PySide hands a plain object to the callback as an empty value.
+  return JSON.stringify({
     visible: document.visibilityState === 'visible',
     covered: !!document.fullscreenElement,
-  };
+  });
 })
 """ % {"size": CANARY_SIZE_CSS_PX}
 
@@ -273,7 +275,10 @@ class SurfaceWatchdog:
 
     def _on_probe_answer(self, result: object) -> None:
         self._awaiting_answer = False
-        state = result if isinstance(result, dict) else {}
+        try:
+            state = json.loads(result) if isinstance(result, str) and result else {}
+        except ValueError:
+            state = {}
         if not state.get("visible") or state.get("covered"):
             self._settle(Reading.SKIPPED)
             return
