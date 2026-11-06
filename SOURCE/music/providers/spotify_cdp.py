@@ -207,10 +207,20 @@ class SpotifyCDPProvider(MusicProvider[None]):
         exc: Exception,
     ) -> NoReturn:
         logger.exception("Spotify CDP %s failed for query=%r", operation, query)
-        raise ServiceUnavailableError(
-            "Spotify",
-            "CDP %s failed: %s" % (operation, exc),
-        ) from exc
+        state = getattr(exc, "state", "")
+        if not state:
+            raise ServiceUnavailableError(
+                "Spotify",
+                "CDP %s failed: %s" % (operation, exc),
+            ) from exc
+        # Same reason, same words, on screen and in the tool result.
+        from music.spotify import connection
+
+        message = connection.message_for(state)
+        code = "spotify_%s" % state
+        connection.record_play_failure(None, state=state, message=message, code=code)
+        connection.notify_spotify(None, message, code=code, level="error")
+        raise ServiceUnavailableError("Spotify", message) from exc
 
     # ------------------------------------------------------------------
     # MusicProvider ABC
