@@ -185,7 +185,7 @@ const TIER_OPTIONS = [
 
 const TIER_DESCRIPTIONS = {
   solo: 'Viola answers questions, plays music, searches the web, and manages your local calendar. No file access, no email, no browsing, no desktop control. The safest option for shared devices.',
-  ensemble: 'Viola can read your files, browse the web in a sandbox, and read email. Anything that modifies data requires your confirmation first.',
+  ensemble: 'Viola can read your files, browse the web in a sandbox, and send email you approve. Anything that modifies data requires your confirmation first.',
   symphony: 'Full access. Viola can write files, send emails, control your desktop, and browse with your saved passwords. Dangerous actions still require confirmation.',
 };
 
@@ -2276,7 +2276,7 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
                   <Section title="Agent Autonomy">
                     {/* Segmented control */}
                     <div style={{ padding: '16px 20px' }}>
-                      <div style={{
+                      <div role="group" aria-label="Agent autonomy" style={{
                         display: 'flex',
                         borderRadius: '12px',
                         border: `1px solid ${theme.colors.borderLight}`,
@@ -2287,6 +2287,8 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
                           return (
                             <button
                               key={tier.id}
+                              type="button"
+                              aria-pressed={isActive}
                               onClick={() => {
                                 updateLocal('agent_autonomy', tier.id);
                                 // Derive browser_session_mode from autonomy mode

@@ -242,12 +242,12 @@ describe('Chat thread model restoration through actual apiFetch', () => {
 
   it('blocks suggestion dispatch while the new target read is pending',async()=>{
     const pending=await selectPendingTarget();
-    const suggestion=screen.getByRole('button',{name:'Plan the next stage of this project'});
+    const suggestion=screen.getByRole('button',{name:'Plan a simple dinner for tonight'});
     await act(async()=>fireEvent.click(suggestion));expect(sent).toEqual([]);
-    expect(screen.getByRole('textbox',{name:'Message Viola'})).toHaveValue('Plan the next stage of this project');
+    expect(screen.getByRole('textbox',{name:'Message Viola'})).toHaveValue('Plan a simple dinner for tonight');
     await act(async()=>pending.resolve(ok({thread:otherThread,messages:[],active_stream_ids:[]})));
     await act(async()=>fireEvent.click(screen.getByRole('button',{name:'Send message'})));
-    expect(sent[0]).toEqual({text:'Plan the next stage of this project',model:'model-c'});
+    expect(sent[0]).toEqual({text:'Plan a simple dinner for tonight',model:'model-c'});
   });
 
   it('allows a confirmed conversation to send during a same-target refresh and retires that read',async()=>{

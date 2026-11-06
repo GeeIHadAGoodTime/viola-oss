@@ -8,6 +8,13 @@ const levelName = (gift) => gift.selected_level === 'flexible'
   ? `Flexible $${(gift.monthly_price_cents / 100).toFixed(2)} monthly level`
   : gift.selected_level === 'max' ? 'Max' : 'Pro';
 
+// "Free · free." said the plan twice: a status only counts when it adds something.
+const baseSummary = (base) => {
+  const plan = planName(base.plan_id);
+  const status = String(base.status || '').replaceAll('_', ' ');
+  return status && status.toLowerCase() !== plan.toLowerCase() ? `${plan} · ${status}` : plan;
+};
+
 export default function MonthGiftSummary({ entitlement }) {
   if (!entitlement || (!entitlement.active_gift && !entitlement.queued_gifts?.length)) return null;
   const base = entitlement.base_subscription;
@@ -19,7 +26,7 @@ export default function MonthGiftSummary({ entitlement }) {
   return <section aria-label="Complimentary month access" data-testid="month-gift-summary"
     style={{ color: colors.textSecondary, fontSize: '14px', lineHeight: 1.5 }}>
     <h4 style={{ color: colors.textPrimary, margin: '0 0 8px' }}>Complimentary access</h4>
-    <p>Base subscription: {planName(base.plan_id)} · {base.status}.
+    <p>Base subscription: {baseSummary(base)}.
       {base.funded_paid_through_at && <> Paid through {date(base.funded_paid_through_at)}.</>}</p>
     {base.current_period_start && Date.parse(base.current_period_start) > Date.now()
       && <p>Base paid access is scheduled to begin {date(base.current_period_start)}.</p>}

@@ -17,7 +17,7 @@
  * and no spoke param means the cloud SPA.
  */
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import SettingsModal from './SettingsModal';
 
@@ -86,6 +86,44 @@ const setSource = (source) => {
 // text a cloud user must read where the key field used to be.
 const UPSELL_TITLE = 'AI provider setup';
 const UPSELL_REASON = /are set up in the desktop app/i;
+
+// 1.0.5 build 9: the selected tier was shown by colour alone, so a screen
+// reader and Windows UI Automation could not tell which one was on.
+describe('SettingsModal agent autonomy', () => {
+  beforeEach(() => {
+    settingsHarness.settings = { theme: 'dark', agent_enabled: true, agent_autonomy: 'ensemble' };
+    apiFetchMock.mockReset();
+    apiFetchMock.mockResolvedValue({ json: () => Promise.resolve({ devices: [] }) });
+    window.viola = {};
+  });
+  afterEach(() => {
+    delete window.viola;
+  });
+
+  it('says which tier is selected, and follows a change', async () => {
+    render(<SettingsModal isOpen onClose={vi.fn()} />);
+    openAiTab();
+
+    const group = await screen.findByRole('group', { name: 'Agent autonomy' });
+    const tier = (name) => within(group).getByRole('button', { name: new RegExp(`^${name}`) });
+    expect(tier('Ensemble')).toHaveAttribute('aria-pressed', 'true');
+    expect(tier('Solo')).toHaveAttribute('aria-pressed', 'false');
+
+    fireEvent.click(tier('Solo'));
+
+    expect(tier('Solo')).toHaveAttribute('aria-pressed', 'true');
+    expect(tier('Ensemble')).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('does not promise reading email, which is off in this release', async () => {
+    render(<SettingsModal isOpen onClose={vi.fn()} />);
+    openAiTab();
+
+    await screen.findByRole('group', { name: 'Agent autonomy' });
+    expect(screen.getByText(/send email you approve/)).toBeInTheDocument();
+    expect(screen.queryByText(/read email/i)).toBeNull();
+  });
+});
 
 describe('SettingsModal AI-provider surface (desktop_ai gate)', () => {
   beforeEach(() => {

@@ -3,10 +3,10 @@ import PropTypes from 'prop-types';
 import ChatMessage from './ChatMessage.jsx';
 
 const SUGGESTIONS = [
-  'Plan the next stage of this project',
-  'Review the current architecture',
-  'Draft a focused implementation checklist',
-  'Summarize what changed today',
+  'Plan a simple dinner for tonight',
+  'Help me write a short thank-you note',
+  'Explain something I keep forgetting',
+  'What can you do for me?',
 ];
 
 export default function ChatThread({
@@ -36,7 +36,7 @@ export default function ChatThread({
     return (
       <div className="chat-thread-empty">
         <div>
-          <h2>What are we working on?</h2>
+          <h2>What can I help with?</h2>
           <div className="chat-suggestion-grid">
             {SUGGESTIONS.map((suggestion) => (
               <button type="button" key={suggestion} onClick={() => onSuggestion(suggestion)}>

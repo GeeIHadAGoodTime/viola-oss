@@ -1161,6 +1161,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
   // Keyboard input state
   const [typingInput, setTypingInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const stageTypingFieldRef = useRef(null);
 
   const normalizeSettingsTab = useCallback((value) => {
     if (typeof value !== 'string' || !value.trim()) return null;
@@ -3190,7 +3191,10 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (settingsOpen || queueOpen || historyOpen || roomsOpen || helpOpen || bugReportOpen || workbenchPanelOpen || commandPaletteOpen) return;
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      // The stage's own field still ends here for Enter and Escape; everything
+      // else in it is ordinary text editing, Ctrl+A included.
+      const inStageField = e.target === stageTypingFieldRef.current;
+      if ((e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') && !inStageField) return;
       if (isHotkeyEvent(e, muteHotkey) && !isTyping && !e.repeat) {
         e.preventDefault();
         toggleMicMuted();
@@ -3225,13 +3229,14 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
         return;
       }
       if (e.key === 'Escape' && isTyping) { setTypingInput(''); setIsTyping(false); return; }
-      if (e.key === 'Backspace' && isTyping) {
+      if (e.key === 'Backspace' && isTyping && !inStageField) {
         e.preventDefault();
         setTypingInput(prev => { const newVal = prev.slice(0, -1); if (newVal.length === 0) setIsTyping(false); return newVal; });
         return;
       }
-      if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey && !inStageField) {
         e.preventDefault(); setIsTyping(true); setTypingInput(prev => prev + e.key);
+        stageTypingFieldRef.current?.focus();
         return;
       }
     };
@@ -3254,6 +3259,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
       e.preventDefault();
       setIsTyping(true);
       setTypingInput(prev => (prev + pasted).slice(0, STAGE_TYPING_MAX_CHARS));
+      stageTypingFieldRef.current?.focus();
     };
     document.addEventListener('keydown', handleKeyDown);
     document.addEventListener('keyup', handleKeyUp);
@@ -3982,6 +3988,9 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
               isTyping={isTyping}
               typingInput={typingInput}
               setTypingInput={setTypingInput}
+              setIsTyping={setIsTyping}
+              typingFieldRef={stageTypingFieldRef}
+              typingMaxChars={STAGE_TYPING_MAX_CHARS}
               isCommandLoading={isCommandLoading}
               lastResponse={lastResponse}
               mainThinking={mainThinking}

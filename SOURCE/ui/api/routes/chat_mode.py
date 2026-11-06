@@ -132,15 +132,51 @@ def _sanitize_chat_tool_events(events: object) -> list[dict[str, Any]]:
     return sanitized
 
 
+_DEFAULT_THREAD_TITLE = "New chat"
+
+
 def _auto_title(text: str) -> str:
     words = [part.strip(" \t\r\n.,;:!?()[]{}") for part in str(text or "").split()]
     clean_words = [word for word in words if word]
     if not clean_words:
-        return "New chat"
+        return _DEFAULT_THREAD_TITLE
     title = " ".join(clean_words[:8])
     if len(title) > 72:
         title = "%s..." % title[:69]
     return title[0].upper() + title[1:]
+
+
+async def _is_untouched_new_chat(chat_store: Any, user_id: str, thread: Any) -> bool:
+    """True for a thread still called "New chat" with nothing in it."""
+    if thread.title.strip().lower() != _DEFAULT_THREAD_TITLE.lower():
+        return False
+    return not await chat_store.list_messages(user_id, thread.id, limit=1)
+
+
+async def _without_spare_new_chats(chat_store: Any, user_id: str, threads: list[Any]) -> list[Any]:
+    """Keep the newest empty "New chat" in the list and leave out the others.
+
+    The sidebar showed a row of identical "New chat" entries, one per press of
+    the button: a chat names itself from its first message, so those were all
+    empty and told the user nothing.
+    """
+    listed = []
+    kept_an_empty_chat = False
+    for thread in threads:
+        if await _is_untouched_new_chat(chat_store, user_id, thread):
+            if kept_an_empty_chat:
+                continue
+            kept_an_empty_chat = True
+        listed.append(thread)
+    return listed
+
+
+async def _empty_new_chat(chat_store: Any, user_id: str) -> Any | None:
+    """Return the empty chat a press of New chat should land on, if any."""
+    for thread in await chat_store.list_threads(user_id, limit=50):
+        if await _is_untouched_new_chat(chat_store, user_id, thread):
+            return thread
+    return None
 
 
 def _chat_stream_id() -> str:
@@ -678,7 +714,8 @@ def register_chat_mode_routes(context: ApiContext, toolbox: RouteToolbox) -> Non
             user_id = _require_request_user_id(request)
             chat_store = await _store()
             threads = await chat_store.list_threads(user_id, search=search, limit=limit)
-            return success_response({"threads": [_thread_payload(thread) for thread in threads]})
+            listed = await _without_spare_new_chats(chat_store, user_id, threads)
+            return success_response({"threads": [_thread_payload(thread) for thread in listed]})
 
         return await toolbox.record_and_call(_inner, route="/v1/chat/threads", method="GET")
 
@@ -688,9 +725,16 @@ def register_chat_mode_routes(context: ApiContext, toolbox: RouteToolbox) -> Non
             user_id = _require_request_user_id(request)
             chat_store = await _store()
             model = _validate_chat_model(user_id, body.model, explicit=bool(body.model))
+            title = body.title or _DEFAULT_THREAD_TITLE
+            if title.strip().lower() == _DEFAULT_THREAD_TITLE.lower():
+                existing = await _empty_new_chat(chat_store, user_id)
+                if existing is not None:
+                    if model != existing.model:
+                        existing = await chat_store.set_thread_model(user_id, existing.id, model) or existing
+                    return success_response({"thread": _thread_payload(existing)})
             thread = await chat_store.create_thread(
                 user_id,
-                title=body.title or "New chat",
+                title=title,
                 model=model,
             )
             return success_response({"thread": _thread_payload(thread)})
@@ -800,7 +844,7 @@ def register_chat_mode_routes(context: ApiContext, toolbox: RouteToolbox) -> Non
                 updated = await chat_store.set_thread_model(user_id, thread_id, body.model)
                 if updated is not None:
                     thread = updated
-            if not existing_messages and thread.title.strip().lower() == "new chat":
+            if not existing_messages and thread.title.strip().lower() == _DEFAULT_THREAD_TITLE.lower():
                 titled = await chat_store.rename_thread(user_id, thread_id, _auto_title(body.text))
                 if titled is not None:
                     thread = titled
