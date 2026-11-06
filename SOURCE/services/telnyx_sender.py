@@ -249,14 +249,19 @@ def normalize_e164(raw_phone: str) -> str:
 def _telnyx_credentials() -> tuple[str, str, str | None]:
     """Return ``(api_key, from_number, messaging_profile_id)`` or raise.
 
-    SMS requires the dedicated toll-free ``telnyx_sms_from_number``. Falling
-    back to the voice number would send A2P SMS from the wrong Telnyx posture.
+    SMS sends from the dedicated toll-free number only. Falling back to the voice
+    number would send A2P SMS from the wrong Telnyx posture. The approved number
+    is the one value this module accepts, so an unset
+    ``telnyx_sms_from_number`` means that number rather than "SMS is off": the
+    cloud never set it, and every code failed with "SMS is not configured"
+    (11-05 laptop run). A Telnyx key is still required, and a configured value
+    that differs is still refused below.
     """
     settings = get_settings()
     api_key = (getattr(settings, "telnyx_api_key", None) or "").strip()
-    from_number_raw = (getattr(settings, "telnyx_sms_from_number", None) or "").strip()
+    from_number_raw = (getattr(settings, "telnyx_sms_from_number", None) or "").strip() or APPROVED_SMS_FROM_NUMBER
     profile_id = (getattr(settings, "telnyx_messaging_profile_id", None) or "").strip() or None
-    if not api_key or not from_number_raw:
+    if not api_key:
         raise TelnyxSendError("SMS is not configured.")
     try:
         from_number = normalize_e164(from_number_raw)
