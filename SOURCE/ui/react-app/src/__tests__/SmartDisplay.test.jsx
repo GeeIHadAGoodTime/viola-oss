@@ -1571,6 +1571,59 @@ describe('YouTube iframe playback honesty (#2757)', () => {
     expect(youtubeStateMessages().filter((m) => m.payload.state === 'UNSTARTED')).toHaveLength(0);
   });
 
+  it('stops reporting a paused position after saying so twice', async () => {
+    await mountWithTrack();
+    const positions = () => wsHarness.sent.filter((m) => m.action === 'position_update');
+    const tick = (seconds, state) => act(() => {
+      window.dispatchEvent(iframeMessage('yt_iframe_time', { currentTime: seconds, duration: 200, state, videoId: 'vid-123' }));
+    });
+    const now = vi.spyOn(Date, 'now');
+    let clock = 1_000_000;
+    now.mockImplementation(() => clock);
+    try {
+      tick(30, 2);
+      const afterFirst = positions().length;
+      expect(afterFirst).toBeGreaterThan(0);
+      for (let i = 0; i < 20; i += 1) {
+        clock += 1000;
+        tick(30, 2);
+      }
+      expect(positions().length).toBe(afterFirst + 1);
+    } finally {
+      now.mockRestore();
+    }
+  });
+
+  it('reports a seek and a state change at once, and a playing song every two seconds', async () => {
+    await mountWithTrack();
+    const positions = () => wsHarness.sent.filter((m) => m.action === 'position_update');
+    const tick = (seconds, state) => act(() => {
+      window.dispatchEvent(iframeMessage('yt_iframe_time', { currentTime: seconds, duration: 200, state, videoId: 'vid-123' }));
+    });
+    const now = vi.spyOn(Date, 'now');
+    let clock = 2_000_000;
+    now.mockImplementation(() => clock);
+    try {
+      tick(10, 1);
+      const start = positions().length;
+      clock += 1000;
+      tick(11, 1);
+      expect(positions().length).toBe(start);
+      clock += 1000;
+      tick(12, 1);
+      expect(positions().length).toBe(start + 1);
+      clock += 100;
+      tick(120, 1);
+      expect(positions().length).toBe(start + 2);
+      clock += 100;
+      tick(120.1, 2);
+      expect(positions().length).toBe(start + 3);
+      expect(positions().at(-1).payload.video_id).toBe('vid-123');
+    } finally {
+      now.mockRestore();
+    }
+  });
+
   it('reports a stuck player once, not once per retry post', async () => {
     // Measured against the real player page: once retryPlayVideo() exceeds
     // _maxPlayRetries it re-posts yt_iframe_autoplay_blocked on every 1s tick
@@ -2105,6 +2158,19 @@ it('review: ignores a late old-principal streaming completion', async () => {
 });
 
 
+describe('SmartDisplay volume slider during speech', () => {
+  it('shows the level the user chose, not the ducked level', () => {
+    playerHarness.state = {
+      is_playing: true,
+      volume: 20,
+      user_volume: 80,
+      now_playing: { id: 't1', title: 'Track', artist: 'A', provider: 'local' },
+    };
+    render(<SmartDisplay />);
+    expect(screen.getByRole('slider', { name: 'Volume' })).toHaveValue('80');
+  });
+});
+
 describe('SmartDisplay rating requests follow track and click order', () => {
   const trackA = { id: 'track-a', title: 'Track A', artist: 'Fixture Artist', provider: 'local' };
   const trackB = { id: 'track-b', title: 'Track B', artist: 'Fixture Artist', provider: 'local' };
@@ -2153,6 +2219,32 @@ describe('SmartDisplay rating requests follow track and click order', () => {
     await user.click(button(name));
     expectRating(rating);
     expect(apiHarness.setRating.mock.calls).toEqual([[rating, 'track-a'], [rating, 'track-a']]);
+  });
+
+  it('skips the track once a dislike is saved, like the Next button', async () => {
+    const { user } = mount();
+    await user.click(button('Dislike'));
+    await waitFor(() => expect(apiHarness.skip).toHaveBeenCalledTimes(1));
+    expect(apiHarness.setRating.mock.calls).toEqual([['disliked', 'track-a']]);
+  });
+
+  it('does not skip for a like, or for taking a dislike back', async () => {
+    apiHarness.skip.mockClear();
+    const { user } = mount();
+    await user.click(button('Like'));
+    await waitFor(() => expect(apiHarness.setRating).toHaveBeenCalledTimes(1));
+    await user.click(button('Like'));
+    await waitFor(() => expect(apiHarness.setRating).toHaveBeenCalledTimes(2));
+    expect(apiHarness.skip).not.toHaveBeenCalled();
+  });
+
+  it('does not skip when the dislike could not be saved', async () => {
+    apiHarness.skip.mockClear();
+    apiHarness.setRating.mockRejectedValueOnce(apiRejection());
+    const { user } = mount();
+    await user.click(button('Dislike'));
+    expect(await screen.findByText(failedCopy)).toBeInTheDocument();
+    expect(apiHarness.skip).not.toHaveBeenCalled();
   });
 
   it('keeps the newest choice when an older save fails, and orders the actual writes', async () => {
