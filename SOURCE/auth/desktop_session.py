@@ -65,6 +65,7 @@ _REVOKED_REFRESH_ERROR_CODES = frozenset(
         "invalid_grant",
         "refresh_token_not_found",
         "refresh_token_already_used",
+        "refresh_token_reused",
         "session_expired",
         "session_not_found",
         "user_banned",
