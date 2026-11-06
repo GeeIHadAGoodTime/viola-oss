@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "68523ee283f9a1f17f873c8851c4b3990eca2262",
-  "sha256": "609d067822b86d1d87b241de1ac06d6fa907abbaacacd9f9061263f3e56eff2c",
+  "revision": "f94f46e99c56314936326c2179cff4692716e25b",
+  "sha256": "037ceca979e1fb55fbaa3372a53d529e2c54a887a88d1b6f1a8cf66016d7f876",
   "files": [
     {
       "path": ".env.example",
@@ -9925,8 +9925,8 @@
     },
     {
       "path": "ui/qt_native/webview_window.py",
-      "sha256": "ce1f5c225b34cceef46763305bb93c444df257115ae1eea2e1efef2f48c3cfc3",
-      "bytes": 253983
+      "sha256": "bac51cf2ec098260a03e4b47bde6929b29dbc11fc0f3b0faf8290eeac3f62124",
+      "bytes": 255349
     },
     {
       "path": "ui/qt_native/widgets/connectivity_status.py",
@@ -10125,8 +10125,8 @@
     },
     {
       "path": "ui/react-app/src/__tests__/SmartDisplay.test.jsx",
-      "sha256": "cc7f429c3eecee471478e3866f1be9008b0d5995e1ac9613411fb3b37aac2784",
-      "bytes": 146791
+      "sha256": "d4739220adb4a911ca40a05a3518ef13981d86ff69b3004dfa87913272689668",
+      "bytes": 146766
     },
     {
       "path": "ui/react-app/src/__tests__/hooks/useEventBus.test.jsx",
