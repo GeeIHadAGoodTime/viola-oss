@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "738024675a88dfdc5afa07842a1733066e72c882",
-  "sha256": "bc346684cfec596ac65f0d41746bc564698d4e1d4271d84a3742c24438a9467d",
+  "revision": "2cb7f36d7c29d75f70d03e079cd185c4784cdedc",
+  "sha256": "da7881326e11523d2e15231a66addeaeafc30785725f903063f397fad02aacec",
   "files": [
     {
       "path": ".env.example",
@@ -150,8 +150,8 @@
     },
     {
       "path": "audio_core/aec_reference_base.py",
-      "sha256": "cba6c33f399659d793d0258703d91a33ba1a6ed4b0dd89c4951552355b8ef457",
-      "bytes": 23487
+      "sha256": "7c3c7cf0b2f6af23b29b305d94af607dfb81349d6ad88d839ca922a9d8014af2",
+      "bytes": 24059
     },
     {
       "path": "audio_core/calibration/__init__.py",
@@ -339,9 +339,14 @@
       "bytes": 11868
     },
     {
+      "path": "audio_core/own_playback.py",
+      "sha256": "8ff7272cfea38e71fc225683d3b232d568c4768594e79ef31b1505a99b64a2ac",
+      "bytes": 7834
+    },
+    {
       "path": "audio_core/portaudio_guard.py",
-      "sha256": "9e6071eb7a15dab953df6bb42795ede7a95a2b096a47549a1682d6c2908ad8ea",
-      "bytes": 24169
+      "sha256": "8a43541f3f0cb5db13bfb26fbc4c070934177f171d4e08ec79f188651bade865",
+      "bytes": 27098
     },
     {
       "path": "audio_core/queue_controller.py",
@@ -1240,8 +1245,8 @@
     },
     {
       "path": "core/voice_command_handler.py",
-      "sha256": "8c945a6b7e1d475399b42bbb87e093f95e3b74c48123a8fd53d9517ca97dc466",
-      "bytes": 99055
+      "sha256": "55671db5b7d88fd02b2659e497361d3d7593e1d57356a466e8c44c108303a3a6",
+      "bytes": 110924
     },
     {
       "path": "core/voice_orchestrator.py",
@@ -1255,8 +1260,8 @@
     },
     {
       "path": "core/voice_orchestrator_wake.py",
-      "sha256": "7d86bef88d6cbe83b5414ccedd1597577dfab60fa355c6aec7e7a33191c21f87",
-      "bytes": 17620
+      "sha256": "14dba26f44601333146e96d0b3aaeb990df14e063480d21965397b360e966006",
+      "bytes": 18231
     },
     {
       "path": "core/voice_pipeline_initializer.py",
@@ -1275,8 +1280,8 @@
     },
     {
       "path": "core/voice_wake_processor.py",
-      "sha256": "817557274a91ead4f27a2060e1e3ec80c15973be60ddfc885f35769eedff4531",
-      "bytes": 10587
+      "sha256": "880c5e5ea8d479427be55fdd215979c6444728ae74e77d5d14af7bf6feb6aa64",
+      "bytes": 10916
     },
     {
       "path": "core/win32_job.py",
@@ -10920,8 +10925,8 @@
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.jsx",
-      "sha256": "1685b01d6ce92e3452aa2197fdb1bbd8c9fe90334a9b9743ed5c7d1c99bd72e1",
-      "bytes": 218121
+      "sha256": "2b1f9a1c4823893fe0ec6c3bd9f23f58df1ca4184658f95a658d5689bd4105e0",
+      "bytes": 218385
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.localDiscovery.test.jsx",
@@ -11472,6 +11477,16 @@
       "path": "ui/react-app/src/components/settings/TtsStatusIndicator.test.jsx",
       "sha256": "194422d61bbdca71db53cec8fc9e9134db61f55824546c7fcc871e8211286674",
       "bytes": 2261
+    },
+    {
+      "path": "ui/react-app/src/components/settings/WakeDoubleCheckRow.jsx",
+      "sha256": "bee94999c070dc2ba08c51bedf4d3d50574683d1b2fd348ecd57a5288a6b7403",
+      "bytes": 906
+    },
+    {
+      "path": "ui/react-app/src/components/settings/WakeDoubleCheckRow.test.jsx",
+      "sha256": "ea3caa8f26a2351e9537198fddf82ba376295f71e21a4eb1ef57e9038375c5e4",
+      "bytes": 902
     },
     {
       "path": "ui/react-app/src/components/settings/WakeSensitivitySlider.jsx",
@@ -13280,13 +13295,13 @@
     },
     {
       "path": "violawake/config.py",
-      "sha256": "40006500132156f2b5223d84397ec724b7a96de1dd588c5b74e9021108808328",
-      "bytes": 13701
+      "sha256": "bfb9a15e4658516993fc1c15d26e0b2f709236fd9252549c734d934854080a6d",
+      "bytes": 14850
     },
     {
       "path": "violawake/engine.py",
-      "sha256": "8e79ceba8d6d528e0efc29f3914c56d5884cd787019e87028765419e9734b724",
-      "bytes": 51605
+      "sha256": "06b212cf82bfbbbb65241dd00c44a15a070f219ce0f5fbad3ad8e76680e46701",
+      "bytes": 53164
     },
     {
       "path": "violawake/model.py",
@@ -13625,8 +13640,8 @@
     },
     {
       "path": "voice/synthesis/kokoro_engine.py",
-      "sha256": "03f826b1618c376d36fd385a66eba530f0f21f7b30d1c571813cb04ff1df84ec",
-      "bytes": 87672
+      "sha256": "d2b9aaa7479c1fcfa9394750faed5b236a688641c9261fc6f9ae768928dfb2be",
+      "bytes": 88158
     },
     {
       "path": "voice/synthesis/lazy_engine.py",
@@ -13685,8 +13700,8 @@
     },
     {
       "path": "voice/transcription/whisper.py",
-      "sha256": "ff3a8d82715192f7e030daf037a17c8cc56e8e65ac07cfa4746212a8cf583fb3",
-      "bytes": 18063
+      "sha256": "72191dfc47579d574b7cd87a28dfd8bf363eae1bef4d2508b93ac54cb346ea2f",
+      "bytes": 18708
     },
     {
       "path": "voice/transcription/whisper_model_cache.py",
@@ -13705,8 +13720,8 @@
     },
     {
       "path": "voice/wake_chime.py",
-      "sha256": "d06f34a1d2b424c178ed2797cf3c8305dbb8273e8faf97fef38fd490eef3b879",
-      "bytes": 6918
+      "sha256": "93341b2192f0c38c40e7c6a51c22ac9e1be158ffaa525f8b7881354e4b342f9a",
+      "bytes": 6931
     },
     {
       "path": "voice/wake_detector/__init__.py",
@@ -13724,14 +13739,19 @@
       "bytes": 21789
     },
     {
+      "path": "voice/wake_detector/aec_delay_tracker.py",
+      "sha256": "055fa00980efed02273504242ddaddc6eee6249ec0f07df70e9595299475e0f0",
+      "bytes": 8237
+    },
+    {
       "path": "voice/wake_detector/aec_processor.py",
-      "sha256": "e8657788107d2fc05fbfa566709cb39c34335339466b06ddc66d64d22fba04aa",
-      "bytes": 47035
+      "sha256": "e06f905a24005b7ffd3f21bcfe4b118c7a7d86ae243908dc0af862a425eae7a3",
+      "bytes": 47855
     },
     {
       "path": "voice/wake_detector/aec_viola.py",
-      "sha256": "68a2eacc1837787f7390de4bfebe971ad11c4440fcabc306b77e9c3da088f7b8",
-      "bytes": 31729
+      "sha256": "eb7a86583a69e9728861b7104f99397d711416c9deff54332fed802b9f914fab",
+      "bytes": 33413
     },
     {
       "path": "voice/wake_detector/bt_delay_capture.py",
@@ -13810,8 +13830,8 @@
     },
     {
       "path": "voice/wake_detector/facade.py",
-      "sha256": "cee624f1b4d438f17cfd1fee91069ed019652872e0ca3e6d78232381df45854d",
-      "bytes": 49658
+      "sha256": "65fe7a0ccf38cee3c35bdc05354d2e6c920d25276133a03d38dccba0c1415418",
+      "bytes": 49966
     },
     {
       "path": "voice/wake_detector/fp_collector.py",
@@ -13822,6 +13842,11 @@
       "path": "voice/wake_detector/noise_classifier.py",
       "sha256": "82ad62c7f589346f89db5ab5a2b3a3f766e75e816fe56262a20ef67c372a2b26",
       "bytes": 2272
+    },
+    {
+      "path": "voice/wake_detector/own_speech.py",
+      "sha256": "fabd94898ec94b1efbbfd8ca5b3025683562a5aa09ba0d1ee5db65dce107fb2d",
+      "bytes": 7282
     },
     {
       "path": "voice/wake_detector/resampler.py",
@@ -13855,8 +13880,8 @@
     },
     {
       "path": "voice/wake_detector/violawake_listener.py",
-      "sha256": "8f24853771ec34e714965e37ceefb84a781c473291a0c3aebb8184636ca6f94e",
-      "bytes": 183774
+      "sha256": "71563474dd6d00b8d033a3b00b2a3aa90228348035d7c4ed0689ab955e52cbe6",
+      "bytes": 189457
     },
     {
       "path": "voice/wake_detector/wake/__init__.py",
@@ -13870,13 +13895,13 @@
     },
     {
       "path": "voice/wake_detector/wake/context.py",
-      "sha256": "12001f7a6cae0831a8377f9ddc38f758b8e523125c8b9c6e509d0f32133a07fb",
-      "bytes": 2420
+      "sha256": "caa13538726687ea2831da1f817cac274f1eb646fddf6e59393d20a8c3681bd3",
+      "bytes": 2765
     },
     {
       "path": "voice/wake_detector/wake_decision_policy.py",
-      "sha256": "de924237cc01291268583253c3d056dc9287f6187aab1b520bb5f6174609f23d",
-      "bytes": 28844
+      "sha256": "a450946d5189efb1dd047a3e483a03cf08bb1bebb1fd0b01df48d008d098a0c6",
+      "bytes": 29189
     },
     {
       "path": "voice/wake_detector/wake_factory.py",
@@ -13890,8 +13915,8 @@
     },
     {
       "path": "voice/wake_detector/wake_verifier.py",
-      "sha256": "6c14d9b03d04984aa0b22244364ef5064bd81a67d1a15f2befb4f4458b76cea9",
-      "bytes": 32223
+      "sha256": "9cbbe5b8f2a3a8836f03d3b5ed4e1d6d4bca1f439292b2bb428b1c368931abfb",
+      "bytes": 33327
     }
   ]
 }
