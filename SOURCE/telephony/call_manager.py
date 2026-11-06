@@ -137,6 +137,7 @@ from telephony.remote_voice import maybe_remote_first_kokoro, remote_transcribe_
 from telephony.telnyx_dial_response import telnyx_dial_call_control_id  # noqa: E402 - customer privacy bootstrap precedes application imports
 from telephony.usage import company_phone_billing_available, get_phone_billing  # noqa: E402 - customer privacy bootstrap precedes application imports
 from telephony.user_settings_lookup import load_cloud_user_settings_blob  # noqa: E402 - customer privacy bootstrap precedes application imports
+from telephony.phone_stt_background import OffPathTranscriber  # noqa: E402 - customer privacy bootstrap precedes application imports
 from telephony.spoken_transcript_pacer import SpokenTranscriptPacer  # noqa: E402 - customer privacy bootstrap precedes application imports
 from telephony.voicemail_answer_watch import VoicemailAnswerWatch  # noqa: E402 - customer privacy bootstrap precedes application imports
 from telephony.voicemail_detection import PipecatVoicemailDetectionHandler  # noqa: E402 - customer privacy bootstrap precedes application imports
@@ -8101,6 +8102,11 @@ class CallManager:
                 # processor per call), while concurrent calls proceed in parallel
                 # under the process-wide _phone_stt_transcribe_semaphore() cap.
                 self._stt_call_lock = threading.Lock()
+                self._off_path = OffPathTranscriber(
+                    self._transcribe_clip,
+                    self._yield_transcription,
+                    self.push_frame,
+                )
                 base_kwargs = dict(kwargs)
                 if uses_multilingual:
                     base_kwargs["beam_size"] = beam_size
@@ -8198,13 +8204,20 @@ class CallManager:
                     yield ErrorFrame("Whisper model not available")
                     return
 
-                text = await self._transcribe_pcm_text(
+                # Returns at once: awaiting the decode here held all later audio
+                # back from VAD. The transcript is pushed when it is ready.
+                self._off_path.submit(audio)
+
+            async def _transcribe_clip(self, audio: bytes) -> str:
+                return await self._transcribe_pcm_text(
                     audio,
                     initial_prompt=self._initial_prompt,
                     collect_metrics=True,
                 )
-                async for frame in self._yield_transcription(text):
-                    yield frame
+
+            async def cleanup(self) -> None:
+                self._off_path.cancel()
+                await super().cleanup()
 
         return _SharedPhoneWhisperSTTService(
             settings=_SharedPhoneWhisperSTTService.Settings(

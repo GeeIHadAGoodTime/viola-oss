@@ -1305,6 +1305,25 @@ _PLAYBACK_SILENT_ACTIONS = frozenset({"next", "skip", "previous"})
 _DISCOVERY_TOOL_NAMES = frozenset({"ToolSearch", "tool_search"})
 
 
+def _phone_watch_lost_response(tool_name: str, tool_result: Any) -> str | None:
+    """The reply for a call whose status cannot be read, or None.
+
+    This ends the turn with no further model step, so the model never gets to act on
+    a poll error: it cannot hang up the call or report it as failed.
+    """
+    if tool_name != "phone" or tool_result is None:
+        return None
+    data = getattr(tool_result, "data", None)
+    if isinstance(data, str):
+        try:
+            data = _json.loads(data)
+        except ValueError:
+            return None
+    if not isinstance(data, dict) or data.get("status") != "status_unavailable" or not data.get("call_placed"):
+        return None
+    return "The call is still going as far as I can tell. I can't see its progress right now, so I'm leaving it alone. The Phone tab will show how it ends."
+
+
 def _playback_terminal_response(tool_name: str, tool_result: Any) -> tuple[str, bool] | None:
     """Return ``(text, silent)`` when a confirmed playback control can end the turn."""
     if tool_name != "playback" or tool_result is None or not getattr(tool_result, "ok", False):
@@ -4615,6 +4634,15 @@ async def run_agent_loop(
                             continue_listening=False,
                             params={"nested_gate_result": dict(_nested_gate)},
                         )
+                _phone_watch_lost = _phone_watch_lost_response(tc_name, tool_result)
+                if _phone_watch_lost is not None:
+                    _set_final_response(
+                        executor,
+                        _phone_watch_lost,
+                        continue_listening=False,
+                        params={"silent_reply": True, "terminal_tool": "phone"},
+                    )
+                    _media_terminal_fired = True
                 _terminal_tool_response = _terminal_response_from_tool_result(tc_name, tool_result)
                 if _terminal_tool_response is not None and len(all_tool_calls) == 1:
                     _set_final_response(executor, _terminal_tool_response, continue_listening=False)

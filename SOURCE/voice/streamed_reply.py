@@ -23,6 +23,7 @@ from collections.abc import AsyncIterator, Callable, Iterator
 from typing import Any
 
 from config import env as config_env
+from core.live_call_state import live_call_active
 from core.logging_config import get_logger
 from services.llm.answer_stream import FinalAnswerSpeechGate
 from services.llm.stream_bus import (
@@ -143,6 +144,9 @@ class StreamedReply:
 
     def _push(self, text: str) -> None:
         if self._closed or not text.strip():
+            return
+        if self.speaking_task is None and live_call_active():
+            # Nothing starts over a live call; the reply still reaches the screen.
             return
         self._queue.put_nowait(text.strip() + " ")
         if self.speaking_task is None:

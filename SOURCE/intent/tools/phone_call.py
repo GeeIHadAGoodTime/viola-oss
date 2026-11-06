@@ -25,6 +25,7 @@ from telephony.caller_validation import is_assistant_caller_name, validate_calle
 
 from config.defaults import DEFAULT_PHONE_MODEL
 from config.settings import settings
+from core.live_call_state import note_call_live, note_call_over
 from core.constants import TIMEOUT_VERY_LONG
 from core.logging_config import get_logger
 from core.product import plan_family_for_id
@@ -1119,6 +1120,9 @@ _CLOUD_POLL_OUTAGE_LIMIT = 120.0
 # The answer the poller gives when it stops watching a call whose real state it
 # does not know. Never a CallStatus: it must not read as an ending.
 _CLOUD_STATUS_UNAVAILABLE = "status_unavailable"
+# Calls whose latest status read failed. The model cannot end one of these until a
+# read succeeds, so a poll error can never become a hangup, whatever it concludes.
+_calls_with_unreadable_status: set[str] = set()
 
 # Terminal call statuses the cloud /api/phone/status endpoint can report. This
 # MUST cover every CallStatus the server treats as terminal
@@ -1280,6 +1284,7 @@ async def _cloud_poll_status(
                 resp.raise_for_status()
                 data = _unwrap_cloud_response_payload(resp.json())
             except (httpx.HTTPError, ValueError) as exc:
+                _calls_with_unreadable_status.add(call_id)
                 failures += 1
                 outage = time.monotonic() - last_read
                 detail = exc.response.status_code if isinstance(exc, httpx.HTTPStatusError) else type(exc).__name__
@@ -1295,10 +1300,12 @@ async def _cloud_poll_status(
                     break
                 await asyncio.sleep(_CLOUD_POLL_INTERVAL)
                 continue
+            _calls_with_unreadable_status.discard(call_id)
             failures = 0
             last_read = time.monotonic()
             status = data.get("status", "")
             if status in terminal:
+                note_call_over(call_id)
                 return data
             await asyncio.sleep(_CLOUD_POLL_INTERVAL)
 
@@ -1713,6 +1720,9 @@ async def _make_phone_call_cloud(
                 "message": "Call queued. It will dial automatically when the current call ends.",
             },
         )
+    # From here until the call ends the PC keeps quiet. Its voice reaches the line
+    # when the phone is in the same room (see core/live_call_state.py).
+    note_call_live(call_id)
     if not wait_for_completion:
         return ToolResult(
             ok=True,
@@ -1829,8 +1839,11 @@ async def check_call_status(call_id: str) -> ToolResult:
             # model receives a doubly-nested payload). Mirror the sibling
             # _cloud_poll_status / _cloud_get_transcript helpers.
             data = _unwrap_cloud_response_payload(resp.json())
+        _calls_with_unreadable_status.discard(call_id)
         if data.get("status") == "not_found":
             return ToolResult(ok=False, error="Call %s not found." % call_id)
+        if data.get("status") in _CLOUD_TERMINAL_STATUSES:
+            note_call_over(call_id)
         return ToolResult(ok=True, data=data)
     except httpx.HTTPStatusError as exc:
         if exc.response.status_code == 404:
@@ -1842,6 +1855,7 @@ async def check_call_status(call_id: str) -> ToolResult:
 
 def _call_status_unreadable_result(call_id: str, detail: str) -> ToolResult:
     """A status read that failed tells us about the read, not about the call."""
+    _calls_with_unreadable_status.add(call_id)
     return ToolResult(
         ok=False,
         error="Viola could not read this call's status (%s). That says nothing about the call itself." % detail,
@@ -1865,6 +1879,18 @@ async def end_phone_call(call_id: str) -> ToolResult:
         ended = await manager.end_call(call_id, user_id=user_id) if manager and user_id else False
         return ToolResult(
             ok=bool(ended), error=None if ended else "Call not found or already ended.", data={"call_id": call_id}
+        )
+    if call_id in _calls_with_unreadable_status:
+        logger.warning("Refusing to end call %s: its status could not be read", call_id)
+        return ToolResult(
+            ok=False,
+            error=(
+                "This call was not ended: its status could not be read, and a failed read says nothing about the "
+                "call. Check its status first. The user can end it from the Phone tab."
+            ),
+            error_category="call_status_unreadable",
+            retryable=True,
+            data={"call_id": call_id, "ended": False},
         )
     cloud_url = _resolve_cloud_url()
     if not cloud_url:

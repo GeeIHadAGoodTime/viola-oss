@@ -12,6 +12,7 @@ from __future__ import annotations
 import inspect
 from typing import Any, cast
 
+from core.live_call_state import live_call_active
 from core.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -72,6 +73,9 @@ class LazyTTSEngine:
         Returns:
             True if successful, False otherwise
         """
+        if live_call_active():
+            logger.info("Speech held back: a phone call is live")
+            return False
         if not self._ensure_loaded():
             return False
 
