@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "388f41d210b44a3045d3bbf3bbdf6432a8aa4dc5",
-  "sha256": "3b1416e05e46c7bdba0d2624e7b5618876d7534e96c297daaf279421f343b65b",
+  "revision": "9a1a0fcccb27a27656a9ff8c4d7c65d42799d4d6",
+  "sha256": "94047be2faa79579d8ffa29282ffbc1ad76385d6f74c4b306755f5d3ae049dc6",
   "files": [
     {
       "path": ".env.example",
@@ -1585,13 +1585,13 @@
     },
     {
       "path": "intent/agent_executor.py",
-      "sha256": "cc91eb86f9ea8e6710fe71299c5df44c63aa7a2daf19e4705d02198634467e27",
-      "bytes": 601438
+      "sha256": "7ba9f3f233b83d745f80c081f9cbdc538138eb276840144df7241564ce75d298",
+      "bytes": 601998
     },
     {
       "path": "intent/agent_loop.py",
-      "sha256": "be9218b8a470293fbdf3007063b039905c30de19ed77117155c50c97bdea466d",
-      "bytes": 267556
+      "sha256": "00235d2af8edba83a6485c387ca9aa8291c13d791403e47ebb20422a1e0b2615",
+      "bytes": 267603
     },
     {
       "path": "intent/agent_message_manager.py",
@@ -1965,8 +1965,8 @@
     },
     {
       "path": "intent/task_checkpoint.py",
-      "sha256": "b3fdc76548e11e3e2ddc8ed7e9dd2e985e981e525b1bfae1b44ffaa6e88c2835",
-      "bytes": 20064
+      "sha256": "238d0bfecf5797369539f9d664775514e517215fe1b02a9096455db7d17c2e51",
+      "bytes": 20114
     },
     {
       "path": "intent/task_trace.py",
@@ -4705,8 +4705,8 @@
     },
     {
       "path": "services/llm/providers/openai_compatible.py",
-      "sha256": "a17bba1e3e613b449e277135c1b704a0e7ab209f16a36dce62068ff68aa0d664",
-      "bytes": 189765
+      "sha256": "9de1224ded76fe0fbd22c8403745b7b864fd4551e31edc357d1d948dc369d4f0",
+      "bytes": 191532
     },
     {
       "path": "services/llm/quota_repository.py",
