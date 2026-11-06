@@ -569,7 +569,7 @@ def create_app(state: Any, music: Any, intent: Any) -> FastAPI:
 
     # ========== LAN ACCESS FOR ROOMS (PHONE PAIRING) ==========
     # The API binds loopback; phones reach the hub through an extra LAN
-    # listener the user turns on by opening Rooms > Add Room
+    # listener the user turns on with Start in Rooms > Add Room
     # (utils/speaker_pairing_flow.py). The supervisor reopens a remembered
     # listener after a restart, follows LAN address changes, and applies the
     # Settings toggle. It opens nothing while ``lan_access_enabled`` is off, so
