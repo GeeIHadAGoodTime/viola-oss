@@ -2074,17 +2074,19 @@ def _redacted_static_step_field(key: str, value: Any) -> Any:
 
 
 def _redact_step_data(step_data: dict[str, Any]) -> Any:
-    """``redact_card_data(step_data)``, reusing the redaction of unchanged tool-schema fields."""
+    """Card and personal data out of a step line, reusing the redaction of unchanged tool-schema fields."""
     static_keys = [key for key in _STEP_LOG_STATIC_FIELDS if isinstance(step_data.get(key), (dict, list))]
     if not static_keys:
-        return redact_card_data(step_data)
+        return redact_pii(redact_card_data(step_data))
     try:
         redacted_static = {key: _redacted_static_step_field(key, step_data[key]) for key in static_keys}
-        rest = redact_card_data({key: value for key, value in step_data.items() if key not in redacted_static})
+        rest = redact_pii(
+            redact_card_data({key: value for key, value in step_data.items() if key not in redacted_static})
+        )
     except Exception:  # noqa: BLE001, RUF100 - any surprise falls back to the plain whole-mapping redaction
-        return redact_card_data(step_data)
+        return redact_pii(redact_card_data(step_data))
     if not isinstance(rest, dict):
-        return redact_card_data(step_data)
+        return redact_pii(redact_card_data(step_data))
     return {key: redacted_static[key] if key in redacted_static else rest[key] for key in step_data}
 
 
@@ -5648,7 +5650,7 @@ class AgentExecutor:
         except Exception:
             logger.debug("Task trace stop event write failed, continuing", exc_info=True)
         try:
-            line = json.dumps(redact_card_data(stop_data), default=str) + "\n"
+            line = json.dumps(redact_pii(redact_card_data(stop_data)), default=str) + "\n"
             step_log_path = self._get_structured_step_log_path()
             # Same ordered writer as the step and task_complete lines.
             _run_task_log_io(lambda: _write_structured_log_line(step_log_path, line))
@@ -5940,7 +5942,7 @@ class AgentExecutor:
                 "llm_total_input_tokens_seen": getattr(self, "_llm_total_input_tokens_seen", 0),
                 "responses_continuity_mode": getattr(self, "_last_continuity_mode", None),
             }
-            line = json.dumps(complete_data, default=str) + "\n"
+            line = json.dumps(redact_pii(redact_card_data(complete_data)), default=str) + "\n"
             step_log_path = self._get_structured_step_log_path()
             _run_task_log_io(lambda: _append_structured_log_line(jsonl_dir, step_log_path, line))
         except Exception:
