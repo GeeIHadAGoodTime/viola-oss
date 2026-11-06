@@ -5718,7 +5718,7 @@ class AgentExecutor:
             total_duration,
             outcome,
         )
-        self._retire_unanswered_confirmations()
+        self._retire_unanswered_confirmations(start_time)
 
         if not self._agent_chain_metrics_recorded:
             self._agent_chain_metrics_recorded = True
@@ -8550,13 +8550,13 @@ class AgentExecutor:
         except Exception as exc:
             logger.debug("Consult-user WS broadcast failed for %s: %s", tool_name, exc)
 
-    def _retire_unanswered_confirmations(self) -> None:
+    def _retire_unanswered_confirmations(self, turn_started_at: float) -> None:
         """A question this turn did not answer ends with this turn (see ApprovalManager)."""
         retire = getattr(getattr(self, "_approval", None), "retire_unanswered_confirmations", None)
         if not callable(retire) or getattr(self, "_current_agent_id", None):
             return  # helpers share the store and must not end their parent's question
         try:
-            dropped = retire(getattr(self, "task_id", None))
+            dropped = retire(turn_started_at)
         except Exception:  # noqa: BLE001, RUF100 - a stale grant then expires on its own timer
             logger.debug("Retiring unanswered confirmations failed", exc_info=True)
             return
