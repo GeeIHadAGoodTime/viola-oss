@@ -34,6 +34,9 @@ if TYPE_CHECKING:
     from telephony.call_manager import CallRecord
 
 
+# A person may be waiting on this answer, so it is bounded. Warm it takes under a second.
+_LATE_GREETING_CLASSIFY_SECS = 4.0
+
 AMD_MACHINE_RESULTS = {"machine"}
 AMD_GREETING_READY_RESULTS = {"beep_detected", "ended", "no_beep_detected", "not_sure"}
 AMD_HUMAN_RESULTS = {"human", "human_business", "human_residence"}
@@ -320,7 +323,14 @@ class PipecatVoicemailDetectionHandler:
         if not greeting or self._record.voicemail_detected or self._record.voicemail_prompt_ready:
             return ""
         self._classification_decided = False
-        return await self.classify_opening(greeting)
+        try:
+            return await asyncio.wait_for(self.classify_opening(greeting), timeout=_LATE_GREETING_CLASSIFY_SECS)
+        finally:
+            # The gate holds Viola's turns until a decision lands, so no failure of
+            # this check may leave it undecided: that would mute her for the call.
+            if not self._classification_decided:
+                logger.warning("Call %s: late greeting check gave no answer; staying on the call", self._record.call_id)
+                await self._apply_decision("CONVERSATION")
 
     async def _apply_decision(self, classification: str) -> None:
         """Apply a terminal human/voicemail decision exactly once."""

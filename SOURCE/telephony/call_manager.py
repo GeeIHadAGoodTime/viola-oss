@@ -3950,8 +3950,11 @@ async def _classify_greeting_that_arrives_late(record: CallRecord, answer_settle
         greeting = await answer_settle_observer.wait_for_first_transcription(_LATE_GREETING_WAIT_SECS)
         if greeting and await voicemail_handler.reclassify_late_greeting(greeting) == "VOICEMAIL":
             logger.info("Call %s: late greeting was a recording; switching to one voicemail message", record.call_id)
-    except (AttributeError, RuntimeError, TypeError, ValueError):
-        logger.debug("Call %s: late greeting check failed", record.call_id, exc_info=True)
+    except asyncio.CancelledError:
+        raise
+    # A failed check must never disturb the call; the handler has already released it.
+    except Exception:  # noqa: BLE001, RUF100
+        logger.warning("Call %s: late greeting check failed", record.call_id, exc_info=True)
 
 
 def _phone_function_result_properties(*, run_llm: bool = True) -> Any:
