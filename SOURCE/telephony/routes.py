@@ -768,7 +768,8 @@ async def _proxy_account_sms(action: str, user: User | None, body: dict | None) 
                 json=body if method == "POST" else None,
                 headers={"Authorization": "Bearer %s" % bearer},
             )
-    except httpx.HTTPError as exc:
+        payload = resp.json()
+    except (httpx.HTTPError, ValueError) as exc:
         logger.warning("Account SMS proxy %s failed: %s", action, type(exc).__name__)
         return JSONResponse(
             {
@@ -777,21 +778,8 @@ async def _proxy_account_sms(action: str, user: User | None, body: dict | None) 
             },
             status_code=502,
         )
-    try:
-        payload = resp.json()
-    except ValueError:
-        payload = None
     if not isinstance(payload, dict):
-        # The account service answered, so the user's connection is fine and
-        # must not be blamed. A gateway error page lands here.
-        logger.warning("Account SMS proxy %s got an unreadable answer (status=%s)", action, resp.status_code)
-        return JSONResponse(
-            {
-                "error": "Viola's account service had a problem with that. Try again in a few minutes.",
-                "error_code": "cloud_bad_response",
-            },
-            status_code=502,
-        )
+        return JSONResponse({"error": "Unexpected response.", "error_code": "cloud_bad_response"}, status_code=502)
     return JSONResponse(payload, status_code=resp.status_code)
 
 
