@@ -59,6 +59,8 @@ def browser_audio_peak(root_pid: int | None) -> dict[str, Any]:
 
 def _first_failure(report: dict[str, Any]) -> str:
     """The first link in the chain that isn't working."""
+    if report.get("page_auth_state") == "session_rejected":
+        return "spotify_refused_sign_in"
     if not report.get("in_app_sign_in") and not report.get("player_sign_in_cookie"):
         return "no_sign_in"
     if not report.get("browser_running"):
