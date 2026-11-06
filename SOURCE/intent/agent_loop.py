@@ -1284,6 +1284,11 @@ _MEMORY_ID_RE = re.compile(r"\bid=(\d+)\b")
 _PLAYBACK_TERMINAL_ACTIONS = frozenset(
     {
         "dislike_skip",
+        "shuffle_on",
+        "shuffle_off",
+        "repeat_off",
+        "repeat_all",
+        "repeat_one",
         "next",
         "skip",
         "previous",

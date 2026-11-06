@@ -5157,7 +5157,8 @@ async def pair_speaker_setup(
         "Control current music playback, music player volume, and queue state. Actions: stop, pause, resume, skip, next, previous, seek_to "
         "(absolute seconds), seek_relative (delta seconds; negative rewinds), seek_from_end (seconds before the end of the track, "
         "for 'skip to 10 seconds before the end'; the tool reads the track length itself), "
-        "restart, clear_queue, volume_set, volume_up, volume_down, mute, and unmute. Useful for operations on whatever is already playing. "
+        "restart, clear_queue, volume_set, volume_up, volume_down, mute, unmute, shuffle_on, shuffle_off, repeat_off, repeat_all (the queue) "
+        "and repeat_one (this track). Useful for operations on whatever is already playing. "
         "For requests like 'skip', 'next song', 'skip this song', or 'advance to the next track', "
         "call playback directly; do not call view_queue first to decide whether transport control is allowed. "
         "Every plain volume request (set the volume to 30, volume 50, turn it down, louder, quieter, volume up/down) "
@@ -5177,7 +5178,8 @@ async def playback(
         Field(
             description=(
                 "Playback action. Use one of: 'stop', 'pause', 'resume', 'skip', 'next', 'previous', "
-                "'seek_to', 'seek_relative', 'seek_from_end', 'restart', 'clear_queue', 'volume_set', 'volume_up', "
+                "'seek_to', 'seek_relative', 'seek_from_end', 'restart', 'clear_queue', 'shuffle_on', 'shuffle_off', "
+                "'repeat_off', 'repeat_all', 'repeat_one', 'volume_set', 'volume_up', "
                 "'volume_down', 'mute', or 'unmute'. "
                 "Use 'skip' or 'next' for next-song requests. The alias 'seek' is accepted as 'seek_to'."
             )

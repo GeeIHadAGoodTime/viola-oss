@@ -1234,6 +1234,7 @@ async def play_music_handler(query: str, provider: str = "", target_room: str = 
 # "volume up" is a nudge. A step of 100 (the 1.0.5 laptop saw "volume up" land
 # on 100) is an absolute level passed in the wrong field, and playing at full
 # volume is the worst way to find that out. An exact level uses volume_set.
+_REPEAT_ACTIONS = {"repeat_off": "off", "repeat_all": "all", "repeat_one": "one"}
 _DEFAULT_VOLUME_STEP = 10
 _MAX_VOLUME_STEP = 30
 
@@ -1499,6 +1500,22 @@ async def playback_control_handler(
             if not data.get("ok"):
                 return ToolResult(ok=False, data=data, error=_response_error(data))
             return await _seek_result("seek_to", target_seconds, data)
+
+        if action_name in {"shuffle_on", "shuffle_off"}:
+            enabled = action_name == "shuffle_on"
+            data = await _post_runtime("/v1/shuffle", {"enabled": enabled}, timeout=10.0)
+            if not data.get("ok"):
+                return ToolResult(ok=False, data=data, error=_response_error(data))
+            message = "Shuffle is on." if enabled else "Shuffle is off."
+            return ToolResult(ok=True, data={"action": action_name, "message": message, "verified": True})
+
+        if action_name in _REPEAT_ACTIONS:
+            mode = _REPEAT_ACTIONS[action_name]
+            data = await _post_runtime("/v1/repeat", {"mode": mode}, timeout=10.0)
+            if not data.get("ok"):
+                return ToolResult(ok=False, data=data, error=_response_error(data))
+            message = {"off": "Repeat is off.", "all": "Repeating the queue.", "one": "Repeating this track."}[mode]
+            return ToolResult(ok=True, data={"action": action_name, "message": message, "verified": True})
 
         if action_name == "seek_from_end":
             if seek_from_end_seconds is None:
