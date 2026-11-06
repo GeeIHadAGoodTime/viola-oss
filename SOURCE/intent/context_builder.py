@@ -868,7 +868,7 @@ class ContextBuilder:
             window = get_window()
         except Exception as exc:
             logger.debug("Conversation window lookup failed (non-fatal): %s", exc)
-            return [], 0
+            return self._stored_conversation_frames(limit=20), 0
         return [frame for frame in window.frames if isinstance(frame, Frame)], int(window.omitted_exchanges)
 
     @staticmethod
