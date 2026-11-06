@@ -1706,6 +1706,7 @@ def _reconcile_claimed_order(
     order_summary: dict[str, Any],
     claimed_items: Any,
     claimed_total: str,
+    claimed_text: str = "",
 ) -> None:
     """Compare what the model claimed with what the store's page shows.
 
@@ -1724,10 +1725,10 @@ def _reconcile_claimed_order(
                 warnings.append(
                     "Viola thought this order had %s, but the store's page does not show it." % _order_item_name(item)
                 )
-        if claimed:
-            for item in page_items:
-                if not _order_item_seen_in(item, claimed):
-                    warnings.append("The store's page shows %s, which Viola did not mention." % _order_item_name(item))
+        said = claimed or ([claimed_text] if claimed_text.strip() else [])
+        for item in page_items if said else []:
+            if not _order_item_seen_in(item, said):
+                warnings.append("The store's page shows %s, which Viola did not mention." % _order_item_name(item))
     else:
         if claimed:
             order_summary["items"] = claimed
@@ -1792,8 +1793,13 @@ _APPROVAL_TEXT_REASONS = {
 }
 
 
-def _payment_approval_ways_line(delivery: dict[str, Any] | None) -> str:
-    """Say both ways to approve, every time: on this device, and by a texted link."""
+def _payment_approval_ways_line(delivery: dict[str, Any] | None, link_note: str | None = None) -> str:
+    """Say both ways to approve, every time: on this device, and by a texted link.
+
+    ``link_note`` already says why there is no link for the phone, so it is not repeated.
+    """
+    if link_note:
+        return "You can approve here with Review and pay."
     sms = delivery.get("sms_default") if isinstance(delivery, dict) else None
     if isinstance(sms, dict) and (sms.get("sent") or sms.get("already_sent")):
         return "You can approve here with Review and pay, or from the link I just texted to your phone."
@@ -12246,8 +12252,8 @@ class AgentExecutor:
                         'aside',
                     ]);
 
-                    const moneyRe = /[$\u20ac\u00a3]\s?\d[\d,]*(?:\.\d{2})?/g;
-                    const notAnItem = /^(sub-?total|total|order total|estimated total|tax|taxes|estimated tax|shipping|delivery|fees?|discount|savings|tip|promo)\b/i;
+                    const moneyRe = /[$\\u20ac\\u00a3]\\s?\\d[\\d,]*(?:\\.\\d{2})?/g;
+                    const notAnItem = /^(sub-?total|total|order total|estimated total|tax|taxes|estimated tax|shipping|delivery|fees?|discount|savings|tip|promo)\\b/i;
                     const moneyIn = (text) => (text.match(moneyRe) || []);
                     const shown = (el) => el.offsetParent !== null || getComputedStyle(el).position === 'fixed';
                     const named = Array.from(document.querySelectorAll([
@@ -12289,9 +12295,9 @@ class AgentExecutor:
                         if (items.length >= 20) continue;
                         const prices = moneyIn(text);
                         const field = el.querySelector('select, input[type="number"], input[name*="qty" i], input[name*="quantity" i]');
-                        const counted = text.match(/\b(?:qty|quantity)\b\W*(\d+)/i) || text.match(/(?:^|\s)[x\u00d7]\s?(\d+)\b/i) || text.match(/\b(\d+)\s?[x\u00d7](?:\s|$)/i);
+                        const counted = text.match(/\\b(?:qty|quantity)\\b\\W*(\\d+)/i) || text.match(/(?:^|\\s)[x\\u00d7]\\s?(\\d+)\\b/i) || text.match(/\\b(\\d+)\\s?[x\\u00d7](?:\\s|$)/i);
                         const quantity = field && Number(field.value) > 0 ? Number(field.value) : (counted ? Number(counted[1]) : null);
-                        const name = norm(text.replace(moneyRe, ' ').replace(/\b(?:qty|quantity)\b\W*\d+/ig, ' '));
+                        const name = norm(text.replace(moneyRe, ' ').replace(/\\b(?:qty|quantity)\\b\\W*\\d+/ig, ' '));
                         items.push({
                             name: name || text,
                             description: text,
@@ -12399,10 +12405,11 @@ class AgentExecutor:
         # card shows what the store's own page says, and says so when they differ.
         claimed_items = order_summary.pop("items", None)
         claimed_total = str(order_summary.get("total") or "").strip()
+        claimed_text = str(order_summary.get("description") or "")
         await self._extract_dom_order_details(page, order_summary)
         await self._extract_dom_total(page, order_summary)
         self._apply_context_delivery_address_to_summary(order_summary)
-        _reconcile_claimed_order(order_summary, claimed_items, claimed_total)
+        _reconcile_claimed_order(order_summary, claimed_items, claimed_total, claimed_text)
         requested = str(getattr(self, "_agent_task_description", "") or "").strip()
         if requested:
             order_summary["requested"] = requested
@@ -13254,6 +13261,21 @@ class AgentExecutor:
         if callable(stop):
             await stop()
 
+    def _visible_browser_page(self, preferred_url: str = "") -> Any:
+        """The page in the desktop's visible agent browser, when it is on the checkout."""
+        try:
+            from mcp_servers.browser_cdp.server import manager as visible_browser
+
+            if not visible_browser.is_connected:
+                return None
+            page = visible_browser.page
+        except (AttributeError, ImportError, RuntimeError):
+            logger.debug("Visible agent browser is not available for the checkout page")
+            return None
+        if preferred_url and not self._same_merchant_resume_page(self._page_url(page), preferred_url):
+            return None
+        return page
+
     async def _get_active_browser_page_from_cdp(self, preferred_url: str = "") -> Any:
         """Attach to the existing CDP-launched checkout browser and return its live page."""
         bridge = getattr(self, "_payment_cdp_bridge", None)
@@ -13263,6 +13285,14 @@ class AgentExecutor:
                 not preferred_url or self._same_merchant_resume_page(self._page_url(page), preferred_url)
             ):
                 return page
+
+        # On the desktop the checkout is in the visible browser the agent already
+        # drives. A second Playwright cannot start on the app's event loop and could
+        # not attach to Qt WebEngine anyway, so this method used to return None there
+        # and the approval card never saw the page: no items, no store total.
+        visible_page = self._visible_browser_page(preferred_url)
+        if visible_page is not None:
+            return visible_page
 
         try:
             from config.settings import settings

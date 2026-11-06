@@ -5322,7 +5322,10 @@ async def run_agent_loop(
                         payment_confirmation_ctx,
                         str(payment_confirmation_ctx.get("url") or ""),
                     )
-                    final_answer = "%s\n%s" % (final_answer, _payment_approval_ways_line(delivery))
+                    final_answer = "%s\n%s" % (
+                        final_answer,
+                        _payment_approval_ways_line(delivery, payment_confirmation_ctx.get("link_note")),
+                    )
                     final_answer = _payment_gate_answer_with_confirm_url(
                         final_answer,
                         str(payment_confirmation_ctx.get("url") or ""),
