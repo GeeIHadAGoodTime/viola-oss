@@ -102,7 +102,8 @@ def _reconcile_phase_with_iframe_locked(player: Any, payload: dict[str, Any]) ->
     if reported_video_id and current_video_id and reported_video_id != current_video_id:
         player._iframe_phase_disagreements = 0
         return False
-    if _YT_PHASE_MAP.get(yt_state) == phase:
+    # While a track loads the iframe may still say PAUSED; only PLAYING settles it.
+    if _YT_PHASE_MAP.get(yt_state) == phase or (phase == PlaybackPhase.LOADING and yt_state == "PAUSED"):
         player._iframe_phase_disagreements = 0
         return False
     player._iframe_phase_disagreements = getattr(player, "_iframe_phase_disagreements", 0) + 1

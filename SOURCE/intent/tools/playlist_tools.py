@@ -169,9 +169,10 @@ async def end_deleted_playlist_playback(name: str) -> bool:
     longer existed (1.0.5 laptop T2). A delete of any other playlist leaves the
     music alone.
     """
+    from core.user_context import _is_cloud_surface
     from music.playback_session import get_playback_session_controller
 
-    if not get_playback_session_controller().end_playlist_session(name):
+    if _is_cloud_surface() or not get_playback_session_controller().end_playlist_session(name):
         return False
     for path in ("/v1/stop", "/v1/queue/clear"):
         response = await _post_runtime(path, {})

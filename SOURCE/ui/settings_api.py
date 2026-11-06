@@ -1725,7 +1725,7 @@ def create_settings_router(*, music_service: object | None = None) -> APIRouter:
                 # form says so instead of green text and a failure later. This
                 # also fills the track cache, so the first play starts sooner.
                 tracks = await playlist_mgr.get_playlist_videos(
-                    name, limit=1, shuffle=False, progressive=False, force_refresh=True, user_id=user_id
+                    name, limit=500, shuffle=False, progressive=False, force_refresh=True, user_id=user_id
                 )
                 if not tracks:
                     playlist_mgr.remove_playlist(name, user_id=user_id)
