@@ -727,15 +727,20 @@ function ContentCardInner({ data, onDismiss }) {
         }}
       >
         {/* Header with gold accent line */}
-        <div style={{
-          padding: '24px 32px 16px 32px',
-          display: 'flex',
-          alignItems: 'flex-start',
-          justifyContent: 'space-between',
-          gap: '12px',
-          flexShrink: 0,
-          borderBottom: `1px solid ${THEME.colors.borderSubtle}`,
-        }}>
+        <div
+          data-testid="content-card-header"
+          style={{
+            padding: data.title || data.subtitle ? '24px 32px 16px 32px' : '12px 16px 0 32px',
+            display: 'flex',
+            alignItems: 'flex-start',
+            justifyContent: 'space-between',
+            gap: '12px',
+            flexShrink: 0,
+            // An untitled card has only the close button up here: a ruled-off
+            // header with nothing in it read as a page that failed to load.
+            ...(data.title || data.subtitle ? { borderBottom: `1px solid ${THEME.colors.borderSubtle}` } : null),
+          }}
+        >
           <div style={{ flex: 1, minWidth: 0 }}>
             {data.title && (
               <div style={{

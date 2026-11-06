@@ -295,6 +295,16 @@ function getActiveStagePillMode(displayMode) {
   return 'music';
 }
 
+// The pill that is lit must match what is on the stage. An agent task with no
+// page yet keeps displayMode 'agentic_task' while the stage shows music, and the
+// globe pill stayed lit over the player (1.0.5 build 9).
+export function visibleStagePillMode(displayMode, stageContentMode) {
+  const pillMode = getActiveStagePillMode(displayMode);
+  return (pillMode === 'agent' || pillMode === 'browser') && stageContentMode !== 'browser'
+    ? stageContentMode
+    : pillMode;
+}
+
 // Decides which stage CONTENT actually renders, given the current display mode plus
 // live signals. Two rules the raw displayMode map can't express:
 //   1. A live phone call does NOT auto-steal the stage (founder direction
@@ -649,6 +659,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
   // calendar
   // =========================================================================
   const [displayMode, setDisplayMode] = useState('now_playing');
+  const stageContentModeRef = useRef('music');
   const [browserModeActive, setBrowserModeActive] = useState(false);
   const [browserUrl, setBrowserUrl] = useState('');
   const [calendarModeActive, setCalendarModeActive] = useState(false);
@@ -938,7 +949,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
     setDisplayMode('now_playing');
   }, [agentTaskActive]);
   const handleStageModeSelect = useCallback((nextMode) => {
-    const activeStageMode = getActiveStagePillMode(displayMode);
+    const activeStageMode = visibleStagePillMode(displayMode, stageContentModeRef.current);
     const targetMode = activeStageMode === nextMode || (nextMode === 'agent' && (activeStageMode === 'agent' || activeStageMode === 'browser'))
       ? 'music'
       : nextMode;
@@ -3273,13 +3284,14 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
 
   const formatTime = (date) => formatTimeDisplay(date, userSettings.time_display_format || 'auto');
   const formatDate = (date) => date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
-  const activeStagePillMode = getActiveStagePillMode(displayMode);
   const stageContentMode = resolveStageContentMode(displayMode, {
     activeCallId,
     browserModeActive,
     agentFrameSrc,
     browserUrl,
   });
+  stageContentModeRef.current = stageContentMode;
+  const activeStagePillMode = visibleStagePillMode(displayMode, stageContentMode);
   const isChatStageActive = stageContentMode === 'chat';
 
   // Native browser view (desktop): it may only sit on the browser stage with

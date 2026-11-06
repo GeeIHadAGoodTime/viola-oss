@@ -7,6 +7,8 @@
   align-items: center;
   padding-top: clamp(20px, 3vh, 36px);
   min-width: 0;
+  /* Room for the background-agent cards, which float above this row. */
+  margin-bottom: var(--agent-drawer-space, 0px);
 }
 
 /* AI Response area */

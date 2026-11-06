@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { resolveStageContentMode } from './SmartDisplay';
+import { resolveStageContentMode, visibleStagePillMode } from './SmartDisplay';
 
 // Oracle for the stage-routing rule (2026-06-29, reversed from 2026-06-24):
 //  - a live phone call does NOT auto-open / auto-steal the phone stage (founder
@@ -8,6 +8,27 @@ import { resolveStageContentMode } from './SmartDisplay';
 //    so a concurrent agentic-task/browser signal can't flip it mid-call,
 //  - the browser webview shows ONLY for genuine web browsing, never an empty
 //    about:blank panel for non-browsing agent tasks.
+describe('visibleStagePillMode', () => {
+  it('does not light the globe over the music stage', () => {
+    // 1.0.5 build 9: an agent task with no page keeps this display mode while
+    // the stage shows music.
+    const content = resolveStageContentMode('agentic_task', {});
+    expect(content).toBe('music');
+    expect(visibleStagePillMode('agentic_task', content)).toBe('music');
+  });
+
+  it('lights the globe while a page is on the stage', () => {
+    expect(visibleStagePillMode('agentic_task', 'browser')).toBe('agent');
+    expect(visibleStagePillMode('browser', 'browser')).toBe('browser');
+  });
+
+  it('leaves the other pills alone', () => {
+    expect(visibleStagePillMode('chat', 'chat')).toBe('chat');
+    expect(visibleStagePillMode('phone_tab', 'phone')).toBe('phone');
+    expect(visibleStagePillMode('now_playing', 'music')).toBe('music');
+  });
+});
+
 describe('resolveStageContentMode', () => {
   it('does NOT steal the stage for a live call when the user is elsewhere', () => {
     // Founder direction 2026-06-29: a live call must NOT pull the stage to phone.
