@@ -38,32 +38,6 @@ if TYPE_CHECKING:
     from telephony.hold_handler import HoldModeHandler
 
 
-def publish_transcript_delta(call_id: str, *, role: str, text: str, partial: bool) -> None:
-    """Put one live transcript update on the event bus for the phone panel."""
-    try:
-        bus = get_event_bus()
-        if bus:
-            # PHONE_TRANSCRIPT_L1_PUBLISH: link 1 of the live-transcript chain.
-            # Finals at INFO; partials at DEBUG (word-stream). If this fires but
-            # PHONE_TRANSCRIPT_L2_BRIDGE never does, the bus subscriber isn't
-            # receiving (bus-instance / subscription break upstream of link 2).
-            if partial:
-                logger.debug("PHONE_TRANSCRIPT_L1_PUBLISH call=%s role=%s partial=True", call_id, role)
-            else:
-                logger.info("PHONE_TRANSCRIPT_L1_PUBLISH call=%s role=%s partial=False", call_id, role)
-            bus.publish(
-                CallTranscriptDelta(
-                    call_id=call_id,
-                    role=role,
-                    text=text,
-                    partial=partial,
-                    ts=datetime.now(tz=UTC).isoformat(),
-                )
-            )
-    except Exception as exc:
-        logger.debug("Failed to publish call transcript delta: %s", exc)
-
-
 class TranscriptFrameCollector(FrameProcessor if PIPECAT_AVAILABLE else object):  # type: ignore[misc] # PHONE-02: Pipecat fallback base.
     """Taps Pipecat text frames and appends live turns to a transcript."""
 
@@ -288,7 +262,28 @@ class TranscriptFrameCollector(FrameProcessor if PIPECAT_AVAILABLE else object):
             self._publish_delta(role="viola", text=frame.text, partial=False)
 
     def _publish_delta(self, *, role: str, text: str, partial: bool) -> None:
-        publish_transcript_delta(self._call_id or "", role=role, text=text, partial=partial)
+        try:
+            bus = get_event_bus()
+            if bus:
+                # PHONE_TRANSCRIPT_L1_PUBLISH: link 1 of the live-transcript chain.
+                # Finals at INFO; partials at DEBUG (word-stream). If this fires but
+                # PHONE_TRANSCRIPT_L2_BRIDGE never does, the bus subscriber isn't
+                # receiving (bus-instance / subscription break upstream of link 2).
+                if partial:
+                    logger.debug("PHONE_TRANSCRIPT_L1_PUBLISH call=%s role=%s partial=True", self._call_id or "", role)
+                else:
+                    logger.info("PHONE_TRANSCRIPT_L1_PUBLISH call=%s role=%s partial=False", self._call_id or "", role)
+                bus.publish(
+                    CallTranscriptDelta(
+                        call_id=self._call_id or "",
+                        role=role,
+                        text=text,
+                        partial=partial,
+                        ts=datetime.now(tz=UTC).isoformat(),
+                    )
+                )
+        except Exception as exc:
+            logger.debug("Failed to publish call transcript delta: %s", exc)
 
     @staticmethod
     def _is_final_transcription(frame) -> bool:

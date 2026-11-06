@@ -4153,6 +4153,14 @@ class TranscriptCollector:
         return "\n".join(lines)
 
 
+def _speech_pacer_for_call(transcript_collector: TranscriptCollector, publisher: Any) -> SpokenTranscriptPacer:
+    """Pace Viola's live lines through *publisher*, a transcript frame collector."""
+    return SpokenTranscriptPacer(
+        publisher._publish_delta,
+        trim_spoken=transcript_collector.trim_interrupted_assistant,
+    )
+
+
 # ---------------------------------------------------------------------------
 # Call Manager
 # ---------------------------------------------------------------------------
@@ -6727,10 +6735,7 @@ class CallManager:
                     hangup_after_output_drain=True,
                 )
 
-            speech_pacer = SpokenTranscriptPacer(
-                partial(publish_transcript_delta, record.call_id),
-                trim_spoken=transcript_collector.trim_interrupted_assistant,
-            )
+            speech_pacer = _speech_pacer_for_call(transcript_collector, user_transcript_collector)
             assistant_transcript_collector = TranscriptFrameCollector(
                 transcript_collector,
                 capture_user=False,
