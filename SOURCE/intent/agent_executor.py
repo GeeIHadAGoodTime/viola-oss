@@ -1763,9 +1763,7 @@ def _payment_gate_answer_from_order(answer: str | None, order_summary: dict[str,
                 continue
             quantity = item.get("quantity") if isinstance(item, dict) else None
             price = str(item.get("price") or "").strip() if isinstance(item, dict) else ""
-            rows.append(
-                "- %s%s%s" % ("%s x " % quantity if quantity else "", name, " (%s)" % price if price else "")
-            )
+            rows.append("- %s%s%s" % ("%s x " % quantity if quantity else "", name, " (%s)" % price if price else ""))
         hidden = order_summary.get("items_not_listed")
         if hidden:
             rows.append("- and %s more on the store's page" % hidden)
@@ -1801,7 +1799,9 @@ def _payment_approval_ways_line(delivery: dict[str, Any] | None) -> str:
         return "You can approve here with Review and pay, or from the link I just texted to your phone."
     reason = ""
     if isinstance(sms, dict):
-        reason = str(sms.get("user_message") or _APPROVAL_TEXT_REASONS.get(str(sms.get("reason") or sms.get("status"))) or "")
+        reason = str(
+            sms.get("user_message") or _APPROVAL_TEXT_REASONS.get(str(sms.get("reason") or sms.get("status"))) or ""
+        )
     elif isinstance(delivery, dict):
         reason = _APPROVAL_TEXT_REASONS.get(str(delivery.get("reason")), "")
     reason = reason.rstrip(".") or "texting is not available right now"
