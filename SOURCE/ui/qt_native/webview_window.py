@@ -3121,6 +3121,7 @@ class ViolaWebViewWindow(QMainWindow):
         # carries a currently-valid (<30s TTL) token; api_key/base/cloud are
         # constant, so a signed-in reload always finds them present regardless.
         self.webview.loadFinished.connect(self._refresh_credentials_after_load)
+        self.webview.loadFinished.connect(self._reconnect_bridge_after_reload)
         self.webview.setStyleSheet("background-color: #000000;")
         self.webview.setHtml(_LOADING_HTML)  # breathing icon while backend starts
         self._content_stack.addWidget(self.webview)
@@ -4064,6 +4065,16 @@ class ViolaWebViewWindow(QMainWindow):
         self._bootstrap = bootstrap
         self._load_react_ui()
 
+    def _reconnect_bridge_after_reload(self, ok: bool) -> None:
+        """A reload (render-crash recovery, the surface watchdog) needs the bridge too.
+
+        Only the tracked first navigation installed it, so after any reload
+        ``window.viola`` stayed a placeholder and every native action, Quit from
+        Viola's menu included, silently did nothing. Found live, 1.0.5 build 10.
+        """
+        if ok and self._react_ui_loaded and self._react_ui_load_url is None:
+            self._on_load_finished(ok=True)
+
     def _on_page_loading_changed(self, loading_info) -> None:
         """Route only the tracked React navigation into its completion handler."""
         expected_url = self._react_ui_load_url
@@ -4264,6 +4275,8 @@ class ViolaWebViewWindow(QMainWindow):
             js = """
                 // Load QWebChannel bridge for system browser OAuth
                 (function() {
+                    if (window.__violaBridgeInstalling || (window.viola && !window.viola.__pending)) return;
+                    window.__violaBridgeInstalling = true;
                     var script = document.createElement('script');
                     script.src = 'qrc:///qtwebchannel/qwebchannel.js';
                     script.onload = function() {

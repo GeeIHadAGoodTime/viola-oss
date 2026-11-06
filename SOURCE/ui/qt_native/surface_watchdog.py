@@ -103,14 +103,15 @@ class SurfaceJudge:
     silent: int = 0
     next_rung: int = 0
     rest_rounds: int = 0
+    steps_run: int = 0
 
     def observe(self, reading: Reading, *, user_active: bool = True) -> Rung | None:
         """Take one reading; return the recovery step to run now, if any."""
         if reading is Reading.SKIPPED:
             return None
         if reading is Reading.LANDED:
-            if self.next_rung:
-                logger.warning("Surface watchdog: the page is back on screen after %d step(s)", self.next_rung)
+            if self.steps_run:
+                logger.warning("Surface watchdog: the page is back on screen after %d step(s)", self.steps_run)
             if not self.calibrated:
                 logger.info("Surface watchdog: the page was seen on screen; watching")
             self.calibrated = True
@@ -118,6 +119,7 @@ class SurfaceJudge:
             self.silent = 0
             self.next_rung = 0
             self.rest_rounds = 0
+            self.steps_run = 0
             return None
         if not self.calibrated:
             return None
@@ -136,6 +138,7 @@ class SurfaceJudge:
             # touch or key press lets this step run.
             return None
         self.next_rung += 1
+        self.steps_run += 1
         self.misses = 0
         self.silent = 0
         if self.next_rung >= len(LADDER):
