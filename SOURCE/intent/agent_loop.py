@@ -3829,6 +3829,7 @@ async def run_agent_loop(
                             continue_listening=False,
                         )
                         executor._final_params["cap_state"] = _spend_gate.cap_state
+                        outcome = "cost_limit"
                         break
                 except Exception as _pl_exc:
                     if _handle_agent_loop_billing_failure(_pl_exc):

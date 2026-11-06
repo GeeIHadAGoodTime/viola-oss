@@ -2130,6 +2130,8 @@ def _strip_old_browser_refs(native_messages: list[dict[str, Any]]) -> None:
                     content[key] = _REF_PATTERN.sub("", val)
 
 
+_CHECK_AGENTS_WAIT_S = 20.0
+
 # Tools whose result is a whole-page read. On a long shopping run these are most
 # of the history, and only the newest pages can still be acted on.
 _PAGE_SNAPSHOT_TOOLS = frozenset(
@@ -9670,6 +9672,15 @@ class AgentExecutor:
     async def _handle_check_agents(self, tool_args: dict[str, Any]) -> ToolResult:
         """Return JSON list of this user's active + recent_completed agents."""
         from services.agent_runtime.registry import agent_registry
+
+        # Hold the answer until a helper finishes or a short time passes. Polled
+        # at full speed, a parent spent 16 model turns in 45 s, each resending
+        # its whole context, to learn nothing had changed.
+        running = [asyncio.ensure_future(done.wait()) for done in (getattr(self, "_live_helpers", None) or {}).values()]
+        if running:
+            await asyncio.wait(running, timeout=_CHECK_AGENTS_WAIT_S, return_when=asyncio.FIRST_COMPLETED)
+            for wait in running:
+                wait.cancel()
 
         user_id = self._get_effective_user_id()
         active = await agent_registry.list_active(user_id)
