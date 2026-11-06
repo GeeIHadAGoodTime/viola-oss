@@ -144,8 +144,8 @@ ROUTE_TOOL_SCHEMAS: list[dict[str, Any]] = [
         "name": "open_app_panel",
         "description": (
             "Open a Viola UI panel for requests like 'open settings', 'show payment methods', "
-            "or 'take me to my calendar'. Available panel_id values: settings, "
-            "rooms.add_speaker, calendar, music_accounts, payment_methods, help. "
+            "'open the memory panel' or 'take me to my calendar'. Available panel_id values: settings, "
+            "rooms.add_speaker, calendar, music_accounts, payment_methods, help, memory. "
             "Returns structured ui_action data for the app; this is a UI capability, "
             "not a classifier, gate, or settings mutation."
         ),
@@ -161,6 +161,7 @@ ROUTE_TOOL_SCHEMAS: list[dict[str, Any]] = [
                         "music_accounts",
                         "payment_methods",
                         "help",
+                        "memory",
                     ],
                     "description": "Panel to open.",
                 },

@@ -273,9 +273,16 @@ _APP_PANEL_ACTIONS: dict[str, dict[str, str]] = {
         "ui_action": "open_help",
         "path_identifier": "help",
     },
+    "memory": {
+        "ui_action": "open_memory_panel",
+        "path_identifier": "memory",
+    },
 }
 
 _APP_PANEL_ALIASES: dict[str, str] = {
+    "memories": "memory",
+    "memory_panel": "memory",
+    "workbench": "memory",
     "rooms_add_speaker": "rooms.add_speaker",
     "room_add_speaker": "rooms.add_speaker",
     "add_speaker": "rooms.add_speaker",
@@ -1583,7 +1590,9 @@ async def file_write(
 @server.tool(
     description=(
         "Execute a shell command and return stdout, stderr, and exit code. "
-        "Last resort — prefer dedicated tools (file_read, web_search, media) over shell. "
+        "Last resort — prefer dedicated tools (file_read, web_search, media) over shell: "
+        "file_read info says whether a file exists, file_write delete removes one. "
+        "Use a full path or working_directory for a script. "
         "30s default timeout, 4000 char output cap."
     ),
     annotations=_DANGEROUS,
@@ -1621,7 +1630,9 @@ async def run_command(
             working_directory,
             permission_mode=permission_mode,
         )
-        return _format_result(result)
+        # A failed command's output is the only way to see why it failed; the
+        # model used to get just "exit code 2" and rewrote a working script.
+        return _format_result_with_error_data(result)
     except Exception as exc:
         logger.exception("run_command failed for command_chars=%d", len(command or ""))
         return json.dumps({"error": str(exc)})
@@ -5017,8 +5028,9 @@ async def check_music_provider_status(
 @server.tool(
     description=(
         "Open a Viola app panel for user intents like 'open settings', 'show payment methods', "
-        "or 'take me to my calendar'. Available panel_id values: settings, rooms.add_speaker, "
-        "calendar, music_accounts, payment_methods, help. Optional sub_tab can name a Settings "
+        "'open the memory panel' or 'take me to my calendar'. Available panel_id values: settings, "
+        "rooms.add_speaker, calendar, music_accounts, payment_methods, help, memory (the user's saved "
+        "memories and Workbench). Optional sub_tab can name a Settings "
         "tab such as account, ai_agents, music_voice, messaging, services, payment, or preferences. "
         "Optional prefill can pass structured UI defaults such as {'room_name': 'kitchen'}. "
         "Returns a structured ui_action envelope for the React app; this is a UI capability, "
@@ -5033,7 +5045,7 @@ async def open_app_panel(
         Field(
             description=(
                 "Panel to open. Use one of: settings, rooms.add_speaker, calendar, "
-                "music_accounts, payment_methods, help."
+                "music_accounts, payment_methods, help, memory."
             )
         ),
     ],

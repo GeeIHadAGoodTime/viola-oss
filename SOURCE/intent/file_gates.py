@@ -235,9 +235,19 @@ def _folder_named(folder: Path, user_text: str, text: str, home: Path | None, *,
     return bool(
         home is not None
         and folder.name.lower() in _WELL_KNOWN_USER_FOLDERS
-        and _norm(str(folder.parent)) == _norm(str(home))
+        and _is_users_own_folder(folder, home)
         and re.search(r"\bmy\s+%s\b" % name, user_text, re.IGNORECASE)
     )
+
+
+def _is_users_own_folder(folder: Path, home: Path) -> bool:
+    """``folder`` is the real one "my desktop" means, also when OneDrive moved it."""
+    if _norm(str(folder.parent)) == _norm(str(home)):
+        return True
+    from intent.tools.filesystem import user_known_folder
+
+    known = user_known_folder(folder.name)
+    return known is not None and _norm(str(known)) == _norm(str(folder))
 
 
 def is_user_referenced_path(p: Path, user_text: str) -> bool:
@@ -382,12 +392,7 @@ def _named_in_current_request(p: Path) -> bool:
         words = str(getattr(active_taint_tracker(), "user_request", "") or "")
     except ImportError:  # pragma: no cover - same package
         return False
-    if not words.strip():
-        return False
-    if _name_mentioned(p.name, words):
-        return True
-    text = _norm(words)
-    return any(_contains_path(text, form) for form in _path_forms(p, _home()) if "/" in form)
+    return named_by_user(p, words)
 
 
 def base_file_write_class(action: str) -> str | None:
@@ -472,6 +477,16 @@ def file_write_action_class(args: Mapping[str, Any] | None) -> str | None:
     return FILE_WRITE
 
 
+def named_by_user(p: Path, user_text: str) -> bool:
+    """The user's own words name this file, by name or by a path to it."""
+    if not user_text or not user_text.strip():
+        return False
+    if _name_mentioned(p.name, user_text):
+        return True
+    text = _norm(user_text)
+    return any(_contains_path(text, form) for form in _path_forms(p, _home()) if "/" in form)
+
+
 def describe_file_action(action_class: str, args: Mapping[str, Any] | None) -> str | None:
     """Plain-words description for the confirm prompt, or None if not a file class."""
     params = args or {}
@@ -529,6 +544,7 @@ __all__ = [
     "is_autostart_location",
     "is_executable_file",
     "is_user_referenced_path",
+    "named_by_user",
     "reset_file_gate_context",
     "user_texts_from_messages",
 ]

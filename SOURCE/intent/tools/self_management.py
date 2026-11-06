@@ -123,7 +123,9 @@ async def update_status() -> ToolResult:
 
     Surfaces:
         * ``available`` (bool) — newer release than the local build.
-        * ``current_version`` / ``latest_version``.
+        * ``current_version`` / ``latest_version`` — never older than the
+          running build, whatever the staged rollout offers this install.
+        * ``published_version`` — the newest release on the manifest.
         * ``min_supported`` — the force-update floor.
         * ``required`` (bool) — set when current build is below
           ``min_supported``.
@@ -143,7 +145,7 @@ async def update_status() -> ToolResult:
     # to the user instead of looking broken.
     import httpx
 
-    from utils.update_checker import check_for_update
+    from utils.update_checker import _parse_version, check_for_update
 
     try:
         # The user asked, right now -- bypass the background poll's short-TTL
@@ -168,6 +170,8 @@ async def update_status() -> ToolResult:
     max_version_issue = bool(result.get("max_version_issue"))
     max_version_message = str(result.get("max_version_message") or "")
     reason = str(result.get("reason") or "")
+    published_version = str(result.get("published_version") or latest_version)
+    current_parsed = _parse_version(current_version)
 
     if max_version_issue:
         message = (
@@ -194,10 +198,26 @@ async def update_status() -> ToolResult:
         message = "Viola is up to date. The newer release is paused for staged rollout."
     elif reason == "below_user_minimum":
         message = "Viola is up to date for your pinned channel — newer releases are below your minimum version."
+    elif _parse_version(published_version) > current_parsed:
+        message = (
+            "Viola is up to date (version %s). Version %s is rolling out gradually and will reach you soon."
+            % (current_version, published_version)
+        )
+    elif published_version and _parse_version(published_version) < current_parsed:
+        message = "Viola is up to date. You are on version %s, which is newer than the public release (%s)." % (
+            current_version,
+            published_version,
+        )
     else:
         message = "Viola is up to date (version %s)." % current_version
 
     data = dict(result)
+    if not available and _parse_version(latest_version) < current_parsed:
+        # The manifest answers "what should this install be offered", and during
+        # a staged rollout that can be an older release. Told latest_version
+        # 1.0.3 on a 1.0.5 build, the model said 1.0.3 was the newest version
+        # (1.0.5 laptop). Nothing older than what is running is ever "latest".
+        data["latest_version"] = current_version
     data["message"] = message
     return ToolResult(ok=True, data=data)
 

@@ -209,6 +209,23 @@ _POWERSHELL_READONLY_FILESYSTEM_CMDLETS = frozenset(
 )
 
 _CMD_READONLY_FILESYSTEM_COMMANDS = frozenset({"dir", "type"})
+# ``echo %VAR%`` for these only tells where things are; any other variable may
+# hold something private, so it keeps its confirmation.
+_CMD_BENIGN_ECHO_VARS = frozenset(
+    {
+        "CD",
+        "COMPUTERNAME",
+        "DATE",
+        "HOMEDRIVE",
+        "HOMEPATH",
+        "OS",
+        "PROCESSOR_ARCHITECTURE",
+        "TIME",
+        "USERNAME",
+        "USERPROFILE",
+    }
+)
+_CMD_VAR_RE = re.compile(r"%([^%\s]*)%")
 
 _WRITE_COMMANDS = frozenset(
     {
@@ -1233,7 +1250,11 @@ def _cmd_command_is_read_only(command: _SimpleCommand, cwd: str) -> bool:
         return False
     exe = command.executable
     args = list(argv[1:])
-    if "%" in " ".join(args):
+    joined = " ".join(args)
+    if exe == "echo":
+        # Only names that say where things are; the rest may hold something private.
+        joined = _CMD_VAR_RE.sub(lambda m: "" if m.group(1).upper() in _CMD_BENIGN_ECHO_VARS else m.group(0), joined)
+    if "%" in joined:
         return False
     if _sensitive_path_reason(args):
         return False
@@ -1250,7 +1271,40 @@ def _cmd_command_is_read_only(command: _SimpleCommand, cwd: str) -> bool:
         "whoami",
     }:
         return True
+    if exe in {"date", "time"}:
+        # With /t these print the value; bare, they prompt to change the clock.
+        return [arg.lower() for arg in args] == ["/t"]
+    if exe == "if":
+        return _cmd_if_exist_is_read_only(args)
+    if exe in {"cmd", "powershell", "pwsh"}:
+        return _nested_shell_is_read_only(exe, args, cwd)
     return _external_command_is_read_only(exe, args, cwd)
+
+
+def _cmd_if_exist_is_read_only(args: list[str]) -> bool:
+    """``if [not] exist <path> echo a [else echo b]`` only reports whether a path exists."""
+    words = list(args)
+    if words[:1] and words[0].lower() == "not":
+        words = words[1:]
+    if len(words) < 3 or words[0].lower() != "exist":
+        return False
+    body = " ".join(words[2:]).replace("(", " ").replace(")", " ")
+    branches = re.split(r"\belse\b", body, flags=re.IGNORECASE)
+    return all(branch.lower().split()[:1] == ["echo"] for branch in branches)
+
+
+def _nested_shell_is_read_only(exe: str, args: list[str], cwd: str) -> bool:
+    """``cmd /c <x>`` and ``powershell -Command <x>`` read only when ``x`` does."""
+    if exe == "cmd":
+        nested, shell = _join_after_switch(args, {"/c", "/r"}), "cmd"
+    else:
+        nested, shell = _join_after_switch(args, {"-command", "-c"}), "powershell"
+    if not nested:
+        return False
+    nested = nested.strip()
+    if len(nested) >= 2 and nested[0] == nested[-1] == '"':
+        nested = nested[1:-1]
+    return validate_shell_command(nested, shell, cwd, "default").read_only
 
 
 def _external_command_is_read_only(exe: str, args: list[str], cwd: str) -> bool:
@@ -1265,7 +1319,9 @@ def _external_command_is_read_only(exe: str, args: list[str], cwd: str) -> bool:
         return _rg_is_read_only(args)
     if exe == "pyright":
         return _pyright_is_read_only(args)
-    if exe in {"python", "python3"}:
+    if exe in {"python", "python3", "py"}:
+        if len(args) >= 3 and args[0] == "-m" and args[1] == "pip":
+            return args[2] in {"list", "show", "freeze", "--version", "-V"}
         return args in (["--version"], ["-V"], ["-VV"]) or not args
     if exe in {"pip", "pip3"}:
         return bool(args) and args[0] in {"list", "show", "freeze", "--version", "-V"}
@@ -1286,6 +1342,8 @@ def _git_is_read_only(args: list[str]) -> bool:
     if not args:
         return False
     subcommand = args[0].lower()
+    if args in (["--version"], ["version"]):
+        return True
     if subcommand in _GIT_WRITE_SUBCOMMANDS:
         return False
     # S9-12: per-flag write detection. ``git diff --output=patch.txt`` (and
