@@ -37,6 +37,13 @@ from intent.agent_middleware import (
     URLTrackerMiddleware,
     run_middleware_pipeline,
 )
+from intent.active_task import (
+    ActiveTask,
+    add_turn_reminder,
+    final_answer_is_off_task,
+    off_task_answer_message,
+    off_task_correction_text,
+)
 from intent.context_compaction import (
     compact_native_messages,
     is_token_limit_error,
@@ -136,6 +143,11 @@ class _AgentLoopCostLimitStop(RuntimeError):
 _COMPACTION_PROGRESS_MIN_FRACTION = 0.05  # 5% token reduction = "progress"
 _COMPACTION_NO_PROGRESS_LIMIT = 2  # bail after this many consecutive no-progress attempts
 _COMPACTION_HARD_CEILING = 6  # absolute defense-in-depth (always-allow at most this many)
+
+
+# A run this long, or one that compacted, is checked for having wandered off the
+# request before it may report success. Short runs cannot drift and pay nothing.
+_ANSWER_CHECK_MIN_STEPS = 15
 
 
 def _compaction_should_allow(executor: Any) -> bool:
@@ -341,6 +353,37 @@ def _prompt_bundle_has_current_user_text(prompt_context_bundle: PromptFrameBundl
         if getattr(frame, "role", None) is FrameRole.USER:
             return _frame_text(frame) == needle
     return False
+
+
+def _run_was_compacted(executor: Any) -> bool:
+    count = getattr(executor, "_compaction_count", 0)
+    return isinstance(count, int) and count > 0
+
+
+def _active_task_for_run(
+    executor: Any,
+    checkpoint: Any,
+    user_text: str,
+    messages: list[dict[str, Any]],
+    restored: bool,
+) -> ActiveTask:
+    """Record what this run is for, on the executor and in its checkpoint."""
+
+    context = getattr(checkpoint, "context", None)
+    recorded = context.get("active_request") if isinstance(context, dict) else None
+    description = getattr(checkpoint, "task_description", "")
+    previous = getattr(executor, "_active_task", None)
+    active_task = ActiveTask.for_run(
+        user_text=user_text,
+        messages=messages,
+        restored=restored,
+        previous=previous if isinstance(previous, ActiveTask) else None,
+        checkpoint_request=recorded if isinstance(recorded, str) and recorded else str(description or ""),
+    )
+    executor._active_task = active_task
+    if isinstance(context, dict) and active_task.request:
+        context["active_request"] = active_task.request
+    return active_task
 
 
 def _executor_hook_session_id(executor: AgentExecutor) -> str | None:
@@ -1685,6 +1728,7 @@ async def run_agent_loop(
         _PaymentConfirmationGateRefused,
         _record_structured_incomplete_diagnostic,
         _remember_last_tool_result,
+        _shorten_old_page_snapshots,
         _strip_image_from_result,
         _strip_old_browser_refs,
         _terminal_response_from_tool_result,
@@ -2187,6 +2231,7 @@ async def run_agent_loop(
     taint_tracker.set_payment_approval_probe(getattr(executor, "_payment_gate_approval_active", None))
     _bind_active_taint_tracker(taint_tracker)
     _bind_file_gate_context_for_run(executor, loop_messages, user_text)
+    active_task = _active_task_for_run(executor, checkpoint, user_text, loop_messages, initial_messages is not None)
     pending_hook_context_messages: list[dict[str, Any]] = []
     native_turn_max_tokens = _native_turn_max_tokens_for_model(executor._get_model_name_safe())
 
@@ -2237,6 +2282,7 @@ async def run_agent_loop(
             return
         for pending_text in pending:
             loop_messages.append({"role": "user", "content": pending_text})
+            active_task.note_instruction(pending_text)
         _record_subagent_transcript()
 
     _record_subagent_transcript()
@@ -2534,6 +2580,10 @@ async def run_agent_loop(
             replacement_writer=lambda records: record_tool_result_replacements(executor, records),
             session_id=tool_result_replacement_session_id(executor),
         )
+        if active_task.steps_taken or initial_messages is not None or _run_was_compacted(executor):
+            # Added to this outgoing copy only: the goal rides on every turn of a
+            # working run whatever happens to history, and history does not grow.
+            turn_messages = add_turn_reminder(turn_messages, active_task.render_reminder())
         turn_kwargs: dict[str, Any] = {
             "messages": turn_messages,
             "first_turn": first_turn,
@@ -2632,6 +2682,30 @@ async def run_agent_loop(
             turn_kwargs["responses_continuity"] = copy.deepcopy(continuity_payload)
         return turn_kwargs, turn_messages, continuity_before
 
+    _off_task_verdicts: dict[str, bool | None] = {}
+
+    async def _answer_is_off_task(answer: str) -> bool:
+        """Check a long run's answer against its request, once per distinct answer."""
+        if not (_run_was_compacted(executor) or iterations >= _ANSWER_CHECK_MIN_STEPS):
+            return False
+        if answer not in _off_task_verdicts:
+            _off_task_verdicts[answer] = await final_answer_is_off_task(
+                active_task,
+                answer,
+                user_id=str(getattr(executor, "_user_id", "") or ""),
+            )
+        return _off_task_verdicts[answer] is True
+
+    async def _send_off_task_answer_back(answer: str) -> bool:
+        """Return True when an off-task answer went back for one more try."""
+        if active_task.answer_redirected or not await _answer_is_off_task(answer):
+            return False
+        active_task.answer_redirected = True
+        logger.warning("Agent task %s: final answer is off the request; sending it back once", task_id)
+        loop_messages.append({"role": "assistant", "content": answer})
+        loop_messages.append({"role": "user", "content": off_task_correction_text(active_task)})
+        return True
+
     def _acknowledge_sent_messages(messages: list[dict[str, Any]]) -> None:
         """Advance the agent-loop-side delta cursor after a successful provider call."""
         nonlocal _loop_sent_message_count
@@ -2703,6 +2777,7 @@ async def run_agent_loop(
             session_id=tool_result_replacement_session_id(executor),
             replacement_writer=lambda records: record_tool_result_replacements(executor, records),
             content_replacement_state=getattr(executor, "_content_replacement_state", None),
+            active_task=active_task,
         )
         if not compaction_meta:
             return False
@@ -3753,6 +3828,8 @@ async def run_agent_loop(
                 answer_text = response.get("answer", "")
                 cl_value = response.get("continue_listening")
                 raw_text = answer_text if isinstance(answer_text, str) else str(answer_text or "")
+                if await _send_off_task_answer_back(_normalize_terminal_model_text(raw_text)):
+                    continue
                 _set_final_response(
                     executor,
                     _normalize_terminal_model_text(raw_text),
@@ -3793,6 +3870,8 @@ async def run_agent_loop(
             if resp_type == "final_answer":
                 answer_text = response.get("answer", response.get("text", ""))
                 raw = answer_text if isinstance(answer_text, str) else str(answer_text)
+                if await _send_off_task_answer_back(_normalize_terminal_model_text(raw)):
+                    continue
                 _set_final_response(
                     executor,
                     _normalize_terminal_model_text(raw),
@@ -3825,6 +3904,8 @@ async def run_agent_loop(
                         "Agent loop received text fallback response with content_len=%d; treating as answer",
                         len(content),
                     )
+                    if await _send_off_task_answer_back(_normalize_terminal_model_text(content)):
+                        continue
                     _set_final_response(
                         executor,
                         _normalize_terminal_model_text(content),
@@ -4562,6 +4643,13 @@ async def run_agent_loop(
                     executor._forced_tool_failure_error = tool_result.error or "calendar tool failed"
                     executor._forced_tool_failure_outcome = "tool_error"
 
+                active_task.note_step(
+                    tc_name,
+                    tc_args,
+                    ok=bool(tool_result.ok),
+                    note=str(_turn_reasoning if tool_result.ok else tool_result.error or ""),
+                    page_url=str(getattr(executor, "_last_page_url", "") or ""),
+                )
                 if session_memory is not None:
                     try:
                         session_memory.update_after_tool(
@@ -4951,6 +5039,7 @@ async def run_agent_loop(
                 loop_messages.append({"role": "user", "content": tool_results_content})
                 if _had_browser_nav:
                     _strip_old_browser_refs(loop_messages)
+                _shorten_old_page_snapshots(loop_messages)
                 _record_subagent_transcript()
                 tool_results_content = []
                 _flush_pending_hook_context()
@@ -5235,6 +5324,16 @@ async def run_agent_loop(
                 outcome = "incomplete"
                 _record_structured_incomplete_diagnostic(executor, incomplete_diagnostic)
 
+        if outcome == "success" and await _answer_is_off_task(final_answer):
+            logger.warning("Agent task %s: final answer does not deal with the request; not reporting success", task_id)
+            outcome = "off_task"
+            final_answer = off_task_answer_message(active_task)
+            _set_final_response(executor, final_answer, continue_listening=True)
+            _record_structured_incomplete_diagnostic(
+                executor,
+                {"reason": "final_answer_off_task", "domain": "agent_task", "evidence_source": "final_answer_check"},
+            )
+
         if (
             outcome in ("success", "payment_gate", "signature_gate")
             and _current_subagent_id(executor)
@@ -5365,7 +5464,7 @@ async def run_agent_loop(
             )
         terminal_llm_error = executor._llm_error_occurred and not final_overrides_llm_error
         terminal_cost_limit = outcome == "cost_limit"
-        terminal_incomplete = outcome == "incomplete"
+        terminal_incomplete = outcome in {"incomplete", "off_task"}
         final_ok = (
             not terminal_llm_error
             and executor._forced_tool_failure_error is None

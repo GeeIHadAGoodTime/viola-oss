@@ -49,6 +49,7 @@ from intent.approval import (
     ConfirmationDeferred,
     current_confirmation_conversation_scope,
 )
+from intent.active_task import ActiveTask
 from intent.context_compaction import (
     compact_messages,
     compact_native_messages,
@@ -2127,6 +2128,67 @@ def _strip_old_browser_refs(native_messages: list[dict[str, Any]]) -> None:
                 val = content.get(key)
                 if isinstance(val, str) and _REF_PATTERN.search(val):
                     content[key] = _REF_PATTERN.sub("", val)
+
+
+# Tools whose result is a whole-page read. On a long shopping run these are most
+# of the history, and only the newest pages can still be acted on.
+_PAGE_SNAPSHOT_TOOLS = frozenset(
+    {
+        "browser_navigate",
+        "browser_snapshot",
+        "browser_interact",
+        "browser_fill_form",
+        "browser_run_script",
+        "browser_get_form_fields",
+        "verify_state",
+    }
+)
+_PAGE_SNAPSHOTS_KEPT_WHOLE = 2
+_OLD_PAGE_SNAPSHOT_CHARS = 1_500
+_OLD_PAGE_SNAPSHOT_NOTE = "\n[older page view shortened. Take a new snapshot if you need that page again.]"
+
+
+def _tool_names_by_call_id(native_messages: list[dict[str, Any]]) -> dict[str, str]:
+    names: dict[str, str] = {}
+    for message in native_messages:
+        content = message.get("content") if isinstance(message, dict) else None
+        if isinstance(content, dict) and isinstance(content.get("tool_calls"), list):
+            for call in content["tool_calls"]:
+                function = call.get("function") if isinstance(call, dict) else None
+                if isinstance(function, dict) and call.get("id"):
+                    names[str(call["id"])] = str(function.get("name") or "")
+        elif isinstance(content, list):
+            for block in content:
+                if isinstance(block, dict) and block.get("type") == "tool_use" and block.get("id"):
+                    names[str(block["id"])] = str(block.get("name") or "")
+    return names
+
+
+def _shorten_old_page_snapshots(native_messages: list[dict[str, Any]]) -> None:
+    """Keep the two newest page views whole and shorten older ones in place.
+
+    Each result keeps its head, which holds the URL, title and top of the page,
+    so the model still knows where it has been. Search results and files are not
+    touched: an answer found there has to stay readable (R2-P0-1).
+    """
+
+    tool_names = _tool_names_by_call_id(native_messages)
+    seen = 0
+    for message in reversed(native_messages):
+        content = message.get("content") if isinstance(message, dict) else None
+        if not isinstance(content, list):
+            continue
+        for block in reversed(content):
+            if not isinstance(block, dict) or block.get("type") != "tool_result":
+                continue
+            if tool_names.get(str(block.get("tool_use_id") or "")) not in _PAGE_SNAPSHOT_TOOLS:
+                continue
+            seen += 1
+            text = block.get("content")
+            if seen <= _PAGE_SNAPSHOTS_KEPT_WHOLE or not isinstance(text, str):
+                continue
+            if len(text) > _OLD_PAGE_SNAPSHOT_CHARS + len(_OLD_PAGE_SNAPSHOT_NOTE):
+                block["content"] = text[:_OLD_PAGE_SNAPSHOT_CHARS] + _OLD_PAGE_SNAPSHOT_NOTE
 
 
 # ---------------------------------------------------------------------------
@@ -4313,6 +4375,16 @@ class AgentExecutor:
             restored_continuity=checkpoint.llm_continuity,
         )
 
+    def _restored_active_task(self, checkpoint: Any) -> ActiveTask | None:
+        """The task a restored chain belongs to, for compaction before the loop starts."""
+        task = getattr(self, "_active_task", None)
+        if isinstance(task, ActiveTask) and task.request:
+            return task
+        context = getattr(checkpoint, "context", None)
+        recorded = context.get("active_request") if isinstance(context, dict) else ""
+        request = recorded or getattr(checkpoint, "task_description", "") or ""
+        return ActiveTask.from_messages(self._native_messages, str(request)) if request else None
+
     @staticmethod
     def _format_prior_context_lines(
         messages: list[dict[str, str]] | None,
@@ -5031,6 +5103,7 @@ class AgentExecutor:
                         self._native_messages,
                         user_id=self._user_id or "",
                         session_id=self._session_id,
+                        active_task=self._restored_active_task(existing_checkpoint),
                     )
                     if compacted:
                         self._native_messages = compacted
@@ -10765,11 +10838,16 @@ class AgentExecutor:
                         session_id=tool_result_replacement_session_id(self),
                         replacement_writer=lambda records: record_tool_result_replacements(self, records),
                         content_replacement_state=getattr(self, "_content_replacement_state", None),
+                        active_task=getattr(self, "_active_task", None),
                     )
                     if _compaction_meta:
                         self._pending_compaction_meta = _compaction_meta
                 else:
-                    messages[:] = await compact_messages(messages, user_id=self._user_id)
+                    messages[:] = await compact_messages(
+                        messages,
+                        user_id=self._user_id,
+                        active_task=getattr(self, "_active_task", None),
+                    )
                 _budget_msgs = self._native_messages if self._use_native else messages
                 self._token_tracker.recount(_budget_msgs, after_compaction=True)
                 _compaction_record_progress(self, pre_compaction_tokens, self._token_tracker.total_tokens)
@@ -11006,7 +11084,11 @@ class AgentExecutor:
                         if _compaction_meta:
                             self._pending_compaction_meta = _compaction_meta
                     else:
-                        messages[:] = await compact_messages(messages, user_id=self._user_id)
+                        messages[:] = await compact_messages(
+                        messages,
+                        user_id=self._user_id,
+                        active_task=getattr(self, "_active_task", None),
+                    )
                     _compaction_record_progress(
                         self,
                         pre_compaction_tokens,
