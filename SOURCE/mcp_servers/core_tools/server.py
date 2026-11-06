@@ -3442,6 +3442,7 @@ def _normalize_user_capability_spec(
         else:
             continue
         action_type = str(item.get("type") or "call_capability")
+        item["type"] = action_type
         args_json = item.pop("args_json", None)
         if action_type == "call_capability" and "args" not in item:
             try:
@@ -3454,6 +3455,14 @@ def _normalize_user_capability_spec(
         actions.append({key: value for key, value in item.items() if value is not None})
     if actions:
         raw["actions"] = actions
+    # A routine needs only a name and its actions from the user. Everything else
+    # was a validation error the model could not explain, and nothing got saved.
+    name = str(raw.get("name") or "").strip()
+    if name:
+        raw["description"] = str(raw.get("description") or "").strip() or "Routine: %s" % name
+        trigger = raw.get("trigger")
+        if not isinstance(trigger, dict) or not trigger.get("phrases"):
+            raw["trigger"] = {"kind": "phrase", "phrases": [name, "run %s" % name]}
 
     return {key: value for key, value in raw.items() if value is not None}
 

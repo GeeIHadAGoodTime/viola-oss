@@ -27,6 +27,14 @@ _HELD_LOW_LEVEL_KEYS: dict[str, list[str]] = {}
 _HELD_LOW_LEVEL_MOUSE_BUTTONS: dict[str, list[str]] = {}
 _LOW_LEVEL_MOUSE_BUTTONS = frozenset({"left", "right", "middle"})
 
+# A window can hold more than the user named. Win11 Notepad keeps every open tab
+# in one window, so "close Notepad" offered to throw away Jay's other tabs.
+_CLOSE_APP_GUIDANCE = (
+    "Before closing an app or window, read_window to see what else it holds. Close only what the user named; "
+    "ctrl+w closes one tab. If closing it would also close other documents or tabs, leave them open and say "
+    "what is in the way. Never offer to discard work the user did not name. "
+)
+
 ComputerAction = Literal[
     "launch_app",
     "list_windows",
@@ -556,7 +564,8 @@ def _merge_action_metadata(
         "Use browser_navigate only for URLs/web pages; use launch_app for any installed native desktop application. "
         "To type, press keys or click in an app, name it with app_executable (for example 'notepad') or "
         "window_title: Viola brings that window to the front first. Viola's own window is never a target. "
-        "For pointer coordinates use the screenshot's logical 1024x768 coordinate plane unless coordinate_mode='physical'."
+        "For pointer coordinates use the screenshot's logical 1024x768 coordinate plane unless coordinate_mode='physical'. "
+        + _CLOSE_APP_GUIDANCE
     ),
 )
 async def computer(
