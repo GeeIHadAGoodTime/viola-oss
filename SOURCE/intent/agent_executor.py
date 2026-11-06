@@ -12846,6 +12846,8 @@ class AgentExecutor:
                     self._bot_check_unresolved = False
             return None
         data = tool_result.data if isinstance(tool_result.data, dict) else {}
+        from urllib.parse import urlparse
+
         url = str(data.get("url") or getattr(self, "_last_page_url", None) or "")
         host = urlparse(url).hostname or url
         self._bot_check_unresolved = True
