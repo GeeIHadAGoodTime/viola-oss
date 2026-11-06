@@ -237,7 +237,7 @@ describe('closing the browser takes the globe pill away', () => {
   });
 });
 
-describe('a site's person check', () => {
+describe("a site's person check", () => {
   const check = (extra = {}) => agentic(WIKI, {
     agent_task: { description: 'buy water', status: 'bot_check', phase: 'user_input' },
     ...extra,
