@@ -343,7 +343,17 @@ class ApplicationTests(unittest.TestCase):
         ns = selected_namespace(
             "voice/synthesis/kokoro_engine.py",
             functions={"_probe_kokoro_package"},
-            classes={"KokoroTTSEngine": {"__init__", "_ensure_loaded", "_synthesize_internal", "is_available"}},
+            classes={
+                "KokoroTTSEngine": {
+                    "__init__",
+                    "_ensure_loaded",
+                    "_synthesize_internal",
+                    "_create_routed_samples",
+                    "_foreign_route",
+                    "_claim_unspoken_notice",
+                    "is_available",
+                }
+            },
             values=values,
         )
         engine = ns["KokoroTTSEngine"]

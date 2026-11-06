@@ -249,6 +249,7 @@ class KokoroStopTests(unittest.IsolatedAsyncioTestCase):
 
         async def chunks():
             yield "First."
+            await self.until(lambda: self.plays)
             self.engine.stop()
             yield "Retired."
             yield "Still retired."
