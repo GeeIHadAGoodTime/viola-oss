@@ -420,7 +420,7 @@ export default function PhoneCallPanel({
               const speaker = transcriptSpeakerLabel(role, recipientName);
               return (
                 <div
-                  key={`${entry.ts || 'transcript'}-${index}`}
+                  key={`transcript-${index}`}
                   style={{
                     display: 'flex',
                     flexDirection: 'column',

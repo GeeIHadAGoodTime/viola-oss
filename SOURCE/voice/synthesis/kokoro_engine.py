@@ -1426,6 +1426,50 @@ class KokoroTTSEngine:
                 self.stop()
                 raise
 
+    async def speak_preview(
+        self, voice: str | None, *, language: str | None = None, rate: float | None = None, volume: float | None = None
+    ) -> bool:
+        """Say a short sample in a voice, at a speed and volume, without saving anything.
+
+        The Settings preview hears the choice on the screen, not the saved one,
+        so nothing here touches the running route. Returns whether it played.
+        """
+        from voice.customer_voice_routing import preview_sentence, resolve_kokoro_voice_alias
+
+        selected_language = language or getattr(self, "_speech_language", "en-us")
+        selected_voice = resolve_kokoro_voice_alias(voice) if voice and voice != "default" else None
+        speed = self._speed if rate is None else float(rate) / 150.0
+        scale = self._current_volume() if volume is None else max(0.0, min(1.0, float(volume)))
+        policy_marker = getattr(self, "_tts_disable_marker", 0)
+
+        def render() -> bytes:
+            with self._lock:
+                if not self._ensure_loaded():
+                    return b""
+                samples, sample_rate = self._kokoro.create(
+                    preview_sentence(selected_language),
+                    voice=selected_voice or self._voice,
+                    speed=speed,
+                    lang=selected_language,
+                )
+                self._last_sample_rate = int(sample_rate)
+                samples = np.asarray(samples, dtype=np.float32)
+                if self._post_fx_enabled:
+                    from voice.synthesis.audio_postfx import process_voice
+
+                    samples = process_voice(samples, int(sample_rate), self._loudness_target_lufs)
+                return self._scale_pcm_volume(self._float_to_int16(samples), scale).tobytes()
+
+        if self._speak_lock is None:
+            self._speak_lock = asyncio.Lock()
+        async with self._speak_lock:
+            pcm = await asyncio.to_thread(render)
+            if not pcm:
+                return False
+            return bool(
+                await asyncio.to_thread(self._play_pcm_locally, pcm, self.last_sample_rate, policy_marker=policy_marker)
+            )
+
     def _create_opener_cache(self, cfg: object) -> OpenerCache | None:
         if getattr(cfg, "tts_opener_cache_enabled", True) is False:
             return None

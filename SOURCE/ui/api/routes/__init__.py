@@ -81,6 +81,32 @@ def _register_utility_endpoints(app: FastAPI) -> None:
         stopped = stop_ringing_alarm(user_id, alarm_id, reason="stopped")
         return success_response({"stopped": stopped})
 
+    @app.post("/v1/voice/preview", dependencies=[Depends(require_auth)])
+    async def _voice_preview(request: Request) -> dict[str, Any]:
+        """Say a short sample in the voice, speed and volume shown in Settings. Saves nothing."""
+        try:
+            body = await request.json()
+        except ValueError:
+            body = None
+        body = body if isinstance(body, dict) else {}
+        from voice.synthesis import factory as tts_factory
+
+        # The one shared engine; reading it never builds one (a cloud process has none).
+        preview = getattr(getattr(tts_factory, "_shared_kokoro", None), "speak_preview", None)
+        if not callable(preview):
+            return success_response({"played": False, "reason": "speech_unavailable"})
+        try:
+            played = await preview(
+                body.get("voice") if isinstance(body.get("voice"), str) else None,
+                language=body.get("language") if isinstance(body.get("language"), str) else None,
+                rate=float(body["rate"]) if isinstance(body.get("rate"), (int, float)) else None,
+                volume=float(body["volume"]) if isinstance(body.get("volume"), (int, float)) else None,
+            )
+        except (ValueError, AssertionError, RuntimeError) as exc:
+            log.warning("Voice preview failed: %s", type(exc).__name__)
+            return success_response({"played": False, "reason": "voice_unavailable"})
+        return success_response({"played": bool(played)})
+
     @app.post("/v1/ws/auth", dependencies=[Depends(require_auth)])
     async def _ws_auth(request: Request) -> dict[str, Any]:
         """Exchange an authenticated request for a short-lived WS auth token.

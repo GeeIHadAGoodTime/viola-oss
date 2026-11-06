@@ -28,6 +28,19 @@ _VOICE_FAMILIES = {
 _SETTINGS_VOICE_ALIASES = {"alloy": "af_alloy", "echo": "am_echo", "nova": "af_nova"}
 
 
+_PREVIEW_SENTENCES = {
+    "es": "Hola, soy Viola. Así sueno cuando te hablo.",
+    "zh": "你好，我是你的语音助手。这就是我的声音。",
+}
+_ENGLISH_PREVIEW = "Hi, I'm Viola. This is how I sound when I talk to you."
+
+
+def preview_sentence(locale: object) -> str:
+    """What a voice says in the Settings preview, in its own language."""
+    key = locale.lower().replace("_", "-").split("-", 1)[0] if isinstance(locale, str) else ""
+    return _PREVIEW_SENTENCES.get(key, _ENGLISH_PREVIEW)
+
+
 def default_voice(locale: str) -> str | None:
     """The locale's default voice ID, or None when the locale has no voice family."""
     family = _VOICE_FAMILIES.get(locale)
