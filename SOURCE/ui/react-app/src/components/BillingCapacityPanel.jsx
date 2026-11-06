@@ -30,7 +30,7 @@ SummaryRow.propTypes = { label: PropTypes.string.isRequired, children: PropTypes
 // page does), the card shows that number, so the page never shows two
 // different percentages; null hides the row until that read arrives.
 export default function BillingCapacityPanel({
-  accountId, refreshUser, fallback = null, entitlement = null, managedUsagePercent,
+  accountId, refreshUser, fallback = null, entitlement = null, managedUsagePercent, currentPlanFallback = null,
 }) {
   const billing = useBillingCapacity({ accountId, refreshUser });
   const { catalog, account, quote, attempt, operation, loading, quoting, changing, error } = billing;
@@ -120,7 +120,7 @@ export default function BillingCapacityPanel({
             ? `${capacityMoney(account.recurring_amount_cents ?? (account.interval === 'year'
               ? catalog?.selections?.find((row) => row.monthly_price_cents === account.monthly_price_cents)?.annual_price_cents
               : account.monthly_price_cents))}/${account.interval === 'year' ? 'year' : 'month'} · ${account.capacity_multiplier}× Pro`
-            : 'Free'}</SummaryRow>
+            : (currentPlanFallback || 'Free')}</SummaryRow>
           {entitlement?.active_gift && <SummaryRow label="Effective complimentary capacity">
             {entitlement.active_gift.capacity_multiplier}× Pro through {capacityDate(entitlement.active_gift.end_at)}
           </SummaryRow>}
@@ -254,6 +254,9 @@ BillingCapacityPanel.propTypes = {
   accountId: PropTypes.string.isRequired,
   refreshUser: PropTypes.func,
   fallback: PropTypes.node,
+  // What to say instead of "Free" when this account has no paid price of its
+  // own: a complimentary Pro plan, or a plan read that has not finished.
+  currentPlanFallback: PropTypes.string,
   entitlement: PropTypes.object,
   managedUsagePercent: PropTypes.number,
 };

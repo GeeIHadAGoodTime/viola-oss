@@ -3782,6 +3782,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
           setSettingsInitialSection(null);
           setSettingsOpen(true);
         }}
+        onOpenStageHistory={() => setHistoryOpen(true)}
         profileName={accountUser?.user_metadata?.full_name || accountUser?.user_metadata?.name || accountUser?.email
           || (desktopAccount?.signed_in ? desktopAccount.email : '')
           || userSettings?.display_name || userSettings?.name || 'Local user'}

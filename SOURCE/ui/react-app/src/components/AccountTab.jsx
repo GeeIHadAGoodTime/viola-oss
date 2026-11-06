@@ -857,6 +857,8 @@ const ProfileCard = ({ user, subscription, billingStatus = 'ready', onLogout, lo
         refreshUser={refreshUser}
         entitlement={subscription?.entitlement}
         managedUsagePercent={usage?.monthlyPercent ?? null}
+        currentPlanFallback={billingStatus !== 'ready' ? 'Checking plan…'
+          : subscription?.hasPaidAccess ? (subscription?.planFamily === 'max' ? 'Max' : 'Pro') : null}
         fallback={billingStatus === 'ready' && !subscription?.hasPaidAccess
           ? <UpgradePanel addToast={addToast} refreshUser={refreshUser} /> : null}
       />

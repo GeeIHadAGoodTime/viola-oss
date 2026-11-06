@@ -125,6 +125,7 @@ function ChatModeInner({
   handlePTTStart = () => {},
   handlePTTEnd = () => {},
   onOpenSettings = () => {},
+  onOpenStageHistory = null,
   profileName,
   profileDetail = '',
   commandRegistry = null,
@@ -1426,6 +1427,7 @@ function ChatModeInner({
         onDelete={deleteThread}
         onExport={exportThread}
         onOpenSettings={onOpenSettings}
+        onOpenStageHistory={onOpenStageHistory}
         profileName={profileName}
         profileDetail={profileDetail}
       />
@@ -1538,6 +1540,7 @@ ChatModeInner.propTypes = {
   handlePTTStart: PropTypes.func,
   handlePTTEnd: PropTypes.func,
   onOpenSettings: PropTypes.func,
+  onOpenStageHistory: PropTypes.func,
   profileName: PropTypes.string,
   profileDetail: PropTypes.string,
   commandRegistry: PropTypes.shape({
