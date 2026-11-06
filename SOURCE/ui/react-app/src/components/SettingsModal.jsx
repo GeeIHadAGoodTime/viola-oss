@@ -61,8 +61,8 @@ const theme = THEME;
 /**
  * Settings > System > Advanced: whether phones and tablets on this Wi-Fi can
  * reach Viola (Rooms). Applied immediately through /v1/network/lan-access, not
- * through the Save draft, because it opens or closes a network port. Opening
- * Rooms > Add Room turns it on; this is where the user can see and undo that.
+ * through the Save draft, because it opens or closes a network port. Start in
+ * Rooms > Add Room turns it on too; this is where the user can see and undo that.
  */
 function LanAccessSettingRow() {
   const [status, setStatus] = useState(null);
@@ -106,7 +106,7 @@ function LanAccessSettingRow() {
   return (
     <SettingRow
       title="Let devices on your Wi-Fi connect"
-      description="Lets phones and tablets on this Wi-Fi join as Rooms speakers. They still need the code from Rooms > Add Room. Turns on when you add a room."
+      description="Lets phones and tablets on this Wi-Fi join as Rooms speakers. They still need the code from Rooms > Add Room. Off until you start Rooms, and turns off again if nothing joins."
     >
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
         <Toggle

@@ -12,7 +12,7 @@ from fastapi import Depends, HTTPException, Request
 from ui.api.context import ApiContext
 from ui.api.routes.auth_dependencies import require_auth
 from ui.core.security import is_loopback_request
-from utils.speaker_pairing_flow import build_local_address_payload, ensure_lan_access
+from utils.speaker_pairing_flow import build_local_address_payload, ensure_lan_access, note_pairing_activity
 
 
 class LanAccessRequest(BaseModel):
@@ -51,12 +51,16 @@ def register_network_routes(context: ApiContext) -> None:
         can type at useviola.com/connect or the bundled /connect page to reach
         this hub without scanning a QR or typing the IP.
 
-        Opening Add Room is the user asking for other devices to reach this
-        hub, so this first opens LAN access (``ensure_lan_access``). The link
-        and code are only returned when that address is actually being served;
-        otherwise ``lan_access`` says why and the panel shows that instead.
+        This only looks: Add Room is the first thing Rooms shows, so a read
+        must never open a port. The panel's Start button does that through
+        ``POST /v1/network/lan-access``. The link and code are only returned
+        when that address is actually being served; otherwise ``lan_access``
+        says why and the panel shows that instead. While LAN access is on, this
+        call (the open panel renewing its link) keeps the pairing window open.
         """
-        status = await ensure_lan_access(enable=True)
+        status = await ensure_lan_access(enable=None)
+        if status.reachable:
+            note_pairing_activity()
         return success_response(build_local_address_payload(status))
 
     @router.get(

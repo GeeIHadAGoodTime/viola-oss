@@ -311,8 +311,27 @@ export default function ConnectSpeakerPanel({ initialRoomName = 'new-room' }) {
     setReloadKey((k) => k + 1);
   }, []);
 
-  // Turning LAN access off closes the hub's Wi-Fi port right away; reopening
-  // the panel (or Try again) turns it back on.
+  // Viola listens only on this computer until the user starts Rooms here.
+  // Just looking at this panel must not open a port on the Wi-Fi.
+  const handleStartLan = useCallback(async () => {
+    setLanBusy(true);
+    try {
+      await authFetch('/v1/network/lan-access', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: true }),
+      });
+    } catch {
+      // The reload below reports the hub's real state either way.
+    } finally {
+      setLanBusy(false);
+      setLoading(true);
+      setReloadKey((k) => k + 1);
+    }
+  }, []);
+
+  // Turning LAN access off closes the hub's Wi-Fi port right away; Start
+  // turns it back on.
   const handleTurnOffLan = useCallback(async () => {
     setLanBusy(true);
     try {
@@ -330,7 +349,6 @@ export default function ConnectSpeakerPanel({ initialRoomName = 'new-room' }) {
           lan_access: {
             reachable: false,
             reason_code: 'lan_access_off',
-            message: 'Devices on your Wi-Fi can no longer connect to Viola. Click Try again to allow them.',
           },
         });
       }
@@ -407,6 +425,45 @@ export default function ConnectSpeakerPanel({ initialRoomName = 'new-room' }) {
           }}
         >
           Retry
+        </button>
+      </div>
+    );
+  }
+
+  if (lanAccess?.reason_code === 'lan_access_off') {
+    return (
+      <div
+        style={{ textAlign: 'center', padding: '32px 20px' }}
+        data-testid="connect-speaker-lan-start-view"
+      >
+        <div style={{ color: theme.colors.accent, display: 'flex', justifyContent: 'center', marginBottom: '12px' }}>
+          <Icons.Wifi />
+        </div>
+        <div style={{ color: theme.colors.textPrimary, fontSize: '14px', marginBottom: '8px', lineHeight: '1.5' }}>
+          Start Rooms to add a phone or tablet as a speaker.
+        </div>
+        <div style={{ color: theme.colors.textMuted, fontSize: '12px', marginBottom: '16px', lineHeight: '1.5' }}>
+          Until then, only this computer can reach Viola. Starting lets devices on your Wi-Fi find her, and they
+          still need the code shown here. It turns off again if nothing joins. If Windows asks, choose Allow.
+        </div>
+        <button
+          type="button"
+          onClick={handleStartLan}
+          disabled={lanBusy}
+          style={{
+            padding: '10px 20px',
+            minHeight: '44px',
+            borderRadius: '10px',
+            border: 'none',
+            backgroundColor: theme.colors.accent,
+            color: 'white',
+            fontSize: '14px',
+            fontWeight: 500,
+            cursor: lanBusy ? 'default' : 'pointer',
+          }}
+          data-testid="connect-speaker-lan-start"
+        >
+          {lanBusy ? 'Starting...' : 'Start Rooms'}
         </button>
       </div>
     );

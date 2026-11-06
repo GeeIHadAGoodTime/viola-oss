@@ -5,17 +5,27 @@ LAN access (why the Add Room link can work at all)
 The desktop API binds loopback (``config/settings.py`` ``api_host``), so a
 clean install opens no LAN port and shows no firewall prompt over onboarding
 (#4867). A phone can only follow the Add Room QR / link / pairing word if the
-hub ALSO listens on its LAN address. Opening Add Room is the user's explicit
-request for that, so the panel's ``/v1/network/local-address`` call runs
-``ensure_lan_access(enable=True)``: it remembers the choice in the
-install-scoped ``lan_access_enabled`` setting (so paired speakers can
-reconnect after a restart) and opens a ``core.server_factory.LanListener`` on
-the LAN address the link shows. That listener serves the same app object, so
-the middleware auth, the spoke-scope allowlist and every route-level
-loopback-only guard apply to LAN callers exactly as before. If LAN access
-cannot be opened (auth disabled, an explicit loopback ``VIOLA_API_HOST``, no
-network, the port taken), the payload says why and carries no link, so the
-panel never shows a URL that cannot work.
+hub ALSO listens on its LAN address. That is the user's call, and it takes a
+deliberate act: the Start button in Rooms > Add Room, the Settings toggle, or
+asking Viola to pair a speaker. Those run ``ensure_lan_access(enable=True)``,
+which remembers the choice in the install-scoped ``lan_access_enabled`` setting
+and opens a ``core.server_factory.LanListener`` on the LAN address the link
+shows. Merely LOOKING at Rooms opens nothing: the panel's
+``/v1/network/local-address`` call only reports (1.0.5 build 9 opened the port
+on every look, because Add Room is the modal's first tab, and kept it open for
+good).
+
+The port stays open only while it has a use. ``lan_access_supervisor`` turns
+LAN access back off once nothing has paired for
+``LAN_ACCESS_UNPAIRED_WINDOW_SECONDS`` after the last sign of someone pairing,
+and at startup when no paired device is left to reconnect. That also closes
+the port on installs an older build left open.
+
+The listener serves the same app object, so the middleware auth, the
+spoke-scope allowlist and every route-level loopback-only guard apply to LAN
+callers exactly as before. If LAN access cannot be opened (auth disabled, an
+explicit loopback ``VIOLA_API_HOST``, no network, the port taken), the payload
+says why and carries no link, so the panel never shows a URL that cannot work.
 """
 
 from __future__ import annotations
@@ -122,6 +132,11 @@ def build_local_address_payload(lan_status: LanAccessStatus | None = None) -> Js
 
 LAN_ACCESS_SETTING = "lan_access_enabled"
 LAN_ACCESS_SUPERVISOR_INTERVAL_SECONDS = 15.0
+# How long LAN access stays open with nothing paired, counted from the last
+# sign of someone pairing (Start, or the open panel renewing its link every few
+# minutes). Long enough to find a phone and scan the code, short enough that a
+# forgotten Start does not leave a port open on the Wi-Fi all week.
+LAN_ACCESS_UNPAIRED_WINDOW_SECONDS = 15 * 60
 _FIREWALL_CACHE_SECONDS = 30.0
 
 
@@ -147,6 +162,9 @@ _lan_listener: Any = None
 _lan_locks: weakref.WeakKeyDictionary[asyncio.AbstractEventLoop, asyncio.Lock] = weakref.WeakKeyDictionary()
 _lan_locks_guard = threading.Lock()
 _firewall_cache: tuple[float, str, JsonDict] | None = None
+# time.monotonic() deadline for pairing something; None until a user start in
+# this run, which is how a setting left on by an earlier run is recognised.
+_lan_unpaired_deadline: float | None = None
 
 
 def register_lan_app(app: Any) -> None:
@@ -206,6 +224,55 @@ def _persist_lan_access_setting(enabled: bool) -> None:
             manager.set(LAN_ACCESS_SETTING, enabled)
     except Exception:
         logger.warning("Could not save %s=%s", LAN_ACCESS_SETTING, enabled, exc_info=True)
+
+
+def _has_paired_device() -> bool:
+    """True when a device could still reconnect to the hub over the LAN."""
+    try:
+        from ui.security.spoke_credentials import SPOKE_TOKEN_IDLE_MAX_AGE_SECONDS
+        from ui.security.spoke_device_registry import list_devices
+
+        oldest_usable = int(time.time()) - SPOKE_TOKEN_IDLE_MAX_AGE_SECONDS
+        return any(
+            not device.get("revoked") and int(device.get("last_seen") or 0) >= oldest_usable
+            for device in list_devices()
+        )
+    except Exception:
+        # A read failure must not unpair a working house.
+        logger.warning("Could not read paired devices; leaving LAN access as it is", exc_info=True)
+        return True
+
+
+def note_pairing_activity() -> None:
+    """Someone is pairing right now: give them the full window again."""
+    global _lan_unpaired_deadline
+    _lan_unpaired_deadline = time.monotonic() + LAN_ACCESS_UNPAIRED_WINDOW_SECONDS
+
+
+async def _retire_unused_lan_access(at_startup: bool = False) -> bool:
+    """Turn LAN access off when nothing uses it; return True if it did.
+
+    At startup a saved "on" with nothing paired is closed straight away, since
+    no device is waiting to reconnect. Later the user gets the pairing window.
+    """
+    if not await asyncio.to_thread(_lan_access_setting_enabled):
+        return False
+    if await asyncio.to_thread(_has_paired_device):
+        return False
+    deadline = _lan_unpaired_deadline
+    if deadline is None:
+        if not at_startup:
+            # Turned on outside this module (a settings file edit, say).
+            note_pairing_activity()
+            return False
+    elif time.monotonic() < deadline:
+        return False
+    logger.info(
+        "LAN access closed: no device paired (%s)",
+        "left on by an earlier run" if deadline is None else "pairing window ended",
+    )
+    await ensure_lan_access(False, check_firewall=False)
+    return True
 
 
 def _lan_blocked_reason() -> tuple[str, str] | None:
@@ -269,6 +336,7 @@ def classify_firewall_state(rules: list[dict[str, Any]], categories: list[str]) 
         category = "Public"
     else:
         category = categories[0] if categories else ""
+    on_public_network = category.lower() == "public"
     blocked = any(
         str(rule.get("action", "")).lower() == "block" and _profile_covers(str(rule.get("profile", "")), category)
         for rule in rules
@@ -285,14 +353,25 @@ def classify_firewall_state(rules: list[dict[str, Any]], categories: list[str]) 
         )
     elif allowed:
         state = "allowed"
-        message = None
+        # Viola's installer adds no firewall rule. An Allow on Public came from
+        # someone answering the Windows prompt on a public network, and the
+        # app cannot change it without admin rights, so say what it means.
+        message = (
+            (
+                "Windows treats this Wi-Fi as a public network and allows Viola on it, so other people here "
+                "can reach this computer's Rooms page. They still need your code. On your own Wi-Fi, set it "
+                "to Private in Windows network settings. Elsewhere, stop Rooms when you're done."
+            )
+            if on_public_network
+            else None
+        )
     else:
         state = "no_rule"
         message = "If Windows asks whether Viola may use this network, choose Allow."
-        if category.lower() == "public":
+        if on_public_network:
             message = (
-                "Windows treats this Wi-Fi as a public network. If Windows asks about Viola, allow it, "
-                "or set this Wi-Fi to Private in Windows network settings."
+                "Windows treats this Wi-Fi as a public network. If this is your own Wi-Fi, set it to Private "
+                "in Windows network settings, then choose Allow if Windows asks about Viola."
             )
     return {"state": state, "network_category": category or None, "message": message}
 
@@ -357,20 +436,25 @@ def _off_status(enabled: bool, port: int, code: str, message: str, host: str | N
 async def ensure_lan_access(enable: bool | None = None, *, check_firewall: bool = True) -> LanAccessStatus:
     """Open, keep, move or close the LAN listener to match the user's choice.
 
-    ``enable=True`` records the user's request (opening Add Room),
-    ``enable=False`` turns LAN access off, ``None`` only reconciles with the
-    saved setting (startup and the background supervisor). Must run on the
-    loop serving the app. Never raises; failures come back in the status.
+    ``enable=True`` records the user's request (Start in Add Room, the
+    Settings toggle, asking Viola to pair a speaker), ``enable=False`` turns
+    LAN access off, ``None`` only reconciles with the saved setting and is
+    safe for anything that merely looks. Must run on the loop serving the app.
+    Never raises; failures come back in the status.
     """
     from core.lan_exposure import set_active_lan_listener
     from core.server_factory import LanListener, LanListenerError
 
-    global _lan_listener
+    global _lan_listener, _lan_unpaired_deadline
     port = int(settings.api_port)
     async with _lan_lock():
         if enable is not None:
             await asyncio.to_thread(_persist_lan_access_setting, bool(enable))
             enabled = bool(enable)
+            if enabled:
+                note_pairing_activity()
+            else:
+                _lan_unpaired_deadline = None
         else:
             enabled = await asyncio.to_thread(_lan_access_setting_enabled)
 
@@ -443,11 +527,16 @@ async def lan_access_supervisor(interval: float = LAN_ACCESS_SUPERVISOR_INTERVAL
 
     Re-runs ``ensure_lan_access()`` periodically: brings a remembered LAN
     listener back after a restart once the network is up, follows a DHCP
-    address change, and applies a toggle saved from Settings. Cheap: reads
-    one setting and asks the OS for the outbound interface address.
+    address change, and applies a toggle saved from Settings. Before that it
+    closes LAN access that nothing paired with. Cheap: reads one setting, and
+    only when that is on the paired-device list, then asks the OS for the
+    outbound interface address.
     """
+    at_startup = True
     while True:
         try:
+            await _retire_unused_lan_access(at_startup)
+            at_startup = False
             await ensure_lan_access(None, check_firewall=False)
         except asyncio.CancelledError:
             raise
