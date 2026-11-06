@@ -63,6 +63,11 @@ _RUNTIME_MESSAGE_KEYS = (
     "_viola_history_snip",
 )
 
+_HELPER_REPORT_CHARS = 4_000
+_HELPER_ANSWER_PROMPT = """\
+Helpers each researched part of the user's request. Write the final reply to the user from their reports: answer what was asked, comparing where the user asked for a comparison, in plain speech-friendly prose. Do not mention helpers. Use only what the reports say, and say so if something asked for is missing.
+"""
+
 _ANSWER_CHECK_PROMPT = """\
 You compare an assistant's final reply with the request it was working on. Answer with exactly one word.
 
@@ -229,18 +234,26 @@ class ActiveTask:
         restored: bool,
         previous: ActiveTask | None = None,
         checkpoint_request: str = "",
+        checkpoint_description: str = "",
     ) -> ActiveTask:
         """Return the task for a run.
 
         A run that continues restored history is the same task. Its ``user_text``
         is an internal event or resume note, never a new request, so the task
-        that was already running stays the goal.
+        that was already running stays the goal. ``checkpoint_request`` is the
+        request this task recorded. An older checkpoint only has its first 200
+        characters as ``checkpoint_description``, which counts if the chain holds
+        that message. Otherwise the run is a child handed ``user_text`` as its task.
         """
 
         if restored:
             if isinstance(previous, cls) and previous.request:
                 return previous
-            return cls.from_messages(messages, str(checkpoint_request or user_text or "").strip())
+            if checkpoint_request:
+                return cls.from_messages(messages, checkpoint_request)
+            description = str(checkpoint_description or "").strip()
+            if description and find_request_index(messages, description, exact=True) is not None:
+                return cls.from_messages(messages, description)
         return cls.from_messages(messages, user_text)
 
     def note_instruction(self, text: str) -> None:
@@ -401,6 +414,38 @@ def _answer_check_context(items: Iterable[str], title: str) -> list[str]:
     if not values:
         return []
     return [title, *("- %s" % value for value in values)]
+
+
+async def answer_from_helper_results(task: ActiveTask, results: Sequence[dict[str, str]], *, user_id: str = "") -> str:
+    """Turn finished helper reports into one answer, when the parent run cannot.
+
+    The background route is separate from the one that failed, so it usually
+    still works. If it does not, the user gets short labelled findings.
+    """
+
+    reports = "\n\n".join(
+        "Helper task: %s\nReport:\n%s" % (_shorten(item["task"], 200), _shorten(item["answer"], _HELPER_REPORT_CHARS))
+        for item in results
+    )
+    from services.openai_background import run_background_openai_response
+
+    try:
+        raw = await run_background_openai_response(
+            system_prompt=_HELPER_ANSWER_PROMPT,
+            user_content="The user asked:\n%s\n\n%s" % (_quoted(_shorten(task.request, _ANSWER_CHECK_CHARS)), reports),
+            max_output_tokens=800,
+            user_id=user_id,
+            timeout_s=30.0,
+            operation="helper_results_answer",
+        )
+    except Exception as exc:
+        logger.warning("Helper results could not be combined: %s", exc)
+        raw = ""
+    combined = str(raw or "").strip()
+    if combined:
+        return combined
+    findings = "\n".join("- %s: %s" % (_shorten(item["task"], 80), _shorten(item["answer"], 300)) for item in results)
+    return "I lost the connection before I could put this together, but here is what the helpers found:\n%s" % findings
 
 
 def off_task_answer_message(task: ActiveTask) -> str:

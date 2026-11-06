@@ -4,6 +4,7 @@ import CallBriefing, {
   CALL_APPROVE_COMMAND,
   CALL_CANCEL_COMMAND,
   answerCallBriefing,
+  callBriefingBelongsElsewhere,
   callBriefingFromConsultEvent,
 } from './CallBriefing';
 
@@ -23,6 +24,24 @@ const pendingSearchCall = {
   untrusted_source: true,
   task_id: 'task-1',
 };
+
+describe('callBriefingBelongsElsewhere', () => {
+  const inChatA = { chat_thread_id: 'chat-a', awaiting_confirmation: true };
+
+  it('hides a chat approval while a different chat is open', () => {
+    expect(callBriefingBelongsElsewhere(inChatA, 'chat-b')).toBe(true);
+  });
+
+  it('shows it in its own chat and outside chat', () => {
+    expect(callBriefingBelongsElsewhere(inChatA, 'chat-a')).toBe(false);
+    expect(callBriefingBelongsElsewhere(inChatA, null)).toBe(false);
+  });
+
+  it('shows an approval that was not asked in a saved chat', () => {
+    expect(callBriefingBelongsElsewhere({ awaiting_confirmation: true }, 'chat-b')).toBe(false);
+    expect(callBriefingBelongsElsewhere(null, 'chat-b')).toBe(false);
+  });
+});
 
 describe('callBriefingFromConsultEvent', () => {
   it('turns a pending phone confirmation into an awaiting briefing with the exact number', () => {

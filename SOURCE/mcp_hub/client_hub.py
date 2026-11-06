@@ -1461,6 +1461,12 @@ class MCPClientHub:
             # irreversible calendar writes (e.g. delete) stay confirmation-gated
             # by the tier-independent unified confirmation gate. ---
             "calendar",
+            # --- Background agents: a child gets this level's tools at most
+            # and never the browser, payment or desktop tools. Without these
+            # "start a background agent" had nothing to call at Solo. ---
+            "start_agent",
+            "check_agents",
+            "cancel_agent",
             # --- Self-reporting & introspection ---
             "file_bug_report",
             "user_capabilities",

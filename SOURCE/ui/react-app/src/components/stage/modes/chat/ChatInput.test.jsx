@@ -19,6 +19,17 @@ const renderInput = (props = {}) => render(
   />,
 );
 
+describe('ChatInput while a chat is loading', () => {
+  it('keeps taking keystrokes, because a disabled box drops what is typed', () => {
+    const onSend = vi.fn();
+    renderInput({ disabled: true, value: 'yes', onSend });
+
+    expect(screen.getByRole('textbox', { name: 'Message Viola' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Send message' })).toBeDisabled();
+    expect(onSend).not.toHaveBeenCalled();
+  });
+});
+
 describe('ChatInput accessibility', () => {
   it('names the composer for assistive tech, not only by placeholder', () => {
     renderInput();

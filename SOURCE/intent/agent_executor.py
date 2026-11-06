@@ -9398,21 +9398,6 @@ class AgentExecutor:
         # extension outside the parity surface.
         run_in_background = True
 
-        if run_in_background:
-            shared_names = _shared_state_tool_names(
-                self._native_tools_for_child(
-                    subagent_mode=effective_mode,
-                    subagent_type=effective_subagent_type,
-                )
-            )
-            if shared_names:
-                return ToolResult(
-                    ok=False,
-                    error=_background_shared_state_error(shared_names),
-                    error_category="SUBAGENT_SHARED_STATE_TOOLS",
-                    retryable=False,
-                )
-
         from services.agent_runtime.registry import (
             AgentLimitExceededError,
             agent_registry,
@@ -9432,6 +9417,10 @@ class AgentExecutor:
         # request returned; SSE finalize_stream is what the web UI actually
         # consumes.
         delivery_channel = getattr(self, "_channel", None)
+        helper_done = asyncio.Event()
+        if getattr(self, "_live_helpers", None) is None:
+            self._live_helpers = {}
+        self._live_helpers[agent_id] = helper_done
 
         async def _runner(cancel_event: asyncio.Event) -> str:
             from intent.hooks import dispatch_lifecycle
@@ -9474,11 +9463,22 @@ class AgentExecutor:
                         subagent_mode=effective_mode,
                         subagent_type=effective_subagent_type,
                         model_override=str(tool_args.get("model") or "").strip() or None,
-                        allow_shared_state_tools=False,
+                        # Background children run beside the parent, so the
+                        # browser, payment and desktop tools stay with it. A
+                        # fork inherits those tools, and refusing to start here
+                        # meant no background agent could ever run.
+                        exclude_shared_state_tools=True,
                     )
                     answer = _child_answer_text(child_result)
                     finalize_stream(stream_id, content=answer)
-                    if delivery_channel is not None and answer:
+                    if getattr(self, "_agent_loop_active", False):
+                        # The parent is still working and writes the reply. This
+                        # report used to go straight to the stage, raw.
+                        self._held_helper_answers = [
+                            *(getattr(self, "_held_helper_answers", None) or []),
+                            {"task": task, "answer": answer},
+                        ]
+                    elif delivery_channel is not None and answer:
                         try:
                             await delivery_channel.send(answer)
                         except Exception as exc:
@@ -9534,6 +9534,10 @@ class AgentExecutor:
                         error=str(exc),
                     )
                     raise
+
+                finally:
+                    helper_done.set()
+                    self._live_helpers.pop(agent_id, None)
 
         try:
             registry_start = getattr(agent_registry, "start", None)
@@ -9593,7 +9597,11 @@ class AgentExecutor:
                     runner_task=runner_task,
                 )
         except AgentLimitExceededError as exc:
-            return ToolResult(ok=False, error=str(exc))
+            self._live_helpers.pop(agent_id, None)
+            return ToolResult(
+                ok=False,
+                error="%s Tell the user how many are running; they can wait or cancel one from the agents drawer." % exc,
+            )
 
         if not run_in_background:
             background_wait_task = asyncio.create_task(background_signal.wait())

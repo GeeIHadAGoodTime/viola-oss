@@ -40,9 +40,11 @@ from intent.agent_middleware import (
 from intent.active_task import (
     ActiveTask,
     add_turn_reminder,
+    answer_from_helper_results,
     final_answer_is_off_task,
     off_task_answer_message,
     off_task_correction_text,
+    user_authored_text,
 )
 from intent.context_compaction import (
     compact_native_messages,
@@ -148,6 +150,13 @@ _COMPACTION_HARD_CEILING = 6  # absolute defense-in-depth (always-allow at most 
 # A run this long, or one that compacted, is checked for having wandered off the
 # request before it may report success. Short runs cannot drift and pay nothing.
 _ANSWER_CHECK_MIN_STEPS = 15
+# A bad gateway on one model call must not end a run that has work in hand: T8b
+# lost three finished helpers to one HTTP 502.
+_TRANSIENT_TURN_RETRIES = 2
+_TRANSIENT_TURN_BACKOFF_S = 2.0
+_TRANSIENT_ERROR_CATEGORIES = frozenset({"server", "overloaded", "transport", "timeout"})
+_TRANSIENT_STATUS_TEXT_RE = re.compile(r"\b(?:500|502|503|504|529)\b")
+_HELPER_WAIT_S = 240.0
 
 
 def _compaction_should_allow(executor: Any) -> bool:
@@ -355,6 +364,48 @@ def _prompt_bundle_has_current_user_text(prompt_context_bundle: PromptFrameBundl
     return False
 
 
+def _is_transient_turn_error(exc: BaseException) -> bool:
+    from services.llm.request_policy import classify_provider_error
+
+    # Some routes only carry the status in the message ("HTTP 502").
+    return classify_provider_error(exc) in _TRANSIENT_ERROR_CATEGORIES or bool(
+        _TRANSIENT_STATUS_TEXT_RE.search(str(exc))
+    )
+
+
+def _log_reasoning_tier(executor: Any) -> None:
+    """Say which reasoning tier this run asks for, so helpers can be checked from the log."""
+    from config.defaults import get_configured_reasoning_effort
+
+    depth = getattr(executor, "_depth", 0)
+    tier = "background_agent" if isinstance(depth, int) and depth > 0 else "agent"
+    model = executor._get_model_name_safe()
+    logger.info(
+        "Agent run reasoning_tier=%s effort=%s depth=%s model=%s task=%s",
+        tier,
+        get_configured_reasoning_effort(tier, model),
+        depth,
+        model,
+        getattr(executor, "task_id", "?"),
+    )
+
+
+async def _answer_from_helpers(executor: Any, active_task: ActiveTask) -> str:
+    """Finish for the parent when it can no longer reach the model itself."""
+    live = dict(getattr(executor, "_live_helpers", None) or {})
+    if live:
+        logger.info("Agent run failed with %d helpers still working; waiting for them", len(live))
+        waits = [asyncio.ensure_future(done.wait()) for done in live.values()]
+        await asyncio.wait(waits, timeout=_HELPER_WAIT_S)
+        for wait in waits:
+            wait.cancel()
+    held = list(getattr(executor, "_held_helper_answers", None) or [])
+    if not held:
+        return ""
+    executor._held_helper_answers = []
+    return await answer_from_helper_results(active_task, held, user_id=str(getattr(executor, "_user_id", "") or ""))
+
+
 def _run_was_compacted(executor: Any) -> bool:
     count = getattr(executor, "_compaction_count", 0)
     return isinstance(count, int) and count > 0
@@ -378,7 +429,8 @@ def _active_task_for_run(
         messages=messages,
         restored=restored,
         previous=previous if isinstance(previous, ActiveTask) else None,
-        checkpoint_request=recorded if isinstance(recorded, str) and recorded else str(description or ""),
+        checkpoint_request=recorded if isinstance(recorded, str) else "",
+        checkpoint_description=description if isinstance(description, str) else "",
     )
     executor._active_task = active_task
     if isinstance(context, dict) and active_task.request:
@@ -2232,6 +2284,9 @@ async def run_agent_loop(
     _bind_active_taint_tracker(taint_tracker)
     _bind_file_gate_context_for_run(executor, loop_messages, user_text)
     active_task = _active_task_for_run(executor, checkpoint, user_text, loop_messages, initial_messages is not None)
+    executor._agent_loop_active = True
+    _log_reasoning_tier(executor)
+    _transient_turn_retries = 0
     pending_hook_context_messages: list[dict[str, Any]] = []
     native_turn_max_tokens = _native_turn_max_tokens_for_model(executor._get_model_name_safe())
 
@@ -2580,7 +2635,7 @@ async def run_agent_loop(
             replacement_writer=lambda records: record_tool_result_replacements(executor, records),
             session_id=tool_result_replacement_session_id(executor),
         )
-        if active_task.steps_taken or initial_messages is not None or _run_was_compacted(executor):
+        if turn_messages and active_task.request not in user_authored_text(turn_messages[-1]):
             # Added to this outgoing copy only: the goal rides on every turn of a
             # working run whatever happens to history, and history does not grow.
             turn_messages = add_turn_reminder(turn_messages, active_task.render_reminder())
@@ -3716,6 +3771,17 @@ async def run_agent_loop(
                     call_kind="agent_loop",
                     exc=exc,
                 )
+                if _transient_turn_retries < _TRANSIENT_TURN_RETRIES and _is_transient_turn_error(exc):
+                    _transient_turn_retries += 1
+                    logger.warning(
+                        "Agent turn %d hit a temporary model error, retry %d/%d: %s",
+                        iterations,
+                        _transient_turn_retries,
+                        _TRANSIENT_TURN_RETRIES,
+                        exc,
+                    )
+                    await asyncio.sleep(_TRANSIENT_TURN_BACKOFF_S * _transient_turn_retries)
+                    continue
                 if isinstance(exc, RuntimeError) and _is_native_tool_calling_unsupported(exc):
                     logger.exception("Native tool calling not supported by active provider")
                     terminal_provider_error = "PROVIDER_UNSUPPORTED"
@@ -3729,6 +3795,8 @@ async def run_agent_loop(
                 executor._llm_error_occurred = True
                 outcome = "llm_error"
                 break
+
+            _transient_turn_retries = 0
 
             # Per-turn billing: reservation settlement happened in
             # _call_native_turn; keep the post-settle cap recheck so a turn
@@ -3858,7 +3926,9 @@ async def run_agent_loop(
                     operator_message = user_message_for_operator_diagnostic(operator_diagnostic)
                     if operator_message:
                         _set_final_response(executor, operator_message, continue_listening=False)
-                outcome = "llm_error" if executor._llm_error_occurred else "success"
+                # Tools may have run, but the model never answered: that is a
+                # failure whatever came before it, not a success.
+                outcome = "llm_error"
                 break
 
             if resp_type in {"ask_user", "clarification"}:
@@ -5101,6 +5171,12 @@ async def run_agent_loop(
                 },
             )
 
+        if outcome == "llm_error":
+            helper_answer = await _answer_from_helpers(executor, active_task)
+            if helper_answer:
+                final_answer = helper_answer
+                _set_final_response(executor, final_answer, continue_listening=False)
+
         from intent.agent_executor import _apply_approval_blocked_final_answer
 
         final_answer = _apply_approval_blocked_final_answer(executor, final_answer)
@@ -5543,6 +5619,7 @@ async def run_agent_loop(
             error=str(exc),
         )
     finally:
+        executor._agent_loop_active = False
         _dispatch_session_end("agent_loop_teardown")
         hook_file_watcher = getattr(executor, "_hook_file_watcher", None)
         if hook_file_watcher is not None:

@@ -3683,7 +3683,8 @@ async def spawn_parallel_subtasks(
         "Provide prompt as the exact task and description as the short reason/label. "
         "The optional mode selects the child's context model: 'fork' (inherit parent) or 'fresh' (clean slate). "
         "All launches return immediately with an agent_id; completion arrives through task notifications. "
-        "check_agents returns status for prior background work."
+        "check_agents returns status for prior background work. "
+        "A background agent has no browser, payment or desktop tools; do that work yourself."
     ),
     annotations=_SAFE,
     # F-014 (R3-C): ``start_agent`` must remain visible on turn one so the
@@ -3889,6 +3890,8 @@ async def check_pending_tasks(
                     continue
                 status = data.get("status", "")
                 if status not in ("in_progress", "interrupted", "waiting_for_user"):
+                    continue
+                if checkpoints.is_stale_pending(data):
                     continue
                 desc = data.get("task_description", "")
                 if query and query.lower() not in desc.lower():

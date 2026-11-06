@@ -189,6 +189,7 @@ function ChatModeInner({
   const interceptCloudConsent = useCloudConsentGate();
   const eventSourceRef = useRef(null);
   const activeThreadIdRef = useRef(null);
+  const newChatPendingRef = useRef(null);
   const activeStreamIdRef = useRef(null);
   const streamingRef = useRef(false);
   const dragDepthRef = useRef(0);
@@ -874,6 +875,10 @@ function ChatModeInner({
 
   const sendText = useCallback(async (text) => {
     const clean = text.trim();
+    // "New chat" is still being created: wait for it. Sent now, this message
+    // would go to the chat being left, and its bubble would be wiped when the
+    // new chat opened. A "yes" there could answer that chat's approval.
+    if (clean && newChatPendingRef.current) await newChatPendingRef.current;
     if (!clean || streamingRef.current || threadReadBlocksSend()) return;
     // The SAME first-run consent gate every other turn entry point uses. This
     // composer had none: a brand-new cloud user who opened Chat first could not
@@ -976,6 +981,15 @@ function ChatModeInner({
     }
   }, [attachStream, ensureThread, selectedModel, interceptCloudConsent, showUnconfirmedRequest, threadReadBlocksSend, retireThreadRefresh]);
 
+  // Tell the shell which chat is open, so a pending approval shows only in the
+  // chat it belongs to.
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent('viola:chat:active-thread', { detail: { threadId: activeThreadId } }));
+  }, [activeThreadId]);
+  useEffect(() => () => {
+    window.dispatchEvent(new CustomEvent('viola:chat:active-thread', { detail: { threadId: null } }));
+  }, []);
+
   const stopStreaming = useCallback(async () => {
     pendingStopRef.current = true;
     if (streamSessionRef.current) return streamSessionRef.current.cancel();
@@ -990,17 +1004,23 @@ function ChatModeInner({
     if (streamingRef.current && !(await stopStreaming())) return;
     if (requestGenerationRef.current !== generation) return;
     retireModelSave();
-    const data = await apiFetch('/v1/chat/threads', {
+    const creating = apiFetch('/v1/chat/threads', {
       method: 'POST',
       body: JSON.stringify({ title: 'New chat', model: selectedModel || null }),
+    }).then((data) => {
+      if (requestGenerationRef.current !== generation) return;
+      setThreads((current) => [data.thread, ...current]);
+      setActiveThreadId(data.thread.id);
+      activeThreadIdRef.current = data.thread.id;
+      setActiveThread(data.thread);
+      setTitleDraft(data.thread.title);
+      setMessages([]);
     });
-    if (requestGenerationRef.current !== generation) return;
-    setThreads((current) => [data.thread, ...current]);
-    setActiveThreadId(data.thread.id);
-    activeThreadIdRef.current = data.thread.id;
-    setActiveThread(data.thread);
-    setTitleDraft(data.thread.title);
-    setMessages([]);
+    const settled = creating.catch(() => {}).finally(() => {
+      if (newChatPendingRef.current === settled) newChatPendingRef.current = null;
+    });
+    newChatPendingRef.current = settled;
+    await creating;
   }, [selectedModel, stopStreaming, retireModelSave]);
 
   useEffect(() => {

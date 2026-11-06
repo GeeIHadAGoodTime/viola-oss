@@ -73,7 +73,6 @@ export default function ChatInput({
         placeholder="Message Viola"
         aria-label="Message Viola"
         rows={1}
-        disabled={disabled}
       />
       <button
         type="button"

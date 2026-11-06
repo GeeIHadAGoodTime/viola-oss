@@ -24,6 +24,7 @@ import TimerCountdown from './components/TimerCountdown';
 import { useSettings } from './hooks/useSettings';
 import { useAvailableRooms } from './hooks/useAvailableRooms';
 import CallBriefing, {
+  callBriefingBelongsElsewhere,
   CALL_APPROVE_COMMAND,
   CALL_CANCEL_COMMAND,
   answerCallBriefing,
@@ -734,6 +735,12 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
   // `call_consultation` when mid-call guidance is asked).  Each toast
   // clears either on dismiss or when a new event of the same type arrives.
   const [callBriefing, setCallBriefing] = useState(null);
+  const [openChatThreadId, setOpenChatThreadId] = useState(null);
+  useEffect(() => {
+    const handleActiveThread = (event) => setOpenChatThreadId(event.detail?.threadId || null);
+    window.addEventListener('viola:chat:active-thread', handleActiveThread);
+    return () => window.removeEventListener('viola:chat:active-thread', handleActiveThread);
+  }, []);
   const [callConsultation, setCallConsultation] = useState(null);
   const consultationReply = useCallConsultationReply(callConsultation, setCallConsultation);
   const [lastEndedCall, setLastEndedCall] = useState(null);
@@ -4212,7 +4219,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
 
       {/* Phone-call UX toasts (bottom-right) driven by telephony WS events */}
       <CallBriefing
-        briefing={callBriefing}
+        briefing={callBriefingBelongsElsewhere(callBriefing, openChatThreadId) ? null : callBriefing}
         onDismiss={() => setCallBriefing(null)}
         onApprove={() => answerCallBriefingInItsChat(CALL_APPROVE_COMMAND)}
         onCancel={() => answerCallBriefingInItsChat(CALL_CANCEL_COMMAND).then(() => setCallBriefing(null))}
