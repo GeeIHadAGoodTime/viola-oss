@@ -55,12 +55,12 @@ logger = get_logger(__name__)
 ANSWER_EVENT_KEY = "answer"
 FINAL_ANSWER_PHASE = "final_answer"
 
-# Mirrors voice/synthesis/text_normalizer.py: a spoken reply longer than six
+# Mirrors voice/synthesis/text_normalizer.py: a spoken reply longer than ten
 # sentences or 800 characters (about 45 seconds) stops there and ends with this
 # suffix. A reply inside the budget is spoken whole. Live speech keeps the same
 # budget and says the suffix the moment it reaches the limit, so a long answer
 # never leaves her silent waiting for the model to finish.
-MAX_LIVE_SENTENCES = 6
+MAX_LIVE_SENTENCES = 10
 MAX_SPOKEN_CHARS = 800
 SUMMARY_SUFFIX = "I'll send the full details in chat."
 

@@ -105,15 +105,15 @@ class FormatterLocaleTests(unittest.TestCase):
     def test_english_link_and_summary_messages_remain_unchanged(self):
         self.assertEqual(self.module.normalize_for_speech("[View](https://example.com)"), "View (link sent in chat)")
         self.assertEqual(
-            self.module.normalize_for_speech("One. Two. Three. Four. Five. Six. Seven."),
-            "One. Two. Three. Four. Five. Six. I'll send the full details in chat.",
+            self.module.normalize_for_speech("A. B. C. D. E. F. G. H. I. J. K."),
+            "A. B. C. D. E. F. G. H. I. J. I'll send the full details in chat.",
         )
 
     def test_non_english_summary_is_bounded_and_has_no_english_suffix(self):
         for language, text, expected in (
-            ("fr", "Un. Deux. Trois. Quatre. Cinq. Six. Sept.", "Un. Deux. Trois. Quatre. Cinq. Six…"),
-            ("ja", "一。二。三。四。五。六。七。", "一。 二。 三。 四。 五。 六…"),
-            ("hi", "एक। दो। तीन। चार। पाँच। छह। सात।", "एक। दो। तीन। चार। पाँच। छह…"),
+            ("fr", "A. B. C. D. E. F. G. H. I. J. K.", "A. B. C. D. E. F. G. H. I. J…"),
+            ("ja", "一。二。三。四。五。六。七。八。九。十。百。", "一。 二。 三。 四。 五。 六。 七。 八。 九。 十…"),
+            ("hi", "एक। दो। तीन। चार। पाँच। छह। सात। आठ। नौ। दस। ग्यारह।", "एक। दो। तीन। चार। पाँच। छह। सात। आठ। नौ। दस…"),
         ):
             with self.subTest(language=language):
                 self.assertEqual(self.module.normalize_for_speech(text, language=language), expected)

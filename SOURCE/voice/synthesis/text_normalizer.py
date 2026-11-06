@@ -270,7 +270,7 @@ _TENS = ["", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eigh
 # one stops at the budget and the rest stays on screen. About 45 seconds.
 _MAX_SPOKEN_CHARS = 800
 _SUMMARY_CHARS = _MAX_SPOKEN_CHARS
-_MAX_SPOKEN_SENTENCES = 6
+_MAX_SPOKEN_SENTENCES = 10
 _SUMMARY_SUFFIX = "I'll send the full details in chat."
 
 # Initialisms: spell each letter or digit-like suffix as a spoken token.
@@ -1038,7 +1038,7 @@ class SpeechFormatter:
 
     def __init__(self, *, summarize: bool = True, config: object | None = None) -> None:
         # Viola's user-facing TTS sets summarize=True so the assistant doesn't
-        # drone on at length; long replies get capped at 6 sentences and end
+        # drone on at length; long replies get capped at 10 sentences and end
         # with "I'll send the full details in chat." Other speakers piped
         # through this formatter — e.g. the receptionist role-play in
         # tools/phone_receptionist_pipeline.py — must opt out, otherwise
@@ -1112,7 +1112,7 @@ def normalize_for_speech(text: str, *, summarize: bool = True, language: object 
     ``summarize=False`` keeps every sentence and never appends Viola's
     "I'll send the full details in chat." suffix. Use it for non-Viola
     speakers like the receptionist role-play whose dialogue should not
-    be capped at six sentences.
+    be capped at ten sentences.
     """
     formatter = _DEFAULT_FORMATTER if summarize else _VERBATIM_FORMATTER
     return formatter.format(text, language=language)

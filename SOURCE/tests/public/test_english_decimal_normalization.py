@@ -238,8 +238,8 @@ class EnglishDecimalNormalization(unittest.TestCase):
     def test_english_url_and_summary_controls_remain_present(self):
         self.assertEqual(self.formatter.format("See https://example.com/1.25?secret=fixture"), "See (link sent in chat)")
         self.assertEqual(
-            self.module.SpeechFormatter(config=self.formatter._config).format("One. Two. Three. Four. Five. Six. Seven."),
-            "One. Two. Three. Four. Five. Six. I'll send the full details in chat.",
+            self.module.SpeechFormatter(config=self.formatter._config).format("A. B. C. D. E. F. G. H. I. J. K."),
+            "A. B. C. D. E. F. G. H. I. J. I'll send the full details in chat.",
         )
 
 
