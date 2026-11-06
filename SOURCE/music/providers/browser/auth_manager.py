@@ -501,7 +501,7 @@ class BrowserAuthManager:
         from music.spotify import connection
 
         connection.forget_verdict(user_id)
-        connection.start_verification(user_id, reason="sign_in", notify_failure=True)
+        connection.start_verification(user_id, reason="sign_in", notify_failure=True, direct_sign_in_if_refused=True)
 
     async def _select_music_source(self, provider_name: str) -> bool:
         """Make *provider_name* the music source the user chose in Settings.

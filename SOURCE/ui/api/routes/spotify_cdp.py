@@ -6,6 +6,8 @@ session. Spotify login is handled only by the in-app BrowserAuth overlay.
 Endpoints:
     GET  /v1/spotify/cdp/status  - Check Spotify CDP login status
     POST /v1/spotify/cdp/disconnect - Disconnect Spotify CDP session
+    POST /v1/spotify/direct-sign-in - Sign in in the player's own visible window
+    POST /v1/spotify/direct-sign-in/cancel - Close that window
 """
 
 from __future__ import annotations
@@ -18,6 +20,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 
 from contracts.api_response import failure_response, success_response
 from core.logging_config import get_logger
@@ -173,6 +176,12 @@ def _spotify_connection(user_id: str) -> Any:
     return get_spotify_connection(user_id)
 
 
+def _cancel_direct_sign_in(user_id: str) -> None:
+    from music.spotify.connection import cancel_direct_sign_in
+
+    cancel_direct_sign_in(user_id)
+
+
 def _cancel_browser_auth_login_watch(user_id: str) -> None:
     from music.providers.browser.auth_manager import get_browser_auth_manager
 
@@ -320,6 +329,39 @@ async def get_spotify_status(user_id: str = Depends(get_current_user_id)) -> Any
     )
 
 
+class DirectSignInRequest(BaseModel):
+    # Settings > Music Source: save Spotify as the source once this sign-in works.
+    select_as_music_source: bool = False
+
+
+@status_router.post(
+    "/direct-sign-in",
+    dependencies=[Depends(require_auth)],
+)
+async def start_direct_sign_in(
+    body: DirectSignInRequest | None = None,
+    user_id: str = Depends(get_current_user_id),
+) -> Any:
+    """Open the user's playback profile in a visible window to sign in to Spotify."""
+    from music.spotify import connection
+
+    await asyncio.to_thread(_stop_spotify_playback)
+    select = bool(body.select_as_music_source) if body is not None else False
+    started = connection.start_direct_sign_in(user_id, select_as_music_source=select)
+    return success_response({"started": started, "state": connection.SIGNING_IN})
+
+
+@status_router.post(
+    "/direct-sign-in/cancel",
+    dependencies=[Depends(require_auth)],
+)
+async def cancel_direct_sign_in(user_id: str = Depends(get_current_user_id)) -> Any:
+    """Close the sign-in window without signing in."""
+    from music.spotify import connection
+
+    return success_response({"cancelled": connection.cancel_direct_sign_in(user_id)})
+
+
 @status_router.get(
     "/diagnostic",
     dependencies=[Depends(require_auth)],
@@ -362,6 +404,7 @@ async def disconnect_spotify_cdp(user_id: str = Depends(get_current_user_id)) ->
     _cdp_disconnect_in_progress = True
     _mark_cdp_session_cookies_stale()
     try:
+        _cancel_direct_sign_in(user_id)
         await asyncio.to_thread(_stop_spotify_playback)
         await asyncio.to_thread(controller.disconnect)
         # Sign Viola's in-app browser out too, or the next status check finds

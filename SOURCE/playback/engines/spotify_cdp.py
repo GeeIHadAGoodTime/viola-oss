@@ -495,6 +495,7 @@ class SpotifyCDPEngine(ProviderPlaybackEngine):
             connection.NO_BROWSER,
             connection.PLAYER_UNAVAILABLE,
             connection.DRM_UNAVAILABLE,
+            connection.SIGNING_IN,
         )
         if known:
             message = connection.message_for(state)

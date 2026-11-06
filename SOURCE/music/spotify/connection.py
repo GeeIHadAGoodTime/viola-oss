@@ -16,6 +16,13 @@ States:
 ``no_browser``         Neither Edge nor Chrome is installed.
 ``player_unavailable`` The playback browser could not start or reach Spotify.
 ``drm_unavailable``    The playback browser cannot decrypt protected audio.
+``signing_in``         The user is signing in, in the player's own window.
+
+There are two ways in. Normally the user signs in inside Viola and the cookie is
+handed to the player. If Spotify refuses that, or the user prefers it, the player's
+own profile opens in a small visible window and the user signs in there; that
+sign-in lives in the player's profile (``sign_in_source`` = ``player``), needs no
+handoff and survives a restart like any browser sign-in.
 
 The verdict is kept in memory and in a small file inside the user's playback
 profile (no cookie values, nothing secret), so it survives a restart and goes
@@ -41,11 +48,15 @@ SESSION_REJECTED = "session_rejected"
 NO_BROWSER = "no_browser"
 PLAYER_UNAVAILABLE = "player_unavailable"
 DRM_UNAVAILABLE = "drm_unavailable"
+SIGNING_IN = "signing_in"
+
+SIGN_IN_SOURCE_PLAYER = "player"
 
 _MESSAGES = {
     NOT_SIGNED_IN: "Spotify isn't connected. Connect it in Settings > Music.",
     CHECKING: "Viola is checking your Spotify sign-in.",
     CONNECTED: "",
+    SIGNING_IN: "Finish signing in to Spotify in the window Viola opened.",
     SESSION_REJECTED: "Spotify didn't accept your sign-in. Sign in to Spotify again in Settings > Music.",
     NO_BROWSER: (
         "Spotify needs Microsoft Edge or Google Chrome to play music, and neither was found on this "
@@ -64,6 +75,10 @@ _MESSAGES = {
 PLAY_DID_NOT_START_MESSAGE = (
     "Spotify is connected, but that song didn't start. Try again. If it keeps happening, restart Viola."
 )
+
+HANDOVER_REFUSED_MESSAGE = "Spotify wants you to sign in once more. Finish signing in in the window Viola opened."
+DIRECT_SIGN_IN_TIMEOUT_SECONDS = 600.0
+DIRECT_SIGN_IN_POLL_SECONDS = 2.0
 
 VERDICT_FILE = "viola_connection.json"
 
@@ -105,6 +120,7 @@ class SpotifyConnection:
 _lock = threading.RLock()
 _verdicts: dict[str, dict[str, Any]] = {}
 _running: set[str] = set()
+_signing_in: dict[str, threading.Event] = {}
 _last_failures: dict[str, dict[str, Any]] = {}
 
 
@@ -151,13 +167,23 @@ def _load_verdict(user_id: str) -> dict[str, Any] | None:
     return payload
 
 
-def record_verdict(user_id: str, state: str, *, detail: str = "") -> SpotifyConnection:
+def record_verdict(
+    user_id: str,
+    state: str,
+    *,
+    detail: str = "",
+    sign_in_source: str | None = None,
+) -> SpotifyConnection:
     """Remember what the player found. Every state change is logged."""
     if state not in _MESSAGES:
         raise ValueError("Unknown Spotify connection state: %s" % state)
     payload = {"state": state, "detail": detail[:200], "checked_at": time.time()}
+    earlier = _load_verdict(user_id) or {}
+    source = sign_in_source or earlier.get("sign_in_source")
+    if source:
+        payload["sign_in_source"] = source
     with _lock:
-        previous = (_verdicts.get(user_id) or {}).get("state")
+        previous = earlier.get("state")
         _verdicts[user_id] = dict(payload)
         if state == CONNECTED:
             _last_failures.pop(user_id, None)
@@ -170,6 +196,14 @@ def record_verdict(user_id: str, state: str, *, detail: str = "") -> SpotifyConn
     if previous != state:
         logger.info("Spotify connection: %s -> %s (%s)", previous or "unknown", state, detail or "no detail")
     return SpotifyConnection(state=state, message=_MESSAGES[state], checked_at=payload["checked_at"])
+
+
+def signed_in_inside_the_player(user_id: str | None) -> bool:
+    """Did the user sign in in the player's own window? Then there is nothing to hand over."""
+    resolved = resolve_user_id(user_id)
+    if not resolved:
+        return False
+    return (_load_verdict(resolved) or {}).get("sign_in_source") == SIGN_IN_SOURCE_PLAYER
 
 
 def forget_verdict(user_id: str) -> None:
@@ -194,6 +228,15 @@ def _sign_in_present(user_id: str) -> bool | None:
         return None
 
 
+def _login_watch_active(user_id: str) -> bool:
+    try:
+        from music.providers.browser.auth_manager import get_browser_auth_manager
+
+        return get_browser_auth_manager(user_id).is_login_watch_active("spotify")
+    except Exception:
+        return False
+
+
 def get_spotify_connection(user_id: str | None = None) -> SpotifyConnection:
     """The current answer. Blocking but cheap; async callers use ``asyncio.to_thread``.
 
@@ -207,10 +250,18 @@ def get_spotify_connection(user_id: str | None = None) -> SpotifyConnection:
 
     with _lock:
         checking = resolved in _running
+        signing_in = resolved in _signing_in
+    if signing_in:
+        return SpotifyConnection(SIGNING_IN, _MESSAGES[SIGNING_IN])
     if checking:
         return SpotifyConnection(CHECKING, _MESSAGES[CHECKING])
 
     verdict = _load_verdict(resolved)
+    if verdict is not None and verdict.get("sign_in_source") == SIGN_IN_SOURCE_PLAYER:
+        # The sign-in lives in the player's own profile, and Disconnect removes
+        # this verdict before anything else, so leftovers can't bring it back.
+        state = str(verdict.get("state"))
+        return SpotifyConnection(state, _MESSAGES[state], verdict.get("checked_at"))
     # The in-app store is the only sign-in there is. Files left in the playback
     # profile are not: Disconnect can't always delete them at once, and they must
     # not bring Spotify back.
@@ -222,7 +273,8 @@ def get_spotify_connection(user_id: str | None = None) -> SpotifyConnection:
         return SpotifyConnection(NOT_SIGNED_IN, _MESSAGES[NOT_SIGNED_IN])
 
     if verdict is None:
-        start_verification(resolved, reason="sign_in_without_verdict", notify_failure=True)
+        if not _login_watch_active(resolved):  # the watch starts the check itself when it finishes
+            start_verification(resolved, reason="sign_in_without_verdict", notify_failure=True)
         return SpotifyConnection(CHECKING, _MESSAGES[CHECKING])
 
     state = str(verdict.get("state"))
@@ -242,6 +294,8 @@ def peek_state(user_id: str | None = None) -> str:
     if not resolved:
         return NOT_SIGNED_IN
     with _lock:
+        if resolved in _signing_in:
+            return SIGNING_IN
         if resolved in _running:
             return CHECKING
     verdict = _load_verdict(resolved)
@@ -269,8 +323,18 @@ def verify_now(user_id: str, *, reason: str) -> SpotifyConnection:
     return result
 
 
-def start_verification(user_id: str, *, reason: str, notify_failure: bool = False) -> bool:
-    """Run ``verify_now`` on a background thread. One at a time per user."""
+def start_verification(
+    user_id: str,
+    *,
+    reason: str,
+    notify_failure: bool = False,
+    direct_sign_in_if_refused: bool = False,
+) -> bool:
+    """Run ``verify_now`` on a background thread. One at a time per user.
+
+    ``direct_sign_in_if_refused``: the user has just signed in and is watching,
+    so if Spotify refuses the handover, open the player's own sign-in right away.
+    """
     with _lock:
         if user_id in _running:
             return False
@@ -286,11 +350,103 @@ def start_verification(user_id: str, *, reason: str, notify_failure: bool = Fals
         finally:
             with _lock:
                 _running.discard(user_id)
+        if direct_sign_in_if_refused and result is not None and result.state == SESSION_REJECTED:
+            notify_spotify(user_id, HANDOVER_REFUSED_MESSAGE, code="spotify_sign_in_in_window")
+            start_direct_sign_in(user_id)
+            return
         if notify_failure and result is not None and not result.connected:
             notify_spotify(user_id, result.message, code="spotify_%s" % result.state)
 
     threading.Thread(target=_run, name="SpotifyConnectionCheck", daemon=True).start()
     return True
+
+
+def start_direct_sign_in(user_id: str, *, select_as_music_source: bool = False) -> bool:
+    """Open the player's own window for the user to sign in. Returns False if already open."""
+    cancel = threading.Event()
+    with _lock:
+        if user_id in _signing_in:
+            return False
+        _signing_in[user_id] = cancel
+
+    def _run() -> None:
+        try:
+            _direct_sign_in(user_id, cancel, select_as_music_source=select_as_music_source)
+        except Exception:
+            logger.exception("Spotify sign-in in the player's window failed")
+            notify_spotify(user_id, message_for(PLAYER_UNAVAILABLE), code="spotify_player_unavailable", level="error")
+        finally:
+            with _lock:
+                _signing_in.pop(user_id, None)
+
+    threading.Thread(target=_run, name="SpotifyDirectSignIn", daemon=True).start()
+    return True
+
+
+def cancel_direct_sign_in(user_id: str) -> bool:
+    """Stop waiting and close the sign-in window. Returns True when one was open."""
+    with _lock:
+        cancel = _signing_in.get(user_id)
+    if cancel is None:
+        return False
+    cancel.set()
+    return True
+
+
+def _direct_sign_in(user_id: str, cancel: threading.Event, *, select_as_music_source: bool) -> None:
+    from music.providers.spotify_cdp import get_cdp_controller
+    from music.spotify.cdp_controller import SpotifyCDPError
+
+    controller = get_cdp_controller(user_id=user_id)
+    try:
+        controller.open_direct_sign_in()
+    except SpotifyCDPError as exc:
+        logger.warning("Spotify sign-in window did not open: %s", exc)
+        record_verdict(user_id, exc.state, detail="sign-in window")
+        notify_spotify(user_id, message_for(exc.state), code="spotify_%s" % exc.state, level="error")
+        return
+
+    deadline = time.monotonic() + DIRECT_SIGN_IN_TIMEOUT_SECONDS
+    status = "waiting"
+    while status == "waiting" and not cancel.is_set() and time.monotonic() < deadline:
+        cancel.wait(DIRECT_SIGN_IN_POLL_SECONDS)
+        status = controller.direct_sign_in_status()
+
+    if status != "signed_in" or cancel.is_set():
+        logger.info("Spotify sign-in window closed without a sign-in (%s)", status)
+        controller.close_direct_sign_in()
+        return
+
+    logger.info("Spotify sign-in seen in the player's window; hiding it and checking")
+    controller.close_direct_sign_in()
+    record_verdict(user_id, CHECKING, detail="direct sign-in", sign_in_source=SIGN_IN_SOURCE_PLAYER)
+    with _lock:
+        _signing_in.pop(user_id, None)
+        _running.add(user_id)
+    try:
+        result = verify_now(user_id, reason="direct_sign_in")
+    finally:
+        with _lock:
+            _running.discard(user_id)
+    if result.connected:
+        notify_spotify(user_id, "Spotify is connected.", code="spotify_connected")
+        if select_as_music_source:
+            _select_as_music_source(user_id)
+    else:
+        notify_spotify(user_id, result.message, code="spotify_%s" % result.state, level="error")
+
+
+def _select_as_music_source(user_id: str) -> None:
+    import asyncio
+
+    from core.asyncio_safe import get_main_loop
+    from music.providers.browser.auth_manager import get_browser_auth_manager
+
+    loop = get_main_loop()
+    if loop is None or not loop.is_running():
+        logger.warning("Spotify is connected, but the music source could not be saved (no event loop)")
+        return
+    asyncio.run_coroutine_threadsafe(get_browser_auth_manager(user_id)._select_music_source("spotify"), loop)
 
 
 def record_play_failure(user_id: str | None, *, state: str, message: str, code: str) -> None:
@@ -300,7 +456,7 @@ def record_play_failure(user_id: str | None, *, state: str, message: str, code: 
         return
     with _lock:
         _last_failures[resolved] = {"state": state, "message": message, "code": code, "at": time.monotonic()}
-    if state != CONNECTED:
+    if state not in (CONNECTED, SIGNING_IN):
         record_verdict(resolved, state, detail=code)
 
 
@@ -353,7 +509,9 @@ __all__ = [
     "NO_BROWSER",
     "PLAYER_UNAVAILABLE",
     "SESSION_REJECTED",
+    "SIGNING_IN",
     "SpotifyConnection",
+    "cancel_direct_sign_in",
     "clear_play_failure",
     "forget_verdict",
     "get_spotify_connection",
@@ -364,7 +522,9 @@ __all__ = [
     "record_play_failure",
     "record_verdict",
     "resolve_user_id",
+    "signed_in_inside_the_player",
     "spotify_usable",
+    "start_direct_sign_in",
     "start_verification",
     "verify_now",
 ]

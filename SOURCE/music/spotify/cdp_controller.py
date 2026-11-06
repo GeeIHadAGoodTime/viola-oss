@@ -33,6 +33,7 @@ from core.logging_config import get_logger
 from core.platform import get_data_dir
 from core.subprocess_utils import popen_silent
 from music.spotify.cookie_bridge import (
+    SPOTIFY_AUTH_COOKIE,
     get_cached_spotify_cookies,
     has_spotify_auth_cookie,
     inject_spotify_cookies_into_playwright,
@@ -141,6 +142,7 @@ def _track_text_matches(expected: str | None, observed: str | None) -> bool:
 # ---------------------------------------------------------------------------
 SPOTIFY_URL = "https://open.spotify.com"
 SPOTIFY_LIKED_SONGS_URL = "https://open.spotify.com/collection/tracks"
+SPOTIFY_DIRECT_LOGIN_URL = "https://accounts.spotify.com/login?continue=https%3A%2F%2Fopen.spotify.com%2F"
 
 # --- Liked Songs (the user's Spotify library) --------------------------------
 # Like/unlike goes through the logged-in web player itself, never through the
@@ -1221,6 +1223,9 @@ class SpotifyCDPController:
     any thread (including asyncio worker threads).
     """
 
+    # True while the player's own window is open for the user to sign in.
+    _direct_sign_in_open: bool = False
+
     def __init__(self, *, user_id: str | None = None) -> None:
         self._user_id = _resolve_spotify_cdp_user_id(user_id)
         self._profile_path = spotify_cdp_profile_path(self._user_id)
@@ -1740,12 +1745,17 @@ class SpotifyCDPController:
         self.find_browser()
         logger.info("Spotify CDP launch requested (random loopback DevTools port, offscreen=True)")
 
-    def _launch_chrome(self) -> int:
+    def _launch_chrome(self, *, sign_in_url: str | None = None) -> int:
         """Start the Spotify Chrome and return its per-launch DevTools port.
 
         Launched via subprocess (not Playwright) to keep native Widevine.
         See the DevTools exposure notes at the top of this module for the
         port, bind and origin policy.
+
+        With ``sign_in_url`` the same profile opens as a small visible app
+        window, for the user to sign in. App mode has no toolbar, so there is no
+        profile button to sign in to a Microsoft account with, no sidebar and no
+        extensions menu, on top of the same flags as the hidden player.
 
         Raises:
             SpotifyCDPError: If Chrome does not come up, or comes up accepting
@@ -1765,11 +1775,6 @@ class SpotifyCDPController:
             "--remote-allow-origins=%s" % CDP_NO_WEB_ORIGIN,
             "--autoplay-policy=no-user-gesture-required",
             "--user-data-dir=%s" % self._profile_path,
-            # Spotify's Web Playback UI needs a real headed page for
-            # the CDP click/DRM/user-gesture path. Keep normal playback
-            # off-screen but headed so the click path can start audio.
-            "--window-size=1280,720",
-            "--window-position=%d,%d" % (_OFFSCREEN_XY, _OFFSCREEN_XY),
             # The window is cloaked (see cloak_chrome_windows); do not let
             # Chrome treat it as occluded and throttle the page.
             "--disable-backgrounding-occluded-windows",
@@ -1778,6 +1783,13 @@ class SpotifyCDPController:
             # The playback profile is Viola's alone: never sync an account into it.
             "--disable-sync",
         ]
+        if sign_in_url:
+            chrome_args.extend(["--window-size=520,760", "--window-position=120,60"])
+        else:
+            # Spotify's Web Playback UI needs a real headed page for
+            # the CDP click/DRM/user-gesture path. Keep normal playback
+            # off-screen but headed so the click path can start audio.
+            chrome_args.extend(["--window-size=1280,720", "--window-position=%d,%d" % (_OFFSCREEN_XY, _OFFSCREEN_XY)])
         disabled_features: list[str] = []
         if browser_name == "Edge":
             chrome_args.extend(_EDGE_EXTRA_ARGS)
@@ -1815,7 +1827,7 @@ class SpotifyCDPController:
         if disabled_features:
             chrome_args.append("--disable-features=" + ",".join(disabled_features))
         # Start blank: Edge's new tab page would otherwise load MSN first.
-        chrome_args.append("about:blank")
+        chrome_args.append("--app=%s" % sign_in_url if sign_in_url else "about:blank")
         logger.info("Launching %s via subprocess (random loopback DevTools port, offscreen=True)", browser_name)
 
         # CREATE_NO_WINDOW on Windows prevents a console flash
@@ -1829,18 +1841,20 @@ class SpotifyCDPController:
             "creationflags": creation_flags,
             "env": _browser_launch_env(),
         }
-        startupinfo = _hidden_startupinfo()
+        startupinfo = None if sign_in_url else _hidden_startupinfo()
         if startupinfo is not None:
             popen_kwargs["startupinfo"] = startupinfo
         focus_guard = _ForegroundGuard()
-        focus_guard.lock()
+        if not sign_in_url:
+            focus_guard.lock()
         try:
             self._chrome_proc = popen_silent(chrome_args, **popen_kwargs)
         except Exception:
             focus_guard.unlock()
             raise
         logger.info("%s PID: %d", browser_name, self._chrome_proc.pid)
-        self._start_cloak_watchdog(self._chrome_proc, focus_guard)
+        if not sign_in_url:
+            self._start_cloak_watchdog(self._chrome_proc, focus_guard)
 
         # Bind Chrome to the Viola-lifetime Job Object so the OS
         # kernel forcibly terminates Chrome (and all its child
@@ -1888,7 +1902,8 @@ class SpotifyCDPController:
             # Small extra wait for Chrome to finish initializing, then release the
             # foreground lock once its windows are cloaked (WS_EX_NOACTIVATE).
             time.sleep(1.5)
-            self._recloak_chrome_window()
+            if not sign_in_url:
+                self._recloak_chrome_window()
         finally:
             focus_guard.unlock()
         return port
@@ -1900,7 +1915,7 @@ class SpotifyCDPController:
         """Connect to Chrome via CDP (thread-safe wrapper)."""
         self._in_cdp_thread(self._connect_impl)
 
-    def _connect_impl(self) -> None:
+    def _connect_impl(self, *, sign_in_url: str | None = None) -> None:
         """Connect to Chrome via CDP and get a page for open.spotify.com.
 
         Launches Chrome via subprocess (not Playwright's launch_persistent_context)
@@ -1945,11 +1960,11 @@ class SpotifyCDPController:
             # or one still running after a Viola restart) when it is verified
             # and refuses web origins, else launch a new one.
             target_url = SPOTIFY_URL
-            port = self._find_reusable_cdp_port()
+            port = None if sign_in_url else self._find_reusable_cdp_port()
             if port is not None and port != self._cdp_port:
                 logger.info("Reusing the Spotify Chrome already running on loopback port %d", port)
             if port is None:
-                port = self._launch_chrome()
+                port = self._launch_chrome(sign_in_url=sign_in_url)
             self._cdp_port = port
 
             # ---- Step 2: Connect Playwright via connect_over_cdp ----
@@ -1970,15 +1985,23 @@ class SpotifyCDPController:
             except Exception:
                 logger.debug("Could not watch Spotify web player requests", exc_info=True)
 
-            self._refresh_bridge_cookies()
-            try:
-                injected_count = inject_spotify_cookies_into_playwright(context, user_id=self._user_id)
-                self._cookie_bridge_last_injected = injected_count > 0
-            except Exception:
-                logger.warning("Spotify cookie handoff to the playback browser failed", exc_info=True)
+            if not sign_in_url and not self._signed_in_inside_player():
+                self._refresh_bridge_cookies()
+                try:
+                    injected_count = inject_spotify_cookies_into_playwright(context, user_id=self._user_id)
+                    self._cookie_bridge_last_injected = injected_count > 0
+                except Exception:
+                    logger.warning("Spotify cookie handoff to the playback browser failed", exc_info=True)
 
             # Register Chrome PID for ProcTap capture
             self._register_chrome_for_capture()
+
+            if sign_in_url:
+                # The window already shows Spotify's login; leave the page alone
+                # while the user signs in.
+                self._page = context.pages[0] if context.pages else context.new_page()
+                self._connected = True
+                return
 
             # Find or create Spotify page
             spotify_page = None
@@ -2040,8 +2063,57 @@ class SpotifyCDPController:
 
     def _sign_in_available(self) -> bool:
         """Is there a Spotify sign-in? If not, the player has no reason to start."""
+        if self._signed_in_inside_player():
+            return True
         self._refresh_bridge_cookies()
         return has_spotify_auth_cookie(get_cached_spotify_cookies(user_id=self._user_id))
+
+    def _signed_in_inside_player(self) -> bool:
+        """The sign-in lives in this profile: handing a cookie over would overwrite it."""
+        from music.spotify.connection import signed_in_inside_the_player
+
+        return signed_in_inside_the_player(self._user_id)
+
+    # ------------------------------------------------------------------
+    # Signing in inside the player's own window
+    # ------------------------------------------------------------------
+    def open_direct_sign_in(self) -> None:
+        """Open this user's playback profile in a visible window at Spotify's login."""
+        self._in_cdp_thread(self._open_direct_sign_in_impl)
+
+    def _open_direct_sign_in_impl(self) -> None:
+        self._shutdown_impl()
+        self._direct_sign_in_open = True
+        try:
+            self._connect_impl(sign_in_url=SPOTIFY_DIRECT_LOGIN_URL)
+            # A cookie Spotify refused must not count as the new sign-in.
+            if self._pw_context is not None:
+                self._pw_context.clear_cookies(name=SPOTIFY_AUTH_COOKIE)
+            _invalidate_cdp_session_cache()
+        except Exception:
+            self._direct_sign_in_open = False
+            raise
+        logger.info("Spotify sign-in window open in the player's own profile")
+
+    def direct_sign_in_status(self) -> str:
+        """``waiting``, ``signed_in`` or ``closed`` (the user closed the window)."""
+        return self._in_cdp_thread(self._direct_sign_in_status_impl)
+
+    def _direct_sign_in_status_impl(self) -> str:
+        if self._chrome_process_exited() or self._page is None or self._page.is_closed():
+            # Signed in, then closed the window before the next look: the browser
+            # wrote the cookie to the profile on its way out.
+            _invalidate_cdp_session_cache()
+            return "signed_in" if has_cdp_session_cookies(user_id=self._user_id) else "closed"
+        # Only the cookie store is read: the login page itself is left alone.
+        return "signed_in" if self._has_authenticated_spotify_cookies_impl() else "waiting"
+
+    def close_direct_sign_in(self) -> None:
+        """Close the window, writing its cookies to the profile. The player restarts hidden."""
+        self._in_cdp_thread(self._close_direct_sign_in_impl)
+
+    def _close_direct_sign_in_impl(self) -> None:
+        self._shutdown_impl()
 
     def _ensure_running_impl(self) -> None:
         """Ensure the player is running, connected and signed in.
@@ -2054,6 +2126,8 @@ class SpotifyCDPController:
         Raises:
             SpotifyCDPError: With ``state`` saying why the player can't be used.
         """
+        if self._direct_sign_in_open:
+            raise SpotifyCDPError("The sign-in window is open.", state="signing_in")
         reconnect_notice = False
         if self._connected and self._page:
             # Verify page is still responsive
@@ -2115,7 +2189,7 @@ class SpotifyCDPController:
 
     def _try_cookie_bridge_login(self) -> bool:
         """Hand over a sign-in the player doesn't have yet (the user signed in again)."""
-        if self._pw_context is None:
+        if self._pw_context is None or self._signed_in_inside_player():
             return False
         self._refresh_bridge_cookies()
         try:
@@ -2230,6 +2304,14 @@ class SpotifyCDPController:
 
     def _login_status_impl(self) -> dict[str, Any]:
         """Return login state without exposing cookies, tokens, or identifiers."""
+        if self._direct_sign_in_open:
+            # The user is typing a password in that page: leave it alone.
+            return {
+                "logged_in": False,
+                "auth_state": "signing_in",
+                "login_error_code": None,
+                "challenge_required": False,
+            }
         if not self._page:
             return {
                 "logged_in": False,
@@ -3359,6 +3441,7 @@ class SpotifyCDPController:
         DevTools port closes with it. Does NOT touch other Chrome processes.
         """
         logger.info("Shutting down Spotify CDP controller")
+        self._direct_sign_in_open = False
         self._connected = False
         self._page = None
         self._account_tier_cache = None

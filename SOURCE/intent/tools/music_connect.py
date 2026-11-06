@@ -181,6 +181,7 @@ def _spotify_chrome_pid() -> int | None:
 _SPOTIFY_TOOL_STATUS = {
     "connected": "connected",
     "checking": "checking",
+    "signing_in": "awaiting_user_login",
     "not_signed_in": "not_connected",
     "session_rejected": "session_expired",
 }
@@ -271,8 +272,15 @@ async def _provider_status(provider_id: str) -> dict[str, Any]:
 
 async def _connect_spotify() -> dict[str, Any]:
     status = await _spotify_status()
-    if status.get("connected") is True or status.get("status") == "checking":
+    if status.get("connected") is True or status.get("status") in ("checking", "awaiting_user_login"):
         return status
+    if status.get("session_expired") is True:
+        # The in-app sign-in was refused or has run out: go straight to the
+        # player's own window, which needs no handover.
+        payload = await _post_runtime("/v1/spotify/direct-sign-in", timeout=TIMEOUT_EXTENDED)
+        if payload.get("ok") is False:
+            return _error_envelope("spotify", _response_error(payload), code="browser_provider_login_failed")
+        return await _spotify_status()
     return await _connect_browser_provider("spotify")
 
 
