@@ -211,6 +211,25 @@ def _extract_applied_volume(result: object) -> int | None:
     return None
 
 
+def _spotify_identity_match(query: str, now_playing: JsonDict) -> str | None:
+    """Compare a Spotify track request to what plays. None when the request isn't one."""
+    raw = str(query or "").strip()
+    if raw.startswith("spotify:track:"):
+        wanted = raw[len("spotify:track:") :]
+    elif "open.spotify.com/track/" in raw:
+        wanted = raw.split("open.spotify.com/track/", 1)[1]
+    else:
+        return None
+    wanted = wanted.split("?", 1)[0].split("/", 1)[0].strip()
+    capabilities = now_playing.get("capabilities")
+    uri = capabilities.get("uri") if isinstance(capabilities, dict) else ""
+    reported = " ".join(str(value or "") for value in (now_playing.get("url"), now_playing.get("track_id"), uri))
+    if wanted and wanted in reported:
+        return "exact"
+    provider = str(now_playing.get("provider") or now_playing.get("playback_mode") or "").lower()
+    return "unknown" if "spotify" in provider else "fallback_unrelated"
+
+
 def _youtube_identity_matches(query: str, now_playing: JsonDict) -> bool:
     """True when the request names the exact YouTube video that is playing.
 
@@ -646,6 +665,13 @@ class CommandExecutor:
         # first: the same id is an exact match; anything else falls through.
         if _youtube_identity_matches(query, np):
             return "exact"
+        # Same for a Spotify selection: "spotify:track:<id>" shares no words
+        # with the song's title, so the play tool stopped the very song it
+        # asked for. Compare the id; an id with no match stays "unknown" until
+        # the player reports the song, it is not evidence of a wrong song.
+        spotify_match = _spotify_identity_match(query, np)
+        if spotify_match is not None:
+            return spotify_match
         title = str(np.get("title") or "").strip().lower()
         artist = str(np.get("artist") or "").strip().lower()
         # An unverified title is a query-echo placeholder (e.g. the browser

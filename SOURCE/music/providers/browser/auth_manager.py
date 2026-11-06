@@ -348,6 +348,11 @@ class BrowserAuthManager:
                 logger.exception("Spotify disconnect: could not clear the in-app browser's Spotify cookies")
         if self._user_id:
             clear_cached_spotify_cookies(user_id=self._user_id)
+        resolved = _resolve_sign_in_user_id(self._user_id)
+        if resolved:
+            from music.spotify.connection import forget_verdict
+
+            forget_verdict(resolved)
         status = self._provider_status.get("spotify")
         if status is not None:
             status.logged_in = False
@@ -485,6 +490,18 @@ class BrowserAuthManager:
         self._close_login_view()
         if select_as_music_source:
             await self._select_music_source(provider_name)
+        if provider_name == "spotify":
+            self._verify_spotify_in_player()
+
+    def _verify_spotify_in_player(self) -> None:
+        """A cookie in this view isn't a connection: try it in the real player."""
+        user_id = _resolve_sign_in_user_id(self._user_id)
+        if not user_id:
+            return
+        from music.spotify import connection
+
+        connection.forget_verdict(user_id)
+        connection.start_verification(user_id, reason="sign_in", notify_failure=True)
 
     async def _select_music_source(self, provider_name: str) -> bool:
         """Make *provider_name* the music source the user chose in Settings.
@@ -624,6 +641,7 @@ class BrowserAuthManager:
                 # Watch the in-app browser's cookies before Spotify can set the
                 # sign-in cookie, so the sign-in is seen when it happens.
                 self._watch_spotify_cookies()
+                self._drop_refused_spotify_sign_in()
             self._controller.navigate(login_url)
             logger.info("Navigated to login page for %s", provider_name)
             # Show the overlay so the user can interact with the login page
@@ -640,6 +658,26 @@ class BrowserAuthManager:
             )
 
         return login_url
+
+    def _drop_refused_spotify_sign_in(self) -> None:
+        """Sign in again: a sign-in Spotify refused must not count as the new one.
+
+        The watch finishes on the sign-in cookie, so a stale cookie closed the
+        view within two seconds, before the user could type anything.
+        """
+        from music.spotify import connection
+        from music.spotify.cookie_bridge import delete_spotify_cookies_from_qweb
+
+        resolved = _resolve_sign_in_user_id(self._user_id)
+        if not resolved or connection.peek_state(resolved) == connection.CONNECTED:
+            return
+        webview_controller, dispatch_to_main = self._webview_and_dispatcher()
+        try:
+            deleted = delete_spotify_cookies_from_qweb(webview_controller, dispatch_to_main=dispatch_to_main)
+            logger.info("Spotify sign-in: cleared an old in-app sign-in first (cookies=%s)", deleted)
+        except Exception:
+            logger.exception("Could not clear the old Spotify sign-in")
+        connection.forget_verdict(resolved)
 
     def mark_logged_in(self, provider_name: str) -> None:
         """Mark a provider as successfully logged in.
@@ -778,89 +816,73 @@ def get_browser_auth_manager(user_id: str | None = None) -> BrowserAuthManager:
 SPOTIFY_NOT_CONNECTED_NOTICE = (
     "Spotify isn't connected yet, so this is playing on YouTube. Connect Spotify in Settings > Music."
 )
-_SPOTIFY_RECHECK_SECONDS = 30.0
+SPOTIFY_FALLBACK_SUFFIX = "This is playing on YouTube for now."
 _NOTICE_REPEAT_SECONDS = 20.0
 _last_notice_at = 0.0
+_last_notice_text = ""
 
 
 def _resolve_sign_in_user_id(user_id: str | None) -> str | None:
-    if user_id:
-        return user_id
-    try:
-        from core.user_context import get_current_or_device_user_id
+    from music.spotify.connection import resolve_user_id
 
-        return get_current_or_device_user_id() or None
-    except Exception:
-        return None
+    return resolve_user_id(user_id)
 
 
 def is_spotify_signed_in(user_id: str | None = None) -> bool:
-    """Return True when Spotify can play for *user_id* right now.
+    """Return True when playing on Spotify is worth trying for *user_id* right now.
 
-    Signed in means any of: the in-app sign-in was detected, its cookies are
-    cached for the playback browser, or the playback browser's own profile
-    holds Spotify's sign-in cookies. When none of those is known, the in-app
-    browser's cookie store is read (about a second, at most every 30 s), which
-    finds a sign-in from before a restart.
-
-    Blocking; async callers use ``asyncio.to_thread``.
+    The answer comes from ``music/spotify/connection.py``, the same place
+    Settings reads. Blocking; async callers use ``asyncio.to_thread``.
     """
-    resolved = _resolve_sign_in_user_id(user_id)
-    if not resolved:
-        return False
+    from music.spotify.connection import spotify_usable
 
-    manager = get_browser_auth_manager(resolved)
-    status = manager.get_auth_status().get("spotify")
-    if status is not None and status.logged_in:
-        return True
+    return spotify_usable(user_id)
 
-    try:
-        from music.spotify.cookie_bridge import get_cached_spotify_cookies, has_spotify_auth_cookie
 
-        if has_spotify_auth_cookie(get_cached_spotify_cookies(user_id=resolved)):
-            return True
-    except Exception:
-        logger.debug("Spotify cookie cache check failed", exc_info=True)
+def spotify_fallback_notice(user_id: str | None = None) -> str:
+    """What to tell the user when Spotify is the source and YouTube plays instead."""
+    from music.spotify import connection
 
-    try:
-        from music.spotify.cdp_controller import has_cdp_session_cookies
-
-        if has_cdp_session_cookies(user_id=resolved):
-            return True
-    except Exception:
-        logger.debug("Spotify playback-profile cookie check failed", exc_info=True)
-
-    if status is None or manager.is_login_watch_active("spotify"):
-        return False
-    if time.time() - (status.last_checked or 0.0) < _SPOTIFY_RECHECK_SECONDS:
-        return False
-    return bool(manager.refresh_spotify_sign_in())
+    failure = connection.recent_play_failure(user_id)
+    if failure is not None:
+        return "%s %s" % (failure["message"], SPOTIFY_FALLBACK_SUFFIX)
+    state = connection.get_spotify_connection(user_id)
+    if state.state == connection.NOT_SIGNED_IN:
+        return SPOTIFY_NOT_CONNECTED_NOTICE
+    return "%s %s" % (state.message, SPOTIFY_FALLBACK_SUFFIX)
 
 
 def notify_spotify_not_connected(user_id: str | None = None) -> bool:
-    """Tell the user on screen that Spotify was skipped because it isn't connected.
+    """Tell the user on screen that Spotify was skipped, and why.
 
     The music source is Spotify but Spotify cannot play, so Viola plays on
     YouTube instead. Saying so on screen (as well as in the tool result the
-    reply is written from) means the switch is never silent. Sent as the
-    ``error`` frame React's toast handler reads (``usePlayerState``), at
-    ``info`` level, to this install's UI only. Returns True when it went out.
+    reply is written from) means the switch is never silent.
     """
-    global _last_notice_at
+    return notify_user_about_spotify(user_id, spotify_fallback_notice(user_id), code="spotify_not_connected")
+
+
+def notify_user_about_spotify(user_id: str | None, message: str, *, code: str, level: str = "info") -> bool:
+    """Show *message* as a toast on this install's UI. Returns True when it went out.
+
+    Sent as the ``error`` frame React's toast handler reads
+    (``usePlayerState``). ``level`` sets how it looks.
+    """
+    global _last_notice_at, _last_notice_text
     now = time.monotonic()
-    if _last_notice_at and now - _last_notice_at < _NOTICE_REPEAT_SECONDS:
+    if _last_notice_at and now - _last_notice_at < _NOTICE_REPEAT_SECONDS and message == _last_notice_text:
         return False
     try:
         from ui.websocket.event_hub import get_event_hub, transport_command_recipients
 
         hub = get_event_hub()
         if hub is None:
-            logger.debug("Spotify fallback notice skipped (no event hub)")
+            logger.debug("Spotify notice skipped (no event hub)")
             return False
         recipients = transport_command_recipients(_resolve_sign_in_user_id(user_id))
         if not recipients:
             return False
-        payload = {"user_message": SPOTIFY_NOT_CONNECTED_NOTICE, "level": "info", "code": "spotify_not_connected"}
+        payload = {"user_message": message, "level": level, "code": code}
 
         async def _send() -> None:
             for recipient in recipients:
@@ -873,14 +895,15 @@ def notify_spotify_not_connected(user_id: str | None = None) -> bool:
 
             loop = get_main_loop()
             if loop is None or not loop.is_running() or loop.is_closed():
-                logger.debug("Spotify fallback notice skipped (no running event loop)")
+                logger.debug("Spotify notice skipped (no running event loop)")
                 return False
             asyncio.run_coroutine_threadsafe(_send(), loop)
     except Exception:
-        logger.debug("Spotify fallback notice failed", exc_info=True)
+        logger.debug("Spotify notice failed", exc_info=True)
         return False
     _last_notice_at = now
-    logger.info("Told the user Spotify isn't connected and YouTube is playing instead")
+    _last_notice_text = message
+    logger.info("Spotify notice shown code=%s: %s", code, message)
     return True
 
 
@@ -891,4 +914,6 @@ __all__ = [
     "get_browser_auth_manager",
     "is_spotify_signed_in",
     "notify_spotify_not_connected",
+    "notify_user_about_spotify",
+    "spotify_fallback_notice",
 ]

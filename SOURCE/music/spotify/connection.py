@@ -61,6 +61,11 @@ _MESSAGES = {
     ),
 }
 
+PLAY_DID_NOT_START_MESSAGE = (
+    "Spotify is connected, but that song didn't start. Try again. "
+    "If it keeps happening, restart Viola."
+)
+
 VERDICT_FILE = "viola_connection.json"
 
 # A play that just failed keeps Spotify out of use for this long, so a retry on
@@ -98,6 +103,10 @@ _lock = threading.RLock()
 _verdicts: dict[str, dict[str, Any]] = {}
 _running: set[str] = set()
 _last_failures: dict[str, dict[str, Any]] = {}
+
+
+def message_for(state: str) -> str:
+    return _MESSAGES.get(state, _MESSAGES[PLAYER_UNAVAILABLE])
 
 
 def resolve_user_id(user_id: str | None = None) -> str | None:
@@ -226,6 +235,21 @@ def get_spotify_connection(user_id: str | None = None) -> SpotifyConnection:
     return SpotifyConnection(state, _MESSAGES[state], verdict.get("checked_at"))
 
 
+def peek_state(user_id: str | None = None) -> str:
+    """The last known state, with no cookie read and no check started.
+
+    For code on the event loop, such as building the assistant's context.
+    """
+    resolved = resolve_user_id(user_id)
+    if not resolved:
+        return NOT_SIGNED_IN
+    with _lock:
+        if resolved in _running:
+            return CHECKING
+    verdict = _load_verdict(resolved)
+    return str(verdict.get("state")) if verdict else NOT_SIGNED_IN
+
+
 def verify_now(user_id: str, *, reason: str) -> SpotifyConnection:
     """Try the sign-in in the playback browser and record the verdict. Blocking."""
     from music.providers.spotify_cdp import get_cdp_controller
@@ -324,7 +348,9 @@ __all__ = [
     "clear_play_failure",
     "forget_verdict",
     "get_spotify_connection",
+    "message_for",
     "notify_spotify",
+    "peek_state",
     "recent_play_failure",
     "record_play_failure",
     "record_verdict",

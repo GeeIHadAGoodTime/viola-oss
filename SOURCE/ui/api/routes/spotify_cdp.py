@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import asyncio
 import shutil
-import time
 from pathlib import Path
 from typing import Any
 
@@ -28,11 +27,6 @@ logger = get_logger(__name__)
 router = APIRouter(prefix="/v1/spotify/cdp", tags=["spotify-cdp"])
 status_router = APIRouter(prefix="/v1/spotify", tags=["spotify"])
 _cdp_disconnect_in_progress = False
-
-# When nothing else says Spotify is signed in, read the in-app browser's
-# sign-in cookie at most this often (it costs about a second). This is what
-# finds an earlier sign-in after Viola restarts.
-_BROWSER_AUTH_RECHECK_SECONDS = 30.0
 
 
 def _get_controller(user_id: str) -> Any:
@@ -135,21 +129,23 @@ def _get_browser_auth_snapshot(user_id: str) -> dict[str, Any]:
         }
 
 
-async def _refresh_browser_auth_sign_in(user_id: str) -> None:
-    """Re-read the in-app browser's Spotify sign-in, unless that just happened."""
+def _stop_spotify_playback() -> None:
+    """Disconnect ends a Spotify song too: a live poller would bring the browser back."""
     try:
-        from music.providers.browser.auth_manager import get_browser_auth_manager
+        from playback.engine_manager import _get_player_for_emit
 
-        manager = get_browser_auth_manager(user_id)
-        if manager.is_login_watch_active("spotify"):
-            return  # the sign-in watch is already checking every few seconds
-        status = manager.get_provider_status("spotify")
-        last_checked = status.last_checked or 0.0
-        if time.time() - last_checked < _BROWSER_AUTH_RECHECK_SECONDS:
-            return
-        await manager.check_login_state("spotify")
+        player = _get_player_for_emit()
+        state = getattr(player, "_state", None)
+        if player is not None and getattr(state, "playback_mode", None) == "spotify_cdp":
+            player.stop()
     except Exception:
-        logger.exception("Spotify BrowserAuth sign-in refresh failed")
+        logger.exception("Spotify disconnect: could not stop playback")
+
+
+def _spotify_connection(user_id: str) -> Any:
+    from music.spotify.connection import get_spotify_connection
+
+    return get_spotify_connection(user_id)
 
 
 def _cancel_browser_auth_login_watch(user_id: str) -> None:
@@ -259,22 +255,15 @@ async def get_spotify_status(user_id: str = Depends(get_current_user_id)) -> Any
 
     browser_auth = _get_browser_auth_snapshot(user_id)
     cookie_bridge_cached = _get_cached_cookie_bridge_status(user_id)
-    if not (cdp_status.get("logged_in") or browser_auth.get("logged_in") or cookie_bridge_cached):
-        await _refresh_browser_auth_sign_in(user_id)
-        browser_auth = _get_browser_auth_snapshot(user_id)
-        cookie_bridge_cached = _get_cached_cookie_bridge_status(user_id)
-    browser_logged_in = bool(browser_auth.get("logged_in"))
-    cdp_logged_in = bool(cdp_status.get("logged_in"))
-    logged_in = cdp_logged_in or browser_logged_in or cookie_bridge_cached
+    # One truth, shared with the assistant's tools and the music source. The
+    # fields below it are detail for support, never a second opinion.
+    state = await asyncio.to_thread(_spotify_connection, user_id)
+    logged_in = bool(state.connected)
 
-    if cdp_status.get("connected") and cdp_logged_in:
+    if logged_in and cdp_status.get("connected"):
         auth_source = "cdp_dom"
-    elif cdp_logged_in:
-        auth_source = "cdp_cookies"
-    elif browser_logged_in:
-        auth_source = "browser_auth"
-    elif cookie_bridge_cached:
-        auth_source = "cookie_bridge"
+    elif logged_in:
+        auth_source = "player_verdict"
     else:
         auth_source = "none"
 
@@ -291,6 +280,8 @@ async def get_spotify_status(user_id: str = Depends(get_current_user_id)) -> Any
             "display_name": "Spotify",
             "logged_in": logged_in,
             "connected": logged_in,
+            "state": state.state,
+            "state_message": state.message,
             "profile_exists": bool(cdp_status.get("profile_exists")),
             "account_email": account_email,
             "auth_source": auth_source,
@@ -302,6 +293,25 @@ async def get_spotify_status(user_id: str = Depends(get_current_user_id)) -> Any
             "cookie_bridge_cached": cookie_bridge_cached,
         }
     )
+
+
+@status_router.get(
+    "/diagnostic",
+    dependencies=[Depends(require_auth)],
+)
+async def get_spotify_diagnostic(user_id: str = Depends(get_current_user_id)) -> Any:
+    """Check every link from sign-in to sound, log it, and return it. No secrets."""
+    from music.spotify.diagnostic import log_diagnostic
+
+    try:
+        report = await asyncio.to_thread(log_diagnostic, _get_controller(user_id), reason="requested")
+    except Exception:
+        logger.exception("Spotify diagnostic failed")
+        return JSONResponse(
+            status_code=500,
+            content=failure_response("spotify_diagnostic_failed", "The Spotify check could not run."),
+        )
+    return success_response(report)
 
 
 @router.post(
@@ -327,6 +337,7 @@ async def disconnect_spotify_cdp(user_id: str = Depends(get_current_user_id)) ->
     _cdp_disconnect_in_progress = True
     _mark_cdp_session_cookies_stale()
     try:
+        await asyncio.to_thread(_stop_spotify_playback)
         await asyncio.to_thread(controller.disconnect)
         # Sign Viola's in-app browser out too, or the next status check finds
         # its Spotify cookie and reports Spotify connected again.

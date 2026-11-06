@@ -178,53 +178,30 @@ def _spotify_chrome_pid() -> int | None:
     return None
 
 
-def _spotify_cdp_session_present() -> bool:
-    """Cookie-store probe for the external CDP Chrome profile.
-
-    The Qt overlay's `logged_in` flag only reflects Qt's cookie jar, but Spotify
-    playback runs in a SEPARATE Chrome process whose cookies live in
-    `.viola-chrome-profile/Default/Network/Cookies`. After a Viola restart the
-    Qt jar is empty, so the recipe reports `logged_in=False` even though the
-    CDP profile still has a valid sp_dc / sp_key (1-year expiry). Treating that
-    as "needs login" forces a redundant re-auth on every cold start.
-    """
-    try:
-        from music.spotify.cdp_controller import has_cdp_session_cookies
-
-        return bool(has_cdp_session_cookies())
-    except Exception:
-        return False
+_SPOTIFY_TOOL_STATUS = {
+    "connected": "connected",
+    "checking": "checking",
+    "not_signed_in": "not_connected",
+    "session_rejected": "session_expired",
+}
 
 
-def _spotify_status_from_data(data: dict[str, Any]) -> dict[str, Any]:
-    logged_in = bool(data.get("logged_in"))
-    connected = bool(data.get("connected"))
-    chrome_pid = _spotify_chrome_pid()
-    cdp_session_present = False
-    if not logged_in:
-        cdp_session_present = _spotify_cdp_session_present()
-        if cdp_session_present:
-            logged_in = True
-    if logged_in:
-        status = "connected"
-    elif connected or chrome_pid:
-        status = "awaiting_user_login"
-    else:
-        status = "not_connected"
-
+def _spotify_status_from_connection(state: Any) -> dict[str, Any]:
+    """The tool's view of Spotify: the same answer Settings shows, with the same words."""
+    connected = bool(state.connected)
     return _with_connection_next_action(
         {
             "ok": True,
-            "status": status,
+            "status": _SPOTIFY_TOOL_STATUS.get(state.state, state.state),
             "provider": "spotify",
             "display_name": _PROVIDER_DISPLAY_NAMES["spotify"],
-            "connected": logged_in,
-            "logged_in": logged_in,
-            "session_expired": False,
-            "profile_exists": bool(data.get("profile_exists")),
-            "provider_chrome_pid": chrome_pid,
+            "connected": connected,
+            "logged_in": connected,
+            "session_expired": state.state == "session_rejected",
+            "message": state.message,
+            "provider_chrome_pid": _spotify_chrome_pid(),
             "login_url_to_show_user": _PROVIDER_LOGIN_URLS["spotify"],
-            "needs_login": not logged_in,
+            "needs_login": state.state in ("not_signed_in", "session_rejected"),
             "supported_providers": supported_music_providers(),
         }
     )
@@ -274,15 +251,9 @@ def _browser_status_from_data(provider_id: str, data: dict[str, Any]) -> dict[st
 
 
 async def _spotify_status() -> dict[str, Any]:
-    # Spotify is special-cased: even when the Qt overlay's recipe reports
-    # logged_in=False, the external CDP Chrome profile may still hold a valid
-    # sp_dc / sp_key (1-year expiry). _spotify_status_from_data layers a
-    # cookie-store probe on top of the browser auth payload so the agent
-    # doesn't pointlessly re-prompt for login on every Viola restart.
-    payload = await _get_runtime("/v1/browser/auth/status/spotify")
-    if payload.get("ok") is False:
-        return _error_envelope("spotify", _response_error(payload), code="browser_provider_status_failed")
-    return _spotify_status_from_data(_response_data(payload))
+    from music.spotify.connection import get_spotify_connection
+
+    return _spotify_status_from_connection(await asyncio.to_thread(get_spotify_connection))
 
 
 async def _browser_provider_status(provider_id: str) -> dict[str, Any]:
@@ -299,6 +270,9 @@ async def _provider_status(provider_id: str) -> dict[str, Any]:
 
 
 async def _connect_spotify() -> dict[str, Any]:
+    status = await _spotify_status()
+    if status.get("connected") is True or status.get("status") == "checking":
+        return status
     return await _connect_browser_provider("spotify")
 
 
