@@ -30,6 +30,8 @@ from core.logging_config import get_logger
 
 logger = get_logger(__name__)
 
+OFFLINE_REPLY = "I'm offline right now, so I can't do that. Check your Wi-Fi and try again."
+
 _PUBLIC_ADDRESSES = ("1.1.1.1", "2606:4700:4700::1111")
 _TCP_TIMEOUT_S = 1.5
 _ONLINE_REMEMBER_S = 20.0
@@ -102,6 +104,21 @@ async def is_offline() -> bool:
     if not online:
         logger.info("Connectivity: this computer is offline")
     return not online
+
+
+async def model_is_out_of_reach() -> bool:
+    """True when the selected model needs the internet and there is none. Never raises."""
+    try:
+        from services.llm.factory import LLMProviderFactory
+
+        if not LLMProviderFactory.selected_model_needs_internet():
+            return False
+        if await is_offline():
+            logger.warning("Turn answered as offline: no internet, and the model needs it")
+            return True
+    except (ImportError, OSError, RuntimeError):
+        logger.debug("Connectivity check skipped", exc_info=True)
+    return False
 
 
 def reset_for_tests() -> None:

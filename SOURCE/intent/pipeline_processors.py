@@ -52,37 +52,6 @@ _LLM_FINAL_COMMANDS = frozenset(
 )
 
 
-OFFLINE_REPLY = "I'm offline right now, so I can't do that. Check your Wi-Fi and try again."
-
-
-async def offline_turn_result(node_id: object) -> PipelineResult | None:
-    """Say so at once when the model cannot be reached because we are offline.
-
-    Not routing: nothing about the words is read. The model is simply out of
-    reach, and the turn would spend half a minute finding that out.
-    """
-    try:
-        from services.connectivity import is_offline
-        from services.llm.factory import LLMProviderFactory
-
-        if not LLMProviderFactory.selected_model_needs_internet() or not await is_offline():
-            return None
-    except (ImportError, OSError, RuntimeError):
-        logger.debug("Connectivity check skipped", exc_info=True)
-        return None
-    logger.warning("Turn answered as offline: no internet, and the model needs it")
-    return PipelineResult(
-        ok=False,
-        intent="offline",
-        data={"message": OFFLINE_REPLY},
-        error="offline",
-        source="ai",
-        requires_clarification=False,
-        policy_flags=["offline"],
-        source_node_id=node_id,
-    )
-
-
 class IntentPipelineProcessors:
     """Handles the different processing phases of the intent pipeline."""
 
@@ -225,9 +194,22 @@ class IntentPipelineProcessors:
         if not self.pipeline.gpt_handler:
             return None
 
-        offline_result = await offline_turn_result(self.pipeline.node_id)
-        if offline_result is not None:
-            return offline_result
+        # Say so at once when we are offline and the model is out of reach. Not
+        # routing: nothing about the words is read, and the turn would otherwise
+        # spend half a minute finding out (1.0.5 build 9, High 2).
+        from services.connectivity import OFFLINE_REPLY, model_is_out_of_reach
+
+        if await model_is_out_of_reach():
+            return PipelineResult(
+                ok=False,
+                intent="offline",
+                data={"message": OFFLINE_REPLY},
+                error="offline",
+                source="ai",
+                requires_clarification=False,
+                policy_flags=["offline"],
+                source_node_id=self.pipeline.node_id,
+            )
 
         # F-003: Enforce per-user rate limit before any LLM call
         try:
