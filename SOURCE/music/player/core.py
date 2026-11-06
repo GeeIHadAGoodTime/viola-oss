@@ -231,6 +231,8 @@ class MusicPlayer:
             return
         try:
             if value:
+                if sm.phase == PlaybackPhase.STOPPED:
+                    sm.transition(PlaybackPhase.LOADING, force=True)
                 sm.transition(PlaybackPhase.PLAYING, force=True)
             elif sm.phase == PlaybackPhase.PLAYING:
                 # "Not playing" from PAUSED is still PAUSED. Mapping it to
