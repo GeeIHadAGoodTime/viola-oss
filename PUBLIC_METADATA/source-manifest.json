@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "6140fc47bbe4713d2fbd50d9efd5cf3d9fd629fa",
-  "sha256": "7210861d5adcf34beed66ca34ef69d30486e284ccdc39fad0c4bac4cd8304db9",
+  "revision": "a1765d3552e6dfa0cbe1fdb4c6a3d93ed4f14b97",
+  "sha256": "e48c58f4272bca56446d6218d2aa52b34f61d3c027e6185c020e059daefd1b15",
   "files": [
     {
       "path": ".env.example",
@@ -2110,8 +2110,8 @@
     },
     {
       "path": "intent/tools/music_connect.py",
-      "sha256": "0026b88c8a8cd3082e0fff54b89065f1f81ae65d8dc459b798a614357c51751b",
-      "bytes": 14439
+      "sha256": "bec23a20b69f2012eeab71ffc5332cc4bc17a215a8df80ee313f7e3b6326bc9b",
+      "bytes": 14965
     },
     {
       "path": "intent/tools/music_tools.py",
@@ -2940,8 +2940,8 @@
     },
     {
       "path": "music/providers/browser/auth_manager.py",
-      "sha256": "149a2254dc52deef0d163ac0b8e72a0a8136537c0da0c2f977c6ac1396face51",
-      "bytes": 37164
+      "sha256": "0865896c87e228a8294703ff34ddd56e7bb9b626196861b89137a2bbf95257e4",
+      "bytes": 37196
     },
     {
       "path": "music/providers/browser/content_id.py",
@@ -3280,13 +3280,13 @@
     },
     {
       "path": "music/spotify/cdp_controller.py",
-      "sha256": "2d9e2ae241bc3ccc352b60c8719fe1bbd3e621741aec9a687d78ec87c1f8b544",
-      "bytes": 165045
+      "sha256": "00e311cdc729c27e3d96eaa278c88825600fbcd7408fbfcc35ed4e8aabcb5193",
+      "bytes": 171010
     },
     {
       "path": "music/spotify/connection.py",
-      "sha256": "5ab043f866f04617b23bb7cf9f97997a19195861cef97965cd3f28213d45f669",
-      "bytes": 13579
+      "sha256": "ec5690d0439769e51a4fd4eacd9823f57f52173aeac3250068c23af363e8715f",
+      "bytes": 19975
     },
     {
       "path": "music/spotify/cookie_bridge.py",
@@ -3365,8 +3365,8 @@
     },
     {
       "path": "playback/engines/spotify_cdp.py",
-      "sha256": "72f7fc4f902d31e515dcddc782b091553461fd6713b525ccaee90af302abaaca",
-      "bytes": 34027
+      "sha256": "03ed0e4e453e82fb5ef614db36fab704ee17a4267ee13d15fa71185609179591",
+      "bytes": 34062
     },
     {
       "path": "playback/engines/youtube.py",
@@ -9655,8 +9655,8 @@
     },
     {
       "path": "ui/api/routes/spotify_cdp.py",
-      "sha256": "597ea5208a1238ebefa50ba7e6cb8b50a833ead79b1ab21cf2c0896ef2ee27ba",
-      "bytes": 14273
+      "sha256": "deae20ac941e1bfa2ef7a6913c5f17363e527fdb1b748c5c07930a1a3870d991",
+      "bytes": 15820
     },
     {
       "path": "ui/api/routes/state.py",
@@ -10935,8 +10935,8 @@
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.jsx",
-      "sha256": "09d79bf5d1bfc6a481bd0e6dec10e1623690fef76e720f82b558c050576f0e4b",
-      "bytes": 219638
+      "sha256": "0f995aa607df88ed674f5b5eb5ae40729a40eb77945b1008f2f81e0b9f086acb",
+      "bytes": 223207
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.localDiscovery.test.jsx",
@@ -10955,8 +10955,8 @@
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.spotifyStatus.test.jsx",
-      "sha256": "3f4bec8a7b951d8046fbdd571056b137f710bc678c8bd8909ffdc8313c7500c7",
-      "bytes": 1684
+      "sha256": "01fe99be6f8727b1cf8b9edc19950f94c15a1e8215f54c83b6008690672039e7",
+      "bytes": 2197
     },
     {
       "path": "ui/react-app/src/components/SpokePairingGate.jsx",
