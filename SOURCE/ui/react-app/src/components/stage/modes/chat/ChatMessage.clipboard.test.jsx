@@ -173,7 +173,7 @@ it('keeps copying independent from server-backed action availability', async () 
   installClipboard({ writeText: vi.fn().mockResolvedValue() });
   renderMessage({ ...initialMessage, id: 'local-user-1', metadata: { optimistic: true } });
   expect(screen.getByRole('button', { name: 'Regenerate' })).toBeDisabled();
-  expect(screen.getByRole('button', { name: 'Edit' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Fork chat from this message' })).toBeDisabled();
   await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Copy' })); });
   expect(screen.getByRole('button', { name: 'Copied' })).toBeEnabled();
 });

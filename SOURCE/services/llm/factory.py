@@ -335,6 +335,34 @@ class LLMProviderFactory:
         return cls._create_managed_provider_gated(settings)
 
     @classmethod
+    def selected_model_needs_internet(cls) -> bool:
+        """False when the chosen model answers on this computer. Any doubt says True."""
+        try:
+            from config.defaults import DEFAULT_AI_SOURCE
+            from config.settings import settings as app_settings
+            from ui.settings_manager import get_settings_manager
+
+            override = (getattr(app_settings, "ai_source_override", "") or "").strip()
+            if override:
+                return override != "local"
+            user_id = cls._current_user_id_for_profiles()
+            if user_id:
+                from services.connectors.profiles import get_connection_profile_store
+
+                store = get_connection_profile_store()
+                selected = store.get_selected_profile_id(user_id, "llm")
+                profile = store.get_profile(user_id, selected) if selected else None
+                if profile is not None:
+                    return cls._is_cloud_provider(
+                        str(getattr(profile, "provider_type", "") or ""),
+                        getattr(profile, "base_url", None),
+                    )
+            return get_settings_manager().get("ai_source", DEFAULT_AI_SOURCE) != "local"
+        except Exception:  # noqa: BLE001, RUF100 - this only picks a friendlier failure
+            logger.debug("Could not tell where the model runs", exc_info=True)
+            return True
+
+    @classmethod
     def _current_user_id_for_profiles(cls) -> str | None:
         """Resolve the principal whose selected LLM connection profile applies.
 

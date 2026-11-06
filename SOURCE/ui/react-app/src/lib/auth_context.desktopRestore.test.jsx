@@ -8,7 +8,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { act, cleanup, render, screen } from '@testing-library/react';
 import { AuthProvider, useAuth } from './auth_context';
-import { hydrateDesktopSessionFromCookie } from '../auth/authClient';
+import { hydrateDesktopSessionFromCookie, reattachDesktopSessionCookie } from '../auth/authClient';
 import { gotrueClient } from './gotrue_client';
 
 const SESSION = {
@@ -20,7 +20,10 @@ const SESSION = {
 vi.mock('./billingEntitlement', () => ({
   readBillingSubscription: vi.fn(() => new Promise(() => {})),
 }));
-vi.mock('../auth/authClient', () => ({ hydrateDesktopSessionFromCookie: vi.fn() }));
+vi.mock('../auth/authClient', () => ({
+  hydrateDesktopSessionFromCookie: vi.fn(),
+  reattachDesktopSessionCookie: vi.fn(async () => false),
+}));
 vi.mock('./gotrue_client', () => ({
   GOTRUE_STORAGE_KEY: 'synthetic-gotrue-session',
   externalOAuthAuthorizeUrl: vi.fn(),
@@ -63,6 +66,26 @@ it('retries a transient cookie-restore failure and ends up signed in', async () 
 
   expect(hydrateDesktopSessionFromCookie).toHaveBeenCalledTimes(2);
   expect(gotrueClient.setSession).toHaveBeenCalledTimes(1);
+  expect(screen.getByTestId('state').textContent).toBe('in:account@example.com');
+});
+
+it('a lost cookie does not sign the page out while the computer is signed in', async () => {
+  hydrateDesktopSessionFromCookie.mockResolvedValueOnce(signedOutMiss).mockResolvedValueOnce(hit);
+  reattachDesktopSessionCookie.mockResolvedValueOnce(true);
+  await act(async () => { render(<AuthProvider><Probe /></AuthProvider>); });
+
+  expect(reattachDesktopSessionCookie).toHaveBeenCalledTimes(1);
+  expect(screen.getByTestId('state').textContent).toBe('in:account@example.com');
+});
+
+it('retries when the cloud blips while the session is being applied', async () => {
+  hydrateDesktopSessionFromCookie.mockResolvedValue(hit);
+  gotrueClient.setSession.mockResolvedValueOnce({ data: { session: null }, error: { status: 503, message: 'blip' } });
+  await act(async () => { render(<AuthProvider><Probe /></AuthProvider>); });
+  expect(screen.getByTestId('state').textContent).toBe('out');
+
+  await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+
   expect(screen.getByTestId('state').textContent).toBe('in:account@example.com');
 });
 
