@@ -7929,6 +7929,9 @@ class CallManager:
         async def _consume() -> None:
             async for _frame in stt.run_stt(silence_bytes):
                 pass
+            finish = getattr(stt, "finish_pending_transcriptions", None)
+            if callable(finish):
+                await finish()
 
         await asyncio.wait_for(_consume(), timeout=_PHONE_RING_STT_WARMUP_TIMEOUT_SECS)
 
@@ -8214,6 +8217,9 @@ class CallManager:
                     initial_prompt=self._initial_prompt,
                     collect_metrics=True,
                 )
+
+            async def finish_pending_transcriptions(self) -> None:
+                await self._off_path.finish_pending()
 
             async def cleanup(self) -> None:
                 self._off_path.cancel()

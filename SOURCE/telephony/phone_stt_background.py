@@ -53,6 +53,11 @@ class OffPathTranscriber:
             except Exception:  # noqa: BLE001, RUF100
                 logger.exception("Phone transcription failed for one clip")
 
+    async def finish_pending(self) -> None:
+        """Wait for every clip submitted so far."""
+        while self._running:
+            await asyncio.gather(*list(self._running), return_exceptions=True)
+
     def cancel(self) -> None:
         for task in list(self._running):
             task.cancel()
