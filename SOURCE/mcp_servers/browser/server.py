@@ -15,6 +15,7 @@ import json
 import os
 import re
 import socket
+import textwrap
 import threading
 import time
 from dataclasses import dataclass
@@ -5228,10 +5229,13 @@ _LOCATOR_ENTRY_METHODS = frozenset(
         "get_by_role",
         "get_by_label",
         "get_by_placeholder",
+        "get_by_test_id",
+        "get_by_alt_text",
+        "get_by_title",
     }
 )
 _LOCATOR_CHAIN_METHODS = frozenset({"first", "last", "nth"})
-_LOCATOR_TERMINAL_ACTIONS = frozenset(
+_FRAME_TERMINAL_ACTIONS = frozenset(
     {
         "click",
         "fill",
@@ -5240,17 +5244,23 @@ _LOCATOR_TERMINAL_ACTIONS = frozenset(
         "select_option",
     }
 )
-
-# Master regex: matches page.locator(...) or page.get_by_*(...) followed by
-# one or more chained calls ending with a terminal action.
-# Note: matched after removeprefix("await "), so no "await " prefix in regex.
-_LOCATOR_CHAIN_RE = re.compile(
-    r"page\.(locator|get_by_text|get_by_role|get_by_label|get_by_placeholder)"
-    r"\((.+?)\)"  # capture args of entry method
-    r"((?:\.\w+\([^)]*\))*)"  # zero or more chained .method() calls
-    r"\s*$"
-)
-
+_LOCATOR_TERMINAL_ACTIONS = _FRAME_TERMINAL_ACTIONS | {
+    "dblclick",
+    "type",
+    "press_sequentially",
+    "press",
+    "hover",
+    "focus",
+    "scroll_into_view_if_needed",
+    "wait_for",
+    "count",
+    "is_visible",
+    "is_enabled",
+    "is_checked",
+    "inner_text",
+    "text_content",
+    "get_attribute",
+}
 
 def _unquote(s: str) -> str:
     """Strip surrounding quotes from a string argument."""
@@ -5258,30 +5268,6 @@ def _unquote(s: str) -> str:
     if len(s) >= 2 and s[0] in ("'", '"') and s[-1] == s[0]:
         return s[1:-1]
     return s
-
-
-def _parse_entry_args(method: str, raw_args: str) -> tuple[list[Any], dict[str, Any]]:
-    """Parse positional and keyword arguments for locator entry methods.
-
-    Returns (positional_args, keyword_args).
-    """
-    args: list[Any] = []
-    kwargs: dict[str, Any] = {}
-
-    if method == "get_by_role":
-        # get_by_role('button', name='Submit') — positional role + optional name=
-        parts = [p.strip() for p in raw_args.split(",")]
-        for part in parts:
-            if "=" in part and not part.strip().startswith(("'", '"')):
-                key, _, val = part.partition("=")
-                kwargs[key.strip()] = _unquote(val)
-            else:
-                args.append(_unquote(part))
-    else:
-        # locator, get_by_text, get_by_label, get_by_placeholder — single string arg
-        args.append(_unquote(raw_args))
-
-    return args, kwargs
 
 
 def _parse_chain_segment(segment: str) -> tuple[str, list[str]]:
@@ -5298,101 +5284,208 @@ def _parse_chain_segment(segment: str) -> tuple[str, list[str]]:
     return method, args
 
 
-async def _execute_locator_chain(page: Any, line: str, opts: dict[str, Any]) -> str:
-    """Execute a locator chain like page.locator('sel').first().click().
+def _snake_case(name: str) -> str:
+    """``getByRole`` -> ``get_by_role``: the model writes both Playwright dialects."""
+    return re.sub(r"(?<=[a-z0-9])([A-Z])", lambda m: "_" + m.group(1).lower(), name)
 
-    Builds the locator step-by-step from parsed segments. No eval.
+
+_NOT_LITERAL = object()
+
+
+def _ast_literal(node: ast.AST) -> Any:
+    """Read a literal argument. Scripts are parsed, never evaluated."""
+    if isinstance(node, ast.Constant):
+        return node.value
+    if isinstance(node, ast.Name) and node.id in {"true", "false", "null"}:
+        return {"true": True, "false": False, "null": None}[node.id]
+    if isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.USub):
+        value = _ast_literal(node.operand)
+        return -value if isinstance(value, (int, float)) else _NOT_LITERAL
+    if isinstance(node, ast.List):
+        items = [_ast_literal(item) for item in node.elts]
+        return _NOT_LITERAL if any(item is _NOT_LITERAL for item in items) else items
+    if isinstance(node, ast.Dict):
+        result: dict[str, Any] = {}
+        for key_node, value_node in zip(node.keys, node.values, strict=True):
+            key = key_node.id if isinstance(key_node, ast.Name) else _ast_literal(key_node) if key_node else None
+            value = _ast_literal(value_node)
+            if not isinstance(key, str) or value is _NOT_LITERAL:
+                return _NOT_LITERAL
+            result[_snake_case(key)] = value
+        return result
+    return _NOT_LITERAL
+
+
+def _parse_playwright_chain(line: str) -> list[tuple[str, list[Any], dict[str, Any]]] | None:
+    """Parse ``await page.get_by_role('button', name='Add').first.click()``.
+
+    Returns the ``(name, args, kwargs)`` steps after ``page``, or None when the
+    line is not one literal call chain on ``page``. Python and JavaScript spellings
+    both parse: ``.first`` / ``.first()``, ``getByRole('x', {name: 'y'})``. A
+    property step and a call with no arguments look the same to the executor.
     """
-    m = _LOCATOR_CHAIN_RE.match(line.strip().removeprefix("await ").strip())
-    if not m:
-        raise ValueError("Cannot parse locator chain: %s" % line[:80])
+    source = line.strip().rstrip(";").strip()
+    source = source.removeprefix("await ").strip()
+    try:
+        node = ast.parse(source, mode="eval").body
+    except (SyntaxError, ValueError):
+        return None
+    steps: list[tuple[str, list[Any], dict[str, Any]]] = []
+    while True:
+        if isinstance(node, ast.Await):
+            node = node.value
+        elif isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
+            args = [_ast_literal(item) for item in node.args]
+            kwargs = {_snake_case(item.arg): _ast_literal(item.value) for item in node.keywords if item.arg}
+            if len(kwargs) != len(node.keywords):
+                return None
+            if args and isinstance(args[-1], dict):
+                kwargs.update(args.pop())
+            if any(item is _NOT_LITERAL for item in [*args, *kwargs.values()]):
+                return None
+            steps.append((_snake_case(node.func.attr), args, kwargs))
+            node = node.func.value
+        elif isinstance(node, ast.Attribute):
+            steps.append((_snake_case(node.attr), [], {}))
+            node = node.value
+        elif isinstance(node, ast.Name) and node.id == "page":
+            steps.reverse()
+            return steps
+        else:
+            return None
 
-    entry_method = m.group(1)
-    entry_args_raw = m.group(2)
-    chain_str = m.group(3)  # e.g. ".first().click()" or ".nth(2).fill('hello')"
 
-    if entry_method not in _LOCATOR_ENTRY_METHODS:
-        raise ValueError("Disallowed locator entry method: %s" % entry_method)
+def _render_page_call(steps: list[tuple[str, list[Any], dict[str, Any]]]) -> str | None:
+    """Spell a one-step ``page.x(...)`` chain the way the command table below expects."""
+    if len(steps) != 1:
+        return None
+    name, args, kwargs = steps[0]
+    if name == "url":
+        return "await page.url"
+    rendered = [json.dumps(item, ensure_ascii=False) if isinstance(item, str) else str(item) for item in args]
+    options = {key: value for key, value in kwargs.items() if key in _SAFE_OPTION_KEYS}
+    if options:
+        rendered.append("{%s}" % ", ".join("%s: %s" % (key, json.dumps(value)) for key, value in options.items()))
+    return "await page.%s(%s)" % (name, ", ".join(rendered))
 
-    # Security: check string arguments for blocked patterns (multi-layered)
-    _loc_blocked = await _is_js_blocked(entry_args_raw) or await _is_js_blocked(chain_str)
-    if _loc_blocked:
-        raise RuntimeError("Blocked pattern '%s' in locator chain" % _loc_blocked)
 
-    # Build the locator from entry method
-    pos_args, kw_args = _parse_entry_args(entry_method, entry_args_raw)
-    locator = getattr(page, entry_method)(*pos_args, **kw_args)
+async def _focused_input_block(page: Any, text: str) -> str | None:
+    """Run the guards ``fill`` gets against whatever has keyboard focus."""
+    if (violation := _payment_value_violation(text)) is not None:
+        return violation
+    focused = page.locator(":focus")
+    if not await focused.count():
+        return None
+    block, _signal = await _payment_field_block_from_locator(focused, ":focus")
+    return block
 
-    # Parse chain segments: split ".method(args)" segments
-    segments = re.findall(r"\.\w+\([^)]*\)", chain_str)
-    if not segments:
+
+async def _execute_parsed_chain(
+    page: Any,
+    steps: list[tuple[str, list[Any], dict[str, Any]]],
+    line: str,
+    *,
+    click_fn: Callable[[Any, str], Awaitable[str]] | None,
+    press_fn: Callable[[str], Awaitable[str]] | None,
+) -> str | None:
+    """Run a parsed call chain under the same gates as the single-command forms."""
+    strings = [item for _name, args, kwargs in steps for item in [*args, *kwargs.values()] if isinstance(item, str)]
+    for item in strings:
+        if blocked := await _is_js_blocked(item):
+            raise RuntimeError("Blocked pattern '%s' in locator chain" % blocked)
+
+    entry, entry_args, entry_kwargs = steps[0]
+    if entry == "keyboard":
+        return await _execute_keyboard_step(page, steps[1:], press_fn)
+    if entry == "mouse":
+        if len(steps) == 2 and steps[1][0] == "wheel" and len(steps[1][1]) == 2:
+            await page.mouse.wheel(float(steps[1][1][0]), float(steps[1][1][1]))
+            return "Scrolled"
+        raise ValueError(
+            "page.mouse clicks use raw coordinates that cannot be checked. "
+            "Use page.locator(...).click() or browser_interact(action='click')."
+        )
+    if entry == "wait_for_load_state":
+        state = str(entry_args[0]) if entry_args else "load"
+        await page.wait_for_load_state(state, timeout=min(int(entry_kwargs.get("timeout") or 10000), 15000))
+        return "Page reached %s" % state
+
+    if entry not in _LOCATOR_ENTRY_METHODS:
+        raise ValueError("Disallowed locator entry method: %s" % entry)
+    if len(steps) < 2:
         raise ValueError("Locator chain has no terminal action: %s" % line[:80])
 
-    # Last segment is the terminal action; preceding ones are chain methods
-    for seg in segments[:-1]:
-        method_name, seg_args = _parse_chain_segment(seg)
-        if method_name not in _LOCATOR_CHAIN_METHODS:
-            raise ValueError(
-                "Disallowed chain method: '%s'. Allowed: %s" % (method_name, ", ".join(sorted(_LOCATOR_CHAIN_METHODS)))
-            )
-        if method_name == "nth":
-            if not seg_args or not seg_args[0].isdigit():
+    locator = getattr(page, entry)(*entry_args, **_locator_kwargs(entry_kwargs))
+    for name, args, kwargs in steps[1:-1]:
+        if name == "first":
+            locator = locator.first
+        elif name == "last":
+            locator = locator.last
+        elif name == "nth":
+            if not args or not isinstance(args[0], int):
                 raise ValueError("nth() requires an integer argument")
-            locator = locator.nth(int(seg_args[0]))
-        elif method_name == "first":
-            locator = locator.first  # property in Playwright Python
-        elif method_name == "last":
-            locator = locator.last  # property in Playwright Python
+            locator = locator.nth(args[0])
+        elif name == "filter":
+            locator = locator.filter(**_locator_kwargs(kwargs))
+        elif name in _LOCATOR_ENTRY_METHODS:
+            locator = getattr(locator, name)(*args, **_locator_kwargs(kwargs))
+        else:
+            raise ValueError(
+                "Disallowed chain method: '%s'. Allowed: %s"
+                % (name, ", ".join(sorted(_LOCATOR_CHAIN_METHODS | _LOCATOR_ENTRY_METHODS | {"filter"})))
+            )
 
-    # Terminal action
-    terminal_name, terminal_args = _parse_chain_segment(segments[-1])
-    if terminal_name not in _LOCATOR_TERMINAL_ACTIONS:
+    terminal, args, kwargs = steps[-1]
+    if terminal not in _LOCATOR_TERMINAL_ACTIONS:
         raise ValueError(
-            "Disallowed terminal action: '%s'. Allowed: %s"
-            % (terminal_name, ", ".join(sorted(_LOCATOR_TERMINAL_ACTIONS)))
+            "Disallowed terminal action: '%s'. Allowed: %s" % (terminal, ", ".join(sorted(_LOCATOR_TERMINAL_ACTIONS)))
         )
-
+    desc = line.strip().removeprefix("await ").removeprefix("page.").rstrip(";")[:120]
     kw: dict[str, Any] = {"timeout": 5000}
-    kw.update(opts)
+    kw.update({key: value for key, value in kwargs.items() if key in _SAFE_OPTION_KEYS})
 
-    desc_parts = [entry_method, "(", entry_args_raw, ")"]
-    for seg in segments[:-1]:
-        desc_parts.append(seg)
-    desc = "".join(desc_parts)
-
-    if terminal_name == "click":
+    if terminal in {"click", "dblclick"}:
         _pay_block, _blocked_signal = await _payment_gate_block_from_locator(locator, desc)
         if _pay_block:
             raise RuntimeError(_pay_block)
-        await locator.click(**kw)
+        if click_fn is not None and terminal == "click":
+            return await click_fn(locator, desc)
+        await getattr(locator, terminal)(**kw)
         return "Clicked %s" % desc
-    elif terminal_name == "fill":
-        if not terminal_args:
-            raise ValueError("fill() requires a text argument")
-        text = _unquote(terminal_args[0])
+    if terminal in {"fill", "type", "press_sequentially"}:
+        if not args:
+            raise ValueError("%s() requires a text argument" % terminal)
+        text = str(args[0])
         if (violation := _payment_value_violation(text)) is not None:
             raise RuntimeError(violation)
         _field_block, _blocked_signal = await _payment_field_block_from_locator(locator, desc)
         if _field_block:
             raise RuntimeError(_field_block)
-        await locator.fill(text, **kw)
+        if terminal == "fill":
+            await locator.fill(text, **kw)
+        else:
+            await locator.press_sequentially(text, timeout=kw["timeout"])
         return "Filled %s with '%s'" % (desc, text)
-    elif terminal_name == "check":
+    if terminal == "press":
+        if not args:
+            raise ValueError("press() requires a key argument")
+        key = str(args[0])
+        if key.lower() in {"enter", "numpadenter", "space", " "}:
+            _pay_block, _blocked_signal = await _payment_gate_block_from_locator(locator, desc, key)
+            if _pay_block:
+                raise RuntimeError(_pay_block)
+        await locator.press(key, **kw)
+        return "Pressed '%s' on %s" % (key, desc)
+    if terminal in {"check", "uncheck"}:
         _pay_block, _blocked_signal = await _payment_gate_block_from_locator(locator, desc)
         if _pay_block:
             raise RuntimeError(_pay_block)
-        await locator.check(**kw)
-        return "Checked %s" % desc
-    elif terminal_name == "uncheck":
-        _pay_block, _blocked_signal = await _payment_gate_block_from_locator(locator, desc)
-        if _pay_block:
-            raise RuntimeError(_pay_block)
-        await locator.uncheck(**kw)
-        return "Unchecked %s" % desc
-    elif terminal_name == "select_option":
-        if not terminal_args:
+        await getattr(locator, terminal)(**kw)
+        return "%s %s" % ("Checked" if terminal == "check" else "Unchecked", desc)
+    if terminal == "select_option":
+        if not args:
             raise ValueError("select_option() requires a value argument")
-        val = _unquote(terminal_args[0])
+        val = str(args[0])
         _pay_block, _blocked_signal = await _payment_gate_block_from_locator(locator, val, desc)
         if _pay_block:
             raise RuntimeError(_pay_block)
@@ -5401,8 +5494,51 @@ async def _execute_locator_chain(page: Any, line: str, opts: dict[str, Any]) -> 
             raise RuntimeError(_field_block)
         await locator.select_option(val, **kw)
         return "Selected '%s' in %s" % (val, desc)
+    if terminal in {"hover", "focus", "scroll_into_view_if_needed"}:
+        await getattr(locator, terminal)(timeout=kw["timeout"])
+        return "Done: %s" % desc
+    if terminal == "wait_for":
+        await locator.wait_for(state=str(kwargs.get("state") or "visible"), timeout=kw["timeout"])
+        return "Appeared: %s" % desc
+    if terminal == "count":
+        return str(await locator.count())
+    if terminal in {"is_visible", "is_enabled", "is_checked"}:
+        return str(await getattr(locator, terminal)())
+    if terminal in {"inner_text", "text_content"}:
+        return _truncate(str(await getattr(locator, terminal)(timeout=kw["timeout"])), 500)
+    if terminal == "get_attribute":
+        if not args:
+            raise ValueError("get_attribute() requires a name")
+        return str(await locator.get_attribute(str(args[0]), timeout=kw["timeout"]))
+    raise ValueError("Unhandled terminal action: %s" % terminal)
 
-    raise ValueError("Unhandled terminal action: %s" % terminal_name)
+
+def _locator_kwargs(kwargs: dict[str, Any]) -> dict[str, Any]:
+    return {key: value for key, value in kwargs.items() if key in {"name", "exact", "has_text", "has_not_text"}}
+
+
+async def _execute_keyboard_step(
+    page: Any,
+    steps: list[tuple[str, list[Any], dict[str, Any]]],
+    press_fn: Callable[[str], Awaitable[str]] | None,
+) -> str:
+    """``page.keyboard.*`` goes through the gated key path, never straight to the page."""
+    if len(steps) != 1 or not steps[0][1]:
+        raise ValueError("Use page.keyboard.press('Enter') or page.keyboard.type('text')")
+    name, args, _kwargs = steps[0]
+    value = str(args[0])
+    if name == "press":
+        press = press_fn or browser_press_key
+        outcome = json.loads(await press(value))
+        if isinstance(outcome, dict) and (outcome.get("ok") is False or outcome.get("error")):
+            raise RuntimeError(str(outcome.get("error") or "The key was not pressed"))
+        return "Pressed '%s'" % value
+    if name in {"type", "insert_text"}:
+        if block := await _focused_input_block(page, value):
+            raise RuntimeError(block)
+        await page.keyboard.insert_text(value)
+        return "Typed '%s'" % value
+    raise ValueError("Unsupported keyboard call: %s" % name)
 
 
 async def _execute_frame_locator_chain(page: Any, line: str, opts: dict[str, Any]) -> str:
@@ -5454,10 +5590,10 @@ async def _execute_frame_locator_chain(page: Any, line: str, opts: dict[str, Any
 
     # Terminal action
     terminal_name, terminal_args = _parse_chain_segment(segments[-1])
-    if terminal_name not in _LOCATOR_TERMINAL_ACTIONS:
+    if terminal_name not in _FRAME_TERMINAL_ACTIONS:
         raise ValueError(
             "Disallowed terminal action: '%s'. Allowed: %s"
-            % (terminal_name, ", ".join(sorted(_LOCATOR_TERMINAL_ACTIONS)))
+            % (terminal_name, ", ".join(sorted(_FRAME_TERMINAL_ACTIONS)))
         )
 
     kw: dict[str, Any] = {"timeout": 5000}
@@ -5510,14 +5646,31 @@ async def _execute_frame_locator_chain(page: Any, line: str, opts: dict[str, Any
     raise ValueError("Unhandled terminal action: %s" % terminal_name)
 
 
-async def _execute_playwright_line(page: Any, line: str) -> str | None:
+async def _execute_playwright_line(
+    page: Any,
+    line: str,
+    *,
+    click_fn: Callable[[Any, str], Awaitable[str]] | None = None,
+    press_fn: Callable[[str], Awaitable[str]] | None = None,
+) -> str | None:
     """Execute a single Playwright command by parsing and dispatching.
 
     Returns a human-readable result string, or None for void operations.
     Raises ValueError for unrecognized commands, RuntimeError for blocked
     patterns, and propagates Playwright exceptions for failed operations.
+
+    ``click_fn`` lets the visible desktop browser route a click through its
+    verified click (it runs after the payment gate here); ``press_fn`` does the
+    same for ``page.keyboard.press``.
     """
-    stripped = line.strip()
+    stripped = line.strip().rstrip(";").strip()
+    if not stripped.startswith(("await ", "asyncio.")):
+        stripped = "await " + stripped
+
+    steps = _parse_playwright_chain(stripped)
+    if steps and not stripped.startswith("await page.frame_locator("):
+        if len(steps) > 1 or steps[0][0] == "wait_for_load_state":
+            return await _execute_parsed_chain(page, steps, stripped, click_fn=click_fn, press_fn=press_fn)
 
     # --- Navigation ---
     m = _GOTO_RE.match(stripped)
@@ -5557,6 +5710,8 @@ async def _execute_playwright_line(page: Any, line: str) -> str | None:
         _pay_block, _blocked_signal = await _payment_gate_block_from_locator(_click_locator, _click_sel)
         if _pay_block and not _is_safe_pattern(_click_sel):
             raise RuntimeError(_pay_block)
+        if click_fn is not None:
+            return await click_fn(_click_locator, _click_sel)
         kw: dict[str, Any] = {"timeout": 5000}
         kw.update(opts)
         await page.click(_click_sel, **kw)
@@ -5570,6 +5725,8 @@ async def _execute_playwright_line(page: Any, line: str) -> str | None:
         _pay_block, _blocked_signal = await _payment_gate_block_from_locator(_loc, _loc_sel)
         if _pay_block and not _is_safe_pattern(_loc_sel):
             raise RuntimeError(_pay_block)
+        if click_fn is not None:
+            return await click_fn(_loc, _loc_sel)
         kw = {"timeout": 5000}
         kw.update(opts)
         await page.locator(_loc_sel).click(**kw)
@@ -5578,10 +5735,6 @@ async def _execute_playwright_line(page: Any, line: str) -> str | None:
     # Frame locator chains: page.frame_locator('iframe').locator('sel').click()
     if stripped.startswith("await page.frame_locator("):
         return await _execute_frame_locator_chain(page, stripped, opts)
-
-    # Locator chains: page.locator(...).first().click(), page.get_by_text(...).click(), etc.
-    if stripped.startswith("await page.locator(") or stripped.startswith("await page.get_by_"):
-        return await _execute_locator_chain(page, stripped, opts)
 
     # --- Text input ---
     m = _FILL_RE.match(stripped)
@@ -5742,18 +5895,82 @@ async def _execute_playwright_line(page: Any, line: str) -> str | None:
         val = await page.get_attribute(m.group(2), m.group(4), **kw)
         return str(val)
 
+    # The same call in the other spelling: page.waitForTimeout(500), page.click('x', timeout=9000).
+    rendered = _render_page_call(steps) if steps else None
+    if rendered and rendered != stripped:
+        return await _execute_playwright_line(page, rendered, click_fn=click_fn, press_fn=press_fn)
+
     raise ValueError(
-        "Unrecognized command: '%s'. Supported: page.goto, page.click, "
-        "page.fill, page.type, page.press, page.wait_for_selector, "
-        "page.wait_for_timeout, page.select_option, page.check, page.uncheck, "
-        "page.evaluate, page.screenshot, page.title, page.url, page.inner_text, "
-        "page.get_attribute, page.go_back, page.go_forward, page.reload, "
-        "page.locator(...).click, page.locator(...).first().click(), "
-        "page.locator(...).nth(N).click(), page.get_by_text(...).click(), "
-        "page.get_by_role(...).click(), page.get_by_label(...).fill(), "
-        "page.get_by_placeholder(...).fill(), "
-        "page.frame_locator(...).locator(...).click(), asyncio.sleep" % stripped[:80]
+        "Unrecognized command: '%s'. This runner takes straight-line Playwright, one call per line, in "
+        "Python or JavaScript spelling: page.goto, page.click, page.fill, page.type, page.press, "
+        "page.wait_for_selector, page.wait_for_timeout, page.wait_for_load_state, page.select_option, "
+        "page.check, page.uncheck, page.evaluate, page.screenshot, page.title, page.url, page.inner_text, "
+        "page.get_attribute, page.go_back, page.go_forward, page.reload, page.keyboard.press, "
+        "page.keyboard.type, page.mouse.wheel, asyncio.sleep, and locator chains from page.locator or "
+        "page.get_by_role/text/label/placeholder/test_id/alt_text/title through .first, .last, .nth(N), "
+        ".filter(has_text=...) to .click, .fill, .press, .check, .select_option, .hover, .count, "
+        ".inner_text and similar. Loops, functions and conditions are not supported." % stripped[:80]
     )
+
+
+_PLAYWRIGHT_LINE_RE = re.compile(
+    r"^\s*(?:(?:const|let|var)\s+)?(?:\w+\s*=\s*)?(?:return\s+|print\()?(?:await\s+)?(?:page\.|asyncio\.sleep)"
+)
+_JS_DECLARATION_RE = re.compile(r"^(?:const|let|var)\s+")
+
+
+def _script_is_playwright(lines: list[str]) -> bool:
+    """True when a line really is a call on ``page``, not JavaScript that mentions it."""
+    return any(_PLAYWRIGHT_LINE_RE.match(line) for line in lines)
+
+
+def _playwright_script_lines(script: str) -> list[str]:
+    """Split a script into statements, resolving simple locator variables.
+
+    ``btn = page.get_by_role('button', name='Add').first`` then ``await btn.click()``
+    is ordinary Playwright, and so is a call spread over several lines. Nothing is
+    evaluated: statements are read with ``ast`` and each one still goes through
+    ``_execute_playwright_line``. Anything else stays a line of its own and fails
+    there with the list of what is supported.
+    """
+    source = textwrap.dedent(script).strip()
+    plain = [line.strip() for line in source.splitlines() if line.strip() and not line.strip().startswith(("#", "//"))]
+    cleaned = "\n".join(_JS_DECLARATION_RE.sub("", line).rstrip(";").rstrip() for line in plain)
+    try:
+        tree = compile(cleaned, "<script>", "exec", flags=ast.PyCF_ONLY_AST | ast.PyCF_ALLOW_TOP_LEVEL_AWAIT)
+    except (SyntaxError, ValueError):
+        return plain
+
+    aliases: dict[str, str] = {}
+
+    def _resolve(text: str) -> str:
+        root = re.match(r"(await\s+)?(\w+)", text)
+        if root and root.group(2) in aliases:
+            return (root.group(1) or "") + aliases[root.group(2)] + text[root.end() :]
+        return text
+
+    statements: list[str] = []
+    for node in tree.body:
+        text = ast.get_source_segment(cleaned, node) or ""
+        if isinstance(node, (ast.Import, ast.ImportFrom)):
+            continue
+        if isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
+            value = ast.get_source_segment(cleaned, node.value) or ""
+            if isinstance(node.value, ast.Await):
+                statements.append(_resolve(value))
+            else:
+                aliases[node.targets[0].id] = _resolve(value)
+            continue
+        if (
+            isinstance(node, ast.Expr)
+            and isinstance(node.value, ast.Call)
+            and isinstance(node.value.func, ast.Name)
+            and node.value.func.id == "print"
+            and len(node.value.args) == 1
+        ):
+            text = ast.get_source_segment(cleaned, node.value.args[0]) or text
+        statements.append(_resolve(" ".join(text.split("\n"))))
+    return statements
 
 
 @server.tool(
@@ -5829,7 +6046,7 @@ async def browser_run_script(script: str) -> str:
         if not lines:
             return _json({"error": "Script is empty (no executable lines)"})
 
-        if not any("page." in line or "asyncio.sleep" in line for line in lines):
+        if not _script_is_playwright(lines):
             _blocked_match = await _is_js_blocked(script)
             if _blocked_match:
                 return _json(
@@ -5863,6 +6080,7 @@ async def browser_run_script(script: str) -> str:
                 }
             )
 
+        lines = _playwright_script_lines(script)
         for i, line in enumerate(lines):
             try:
                 result = await _execute_playwright_line(page, line)

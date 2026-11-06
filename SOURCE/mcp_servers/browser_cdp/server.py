@@ -64,6 +64,8 @@ from mcp_servers.browser.server import (
     _payment_gate_block_from_locator,
     _payment_gate_refusal,
     _payment_probe_strings_from_element_info,
+    _playwright_script_lines,
+    _script_is_playwright,
     _select_dropdown_value,
 )
 from services.browser.api_log_redaction import format_api_log_entry
@@ -3144,6 +3146,14 @@ async def browser_evaluate(script: str) -> str:
         return _json({"error": "Evaluate failed: %s" % exc})
 
 
+async def _script_click(locator: Any, desc: str) -> str:
+    """A click from a script gets the same landing checks as browser_interact."""
+    outcome = json.loads(await _do_click(desc, locator=locator))
+    if outcome.get("ok") is False or outcome.get("error"):
+        raise RuntimeError(str(outcome.get("error") or "The click on %s had no visible effect" % desc))
+    return "Clicked %s (now on %s)" % (desc, outcome.get("url") or "the same page")
+
+
 async def _execute_overlay_playwright_line(line: str) -> str | None:
     stripped = line.strip().rstrip(";")
     if stripped == "page.url":
@@ -3152,14 +3162,16 @@ async def _execute_overlay_playwright_line(line: str) -> str | None:
         stripped = "await " + stripped
     if stripped.startswith("await page.navigate("):
         stripped = stripped.replace("await page.navigate(", "await page.goto(", 1)
-    return await _execute_playwright_line(manager.page, stripped)
+    return await _execute_playwright_line(manager.page, stripped, click_fn=_script_click, press_fn=browser_press_key)
 
 
 @server.tool(
     description=(
         "Execute browser code. For simple DOM reads pass JavaScript directly, e.g. "
         "document.title, return document.title, evaluate(document.title), or evaluate document.title. "
-        "For multi-step actions pass Playwright page.click/page.fill/page.evaluate lines. "
+        "For multi-step actions pass straight-line Playwright in Python or JavaScript spelling, for example "
+        "await page.get_by_role('button', name='Add').first.click(), page.keyboard.press('Enter'), "
+        "page.wait_for_load_state('load'). Clicks get the same landing check as browser_interact. "
         "JavaScript exceptions return success=false instead of opaque success output."
     ),
     annotations=_CONFIRM,
@@ -3193,7 +3205,7 @@ async def browser_run_script(script: str) -> str:
                 script[:200],
             )
             return _json({"ok": False, "error": sig_block, "success": False})
-        if not any("page." in line or "asyncio.sleep" in line for line in lines):
+        if not _script_is_playwright(lines):
             if blocked := blocked_js_pattern(script):
                 return _json(
                     {
@@ -3219,6 +3231,7 @@ async def browser_run_script(script: str) -> str:
                 }
             )
 
+        lines = _playwright_script_lines(script)
         for index, line in enumerate(lines, start=1):
             try:
                 result = await _execute_overlay_playwright_line(line)
