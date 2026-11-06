@@ -255,6 +255,9 @@ class PipecatVoicemailDetectionHandler:
         self._notice_sent = False
         self._context_frame_target: Any | None = None
         self._classification_decided = False
+        # Set when a person answered her voicemail message. A later carrier signal
+        # about the greeting says nothing about who is on the line now.
+        self._live_person_confirmed = False
         self._response_gate = _VoicemailResponseGate(call_record, self)
         # One-shot voicemail classification (2026-06-27): the opening greeting is
         # classified ONCE, synchronously, when the recipient's first turn completes
@@ -346,7 +349,25 @@ class PipecatVoicemailDetectionHandler:
         return await self._amd_handler.on_transcription(text, timestamp)
 
     async def on_amd_result(self, result: str, event_type: str = "") -> bool:
+        if self._live_person_confirmed:
+            return False
         return bool(await self._amd_handler.on_amd_result(result, event_type))
+
+    async def on_live_person_answered(self) -> None:
+        """A person answered her message: this is a conversation again."""
+        self._live_person_confirmed = True
+        self._classification_decided = True
+        record = self._record
+        record.voicemail_detected = False
+        record.voicemail_prompt_ready = False
+        record.voicemail_message_delivered = False
+        record.voicemail_answered_by_person = True
+        record.voicemail_detected_at = None
+        record.voicemail_detection_source = ""
+        record.outcome = ""
+        record._end_call_committed = False
+        record._pending_end_call = None
+        self._response_gate.reopen_for_conversation()
 
     async def on_outbound_opening_queued(self, reason: str) -> None:
         """Release Pipecat's TTS gate for silent-answer openings."""
@@ -403,6 +424,9 @@ class PipecatVoicemailDetectionHandler:
 
     async def _on_pipecat_voicemail_detected(self, *_args: Any) -> None:
         self._mark_detected("pipecat_llm", "voicemail")
+        answer_watch = getattr(self._record, "_voicemail_answer_watch", None)
+        if answer_watch is not None:
+            answer_watch.note_voicemail_mode()
         # Drop Viola's buffered normal opening: she leaves a voicemail message instead.
         await self._response_gate.drop_buffered()
         await self._publish_voicemail_context()
@@ -482,6 +506,12 @@ class _VoicemailResponseGate(FrameProcessor if PIPECAT_AVAILABLE else object):  
         # context is worth re-firing.
         self._held_voicemail_frame: tuple[Any, Any] | None = None
 
+    def reopen_for_conversation(self) -> None:
+        """Forget the message accounting: ordinary turns pass from here on."""
+        self._voicemail_generation_in_flight = False
+        self._held_voicemail_frame = None
+        self._buffered_context_frames = []
+
     async def note_generation_delivered(self) -> None:
         """The in-flight voicemail generation finished with text that reached TTS."""
         self._voicemail_generation_in_flight = False
@@ -526,6 +556,16 @@ class _VoicemailResponseGate(FrameProcessor if PIPECAT_AVAILABLE else object):  
         if not PIPECAT_AVAILABLE:
             return
         await super().process_frame(frame, direction)
+        # The turn's context can get here before the turn-started event has run, so
+        # settle who is on the line first: a person's turn must never be dropped.
+        answer_watch = getattr(self._record, "_voicemail_answer_watch", None)
+        if (
+            answer_watch is not None
+            and direction == FrameDirection.DOWNSTREAM
+            and LLMContextFrame is not None
+            and isinstance(frame, LLMContextFrame)
+        ):
+            await answer_watch.on_recipient_turn_started()
         if (
             direction == FrameDirection.DOWNSTREAM
             and LLMContextFrame is not None

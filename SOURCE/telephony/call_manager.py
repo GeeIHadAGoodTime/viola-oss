@@ -138,6 +138,7 @@ from telephony.telnyx_dial_response import telnyx_dial_call_control_id  # noqa: 
 from telephony.usage import company_phone_billing_available, get_phone_billing  # noqa: E402 - customer privacy bootstrap precedes application imports
 from telephony.user_settings_lookup import load_cloud_user_settings_blob  # noqa: E402 - customer privacy bootstrap precedes application imports
 from telephony.spoken_transcript_pacer import SpokenTranscriptPacer  # noqa: E402 - customer privacy bootstrap precedes application imports
+from telephony.voicemail_answer_watch import VoicemailAnswerWatch  # noqa: E402 - customer privacy bootstrap precedes application imports
 from telephony.voicemail_detection import PipecatVoicemailDetectionHandler  # noqa: E402 - customer privacy bootstrap precedes application imports
 
 logger = get_logger(__name__)
@@ -3584,6 +3585,8 @@ class CallRecord:
     # _voicemail_context_frames_to_allow count that dropped the post-interrupt
     # re-fire and left 57s of dead air (closing call 857c52b2, 2026-06-27).
     voicemail_message_delivered: bool = False
+    # A person answered her voicemail message, so the call went back to a conversation.
+    voicemail_answered_by_person: bool = False
     human_takeover_detected: bool = False
     human_takeover_at: datetime | None = None
     info_manifest: dict[str, list[str]] = field(default_factory=dict)
@@ -3638,6 +3641,7 @@ class CallRecord:
     _cost_tracker: Any = field(default=None, repr=False)
     _hold_handler: Any = field(default=None, repr=False)
     _voicemail_handler: Any = field(default=None, repr=False)
+    _voicemail_answer_watch: Any = field(default=None, repr=False)
     _late_greeting_task: Any = field(default=None, repr=False)
     _payment_sensitive_segment: Any = field(default=None, repr=False)
     queue_id: str = ""
@@ -6838,6 +6842,12 @@ class CallManager:
             record._bot_speech_echo_reference = bot_speech_echo_reference
             bot_turn_floor_state = BotTurnFloorState()
             record._bot_turn_floor_state = bot_turn_floor_state
+            voicemail_answer_watch = VoicemailAnswerWatch(
+                record,
+                on_live_answer=voicemail_handler.on_live_person_answered,
+            )
+            record._voicemail_answer_watch = voicemail_answer_watch
+            bot_turn_floor_state.live_answer_check = voicemail_answer_watch.latest_speech_answers_message
             turn_strategies = UserTurnStrategies(
                 start=[
                     SelfEchoGuardedMinWordsUserTurnStartStrategy(
@@ -6896,6 +6906,7 @@ class CallManager:
             @user_aggregator.event_handler("on_user_turn_started")
             async def _on_user_turn_started_floor(_agg: Any, _strategy: Any) -> None:
                 bot_turn_floor_state.note_generation_ended()
+                await voicemail_answer_watch.on_recipient_turn_started()
 
             language_handler.set_context_frame_target(user_aggregator)
             voicemail_handler.set_context_frame_target(user_aggregator)
@@ -6966,6 +6977,7 @@ class CallManager:
                 inbound_tee_processor,
                 stt,
                 answer_settle_observer,
+                voicemail_answer_watch,
             ]
             # Streaming STT sits immediately after batch whisper: both receive the
             # same InputAudioRawFrame (whisper passes audio through), whisper still

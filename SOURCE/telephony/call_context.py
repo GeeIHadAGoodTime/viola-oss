@@ -77,6 +77,15 @@ def build_phone_volatile_context(
         # not hold: it closed the call in words and left the line open.
         "reply_check: If this reply closes the call (thanks, goodbye, have a good day), it must call `end_call` in this same response. If it does not call `end_call`, it must contain no closing words. If it asks a question, it must end on that question.",
     ]
+    if bool(getattr(call_record, "voicemail_answered_by_person", False)):
+        lines.extend(
+            [
+                "call_phase: person_answered_voicemail_message",
+                "This line is NOT a voicemail any more: a real person answered while you were leaving your message. "
+                "Ignore any earlier instruction to leave one message and finish. Talk with them normally, carry on "
+                "from what they said, do not repeat your whole message, and finish the task.",
+            ]
+        )
     if bool(getattr(call_record, "_end_call_committed", False)):
         caller = _clean_text(caller_name or getattr(call_record, "caller_name", ""), "the owner")
         lines.extend(
