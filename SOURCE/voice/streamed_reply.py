@@ -24,7 +24,7 @@ from typing import Any
 
 from config import env as config_env
 from core.logging_config import get_logger
-from services.llm.answer_stream import FinalAnswerSpeechGate
+from services.llm.answer_stream import SUMMARY_SUFFIX, FinalAnswerSpeechGate
 from services.llm.stream_bus import (
     add_stream_listener,
     bind_stream_producer,
@@ -78,7 +78,8 @@ class StreamedReply:
         self.user_id = user_id
         self._own_stream = stream_id is None
         self.stream_id = stream_id or "speech-%s" % uuid.uuid4().hex
-        self.gate = FinalAnswerSpeechGate(live=live, reason=reason)
+        english = str(getattr(tts, "_speech_language", "en-us") or "en-us").lower().startswith("en")
+        self.gate = FinalAnswerSpeechGate(live=live, reason=reason, summary_suffix=SUMMARY_SUFFIX if english else None)
         self._start_speaking = start_speaking
         self._queue: asyncio.Queue[str | None] = asyncio.Queue()
         self._loop: asyncio.AbstractEventLoop | None = None

@@ -4,6 +4,7 @@ import re
 
 from voice.english_numbers import num2words
 from voice.pronunciation_tables import _ACRONYM_INITIALISMS, _ACRONYM_WORDS, _BRAND_PRONUNCIATIONS
+from voice.speech_language import BASE, MANDARIN, SPANISH, speech_spans
 
 from core.logging_config import get_logger
 
@@ -23,7 +24,20 @@ _NON_ENGLISH_SENTENCE_BOUNDARY_RE = re.compile(r"(?<=[。！？।])\s*|(?<=[.!?
 # Currency: $25 → "twenty-five dollars", $15.99 → "fifteen dollars and ninety-nine cents"
 # Must run BEFORE the generic standalone number regex.
 # ---------------------------------------------------------------------------
-_CURRENCY_RE = re.compile(r"\$(\d{1,}(?:,\d{3})*)(?:\.(\d+))?")
+_CURRENCY_RE = re.compile(r"([$€£¥₹])\s?(\d{1,}(?:,\d{3})*)(?:\.(\d+))?")
+# symbol: singular, plural, minor unit singular and plural (None: no minor unit).
+_CURRENCIES = {
+    "$": ("dollar", "dollars", "cent", "cents"),
+    "€": ("euro", "euros", "cent", "cents"),
+    "£": ("pound", "pounds", "penny", "pence"),
+    "¥": ("yen", "yen", None, None),
+    "₹": ("rupee", "rupees", "paisa", "paise"),
+}
+# $1.2 million, €5k, $3B: the amount is the whole number and the unit comes last.
+_CURRENCY_SCALE_RE = re.compile(
+    r"([$€£¥₹])\s?(\d[\d,]*(?:\.\d+)?)\s?(thousand|million|billion|trillion|[kKmMbB](?![\w]))",
+)
+_SCALE_WORDS = {"k": "thousand", "m": "million", "b": "billion"}
 
 # ---------------------------------------------------------------------------
 # Phone numbers: 555-123-4567 → digit-by-digit with commas for pauses
@@ -52,6 +66,9 @@ _DEGREE_ONE_RE = re.compile(r"(?<![\d.,])[-−+]?1$")
 # ---------------------------------------------------------------------------
 _TIME_RE = re.compile(r"\b(\d{1,2}):(\d{2})(?:\s*(AM|PM|am|pm|a\.m\.|p\.m\.))?\b")
 
+# 5pm, 11 a.m. (the spaced form of a plain number also reads through here).
+_HOUR_RE = re.compile(r"\b(\d{1,2})\s?(am|pm|AM|PM|a\.m\.|p\.m\.)(?![\w])")
+
 _ORDINAL_RE = re.compile(r"\b(\d+)(st|nd|rd|th)\b", flags=re.IGNORECASE)
 _WHITESPACE_RE = re.compile(r"\s+")
 # Isolated markdown symbols that survive emphasis/header/bullet cleanup.
@@ -61,7 +78,11 @@ _WHITESPACE_RE = re.compile(r"\s+")
 _ISOLATED_SYMBOL_RE = re.compile(r"(?<!\w)[*#_](?!\w)")
 # Calendar years need their own spoken forms before generic number conversion:
 # 1901-1999 use "nineteen oh one"/"nineteen ninety-nine"; 2000-2009 stay "two thousand ...".
-_YEAR_RE = re.compile(r"\b(19|20)\d{2}\b")
+# A counted amount (1999 kilometers, 2000 dollars) is a number, not a year.
+_YEAR_RE = re.compile(
+    r"\b(19|20)\d{2}\b(?!\s+(?:kilometers?|miles?|meters?|feet|pounds?|kilograms?|grams?|dollars?|euros?|"
+    r"people|calories|steps|words|items|times|points|users|songs|tracks))"
+)
 _PARENTHETICAL_RE = re.compile(r"\s*\(([^()]{3,80})\)\s*")
 _STRONG_CONJUNCTION_RE = re.compile(r"(?<![,;:])\s+(but|so|because)\s+", flags=re.IGNORECASE)
 _AND_CLAUSE_RE = re.compile(
@@ -82,6 +103,142 @@ _DECIMAL_RE = re.compile(
     r"(?<![\w.$£€¥₹₩₽₿¢,@#+\-−/\\:])(?P<sign>[+\-−]?)(?P<whole>[0-9]*)\.(?P<fraction>[0-9]+)"
     r"(?![\w%$£€¥₹₩₽₿¢@#/\\:+\-−]|\.[\w]|,[0-9])"
 )
+
+# Thousands written with commas: 1,234 and 1,234.5 are one number, not three.
+_GROUPED_NUMBER_RE = re.compile(
+    r"(?<![\w.,$£€¥₹])(?P<sign>[-−+]?)(?P<int>[1-9]\d{0,2}(?:,\d{3})+)(?:\.(?P<fraction>\d+))?(?P<percent>%)?"
+    r"(?![\w]|,\d|\.\d)"
+)
+# A minus sign in front of a number, not a hyphen inside a word, range or date.
+_MINUS_RE = re.compile(r"(?:(?<=^)|(?<=[\s(]))[-−](?=\d)")
+_NUMBER_SIGN_RE = re.compile(r"(?<![\w&])#(?=\d)")
+
+# Units after a number. Case matters: mg and MG, m and M are different things.
+_UNITS = {
+    "km": ("kilometer", "kilometers"),
+    "cm": ("centimeter", "centimeters"),
+    "mm": ("millimeter", "millimeters"),
+    "kg": ("kilogram", "kilograms"),
+    "mg": ("milligram", "milligrams"),
+    "lb": ("pound", "pounds"),
+    "lbs": ("pound", "pounds"),
+    "oz": ("ounce", "ounces"),
+    "ft": ("foot", "feet"),
+    "yd": ("yard", "yards"),
+    "mi": ("mile", "miles"),
+    "mph": ("mile per hour", "miles per hour"),
+    "kph": ("kilometer per hour", "kilometers per hour"),
+    "km/h": ("kilometer per hour", "kilometers per hour"),
+    "ml": ("milliliter", "milliliters"),
+    "mL": ("milliliter", "milliliters"),
+    "KB": ("kilobyte", "kilobytes"),
+    "kB": ("kilobyte", "kilobytes"),
+    "MB": ("megabyte", "megabytes"),
+    "GB": ("gigabyte", "gigabytes"),
+    "TB": ("terabyte", "terabytes"),
+    "Hz": ("hertz", "hertz"),
+    "kHz": ("kilohertz", "kilohertz"),
+    "MHz": ("megahertz", "megahertz"),
+    "GHz": ("gigahertz", "gigahertz"),
+    "kW": ("kilowatt", "kilowatts"),
+    "kWh": ("kilowatt hour", "kilowatt hours"),
+    "hr": ("hour", "hours"),
+    "hrs": ("hour", "hours"),
+    "min": ("minute", "minutes"),
+    "mins": ("minute", "minutes"),
+    "sec": ("second", "seconds"),
+    "secs": ("second", "seconds"),
+    "ms": ("millisecond", "milliseconds"),
+    "USD": ("US dollar", "US dollars"),
+    "EUR": ("euro", "euros"),
+    "GBP": ("pound", "pounds"),
+}
+# One-letter units only with a space: 5 m is meters, while 5m may be five million.
+_SPACED_UNITS = {
+    "m": ("meter", "meters"),
+    "g": ("gram", "grams"),
+    "L": ("liter", "liters"),
+    "W": ("watt", "watts"),
+    "V": ("volt", "volts"),
+}
+_AMOUNT = r"(?<![\w.,$£€¥₹])(?P<number>\d[\d,]*(?:\.\d+)?)"
+_UNIT_RE = re.compile(
+    _AMOUNT
+    + r"(?:\s?(?P<unit>"
+    + "|".join(re.escape(unit) for unit in sorted(_UNITS, key=len, reverse=True))
+    + r")|\s(?P<spaced>"
+    + "|".join(_SPACED_UNITS)
+    + r"))(?![\w/])"
+)
+# Lower-case letters joined to digits (mp3, h264): the pronunciation route has
+# no reading for the mixed token, so it would be dropped from the sentence.
+_LETTERS_DIGITS_RE = re.compile(r"(?<![\w.])([a-z]{1,3})(\d+)(?![\w.])")
+_FRACTIONS = {
+    "1/2": "one half",
+    "1/3": "one third",
+    "2/3": "two thirds",
+    "1/4": "one quarter",
+    "3/4": "three quarters",
+    "24/7": "twenty four seven",
+    "½": "one half",
+    "⅓": "one third",
+    "⅔": "two thirds",
+    "¼": "one quarter",
+    "¾": "three quarters",
+}
+_FRACTION_RE = re.compile(r"(?<![\w/.])(1/2|1/3|2/3|1/4|3/4|24/7)(?![\w/])|[½⅓⅔¼¾]")
+# 5-10 minutes reads as a range. Only before a counted word: "won 3-2" stays a score.
+_RANGE_RE = re.compile(
+    r"(?<![\w.,/\-])(\d+(?:\.\d+)?)\s?[-–]\s?(\d+(?:\.\d+)?)"
+    r"(?=\s?(?:%|°|percent|seconds?|minutes?|hours?|days?|weeks?|months?|years?|degrees?|people|miles?|km|"
+    r"kilometers?|dollars?|times?|items?)\b|\s?%|\s?°)"
+)
+
+# Sums read aloud: 2 + 2 = 4. Only between numbers; "=" has no reading at all.
+_ARITHMETIC_RE = re.compile(r"(?<=\d)\s*([+×÷=*])\s*(?=[-−]?\d)|(?<=\d)\s+([x\-−/])\s+(?=\d)")
+_ARITHMETIC_WORDS = {
+    "+": " plus ",
+    "×": " times ",
+    "*": " times ",
+    "x": " times ",
+    "÷": " divided by ",
+    "/": " divided by ",
+    "=": " equals ",
+    "-": " minus ",
+    "−": " minus ",
+}
+# Versions and addresses: 1.0.5 is not three numbers run together.
+_DOTTED_NUMBER_RE = re.compile(r"(?<![\w.])\d+(?:\.\d+){2,3}(?![\w]|\.\d)")
+
+_MONTHS = (
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+)
+_MONTH_ABBREVIATIONS = {
+    **{month[:3]: month for month in _MONTHS if month != "May"},
+    "Sept": "September",
+}
+_MONTH_PATTERN = "|".join(_MONTHS)
+_MONTH_OR_SHORT = "|".join((*_MONTHS, *sorted(_MONTH_ABBREVIATIONS, key=len, reverse=True)))
+_ISO_DATE_RE = re.compile(r"(?<![\w\-/])(\d{4})-(\d{2})-(\d{2})(?![\w\-/])")
+_SLASH_DATE_RE = re.compile(r"(?<![\w\-/.])(\d{1,2})/(\d{1,2})/(\d{4}|\d{2})(?![\w\-/])")
+_MONTH_DAY_RE = re.compile(
+    r"\b(" + _MONTH_OR_SHORT + r")\b\.?\s+(\d{1,2})(?:st|nd|rd|th)?\b(?!:|\.\d|\s?%)(?:,?\s+(\d{4})\b)?"
+)
+_DAY_MONTH_RE = re.compile(
+    r"\b(?:the\s+)?(\d{1,2})(?:st|nd|rd|th)?\s+(?:of\s+)?(" + _MONTH_PATTERN + r")\b(?:,?\s+(\d{4})\b)?"
+)
+_MONTH_YEAR_RE = re.compile(r"\b(" + "|".join(sorted(_MONTH_ABBREVIATIONS, key=len, reverse=True)) + r")\b\.?\s+(\d{4})\b")
 
 _ONES = [
     "zero",
@@ -106,9 +263,11 @@ _ONES = [
     "nineteen",
 ]
 _TENS = ["", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety"]
-_MAX_SPOKEN_CHARS = 500
-_SUMMARY_CHARS = 360
-_MAX_SPOKEN_SENTENCES = 3
+# How much of a reply is spoken (services/llm/answer_stream.py uses the same
+# budget for live speech). A reply inside it is spoken whole, in one go; a longer
+# one stops at the budget and the rest stays on screen. About 45 seconds.
+_MAX_SPOKEN_CHARS = 800
+_MAX_SPOKEN_SENTENCES = 6
 _SUMMARY_SUFFIX = "I'll send the full details in chat."
 
 # Initialisms: spell each letter or digit-like suffix as a spoken token.
@@ -250,10 +409,12 @@ def _two_digit_year_words(n: int) -> str:
 
 def _replace_year(match: re.Match[str]) -> str:
     try:
-        year = int(match.group(0))
+        return _year_words(int(match.group(0)))
     except (ValueError, IndexError):
         return match.group(0)
 
+
+def _year_words(year: int) -> str:
     century = year // 100
     last_two = year % 100
 
@@ -293,6 +454,111 @@ def _replace_decimal(match: re.Match[str]) -> str:
     return prefix + whole + " point " + fraction
 
 
+def _ordinal_words(number: int) -> str:
+    return _clean_num2words_ordinal_output(num2words(number, to="ordinal", lang="en"))
+
+
+def _date_words(year: int | None, month: int, day: int) -> str | None:
+    if not 1 <= month <= 12 or not 1 <= day <= 31:
+        return None
+    spoken = "%s %s" % (_MONTHS[month - 1], _ordinal_words(day))
+    if year is None:
+        return spoken
+    if 1900 <= year <= 2099:
+        return "%s, %s" % (spoken, _year_words(year))
+    return "%s, %s" % (spoken, _number_to_words(year))
+
+
+def _normalize_dates(text: str) -> str:
+    def iso(match: re.Match[str]) -> str:
+        return _date_words(int(match.group(1)), int(match.group(2)), int(match.group(3))) or match.group(0)
+
+    def slash(match: re.Match[str]) -> str:
+        year = int(match.group(3))
+        return _date_words(year + 2000 if year < 100 else year, int(match.group(1)), int(match.group(2))) or (
+            match.group(0)
+        )
+
+    def month_day(match: re.Match[str]) -> str:
+        month = _MONTH_ABBREVIATIONS.get(match.group(1), match.group(1))
+        year = int(match.group(3)) if match.group(3) else None
+        return _date_words(year, _MONTHS.index(month) + 1, int(match.group(2))) or match.group(0)
+
+    def day_month(match: re.Match[str]) -> str:
+        day = int(match.group(1))
+        if not 1 <= day <= 31:
+            return match.group(0)
+        spoken = "the %s of %s" % (_ordinal_words(day), match.group(2))
+        if match.group(3):
+            spoken += ", " + _year_words(int(match.group(3)))
+        return spoken
+
+    def month_year(match: re.Match[str]) -> str:
+        return "%s %s" % (_MONTH_ABBREVIATIONS[match.group(1)], match.group(2))
+
+    text = _ISO_DATE_RE.sub(iso, text)
+    text = _SLASH_DATE_RE.sub(slash, text)
+    text = _MONTH_DAY_RE.sub(month_day, text)
+    text = _DAY_MONTH_RE.sub(day_month, text)
+    return _MONTH_YEAR_RE.sub(month_year, text)
+
+
+def _amount_words(number: str) -> str:
+    """An amount as written (commas, one decimal point), spoken as one number."""
+    whole, _, fraction = number.replace(",", "").partition(".")
+    words = _number_to_words(int(whole or "0"))
+    if fraction:
+        words += " point " + " ".join(_DIGIT_NAMES[int(digit)] for digit in fraction)
+    return words
+
+
+def _replace_grouped_number(match: re.Match[str]) -> str:
+    fraction = match.group("fraction")
+    words = _amount_words(match.group("int") + ("." + fraction if fraction else ""))
+    sign = match.group("sign")
+    prefix = "minus " if sign in {"-", "−"} else "plus " if sign == "+" else ""
+    return prefix + words + (" percent" if match.group("percent") else "")
+
+
+def _replace_unit(match: re.Match[str]) -> str:
+    number = match.group("number")
+    names = _UNITS[match.group("unit")] if match.group("unit") else _SPACED_UNITS[match.group("spaced")]
+    return "%s %s" % (_amount_words(number), names[0] if number == "1" else names[1])
+
+
+def _replace_scaled_currency(match: re.Match[str]) -> str:
+    symbol, amount, scale = match.groups()
+    scale = _SCALE_WORDS.get(scale.lower(), scale)
+    return "%s %s %s" % (_amount_words(amount), scale, _CURRENCIES[symbol][1])
+
+
+def _replace_letters_digits(match: re.Match[str]) -> str:
+    letters = " ".join(match.group(1).upper())
+    return "%s %s" % (letters, _number_to_words(int(match.group(2))))
+
+
+def _replace_dotted_number(match: re.Match[str]) -> str:
+    if _PHONE_RE.fullmatch(match.group(0)):
+        return match.group(0)
+    return " point ".join(match.group(0).split("."))
+
+
+def _normalize_measures(text: str) -> str:
+    """Forms that must become words before the plain number passes split them apart."""
+    text = _normalize_dates(text)
+    text = _DOTTED_NUMBER_RE.sub(_replace_dotted_number, text)
+    text = _ARITHMETIC_RE.sub(lambda match: _ARITHMETIC_WORDS[match.group(1) or match.group(2)], text)
+    text = _MINUS_RE.sub("minus ", text)
+    text = _NUMBER_SIGN_RE.sub("number ", text)
+    text = _CURRENCY_SCALE_RE.sub(_replace_scaled_currency, text)
+    text = _RANGE_RE.sub(r"\1 to \2", text)
+    text = _UNIT_RE.sub(_replace_unit, text)
+    text = _GROUPED_NUMBER_RE.sub(_replace_grouped_number, text)
+    text = _FRACTION_RE.sub(lambda match: _FRACTIONS[match.group(0)], text)
+    text = _LETTERS_DIGITS_RE.sub(_replace_letters_digits, text)
+    return _HOUR_RE.sub(lambda match: "%s %s" % (match.group(1), match.group(2).upper().replace(".", "")), text)
+
+
 def _normalize_english_numbers(text: str) -> str:
     def other_numbers(segment: str) -> str:
         # Keep the established priority for all non-decimal numeric contracts.
@@ -304,7 +570,7 @@ def _normalize_english_numbers(text: str) -> str:
         segment = _YEAR_RE.sub(_replace_year, segment)
         return _STANDALONE_NUMBER_RE.sub(_replace_number, segment)
 
-    text = _expand_degrees(text, "en")
+    text = _normalize_measures(_expand_degrees(text, "en"))
     parts = []
     cursor = 0
     for decimal in _DECIMAL_RE.finditer(text):
@@ -313,6 +579,40 @@ def _normalize_english_numbers(text: str) -> str:
         cursor = decimal.end()
     parts.append(other_numbers(text[cursor:]))
     return "".join(parts)
+
+
+def _normalize_english_route_numbers(text: str) -> str:
+    """English number rules, leaving any Spanish or Chinese words to their own rules.
+
+    Each span is written for the language that will read it. A Spanish span
+    keeps quote marks around it so the engine can still recognise a one-word
+    phrase after the sentence's own punctuation is gone.
+    """
+    spans = speech_spans(text)
+    if all(span.language == BASE for span in spans):
+        return _normalize_english_numbers(text)
+    sentences: list[str] = []
+    for sentence in _split_sentences(text, english=False):
+        spans = speech_spans(sentence)
+        if all(span.language == BASE for span in spans):
+            sentences.append(_normalize_english_numbers(sentence))
+            continue
+        parts: list[str] = []
+        for span in spans:
+            if span.language == BASE:
+                parts.append(_normalize_english_numbers(span.text))
+            elif span.language == SPANISH:
+                spoken = _normalize_spanish_numbers(_expand_degrees(span.text, "es"))
+                parts.append(spoken if len(spans) == 1 else "“%s”" % spoken)
+            elif span.language == MANDARIN:
+                parts.append(_normalize_mandarin_symbols(span.text))
+            else:
+                parts.append(span.text)
+        joined = " ".join(parts)
+        if sentence.rstrip()[-1:] in {".", "!", "?"} and joined.rstrip()[-1:] not in {".", "!", "?"}:
+            joined += sentence.rstrip()[-1]
+        sentences.append(joined)
+    return " ".join(sentences)
 
 
 def _expand_degrees(text: str, language: str) -> str:
@@ -548,25 +848,26 @@ def _normalize_spanish_numbers(text: str) -> str:
 def _replace_currency(match: re.Match[str]) -> str:
     """Convert $25 → 'twenty-five dollars', $15.99 → 'fifteen dollars and ninety-nine cents'."""
     try:
-        dollars_str = match.group(1).replace(",", "")
-        cents_str = match.group(2)
+        major, majors, minor, minors = _CURRENCIES[match.group(1)]
+        dollars_str = match.group(2).replace(",", "")
+        cents_str = match.group(3)
         dollars = int(dollars_str)
-        if cents_str and len(cents_str) > 2 and any(digit != "0" for digit in cents_str):
+        if cents_str and (minor is None or len(cents_str) > 2) and any(digit != "0" for digit in cents_str):
             # Preserve fractional currency beyond cents instead of consuming a
             # two-digit prefix and leaving unrelated digits behind.
             fraction = " ".join(_DIGIT_NAMES[int(digit)] for digit in cents_str)
-            return "%s point %s dollars" % (_number_to_words(dollars), fraction)
+            return "%s point %s %s" % (_number_to_words(dollars), fraction, majors)
         cents = int(cents_str.ljust(2, "0")) if cents_str else 0
 
         if dollars == 0 and cents > 0:
-            cent_word = "cent" if cents == 1 else "cents"
+            cent_word = minor if cents == 1 else minors
             return "%s %s" % (_number_to_words(cents), cent_word)
 
-        dollar_word = "dollar" if dollars == 1 else "dollars"
+        dollar_word = major if dollars == 1 else majors
         result = "%s %s" % (_number_to_words(dollars), dollar_word)
 
         if cents > 0:
-            cent_word = "cent" if cents == 1 else "cents"
+            cent_word = minor if cents == 1 else minors
             result += " and %s %s" % (_number_to_words(cents), cent_word)
 
         return result
@@ -719,7 +1020,7 @@ def _summarize_oversized(text: str, *, english: bool = True) -> str:
     else:
         summary = text
 
-    summary = _truncate_at_word(summary, _SUMMARY_CHARS).rstrip(" ,;:")
+    summary = _truncate_at_word(summary, _MAX_SPOKEN_CHARS).rstrip(" ,;:")
     if not english:
         return summary.rstrip(".!?。！？।…") + "…" if summary else ""
     if summary and summary[-1] not in ".!?":
@@ -734,7 +1035,7 @@ class SpeechFormatter:
 
     def __init__(self, *, summarize: bool = True, config: object | None = None) -> None:
         # Viola's user-facing TTS sets summarize=True so the assistant doesn't
-        # drone on at length; long replies get capped at 3 sentences and end
+        # drone on at length; long replies get capped at 6 sentences and end
         # with "I'll send the full details in chat." Other speakers piped
         # through this formatter — e.g. the receptionist role-play in
         # tools/phone_receptionist_pipeline.py — must opt out, otherwise
@@ -767,7 +1068,7 @@ class SpeechFormatter:
             result = _replace_bullets(result)
             result = _URL_RE.sub(_replace_url if english else "…", result)
             if english:
-                result = _normalize_english_numbers(result)
+                result = _normalize_english_route_numbers(result)
             elif _locale_base(language) == "es":
                 result = _normalize_spanish_numbers(_expand_degrees(result, "es"))
             elif _locale_base(language) == "zh":
@@ -808,7 +1109,7 @@ def normalize_for_speech(text: str, *, summarize: bool = True, language: object 
     ``summarize=False`` keeps every sentence and never appends Viola's
     "I'll send the full details in chat." suffix. Use it for non-Viola
     speakers like the receptionist role-play whose dialogue should not
-    be capped at three sentences.
+    be capped at six sentences.
     """
     formatter = _DEFAULT_FORMATTER if summarize else _VERBATIM_FORMATTER
     return formatter.format(text, language=language)

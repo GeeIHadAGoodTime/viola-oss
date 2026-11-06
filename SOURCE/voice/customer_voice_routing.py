@@ -28,6 +28,12 @@ _VOICE_FAMILIES = {
 _SETTINGS_VOICE_ALIASES = {"alloy": "af_alloy", "echo": "am_echo", "nova": "af_nova"}
 
 
+def default_voice(locale: str) -> str | None:
+    """The locale's default voice ID, or None when the locale has no voice family."""
+    family = _VOICE_FAMILIES.get(locale)
+    return family[2] if family else None
+
+
 def resolve_kokoro_voice_alias(voice: str) -> str:
     """Resolve the existing settings UI labels to actual Kokoro asset IDs."""
     return _SETTINGS_VOICE_ALIASES.get(voice, voice)

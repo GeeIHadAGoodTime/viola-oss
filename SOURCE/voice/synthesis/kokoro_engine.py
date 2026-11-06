@@ -141,6 +141,12 @@ _FIRST_UNIT_CHARS = 90
 _MAX_UNIT_CHARS = 200
 _MIN_UNIT_CHARS = 30
 _CLAUSE_END_MARKS = ",;:—–"
+# A breath between two languages in one sentence.
+_LANGUAGE_SWITCH_PAUSE_SECONDS = 0.12
+# One reply says the "can't say that part" notice once, even across sentences.
+_UNSPOKEN_NOTICE_REPEAT_SECONDS = 30.0
+# Language names of the internal eSpeak pronunciation route.
+_ESPEAK_LANGUAGES = {"zh": "cmn"}
 _CLAUSE_END_RE = re.compile(r"[,;:—–](?=\s)")
 
 # Safety limit: reject text longer than this to prevent memory/CPU exhaustion.
@@ -795,6 +801,11 @@ class KokoroTTSEngine:
         retry_text = drop_unspeakable(text, tokens, latin_script=latin_script)
         if not retry_text or retry_text == text or not any(character.isalnum() for character in retry_text):
             logger.warning("Customer speech could not be spoken: %s tokens=%s", exc, list(tokens))
+            if self._claim_unspoken_notice():
+                # Nothing of this text can be read: say so instead of going silent.
+                from voice.speech_language import unspoken_notice
+
+                return self._synthesize_internal(unspoken_notice(language), voice, speed, apply_volume=apply_volume)
             raise exc
         try:
             audio = self._synthesize_internal(retry_text, voice, speed, apply_volume=apply_volume)
@@ -825,12 +836,9 @@ class KokoroTTSEngine:
             speed = self._speed_with_jitter()
         t0 = time.perf_counter()
 
-        samples, sample_rate = self._kokoro.create(
-            text,
-            voice=selected_voice,
-            speed=speed,
-            lang=getattr(self, "_speech_language", "en-us"),
-        )
+        samples, sample_rate = self._create_routed_samples(text, selected_voice, speed)
+        if len(samples) == 0:
+            return b""
 
         elapsed = time.perf_counter() - t0
         audio_duration = len(samples) / sample_rate
@@ -866,6 +874,100 @@ class KokoroTTSEngine:
             pcm_native = self._scale_pcm_volume(pcm_native, self._current_volume())
 
         return pcm_native.tobytes()
+
+    def _create_routed_samples(self, text: str, voice: str | np.ndarray, speed: float) -> tuple[np.ndarray, int]:
+        """Synthesise ``text``, sending each language to the voice that can read it.
+
+        The selected language still decides everything it can pronounce. Spanish
+        and Chinese inside it go to their own route and voice, and text no route
+        can read is replaced by one spoken notice, so a reply is never silently
+        cut short. (voice/speech_language.py says why.)
+        """
+        from voice.speech_language import BASE, SPANISH, spanish_route_text, speech_spans, unspoken_notice
+
+        base = getattr(self, "_speech_language", "en-us")
+        kokoro = self._kokoro
+        assert kokoro is not None
+        spanish_base = base.split("-", 1)[0] == "es"
+        spans = speech_spans(text, base)
+        if not spans or (len(spans) == 1 and spans[0].language == BASE):
+            return kokoro.create(spanish_route_text(text) if spanish_base else text, voice=voice, speed=speed, lang=base)
+
+        sample_rate = SAMPLE_RATE_24K
+        parts: list[np.ndarray] = []
+        skipped = False
+        for span in spans:
+            if span.language == BASE:
+                samples, sample_rate = kokoro.create(
+                    spanish_route_text(span.text) if spanish_base else span.text, voice=voice, speed=speed, lang=base
+                )
+                parts.append(np.asarray(samples, dtype=np.float32))
+                continue
+            route = self._foreign_route(span.language)
+            if route is None:
+                skipped = True
+                continue
+            language, route_voice = route
+            try:
+                samples, sample_rate = kokoro.create(
+                    spanish_route_text(span.text) if span.language == SPANISH else span.text,
+                    voice=route_voice,
+                    speed=speed,
+                    lang=language,
+                )
+            except (ValueError, RuntimeError, KeyError, AssertionError) as exc:
+                logger.warning("Speech route %s could not read a span: %s", span.language, type(exc).__name__)
+                skipped = True
+                continue
+            parts.append(np.asarray(samples, dtype=np.float32))
+        if skipped and self._claim_unspoken_notice():
+            samples, sample_rate = kokoro.create(
+                spanish_route_text(unspoken_notice(base)) if spanish_base else unspoken_notice(base),
+                voice=voice,
+                speed=speed,
+                lang=base,
+            )
+            parts.append(np.asarray(samples, dtype=np.float32))
+        if not parts:
+            return np.empty(0, dtype=np.float32), sample_rate
+        pause = np.zeros(int(sample_rate * _LANGUAGE_SWITCH_PAUSE_SECONDS), dtype=np.float32)
+        joined: list[np.ndarray] = []
+        for part in parts:
+            if joined:
+                joined.append(pause)
+            joined.append(part)
+        return np.concatenate(joined), sample_rate
+
+    def _foreign_route(self, span_language: str) -> tuple[str, str] | None:
+        """The (language, voice) that reads a span, or None when this build has no such route."""
+        from voice.customer_voice_routing import default_voice
+
+        voice = default_voice(span_language)
+        kokoro = self._kokoro
+        if voice is None or kokoro is None:
+            return None
+        customer = getattr(self, "_customer_tokenizer", None)
+        if customer is not None:
+            if not customer.supports_locale(span_language):
+                return None
+            language = span_language
+        else:
+            language = _ESPEAK_LANGUAGES.get(span_language, span_language)
+        try:
+            if voice not in kokoro.get_voices():
+                return None
+        except (AttributeError, TypeError, ValueError):
+            return None
+        return language, voice
+
+    def _claim_unspoken_notice(self) -> bool:
+        """True once per reply: the first text no route could read gets the spoken notice."""
+        now = time.monotonic()
+        last = getattr(self, "_unspoken_notice_at", None)
+        if last is not None and now - last < _UNSPOKEN_NOTICE_REPEAT_SECONDS:
+            return False
+        self._unspoken_notice_at = now
+        return True
 
     @staticmethod
     def _scale_pcm_volume(pcm: np.ndarray, volume: float) -> np.ndarray:
@@ -903,7 +1005,7 @@ class KokoroTTSEngine:
 
     def _begin_spoken_reply(self) -> None:
         """Per-reply speech state starts over (the caller holds the speak lock)."""
-        self._unspoken_notice_given = False
+        self._unspoken_notice_at = None
 
     def _prepare_route_text(self, text: str) -> str:
         """Let an explicit customer component reject unsupported complete input."""
@@ -1305,15 +1407,20 @@ class KokoroTTSEngine:
         if len(clean_text) > _MAX_TEXT_LENGTH:
             clean_text = clean_text[:_MAX_TEXT_LENGTH]
 
-        use_streaming = len(clean_text) > _CHUNK_THRESHOLD
-        sentences = _split_sentences(clean_text) if use_streaming else []
+        # Every multi-sentence reply goes sentence by sentence: audio starts
+        # after the first one is ready, not after the whole reply is.
+        sentences = [
+            unit
+            for index, sentence in enumerate(_split_sentences(clean_text))
+            for unit in _speech_units(sentence, first=index == 0)
+        ]
         # Fall back to single-shot if split produces 0 or 1 sentence
-        if len(sentences) <= 1:
-            use_streaming = False
+        use_streaming = len(sentences) > 1
 
         async with self._speak_lock:
             if not self._tts_is_enabled() or policy_marker is not getattr(self, "_tts_disable_marker", 0):
                 return
+            self._begin_spoken_reply()
             try:
                 if use_streaming:
                     await self._speak_streaming(clean_text, sentences, policy_marker=policy_marker)

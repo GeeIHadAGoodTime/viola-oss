@@ -24,9 +24,12 @@ What may be spoken while the model is still writing (design, 2026-10-31):
 - Sentence by sentence. A sentence is released only when it is complete and
   the answer so far still passes every check that could later change the
   answer: JSON/template clean-up, the sensitive-data block, the self-diagnosis
-  override (any "error" wording), and the spoken-length cap. The first sentence
-  that would trip one of them stops live speech for the rest of the turn; the
-  final answer, after every guard ran, decides what is still said.
+  override (any "error" wording). The first sentence that would trip one of
+  them stops live speech for the rest of the turn; the final answer, after
+  every guard ran, decides what is still said.
+- Without a wait at the end of the budget. A reply over the spoken budget says
+  the summary line straight after its last budgeted sentence and is finished;
+  nothing still to come can make her pause mid-reply.
 - Never twice. :meth:`FinalAnswerSpeechGate.finish` compares what was spoken
   with the final answer and returns only the part not yet said. When a model
   call is abandoned (stream failure, truncation retry) its spoken sentences are
@@ -52,12 +55,13 @@ logger = get_logger(__name__)
 ANSWER_EVENT_KEY = "answer"
 FINAL_ANSWER_PHASE = "final_answer"
 
-# Mirrors voice/synthesis/text_normalizer.py: a spoken reply longer than three
-# sentences or 500 characters is cut to three sentences (at most 360
-# characters) plus this suffix. Live speech keeps the same budget.
-MAX_LIVE_SENTENCES = 3
-MAX_LIVE_CHARS = 360
-MAX_SPOKEN_CHARS = 500
+# Mirrors voice/synthesis/text_normalizer.py: a spoken reply longer than six
+# sentences or 800 characters (about 45 seconds) stops there and ends with this
+# suffix. A reply inside the budget is spoken whole. Live speech keeps the same
+# budget and says the suffix the moment it reaches the limit, so a long answer
+# never leaves her silent waiting for the model to finish.
+MAX_LIVE_SENTENCES = 6
+MAX_SPOKEN_CHARS = 800
 SUMMARY_SUFFIX = "I'll send the full details in chat."
 
 # Set while a child agent runs inside a turn: its text is never the answer.
@@ -269,7 +273,9 @@ class FinalAnswerSpeechGate:
     Not thread-safe; feed it from one thread (the speech sink hops to its loop).
     """
 
-    def __init__(self, *, live: bool = True, reason: str | None = None) -> None:
+    def __init__(self, *, live: bool = True, reason: str | None = None, summary_suffix: str | None = SUMMARY_SUFFIX) -> None:
+        self._summary_suffix = summary_suffix
+        self._suffix_said = False
         self._attempts: dict[str, _Attempt] = {}
         self._spoken: list[str] = []
         self._replay: list[str] = []
@@ -389,6 +395,10 @@ class FinalAnswerSpeechGate:
         for sentence in sentences:
             if self._offer(sentence):
                 out.append(sentence)
+            elif self.stop_reason == "long_answer" and not self._suffix_said:
+                self._suffix_said = True
+                if self._spoken and self._summary_suffix:
+                    out.append(self._summary_suffix)
         return out
 
     def _offer(self, sentence: str) -> bool:
@@ -408,7 +418,7 @@ class FinalAnswerSpeechGate:
             self.stop_live(reason)
             return False
         spoken_chars = sum(len(s) + 1 for s in self._spoken)
-        if len(self._spoken) >= MAX_LIVE_SENTENCES or spoken_chars + len(sentence) > MAX_LIVE_CHARS:
+        if len(self._spoken) >= MAX_LIVE_SENTENCES or spoken_chars + len(sentence) > MAX_SPOKEN_CHARS:
             self.stop_live("long_answer")
             return False
         self._final_text_so_far = candidate
@@ -449,9 +459,12 @@ class FinalAnswerSpeechGate:
         oversized = len(final_sentences) > MAX_LIVE_SENTENCES or len(final) > MAX_SPOKEN_CHARS
         if not oversized:
             return " ".join(rest)
+        if self._suffix_said:
+            return ""
         budget = max(0, MAX_LIVE_SENTENCES - len(self._spoken))
         kept = rest[:budget]
-        return " ".join([*kept, SUMMARY_SUFFIX]) if kept or rest else ""
+        ending = [self._summary_suffix] if self._summary_suffix else []
+        return " ".join([*kept, *ending]) if kept or rest else ""
 
 
 __all__ = [
