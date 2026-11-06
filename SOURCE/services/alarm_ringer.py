@@ -123,7 +123,13 @@ def _default_emit(user_id: str, event_type: str, payload: dict[str, Any]) -> Non
         if hub is None or loop is None or not loop.is_running():
             logger.debug("Alarm %s broadcast skipped; EventHub/loop unavailable", event_type)
             return
-        asyncio.run_coroutine_threadsafe(hub.broadcast_to_user(user_id, event_type, payload), loop)
+        # The desktop UI socket binds under the account or the device identity,
+        # whichever resolved when it connected. Sent to one of them, the alarm
+        # rang with no card on screen (1.0.5 build 9, T5).
+        from ui.websocket.event_hub import transport_command_recipients
+
+        for recipient in transport_command_recipients(user_id):
+            asyncio.run_coroutine_threadsafe(hub.broadcast_to_user(recipient, event_type, payload), loop)
     except Exception:  # noqa: BLE001, RUF100 - a UI broadcast failure must not stop the ring
         logger.warning("Alarm %s broadcast failed for user=%s", event_type, user_id, exc_info=True)
 
