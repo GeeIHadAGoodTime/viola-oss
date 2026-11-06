@@ -1174,6 +1174,42 @@ def cloak_chrome_windows(root_pid: int) -> int:
     return changed
 
 
+def bring_browser_window_forward(root_pid: int) -> bool:
+    """Put the sign-in window in front. The user just asked for it, so this isn't stealing focus."""
+    if sys.platform != "win32":
+        return False
+    import ctypes
+    from ctypes import wintypes
+
+    pids = _chrome_process_tree(root_pid)
+    user32 = ctypes.WinDLL("user32", use_last_error=True)
+    found: list[int] = []
+    enum_proc = ctypes.WINFUNCTYPE(ctypes.c_bool, wintypes.HWND, wintypes.LPARAM)
+
+    def _check(hwnd: int, _lparam: int) -> bool:
+        pid = wintypes.DWORD()
+        user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+        cls = ctypes.create_unicode_buffer(64)
+        user32.GetClassNameW(hwnd, cls, 64)
+        if pid.value in pids and cls.value == "Chrome_WidgetWin_1" and user32.IsWindowVisible(hwnd):
+            found.append(hwnd)
+        return True
+
+    user32.EnumWindows(enum_proc(_check), 0)
+    if not found:
+        return False
+    kernel32 = ctypes.WinDLL("kernel32")
+    own_thread = kernel32.GetCurrentThreadId()
+    front_thread = user32.GetWindowThreadProcessId(user32.GetForegroundWindow(), None)
+    attached = bool(front_thread and user32.AttachThreadInput(own_thread, front_thread, True))
+    try:
+        user32.ShowWindow(found[0], 9)  # SW_RESTORE
+        return bool(user32.SetForegroundWindow(found[0]))
+    finally:
+        if attached:
+            user32.AttachThreadInput(own_thread, front_thread, False)
+
+
 def playback_window_visible(root_pid: int) -> bool:
     """Could the user see or reach a playback window? Read-only check for the diagnostic."""
     if sys.platform != "win32":
@@ -2093,6 +2129,8 @@ class SpotifyCDPController:
         except Exception:
             self._direct_sign_in_open = False
             raise
+        if self._chrome_proc is not None:
+            bring_browser_window_forward(self._chrome_proc.pid)
         logger.info("Spotify sign-in window open in the player's own profile")
 
     def direct_sign_in_status(self) -> str:
