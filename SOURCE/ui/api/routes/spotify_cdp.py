@@ -12,6 +12,8 @@ from __future__ import annotations
 
 import asyncio
 import shutil
+import threading
+import time
 from pathlib import Path
 from typing import Any
 
@@ -27,6 +29,8 @@ logger = get_logger(__name__)
 router = APIRouter(prefix="/v1/spotify/cdp", tags=["spotify-cdp"])
 status_router = APIRouter(prefix="/v1/spotify", tags=["spotify"])
 _cdp_disconnect_in_progress = False
+_PROFILE_REMOVAL_ATTEMPTS = 24
+_PROFILE_REMOVAL_GAP_SECONDS = 5.0
 
 
 def _get_controller(user_id: str) -> Any:
@@ -130,15 +134,24 @@ def _get_browser_auth_snapshot(user_id: str) -> dict[str, Any]:
 
 
 async def _remove_profile(profile_path: Path) -> None:
-    """Delete the playback profile. The browser can hold files for a moment after it exits."""
-    for attempt in range(4):
-        if not profile_path.exists():
-            return
-        if attempt:
-            await asyncio.sleep(0.5)
-        await asyncio.to_thread(shutil.rmtree, profile_path, True)
+    """Delete the playback profile.
+
+    The browser can take most of a minute to let go of its files (seen live), so
+    Disconnect doesn't wait for it: a background retry finishes the job.
+    """
+    await asyncio.to_thread(shutil.rmtree, profile_path, True)
     if profile_path.exists():
-        logger.warning("Spotify disconnect: the playback profile could not be fully removed")
+        threading.Thread(target=_finish_profile_removal, args=(profile_path,), daemon=True).start()
+
+
+def _finish_profile_removal(profile_path: Path) -> None:
+    for _ in range(_PROFILE_REMOVAL_ATTEMPTS):
+        time.sleep(_PROFILE_REMOVAL_GAP_SECONDS)
+        shutil.rmtree(profile_path, True)
+        if not profile_path.exists():
+            logger.info("Spotify disconnect: the playback profile is gone")
+            return
+    logger.warning("Spotify disconnect: the playback profile could not be fully removed")
 
 
 def _stop_spotify_playback() -> None:
