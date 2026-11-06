@@ -137,16 +137,6 @@ _CHUNK_THRESHOLD = 200
 _MAX_TEXT_LENGTH = 5000
 
 
-def _note_spoken_text(text: str) -> None:
-    """Record what Viola is about to say, so her own words can be recognised when heard back."""
-    try:
-        from audio_core.own_playback import get_own_playback
-
-        get_own_playback().note_text(text)
-    except Exception as exc:  # noqa: BLE001, RUF100 - this record must never break speech
-        logger.debug("Spoken text record failed: %s", exc)
-
-
 def _push_tts_aec_reference(samples: np.ndarray, sample_rate: int) -> None:
     """Give the wake detector's echo canceller the speech Viola is playing.
 
@@ -1237,7 +1227,13 @@ class KokoroTTSEngine:
             getattr(self, "_voice_blend_spec", None) or "none",
             language,
         )
-        _note_spoken_text(text)
+        try:
+            # What she is about to say, so her own words can be recognised when heard back.
+            from audio_core.own_playback import get_own_playback
+
+            get_own_playback().note_text(text)
+        except Exception as exc:  # noqa: BLE001, RUF100 - this record must never break speech
+            logger.debug("Spoken text record failed: %s", exc)
 
         try:
             from admin.instrumentation import record_feature_used
@@ -1649,7 +1645,12 @@ class KokoroTTSEngine:
 
                     async for chunk in text_chunks:
                         full_text_parts.append(chunk)
-                        _note_spoken_text(chunk)
+                        try:
+                            from audio_core.own_playback import get_own_playback
+
+                            get_own_playback().note_text(chunk)
+                        except Exception as exc:  # noqa: BLE001, RUF100 - must never break speech
+                            logger.debug("Spoken text record failed: %s", exc)
                         if stop_marker is not getattr(self, "_stop_marker", 0) or (
                             customer_route and route_epoch is not getattr(self, "_customer_route_epoch", 0)
                         ):

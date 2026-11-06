@@ -33,12 +33,25 @@ from typing import Any
 
 import numpy as np
 
-from audio_core.own_playback import get_own_playback
 from core.logging_config import get_logger
 
 logger = get_logger(__name__)
 
+
+def get_own_playback() -> Any:
+    """The record of what she played (imported late: audio_core pulls in the capture stack)."""
+    from audio_core.own_playback import get_own_playback as playback
+
+    return playback()
+
+
 CHUNK_SAMPLES = 1280
+# The detector's rule while she talks: (k, n, frame threshold). Every frame of
+# "Viola" is masked by her voice, and recordings that peak at 0.92-0.96 over a
+# reply clear 6 of 7 at 0.85 only a third of the time. Her own voice cannot pass on
+# this rule alone (every candidate is checked below), so it only has to be quick
+# and stay quiet on other people's speech: 125 candidates in 30 h of speech.
+OVER_SPEECH_RULE: tuple[int, int, float] = (2, 3, 0.85)
 # Scored audio: the model needs about 1.4 s to warm up, then the 1.6 s left
 # covers the word and the time the detector took to confirm it.
 REFERENCE_WINDOW_S = 3.2
@@ -185,6 +198,7 @@ def busy_turn_active() -> bool:
 
 
 __all__ = [
+    "OVER_SPEECH_RULE",
     "OWN_WORD_SCORE",
     "REFERENCE_WINDOW_S",
     "STRONG_SCORE",

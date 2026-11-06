@@ -284,15 +284,6 @@ MUSIC_WAKE_RULE: tuple[int, int, float] = (5, 6, 0.78)
 QUIET_WAKE_RULE: tuple[int, int, float] = (3, 7, 0.85)
 
 
-# While Viola herself is talking every frame of "Viola" is masked by her voice:
-# over a Kokoro reply, real recordings that peak at 0.92-0.96 clear 6 of 7 at
-# 0.85 only a third of the time. Her own voice cannot pass on this rule alone:
-# each candidate is checked against what she just played (see
-# voice.wake_detector.own_speech), so the rule only has to be quick and to stay
-# quiet on other people's speech.
-OVER_SPEECH_RULE: tuple[int, int, float] = (2, 3, 0.85)
-
-
 def stream_operating_point(level: float, *, checked: bool = False) -> tuple[int, int, float]:
     """Return (k, n, frame_threshold) for a sensitivity level.
 

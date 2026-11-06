@@ -72,7 +72,6 @@ try:
 except ImportError:  # pragma: no cover - exercised on boxes without PortAudio
     pyaudio = None  # type: ignore[assignment]
 
-from audio_core.own_playback import get_own_playback
 from audio_core.portaudio_guard import GuardedStream, open_portaudio, open_stream, terminate_portaudio
 from config import AppConfig
 from config.constants import AUDIO_SAMPLE_RATE
@@ -191,9 +190,6 @@ def _resolve_custom_wake_model_path() -> Path | None:
     return None
 
 
-from violawake.config import OVER_SPEECH_RULE
-from voice.wake_detector import own_speech
-from voice.wake_detector.aec_delay_tracker import AECDelayTracker
 from voice.wake_detector.aec_processor import (
     AEC_FRAME_SAMPLES,
     AEC_SAMPLE_RATE,
@@ -215,9 +211,19 @@ from voice.wake_detector.wake_decision_policy import (
 logger = get_logger(__name__)
 
 
+def _own_speech() -> Any:
+    """The own-voice check and the link to the voice turn."""
+    from voice.wake_detector import own_speech
+
+    return own_speech
+
+
 def _busy_voice_turn() -> bool:
     """True while a voice turn only waits on its command, so a new wake runs beside it."""
-    return own_speech.busy_turn_active()
+    try:
+        return _own_speech().busy_turn_active()
+    except ImportError:
+        return False
 
 
 def _viola_self_speech_active() -> bool:
@@ -718,7 +724,7 @@ class ViolaWakeListener:
         self._wake_fired_frame = -1
         # Scores what Viola just played (voice.wake_detector.own_speech).
         self._reference_engine: Any = None
-        self._aec_delay_tracker = AECDelayTracker()
+        self._aec_delay_tracker: Any = None
         self._mic_keeps_s = _MME_KEEPS_S
         self._aec_louder_chunks = 0
         self._aec_louder_logged_at = 0.0
@@ -1358,6 +1364,10 @@ class ViolaWakeListener:
 
     def _track_aec_delay(self, mic_int16: np.ndarray, served_reference: list[np.ndarray]) -> None:
         """Keep the canceller's reference delay on the real microphone lag (see aec_delay_tracker)."""
+        if self._aec_delay_tracker is None:
+            from voice.wake_detector.aec_delay_tracker import AECDelayTracker
+
+            self._aec_delay_tracker = AECDelayTracker()
         route = "music" if self._music_playing() else "speech"
         try:
             delay_ms = self._aec_delay_tracker.push(mic_int16, np.concatenate(served_reference), route)
@@ -2594,7 +2604,8 @@ class ViolaWakeListener:
                 # her, so Stage 2 has nothing to add: the wake model heard the
                 # word and it is not in her speech. In the quiet tail after her
                 # last word it can listen again, and it does.
-                over_her_voice = get_own_playback().seconds_since_audio() < _SPEAKING_NOW_S
+                own_speech = _own_speech()
+                over_her_voice = own_speech.get_own_playback().seconds_since_audio() < _SPEAKING_NOW_S
                 if over_her_voice and own_speech.deliver_barge_in():
                     logger.info("[WAKE_OVER_SPEECH] the speaking turn took the wake (score=%.3f)", actual_score)
                     return
@@ -3213,7 +3224,9 @@ class ViolaWakeListener:
                                 engine.threshold = effective_threshold
                                 engine.checked = stage2_checked
                                 engine.music_rule = music_rule
-                                engine.over_speech_rule = OVER_SPEECH_RULE if _viola_self_speech_active() else None
+                                engine.over_speech_rule = (
+                                    _own_speech().OVER_SPEECH_RULE if _viola_self_speech_active() else None
+                                )
                                 last_wake_score = engine.process_chunk(audio_chunk)
                                 self._maybe_start_early_check(engine, last_wake_score, contiguous, frame_count)
                     else:
@@ -3635,7 +3648,7 @@ class ViolaWakeListener:
                 # must not disturb the stream scoring the microphone.
                 self._reference_engine = fork()
                 self._reference_engine.set_callback(None)
-        return own_speech.check_wake_over_speech(score, self._reference_engine)
+        return _own_speech().check_wake_over_speech(score, self._reference_engine)
 
     def _verify_wake_candidate(
         self,
@@ -3934,7 +3947,7 @@ class ViolaWakeListener:
                 use_vad = False  # VAD failed mid-recording: RMS from here on
             return rms >= silence_threshold
 
-        playback = get_own_playback()
+        playback = _own_speech().get_own_playback()
         frames: list[bytes] = []
         lead_in: deque[bytes] = deque(maxlen=max(1, lead_in_frames))
         speech_started = onset_timeout is None
