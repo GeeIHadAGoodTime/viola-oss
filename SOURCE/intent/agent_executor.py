@@ -1310,6 +1310,23 @@ def _delivery_address_from_value(value: Any) -> dict[str, str] | str | None:
     return None
 
 
+def _street_number_and_name(address: dict[str, str] | str) -> tuple[str, str] | None:
+    text = address.get("street", "") if isinstance(address, dict) else str(address)
+    match = re.match(r"\s*(\d{1,6}[a-z]?)\s+([^,\n]{1,80})", text, re.IGNORECASE)
+    if match is None:
+        return None
+    return match.group(1).lower(), " ".join(re.findall(r"[a-z0-9]+", match.group(2).lower()))
+
+
+def _house_number_differs(order_address: Any, saved_address: Any) -> bool:
+    """True for the same street with another number: the slip a misheard digit makes."""
+    order = _street_number_and_name(order_address) if order_address else None
+    saved = _street_number_and_name(saved_address) if saved_address else None
+    if order is None or saved is None or order[0] == saved[0]:
+        return False
+    return order[1].startswith(saved[1]) or saved[1].startswith(order[1])
+
+
 def _delivery_address_from_request(
     request: dict[str, Any],
 ) -> dict[str, str] | str | None:
@@ -12104,13 +12121,15 @@ class AgentExecutor:
             order_summary["description"] = summary
 
     def _apply_context_delivery_address_to_summary(self, order_summary: dict[str, Any]) -> None:
-        """Backfill the delivery address from saved settings when no structured tool arg exists."""
+        """Backfill the saved address, and flag an order that differs from it by a house number.
 
-        existing = order_summary.get("delivery_address")
-        if isinstance(existing, dict) and any(existing.get(key) for key in ("street", "city", "state", "zip")):
-            return
-        if isinstance(existing, str) and existing.strip():
-            return
+        Only the Settings screen writes the saved address, so it is what the user
+        typed. The order's address may have been heard, or read off the merchant's
+        page. It is not replaced, because the card must show what the merchant
+        holds, but the user is told before paying.
+        """
+
+        existing = _delivery_address_from_value(order_summary.get("delivery_address"))
 
         try:
             from ui.settings_manager import get_settings_manager
@@ -12123,6 +12142,12 @@ class AgentExecutor:
         except Exception:
             saved = None
         address = _delivery_address_from_value(saved)
+        if existing:
+            if _house_number_differs(existing, address):
+                order_summary["address_warning"] = (
+                    "The house number here differs from the address you saved. Check it before you pay."
+                )
+            return
         if address:
             order_summary["delivery_address"] = address
 
