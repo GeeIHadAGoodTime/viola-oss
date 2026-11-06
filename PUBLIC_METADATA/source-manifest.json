@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "344be92e06e93cd50999b8f7ce85ef8b199b83da",
-  "sha256": "474fa99ea048e23b53de710a0a3190230bff8c4f4fb6ee186b196606f81bf629",
+  "revision": "c49d70b48fe96e88c0b8d7bb23788d188f4ca3be",
+  "sha256": "aa33586ea152358651efc7a7d93c321b6d16784588bb7447494898c98f49e58b",
   "files": [
     {
       "path": ".env.example",
@@ -45,8 +45,8 @@
     },
     {
       "path": "LICENSES/SPEECH_COMPONENT_NOTICES.md",
-      "sha256": "3013b761b4e4e845e1b1bd9858e6efcf5512bf094289be4ea1eeeb0d21c5d877",
-      "bytes": 3294
+      "sha256": "4d47ff90cab038700f3a6261f7215f427df6579f2cb249ed902b12ab64344516",
+      "bytes": 3432
     },
     {
       "path": "LICENSES/Silero-MIT.txt",
@@ -6120,8 +6120,8 @@
     },
     {
       "path": "tests/public/test_customer_launch_wiring.py",
-      "sha256": "ad6433e7f60eb491629b0f1151e1d993735a2c56417912ebde5ba8a853bb9ed9",
-      "bytes": 23868
+      "sha256": "3fed23c14674cf91e5b762baa977085bb6a0657f6263817181ad9b94684b87e5",
+      "bytes": 23882
     },
     {
       "path": "tests/public/test_customer_phone_routing.py",
@@ -13495,13 +13495,13 @@
     },
     {
       "path": "voice/customer_runtime.py",
-      "sha256": "43c20a0c0267c11487ea1ab937da7a1ba1d2823ad247a0ec6b5e5ba247a4fdae",
-      "bytes": 7539
+      "sha256": "420af0b5e9b2f0145127522932402821ce751906ab83108a4df4cdb27e15c569",
+      "bytes": 7553
     },
     {
       "path": "voice/customer_voice_routing.py",
-      "sha256": "8fa3f56e70cd5746ae67386f6258b2108f1a598f6d88deb686ef7109b2460978",
-      "bytes": 5168
+      "sha256": "d9eac147633d8537aa4a8d0bdf3fc07f218e7042f4c2948a32c0afc2ecaa39fb",
+      "bytes": 5507
     },
     {
       "path": "voice/dictation/__init__.py",
@@ -13625,8 +13625,8 @@
     },
     {
       "path": "voice/speech_language.py",
-      "sha256": "89f615e16d4695f178745c3e2c3e74c1ceda9049fb2205e37a684934727c6cad",
-      "bytes": 11896
+      "sha256": "4f62b8c06178a6183ff54732441bffebcb6b3a1bba7602d4f97d056438469486",
+      "bytes": 18477
     },
     {
       "path": "voice/spoke_handler.py",
@@ -13665,8 +13665,8 @@
     },
     {
       "path": "voice/synthesis/kokoro_engine.py",
-      "sha256": "ee9b90267c49f8b59ee8e019cabc7d373189c147fb8676ab0d45b0a0f1ff04b8",
-      "bytes": 94873
+      "sha256": "7697ba978a30dd6b91dcdbd7d278e48b345768eed6d6ab5866c8f27ab79ff8ef",
+      "bytes": 94909
     },
     {
       "path": "voice/synthesis/lazy_engine.py",
@@ -13685,8 +13685,8 @@
     },
     {
       "path": "voice/synthesis/text_normalizer.py",
-      "sha256": "8ee68807efe70714f7d781d2bde475f1ed2ff80c8bbd9c4023de3bd5debf8802",
-      "bytes": 46399
+      "sha256": "78c921d7a616b796eef1e0638b4b848ae2fff9840f3fc9e394146cbccaffccd0",
+      "bytes": 50598
     },
     {
       "path": "voice/synthesis/tts_wire.py",

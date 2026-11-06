@@ -30,12 +30,13 @@
   },
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "c435ee98e98baf22edbe30406b0cdc078e4ea9bdb93d3f5b4d4be9d61acb9906",
-  "source_tree_sha256": "474fa99ea048e23b53de710a0a3190230bff8c4f4fb6ee186b196606f81bf629",
+  "source_manifest_sha256": "a40882cfb9b6dec021101cc42815c3fec555d7ce887764f32d8d3d8449c1f618",
+  "source_tree_sha256": "aa33586ea152358651efc7a7d93c321b6d16784588bb7447494898c98f49e58b",
   "source_file_count": 2786,
-  "source_revision": "344be92e06e93cd50999b8f7ce85ef8b199b83da",
+  "source_revision": "c49d70b48fe96e88c0b8d7bb23788d188f4ca3be",
   "comparison_public_revision": "ecab2772465fcc89ae6645b028af1c2273b9199f",
   "changed_source_paths": [
+    "LICENSES/SPEECH_COMPONENT_NOTICES.md",
     "START_WEB_INTERFACE.py",
     "audio_core/aec_reference_base.py",
     "audio_core/capture/_proctap_subprocess.py",
@@ -424,6 +425,7 @@
     "violawake/engine.py",
     "voice/continuous_capture.py",
     "voice/customer_pronunciation.py",
+    "voice/customer_runtime.py",
     "voice/customer_voice_routing.py",
     "voice/pipeline.py",
     "voice/pipeline_wake_callback.py",
@@ -518,7 +520,7 @@
     "historical_inventory_limits": "This renderer correction changes no dependency or workflow inputs. All six retained SBOMs and their complete status objects stay historical and unchanged; no current installed inventory qualification is claimed."
   },
   "qualification": {
-    "source_commit": "344be92e06e93cd50999b8f7ce85ef8b199b83da",
+    "source_commit": "c49d70b48fe96e88c0b8d7bb23788d188f4ca3be",
     "kind": "speech"
   },
   "historical_bindings": [
