@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "738024675a88dfdc5afa07842a1733066e72c882",
-  "sha256": "bc346684cfec596ac65f0d41746bc564698d4e1d4271d84a3742c24438a9467d",
+  "revision": "8b8d25a269297660a97481883726591d87e78658",
+  "sha256": "21221f42cb739199306ea1654d854f95331625c12d9e5ec7cc1793b09f42ce68",
   "files": [
     {
       "path": ".env.example",
@@ -1170,8 +1170,8 @@
     },
     {
       "path": "core/state_selectors.py",
-      "sha256": "01798f06563e6e12d19451e5eada4cc82e2bf21fa9633e3813cde6c718a7b850",
-      "bytes": 16306
+      "sha256": "da0f3423f2b3f8b3eb9f2515e0bca7079f88c295044251a871c60d729b07467e",
+      "bytes": 17353
     },
     {
       "path": "core/subprocess_env.py",
@@ -1585,8 +1585,8 @@
     },
     {
       "path": "intent/agent_loop.py",
-      "sha256": "d68539a05193f3ef32dd8fa38b0da95513862ca0283b06538ee6f244963529e2",
-      "bytes": 259492
+      "sha256": "0929d8d2f103aee5df49d30182d3dac3363c9d2be811b704af27f84573c379c5",
+      "bytes": 259663
     },
     {
       "path": "intent/agent_message_manager.py",
@@ -1610,8 +1610,8 @@
     },
     {
       "path": "intent/ai_controller.py",
-      "sha256": "43bc3c20f31293be128be6cf6232071ac34cfa9d1f4cc5db5f840408c87d5f39",
-      "bytes": 167851
+      "sha256": "9b5a9571456b9d2fc645c3f40ad70f89ed2d953b62064312c88c340717b6b72e",
+      "bytes": 167981
     },
     {
       "path": "intent/ai_interpreter.py",
@@ -1815,8 +1815,8 @@
     },
     {
       "path": "intent/instant_commands/music.py",
-      "sha256": "a26899cdc7ddfd424bd6a8d5b68ae3def4e0c02ea15b18e7ac41db4ee7ca374b",
-      "bytes": 108908
+      "sha256": "d4b2856d9a4ae61f9b8cfc98ff1422092c02c7e77e102ecc849a7953622f36d0",
+      "bytes": 109390
     },
     {
       "path": "intent/instant_commands/runtime.py",
@@ -2045,8 +2045,8 @@
     },
     {
       "path": "intent/tools/deferred_tool_schemas.py",
-      "sha256": "6660e84d58292985526196f0a079a6abd1bfea9efa44e0733d63eb4143850f58",
-      "bytes": 36582
+      "sha256": "43248360410d6c2b909fe62acae917a410782715e97f0b293acdeccbbb4aea21",
+      "bytes": 36751
     },
     {
       "path": "intent/tools/delegation.py",
@@ -2115,8 +2115,8 @@
     },
     {
       "path": "intent/tools/music_tools.py",
-      "sha256": "53c5bb89c5cd26e66c1d87ab28a34a05b15b902f6c23a9bf59c0af3d695f2664",
-      "bytes": 67963
+      "sha256": "3387b332c474fe7539d7116995950609a75d8a3a9a5f7e31c8f448ed1de59bb0",
+      "bytes": 73271
     },
     {
       "path": "intent/tools/notification_tools.py",
@@ -2130,8 +2130,8 @@
     },
     {
       "path": "intent/tools/playlist_tools.py",
-      "sha256": "ecb93cc7e03b66e498588291a67446063916543848686693f314c6436f6229fa",
-      "bytes": 25083
+      "sha256": "75885ed6851e738e4f170e2b7b5652e046ef0b15d1d6e57d250424170112dc3d",
+      "bytes": 28810
     },
     {
       "path": "intent/tools/random_pick.py",
@@ -2250,13 +2250,13 @@
     },
     {
       "path": "mcp_hub/approval_bridge.py",
-      "sha256": "32fa2f04685494b7f58abd092a113dcdc40afdae3ff2e71573837645ca1e77a3",
-      "bytes": 66816
+      "sha256": "d66d5dc0fe526b6ff0de805043288d615021e0fd29c4f33c32053388b05a55c0",
+      "bytes": 67068
     },
     {
       "path": "mcp_hub/client_hub.py",
-      "sha256": "e703a863b09812f47f4571d599d53eea5422f0b5bd7a5e3d4476d6ba882327bf",
-      "bytes": 132129
+      "sha256": "63fdbd3f23ee595263cf91f51540124a0b715b3845d485516ea5800ce7d131b2",
+      "bytes": 132752
     },
     {
       "path": "mcp_hub/compound_tools.py",
@@ -2360,8 +2360,8 @@
     },
     {
       "path": "mcp_servers/computer_use/server.py",
-      "sha256": "58cfa3db77937c250f74a7c65c12be93bd1a80693281a523dbd72cff18ebbe83",
-      "bytes": 50124
+      "sha256": "7693a291703e052cbb2667ba1cb131a57031a8ace1b67b68dbf97c06d022aea7",
+      "bytes": 52555
     },
     {
       "path": "mcp_servers/core_tools/__init__.py",
@@ -2375,8 +2375,8 @@
     },
     {
       "path": "mcp_servers/core_tools/server.py",
-      "sha256": "7cbfe843cd4fbd9870d8c2b07c4670dccc6e659c4ce146ef5ebcf2c2557624a2",
-      "bytes": 263259
+      "sha256": "307b390b4e522d0ee9634a5ee3fdbe45f3636bccd99b324426638f400b5a8969",
+      "bytes": 265208
     },
     {
       "path": "mcp_servers/phone_tool_descriptions.py",
@@ -2455,8 +2455,8 @@
     },
     {
       "path": "models/player.py",
-      "sha256": "eddc6066e388624611235f716460db2bf30e938e760c803f2e2206ac48498e86",
-      "bytes": 11347
+      "sha256": "dc67efa576a2fc946bd561e30614454b53e7d050cccafd430233f657b27dc17f",
+      "bytes": 11522
     },
     {
       "path": "models/state_manager.py",
@@ -2495,13 +2495,13 @@
     },
     {
       "path": "music/autoplay/ytmusic_radio.py",
-      "sha256": "7f57053b7e2a30f69c060d81907865e4580d6bbb59b86a6857fc5958bdb04ffb",
-      "bytes": 10569
+      "sha256": "9518a7baf95d35c813c8e9c8c9fe15666a7e289652fd975c6f6e4bc9abfd6d14",
+      "bytes": 10726
     },
     {
       "path": "music/autoplay_controller.py",
-      "sha256": "1d61ee2201f10ca11e5425416b575b34dcf477f7fbe1d0574e8a562ef64aa6d5",
-      "bytes": 42613
+      "sha256": "93df1bf495792deafef8eec1ca805bef7fbc1490fe0862931358480b512ffcf7",
+      "bytes": 43079
     },
     {
       "path": "music/backends/base.py",
@@ -2835,8 +2835,8 @@
     },
     {
       "path": "music/playback_session.py",
-      "sha256": "977ecf11fe7cd532446fa7b5899b217a063bd7372d118b87916e56bdd48d3bd2",
-      "bytes": 17290
+      "sha256": "b7879768d01e06d5887b2f009eefeeb70094c7eb802b24e93ac7437541be3fa3",
+      "bytes": 17791
     },
     {
       "path": "music/player/__init__.py",
@@ -2850,8 +2850,8 @@
     },
     {
       "path": "music/player/core.py",
-      "sha256": "3ee09ba49d43986ed499b85cf7f5d0e408ec53b3629a7ca05caa2a1c95c68315",
-      "bytes": 42851
+      "sha256": "b2d097a0ae54d24a32cc1478f2009513733b013288ae9f9519d8a790a341f9ec",
+      "bytes": 42974
     },
     {
       "path": "music/player/fallback.py",
@@ -2910,8 +2910,8 @@
     },
     {
       "path": "music/playlists/playlist_player.py",
-      "sha256": "60b1947fd51db52246bf8dcfd03dc240a523932f5f6ad5fad4447ab5797df50b",
-      "bytes": 10097
+      "sha256": "be2393a5df6d8e6d0fc45de68874e9d48a48949741c70265ba4837b8a22141c5",
+      "bytes": 10686
     },
     {
       "path": "music/playlists/playlist_store.py",
@@ -3125,13 +3125,13 @@
     },
     {
       "path": "music/queue_config.py",
-      "sha256": "e222fc2a1872605f390f9602bb5a9f21cd7f563b677ac057c767c881517c9b05",
-      "bytes": 7515
+      "sha256": "7e881467456f2487a1e0c148017ec0bcfc014851ac5dcda895b89359f73568a6",
+      "bytes": 7847
     },
     {
       "path": "music/rating_system.py",
-      "sha256": "0872df226d8cc719e694e1bcdf541db37faeb485673bbf64ef4782f80e99a752",
-      "bytes": 38959
+      "sha256": "23e662615b3303d71e10719832bcb98bd0906f8903c94209d4a4dde1372f5818",
+      "bytes": 39246
     },
     {
       "path": "music/recents_service.py",
@@ -4630,8 +4630,8 @@
     },
     {
       "path": "services/llm/prompts/constants.py",
-      "sha256": "8c40d026fa0578c7f36cf14d849010719cf01ea6abf08cb7075bf291ef2450c9",
-      "bytes": 16283
+      "sha256": "aa2458782be7c9e56d7b71dd8fb5413722df8bbea43188f3cc84ea36d9498357",
+      "bytes": 16636
     },
     {
       "path": "services/llm/prompts/output_styles.py",
@@ -4720,8 +4720,8 @@
     },
     {
       "path": "services/llm/route_tool_schemas.py",
-      "sha256": "e591a828df5e1e6a4a6ba4d6d8f8943bc3848dd775ea1a273b5d60350f5e2aad",
-      "bytes": 44415
+      "sha256": "4e2016a62639e4f03cfd96511722c7ebd5ec3377e264ab95932d3d7958ad3269",
+      "bytes": 44587
     },
     {
       "path": "services/llm/session_cost_tracker.py",
@@ -9470,8 +9470,8 @@
     },
     {
       "path": "ui/api/routes/control.py",
-      "sha256": "dcabbcc441c66ba2513b58677646b2068af57a3a48af7da899245d920255470c",
-      "bytes": 67989
+      "sha256": "35310640bcebec367c368d1f323e62209e8fcb13cae6ac4877ed8311f3038a45",
+      "bytes": 68512
     },
     {
       "path": "ui/api/routes/cost.py",
@@ -9580,8 +9580,8 @@
     },
     {
       "path": "ui/api/routes/playlists.py",
-      "sha256": "30d58b8c23b0240b6045d830410d85d936a9455a843bd9938205076c8c9e7fee",
-      "bytes": 12329
+      "sha256": "a70e002f4c5f75ec2b8ed74477d3f5c2984ad609af9cf6cc4afb70e113457af8",
+      "bytes": 12513
     },
     {
       "path": "ui/api/routes/plugins.py",
@@ -9600,8 +9600,8 @@
     },
     {
       "path": "ui/api/routes/rating.py",
-      "sha256": "c44e71e9968fb094cebf02ca6b5a207d57f618f7cf15049500b336099825f522",
-      "bytes": 12990
+      "sha256": "0446a6e2562f3a0f1b90b557b3c1e870fc5458dbd6b65170aad271d82a6e9736",
+      "bytes": 13316
     },
     {
       "path": "ui/api/routes/regression_stubs.py",
@@ -10085,8 +10085,8 @@
     },
     {
       "path": "ui/react-app/src/SmartDisplay.jsx",
-      "sha256": "4e24a97267f758c40cc5b47b4aab80793d9b5455a3ab2cde0cc88113ec8b0b13",
-      "bytes": 194662
+      "sha256": "4b60b20bbce063d305c2d3ebe8706fd6e68feadf7f8ee46b9232e88c205d66f7",
+      "bytes": 196130
     },
     {
       "path": "ui/react-app/src/SmartDisplay.overlayLifecycle.test.jsx",
@@ -10125,8 +10125,8 @@
     },
     {
       "path": "ui/react-app/src/__tests__/SmartDisplay.test.jsx",
-      "sha256": "cc7f429c3eecee471478e3866f1be9008b0d5995e1ac9613411fb3b37aac2784",
-      "bytes": 146791
+      "sha256": "66437338f43a59d355b04be0677b74f50e9f1442ddb54eded366e6f1eb6c722c",
+      "bytes": 150211
     },
     {
       "path": "ui/react-app/src/__tests__/hooks/useEventBus.test.jsx",
@@ -10920,8 +10920,8 @@
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.jsx",
-      "sha256": "1685b01d6ce92e3452aa2197fdb1bbd8c9fe90334a9b9743ed5c7d1c99bd72e1",
-      "bytes": 218121
+      "sha256": "994b64de4a994ebb5850ded7c24d3521702304810d781c2af9d056d862ef5015",
+      "bytes": 218120
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.localDiscovery.test.jsx",
@@ -12800,8 +12800,8 @@
     },
     {
       "path": "ui/settings_api.py",
-      "sha256": "7f2659ad8cf39b644b6b9c08b10037367c16b6b777da18500173e279e5dc63f8",
-      "bytes": 88511
+      "sha256": "655c554c21fe3312e10dfb5973c73ab3cb5c72919612f4a4ecb58e40cdb749b8",
+      "bytes": 89437
     },
     {
       "path": "ui/settings_effects.py",
@@ -12890,8 +12890,8 @@
     },
     {
       "path": "ui/websocket/command_handlers.py",
-      "sha256": "df7c059646baa16a2c64667173435bceaf7418cdea56232eafb13b12650cc894",
-      "bytes": 51029
+      "sha256": "287ebeebf1ec31e5d87967b1d2992c4c653dc922d0656663876e018f892ee721",
+      "bytes": 54144
     },
     {
       "path": "ui/websocket/event_hub.py",
@@ -12900,8 +12900,8 @@
     },
     {
       "path": "ui/websocket/routes.py",
-      "sha256": "e1244f405d5b037f542379c685a1b3cf0bb0a50efd1ff0cd4174f06ba42ac948",
-      "bytes": 15296
+      "sha256": "af1646c6535ca99770d2e2d325ac61f61542f8cbc061b3274db25110bd9c578d",
+      "bytes": 15298
     },
     {
       "path": "updates/__init__.py",
@@ -12945,8 +12945,8 @@
     },
     {
       "path": "utils/api_helpers.py",
-      "sha256": "ccdeb8ffea22b299da40f8e7e02a5850dbacb2c17d9e62d956be7add33efe032",
-      "bytes": 5270
+      "sha256": "160dc232c804e96a85ca04894b03fa3f0bfda5ea4451ab81d710037992b04037",
+      "bytes": 5518
     },
     {
       "path": "utils/async_helper.py",
@@ -12975,8 +12975,8 @@
     },
     {
       "path": "utils/audio_ducking.py",
-      "sha256": "51f8628748ce0f4e929b6331ffe835bc61f2d49bc40c9fbfc4249d8fee87f08d",
-      "bytes": 17412
+      "sha256": "1d9a323292defa17409c15b2fa8c766b276fdb95017ed25ef35e0cb3af4b7998",
+      "bytes": 19717
     },
     {
       "path": "utils/audio_preprocessing.py",
