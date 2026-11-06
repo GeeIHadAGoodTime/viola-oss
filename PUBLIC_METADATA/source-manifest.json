@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "f7fbff509b7c1714c0b495af2bbbc24ff57c2315",
-  "sha256": "6afcc85e71edaf60c586327f4c62167a67e9a6429c334358e3dace6608fa31b4",
+  "revision": "68a9135a395ec1ca04c0c69180ad0b9efb220fec",
+  "sha256": "4207133aca2b61c614abd200537558366e9ab443a9dff40c808c9434bc97c1dc",
   "files": [
     {
       "path": ".env.example",
@@ -1690,8 +1690,8 @@
     },
     {
       "path": "intent/context_compaction.py",
-      "sha256": "5cd6c9deff8b921c607b10dccec308dcd34c9e307f14497f56981389fd920ca1",
-      "bytes": 52161
+      "sha256": "1837f8bc398b024cd8fb2d6741caab988bfded1bf16dc5a815eaba5bfcab797d",
+      "bytes": 53553
     },
     {
       "path": "intent/file_gates.py",
