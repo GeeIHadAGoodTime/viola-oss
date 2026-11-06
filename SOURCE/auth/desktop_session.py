@@ -54,6 +54,33 @@ _LOCAL_SESSION_TTL_DAYS = 30
 _ACCESS_REFRESH_SKEW_SECONDS = 120
 _DEFAULT_ACCESS_TTL_SECONDS = 15 * 60
 _SQLITE_TIMEOUT_SECONDS = 5.0
+# How long quitting waits for a refresh already on the wire. The rotated pair
+# must reach the disk before the process goes: the old refresh token is spent.
+_SHUTDOWN_REFRESH_WAIT_SECONDS = 2.0
+# The GoTrue rejections that really mean "this session is over". Anything else
+# (a gateway page, a rate limit, a body nobody can read) says nothing about the
+# session, so it never signs the user out.
+_REVOKED_REFRESH_ERROR_CODES = frozenset(
+    {
+        "invalid_grant",
+        "refresh_token_not_found",
+        "refresh_token_already_used",
+        "session_expired",
+        "session_not_found",
+        "user_banned",
+        "user_not_found",
+    }
+)
+_REVOKED_REFRESH_STATUSES = frozenset({400, 401, 403})
+# Validation outcomes that leave the stored session intact. A caller must not
+# treat these as "signed out": no cookie cleared, no sign-in form.
+_TRANSIENT_VALIDATION_REASONS = frozenset(
+    {
+        "gotrue_refresh_transient",
+        "desktop_token_store_unavailable",
+        "desktop_session_validation_error",
+    }
+)
 
 
 class DesktopSessionError(RuntimeError):
@@ -92,6 +119,11 @@ class DesktopSessionValidation:
     access_token: str | None = None
     refreshed: bool = False
     reason: str | None = None
+
+    @property
+    def transient(self) -> bool:
+        """Not authenticated right now, but the stored session is still there."""
+        return not self.authenticated and self.reason in _TRANSIENT_VALIDATION_REASONS
 
 
 @dataclass(frozen=True)
@@ -240,21 +272,11 @@ class DesktopSessionStore:
             TypeError,
             ValueError,
         ):
-            try:
-                self.delete_session_token(session_token)
-            except (
-                OSError,
-                RuntimeError,
-                SecurityError,
-                sqlite3.Error,
-                TypeError,
-                ValueError,
-            ):
-                logger.debug(
-                    "Desktop local session cleanup after validation failure also failed",
-                    exc_info=True,
-                )
-            logger.exception("Desktop local session validation failed closed")
+            # Fail closed for THIS request only. A failure inside this process
+            # says nothing about the session itself: quitting raises
+            # "cannot schedule new futures after shutdown" here, and deleting on
+            # that signed people out on an unlucky quit (1.0.5 build 9, 11-04).
+            logger.exception("Desktop local session validation failed closed (session kept)")
             return DesktopSessionValidation(authenticated=False, reason="desktop_session_validation_error")
 
     async def active_access_token(self, *, user_id: str | None = None) -> str | None:
@@ -295,7 +317,6 @@ class DesktopSessionStore:
                 ValueError,
             ):
                 logger.debug("Desktop active session row validation failed closed", exc_info=True)
-                self.delete_session_hash(row.session_hash)
                 continue
             if validation.authenticated and validation.access_token:
                 return validation.access_token
@@ -362,6 +383,11 @@ class DesktopSessionStore:
         access_token = self._get_token(row, "access")
         refresh_token = self._get_token(row, "refresh")
         if not access_token or not refresh_token:
+            if self._token_entries_present(row):
+                # The tokens are on disk and cannot be read right now (keyring
+                # or master key unavailable). They may read fine next time.
+                logger.warning("Desktop local session tokens unreadable right now (session kept)")
+                return DesktopSessionValidation(authenticated=False, reason="desktop_token_store_unavailable")
             self.delete_session_hash(session_hash)
             return DesktopSessionValidation(authenticated=False, reason="missing_desktop_gotrue_tokens")
 
@@ -369,14 +395,8 @@ class DesktopSessionStore:
         if row.access_expires_at <= now + timedelta(seconds=_ACCESS_REFRESH_SKEW_SECONDS):
             try:
                 refresh_result = await self._refresh_session_row_serialized(session_hash)
-            except DesktopSessionRefreshTransientError:
-                # Cloud 5xx / network blip — the stored session is almost
-                # certainly still valid. PRESERVE it (do NOT delete): only this
-                # request fails unauthenticated, and the next validation retries
-                # the refresh once the cloud recovers. Deleting here would log
-                # users out permanently on a transient blip (issue #340).
-                return DesktopSessionValidation(authenticated=False, reason="gotrue_refresh_transient")
             except (
+                DesktopSessionRefreshTransientError,
                 DesktopSessionError,
                 OSError,
                 RuntimeError,
@@ -384,13 +404,25 @@ class DesktopSessionStore:
                 sqlite3.Error,
                 TypeError,
                 ValueError,
-            ):
-                self.delete_session_hash(session_hash)
-                return DesktopSessionValidation(authenticated=False, reason="gotrue_refresh_invalid")
-            if refresh_result is None:
-                return DesktopSessionValidation(authenticated=False, reason="gotrue_refresh_failed")
-            row, access_token = refresh_result
-            refreshed = True
+            ) as exc:
+                # Cloud 5xx, network blip, or a failure inside this process (a
+                # thread pool closing while Viola quits, a busy database). None
+                # of those is a verdict on the session, so PRESERVE it: only
+                # this request is affected, and the next validation retries.
+                # Only ``refresh_result is None`` below, GoTrue itself saying
+                # the session is over, ends it (issue #340; 1.0.5 build 9).
+                logger.warning(
+                    "Desktop local session refresh failed for now (session kept): %s",
+                    type(exc).__name__,
+                )
+                if row.access_expires_at <= now:
+                    return DesktopSessionValidation(authenticated=False, reason="gotrue_refresh_transient")
+                # The current access token is still good: keep working on it.
+            else:
+                if refresh_result is None:
+                    return DesktopSessionValidation(authenticated=False, reason="gotrue_refresh_failed")
+                row, access_token = refresh_result
+                refreshed = True
 
         # The last-used UPDATE commits (fsync): keep it off the event loop.
         await asyncio.to_thread(self._touch_session, session_hash)
@@ -448,12 +480,19 @@ class DesktopSessionStore:
         access_token = self._get_token(row, "access")
         refresh_token = self._get_token(row, "refresh")
         if not access_token or not refresh_token:
+            if self._token_entries_present(row):
+                raise DesktopSessionRefreshTransientError("token_store_unavailable")
             self.delete_session_hash(session_hash)
             return None
         if row.access_expires_at > _utcnow() + timedelta(seconds=_ACCESS_REFRESH_SKEW_SECONDS):
             # Another consumer already refreshed while we waited on the
             # lock; the rotated pair is persisted — reuse it, never replay.
             return row, access_token
+        if _shutdown_started.is_set():
+            # Quitting: a rotation started now could lose its answer when the
+            # process exits, and the spent token would sign the user out at the
+            # next launch.
+            raise DesktopSessionRefreshTransientError("shutting_down")
         # This thread has no running event loop, so the (monkeypatchable)
         # async GoTrue boundary runs on its own short-lived loop.
         refreshed_payload = asyncio.run(_refresh_gotrue_tokens(refresh_token))
@@ -486,8 +525,8 @@ class DesktopSessionStore:
 
         Returns the GoTrue-shaped token payload, or ``None`` when no desktop
         session matches / the session is genuinely invalid (fail closed).
-        Raises ``DesktopSessionRefreshTransientError`` (uncaught here, by
-        design) when the refresh hit a cloud 5xx / network blip — the caller
+        Raises ``DesktopSessionRefreshTransientError`` when the refresh hit a
+        cloud 5xx / network blip or failed inside this process — the caller
         (``auth/desktop_gotrue_proxy.py``) must NOT treat that the same as a
         genuine rejection: the stored session survives a transient failure,
         so the response must not wipe the webview's auth cookies either
@@ -508,8 +547,10 @@ class DesktopSessionStore:
             TypeError,
             ValueError,
         ):
-            logger.exception("Desktop GoTrue refresh grant failed closed")
-            return None
+            # Not a verdict on the session: the route must leave the session
+            # and its cookie alone and let the webview try again.
+            logger.exception("Desktop GoTrue refresh grant failed for now (session kept)")
+            raise DesktopSessionRefreshTransientError("local_failure") from None
 
     def _gotrue_refresh_grant_locked_sync(
         self,
@@ -568,7 +609,57 @@ class DesktopSessionStore:
         session_hash = hash_token(session_token)
         return self.delete_session_hash(session_hash)
 
+    def reattach_active_session(self) -> MintedDesktopSession | None:
+        """Hand this computer's own page a working cookie for the live session.
+
+        The account and the page used to be able to disagree: the session row
+        stays signed in while the webview's cookie is gone or points at a row
+        that no longer exists, so the app worked and Settings > Account showed a
+        sign-in form (1.0.5 build 9, 11-05). The cookie value is only stored as
+        a hash, so it cannot be read back; the newest usable session gets a new
+        cookie value instead. Same tokens and same account, so no account-change
+        event fires. Returns ``None`` when this computer is not signed in.
+        """
+        with self._refresh_serial_lock, self._lock:
+            now = _utcnow()
+            for row in self._session_rows_by_recent_use():
+                if row.expires_at <= now:
+                    continue
+                access_token = self._get_token(row, "access")
+                refresh_token = self._get_token(row, "refresh")
+                if not access_token or not refresh_token:
+                    continue
+                session_token = "%s%s" % (LOCAL_SESSION_PREFIX, generate_secure_token(32))
+                session_hash = hash_token(session_token)
+                self._store_token_pair(
+                    user_id=row.user_id,
+                    session_hash=session_hash,
+                    access_token=access_token,
+                    refresh_token=refresh_token,
+                )
+                try:
+                    with self._connect() as conn:
+                        conn.execute(
+                            "UPDATE desktop_sessions SET session_hash = ? WHERE session_hash = ?",
+                            (session_hash, row.session_hash),
+                        )
+                except sqlite3.Error:
+                    self._delete_token_pair(row.user_id, session_hash)
+                    raise
+                self._delete_token_pair(row.user_id, row.session_hash)
+                return MintedDesktopSession(
+                    session_token=session_token,
+                    user_id=row.user_id,
+                    session_id=row.gotrue_session_id or session_hash,
+                    max_age_seconds=max(1, int((row.expires_at - now).total_seconds())),
+                )
+        return None
+
     def delete_session_hash(self, session_hash: str) -> bool:
+        if _shutdown_started.is_set():
+            # Nothing that happens while Viola quits may end a session.
+            logger.warning("Desktop local session delete skipped: Viola is quitting")
+            return False
         with self._lock:
             row = self._get_session_row(session_hash)
             if row is not None:
@@ -662,10 +753,23 @@ class DesktopSessionStore:
         removed_access = manager.delete_secret(_token_secret_ref(user_id, session_hash, "access"))
         removed_refresh = manager.delete_secret(_token_secret_ref(user_id, session_hash, "refresh"))
         if removed_access or removed_refresh:
-            manager.save_to_file(self._token_cache_path)
+            # Atomic: a quit in the middle of a plain rewrite left a cut-off
+            # file, and that took every other session's tokens with it.
+            try:
+                manager.save_to_file(self._token_cache_path, strict=True)
+            except SecurityError:
+                logger.warning("Desktop token cache not rewritten after a delete", exc_info=True)
 
     def _get_token(self, row: _SessionRow, kind: str) -> str | None:
         return self._secret_manager().get_secret(_token_secret_ref(row.user_id, row.session_hash, kind))
+
+    def _token_entries_present(self, row: _SessionRow) -> bool:
+        """True when this row's tokens are stored, readable or not."""
+        manager = self._secret_manager()
+        return all(
+            manager.has_secret(_token_secret_ref(row.user_id, row.session_hash, kind))
+            for kind in ("access", "refresh")
+        )
 
     def _get_session_row(self, session_hash: str) -> _SessionRow | None:
         self._ensure_sqlite_schema()
@@ -738,6 +842,9 @@ class DesktopSessionStore:
         if refreshed is None:
             raise DesktopSessionError("GoTrue refresh returned no token payload")
         if refreshed.user_id != row.user_id:
+            # The one local check that is a verdict: these tokens belong to
+            # someone else, so this row must not live on.
+            self.delete_session_hash(session_hash)
             raise DesktopSessionError("GoTrue refresh user_id changed")
 
         email = refreshed.email or row.email
@@ -749,12 +856,14 @@ class DesktopSessionStore:
             access_token=refreshed.access_token,
             refresh_token=refreshed.refresh_token,
         )
+        # A session in use stays alive: only a month of silence ends it locally.
+        expires_at = _utcnow() + timedelta(days=_LOCAL_SESSION_TTL_DAYS)
         with self._connect() as conn:
             conn.execute(
                 """
                 UPDATE desktop_sessions
                 SET email = ?, email_verified = ?, gotrue_session_id = ?,
-                    access_expires_at = ?, last_used_at = ?
+                    access_expires_at = ?, last_used_at = ?, expires_at = ?
                 WHERE session_hash = ? AND user_id = ?
                 """,
                 (
@@ -763,6 +872,7 @@ class DesktopSessionStore:
                     gotrue_session_id,
                     _format_dt(refreshed.access_expires_at),
                     _format_dt(_utcnow()),
+                    _format_dt(expires_at),
                     session_hash,
                     row.user_id,
                 ),
@@ -775,7 +885,7 @@ class DesktopSessionStore:
                 email_verified=email_verified,
                 gotrue_session_id=gotrue_session_id,
                 created_at=row.created_at,
-                expires_at=row.expires_at,
+                expires_at=expires_at,
                 last_used_at=_utcnow(),
                 access_expires_at=refreshed.access_expires_at,
             ),
@@ -785,6 +895,8 @@ class DesktopSessionStore:
 
 _store: DesktopSessionStore | None = None
 _store_lock = threading.Lock()
+# Set once Viola starts quitting; see ``begin_desktop_session_shutdown``.
+_shutdown_started = threading.Event()
 
 # Callbacks run when a desktop account signs in or out (a session row is
 # created, or the last rows are deleted or purged). They take no arguments and
@@ -852,11 +964,32 @@ def reset_desktop_session_store_for_tests(
     root_dir: Path | None = None,
 ) -> DesktopSessionStore:
     global _store, _account_change_generation
+    _shutdown_started.clear()
     with _store_lock:
         _store = DesktopSessionStore(root_dir=root_dir)
         with _account_change_listeners_lock:
             _account_change_generation += 1
         return _store
+
+
+def begin_desktop_session_shutdown(timeout_s: float = _SHUTDOWN_REFRESH_WAIT_SECONDS) -> bool:
+    """Viola is quitting: stop touching stored sessions. Never raises.
+
+    From here on no refresh starts and no session is deleted, whatever fails in
+    the threads still running while the process winds down. A refresh already
+    on the wire gets ``timeout_s`` to store its rotated pair, because the token
+    it spent cannot be used again. Returns whether nothing is left in flight.
+    """
+    _shutdown_started.set()
+    store = _store
+    if store is None:
+        return True
+    acquired = store._refresh_serial_lock.acquire(timeout=max(0.0, timeout_s))
+    if acquired:
+        store._refresh_serial_lock.release()
+    else:
+        logger.warning("A token refresh was still running when Viola quit")
+    return acquired
 
 
 def is_desktop_local_session_token(token: object) -> bool:
@@ -905,6 +1038,10 @@ async def serve_desktop_gotrue_refresh_grant(
 
 def delete_desktop_session_token(session_token: str) -> bool:
     return get_desktop_session_store().delete_session_token(session_token)
+
+
+def reattach_desktop_session() -> MintedDesktopSession | None:
+    return get_desktop_session_store().reattach_active_session()
 
 
 def purge_desktop_sessions_for_user(user_id: str) -> dict[str, Any]:
@@ -974,7 +1111,7 @@ async def _refresh_gotrue_tokens(refresh_token: str) -> Mapping[str, Any] | None
 
         if not _desktop_should_proxy_to_cloud():
             logger.warning("Desktop local session refresh refused non-cloud base URL")
-            return None
+            raise DesktopSessionRefreshTransientError("no_cloud_base_url")
         async with httpx.AsyncClient(timeout=TIMEOUT_LONG) as client:
             response = await client.post(
                 "%s/auth/v1/token" % _get_cloud_base_url(),
@@ -991,23 +1128,51 @@ async def _refresh_gotrue_tokens(refresh_token: str) -> Mapping[str, Any] | None
             )
             raise DesktopSessionRefreshTransientError("gotrue_status_%s" % response.status_code)
         if response.status_code >= 400:
-            # Genuine rejection (401 revoked / 400 malformed refresh token):
-            # PERMANENT — fail closed, the caller deletes the session.
-            logger.warning("Desktop local session refresh rejected status=%s", response.status_code)
-            return None
+            if _is_revoked_refresh_response(response):
+                # GoTrue itself said the session is over: PERMANENT, the caller
+                # deletes the session.
+                logger.warning("Desktop local session refresh rejected status=%s", response.status_code)
+                return None
+            # A rate limit, a gateway or firewall page: says nothing about the
+            # session, so it survives.
+            logger.warning(
+                "Desktop local session refresh refused status=%s (session preserved)",
+                response.status_code,
+            )
+            raise DesktopSessionRefreshTransientError("gotrue_status_%s" % response.status_code)
         data = response.json()
-        return data if isinstance(data, Mapping) else None
+        if isinstance(data, Mapping):
+            return data
+        logger.warning("Desktop local session refresh answer unreadable (session preserved)")
+        raise DesktopSessionRefreshTransientError("unreadable_answer")
     except httpx.HTTPError as exc:
         # Network drop / timeout / connection error: TRANSIENT, not a
         # revocation — preserve the session for the next attempt. This is
         # exactly what a laptop-sleep/wake network hiccup looks like.
         logger.warning("Desktop local session refresh transport failure (session preserved): %s", exc)
         raise DesktopSessionRefreshTransientError("transport") from exc
-    except (ValueError, TypeError):
-        # Malformed/undecodable success body — a valid GoTrue response never
-        # looks like this; treat as permanent so we don't loop forever.
-        logger.exception("Desktop local session refresh payload failure")
-        return None
+    except (ValueError, TypeError) as exc:
+        # A 200 nobody can read: a captive portal or proxy page, typical while
+        # a network comes back. Not GoTrue's voice, so not a verdict.
+        logger.warning("Desktop local session refresh answer unreadable (session preserved)")
+        raise DesktopSessionRefreshTransientError("unreadable_answer") from exc
+
+
+def _is_revoked_refresh_response(response: httpx.Response) -> bool:
+    """True only for GoTrue's own "this refresh token is finished" answer."""
+    if response.status_code not in _REVOKED_REFRESH_STATUSES:
+        return False
+    try:
+        body = response.json()
+    except ValueError:
+        return False
+    if not isinstance(body, Mapping):
+        return False
+    codes = {str(body.get(key) or "").strip().lower() for key in ("error_code", "error", "code")}
+    if codes & _REVOKED_REFRESH_ERROR_CODES:
+        return True
+    message = " ".join(str(body.get(key) or "") for key in ("msg", "message", "error_description"))
+    return "invalid refresh token" in message.lower()
 
 
 def _decode_unverified_jwt_payload(token: str) -> dict[str, Any] | None:
@@ -1176,7 +1341,9 @@ __all__ = [
     "DesktopSessionRefreshTransientError",
     "DesktopSessionStore",
     "create_desktop_session_from_gotrue_payload",
+    "begin_desktop_session_shutdown",
     "delete_desktop_session_token",
+    "reattach_desktop_session",
     "desktop_access_token_for_active_session",
     "desktop_access_token_for_session_token",
     "get_desktop_account_identity",
