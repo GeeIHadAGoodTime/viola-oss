@@ -97,7 +97,8 @@ def inject_preferences(ps: dict[str, Any]) -> dict[str, Any]:
         from utils.audio_ducking import user_volume_while_ducked
 
         ducked_from = user_volume_while_ducked()
-        ps["user_volume"] = ducked_from if ducked_from is not None else ps.get("volume")
+        if ducked_from is not None:
+            ps["user_volume"] = ducked_from
     except Exception:
         pass
     return ps

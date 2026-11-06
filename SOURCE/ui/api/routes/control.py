@@ -189,7 +189,7 @@ def register_control_routes(context: ApiContext, toolbox: RouteToolbox) -> None:
                 update={
                     "repeat_mode": select_repeat_mode(),
                     "shuffle": select_shuffle_enabled(),
-                    "user_volume": ducked_from if ducked_from is not None else result.volume,
+                    "user_volume": ducked_from,
                 }
             )
         except Exception:
