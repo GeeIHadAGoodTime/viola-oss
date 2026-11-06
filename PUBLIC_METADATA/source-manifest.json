@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "abd432873f7306345f21af33d67442635e40bfcf",
-  "sha256": "cb7126eb100ee586b87e6df11daed1f6411d7c582e7528f3a8137d0a1549350b",
+  "revision": "d26a58d6be2fb4c558f4ad329b9ea394000a2f76",
+  "sha256": "ce5f220b3f3a6c6088978d0364599e04a4d56540d685dfd0e7479b8c10af33f6",
   "files": [
     {
       "path": ".env.example",
@@ -10925,8 +10925,8 @@
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.jsx",
-      "sha256": "ba2f538e166079b75e3f42f0d6492de86ae0da4ebe71d6d79c6b78fb9e30b86c",
-      "bytes": 213878
+      "sha256": "641e840e29bc03c2169a96ce9106d52e160640815e9a34416d3551946a28a4f5",
+      "bytes": 218556
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.localDiscovery.test.jsx",
