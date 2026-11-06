@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "738024675a88dfdc5afa07842a1733066e72c882",
-  "sha256": "bc346684cfec596ac65f0d41746bc564698d4e1d4271d84a3742c24438a9467d",
+  "revision": "25aab7d5fbbb07adbc1dd8354f96d2ab2911ca88",
+  "sha256": "479a6da5008dbc1a93b2e78c7a11ec0d7910994dec6ff4131ca242a2e9ca9560",
   "files": [
     {
       "path": ".env.example",
@@ -1580,8 +1580,8 @@
     },
     {
       "path": "intent/agent_executor.py",
-      "sha256": "22b1dfa60ab157c69f22b2e8b1296d8b76952d7ceafb57be5fde429b5878cd10",
-      "bytes": 596261
+      "sha256": "f6e6f92a2f46644b3c5f0ab4cdaa9d601e72405263a3e584a6ce1626a30a89a2",
+      "bytes": 596877
     },
     {
       "path": "intent/agent_loop.py",
@@ -1860,8 +1860,8 @@
     },
     {
       "path": "intent/irreversible_actions.py",
-      "sha256": "6fc6d7f53716f893770b94d0efb8d21b0548f94608960a49ced4a6fed337a3d7",
-      "bytes": 21977
+      "sha256": "ec5f0a16d6936d515d46d0445e29e11738cc053a3876ca512ed06a3c9be5ea88",
+      "bytes": 22370
     },
     {
       "path": "intent/json_utils.py",
@@ -2125,8 +2125,8 @@
     },
     {
       "path": "intent/tools/phone_call.py",
-      "sha256": "049c0c8c59ee8658ff305e810a5cb68823888d0ed117ffa3c9ca48c22aca6959",
-      "bytes": 74381
+      "sha256": "0deee85c6013f666e37bc8ef071fcd7fadc33e371ed13a52d2cf9f6a77e1fbe3",
+      "bytes": 77896
     },
     {
       "path": "intent/tools/playlist_tools.py",
@@ -2380,8 +2380,8 @@
     },
     {
       "path": "mcp_servers/phone_tool_descriptions.py",
-      "sha256": "a5584d22837677c60226ca29ec5b4489760eb76e6dc5596d766c0e000cc53733",
-      "bytes": 3254
+      "sha256": "352b5ec13056a715221e3821023c3dd2b86e50b4e9235641a887f20a87b1157d",
+      "bytes": 3433
     },
     {
       "path": "messaging/__init__.py",
@@ -5365,8 +5365,8 @@
     },
     {
       "path": "services/telnyx_sender.py",
-      "sha256": "b3f2f7f654805d9fef8c9ecd73970b54ff49ab07b0bda400b400dd1e8f76abf5",
-      "bytes": 15322
+      "sha256": "11ea6731c841aacac0ed1249d5cfc4ca92aaae4a0b5dd5bb41a663734c17ea91",
+      "bytes": 15662
     },
     {
       "path": "services/timer_core.py",
@@ -5695,8 +5695,8 @@
     },
     {
       "path": "telephony/answer_settle.py",
-      "sha256": "992f62a66b84b80e85b97f7bd3d38ff6987aa8ac98fc612855b9c72055b71930",
-      "bytes": 17622
+      "sha256": "13d547b2aa355b2af94d116ee64424b14fd63f89531bccfea0124fb4a2e2cbf3",
+      "bytes": 20269
     },
     {
       "path": "telephony/audio_bridge.py",
@@ -5715,8 +5715,8 @@
     },
     {
       "path": "telephony/call_context.py",
-      "sha256": "fb7eda58111737f3a6326f3798e9633e39d2b82df24a6ed09ea68270509193d4",
-      "bytes": 24325
+      "sha256": "169e218da01d6e5cd69d1b51b866ebd02aaf4b5061cdfd61575954bb2bf32d31",
+      "bytes": 25874
     },
     {
       "path": "telephony/call_disclosures.py",
@@ -5730,8 +5730,8 @@
     },
     {
       "path": "telephony/call_manager.py",
-      "sha256": "ba5864fc808200df886df9228fb80883bee6e38ded7852bca0f18afd17eb68ac",
-      "bytes": 381015
+      "sha256": "a90d64607abc923b94393ca8743e1864a4de094756ffcd5a77c3e666d8527600",
+      "bytes": 387136
     },
     {
       "path": "telephony/call_queue.py",
@@ -5910,8 +5910,8 @@
     },
     {
       "path": "telephony/phone_stt_options.py",
-      "sha256": "b473a060ce81ccd86191fe0755f2eeb2b1a092a8106656ab91c4e08bffa21163",
-      "bytes": 3289
+      "sha256": "a7adc0d302bb2614710fd29eaa3bdfe2add874c75d4ae9b55885888f934135a8",
+      "bytes": 3472
     },
     {
       "path": "telephony/phone_tos.py",
@@ -5920,13 +5920,13 @@
     },
     {
       "path": "telephony/phone_turn_stop.py",
-      "sha256": "f4502c1d74b073f920cd2bcba61047d8097339734b4d2768a2b26193a79d3e18",
-      "bytes": 10971
+      "sha256": "d4d88935da41febe3ddf18daea96ae930d4e6b86bbc4772d5673059f52e3d6ff",
+      "bytes": 13635
     },
     {
       "path": "telephony/phone_vad_calibration.py",
-      "sha256": "810d5deba9f43daf052f75fb2b23edd9f36039e01df73e2519294a9a67c39003",
-      "bytes": 4621
+      "sha256": "0de73ae614776880782b451fbce2b28e1e268f57f5bc289f3b263abe2b28a05e",
+      "bytes": 5009
     },
     {
       "path": "telephony/piper_tts.py",
@@ -5950,13 +5950,18 @@
     },
     {
       "path": "telephony/remote_voice.py",
-      "sha256": "0e51aa5c47a2c4e1647420d36240f54e1db9c1dbedd026e686c2bd3a5bac421a",
-      "bytes": 36945
+      "sha256": "db48010e49d5ef1dcd8cff352b06e801582a57d3e2bb8f4c0b644649a6efdeac",
+      "bytes": 41622
     },
     {
       "path": "telephony/routes.py",
-      "sha256": "894d2a85f3629554cea92b9c831499646676e5b2bf744f607e360a85ecb7dadf",
-      "bytes": 61491
+      "sha256": "a04fcfae884bb0649a0e227beb5bc9bc7f3855db1ae4ef4bb592124416d6f0c4",
+      "bytes": 62194
+    },
+    {
+      "path": "telephony/spoken_transcript_pacer.py",
+      "sha256": "e32dd2a1382148aeb9df5ac7d522bb4e8e960b75151a205f80c94f6af571850c",
+      "bytes": 7184
     },
     {
       "path": "telephony/streaming_stt_model.py",
@@ -6000,8 +6005,8 @@
     },
     {
       "path": "telephony/transcription_observer.py",
-      "sha256": "8231f3f29dc921f4524c183ce3f93c9dde40fee5f1d137294a629d771df37fb1",
-      "bytes": 16150
+      "sha256": "d7415bfb6efe3746c4dfb440ec9f8687d4b7ac65b14b73bb7545a69b9202d280",
+      "bytes": 16920
     },
     {
       "path": "telephony/tts_corruption_guard.py",
@@ -6030,8 +6035,8 @@
     },
     {
       "path": "telephony/voicemail_detection.py",
-      "sha256": "9d3f82b250ad4431ad4d7e5de62ac3346baa3cb2c1fe5d64fb50d9be02f4bc91",
-      "bytes": 27604
+      "sha256": "417c1a9dfedfd12869a7ee208274770a9af4eb36267db78fd2f86074f70e9ee0",
+      "bytes": 28357
     },
     {
       "path": "tests/customer_speech/test_real_cjk_pronunciation.py",

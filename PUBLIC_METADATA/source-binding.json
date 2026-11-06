@@ -30,10 +30,10 @@
   },
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "0c2d2b6c69792b861990123ba0933fbc0f7eec31b0a4537a287876b215272dc0",
-  "source_tree_sha256": "bc346684cfec596ac65f0d41746bc564698d4e1d4271d84a3742c24438a9467d",
-  "source_file_count": 2778,
-  "source_revision": "738024675a88dfdc5afa07842a1733066e72c882",
+  "source_manifest_sha256": "93c9baec9227ab4b8ff8b94283d3a123a4878b7c3af77554aa035d3e070f9d5d",
+  "source_tree_sha256": "479a6da5008dbc1a93b2e78c7a11ec0d7910994dec6ff4131ca242a2e9ca9560",
+  "source_file_count": 2779,
+  "source_revision": "25aab7d5fbbb07adbc1dd8354f96d2ab2911ca88",
   "comparison_public_revision": "ecab2772465fcc89ae6645b028af1c2273b9199f",
   "changed_source_paths": [
     "START_WEB_INTERFACE.py",
@@ -196,11 +196,20 @@
     "services/user_capabilities/service.py",
     "spoke/mic_streamer.py",
     "spoke/tts_receiver.py",
+    "telephony/answer_settle.py",
+    "telephony/call_context.py",
     "telephony/call_manager.py",
     "telephony/openai_chat.py",
     "telephony/phone_mode.py",
+    "telephony/phone_stt_options.py",
+    "telephony/phone_turn_stop.py",
+    "telephony/phone_vad_calibration.py",
     "telephony/post_call_actions.py",
+    "telephony/remote_voice.py",
     "telephony/routes.py",
+    "telephony/spoken_transcript_pacer.py",
+    "telephony/transcription_observer.py",
+    "telephony/voicemail_detection.py",
     "tests/customer_speech/test_real_cjk_pronunciation.py",
     "tests/customer_speech/test_real_pronunciation.py",
     "tests/public/test_billing_capacity_mount.py",
@@ -505,8 +514,8 @@
     "historical_inventory_limits": "This renderer correction changes no dependency or workflow inputs. All six retained SBOMs and their complete status objects stay historical and unchanged; no current installed inventory qualification is claimed."
   },
   "qualification": {
-    "source_commit": "738024675a88dfdc5afa07842a1733066e72c882",
-    "kind": "scheduler one-shot staleness"
+    "source_commit": "25aab7d5fbbb07adbc1dd8354f96d2ab2911ca88",
+    "kind": "phone reliability"
   },
   "historical_bindings": [
     {
