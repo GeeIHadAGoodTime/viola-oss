@@ -105,9 +105,15 @@ _CDP_SUBMIT_CLICK_WAIT_ATTEMPTS = 30
 _CDP_SUBMIT_CLICK_WAIT_INTERVAL_SECONDS = 0.4
 _CDP_SNAPSHOT_MAX_REFS = 60
 _CDP_SNAPSHOT_MAX_TEXT_CHARS = 1800
-_CDP_SNAPSHOT_MAX_SELECTOR_CHARS = 220
+_CDP_SNAPSHOT_MAX_SELECTOR_CHARS = 80
 _CDP_SNAPSHOT_MAX_LLM_CHARS = 12_000
 _CDP_SNAPSHOT_MAX_CONTEXT_CHARS = 360
+_CDP_SNAPSHOT_MAX_CONTROLS = 600
+_CDP_SNAPSHOT_CONTROLS_BUDGET = 5000
+_CDP_SNAPSHOT_MAX_FIND_MATCHES = 25
+_CDP_IMPORTANT_CONTROLS = 12
+# Ranks controls for the short list only; nothing is decided from these words.
+_CDP_SHOPPING_CONTROL_RE = re.compile(r"(?i)add[ _-]*to|addcart|cart|basket|\bbuy\b|checkout")
 _BOGUS_PSEUDO_RE = re.compile(
     r"(?ix)(?::contains\s*\(|:has-text\s*\(|:icontains\s*\(|"
     r"\[\s*innerText\s*[*^$~|]?=\s*|\[\s*textContent\s*[*^$~|]?=\s*|"
@@ -317,9 +323,10 @@ def _cdp_important_controls_from_snapshot(snapshot_text: str) -> list[dict[str, 
                 "duplicate_text": {},
             }
         )
-        if len(controls) >= 12:
-            break
-    return controls
+    # Page order alone fills this list with the site's navigation. A stable sort
+    # keeps page order inside each group.
+    controls.sort(key=lambda item: 0 if _CDP_SHOPPING_CONTROL_RE.search(str(item["text"])) else 1)
+    return controls[:_CDP_IMPORTANT_CONTROLS]
 
 
 def _bogus_selector_error(selector: str) -> str | None:
@@ -1631,6 +1638,181 @@ async def browser_get_page_info() -> str:
         return _json({"error": "Failed to get page info: %s" % exc})
 
 
+# Controls the accessibility tree cannot see. Older sites build buttons from plain
+# <a onclick>, <span>, <div>, <td> or an image with no alt text, which carry no
+# role, so an ARIA snapshot shows no control at all (or only loose text). RockAuto
+# is the case from 1.0.5 build 9: she never found its add-to-cart control. What
+# marks these elements is how they behave: an inline click handler, a pointer
+# cursor, or a tabindex. Listeners added from script leave no trace in the DOM, so
+# the pointer cursor is what finds those. Only the outermost element of a clickable
+# stack is listed.
+_CDP_DOM_CONTROLS_JS = r"""((limit) => {
+  const semantic = 'a[href],button,input,select,textarea,summary,[role]';
+  const seen = new Set();
+  const found = [];
+  const isShown = (el, r) => {
+    if (r.width < 4 || r.height < 4) return false;
+    const style = getComputedStyle(el);
+    return style.visibility !== 'hidden' && style.display !== 'none' && Number(style.opacity) !== 0;
+  };
+  const clickable = (el) => {
+    if (el.hasAttribute('onclick') || el.hasAttribute('tabindex') && el.tabIndex >= 0) return true;
+    return getComputedStyle(el).cursor === 'pointer';
+  };
+  const speak = (el) => {
+    const own = (el.innerText || el.textContent || '').trim().replace(/\s+/g, ' ');
+    const image = el.tagName === 'IMG' ? el : el.querySelector('img,input[type=image]');
+    const parts = [
+      el.getAttribute('aria-label'), own, el.value, el.getAttribute('title'), el.getAttribute('alt'),
+      image && (image.getAttribute('alt') || image.getAttribute('title')),
+    ];
+    return (parts.find((part) => part && String(part).trim()) || '').toString().trim().substring(0, 100);
+  };
+  const clue = (el) => {
+    const image = el.tagName === 'IMG' ? el : el.querySelector('img,input[type=image]');
+    const file = image && image.getAttribute('src') ? image.getAttribute('src').split('?')[0].split('/').pop() : '';
+    const words = [el.id, typeof el.className === 'string' ? el.className : '', file, el.getAttribute('name')];
+    return words.filter(Boolean).join(' ').substring(0, 80);
+  };
+  // What the control belongs to: twenty identical "Add to Cart" buttons are only
+  // usable if each says which row it is in.
+  const owner = (el) => {
+    const row = el.closest('tr,li,article,[class*="listing"],[class*="product"],[class*="item"]');
+    return row && row !== el ? (row.innerText || '').trim().replace(/\s+/g, ' ').substring(0, 110) : '';
+  };
+  const cssPath = (el) => {
+    const path = [];
+    for (let n = el; n && n.nodeType === 1 && n !== document.documentElement; n = n.parentElement) {
+      if (n.id && !/["'\\\s]/.test(n.id) && document.querySelectorAll('#' + CSS.escape(n.id)).length === 1) {
+        path.unshift('#' + CSS.escape(n.id));
+        return path.join(' > ');
+      }
+      let index = 1;
+      for (let sibling = n.previousElementSibling; sibling; sibling = sibling.previousElementSibling) {
+        if (sibling.tagName === n.tagName) index += 1;
+      }
+      path.unshift(n.tagName.toLowerCase() + ':nth-of-type(' + index + ')');
+    }
+    return path.join(' > ');
+  };
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_ELEMENT);
+  const height = window.innerHeight;
+  for (let el = walker.nextNode(); el; el = walker.nextNode()) {
+    if (el.matches(semantic) && !(el.tagName === 'A' && !el.hasAttribute('href'))) continue;
+    if (el.closest('a[href],button,[role=button],[role=link]')) continue;
+    if (el.tagName === 'BODY' || el.tagName === 'HTML' || el.tagName === 'SVG') continue;
+    if (!clickable(el)) continue;
+    const parent = el.parentElement;
+    if (parent && seen.has(parent)) { seen.add(el); continue; }
+    const r = el.getBoundingClientRect();
+    if (!isShown(el, r)) continue;
+    if (r.width > window.innerWidth * 0.9 && r.height > height * 0.5) continue;
+    seen.add(el);
+    const text = speak(el);
+    const hint = clue(el);
+    if (!text && !hint) continue;
+    found.push({
+      tag: el.tagName.toLowerCase(), text, hint, selector: cssPath(el), context: owner(el),
+      on_screen: r.bottom > 0 && r.top < height,
+    });
+    if (found.length >= limit) break;
+  }
+  return found;
+})(%d)"""
+
+
+async def _cdp_dom_controls(first_ref: int) -> list[dict[str, Any]]:
+    """Find clickable elements with no accessibility role and give them refs."""
+    try:
+        found = await manager.evaluate_js(_CDP_DOM_CONTROLS_JS % _CDP_SNAPSHOT_MAX_CONTROLS)
+    except _CDP_OPERATION_ERRORS:
+        logger.debug("Clickable-element scan failed")
+        return []
+    if not isinstance(found, list):
+        return []
+    controls = [item for item in found if isinstance(item, dict) and item.get("selector")]
+    for offset, item in enumerate(controls):
+        item["ref"] = "@e%d" % (first_ref + offset)
+    _store_cdp_refs(controls)
+    return controls
+
+
+def _cdp_dom_control_line(item: dict[str, Any]) -> str:
+    hint = str(item.get("hint") or "")
+    text = str(item.get("text") or "")
+    context = str(item.get("context") or "")
+    where = "" if item.get("on_screen") else " (scroll needed)"
+    return "- clickable %s %s %s%s%s%s" % (
+        item.get("ref"),
+        item.get("tag"),
+        json.dumps(text),
+        " hint=%s" % json.dumps(hint) if hint else "",
+        " in=%s" % json.dumps(context) if context else "",
+        where,
+    )
+
+
+def _cdp_dom_controls_block(controls: list[dict[str, Any]]) -> str:
+    """The list, shopping controls first and then what is on screen, within a budget."""
+    ranked = sorted(
+        controls,
+        key=lambda item: (
+            0 if _CDP_SHOPPING_CONTROL_RE.search("%s %s" % (item.get("text"), item.get("hint"))) else 1,
+            0 if item.get("on_screen") else 1,
+        ),
+    )
+    lines: list[str] = []
+    used = 0
+    for item in ranked:
+        line = _cdp_dom_control_line(item)
+        if used + len(line) > _CDP_SNAPSHOT_CONTROLS_BUDGET:
+            break
+        lines.append(line)
+        used += len(line) + 1
+    if not lines:
+        return ""
+    return "Clickable elements with no accessibility role (use the @eN ref):\n" + "\n".join(lines)
+
+
+def _cdp_find_in_snapshot(query: str, annotated: str, controls: list[dict[str, Any]]) -> list[str]:
+    """Controls on the whole page that best match ``query``, not just the cut-down view.
+
+    A word counts when it appears in the line, ignoring case and separators, so
+    "add to cart" also reaches an icon whose only clue is ``addcart.png``.
+    """
+    words = [word for word in re.split(r"\W+", query.lower()) if word]
+    if not words:
+        return []
+    needed = max(1, (len(words) + 1) // 2)
+    scored: list[tuple[int, int, str]] = []
+    rows = [line for line in annotated.splitlines() if re.search(r"@e\d+", line)]
+    rows += [_cdp_dom_control_line(item) for item in controls]
+    for index, row in enumerate(rows):
+        lowered = row.lower()
+        hits = sum(1 for word in words if word in lowered)
+        if hits >= needed:
+            scored.append((-hits, index, row.strip()))
+    scored.sort()
+    return [row for _hits, _index, row in scored[:_CDP_SNAPSHOT_MAX_FIND_MATCHES]]
+
+
+def _cdp_fit_snapshot(annotated: str, controls_block: str, preview: str) -> str:
+    """Fit the snapshot to the model's budget without losing the controls.
+
+    A plain cut keeps the top of the page, so a long parts table loses everything
+    below the navigation. Lines with refs are what can be acted on: when the page
+    is too long they survive first, and the rest of the structure goes.
+    """
+    sections = [part for part in (controls_block, annotated, preview) if part]
+    whole = "\n\n".join(sections)
+    if len(whole) <= _CDP_SNAPSHOT_MAX_LLM_CHARS:
+        return whole
+    room = _CDP_SNAPSHOT_MAX_LLM_CHARS - len(controls_block) - 2
+    with_refs = "\n".join(line for line in annotated.splitlines() if re.search(r"@e\d+", line))
+    body = annotated if len(annotated) <= room else with_refs
+    return "\n\n".join(part for part in (controls_block, _truncate(body, room)) if part)
+
+
 @server.tool(
     description=(
         "Get the page's interactive snapshot with @eN refs and selector_for_ref entries for clicking, "
@@ -1642,8 +1824,13 @@ async def browser_get_page_info() -> str:
 async def browser_snapshot(
     wait_for_stable: bool = False,
     mode: str = "full",
+    find: str = "",
 ) -> str:
-    """Get fresh page state with @eN refs for CDP browser tools."""
+    """Get fresh page state with @eN refs for CDP browser tools.
+
+    ``find`` also returns every line of the whole page that holds all its words,
+    which reaches controls a long page's cut-down view has dropped.
+    """
     if block := await _browser_payment_observation_refusal("browser_snapshot"):
         _clear_cdp_refs()
         return block
@@ -1658,6 +1845,10 @@ async def browser_snapshot(
         annotated, _ = _inject_refs_into_aria_snapshot(aria_text, browser_manager=_CDP_REF_MANAGER)
         visible_refs = set(re.findall(r"e\d+", annotated))
         _CDP_REF_MANAGER.restrict_ref_map(visible_refs)
+        next_ref = max((int(ref) for ref in re.findall(r"@e(\d+)", annotated)), default=0) + 1
+        dom_controls = await _cdp_dom_controls(next_ref)
+        controls_block = _cdp_dom_controls_block(dom_controls)
+        preview = ""
         if mode == "interactive":
             snapshot_text = "\n".join(line for line in annotated.splitlines() if re.search(r"@e\d+", line))
         else:
@@ -1667,24 +1858,44 @@ async def browser_snapshot(
             except _CDP_OPERATION_ERRORS:
                 body_text = ""
             if body_text:
-                snapshot_text = "%s\n\nPage text preview:\n%s" % (
-                    snapshot_text,
-                    _truncate(str(body_text).replace("\r", " "), _CDP_SNAPSHOT_MAX_TEXT_CHARS),
+                preview = "Page text preview:\n%s" % _truncate(
+                    str(body_text).replace("\r", " "), _CDP_SNAPSHOT_MAX_TEXT_CHARS
                 )
-        selector_for_ref = {
-            "@%s" % key.lstrip("@"): value for key, value in _CDP_REF_SELECTOR_MAP.items() if key.startswith("@")
-        }
-        important_controls = _cdp_important_controls_from_snapshot(snapshot_text)
-        snapshot_original_chars = len(snapshot_text)
+        important_controls = _cdp_important_controls_from_snapshot(annotated)
+        shopping = [
+            {
+                "ref": item["ref"],
+                "role": "clickable",
+                "text": item.get("text") or item.get("hint") or "",
+                "state": {},
+                "context": str(item.get("context") or ""),
+                "duplicate_text": {},
+            }
+            for item in dom_controls
+            if _CDP_SHOPPING_CONTROL_RE.search("%s %s" % (item.get("text"), item.get("hint")))
+        ]
+        important_controls = shopping + important_controls
+        important_controls = important_controls[:_CDP_IMPORTANT_CONTROLS]
+        full_text = "\n\n".join(part for part in (snapshot_text, controls_block, preview) if part)
+        snapshot_original_chars = len(full_text)
         # #579: compute page_health BEFORE truncation, off the full snapshot
         # text (which already includes the body-text preview above) so a
         # Cloudflare / JS-challenge interstitial on the desktop CDP surface
         # surfaces the same bot_protection fact the #575 loop halt consumes.
         page_title = await manager.get_title()
-        page_health = detect_page_health(page_title, None, snapshot_text)
+        page_health = detect_page_health(page_title, None, full_text)
         snapshot_truncated = snapshot_original_chars > _CDP_SNAPSHOT_MAX_LLM_CHARS
-        if snapshot_truncated:
-            snapshot_text = _truncate(snapshot_text, _CDP_SNAPSHOT_MAX_LLM_CHARS)
+        snapshot_text = _cdp_fit_snapshot(snapshot_text, controls_block, preview)
+        find_matches = _cdp_find_in_snapshot(find, annotated, dom_controls) if find.strip() else []
+        # Only the refs the model can see, and the short form of each: every ref
+        # resolves here, so a long CSS path would only cost tokens on every step.
+        shown_refs = set(re.findall(r"@e\d+", " ".join([snapshot_text, *find_matches])))
+        shown_refs.update(str(item.get("ref")) for item in important_controls)
+        selector_for_ref = {
+            "@%s" % key.lstrip("@"): _compact_cdp_selector_for_llm(key, value)
+            for key, value in _CDP_REF_SELECTOR_MAP.items()
+            if key.startswith("@") and key in shown_refs
+        }
         result = {
             "snapshot": snapshot_text.strip(),
             "url": await manager.get_url(),
@@ -1697,6 +1908,13 @@ async def browser_snapshot(
         }
         if page_health:
             result["page_health"] = page_health
+        if find.strip():
+            result["find_matches"] = find_matches
+        elif snapshot_truncated:
+            result["snapshot_hint"] = (
+                "This page is longer than this view. browser_snapshot(find='add to cart') "
+                "searches the whole page for a control by its words."
+            )
         return _json(result)
     except _CDP_OPERATION_ERRORS as exc:
         return _json({"error": "Snapshot failed: %s" % exc})
@@ -3265,7 +3483,9 @@ async def browser_run_script(script: str) -> str:
             }
         )
     except Exception as exc:
-        return _json({"error": "Script execution failed: %s" % exc, "success": False})
+        # The command error's own text is a generic retry line; the model needs the cause.
+        detail = getattr(exc, "error", "") or exc
+        return _json({"error": "Script execution failed: %s" % str(detail)[:400], "success": False})
 
 
 @server.tool(
