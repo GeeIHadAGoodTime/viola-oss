@@ -148,6 +148,9 @@ def _is_wake_undo(transcript: str) -> bool:
     return bool(_NO_COMMAND_RE.match(text) or _WAKE_UNDO_RE.match(text))
 
 
+# Longest a task's reply waits for a turn that started beside it.
+_SIDE_TURN_WAIT_SEC = 30.0
+
 _ECHO_WORD_RE = re.compile(r"[a-z0-9']+")
 # A transcript this short is too easy to match by accident ("jazz" after
 # "jazz or rock?"), so it is never called an echo.
@@ -156,6 +159,10 @@ _ECHO_MIN_WORDS = 3
 _ECHO_MATCH_RATIO = 0.75
 # How long after a reply its echo can still turn up in a recording.
 _ECHO_WINDOW_SEC = 30.0
+# A shorter transcript counts as her echo only if it repeats the last few words
+# she said and speech started within this long of her finishing.
+_ECHO_TAIL_WORDS = 5
+_ECHO_TAIL_GAP_SEC = 1.5
 # Two words this similar are the same word misheard ("playin"/"playing",
 # "relaxin"/"relaxing"); "toe"/"tokyo" is not.
 _FUZZY_WORD_RATIO = 0.8
@@ -215,6 +222,18 @@ def _is_echo_of_reply(transcript: str, reply: str) -> bool:
     return matched / len(heard) >= _ECHO_MATCH_RATIO
 
 
+def _is_echo_tail(transcript: str, spoken: str) -> bool:
+    """True when a short transcript is just the last words of what she said.
+
+    A question is exempt: "rock" right after "jazz or rock?" is an answer.
+    """
+    heard = _echo_words(transcript)
+    if not heard or len(heard) >= _ECHO_MIN_WORDS or spoken.rstrip().endswith("?"):
+        return False
+    end = _echo_words(spoken)[-_ECHO_TAIL_WORDS:]
+    return all(any(_same_word(word, said) for said in end) for word in heard)
+
+
 # --------------------------------------------------------------------------- #
 # Barge-in while Viola is speaking                                             #
 # --------------------------------------------------------------------------- #
@@ -245,9 +264,12 @@ def _is_echo_of_reply(transcript: str, reply: str) -> bool:
 _BARGE_IN_SETTLE_SEC = 0.8
 # How much of the most recent audio is transcribed per check.
 _BARGE_IN_WINDOW_SEC = 3.0
-# Checks per reply. A canceller that leaves all of Viola's voice in raises a
-# candidate every couple of seconds; this bounds the speech-to-text work.
-_BARGE_IN_MAX_CHECKS = 12
+# A canceller that leaves all of Viola's voice in raises a candidate every couple
+# of seconds. After this many checks in a reply they are paced, never stopped:
+# build 9 gave up after 12, so the rest of a long reply could not be interrupted.
+_BARGE_IN_FAST_CHECKS = 6
+# Paced checks run at most this often. A window covers 3 s, so nothing goes unseen.
+_BARGE_IN_PACED_GAP_SEC = 3.0
 # A check that takes longer than this counts as "not the user".
 _BARGE_IN_STT_TIMEOUT_SEC = 5.0
 # A run of this many consecutive words of the reply, in order, inside the
@@ -257,6 +279,11 @@ _BARGE_IN_ECHO_RUN = 2
 # finished their request, and the longest she waits for that.
 _BARGE_IN_USER_DONE_SEC = 0.7
 _BARGE_IN_USER_MAX_SEC = 5.0
+# A wake heard over her voice: the request is taken from this long before the
+# detector confirmed. Earlier audio is mostly her; later audio is clean.
+_BARGE_IN_WAKE_LEAD_SEC = 0.35
+# Whisper's own "this was not speech" above this means the words are invented.
+_BARGE_IN_NO_SPEECH_PROB = 0.6
 
 # The wake word as Whisper writes it. Stricter than the wake Stage 2 list on
 # purpose: here a false match stops Viola mid-sentence.
@@ -353,6 +380,26 @@ def classify_barge_in_transcript(transcript: str, reply: str) -> BargeInDecision
     command = " ".join(after)
     if _BARGE_IN_STOP_RE.match(command.lower()):
         return BargeInDecision("stop", "wake_word_stop", command)
+    return BargeInDecision("command", "wake_word_command", command)
+
+
+def classify_after_wake(transcript: str, reply: str) -> BargeInDecision:
+    """What the user said after a wake that was already accepted over Viola's voice.
+
+    The wake model heard "Viola", so the wake word need not be in the transcript
+    (over her voice it often is not). Whatever her own words remain are dropped;
+    the rest is the request. Nothing clear means she listens for it.
+    """
+    tokens = _BARGE_IN_TOKEN_RE.findall((transcript or "").replace("\u2019", "'"))
+    wake_at = max((i for i, t in enumerate(tokens) if _is_barge_in_wake_word(t)), default=None)
+    rest = _drop_reply_runs(tokens if wake_at is None else tokens[wake_at + 1 :], _echo_words(reply))
+    if not rest:
+        return BargeInDecision("listen", "wake_word_over_speech")
+    command = " ".join(rest)
+    if _BARGE_IN_STOP_RE.match(command.lower()):
+        return BargeInDecision("stop", "wake_word_stop", command)
+    if _is_echo_of_reply(command, reply):
+        return BargeInDecision("listen", "wake_word_over_speech")
     return BargeInDecision("command", "wake_word_command", command)
 
 
@@ -535,6 +582,8 @@ class CommandContext:
     ducking_cleaned_up: bool = False
     wake_detector: Any = None
     data_clip_id: int | None = None  # Wake data collection clip ID
+    # Started by a wake while another voice turn waits on its command.
+    side_turn: bool = False
 
     def has_audio(self) -> bool:
         """Return True if any audio source (buffer or file) is available."""
@@ -551,8 +600,21 @@ class CommandContext:
             self.audio_sample_rate = 0
 
 
+def _own_speech() -> Any:
+    """The wake loop's link to the voice turn (imported late: it pulls in the audio stack)."""
+    from voice.wake_detector import own_speech
+
+    return own_speech
+
+
 class VoiceCommandHandler:
     """Handles processing of individual voice commands."""
+
+    # Voice turns running now. A wake heard while a turn only waits on its command
+    # starts a second, side turn (see handle_once).
+    _active_turns = 0
+    _main_command_running = False
+    _side_turn_running = False
 
     def __init__(
         self,
@@ -578,6 +640,7 @@ class VoiceCommandHandler:
         self._last_stt_activity = time.time()
         self._wake_timestamp: float | None = None  # Track when wake was detected
         self._wake_perf_counter: float | None = None  # High-precision wake timing
+        self._wake_monotonic: float | None = None  # Same moment on the clock own_playback uses
         self._continuous_capture: Any | None = None  # ContinuousMicCapture instance
         # The last reply spoken aloud and when (time.monotonic()), so a
         # recording of Viola's own voice is not run as the user's next command.
@@ -590,11 +653,20 @@ class VoiceCommandHandler:
         self._barge_in_no_local_stt_logged = False
         # Same-class fallback when no running app holds the desktop's command service.
         self._local_command_service: Any | None = None
+        # Voice turns running now. A wake heard while a turn only waits on its
+        # command starts a second, side turn (see handle_once).
+        self._active_turns = 0
+        self._main_command_running = False
+        self._side_turn_running = False
+        stop = getattr(tts, "stop", None)
+        if callable(stop):
+            _own_speech().set_speech_stopper(stop)
 
     def record_wake_timestamp(self) -> None:
         """Record timestamp when wake word was detected for guardrail checks."""
         self._wake_timestamp = time.time()
         self._wake_perf_counter = time.perf_counter()
+        self._wake_monotonic = time.monotonic()
         logger.debug("Wake timestamp recorded: %.3f", self._wake_timestamp)
 
     def _check_stt_start_guardrail(self) -> bool:
@@ -644,6 +716,18 @@ class VoiceCommandHandler:
         ctx = CommandContext()
         ctx.wake_detector = getattr(self.voice_pipeline, "wake_detector", None)
 
+        # A wake while another turn only waits on its command ("Viola, pause"
+        # during a long research task): this turn runs beside it.
+        if self._main_command_running:
+            if self._side_turn_running:
+                logger.info("A second wake during a task while one is being handled; ignored")
+                return
+            ctx.side_turn = True
+            self._side_turn_running = True
+            self._publish_busy_turn()
+            logger.info("Voice turn started beside a running task")
+        self._active_turns += 1
+
         # Capture data collection clip ID from wake detector
         if ctx.wake_detector:
             ctx.data_clip_id = getattr(ctx.wake_detector, "_last_data_clip_id", None)
@@ -667,6 +751,10 @@ class VoiceCommandHandler:
             error_msg = sanitize_error_message(e)
             logger.exception("Voice handling error: %s", error_msg)
         finally:
+            self._active_turns -= 1
+            if ctx.side_turn:
+                self._side_turn_running = False
+                self._publish_busy_turn()
             if ctx.user_id:
                 from core.user_context import user_scope
 
@@ -674,6 +762,10 @@ class VoiceCommandHandler:
                     self._cleanup_after_command(ctx)
             else:
                 self._cleanup_after_command(ctx)
+
+    def _publish_busy_turn(self) -> None:
+        """Tell the wake loop whether a new wake can run beside the current turn."""
+        _own_speech().set_busy_turn(self._main_command_running and not self._side_turn_running)
 
     # -------------------------------------------------------------------------
     # Command Processing Phases
@@ -695,6 +787,8 @@ class VoiceCommandHandler:
         while True:
             turn += 1
 
+            turn_started = time.monotonic()
+
             # --- Setup listening state ---
             if turn == 1:
                 self._setup_listening_state(ctx)
@@ -707,6 +801,7 @@ class VoiceCommandHandler:
             else:
                 ctx.audio_file = await self._record_follow_up_audio(follow_up_timeout, ctx)
 
+            recorded_at = time.monotonic()
             if not ctx.has_audio():
                 exit_reason = "no_audio" if turn == 1 else "follow_up_timeout"
                 if turn == 1:
@@ -715,6 +810,7 @@ class VoiceCommandHandler:
 
             # --- Transcribe ---
             transcript = await self._transcribe_audio_with_timeout(ctx)
+            transcribed_at = time.monotonic()
             if not transcript:
                 exit_reason = "empty_transcript"
                 if turn == 1:
@@ -773,6 +869,7 @@ class VoiceCommandHandler:
             # --- Interpret and dispatch ---
             # The reply may start speaking while the model is still writing it
             # (voice/streamed_reply.py); speech decisions stay with the result.
+            command_started = time.monotonic()
             turn_source = "follow_up" if turn > 1 else "wake"
             streamed = self._new_streamed_reply(ctx.user_id)
             with use_voice_turn_context(
@@ -785,6 +882,7 @@ class VoiceCommandHandler:
                     user_id=ctx.user_id,
                     streamed_reply=streamed,
                 )
+            command_done = time.monotonic()
             if result is None:
                 await self._end_streamed_reply(streamed)
                 if turn == 1:
@@ -823,6 +921,7 @@ class VoiceCommandHandler:
 
             # --- Speak response ---
             await self._speak_response(result, user_id=ctx.user_id, streamed_reply=streamed)
+            self._log_turn_timing(turn, turn_started, recorded_at, transcribed_at, command_started, command_done)
 
             # --- Handle TTS interruption ---
             # The user talked over the reply and the check in
@@ -928,6 +1027,43 @@ class VoiceCommandHandler:
 
         if turn > 1 or conversation_enabled:
             logger.info("Conversation ended: %s (after %d turn(s))", exit_reason, turn)
+
+    def _log_turn_timing(
+        self,
+        turn: int,
+        turn_started: float,
+        recorded_at: float,
+        transcribed_at: float,
+        command_started: float,
+        command_done: float,
+    ) -> None:
+        """One line per turn with where its time went (1.0.5 build 9: "7-12 s to the first word").
+
+        ``first_word`` is when her audio reached the output, from the wake (the
+        chime, turn 1) or from the start of listening (a follow-up), and from
+        the moment the user finished talking. It can come before ``command``
+        ends: a streamed reply starts while the model still writes.
+        """
+        from audio_core.own_playback import get_own_playback
+
+        started = self._wake_monotonic if turn == 1 and self._wake_monotonic is not None else turn_started
+        spoke_at = get_own_playback().utterance_started_at()
+        first_word = spoke_at if spoke_at is not None and spoke_at >= recorded_at else None
+
+        def ms(a: float, b: float) -> int:
+            return round((b - a) * 1000)
+
+        logger.info(
+            "[TURN_TIMING] turn=%d listen_ms=%d stt_ms=%d command_ms=%d first_word_after_wake_ms=%s "
+            "first_word_after_user_ms=%s reply_end_ms=%d",
+            turn,
+            ms(started, recorded_at),
+            ms(recorded_at, transcribed_at),
+            ms(command_started, command_done),
+            "-" if first_word is None else ms(started, first_word),
+            "-" if first_word is None else ms(recorded_at, first_word),
+            ms(started, time.monotonic()),
+        )
 
     async def _record_follow_up_audio(
         self,
@@ -1393,14 +1529,33 @@ class VoiceCommandHandler:
         )
         logger.debug("Voice turn via command service (follow_up=%s)", is_follow_up)
         attached = streamed_reply.attached() if streamed_reply is not None else contextlib.nullcontext()
-        with attached:
-            command_result = await self._run_command_bounded(
-                self._command_service().execute(request),
-                transcript,
-            )
+        # The wake word stays open while the command runs: a turn only waiting on
+        # a long task must not leave Viola deaf for its length (build 9, J4).
+        main_turn = not self._side_turn_running
+        if main_turn:
+            self._main_command_running = True
+            self._publish_busy_turn()
+        try:
+            with attached:
+                command_result = await self._run_command_bounded(
+                    self._command_service().execute(request),
+                    transcript,
+                )
+        finally:
+            if main_turn:
+                self._main_command_running = False
+                self._publish_busy_turn()
+        if main_turn:
+            await self._wait_for_side_turn()
         if command_result is None:
             return None
         return self._voice_result_from_command(command_result)
+
+    async def _wait_for_side_turn(self) -> None:
+        """Let a side turn finish talking before this turn's reply starts."""
+        deadline = time.monotonic() + _SIDE_TURN_WAIT_SEC
+        while self._side_turn_running and time.monotonic() < deadline:
+            await asyncio.sleep(0.05)
 
     def _command_service(self) -> Any:
         """Return the command service push-to-talk and typed commands use.
@@ -1801,6 +1956,9 @@ class VoiceCommandHandler:
         """
         self._barge_in_decision = None
         interrupt_event = asyncio.Event()
+        wake_event = asyncio.Event()
+        # time.monotonic() of a wake heard over this reply (from the wake loop).
+        wake_heard: list[float] = []
         loop = asyncio.get_running_loop()
 
         def _on_interrupt() -> None:
@@ -1812,8 +1970,24 @@ class VoiceCommandHandler:
                 # A late capture callback may outlive the caller's event loop.
                 logger.debug("Ignored TTS interrupt after event-loop shutdown")
 
+        def _on_wake_over_speech() -> None:
+            """Called on the wake loop's thread: the wake word, and it is not her voice."""
+            wake_heard.append(time.monotonic())
+            # Silence first, from this thread: the event loop may be busy, and
+            # stop() never waits for anything.
+            if self.tts and hasattr(self.tts, "stop"):
+                try:
+                    self.tts.stop()
+                except Exception:  # noqa: BLE001, RUF100 - the turn still handles the interrupt
+                    logger.debug("TTS stop failed for a wake over speech", exc_info=True)
+            try:
+                loop.call_soon_threadsafe(wake_event.set)
+            except RuntimeError:
+                logger.debug("Ignored a wake over speech after event-loop shutdown")
+
         # Start VAD monitoring (also accumulates audio in buffer)
         capture.set_mode("vad_monitor", on_interrupt=_on_interrupt)
+        _own_speech().set_barge_in_target(_on_wake_over_speech)
 
         tts_task: asyncio.Future | None = None
         try:
@@ -1822,16 +1996,19 @@ class VoiceCommandHandler:
             ignored: dict[str, int] = {}
             while True:
                 interrupt_task = asyncio.ensure_future(interrupt_event.wait())
+                wake_task = asyncio.ensure_future(wake_event.wait())
                 done, _pending = await asyncio.wait(
-                    {tts_task, interrupt_task},
+                    {tts_task, interrupt_task, wake_task},
                     return_when=asyncio.FIRST_COMPLETED,
                 )
-                if tts_task in done:
-                    interrupt_task.cancel()
-                    try:
-                        await interrupt_task
-                    except asyncio.CancelledError:
-                        pass
+                for waiter in (interrupt_task, wake_task):
+                    if not waiter.done():
+                        waiter.cancel()
+                        try:
+                            await waiter
+                        except asyncio.CancelledError:
+                            pass
+                if tts_task in done and not wake_heard:
                     if ignored:
                         logger.info(
                             "Viola finished her reply; %d sound(s) heard while she spoke were not the user (%s)",
@@ -1842,13 +2019,18 @@ class VoiceCommandHandler:
                     return False
 
                 interrupt_event.clear()
-                checks += 1
-                decision = await self._check_barge_in(capture, message, tts_task)
-                if decision.wake_at_end:
-                    # "...Viola" at the very end of the window: a word of her
-                    # own cut in half, or the user still talking. Look again.
+                if wake_heard:
+                    decision = BargeInDecision("listen", "wake_word_over_speech")
+                else:
                     checks += 1
                     decision = await self._check_barge_in(capture, message, tts_task)
+                    if decision.wake_at_end and not wake_heard:
+                        # "...Viola" at the very end of the window: a word of her
+                        # own cut in half, or the user still talking. Look again.
+                        checks += 1
+                        decision = await self._check_barge_in(capture, message, tts_task)
+                    if wake_heard:  # the wake loop got there during the check
+                        decision = BargeInDecision("listen", "wake_word_over_speech")
                 if decision.interrupts:
                     # A streamed reply queues nothing more once the user cut in.
                     if not isinstance(message, str):
@@ -1865,7 +2047,9 @@ class VoiceCommandHandler:
                         await tts_task
                     except (asyncio.CancelledError, Exception):  # noqa: BLE001, RUF100 - TTS is being cut off
                         pass
-                    decision = await self._complete_barge_in(capture, message, decision)
+                    decision = await self._complete_barge_in(
+                        capture, message, decision, wake_at=wake_heard[0] if wake_heard else None
+                    )
                     capture.set_mode("paused")
                     self._barge_in_decision = decision
                     await self._record_voice_event(
@@ -1886,13 +2070,21 @@ class VoiceCommandHandler:
                     return True
 
                 ignored[decision.reason] = ignored.get(decision.reason, 0) + 1
-                if checks >= _BARGE_IN_MAX_CHECKS:
-                    logger.info(
-                        "Barge-in: %d checks this reply were all Viola's own voice or other sound; "
-                        "not checking again until she finishes",
-                        checks,
+                if checks >= _BARGE_IN_FAST_CHECKS and not tts_task.done():
+                    # Paced, not given up: she can be interrupted to her last
+                    # word. The wake route stays live during the pause.
+                    pause_for_wake = asyncio.ensure_future(wake_event.wait())
+                    await asyncio.wait(
+                        {tts_task, pause_for_wake},
+                        timeout=_BARGE_IN_PACED_GAP_SEC,
+                        return_when=asyncio.FIRST_COMPLETED,
                     )
-                    continue  # not re-armed: only tts_task can finish the wait now
+                    if not pause_for_wake.done():
+                        pause_for_wake.cancel()
+                        try:
+                            await pause_for_wake
+                        except asyncio.CancelledError:
+                            pass
                 if not tts_task.done():
                     capture.rearm_interrupt()
 
@@ -1904,6 +2096,7 @@ class VoiceCommandHandler:
             logger.warning("Interruptible TTS error: %s", exc)
             return False
         finally:
+            _own_speech().clear_barge_in_target(_on_wake_over_speech)
             # If still in vad_monitor mode (e.g., TTS completed normally),
             # switch to paused to stop VAD processing
             if capture.mode == "vad_monitor":
@@ -2008,6 +2201,8 @@ class VoiceCommandHandler:
         capture: Any,
         message: str | StreamedReply,
         decision: BargeInDecision,
+        *,
+        wake_at: float | None = None,
     ) -> BargeInDecision:
         """Viola has stopped for the user: let them finish, then hear the whole request.
 
@@ -2017,6 +2212,10 @@ class VoiceCommandHandler:
         now. A "stop" from either transcription stops. A request runs only when
         both transcriptions agree on it (the longer one extends the checked
         one); otherwise Viola, who has stopped talking, listens for it again.
+
+        ``wake_at``: the wake model heard the wake word over her voice at that
+        moment and she stopped right there. Everything after it is clean audio,
+        so one transcription of it is the request.
         """
         started = time.monotonic()
         while time.monotonic() - started < _BARGE_IN_USER_MAX_SEC:
@@ -2026,6 +2225,12 @@ class VoiceCommandHandler:
                 and capture.seconds_since_speech() >= _BARGE_IN_USER_DONE_SEC
             ):
                 break
+        if wake_at is not None:
+            seconds = time.monotonic() - wake_at + _BARGE_IN_WAKE_LEAD_SEC
+            transcript = await self._transcribe_recent(capture, seconds)
+            if self._local_no_speech_prob() > _BARGE_IN_NO_SPEECH_PROB:
+                transcript = ""
+            return classify_after_wake(transcript or "", self._reply_text(message))
         window_end = getattr(self, "_barge_in_window_end", None) or started
         seconds = min(_BARGE_IN_WINDOW_SEC + (time.monotonic() - window_end), 30.0)
         transcript = await self._transcribe_recent(capture, seconds)
@@ -2045,23 +2250,44 @@ class VoiceCommandHandler:
             logger.info("Barge-in request was not heard clearly over Viola's voice; listening for it again")
         return BargeInDecision("listen", "wake_word_request_unclear" if decision.kind == "command" else decision.reason)
 
+    def _local_no_speech_prob(self) -> float:
+        """Whisper's no-speech probability for the last on-device transcription (0 if unknown)."""
+        value = getattr(self._local_barge_in_transcriber(), "last_no_speech_prob", 0.0)
+        return float(value) if isinstance(value, (int, float)) else 0.0
+
+    def _local_no_speech_prob(self) -> float:
+        """Whisper's no-speech probability for the last on-device transcription (0 if unknown)."""
+        value = getattr(self._local_barge_in_transcriber(), "last_no_speech_prob", 0.0)
+        return float(value) if isinstance(value, (int, float)) else 0.0
+
     def _take_barge_in_decision(self) -> BargeInDecision | None:
         decision = getattr(self, "_barge_in_decision", None)
         self._barge_in_decision = None
         return decision
 
     def _transcript_is_own_reply(self, transcript: str) -> bool:
-        """True (and logged) when ``transcript`` is Viola's last reply heard back."""
+        """True (and logged) when ``transcript`` is Viola's own recent speech heard back.
+
+        Compared with everything she was given to say lately, not only this
+        turn's reply: a reply to a tapped button or a reminder can play during
+        a follow-up window. A short transcript that is the end of what she just
+        said, heard within moments of her finishing, is her too; three words
+        were needed before, so "cancelled." (build 9, 17:11:06) went through.
+        """
+        from audio_core.own_playback import get_own_playback
+
+        playback = get_own_playback()
+        spoken = [playback.recent_text(_ECHO_WINDOW_SEC)]
         last = self._last_spoken_reply
-        if last is None:
-            return False
-        reply, spoken_at = last
-        if time.monotonic() - spoken_at > _ECHO_WINDOW_SEC:
-            return False
-        if not _is_echo_of_reply(transcript, reply):
+        if last is not None and time.monotonic() - last[1] <= _ECHO_WINDOW_SEC:
+            spoken.append(last[0])
+        spoken = [text for text in spoken if text]
+        gap = playback.last_onset_gap_s
+        tail = gap is not None and gap <= _ECHO_TAIL_GAP_SEC and any(_is_echo_tail(transcript, s) for s in spoken)
+        if not tail and not any(_is_echo_of_reply(transcript, text) for text in spoken):
             return False
         logger.warning(
-            "Ignored a recording of Viola's own reply (%d words matched the reply just spoken); "
+            "Ignored a recording of Viola's own reply (%d words matched what she just said); "
             "not running it as a command",
             len(_echo_words(transcript)),
         )
@@ -2202,6 +2428,15 @@ class VoiceCommandHandler:
         except LookupError as exc:
             logger.warning("Voice cleanup continuing without user_id: %s", exc)
             user_id = ""
+        if self._active_turns > 0:
+            # Another turn is still running: it keeps the wake pause and the
+            # listening state, and the last one out cleans up.
+            if user_id:
+                _update_state_hub_voice_mode("processing", user_id=user_id)
+            self._cleanup_ducking(ctx)
+            ctx.clear_audio_buffer()
+            self._cleanup_audio_file(ctx)
+            return
         if user_id:
             _update_state_hub_voice_mode("idle", user_id=user_id)
         self._resume_wake_detector(ctx)

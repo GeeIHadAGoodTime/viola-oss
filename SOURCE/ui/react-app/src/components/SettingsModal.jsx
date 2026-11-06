@@ -53,6 +53,7 @@ import {
   useDebouncedCallback,
 } from './settings';
 import WakeSensitivitySlider from './settings/WakeSensitivitySlider';
+import WakeDoubleCheckRow from './settings/WakeDoubleCheckRow';
 import AddPlaylistForm from './settings/AddPlaylistForm';
 
 // Use centralized theme from config.js
@@ -3509,6 +3510,10 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
                   Wake-word selection and custom training live in Customize.
                 </div>
               </div>
+              <WakeDoubleCheckRow
+                enabled={localSettings.wake_verification_enabled}
+                onChange={(v) => updateLocal('wake_verification_enabled', v)}
+              />
             </Section>
 
             <Section title="Push-to-Talk">

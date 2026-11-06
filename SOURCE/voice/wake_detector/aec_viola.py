@@ -49,6 +49,12 @@ from core.logging_config import get_logger
 logger = get_logger(__name__)
 
 
+# Output power this many times the microphone's, for this many frames (with
+# recovery counted down), means the filter is adding signal, not removing it.
+_DIVERGED_POWER_RATIO = 1.5
+_DIVERGED_FRAMES = 30
+
+
 class ViolaAEC:
     """
     Frequency-Domain Adaptive Filter (FDAF) with Frame-Level DTD.
@@ -88,7 +94,7 @@ class ViolaAEC:
         frame_size: int = 160,
         sample_rate: int = 16000,
         filter_length_ms: int = 150,  # 2400 taps - capture more room reflections
-        mu: float = 0.1,  # Best balance of convergence speed and stability
+        mu: float = 0.2,  # Safe since the step is normalised by the frame's own power too; 24-28 dB on speech
         dtd_threshold: float = 10.0,  # Error must be 10x baseline for DTD (balanced)
         dtd_holdoff_frames: int = 50,  # 500ms holdoff after DTD
         warmup_frames: int = 1000,  # ~10 seconds warmup (matches test setup)
@@ -151,14 +157,17 @@ class ViolaAEC:
         while self.fft_size < 2 * frame_size:
             self.fft_size *= 2
 
-        # Adaptive filter in frequency domain (complex)
-        self._W = np.zeros(self.fft_size, dtype=np.complex128)
+        # Adaptive filter in frequency domain (complex). Real signals: only the
+        # non-negative frequencies are kept, which more than halves the per-frame
+        # FFT time on the interpreter the wake loop shares with everything else.
+        self._bins = self.fft_size // 2 + 1
+        self._W = np.zeros(self._bins, dtype=np.complex128)
 
         # Reference signal buffer (size = fft_size)
         self._ref_buffer = np.zeros(self.fft_size, dtype=np.float64)
 
         # Power spectrum estimate for normalization (smoothed)
-        self._power_spectrum = np.ones(self.fft_size, dtype=np.float64) * 1e-6
+        self._power_spectrum = np.ones(self._bins, dtype=np.float64) * 1e-6
 
         # Regularization per frequency bin
         self._eps = 1e-3
@@ -181,6 +190,8 @@ class ViolaAEC:
         # Statistics tracking
         self._frame_count = 0
         self._dtd_frame_count = 0
+        self._diverged_frames = 0
+        self._diverged_resets = 0
 
         # === FDAF-IRM specific buffers ===
         if dtd_mode == "fdaf_irm":
@@ -354,13 +365,13 @@ class ViolaAEC:
         self._ref_buffer[-L:] = ref
 
         # === STEP 2: Compute reference spectrum ===
-        X = np.fft.fft(self._ref_buffer)
+        X = np.fft.rfft(self._ref_buffer)
 
         # === STEP 3: Compute estimated echo in frequency domain ===
         Y = X * self._W
 
         # === STEP 4: Convert to time domain (overlap-save: take last L samples) ===
-        y_full = np.fft.ifft(Y).real
+        y_full = np.fft.irfft(Y, N)
         estimated_echo = y_full[-L:]
 
         # === STEP 5: Compute error and output ===
@@ -544,27 +555,47 @@ class ViolaAEC:
         e_padded[-L:] = filter_error  # Unscaled error for proper convergence
 
         # Error spectrum
-        E = np.fft.fft(e_padded)
+        E = np.fft.rfft(e_padded)
 
         # Normalized FDAF update: W += mu_effective * conj(X) * E / P
         # P is smoothed power spectrum + regularization
         # mu_effective is reduced during DTD if dtd_leak > 0
-        P = self._power_spectrum + self._eps
+        # Never below this frame's own power: normalising a loud onset by the
+        # smoothed power of the quiet frames before it makes the step far larger
+        # than 1 in those bins, and on some music the filter ran away (output
+        # 40 dB above the microphone, with no echo in the room at all).
+        P = np.maximum(self._power_spectrum, X_power) + self._eps
         gradient = np.conj(X) * E / P
         self._W += mu_effective * gradient
 
         # === STEP 8: Causality constraint ===
         # The filter should be causal (only first filter_length coefficients)
         # Convert to time domain, zero out acausal part, convert back
-        w_time = np.fft.ifft(self._W).real
+        w_time = np.fft.irfft(self._W, N)
         w_time[self.filter_length :] = 0  # Zero out acausal coefficients
-        self._W = np.fft.fft(w_time)
+        self._W = np.fft.rfft(w_time)
 
-        # Constrain filter energy to prevent divergence
-        w_energy = np.sum(np.abs(self._W) ** 2)
+        # Constrain filter energy to prevent divergence (both halves of the spectrum)
+        power = np.abs(self._W) ** 2
+        w_energy = 2.0 * np.sum(power) - power[0] - power[-1]
         max_energy = 10.0 * self.fft_size  # Reasonable bound
         if w_energy > max_energy:
             self._W *= np.sqrt(max_energy / w_energy)
+
+        # The filter made things worse for a while: it has diverged, and what it
+        # learned is worth nothing. Start again rather than keep adding signal.
+        if error_power > mic_power * _DIVERGED_POWER_RATIO and mic_power > 1e-9:
+            self._diverged_frames += 1
+            if self._diverged_frames >= _DIVERGED_FRAMES:
+                logger.warning(
+                    "[AEC] filter diverged (output above the microphone for %d frames); resetting it",
+                    self._diverged_frames,
+                )
+                self._W[:] = 0.0
+                self._diverged_frames = 0
+                self._diverged_resets += 1
+        else:
+            self._diverged_frames = max(0, self._diverged_frames - 1)
 
         # For fdaf_irm with mask_all_frames, apply IRM to ALL frames (not just DTD)
         # The filter update above used time-domain error for accurate adaptation.

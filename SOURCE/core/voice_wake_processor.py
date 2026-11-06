@@ -101,6 +101,14 @@ class VoiceWakeProcessor:
 
     def check_already_listening(self) -> bool:
         """Check if already listening for commands."""
+        try:
+            from voice.wake_detector.own_speech import busy_turn_active
+
+            if busy_turn_active():
+                # The running turn only waits on its command: this wake runs beside it.
+                return True
+        except ImportError:
+            logger.debug("Busy-turn state unavailable")
         is_listening = bool(getattr(self.orchestrator.state, "is_listening", False))
         is_user_listening = getattr(self.orchestrator.state, "is_user_listening", None)
         if callable(is_user_listening):
