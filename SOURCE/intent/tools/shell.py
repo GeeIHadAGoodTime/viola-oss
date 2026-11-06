@@ -467,7 +467,8 @@ async def run_command(
         )
 
     if working_directory:
-        cwd = Path(working_directory).expanduser().resolve()
+        # A relative folder is relative to where commands run, not to Viola's own.
+        cwd = (Path(_default_working_directory()) / Path(working_directory).expanduser()).resolve()
         if not cwd.is_dir():
             return ToolResult(ok=False, error="Working directory does not exist: %s" % cwd)
         cwd_str = str(cwd)
