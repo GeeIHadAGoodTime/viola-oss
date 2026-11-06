@@ -69,7 +69,11 @@ VERDICT_FILE = "viola_connection.json"
 
 # A play that just failed keeps Spotify out of use for this long, so a retry on
 # another service in the same request is treated as the fallback it is.
-_RECENT_FAILURE_SECONDS = 120.0
+_RECENT_FAILURE_SECONDS = 45.0
+# Being offline or a browser hiccup passes. After this long, try the player again
+# rather than leaving Spotify marked as not working until someone presses Connect.
+_RECHECK_SECONDS = 60.0
+_RECHECKED_STATES = (PLAYER_UNAVAILABLE, NO_BROWSER, DRM_UNAVAILABLE)
 
 
 @dataclass(frozen=True)
@@ -222,7 +226,11 @@ def get_spotify_connection(user_id: str | None = None) -> SpotifyConnection:
         return SpotifyConnection(CHECKING, _MESSAGES[CHECKING])
 
     state = str(verdict.get("state"))
-    return SpotifyConnection(state, _MESSAGES[state], verdict.get("checked_at"))
+    checked_at = verdict.get("checked_at")
+    if state in _RECHECKED_STATES and time.time() - float(checked_at or 0.0) > _RECHECK_SECONDS:
+        start_verification(resolved, reason="recheck")
+        return SpotifyConnection(CHECKING, _MESSAGES[CHECKING])
+    return SpotifyConnection(state, _MESSAGES[state], checked_at)
 
 
 def peek_state(user_id: str | None = None) -> str:
