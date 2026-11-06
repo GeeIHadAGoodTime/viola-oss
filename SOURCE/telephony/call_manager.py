@@ -3126,6 +3126,29 @@ async def _remote_warm_loop(
     """
     from telephony import remote_voice
 
+    remote_voice.begin_warm_watch()
+    try:
+        await _ping_remote_worker_until_cancelled(
+            call_id,
+            warm_ready,
+            started_monotonic,
+            ping_timeout_s=ping_timeout_s,
+            keepalive_s=keepalive_s,
+        )
+    finally:
+        remote_voice.end_warm_watch()
+
+
+async def _ping_remote_worker_until_cancelled(
+    call_id: str,
+    warm_ready: asyncio.Event,
+    started_monotonic: float,
+    *,
+    ping_timeout_s: float,
+    keepalive_s: float,
+) -> None:
+    from telephony import remote_voice
+
     while True:
         ping_started = time.monotonic()
         try:
@@ -6202,6 +6225,7 @@ class CallManager:
             try:
                 from telephony import remote_voice as _remote_voice_probe
 
+                await asyncio.to_thread(_remote_voice_probe.refresh_remote_capacity)
                 _remote_configured = bool(_remote_voice_probe.remote_voice_available())
             # Best-effort: the availability probe must never break the call.
             except Exception as exc:  # noqa: BLE001, RUF100
@@ -7154,12 +7178,19 @@ class CallManager:
                     name="phone-preparing-cue-%s" % record.call_id,
                 )
                 try:
-                    await _await_remote_warm_gate(
+                    from telephony import remote_voice as _remote_voice_gate
+
+                    # A worker that just missed a whole ceiling is stuck, not
+                    # cold: do not make this call wait a minute for it too.
+                    gate_ceiling = 0.0 if _remote_voice_gate.warm_gate_recently_gave_up() else REMOTE_WARM_DIAL_CEILING_S
+                    worker_warm = await _await_remote_warm_gate(
                         record.call_id,
                         remote_warm_ready,
                         remote_warm_started,
-                        ceiling_s=REMOTE_WARM_DIAL_CEILING_S,
+                        ceiling_s=gate_ceiling,
                     )
+                    if not worker_warm and gate_ceiling > 0.0:
+                        _remote_voice_gate.note_warm_gate_gave_up()
                 finally:
                     preparing_cue_task.cancel()
                     with suppress(asyncio.CancelledError):
