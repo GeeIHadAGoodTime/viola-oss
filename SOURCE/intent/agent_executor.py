@@ -12295,9 +12295,9 @@ class AgentExecutor:
                         if (items.length >= 20) continue;
                         const prices = moneyIn(text);
                         const field = el.querySelector('select, input[type="number"], input[name*="qty" i], input[name*="quantity" i]');
-                        const counted = text.match(/\\b(?:qty|quantity)\\b\\W*(\\d+)/i) || text.match(/(?:^|\\s)[x\\u00d7]\\s?(\\d+)\\b/i) || text.match(/\\b(\\d+)\\s?[x\\u00d7](?:\\s|$)/i);
+                        const counted = text.match(/(?:qty|quantity)\\b\\W*(\\d+)/i) || text.match(/(?:^|\\s)[x\\u00d7]\\s?(\\d+)\\b/i) || text.match(/\\b(\\d+)\\s?[x\\u00d7](?:\\s|$)/i);
                         const quantity = field && Number(field.value) > 0 ? Number(field.value) : (counted ? Number(counted[1]) : null);
-                        const name = norm(text.replace(moneyRe, ' ').replace(/\\b(?:qty|quantity)\\b\\W*\\d+/ig, ' '));
+                        const name = norm(text.replace(moneyRe, ' ').replace(/(?:qty|quantity)\\b\\W*\\d+/ig, ' '));
                         items.push({
                             name: name || text,
                             description: text,
