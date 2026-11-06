@@ -30,6 +30,25 @@ function freshTurn() {
   return { turn: null, target: '', spoken: false, done: false, budget: 0, lastActivity: 0 };
 }
 
+// One line of text that was still being written when it appeared: reveal it at
+// speaking pace. A line that was already finished shows whole.
+export function usePacedLine(text, live) {
+  const value = typeof text === 'string' ? text : '';
+  const paced = useRef(Boolean(live));
+  const [count, setCount] = useState(0);
+  const incomplete = paced.current && count < value.length;
+
+  useEffect(() => {
+    if (!incomplete) return undefined;
+    const timer = setInterval(() => {
+      setCount((shown) => Math.min(value.length, shown + (SPOKEN_CHARS_PER_SECOND * PACE_TICK_MS) / 1000));
+    }, PACE_TICK_MS);
+    return () => clearInterval(timer);
+  }, [incomplete, value.length]);
+
+  return paced.current ? value.slice(0, wordEnd(value, Math.floor(count))) : value;
+}
+
 export function usePacedReply({ speechRate = 1 } = {}) {
   const [liveReply, setLiveReply] = useState('');
   const state = useRef(freshTurn());
