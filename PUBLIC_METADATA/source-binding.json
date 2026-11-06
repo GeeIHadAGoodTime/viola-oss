@@ -30,10 +30,10 @@
   },
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "03afbcf6eff6f2b516eff81cb0ddaeb520992ac4ce3e130dcf664d781956e77b",
-  "source_tree_sha256": "4c0e11433bb117422513121596f80f68bdc0ee444f85d4e92a8693186e24847e",
+  "source_manifest_sha256": "8eb8dcf71c6997c6ed78cc3b9ede43f267a0a632d6bc8c7e1140b00b18d7d00a",
+  "source_tree_sha256": "da86a51c606894e9f8b9fca2e56e0a7d71ac328d5d254a61f4d5b0910850c957",
   "source_file_count": 2782,
-  "source_revision": "083e645154dc81eef0a5df012c36921f371ac8a5",
+  "source_revision": "12a442f7ed20a0056678538fe73d5989dd0148b4",
   "comparison_public_revision": "ecab2772465fcc89ae6645b028af1c2273b9199f",
   "changed_source_paths": [
     "START_WEB_INTERFACE.py",
@@ -522,7 +522,7 @@
     "historical_inventory_limits": "This renderer correction changes no dependency or workflow inputs. All six retained SBOMs and their complete status objects stay historical and unchanged; no current installed inventory qualification is claimed."
   },
   "qualification": {
-    "source_commit": "083e645154dc81eef0a5df012c36921f371ac8a5",
+    "source_commit": "12a442f7ed20a0056678538fe73d5989dd0148b4",
     "kind": "phone reliability"
   },
   "historical_bindings": [

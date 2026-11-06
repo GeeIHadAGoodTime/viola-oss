@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "083e645154dc81eef0a5df012c36921f371ac8a5",
-  "sha256": "4c0e11433bb117422513121596f80f68bdc0ee444f85d4e92a8693186e24847e",
+  "revision": "12a442f7ed20a0056678538fe73d5989dd0148b4",
+  "sha256": "da86a51c606894e9f8b9fca2e56e0a7d71ac328d5d254a61f4d5b0910850c957",
   "files": [
     {
       "path": ".env.example",
@@ -13675,8 +13675,8 @@
     },
     {
       "path": "voice/synthesizer.py",
-      "sha256": "855e7d8ad3ca2a88ad613980d7f51adf075fedc72ff1a48f0b5054e159b5db6f",
-      "bytes": 8122
+      "sha256": "ec2cfa9e4642648ed589fac759ee7ce383cfb83d02dfefeee5c58ce1d1486828",
+      "bytes": 8190
     },
     {
       "path": "voice/transcriber.py",
