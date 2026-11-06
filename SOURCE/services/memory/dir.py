@@ -653,6 +653,14 @@ class MemoryDir:
         removed = 0
         masked = 0
         try:
+            # Memories written to the top of memory/ were invisible to recall.
+            for stray in sorted(self.root.glob("*.md")):
+                if stray.resolve() == self.index_path.resolve():
+                    continue
+                topic = self.topics_dir / stray.name
+                existing = self._read_memory_file(topic).rstrip() + "\n" if topic.exists() else ""
+                self._write_memory_file(topic, existing + self._read_memory_file(stray))
+                stray.unlink()
             for path in sorted(self.topics_dir.glob("*.md")):
                 original = self._read_memory_file(path)
                 kept: list[str] = []
@@ -841,7 +849,12 @@ class MemoryDir:
         if target.startswith("topic:"):
             topic = _topic_slug(target.split(":", 1)[1])
             return self._normalize_memory_path("%s/%s" % (TOPICS_DIR, topic))
-        return self._normalize_memory_path(target)
+        resolved = self._normalize_memory_path(target)
+        # A bare file name means a topic. Left at the top of memory/ it was saved
+        # and reported as saved, but no list or recall ever looked there.
+        if resolved.parent.resolve() == self.root.resolve() and not resolved.exists():
+            return self._normalize_memory_path("%s/%s" % (TOPICS_DIR, resolved.name))
+        return resolved
 
     @staticmethod
     def _looks_like_index_pointer(content: str) -> bool:

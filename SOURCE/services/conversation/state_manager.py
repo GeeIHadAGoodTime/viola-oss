@@ -123,11 +123,13 @@ MAX_HISTORY = 200
 # size, never the words of the request. The newest exchange is always sent, so
 # "what did you just say" works after any gap; the running playback, pending
 # gates and paused tasks reach the model through their own context providers.
-PROMPT_WINDOW_MAX_TOKENS = 4_000
+# Kept small because history is the uncached part of a command: the managed model
+# reuses the head of the prompt, or a whole earlier request extended exactly, and
+# nothing in between (measured 2026-11-05, build 10 context report).
+PROMPT_WINDOW_MAX_TOKENS = 2_500
 # When the window overflows it drops back to this size, then stays put until it
-# overflows again. A window that slid one exchange per command would change the
-# start of the history every time and no history would ever be cached.
-PROMPT_WINDOW_TRIM_TO_TOKENS = 2_000
+# overflows again, so providers that do cache a shared prefix can reuse the history.
+PROMPT_WINDOW_TRIM_TO_TOKENS = 1_250
 # A silence this long starts a new topic. Same envelope as the implicit-resume
 # window below.
 PROMPT_WINDOW_IDLE_GAP_SECONDS = 600
