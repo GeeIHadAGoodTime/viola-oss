@@ -33,6 +33,7 @@ from services.llm.stream_bus import (
     remove_stream,
     remove_stream_listener,
 )
+from voice.stage_reply import StageReplyRelay
 
 logger = get_logger(__name__)
 
@@ -89,6 +90,8 @@ class StreamedReply:
         self.speaking_task: asyncio.Future[Any] | None = None
         self.created_at = time.monotonic()
         self.first_sentence_at: float | None = None
+        # The stage shows this reply as it is written, paced with the voice.
+        self._stage = StageReplyRelay(user_id=user_id, spoken=True)
 
     # -- wiring -----------------------------------------------------------
     @property
@@ -105,6 +108,7 @@ class StreamedReply:
         """Listen on the stream and scope every provider call under it to this stream."""
         self._loop = asyncio.get_running_loop()
         self._loop_thread = threading.get_ident()
+        self._stage.bind_loop()
         try:
             if self._own_stream:
                 bind_stream_producer(self.stream_id, owner_id=self.user_id)
@@ -123,6 +127,7 @@ class StreamedReply:
             with context:
                 yield self
         finally:
+            self._stage.close()
             remove_stream_listener(self.stream_id, self._on_event)
 
     def _on_event(self, event: dict[str, Any]) -> None:
@@ -139,6 +144,7 @@ class StreamedReply:
     def _handle(self, event: dict[str, Any]) -> None:
         if self._closed:
             return
+        self._stage.on_event(event)
         for sentence in self.gate.feed(event):
             self._push(sentence)
 

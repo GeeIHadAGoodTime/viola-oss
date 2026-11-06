@@ -267,13 +267,81 @@ class _Attempt:
     ended: bool = False
 
 
+# Text with no phase may be a preamble before a tool call. It is shown once it is
+# longer than a preamble is, and taken back if a tool call follows after all.
+_UNPHASED_SHOW_AFTER_CHARS = 120
+
+
+class FinalAnswerText:
+    """The answer text so far, for the screen, from the same answer events.
+
+    Same rule as speech: a tool preamble ("commentary") is never the answer. The
+    screen needs no sentence boundary and no guard hold, because the finished
+    reply replaces this text when the command returns.
+    """
+
+    def __init__(self) -> None:
+        self._attempts: dict[str, _Attempt] = {}
+        self.text = ""
+
+    def feed(self, event: dict[str, Any] | None) -> bool:
+        """Consume one stream-bus event; True when :attr:`text` changed."""
+        payload = event.get(ANSWER_EVENT_KEY) if isinstance(event, dict) else None
+        if not isinstance(payload, dict):
+            return False
+        op = payload.get("op")
+        attempt_id = str(payload.get("attempt") or "")
+        if op == "start":
+            self._attempts[attempt_id] = _Attempt()
+            return False
+        attempt = self._attempts.get(attempt_id)
+        if attempt is None:
+            return False
+        before = self.text
+        if op == "item":
+            kind = str(payload.get("kind") or "message")
+            if kind == "function_call":
+                attempt.tool_calls = True
+            attempt.items[str(payload.get("item") or "")] = _Item(phase=payload.get("phase"), kind=kind)
+        elif op == "text":
+            item = attempt.items.setdefault(str(payload.get("item") or ""), _Item(phase=None))
+            item.text += str(payload.get("text") or "")
+        elif op == "end":
+            attempt.ended = True
+            attempt.tool_calls = attempt.tool_calls or str(payload.get("tool_calls")).lower() == "true"
+            if str(payload.get("status") or "completed") != "completed":
+                return False
+        self._refresh(attempt)
+        return self.text != before
+
+    def _refresh(self, attempt: _Attempt) -> None:
+        if attempt.tool_calls:
+            self.text = ""
+            return
+        final = "".join(item.text for item in attempt.items.values() if item.phase == FINAL_ANSWER_PHASE)
+        held = "".join(
+            item.text for item in attempt.items.values() if item.kind == "message" and item.phase != FINAL_ANSWER_PHASE
+        )
+        if final:
+            text = final
+        elif attempt.ended or len(held) > _UNPHASED_SHOW_AFTER_CHARS:
+            text = held
+        else:
+            text = ""
+        # A structured reply is cleaned up before it is shown.
+        if text.lstrip()[:1] not in {"{", "[", "`"}:
+            self.text = text
+
+
 class FinalAnswerSpeechGate:
     """Turns answer events into sentences that are safe to speak now.
 
     Not thread-safe; feed it from one thread (the speech sink hops to its loop).
     """
 
-    def __init__(self, *, live: bool = True, reason: str | None = None, summary_suffix: str | None = SUMMARY_SUFFIX) -> None:
+    def __init__(
+        self, *, live: bool = True, reason: str | None = None, summary_suffix: str | None = SUMMARY_SUFFIX
+    ) -> None:
         self._summary_suffix = summary_suffix
         self._suffix_said = False
         self._attempts: dict[str, _Attempt] = {}
@@ -471,6 +539,7 @@ __all__ = [
     "ANSWER_EVENT_KEY",
     "AnswerAttempt",
     "FinalAnswerSpeechGate",
+    "FinalAnswerText",
     "all_sentences",
     "answer_events_are_muted",
     "answer_events_muted",

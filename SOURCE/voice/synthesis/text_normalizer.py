@@ -111,7 +111,7 @@ _GROUPED_NUMBER_RE = re.compile(
 )
 # A minus sign in front of a number, not a hyphen inside a word, range or date.
 _MINUS_RE = re.compile(r"(?:(?<=^)|(?<=[\s(]))[-−](?=\d)")
-_NUMBER_SIGN_RE = re.compile(r"(?<![\w&])#(?=\d)")
+_NUMBER_SIGN_RE = re.compile(r"(?<![\w&])#(?=\d+(?![\d.]))")
 
 # Units after a number. Case matters: mg and MG, m and M are different things.
 _UNITS = {
@@ -267,6 +267,7 @@ _TENS = ["", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eigh
 # budget for live speech). A reply inside it is spoken whole, in one go; a longer
 # one stops at the budget and the rest stays on screen. About 45 seconds.
 _MAX_SPOKEN_CHARS = 800
+_SUMMARY_CHARS = _MAX_SPOKEN_CHARS
 _MAX_SPOKEN_SENTENCES = 6
 _SUMMARY_SUFFIX = "I'll send the full details in chat."
 
@@ -1020,7 +1021,7 @@ def _summarize_oversized(text: str, *, english: bool = True) -> str:
     else:
         summary = text
 
-    summary = _truncate_at_word(summary, _MAX_SPOKEN_CHARS).rstrip(" ,;:")
+    summary = _truncate_at_word(summary, _SUMMARY_CHARS).rstrip(" ,;:")
     if not english:
         return summary.rstrip(".!?。！？।…") + "…" if summary else ""
     if summary and summary[-1] not in ".!?":

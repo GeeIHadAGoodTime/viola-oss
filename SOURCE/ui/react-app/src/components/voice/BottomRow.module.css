@@ -16,7 +16,10 @@
   min-height: 1.6em;
   max-width: 100%;
   min-width: 0;
-  overflow: hidden;
+  /* A long answer scrolls here instead of being cut off or pushing the player. */
+  max-height: 34vh;
+  overflow-x: hidden;
+  overflow-y: auto;
   word-wrap: break-word;
   overflow-wrap: break-word;
 }

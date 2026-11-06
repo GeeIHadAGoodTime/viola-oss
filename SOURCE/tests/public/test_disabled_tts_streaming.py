@@ -80,6 +80,7 @@ class DisabledTTSStreamingTests(unittest.IsolatedAsyncioTestCase):
 
         namespace = dict(
             asyncio=asyncio,
+            contextlib=contextlib,
             threading=threading,
             re=re,
             time=time,
@@ -101,6 +102,7 @@ class DisabledTTSStreamingTests(unittest.IsolatedAsyncioTestCase):
                 "_play_pcm_if_enabled",
                 "_synthesize_locked",
                 "_retry_without_unspeakable",
+                "_claim_unspoken_notice",
                 "speak",
                 "_speak_single",
                 "_speak_streaming",
@@ -108,8 +110,19 @@ class DisabledTTSStreamingTests(unittest.IsolatedAsyncioTestCase):
                 "_speak_cached_pcm",
                 "_lookup_opener_cache",
             },
-            helpers={"_strip_emoji", "_split_sentences"},
-            constants={"_EMOJI_RE", "_SENTENCE_RE", "_CHUNK_THRESHOLD", "_MAX_TEXT_LENGTH", "STREAM_TIMEOUT_SECONDS"},
+            helpers={"_strip_emoji", "_split_sentences", "_speech_units"},
+            constants={
+                "_EMOJI_RE",
+                "_SENTENCE_RE",
+                "_CHUNK_THRESHOLD",
+                "_MAX_TEXT_LENGTH",
+                "STREAM_TIMEOUT_SECONDS",
+                "_SPEECH_LOOKAHEAD_UNITS",
+                "_FIRST_UNIT_CHARS",
+                "_MAX_UNIT_CHARS",
+                "_MIN_UNIT_CHARS",
+                "_CLAUSE_END_RE",
+            },
             namespace=namespace,
         )
         self.engine = engine_type()
@@ -169,7 +182,7 @@ class DisabledTTSStreamingTests(unittest.IsolatedAsyncioTestCase):
     async def test_disable_between_chunks_keeps_history_but_stops_next_speech(self):
         async def chunks():
             yield "First."
-            self.assertEqual(len(self.plays), 1)
+            await self._until_played(1)
             self.config.tts_enabled = False
             yield "Second."
 
@@ -256,22 +269,19 @@ class DisabledTTSStreamingTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(self.calls), 3)
         self.assertEqual(len(self.plays), 3)
 
-    async def test_unspeakable_later_sentence_is_skipped_not_the_whole_reply(self):
+    async def test_unspeakable_later_sentence_is_replaced_by_the_notice_not_the_whole_reply(self):
         text, attempts = self._customer_reply(("Brubeck",), named=False)
         await self.engine.speak(text)
-        self.assertEqual(len(attempts), 3)
         self.assertEqual(sum("first sentence" in attempt for attempt in attempts), 1)
-        self.assertEqual([("third" in call) for call in self.calls], [False, True])
-        self.assertEqual(len(self.plays), 2)
+        self.assertEqual(len(self.plays), 3)
+        self.assertTrue(any("on the screen" in call for call in self.calls))
 
-    async def test_unspeakable_first_sentence_still_fails_before_any_audio(self):
-        from voice.customer_pronunciation import PronunciationError
-
+    async def test_unspeakable_first_sentence_says_so_instead_of_going_silent(self):
         text, attempts = self._customer_reply(("first",), named=False)
-        with self.assertRaises(PronunciationError):
-            await self.engine.speak(text)
-        self.assertEqual(self.plays, [])
+        await self.engine.speak(text)
+        self.assertTrue(self.plays)
         self.assertEqual(sum("first sentence" in attempt for attempt in attempts), 1)
+        self.assertTrue(any("on the screen" in call for call in self.calls))
 
     async def test_cached_pcm_cannot_bypass_disable_at_playback_boundary(self):
         self.config.tts_enabled = False
@@ -319,11 +329,25 @@ class DisabledTTSStreamingTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(await asyncio.wait_for(task, 5), b"")
         self.assertEqual((self.calls, self.loads), ([], []))
 
+    async def _until_played(self, count):
+        for _ in range(500):
+            if len(self.plays) >= count:
+                return
+            await asyncio.sleep(0.01)
+        self.fail("Speech never reached playback")
+
+    async def _until_called(self, text):
+        for _ in range(500):
+            if text in self.calls:
+                return
+            await asyncio.sleep(0.01)
+        self.fail("Speech never reached synthesis")
+
     async def test_enabled_streaming_preserves_immediate_sentence_delivery(self):
         async def chunks():
             yield "First."
+            await self._until_played(1)
             self.assertEqual(self.calls, ["First."])
-            self.assertEqual(len(self.plays), 1)
             yield "Second."
 
         self.assertEqual(await self.facade.speak_streaming(chunks()), "First.Second.")
@@ -666,8 +690,9 @@ class DisabledTTSStreamingTests(unittest.IsolatedAsyncioTestCase):
 
         async def chunks():
             yield "Before."
+            await self._until_played(1)
             yield "First."
-            self.assertEqual(len(self.plays), 1)
+            await self._until_called("First.")
             self.config.tts_enabled = True
             yield "Fresh."
 

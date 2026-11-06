@@ -105,21 +105,21 @@ class FormatterLocaleTests(unittest.TestCase):
     def test_english_link_and_summary_messages_remain_unchanged(self):
         self.assertEqual(self.module.normalize_for_speech("[View](https://example.com)"), "View (link sent in chat)")
         self.assertEqual(
-            self.module.normalize_for_speech("First. Second. Third. Fourth."),
-            "First. Second. Third. I'll send the full details in chat.",
+            self.module.normalize_for_speech("One. Two. Three. Four. Five. Six. Seven."),
+            "One. Two. Three. Four. Five. Six. I'll send the full details in chat.",
         )
 
     def test_non_english_summary_is_bounded_and_has_no_english_suffix(self):
         for language, text, expected in (
-            ("fr", "Premier. Deuxième. Troisième. Quatrième.", "Premier. Deuxième. Troisième…"),
-            ("ja", "一。二。三。四。", "一。 二。 三…"),
-            ("hi", "एक। दो। तीन। चार।", "एक। दो। तीन…"),
+            ("fr", "Un. Deux. Trois. Quatre. Cinq. Six. Sept.", "Un. Deux. Trois. Quatre. Cinq. Six…"),
+            ("ja", "一。二。三。四。五。六。七。", "一。 二。 三。 四。 五。 六…"),
+            ("hi", "एक। दो। तीन। चार। पाँच। छह। सात।", "एक। दो। तीन। चार। पाँच। छह…"),
         ):
             with self.subTest(language=language):
                 self.assertEqual(self.module.normalize_for_speech(text, language=language), expected)
                 self.assertEqual(self.module.normalize_for_speech(text, language=language, summarize=False), text)
         for language in LANGUAGES:
-            result = self.module.normalize_for_speech("長" * 700, language=language)
+            result = self.module.normalize_for_speech("長" * 900, language=language)
             self.assertLessEqual(len(result), self.module._SUMMARY_CHARS + 1)
             self.assertTrue(result.endswith("…"))
             self.assertNotIn(self.module._SUMMARY_SUFFIX, result)

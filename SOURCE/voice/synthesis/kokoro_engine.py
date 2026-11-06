@@ -1003,10 +1003,6 @@ class KokoroTTSEngine:
 
         return self._voice, self._voice
 
-    def _begin_spoken_reply(self) -> None:
-        """Per-reply speech state starts over (the caller holds the speak lock)."""
-        self._unspoken_notice_at = None
-
     def _prepare_route_text(self, text: str) -> str:
         """Let an explicit customer component reject unsupported complete input."""
         if getattr(self, "_customer_tokenizer", None) is not None:
@@ -1420,7 +1416,7 @@ class KokoroTTSEngine:
         async with self._speak_lock:
             if not self._tts_is_enabled() or policy_marker is not getattr(self, "_tts_disable_marker", 0):
                 return
-            self._begin_spoken_reply()
+            self._unspoken_notice_at = None
             try:
                 if use_streaming:
                     await self._speak_streaming(clean_text, sentences, policy_marker=policy_marker)
@@ -1744,7 +1740,7 @@ class KokoroTTSEngine:
         full_text_parts: list[str] = []
 
         async with self._speak_lock:
-            self._begin_spoken_reply()
+            self._unspoken_notice_at = None
             # --- diagnostics: is_speaking flag (once) ---
             monitor = None
             try:
@@ -1846,6 +1842,7 @@ class KokoroTTSEngine:
                     synthesis_task = asyncio.create_task(synthesize_ahead())
                     previous_pcm: bytes | None = None
                     previous_sentence: str | None = None
+                    previous_marker: object | None = None
                     while True:
                         if synthesis_task.done() and ready.empty():
                             break  # The end marker found the queue full and was dropped.
@@ -1856,6 +1853,10 @@ class KokoroTTSEngine:
                         if marker is not getattr(self, "_tts_disable_marker", 0) or not self._tts_is_enabled():
                             previous_pcm = previous_sentence = None
                             continue
+                        if marker is not previous_marker:
+                            # Speech was retired in between: nothing to join on to.
+                            previous_pcm = previous_sentence = None
+                        previous_marker = marker
                         if previous_sentence is not None:
                             await self._sleep_sentence_gap(previous_sentence, sentence)
                         pcm = self._smooth_sentence_boundary(previous_pcm, pcm)
