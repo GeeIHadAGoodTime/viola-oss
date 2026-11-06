@@ -669,7 +669,12 @@ class BrowserAuthManager:
         from music.spotify.cookie_bridge import delete_spotify_cookies_from_qweb
 
         resolved = _resolve_sign_in_user_id(self._user_id)
-        if not resolved or connection.peek_state(resolved) != connection.SESSION_REJECTED:
+        if not resolved:
+            return
+        state = connection.peek_state(resolved)
+        if state != connection.SESSION_REJECTED:
+            if state != connection.CONNECTED:
+                connection.forget_verdict(resolved)  # a new attempt, a new verdict
             return
         webview_controller, dispatch_to_main = self._webview_and_dispatcher()
         try:
