@@ -214,6 +214,66 @@ describe('agent browser on the stage', () => {
   });
 });
 
+describe('closing the browser takes the globe pill away', () => {
+  const pill = () => screen.queryByRole('button', { name: /Open agent browser mode/i });
+
+  it('"close the browser" after the task ended: the backend forgets the page', async () => {
+    await mount();
+    await send(agentic(WIKI));
+    await send(hidden({ agent_outcome: 'done' }));
+    expect(pill()).toBeInTheDocument();
+
+    await send(hidden({ page_forgotten: true }));
+
+    await waitFor(() => expect(pill()).not.toBeInTheDocument());
+  });
+
+  it('Close on the stage removes it too', async () => {
+    await mount();
+    fireEvent.click(await reopenFinishedAgentPage());
+    await send(hidden());
+
+    await waitFor(() => expect(pill()).not.toBeInTheDocument());
+  });
+});
+
+describe('a site's person check', () => {
+  const check = (extra = {}) => agentic(WIKI, {
+    agent_task: { description: 'buy water', status: 'bot_check', phase: 'user_input' },
+    ...extra,
+  });
+
+  it('brings the view on screen from another stage and says what to do', async () => {
+    await mount();
+    await send(agentic(WIKI));
+    fireEvent.click(screen.getByRole('button', { name: /Open music mode/i }));
+
+    await send(check());
+
+    await waitFor(() => expect(lastSurfaceActive()).toBe(true));
+    expect(await screen.findByText(/check you're a person/i)).toBeInTheDocument();
+  });
+
+  it('stays on screen when the task has ended with the check unfinished', async () => {
+    await mount();
+    await send(check());
+    await send(check({ agent_busy: false }));
+
+    await waitFor(() => expect(lastSurfaceActive()).toBe(true));
+    expect(screen.getByText(/check you're a person/i)).toBeInTheDocument();
+    expect(window.viola.hideBrowserOverlay).not.toHaveBeenCalled();
+  });
+
+  it('goes back to the agent working when the user has finished', async () => {
+    await mount();
+    await send(check());
+    await send(agentic(WIKI));
+
+    await waitFor(() => expect(screen.queryByText(/check you're a person/i)).not.toBeInTheDocument());
+    expect(screen.queryByText('Your turn')).not.toBeInTheDocument();
+  });
+});
+
 describe('embedded sign-in page', () => {
   it('gets the browser stage with a Done button that closes it', async () => {
     await mount();
