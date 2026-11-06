@@ -30,10 +30,10 @@
   },
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "6c65652631144062620d21d1cccabe95b4d88c1f4209cae4f8ee8dfcbe31d810",
-  "source_tree_sha256": "721f0e377b62c67acb4ff61083fb93e3211cb21465d260aa535395e903e9f14b",
+  "source_manifest_sha256": "ac82f9a490cfb2a9bf021ccd590fcf6ffea524ac5cfede9b6a4a9bb17f6ae632",
+  "source_tree_sha256": "57349fbd353c454ead5679668365a3320982d73fe23ad9fe33559e8e6f9d43b3",
   "source_file_count": 2778,
-  "source_revision": "e1aec75a1223658a86f060515353b33e2075a85a",
+  "source_revision": "20a9a8384134dd4f786721cee06f2f682d0bb944",
   "comparison_public_revision": "ecab2772465fcc89ae6645b028af1c2273b9199f",
   "changed_source_paths": [
     "START_WEB_INTERFACE.py",
@@ -137,12 +137,14 @@
     "music/playlist_manager.py",
     "music/playlists/playlist_player.py",
     "music/providers/browser/auth_manager.py",
+    "music/providers/browser_search.py",
     "music/providers/selection.py",
     "music/providers/spotify_cdp.py",
     "music/queue_config.py",
     "music/rating_system.py",
     "music/resolution/provider_router.py",
     "music/resolution/provider_router_metadata.py",
+    "music/runtime/autoplay_service.py",
     "music/runtime/backend_manager.py",
     "music/runtime/control_surface.py",
     "music/runtime/embedded_playback.py",
@@ -514,7 +516,7 @@
     "historical_inventory_limits": "This renderer correction changes no dependency or workflow inputs. All six retained SBOMs and their complete status objects stay historical and unchanged; no current installed inventory qualification is claimed."
   },
   "qualification": {
-    "source_commit": "e1aec75a1223658a86f060515353b33e2075a85a",
+    "source_commit": "20a9a8384134dd4f786721cee06f2f682d0bb944",
     "kind": "music"
   },
   "historical_bindings": [

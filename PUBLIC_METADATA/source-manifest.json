@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "e1aec75a1223658a86f060515353b33e2075a85a",
-  "sha256": "721f0e377b62c67acb4ff61083fb93e3211cb21465d260aa535395e903e9f14b",
+  "revision": "20a9a8384134dd4f786721cee06f2f682d0bb944",
+  "sha256": "57349fbd353c454ead5679668365a3320982d73fe23ad9fe33559e8e6f9d43b3",
   "files": [
     {
       "path": ".env.example",
@@ -3005,8 +3005,8 @@
     },
     {
       "path": "music/providers/browser_search.py",
-      "sha256": "c8255b978e79c784bc12999e3f8b5e6a75dd3b9e4dab6716bba96bc50014ea2a",
-      "bytes": 11149
+      "sha256": "92a4829354fde4dabf91885361e42e19ac7ffa1853ddc5a9ee0b0f51379cd637",
+      "bytes": 12458
     },
     {
       "path": "music/providers/checker.py",
@@ -3185,8 +3185,8 @@
     },
     {
       "path": "music/runtime/autoplay_service.py",
-      "sha256": "64d60150b58855340101655bd20b839e6fcf0c67fd3844100c586c109a11e66a",
-      "bytes": 3241
+      "sha256": "d8d948da3e859f2855ef52ac854993b914bee5365118b48ce769e7a9b9dd45b1",
+      "bytes": 3906
     },
     {
       "path": "music/runtime/backend_manager.py",
@@ -10085,8 +10085,8 @@
     },
     {
       "path": "ui/react-app/src/SmartDisplay.jsx",
-      "sha256": "4b60b20bbce063d305c2d3ebe8706fd6e68feadf7f8ee46b9232e88c205d66f7",
-      "bytes": 196130
+      "sha256": "474da806140a88c1a237e6d40414862ae30a60240a8b5036dadc12e8207a890c",
+      "bytes": 196532
     },
     {
       "path": "ui/react-app/src/SmartDisplay.overlayLifecycle.test.jsx",
@@ -10125,8 +10125,8 @@
     },
     {
       "path": "ui/react-app/src/__tests__/SmartDisplay.test.jsx",
-      "sha256": "66437338f43a59d355b04be0677b74f50e9f1442ddb54eded366e6f1eb6c722c",
-      "bytes": 150211
+      "sha256": "84987b2d2c55f5e3e8a41c3813b6aa4a866aee43e5e600b1cab790355c6fb70f",
+      "bytes": 150846
     },
     {
       "path": "ui/react-app/src/__tests__/hooks/useEventBus.test.jsx",
