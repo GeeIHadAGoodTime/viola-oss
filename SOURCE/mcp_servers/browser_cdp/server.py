@@ -1876,7 +1876,7 @@ async def browser_snapshot(
         ]
         important_controls = shopping + important_controls
         important_controls = important_controls[:_CDP_IMPORTANT_CONTROLS]
-        full_text = "\n\n".join(part for part in (snapshot_text, controls_block, preview) if part)
+        full_text = "\n\n".join(part for part in (annotated, controls_block, preview) if part)
         snapshot_original_chars = len(full_text)
         # #579: compute page_health BEFORE truncation, off the full snapshot
         # text (which already includes the body-text preview above) so a
@@ -1920,6 +1920,21 @@ async def browser_snapshot(
         return _json({"error": "Snapshot failed: %s" % exc})
 
 
+async def visible_page_health() -> dict[str, Any]:
+    """Read-only look at the visible page, for waiting on a check the user is doing."""
+    await manager.ensure_connected()
+    info = await manager.evaluate_js("""(() => ({
+            title: document.title || '',
+            url: location.href,
+            text: ((document.body && document.body.innerText) || '').substring(0, 5000),
+        }))()""")
+    if not isinstance(info, dict):
+        return {}
+    info["page_health"] = detect_page_health(info.get("title"), None, str(info.get("text") or "")) or {}
+    info.pop("text", None)
+    return info
+
+
 async def _attach_cdp_interaction_snapshot(result: dict[str, Any]) -> None:
     """Attach fresh refs after an interaction invalidates the previous snapshot."""
     try:
@@ -1935,6 +1950,9 @@ async def _attach_cdp_interaction_snapshot(result: dict[str, Any]) -> None:
         return
 
     result["snapshot"] = snapshot_payload.get("snapshot", "")
+    if snapshot_payload.get("page_health"):
+        # The page a click led to can be a person check; the loop reads this field.
+        result["page_health"] = snapshot_payload["page_health"]
     result["selector_for_ref"] = snapshot_payload.get("selector_for_ref", {})
     result["refs_resolve_server_side"] = bool(snapshot_payload.get("refs_resolve_server_side"))
     result["important_controls"] = snapshot_payload.get("important_controls", [])

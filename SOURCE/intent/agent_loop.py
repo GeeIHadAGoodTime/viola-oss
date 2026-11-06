@@ -4796,6 +4796,20 @@ async def run_agent_loop(
                 except (AttributeError, RuntimeError, TypeError, ValueError):
                     logger.debug("Repeated tool progress tracking failed", exc_info=True)
 
+                # A site's person check: the user does it, the loop waits, and the
+                # model reads how it went with this tool's result.
+                bot_check_note = await executor._resolve_bot_check_after_tool(tc_name, tool_result)
+                if bot_check_note:
+                    executor._pending_stuck_tool_progress = None
+                    latest_result = tool_results_content[-1]
+                    if isinstance(latest_result["content"], list):
+                        latest_result["content"] = [
+                            *latest_result["content"],
+                            {"type": "text", "text": bot_check_note},
+                        ]
+                    else:
+                        latest_result["content"] = "%s\n\n%s" % (latest_result["content"], bot_check_note)
+
                 # â”€â”€ Post-execution bookkeeping via middleware pipeline â”€â”€
                 # Browser tier tracking (lightweight, not worth a middleware)
                 if tc_name == "check_api_registry":

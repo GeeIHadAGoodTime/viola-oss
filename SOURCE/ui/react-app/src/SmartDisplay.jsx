@@ -343,6 +343,7 @@ export function resolveStageContentMode(displayMode, signals = {}) {
 export { shouldPromptForCloudConsent };
 
 export function getAgentPillLabel(status, phase, active = true) {
+  if (status === 'bot_check') return 'Your turn';
   if (!active) return '';
   const cleanStatus = (status || '').trim();
   if (cleanStatus) {
@@ -707,6 +708,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
   // The page the agent last browsed, so its view can be reopened after the
   // task ends or the view was closed (pill / Ctrl+K "Open Agent Browser").
   const [lastAgentBrowserUrl, setLastAgentBrowserUrl] = useState('');
+  const lastOverlayStatusRef = useRef('');
 
   // Modal state
   // TopBar's expanded-calendar modal (CalendarView.jsx, compact mode) is
@@ -988,8 +990,13 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
   // stage-leave effect below closes the native view, or parks it off screen
   // while the agent is still working in it (the globe pill brings it back).
   const handleBrowserExit = useCallback(() => {
+    // Close / Done means closed: nothing stays to reopen unless the agent is working.
+    if (!agentTaskActive) {
+      setLastAgentBrowserUrl('');
+      setAgentContextPillVisible(false);
+    }
     activateMusicMode();
-  }, [activateMusicMode]);
+  }, [activateMusicMode, agentTaskActive]);
   const handleConsultationTakeover = useCallback(async (callId) => {
     if (!callId || callOwnerTakeoverPending) return;
     setCallOwnerTakeoverPending(true);
@@ -1655,10 +1662,15 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
       const url = msg.url || msg.payload?.url || '';
       const agentTask = msg.agent_task || msg.payload?.agent_task;
       const agentBusy = (msg.agent_busy ?? msg.payload?.agent_busy) !== false;
+      if (msg.page_forgotten || msg.payload?.page_forgotten) {
+        // The browser was closed on purpose: nothing to reopen, so no globe pill.
+        setLastAgentBrowserUrl('');
+        setAgentContextPillVisible(false);
+      }
       if (visible !== undefined) { setBrowserOverlayVisible(!!visible); }
       setBrowserOverlayMode(visible === false ? '' : mode);
       setLoginProvider(visible !== false && mode === 'login' ? url : '');
-      if (stageForOverlayState({ visible: visible !== false, mode }) === 'browser') {
+      if (stageForOverlayState({ visible: visible !== false, mode, status: agentTask?.status }) === 'browser') {
         // The sign-in page needs the browser stage: its Done button lives there.
         setBrowserModeActive(true);
         setDisplayMode('browser');
@@ -1673,6 +1685,8 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
           setAgentTaskStatus(agentTask.status || 'working');
           setAgentTaskPhase(agentTask.phase || 'acting');
           if (agentTask.phase === 'user_input') { setAgentTakeoverActive(true); }
+          else if (lastOverlayStatusRef.current === 'bot_check') { setAgentTakeoverActive(false); }
+          lastOverlayStatusRef.current = agentTask.status || '';
         }
       } else if (!visible) {
         const outcome = msg.agent_outcome || msg.payload?.agent_outcome || '';

@@ -45,8 +45,11 @@ export function browserLeaveAction({ overlayVisible, overlayMode, agentBusy } = 
  * the stage alone. A sign-in page always gets the browser stage (it has the
  * Done button); an agent page gets it through the agent-task display rules.
  */
-export function stageForOverlayState({ visible, mode } = {}) {
+export function stageForOverlayState({ visible, mode, status } = {}) {
   if (visible && mode === 'login') return 'browser';
+  // A site's person check is the user's to finish, so it must be on screen even
+  // if they were on another stage.
+  if (visible && mode === 'agentic' && status === 'bot_check') return 'browser';
   return null;
 }
 
