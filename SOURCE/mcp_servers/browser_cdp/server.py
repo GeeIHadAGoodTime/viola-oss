@@ -1816,7 +1816,9 @@ def _cdp_fit_snapshot(annotated: str, controls_block: str, preview: str) -> str:
 @server.tool(
     description=(
         "Get the page's interactive snapshot with @eN refs and selector_for_ref entries for clicking, "
-        "filling, and selecting elements." + _CDP_REF_USAGE_DOC
+        "filling, and selecting elements. Clickable elements with no accessibility role are listed too, "
+        "with the row they belong to. On a long page pass find='add to cart' (any words) to search every "
+        "control on the whole page." + _CDP_REF_USAGE_DOC
     ),
     annotations=_SAFE,
     meta={"risk": "safe", "anthropic/alwaysLoad": True},
