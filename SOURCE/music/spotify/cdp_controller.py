@@ -2140,7 +2140,9 @@ class SpotifyCDPController:
     def _direct_sign_in_status_impl(self) -> str:
         if self._chrome_process_exited() or self._page is None or self._page.is_closed():
             # Signed in, then closed the window before the next look: the browser
-            # wrote the cookie to the profile on its way out.
+            # wrote the cookie to the profile on its way out. It has to be fully
+            # gone first, or the file is locked and can't be read.
+            self._shutdown_impl()
             _invalidate_cdp_session_cache()
             return "signed_in" if has_cdp_session_cookies(user_id=self._user_id) else "closed"
         # Only the cookie store is read: the login page itself is left alone.
