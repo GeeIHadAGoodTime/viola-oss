@@ -20,6 +20,15 @@ from typing import TYPE_CHECKING, Any, Callable
 
 from core.logging_config import get_logger
 from diagnostics import latency_spans
+from intent.active_task import (
+    ActiveTask,
+    add_turn_reminder,
+    answer_from_helper_results,
+    final_answer_is_off_task,
+    message_carries_request,
+    off_task_answer_message,
+    off_task_correction_text,
+)
 from intent.agent_message_manager import (
     reconstruct_executor_content_replacement_state,
     record_tool_result_replacements,
@@ -36,15 +45,6 @@ from intent.agent_middleware import (
     ToolBlacklistMiddleware,
     URLTrackerMiddleware,
     run_middleware_pipeline,
-)
-from intent.active_task import (
-    ActiveTask,
-    add_turn_reminder,
-    answer_from_helper_results,
-    final_answer_is_off_task,
-    message_carries_request,
-    off_task_answer_message,
-    off_task_correction_text,
 )
 from intent.context_compaction import (
     compact_native_messages,

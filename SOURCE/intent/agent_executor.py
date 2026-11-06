@@ -39,6 +39,7 @@ from config.env import get_bool as _env_get_bool
 from core.asyncio_safe import is_event_loop_closed_error
 from core.logging_config import get_logger
 from core.platform import get_logs_dir
+from intent.active_task import ActiveTask, answer_from_helper_results
 from intent.agent_message_manager import (
     AgentMessageManager,
     record_tool_result_replacements,
@@ -49,7 +50,6 @@ from intent.approval import (
     ConfirmationDeferred,
     current_confirmation_conversation_scope,
 )
-from intent.active_task import ActiveTask
 from intent.context_compaction import (
     compact_messages,
     compact_native_messages,
@@ -9346,6 +9346,22 @@ class AgentExecutor:
         except Exception:
             logger.debug("Failed to auto-trigger OAuth for %s", tool_name, exc_info=True)
 
+    async def _deliver_helper_answers(self, channel: Any, user_id: str) -> None:
+        """Send what the helpers found, as one reply, to where the user asked."""
+        held = list(getattr(self, "_held_helper_answers", None) or [])
+        self._held_helper_answers = []
+        if channel is None or not held:
+            return
+        task = getattr(self, "_active_task", None)
+        if len(held) == 1 or not isinstance(task, ActiveTask):
+            reply = "\n\n".join(item["answer"] for item in held)
+        else:
+            reply = await answer_from_helper_results(task, held, user_id=user_id)
+        try:
+            await channel.send(reply)
+        except Exception as exc:
+            logger.debug("Background agent channel.send failed: %s", exc)
+
     async def _handle_start_agent(self, tool_args: dict[str, Any]) -> ToolResult:
         """Dispatch a long-running background agent and return its id immediately.
 
@@ -9471,18 +9487,15 @@ class AgentExecutor:
                     )
                     answer = _child_answer_text(child_result)
                     finalize_stream(stream_id, content=answer)
-                    if getattr(self, "_agent_loop_active", False):
-                        # The parent is still working and writes the reply. This
-                        # report used to go straight to the stage, raw.
-                        self._held_helper_answers = [
-                            *(getattr(self, "_held_helper_answers", None) or []),
-                            {"task": task, "answer": answer},
-                        ]
-                    elif delivery_channel is not None and answer:
-                        try:
-                            await delivery_channel.send(answer)
-                        except Exception as exc:
-                            logger.debug("Background agent channel.send failed: %s", exc)
+                    self._held_helper_answers = [
+                        *(getattr(self, "_held_helper_answers", None) or []),
+                        {"task": task, "answer": answer},
+                    ]
+                    # While the parent runs it writes the reply; reports used to
+                    # go straight to the stage, raw. Once it has ended, the last
+                    # helper to finish delivers one reply for all of them.
+                    if not getattr(self, "_agent_loop_active", False) and len(self._live_helpers) <= 1:
+                        await self._deliver_helper_answers(delivery_channel, user_id)
                     try:
                         dispatch_lifecycle(
                             "SubagentStop",
