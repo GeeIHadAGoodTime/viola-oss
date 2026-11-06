@@ -2812,6 +2812,12 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
             }
           }
           if (!(playerState?.queue?.length > 0)) { setIframePosition(0); }
+          // The embed is keyed on the video, so replaying the same one gets no
+          // new embed: without this, Repeat One stopped at the end of the song.
+          if (!isSpoke && (playerState?.repeat_mode === 'one' || (playerState?.repeat_mode === 'all' && !(playerState?.queue?.length > 0)))) {
+            sendToIframe('seekTo', { seconds: 0 });
+            sendToIframe('play');
+          }
         }
       }
       if (type === 'yt_iframe_error') {

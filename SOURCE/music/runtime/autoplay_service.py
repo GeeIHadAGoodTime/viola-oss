@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from models.player import QueueItem
+from music.player.playback_state import PlaybackPhase
 from music.queue_config import QueueLimits
 
 from .queue_resolver import QueueItemResolver
@@ -30,8 +31,18 @@ class AutoplayService:
         self._failure_ttl = failure_ttl
         self._logger = logger.getChild("autoplay_service")
 
+    def _stopped_by_user(self) -> bool:
+        phase = getattr(getattr(self._player, "_playback_sm", None), "phase", None)
+        return phase == PlaybackPhase.STOPPED and bool(getattr(self._player, "_user_paused", False))
+
     def enqueue(self, query: str, *, metadata: dict[str, Any] | None = None) -> QueueItem | None:
         player = self._player
+        # A radio fetch already in flight must not refill the queue after the
+        # user stopped: the first item became the current track and its embed
+        # started playing by itself a few seconds later.
+        if self._stopped_by_user():
+            self._logger.info("Autoplay: playback was stopped; not queueing %r", (metadata or {}).get("title"))
+            return None
         engine_manager = getattr(player, "_playback_manager", None) or getattr(player, "_engine_manager", None)
         item = self._resolver.resolve(
             query,

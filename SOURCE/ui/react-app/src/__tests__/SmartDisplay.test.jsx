@@ -1571,6 +1571,21 @@ describe('YouTube iframe playback honesty (#2757)', () => {
     expect(youtubeStateMessages().filter((m) => m.payload.state === 'UNSTARTED')).toHaveLength(0);
   });
 
+  it('replays the same video at its end under Repeat One', async () => {
+    await mountWithTrack();
+    playerHarness.state = { ...playerHarness.state, repeat_mode: 'one' };
+    const view = render(<SmartDisplay />);
+    const frame = view.container.querySelector('iframe');
+    const post = vi.spyOn(frame.contentWindow, 'postMessage');
+    act(() => {
+      window.dispatchEvent(iframeMessage('yt_iframe_state', { state: 0, videoId: 'vid-123' }));
+    });
+    const sent = post.mock.calls.map(([message]) => message?.type);
+    expect(sent).toContain('viola_seek');
+    expect(sent).toContain('viola_play');
+    post.mockRestore();
+  });
+
   it('stops reporting a paused position after saying so twice', async () => {
     await mountWithTrack();
     const positions = () => wsHarness.sent.filter((m) => m.action === 'position_update');

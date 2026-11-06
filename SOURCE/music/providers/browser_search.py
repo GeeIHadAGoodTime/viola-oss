@@ -146,6 +146,27 @@ def _renderer_to_entry(renderer: dict[str, Any]) -> dict[str, str] | None:
     }
 
 
+def _lockup_to_entry(lockup: dict[str, Any]) -> dict[str, str] | None:
+    """Convert a lockupViewModel (YouTube's newer playlist row) to our entry shape."""
+    video_id = lockup.get("contentId")
+    if lockup.get("contentType") != "LOCKUP_CONTENT_TYPE_VIDEO":
+        return None
+    if not (isinstance(video_id, str) and _VIDEO_ID_RE.match(video_id)):
+        return None
+    metadata = (lockup.get("metadata") or {}).get("lockupMetadataViewModel") or {}
+    title = (metadata.get("title") or {}).get("content")
+    rows = ((metadata.get("metadata") or {}).get("contentMetadataViewModel") or {}).get("metadataRows") or []
+    parts = (rows[0].get("metadataParts") or []) if rows else []
+    channel = ((parts[0].get("text") or {}).get("content")) if parts else ""
+    return {
+        "video_id": video_id,
+        "title": title if isinstance(title, str) else "",
+        "channel": channel if isinstance(channel, str) else "",
+        "duration_text": "",
+        "thumbnail_url": "",
+    }
+
+
 def _extract_search_results_from_html(html_text: str, limit: int) -> list[dict[str, str]]:
     data = _decode_yt_initial_data(html_text)
     if data is None:
@@ -175,8 +196,12 @@ def _extract_playlist_entries_from_html(html_text: str, limit: int) -> list[dict
 
     results: list[dict[str, str]] = []
     seen: set[str] = set()
-    for renderer in _walk_for_renderer(data, "playlistVideoRenderer", limit * 2):
-        entry = _renderer_to_entry(renderer)
+    # YouTube now serves many playlist pages as lockupViewModel rows. With only
+    # the old renderer every link read as empty, so nothing could be saved.
+    candidates = [_renderer_to_entry(item) for item in _walk_for_renderer(data, "playlistVideoRenderer", limit * 2)]
+    if not candidates:
+        candidates = [_lockup_to_entry(item) for item in _walk_for_renderer(data, "lockupViewModel", limit * 2)]
+    for entry in candidates:
         if entry is None:
             continue
         vid = entry["video_id"]
