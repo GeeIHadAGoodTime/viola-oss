@@ -67,6 +67,7 @@ _SUMMARY_MESSAGE_CHARS = 6_000
 # current run is never crowded out by older tasks.
 _SUMMARY_EARLIER_HISTORY_SHARE = 0.25
 _SUMMARY_MAX_OUTPUT_TOKENS = 3_000
+_SUMMARY_TIMEOUT_S = 60.0
 _NATIVE_COMPACT_BOUNDARY_KEY = "_viola_compact_boundary"
 
 # R2-P0-1: tool-result truncation budgets. Parity target is Claude Code's
@@ -718,6 +719,7 @@ async def _summarise_messages_with_background_model(
         max_output_tokens=_SUMMARY_MAX_OUTPUT_TOKENS,
         user_id=user_id,
         model=BACKGROUND_COMPACTION_MODEL,
+        timeout_s=_SUMMARY_TIMEOUT_S,
     )
 
     body = _format_compact_summary(raw)
