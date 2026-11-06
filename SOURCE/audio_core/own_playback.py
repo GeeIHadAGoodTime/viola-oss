@@ -55,6 +55,8 @@ class OwnPlayback:
         self._write = 0
         self._lock = threading.Lock()
         self._last_audio_at: float | None = None
+        # How far the ring has been written, on the clock (silence included).
+        self._ring_at: float | None = None
         self._text: deque[SpokenText] = deque(maxlen=64)
         # When the current or last utterance began (a pause of UTTERANCE_GAP_S
         # or more starts a new one), for the turn timing log.
@@ -83,13 +85,13 @@ class OwnPlayback:
 
     def _advance_silence_locked(self, now: float) -> None:
         """Write the silence between the last audio and ``now`` so the ring stays on the clock."""
-        last = self._last_audio_at
+        last = self._ring_at
         if last is None:
             return
         gap = now - last
         if gap > _SILENCE_GAP_S:
             self._append_locked(np.zeros(min(self._size, int(gap * self._rate)), dtype=np.float32))
-            self._last_audio_at = now
+            self._ring_at = now
 
     def note_audio(self, samples: np.ndarray, sample_rate: int) -> None:
         """Record PCM that has just gone to the speaker (mono, float [-1, 1] or int16)."""
@@ -117,6 +119,7 @@ class OwnPlayback:
             self._advance_silence_locked(now)
             self._append_locked(floats)
             self._last_audio_at = now
+            self._ring_at = now
             self._tail_waived = False
 
     def note_text(self, text: str) -> None:
@@ -181,6 +184,7 @@ class OwnPlayback:
             self._ring[:] = 0.0
             self._write = 0
             self._last_audio_at = None
+            self._ring_at = None
             self._text.clear()
             self._utterance_started_at = None
             self.last_onset_gap_s = None

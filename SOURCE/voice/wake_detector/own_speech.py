@@ -50,6 +50,9 @@ OWN_WORD_SCORE = 0.7
 # A wake over a reply nobody is waiting on (typed, a reminder) needs this much
 # if only the quick rule confirmed it.
 STRONG_SCORE = 0.95
+# The self-speech flag lasts 2 s past her last word; a record older than that is
+# from some earlier speech.
+RECORD_FRESH_S = 2.5
 # Keeps the scored reference at a level the model handles the same way at any
 # output volume (a quiet-hours reply is otherwise near the silence gate).
 _REFERENCE_RMS = 0.05
@@ -96,7 +99,10 @@ def check_wake_over_speech(score: float, reference_engine: Any) -> OwnSpeechVerd
     started = time.perf_counter()
     try:
         audio = playback.recent_audio(REFERENCE_WINDOW_S)
-        reference = None if audio is None else reference_wake_score(reference_engine, audio)
+        # She is flagged as speaking, so her audio must be here: a silent record
+        # means this speech does not report it, which proves nothing about her voice.
+        unrecorded = audio is None or reference_engine is None or playback.seconds_since_audio() > RECORD_FRESH_S
+        reference = None if unrecorded else reference_wake_score(reference_engine, audio)
     except Exception as exc:  # noqa: BLE001, RUF100 - a failed check must not cut her off
         logger.warning("[WAKE_OVER_SPEECH] reference check failed: %s", exc)
         return OwnSpeechVerdict(False, "reference_check_failed")
