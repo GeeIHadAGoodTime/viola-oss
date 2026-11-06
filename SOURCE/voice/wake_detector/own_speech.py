@@ -55,6 +55,13 @@ OVER_SPEECH_RULE: tuple[int, int, float] = (2, 3, 0.85)
 # Scored audio: the model needs about 1.4 s to warm up, then the 1.6 s left
 # covers the word and the time the detector took to confirm it.
 REFERENCE_WINDOW_S = 3.2
+# In this band the answer is not in yet. Her own word can still be rising (the
+# record ends where the speaker is now: 0.64 on the way to 0.80), and ordinary
+# sentences reach 0.59. A candidate here waits for the detector's next one, at
+# least UNSURE_MIN_WAIT_S later: by then her word has scored in full.
+UNSURE_SCORE = 0.4
+UNSURE_MIN_WAIT_S = 0.25
+UNSURE_MAX_WAIT_S = 1.5
 # A reference score at or above this means she said something wake-like just now.
 # Every time her voice set the detector off (62 min of replies, ones full of
 # "Viola" and "viola" and "violet"), her reference scored 0.80 or more; ordinary
@@ -97,12 +104,14 @@ def reference_wake_score(engine: Any, audio: np.ndarray) -> float:
     return best
 
 
-def judge_wake_over_speech(reference_score: float | None) -> OwnSpeechVerdict:
+def judge_wake_over_speech(reference_score: float | None, *, looked_twice: bool = False) -> OwnSpeechVerdict:
     """Decide one wake candidate heard while she talks (or just stopped)."""
     if reference_score is None:
         return OwnSpeechVerdict(False, "no_record_of_her_audio")
     if reference_score >= OWN_WORD_SCORE:
         return OwnSpeechVerdict(False, "her_own_voice", reference_score)
+    if reference_score >= UNSURE_SCORE and not looked_twice:
+        return OwnSpeechVerdict(False, "look_again", reference_score)
     return OwnSpeechVerdict(True, "not_in_her_speech", reference_score)
 
 
@@ -119,7 +128,16 @@ def check_wake_over_speech(score: float, reference_engine: Any) -> OwnSpeechVerd
     except Exception as exc:  # noqa: BLE001, RUF100 - a failed check must not cut her off
         logger.warning("[WAKE_OVER_SPEECH] reference check failed: %s", exc)
         return OwnSpeechVerdict(False, "reference_check_failed")
-    verdict = judge_wake_over_speech(reference)
+    global _unsure_at
+    now = time.monotonic()
+    waited = None if _unsure_at is None else now - _unsure_at
+    verdict = judge_wake_over_speech(
+        reference, looked_twice=waited is not None and UNSURE_MIN_WAIT_S <= waited <= UNSURE_MAX_WAIT_S
+    )
+    if verdict.reason == "look_again" and (waited is None or waited > UNSURE_MAX_WAIT_S):
+        _unsure_at = now
+    elif verdict.reason != "look_again":
+        _unsure_at = None
     logger.info(
         "[WAKE_OVER_SPEECH] %s score=%.3f %s in %.0f ms",
         "CLEARED" if verdict.cleared else "REFUSED",
@@ -135,6 +153,8 @@ def check_wake_over_speech(score: float, reference_engine: Any) -> OwnSpeechVerd
 # --------------------------------------------------------------------------- #
 
 _lock = threading.Lock()
+# When a candidate first landed in the unsure band (wake loop thread only).
+_unsure_at: float | None = None
 _barge_in_target: Callable[[], None] | None = None
 _speech_stopper: Callable[[], None] | None = None
 _busy_turn = False
