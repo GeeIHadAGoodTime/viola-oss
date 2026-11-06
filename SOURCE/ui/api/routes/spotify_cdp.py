@@ -129,6 +129,18 @@ def _get_browser_auth_snapshot(user_id: str) -> dict[str, Any]:
         }
 
 
+async def _remove_profile(profile_path: Path) -> None:
+    """Delete the playback profile. The browser can hold files for a moment after it exits."""
+    for attempt in range(4):
+        if not profile_path.exists():
+            return
+        if attempt:
+            await asyncio.sleep(0.5)
+        await asyncio.to_thread(shutil.rmtree, profile_path, True)
+    if profile_path.exists():
+        logger.warning("Spotify disconnect: the playback profile could not be fully removed")
+
+
 def _stop_spotify_playback() -> None:
     """Disconnect ends a Spotify song too: a live poller would bring the browser back."""
     try:
@@ -346,8 +358,7 @@ async def disconnect_spotify_cdp(user_id: str = Depends(get_current_user_id)) ->
             await asyncio.to_thread(_forget_browser_auth_sign_in, user_id)
         except Exception:
             logger.exception("Spotify disconnect: in-app browser sign-out failed")
-        if profile_path.exists():
-            await asyncio.to_thread(shutil.rmtree, profile_path, True)
+        await _remove_profile(profile_path)
         return success_response({"message": "Spotify disconnected"})
     except Exception:
         logger.exception("Failed to disconnect Spotify CDP session")

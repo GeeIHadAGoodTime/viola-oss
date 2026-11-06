@@ -2213,7 +2213,10 @@ class SpotifyCDPController:
             return
 
         self._finish_unexpected_reconnect_notice(reconnect_notice, success=True)
-        raise self._signed_out_error(self._login_status_impl())
+        status = self._wait_for_login_verdict()
+        if status.get("logged_in") or status.get("auth_state") in ("loading", "unknown"):
+            return  # a page mid-load is not a signed-out page; the next check decides
+        raise self._signed_out_error(status)
 
     # ------------------------------------------------------------------
     # Login detection
