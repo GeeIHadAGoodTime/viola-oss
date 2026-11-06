@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "738024675a88dfdc5afa07842a1733066e72c882",
-  "sha256": "bc346684cfec596ac65f0d41746bc564698d4e1d4271d84a3742c24438a9467d",
+  "revision": "f9a571bf37a17d28d74b77e21b273c1883b3c37e",
+  "sha256": "81b8e64b8e97c03ed4bc6430ca5878b3bbb686208db5585895fe84c319772580",
   "files": [
     {
       "path": ".env.example",
@@ -540,8 +540,8 @@
     },
     {
       "path": "auth/desktop_session.py",
-      "sha256": "c02e6b9e6986367b9fd577b3531b82022eadce40f4ebaf0e96f206432aea20c5",
-      "bytes": 51072
+      "sha256": "594e4bef00cf44e5aae5ac5fc3e3ca3ede79ad0011c31b34690697751637ea75",
+      "bytes": 60163
     },
     {
       "path": "auth/entitlement_projection.py",
@@ -570,8 +570,8 @@
     },
     {
       "path": "auth/middleware.py",
-      "sha256": "8055efb2777f3e40c3710341bfe948a958c99e839b4f246c9187a861e146e8d2",
-      "bytes": 52729
+      "sha256": "dd477362ce54b2ed9f20f4dba9d4af5dbad632901c006b027fc45b423d5b155b",
+      "bytes": 52445
     },
     {
       "path": "auth/migrations/__init__.py",
@@ -1900,8 +1900,8 @@
     },
     {
       "path": "intent/pipeline_processors.py",
-      "sha256": "32aaffd3182851bbbc44fdf668ea6e14c7c93fb71c9394444827eacdfc437a09",
-      "bytes": 24655
+      "sha256": "8f07e11c3e4a6f62ac404f9fe9ab18c5a5c28faef263270bf3aaf890d7db4b53",
+      "bytes": 26007
     },
     {
       "path": "intent/pipeline_room_tracking.py",
@@ -3960,8 +3960,8 @@
     },
     {
       "path": "services/alarm_ringer.py",
-      "sha256": "e54747f7f337e191fdd8a4aeaf864cbb8e5fb260b95886d0b0db7be333ee8f4b",
-      "bytes": 13846
+      "sha256": "f885a87a69da084829a09c6c802fd30982b67d8bde3bb9718259968f00ff3261",
+      "bytes": 14207
     },
     {
       "path": "services/api_cache.py",
@@ -4349,6 +4349,11 @@
       "bytes": 40365
     },
     {
+      "path": "services/connectivity.py",
+      "sha256": "57c07e86424708b1778db45f115aa6acc802a3235864179e155bde93724f3547",
+      "bytes": 3679
+    },
+    {
       "path": "services/connectors/__init__.py",
       "sha256": "1fafb112e411287cc87ef5bc2f9ad63047b56b33c10f158b8a9270e414d609b5",
       "bytes": 727
@@ -4560,8 +4565,8 @@
     },
     {
       "path": "services/llm/factory.py",
-      "sha256": "831524a43499345a512bb2282e53a6c3ff0a00c926132f02acd8c9297e3a3837",
-      "bytes": 58909
+      "sha256": "4d4345cae38d524bed96513e52839badba493504d86e9e3fadeda3547e397aff",
+      "bytes": 60335
     },
     {
       "path": "services/llm/hook_llm.py",
@@ -4980,8 +4985,8 @@
     },
     {
       "path": "services/notifications/timer_notifier.py",
-      "sha256": "6dec7436fa373acd614fedbd3be854d208006f9c7940961d1b43c78559cae39a",
-      "bytes": 11418
+      "sha256": "f84c9a6e0402aca1725fe64e2c4772c025ae7236051e67f4286c3f2584a72743",
+      "bytes": 11663
     },
     {
       "path": "services/notifications/web_push.py",
@@ -9575,8 +9580,8 @@
     },
     {
       "path": "ui/api/routes/onboarding.py",
-      "sha256": "ace9632268b121e68552633eeed1d6fa53e8c5f0183fddf340d1af8f112180c5",
-      "bytes": 21937
+      "sha256": "699b174a3d9ceddf229fdb12517166be460a55a8313d70f3623445a7fd852495",
+      "bytes": 23615
     },
     {
       "path": "ui/api/routes/playlists.py",
@@ -9904,6 +9909,11 @@
       "bytes": 11824
     },
     {
+      "path": "ui/qt_native/surface_watchdog.py",
+      "sha256": "264fead277bc7f64b1eddb8b8b2fd575d38235b8d3f7c4f7f9c90e1c116b1364",
+      "bytes": 11961
+    },
+    {
       "path": "ui/qt_native/touch_input.py",
       "sha256": "077512db9e363f0bc48de7e1a39bb2e6493f98a2b76bf82aa20660360f445d4e",
       "bytes": 10493
@@ -9925,8 +9935,8 @@
     },
     {
       "path": "ui/qt_native/webview_window.py",
-      "sha256": "60952a08569f0315035e9cb417fb5649fd1d5fff58e63d895b89608584eaeb93",
-      "bytes": 251782
+      "sha256": "c3eac91eafe4b6151e76fe37a3eb448545c79007807867258a5d8c5e21f23b56",
+      "bytes": 257012
     },
     {
       "path": "ui/qt_native/widgets/connectivity_status.py",
@@ -9955,8 +9965,8 @@
     },
     {
       "path": "ui/react-app/index.html",
-      "sha256": "1a40230ebcf869e46d9cdee06a73e637778ac9dbcdec655aaa95fa36cc12e2a5",
-      "bytes": 1470
+      "sha256": "9746d9133ac4a817aa84b7f7708ec991809fbf0d66d25b0308559103004b2c0b",
+      "bytes": 1505
     },
     {
       "path": "ui/react-app/onboarding-guest-harness.html",
@@ -10085,8 +10095,8 @@
     },
     {
       "path": "ui/react-app/src/SmartDisplay.jsx",
-      "sha256": "4e24a97267f758c40cc5b47b4aab80793d9b5455a3ab2cde0cc88113ec8b0b13",
-      "bytes": 194662
+      "sha256": "f4706bbedc32c46db0bea28aedb7672eada062d6a85225386c5beda3e26cc637",
+      "bytes": 195819
     },
     {
       "path": "ui/react-app/src/SmartDisplay.overlayLifecycle.test.jsx",
@@ -10370,8 +10380,8 @@
     },
     {
       "path": "ui/react-app/src/auth/authClient.js",
-      "sha256": "6c474157ad2291039d57fd2aedaaf441bec934b94618c9fe472478cfd5c4057f",
-      "bytes": 30058
+      "sha256": "7b5ed4e633412c051e31c6aecf7f86a442fc7e7705465cf73829723651f8c838",
+      "bytes": 30962
     },
     {
       "path": "ui/react-app/src/auth/authClient.test.js",
@@ -10440,8 +10450,8 @@
     },
     {
       "path": "ui/react-app/src/components/AccountTab.jsx",
-      "sha256": "742f7b59f0280f5d94f894a6d39ef3b39ea40e5c0e3fef215aba0a82fd5bb54c",
-      "bytes": 90144
+      "sha256": "7a14e3e52119bdb16078a4acebe554f39a9bd232f80dbf8d8e55ee49c31be46f",
+      "bytes": 92203
     },
     {
       "path": "ui/react-app/src/components/AccountTab.legacy.jsx",
@@ -10470,8 +10480,8 @@
     },
     {
       "path": "ui/react-app/src/components/AccountTab.signInLayout.test.jsx",
-      "sha256": "3549566610dd6e2540821a0ce00cd22acd79d19f51e3deeaa6fb83c9b739af76",
-      "bytes": 6457
+      "sha256": "017a6a7ff1edd886013f4d3016717e99038f2eebfcc264c2f0ee63a902019094",
+      "bytes": 7283
     },
     {
       "path": "ui/react-app/src/components/AccountTab.test.jsx",
@@ -10505,8 +10515,8 @@
     },
     {
       "path": "ui/react-app/src/components/BillingCapacityPanel.jsx",
-      "sha256": "85d3ad1ab0b5b6690cae4be7e34b75fd353be450c8327411f05f970710a07d37",
-      "bytes": 19458
+      "sha256": "ea5139d99adf605c4144acd54d4103283d5fbc461f8adc057aaff82bba4c543e",
+      "bytes": 19704
     },
     {
       "path": "ui/react-app/src/components/BillingCapacityPanel.test.jsx",
@@ -10620,8 +10630,8 @@
     },
     {
       "path": "ui/react-app/src/components/ContentCard.jsx",
-      "sha256": "485a66ce5c2aae984bc802f6eada189e7454caa17108db7a9d4d4b33445daba2",
-      "bytes": 28082
+      "sha256": "2357ba48c28eff8d00b6555ed2ea27dffec78c61b0cf43b43ebd97c12ced6fdf",
+      "bytes": 28357
     },
     {
       "path": "ui/react-app/src/components/ContentCard.test.jsx",
@@ -10870,8 +10880,8 @@
     },
     {
       "path": "ui/react-app/src/components/RoomGroupsModal.jsx",
-      "sha256": "6520d146135b5e2d9cc55f5baab62dbc07b441b31d5bf2a91ebfdcde399ab2ef",
-      "bytes": 26974
+      "sha256": "a7eed2b8cec90f1783eef9bc4cdbd37c2e23a6e9b4f4e2cbf516e56b99de7853",
+      "bytes": 27081
     },
     {
       "path": "ui/react-app/src/components/RoomGroupsModal.test.jsx",
@@ -10920,8 +10930,8 @@
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.jsx",
-      "sha256": "1685b01d6ce92e3452aa2197fdb1bbd8c9fe90334a9b9743ed5c7d1c99bd72e1",
-      "bytes": 218121
+      "sha256": "2d9efbac44b4e359b7f69e3d12c70ea482758cacd1ba56ac9ce2d9582e58e99e",
+      "bytes": 218513
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.localDiscovery.test.jsx",
@@ -11004,6 +11014,16 @@
       "bytes": 3635
     },
     {
+      "path": "ui/react-app/src/components/ViolaDialog.jsx",
+      "sha256": "137313e367c71b61d7942a26d5197fa6f44e539c25dd496121bc15597b12251c",
+      "bytes": 8301
+    },
+    {
+      "path": "ui/react-app/src/components/ViolaDialog.test.jsx",
+      "sha256": "bdb3f8bd67788f7f20fa6bd4087aab6e5c101a0a447802f016b5c41604126f8c",
+      "bytes": 3552
+    },
+    {
       "path": "ui/react-app/src/components/WakeWordSection.jsx",
       "sha256": "5da128d197523d0d575e7114e4cea1071f300d5d1806e90a088706bab5332c8a",
       "bytes": 27800
@@ -11055,8 +11075,8 @@
     },
     {
       "path": "ui/react-app/src/components/advanced/AdvancedSettingsWindow.jsx",
-      "sha256": "76a54bbff8db2e2ecfa876c07abbafd65d3aa755ecba9957d53d618b86ee6862",
-      "bytes": 17991
+      "sha256": "6f1efd0e39579e7bb45593f9eeca4338888faf1a2a7c924ee28596b096d6472c",
+      "bytes": 18061
     },
     {
       "path": "ui/react-app/src/components/advanced/AdvancedSettingsWindow.test.jsx",
@@ -11230,13 +11250,13 @@
     },
     {
       "path": "ui/react-app/src/components/messaging/QRPairCard.jsx",
-      "sha256": "5cd3bf1020a71b4c346fb58ab1bd68eef4a2fd8f2a2d4b7c1478e00e0ff23df0",
-      "bytes": 10206
+      "sha256": "323e8a6e728a915b639eea4b27fcc9a41aa2b0d374ff06f4e37cd431c647e836",
+      "bytes": 10375
     },
     {
       "path": "ui/react-app/src/components/messaging/QRPairCard.test.jsx",
-      "sha256": "d8e03265bbdbd64a6b1ce8fb49c300ee39c95b94fec05da0e5c8dcb91bc73e49",
-      "bytes": 6857
+      "sha256": "98c3fe8f50cdfb844dd54cdae162d28e339c1d29502844f232fbd76c0242fabd",
+      "bytes": 7055
     },
     {
       "path": "ui/react-app/src/components/messaging/index.js",
@@ -11645,13 +11665,13 @@
     },
     {
       "path": "ui/react-app/src/components/stage/modes/chat/ChatMessage.clipboard.test.jsx",
-      "sha256": "b9554221a21f191e050274a3ef6b98c943dc893b89f81b7188260aa69749421f",
-      "bytes": 8567
+      "sha256": "c2aa5cc0cc9d6c0f04bef5fbfd432df1ca2a874e44ba95844c5d203bac6ee392",
+      "bytes": 8590
     },
     {
       "path": "ui/react-app/src/components/stage/modes/chat/ChatMessage.jsx",
-      "sha256": "a3d3494b7eeef69f871f99cd13451e59e38bc6fb5dd2cdb72d8299d5c0594a43",
-      "bytes": 3817
+      "sha256": "7672c3d8bc346803951ddf47713ea1a73f8e8035f1699a3d26b03b49aad0378e",
+      "bytes": 4014
     },
     {
       "path": "ui/react-app/src/components/stage/modes/chat/ChatMode.consentGate.test.jsx",
@@ -11660,13 +11680,13 @@
     },
     {
       "path": "ui/react-app/src/components/stage/modes/chat/ChatMode.css",
-      "sha256": "58aefbcfd92eb47863cbac78df78df0fd27504109b9ffbc4deb979f3485f838e",
-      "bytes": 19159
+      "sha256": "cddd0551b591fbbe5eea94f7e910e885197f187837ac2be0715b19704e4ac1c8",
+      "bytes": 19397
     },
     {
       "path": "ui/react-app/src/components/stage/modes/chat/ChatMode.jsx",
-      "sha256": "943e4645dc38745d8031db89773404b810fdc165f840fe90bd4fefd5a232afcf",
-      "bytes": 65188
+      "sha256": "781e5a062defef91542c939f68c740ec20b46eb7f2782424b6b70fd397594ed0",
+      "bytes": 66706
     },
     {
       "path": "ui/react-app/src/components/stage/modes/chat/ChatMode.modelRecovery.test.jsx",
@@ -11685,13 +11705,13 @@
     },
     {
       "path": "ui/react-app/src/components/stage/modes/chat/ChatMode.test.jsx",
-      "sha256": "033335acc8d7dbb26a84d59e9358b0c2d40e0c34049252add88daef97c80f56a",
-      "bytes": 64774
+      "sha256": "590fbcc31aa16d6f79798e0647cdcf11f363fff44fa6c84d73792f37e8729b20",
+      "bytes": 67142
     },
     {
       "path": "ui/react-app/src/components/stage/modes/chat/ChatSidebar.jsx",
-      "sha256": "2db5b0a2ea7fd6cbf9b09a8fe913033101f0d4737113e49f30d18a42eb5baee0",
-      "bytes": 5844
+      "sha256": "a2a103ffb9555137b8056ee3e25103e4a8d9fa081b5cfe941134cc63bd541c47",
+      "bytes": 6090
     },
     {
       "path": "ui/react-app/src/components/stage/modes/chat/ChatThread.jsx",
@@ -11785,8 +11805,8 @@
     },
     {
       "path": "ui/react-app/src/components/voice/BottomRow.jsx",
-      "sha256": "7a58bb61e92a6d636711266f91cbe7c8c4e6ad3dececa277aeed42b673dbd55e",
-      "bytes": 9002
+      "sha256": "58c05af59e2a5ec8ac07509a209230b0b81a42ef158a43df41eebd55a018bb3d",
+      "bytes": 9199
     },
     {
       "path": "ui/react-app/src/components/voice/BottomRow.module.css",
@@ -12134,6 +12154,16 @@
       "bytes": 19024
     },
     {
+      "path": "ui/react-app/src/hooks/useVoiceNotice.js",
+      "sha256": "2c47a235215d5dd4a0aed3a951d764d041ca5e14e51d47016fb3b09420661ba6",
+      "bytes": 1720
+    },
+    {
+      "path": "ui/react-app/src/hooks/useVoiceNotice.test.jsx",
+      "sha256": "b423a1a2b3047fc4776422c58385043edb00a8e1643cf58c9cac8dda3a303d54",
+      "bytes": 2890
+    },
+    {
       "path": "ui/react-app/src/hooks/useVoiceOnboarding.js",
       "sha256": "bfb4dcbfead26c8d33b1778e892603fc3b8e7da04f251e24b7bbe45df7d3a625",
       "bytes": 39515
@@ -12215,8 +12245,8 @@
     },
     {
       "path": "ui/react-app/src/lib/auth_context.desktopRestore.test.jsx",
-      "sha256": "65db4e1966e98b3961df714335c4ff1c158a8592b80292f0abc100761891f5cd",
-      "bytes": 4781
+      "sha256": "7d6e71b2f274028fd773c06a9a924a2f1f7f8ece39a0ca9c73875319ebfdf415",
+      "bytes": 5917
     },
     {
       "path": "ui/react-app/src/lib/auth_context.monthGift.test.jsx",
@@ -12230,8 +12260,8 @@
     },
     {
       "path": "ui/react-app/src/lib/auth_context.tsx",
-      "sha256": "9609923987ed8a2b19d36b8732d2b5a8ea98b3648fa5e51ea3c9e8d77a4c060a",
-      "bytes": 39814
+      "sha256": "77e9b05934229c93c23c39c199c320dbfa20be9f9c50f41f9938675dbde7900d",
+      "bytes": 40721
     },
     {
       "path": "ui/react-app/src/lib/billingEntitlement.mountedRoute.test.ts",
@@ -12380,8 +12410,8 @@
     },
     {
       "path": "ui/react-app/src/styles/touch-hardening.css",
-      "sha256": "ffb04e43d8e6bcfcb46405ca6f317b0de9839dd782a35abc244f738811e5eb58",
-      "bytes": 6121
+      "sha256": "16cef9c2436bf36805480a6cff993841de62c4b65e12a2044c2d43da999cebbd",
+      "bytes": 6324
     },
     {
       "path": "ui/react-app/src/styles/variables.css",
@@ -12725,8 +12755,8 @@
     },
     {
       "path": "ui/security/auth.py",
-      "sha256": "1ed792822a2116fb58ce9a12db35530b39ee2474ee76131b9ca8fe7a5cb7d8fc",
-      "bytes": 47954
+      "sha256": "0ecd55b48893b134bd602f0c6bf4d2b654757c632470f08f66b4a47848767cd9",
+      "bytes": 48558
     },
     {
       "path": "ui/security/auth_failure_store.py",
@@ -13060,8 +13090,8 @@
     },
     {
       "path": "utils/enhancements/secrets.py",
-      "sha256": "9377ce59d5f817d9d1b4fbd9e532455723ff7155874cd498f6797f4effc56c12",
-      "bytes": 24656
+      "sha256": "6478ae068a9ea3c8c88ff26a63948475491f741b41de60a77fcfd960252a3cfb",
+      "bytes": 25370
     },
     {
       "path": "utils/failfast.py",
@@ -13260,8 +13290,8 @@
     },
     {
       "path": "viola_qt.py",
-      "sha256": "5497e3c3e28edb40850b6020d5a04350801be354752cb104077e5498963b7c07",
-      "bytes": 89517
+      "sha256": "8a5eba4050670eb22d7140b031c76fba44b0496ec671858f75a44f7d97e626cf",
+      "bytes": 90272
     },
     {
       "path": "viola_spoke.py",
