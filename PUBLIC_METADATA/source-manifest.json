@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "20a9a8384134dd4f786721cee06f2f682d0bb944",
-  "sha256": "57349fbd353c454ead5679668365a3320982d73fe23ad9fe33559e8e6f9d43b3",
+  "revision": "8bb7a2acc79fb35b71958cd299b202d4af42fc80",
+  "sha256": "262f72a08e51df1187eeb00c8f7e96df9fcb71f74f836607c62b42973e486e51",
   "files": [
     {
       "path": ".env.example",
@@ -3185,8 +3185,8 @@
     },
     {
       "path": "music/runtime/autoplay_service.py",
-      "sha256": "d8d948da3e859f2855ef52ac854993b914bee5365118b48ce769e7a9b9dd45b1",
-      "bytes": 3906
+      "sha256": "05d54ba6cbc9ac3daa19abe8e5e7852608c0dc10754d7c07edb417ac84ed886e",
+      "bytes": 3861
     },
     {
       "path": "music/runtime/backend_manager.py",

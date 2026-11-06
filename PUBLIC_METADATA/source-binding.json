@@ -30,10 +30,10 @@
   },
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "ac82f9a490cfb2a9bf021ccd590fcf6ffea524ac5cfede9b6a4a9bb17f6ae632",
-  "source_tree_sha256": "57349fbd353c454ead5679668365a3320982d73fe23ad9fe33559e8e6f9d43b3",
+  "source_manifest_sha256": "757602740d89ea022c1227b86ee06d4dd4fa06bb92bf3a8bfed639154413423d",
+  "source_tree_sha256": "262f72a08e51df1187eeb00c8f7e96df9fcb71f74f836607c62b42973e486e51",
   "source_file_count": 2778,
-  "source_revision": "20a9a8384134dd4f786721cee06f2f682d0bb944",
+  "source_revision": "8bb7a2acc79fb35b71958cd299b202d4af42fc80",
   "comparison_public_revision": "ecab2772465fcc89ae6645b028af1c2273b9199f",
   "changed_source_paths": [
     "START_WEB_INTERFACE.py",
@@ -516,7 +516,7 @@
     "historical_inventory_limits": "This renderer correction changes no dependency or workflow inputs. All six retained SBOMs and their complete status objects stay historical and unchanged; no current installed inventory qualification is claimed."
   },
   "qualification": {
-    "source_commit": "20a9a8384134dd4f786721cee06f2f682d0bb944",
+    "source_commit": "8bb7a2acc79fb35b71958cd299b202d4af42fc80",
     "kind": "music"
   },
   "historical_bindings": [
