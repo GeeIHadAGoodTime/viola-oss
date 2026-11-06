@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "115cdbf23b43c47daed3a076891f7382a99751de",
-  "sha256": "1a4771125736a86abbe7bbaf39842e7006fb753a0663e683accde2ad78a48814",
+  "revision": "4fd93649b046af2f3c703786d330605c54c56d9e",
+  "sha256": "f4c3a212c5d8ee32ec72a38781f18e66e9b47d0f3beab701c35c784647e2dbd4",
   "files": [
     {
       "path": ".env.example",
@@ -9910,8 +9910,8 @@
     },
     {
       "path": "ui/qt_native/surface_watchdog.py",
-      "sha256": "264fead277bc7f64b1eddb8b8b2fd575d38235b8d3f7c4f7f9c90e1c116b1364",
-      "bytes": 11961
+      "sha256": "c3a61257483b265e9af0fceae163da64180a58ac99933e90f04ff2a743830ca2",
+      "bytes": 12238
     },
     {
       "path": "ui/qt_native/touch_input.py",
@@ -9935,8 +9935,8 @@
     },
     {
       "path": "ui/qt_native/webview_window.py",
-      "sha256": "c3eac91eafe4b6151e76fe37a3eb448545c79007807867258a5d8c5e21f23b56",
-      "bytes": 257012
+      "sha256": "7ac54f08750bfb583e194cd2285643615917500c6e3029cef8af992c3ac693fc",
+      "bytes": 257784
     },
     {
       "path": "ui/qt_native/widgets/connectivity_status.py",
