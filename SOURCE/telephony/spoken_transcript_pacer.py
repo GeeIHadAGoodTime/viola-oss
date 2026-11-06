@@ -16,6 +16,7 @@ about one. An interruption trims that entry to what had been spoken.
 from __future__ import annotations
 
 import asyncio
+import time
 from collections.abc import Callable
 from typing import Any
 
@@ -136,9 +137,12 @@ class SpokenTranscriptPacer(FrameProcessor if PIPECAT_AVAILABLE else object):  #
         self._reset()
 
     async def _reveal_while_speaking(self) -> None:
+        last_tick = time.monotonic()
         while self._speaking:
             await asyncio.sleep(self._tick_secs)
-            self._spoken_secs += self._tick_secs
+            now = time.monotonic()
+            self._spoken_secs += now - last_tick
+            last_tick = now
             limit = int(self._spoken_secs * self._chars_per_second)
             revealed = _word_boundary(self._target, limit)
             if revealed > self._revealed:
