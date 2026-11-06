@@ -115,11 +115,14 @@ def register_rating_routes(context: ApiContext, toolbox: RouteToolbox) -> None:
                 if not music:
                     return error_response("Music backend not available", status_code=400)
 
-                # Get current track
+                # Get current track. The live adapter exposes it only through
+                # state(); without this every rating of the playing track,
+                # including the Dislike button and rate_track, ended here with
+                # "No track currently playing" while music played.
                 current_track = getattr(music, "current_track", None)
                 if not current_track:
-                    # Try alternative methods
-                    state = getattr(music, "get_state", lambda: None)()
+                    state_reader = getattr(music, "get_state", None) or getattr(music, "state", None)
+                    state = state_reader() if callable(state_reader) else None
                     if state:
                         current_track = (
                             state.get("now_playing")

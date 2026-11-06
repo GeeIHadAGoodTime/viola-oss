@@ -5153,13 +5153,14 @@ async def pair_speaker_setup(
 @server.tool(
     description=(
         "Control current music playback, music player volume, and queue state. Actions: stop, pause, resume, skip, next, previous, seek_to "
-        "(absolute seconds), seek_relative (delta seconds; negative rewinds), "
+        "(absolute seconds), seek_relative (delta seconds; negative rewinds), seek_from_end (seconds before the end of the track, "
+        "for 'skip to 10 seconds before the end'; the tool reads the track length itself), "
         "restart, clear_queue, volume_set, volume_up, volume_down, mute, and unmute. Useful for operations on whatever is already playing. "
         "For requests like 'skip', 'next song', 'skip this song', or 'advance to the next track', "
         "call playback directly; do not call view_queue first to decide whether transport control is allowed. "
-        "When CURRENT SYSTEM STATE shows music is playing, bare contextual volume requests such as turn it down, "
-        "louder, quieter, or volume up/down should use playback's music player volume actions. "
-        "Machine-wide OS/system output volume belongs to desktop_volume only when the user explicitly asks for system, OS, desktop, speaker, computer, or master output volume. "
+        "Every plain volume request (set the volume to 30, volume 50, turn it down, louder, quieter, volume up/down) "
+        "is this tool's music player volume, whether music is playing, paused or stopped. "
+        "Machine-wide OS/system output volume belongs to desktop_volume only when the user's own words say system, OS, desktop, speaker, computer, or master volume. "
         "Does not start new music, choose tracks, add rooms, or pair speakers; media and "
         "playlist cover starting playback, and pair_speaker_setup covers Add Room setup. "
         "Set completes_request=true only when this one call is the user's whole request; Viola then answers "
@@ -5174,7 +5175,7 @@ async def playback(
         Field(
             description=(
                 "Playback action. Use one of: 'stop', 'pause', 'resume', 'skip', 'next', 'previous', "
-                "'seek_to', 'seek_relative', 'restart', 'clear_queue', 'volume_set', 'volume_up', "
+                "'seek_to', 'seek_relative', 'seek_from_end', 'restart', 'clear_queue', 'volume_set', 'volume_up', "
                 "'volume_down', 'mute', or 'unmute'. "
                 "Use 'skip' or 'next' for next-song requests. The alias 'seek' is accepted as 'seek_to'."
             )
@@ -5192,6 +5193,10 @@ async def playback(
             )
         ),
     ] = None,
+    seek_from_end_seconds: Annotated[
+        float | None,
+        Field(description="Seconds before the end of the track for action='seek_from_end'."),
+    ] = None,
     seconds: Annotated[
         float | None,
         Field(description=("Compatibility alias for seek_to_seconds when action='seek' or action='seek_to'.")),
@@ -5202,7 +5207,12 @@ async def playback(
     ] = None,
     volume_step: Annotated[
         int | None,
-        Field(description="Music player volume step percent for action='volume_up' or action='volume_down'."),
+        Field(
+            description=(
+                "Small relative step in percent for action='volume_up' or action='volume_down' (default 10, at most 30). "
+                "Leave it empty unless the user named a step; an exact level uses action='volume_set'."
+            )
+        ),
     ] = None,
     completes_request: Annotated[
         bool,
@@ -5232,6 +5242,7 @@ async def playback(
                 action,
                 seek_to_seconds=effective_seek_to,
                 seek_delta_seconds=seek_delta_seconds,
+                seek_from_end_seconds=seek_from_end_seconds,
                 volume_level=volume_level,
                 volume_step=volume_step,
                 user_id=required_user_id,
@@ -5269,7 +5280,12 @@ async def view_queue() -> str:
     description=(
         "Rate a music track with thumbs up or thumbs down. Without track_id, "
         "rates the currently playing track. With track_id, rates that explicit "
-        "track through Viola's rating system."
+        "track through Viola's rating system. "
+        "When music is playing, a remark about the song such as 'I don't like this', 'I hate this song', "
+        "'not this one' or 'thumbs down' IS the request: call this at once with value='thumbs_down' and do not "
+        "ask what they mean. It records the dislike and skips to the next track in one step, so do not also call "
+        "playback. Set completes_request=true only when this one call is the user's whole request; Viola then "
+        "answers from the confirmed result without another turn."
     ),
     annotations=_CONFIRM,
     meta={"risk": "confirm"},
@@ -5281,7 +5297,7 @@ async def rate_track(
             description=(
                 "Rating value. Use 'thumbs_up' to like the track (on Spotify: save it to the user's "
                 "Spotify Liked Songs), 'remove' to unlike it (remove from liked songs, keep playing), or "
-                "'thumbs_down' to dislike it. The aliases 'up', 'down' and 'unlike' are accepted."
+                "'thumbs_down' to dislike it and skip it. The aliases 'up', 'down' and 'unlike' are accepted."
             )
         ),
     ] = "",
@@ -5301,8 +5317,19 @@ async def rate_track(
         str,
         Field(description="Compatibility alias for value, accepting 'up' or 'down'."),
     ] = "",
+    completes_request: Annotated[
+        bool,
+        Field(
+            description=(
+                "true only if this call by itself fully answers everything the user asked in this turn; "
+                "false if the user asked for anything else too. Default false."
+            )
+        ),
+    ] = False,
 ) -> str:
     """Rate the current or explicit track through Viola's canonical rating APIs."""
+    # Read by the agent loop from the call arguments; the handler ignores it.
+    del completes_request
     try:
         effective_value = value or rating
         result = await _rate_track_handler(

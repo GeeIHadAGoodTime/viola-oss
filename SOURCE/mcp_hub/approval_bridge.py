@@ -60,7 +60,10 @@ _PATH_LIKE_ARG_NAMES: frozenset[str] = frozenset(
 )
 
 _PLAYLIST_SAFE_ACTIONS: frozenset[str] = frozenset({"list"})
-_PLAYLIST_CONFIRM_ACTIONS: frozenset[str] = frozenset({"play", "play_favorites"})
+# Only delete takes a playlist away. Building one (create, then add_track once
+# per song) is the user's own request and is undone by deleting it, so asking
+# for each step meant three confirmations for one "make me a playlist".
+_PLAYLIST_CONFIRM_ACTIONS: frozenset[str] = frozenset({"create", "add_track", "play", "play_favorites"})
 _GMAIL_SAFE_ACTIONS: frozenset[str] = frozenset(
     {"inbox", "read", "search", "thread", "daily_summary", "labels", "list_labels", "allow_access"}
 )
