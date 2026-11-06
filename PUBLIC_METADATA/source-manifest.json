@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "5368179c3459538cc8d257eb09259b4d184c9f41",
-  "sha256": "c6fa7f03f5c14b1cca889dd7f0005b1101fc925238664b4a129ca9a09c120915",
+  "revision": "fb3eb5c02c21dc1ed65e95157ddad5b8230b416c",
+  "sha256": "ebc48d685dfda5c465b96e53656c64e4c6c4110f206b593978f20e0e3fe79721",
   "files": [
     {
       "path": ".env.example",
@@ -13845,8 +13845,8 @@
     },
     {
       "path": "voice/wake_detector/own_speech.py",
-      "sha256": "4caf782ebe36a646948aa46880f27264f34b0e98cf22b37a39c72032e2fcb600",
-      "bytes": 8339
+      "sha256": "63bd45049823e40acd3f9cf4412b408ff8a8a06e588f53f63511ebae95ef93a5",
+      "bytes": 9377
     },
     {
       "path": "voice/wake_detector/resampler.py",
