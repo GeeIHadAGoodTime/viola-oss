@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "d26a58d6be2fb4c558f4ad329b9ea394000a2f76",
-  "sha256": "ce5f220b3f3a6c6088978d0364599e04a4d56540d685dfd0e7479b8c10af33f6",
+  "revision": "344be92e06e93cd50999b8f7ce85ef8b199b83da",
+  "sha256": "474fa99ea048e23b53de710a0a3190230bff8c4f4fb6ee186b196606f81bf629",
   "files": [
     {
       "path": ".env.example",
@@ -10130,8 +10130,8 @@
     },
     {
       "path": "ui/react-app/src/__tests__/SmartDisplay.test.jsx",
-      "sha256": "cc7f429c3eecee471478e3866f1be9008b0d5995e1ac9613411fb3b37aac2784",
-      "bytes": 146791
+      "sha256": "6ae5f9757f9744cb3a688ae13d949d64c17ba105925a6e6201fefb2563928785",
+      "bytes": 146685
     },
     {
       "path": "ui/react-app/src/__tests__/hooks/useEventBus.test.jsx",
