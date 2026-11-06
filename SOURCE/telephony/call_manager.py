@@ -1972,6 +1972,35 @@ def _is_cloud_llm_consented() -> bool:
     return is_cloud_llm_consented()
 
 
+def _transcript_only_summary(transcript_text: str) -> str:
+    """What the card says when no model may read the call."""
+    lines = [line for line in transcript_text.strip().split("\n") if line.strip()]
+    return "No summary for this call. The transcript has %d line%s." % (len(lines), "" if len(lines) == 1 else "s")
+
+
+async def _post_call_llm_consented(user_id: str | None, *, cloud_mode: bool) -> bool:
+    """Whether the call's OWNER allows the post-call LLM work.
+
+    The call's cloud teardown runs on the serving loop, where the sync consent
+    gate cannot bridge to the async consent service and fails closed. That logged
+    "cloud LLM consent not given" for a user who had granted it minutes earlier,
+    and left the card with its first and last lines instead of a summary.
+    """
+    if cloud_mode and user_id:
+        try:
+            from services.cloud_consent import get_cloud_consent_service
+
+            service = get_cloud_consent_service()
+            return bool(await service.has_consent(user_id, service.CLOUD_LLM))
+        except ImportError:
+            pass
+        # Consent must fail closed; a lookup failure only costs the summary.
+        except Exception as exc:  # noqa: BLE001, RUF100
+            logger.warning("Post-call consent lookup failed: %s", type(exc).__name__)
+            return False
+    return _is_cloud_llm_consented()
+
+
 def _ensure_cloud_llm_consent_for_phone_call() -> None:
     if _is_cloud_llm_consented():
         return
@@ -7309,10 +7338,14 @@ class CallManager:
             # Estimate cost
             self._estimate_cost(record)
 
+            post_call_llm_allowed = await _post_call_llm_consented(record.user_id, cloud_mode=self.config.mode == "cloud")
+
             # Generate post-call summary
             record.summary = await self._generate_summary(
                 transcript_collector.to_text(),
                 user_id=record.user_id,
+                task=record.task,
+                llm_allowed=post_call_llm_allowed,
             )
 
             # Post-call extraction and automation
@@ -7322,7 +7355,7 @@ class CallManager:
                     extract_call_data,
                 )
 
-                if _is_cloud_llm_consented():
+                if post_call_llm_allowed:
                     extraction = await extract_call_data(
                         transcript_collector.to_text(),
                         record.task,
@@ -7715,6 +7748,14 @@ class CallManager:
                             record.call_id,
                             exc_info=True,
                         )
+                # With the media gone no frames flow, so the pipeline would idle
+                # out 150 s later and the call would read as live until then
+                # (2m45s call, "live" for 5m). An EndFrame finishes it now through
+                # the same completion path, which still owns the terminal status.
+                if record._pipeline_task is not None:
+                    from pipecat.frames.frames import EndFrame
+
+                    await record._pipeline_task.queue_frame(EndFrame(reason="Telnyx media stream ended"))
                 return
 
             record.status = CallStatus.FAILED
@@ -8319,30 +8360,35 @@ class CallManager:
             tts_cost,
         )
 
-    async def _generate_summary(self, transcript_text: str, *, user_id: str = "") -> str:
+    async def _generate_summary(
+        self,
+        transcript_text: str,
+        *,
+        user_id: str = "",
+        task: str = "",
+        llm_allowed: bool | None = None,
+    ) -> str:
         """Generate a concise post-call summary using the LLM.
 
-        Falls back to a basic summary if the LLM call fails.
+        Falls back to a plain line count if the LLM cannot be used. It never
+        stitches the first and last lines together: that read like a summary and
+        said nothing about the call.
         """
         if not transcript_text.strip():
             return "No conversation recorded."
 
-        if not _is_cloud_llm_consented():
+        fallback = _transcript_only_summary(transcript_text)
+        if not (_is_cloud_llm_consented() if llm_allowed is None else llm_allowed):
             logger.warning("Skipping post-call summary: cloud LLM consent not given")
-            lines = transcript_text.strip().split("\n")
-            if len(lines) <= 3:
-                return "Call transcript: " + _log_text_preview(transcript_text.strip())
-            return "Call started with: %s\n...\nCall ended with: %s" % (
-                _log_text_preview(lines[0]),
-                _log_text_preview(lines[-1]),
-            )
+            return fallback
 
         try:
+            request = "\nWHAT THE USER ASKED FOR:\n%s\n" % task if task.strip() else ""
             prompt = (
                 "Summarize this phone call in 2-3 sentences for the person who requested it.\n"
-                "Include what was accomplished or not, key details such as times, prices, "
-                "confirmation numbers, and any follow-up needed. Be factual. No preamble.\n\n"
-                "CALL TRANSCRIPT:\n%s" % transcript_text
+                "Say whether what they asked for got done, and if it did not, what happened instead. "
+                "Include key details such as times, prices, confirmation numbers, and any follow-up needed. "
+                "Be factual. No preamble.\n%s\nCALL TRANSCRIPT:\n%s" % (request, transcript_text)
             )
 
             data = await create_accounted_openai_chat_completion(
@@ -8363,13 +8409,7 @@ class CallManager:
 
         except Exception as exc:
             logger.warning("Summary generation failed: %s", exc)
-            lines = transcript_text.strip().split("\n")
-            if len(lines) <= 3:
-                return "Call transcript: " + transcript_text.strip()
-            return "Call started with: %s\n...\nCall ended with: %s" % (
-                lines[0],
-                lines[-1],
-            )
+            return fallback
 
     def cleanup_completed(self, max_age_seconds: float = 3600) -> int:
         """Remove completed call records older than max_age.
