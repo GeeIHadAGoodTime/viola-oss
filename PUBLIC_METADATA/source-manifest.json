@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "2cb7f36d7c29d75f70d03e079cd185c4784cdedc",
-  "sha256": "da7881326e11523d2e15231a66addeaeafc30785725f903063f397fad02aacec",
+  "revision": "5368179c3459538cc8d257eb09259b4d184c9f41",
+  "sha256": "c6fa7f03f5c14b1cca889dd7f0005b1101fc925238664b4a129ca9a09c120915",
   "files": [
     {
       "path": ".env.example",
@@ -340,8 +340,8 @@
     },
     {
       "path": "audio_core/own_playback.py",
-      "sha256": "8ff7272cfea38e71fc225683d3b232d568c4768594e79ef31b1505a99b64a2ac",
-      "bytes": 7834
+      "sha256": "5114de409fbe9de90938728ada24f3dd0ec39c64e77dc30abe33370ba8787441",
+      "bytes": 8008
     },
     {
       "path": "audio_core/portaudio_guard.py",
@@ -13295,8 +13295,8 @@
     },
     {
       "path": "violawake/config.py",
-      "sha256": "bfb9a15e4658516993fc1c15d26e0b2f709236fd9252549c734d934854080a6d",
-      "bytes": 14850
+      "sha256": "3eb1d594745402e9dee6c52a041b1629985f081e99c9a7f5d2c53349099b2fae",
+      "bytes": 14379
     },
     {
       "path": "violawake/engine.py",
@@ -13640,8 +13640,8 @@
     },
     {
       "path": "voice/synthesis/kokoro_engine.py",
-      "sha256": "d2b9aaa7479c1fcfa9394750faed5b236a688641c9261fc6f9ae768928dfb2be",
-      "bytes": 88158
+      "sha256": "542d99cdd46ba60ea6bbbb5343d54bea90d4e4608d0ba4821e6db2501c9f50b5",
+      "bytes": 88401
     },
     {
       "path": "voice/synthesis/lazy_engine.py",
@@ -13845,8 +13845,8 @@
     },
     {
       "path": "voice/wake_detector/own_speech.py",
-      "sha256": "fabd94898ec94b1efbbfd8ca5b3025683562a5aa09ba0d1ee5db65dce107fb2d",
-      "bytes": 7282
+      "sha256": "4caf782ebe36a646948aa46880f27264f34b0e98cf22b37a39c72032e2fcb600",
+      "bytes": 8339
     },
     {
       "path": "voice/wake_detector/resampler.py",
@@ -13880,8 +13880,8 @@
     },
     {
       "path": "voice/wake_detector/violawake_listener.py",
-      "sha256": "71563474dd6d00b8d033a3b00b2a3aa90228348035d7c4ed0689ab955e52cbe6",
-      "bytes": 189457
+      "sha256": "bf685dae5ad85f1bdd60ea7fcd4fa21a0a72afbc1abcbc440b1b7b118c61eece",
+      "bytes": 189798
     },
     {
       "path": "voice/wake_detector/wake/__init__.py",
