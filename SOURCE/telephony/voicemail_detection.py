@@ -308,6 +308,20 @@ class PipecatVoicemailDetectionHandler:
         await self._apply_decision(classification)
         return classification
 
+    async def reclassify_late_greeting(self, greeting_text: str) -> str:
+        """Classify a greeting that arrived after Viola opened as if nobody spoke.
+
+        A pickup called silent has no greeting to classify, so it is treated as a
+        live person. When the first words then turn up, they get the check they
+        missed. The gate holds Viola's next ordinary turn until the answer is in,
+        and a real recording switches the call to leaving one message.
+        """
+        greeting = (greeting_text or "").strip()
+        if not greeting or self._record.voicemail_detected or self._record.voicemail_prompt_ready:
+            return ""
+        self._classification_decided = False
+        return await self.classify_opening(greeting)
+
     async def _apply_decision(self, classification: str) -> None:
         """Apply a terminal human/voicemail decision exactly once."""
         if self._classification_decided:

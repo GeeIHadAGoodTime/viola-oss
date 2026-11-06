@@ -137,6 +137,7 @@ from telephony.remote_voice import maybe_remote_first_kokoro, remote_transcribe_
 from telephony.telnyx_dial_response import telnyx_dial_call_control_id  # noqa: E402 - customer privacy bootstrap precedes application imports
 from telephony.usage import company_phone_billing_available, get_phone_billing  # noqa: E402 - customer privacy bootstrap precedes application imports
 from telephony.user_settings_lookup import load_cloud_user_settings_blob  # noqa: E402 - customer privacy bootstrap precedes application imports
+from telephony.spoken_transcript_pacer import SpokenTranscriptPacer  # noqa: E402 - customer privacy bootstrap precedes application imports
 from telephony.voicemail_detection import PipecatVoicemailDetectionHandler  # noqa: E402 - customer privacy bootstrap precedes application imports
 
 logger = get_logger(__name__)
@@ -563,6 +564,8 @@ PHONE_VAD_START_SECS = 0.2
 # pre-queue yield guard below are the structural backstops; this value keeps the
 # common case from ever reaching them.
 _PHONE_ANSWER_SILENT_FALLBACK_SECS = 4.0
+# How long after a silent-answer opening the first words still count as the greeting.
+_LATE_GREETING_WAIT_SECS = 20.0
 _PHONE_RING_WARMUP_AUDIO_SAMPLE_RATE = 16000
 _PHONE_RING_WARMUP_AUDIO_SECONDS = 1
 _PHONE_RING_STT_WARMUP_TIMEOUT_SECS = 3.0
@@ -3635,6 +3638,7 @@ class CallRecord:
     _cost_tracker: Any = field(default=None, repr=False)
     _hold_handler: Any = field(default=None, repr=False)
     _voicemail_handler: Any = field(default=None, repr=False)
+    _late_greeting_task: Any = field(default=None, repr=False)
     _payment_sensitive_segment: Any = field(default=None, repr=False)
     queue_id: str = ""
     queue_position: int = 0
@@ -3759,6 +3763,11 @@ async def queue_model_driven_outbound_opening(
     voicemail_handler = getattr(record, "_voicemail_handler", None)
     if voicemail_handler is not None and hasattr(voicemail_handler, "on_outbound_opening_queued"):
         await voicemail_handler.on_outbound_opening_queued(reason)
+    # Viola has the floor from here. A stray "hello" while the opening is being
+    # written must meet the same word-count bar as one spoken over her audio.
+    floor_state = getattr(record, "_bot_turn_floor_state", None)
+    if floor_state is not None:
+        floor_state.note_generation_started()
     await task.queue_frame(LLMRunFrame())
     logger.info("Call %s: queued model-driven outbound opening via %s", record.call_id, reason)
     return True
@@ -3924,7 +3933,25 @@ async def queue_outbound_opening_after_answer_settle(
         return "recipient_turn_opened"
 
     queued = await queue_model_driven_outbound_opening(record, task, reason="silent_answer")
+    if queued:
+        record._late_greeting_task = asyncio.create_task(
+            _classify_greeting_that_arrives_late(record, answer_settle_observer),
+            name="phone-late-greeting-%s" % record.call_id,
+        )
     return "silent_answer_queued" if queued else "skipped"
+
+
+async def _classify_greeting_that_arrives_late(record: CallRecord, answer_settle_observer: Any) -> None:
+    """Give a pickup called silent the voicemail check it missed, if words turn up."""
+    voicemail_handler = getattr(record, "_voicemail_handler", None)
+    if voicemail_handler is None or not hasattr(voicemail_handler, "reclassify_late_greeting"):
+        return
+    try:
+        greeting = await answer_settle_observer.wait_for_first_transcription(_LATE_GREETING_WAIT_SECS)
+        if greeting and await voicemail_handler.reclassify_late_greeting(greeting) == "VOICEMAIL":
+            logger.info("Call %s: late greeting was a recording; switching to one voicemail message", record.call_id)
+    except (AttributeError, RuntimeError, TypeError, ValueError):
+        logger.debug("Call %s: late greeting check failed", record.call_id, exc_info=True)
 
 
 def _phone_function_result_properties(*, run_llm: bool = True) -> Any:
@@ -4094,6 +4121,28 @@ class TranscriptCollector:
         cleaned = str(redact_card_data(text)).strip()
         if cleaned:
             self.entries.append({"role": "viola", "text": cleaned, "ts": self._timestamp(ts)})
+
+    def trim_interrupted_assistant(self, written: str, heard: str) -> None:
+        """Cut a recorded reply back to what was said before the interruption.
+
+        Replies are recorded when the model finishes writing them. If nothing was
+        heard the entry goes, so a reply nobody heard does not read as said.
+        """
+        from intent.log_redaction import redact_card_data
+
+        cleaned = str(redact_card_data(written)).strip()
+        for index in range(len(self.entries) - 1, -1, -1):
+            entry = self.entries[index]
+            if entry.get("role") != "viola":
+                continue
+            if entry.get("text") != cleaned:
+                return
+            spoken = str(redact_card_data(heard)).strip()
+            if spoken:
+                entry["text"] = spoken
+            else:
+                del self.entries[index]
+            return
 
     def to_text(self) -> str:
         """Format transcript as readable text."""
@@ -6678,10 +6727,15 @@ class CallManager:
                     hangup_after_output_drain=True,
                 )
 
+            speech_pacer = SpokenTranscriptPacer(
+                partial(publish_transcript_delta, record.call_id),
+                trim_spoken=transcript_collector.trim_interrupted_assistant,
+            )
             assistant_transcript_collector = TranscriptFrameCollector(
                 transcript_collector,
                 capture_user=False,
                 on_assistant_complete=_on_assistant_text_complete,
+                speech_pacer=speech_pacer,
             )
             payment_gate_text_filter = None
             if _phone_text_gate_executor is not None:
@@ -7015,6 +7069,7 @@ class CallManager:
                     outbound_tee_processor,
                     *([disclosure_playback_marker] if disclosure_playback_marker is not None else []),
                     transport.output(),
+                    speech_pacer,
                     *([playout_end_mark] if playout_end_mark is not None else []),
                     end_call_hangup,
                     assistant_aggregator,
@@ -7453,6 +7508,8 @@ class CallManager:
             # opening-turn observer may already have cancelled it). Guarantees the
             # warm-state task never leaks past the call on any exit path.
             await _cancel_remote_warm("call cleanup (finally)")
+            if record._late_greeting_task is not None:
+                record._late_greeting_task.cancel()
 
             if disconnect_watchdog_task is not None and not disconnect_watchdog_task.done():
                 disconnect_watchdog_task.cancel()
