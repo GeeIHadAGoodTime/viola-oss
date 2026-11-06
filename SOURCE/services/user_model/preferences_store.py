@@ -60,6 +60,11 @@ def _run_async(coro: Any, *, timeout: float = 3.0) -> Any:
         return run_async_synchronously(
             coro,
             timeout=timeout,
+            # Desktop reads these while building a turn ON the serving loop, so
+            # the serving loop cannot also run them: every such read was refused
+            # by the guard below and the saved preference silently went missing.
+            # Ignored on the cloud, which needs its pool's own loop.
+            prefer_isolated_loop=True,
             timeout_result=None,
             timeout_log_message=(
                 "User-preferences async call timed out after %.1fs (likely "

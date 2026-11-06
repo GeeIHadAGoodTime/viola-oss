@@ -553,7 +553,9 @@ class RuntimeMetrics:
             )
             self._heartbeats[subsystem] = entry
         # Heartbeats are high-frequency - use DEBUG for normal states, WARNING for errors
-        # Normal states: ok, idle, active, ready, handled, waiting, listening
+        # Normal states: ok, idle, active, ready, handled, waiting, listening,
+        # reconciled (every state update the hub accepts: 47,024 WARNING lines
+        # in one day on the 1.0.5 build-9 laptop, with nothing wrong).
         # Error states: error, failed, timeout, stale, degraded
         normal_statuses = {
             "ok",
@@ -563,6 +565,7 @@ class RuntimeMetrics:
             "handled",
             "waiting",
             "listening",
+            "reconciled",
         }
         severity = "DEBUG" if status.lower() in normal_statuses else "WARNING"
         get_diagnostics_bus().emit(

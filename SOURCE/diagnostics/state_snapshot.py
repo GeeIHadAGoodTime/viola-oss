@@ -100,6 +100,10 @@ except Exception:  # pragma: no cover - optional dependency
     pass
 
 SNAPSHOT_VERSION = "1.1.0"  # Version bump: reads from StateHub
+# Every 5 minutes. At 30 s this was 2,880 fsynced files a day on a battery
+# tablet, and the 20 kept covered only the 10 minutes before a problem. Now they
+# cover the last 100 minutes.
+DEFAULT_SNAPSHOT_INTERVAL_SECONDS = 300.0
 DEFAULT_SNAPSHOT_DIR = get_logs_dir() / "state_snapshots"
 
 
@@ -126,7 +130,7 @@ class PersistentSnapshotter:
         self,
         *,
         output_dir: Path = DEFAULT_SNAPSHOT_DIR,
-        interval: float = 30.0,
+        interval: float = DEFAULT_SNAPSHOT_INTERVAL_SECONDS,
         max_snapshots: int = 20,
         min_interval: float = 5.0,
     ) -> None:
