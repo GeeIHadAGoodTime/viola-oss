@@ -968,7 +968,8 @@ class CDPBrowserManager:
     @property
     def page(self) -> Any:
         """Return the current Playwright Page for the Qt overlay."""
-        return self.cdp.page
+        cdp = self.cdp
+        return cdp.bound_page if isinstance(cdp, PlaywrightCDPClient) else cdp.page
 
     @property
     def perception(self) -> Any | None:
