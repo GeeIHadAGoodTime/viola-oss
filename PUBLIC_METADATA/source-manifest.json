@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "16bd45e5ed8125dd75d4bffbc05f2c532909e7d7",
-  "sha256": "c100f4a298235e656e2437c12bb8770dc78c2d1c3f084dc68de356596f385687",
+  "revision": "6140fc47bbe4713d2fbd50d9efd5cf3d9fd629fa",
+  "sha256": "7210861d5adcf34beed66ca34ef69d30486e284ccdc39fad0c4bac4cd8304db9",
   "files": [
     {
       "path": ".env.example",
@@ -3065,8 +3065,8 @@
     },
     {
       "path": "music/providers/spotify_cdp.py",
-      "sha256": "ab704a09b64766ca9819681cb8bed1c9d4b1787113a7e984fa7100e34c764203",
-      "bytes": 14097
+      "sha256": "7f232acab22dfa045a52f5a5bec8ed1040f7d47ba039e34bd0d5cb1cf70ab055",
+      "bytes": 14117
     },
     {
       "path": "music/providers/youtube_availability.py",
@@ -3280,13 +3280,13 @@
     },
     {
       "path": "music/spotify/cdp_controller.py",
-      "sha256": "69d4474792c4899c3a27a6e030981b5c00852a20fa34dd6037952ddf54b67b5e",
-      "bytes": 164166
+      "sha256": "2d9e2ae241bc3ccc352b60c8719fe1bbd3e621741aec9a687d78ec87c1f8b544",
+      "bytes": 165045
     },
     {
       "path": "music/spotify/connection.py",
-      "sha256": "71c3a8e001268b8df8d6a1a6ca5f584b4367a6cc2b2d76b8129f5b6c12680466",
-      "bytes": 12891
+      "sha256": "5ab043f866f04617b23bb7cf9f97997a19195861cef97965cd3f28213d45f669",
+      "bytes": 13579
     },
     {
       "path": "music/spotify/cookie_bridge.py",
@@ -3365,8 +3365,8 @@
     },
     {
       "path": "playback/engines/spotify_cdp.py",
-      "sha256": "249d214efa0375d4f6691909b878dc7cf373d8d5ae12bc9f6f9fefbae9f3557e",
-      "bytes": 33704
+      "sha256": "72f7fc4f902d31e515dcddc782b091553461fd6713b525ccaee90af302abaaca",
+      "bytes": 34027
     },
     {
       "path": "playback/engines/youtube.py",
@@ -9655,8 +9655,8 @@
     },
     {
       "path": "ui/api/routes/spotify_cdp.py",
-      "sha256": "cb73aa557658becdb40297990c4800711da2e2d78b740d4442361002508af0b5",
-      "bytes": 13795
+      "sha256": "597ea5208a1238ebefa50ba7e6cb8b50a833ead79b1ab21cf2c0896ef2ee27ba",
+      "bytes": 14273
     },
     {
       "path": "ui/api/routes/state.py",
