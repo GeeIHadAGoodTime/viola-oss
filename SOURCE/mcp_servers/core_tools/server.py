@@ -1585,6 +1585,7 @@ async def file_write(
     description=(
         "Execute a shell command and return stdout, stderr, and exit code. "
         "Last resort — prefer dedicated tools (file_read, web_search, media) over shell. "
+        "On Windows a plain command runs in cmd.exe from the user's home folder, so 'dir Desktop' lists their desktop. "
         "30s default timeout, 4000 char output cap."
     ),
     annotations=_DANGEROUS,
@@ -3469,8 +3470,9 @@ def _normalize_user_capability_spec(
 
 @server.tool(
     description=(
-        "Author user-scoped shortcuts as declarative compositions that can be created, listed, updated, "
-        "disabled, enabled, or deleted after confirmation. When you notice the user repeatedly asking for "
+        "The user's routines, also called shortcuts: declarative compositions that can be created, listed, "
+        "updated, disabled, enabled, or deleted after confirmation. A create needs only spec.name and "
+        "spec.actions. When you notice the user repeatedly asking for "
         "the same workflow, or when the user explicitly wants a recurring task, propose creating a shortcut "
         "here. Creating a shortcut reports phrase conflicts and deterministic command interception risks. "
         "Confirm before saving."

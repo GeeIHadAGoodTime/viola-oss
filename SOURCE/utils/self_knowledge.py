@@ -417,7 +417,8 @@ class SelfKnowledgeBuilder:
             lines.append(
                 "Extension paths: mcp_servers (add MCP tool servers), "
                 "self_manage install_package (pip dependency), "
-                "user_capabilities (create user shortcuts)."
+                "user_capabilities (the user's routines, also called shortcuts: create, list, delete. "
+                "A routine is never smart_home, which is only for Home Assistant devices)."
             )
             capabilities = list_for_user(user_id, user_tier=tier)
         except Exception as exc:
