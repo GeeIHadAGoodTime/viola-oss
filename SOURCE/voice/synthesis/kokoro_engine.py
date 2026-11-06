@@ -147,7 +147,7 @@ _LANGUAGE_SWITCH_PAUSE_SECONDS = 0.12
 # One reply says the "can't say that part" notice once, even across sentences.
 _UNSPOKEN_NOTICE_REPEAT_SECONDS = 30.0
 # Language names of the internal eSpeak pronunciation route.
-_ESPEAK_LANGUAGES = {"zh": "cmn"}
+_ESPEAK_LANGUAGES = {"zh": "cmn", "fr": "fr-fr"}
 _CLAUSE_END_RE = re.compile(r"[,;:—–](?=\s)")
 
 # Safety limit: reject text longer than this to prevent memory/CPU exhaustion.
@@ -898,7 +898,7 @@ class KokoroTTSEngine:
         can read is replaced by one spoken notice, so a reply is never silently
         cut short. (voice/speech_language.py says why.)
         """
-        from voice.speech_language import BASE, SPANISH, spanish_route_text, speech_spans, unspoken_notice
+        from voice.speech_language import BASE, MANDARIN, route_text, spanish_route_text, speech_spans, unspoken_notice
 
         base = getattr(self, "_speech_language", "en-us")
         kokoro = self._kokoro
@@ -927,7 +927,7 @@ class KokoroTTSEngine:
             language, route_voice = route
             try:
                 samples, sample_rate = kokoro.create(
-                    spanish_route_text(span.text) if span.language == SPANISH else span.text,
+                    span.text if span.language == MANDARIN else route_text(span.language, span.text),
                     voice=route_voice,
                     speed=speed,
                     lang=language,

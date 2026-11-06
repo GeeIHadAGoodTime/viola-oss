@@ -4,7 +4,7 @@ import re
 
 from voice.english_numbers import num2words
 from voice.pronunciation_tables import _ACRONYM_INITIALISMS, _ACRONYM_WORDS, _BRAND_PRONUNCIATIONS
-from voice.speech_language import BASE, MANDARIN, SPANISH, speech_spans
+from voice.speech_language import BASE, FRENCH, MANDARIN, PORTUGUESE, SPANISH, speech_spans
 
 from core.logging_config import get_logger
 
@@ -604,13 +604,16 @@ def _normalize_english_route_numbers(text: str) -> str:
         for span in spans:
             if span.language == BASE:
                 parts.append(_normalize_english_numbers(span.text))
-            elif span.language == SPANISH:
-                spoken = _normalize_spanish_numbers(_expand_degrees(span.text, "es"))
-                parts.append(spoken if len(spans) == 1 else "“%s”" % spoken)
             elif span.language == MANDARIN:
                 parts.append(_normalize_mandarin_symbols(span.text))
             else:
-                parts.append(span.text)
+                if span.language == SPANISH:
+                    spoken = _normalize_spanish_numbers(_expand_degrees(span.text, "es"))
+                elif span.language in (FRENCH, PORTUGUESE):
+                    spoken = _normalize_romance_numbers(span.text, span.language)
+                else:
+                    spoken = span.text
+                parts.append(spoken if len(spans) == 1 else "“%s”" % spoken)
         joined = " ".join(parts)
         if sentence.rstrip()[-1:] in {".", "!", "?"} and joined.rstrip()[-1:] not in {".", "!", "?"}:
             joined += sentence.rstrip()[-1]
@@ -846,6 +849,106 @@ def _normalize_spanish_numbers(text: str) -> str:
     text = re.sub(r"\b([13])er\b", lambda match: _ES_ORDINALS[int(match.group(1))], text)
     text = re.sub(r"(?<=\d)\s?[ºª]", "", text)
     return _ES_NUMBER_RE.sub(_replace_spanish_number, text)
+
+
+# ---------------------------------------------------------------------------
+# French and Portuguese numbers: like Spanish, those routes accept letters only.
+# They only ever read a phrase inside a reply, so plain counts are enough.
+# ---------------------------------------------------------------------------
+_FR_UNITS = (
+    "zéro un deux trois quatre cinq six sept huit neuf dix onze douze treize quatorze quinze seize dix-sept dix-huit "
+    "dix-neuf"
+).split()
+_FR_TENS = ("", "", "vingt", "trente", "quarante", "cinquante", "soixante")
+_PT_UNITS = (
+    "zero um dois três quatro cinco seis sete oito nove dez onze doze treze catorze quinze dezesseis dezessete dezoito "
+    "dezenove"
+).split()
+_PT_TENS = ("", "", "vinte", "trinta", "quarenta", "cinquenta", "sessenta", "setenta", "oitenta", "noventa")
+_PT_HUNDREDS = (
+    "",
+    "cento",
+    "duzentos",
+    "trezentos",
+    "quatrocentos",
+    "quinhentos",
+    "seiscentos",
+    "setecentos",
+    "oitocentos",
+    "novecentos",
+)
+_ROMANCE_NUMBER_RE = re.compile(r"(?<![\w.,])(\d{1,9})(?:[.,](\d{1,3}))?(?![\w])(\s?%)?")
+
+
+def _french_below_hundred(n: int) -> str:
+    if n < 20:
+        return _FR_UNITS[n]
+    if n < 70:
+        tens, unit = divmod(n, 10)
+        if not unit:
+            return _FR_TENS[tens]
+        return _FR_TENS[tens] + (" et un" if unit == 1 else " " + _FR_UNITS[unit])
+    if n < 80:
+        return "soixante " + ("et onze" if n == 71 else _FR_UNITS[n - 60])
+    return "quatre vingt" + (" " + _FR_UNITS[n - 80] if n > 80 else "s")
+
+
+def _french_number(n: int) -> str:
+    if n < 100:
+        return _french_below_hundred(n)
+    if n < 1000:
+        hundreds, rest = divmod(n, 100)
+        head = "cent" if hundreds == 1 else _FR_UNITS[hundreds] + " cent"
+        return head + (" " + _french_below_hundred(rest) if rest else "s" if hundreds > 1 else "")
+    if n < 1_000_000:
+        thousands, rest = divmod(n, 1000)
+        head = "mille" if thousands == 1 else _french_number(thousands).rstrip("s") + " mille"
+        return head + (" " + _french_number(rest) if rest else "")
+    millions, rest = divmod(n, 1_000_000)
+    head = _french_number(millions) + (" million" if millions == 1 else " millions")
+    return head + (" " + _french_number(rest) if rest else "")
+
+
+def _portuguese_below_thousand(n: int) -> str:
+    if n < 20:
+        return _PT_UNITS[n]
+    if n < 100:
+        tens, unit = divmod(n, 10)
+        return _PT_TENS[tens] + (" e " + _PT_UNITS[unit] if unit else "")
+    if n == 100:
+        return "cem"
+    hundreds, rest = divmod(n, 100)
+    return _PT_HUNDREDS[hundreds] + (" e " + _portuguese_below_thousand(rest) if rest else "")
+
+
+def _portuguese_number(n: int) -> str:
+    if n < 1000:
+        return _portuguese_below_thousand(n)
+    if n < 1_000_000:
+        thousands, rest = divmod(n, 1000)
+        head = "mil" if thousands == 1 else _portuguese_below_thousand(thousands) + " mil"
+        joiner = " e " if rest and (rest < 100 or rest % 100 == 0) else " "
+        return head + (joiner + _portuguese_below_thousand(rest) if rest else "")
+    millions, rest = divmod(n, 1_000_000)
+    head = _portuguese_below_thousand(millions) + (" milhão" if millions == 1 else " milhões")
+    return head + (" " + _portuguese_number(rest) if rest else "")
+
+
+def _normalize_romance_numbers(text: str, language: str) -> str:
+    french = language == FRENCH
+    spell = _french_number if french else _portuguese_number
+
+    def replace(match: re.Match[str]) -> str:
+        words = spell(int(match.group(1)))
+        if match.group(2):
+            words += (" virgule " if french else " vírgula ") + spell(int(match.group(2)))
+        if match.group(3):
+            words += " pour cent" if french else " por cento"
+        return words
+
+    text = re.sub(r"€\s?(\d[\d.,]*)", lambda match: match.group(1) + " euros", text)
+    text = re.sub(r"\$\s?(\d[\d.,]*)", lambda match: match.group(1) + (" dollars" if french else " dólares"), text)
+    return _ROMANCE_NUMBER_RE.sub(replace, text)
 
 
 def _replace_currency(match: re.Match[str]) -> str:

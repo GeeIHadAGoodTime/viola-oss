@@ -164,7 +164,7 @@ class QualificationLaunchTests(unittest.TestCase):
             self.assertIs(self.runtime.get_qualification_composition(), owner)
             self.assertIs(self.runtime.get_qualification_composition(), owner)
         self.assertEqual(compose.call_count, 2)
-        self.assertEqual(compose.call_args.kwargs, {"mandarin": True, "romance_locales": ("es",)})
+        self.assertEqual(compose.call_args.kwargs, {"mandarin": True, "romance_locales": ("es", "fr", "pt-br")})
 
     def factory(self, create):
         namespace = {"threading": threading, "_shared_kokoro_lock": threading.Lock(), "_shared_kokoro": None,

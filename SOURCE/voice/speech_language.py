@@ -12,9 +12,13 @@ the whole time; nothing sent text to them.
 - Han text goes to the Mandarin route. Other scripts with no route (kana,
   Hangul, Cyrillic, Arabic...) are reported as ``UNSUPPORTED`` so the engine can
   say it cannot read them, instead of going quiet.
-- Under an English setting, Spanish is found from a sentence's own words. An
-  English sentence only gives up words to Spanish on strong evidence: names like
-  "Los Angeles", "Buenos Aires" or "José" stay English.
+- Under an English setting, Spanish, French and Brazilian Portuguese are found
+  from a sentence's own words and go to their own route and voice. Italian and
+  German have no pronunciation route in the customer speech stack, so they are
+  reported as ``UNSUPPORTED`` too: an honest line beats English letter rules
+  reading "Guten Morgen". An English sentence only gives up words to another
+  language on strong evidence: names like "Los Angeles", "Moulin Rouge", "Mamma
+  Mia" or "José" stay English.
 
 Pure text work: no model, no settings, no I/O. This decides how a reply is
 pronounced, never what happens with a command.
@@ -27,6 +31,10 @@ from dataclasses import dataclass
 
 BASE = "base"
 SPANISH = "es"
+FRENCH = "fr"
+PORTUGUESE = "pt-br"
+ITALIAN = "it"
+GERMAN = "de"
 MANDARIN = "zh"
 UNSUPPORTED = "unsupported"
 
@@ -55,23 +63,6 @@ _PINYIN_MARKS = frozenset("āēīōūǎěǐǒǔǖǘǚǜ")
 _WORD_RE = re.compile(r"[^\W\d_]+(?:['’][^\W\d_]+)*")
 _QUOTED_RE = re.compile(r'"([^"]+)"|“([^”]+)”|«([^»]+)»|(?<![\w])[\'‘]([^\'’]+)[\'’](?!\w)')
 
-# Words that are Spanish and not English. A short list on purpose: greetings and
-# everyday words. Spanish words English also uses as names are left out.
-_ES_STRONG = frozenset(
-    """
-    hola adiós adios gracias buenos buenas días dias noches tardes señor señora señorita perdón perdon disculpa
-    cómo qué quién quien cuándo cuando dónde donde cuál cual porqué porque pero también tambien muy está están
-    estás estoy estamos eres somos tengo tienes tiene tenemos quiero quieres quiere puedo puedes puede hacer
-    hoy ayer mañana ahora aquí aqui allí alli siempre nunca mucho mucha muchos muchas gusto encantado encantada
-    hasta luego vemos feliz cumpleaños navidad bienvenido bienvenida siento favor esto esta eso
-    bien bueno buena estar nosotros ustedes ellos ellas usted tú él
-    """.split()
-)
-# Spanish function words. Not evidence alone: "La La Land", "Rio de la Plata".
-_ES_NEUTRAL = frozenset(
-    "de la el los las un una unos unas y o en es son con para por que del al lo se su sus mi tu te le nos más sin "
-    "sobre".split()
-)
 # Words that show a sentence is English whatever else is in it.
 _EN_COMMON = frozenset(
     """
@@ -80,7 +71,125 @@ _EN_COMMON = frozenset(
     called how what when where why which who good morning hello hi not but or if as an
     """.split()
 )
-_ACCENTED_RE = re.compile(r"[áéíóúüñ]", re.IGNORECASE)
+
+
+@dataclass(frozen=True)
+class _Language:
+    """How to recognise one language from its own words.
+
+    ``strong``: words of the language that are not English words. Short on
+    purpose: greetings and everyday words, nothing English uses as a word or a
+    name (no "boa", "mia", "die", "bene"). ``neutral``: its function words, which
+    are never evidence alone ("La La Land", "Rio de la Plata"). ``alone``: words
+    that are a whole sentence by themselves ("Hola!", "Merci."). ``named``: the
+    English name of the language: a sentence that says it is talking about the
+    language can hand over a single word ("In French, thanks is merci.").
+    """
+
+    code: str
+    named: str
+    strong: frozenset[str]
+    neutral: frozenset[str]
+    alone: frozenset[str]
+    marks: re.Pattern[str]
+    # English-looking words that are ordinary here ("Ich bin in Berlin").
+    homographs: frozenset[str]
+    # Accented words count as evidence only where the route can read them, so
+    # a wrong guess is a French reading, never a refusal.
+    accents_count: bool
+
+
+_LANGUAGES = (
+    _Language(
+        code=SPANISH,
+        named="spanish",
+        strong=frozenset(
+            """
+            hola adiós adios gracias buenos buenas días dias noches tardes señor señora señorita perdón perdon disculpa
+            cómo qué quién quien cuándo cuando dónde donde cuál cual porqué porque pero también tambien muy está están
+            estás estoy estamos eres somos tengo tienes tiene tenemos quiero quieres quiere puedo puedes puede hacer
+            hoy ayer mañana ahora aquí aqui allí alli siempre nunca mucho mucha muchos muchas gusto encantado encantada
+            hasta luego vemos feliz cumpleaños navidad bienvenido bienvenida siento favor esto esta eso
+            bien bueno buena estar nosotros ustedes ellos ellas usted tú él
+            """.split()
+        ),
+        neutral=frozenset(
+            "de la el los las un una unos unas y o en es son con para por que del al lo se su sus mi tu te le nos más "
+            "sin sobre".split()
+        ),
+        alone=frozenset("hola gracias adiós adios buenos buenas".split()),
+        marks=re.compile(r"[áéíóúüñ]", re.IGNORECASE),
+        homographs=frozenset(),
+        accents_count=True,
+    ),
+    _Language(
+        code=FRENCH,
+        named="french",
+        strong=frozenset(
+            """
+            bonjour bonsoir merci revoir beaucoup allez êtes suis sommes sont avec dans très aujourd'hui demain
+            hier maintenant toujours jamais pourquoi quand parce mais aussi vous nous bonne journée matin soir nuit
+            plaît plait c'est d'accord j'ai s'il l'heure ça voici est oui
+            """.split()
+        ),
+        neutral=frozenset(
+            "le la les un une des du de et en à au aux ce cet cette qui que ne pas sur il elle je tu bon comment".split()
+        ),
+        alone=frozenset("bonjour bonsoir merci".split()),
+        marks=re.compile(r"[àâæçéèêëîïôùûœ]", re.IGNORECASE),
+        homographs=frozenset("on as or an".split()),
+        accents_count=True,
+    ),
+    _Language(
+        code=PORTUGUESE,
+        named="portuguese",
+        strong=frozenset(
+            """
+            olá obrigado obrigada você vocês não muito muita tudo hoje amanhã ontem também então ainda até
+            tchau adeus prazer desculpe estou está são bom dia noite tarde boas sempre nunca porque quando onde sei
+            """.split()
+        ),
+        neutral=frozenset("os um uma da dos das em na nas e que para com por ao à boa bem mas eu sim agora".split()),
+        alone=frozenset("olá obrigado obrigada tchau".split()),
+        marks=re.compile(r"[ãõáàâêéíóôúç]", re.IGNORECASE),
+        homographs=frozenset("do as no for".split()),
+        accents_count=True,
+    ),
+    _Language(
+        code=ITALIAN,
+        named="italian",
+        strong=frozenset(
+            """
+            buongiorno buonasera buonanotte arrivederci grazie prego sono siamo siete molto oggi domani ieri adesso
+            perché perche anche ancora questo questa quello quella voglio posso piacere scusa scusi quando sempre
+            stai mille chiamo
+            """.split()
+        ),
+        neutral=frozenset("il lo la i gli le un una di del della dei delle e che per con al alla ciao bene".split()),
+        alone=frozenset("buongiorno buonasera buonanotte arrivederci grazie".split()),
+        marks=re.compile(r"[àèéìòù]", re.IGNORECASE),
+        homographs=frozenset("in do".split()),
+        accents_count=False,
+    ),
+    _Language(
+        code=GERMAN,
+        named="german",
+        strong=frozenset(
+            """
+            guten gute morgen abend nacht danke bitte hallo tschüss auf wiedersehen ich bin nicht und ist sind heute
+            gestern sehr schön wir haben habe möchte warum wann weil aber auch geht wie
+            """.split()
+        ),
+        neutral=frozenset("der das den dem ein eine einen zu mit von für tag gut es dir ihnen sie mein".split()),
+        alone=frozenset("hallo danke tschüss".split()),
+        marks=re.compile(r"[äöüß]", re.IGNORECASE),
+        homographs=frozenset("in an so was will".split()),
+        accents_count=False,
+    ),
+)
+_ROUTED = frozenset({SPANISH, FRENCH, PORTUGUESE})
+# French elision: l'école, d'accord, qu'il. Function words glued to the next word.
+_FRENCH_ELISION_RE = re.compile(r"^(?:[cdjlmnst]|qu)['’]", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -99,84 +208,107 @@ def _base_language(base: str) -> str:
     return base.lower().replace("_", "-").split("-", 1)[0]
 
 
-def _classify(word: str) -> str:
-    lowered = word.lower()
-    if lowered in _ES_STRONG:
+def _classify(word: str, language: _Language) -> str:
+    lowered = word.lower().replace("’", "'")
+    if lowered in language.strong:
         return "strong"
-    if lowered in _ES_NEUTRAL:
+    if lowered in language.neutral or lowered in language.homographs:
+        return "neutral"
+    if language.code == FRENCH and _FRENCH_ELISION_RE.match(lowered):
         return "neutral"
     if lowered in _EN_COMMON:
         return "english"
-    return "accented" if _ACCENTED_RE.search(lowered) else "other"
+    return "accented" if language.accents_count and language.marks.search(lowered) else "other"
 
 
-def _reads_as_spanish(text: str) -> bool:
-    """Whether a whole sentence (or quoted phrase) is Spanish."""
-    if "¿" in text or "¡" in text:
-        return True
+def _score(text: str, language: _Language) -> int | None:
+    """How strongly a whole sentence (or quoted phrase) reads as ``language``, or None."""
     words = [match.group(0) for match in _WORD_RE.finditer(text)]
-    if not words:
-        return False
-    kinds = [_classify(word) for word in words]
+    if not words or language.named in text.lower():
+        return None
+    kinds = [_classify(word, language) for word in words]
     strong = kinds.count("strong")
     neutral = kinds.count("neutral")
     accented = kinds.count("accented")
-    if "english" in kinds:
-        return False
-    if strong:
-        return (strong + neutral + accented) * 3 >= len(words)
+    english = kinds.count("english")
+    points = strong * 2 + neutral + accented
+    # A foreign sentence can hold a word English also has ("Ich bin in Berlin"),
+    # an English sentence about a foreign phrase cannot pass this.
+    if english and (strong < 2 or strong + neutral <= english * 2):
+        return None
+    if len(words) == 1:
+        return points if words[0].lower() in language.alone else None
+    if strong and strong + neutral >= 2:
+        return points if (strong + neutral + accented) * 3 >= len(words) else None
     if accented and neutral and len(words) >= 3:
-        return (accented + neutral) * 2 >= len(words)
+        return points if (accented + neutral) * 2 >= len(words) else None
     # Function words alone need a real sentence: "Son las tres y media", never
     # a place name like "Rio de la Plata".
-    return len(words) >= 5 and neutral * 2 > len(words)
+    return points if len(words) >= 5 and neutral * 2 > len(words) else None
 
 
-def _spanish_ranges(text: str) -> list[tuple[int, int]]:
-    """Character ranges of Spanish phrases inside an English sentence."""
-    ranges: list[tuple[int, int]] = []
+def _sentence_language(text: str) -> str | None:
+    """The language a whole sentence is in, when it is not English."""
+    if "¿" in text or "¡" in text:
+        return SPANISH
+    best: tuple[int, str] | None = None
+    for language in _LANGUAGES:
+        points = _score(text, language)
+        if points is not None and (best is None or points > best[0]):
+            best = (points, language.code)
+    return best[1] if best else None
+
+
+def _phrase_ranges(text: str) -> list[tuple[int, int, str]]:
+    """Foreign phrases inside an English sentence, as (start, end, language)."""
+    found: list[tuple[int, int, str]] = []
     for match in _QUOTED_RE.finditer(text):
         group = next(index for index in range(1, 5) if match.group(index) is not None)
-        if _reads_as_spanish(match.group(group)):
-            ranges.append((match.start(group), match.end(group)))
+        language = _sentence_language(match.group(group))
+        if language is not None:
+            found.append((match.start(group), match.end(group), language))
     words = list(_WORD_RE.finditer(text))
-    index = 0
-    while index < len(words):
-        if _classify(words[index].group(0)) not in {"strong", "neutral"}:
-            index += 1
+    lowered = text.lower()
+    for language in _LANGUAGES:
+        # "In French, thanks is merci": the sentence says what the word is.
+        needed = 1 if language.named in lowered else 2
+        index = 0
+        while index < len(words):
+            if _classify(words[index].group(0), language) not in {"strong", "neutral"}:
+                index += 1
+                continue
+            end = index
+            strong: list[int] = []
+            while end < len(words):
+                kind = _classify(words[end].group(0), language)
+                if kind not in {"strong", "neutral"}:
+                    break
+                if end > index and text[words[end - 1].end() : words[end].start()].strip(" ,") != "":
+                    break
+                if kind == "strong":
+                    strong.append(end)
+                end += 1
+            # "por favor": "favor" is the only Spanish-only word, "por" makes the pair.
+            pair = len(strong) == 1 and strong[0] > index and words[index].group(0).lower() == "por"
+            if len(strong) >= needed or pair:
+                first = index if pair else strong[0]
+                found.append((words[first].start(), words[strong[-1]].end(), language.code))
+            index = max(end, index + 1)
+    return _merged(found)
+
+
+def _merged(ranges: list[tuple[int, int, str]]) -> list[tuple[int, int, str]]:
+    """Overlapping finds keep the longest one: "buenos días", not its "días" alone."""
+    kept: list[tuple[int, int, str]] = []
+    for found in sorted(ranges, key=lambda item: (item[0], item[0] - item[1])):
+        if kept and found[0] < kept[-1][1]:
             continue
-        end = index
-        strong = 0
-        last_strong = -1
-        first_strong = -1
-        while end < len(words):
-            kind = _classify(words[end].group(0))
-            if kind not in {"strong", "neutral"}:
-                break
-            if end > index and text[words[end - 1].end() : words[end].start()].strip(" ,") != "":
-                break
-            if kind == "strong":
-                strong += 1
-                last_strong = end
-                first_strong = end if first_strong < 0 else first_strong
-            end += 1
-        # Two Spanish-only words side by side: "buenos días", "por favor" counts
-        # "favor" alone, so "por" is what makes that pair.
-        if strong >= 2 or (strong == 1 and last_strong > index and words[index].group(0).lower() == "por"):
-            first = index if words[index].group(0).lower() == "por" else first_strong
-            ranges.append((words[first].start(), words[last_strong].end()))
-        index = max(end, index + 1)
-    return _merged(ranges)
+        kept.append(found)
+    return kept
 
 
-def _merged(ranges: list[tuple[int, int]]) -> list[tuple[int, int]]:
-    merged: list[tuple[int, int]] = []
-    for start, end in sorted(ranges):
-        if merged and start <= merged[-1][1]:
-            merged[-1] = (merged[-1][0], max(merged[-1][1], end))
-        else:
-            merged.append((start, end))
-    return merged
+def _spoken_as(language: str) -> str:
+    return language if language in _ROUTED else UNSUPPORTED
 
 
 def _drop_pinyin(text: str) -> str:
@@ -248,13 +380,13 @@ def speech_spans(text: str, base: str = "en-us") -> list[SpeechSpan]:
         piece = _drop_pinyin(span.text) if has_chinese else span.text
         if not english or not _speakable(piece):
             result.append(SpeechSpan(BASE, piece))
-        elif len(spans) == 1 and _reads_as_spanish(piece):
-            result.append(SpeechSpan(SPANISH, piece))
+        elif len(spans) == 1 and _sentence_language(piece) is not None:
+            result.append(SpeechSpan(_spoken_as(_sentence_language(piece) or ""), piece))
         else:
             cursor = 0
-            for start, end in _spanish_ranges(piece):
+            for start, end, language in _phrase_ranges(piece):
                 result.append(SpeechSpan(BASE, piece[cursor:start]))
-                result.append(SpeechSpan(SPANISH, piece[start:end]))
+                result.append(SpeechSpan(_spoken_as(language), piece[start:end]))
                 cursor = end
             result.append(SpeechSpan(BASE, piece[cursor:]))
     # Punctuation left between two spans has nothing to say on its own, and a
@@ -264,15 +396,24 @@ def speech_spans(text: str, base: str = "en-us") -> list[SpeechSpan]:
     return [SpeechSpan(span.language, span.text.strip(edge)) for span in kept]
 
 
-def spanish_route_text(text: str) -> str:
-    """Only what the Spanish route accepts: letters and its own punctuation.
+def route_text(language: str, text: str) -> str:
+    """Only what a Romance route accepts: letters and its own punctuation.
 
-    The route refuses a whole phrase over one quote mark, dash or inverted
-    question mark, which read as silence.
+    A route refuses a whole phrase over one quote mark, dash or inverted
+    question mark, which read as silence. French keeps its apostrophes, which
+    are how it joins words.
     """
-    cleaned = re.sub(r"[¿¡\"“”«»‘’`()\[\]{}*_~]", "", text)
-    cleaned = re.sub(r"\s*[—–-]\s*|\s*…\s*|'", " ", cleaned)
+    cleaned = re.sub(r"[¿¡\"“”«»‘`()\[\]{}*_~]", "", text)
+    cleaned = re.sub(r"\s*[—–-]\s*|\s*…\s*", " ", cleaned)
+    if language == FRENCH:
+        cleaned = cleaned.replace("’", "'")
+    else:
+        cleaned = re.sub(r"['’]", " ", cleaned)
     return re.sub(r"\s+", " ", cleaned).strip()
+
+
+def spanish_route_text(text: str) -> str:
+    return route_text(SPANISH, text)
 
 
 def unspoken_notice(base: str) -> str:
@@ -281,10 +422,15 @@ def unspoken_notice(base: str) -> str:
 
 __all__ = [
     "BASE",
+    "FRENCH",
+    "GERMAN",
+    "ITALIAN",
     "MANDARIN",
+    "PORTUGUESE",
     "SPANISH",
     "UNSUPPORTED",
     "SpeechSpan",
+    "route_text",
     "spanish_route_text",
     "speech_spans",
     "unspoken_notice",

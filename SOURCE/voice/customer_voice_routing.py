@@ -25,6 +25,11 @@ _VOICE_FAMILIES = {
     "pt-br": ("pf_", "pm_", "pf_dora"),
 }
 
+# Voices that read a phrase inside a reply ("In French, thanks is merci"). They
+# are in the shipped voice file already, and they are not output languages: the
+# Settings picker and the qualification marker do not offer them.
+_PHRASE_VOICES = {"fr": "ff_siwis", "pt-br": "pf_dora"}
+
 _SETTINGS_VOICE_ALIASES = {"alloy": "af_alloy", "echo": "am_echo", "nova": "af_nova"}
 
 
@@ -79,6 +84,8 @@ def require_customer_voice(locale: object, voice: object) -> None:
     from voice.customer_runtime import qualification_profile
 
     profile = qualification_profile()
+    if _PHRASE_VOICES.get(key) == voice:
+        return
     if profile is not None and (key not in profile["locales"] or voice not in profile["selected_voice_ids"]):
         raise ValueError("The voice and locale are not selected in this qualification artifact")
 
