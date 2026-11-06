@@ -279,6 +279,18 @@ describe("a site's person check", () => {
     expect(window.viola.hideBrowserOverlay).not.toHaveBeenCalled();
   });
 
+  it('the checkout stays on screen behind a payment review when the task ends', async () => {
+    await mount();
+    await send(agentic(WIKI, {
+      agent_busy: false,
+      agent_task: { description: 'buy water', status: 'payment_review', phase: 'user_input' },
+    }));
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Open agent browser mode/i })); });
+    await act(async () => { harness.progress({ status: 'complete', terminal: true }); });
+
+    expect(window.viola.hideBrowserOverlay).not.toHaveBeenCalled();
+  });
+
   it('goes back to the agent working when the user has finished', async () => {
     await mount();
     await send(check());

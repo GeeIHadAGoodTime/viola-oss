@@ -1720,9 +1720,9 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
     if (!setAgentProgressCallback) return;
     const handleAgentProgress = (payload) => {
       const terminal = payload?.terminal === true || ['complete', 'error', 'cancelled'].includes(payload?.status);
-      if (terminal && lastOverlayStatusRef.current === 'bot_check') {
-        // The task is over but a site's person check is still the user's to finish:
-        // the view stays up until they close it.
+      if (terminal && ['bot_check', 'payment_review', 'signature_review'].includes(lastOverlayStatusRef.current)) {
+        // The task is over but the page is still the user's to act on: a site's
+        // person check, or the checkout they are reviewing. The view stays up.
         setAgentTaskActive(false);
         return;
       }
