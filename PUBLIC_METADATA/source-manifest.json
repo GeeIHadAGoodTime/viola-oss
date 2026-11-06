@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "5c5b4909db738c29afe6788affbd4d364a851395",
-  "sha256": "903d9019a9d2450b3d122569d636fdc06c6e88a371dcd158a672cc92be0121d5",
+  "revision": "c9157c76ad189ca586b7062d139312d6aa0f1405",
+  "sha256": "f22b6c204de555f513121dcc2580947da627219813d32c5dc4360c9e76a5a854",
   "files": [
     {
       "path": ".env.example",
@@ -1580,13 +1580,13 @@
     },
     {
       "path": "intent/agent_executor.py",
-      "sha256": "b3194e085ed286a3dcf321dd856dfed493575e1d1fd48d8893e4303f56403751",
-      "bytes": 611602
+      "sha256": "72b3c65a2ba0cce988c73fbf17e4134d4db595ad6990e96690a2d412a2385680",
+      "bytes": 613272
     },
     {
       "path": "intent/agent_loop.py",
-      "sha256": "31585d259b348e47d8ade05f427851719ef08bc86712ac334af26fc1393d9519",
-      "bytes": 260728
+      "sha256": "ed01ad66eac98cf49e4e97e8d317f26ab130222a3c51af73a33fdbe1bfe3a27b",
+      "bytes": 260842
     },
     {
       "path": "intent/agent_message_manager.py",
@@ -1610,8 +1610,8 @@
     },
     {
       "path": "intent/ai_controller.py",
-      "sha256": "43bc3c20f31293be128be6cf6232071ac34cfa9d1f4cc5db5f840408c87d5f39",
-      "bytes": 167851
+      "sha256": "ff8329fe76cf0d4bbdefd1b2fc417deb3a008aacfa980a919027fd3f51ed3726",
+      "bytes": 168184
     },
     {
       "path": "intent/ai_interpreter.py",
@@ -10085,13 +10085,13 @@
     },
     {
       "path": "ui/react-app/src/SmartDisplay.jsx",
-      "sha256": "4ca781ee659782cc9a239b31dcb46721ec502b0ba416169fa2197265dbe2f356",
-      "bytes": 195393
+      "sha256": "da2e8ab1d5e0a6d8884a55809242159c15e7d997cabbec71599f431e4f657676",
+      "bytes": 196135
     },
     {
       "path": "ui/react-app/src/SmartDisplay.overlayLifecycle.test.jsx",
-      "sha256": "133b2eac436726b691e021369eb3ae5930a6763a53c91bcba597fc65aa37daa2",
-      "bytes": 15485
+      "sha256": "f31934828b9cbf5dc8e935b6546c58f6874a5e83968693415cd2ef57bf0d51a3",
+      "bytes": 16858
     },
     {
       "path": "ui/react-app/src/SmartDisplay.spokePolicy.test.jsx",
