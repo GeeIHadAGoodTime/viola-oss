@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
+import { confirmDialog, promptDialog } from '../../../ViolaDialog';
 import ErrorBoundary from '../../../ErrorBoundary.jsx';
 import { THEME } from '../../../../config';
 import { apiFetch, buildStreamUrl } from '../../../../hooks/useViolaApi';
@@ -141,6 +142,8 @@ function ChatModeInner({
   const [threads, setThreads] = useState([]);
   const [activeThreadId, setActiveThreadId] = useState(null);
   const [activeThread, setActiveThread] = useState(null);
+  const activeThreadRef = useRef(null);
+  activeThreadRef.current = activeThread;
   const [messages, setMessages] = useState([]);
   const [search, setSearch] = useState('');
   const [threadListError, setThreadListError] = useState('');
@@ -1032,8 +1035,30 @@ function ChatModeInner({
     await loadThread(threadId);
   }, [loadThread, stopStreaming, retireModelSave]);
 
+  // The sidebar row can lag behind the open chat, which gets its real title
+  // from the first reply. Name the chat the user is looking at.
+  const threadTitle = useCallback((thread) => (
+    (activeThreadRef.current?.id === thread.id ? activeThreadRef.current.title : thread.title)
+    || thread.title
+    || 'New chat'
+  ), []);
+
+  // Keep the sidebar row on the title the open chat really has.
+  useEffect(() => {
+    const { id, title } = activeThread || {};
+    if (!id || !title) return;
+    setThreads((current) => (current.some((item) => item.id === id && item.title !== title)
+      ? current.map((item) => (item.id === id ? { ...item, title } : item))
+      : current));
+  }, [activeThread]);
+
   const renameThread = useCallback(async (thread, nextTitle) => {
-    const title = nextTitle ?? window.prompt('Rename chat', thread.title || 'New chat');
+    const title = nextTitle ?? await promptDialog({
+      title: 'Rename chat',
+      label: 'Chat name',
+      defaultValue: threadTitle(thread),
+      confirmLabel: 'Rename',
+    });
     if (!title || !title.trim()) return;
     const trimmed = title.trim();
     if (Array.from(trimmed).length > 200) {
@@ -1058,11 +1083,17 @@ function ChatModeInner({
         setThreadActionError('Could not confirm the new chat title. Please try again.');
       }
     }
-  }, []);
+  }, [threadTitle]);
 
   const deleteThread = useCallback(async (thread) => {
     const generation = requestGenerationRef.current;
-    if (!window.confirm(`Delete "${thread.title || 'New chat'}"?`)) return;
+    const confirmed = await confirmDialog({
+      title: `Delete "${threadTitle(thread)}"?`,
+      body: 'This chat and its messages will be removed.',
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (!confirmed) return;
     if (activeThreadIdRef.current === thread.id && streamingRef.current && !(await stopStreaming())) return;
     if (requestGenerationRef.current !== generation) return;
     await apiFetch(`/v1/chat/threads/${encodeURIComponent(thread.id)}`, { method: 'DELETE' });
@@ -1079,7 +1110,7 @@ function ChatModeInner({
         setMessages([]);
       }
     }
-  }, [loadThread, stopStreaming, threads]);
+  }, [loadThread, stopStreaming, threadTitle, threads]);
 
   const exportThread = useCallback(async (thread = activeThread) => {
     if (!thread || exportRequestRef.current) return;
@@ -1225,8 +1256,15 @@ function ChatModeInner({
       : [...messages.slice(0, messages.findIndex((item) => item.id === message.id))]
         .reverse()
         .find((item) => item.role === 'user')?.content || '';
-    const content = window.prompt('Edit message and branch', startingText);
-    if (!content || !activeThreadIdRef.current) return;
+    const content = await promptDialog({
+      title: 'Fork this chat',
+      label: 'Your message in the new chat. This chat stays as it is.',
+      defaultValue: startingText,
+      confirmLabel: 'Fork',
+      multiline: true,
+    });
+    if (!content || !content.trim() || !activeThreadIdRef.current) return;
+    if (streamingRef.current || requestGenerationRef.current !== generation) return;
     const sourceMessageId = message.role === 'user'
       ? message.id
       : [...messages.slice(0, messages.findIndex((item) => item.id === message.id))]

@@ -16,7 +16,7 @@ import type {
   User,
 } from '@supabase/auth-js';
 import { ACCEPTED_PRIVACY_VERSION, ACCEPTED_TERMS_VERSION } from '../auth/legalVersions';
-import { hydrateDesktopSessionFromCookie } from '../auth/authClient';
+import { hydrateDesktopSessionFromCookie, reattachDesktopSessionCookie } from '../auth/authClient';
 import { completeDesktopOAuth } from '../auth/desktopOAuth';
 import { isDesktopApp } from '../utils/runtimeSurface';
 import { inMemorySessionStorage } from './sessionStore';
@@ -497,12 +497,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch {
       return { session: null, transient: true };
     }
+    if (!hydrated.ok && !isTransientHydrationError(hydrated.error) && mayRestoreSession(restoration)) {
+      // A definite "no session for this cookie". The session store decides
+      // whether this computer is signed in, not the cookie: if it is, this page
+      // gets a new cookie and reads again (1.0.5 build 9, 11-05).
+      if (await reattachDesktopSessionCookie()) {
+        try {
+          hydrated = await hydrateDesktopSessionFromCookie();
+        } catch {
+          return { session: null, transient: true };
+        }
+      }
+    }
     if (!hydrated.ok || !hydrated.session) {
       return { session: null, transient: isTransientHydrationError(hydrated.error) };
     }
     const pair = hydrated.session;
     // Seed the auth-js client so its normal auto-refresh lifecycle takes over
     // (the returned pair is already rotated/valid from the store).
+    let restoreTransient = false;
     const session = await runSessionRestoration(async () => {
       if (!isMounted() || !mayRestoreSession(restoration)) return null;
       let restoredSession: Session | null;
@@ -518,7 +531,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // write. Preserve that uncertainty across later unrelated work.
         // An empty store remains a recoverable miss, not a poisoned drain.
         if (sdkSessionPresent()) retainSessionUncertainty(sdkSessionPresent);
-        if (isMounted() && mayRestoreSession(restoration)) setAuthError(restoreError);
+        // setSession reads the user from the cloud, so a blip right after a
+        // launch landed here and the page stayed signed out for the whole run.
+        restoreTransient = isTransientHydrationError(restoreError) || restoreError instanceof TypeError;
+        if (!restoreTransient && isMounted() && mayRestoreSession(restoration)) setAuthError(restoreError);
         return null;
       }
       if (!mayRestoreSession(restoration)) {
@@ -533,7 +549,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       return restoredSession;
     }, restoration);
-    return { session, transient: false };
+    return { session, transient: restoreTransient };
   }, [setAuthError]);
 
   const mountedRef = useRef(true);

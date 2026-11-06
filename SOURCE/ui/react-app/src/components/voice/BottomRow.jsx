@@ -4,6 +4,7 @@
  */
 import { useId } from 'react';
 import PropTypes from 'prop-types';
+import { useVoiceNotice } from '../../hooks/useVoiceNotice';
 import { useTranslation } from 'react-i18next';
 import { THEME } from '../../config';
 import ErrorBoundary from '../ErrorBoundary';
@@ -61,6 +62,7 @@ const BottomRow = ({
 }) => {
   const { t } = useTranslation();
   const micStatusId = useId();
+  const voiceNotice = useVoiceNotice(voice, lastResponse, isCommandLoading);
 
   return (
     <div className={`viola-bottom-row ${styles.container}`}>
@@ -68,7 +70,7 @@ const BottomRow = ({
       <ErrorBoundary name="AI Response">
         <div
           className={styles.responseArea}
-          role={voice.error ? 'alert' : 'status'}
+          role={voiceNotice ? 'alert' : 'status'}
           aria-live="polite"
           aria-atomic="true"
           style={{ color: isTyping ? THEME.colors.textPrimary : THEME.colors.textTertiary }}
@@ -112,21 +114,25 @@ const BottomRow = ({
                 <span className={styles.thinkingText} style={{ color: `${THEME.colors.statusYellow}CC` }}>
                   {processingTooLong ? t('voice.status.taking_longer') : t('voice.status.thinking')}
                 </span>
-              ) : voice.error ? (
-                /*
-                  Rendered through describeError rather than raw. This area is
-                  the only thing a user sees when a voice turn fails, so it must
-                  survive whatever the failure hands it: the API's failure
-                  envelope is an OBJECT (`{code, message}`), and React throws
-                  "Objects are not valid as a React child" on one, which the
-                  surrounding ErrorBoundary turned into "AI Response couldn't
-                  load" — losing the reason exactly when the user needed it.
-                  Normalising at the point of render means no upstream caller
-                  can ever crash this widget again.
-                */
-                <span style={{ color: `${THEME.colors.statusRed}CC` }}>{describeError(voice.error)}</span>
               ) : (
-                <span>{renderStageMarkdown(lastResponse)}</span>
+                <>
+                  {/*
+                    Rendered through describeError rather than raw. The API's
+                    failure envelope is an OBJECT (`{code, message}`), and React
+                    throws "Objects are not valid as a React child" on one,
+                    which the ErrorBoundary turned into "AI Response couldn't
+                    load". Normalising here means no upstream caller can crash
+                    this widget.
+
+                    The notice sits ABOVE the reply, never instead of it: it
+                    used to replace the reply line and, with nothing to clear
+                    it, hid every later reply for 70+ minutes (build 9, High 1).
+                  */}
+                  {voiceNotice && (
+                    <span style={{ color: `${THEME.colors.statusRed}CC` }}>{describeError(voiceNotice)}</span>
+                  )}
+                  <span>{renderStageMarkdown(lastResponse)}</span>
+                </>
               )}
             </div>
           )}

@@ -13,6 +13,7 @@ import React, { useState, useCallback, useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
 import { useAuth } from '../hooks/useAuth';
 import { useAuth as useCloudAuth } from '../auth/useAuth';
+import { reattachDesktopSessionCookie, signOut as authClientSignOut } from '../auth/authClient';
 import { enabledAuthProviders, expectedAuthProviderCount, peekEnabledAuthProviders } from '../auth/authProviders';
 import { isDesktopApp } from '../utils/runtimeSurface';
 import { isCloudSurface } from './auth/cloudSurface';
@@ -737,6 +738,8 @@ UpgradePanel.propTypes = {
 };
 
 // User Profile Card
+const BACKEND_ACCOUNT_RETRY_MS = 15000;
+
 const ProfileCard = ({ user, subscription, billingStatus = 'ready', onLogout, logoutPending = false, addToast, refreshUser }) => {
   const [portalLoading, setPortalLoading] = useState(false);
   const { usage } = useUsage();
@@ -2337,8 +2340,13 @@ export function AccountTab({
   // session but the backend has an account, re-read the desktop session; if
   // that still fails, say so instead of showing a bare Sign In form as if
   // nothing were signed in (1.0.5 build 5, A2.7, after an upgrade).
-  const needsBackendCheck = !loading && !effectiveIsLoggedIn && isDesktopApp();
-  const desktopAccount = useDesktopAccount({ enabled: needsBackendCheck });
+  // Asks whenever THIS provider has no session, even if the cloud provider
+  // does: plan, usage and billing all read through this one, and without it the
+  // card said "Checking plan…" with nothing left to finish the check.
+  const needsBackendCheck = !loading && !isLoggedIn && isDesktopApp();
+  const [backendRefreshKey, setBackendRefreshKey] = useState(0);
+  const [backendRetryKey, setBackendRetryKey] = useState(0);
+  const desktopAccount = useDesktopAccount({ enabled: needsBackendCheck, refreshKey: String(backendRefreshKey) });
   const [backendAccount, setBackendAccount] = useState(null);
   useEffect(() => {
     if (!needsBackendCheck || !desktopAccount?.signed_in) {
@@ -2346,12 +2354,35 @@ export function AccountTab({
       return undefined;
     }
     let cancelled = false;
-    (async () => {
+    let retryTimer;
+    const attempt = async () => {
       const restored = restoreDesktopSession ? await restoreDesktopSession() : false;
-      if (!cancelled && !restored) setBackendAccount({ email: desktopAccount.email || null });
-    })();
-    return () => { cancelled = true; };
-  }, [needsBackendCheck, desktopAccount, restoreDesktopSession]);
+      if (cancelled || restored) return;
+      setBackendAccount({ email: desktopAccount.email || null });
+      // Most often the account service is unreachable for a moment. Keep trying
+      // while this page is open, so it heals by itself.
+      retryTimer = setTimeout(attempt, BACKEND_ACCOUNT_RETRY_MS);
+    };
+    attempt();
+    return () => { cancelled = true; clearTimeout(retryTimer); };
+  }, [needsBackendCheck, desktopAccount, restoreDesktopSession, backendRetryKey]);
+
+  // This computer is signed in but the page cannot load the account right now.
+  // Sign-out still has to work, and it runs on the session store.
+  const handleBackendSignOut = useCallback(async () => {
+    setLogoutPending(true);
+    setLogoutError('');
+    try {
+      await reattachDesktopSessionCookie();
+      await authClientSignOut();
+      setBackendAccount(null);
+      setBackendRefreshKey((value) => value + 1);
+    } catch {
+      setLogoutError('Sign-out could not be completed. Please retry.');
+    } finally {
+      setLogoutPending(false);
+    }
+  }, []);
 
   // On cloud the front door owns the SDK bridge and its cleanup. A second
   // direct SDK logout would bypass that ownership queue. Desktop retains its
@@ -2447,7 +2478,9 @@ export function AccountTab({
     <>
       <Section title="Account">
         {logoutNotice}
-        {backendAccount && (
+        {backendAccount ? (
+          /* The session store says signed in, so this page never offers a
+             password form: one truth for the app and this page. */
           <div role="status" data-testid="backend-account-notice" style={{
             margin: '20px 24px 0',
             padding: '12px 14px',
@@ -2457,13 +2490,18 @@ export function AccountTab({
             fontSize: '14px',
             lineHeight: 1.5,
           }}>
-            {backendAccount.email
-              ? `Viola is signed in on this computer as ${backendAccount.email}, but this page could not load that sign-in.`
-              : 'Viola is signed in on this computer, but this page could not load that sign-in.'}
-            {' '}Sign in again below to manage your account here.
+            <p style={{ margin: 0 }}>
+              {backendAccount.email ? `Signed in as ${backendAccount.email}.` : 'Viola is signed in on this computer.'}
+              {' '}Your account details can't be loaded right now. Viola keeps trying.
+            </p>
+            <div style={{ display: 'flex', gap: '10px', marginTop: '12px' }}>
+              <Button variant="secondary" onClick={() => setBackendRetryKey((value) => value + 1)}>Try again</Button>
+              <Button variant="secondary" onClick={handleBackendSignOut} disabled={logoutPending}>
+                {logoutPending ? 'Signing out…' : 'Sign out'}
+              </Button>
+            </div>
           </div>
-        )}
-        <AuthForm />
+        ) : <AuthForm />}
       </Section>
 
       <Section title="Phone">

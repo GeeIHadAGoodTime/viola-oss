@@ -225,6 +225,18 @@ ChunkLoadErrorBoundary.propTypes = {
 // Trim it to a readable lead with a visible ellipsis instead.
 const RESPONSE_LINE_MAX_CHARS = 160;
 
+/**
+ * A long spoken answer, as a card. Over a playing video it must not sit in the
+ * middle of the picture for up to 90 s behind a dimmed screen (1.0.5 build 9):
+ * it docks in the corner, the video stays bright, and it leaves in 15 s. The
+ * full text stays in Chat History.
+ */
+export function longAnswerCard(body, overVideo) {
+  return overVideo
+    ? { type: 'detail', body, long_answer: true, compact: true, dismiss_after_ms: LONG_ANSWER_OVER_VIDEO_MS }
+    : { type: 'detail', body, long_answer: true };
+}
+
 export function truncateForResponseLine(text) {
   const value = typeof text === 'string' ? text.trim() : '';
   if (value.length <= RESPONSE_LINE_MAX_CHARS) return value;
@@ -431,6 +443,7 @@ function formatCallTitleElapsed(startedAt, fallbackMs = Date.now()) {
 
 // Embedded YouTube Player component - MUST be defined outside SmartDisplay
 // to prevent React from recreating it on every parent render
+const LONG_ANSWER_OVER_VIDEO_MS = 15000;
 const SPOKE_EMBED_URL = resolveYouTubeEmbedUrl(import.meta.env.VITE_YOUTUBE_EMBED_URL);
 const SPOKE_EMBED_ORIGIN = new URL(SPOKE_EMBED_URL).origin;
 
@@ -1898,6 +1911,14 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
   // =========================================================================
   const showNotificationsRef = useRef(true);
   showNotificationsRef.current = userSettings?.show_notifications ?? true;
+  const videoPlaying = Boolean(playerState.is_playing && playerState.now_playing?.video_id);
+  const videoPlayingRef = useRef(videoPlaying);
+  videoPlayingRef.current = videoPlaying;
+  // Video started while a long answer is up: the answer gets out of the way.
+  useEffect(() => {
+    if (!videoPlaying) return;
+    setActiveCard((card) => (card?.long_answer && !card.compact ? longAnswerCard(card.body, true) : card));
+  }, [videoPlaying]);
   useEffect(() => {
     if (!setChatResponseCallback) return;
     const handleChatResponse = (payload) => {
@@ -1934,9 +1955,10 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
           // An auto-promoted long answer has no title anyone wrote for it.
           // ContentCard omits the whole title block when `title` is absent,
           // and no title beats a slug titled "answer".
-          setActiveCard({ type: 'detail', body: text });
+          setActiveCard(longAnswerCard(text, videoPlayingRef.current));
+          // The card leaves on its own, and the answer must still be findable.
+          setChatHistory(prev => appendAssistantEntry(prev, text));
         }
-        // Don't add to chatHistory — card is the display
       } else {
         // Short responses: show in chat only, no card
         setLastResponse(`"${text}"`);
