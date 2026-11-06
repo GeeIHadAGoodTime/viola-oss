@@ -289,6 +289,7 @@ ROUTE_TOOL_SCHEMAS: list[dict[str, Any]] = [
         "description": (
             "Music player volume control for the active Viola music player. "
             "This changes the per-player music volume, not the machine-wide Windows/macOS/Linux output volume. "
+            "CURRENT SYSTEM STATE shows the current level. "
             "Every plain volume request (set the volume to 30, louder, quieter, turn it down) applies here, "
             "whether music is playing, paused or stopped. Use desktop_volume only when the user's own words say "
             "system, OS, desktop, speaker, computer, or master volume. "
