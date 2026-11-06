@@ -216,12 +216,7 @@ def _script_spans(text: str, base_language: str) -> list[SpeechSpan]:
     if base_language == "zh":
         # The Mandarin route reads Chinese and English itself; only a script
         # with no route has to come out.
-        return _join(
-            [
-                SpeechSpan(BASE, span.text) if span.language == MANDARIN else span
-                for span in spans
-            ]
-        )
+        return _join([SpeechSpan(BASE, span.text) if span.language == MANDARIN else span for span in spans])
     return spans
 
 

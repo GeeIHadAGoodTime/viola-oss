@@ -133,6 +133,7 @@ _SENTENCE_RE = re.compile(r"(?<=[.!?])\s+")
 # Character count threshold for chunking long text into sentences
 _CHUNK_THRESHOLD = 200
 
+_WARM_UP_SENTENCE = "Hello there, this is a short sentence."
 # Streamed speech: finished audio waiting behind the sentence being played.
 _SPEECH_LOOKAHEAD_UNITS = 2
 # Speech-unit limits (see _speech_units). The first unit is what the listener
@@ -478,8 +479,22 @@ class KokoroTTSEngine:
         startup from a background thread (see
         VoicePipelineInitializer._prewarm_synthesizer) so the load never blocks
         the first turn.
+
+        Loading is not enough: the first sentence after a load pays for the
+        pronunciation model's and ONNX Runtime's own first run (measured on the
+        customer route: 7.9 s, then 1.2 s for the same sentence). So one throwaway
+        sentence is rendered here too, where nobody is waiting for it.
         """
-        return self._ensure_loaded()
+        ready = self._ensure_loaded()
+        if ready and not getattr(self, "_warmed_up", False):
+            self._warmed_up = True
+            t0 = time.perf_counter()
+            try:
+                self._synthesize_locked(_WARM_UP_SENTENCE, None, apply_volume=False)
+                logger.info("Kokoro warm-up sentence rendered in %.2fs", time.perf_counter() - t0)
+            except (RuntimeError, ValueError, OSError) as exc:
+                logger.debug("Kokoro warm-up skipped: %s", exc)
+        return ready
 
     def _kick_off_opener_cache_build(self) -> None:
         """Schedule the opener cache build on a daemon thread (one-shot)."""
@@ -891,7 +906,9 @@ class KokoroTTSEngine:
         spanish_base = base.split("-", 1)[0] == "es"
         spans = speech_spans(text, base)
         if not spans or (len(spans) == 1 and spans[0].language == BASE):
-            return kokoro.create(spanish_route_text(text) if spanish_base else text, voice=voice, speed=speed, lang=base)
+            return kokoro.create(
+                spanish_route_text(text) if spanish_base else text, voice=voice, speed=speed, lang=base
+            )
 
         sample_rate = SAMPLE_RATE_24K
         parts: list[np.ndarray] = []

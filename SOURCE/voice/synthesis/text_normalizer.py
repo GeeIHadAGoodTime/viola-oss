@@ -238,7 +238,9 @@ _MONTH_DAY_RE = re.compile(
 _DAY_MONTH_RE = re.compile(
     r"\b(?:the\s+)?(\d{1,2})(?:st|nd|rd|th)?\s+(?:of\s+)?(" + _MONTH_PATTERN + r")\b(?:,?\s+(\d{4})\b)?"
 )
-_MONTH_YEAR_RE = re.compile(r"\b(" + "|".join(sorted(_MONTH_ABBREVIATIONS, key=len, reverse=True)) + r")\b\.?\s+(\d{4})\b")
+_MONTH_YEAR_RE = re.compile(
+    r"\b(" + "|".join(sorted(_MONTH_ABBREVIATIONS, key=len, reverse=True)) + r")\b\.?\s+(\d{4})\b"
+)
 
 _ONES = [
     "zero",
