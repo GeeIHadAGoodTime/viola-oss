@@ -153,8 +153,8 @@ _ANSWER_CHECK_MIN_STEPS = 15
 # A bad gateway on one model call must not end a run that has work in hand: T8b
 # lost three finished helpers to one HTTP 502.
 _TRANSIENT_TURN_RETRIES = 2
-_TRANSIENT_TURN_BACKOFF_S = 2.0
-_TRANSIENT_ERROR_CATEGORIES = frozenset({"server", "overloaded", "transport", "timeout"})
+_TRANSIENT_TURN_BACKOFF_S = 1.5
+_TRANSIENT_ERROR_CATEGORIES = frozenset({"server", "overloaded", "timeout"})
 _TRANSIENT_STATUS_TEXT_RE = re.compile(r"\b(?:500|502|503|504|529)\b")
 _HELPER_WAIT_S = 240.0
 
@@ -368,8 +368,10 @@ def _is_transient_turn_error(exc: BaseException) -> bool:
     from services.llm.request_policy import classify_provider_error
 
     # Some routes only carry the status in the message ("HTTP 502").
-    return classify_provider_error(exc) in _TRANSIENT_ERROR_CATEGORIES or bool(
-        _TRANSIENT_STATUS_TEXT_RE.search(str(exc))
+    return (
+        isinstance(exc, ConnectionError)
+        or classify_provider_error(exc) in _TRANSIENT_ERROR_CATEGORIES
+        or bool(_TRANSIENT_STATUS_TEXT_RE.search(str(exc)))
     )
 
 
