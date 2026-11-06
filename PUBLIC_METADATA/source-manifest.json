@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "e8e6be2861cba95f141740c4c62915c81d0fdc8f",
-  "sha256": "44009716176a098add89b350262d4dbec094da43680b3d5787a7c4f09bcb8231",
+  "revision": "ac6c3b1ab7687f035b769c057e22c034e2cfd8fe",
+  "sha256": "a04801d75e1e4fb6ca73460ae2d7d6a13b7893b1307ddda441a9c98e33518867",
   "files": [
     {
       "path": ".env.example",
@@ -5730,8 +5730,8 @@
     },
     {
       "path": "telephony/call_manager.py",
-      "sha256": "f0143ad5854b744a732f88eb90145cb31a83cfce1d59579ac3d99641d03605d2",
-      "bytes": 387369
+      "sha256": "689b6c8c2c3902a1e5a0675357756d3b7fd7beaee2c98cdef37f7f5151068b67",
+      "bytes": 387487
     },
     {
       "path": "telephony/call_queue.py",
@@ -6035,8 +6035,8 @@
     },
     {
       "path": "telephony/voicemail_detection.py",
-      "sha256": "417c1a9dfedfd12869a7ee208274770a9af4eb36267db78fd2f86074f70e9ee0",
-      "bytes": 28357
+      "sha256": "e20d6259cb8775649cc71a91c45153a528afc58bd894059a866a1952431d9d3b",
+      "bytes": 28969
     },
     {
       "path": "tests/customer_speech/test_real_cjk_pronunciation.py",
