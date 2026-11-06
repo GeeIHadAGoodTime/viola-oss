@@ -42,9 +42,9 @@ from intent.active_task import (
     add_turn_reminder,
     answer_from_helper_results,
     final_answer_is_off_task,
+    message_carries_request,
     off_task_answer_message,
     off_task_correction_text,
-    user_authored_text,
 )
 from intent.context_compaction import (
     compact_native_messages,
@@ -2635,7 +2635,7 @@ async def run_agent_loop(
             replacement_writer=lambda records: record_tool_result_replacements(executor, records),
             session_id=tool_result_replacement_session_id(executor),
         )
-        if turn_messages and active_task.request not in user_authored_text(turn_messages[-1]):
+        if turn_messages and not message_carries_request(turn_messages[-1], active_task.request):
             # Added to this outgoing copy only: the goal rides on every turn of a
             # working run whatever happens to history, and history does not grow.
             turn_messages = add_turn_reminder(turn_messages, active_task.render_reminder())

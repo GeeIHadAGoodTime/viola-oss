@@ -347,6 +347,22 @@ class ActiveTask:
         ) % _quoted(_shorten(self.request, _ANCHOR_REQUEST_CHARS))
 
 
+def message_carries_request(message: Any, request: str) -> bool:
+    """True when this message already says the request, so a reminder adds nothing."""
+
+    content = message.get("content") if isinstance(message, dict) else None
+    if isinstance(content, str):
+        return request in content
+    if isinstance(content, list):
+        return any(
+            isinstance(block, dict)
+            and block.get("type") in {"text", "input_text"}
+            and request in str(block.get("text", ""))
+            for block in content
+        )
+    return False
+
+
 def add_turn_reminder(messages: list[dict[str, Any]], reminder: str) -> list[dict[str, Any]]:
     """Return ``messages`` with ``reminder`` at the end of the last user turn.
 
