@@ -161,6 +161,11 @@ def irreversible_action_class(
         return "mcp_register"
     if name == "phone" and action == "call":
         return "phone_call"
+    if name == "phone" and action == "end":
+        # Hanging up a live call cannot be undone, and nobody on the line asked
+        # for it unless the user did: the model once tried this on a healthy call
+        # after a failed status read. The Phone tab's End button is separate.
+        return "phone_hangup"
     if name == "file_write":
         # Targeted gates (founder rule 2026-10-24): deletes, changes to files the
         # user never referred to, bulk moves and autostart/program locations
@@ -295,6 +300,8 @@ def describe_irreversible_action(tool_name: str, args: Mapping[str, Any] | None 
         if number and recipient:
             return "call %s at %s" % (recipient, number)
         return "call %s" % number if number else "place the phone call"
+    if action_class == "phone_hangup":
+        return "hang up the phone call"
     if action_class == "send_email":
         recipient = _clean(params.get("to") or params.get("recipient") or params.get("destination"))
         if name == "gmail" and _action(params) == "reply":

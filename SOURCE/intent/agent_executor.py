@@ -1136,6 +1136,7 @@ _ONE_SHOT_IRREVERSIBLE_CONFIRMATION_CLASSES: frozenset[str] = frozenset(
         "calendar_write",
         "email_bulk",
         "email_trash",
+        "phone_hangup",
         "send_email",
         "send_message",
         "send_sms",
@@ -8682,6 +8683,14 @@ class AgentExecutor:
                 tool_args=tool_args,
                 status="approved",
             )
+            if action_class == "phone_call":
+                # The tool can hold this turn for the whole call, and the PC then
+                # said nothing for 3 minutes (2026-11-05: first sentence 182 s
+                # after the command). Say the call is under way before it starts.
+                try:
+                    await self._speak("Okay, placing the call now. The Phone tab shows how it's going.")
+                except (AttributeError, OSError, RuntimeError, TypeError, ValueError):
+                    logger.debug("Call-started notice could not be spoken", exc_info=True)
             return True
 
         await self._broadcast_consult_user_event(

@@ -1110,6 +1110,15 @@ def _issuer_channel_info(channel: object | None) -> dict[str, Any]:
 
 _CLOUD_POLL_INTERVAL = 3.0  # seconds between status polls
 _CLOUD_POLL_TIMEOUT = 660.0  # max wait (10 min call + 1 min grace)
+# How long the status check may fail in a row before the tool stops waiting and
+# says it cannot see the call. One failed read says nothing about the call: prod
+# access tokens live 300 s, so any call longer than what is left of the token
+# used to dial gets a 401 from the status route while it is perfectly healthy
+# (call 3745134a, 2026-11-05: 401 at 150 s, then Viola tried to hang up on it).
+_CLOUD_POLL_OUTAGE_LIMIT = 120.0
+# The answer the poller gives when it stops watching a call whose real state it
+# does not know. Never a CallStatus: it must not read as an ending.
+_CLOUD_STATUS_UNAVAILABLE = "status_unavailable"
 
 # Terminal call statuses the cloud /api/phone/status endpoint can report. This
 # MUST cover every CallStatus the server treats as terminal
@@ -1220,43 +1229,83 @@ async def _cloud_make_call(
         return resp.json()
 
 
+async def _current_cloud_bearer(previous: str) -> str:
+    """Return a live bearer for the next cloud read, or *previous* if none resolves.
+
+    A token captured when the call was dialed is only good for the rest of its
+    300 s life, so a long-running watcher has to ask again. The resolver is
+    freshness-gated and refreshes through the desktop session, so this is cheap
+    while the token is good and mints a new one when it is not.
+    """
+    try:
+        return await _resolve_cloud_bearer_token() or previous
+    except (AttributeError, ImportError, OSError, RuntimeError, TypeError, ValueError):
+        logger.debug("Phone status poll could not re-resolve the cloud bearer", exc_info=True)
+        return previous
+
+
 async def _cloud_poll_status(
     cloud_url: str,
     token: str,
     call_id: str,
 ) -> dict[str, Any]:
-    """Poll cloud API until the call reaches a terminal status.
+    """Watch a cloud call until it ends or its state can no longer be seen.
 
     Terminal statuses: see ``_CLOUD_TERMINAL_STATUSES`` (kept in sync with the
     server's ``CallStatus`` terminal set — completed, failed, timeout,
     no_answer, voicemail, cancelled).
 
+    A failed read is never evidence about the call. Every read uses a freshly
+    resolved bearer, and an auth error, rate limit, server error or dropped
+    connection just means "ask again". Only a long unbroken run of failures, or
+    running out of the watch window, ends the wait, and then the answer is
+    ``_CLOUD_STATUS_UNAVAILABLE``, which says the call's state is unknown.
+
     Returns the final status response body.
     """
     terminal = _CLOUD_TERMINAL_STATUSES
-    headers = _cloud_headers(token)
     start = time.monotonic()
+    last_read = start
+    failures = 0
 
     async with httpx.AsyncClient(timeout=TIMEOUT_VERY_LONG) as client:
         while time.monotonic() - start < _CLOUD_POLL_TIMEOUT:
-            resp = await client.get(
-                "%s/api/phone/status" % cloud_url,
-                headers=headers,
-                params={"call_id": call_id},
-            )
-            resp.raise_for_status()
-            data = _unwrap_cloud_response_payload(resp.json())
+            token = await _current_cloud_bearer(token)
+            try:
+                resp = await client.get(
+                    "%s/api/phone/status" % cloud_url,
+                    headers=_cloud_headers(token),
+                    params={"call_id": call_id},
+                )
+                resp.raise_for_status()
+                data = _unwrap_cloud_response_payload(resp.json())
+            except (httpx.HTTPError, ValueError) as exc:
+                failures += 1
+                outage = time.monotonic() - last_read
+                detail = exc.response.status_code if isinstance(exc, httpx.HTTPStatusError) else type(exc).__name__
+                logger.info(
+                    "Cloud phone status read failed for call %s (%s, failure %d, %.0fs since the last good read); "
+                    "the call is unaffected, reading again",
+                    call_id,
+                    detail,
+                    failures,
+                    outage,
+                )
+                if outage >= _CLOUD_POLL_OUTAGE_LIMIT:
+                    break
+                await asyncio.sleep(_CLOUD_POLL_INTERVAL)
+                continue
+            failures = 0
+            last_read = time.monotonic()
             status = data.get("status", "")
             if status in terminal:
                 return data
             await asyncio.sleep(_CLOUD_POLL_INTERVAL)
 
-    # Timed out waiting for the call to complete
     return {
         "ok": False,
         "call_id": call_id,
-        "status": "timeout",
-        "error": "Polling timed out",
+        "status": _CLOUD_STATUS_UNAVAILABLE,
     }
 
 
@@ -1285,10 +1334,12 @@ async def _cloud_hangup(
     """Tell the cloud to hang up a call."""
     headers = _cloud_headers(token)
     async with httpx.AsyncClient(timeout=TIMEOUT_VERY_LONG) as client:
+        # The route reads call_id from the query string. A JSON body gets 422,
+        # so this tool could never end a call (2026-11-05, call 3745134a).
         resp = await client.post(
             "%s/api/phone/hangup" % cloud_url,
             headers=headers,
-            json={"call_id": call_id},
+            params={"call_id": call_id},
         )
         resp.raise_for_status()
         return resp.json()
@@ -1675,25 +1726,30 @@ async def _make_phone_call_cloud(
     # --- Poll for completion ---
     try:
         status_data = await _cloud_poll_status(cloud_url, token, call_id)
-    except (httpx.HTTPStatusError, httpx.ConnectError, httpx.TimeoutException):
-        # The dial itself succeeded (we hold a call_id), but contact was lost
-        # before any outcome came back. The call was asked to be placed AND
-        # reported on; only the first half is established, so this cannot ride
-        # an ok=True envelope -- that told the model the tool had done its job
-        # and let Viola speak about a call whose fate nobody knew.
-        logger.exception("Cloud phone status polling failed for call %s", call_id)
+    except httpx.HTTPError:
+        logger.exception("Cloud phone status polling stopped for call %s", call_id)
+        status_data = {"status": _CLOUD_STATUS_UNAVAILABLE}
+    if status_data.get("status") == _CLOUD_STATUS_UNAVAILABLE:
+        # We stopped watching; the call itself is not known to have changed at
+        # all. A failure envelope here made Viola tell the user a live call had
+        # gone wrong and then try to hang it up, so this is a plain "still going
+        # as far as we know" with the outcome marked unknown.
+        logger.warning("Cloud phone call %s: status not readable; leaving the call alone", call_id)
         return ToolResult(
-            ok=False,
-            error="The call was placed, but contact with the cloud was lost before its outcome was known.",
-            error_category="call_outcome_unknown",
-            retryable=False,
+            ok=True,
             unverified=True,
             data={
                 "call_id": call_id,
-                "status": "status_unknown",
+                "status": _CLOUD_STATUS_UNAVAILABLE,
                 "phone_number": phone_number,
                 "call_placed": True,
                 "outcome_known": False,
+                "no_retry": True,
+                "retryable": False,
+                "message": (
+                    "The call was placed and nothing says it has ended. Viola cannot see its progress right now. "
+                    "This is not a failure: leave the call alone and tell the user the Phone tab will show the result."
+                ),
             },
         )
 
@@ -1703,7 +1759,7 @@ async def _make_phone_call_cloud(
     transcript_data: dict[str, Any] = {}
     if final_status in _CLOUD_TRANSCRIPT_STATUSES:
         try:
-            transcript_data = await _cloud_get_transcript(cloud_url, token, call_id)
+            transcript_data = await _cloud_get_transcript(cloud_url, await _current_cloud_bearer(token), call_id)
         except Exception:
             logger.warning("Failed to fetch transcript for call %s", call_id)
 
@@ -1779,15 +1835,21 @@ async def check_call_status(call_id: str) -> ToolResult:
     except httpx.HTTPStatusError as exc:
         if exc.response.status_code == 404:
             return ToolResult(ok=False, error="Call %s not found." % call_id)
-        return ToolResult(
-            ok=False,
-            error="Cloud status check failed (HTTP %d)." % exc.response.status_code,
-        )
-    except (httpx.ConnectError, httpx.TimeoutException):
-        return ToolResult(
-            ok=False,
-            error="Cannot reach cloud backend.",
-        )
+        return _call_status_unreadable_result(call_id, "HTTP %d" % exc.response.status_code)
+    except (httpx.ConnectError, httpx.TimeoutException) as exc:
+        return _call_status_unreadable_result(call_id, type(exc).__name__)
+
+
+def _call_status_unreadable_result(call_id: str, detail: str) -> ToolResult:
+    """A status read that failed tells us about the read, not about the call."""
+    return ToolResult(
+        ok=False,
+        error="Viola could not read this call's status (%s). That says nothing about the call itself." % detail,
+        error_category="call_status_unreadable",
+        retryable=True,
+        unverified=True,
+        data={"call_id": call_id, "status": _CLOUD_STATUS_UNAVAILABLE, "outcome_known": False},
+    )
 
 
 async def end_phone_call(call_id: str) -> ToolResult:

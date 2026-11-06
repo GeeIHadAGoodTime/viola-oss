@@ -55,5 +55,7 @@ CORE_PHONE_TOOL_DESCRIPTION = (
     "Make and manage AI-driven phone calls. "
     + OUTBOUND_PHONE_CALL_DESCRIPTION
     + " Actions: call (needs the destination phone number with its country code), status, end, transcript. action='call' starts a call; "
-    "status monitors progress, transcript retrieves the outcome, and end terminates an active call early."
+    "status monitors progress, transcript retrieves the outcome, and end terminates an active call early. "
+    "Use end only when the user asks to hang up. A failed or unreadable status says nothing about the call: "
+    "never end a call, or tell the user it failed, because of one."
 )
