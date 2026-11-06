@@ -294,6 +294,39 @@ _TASKBAR_HRINIT = 3
 _TASKBAR_MARK_FULLSCREEN = 8
 
 
+def force_foreground(hwnd: int, user32=None, kernel32=None) -> bool:
+    """Put this window in front when the user asked for it (a second launch).
+
+    Qt's activateWindow only flashes the taskbar when Windows' foreground lock
+    refuses it, and the second launch that asks is not the foreground process
+    by then, so a minimized Viola came back behind everything (1.0.5 build 9).
+    Sharing the foreground thread's input for the one call is what Qt itself
+    does for its "always activate" mode. Windows only; never raises.
+    """
+    if not hwnd or (user32 is None and sys.platform != "win32"):
+        return False
+    try:
+        import ctypes
+
+        user32 = user32 or ctypes.WinDLL("user32")
+        kernel32 = kernel32 or ctypes.WinDLL("kernel32")
+        foreground = user32.GetForegroundWindow()
+        if foreground == hwnd:
+            return True
+        ours = kernel32.GetCurrentThreadId()
+        theirs = user32.GetWindowThreadProcessId(foreground, None) if foreground else 0
+        attached = bool(theirs and theirs != ours and user32.AttachThreadInput(theirs, ours, True))
+        try:
+            user32.BringWindowToTop(hwnd)
+            return bool(user32.SetForegroundWindow(hwnd))
+        finally:
+            if attached:
+                user32.AttachThreadInput(theirs, ours, False)
+    except Exception as exc:  # noqa: BLE001, RUF100 - bringing a window forward must never break restore
+        logger.debug("force_foreground failed: %s", exc)
+        return False
+
+
 def mark_taskbar_fullscreen(hwnd: int, fullscreen: bool) -> bool:
     """Tell the Windows shell this window is (or no longer is) full screen.
 
@@ -2887,6 +2920,7 @@ class ViolaWebViewWindow(QMainWindow):
             self.showNormal()
         self.raise_()
         self.activateWindow()
+        logger.info("Window restored: in_front=%s", force_foreground(int(self.winId())))
         if was_off_screen:
             QTimer.singleShot(_RESTORE_SURFACE_REFRESH_MS, self._refresh_page_surface)
 
@@ -3223,8 +3257,8 @@ class ViolaWebViewWindow(QMainWindow):
             timer.start()
 
     def _poll_touch_keyboard(self) -> None:
-        """Lift the page above a docked touch keyboard; stop once it is gone."""
-        from ui.qt_native.touch_input import Rect, bottom_inset_for
+        """Lift the page above the touch keyboard; stop once it is gone."""
+        from ui.qt_native.touch_input import Rect, bottom_inset_for, floating_inset_for, floating_keyboard_rect
 
         keyboard = getattr(self, "_touch_keyboard", None)
         occluded = keyboard.occluded_rect() if keyboard is not None else None
@@ -3237,6 +3271,15 @@ class ViolaWebViewWindow(QMainWindow):
             # only its height so the rectangle's coordinate origin cannot matter.
             docked = Rect(area.x(), area.y() + area.height() - occluded.height, area.width(), occluded.height)
             inset = bottom_inset_for(Rect(geo.x(), geo.y(), geo.width(), geo.height()), docked)
+        elif screen is not None:
+            # Floating: Windows reports no covered area, so ask where it is.
+            # Its window is in physical pixels, the Qt geometry is not.
+            found = floating_keyboard_rect()
+            if found is not None:
+                scale = self.devicePixelRatioF() or 1.0
+                geo = self.geometry()
+                keyboard = Rect(found.x / scale, found.y / scale, found.width / scale, found.height / scale)
+                inset = floating_inset_for(Rect(geo.x(), geo.y(), geo.width(), geo.height()), keyboard)
         self._apply_touch_keyboard_inset(inset)
         if inset:
             self._touch_keyboard_idle_polls = 0
