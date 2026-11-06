@@ -1015,10 +1015,40 @@ def _native_boundary_message(result: Any) -> dict[str, Any]:
     }
 
 
+def _as_loop_assistant_message(message: dict[str, Any]) -> dict[str, Any]:
+    """Store an assistant tool turn the way the agent loop stores every other one.
+
+    The frame renderer gives Anthropic ``tool_use`` blocks. Managed turns are
+    converted on the cloud, whose converter dropped those blocks and then every
+    kept tool result as an orphan, so this must not depend on a cloud deploy.
+    """
+    content = message.get("content")
+    if message.get("role") != "assistant" or not isinstance(content, list):
+        return message
+    tool_calls = [
+        {
+            "id": block.get("id", ""),
+            "type": "function",
+            "function": {
+                "name": block.get("name", ""),
+                "arguments": json.dumps(block.get("input") or {}, ensure_ascii=False, default=str),
+            },
+        }
+        for block in content
+        if isinstance(block, dict) and block.get("type") == "tool_use"
+    ]
+    if not tool_calls:
+        return message
+    text = "\n".join(str(block.get("text", "")) for block in content if isinstance(block, dict) and "text" in block)
+    return {**message, "content": {"_openai_assistant": True, "content": text, "tool_calls": tool_calls}}
+
+
 def _frames_to_native_messages(frames: list[Frame]) -> list[dict[str, Any]]:
     rendered = render_for_anthropic(PromptFrameBundle(frames=frames))
     messages = rendered.get("messages")
-    return messages if isinstance(messages, list) else []
+    if not isinstance(messages, list):
+        return []
+    return [_as_loop_assistant_message(message) if isinstance(message, dict) else message for message in messages]
 
 
 async def compact_messages(
