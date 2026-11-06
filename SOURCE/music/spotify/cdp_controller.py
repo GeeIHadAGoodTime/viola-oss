@@ -2039,11 +2039,9 @@ class SpotifyCDPController:
             logger.debug("Spotify sign-in refresh for the handoff failed", exc_info=True)
 
     def _sign_in_available(self) -> bool:
-        """Is there a Spotify sign-in anywhere? If not, the player has no reason to start."""
+        """Is there a Spotify sign-in? If not, the player has no reason to start."""
         self._refresh_bridge_cookies()
-        if has_spotify_auth_cookie(get_cached_spotify_cookies(user_id=self._user_id)):
-            return True
-        return has_cdp_session_cookies(user_id=self._user_id)
+        return has_spotify_auth_cookie(get_cached_spotify_cookies(user_id=self._user_id))
 
     def _ensure_running_impl(self) -> None:
         """Ensure the player is running, connected and signed in.
@@ -3366,6 +3364,9 @@ class SpotifyCDPController:
         self._account_tier_cache = None
         self._account_tier_cache_at = 0.0
 
+        root_pid = self._chrome_proc.pid if self._chrome_proc is not None else None
+        tree = _chrome_process_tree(root_pid) if root_pid else set()
+        started = time.monotonic()
         self._close_browser_gracefully()
         self._stop_playwright_session()
 
@@ -3373,6 +3374,8 @@ class SpotifyCDPController:
         self._terminate_tracked_chrome()
         if adopted:
             self._close_unusable_profile_chrome()
+        self._end_process_tree(tree)
+        logger.info("Spotify player closed in %.1fs", time.monotonic() - started)
         self._cdp_port = None
         self._remove_devtools_active_port_file()
 
@@ -3441,6 +3444,25 @@ class SpotifyCDPController:
             return False
         return bool(prefs.get("account_info"))
 
+    @staticmethod
+    def _end_process_tree(pids: set[int]) -> None:
+        """Nothing of the player may outlive it: helpers hold the profile's files open."""
+        try:
+            import psutil
+        except ImportError:
+            return
+        procs = []
+        for pid in pids:
+            try:
+                proc = psutil.Process(pid)
+                proc.kill()
+                procs.append(proc)
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                continue
+        _gone, alive = psutil.wait_procs(procs, timeout=5)
+        if alive:
+            logger.warning("Spotify player: %d process(es) still closing", len(alive))
+
     def _close_browser_gracefully(self) -> None:
         """Let the browser write its cookies before it goes.
 
@@ -3453,7 +3475,7 @@ class SpotifyCDPController:
             self._browser.new_browser_cdp_session().send("Browser.close")
             proc = self._chrome_proc
             if proc is not None:
-                proc.wait(timeout=3)
+                proc.wait(timeout=2)
         except Exception as exc:
             logger.debug("Graceful browser close failed: %s", exc)
 

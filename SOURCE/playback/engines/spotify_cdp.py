@@ -513,6 +513,12 @@ class SpotifyCDPEngine(ProviderPlaybackEngine):
             log_diagnostic(self._get_controller(), reason=code)
         except Exception:
             self._logger.debug("Spotify diagnostic after a failed play did not run", exc_info=True)
+        if state == connection.SESSION_REJECTED:
+            # A player nobody can use has no reason to keep running.
+            try:
+                self._get_controller().shutdown()
+            except Exception:
+                self._logger.debug("Spotify player shutdown after a refused sign-in failed", exc_info=True)
 
     def _play(
         self,

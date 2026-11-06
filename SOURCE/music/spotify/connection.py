@@ -190,16 +190,6 @@ def _sign_in_present(user_id: str) -> bool | None:
         return None
 
 
-def _player_profile_signed_in(user_id: str) -> bool:
-    """Does the playback profile still hold a sign-in cookie? (Sign-in store unreadable or empty.)"""
-    try:
-        from music.spotify.cdp_controller import has_cdp_session_cookies
-
-        return bool(has_cdp_session_cookies(user_id=user_id))
-    except Exception:
-        return False
-
-
 def get_spotify_connection(user_id: str | None = None) -> SpotifyConnection:
     """The current answer. Blocking but cheap; async callers use ``asyncio.to_thread``.
 
@@ -217,17 +207,18 @@ def get_spotify_connection(user_id: str | None = None) -> SpotifyConnection:
         return SpotifyConnection(CHECKING, _MESSAGES[CHECKING])
 
     verdict = _load_verdict(resolved)
+    # The in-app store is the only sign-in there is. Files left in the playback
+    # profile are not: Disconnect can't always delete them at once, and they must
+    # not bring Spotify back.
     sign_in = _sign_in_present(resolved)
-    has_sign_in = bool(sign_in) or _player_profile_signed_in(resolved)
     if sign_in is None and verdict is not None:
-        # The sign-in store can't be read right now: the last verdict stands.
-        has_sign_in = True
+        sign_in = True  # the store can't be read right now: the last verdict stands
 
-    if not has_sign_in:
+    if not sign_in:
         return SpotifyConnection(NOT_SIGNED_IN, _MESSAGES[NOT_SIGNED_IN])
 
     if verdict is None:
-        start_verification(resolved, reason="sign_in_without_verdict")
+        start_verification(resolved, reason="sign_in_without_verdict", notify_failure=True)
         return SpotifyConnection(CHECKING, _MESSAGES[CHECKING])
 
     state = str(verdict.get("state"))
@@ -254,9 +245,20 @@ def verify_now(user_id: str, *, reason: str) -> SpotifyConnection:
     from music.providers.spotify_cdp import get_cdp_controller
 
     logger.info("Spotify connection: checking the sign-in in the player (%s)", reason)
-    report = get_cdp_controller(user_id=user_id).check_session()
+    controller = get_cdp_controller(user_id=user_id)
+    report = controller.check_session()
     state = str(report.get("state") or PLAYER_UNAVAILABLE)
-    return record_verdict(user_id, state, detail=str(report.get("detail") or reason))
+    result = record_verdict(user_id, state, detail=str(report.get("detail") or reason))
+    try:
+        from music.spotify.diagnostic import log_diagnostic
+
+        log_diagnostic(controller, reason="check_%s" % reason)
+    except Exception:
+        logger.debug("Spotify diagnostic after the check did not run", exc_info=True)
+    if not result.connected:
+        # A player nobody can use has no reason to keep running.
+        controller.shutdown()
+    return result
 
 
 def start_verification(user_id: str, *, reason: str, notify_failure: bool = False) -> bool:
