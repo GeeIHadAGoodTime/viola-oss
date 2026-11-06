@@ -4667,6 +4667,8 @@ async def api_credential(
     description=(
         "Manage the user's saved Viola playlists, stored locally and persistent across sessions. "
         "Actions: create, add_track using a track_uri from media search results, list, delete, play a saved playlist, or play favorites. "
+        "Building and playing a playlist needs no permission from the user, so never ask before create, add_track or play. "
+        "Viola's own prompt confirms a delete once, so do not ask in words as well; deleting a playlist that is playing stops it. "
         "Does not search the public web, answer music facts, or control transport; media finds and plays selectable tracks, and playback controls pause/skip/seek."
     ),
     annotations=_DANGEROUS,

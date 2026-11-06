@@ -187,7 +187,7 @@ class PlaybackSessionController:
     # Playlist Session Management
     # ------------------------------------------------------------------ #
 
-    async def start_playlist(self, playlist_name: str, shuffle: bool = True) -> bool:
+    async def start_playlist(self, playlist_name: str, shuffle: bool = True, user_id: str | None = None) -> bool:
         """
         Start a playlist session.
 
@@ -196,6 +196,7 @@ class PlaybackSessionController:
         Args:
             playlist_name: Name of the playlist to play
             shuffle: Whether to shuffle the playlist (default True)
+            user_id: Owner of the playlist; None uses the ambient user
 
         Returns:
             True if playlist started successfully, False otherwise
@@ -213,6 +214,7 @@ class PlaybackSessionController:
                 limit=500,  # Fetch full playlist
                 shuffle=shuffle,
                 progressive=False,
+                user_id=user_id,
             )
 
             videos_value = to_json_value(videos)
@@ -257,6 +259,14 @@ class PlaybackSessionController:
         if self._state_mgr is not None:
             self._state_mgr.set_playback_mode(PlaybackMode.FREEFORM)
         self._logger.info("Exited playlist mode, now in FREEFORM mode")
+
+    def end_playlist_session(self, playlist_name: str) -> bool:
+        """End the session if it is this playlist. True when one was ended."""
+        session = self._playlist_session
+        if session is None or session.playlist_name.casefold() != str(playlist_name).strip().casefold():
+            return False
+        self.exit_playlist_mode()
+        return True
 
     def get_playlist_session(self) -> PlaylistSession | None:
         """Get current playlist session if any."""

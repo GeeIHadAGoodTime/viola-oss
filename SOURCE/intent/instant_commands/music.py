@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from ._base import *
+from utils.audio_ducking import player_level_for_user_volume
 
 _NO_MUSIC_TO_RESUME_MESSAGE = "I don't have any music to resume. What would you like to play?"
 
@@ -1245,7 +1246,15 @@ class MusicHandlersMixin:
         - MusicPlayer / ControlSurface: state() returns PlayerState with .volume
         - MusicControllerAdapter: state() returns a dict with "volume" key
         - Mocks / adapters: may expose a .volume or ._volume attribute directly
+
+        While speech holds the music down the player's level is the duck level;
+        "volume up" counts from what the user chose, not from that.
         """
+        from utils.audio_ducking import user_volume_while_ducked
+
+        ducked_from = user_volume_while_ducked()
+        if ducked_from is not None:
+            return ducked_from
         music = self.controller.music
         # Try state() method first (MusicPlayer / ControlSurface)
         if hasattr(music, "state") and callable(music.state):
@@ -1277,7 +1286,7 @@ class MusicHandlersMixin:
         try:
             current_vol = self._get_current_volume()
             new_vol = min(100, current_vol + 10)
-            result = self.controller.music.set_volume(new_vol)
+            result = self.controller.music.set_volume(player_level_for_user_volume(new_vol))
             if asyncio.iscoroutine(result):
                 result = await result
             return {
@@ -1299,7 +1308,7 @@ class MusicHandlersMixin:
         try:
             current_vol = self._get_current_volume()
             new_vol = max(0, current_vol - 10)
-            result = self.controller.music.set_volume(new_vol)
+            result = self.controller.music.set_volume(player_level_for_user_volume(new_vol))
             if asyncio.iscoroutine(result):
                 result = await result
             return {
@@ -1340,7 +1349,7 @@ class MusicHandlersMixin:
                     }
                 level = int(level_match.group(1))
             level = max(0, min(100, level))
-            result = self.controller.music.set_volume(level)
+            result = self.controller.music.set_volume(player_level_for_user_volume(level))
             if asyncio.iscoroutine(result):
                 result = await result
             return {

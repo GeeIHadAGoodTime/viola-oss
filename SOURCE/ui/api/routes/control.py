@@ -182,11 +182,14 @@ def register_control_routes(context: ApiContext, toolbox: RouteToolbox) -> None:
         # and the /v1/player/state endpoint include them.
         try:
             from core.state_selectors import select_repeat_mode, select_shuffle_enabled
+            from utils.audio_ducking import user_volume_while_ducked
 
+            ducked_from = user_volume_while_ducked()
             result = result.model_copy(
                 update={
                     "repeat_mode": select_repeat_mode(),
                     "shuffle": select_shuffle_enabled(),
+                    "user_volume": ducked_from if ducked_from is not None else result.volume,
                 }
             )
         except Exception:
@@ -1112,11 +1115,17 @@ def register_control_routes(context: ApiContext, toolbox: RouteToolbox) -> None:
         user_id: str = Depends(get_current_user_id),
     ):
         async def _inner():
+            from utils.audio_ducking import player_level_for_user_volume
+
             level = int(body.level)
             applied_level = level
+            # While Viola talks the music stays ducked; the level still counts.
+            player_level = player_level_for_user_volume(level)
             try:
                 if hasattr(music, "set_volume"):
-                    set_result = await asyncio.wait_for(asyncio.to_thread(music.set_volume, level), timeout=5.0)
+                    set_result = await asyncio.wait_for(
+                        asyncio.to_thread(music.set_volume, player_level), timeout=5.0
+                    )
                     volume_error = _adapter_failure_error(set_result, default_code="volume_failed")
                     if volume_error is not None:
                         # The adapter reported the player could not change volume
@@ -1138,10 +1147,10 @@ def register_control_routes(context: ApiContext, toolbox: RouteToolbox) -> None:
                             content={"ok": False, "volume": None, "error": volume_error},
                         )
                     extracted = _extract_applied_volume(set_result)
-                    if extracted is not None:
+                    if extracted is not None and player_level == level:
                         applied_level = extracted
                 if hasattr(state, "volume"):
-                    state.volume = applied_level
+                    state.volume = player_level
             except TimeoutError:
                 log.error("music.set_volume() timed out")
                 return _control_error_response(
@@ -1158,7 +1167,7 @@ def register_control_routes(context: ApiContext, toolbox: RouteToolbox) -> None:
                 )
             try:
                 ps = (await _safe_state_adapter(music, state)).model_dump()
-                await hub.broadcast("state", ps, user_id=user_id)
+                await hub.broadcast("state", ps, user_id=user_id, force=True)
             except Exception as exc:
                 log.warning("Failed to broadcast state after volume: %s", exc)
 

@@ -1719,6 +1719,18 @@ def create_settings_router(*, music_service: object | None = None) -> APIRouter:
         user_id = _get_request_user_id(request)
         try:
             success = playlist_mgr.add_playlist(name, url, shuffle, user_id=user_id)
+            if success:
+                # "Saved" promises the user can play it by name, so read the
+                # songs now. A link Viola cannot read is not saved at all: the
+                # form says so instead of green text and a failure later. This
+                # also fills the track cache, so the first play starts sooner.
+                tracks = await playlist_mgr.get_playlist_videos(
+                    name, limit=1, shuffle=False, progressive=False, force_refresh=True, user_id=user_id
+                )
+                if not tracks:
+                    playlist_mgr.remove_playlist(name, user_id=user_id)
+                    logger.warning("Playlist link for %r gave no songs; not saved", name)
+                    success = False
             return JSONResponse(content=success_response(_playlist_response_payload(ok=success, user_id=user_id)))
         except Exception:
             logger.exception("Failed to add playlist")
@@ -1730,6 +1742,10 @@ def create_settings_router(*, music_service: object | None = None) -> APIRouter:
         user_id = _get_request_user_id(request)
         try:
             success = playlist_mgr.remove_playlist(name, user_id=user_id)
+            if success:
+                from intent.tools.playlist_tools import end_deleted_playlist_playback
+
+                await end_deleted_playlist_playback(name)
             return JSONResponse(content=success_response(_playlist_response_payload(ok=success, user_id=user_id)))
         except Exception:
             logger.exception("Failed to delete playlist '%s'", name)

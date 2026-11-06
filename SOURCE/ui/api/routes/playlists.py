@@ -106,7 +106,10 @@ def register_playlist_routes(context: ApiContext, toolbox: RouteToolbox) -> None
 
                     return error_response("not_found", status_code=404, message="Playlist %r not found" % name)
                 log.info("Deleted playlist %r", name)
-                return {"ok": True, "deleted": True, "name": name}
+                from intent.tools.playlist_tools import end_deleted_playlist_playback
+
+                stopped = await end_deleted_playlist_playback(name)
+                return {"ok": True, "deleted": True, "name": name, "stopped_playback": stopped}
             except Exception as exc:
                 log.debug("delete_playlist failed: %s", exc)
                 return handle_route_error(exc, "delete_playlist")

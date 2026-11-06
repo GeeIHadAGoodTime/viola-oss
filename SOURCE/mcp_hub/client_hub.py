@@ -438,6 +438,7 @@ def _legacy_computer_alias(tool_name: str, args: dict[str, Any]) -> tuple[str, d
             "level": args.get("percent"),
             "mute": args.get("mute"),
             "step": args.get("step", 10),
+            "system_volume_word": args.get("system_volume_word", ""),
         }
 
     if tool_name == "desktop_observe":

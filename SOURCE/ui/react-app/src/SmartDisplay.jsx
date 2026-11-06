@@ -1545,6 +1545,9 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
   const hasQueuedTracks = Array.isArray(playerState.queue) && playerState.queue.length > 0;
   const canResumePlayback = Boolean(nowPlaying) || hasQueuedTracks;
   const volume = playerState.volume ?? 80;
+  // While Viola talks `volume` is the ducked level the iframe must follow; the
+  // slider shows the level the user chose.
+  const sliderVolume = playerState.user_volume ?? volume;
 
   // Desktop notification on track change
   const prevTrackTitleRef = useRef(null);
@@ -2497,6 +2500,8 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
       try {
         await api.setRating(actualRating, expectedTrackId);
         settleRating(true);
+        // Dislike means "not this one": same skip as the Next button.
+        if (actualRating === 'disliked') runSkipAction();
       } catch (err) {
         if (ratingSessionRef.current !== session) return;
         settleRating(false);
@@ -3606,7 +3611,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
       displayProgress={displayProgress}
       displayPosition={displayPosition}
       displayDuration={displayDuration}
-      volume={volume}
+      volume={sliderVolume}
       shuffleOn={shuffleOn}
       repeatMode={repeatMode}
       rating={rating}

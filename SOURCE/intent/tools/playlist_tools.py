@@ -144,6 +144,42 @@ async def _confirm_runtime_playback() -> tuple[str, dict[str, Any] | None]:
     return VERIFY_NOT_PLAYING, now
 
 
+def _link_playlists(user_id: str) -> dict[str, dict[str, Any]]:
+    """Playlists saved by link (Settings > Add a playlist, Sync from YouTube).
+
+    They live in the PlaylistManager store, not the SQLite track store, because
+    they are a link rather than a list of tracks. The tool used to look only at
+    SQLite, so the name the Settings form tells the user to say answered "No
+    playlists saved yet" (1.0.5 laptop T2). The manager is desktop-only state.
+    """
+    from core.user_context import _is_cloud_surface
+
+    if _is_cloud_surface():
+        return {}
+    from music.playlist_manager import get_playlist_manager
+
+    return dict(get_playlist_manager().list_playlists(user_id=user_id) or {})
+
+
+async def end_deleted_playlist_playback(name: str) -> bool:
+    """A deleted playlist stops playing: end its session, stop, clear what it queued.
+
+    Deleting used to touch only the store. The armed session stayed on the
+    playback controller and kept refilling the queue from a playlist that no
+    longer existed (1.0.5 laptop T2). A delete of any other playlist leaves the
+    music alone.
+    """
+    from music.playback_session import get_playback_session_controller
+
+    if not get_playback_session_controller().end_playlist_session(name):
+        return False
+    for path in ("/v1/stop", "/v1/queue/clear"):
+        response = await _post_runtime(path, {})
+        if not response.get("ok"):
+            logger.warning("Deleted playlist %r: %s failed: %s", name, path, _runtime_error(response))
+    return True
+
+
 async def create_playlist_handler(
     name: str,
     url: str = "",
@@ -208,15 +244,20 @@ async def list_playlists_handler(user_id: str = "") -> ToolResult:
         store = PlaylistStore()
         # Async-native: cloud `playlist` tool on the serving loop (CL-20260711-afd7).
         playlists = await store.list_playlists_async(resolved_user_id)
-        if not playlists:
+        linked = _link_playlists(resolved_user_id)
+        if not playlists and not linked:
             return ToolResult(
                 ok=True,
                 data="No playlists saved. Use create_playlist to add one.",
             )
         lines = []
-        for i, pl in enumerate(playlists, 1):
+        for pl in playlists:
             track_count = len(await store.get_tracks_async(resolved_user_id, pl.name))
-            lines.append("%d. %s (%d tracks)" % (i, pl.name, track_count))
+            lines.append("%d. %s (%d tracks)" % (len(lines) + 1, pl.name, track_count))
+        known = {pl.name.casefold() for pl in playlists}
+        for link_name in linked:
+            if link_name.casefold() not in known:
+                lines.append("%d. %s (saved link)" % (len(lines) + 1, link_name))
         return ToolResult(ok=True, data="\n".join(lines))
     except Exception as exc:
         return ToolResult(ok=False, data=None, error="list_playlists failed: %s" % exc)
@@ -244,8 +285,16 @@ async def delete_playlist_handler(name: str, user_id: str = "") -> ToolResult:
         store = PlaylistStore()
         # Async-native: cloud `playlist` tool on the serving loop (CL-20260711-afd7).
         deleted = await store.delete_playlist_async(resolved_user_id, name)
+        if name.lower() in _link_playlists(resolved_user_id):
+            from music.playlist_manager import get_playlist_manager
+
+            deleted = get_playlist_manager().remove_playlist(name, user_id=resolved_user_id) or deleted
         if deleted:
-            return ToolResult(ok=True, data="Playlist %r deleted." % name)
+            stopped = await end_deleted_playlist_playback(name)
+            return ToolResult(
+                ok=True,
+                data="Playlist %r deleted.%s" % (name, " It was playing, so I stopped it." if stopped else ""),
+            )
         return ToolResult(ok=False, data=None, error="Playlist %r not found." % name)
     except Exception as exc:
         return ToolResult(ok=False, data=None, error="delete_playlist failed: %s" % exc)
@@ -285,8 +334,11 @@ async def play_playlist_handler(name: str, user_id: str = "") -> ToolResult:
         # Async-native: cloud `playlist` tool on the serving loop (CL-20260711-afd7).
         playlist = await store.get_playlist_async(resolved_user_id, name)
         if playlist is None:
+            linked = _link_playlists(resolved_user_id)
+            if name.lower() in linked:
+                return await _play_link_playlist(name, resolved_user_id)
             all_playlists = await store.list_playlists_async(resolved_user_id)
-            all_names = [pl.name for pl in all_playlists]
+            all_names = [pl.name for pl in all_playlists] + list(linked)
             hint = "Available: %s" % ", ".join(all_names) if all_names else "No playlists saved yet."
             return ToolResult(
                 ok=False,
@@ -314,63 +366,98 @@ async def play_playlist_handler(name: str, user_id: str = "") -> ToolResult:
                 % name,
             )
 
-        first_track = outcome.first_track or {}
-        play_query = _playable_query(first_track)
-        if not play_query:
-            return ToolResult(
-                ok=False,
-                data=None,
-                error="Playlist %r has tracks, but none of them carry a playable URL or title." % name,
-            )
-
-        response = await _post_runtime("/v1/play", {"query": play_query})
-        if int(response.get("_status_code", 0) or 0) != 200 or not response.get("ok"):
-            return ToolResult(
-                ok=False,
-                data={
-                    "playlist": name,
-                    "track_count": outcome.track_count,
-                    "requested_track": first_track.get("title") or play_query,
-                    "response": response,
-                },
-                error=_runtime_error(response),
-            )
-
-        verification, now_playing = await _confirm_runtime_playback()
-        data: dict[str, Any] = {
-            "playlist": name,
-            "track_count": outcome.track_count,
-            "queued_after_current": outcome.remaining_in_session,
-            "shuffled": True,
-            "requested_track": first_track.get("title") or play_query,
-            "verification": verification,
-            "playback_verified": verification == VERIFY_PLAYING,
-        }
-        if now_playing:
-            data["now_playing"] = now_playing
-
-        if verification == VERIFY_PLAYING:
-            playing_label = str(now_playing.get("title") or "").strip() if now_playing else ""
-            data["message"] = "Playing %r \u2014 %d songs, shuffled.%s" % (
-                name,
-                outcome.track_count,
-                (" Now playing: %s." % playing_label) if playing_label else "",
-            )
-            return ToolResult(ok=True, data=data)
-
-        if verification == VERIFY_UNAVAILABLE:
-            data["message"] = (
-                "I started playlist %r (%d songs, shuffled) but could not reach the player to confirm it is playing."
-                % (name, outcome.track_count)
-            )
-        else:
-            data["message"] = (
-                "I started playlist %r (%d songs, shuffled), but the player does not report anything playing yet."
-                % (name, outcome.track_count)
-            )
-        return ToolResult(ok=True, data=data, unverified=True)
+        return await _start_first_track(
+            name,
+            outcome.first_track or {},
+            track_count=outcome.track_count,
+            remaining=outcome.remaining_in_session,
+        )
     except Exception as exc:
         return ToolResult(ok=False, data=None, error="play_playlist failed: %s" % exc)
+
+
+async def _play_link_playlist(name: str, user_id: str) -> ToolResult:
+    """Play a playlist saved by link: read its tracks, arm the session, start track one."""
+    from music.playback_session import get_playback_session_controller
+    from music.playlist_manager import get_playlist_manager
+
+    controller = get_playback_session_controller()
+    if controller._playlist_mgr is None:
+        controller._playlist_mgr = get_playlist_manager()
+    if not await controller.start_playlist(name, shuffle=True, user_id=user_id):
+        return ToolResult(
+            ok=False,
+            data={"playlist": name},
+            error="Playlist %r is saved, but I couldn't read its songs from the link." % name,
+        )
+    session = controller.get_playlist_session()
+    first_tracks = session.pop_next(1) if session is not None else []
+    if not first_tracks:
+        return ToolResult(ok=False, data={"playlist": name}, error="Playlist %r has no songs I can play." % name)
+    return await _start_first_track(
+        name,
+        first_tracks[0],
+        track_count=session.total_count(),
+        remaining=session.remaining_count(),
+    )
+
+
+async def _start_first_track(name: str, first_track: dict[str, Any], *, track_count: int, remaining: int) -> ToolResult:
+    """Start a playlist's first track and report what the player actually did."""
+    play_query = _playable_query(first_track)
+    if not play_query:
+        return ToolResult(
+            ok=False,
+            data=None,
+            error="Playlist %r has tracks, but none of them carry a playable URL or title." % name,
+        )
+
+    response = await _post_runtime("/v1/play", {"query": play_query})
+    if int(response.get("_status_code", 0) or 0) != 200 or not response.get("ok"):
+        return ToolResult(
+            ok=False,
+            data={
+                "playlist": name,
+                "track_count": track_count,
+                "requested_track": first_track.get("title") or play_query,
+                "response": response,
+            },
+            error=_runtime_error(response),
+        )
+
+    verification, now_playing = await _confirm_runtime_playback()
+    data: dict[str, Any] = {
+        "playlist": name,
+        "track_count": track_count,
+        "queued_after_current": remaining,
+        "shuffled": True,
+        "requested_track": first_track.get("title") or play_query,
+        "verification": verification,
+        "playback_verified": verification == VERIFY_PLAYING,
+    }
+    if now_playing:
+        data["now_playing"] = now_playing
+
+    if verification == VERIFY_PLAYING:
+        playing_label = str(now_playing.get("title") or "").strip() if now_playing else ""
+        data["message"] = "Playing %r \u2014 %d songs, shuffled.%s" % (
+            name,
+            track_count,
+            (" Now playing: %s." % playing_label) if playing_label else "",
+        )
+        return ToolResult(ok=True, data=data)
+
+    if verification == VERIFY_UNAVAILABLE:
+        data["message"] = (
+            "I started playlist %r (%d songs, shuffled) but could not reach the player to confirm it is playing."
+            % (name, track_count)
+        )
+    else:
+        data["message"] = (
+            "I started playlist %r (%d songs, shuffled), but the player does not report anything playing yet."
+            % (name, track_count)
+        )
+    return ToolResult(ok=True, data=data, unverified=True)
 
 
 async def _play_spotify_liked_songs(shuffle: bool) -> ToolResult:

@@ -93,6 +93,13 @@ def inject_preferences(ps: dict[str, Any]) -> dict[str, Any]:
         ps["shuffle"] = select_shuffle_enabled()
     except Exception:
         pass
+    try:
+        from utils.audio_ducking import user_volume_while_ducked
+
+        ducked_from = user_volume_while_ducked()
+        ps["user_volume"] = ducked_from if ducked_from is not None else ps.get("volume")
+    except Exception:
+        pass
     return ps
 
 
