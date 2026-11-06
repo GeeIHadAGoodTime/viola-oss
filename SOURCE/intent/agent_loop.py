@@ -5308,18 +5308,25 @@ async def run_agent_loop(
                     payment_confirmation_ctx = await executor._prepare_payment_confirmation_session()
                     from intent.agent_executor import (
                         _dispatch_payment_confirmation_link_for_executor,
+                        _payment_approval_ways_line,
+                        _payment_gate_answer_from_order,
                         _payment_gate_answer_with_confirm_url,
                     )
 
+                    final_answer = _payment_gate_answer_from_order(
+                        final_answer,
+                        payment_confirmation_ctx.get("order_summary"),
+                    )
+                    delivery = await _dispatch_payment_confirmation_link_for_executor(
+                        executor,
+                        payment_confirmation_ctx,
+                        str(payment_confirmation_ctx.get("url") or ""),
+                    )
+                    final_answer = "%s\n%s" % (final_answer, _payment_approval_ways_line(delivery))
                     final_answer = _payment_gate_answer_with_confirm_url(
                         final_answer,
                         str(payment_confirmation_ctx.get("url") or ""),
                         payment_confirmation_ctx.get("link_note"),
-                    )
-                    await _dispatch_payment_confirmation_link_for_executor(
-                        executor,
-                        payment_confirmation_ctx,
-                        str(payment_confirmation_ctx.get("url") or ""),
                     )
                     _set_final_response(executor, final_answer, continue_listening=False)
                 except _PaymentConfirmationGateRefused as exc:

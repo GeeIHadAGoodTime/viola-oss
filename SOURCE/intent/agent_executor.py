@@ -1681,6 +1681,133 @@ def _payment_gate_answer_with_confirm_url(
     return "%s\n%s" % (answer.rstrip(), url)
 
 
+_ORDER_WORD_RE = re.compile(r"[a-z0-9]{3,}")
+_ORDER_FILLER_WORDS = frozenset({"the", "and", "for", "with", "pack", "count", "each", "item", "items", "one", "new"})
+
+
+def _order_words(text: Any) -> set[str]:
+    return set(_ORDER_WORD_RE.findall(str(text or "").lower())) - _ORDER_FILLER_WORDS
+
+
+def _order_item_name(item: Any) -> str:
+    if isinstance(item, dict):
+        return str(item.get("name") or item.get("description") or "").strip()
+    return str(item or "").strip()
+
+
+def _order_item_seen_in(item: Any, others: list[Any]) -> bool:
+    words = _order_words(_order_item_name(item))
+    if not words:
+        return True
+    return any(len(words & _order_words(_order_item_name(other))) * 2 >= len(words) for other in others)
+
+
+def _reconcile_claimed_order(
+    order_summary: dict[str, Any],
+    claimed_items: Any,
+    claimed_total: str,
+) -> None:
+    """Compare what the model claimed with what the store's page shows.
+
+    ``order_summary["items"]`` holds the page's items when they could be read. The
+    claim is only used when they could not, and the card then says so. Every
+    difference becomes a plain line in ``order_warnings``, shown above the pay button.
+    """
+    from services.payments.purchase_ceiling import parse_money_cents
+
+    claimed = claimed_items if isinstance(claimed_items, list) else []
+    page_items = order_summary.get("items")
+    warnings: list[str] = []
+    if isinstance(page_items, list) and page_items:
+        for item in claimed:
+            if not _order_item_seen_in(item, page_items):
+                warnings.append(
+                    "Viola thought this order had %s, but the store's page does not show it." % _order_item_name(item)
+                )
+        if claimed:
+            for item in page_items:
+                if not _order_item_seen_in(item, claimed):
+                    warnings.append("The store's page shows %s, which Viola did not mention." % _order_item_name(item))
+    else:
+        if claimed:
+            order_summary["items"] = claimed
+        order_summary["items_source"] = "agent"
+        warnings.append(
+            "Viola could not read the items from the store's page. Check them on the page before you approve."
+        )
+    dom_total = str(order_summary.get("dom_total") or "").strip()
+    if claimed_total and dom_total:
+        claimed_cents = parse_money_cents(claimed_total)
+        page_cents = order_summary.get("dom_total_cents")
+        if claimed_cents is not None and page_cents is not None and abs(claimed_cents - int(page_cents)) > 1:
+            warnings.append("Viola said the total was %s, but the store's page says %s." % (claimed_total, dom_total))
+    if warnings:
+        order_summary["order_warnings"] = warnings
+
+
+def _payment_gate_answer_from_order(answer: str | None, order_summary: dict[str, Any] | None) -> str | None:
+    """Say what is being bought from the store's page, not from the model's summary."""
+    if not answer or not isinstance(order_summary, dict):
+        return answer
+    lines: list[str] = []
+    merchant = str(order_summary.get("merchant") or "").strip()
+    site = str(order_summary.get("site") or "").strip()
+    if merchant or site:
+        lines.append("Store: %s" % (" at ".join(part for part in (merchant, site) if part)))
+    items = order_summary.get("items")
+    if isinstance(items, list) and items:
+        rows: list[str] = []
+        for item in items:
+            name = _order_item_name(item)
+            if not name:
+                continue
+            quantity = item.get("quantity") if isinstance(item, dict) else None
+            price = str(item.get("price") or "").strip() if isinstance(item, dict) else ""
+            rows.append(
+                "- %s%s%s" % ("%s x " % quantity if quantity else "", name, " (%s)" % price if price else "")
+            )
+        hidden = order_summary.get("items_not_listed")
+        if hidden:
+            rows.append("- and %s more on the store's page" % hidden)
+        if rows:
+            source = "On the store's page" if order_summary.get("items_source") == "page" else "Viola says"
+            lines.append("%s:\n%s" % (source, "\n".join(rows)))
+    total = str(order_summary.get("dom_total") or order_summary.get("total") or "").strip()
+    if total:
+        lines.append("Total: %s" % total)
+    if not lines:
+        return answer
+    for warning in order_summary.get("order_warnings") or []:
+        lines.append("Check this: %s" % warning)
+    prefix = _PAYMENT_GATE_PREFIX
+    return "%s%s" % ("%s " % prefix if str(answer).strip().startswith(prefix) else "", "\n".join(lines))
+
+
+_APPROVAL_TEXT_REASONS = {
+    "no_phone": "add and verify your phone under Settings > Account",
+    "no_consent": "turn on approval texts under Settings > Account",
+    "not_signed_in": "sign in to Viola first",
+    "cloud_not_configured": "texting is not available in this setup",
+    "cloud_unreachable": "Viola's service could not be reached",
+    "cloud_bad_response": "Viola's service gave an answer that could not be read",
+    "hosted_link_unavailable": "no link for your phone could be made",
+}
+
+
+def _payment_approval_ways_line(delivery: dict[str, Any] | None) -> str:
+    """Say both ways to approve, every time: on this device, and by a texted link."""
+    sms = delivery.get("sms_default") if isinstance(delivery, dict) else None
+    if isinstance(sms, dict) and (sms.get("sent") or sms.get("already_sent")):
+        return "You can approve here with Review and pay, or from the link I just texted to your phone."
+    reason = ""
+    if isinstance(sms, dict):
+        reason = str(sms.get("user_message") or _APPROVAL_TEXT_REASONS.get(str(sms.get("reason") or sms.get("status"))) or "")
+    elif isinstance(delivery, dict):
+        reason = _APPROVAL_TEXT_REASONS.get(str(delivery.get("reason")), "")
+    reason = reason.rstrip(".") or "texting is not available right now"
+    return "You can approve here with Review and pay. I could not text you the approval link: %s." % reason
+
+
 async def _dispatch_payment_confirmation_link_for_executor(
     executor: Any,
     payment_confirmation_ctx: dict[str, Any] | None,
@@ -12119,7 +12246,11 @@ class AgentExecutor:
                         'aside',
                     ]);
 
-                    const itemNodes = Array.from(document.querySelectorAll([
+                    const moneyRe = /[$\u20ac\u00a3]\s?\d[\d,]*(?:\.\d{2})?/g;
+                    const notAnItem = /^(sub-?total|total|order total|estimated total|tax|taxes|estimated tax|shipping|delivery|fees?|discount|savings|tip|promo)\b/i;
+                    const moneyIn = (text) => (text.match(moneyRe) || []);
+                    const shown = (el) => el.offsetParent !== null || getComputedStyle(el).position === 'fixed';
+                    const named = Array.from(document.querySelectorAll([
                         '[data-testid*="cart-item" i]',
                         '[data-testid*="order-item" i]',
                         '[data-testid*="line-item" i]',
@@ -12127,15 +12258,46 @@ class AgentExecutor:
                         '[class*="order-item" i]',
                         '[class*="line-item" i]',
                         '[class*="product" i]',
-                    ].join(',')));
+                    ].join(','))).filter(shown);
+                    // A list wrapper matches the same selectors as its rows: drop any
+                    // element that holds more prices than a row inside it, then any
+                    // element inside a row that stayed.
+                    const rowsOf = (nodes) => {
+                        const rows = nodes.filter((el) => !nodes.some((other) => other !== el
+                            && el.contains(other)
+                            && moneyIn(textOf(other)).length > 0
+                            && moneyIn(textOf(el)).length > moneyIn(textOf(other)).length));
+                        return rows.filter((el) => !rows.some((other) => other !== el && other.contains(el)));
+                    };
+                    let itemNodes = rowsOf(named);
+                    if (!itemNodes.some((el) => moneyIn(textOf(el)).length > 0)) {
+                        // Stores with no telling class names: any table row or list
+                        // item that carries a price.
+                        const generic = Array.from(document.querySelectorAll('tr, li, [role="row"], [role="listitem"]'))
+                            .filter((el) => shown(el) && moneyIn(textOf(el)).length > 0);
+                        const genericRows = rowsOf(generic);
+                        if (genericRows.length) itemNodes = genericRows;
+                    }
                     const items = [];
                     const seen = new Set();
+                    let itemCount = 0;
                     for (const el of itemNodes) {
                         const text = textOf(el);
-                        if (!text || text.length < 4 || text.length > 240 || seen.has(text)) continue;
+                        if (!text || text.length < 4 || text.length > 240 || notAnItem.test(text) || seen.has(text)) continue;
                         seen.add(text);
-                        items.push({name: text, description: text});
-                        if (items.length >= 8) break;
+                        itemCount += 1;
+                        if (items.length >= 20) continue;
+                        const prices = moneyIn(text);
+                        const field = el.querySelector('select, input[type="number"], input[name*="qty" i], input[name*="quantity" i]');
+                        const counted = text.match(/\b(?:qty|quantity)\b\W*(\d+)/i) || text.match(/(?:^|\s)[x\u00d7]\s?(\d+)\b/i) || text.match(/\b(\d+)\s?[x\u00d7](?:\s|$)/i);
+                        const quantity = field && Number(field.value) > 0 ? Number(field.value) : (counted ? Number(counted[1]) : null);
+                        const name = norm(text.replace(moneyRe, ' ').replace(/\b(?:qty|quantity)\b\W*\d+/ig, ' '));
+                        items.push({
+                            name: name || text,
+                            description: text,
+                            price: prices.length ? prices[prices.length - 1] : '',
+                            quantity,
+                        });
                     }
 
                     const domTotal = firstText([
@@ -12158,6 +12320,8 @@ class AgentExecutor:
                     return {
                         merchant: merchant,
                         items: items,
+                        item_count: itemCount,
+                        site: host,
                         summary_text: summaryText ? summaryText.slice(0, 700) : '',
                         dom_total: domTotal,
                         delivery_address: deliveryAddress,
@@ -12180,7 +12344,7 @@ class AgentExecutor:
             from services.payments.purchase_ceiling import parse_money_cents
 
             clean_items = []
-            for item in items[:8]:
+            for item in items[:20]:
                 if not isinstance(item, dict):
                     continue
                 name = str(item.get("name") or "").strip()
@@ -12202,6 +12366,14 @@ class AgentExecutor:
                 clean_items.append(clean_item)
             if clean_items:
                 order_summary["items"] = clean_items
+                order_summary["items_source"] = "page"
+                item_count = details.get("item_count")
+                if isinstance(item_count, int) and item_count > len(clean_items):
+                    order_summary["items_not_listed"] = item_count - len(clean_items)
+
+        site = str(details.get("site") or "").strip()
+        if site:
+            order_summary["site"] = site[:120]
 
         summary_text = str(details.get("summary_text") or "").strip()
         if summary_text and _is_generic_payment_order_text(str(order_summary.get("description") or "")):
@@ -12223,9 +12395,17 @@ class AgentExecutor:
         """Populate confirmation-page order fields before creating the session."""
 
         self._apply_payment_review_request_to_summary(order_summary)
+        # What the model says it is buying is a claim. A task can drift, so the
+        # card shows what the store's own page says, and says so when they differ.
+        claimed_items = order_summary.pop("items", None)
+        claimed_total = str(order_summary.get("total") or "").strip()
         await self._extract_dom_order_details(page, order_summary)
         await self._extract_dom_total(page, order_summary)
         self._apply_context_delivery_address_to_summary(order_summary)
+        _reconcile_claimed_order(order_summary, claimed_items, claimed_total)
+        requested = str(getattr(self, "_agent_task_description", "") or "").strip()
+        if requested:
+            order_summary["requested"] = requested
 
     async def _prepare_payment_confirmation_session(self) -> dict[str, Any]:
         """Create the hosted payment confirmation session before AgentResult exists."""
