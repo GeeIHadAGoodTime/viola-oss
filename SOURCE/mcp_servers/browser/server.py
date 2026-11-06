@@ -5262,6 +5262,7 @@ _LOCATOR_TERMINAL_ACTIONS = _FRAME_TERMINAL_ACTIONS | {
     "get_attribute",
 }
 
+
 def _unquote(s: str) -> str:
     """Strip surrounding quotes from a string argument."""
     s = s.strip()
