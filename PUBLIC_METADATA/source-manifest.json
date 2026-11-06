@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "8b8d25a269297660a97481883726591d87e78658",
-  "sha256": "21221f42cb739199306ea1654d854f95331625c12d9e5ec7cc1793b09f42ce68",
+  "revision": "e1aec75a1223658a86f060515353b33e2075a85a",
+  "sha256": "721f0e377b62c67acb4ff61083fb93e3211cb21465d260aa535395e903e9f14b",
   "files": [
     {
       "path": ".env.example",
@@ -9470,8 +9470,8 @@
     },
     {
       "path": "ui/api/routes/control.py",
-      "sha256": "35310640bcebec367c368d1f323e62209e8fcb13cae6ac4877ed8311f3038a45",
-      "bytes": 68512
+      "sha256": "e69b2ff66fe60992331559859a2b226e14d1192bafaf115386d07922aa72dad7",
+      "bytes": 68466
     },
     {
       "path": "ui/api/routes/cost.py",
@@ -12945,8 +12945,8 @@
     },
     {
       "path": "utils/api_helpers.py",
-      "sha256": "160dc232c804e96a85ca04894b03fa3f0bfda5ea4451ab81d710037992b04037",
-      "bytes": 5518
+      "sha256": "db086fc792f2ccd5ba22725fdbf0d27f11451147d00ba2ec55cb8e392ff223a0",
+      "bytes": 5509
     },
     {
       "path": "utils/async_helper.py",
