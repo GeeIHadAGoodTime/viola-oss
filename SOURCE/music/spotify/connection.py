@@ -62,8 +62,7 @@ _MESSAGES = {
 }
 
 PLAY_DID_NOT_START_MESSAGE = (
-    "Spotify is connected, but that song didn't start. Try again. "
-    "If it keeps happening, restart Viola."
+    "Spotify is connected, but that song didn't start. Try again. If it keeps happening, restart Viola."
 )
 
 VERDICT_FILE = "viola_connection.json"

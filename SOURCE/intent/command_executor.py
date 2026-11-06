@@ -1992,8 +1992,7 @@ class CommandExecutor:
                 )
             else:
                 message = (
-                    "Created playlist '%s' — no local songs found yet. "
-                    "Index your music library first." % playlist_name
+                    "Created playlist '%s' — no local songs found yet. Index your music library first." % playlist_name
                 )
         else:
             message = "Created playlist '%s'" % playlist_name

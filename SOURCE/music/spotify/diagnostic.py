@@ -51,7 +51,7 @@ def browser_audio_peak(root_pid: int | None) -> dict[str, Any]:
                 peak = max(peak, float(meter.GetPeakValue()))
             time.sleep(_AUDIO_SAMPLE_GAP_S)
         return {"session_found": found, "peak": round(peak, 4)}
-    except Exception as exc:  # noqa: BLE001 - a meter fault must not end the check
+    except Exception as exc:  # a meter fault must not end the check
         return {"session_found": False, "peak": 0.0, "detail": type(exc).__name__}
     finally:
         comtypes.CoUninitialize()

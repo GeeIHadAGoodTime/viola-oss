@@ -241,7 +241,7 @@ def resolve(
                 # the login flow just like Google OAuth.
                 service_name = _PROACTIVE_CONNECT_DOMAINS[domain_id]
                 if domain_id == "music" and trigger_spotify_browser_auth_login():
-                    message = "I'm opening %s inside Viola — " "just log in and I'll take it from there." % service_name
+                    message = "I'm opening %s inside Viola — just log in and I'll take it from there." % service_name
                 else:
                     message = "%s is not connected yet. I can help start the setup flow." % display_name
             else:

@@ -756,7 +756,9 @@ async def _handle_search_play_mode(
             "selected_provider": selected_provider,
             "tracks": [selected],
             "count": 1,
-            "playback_started": _playback_started_evidence(play_result.ok, play_data, unverified=play_result.unverified),
+            "playback_started": _playback_started_evidence(
+                play_result.ok, play_data, unverified=play_result.unverified
+            ),
             "play_result": play_data,
         }
     )

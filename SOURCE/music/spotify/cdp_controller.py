@@ -337,6 +337,7 @@ def normalize_spotify_track_id(value: str) -> str:
         raise SpotifyCDPError("Not a Spotify track id: %r" % value)
     return raw
 
+
 # --- DevTools (CDP) exposure ------------------------------------------------
 # Viola drives the Spotify Chrome over Chromium's DevTools endpoint, which has
 # no authentication, and that Chrome holds the user's logged-in Spotify
@@ -1286,7 +1287,7 @@ class SpotifyCDPController:
                     old_policy = type(asyncio.get_event_loop_policy()).__name__
                     asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
                     logger.info(
-                        "CDP thread: forced WindowsProactorEventLoopPolicy " "(was %s)",
+                        "CDP thread: forced WindowsProactorEventLoopPolicy (was %s)",
                         old_policy,
                     )
 

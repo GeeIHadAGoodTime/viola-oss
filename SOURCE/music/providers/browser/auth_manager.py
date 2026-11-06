@@ -653,7 +653,7 @@ class BrowserAuthManager:
             self._start_login_watch(provider_name, select_as_music_source=select_as_music_source)
         else:
             logger.warning(
-                "No controller attached; login URL returned but browser " "not navigated for %s",
+                "No controller attached; login URL returned but browser not navigated for %s",
                 provider_name,
             )
 
