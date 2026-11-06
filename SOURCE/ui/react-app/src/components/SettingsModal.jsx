@@ -361,6 +361,21 @@ function validationSummary(profile) {
 // Main Settings Component
 // The backend saves several ids for the same Music Source card: the agent's
 // media tool and the no-sign-in fallback store "youtube_iframe", older
+// The desktop's one answer about Spotify (music/spotify/connection.py). Settings
+// only displays it, so it can never disagree with what the assistant says.
+export function spotifySourceDescription(status) {
+  if (status?.logged_in) return 'Connected';
+  if (status?.state === 'checking') return 'Checking your sign-in...';
+  if (spotifyStatusProblem(status)) return 'Not working';
+  return 'Sign in to play Spotify';
+}
+
+export function spotifyStatusProblem(status) {
+  if (!status || status.logged_in) return '';
+  if (status.state === 'checking' || status.state === 'not_signed_in') return '';
+  return status.state_message || '';
+}
+
 // settings hold "youtube", and Spotify can be "spotify_cdp". The cards only
 // know youtube_music / spotify / local, so an exact match left NO card
 // selected while YouTube was in use (1.0.5 build 5, A10.4).
@@ -1575,6 +1590,16 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
     };
   }, [activeTab, isOpen, refreshSpotifyStatus]);
 
+  // While the desktop tries a sign-in in the player, keep the answer current.
+  const spotifyChecking = spotifyStatus?.state === 'checking';
+  useEffect(() => {
+    if (!isOpen || activeTab !== 'music' || !spotifyChecking) return undefined;
+    const intervalId = setInterval(() => {
+      refreshSpotifyStatus({ silent: true });
+    }, SPOTIFY_LOGIN_POLL_MS);
+    return () => clearInterval(intervalId);
+  }, [activeTab, isOpen, refreshSpotifyStatus, spotifyChecking]);
+
   // Handle "Connect with Spotify" click inside the login overlay
   const spotifyLoginAttemptRef = useRef(0);
   const handleSpotifyConnect = useCallback(async () => {
@@ -1608,6 +1633,12 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
         const status = await refreshSpotifyStatus({ silent: true });
         if (status?.logged_in) {
           stageMusicProvider('spotify');
+          setShowSpotifyLogin(false);
+          return;
+        }
+        if (spotifyStatusProblem(status)) {
+          // The sign-in finished but the player can't use it: Viola says why
+          // on the music page (the same words the assistant uses).
           setShowSpotifyLogin(false);
           return;
         }
@@ -1662,6 +1693,8 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
           profile_exists: false,
         },
         cookie_bridge_cached: false,
+        state: 'not_signed_in',
+        state_message: '',
       }));
       setShowSpotifyLogin(false);
       if (musicSourceCardId(localSettings.active_music_provider_id) === 'spotify') {
@@ -2797,7 +2830,7 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
             id: 'spotify',
             label: 'Spotify',
             icon: <span style={{ fontSize: '18px' }}>S</span>,
-            desc: spotifyLoggedIn ? 'Connected' : 'Sign in to play Spotify',
+            desc: spotifySourceDescription(spotifyStatus),
           }]),
           ...(localMusicHidden ? [] : [
             { id: 'local', label: 'Local Files', icon: <Icons.Music />, desc: localFolder || 'Play from local library' },
@@ -2959,18 +2992,18 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
                   </div>
                 )}
 
-                {(isSpotify || spotifyLoggedIn) && !showSpotifyLogin && (
+                {(isSpotify || spotifyLoggedIn || spotifyChecking) && !showSpotifyLogin && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '8px' }}>
                     <div style={{
                       color: spotifyLoggedIn ? theme.colors.statusGreen : theme.colors.textMuted,
                       fontSize: '13px',
                       fontWeight: spotifyLoggedIn ? 600 : 400,
                     }}>
-                      {spotifyStatusLoading
+                      {spotifyStatusLoading || spotifyChecking
                         ? 'Checking Spotify...'
                         : spotifyLoggedIn
                           ? spotifyAccountLabel
-                          : 'Not connected'}
+                          : spotifyStatusProblem(spotifyStatus) || 'Not connected'}
                     </div>
                     <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                       {spotifyLoggedIn ? (
