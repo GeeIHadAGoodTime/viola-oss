@@ -1580,9 +1580,9 @@ describe('YouTube iframe playback honesty (#2757)', () => {
     act(() => {
       window.dispatchEvent(iframeMessage('yt_iframe_state', { state: 0, videoId: 'vid-123' }));
     });
-    const sent = post.mock.calls.map(([message]) => message?.type);
-    expect(sent).toContain('viola_seek');
-    expect(sent).toContain('viola_play');
+    const sent = post.mock.calls.map(([message]) => message?.command);
+    expect(sent).toContain('seekTo');
+    expect(sent).toContain('play');
     post.mockRestore();
   });
 
