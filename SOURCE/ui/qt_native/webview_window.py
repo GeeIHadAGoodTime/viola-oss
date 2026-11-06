@@ -3208,6 +3208,7 @@ class ViolaWebViewWindow(QMainWindow):
             self._console_page._bridge.set_window(self)
 
         self._setup_fullscreen_hint()
+        self._setup_fullscreen_exit_button()
 
     def _setup_fullscreen_shortcuts(self) -> None:
         """Install Qt-level fullscreen key handling for WebEngine focus cases.
@@ -3448,6 +3449,32 @@ class ViolaWebViewWindow(QMainWindow):
         elif y > _FULLSCREEN_TITLE_BAR_HIDE_PX:
             self._schedule_fullscreen_title_bar_hide()
 
+    def _setup_fullscreen_exit_button(self) -> None:
+        """An Exit fullscreen control for screen readers while the title bar hides.
+
+        A hidden widget is not in the accessibility tree, and only a pointer at
+        the top edge brings the title bar back, so UI Automation and screen
+        readers had no way out of fullscreen (1.0.5 build 9). This one pixel is
+        invisible to the eye and is shown exactly while the bar is hidden.
+        """
+        button = QPushButton(self)
+        button.setAccessibleName("Exit fullscreen")
+        button.setStyleSheet("background: transparent; border: none;")
+        button.setFocusPolicy(Qt.FocusPolicy.TabFocus)
+        button.setGeometry(0, 0, 1, 1)
+        button.clicked.connect(self.exit_fullscreen)
+        button.hide()
+        self._fullscreen_exit_button = button
+
+    def _sync_fullscreen_exit_button(self) -> None:
+        button = getattr(self, "_fullscreen_exit_button", None)
+        if button is None:
+            return
+        needed = self.isFullScreen() and self._fullscreen_hides_title_bar and self.title_bar.isHidden()
+        button.setVisible(bool(needed))
+        if needed:
+            button.raise_()
+
     def _show_fullscreen_title_bar(self) -> None:
         """Show title-bar chrome while fullscreen auto-hide is active."""
         if not self.isFullScreen() or not self._fullscreen_hides_title_bar:
@@ -3458,6 +3485,7 @@ class ViolaWebViewWindow(QMainWindow):
         self._fullscreen_title_bar_revealed = True
         self.title_bar.show()
         self.title_bar.raise_()
+        self._sync_fullscreen_exit_button()
         self._position_fullscreen_hint()
 
     def _schedule_fullscreen_title_bar_hide(self) -> None:
@@ -3482,6 +3510,7 @@ class ViolaWebViewWindow(QMainWindow):
             hide_timer.stop()
         self._fullscreen_title_bar_revealed = False
         self.title_bar.hide()
+        self._sync_fullscreen_exit_button()
         self._position_fullscreen_hint()
 
     def _position_fullscreen_hint(self) -> None:
@@ -3585,6 +3614,7 @@ class ViolaWebViewWindow(QMainWindow):
             # never keeps a video laid over a normal-size window.
             self._video_fullscreen_active = False
             self._video_fullscreen_owns_window = False
+        self._sync_fullscreen_exit_button()
         self._publish_window_fullscreen_state()
 
     def _publish_window_fullscreen_state(self) -> None:
