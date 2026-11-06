@@ -115,7 +115,7 @@ class VoicemailAnswerWatch(FrameProcessor if PIPECAT_AVAILABLE else object):  # 
             and bool(self._record.voicemail_detected)
             and started is not None
             and heard is not None
-            and heard >= started
+            and heard > started
         )
 
     async def on_recipient_turn_started(self) -> bool:
@@ -134,7 +134,7 @@ class VoicemailAnswerWatch(FrameProcessor if PIPECAT_AVAILABLE else object):  # 
         started = self._message_started_at
         if self._talking:
             return True
-        return started is not None and any(heard >= started for heard in self._untranscribed_speech)
+        return started is not None and any(heard > started for heard in self._untranscribed_speech)
 
     async def nobody_answered(self) -> bool:
         """Wait out the window after the message. True when she should hang up."""
