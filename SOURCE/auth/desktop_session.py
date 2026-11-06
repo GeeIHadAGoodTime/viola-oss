@@ -88,6 +88,10 @@ class DesktopSessionError(RuntimeError):
     """Raised when a desktop-local session cannot be safely minted."""
 
 
+class DesktopSessionRejected(DesktopSessionError):
+    """A refresh proved this session must end (tokens of another account)."""
+
+
 class DesktopSessionRefreshTransientError(Exception):
     """A GoTrue token refresh failed for a TRANSIENT reason (gateway 5xx,
     network drop, timeout) — NOT a genuine revocation.
@@ -396,6 +400,8 @@ class DesktopSessionStore:
         if row.access_expires_at <= now + timedelta(seconds=_ACCESS_REFRESH_SKEW_SECONDS):
             try:
                 refresh_result = await self._refresh_session_row_serialized(session_hash)
+            except DesktopSessionRejected:
+                return DesktopSessionValidation(authenticated=False, reason="gotrue_refresh_invalid")
             except (
                 DesktopSessionRefreshTransientError,
                 DesktopSessionError,
@@ -846,7 +852,7 @@ class DesktopSessionStore:
             # The one local check that is a verdict: these tokens belong to
             # someone else, so this row must not live on.
             self.delete_session_hash(session_hash)
-            raise DesktopSessionError("GoTrue refresh user_id changed")
+            raise DesktopSessionRejected("GoTrue refresh user_id changed")
 
         email = refreshed.email or row.email
         email_verified = refreshed.email_verified or row.email_verified

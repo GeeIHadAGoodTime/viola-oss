@@ -69,6 +69,12 @@ textarea,
 
 /* No grey/blue flash over whatever was tapped; every control draws its own
  * pressed state. Pinch and edge overscroll never move the app shell. */
+/* Viola is an app: two fingers must not zoom the page (build 9, K10). Ancestors
+   intersect, so this also stops pinch inside any `touch-action: manipulation`. */
+html {
+  touch-action: pan-x pan-y;
+}
+
 html {
   -webkit-tap-highlight-color: transparent;
 }

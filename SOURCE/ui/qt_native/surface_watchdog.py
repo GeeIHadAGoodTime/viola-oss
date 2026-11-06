@@ -109,6 +109,8 @@ class SurfaceJudge:
         if reading is Reading.LANDED:
             if self.next_rung:
                 logger.warning("Surface watchdog: the page is back on screen after %d step(s)", self.next_rung)
+            if not self.calibrated:
+                logger.info("Surface watchdog: the page was seen on screen; watching")
             self.calibrated = True
             self.misses = 0
             self.silent = 0

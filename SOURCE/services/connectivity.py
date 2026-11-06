@@ -55,10 +55,10 @@ def has_route_out() -> bool:
 async def _tcp_reaches(host: str, port: int = 443) -> bool:
     try:
         _reader, writer = await asyncio.wait_for(asyncio.open_connection(host, port), timeout=_TCP_TIMEOUT_S)
-    except (OSError, asyncio.TimeoutError):
+    except OSError:
         return False
     writer.close()
-    with contextlib.suppress(OSError, asyncio.TimeoutError):
+    with contextlib.suppress(OSError):
         await asyncio.wait_for(writer.wait_closed(), timeout=0.2)
     return True
 
