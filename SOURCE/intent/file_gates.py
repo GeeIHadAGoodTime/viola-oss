@@ -529,11 +529,11 @@ def describe_file_action(action_class: str, args: Mapping[str, Any] | None) -> s
     """Plain-words description for the confirm prompt, or None if not a file class."""
     params = args or {}
     raw_path = str(params.get("path") or params.get("filename") or "").strip()
-    target = _spoken_path(raw_path) if raw_path else "the file"
+    target = raw_path or "the file"
     action = _action_of(params)
-    raw_destination = str(params.get("destination") or "").strip()
-    destination = _spoken_path(raw_destination) if raw_destination else ""
+    destination = str(params.get("destination") or "").strip()
     if action_class == FILE_DELETE:
+        target = _spoken_path(raw_path) if raw_path else target
         path = _resolve(raw_path) if raw_path else None
         if path is not None and path.is_dir():
             count = _folder_file_count(path)
@@ -567,7 +567,7 @@ def describe_file_action(action_class: str, args: Mapping[str, Any] | None) -> s
             return "edit %s" % target
         if action in _COPY_ACTIONS:
             return "copy %s over the existing %s" % (target, destination or "file")
-        return "write %s" % target if raw_path else "write the file"
+        return "write %s" % raw_path if raw_path else "write the file"
     return None
 
 
