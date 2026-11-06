@@ -36,6 +36,12 @@ def _sm_transition(player, phase: PlaybackPhase, *, user_initiated: bool = False
     if sm is None:
         return
     try:
+        # STOPPED -> PLAYING is not a transition: a track that starts from
+        # stopped loads first (the iframe's ENDED leaves the phase at STOPPED
+        # for the next track). Going through LOADING keeps the machine honest
+        # and ends "Forced transition STOPPED -> PLAYING" in the log.
+        if phase == PlaybackPhase.PLAYING and getattr(sm, "phase", None) == PlaybackPhase.STOPPED:
+            sm.transition(PlaybackPhase.LOADING, force=True)
         sm.transition(phase, user_initiated=user_initiated, force=True)
     except Exception:
         logger.debug("State machine transition failed for phase %s", phase)
@@ -54,13 +60,7 @@ def _apply_iframe_phase_locked(player: Any, yt_state: str) -> None:
     Must be called with ``player._cv`` held.
     """
     phase = _YT_PHASE_MAP.get(yt_state)
-    sm = getattr(player, "_playback_sm", None)
-    if phase is not None and sm is not None:
-        # STOPPED -> PLAYING is not a transition: a track that starts from
-        # stopped loads first. Going through LOADING keeps the machine honest
-        # and ends "Forced transition STOPPED -> PLAYING" in the log.
-        if phase == PlaybackPhase.PLAYING and getattr(sm, "phase", None) == PlaybackPhase.STOPPED:
-            _sm_transition(player, PlaybackPhase.LOADING)
+    if phase is not None and getattr(player, "_playback_sm", None) is not None:
         _sm_transition(player, phase)
         return
     # ENDED / UNKNOWN (or a player without a state machine): legacy flags.
