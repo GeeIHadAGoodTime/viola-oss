@@ -71,8 +71,8 @@ _TIER_NEEDS_SYMPHONY: dict[str, str] = {
     "solo": (
         "seeing or describing the screen, desktop control (mouse, keyboard, opening apps, computer volume), "
         "phone calls, text messages, changing or saving files and shell commands need Symphony (Ensemble is "
-        "not enough: name only Symphony for these); email, reading files and the agent browser need "
-        "Ensemble or Symphony"
+        "not enough: name only Symphony for these); going to a website or anything else in the agent browser, "
+        "email and reading files need Ensemble (name only Ensemble for these, a website is not a desktop app)"
     ),
     "ensemble": (
         "seeing or describing the screen, desktop control (mouse, keyboard, opening apps, computer volume), "
@@ -372,6 +372,9 @@ class SelfKnowledgeBuilder:
             )
             if tier not in TIER_DESCRIPTIONS:
                 tier = DEFAULT_AGENT_AUTONOMY
+            agent_mode_off = not bool(sm.get("agent_enabled", True))
+            if agent_mode_off:
+                tier = "solo"
             description = TIER_DESCRIPTIONS[tier]
             # Frame the tier as internal permission state so the model does not
             # surface the raw label/value to users as their "plan" -- when asked
@@ -387,7 +390,13 @@ class SelfKnowledgeBuilder:
                 "Agent Autonomy (you cannot change it from chat)." % (tier, description)
             )
             unavailable = _TIER_NEEDS_SYMPHONY.get(tier)
-            if unavailable:
+            if agent_mode_off:
+                lines.append(
+                    "Agent Mode is off, so only the Solo abilities above work right now whatever level is set. If "
+                    "the user asks for anything else, say it needs Agent Mode, which they turn on in Settings > "
+                    "AI & Agents; do not name a level and do not say you can do it."
+                )
+            elif unavailable:
                 # At Ensemble "can you make phone calls for me?" got "Yes. Tell
                 # me who to call..." with no phone tool in reach (1.0.5 laptop
                 # A5.5). Name what this level leaves out, and where to switch.

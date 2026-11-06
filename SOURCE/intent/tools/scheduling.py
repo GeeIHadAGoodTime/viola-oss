@@ -6,11 +6,12 @@ These functions are called by the MCP tool wrappers in
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from core.logging_config import get_logger
 from intent.tool_types import ToolResult
+from services.user_timezone import user_timezone_scope
 
 logger = get_logger(__name__)
 
@@ -85,7 +86,7 @@ async def schedule_create_handler(
     Returns:
         ToolResult with the new schedule ID or an error.
     """
-    from services.scheduler.service import get_scheduler_service, validate_cron_expr_detail
+    from services.scheduler.service import _normalise_one_shot_at, get_scheduler_service, validate_cron_expr_detail
 
     label = label.strip()
     action = action.strip()
@@ -141,18 +142,29 @@ async def schedule_create_handler(
             pass
 
         if dt is not None:
+            async with user_timezone_scope(resolved_user_id):
+                run_at = datetime.fromisoformat(_normalise_one_shot_at(schedule))
+            if run_at <= datetime.now(UTC):
+                # Accepted, this fires at the next poll while the reply says the
+                # time asked for. Refuse, so the model works the time out again.
+                return ToolResult(
+                    ok=False,
+                    data=None,
+                    error="That time has already passed. It is now %s. Give a time in the future."
+                    % datetime.now().astimezone().isoformat(timespec="minutes"),
+                )
             # svc.add_async() may raise ValueError (e.g. schedule limit reached).
             # Let it propagate to the outer except so the real reason surfaces.
             # Async-native: this handler is awaited ON the cloud FastAPI serving
             # loop, so the sync svc.add()/svc.get() (ScheduleStore Postgres `_run`
             # bridge) would raise SyncBridgeLoopError. Mirror the cron branch's
             # add_async above (CL-20260711-afd7).
-            one_shot_at = dt.isoformat() if dt.tzinfo is not None and dt.utcoffset() is not None else schedule
+            one_shot_at = run_at.isoformat()
             schedule_id = await svc.add_async(
                 resolved_user_id,
                 label=label,
                 action=action,
-                one_shot_at=one_shot_at,
+                one_shot_at=run_at.isoformat(),
             )
             saved = await svc.get_async(resolved_user_id, schedule_id)
             scheduled_at = saved.one_shot_at if saved and saved.one_shot_at else one_shot_at

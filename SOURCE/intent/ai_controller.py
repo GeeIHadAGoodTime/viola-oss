@@ -763,6 +763,23 @@ class AIController:
             logger.exception("Agent mode disabled because user settings could not be loaded")
             return False
 
+    def _effective_agent_autonomy(self, user_id: str | None) -> str:
+        """Return the tool level this request runs at.
+
+        Agent Mode off keeps Viola usable at the Solo level, the one with music,
+        timers, weather and memory. It used to leave no tool loop at all, so
+        "play some jazz" got "I can't prepare the tool loop" (laptop K6, 3 of 3).
+        """
+        from config.defaults import DEFAULT_AGENT_AUTONOMY
+        from ui.settings_manager import get_settings_manager
+
+        if not self._agent_mode_enabled_by_user_setting():
+            return "solo"
+        return (
+            get_settings_manager().get("agent_autonomy", DEFAULT_AGENT_AUTONOMY, user_id=user_id)
+            or DEFAULT_AGENT_AUTONOMY
+        )
+
     def set_conversation_state_manager(self, manager: ConversationStateManager) -> None:
         """Inject the default conversation state manager.
 
@@ -2298,9 +2315,6 @@ class AIController:
         if not getattr(settings, "agent_enabled", False):
             return
 
-        if not self._agent_mode_enabled_by_user_setting():
-            return
-
         try:
             hub = await self._ensure_mcp_hub()
             if hub is None:
@@ -2308,14 +2322,7 @@ class AIController:
 
             # Read capability tier from user settings for permission gating.
             try:
-                from config.defaults import DEFAULT_AGENT_AUTONOMY
-                from ui.settings_manager import get_settings_manager
-
-                _sm = get_settings_manager()
-                agent_autonomy = (
-                    _sm.get("agent_autonomy", DEFAULT_AGENT_AUTONOMY, user_id=_ctx_user_id.get() or None)
-                    or DEFAULT_AGENT_AUTONOMY
-                )
+                agent_autonomy = self._effective_agent_autonomy(_ctx_user_id.get() or None)
             except Exception:
                 logger.exception("Agent prompt setup skipped because user settings could not be loaded")
                 return
@@ -2897,9 +2904,6 @@ class AIController:
         if self.client is None or not getattr(self.client, "SUPPORTS_NATIVE_TOOLS", False):
             return native_tools, tool_surface, prompt_bundle
 
-        if not self._agent_mode_enabled_by_user_setting():
-            return native_tools, tool_surface, prompt_bundle
-
         hub = self._mcp_hub
         if hub is None:
             return native_tools, tool_surface, prompt_bundle
@@ -2907,12 +2911,7 @@ class AIController:
         from config.defaults import DEFAULT_AGENT_AUTONOMY
 
         try:
-            from ui.settings_manager import get_settings_manager
-
-            agent_autonomy = (
-                get_settings_manager().get("agent_autonomy", DEFAULT_AGENT_AUTONOMY, user_id=user_id)
-                or DEFAULT_AGENT_AUTONOMY
-            )
+            agent_autonomy = self._effective_agent_autonomy(user_id)
         except Exception:
             agent_autonomy = DEFAULT_AGENT_AUTONOMY
 
@@ -3046,9 +3045,6 @@ class AIController:
         Returns a ProcessResultDict if the agent completes, or None to fall through.
         """
         from config.settings import settings
-
-        if not self._agent_mode_enabled_by_user_setting():
-            return None
 
         # Classifier removed (2026-04-09).  task_category is always "general".
         task_category = "general"

@@ -83,6 +83,7 @@ from intent.tools.music_tools import (
     video_fullscreen_handler as _video_fullscreen_handler,
 )
 from intent.tools.notification_tools import (
+    delete_notify_reminder_handler as _delete_notify_reminder_handler,
     list_notify_reminders_handler as _list_notify_reminders_handler,
     notify_handler as _notify_handler,
 )
@@ -5563,8 +5564,10 @@ async def alarm(
 
 @server.tool(
     description=(
-        "Send, schedule, or list notifications/reminders. Use action='list' when "
-        "the user asks what reminders they have. For send/schedule, provide message, "
+        "Send, schedule, list or delete notifications/reminders. Use action='list' when "
+        "the user asks what reminders they have, with enabled_only=false to include finished or "
+        "disabled ones. Use action='delete' with reminder set to an id from the list or the "
+        "reminder's words; delete them one at a time. For send/schedule, provide message, "
         "optional when for delayed delivery, and optional channel. User-scoped delivery "
         "uses the user's subscribed web push devices; phone/SMS delivery requires a "
         "separately configured account-bound notification path."
@@ -5587,20 +5590,30 @@ async def notify(
     ] = "",
     action: Annotated[
         str,
-        Field(description="Notification action. Use 'list' to list pending notify reminders; otherwise omit."),
+        Field(
+            description="Notification action. Use 'list' to list notify reminders, 'delete' to delete one; otherwise omit."
+        ),
     ] = "",
     enabled_only: Annotated[
         bool,
         Field(description="For action='list', set true to return only enabled pending reminders."),
     ] = True,
+    reminder: Annotated[
+        str,
+        Field(description="For action='delete', the reminder's id from action='list', or words from its message."),
+    ] = "",
 ) -> str:
-    """Send, schedule, or list notifications/reminders."""
+    """Send, schedule, list or delete notifications/reminders."""
     try:
         action_name = action.strip().lower()
         if action_name == "list":
             return _format_result(await _call_user_scoped(_list_notify_reminders_handler, enabled_only=enabled_only))
+        if action_name == "delete":
+            return _format_result(await _call_user_scoped(_delete_notify_reminder_handler, reminder=reminder))
         if action_name and action_name not in {"send", "schedule", "create"}:
-            return json.dumps({"error": "Unknown action: %s. Use 'list', 'send', 'schedule', or omit action." % action})
+            return json.dumps(
+                {"error": "Unknown action: %s. Use 'list', 'delete', 'send', 'schedule', or omit action." % action}
+            )
         return _format_result(
             await _call_user_scoped(
                 _notify_handler,

@@ -167,6 +167,44 @@ async def list_notify_reminders_handler(enabled_only: bool = True, user_id: str 
         return ToolResult(ok=False, data=None, error="list_notify_reminders failed: %s" % exc)
 
 
+async def delete_notify_reminder_handler(reminder: str, user_id: str = "") -> ToolResult:
+    """Delete one reminder by its schedule id or by words from its message.
+
+    Reminders are the only rows this reaches, so a slip cannot remove an alarm
+    or a scheduled job. Finished and disabled reminders count: Solo has no other
+    tool that can clear them.
+    """
+    ref = " ".join(str(reminder or "").split())
+    if not ref:
+        return ToolResult(ok=False, data=None, error="Say which reminder to delete: its id or its words.")
+    uid = _resolve_user_id(user_id)
+    listed = await list_notify_reminders_handler(enabled_only=False, user_id=uid)
+    if not listed.ok:
+        return listed
+    reminders = listed.data["reminders"]
+    matches = [item for item in reminders if str(item["schedule_id"]) == ref]
+    if not matches:
+        matches = [item for item in reminders if ref.lower() in str(item["message"]).lower()]
+    if not matches:
+        return ToolResult(ok=False, data=None, error="No reminder matches %r." % ref)
+    if len(matches) > 1:
+        options = "; ".join("id %s: %s" % (item["schedule_id"], item["message"]) for item in matches)
+        return ToolResult(ok=False, data=None, error="More than one reminder matches. Pick an id: %s" % options)
+    target = matches[0]
+    try:
+        from services.scheduler.service import get_scheduler_service
+
+        deleted = await get_scheduler_service().delete_async(uid, int(target["schedule_id"]))
+    except Exception as exc:
+        return ToolResult(ok=False, data=None, error="delete_notify_reminder failed: %s" % exc)
+    if not deleted:
+        return ToolResult(ok=False, data=None, error="Reminder %s was not deleted." % target["schedule_id"])
+    return ToolResult(
+        ok=True,
+        data={"deleted": True, "schedule_id": target["schedule_id"], "message": target["message"]},
+    )
+
+
 async def deliver_notification_handler(
     message: str,
     channel: str | None = None,
