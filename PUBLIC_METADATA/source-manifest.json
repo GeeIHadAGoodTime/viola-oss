@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "738024675a88dfdc5afa07842a1733066e72c882",
-  "sha256": "bc346684cfec596ac65f0d41746bc564698d4e1d4271d84a3742c24438a9467d",
+  "revision": "40d988b576aff96b034bdda617f4fe42339fa532",
+  "sha256": "d1a678425ca874d1b10632694ea2f5dc73ad964fc9a802efb348b54747d4a559",
   "files": [
     {
       "path": ".env.example",
@@ -1580,13 +1580,13 @@
     },
     {
       "path": "intent/agent_executor.py",
-      "sha256": "22b1dfa60ab157c69f22b2e8b1296d8b76952d7ceafb57be5fde429b5878cd10",
-      "bytes": 596261
+      "sha256": "b8ed4ca7346b3dc4b1535d21113884752f049958a1bef6e9592d3af6cf626f01",
+      "bytes": 600179
     },
     {
       "path": "intent/agent_loop.py",
-      "sha256": "d68539a05193f3ef32dd8fa38b0da95513862ca0283b06538ee6f244963529e2",
-      "bytes": 259492
+      "sha256": "7f5e0c4a77f14dbbd3a9e89a618aba0ed71344fef139045bad30a85c37e55344",
+      "bytes": 259692
     },
     {
       "path": "intent/agent_message_manager.py",
@@ -1680,8 +1680,8 @@
     },
     {
       "path": "intent/context_builder.py",
-      "sha256": "36dead764d65fa08fde4d18ae73fcdf2b489bf0d869a3cbc22959c13247917c3",
-      "bytes": 120948
+      "sha256": "c08974ee80196ba7dc093ff9e8ff79e2b84ed25aa70f4e7354fb9cdc2e224110",
+      "bytes": 124005
     },
     {
       "path": "intent/context_compaction.py",
@@ -2105,8 +2105,8 @@
     },
     {
       "path": "intent/tools/memory.py",
-      "sha256": "947f5565eb0e59b24c1f58efbe086f970add7f404caa6d2a02516596714249c6",
-      "bytes": 9494
+      "sha256": "34dc486872538b1b74ead6bb252dfe9c83bc3786d50ed2ffea19fb6c885f4575",
+      "bytes": 11692
     },
     {
       "path": "intent/tools/music_connect.py",
@@ -2375,8 +2375,8 @@
     },
     {
       "path": "mcp_servers/core_tools/server.py",
-      "sha256": "7cbfe843cd4fbd9870d8c2b07c4670dccc6e659c4ce146ef5ebcf2c2557624a2",
-      "bytes": 263259
+      "sha256": "14df08ffc6c1ea9f5b9c97b45c15c73c44e38fe18a4207f66f9fc15ec6321e48",
+      "bytes": 263448
     },
     {
       "path": "mcp_servers/phone_tool_descriptions.py",
@@ -4455,8 +4455,8 @@
     },
     {
       "path": "services/conversation/state_manager.py",
-      "sha256": "48ef2b11c3d7528ebb72a5908924f4cb60a381dad0eb09eae1462905639100fa",
-      "bytes": 143937
+      "sha256": "bd22bea2b63140526d153c53e195dbf4c7f33cf65cfab6dde7c79142063a30a9",
+      "bytes": 148716
     },
     {
       "path": "services/conversation/tool_result_storage.py",
@@ -4655,8 +4655,8 @@
     },
     {
       "path": "services/llm/prompts/viola_unified.py",
-      "sha256": "951bb99ae1f79391504a0ac0b0d0a9c0ae93aa216830ec7a16077e360b1a7d39",
-      "bytes": 18292
+      "sha256": "4b17549793de7f25ea740996fd97f7f66d69b7645c4a38f84780a6197bcd5559",
+      "bytes": 18535
     },
     {
       "path": "services/llm/provider_fallback.py",
@@ -4780,18 +4780,18 @@
     },
     {
       "path": "services/memory/dir.py",
-      "sha256": "e2bb40a643a20885dcfc6f7a326bbea9142c4ca18588ae1f62f75382791f37cc",
-      "bytes": 99863
+      "sha256": "b5c90e985d80cf7d2fa998a2e676fb14e73028ebb103b10a9be32761c12d0dae",
+      "bytes": 102986
     },
     {
       "path": "services/memory/extract_memories.py",
-      "sha256": "7ccd5d69935a99aa3a866692109a4b72e4ae6330b3d1e509a895e95563d2d6b9",
-      "bytes": 17750
+      "sha256": "73c82f61a53ae24156e5f0a3f97c42265268a6264b79c3496a67bc71020e75eb",
+      "bytes": 21139
     },
     {
       "path": "services/memory/hygiene.py",
-      "sha256": "831d89fccc7dab41184a97ae84725d1652b9ebd18ae9b69869ec56c118b1652d",
-      "bytes": 7155
+      "sha256": "dbd12e4d396362d3e34f76a2ba21c7a0f39336f5649b09dc48ab6d499044736b",
+      "bytes": 8701
     },
     {
       "path": "services/memory/key_provider.py",
@@ -4800,13 +4800,13 @@
     },
     {
       "path": "services/memory/selector.py",
-      "sha256": "65fd8f1049bfd22ffe07707a435ce5372413c4df85d3311aaf33ef4311105f0e",
-      "bytes": 7727
+      "sha256": "6d97e52190c024d132359cd9c86a9c4ac3477e25a73893540cf1fc7f8f8de4c3",
+      "bytes": 7808
     },
     {
       "path": "services/memory/store.py",
-      "sha256": "f474eab360b698463bb72cd97871895da0daf9a54ad4bb1c11ddd34bdb60bc78",
-      "bytes": 38953
+      "sha256": "91f69e0c769146070cb5e861ca28d7c839ac43d14da24af620f40ae5374f264f",
+      "bytes": 40157
     },
     {
       "path": "services/meta_analysis/__init__.py",
