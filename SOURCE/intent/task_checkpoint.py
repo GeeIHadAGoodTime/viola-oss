@@ -361,7 +361,8 @@ def is_stale_pending(data: dict[str, Any], *, now: datetime | None = None) -> bo
     if updated_at is None:
         return True
     age = ((now or datetime.now(UTC)) - updated_at).total_seconds()
-    limit = _PENDING_WITH_STEPS_TTL_S if data.get("steps") else _PENDING_WITHOUT_STEPS_TTL_S
+    did_work = data.get("steps") or data.get("step_index")
+    limit = _PENDING_WITH_STEPS_TTL_S if did_work else _PENDING_WITHOUT_STEPS_TTL_S
     return age > limit
 
 
