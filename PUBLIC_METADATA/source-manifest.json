@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "25aab7d5fbbb07adbc1dd8354f96d2ab2911ca88",
-  "sha256": "479a6da5008dbc1a93b2e78c7a11ec0d7910994dec6ff4131ca242a2e9ca9560",
+  "revision": "e8e6be2861cba95f141740c4c62915c81d0fdc8f",
+  "sha256": "44009716176a098add89b350262d4dbec094da43680b3d5787a7c4f09bcb8231",
   "files": [
     {
       "path": ".env.example",
@@ -5730,8 +5730,8 @@
     },
     {
       "path": "telephony/call_manager.py",
-      "sha256": "a90d64607abc923b94393ca8743e1864a4de094756ffcd5a77c3e666d8527600",
-      "bytes": 387136
+      "sha256": "f0143ad5854b744a732f88eb90145cb31a83cfce1d59579ac3d99641d03605d2",
+      "bytes": 387369
     },
     {
       "path": "telephony/call_queue.py",
@@ -6005,8 +6005,8 @@
     },
     {
       "path": "telephony/transcription_observer.py",
-      "sha256": "d7415bfb6efe3746c4dfb440ec9f8687d4b7ac65b14b73bb7545a69b9202d280",
-      "bytes": 16920
+      "sha256": "fd983b0d2bfa8adf2a157a244a53e49fec2d127ef4ea029c936ce818f14632b2",
+      "bytes": 16778
     },
     {
       "path": "telephony/tts_corruption_guard.py",
