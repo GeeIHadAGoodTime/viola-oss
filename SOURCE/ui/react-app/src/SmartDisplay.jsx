@@ -709,6 +709,9 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
   // task ends or the view was closed (pill / Ctrl+K "Open Agent Browser").
   const [lastAgentBrowserUrl, setLastAgentBrowserUrl] = useState('');
   const lastOverlayStatusRef = useRef('');
+  // The browser was closed on purpose. The task that closed it is still running at
+  // that moment, and a running task would bring the pill straight back.
+  const browserClosedRef = useRef(false);
 
   // Modal state
   // TopBar's expanded-calendar modal (CalendarView.jsx, compact mode) is
@@ -1666,6 +1669,9 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
         // The browser was closed on purpose: nothing to reopen, so no globe pill.
         setLastAgentBrowserUrl('');
         setAgentContextPillVisible(false);
+        browserClosedRef.current = true;
+      } else if (visible && mode === 'agentic') {
+        browserClosedRef.current = false;
       }
       if (visible !== undefined) { setBrowserOverlayVisible(!!visible); }
       setBrowserOverlayMode(visible === false ? '' : mode);
@@ -1689,6 +1695,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
           lastOverlayStatusRef.current = agentTask.status || '';
         }
       } else if (!visible) {
+        lastOverlayStatusRef.current = '';
         const outcome = msg.agent_outcome || msg.payload?.agent_outcome || '';
         if (outcome === 'done') { addToast({ message: 'Done \u2713', level: 'info' }); }
         else if (outcome === 'error') { addToast({ message: 'That didn\'t work — please try again', level: 'error' }); }
@@ -1713,6 +1720,12 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
     if (!setAgentProgressCallback) return;
     const handleAgentProgress = (payload) => {
       const terminal = payload?.terminal === true || ['complete', 'error', 'cancelled'].includes(payload?.status);
+      if (terminal && lastOverlayStatusRef.current === 'bot_check') {
+        // The task is over but a site's person check is still the user's to finish:
+        // the view stays up until they close it.
+        setAgentTaskActive(false);
+        return;
+      }
       if (terminal) {
         setAgentTaskActive(false);
         setAgentTaskStatus('');
@@ -1737,7 +1750,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
 
   useEffect(() => {
     if (agentTaskActive || browserModeActive) {
-      setAgentContextPillVisible(true);
+      if (!browserClosedRef.current) setAgentContextPillVisible(true);
       return undefined;
     }
     if (!agentContextPillVisible) return undefined;

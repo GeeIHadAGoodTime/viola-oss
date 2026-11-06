@@ -223,9 +223,21 @@ describe('closing the browser takes the globe pill away', () => {
     await send(hidden({ agent_outcome: 'done' }));
     expect(pill()).toBeInTheDocument();
 
+    // The "close the browser" task is itself running while this arrives.
+    await act(async () => { harness.progress({ status: 'working', progress: 'Closing' }); });
     await send(hidden({ page_forgotten: true }));
+    await act(async () => { harness.progress({ status: 'working', progress: 'Closing' }); });
+    await act(async () => { harness.progress({ status: 'complete', terminal: true }); });
 
     await waitFor(() => expect(pill()).not.toBeInTheDocument());
+  });
+
+  it('comes back when a new task browses again', async () => {
+    await mount();
+    await send(hidden({ page_forgotten: true }));
+    await send(agentic(WIKI));
+
+    await waitFor(() => expect(pill()).toBeInTheDocument());
   });
 
   it('Close on the stage removes it too', async () => {
@@ -258,6 +270,9 @@ describe("a site's person check", () => {
     await mount();
     await send(check());
     await send(check({ agent_busy: false }));
+    // Found live: the end-of-task progress event moved the stage away, and leaving
+    // the stage closed the view with the check still on it.
+    await act(async () => { harness.progress({ status: 'complete', terminal: true }); });
 
     await waitFor(() => expect(lastSurfaceActive()).toBe(true));
     expect(screen.getByText(/check you're a person/i)).toBeInTheDocument();
