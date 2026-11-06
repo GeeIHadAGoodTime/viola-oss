@@ -220,6 +220,11 @@ class _DriverBound:
         self._target = target
         self._driver = driver
 
+    @property
+    def wrapped_type(self) -> type:
+        """The Playwright class behind this proxy, for code that checks a method's signature."""
+        return type(self._target)
+
     def __getattr__(self, name: str) -> Any:
         return _bind_to_driver(getattr(self._target, name), self._driver)
 
