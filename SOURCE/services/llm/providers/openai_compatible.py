@@ -4169,6 +4169,22 @@ class OpenAICompatibleProvider(BaseLLMProvider):
                             text = str(block["text"])
                             if text.strip():
                                 parts.append({"type": "output_text", "text": text})
+                        elif block_type == "tool_use":
+                            # A compacted chain stores its kept steps this way.
+                            # Skipping them orphaned every kept tool result, so
+                            # the first turn after compaction saw none of the
+                            # recent work (input fell from 10,683 to 736 tokens).
+                            if parts:
+                                result.append({"role": "assistant", "content": parts})
+                                parts = []
+                            result.append(
+                                {
+                                    "type": "function_call",
+                                    "call_id": block.get("id", ""),
+                                    "name": block.get("name", ""),
+                                    "arguments": json.dumps(block.get("input") or {}, ensure_ascii=False, default=str),
+                                }
+                            )
                     if parts:
                         result.append({"role": "assistant", "content": parts})
 
@@ -4267,18 +4283,29 @@ class OpenAICompatibleProvider(BaseLLMProvider):
                     # Plain text (nudge continuation, final answer text)
                     result.append({"role": "assistant", "content": content})
                 elif isinstance(content, list):
-                    # Unlikely for OpenAI but handle gracefully:
-                    # extract text from content blocks
+                    # A compacted chain stores its kept steps as blocks.
                     parts = []
+                    tool_calls = []
                     for block in content:
                         if isinstance(block, dict) and "text" in block:
                             parts.append(block["text"])
-                    if parts:
-                        result.append(
-                            {
-                                "role": "assistant",
-                                "content": "".join(parts),
-                            }
-                        )
+                        elif isinstance(block, dict) and block.get("type") == "tool_use":
+                            tool_calls.append(
+                                {
+                                    "id": block.get("id", ""),
+                                    "type": "function",
+                                    "function": {
+                                        "name": block.get("name", ""),
+                                        "arguments": json.dumps(
+                                            block.get("input") or {}, ensure_ascii=False, default=str
+                                        ),
+                                    },
+                                }
+                            )
+                    if parts or tool_calls:
+                        openai_message: dict[str, Any] = {"role": "assistant", "content": "".join(parts) or None}
+                        if tool_calls:
+                            openai_message["tool_calls"] = tool_calls
+                        result.append(openai_message)
 
         return result
