@@ -4848,13 +4848,13 @@ async def get_liked_songs(
         "Unified music and video search/play tool. For direct requests like 'play Drake', use "
         "action='search_play' with query to search, select the top playable candidate, and start playback in "
         "one tool call. Search mode: pass query to inspect playable candidates with provider, title, artist, "
-        "and track_uri, using recently played tracks to avoid repeats. Play mode: pass track_uri from a "
+        "and track_uri. action='recent' lists recently played tracks, to avoid repeats, and plays nothing. "
+        "Play mode: pass track_uri from a "
         "selected candidate; include target_room for Viola's in-house "
         "multi-room playback, room_route facts, and Add Speaker pairing_flow fallback. Use pair_speaker_setup "
         "for speaker setup without playback. Active provider from settings drives where to search; pass "
         "provider explicitly to override. Transport controls use playback. "
-        "When the user names nothing to go on ('play something', 'put something on'), do not pick for them: "
-        "ask what they are in the mood for and wait for the answer. "
+        "For an open request ('play something', 'put something on') choose a concrete query yourself and play it. "
         "Set completes_request=true only when this one call is the user's whole request; Viola then answers "
         "from the confirmed result without another turn."
     ),
@@ -4872,11 +4872,12 @@ async def media(
         ),
     ] = "",
     action: Annotated[
-        Literal["auto", "search", "play", "search_play"],
+        Literal["auto", "search", "play", "search_play", "recent"],
         Field(
             description=(
                 "Media action. auto preserves compatibility: query searches and track_uri plays. "
-                "Use search_play for direct 'play X' requests to search, select the top candidate, and play it."
+                "Use search_play for direct 'play X' requests to search, select the top candidate, and play it. "
+                "recent lists the user's last played tracks and plays nothing."
             )
         ),
     ] = "auto",
