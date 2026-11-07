@@ -41,6 +41,7 @@ from violawake.config import (
     STREAM_AGREE_K,
     STREAM_AGREE_N,
     STREAM_CHUNK_SAMPLES,
+    custom_operating_point,
     stream_operating_point,
 )
 
@@ -843,16 +844,24 @@ class ViolaWake:
     def _sync_operating_point(self) -> None:
         """Re-map ``threshold`` (the level) when it changed since the last chunk."""
         checked = bool(getattr(self, "checked", False))
+        custom = bool(getattr(self, "custom_model", False))
+        custom_rule = getattr(self, "custom_rule", None)
         if self._operating_point_pinned or (
-            self.threshold == self._mapped_level and checked == getattr(self, "_mapped_checked", False)
+            self.threshold == self._mapped_level
+            and checked == getattr(self, "_mapped_checked", False)
+            and (custom, custom_rule) == getattr(self, "_mapped_custom", (False, None))
         ):
             return
-        k, n, frame_threshold = stream_operating_point(self.threshold, checked=checked)
+        if custom:
+            k, n, frame_threshold = custom_operating_point(self.threshold, custom_rule, checked=checked)
+        else:
+            k, n, frame_threshold = stream_operating_point(self.threshold, checked=checked)
         if (k, n) != (self._agreement.k, self._agreement.n):
             self._agreement.configure(k, n)
         self._stream_threshold = frame_threshold
         self._mapped_level = self.threshold
         self._mapped_checked = checked
+        self._mapped_custom = (custom, custom_rule)
 
     def _init_music_path(self, debounce_frames: int) -> None:
         # The looser rule used while Viola's own music plays (None = off; the

@@ -817,11 +817,19 @@ class ViolaWakeListener:
 
         from violawake import ViolaWake
 
-        return ViolaWake(
+        engine = ViolaWake(
             model_path=str(model_path),
             threshold=self.threshold,
             debounce_seconds=2.0,
         )
+        try:
+            from services.wake_word.custom_models import custom_wake_rule_for_model, custom_wake_word_for_model
+
+            engine.custom_model = bool(custom_wake_word_for_model(model_path))
+            engine.custom_rule = custom_wake_rule_for_model(model_path)
+        except Exception as exc:  # noqa: BLE001, RUF100 - an unreadable sidecar means the built-in rule
+            logger.warning("Could not read the wake rule for %s: %s", model_path, exc)
+        return engine
 
     def _configure_cadence(self) -> None:
         """Pick the scoring cadence for the loaded engine.
@@ -3525,9 +3533,15 @@ class ViolaWakeListener:
             return
         self._logged_wake_rule = key
         try:
-            from violawake.config import stream_operating_point
+            from violawake.config import custom_operating_point, stream_operating_point
 
-            k, n, frame_threshold = stream_operating_point(level, checked=checked)
+            engine = self._engine
+            if getattr(engine, "custom_model", False):
+                k, n, frame_threshold = custom_operating_point(
+                    level, getattr(engine, "custom_rule", None), checked=checked
+                )
+            else:
+                k, n, frame_threshold = stream_operating_point(level, checked=checked)
         except (ImportError, TypeError, ValueError):
             return
         logger.info(

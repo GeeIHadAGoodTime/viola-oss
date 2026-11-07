@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import re
 from dataclasses import asdict
@@ -27,11 +28,16 @@ from services.violawake_client import (
 from services.wake_word.custom_models import (
     DEFAULT_WAKE_MODEL_ID,
     WakeTrainingJobRecord,
+    calibrate_wake_rule,
     delete_model_for_user,
+    discard_job_samples,
+    keep_job_samples,
     latest_open_job_for_user,
     list_models_for_user,
     read_job_record,
+    read_job_samples,
     resolve_model_for_user,
+    set_model_wake_rule,
     store_trained_model,
     validate_onnx_model,
     write_job_record,
@@ -267,6 +273,23 @@ def _activate_model(user_id: str, record: Any) -> tuple[dict[str, Any], JSONResp
     return reload_result, None
 
 
+async def _measure_wake_rule(user_id: str, job_id: str, model_path: str) -> None:
+    """Fit the detector's rule to this word, using the recordings kept for it.
+
+    Best effort: a model with no measured rule still works, on the default rule.
+    """
+
+    samples = read_job_samples(user_id, job_id)
+    if not samples:
+        return
+    try:
+        rule = await asyncio.to_thread(calibrate_wake_rule, Path(model_path), samples)
+        if rule is not None:
+            set_model_wake_rule(Path(model_path), rule)
+    except Exception:  # never lose a good model over a measurement
+        logger.exception("Could not measure the wake rule for job %s", job_id)
+
+
 def _custom_model_activation_error(record: Any) -> JSONResponse | None:
     if record.is_default:
         return None
@@ -400,6 +423,7 @@ def register_wake_training_routes(context: ApiContext) -> None:
             created_at=_now_iso(),
         )
         write_job_record(record)
+        keep_job_samples(user_id, submission.job_id, [sample.content for sample in samples])
         return success_response({"job_id": submission.job_id, "status": submission.status})
 
     @router.get(
@@ -492,6 +516,7 @@ def register_wake_training_routes(context: ApiContext) -> None:
                         far_per_hour=model_config.far_per_hour,
                         frr=model_config.frr,
                     )
+                    await _measure_wake_rule(user_id, job_id, model_record.model_path)
                     updated = WakeTrainingJobRecord(
                         **{
                             **asdict(updated),
@@ -518,6 +543,8 @@ def register_wake_training_routes(context: ApiContext) -> None:
                     error_reason = "generic"
 
         write_job_record(updated)
+        if updated.status in {"done", "failed"}:
+            discard_job_samples(user_id, job_id)
         return success_response(
             {
                 "job_id": updated.job_id,

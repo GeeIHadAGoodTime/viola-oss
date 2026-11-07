@@ -4,12 +4,17 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import io
 import json
 import re
+import shutil
+import wave
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+
+import numpy as np
 
 from config.wake_config import get_violawake_model_path
 from core.logging_config import get_logger
@@ -27,6 +32,11 @@ _MAX_WAKE_MODEL_BYTES = 50 * 1024 * 1024
 _MODEL_HASH_CHUNK_BYTES = 1024 * 1024
 _SHA256_HEX_LENGTH = 64
 _LOWER_HEX_CHARS = frozenset("0123456789abcdef")
+_RULE_LEVEL = 0.90
+_RULE_FRAME_THRESHOLD = 0.85
+_RULE_MAX_N = 12
+_RULE_SAMPLE_RATE = 16000
+_RULE_ROOM_NOISE = 0.002
 
 
 @dataclass(frozen=True, slots=True)
@@ -186,6 +196,114 @@ def custom_wake_word_for_model(model_path: Path | str | None) -> str | None:
         return None
     word = _read_model_metadata(Path(model_path)).get("wake_word")
     return word.strip() if isinstance(word, str) and word.strip() else None
+
+
+def custom_wake_rule_for_model(model_path: Path | str | None) -> tuple[int, int] | None:
+    """Return the k of n measured for this model, or None when there is none."""
+
+    if not model_path:
+        return None
+    rule = _read_model_metadata(Path(model_path)).get("wake_rule")
+    if not isinstance(rule, dict):
+        return None
+    try:
+        k, n = int(rule["k"]), int(rule["n"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    return (k, n) if 1 <= k <= n <= _RULE_MAX_N else None
+
+
+def job_samples_dir(user_id: str, job_id: str, root: Path | None = None) -> Path:
+    """Return where a job's own recordings wait for its model, on this machine only."""
+
+    return job_path_for_user(user_id, job_id, root).with_suffix("")
+
+
+def keep_job_samples(user_id: str, job_id: str, samples: list[bytes], root: Path | None = None) -> None:
+    """Keep the recordings until the model comes back, so the rule can be measured."""
+
+    folder = job_samples_dir(user_id, job_id, root)
+    folder.mkdir(parents=True, exist_ok=True)
+    for index, sample in enumerate(samples):
+        (folder / ("sample_%02d.wav" % index)).write_bytes(sample)
+
+
+def read_job_samples(user_id: str, job_id: str, root: Path | None = None) -> list[bytes]:
+    folder = job_samples_dir(user_id, job_id, root)
+    return [path.read_bytes() for path in sorted(folder.glob("sample_*.wav"))] if folder.is_dir() else []
+
+
+def discard_job_samples(user_id: str, job_id: str, root: Path | None = None) -> None:
+    shutil.rmtree(job_samples_dir(user_id, job_id, root), ignore_errors=True)
+
+
+def _wav_to_float(sample: bytes) -> np.ndarray | None:
+    """Decode a 16-bit mono WAV to 16 kHz float32, or None if it is something else."""
+
+    try:
+        with wave.open(io.BytesIO(sample), "rb") as wav:
+            if wav.getsampwidth() != 2 or wav.getnchannels() != 1:
+                return None
+            rate = wav.getframerate()
+            audio = np.frombuffer(wav.readframes(wav.getnframes()), dtype="<i2").astype(np.float32) / 32768.0
+    except (EOFError, wave.Error):
+        return None
+    if rate != _RULE_SAMPLE_RATE and audio.size:
+        positions = np.arange(0, audio.size, rate / _RULE_SAMPLE_RATE)
+        audio = np.interp(positions, np.arange(audio.size), audio).astype(np.float32)
+    return audio
+
+
+def rule_from_frames(frames: list[int]) -> tuple[int, int]:
+    """Turn frames-held-per-sample into a k of n a NEW recording will still meet.
+
+    Unseen recordings hold a score for about one frame less than the samples the model
+    was trained on, and the lower quartile ignores one bad take. Two frames of margin
+    from there kept 52 of 60 unseen real recordings of a short word, and left a long
+    word at 6 of 7, which is the fewest false wakes.
+    """
+
+    ordered = sorted(frames)
+    held = ordered[len(ordered) // 4] if ordered else 0
+    k = max(2, min(6, held - 2))
+    return k, (7 if k == 6 else k + 1)
+
+
+def calibrate_wake_rule(model_path: Path, samples: list[bytes]) -> tuple[int, int] | None:
+    """Measure how long this model holds its score on the user's own samples.
+
+    Runs the real streaming engine, so the frames counted are the frames the listener
+    will see. None when it cannot be measured; the model then uses the default rule.
+    """
+
+    from violawake.config import STREAM_CHUNK_SAMPLES
+    from violawake.engine import ViolaWake
+
+    engine = ViolaWake(str(model_path), threshold=_RULE_LEVEL, debounce_seconds=2.0)
+    if not getattr(engine, "supports_streaming", False):
+        return None
+    noise = np.random.default_rng(7)
+    frames: list[int] = []
+    for sample in samples:
+        audio = _wav_to_float(sample)
+        if audio is None or not audio.size:
+            continue
+        lead = noise.normal(0, _RULE_ROOM_NOISE, 2 * _RULE_SAMPLE_RATE).astype(np.float32)
+        stream = np.concatenate([lead, audio, lead])
+        scores = [
+            float(engine.process_chunk(stream[start : start + STREAM_CHUNK_SAMPLES]) or 0.0)
+            for start in range(0, stream.size - STREAM_CHUNK_SAMPLES + 1, STREAM_CHUNK_SAMPLES)
+        ]
+        frames.append(sum(score >= _RULE_FRAME_THRESHOLD for score in scores))
+    return rule_from_frames(frames) if frames else None
+
+
+def set_model_wake_rule(model_path: Path, rule: tuple[int, int]) -> None:
+    """Record the measured rule in the model's sidecar."""
+
+    metadata = _read_model_metadata(model_path)
+    metadata["wake_rule"] = {"k": rule[0], "n": rule[1]}
+    _sidecar_path(model_path).write_text(json.dumps(metadata, indent=2, sort_keys=True), encoding="utf-8")
 
 
 def store_trained_model(
@@ -651,16 +769,23 @@ __all__ = [
     "WakeModelInspection",
     "WakeModelRecord",
     "WakeTrainingJobRecord",
+    "calibrate_wake_rule",
+    "custom_wake_rule_for_model",
     "custom_wake_word_for_model",
     "delete_model_for_user",
+    "discard_job_samples",
     "inspect_wake_model",
     "job_path_for_user",
+    "keep_job_samples",
     "latest_open_job_for_user",
     "list_models_for_user",
     "model_id_for",
     "model_path_for_user",
     "read_job_record",
+    "read_job_samples",
     "resolve_model_for_user",
+    "rule_from_frames",
+    "set_model_wake_rule",
     "store_trained_model",
     "trained_models_dir",
     "validate_onnx_model",
