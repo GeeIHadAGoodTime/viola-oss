@@ -273,9 +273,16 @@ _APP_PANEL_ACTIONS: dict[str, dict[str, str]] = {
         "ui_action": "open_help",
         "path_identifier": "help",
     },
+    "memory": {
+        "ui_action": "open_memory_panel",
+        "path_identifier": "memory",
+    },
 }
 
 _APP_PANEL_ALIASES: dict[str, str] = {
+    "memories": "memory",
+    "memory_panel": "memory",
+    "workbench": "memory",
     "rooms_add_speaker": "rooms.add_speaker",
     "room_add_speaker": "rooms.add_speaker",
     "add_speaker": "rooms.add_speaker",
@@ -1582,9 +1589,9 @@ async def file_write(
 
 @server.tool(
     description=(
-        "Execute a shell command and return stdout, stderr, and exit code. "
-        "Last resort — prefer dedicated tools (file_read, web_search, media) over shell. "
-        "30s default timeout, 4000 char output cap."
+        "Run a shell command; returns stdout, stderr, exit code. Last resort: file_read/file_write handle files "
+        "(info says if one exists). Use full paths. %USERPROFILE%\\Desktop and ~\\Desktop become the real "
+        "Desktop, even under OneDrive (same for Documents, Downloads). 30s timeout, 4000 char output."
     ),
     annotations=_DANGEROUS,
     meta={"risk": "destructive"},
@@ -1621,7 +1628,9 @@ async def run_command(
             working_directory,
             permission_mode=permission_mode,
         )
-        return _format_result(result)
+        # A failed command's output is the only way to see why it failed; the
+        # model used to get just "exit code 2" and rewrote a working script.
+        return _format_result_with_error_data(result)
     except Exception as exc:
         logger.exception("run_command failed for command_chars=%d", len(command or ""))
         return json.dumps({"error": str(exc)})
@@ -4837,11 +4846,13 @@ async def get_liked_songs(
         "Unified music and video search/play tool. For direct requests like 'play Drake', use "
         "action='search_play' with query to search, select the top playable candidate, and start playback in "
         "one tool call. Search mode: pass query to inspect playable candidates with provider, title, artist, "
-        "and track_uri, using recently played tracks to avoid repeats. Play mode: pass track_uri from a "
+        "and track_uri. action='recent' lists recently played tracks, to avoid repeats, and plays nothing. "
+        "Play mode: pass track_uri from a "
         "selected candidate; include target_room for Viola's in-house "
         "multi-room playback, room_route facts, and Add Speaker pairing_flow fallback. Use pair_speaker_setup "
         "for speaker setup without playback. Active provider from settings drives where to search; pass "
         "provider explicitly to override. Transport controls use playback. "
+        "For an open request ('play something', 'put something on') choose a concrete query yourself and play it. "
         "Set completes_request=true only when this one call is the user's whole request; Viola then answers "
         "from the confirmed result without another turn."
     ),
@@ -4859,11 +4870,12 @@ async def media(
         ),
     ] = "",
     action: Annotated[
-        Literal["auto", "search", "play", "search_play"],
+        Literal["auto", "search", "play", "search_play", "recent"],
         Field(
             description=(
                 "Media action. auto preserves compatibility: query searches and track_uri plays. "
-                "Use search_play for direct 'play X' requests to search, select the top candidate, and play it."
+                "Use search_play for direct 'play X' requests to search, select the top candidate, and play it. "
+                "recent lists the user's last played tracks and plays nothing."
             )
         ),
     ] = "auto",
@@ -5017,8 +5029,9 @@ async def check_music_provider_status(
 @server.tool(
     description=(
         "Open a Viola app panel for user intents like 'open settings', 'show payment methods', "
-        "or 'take me to my calendar'. Available panel_id values: settings, rooms.add_speaker, "
-        "calendar, music_accounts, payment_methods, help. Optional sub_tab can name a Settings "
+        "'open the memory panel' or 'take me to my calendar'. Available panel_id values: settings, "
+        "rooms.add_speaker, calendar, music_accounts, payment_methods, help, memory (the user's saved "
+        "memories and Workbench). Optional sub_tab can name a Settings "
         "tab such as account, ai_agents, music_voice, messaging, services, payment, or preferences. "
         "Optional prefill can pass structured UI defaults such as {'room_name': 'kitchen'}. "
         "Returns a structured ui_action envelope for the React app; this is a UI capability, "
@@ -5033,7 +5046,7 @@ async def open_app_panel(
         Field(
             description=(
                 "Panel to open. Use one of: settings, rooms.add_speaker, calendar, "
-                "music_accounts, payment_methods, help."
+                "music_accounts, payment_methods, help, memory."
             )
         ),
     ],

@@ -101,7 +101,10 @@ HIGH_RISK_TOOLS = frozenset(
 #   * payments and shell commands are refused outright, with no confirm
 #     override (TAINT_HARD_BLOCK_ACTION_CLASSES), except that the two
 #     payment-gate-bound tools run once the user approved this exact order
-#     through the payment gate (PAYMENT_GATE_BOUND_TOOLS, below);
+#     through the payment gate (PAYMENT_GATE_BOUND_TOOLS, below), and that a
+#     command that only runs the user's own script goes on to its confirm gate
+#     (``runs_users_own_script``: named by the user or written here, and not
+#     changed while untrusted content was in the conversation);
 #   * a phone call goes on to its confirm-or-cancel gate like the actions
 #     below (r5/phone): the confirmation shows the user the exact number and
 #     who it belongs to, says the number came from outside content, and must
@@ -574,7 +577,61 @@ def is_user_named_file_read(tool_name: str | None, tool_args: object, user_text:
             pattern = r"(?<![\w.\-])" + re.escape(name) + r"(?![\w\-]|\.\w)"
             if re.search(pattern, text, flags=re.IGNORECASE) is not None:
                 return True
+        if _is_own_file_of_this_conversation(raw_path):
+            return True
     return _inside_user_named_folder(raw_path, text, include_self=action in _FOLDER_SEARCH_ACTIONS)
+
+
+def _is_own_file_of_this_conversation(raw_path: str) -> bool:
+    """The path holds what the user had Viola write here, before any untrusted content arrived.
+
+    Reading it back is not third-party content arriving: on the turn the user
+    says "confirm", a look at the script Viola had just written turned the
+    conversation tainted and the next run of that script was refused (1.0.5
+    laptop K1). A file changed while untrusted content was in the conversation
+    never counts: what it holds may have been steered by that content.
+    """
+    from intent.file_gates import active_file_gate_context
+    from intent.tools.filesystem import path_touched_in_session, path_written_under_taint, resolve_tool_path
+
+    context = active_file_gate_context()
+    path = resolve_tool_path(raw_path) if raw_path else None
+    if context is None or not context.user_id or path is None:
+        return False
+    return path_touched_in_session(context.user_id, context.session_key, path) and not path_written_under_taint(
+        context.user_id, context.session_key, path
+    )
+
+
+def runs_users_own_script(tool_args: object) -> bool:
+    """A shell call that only runs a script the user named or had Viola write here.
+
+    Provenance of the script file, never its content: one interpreter on one
+    file (``intent.tools.shell.script_run_target``) that the user's own words
+    name, or that Viola wrote in this conversation, and that was not changed
+    while untrusted content was in the conversation (it may hold what a web page
+    told the model to write). Nothing under Downloads, temp or mail attachments
+    counts: files there arrive from outside. Such a call still goes to the
+    confirm gate, which under taint accepts only the user's own words.
+    """
+    args = _tool_args_mapping(tool_args)
+    if args is None:
+        return False
+    from intent.file_gates import active_file_gate_context, is_outside_arrival_location, named_by_user
+    from intent.tools.filesystem import path_touched_in_session, path_written_under_taint
+    from intent.tools.shell import script_run_target
+
+    context = active_file_gate_context()
+    if context is None or not context.user_id:
+        return False
+    script = script_run_target(args.get("command"), args.get("working_directory"))
+    if script is None or is_outside_arrival_location(script):
+        return False
+    if path_written_under_taint(context.user_id, context.session_key, script):
+        return False
+    return named_by_user(script, context.user_text) or path_touched_in_session(
+        context.user_id, context.session_key, script
+    )
 
 
 def _inside_user_named_folder(raw_path: str, user_text: str, *, include_self: bool) -> bool:
@@ -723,7 +780,8 @@ class BrowserTaintTracker:
 
       * shell commands are refused outright, and so is every payment except
         filling (or speaking) the card the user approved for this exact
-        order through the payment gate's out-of-band approval;
+        order through the payment gate's out-of-band approval. A command that
+        only runs the user's own script reaches its confirm-or-cancel gate;
       * phone calls reach their confirm-or-cancel gate, which shows the exact
         number and who it belongs to (r5/phone);
       * every other consequential action goes on to its confirm-or-cancel
@@ -997,6 +1055,14 @@ class BrowserTaintTracker:
                 'payment(action="request_review") with the merchant, items and total, then stop '
                 "and wait; Viola sends the user the approval link and continues once they approve." % tool_name
             )
+
+        if action_class == "shell_command" and runs_users_own_script(args):
+            logger.info(
+                "TAINT_GATE: %s runs the user's own script; it goes to its confirm gate (taint from '%s')",
+                tool_name,
+                self._taint_source,
+            )
+            return None
 
         if action_class in TAINT_HARD_BLOCK_ACTION_CLASSES:
             logger.warning(

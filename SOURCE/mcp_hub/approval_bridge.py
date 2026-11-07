@@ -486,6 +486,38 @@ def _derive_risk_from_annotations(tool_name: str) -> RiskLevel | None:
 _SELF_MANAGE_READ_ONLY_ACTIONS = frozenset({"update_status", "check_updates", "update"})
 
 
+async def _broadcast_approval_state(tool_name: str, description: str, status: str, user_id: str | None) -> None:
+    """Tell the app about a confirmation asked here, so it shows the one approval card.
+
+    The executor's irreversible gate broadcasts its own; desktop actions and other
+    calls that only this bridge stops used to reach the user as text alone, while
+    a phone call got a card (1.0.5 laptop). Never affects the decision.
+    """
+    payload: dict[str, Any] = {
+        "tool_name": tool_name,
+        "action_class": "desktop_action" if tool_name == "computer" else "tool_action",
+        "planned_action": description,
+        "message": description,
+        "status": status,
+        "choices": ["yes", "no", "cancel"],
+    }
+    task_id = _active_agent_task_id()
+    if task_id:
+        payload["task_id"] = task_id
+    try:
+        from intent.approval import current_confirmation_conversation_scope
+        from ui.websocket.event_hub import get_event_hub
+
+        scope = current_confirmation_conversation_scope() or ""
+        if scope.startswith("chat:"):
+            payload["chat_thread_id"] = scope[len("chat:") :]
+        hub = get_event_hub()
+        if hub is not None:
+            await hub.broadcast("consult_user", payload, user_id=user_id, force=True)
+    except Exception as exc:  # noqa: BLE001, RUF100 - the card is a courtesy; the gate stands without it
+        logger.debug("Approval card broadcast failed for %s: %s", tool_name, exc)
+
+
 def _gate_lets_through(tool_name: str, args: Mapping[str, Any] | None) -> bool:
     """The confirm-or-cancel gate needs nothing for this call (read-only shell, new saved file)."""
     from intent.irreversible_actions import gate_action_class
@@ -1247,7 +1279,11 @@ class ApprovalBridge:
                     approved=user_confirmed,
                 )
                 self.last_permission_decision = final_decision
-                if final_decision.behavior == "allow":
+                allowed = final_decision.behavior == "allow"
+                await _broadcast_approval_state(
+                    tool_name, description, "approved" if allowed else "denied", context.user_id
+                )
+                if allowed:
                     _apply_updated_input(args, final_decision)
                     if tool_name == "computer":
                         _grant_computer_use_session_app(args, user_id=context.user_id, session_id=context.session_id)
@@ -1255,6 +1291,7 @@ class ApprovalBridge:
                 self._append_permission_frame(final_decision)
                 return False
             if confirmation_state == "rejected":
+                await _broadcast_approval_state(tool_name, description, "denied", context.user_id)
                 final_decision = self._permission_policy.resolve_user_response(
                     context,
                     decision,
@@ -1268,15 +1305,21 @@ class ApprovalBridge:
         if channel is not None and original_channel is None:
             self._approval._channel = channel
 
+        from intent.approval import ConfirmationDeferred
+
         try:
-            approved = await _request_permission_decision(
-                self._approval,
-                decision,
-                action_description=description,
-                tool_name=tool_name,
-                tool_args=args,
-                task_id=task_id,
-            )
+            try:
+                approved = await _request_permission_decision(
+                    self._approval,
+                    decision,
+                    action_description=description,
+                    tool_name=tool_name,
+                    tool_args=args,
+                    task_id=task_id,
+                )
+            except ConfirmationDeferred:
+                await _broadcast_approval_state(tool_name, description, "deferred", context.user_id)
+                raise
             final_decision = self._permission_policy.resolve_user_response(
                 context,
                 decision,

@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "738024675a88dfdc5afa07842a1733066e72c882",
-  "sha256": "bc346684cfec596ac65f0d41746bc564698d4e1d4271d84a3742c24438a9467d",
+  "revision": "a8847a7071a19144766495093256b7a582553843",
+  "sha256": "8b82d9efd234199f9a03d0e8c9f5067d51ad858c05dd77694c2c9872d199eb31",
   "files": [
     {
       "path": ".env.example",
@@ -1580,8 +1580,8 @@
     },
     {
       "path": "intent/agent_executor.py",
-      "sha256": "22b1dfa60ab157c69f22b2e8b1296d8b76952d7ceafb57be5fde429b5878cd10",
-      "bytes": 596261
+      "sha256": "b8501760cfa03124d53858d30f92ef4d6b78e9ce5def389f0b82397b8f639959",
+      "bytes": 597593
     },
     {
       "path": "intent/agent_loop.py",
@@ -1620,8 +1620,8 @@
     },
     {
       "path": "intent/approval.py",
-      "sha256": "920db74d2af83c4e9d59b2385fe632961012c6a616093f12b0b2d06198486c87",
-      "bytes": 54987
+      "sha256": "d5fff137bdaf826afe760b2aeec38a1cd4a0a4754dab61b8d2117337c827c16d",
+      "bytes": 56830
     },
     {
       "path": "intent/capability_resolver.py",
@@ -1675,8 +1675,8 @@
     },
     {
       "path": "intent/content_sanitizer.py",
-      "sha256": "606e849c96f118f722ceea175cd27c65db3f3c7d88730de26e05fca0c7a308ba",
-      "bytes": 54695
+      "sha256": "afb0ef9ceaf018483bb1e49e6911b78deb7577671321233fdfd15830f9c11b08",
+      "bytes": 58013
     },
     {
       "path": "intent/context_builder.py",
@@ -1690,8 +1690,8 @@
     },
     {
       "path": "intent/file_gates.py",
-      "sha256": "51d3480a03737cd0f1ed9b4349e7a2eec65be8af7264d72ad2f1b4875e8d3daa",
-      "bytes": 19835
+      "sha256": "2e81b93f7e4e6a4f1026fa2f44eb0f7ba5fd6a0cbb47d92721869b56c749a47c",
+      "bytes": 21736
     },
     {
       "path": "intent/gate_protocol.py",
@@ -1860,8 +1860,8 @@
     },
     {
       "path": "intent/irreversible_actions.py",
-      "sha256": "6fc6d7f53716f893770b94d0efb8d21b0548f94608960a49ced4a6fed337a3d7",
-      "bytes": 21977
+      "sha256": "0d159d942b255eb16068e65c1b6cd6c1c6d90b79a26263a846b3c6b42f54f808",
+      "bytes": 23066
     },
     {
       "path": "intent/json_utils.py",
@@ -1885,13 +1885,13 @@
     },
     {
       "path": "intent/permissions/shell_safety.py",
-      "sha256": "8cee4996cd59d93d247a944c5e526d016d26b2a09f78a4c02ee47845815cd95d",
-      "bytes": 59847
+      "sha256": "3068ff8fc4bbf4829c3b7d5b9de19a3b07cf8fbab8197aea61c6e02ae83d64b7",
+      "bytes": 62185
     },
     {
       "path": "intent/pipeline.py",
-      "sha256": "f9bcfc723ab529af01e3f62dc0f225a9e76f9d306a7fc510a0bedb8fdc88bf69",
-      "bytes": 110547
+      "sha256": "8763311b8afc9a3223f7a58a13e5ca7bc75970755e97823e4c3283ee064b79e6",
+      "bytes": 111021
     },
     {
       "path": "intent/pipeline_contracts.py",
@@ -2030,8 +2030,8 @@
     },
     {
       "path": "intent/tools/bug_reporting.py",
-      "sha256": "d19eb4594a5f23e63eef358380028885c632e3045c0a0beb90486a0a67e516da",
-      "bytes": 11144
+      "sha256": "ba289537dad24069ebea50dfc5b7254e9e22a84a785f9f9b4fd93f596ee41eea",
+      "bytes": 11185
     },
     {
       "path": "intent/tools/calendar_tools.py",
@@ -2075,8 +2075,8 @@
     },
     {
       "path": "intent/tools/filesystem.py",
-      "sha256": "bf38789ca2c2c1a3583ea0e58e4d2c34ed03681dd5c34a2a23c6bb6d3478eef8",
-      "bytes": 83327
+      "sha256": "eed99bce44b1cae31e0772cbc84365b9848cd957cf3e6c96ec76fe4b3062453b",
+      "bytes": 84914
     },
     {
       "path": "intent/tools/knowledge.py",
@@ -2100,8 +2100,8 @@
     },
     {
       "path": "intent/tools/media_tools.py",
-      "sha256": "4c868cffb919d1e26a2f6a625bdc6a087794d0c4ff79737b3947a88cab8ccbc2",
-      "bytes": 34544
+      "sha256": "774e11f0f571b54ce25a9a8a8103e2dffac63864253f17dccda1ebe14db21011",
+      "bytes": 35514
     },
     {
       "path": "intent/tools/memory.py",
@@ -2150,8 +2150,8 @@
     },
     {
       "path": "intent/tools/self_management.py",
-      "sha256": "6ec9133aa8c799faae63717254be2c8dea756b5d6aea3268ba1c3f24d7c8f761",
-      "bytes": 24783
+      "sha256": "8bd939b4c1a2c16f5a66ea7bab9b919d2371ed41f7e3a49039a4a4cb4ebe524c",
+      "bytes": 26056
     },
     {
       "path": "intent/tools/settings_tools.py",
@@ -2160,8 +2160,8 @@
     },
     {
       "path": "intent/tools/shell.py",
-      "sha256": "0ceddc21d51d21f64a196200ecc9ce1dc6c47ebb9c5cd29587ee84f19cd9b4fc",
-      "bytes": 20227
+      "sha256": "ee374538bfc470f2cbafddf7df62a2b63f64c31e602598f1b853661a455fd281",
+      "bytes": 25804
     },
     {
       "path": "intent/tools/system_state.py",
@@ -2205,8 +2205,8 @@
     },
     {
       "path": "intent/tools/weather_tool.py",
-      "sha256": "5f85f698bab82d32ceb76533cd1dc632cb229c305bc351b853b0fa8e11c30fec",
-      "bytes": 16608
+      "sha256": "eeadfbb534cf41639215498856303ee606edd58a25e9d0775ea1116b443a5221",
+      "bytes": 16501
     },
     {
       "path": "intent/tools/web_read.py",
@@ -2215,8 +2215,8 @@
     },
     {
       "path": "intent/tools/web_search.py",
-      "sha256": "3c5817e8d2ed4325cec30a615e5650f2d9fde8e38d8e1b726e924fe51657f3cf",
-      "bytes": 35113
+      "sha256": "10f7dfba1be684f597dc9a989a8ff2a01a918e5da02ce6ccb3d8c65963a7e5cb",
+      "bytes": 46905
     },
     {
       "path": "intent/tools/workbench.py",
@@ -2250,8 +2250,8 @@
     },
     {
       "path": "mcp_hub/approval_bridge.py",
-      "sha256": "32fa2f04685494b7f58abd092a113dcdc40afdae3ff2e71573837645ca1e77a3",
-      "bytes": 66816
+      "sha256": "2767e33ab3e106f00685ad33b05d56b35bdb66906ca7da980ffb5c7ef966f1bc",
+      "bytes": 68862
     },
     {
       "path": "mcp_hub/client_hub.py",
@@ -2360,8 +2360,8 @@
     },
     {
       "path": "mcp_servers/computer_use/server.py",
-      "sha256": "58cfa3db77937c250f74a7c65c12be93bd1a80693281a523dbd72cff18ebbe83",
-      "bytes": 50124
+      "sha256": "a7ba81c0858fe214f12b58c8d35f213a11d2178446305e936adff1bf226dd17d",
+      "bytes": 50264
     },
     {
       "path": "mcp_servers/core_tools/__init__.py",
@@ -2375,8 +2375,8 @@
     },
     {
       "path": "mcp_servers/core_tools/server.py",
-      "sha256": "7cbfe843cd4fbd9870d8c2b07c4670dccc6e659c4ce146ef5ebcf2c2557624a2",
-      "bytes": 263259
+      "sha256": "bfe444de5e82e0a853b838416931efdc4a153d6dded3ee559f6ba27ffae4a0c8",
+      "bytes": 264064
     },
     {
       "path": "mcp_servers/phone_tool_descriptions.py",
@@ -4345,8 +4345,8 @@
     },
     {
       "path": "services/computer_use/window_manager.py",
-      "sha256": "17b1df5322f2ae6a83a21c45e217eeaa90e478bcf810a521dc30ef84d0309445",
-      "bytes": 40365
+      "sha256": "790089af79d57ec966496905d3e658e0e6345966716193c12857df7051d7bf68",
+      "bytes": 41926
     },
     {
       "path": "services/connectors/__init__.py",
@@ -4655,8 +4655,8 @@
     },
     {
       "path": "services/llm/prompts/viola_unified.py",
-      "sha256": "951bb99ae1f79391504a0ac0b0d0a9c0ae93aa216830ec7a16077e360b1a7d39",
-      "bytes": 18292
+      "sha256": "2a1258af2330a2a2a7c1997d290ea1f41f7dd251983868dcb287f2e26433786a",
+      "bytes": 18900
     },
     {
       "path": "services/llm/provider_fallback.py",
@@ -4720,8 +4720,8 @@
     },
     {
       "path": "services/llm/route_tool_schemas.py",
-      "sha256": "e591a828df5e1e6a4a6ba4d6d8f8943bc3848dd775ea1a273b5d60350f5e2aad",
-      "bytes": 44415
+      "sha256": "7d181ddc1b163bc199379c83c81d791fb2f5fee9e20de70c05d1782787534333",
+      "bytes": 44490
     },
     {
       "path": "services/llm/session_cost_tracker.py",
@@ -5065,8 +5065,8 @@
     },
     {
       "path": "services/outbound_provider_registry.py",
-      "sha256": "86254f47d27d1fc43fdc3f4db75426a11a7694a5c0f7973164f242a02298fe78",
-      "bytes": 50409
+      "sha256": "2f9bcfae6a09ed9827f5021fed29abf8c31cc4280a444f186412c566b6b39f9a",
+      "bytes": 51340
     },
     {
       "path": "services/persistence/__init__.py",
@@ -10085,8 +10085,8 @@
     },
     {
       "path": "ui/react-app/src/SmartDisplay.jsx",
-      "sha256": "4e24a97267f758c40cc5b47b4aab80793d9b5455a3ab2cde0cc88113ec8b0b13",
-      "bytes": 194662
+      "sha256": "49adaec53dc034d66056d91eaf6212d7e680cfc15c0b71541d3ab89a67b71b7c",
+      "bytes": 195858
     },
     {
       "path": "ui/react-app/src/SmartDisplay.overlayLifecycle.test.jsx",
@@ -10540,13 +10540,13 @@
     },
     {
       "path": "ui/react-app/src/components/CallBriefing.jsx",
-      "sha256": "caf34e72e2930aa7488782bbefa2c14b126d06755f0cb432c3392f3194ab6cd1",
-      "bytes": 7804
+      "sha256": "7e60701482dba694ac15e8acc219b590b54e4e07aa52e3aa9daa01594bd6cd1a",
+      "bytes": 9451
     },
     {
       "path": "ui/react-app/src/components/CallBriefing.test.jsx",
-      "sha256": "01c304ba6daa9afde7aa5084bb3b641d07a7c7c49bf2b2276aa1234a2fb30d83",
-      "bytes": 7096
+      "sha256": "2845efda3d76fa5d26ac2bbb450bb5c2442ff7e00adbd937a1f7fa9668d21807",
+      "bytes": 9529
     },
     {
       "path": "ui/react-app/src/components/CallConsultation.jsx",
@@ -13190,8 +13190,8 @@
     },
     {
       "path": "utils/update_checker.py",
-      "sha256": "48cf0d7ae861c385fa1cd5d444ff7667c2ed700185d43e1094e8880d11438420",
-      "bytes": 52262
+      "sha256": "473ef332bc7bd1fbcd55176b96e45dbca0d6718dae96bd94a0b21d9aef20fd9c",
+      "bytes": 52731
     },
     {
       "path": "utils/velopack_updater.py",

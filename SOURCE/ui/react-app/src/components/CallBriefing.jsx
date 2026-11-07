@@ -1,5 +1,10 @@
 /**
- * CallBriefing — the confirm-or-cancel card for an outbound phone call.
+ * CallBriefing — Viola's one confirm-or-cancel card.
+ *
+ * Every action that stops at a confirm gate shows here: a phone call with its
+ * exact number, and anything else (opening an app, a shell command, a calendar
+ * change, a delete) with the same words Viola says out loud. Payments are the
+ * exception: they have their own secure review.
  *
  * A dial stops at the agent's unified confirmation gate (phone calls ask once
  * per task; a number found online, or any number not yet confirmed while web
@@ -24,6 +29,11 @@ const CLEARED_STATUSES = new Set(['denied', 'unavailable']);
 
 export const CALL_APPROVE_COMMAND = 'confirm';
 export const CALL_CANCEL_COMMAND = 'cancel';
+// Matches the backend's pending-confirmation lifetime: after this nothing can
+// answer the card, so it must not stay on screen.
+export const ACTION_APPROVAL_TTL_MS = 300000;
+
+const OWN_CARD_ACTION_CLASSES = new Set(['phone_call', 'payment']);
 
 /**
  * Map a `consult_user` WebSocket payload to call-briefing state.
@@ -48,6 +58,27 @@ export function callBriefingFromConsultEvent(payload) {
     chat_thread_id: payload.chat_thread_id || null,
     awaiting_confirmation: awaiting,
     approved: status === 'approved',
+  };
+}
+
+/**
+ * Map a `consult_user` payload for any action other than a call to card state.
+ *
+ * Same contract as `callBriefingFromConsultEvent`: `undefined` leaves the card
+ * alone, `null` clears it (answered, refused, expired), an object shows it.
+ */
+export function actionApprovalFromConsultEvent(payload) {
+  if (!payload || typeof payload !== 'object') return undefined;
+  if (!payload.action_class || OWN_CARD_ACTION_CLASSES.has(payload.action_class)) return undefined;
+  const status = String(payload.status || '').toLowerCase();
+  if (!AWAITING_STATUSES.has(status)) return null;
+  return {
+    planned_action: payload.planned_action || payload.message || '',
+    action_class: payload.action_class,
+    task_id: payload.task_id || null,
+    chat_thread_id: payload.chat_thread_id || null,
+    awaiting_confirmation: true,
+    approved: false,
   };
 }
 
@@ -93,6 +124,7 @@ export default function CallBriefing({ briefing, onDismiss, onApprove, onCancel 
     untrusted_source,
     planned_action,
   } = briefing;
+  const isCall = !briefing.action_class;
   const canAnswer = Boolean(awaiting_confirmation && !approved && (onApprove || onCancel));
   const accent = approved ? theme.colors.statusGreen : theme.colors.statusYellow;
   let title = 'Call plan';
@@ -115,7 +147,7 @@ export default function CallBriefing({ briefing, onDismiss, onApprove, onCancel 
   return (
     <div
       role="dialog"
-      aria-label="Phone call approval"
+      aria-label={isCall ? 'Phone call approval' : 'Action approval'}
       style={{
         position: 'fixed',
         bottom: 20,
@@ -154,6 +186,11 @@ export default function CallBriefing({ briefing, onDismiss, onApprove, onCancel 
         </button>
       </div>
 
+      {!isCall ? (
+        <div data-testid="action-approval-text" style={{ color: '#eee', fontSize: 13, marginBottom: 4 }}>
+          Viola wants to {planned_action}.
+        </div>
+      ) : (
       <div style={{ color: '#ccc', fontSize: 13, marginBottom: 4 }}>
         Call:{' '}
         {business_name ? (
@@ -172,6 +209,7 @@ export default function CallBriefing({ briefing, onDismiss, onApprove, onCancel 
           </strong>
         )}
       </div>
+      )}
 
       {untrusted_source && (
         <div style={{ color: theme.colors.statusYellow, fontSize: 12, marginBottom: 6 }}>
