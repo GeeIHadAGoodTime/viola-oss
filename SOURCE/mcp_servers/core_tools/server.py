@@ -4045,7 +4045,7 @@ async def memory(
 
 @server.tool(
     description=(
-        "Save or correct the user's own delivery address, from their words only. No confirmation first. "
+        "Save or correct the user's own delivery address when they want it kept, from their words only. No confirmation first. "
         "Say the returned read_back word for word."
     ),
     annotations=_SAFE,
@@ -5943,8 +5943,7 @@ async def payment(
         str,
         Field(
             description=(
-                "For action='request_review': concise order summary with items and total. "
-                "This is the PRIMARY checkout handoff path when payment is ready."
+                "For action='request_review': concise order summary with items and total."
             )
         ),
     ] = "",
@@ -5958,7 +5957,14 @@ async def payment(
     ] = "",
     notes: Annotated[
         str,
-        Field(description="Optional checkout notes or reason for opening secure card entry."),
+        Field(description="Optional notes."),
+    ] = "",
+    # Read by the agent executor from the call's arguments for the approval card.
+    # Without it the card fell back to the saved address even when the user had
+    # given another one for this order.
+    delivery_address: Annotated[
+        str,
+        Field(description="Where this order ships."),
     ] = "",
 ) -> str:
     """List masked payment cards or request secure payment handoff.
