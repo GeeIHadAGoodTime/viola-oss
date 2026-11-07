@@ -20,7 +20,7 @@ import time
 import unicodedata
 import uuid
 from collections.abc import Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, Any, Literal
 
 from openai import OpenAIError
@@ -112,6 +112,9 @@ class _PendingConfirmation:
     # main voice/typed conversation. A pending yes/no belongs to the chat it
     # was asked in, never to another one.
     conversation_scope: str | None = None
+    # time.monotonic() when last asked. Not the task id: a question asked by the
+    # approval bridge carries none, and it still belongs to the turn that asked.
+    asked_at: float = 0.0
 
 
 # A pending confirmation is answered in the conversation that asked for it.
@@ -490,13 +493,17 @@ class ApprovalManager:
         store = self._pending_store()
         with store.lock:
             self._prune_pending_confirmations(store, now)
-            for pending in store.confirmations.values():
+            for pending in list(store.confirmations.values()):
                 if (
                     pending.conversation_scope == scope
                     and pending.tool_name == tool_name_value
                     and pending.risk == risk
                     and pending.args_fingerprint == args_fingerprint
                 ):
+                    # Asked again on this turn, so it is this turn's question now.
+                    store.confirmations[pending.confirmation_id] = replace(
+                        pending, created_task_id=created_task_id, asked_at=now
+                    )
                     return ConfirmationDeferred(
                         confirmation_id=pending.confirmation_id,
                         action_description=pending.action_description,
@@ -517,6 +524,7 @@ class ApprovalManager:
             created_task_id=created_task_id,
             expires_at=now + _DEFERRED_CONFIRMATION_TTL_S,
             conversation_scope=scope,
+            asked_at=now,
         )
         with store.lock:
             store.confirmations[confirmation_id] = pending
@@ -561,6 +569,24 @@ class ApprovalManager:
                 }
             )
         return frames
+
+    def pending_confirmations_elsewhere(self) -> list[str]:
+        """Describe what is waiting in other chats, for the prompt only.
+
+        Holds no id and no arguments: nothing here can answer a confirmation. It
+        lets Viola say where a stray "yes" belongs instead of guessing at it.
+        """
+
+        now = time.monotonic()
+        scope = current_confirmation_conversation_scope()
+        store = self._pending_store()
+        with store.lock:
+            self._prune_pending_confirmations(store, now)
+            return [
+                pending.action_description
+                for pending in store.confirmations.values()
+                if pending.conversation_scope != scope
+            ]
 
     def consume_deferred_confirmation(
         self,
@@ -682,6 +708,29 @@ class ApprovalManager:
                 store.confirmations.pop(confirmation_id, None)
         self._apply_tool_arg_confirmation_normalization(tool_name_value, tool_args)
         return "accepted"
+
+    def retire_unanswered_confirmations(self, turn_started_at: float) -> list[tuple[str, str, dict[str, Any]]]:
+        """Drop confirmations asked on an earlier turn that this turn did not answer.
+
+        A pending yes/no is good for the very next turn. "Cancel" normally ends
+        with the model simply not calling the tool, which used to leave the
+        grant alive for its whole lifetime: an identical call a turn later ran
+        with no question asked (seen live on 2026-11-05). Anything asked since
+        ``turn_started_at`` (``time.monotonic()``) stays. Returns (tool,
+        description, args) for each one dropped.
+        """
+        scope = current_confirmation_conversation_scope()
+        store = self._pending_store()
+        dropped: list[tuple[str, str, dict[str, Any]]] = []
+        with store.lock:
+            for confirmation_id, pending in list(store.confirmations.items()):
+                if pending.conversation_scope != scope or pending.asked_at >= turn_started_at:
+                    continue
+                store.confirmations.pop(confirmation_id, None)
+                dropped.append((pending.tool_name, pending.action_description, dict(pending.tool_args)))
+        for _tool_name, description, _args in dropped:
+            logger.info("Unanswered confirmation retired: %s", description)
+        return dropped
 
     def pending_confirmation_args(
         self,

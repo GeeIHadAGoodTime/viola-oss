@@ -25,6 +25,9 @@ _DEFAULT_TOOL_RESULT_CHAR_BUDGET = 1_200
 _TOKEN_CHAR_RATIO = 4
 
 _COMPACT_BOUNDARY_ORIGINS = frozenset({"compact_boundary", "microcompact_boundary"})
+# The message holding the user's current request: kept whole through every
+# compaction, however old it gets inside a long run.
+ACTIVE_REQUEST_FRAME_ORIGIN = "active_task_request"
 _PROTECTED_META_ORIGIN_MARKERS = (
     "gate",
     "permission",
@@ -517,6 +520,8 @@ def _tool_ids(frame: Frame) -> set[str]:
 def _must_survive_compaction(frame: Frame) -> bool:
     if _is_compact_boundary_artifact(frame):
         return False
+    if frame.origin == ACTIVE_REQUEST_FRAME_ORIGIN:
+        return True
     if not frame.is_meta:
         return False
     origin = (frame.origin or "").lower()

@@ -181,10 +181,10 @@ def select_first_run_music_provider(query: str) -> MusicProviderSelection:
             and not _spotify_signed_in(_current_user_id())
             and is_youtube_anonymous_search_available()
         ):
-            # The music source is Spotify but Spotify isn't signed in: play on
+            # The music source is Spotify but Spotify can't play: play on
             # YouTube and say so, instead of failing or switching silently.
             logger.info(
-                "Music source is Spotify but Spotify isn't connected; playing on YouTube instead (query=%s)",
+                "Music source is Spotify but Spotify can't play; playing on YouTube instead (query=%s)",
                 query[:50],
             )
             _notify_spotify_not_connected(_current_user_id())

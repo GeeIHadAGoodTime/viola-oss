@@ -49,10 +49,14 @@ class TranscriptFrameCollector(FrameProcessor if PIPECAT_AVAILABLE else object):
         capture_user: bool = True,
         capture_assistant: bool = True,
         on_assistant_complete: Any | None = None,
+        speech_pacer: Any | None = None,
     ):
         if PIPECAT_AVAILABLE:
             super().__init__()
         self._transcript = transcript_collector
+        # When set, Viola's words reach the live transcript in step with her audio
+        # instead of token by token as the model writes them.
+        self._speech_pacer = speech_pacer
         record = getattr(transcript_collector, "_record", None)
         self._call_id = call_id or getattr(record, "call_id", None)
         self._capture_user = capture_user
@@ -237,13 +241,22 @@ class TranscriptFrameCollector(FrameProcessor if PIPECAT_AVAILABLE else object):
         if not self._capture_assistant:
             return
 
+        pacer = self._speech_pacer
         if isinstance(frame, (InterruptionFrame, LLMFullResponseStartFrame)):
             self._partial_assistant_buffer = ""
+            if pacer is not None and isinstance(frame, LLMFullResponseStartFrame):
+                pacer.note_reply_started()
         elif isinstance(frame, LLMTextFrame):
+            if pacer is not None:
+                if not getattr(frame, "skip_tts", False):
+                    pacer.add_text(frame.text)
+                return
             self._partial_assistant_buffer += frame.text
             self._publish_delta(role="viola", text=self._partial_assistant_buffer, partial=True)
         elif isinstance(frame, LLMFullResponseEndFrame):
             self._partial_assistant_buffer = ""
+            if pacer is not None:
+                pacer.note_reply_written()
         elif isinstance(frame, (TextFrame, TTSSpeakFrame)):
             self._partial_assistant_buffer = ""
             self._publish_delta(role="viola", text=frame.text, partial=False)

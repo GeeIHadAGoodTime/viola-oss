@@ -10,26 +10,34 @@ up to about one second of the audio that follows, with the hint
 ``initial_prompt="Viola, "``, and asks one question: does the transcript
 contain something that sounds like "Viola"?
 
-It is a *soft* gate for a confident detector score. It rejects such a wake
-only when Whisper clearly heard speech and none of it sounds like "Viola".
-Everything uncertain passes: the model not loaded yet, an error or timeout, an
-empty transcript, audio too quiet to judge (whispers, far field), a
-low-confidence or repetitive (hallucinated) decode. A missed real "Viola" is as
-bad as a false wake, so doubt lets a confident wake through.
+Decoded words must include a Viola-like token, however sure or unsure the
+decode is. Build 9 let an unsure decode through: "you know,", "I'm going to go
+ahead and do that", "trouble.", "We all know what I'm doing." and at least six
+more woke her with nobody talking to her, each costing up to 204k tokens, and a
+detector score did not separate them (false wakes reach 0.98). On 30.2 h of
+speech and 14.2 h of vocal music the normal rule made 14 and 50 candidates: the
+unsure rule passed 5 and 25, this rule passes 0 and 0.
 
-Two cases are stricter (1.0.5 build-7 laptop report):
+That costs some real wakes, because Whisper turns some real "Viola"s into words
+like "real" or "yo", the same words it hears in false wakes. Two things win most
+of them back:
 
-- A *low-score* wake: the detector's agreement rule allowed it (k of n frames at
-  the lower per-frame threshold) but the confirming frame scored below the
-  sensitivity level. Then any words Whisper decodes must include a Viola-like
-  token, unsure decode or not. Build 7 let "Yo!" from a rap track through at
-  0.885 (level 0.900) as ``unsure_low_confidence``. Wake-opt data: speech false
-  wakes 11 -> 8 of 22 candidates, music 68 -> 35 of 92, for 0 to 2 points of
-  recall on real recordings (2 only over loud music from another device).
-- A *music-path* wake (``require_token``): while Viola's own music plays, the
-  detector may also wake on a looser rule (``violawake.config``
-  ``MUSIC_WAKE_RULE``) because vocal music masks the word; such a wake passes
-  only on a Viola-like token Whisper is confident about. Doubt rejects it.
+- A second look: an early decode without a token is decoded again on the window
+  plus the audio after it, which holds more of the word (18 of 76 such real
+  wakes). Only a rejected wake pays for it. Quiet rooms: 94 -> 97% (Jay), 89 -> 93%
+  (Sierra), against 100% and 93% before; false wakes stayed 0.
+- Said twice: a user who is not heard says it again. A second candidate within
+  ``repeat_window_s`` passes on its own: 1 such pair in those 44 hours.
+
+What is left of doubt is only when there is nothing to judge: the model not
+loaded yet, an error or timeout, nothing decoded. Those pass, because a broken
+check must not make Viola deaf. Quiet audio is decoded like any other: Whisper
+hears a -38 dBFS "Viola" well (a wake used to pass unheard below -48 dBFS, and
+the guarded rule's quiet wakes were rejected unheard).
+
+A *guarded* wake (``require_token``) is stricter still: the detector may also wake
+on a looser rule (``violawake.config``), but only a token Whisper is confident
+about lets such a wake through. Doubt rejects it.
 
 The check also runs while Viola's own music plays. It used to be skipped then,
 which let room talk over the music wake Viola with nothing checked (build 7,
@@ -86,6 +94,7 @@ from typing import Any, Protocol
 import numpy as np
 
 from core.logging_config import get_logger
+from voice.wake_detector.active_word import active_wake_word, similarity, wake_word_keys
 
 logger = get_logger(__name__)
 
@@ -138,6 +147,11 @@ _VIOLA_EXACT = frozenset(
 
 _TARGET = "viola"
 _WORD_RE = re.compile(r"[a-z]+")
+# How close a decoded word must be to a custom wake word. The exact table above was
+# measured on real recordings of "Viola"; a custom word has no such table, so this is
+# looser on purpose. A wrong pass costs one false wake, a wrong reject means the
+# user's own word does not work. Measured in the release 1.0.5 custom-word run.
+_CUSTOM_MATCH_RATIO = 0.55
 
 
 def _edit_distance(a: str, b: str, limit: int = 2) -> int:
@@ -189,6 +203,29 @@ def find_viola_token(text: str) -> str | None:
     return None
 
 
+def _sounds_like(heard: str, target: str) -> bool:
+    return similarity(heard, target) >= _CUSTOM_MATCH_RATIO
+
+
+def find_target_token(text: str, target: str) -> str | None:
+    """Return the first word in ``text`` that sounds like a custom wake word.
+
+    Adjacent words are also tried joined, because Whisper splits a word it does not
+    know ("zef ira").
+    """
+    keys = wake_word_keys(target)
+    if not keys:
+        return None
+    words = _WORD_RE.findall(text.lower().replace("'", ""))
+    for word in words:
+        if any(_sounds_like(word, key) for key in keys):
+            return word
+    for first, second in pairwise(words):
+        if any(_sounds_like(first + second, key) for key in keys):
+            return f"{first} {second}"
+    return None
+
+
 # ---------------------------------------------------------------------------
 # Soft-gate rule
 # ---------------------------------------------------------------------------
@@ -208,20 +245,8 @@ class VerifierConfig:
     # A chunk is "quiet" below this fraction of the loudest chunk in the window.
     quiet_ratio: float = 0.2
     noise_floor_factor: float = 2.0
-    # Window too quiet to judge (whispers, far field): float RMS of the
-    # loudest 80 ms chunk. 0.004 is about -48 dBFS.
-    quiet_audio_rms: float = 0.004
     # Whisper must answer within this budget or the wake passes.
     whisper_timeout_s: float = 1.5
-    # Unsure decode -> pass. -0.75 (not Whisper's usual -1.0): with the early
-    # start (below) the dev half of the real recordings lost "Viola" said over
-    # another device's music at -0.8 (Jay 89.8%, detector 93.2%); -0.75 keeps
-    # 90.7% for no more of 22 speech false wakes and 3 more of 92 over music
-    # let through. Build-5 measurement note, "Faster and steadier" section.
-    no_speech_unsure: float = 0.6
-    logprob_unsure: float = -0.75
-    compression_unsure: float = 2.4
-    min_words: int = 1
     # Early start: begin the Whisper decode while the detector's agreement
     # run is still building, once this many consecutive frames agree (0 = off).
     # The decode hears the window that ends on that frame (no tail) and is
@@ -236,6 +261,9 @@ class VerifierConfig:
     # not a heard word (see module doc).
     hallucination_no_speech: float = 0.6
     hallucination_logprob: float = -1.0
+    # A second normal-rule candidate this soon after one without a token passes:
+    # the user is saying it again.
+    repeat_window_s: float = 8.0
 
 
 @dataclass(frozen=True)
@@ -253,10 +281,6 @@ class GateDecision:
     token: str | None = None
 
 
-def _word_count(text: str) -> int:
-    return len(_WORD_RE.findall(text.lower()))
-
-
 def _hallucinated_token(info: TranscriptInfo, cfg: VerifierConfig) -> bool:
     return info.no_speech_prob >= cfg.hallucination_no_speech and info.avg_logprob <= cfg.hallucination_logprob
 
@@ -267,42 +291,42 @@ def decide(
     *,
     low_score: bool = False,
     require_token: bool = False,
+    target: str | None = None,
 ) -> GateDecision:
-    """The gate.
+    """The gate: decoded words must hold a trusted Viola-like token.
 
-    Default (a confident detector score): reject only clear speech that holds
-    no Viola-like token. ``low_score``: the confirming frame scored below the
-    sensitivity level, so decoded words without a Viola-like token reject even
-    when the decode is unsure. ``require_token``: only a trusted Viola-like
-    token passes (the looser music-path rule).
+    ``low_score`` (the confirming frame scored below the sensitivity level) only
+    names the reason. ``require_token``: nothing decoded rejects too (the looser
+    guarded rules). ``target``: the user's custom wake word, heard instead of
+    "Viola".
     """
     cfg = config or VerifierConfig()
     if info is None:
         return GateDecision(not require_token, "no_transcript")
     text = info.text.strip()
-    if not text:
+    if not _WORD_RE.search(text.lower()):
         return GateDecision(not require_token, "empty")
-    token = find_viola_token(text)
+    # The word in use, unless a caller names one: every check here follows it.
+    wake_word = target if target is not None else active_wake_word()
+    token = find_target_token(text, wake_word) if wake_word else find_viola_token(text)
     if token and not _hallucinated_token(info, cfg):
         return GateDecision(True, "token", token)
     if require_token:
         return GateDecision(False, "music_rule_without_viola")
     if low_score:
         return GateDecision(False, "low_score_without_viola")
-    if info.no_speech_prob >= cfg.no_speech_unsure:
-        return GateDecision(True, "unsure_no_speech")
-    if info.avg_logprob <= cfg.logprob_unsure:
-        return GateDecision(True, "unsure_low_confidence")
-    if info.compression_ratio >= cfg.compression_unsure:
-        return GateDecision(True, "unsure_repetitive")
-    if _word_count(text) < cfg.min_words:
-        return GateDecision(True, "unsure_no_words")
     return GateDecision(False, "speech_without_viola")
 
 
 # ---------------------------------------------------------------------------
 # Audio helpers
 # ---------------------------------------------------------------------------
+
+
+def _whisper_prompt(config: VerifierConfig) -> str:
+    """Prime Whisper with the word in use. Left on "Viola", it nudged a custom word away."""
+    word = active_wake_word()
+    return "%s, " % word.capitalize() if word else config.prompt
 
 
 def _chunk_rms(audio: np.ndarray) -> np.ndarray:
@@ -430,8 +454,6 @@ class EarlyDecode:
     frame: int
     started: float
     future: Future[TranscriptInfo] | None = None
-    # The early window was too quiet to judge: the wake will pass without Whisper.
-    quiet: bool = False
     finished: float | None = None
 
 
@@ -463,6 +485,8 @@ class WakeVerifier:
         self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="wake-verify")
         # The newest early decode (start_early cancels it if it has not started).
         self._early_pending: Future[TranscriptInfo] | None = None
+        # When a normal-rule candidate last failed for want of a token.
+        self._last_no_token_at: float | None = None
 
     # -- model lifecycle ----------------------------------------------------
 
@@ -522,7 +546,7 @@ class WakeVerifier:
             temperature=0.0,
             condition_on_previous_text=False,
             without_timestamps=True,
-            initial_prompt=self.config.prompt,
+            initial_prompt=_whisper_prompt(self.config),
             vad_filter=False,
             no_speech_threshold=None,
         )
@@ -560,9 +584,6 @@ class WakeVerifier:
             return None
         now = time.perf_counter()
         audio = np.array(window, dtype=np.float32)
-        rms = _chunk_rms(audio)
-        if (float(rms.max()) if len(rms) else 0.0) < self.config.quiet_audio_rms:
-            return EarlyDecode(frame=frame, started=now, quiet=True)
         with self._lock:
             previous = self._early_pending
             if previous is not None:
@@ -642,20 +663,13 @@ class WakeVerifier:
             return _doubt("not_ready")
 
         tail_ms = 0.0
-        if early is not None:
-            mode = "early"
-            lead_ms = max(0.0, (started - early.started) * 1000)
-            if early.quiet or early.future is None:
-                return _doubt("quiet_audio")
-            future: Future[TranscriptInfo] = early.future
-            whisper_started = early.started
-        else:
-            window = np.asarray(window, dtype=np.float32)
-            rms = _chunk_rms(window)
-            peak = float(rms.max()) if len(rms) else 0.0
-            if peak < cfg.quiet_audio_rms:
-                return _doubt("quiet_audio")
 
+        def _read_tail() -> np.ndarray:
+            """The window plus the audio that follows it, up to the speaker's pause."""
+            nonlocal tail_ms
+            base = np.asarray(window, dtype=np.float32)
+            rms = _chunk_rms(base)
+            peak = float(rms.max()) if len(rms) else 0.0
             # "Quiet" is relative to the speech peak, but never below the room's
             # own noise floor (else a soft voice in a noisy room never pauses and
             # every wake waits the full tail): twice the window's quietest 10%,
@@ -667,8 +681,9 @@ class WakeVerifier:
             min_tail = round(cfg.min_tail_s * SAMPLE_RATE)
             max_tail = round(cfg.max_tail_s * SAMPLE_RATE)
 
-            tail: list[np.ndarray] = []
-            tail_samples = 0
+            # Audio read while an early decode ran is already part of the tail.
+            tail: list[np.ndarray] = list(early_tail)
+            tail_samples = sum(len(part) for part in tail)
             try:
                 while tail_samples < max_tail:
                     if tail_samples >= min_tail and quiet_run >= need_quiet:
@@ -685,32 +700,51 @@ class WakeVerifier:
             except Exception as exc:  # noqa: BLE001, RUF100 - a read error must not drop the wake
                 logger.debug("[WAKE_VERIFY] tail read failed: %s", exc)
             tail_ms = tail_samples * 1000.0 / SAMPLE_RATE
+            return np.concatenate([base, *tail]) if tail else base
 
-            audio = np.concatenate([window, *tail]) if tail else window
+        def _await(future: Future[TranscriptInfo]) -> bool:
+            """Drain the microphone until Whisper answers. False: it ran out of time.
+
+            The time budget runs from now (the detector confirmed), whichever path.
+            Draining means nothing the user says meanwhile is lost (and the input
+            buffer never overflows).
+            """
+            deadline = time.perf_counter() + cfg.whisper_timeout_s
+            while not future.done():
+                if time.perf_counter() >= deadline:
+                    return False
+                try:
+                    chunk = read_chunk(False)
+                except Exception:  # noqa: BLE001, RUF100 - keep waiting for Whisper
+                    chunk = None
+                if chunk is None:
+                    time.sleep(0.005)
+                    continue
+                held.append(chunk.raw)
+                early_tail.append(np.asarray(chunk.audio, dtype=np.float32))
+            return True
+
+        early_tail: list[np.ndarray] = []
+        if early is not None:
+            mode = "early"
+            lead_ms = max(0.0, (started - early.started) * 1000)
+            if early.future is None:
+                return _doubt("no_transcript")
+            future: Future[TranscriptInfo] = early.future
+            whisper_started = early.started
+        else:
+            audio = _read_tail()
             whisper_started = time.perf_counter()
             try:
                 future = self._executor.submit(self.transcribe, audio)
             except RuntimeError as exc:
                 return _doubt("error", tail_ms=tail_ms, transcript=str(exc)[:60])
-        # The time budget runs from now (the detector confirmed), whichever path.
-        deadline = time.perf_counter() + cfg.whisper_timeout_s
-        # Keep draining the microphone while Whisper runs so nothing the user
-        # says meanwhile is lost (and the input buffer never overflows).
-        while not future.done():
-            if time.perf_counter() >= deadline:
-                return _doubt(
-                    "timeout",
-                    tail_ms=tail_ms,
-                    whisper_ms=(time.perf_counter() - whisper_started) * 1000,
-                )
-            try:
-                chunk = read_chunk(False)
-            except Exception:  # noqa: BLE001, RUF100 - keep waiting for Whisper
-                chunk = None
-            if chunk is None:
-                time.sleep(0.005)
-                continue
-            held.append(chunk.raw)
+        if not _await(future):
+            return _doubt(
+                "timeout",
+                tail_ms=tail_ms,
+                whisper_ms=(time.perf_counter() - whisper_started) * 1000,
+            )
         finished = early.finished if early is not None and early.finished is not None else time.perf_counter()
         whisper_ms = (finished - whisper_started) * 1000
         try:
@@ -719,9 +753,38 @@ class WakeVerifier:
             logger.debug("[WAKE_VERIFY] Whisper failed: %s", exc)
             return _doubt("error", tail_ms=tail_ms, whisper_ms=whisper_ms)
         verdict = decide(info, cfg, low_score=low_score, require_token=require_token)
+
+        if not verdict.passed and early is not None:
+            # The early window ended on the word; the audio after it may hold the
+            # rest of it. Only a wake that would be rejected pays for this.
+            mode = "early+tail"
+            second_started = time.perf_counter()
+            try:
+                second = self._executor.submit(self.transcribe, _read_tail())
+                if _await(second):
+                    second_info = second.result()
+                    second_verdict = decide(second_info, cfg, low_score=low_score, require_token=require_token)
+                    if second_verdict.passed:
+                        info, verdict = second_info, second_verdict
+            except Exception as exc:  # noqa: BLE001, RUF100 - the first answer stands
+                logger.debug("[WAKE_VERIFY] second look failed: %s", exc)
+            whisper_ms += (time.perf_counter() - second_started) * 1000
+
+        passed, reason = verdict.passed, verdict.reason
+        if not require_token:
+            now = time.monotonic()
+            if passed:
+                self._last_no_token_at = None
+            else:
+                last = self._last_no_token_at
+                if last is not None and now - last <= cfg.repeat_window_s:
+                    passed, reason = True, "said_twice"
+                    self._last_no_token_at = None
+                else:
+                    self._last_no_token_at = now
         return _result(
-            verdict.passed,
-            verdict.reason,
+            passed,
+            reason,
             transcript=info.text,
             token=verdict.token,
             tail_ms=tail_ms,

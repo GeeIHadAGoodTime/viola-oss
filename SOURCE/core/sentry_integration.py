@@ -725,8 +725,12 @@ def capture_web_bug_report(
     client_ip: str | None = None,
     test: bool = False,
     context: dict[str, Any] | None = None,
+    surface: str = "website",
 ) -> str | None:
-    """Capture an anonymous website bug report into Sentry.
+    """Capture an anonymous bug report into Sentry.
+
+    ``surface`` is where the report came from: this endpoint also carries
+    desktop reports, which reach it as an upload from the app.
 
     Returns the Sentry event ID on success, or None if Sentry is not initialized
     (caller is responsible for deciding how to handle the None case).  Never
@@ -783,7 +787,7 @@ def capture_web_bug_report(
     report_context = {key: value for key, value in report_context.items() if value is not None}
 
     tags: dict[str, str] = {
-        "surface": "website",
+        "surface": surface,
         "source": "web_bug_report",
         # Machine-readable test marker (matches the viola_test_account
         # convention). Only set on founder/dev test submissions so the

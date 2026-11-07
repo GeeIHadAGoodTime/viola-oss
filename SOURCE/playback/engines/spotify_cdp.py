@@ -217,6 +217,7 @@ class SpotifyCDPEngine(ProviderPlaybackEngine):
                                 "Spotify re-auth failed; ending active CDP playback: %s",
                                 exc,
                             )
+                            self._report_play_failure(exc)
                             handle.mark_finished(error=exc)
                             return
 
@@ -477,6 +478,55 @@ class SpotifyCDPEngine(ProviderPlaybackEngine):
         If the item has a search_index capability, plays that search result.
         Otherwise, searches and plays the first result.
         """
+        try:
+            return self._play(item, on_artwork=on_artwork)
+        except Exception as exc:
+            self._report_play_failure(exc)
+            raise
+
+    def _report_play_failure(self, exc: Exception) -> None:
+        """Spotify was chosen and can't play: say why, on screen and to the tools."""
+        from music.spotify import connection
+
+        state = str(getattr(exc, "state", "") or getattr(exc.__cause__, "state", "") or "")
+        known = state in (
+            connection.NOT_SIGNED_IN,
+            connection.SESSION_REJECTED,
+            connection.NO_BROWSER,
+            connection.PLAYER_UNAVAILABLE,
+            connection.DRM_UNAVAILABLE,
+            connection.SIGNING_IN,
+        )
+        if known:
+            message = connection.message_for(state)
+        else:
+            # Signed in and reachable, but the song didn't start. Connected stays
+            # true (the next song may play); this play still has to say so.
+            state = connection.CONNECTED
+            message = connection.PLAY_DID_NOT_START_MESSAGE
+        code = "spotify_%s" % (state if known else "play_failed")
+        self._logger.warning("Spotify CDP: play failed state=%s error=%s", code, str(exc)[:300])
+        connection.record_play_failure(None, state=state, message=message, code=code)
+        connection.notify_spotify(None, message, code=code, level="error")
+        try:
+            from music.spotify.diagnostic import log_diagnostic
+
+            log_diagnostic(self._get_controller(), reason=code)
+        except Exception:
+            self._logger.debug("Spotify diagnostic after a failed play did not run", exc_info=True)
+        if state == connection.SESSION_REJECTED:
+            # A player nobody can use has no reason to keep running.
+            try:
+                self._get_controller().shutdown()
+            except Exception:
+                self._logger.debug("Spotify player shutdown after a refused sign-in failed", exc_info=True)
+
+    def _play(
+        self,
+        item: QueueItem,
+        *,
+        on_artwork: Callable[[QueueItem, str | None], None] | None = None,
+    ) -> PlaybackHandle:
         controller = self._get_controller()
         controller.ensure_running()
         self._annotate_account_tier(controller)
@@ -536,6 +586,7 @@ class SpotifyCDPEngine(ProviderPlaybackEngine):
 
         handle.mark_started()
         handle._spotify_cdp_started_at = time.monotonic()
+        self._record_playing()
         # A collection start plays whatever Spotify picks first, so there is
         # no expected title to guard against a stale startup track.
         handle._spotify_cdp_expected_title = "" if liked_songs else (item.title or "")
@@ -574,6 +625,24 @@ class SpotifyCDPEngine(ProviderPlaybackEngine):
         ).start()
 
         return handle
+
+    def _record_playing(self) -> None:
+        """A play that started proves the connection; log the proof a test can read."""
+        from music.spotify import connection
+
+        resolved = connection.resolve_user_id()
+        if resolved:
+            connection.record_verdict(resolved, connection.CONNECTED, detail="playback started")
+
+        def _proof() -> None:
+            try:
+                from music.spotify.diagnostic import log_diagnostic
+
+                log_diagnostic(self._get_controller(), reason="play_started")
+            except Exception:
+                self._logger.debug("Spotify proof log failed", exc_info=True)
+
+        threading.Timer(4.0, _proof).start()
 
     def _search_and_play(self, item: QueueItem, controller: Any) -> None:
         """Search for the track and play the first result."""

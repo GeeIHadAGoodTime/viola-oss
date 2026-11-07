@@ -145,7 +145,24 @@ describe('the page follows the backend sign-in state', () => {
     render(<AccountTab />);
 
     const notice = await screen.findByTestId('backend-account-notice');
-    expect(notice).toHaveTextContent('Viola is signed in on this computer as jay@example.com');
+    expect(notice).toHaveTextContent('Signed in as jay@example.com');
+    // One truth: a computer that is signed in never offers a password form.
+    expect(screen.queryByLabelText('Password')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
+  });
+
+  it('keeps trying until the page has the session', async () => {
+    settings.resolve({});
+    backendAccount = { ok: true, signed_in: true, email: 'jay@example.com' };
+    const restoreDesktopSession = vi.fn(async () => false);
+    signedOutStores({ restoreDesktopSession });
+
+    render(<AccountTab />);
+    await screen.findByTestId('backend-account-notice');
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+
+    await waitFor(() => expect(restoreDesktopSession.mock.calls.length).toBeGreaterThan(1));
   });
 
   it('shows the plain Sign In form when the backend is signed out too', async () => {

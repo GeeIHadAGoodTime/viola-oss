@@ -160,7 +160,8 @@ describe('AccountTab — cloud-only-signed-in plan display (#2741)', () => {
 
     await screen.findByText('cloud-free@example.com');
 
-    expect(await screen.findByText(/Free Plan/i)).toBeInTheDocument();
+    // "Checking plan" shows until the billing read lands; a busy runner took over 1 s.
+    expect(await screen.findByText(/Free Plan/i, {}, { timeout: 5000 })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Manage Subscription/i })).not.toBeInTheDocument();
 
     await waitFor(() => {

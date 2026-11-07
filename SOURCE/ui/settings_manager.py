@@ -929,7 +929,7 @@ class SettingsManager:
         "network_discovery_enabled": False,
         # Rooms: let phones/tablets on the same Wi-Fi reach this hub. Off on a
         # fresh install (no LAN port, no firewall prompt over onboarding);
-        # opening Rooms > Add Room turns it on (utils/speaker_pairing_flow.py).
+        # Start in Rooms > Add Room turns it on (utils/speaker_pairing_flow.py).
         # Install-scoped: the listener belongs to the machine, not an account.
         "lan_access_enabled": False,
         "home_assistant_url": "",

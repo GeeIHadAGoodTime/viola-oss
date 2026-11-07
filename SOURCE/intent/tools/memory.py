@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import re
+from datetime import datetime
 
 from core.logging_config import get_logger
 from intent.tool_types import ToolResult
-from services.memory.store import SENSITIVE_CONTENT_RE
+from services.memory.store import SENSITIVE_CONTENT_RE, contains_street_address
 
 logger = get_logger(__name__)
 
@@ -34,6 +35,11 @@ def _resolve_user_id(user_id: str | None = None) -> str:
 
 
 def _sensitive_error(content: str) -> str | None:
+    if contains_street_address(content):
+        return (
+            "Street addresses are not kept in memory. If this is the user's own address, call "
+            "save_delivery_address with it now, without asking, and say its read_back."
+        )
     if SENSITIVE_CONTENT_RE.search(content):
         return (
             "Cannot store sensitive credentials, payment data, SSNs, PINs, bank details, "
@@ -101,6 +107,49 @@ def _recall_memory(uid: str, query: str, limit: int = 5) -> ToolResult:
     )
 
 
+_CONVERSATION_EXCHANGE_LIMIT = 10
+_CONVERSATION_TEXT_CHARS = 600
+
+
+def _conversation_exchanges(uid: str, query: str, limit: int) -> ToolResult:
+    """Read this user's own conversation so far, oldest first."""
+    from services.conversation.state_manager import get_conversation_manager, get_request_conversation_manager
+
+    manager = get_request_conversation_manager() or get_conversation_manager(uid)
+    if str(getattr(manager, "user_id", uid) or uid) != uid:
+        manager = get_conversation_manager(uid)
+    exchanges: list[dict[str, str]] = []
+    for frame in manager.get_message_chain(behavioral_only=True):
+        text = " ".join(getattr(block, "text", "") for block in frame.blocks if getattr(block, "text", ""))
+        if not text.strip():
+            continue
+        if frame.role.value == "user":
+            when = datetime.fromtimestamp((frame.timestamp_ms or 0) / 1000.0).strftime("%H:%M")
+            exchanges.append({"time": when, "user": text[:_CONVERSATION_TEXT_CHARS], "assistant": ""})
+        elif frame.role.value == "assistant" and exchanges:
+            exchanges[-1]["assistant"] = text[:_CONVERSATION_TEXT_CHARS]
+    total = len(exchanges)
+    first = exchanges[0] if exchanges else None
+    # Live, the model searched "earliest user message today in this conversation":
+    # short words matched unrelated turns and the first exchange was filtered out.
+    # The first exchange always comes back, and a search that finds nothing returns
+    # the conversation rather than an empty result to guess from.
+    words = [word for word in (query or "").lower().split() if len(word) > 3]
+    matches = [
+        row for row in exchanges if any(word in ("%s %s" % (row["user"], row["assistant"])).lower() for word in words)
+    ]
+    count = max(1, min(int(limit or _CONVERSATION_EXCHANGE_LIMIT), _CONVERSATION_EXCHANGE_LIMIT))
+    return ToolResult(
+        ok=True,
+        data={
+            "first_exchange": first,
+            "exchanges": (matches or exchanges)[:count],
+            "matched": len(matches),
+            "total_exchanges": total,
+        },
+    )
+
+
 async def memory_handler(
     action: str = "read",
     path: str = "MEMORY.md",
@@ -131,6 +180,8 @@ async def memory_handler(
             return ToolResult(ok=True, data={"content": memory.read(path=path)})
         if normalized_action == "recall":
             return _recall_memory(uid, query, limit=limit)
+        if normalized_action == "conversation":
+            return _conversation_exchanges(uid, query, limit)
         if normalized_action in {"search", "grep"}:
             path_text = (path or "").strip()
             search_path = path if path_text not in {"", "memory", "memory/", "MEMORY.md", "memory/MEMORY.md"} else None

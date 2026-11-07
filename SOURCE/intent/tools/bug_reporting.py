@@ -280,6 +280,6 @@ async def file_bug_report_handler(message: str) -> ToolResult:
             "bug_id": bug_id,
             "received": bool(data.get("received", False)),
             "type": data.get("type", "bug"),
-            "message": "Bug report filed successfully.",
+            "message": "Thanks, your bug report is with the team. Its reference is %s." % bug_id,
         },
     )

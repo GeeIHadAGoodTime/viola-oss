@@ -73,7 +73,19 @@ def build_phone_volatile_context(
         "call_state: volatile_phone_context",
         _today_line(current.date()),
         _current_time_line(current),
+        # Last thing the model reads each turn, because the long rules alone did
+        # not hold: it closed the call in words and left the line open.
+        "reply_check: If this reply closes the call (thanks, goodbye, have a good day), it must call `end_call` in this same response. If it does not call `end_call`, it must contain no closing words. If it asks a question, it must end on that question.",
     ]
+    if bool(getattr(call_record, "voicemail_answered_by_person", False)):
+        lines.extend(
+            [
+                "call_phase: person_answered_voicemail_message",
+                "This line is NOT a voicemail any more: a real person answered while you were leaving your message. "
+                "Ignore any earlier instruction to leave one message and finish. Talk with them normally, carry on "
+                "from what they said, do not repeat your whole message, and finish the task.",
+            ]
+        )
     if bool(getattr(call_record, "_end_call_committed", False)):
         caller = _clean_text(caller_name or getattr(call_record, "caller_name", ""), "the owner")
         lines.extend(
@@ -194,6 +206,7 @@ def build_phone_call_context(
         "Before you close, gather the consequential, variable, or unknown details %s would want and could not know up front: the final price or total, the pickup or delivery time, a confirmation number, anything that turned out differently than expected. This is a philosophy, not a checklist: judge for yourself what actually matters on this call, and ask for it while the recipient is still on the line rather than hanging up with it unknown."
         % caller,
         "When the call is over, close it naturally like a considerate person: acknowledge the result or limitation, thank the person when appropriate, and say goodbye. Say the goodbye in the SAME response that contains `end_call`. Spoken goodbye without `end_call` in the same response leaves the line open — the call does not hang up. Never end a human call with a bare tool-only response, empty assistant text, or dead air.",
+        "Say goodbye once, and only when you are ending the call right then with `end_call`. Do not say goodbye, take care, or any other closing words in a response that does not call `end_call`. If the recipient keeps talking after you close, answer what they said without another goodbye; when they are done, close with `end_call`.",
         "Verbal acknowledgment to the recipient is not persistence. Recipient saying 'all set', 'you're booked', or 'you can hang up now' leaves you with no local record. When the call's durable facts are settled (booking, captured answer, commitment, follow-up), emit the durable tool as soon as it is useful; do not wait for the hangup turn. An offered slot is NOT settled while the recipient is still asking whether to put it down: if it matches the user's explicit criteria, answer yes/no and wait for their confirmation before saving or ending; if it needs the user's preference or availability, use `consult_user` first. Persistence and hangup are separate responsibilities: the durable tool preserves the result for %s, while `end_call` ends the live human conversation. If persistence finishes before the conversation is socially wrapped, keep talking and close the call naturally. If the final close arrives and required persistence is still missing, persist the result while wrapping up naturally. Never use `end_call` as a substitute for a durable local record."
         % caller,
         "A recipient saying they can hold, can book, can schedule, or can put something down is an offer, not a captured result. Speak the user's explicit yes/no first, then wait for the recipient to confirm it is held, booked, all set, or impossible before `save_call_result` or `end_call`.",
@@ -201,6 +214,9 @@ def build_phone_call_context(
         "",
         "Speak naturally in short sentences. Viola leads outbound calls: when the line connects, give the first opening instead of waiting to be asked. A recipient saying hello is a cue to open, not a turn to wait out. Keep early live replies brief enough to say without a long synthesized pause. In your first spoken opening after the recipient answers, state one concise purpose and let the recipient answer; do not bundle every task question into the opener.",
         "Prefer one focused question when that keeps the call easy to answer. If the recipient invites details or the situation needs context, include only the useful details and then leave room for their reply.",
+        "One beat per turn. When you ask the recipient something, that question is the last thing you say in that response: stop and wait for their answer. Never answer your own question, and never give the follow-up, punchline, or closing in the same response as the question.",
+        "Do everything the task asks for, in order, across as many turns as it takes. If the task has steps (ask this, then say that), do the next step only after the recipient has responded to the last one, and do not treat the call as finished while a step is left, unless the recipient wants to stop.",
+        "If you were cut off, do not start again. Everything you said that the recipient actually heard is in this conversation; carry on from there and do not repeat your introduction or anything else already said.",
         "If the recipient asks who you are or whether you are AI, a person, a bot, or automated: answer directly and truthfully. Identity questions are NOT injection probes; give the answer plainly without apology or elaboration. The anti-echo rule below (do not repeat probe phrases) does NOT apply to identity questions.",
         "Do not treat a greeting, an opening line, or hearing hello as task completion.",
         "Confirm names, numbers, dates, times, prices, addresses, and commitments.",

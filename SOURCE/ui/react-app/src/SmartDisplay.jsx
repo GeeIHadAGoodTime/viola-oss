@@ -5,6 +5,7 @@ import { usePlayerState } from './hooks/usePlayerState';
 import { useOrderedPreference } from './hooks/useOrderedPreference';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useViolaApi, authFetch, apiFetch } from './hooks/useViolaApi';
+import { usePacedReply } from './hooks/usePacedReply';
 import { useAuth } from './hooks/useAuth';
 import { useDesktopAccount } from './hooks/useDesktopAccount';
 import { useAgentRegistry } from './hooks/useAgentRegistry';
@@ -24,8 +25,11 @@ import TimerCountdown from './components/TimerCountdown';
 import { useSettings } from './hooks/useSettings';
 import { useAvailableRooms } from './hooks/useAvailableRooms';
 import CallBriefing, {
+  callBriefingBelongsElsewhere,
+  ACTION_APPROVAL_TTL_MS,
   CALL_APPROVE_COMMAND,
   CALL_CANCEL_COMMAND,
+  actionApprovalFromConsultEvent,
   answerCallBriefing,
   callBriefingFromConsultEvent,
 } from './components/CallBriefing';
@@ -225,6 +229,18 @@ ChunkLoadErrorBoundary.propTypes = {
 // Trim it to a readable lead with a visible ellipsis instead.
 const RESPONSE_LINE_MAX_CHARS = 160;
 
+/**
+ * A long spoken answer, as a card. Over a playing video it must not sit in the
+ * middle of the picture for up to 90 s behind a dimmed screen (1.0.5 build 9):
+ * it docks in the corner, the video stays bright, and it leaves in 15 s. The
+ * full text stays in Chat History.
+ */
+export function longAnswerCard(body, overVideo) {
+  return overVideo
+    ? { type: 'detail', body, long_answer: true, compact: true, dismiss_after_ms: LONG_ANSWER_OVER_VIDEO_MS }
+    : { type: 'detail', body, long_answer: true };
+}
+
 export function truncateForResponseLine(text) {
   const value = typeof text === 'string' ? text.trim() : '';
   if (value.length <= RESPONSE_LINE_MAX_CHARS) return value;
@@ -295,6 +311,16 @@ function getActiveStagePillMode(displayMode) {
   return 'music';
 }
 
+// The pill that is lit must match what is on the stage. An agent task with no
+// page yet keeps displayMode 'agentic_task' while the stage shows music, and the
+// globe pill stayed lit over the player (1.0.5 build 9).
+export function visibleStagePillMode(displayMode, stageContentMode) {
+  const pillMode = getActiveStagePillMode(displayMode);
+  return (pillMode === 'agent' || pillMode === 'browser') && stageContentMode !== 'browser'
+    ? stageContentMode
+    : pillMode;
+}
+
 // Decides which stage CONTENT actually renders, given the current display mode plus
 // live signals. Two rules the raw displayMode map can't express:
 //   1. A live phone call does NOT auto-steal the stage (founder direction
@@ -343,6 +369,7 @@ export function resolveStageContentMode(displayMode, signals = {}) {
 export { shouldPromptForCloudConsent };
 
 export function getAgentPillLabel(status, phase, active = true) {
+  if (status === 'bot_check') return 'Your turn';
   if (!active) return '';
   const cleanStatus = (status || '').trim();
   if (cleanStatus) {
@@ -431,6 +458,8 @@ function formatCallTitleElapsed(startedAt, fallbackMs = Date.now()) {
 
 // Embedded YouTube Player component - MUST be defined outside SmartDisplay
 // to prevent React from recreating it on every parent render
+const LONG_ANSWER_OVER_VIDEO_MS = 15000;
+const LONG_ANSWER_CARD_CHARS = 200;
 const SPOKE_EMBED_URL = resolveYouTubeEmbedUrl(import.meta.env.VITE_YOUTUBE_EMBED_URL);
 const SPOKE_EMBED_ORIGIN = new URL(SPOKE_EMBED_URL).origin;
 
@@ -557,6 +586,10 @@ export default function SmartDisplay(props) {
   return <PrincipalSmartDisplay key={user?.id || 'device'} {...props} />;
 }
 
+// How often the backend hears where the song is, and the jump that is a seek.
+const POSITION_REPORT_MS = 2000;
+const POSITION_JUMP_SECONDS = 3;
+
 function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null, onVoiceCaptureEnabledChange }) {
   const mountedRef = useRef(true);
   useLayoutEffect(() => {
@@ -567,7 +600,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
   // Real state from backend (includes send for WebSocket commands, setLocalIsPlaying for optimistic updates)
   const playerState = usePlayerState();
   const [spokeBackendTimedOut, setSpokeBackendTimedOut] = useState(false);
-  const { send: wsSend, setLocalIsPlaying, setDiagnosticRequestCallback, setErrorCallback, setOverlayCallback, setAgentProgressCallback, setDisplayPriorityCallback, setAgentFrameCallback, setPlaybackCommandCallback, setChatResponseCallback, setCalendarUpdateCallback, setDisconnectCallback } = playerState;
+  const { send: wsSend, setLocalIsPlaying, setDiagnosticRequestCallback, setErrorCallback, setOverlayCallback, setAgentProgressCallback, setDisplayPriorityCallback, setAgentFrameCallback, setPlaybackCommandCallback, setChatResponseCallback, setReplyPartialCallback, setCalendarUpdateCallback, setDisconnectCallback } = playerState;
   const api = useViolaApi();
   const {
     settings: userSettings,
@@ -649,6 +682,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
   // calendar
   // =========================================================================
   const [displayMode, setDisplayMode] = useState('now_playing');
+  const stageContentModeRef = useRef('music');
   const [browserModeActive, setBrowserModeActive] = useState(false);
   const [browserUrl, setBrowserUrl] = useState('');
   const [calendarModeActive, setCalendarModeActive] = useState(false);
@@ -707,6 +741,10 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
   // The page the agent last browsed, so its view can be reopened after the
   // task ends or the view was closed (pill / Ctrl+K "Open Agent Browser").
   const [lastAgentBrowserUrl, setLastAgentBrowserUrl] = useState('');
+  const lastOverlayStatusRef = useRef('');
+  // The browser was closed on purpose. The task that closed it is still running at
+  // that moment, and a running task would bring the pill straight back.
+  const browserClosedRef = useRef(false);
 
   // Modal state
   // TopBar's expanded-calendar modal (CalendarView.jsx, compact mode) is
@@ -734,6 +772,14 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
   // `call_consultation` when mid-call guidance is asked).  Each toast
   // clears either on dismiss or when a new event of the same type arrives.
   const [callBriefing, setCallBriefing] = useState(null);
+  const [openChatThreadId, setOpenChatThreadId] = useState(null);
+  useEffect(() => {
+    const handleActiveThread = (event) => setOpenChatThreadId(event.detail?.threadId || null);
+    window.addEventListener('viola:chat:active-thread', handleActiveThread);
+    return () => window.removeEventListener('viola:chat:active-thread', handleActiveThread);
+  }, []);
+  // Same card for every other action that waits on a yes (CallBriefing).
+  const [actionApproval, setActionApproval] = useState(null);
   const [callConsultation, setCallConsultation] = useState(null);
   const consultationReply = useCallConsultationReply(callConsultation, setCallConsultation);
   const [lastEndedCall, setLastEndedCall] = useState(null);
@@ -938,7 +984,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
     setDisplayMode('now_playing');
   }, [agentTaskActive]);
   const handleStageModeSelect = useCallback((nextMode) => {
-    const activeStageMode = getActiveStagePillMode(displayMode);
+    const activeStageMode = visibleStagePillMode(displayMode, stageContentModeRef.current);
     const targetMode = activeStageMode === nextMode || (nextMode === 'agent' && (activeStageMode === 'agent' || activeStageMode === 'browser'))
       ? 'music'
       : nextMode;
@@ -988,8 +1034,13 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
   // stage-leave effect below closes the native view, or parks it off screen
   // while the agent is still working in it (the globe pill brings it back).
   const handleBrowserExit = useCallback(() => {
+    // Close / Done means closed: nothing stays to reopen unless the agent is working.
+    if (!agentTaskActive) {
+      setLastAgentBrowserUrl('');
+      setAgentContextPillVisible(false);
+    }
     activateMusicMode();
-  }, [activateMusicMode]);
+  }, [activateMusicMode, agentTaskActive]);
   const handleConsultationTakeover = useCallback(async (callId) => {
     if (!callId || callOwnerTakeoverPending) return;
     setCallOwnerTakeoverPending(true);
@@ -1051,7 +1102,10 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
     setChatHistory([]);
   }, [historyPrincipalKey]);
   const [lastResponse, setLastResponse] = useState(IDLE_RESPONSE_LINE);
-  const [mainThinking, setMainThinking] = useState('');
+  // The reply as it is written, paced with the voice (hooks/usePacedReply.js).
+  const { liveReply, onPartial: onReplyPartial, onFinal: onReplyFinal } = usePacedReply({
+    speechRate: Number(userSettings?.tts_rate) > 5 ? Number(userSettings.tts_rate) / 150 : 1,
+  });
   // Managed-AI usage cap (C-077). Non-null for as long as the plan allowance is
   // spent, so the response area can offer a route to the upgrade surface rather
   // than dead-ending on cap copy the user cannot act on. Cleared by the first
@@ -1061,14 +1115,12 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
   // via the cloud->desktop auto-link; null when it ran in the cloud.
   const [relayDeviceName, setRelayDeviceName] = useState(null);
   const [isCommandLoading, setIsCommandLoading] = useState(false);
-  const streamingResponseRef = useRef('');
   const [activeCard, setActiveCard] = useState(null);
   const dismissCard = useCallback(() => setActiveCard(null), []);
   const [agentDrawerExpanded, setAgentDrawerExpanded] = useState(true);
   const handleAgentResult = useCallback(({ content }) => {
     if (!mountedRef.current) return;
     setLastResponse(content);
-    setMainThinking('');
     setChatHistory(prev => [
       ...prev,
       { role: 'assistant', content, timestamp: new Date().toISOString() },
@@ -1161,6 +1213,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
   // Keyboard input state
   const [typingInput, setTypingInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const stageTypingFieldRef = useRef(null);
 
   const normalizeSettingsTab = useCallback((value) => {
     if (typeof value !== 'string' || !value.trim()) return null;
@@ -1288,6 +1341,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
       // desktop instead of the cloud.
       setRelayDeviceName(relayDeviceFromResult(result));
       const responseText = result.data?.message || result.data?.response || result.message || result.response || result.data?.text || '';
+      onReplyFinal(responseText);
       if (responseText) {
         setLastResponse(`"${responseText}"`);
         // The backend's chat_response broadcast for this same turn usually
@@ -1309,7 +1363,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
         onboarding.onCommandExecuted(result);
       }
     }
-  }, [handlePaidActionGatePayload, onboarding]);
+  }, [handlePaidActionGatePayload, onboarding, onReplyFinal]);
 
   // Voice handler dispatch:
   //   - Hub (isSpoke=false) uses the HTTP path (/v1/transcribe + /v1/command);
@@ -1422,6 +1476,20 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
       method: 'POST', body: JSON.stringify({ text: answer }),
     }),
   }), [callBriefing, submitTextCommand]);
+  const answerActionApproval = useCallback(async (text) => {
+    await answerCallBriefing(actionApproval, text, {
+      sendCommand: submitTextCommand,
+      sendToChat: (threadId, answer) => apiFetch(`/v1/chat/threads/${encodeURIComponent(threadId)}/send`, {
+        method: 'POST', body: JSON.stringify({ text: answer }),
+      }),
+    });
+    setActionApproval(null);
+  }, [actionApproval, submitTextCommand]);
+  useEffect(() => {
+    if (!actionApproval) return undefined;
+    const timer = setTimeout(() => setActionApproval(null), ACTION_APPROVAL_TTL_MS);
+    return () => clearTimeout(timer);
+  }, [actionApproval]);
 
   // Cloud browser first-visit welcome (#2607): server-side completion-gated
   // (useCloudWelcome -> /v1/cloud-welcome/*), so it opens once `completed`
@@ -1545,6 +1613,9 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
   const hasQueuedTracks = Array.isArray(playerState.queue) && playerState.queue.length > 0;
   const canResumePlayback = Boolean(nowPlaying) || hasQueuedTracks;
   const volume = playerState.volume ?? 80;
+  // While Viola talks `volume` is the ducked level the iframe must follow; the
+  // slider shows the level the user chose.
+  const sliderVolume = playerState.user_volume ?? volume;
 
   // Desktop notification on track change
   const prevTrackTitleRef = useRef(null);
@@ -1655,10 +1726,18 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
       const url = msg.url || msg.payload?.url || '';
       const agentTask = msg.agent_task || msg.payload?.agent_task;
       const agentBusy = (msg.agent_busy ?? msg.payload?.agent_busy) !== false;
+      if (msg.page_forgotten || msg.payload?.page_forgotten) {
+        // The browser was closed on purpose: nothing to reopen, so no globe pill.
+        setLastAgentBrowserUrl('');
+        setAgentContextPillVisible(false);
+        browserClosedRef.current = true;
+      } else if (visible && mode === 'agentic') {
+        browserClosedRef.current = false;
+      }
       if (visible !== undefined) { setBrowserOverlayVisible(!!visible); }
       setBrowserOverlayMode(visible === false ? '' : mode);
       setLoginProvider(visible !== false && mode === 'login' ? url : '');
-      if (stageForOverlayState({ visible: visible !== false, mode }) === 'browser') {
+      if (stageForOverlayState({ visible: visible !== false, mode, status: agentTask?.status }) === 'browser') {
         // The sign-in page needs the browser stage: its Done button lives there.
         setBrowserModeActive(true);
         setDisplayMode('browser');
@@ -1673,8 +1752,11 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
           setAgentTaskStatus(agentTask.status || 'working');
           setAgentTaskPhase(agentTask.phase || 'acting');
           if (agentTask.phase === 'user_input') { setAgentTakeoverActive(true); }
+          else if (lastOverlayStatusRef.current === 'bot_check') { setAgentTakeoverActive(false); }
+          lastOverlayStatusRef.current = agentTask.status || '';
         }
       } else if (!visible) {
+        lastOverlayStatusRef.current = '';
         const outcome = msg.agent_outcome || msg.payload?.agent_outcome || '';
         if (outcome === 'done') { addToast({ message: 'Done \u2713', level: 'info' }); }
         else if (outcome === 'error') { addToast({ message: 'That didn\'t work — please try again', level: 'error' }); }
@@ -1699,6 +1781,12 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
     if (!setAgentProgressCallback) return;
     const handleAgentProgress = (payload) => {
       const terminal = payload?.terminal === true || ['complete', 'error', 'cancelled'].includes(payload?.status);
+      if (terminal && ['bot_check', 'payment_review', 'signature_review'].includes(lastOverlayStatusRef.current)) {
+        // The task is over but the page is still the user's to act on: a site's
+        // person check, or the checkout they are reviewing. The view stays up.
+        setAgentTaskActive(false);
+        return;
+      }
       if (terminal) {
         setAgentTaskActive(false);
         setAgentTaskStatus('');
@@ -1723,7 +1811,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
 
   useEffect(() => {
     if (agentTaskActive || browserModeActive) {
-      setAgentContextPillVisible(true);
+      if (!browserClosedRef.current) setAgentContextPillVisible(true);
       return undefined;
     }
     if (!agentContextPillVisible) return undefined;
@@ -1898,6 +1986,15 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
   // =========================================================================
   const showNotificationsRef = useRef(true);
   showNotificationsRef.current = userSettings?.show_notifications ?? true;
+  const [pendingLongAnswer, setPendingLongAnswer] = useState(null);
+  const videoPlaying = Boolean(playerState.is_playing && playerState.now_playing?.video_id);
+  const videoPlayingRef = useRef(videoPlaying);
+  videoPlayingRef.current = videoPlaying;
+  // Video started while a long answer is up: the answer gets out of the way.
+  useEffect(() => {
+    if (!videoPlaying) return;
+    setActiveCard((card) => (card?.long_answer && !card.compact ? longAnswerCard(card.body, true) : card));
+  }, [videoPlaying]);
   useEffect(() => {
     if (!setChatResponseCallback) return;
     const handleChatResponse = (payload) => {
@@ -1905,47 +2002,58 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
       dispatchUiActions(payload);
       const text = payload.text || '';
       if (!text) return;
+      onReplyFinal(text);
 
       const hasExplicitCard = payload.card && typeof payload.card === 'object';
-      const isLongResponse = text.length > 200;
-      const willShowCard = hasExplicitCard || isLongResponse;
 
-      if (willShowCard) {
-        // Card responses: the card is the display, but the response line still
-        // shows what Viola actually SAID — same shape as the short-response
-        // branch below — so it stays true and readable after the card
-        // auto-dismisses. It must never show `payload.intent`: that is the
-        // pipeline's own intent slug (`answer`, `set_volume`, `skip`, from
-        // core/voice_command_handler.py), not display copy, so it rendered
-        // as the literal sentence "Showing details for answer" on screen.
-        setLastResponse(`"${truncateForResponseLine(text)}"`);
-        if (hasExplicitCard) {
-          setActiveCard(payload.card);
-          if (payload.card.type === 'gate_review' && payload.card.gate_kind === 'payment') {
-            // Fallback delivery for the purchase approval: a desktop
-            // notification, so a minimized window still tells the user.
-            showNotification('Approve your purchase', {
-              body: truncateForResponseLine(String(payload.card.body || 'Viola is waiting for your approval.')),
-              tag: 'viola-payment-gate',
-              requireInteraction: true,
-            }, showNotificationsRef.current);
-          }
-        } else {
-          // An auto-promoted long answer has no title anyone wrote for it.
-          // ContentCard omits the whole title block when `title` is absent,
-          // and no title beats a slug titled "answer".
-          setActiveCard({ type: 'detail', body: text });
+      // The response line always shows the whole of what Viola said, however
+      // long (it scrolls): a long answer used to be cut to 160 characters and
+      // popped up in full in a card, on top of the video, before she had said a
+      // word of it. It must never show `payload.intent`: that is the pipeline's
+      // own intent slug (`answer`, `set_volume`, `skip`, from
+      // core/voice_command_handler.py), not display copy.
+      setLastResponse(`"${text}"`);
+      if (hasExplicitCard) {
+        setActiveCard(payload.card);
+        if (payload.card.type === 'gate_review' && payload.card.gate_kind === 'payment') {
+          // Fallback delivery for the purchase approval: a desktop
+          // notification, so a minimized window still tells the user.
+          showNotification('Approve your purchase', {
+            body: truncateForResponseLine(String(payload.card.body || 'Viola is waiting for your approval.')),
+            tag: 'viola-payment-gate',
+            requireInteraction: true,
+          }, showNotificationsRef.current);
         }
-        // Don't add to chatHistory — card is the display
       } else {
-        // Short responses: show in chat only, no card
-        setLastResponse(`"${text}"`);
         setChatHistory(prev => appendAssistantEntry(prev, text));
+        // An auto-promoted long answer has no title anyone wrote for it.
+        // ContentCard omits the whole title block when `title` is absent, and
+        // no title beats a slug titled "answer".
+        if (text.length > LONG_ANSWER_CARD_CHARS) setPendingLongAnswer(text);
       }
     };
     setChatResponseCallback(handleChatResponse);
     return () => setChatResponseCallback(null);
-  }, [setChatResponseCallback]);
+  }, [setChatResponseCallback, onReplyFinal]);
+
+  // A long answer gets its card once the stage has finished revealing it. The
+  // card holds the whole text, so at chat_response it would show the reply
+  // before she has said a word of it (1.0.5 build 9). Unspoken replies have
+  // nothing to wait for, so theirs comes at once.
+  useEffect(() => {
+    if (!pendingLongAnswer || liveReply) return;
+    setActiveCard(longAnswerCard(pendingLongAnswer, videoPlayingRef.current));
+    setPendingLongAnswer(null);
+  }, [pendingLongAnswer, liveReply]);
+
+  useEffect(() => {
+    if (!setReplyPartialCallback) return undefined;
+    const handleReplyPartial = (payload) => {
+      if (mountedRef.current) onReplyPartial(payload);
+    };
+    setReplyPartialCallback(handleReplyPartial);
+    return () => setReplyPartialCallback(null);
+  }, [setReplyPartialCallback, onReplyPartial]);
 
   useEffect(() => {
     if (!setCalendarUpdateCallback) return;
@@ -1969,6 +2077,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
   const iframePositionRef = useRef(0);
   const iframeDurationRef = useRef(0);
   const lastPositionUpdateRef = useRef(0);
+  const lastPositionSentRef = useRef({ position: 0, state: null, repeats: 0 });
   const ytHubMutedRef = useRef(false);
   // Which video we have already told the backend failed to start. The player
   // re-posts yt_iframe_autoplay_blocked once a second forever once it exhausts
@@ -2102,6 +2211,8 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
       // number and who it belongs to, with Approve / Cancel (CallBriefing).
       const briefing = callBriefingFromConsultEvent(payload);
       if (briefing !== undefined) setCallBriefing(briefing);
+      const approval = actionApprovalFromConsultEvent(payload);
+      if (approval !== undefined) setActionApproval(approval);
     } else if (data.type === 'call_briefing') {
       setCallBriefing(payload);
       rememberCallMeta(payload, callId);
@@ -2497,6 +2608,8 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
       try {
         await api.setRating(actualRating, expectedTrackId);
         settleRating(true);
+        // Dislike means "not this one": same skip as the Next button.
+        if (actualRating === 'disliked') runSkipAction();
       } catch (err) {
         if (ratingSessionRef.current !== session) return;
         settleRating(false);
@@ -2760,10 +2873,23 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
         iframeDurationRef.current = duration;
         setIframePosition(position);
         setIframeDuration(duration);
+        // The progress bar above runs off the iframe. The backend needs far
+        // less: where the song is every couple of seconds, a seek at once, and
+        // a state change. A paused song says so twice (the backend wants two
+        // reports before it overrides its own phase), then stays silent.
         const now = Date.now();
-        if (now - lastPositionUpdateRef.current >= 1000) {
+        const sent = lastPositionSentRef.current;
+        const moved = Math.abs(position - sent.position);
+        const stateChanged = payload.state !== sent.state;
+        if (stateChanged) sent.repeats = 0;
+        const idle = moved < 0.25 && !stateChanged;
+        const due = now - lastPositionUpdateRef.current >= POSITION_REPORT_MS;
+        if ((due && (!idle || sent.repeats < 1)) || moved >= POSITION_JUMP_SECONDS || stateChanged) {
+          sent.repeats = idle ? sent.repeats + 1 : 0;
+          sent.position = position;
+          sent.state = payload.state;
           lastPositionUpdateRef.current = now;
-          if (wsSend) { wsSend({ action: 'position_update', payload: { position, duration, state: payload.state, source: 'youtube_iframe' } }); }
+          if (wsSend) { wsSend({ action: 'position_update', payload: { position, duration, state: payload.state, video_id: payload.videoId, source: 'youtube_iframe' } }); }
         }
       }
       if (type === 'yt_iframe_state') {
@@ -2789,6 +2915,12 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
             }
           }
           if (!(playerState?.queue?.length > 0)) { setIframePosition(0); }
+          // The embed is keyed on the video, so replaying the same one gets no
+          // new embed: without this, Repeat One stopped at the end of the song.
+          if (!isSpoke && (playerState?.repeat_mode === 'one' || (playerState?.repeat_mode === 'all' && !(playerState?.queue?.length > 0)))) {
+            sendToIframe('seekTo', { seconds: 0 });
+            sendToIframe('play');
+          }
         }
       }
       if (type === 'yt_iframe_error') {
@@ -2835,6 +2967,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
   useEffect(() => {
     setIframePosition(0); setIframeDuration(0);
     iframePositionRef.current = 0; iframeDurationRef.current = 0; lastPositionUpdateRef.current = 0;
+    lastPositionSentRef.current = { position: 0, state: null, repeats: 0 };
     spokeInitialSyncDoneRef.current = false;
     // A new track gets its own chance to fail; the dedupe is per video.
     notStartedReportedRef.current = null;
@@ -3190,7 +3323,10 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (settingsOpen || queueOpen || historyOpen || roomsOpen || helpOpen || bugReportOpen || workbenchPanelOpen || commandPaletteOpen) return;
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      // The stage's own field still ends here for Enter and Escape; everything
+      // else in it is ordinary text editing, Ctrl+A included.
+      const inStageField = e.target === stageTypingFieldRef.current;
+      if ((e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') && !inStageField) return;
       if (isHotkeyEvent(e, muteHotkey) && !isTyping && !e.repeat) {
         e.preventDefault();
         toggleMicMuted();
@@ -3211,27 +3347,24 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
         // streaming turn and no prompt.
         if (interceptCloudConsent({ kind: 'text', text })) return;
         setChatHistory(prev => [...prev, { role: 'user', content: text, timestamp: new Date().toISOString() }]);
-        streamingResponseRef.current = '';
         setLastResponse('"Processing..."'); setIsCommandLoading(true);
-        setMainThinking('');
-        api.sendCommandStreaming(text, (token) => {
-          streamingResponseRef.current += token;
-          setLastResponse(`"${streamingResponseRef.current}"`);
-        }, [], (thinking) => {
-          setMainThinking(prev => `${prev}${thinking}`);
-        }).then(result => {
+        // The stage shows only the answer, as `reply_partial` events: the raw
+        // token stream also carries tool preambles, and the model's reasoning
+        // never goes on the stage (it showed a street address and tool names).
+        api.sendCommandStreaming(text).then(result => {
           if (result) handleCommandResult(result);
         }).catch(() => { setLastResponse('"Sorry, something went wrong."'); }).finally(() => { setIsCommandLoading(false); });
         return;
       }
       if (e.key === 'Escape' && isTyping) { setTypingInput(''); setIsTyping(false); return; }
-      if (e.key === 'Backspace' && isTyping) {
+      if (e.key === 'Backspace' && isTyping && !inStageField) {
         e.preventDefault();
         setTypingInput(prev => { const newVal = prev.slice(0, -1); if (newVal.length === 0) setIsTyping(false); return newVal; });
         return;
       }
-      if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey && !inStageField) {
         e.preventDefault(); setIsTyping(true); setTypingInput(prev => prev + e.key);
+        stageTypingFieldRef.current?.focus();
         return;
       }
     };
@@ -3254,6 +3387,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
       e.preventDefault();
       setIsTyping(true);
       setTypingInput(prev => (prev + pasted).slice(0, STAGE_TYPING_MAX_CHARS));
+      stageTypingFieldRef.current?.focus();
     };
     document.addEventListener('keydown', handleKeyDown);
     document.addEventListener('keyup', handleKeyUp);
@@ -3267,13 +3401,14 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
 
   const formatTime = (date) => formatTimeDisplay(date, userSettings.time_display_format || 'auto');
   const formatDate = (date) => date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
-  const activeStagePillMode = getActiveStagePillMode(displayMode);
   const stageContentMode = resolveStageContentMode(displayMode, {
     activeCallId,
     browserModeActive,
     agentFrameSrc,
     browserUrl,
   });
+  stageContentModeRef.current = stageContentMode;
+  const activeStagePillMode = visibleStagePillMode(displayMode, stageContentMode);
   const isChatStageActive = stageContentMode === 'chat';
 
   // Native browser view (desktop): it may only sit on the browser stage with
@@ -3606,7 +3741,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
       displayProgress={displayProgress}
       displayPosition={displayPosition}
       displayDuration={displayDuration}
-      volume={volume}
+      volume={sliderVolume}
       shuffleOn={shuffleOn}
       repeatMode={repeatMode}
       rating={rating}
@@ -3760,6 +3895,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
           setSettingsInitialSection(null);
           setSettingsOpen(true);
         }}
+        onOpenStageHistory={() => setHistoryOpen(true)}
         profileName={accountUser?.user_metadata?.full_name || accountUser?.user_metadata?.name || accountUser?.email
           || (desktopAccount?.signed_in ? desktopAccount.email : '')
           || userSettings?.display_name || userSettings?.name || 'Local user'}
@@ -3982,9 +4118,14 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
               isTyping={isTyping}
               typingInput={typingInput}
               setTypingInput={setTypingInput}
+              setIsTyping={setIsTyping}
+              typingFieldRef={stageTypingFieldRef}
+              typingMaxChars={STAGE_TYPING_MAX_CHARS}
               isCommandLoading={isCommandLoading}
-              lastResponse={lastResponse}
-              mainThinking={mainThinking}
+              // While the card holds a long answer the line shows only its lead,
+              // so it is not on screen twice. Once the card goes it shows whole.
+              lastResponse={activeCard?.long_answer ? `"${truncateForResponseLine(activeCard.body)}"` : lastResponse}
+              liveReply={liveReply}
               voice={voice}
               processingTooLong={processingTooLong}
               capDenial={capDenial}
@@ -4212,10 +4353,16 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
 
       {/* Phone-call UX toasts (bottom-right) driven by telephony WS events */}
       <CallBriefing
-        briefing={callBriefing}
+        briefing={callBriefingBelongsElsewhere(callBriefing, openChatThreadId) ? null : callBriefing}
         onDismiss={() => setCallBriefing(null)}
         onApprove={() => answerCallBriefingInItsChat(CALL_APPROVE_COMMAND)}
         onCancel={() => answerCallBriefingInItsChat(CALL_CANCEL_COMMAND).then(() => setCallBriefing(null))}
+      />
+      <CallBriefing
+        briefing={callBriefingBelongsElsewhere(actionApproval, openChatThreadId) ? null : actionApproval}
+        onDismiss={() => setActionApproval(null)}
+        onApprove={() => answerActionApproval(CALL_APPROVE_COMMAND)}
+        onCancel={() => answerActionApproval(CALL_CANCEL_COMMAND)}
       />
       {!activeInlineConsultation && (
         <CallConsultation

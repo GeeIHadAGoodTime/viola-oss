@@ -14,6 +14,7 @@ Endpoints:
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 from fastapi.responses import JSONResponse
@@ -69,9 +70,18 @@ def _get_default_provider_id(user_id: str) -> str | None:
         return None
 
 
-def _status_payload(status: Any, default_provider: str | None) -> dict[str, Any]:
+def _status_payload(status: Any, default_provider: str | None, user_id: str | None = None) -> dict[str, Any]:
     payload = status.to_dict()
     payload["is_default"] = payload.get("name") == default_provider
+    if payload.get("name") == "spotify" and user_id:
+        # One truth: this view's sign-in cookie is not "connected" on its own.
+        from music.spotify import connection
+
+        state = connection.get_spotify_connection(user_id)
+        payload["logged_in"] = state.connected
+        payload["session_expired"] = state.state == connection.SESSION_REJECTED
+        payload["state"] = state.state
+        payload["state_message"] = state.message
     return payload
 
 
@@ -115,7 +125,9 @@ async def get_auth_status(user_id: str = Depends(get_current_user_id)) -> Any:
     try:
         all_status = mgr.get_auth_status()
         default_provider = _get_default_provider_id(user_id)
-        providers = [_status_payload(status, default_provider) for status in all_status.values()]
+        providers = await asyncio.to_thread(
+            lambda: [_status_payload(status, default_provider, user_id) for status in all_status.values()]
+        )
         return success_response({"providers": providers})
     except Exception:
         logger.exception("Failed to get browser auth status")
@@ -177,7 +189,8 @@ async def get_provider_status(provider_name: str, user_id: str = Depends(get_cur
         await mgr.check_login_state(provider_name)
         # Re-fetch status after the check (it may have been updated)
         status = mgr.get_provider_status(provider_name)
-        return success_response(_status_payload(status, _get_default_provider_id(user_id)))
+        default_provider = _get_default_provider_id(user_id)
+        return success_response(await asyncio.to_thread(_status_payload, status, default_provider, user_id))
     except Exception:
         logger.exception("Failed to check login status for %s", provider_name)
         return JSONResponse(
@@ -350,7 +363,8 @@ async def refresh_auth_check(provider_name: str, user_id: str = Depends(get_curr
         await mgr.check_session_expired(provider_name)
 
         status = mgr.get_provider_status(provider_name)
-        return success_response(_status_payload(status, _get_default_provider_id(user_id)))
+        default_provider = _get_default_provider_id(user_id)
+        return success_response(await asyncio.to_thread(_status_payload, status, default_provider, user_id))
     except Exception:
         logger.exception("Failed to refresh auth check for %s", provider_name)
         return JSONResponse(

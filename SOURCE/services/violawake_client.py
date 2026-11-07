@@ -24,6 +24,12 @@ shared identity).
 
 ViolaWake honoring the header is the upstream half of the fix; until it does,
 the header is inert and this client behaves exactly as before.
+
+Two callers, two clients. ``ViolaWakeClient`` holds the service credential, so it
+runs only on the Viola cloud. An installed desktop must never hold that key, so it
+uses ``ViolaWakeRelayClient``, which makes the same calls through the cloud's
+``/v1/wake/relay/*`` routes with the signed-in user's own token. ``wake_client_for``
+picks the right one.
 """
 
 from __future__ import annotations
@@ -44,7 +50,8 @@ _MAX_MODEL_DOWNLOAD_BYTES = 50 * 1024 * 1024
 _MODEL_DOWNLOAD_CHUNK_BYTES = 64 * 1024
 _SHA256_HEX_LENGTH = 64
 _LOWER_HEX_CHARS = frozenset("0123456789abcdef")
-_WAKE_DATA_UPLOAD_CONTROL = "wake_data_upload"
+_WAKE_TRAINING_CONTROL = "custom_wake_training"
+_RELAY_PREFIX = "/v1/wake/relay"
 
 # Per-user partition key carried on every ViolaWake request. Version-prefixed
 # so the derivation can change without silently re-partitioning live queues.
@@ -94,6 +101,18 @@ class ViolaWakeUnavailableError(ViolaWakeClientError):
     """Raised when ViolaWake cannot be reached or is not configured."""
 
 
+class ViolaWakeSignInRequiredError(ViolaWakeUnavailableError):
+    """Raised on a desktop that has no signed-in Viola account to relay with."""
+
+
+class ViolaWakeTrainingPausedError(ViolaWakeRemoteError):
+    """ViolaWake refused a submission because this user's training is paused."""
+
+
+class ViolaWakeMonthlyLimitError(ViolaWakeClientError):
+    """The user has used this month's custom wake words. The message is ours, for the user."""
+
+
 @dataclass(frozen=True, slots=True)
 class WakeAudioSample:
     """Audio sample submitted to ViolaWake."""
@@ -123,6 +142,35 @@ class TrainingJobStatus:
     model_id: str | None = None
     error: str | None = None
     raw_status: str | None = None
+    # Set only by the relay, which classified ``error`` on the cloud side so that
+    # ViolaWake's own text never reaches a desktop.
+    error_reason: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class TrainingJobSummary:
+    """One of this user's jobs, as much as a monthly count needs."""
+
+    status: str
+    created_at: str
+    error: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class TrainingReadiness:
+    """Whether a training job could finish right now."""
+
+    ready: bool
+    message: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class WakeWordCheck:
+    """ViolaWake's verdict on a proposed wake word, written for the user to read."""
+
+    ok: bool
+    reason: str | None = None
+    code: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -217,18 +265,70 @@ class ViolaWakeClient:
         if len(recording_ids) != len(audio_samples):
             raise ViolaWakeClientError("ViolaWake rejected one or more audio samples")
 
-        response = await self._post_json(
-            "/api/jobs",
-            {
-                "wake_word": wake_word,
-                "recording_ids": recording_ids,
-                "epochs": epochs,
-            },
-        )
+        payload = {
+            "wake_word": wake_word,
+            "recording_ids": recording_ids,
+            "epochs": epochs,
+        }
+        try:
+            response = await self._post_json("/api/jobs", payload)
+        except ViolaWakeTrainingPausedError:
+            # A pause needs a person to say "try again", and this submission is
+            # exactly that: the user pressed Train. Without this a paused Viola user
+            # has no way back, because only the website has a Resume button.
+            await self._post_json("/api/jobs/resume", {})
+            response = await self._post_json("/api/jobs", payload)
         job_id = str(response.get("job_id", "")).strip()
         if not job_id:
             raise ViolaWakeClientError("ViolaWake did not return a job_id")
         return TrainingSubmission(job_id=job_id, status=_normalize_status(str(response.get("status", "queued"))))
+
+    async def readiness(self) -> TrainingReadiness:
+        """Ask whether a job could finish right now.
+
+        A ViolaWake older than this route answers 404, and an older ViolaWake is
+        one that cannot be relied on to report an outage, so that reads as "no".
+        """
+
+        try:
+            response = await self._get_json("/api/training/readiness")
+        except ViolaWakeRemoteError:
+            return TrainingReadiness(ready=False)
+        message = response.get("message")
+        return TrainingReadiness(
+            ready=bool(response.get("ready")),
+            message=message if isinstance(message, str) and message else None,
+        )
+
+    async def check_word(self, wake_word_text: str) -> WakeWordCheck:
+        """Ask whether a proposed wake word can work, before anything is recorded."""
+
+        response = await self._post_json("/api/training/check-word", {"wake_word": wake_word_text})
+        return WakeWordCheck(
+            ok=bool(response.get("ok")),
+            reason=_optional_str(response.get("reason")),
+            code=_optional_str(response.get("code")),
+        )
+
+    async def list_jobs(self) -> list[TrainingJobSummary]:
+        """List this user's jobs. ViolaWake scopes the list to the tenant key."""
+
+        response = await self._request("GET", "/api/jobs")
+        try:
+            payload = response.json()
+        except ValueError as exc:
+            raise ViolaWakeClientError("ViolaWake returned a non-JSON response") from exc
+        if not isinstance(payload, list):
+            raise ViolaWakeClientError("ViolaWake returned an invalid response")
+        return [
+            TrainingJobSummary(
+                status=str(item.get("status", "")),
+                created_at=str(item.get("created_at", "")),
+                error=_optional_str(item.get("error")),
+            )
+            for item in payload
+            if isinstance(item, dict)
+        ]
 
     async def get_job_status(self, job_id: str) -> TrainingJobStatus:
         """Poll a ViolaWake training job."""
@@ -257,7 +357,7 @@ class ViolaWakeClient:
         expected_hash = _optional_sha256(expected_sha256)
         if expected_sha256 and expected_hash is None:
             raise ViolaWakeClientError("expected model hash is not a valid SHA-256 digest")
-        await _require_wake_data_upload_allowed(_control_action("GET", model_url))
+        await self._before_request("GET", model_url)
 
         headers, url = self._prepare_request(model_url)
         try:
@@ -278,20 +378,11 @@ class ViolaWakeClient:
         except httpx.RequestError as exc:
             raise ViolaWakeUnavailableError("ViolaWake is temporarily unavailable") from exc
 
-    async def get_model_config(self, model_id: str) -> TrainingModelConfig:
+    async def get_model_config(self, model_id: str, *, job_id: str | None = None) -> TrainingModelConfig:
         """Fetch persisted training metadata for a trained model."""
 
-        response = await self._get_json("/api/models/%s/config" % model_id)
-        training_config = response.get("training_config")
-        config_payload = training_config if isinstance(training_config, dict) else None
-        return TrainingModelConfig(
-            d_prime=_optional_float(response.get("d_prime")),
-            far_per_hour=_optional_float(response.get("far_per_hour")),
-            frr=_optional_float(response.get("frr")),
-            training_config=config_payload,
-            architecture=_optional_str(response.get("architecture")) or _config_architecture(config_payload),
-            quality_grade=_optional_str(response.get("quality_grade")) or _config_quality_grade(config_payload),
-        )
+        del job_id  # the relay addresses a model through its job; the direct API does not
+        return _model_config_from_payload(await self._get_json("/api/models/%s/config" % model_id))
 
     async def model_sha256(self, model_url: str) -> str:
         """Download a model and return its SHA-256 hash."""
@@ -317,7 +408,7 @@ class ViolaWakeClient:
         return _json_object(response)
 
     async def _request(self, method: str, path_or_url: str, **kwargs: Any) -> httpx.Response:
-        await _require_wake_data_upload_allowed(_control_action(method, path_or_url))
+        await self._before_request(method, path_or_url)
         headers, url = self._prepare_request(path_or_url, headers=kwargs.pop("headers", None))
 
         try:
@@ -331,6 +422,9 @@ class ViolaWakeClient:
 
         _raise_for_response(response)
         return response
+
+    async def _before_request(self, method: str, path_or_url: str) -> None:
+        await _require_wake_training_allowed(_control_action(method, path_or_url))
 
     def _prepare_request(self, path_or_url: str, headers: dict[str, str] | None = None) -> tuple[dict[str, str], str]:
         if not self.api_url:
@@ -390,6 +484,165 @@ class ViolaWakeClient:
         return b"".join(chunks)
 
 
+class ViolaWakeRelayClient(ViolaWakeClient):
+    """The same operations, for an installed desktop, through the Viola cloud.
+
+    The desktop has no service credential and never will. It presents the signed-in
+    user's own access token to the cloud's ``/v1/wake/relay/*`` routes, and the cloud
+    makes the ViolaWake call. That also means the kill switch and the tenant key live
+    in one place, on the cloud.
+    """
+
+    def __init__(
+        self,
+        *,
+        user_id: str,
+        cloud_url: str | None = None,
+        access_token: str | None = None,
+        timeout: float = _DEFAULT_TIMEOUT,
+        http_client: httpx.AsyncClient | None = None,
+        max_model_download_bytes: int = _MAX_MODEL_DOWNLOAD_BYTES,
+    ) -> None:
+        super().__init__(
+            user_id=user_id,
+            api_url=cloud_url or _cloud_base_url(),
+            service_key="",
+            timeout=timeout,
+            http_client=http_client,
+            max_model_download_bytes=max_model_download_bytes,
+        )
+        self._user_id = user_id
+        self._access_token = access_token
+
+    @property
+    def configured(self) -> bool:
+        return bool(self.api_url)
+
+    async def _before_request(self, method: str, path_or_url: str) -> None:
+        await _require_wake_training_allowed(_control_action(method, path_or_url))
+        if not self._access_token:
+            self._access_token = await _desktop_access_token(self._user_id)
+        if not self._access_token:
+            raise ViolaWakeSignInRequiredError("Sign in to your Viola account to train a wake word.")
+
+    def _prepare_request(self, path_or_url: str, headers: dict[str, str] | None = None) -> tuple[dict[str, str], str]:
+        request_headers = dict(headers or {})
+        request_headers["Authorization"] = "Bearer %s" % (self._access_token or "")
+        return request_headers, self._resolve_url(path_or_url)
+
+    async def submit_training_job(
+        self,
+        wake_word_text: str,
+        audio_samples: list[WakeAudioSample],
+        *,
+        epochs: int = 80,
+    ) -> TrainingSubmission:
+        wake_word = wake_word_text.strip().lower()
+        if not wake_word:
+            raise ViolaWakeClientError("wake_word_text is required")
+        if not audio_samples:
+            raise ViolaWakeClientError("at least one audio sample is required")
+
+        response = _relay_data(
+            await self._post_multipart(
+                "%s/train" % _RELAY_PREFIX,
+                data={"wake_word": wake_word, "epochs": str(epochs)},
+                files=[
+                    ("file", (sample.filename, sample.content, sample.content_type or "application/octet-stream"))
+                    for sample in audio_samples
+                ],
+            )
+        )
+        job_id = str(response.get("job_id", "")).strip()
+        if not job_id:
+            raise ViolaWakeClientError("The Viola cloud did not return a job_id")
+        return TrainingSubmission(job_id=job_id, status=_normalize_status(str(response.get("status", "queued"))))
+
+    async def readiness(self) -> TrainingReadiness:
+        response = _relay_data(await self._get_json("%s/readiness" % _RELAY_PREFIX))
+        message = response.get("message")
+        return TrainingReadiness(
+            ready=bool(response.get("ready")),
+            message=message if isinstance(message, str) and message else None,
+        )
+
+    async def check_word(self, wake_word_text: str) -> WakeWordCheck:
+        response = _relay_data(await self._post_json("%s/check-word" % _RELAY_PREFIX, {"wake_word": wake_word_text}))
+        return WakeWordCheck(
+            ok=bool(response.get("ok")),
+            reason=_optional_str(response.get("reason")),
+            code=_optional_str(response.get("code")),
+        )
+
+    async def get_job_status(self, job_id: str) -> TrainingJobStatus:
+        response = _relay_data(await self._get_json("%s/jobs/%s" % (_RELAY_PREFIX, job_id)))
+        status = _normalize_status(str(response.get("status", "") or ""))
+        model_ready = status == "done" and bool(response.get("model_id"))
+        return TrainingJobStatus(
+            job_id=str(response.get("job_id", job_id)),
+            status=status,
+            progress=_optional_float(response.get("progress")),
+            model_url="%s/jobs/%s/model" % (_RELAY_PREFIX, job_id) if model_ready else None,
+            model_hash=_optional_sha256(response.get("model_hash")),
+            model_id=_optional_str(response.get("model_id")),
+            error=_optional_str(response.get("error")),
+            error_reason=_optional_str(response.get("error_reason")),
+        )
+
+    async def get_model_config(self, model_id: str, *, job_id: str | None = None) -> TrainingModelConfig:
+        del model_id  # never sent: a job proves ownership, a bare model id does not
+        if not job_id:
+            raise ViolaWakeClientError("job_id is required to read a model through the relay")
+        return _model_config_from_payload(
+            _relay_data(await self._get_json("%s/jobs/%s/config" % (_RELAY_PREFIX, job_id)))
+        )
+
+
+def wake_client_for(user_id: str) -> ViolaWakeClient:
+    """Return the client for this process: direct with the service key, else relayed."""
+
+    if (env.get("VIOLA_WAKEWORD_SERVICE_KEY") or "").strip():
+        return ViolaWakeClient(user_id=user_id)
+    return ViolaWakeRelayClient(user_id=user_id)
+
+
+def _cloud_base_url() -> str:
+    from config.settings import settings
+
+    return str(getattr(settings, "cloud_url", "") or "https://api.useviola.com").rstrip("/")
+
+
+async def _desktop_access_token(user_id: str) -> str | None:
+    try:
+        from auth.desktop_session import desktop_access_token_for_active_session
+
+        return await desktop_access_token_for_active_session(user_id=user_id)
+    except Exception as exc:
+        raise ViolaWakeSignInRequiredError("Sign in to your Viola account to train a wake word.") from exc
+
+
+def _relay_data(payload: dict[str, Any]) -> dict[str, Any]:
+    """Unwrap the cloud's ``{"ok": true, "data": {...}}`` envelope."""
+
+    data = payload.get("data")
+    if not isinstance(data, dict):
+        raise ViolaWakeClientError("The Viola cloud returned an invalid response")
+    return data
+
+
+def _model_config_from_payload(response: dict[str, Any]) -> TrainingModelConfig:
+    training_config = response.get("training_config")
+    config_payload = training_config if isinstance(training_config, dict) else None
+    return TrainingModelConfig(
+        d_prime=_optional_float(response.get("d_prime")),
+        far_per_hour=_optional_float(response.get("far_per_hour")),
+        frr=_optional_float(response.get("frr")),
+        training_config=config_payload,
+        architecture=_optional_str(response.get("architecture")) or _config_architecture(config_payload),
+        quality_grade=_optional_str(response.get("quality_grade")) or _config_quality_grade(config_payload),
+    )
+
+
 def _recording_ids_from_bulk_upload(payload: dict[str, Any]) -> list[int]:
     results = payload.get("results", [])
     if not isinstance(results, list):
@@ -412,26 +665,26 @@ def _recording_ids_from_bulk_upload(payload: dict[str, Any]) -> list[int]:
 
 def _control_action(method: str, path_or_url: str) -> str:
     path = path_or_url.split("?", 1)[0].rstrip("/")
-    if path.endswith("/api/recordings/bulk-upload"):
+    if path.endswith(("/api/recordings/bulk-upload", "%s/train" % _RELAY_PREFIX)):
         return "custom_wake_sample_upload"
-    if "/api/models/" in path and path.endswith("/download"):
+    if ("/api/models/" in path and path.endswith("/download")) or (_RELAY_PREFIX in path and path.endswith("/model")):
         return "custom_wake_model_download"
-    if "/api/models/" in path and path.endswith("/config"):
+    if ("/api/models/" in path or _RELAY_PREFIX in path) and path.endswith("/config"):
         return "custom_wake_model_config"
-    if path.endswith("/api/jobs") or "/api/jobs/" in path:
+    if path.endswith("/api/jobs") or "/api/jobs/" in path or "%s/jobs/" % _RELAY_PREFIX in path:
         return "custom_wake_training_job"
     return "custom_wake_violawake_request_%s" % method.lower()
 
 
-async def _require_wake_data_upload_allowed(action: str) -> None:
+async def _require_wake_training_allowed(action: str) -> None:
     try:
         from services.operator_controls import require_enabled_async
 
-        decision = await require_enabled_async(_WAKE_DATA_UPLOAD_CONTROL, action=action)
+        decision = await require_enabled_async(_WAKE_TRAINING_CONTROL, action=action)
     except Exception as exc:
-        raise ViolaWakeUnavailableError("Wake data upload safety control is unavailable") from exc
+        raise ViolaWakeUnavailableError("Wake training safety control is unavailable") from exc
     if not decision.allowed:
-        raise ViolaWakeUnavailableError(decision.public_message or "Wake data upload is disabled")
+        raise ViolaWakeUnavailableError(decision.public_message or "Wake training is disabled")
 
 
 def _normalize_status(status: str) -> str:
@@ -472,6 +725,9 @@ def _error_message(response: httpx.Response) -> str:
             message = detail.get("message") or detail.get("error")
             if isinstance(message, str) and message:
                 return message
+        error = payload.get("error")
+        if isinstance(error, dict) and isinstance(error.get("message"), str) and error["message"]:
+            return error["message"]
     return "ViolaWake request failed"
 
 
@@ -526,6 +782,12 @@ def _origin(url: str) -> tuple[str, str, int]:
 def _raise_for_response(response: httpx.Response) -> None:
     if response.status_code >= 500:
         raise ViolaWakeUnavailableError("ViolaWake is temporarily unavailable")
+    if response.status_code == 429 and _RELAY_PREFIX in str(response.request.url):
+        raise ViolaWakeMonthlyLimitError(_error_message(response))
+    if response.status_code == 409 and response.headers.get("X-Training-Paused"):
+        raise ViolaWakeTrainingPausedError(_error_message(response))
+    if response.status_code in {401, 403} and _RELAY_PREFIX in str(response.request.url):
+        raise ViolaWakeSignInRequiredError("Sign in to your Viola account to train a wake word.")
     if response.status_code >= 400:
         raise ViolaWakeRemoteError(_error_message(response))
 
@@ -562,12 +824,20 @@ __all__ = [
     "DEFAULT_VIOLAWAKE_API_URL",
     "WAKE_TENANT_HEADER",
     "TrainingJobStatus",
+    "TrainingJobSummary",
     "TrainingModelConfig",
+    "TrainingReadiness",
     "TrainingSubmission",
     "ViolaWakeClient",
     "ViolaWakeClientError",
+    "ViolaWakeMonthlyLimitError",
+    "ViolaWakeRelayClient",
     "ViolaWakeRemoteError",
+    "ViolaWakeSignInRequiredError",
+    "ViolaWakeTrainingPausedError",
     "ViolaWakeUnavailableError",
     "WakeAudioSample",
+    "WakeWordCheck",
+    "wake_client_for",
     "wake_tenant_key",
 ]

@@ -438,6 +438,7 @@ def _legacy_computer_alias(tool_name: str, args: dict[str, Any]) -> tuple[str, d
             "level": args.get("percent"),
             "mute": args.get("mute"),
             "step": args.get("step", 10),
+            "system_volume_word": args.get("system_volume_word", ""),
         }
 
     if tool_name == "desktop_observe":
@@ -1432,6 +1433,7 @@ class MCPClientHub:
             "ask_user",
             # --- Memory & knowledge (UI: Memory) ---
             "memory",
+            "save_delivery_address",
             "workbench",
             # --- Web read (UI: Web search) ---
             "web_search",
@@ -1461,6 +1463,12 @@ class MCPClientHub:
             # irreversible calendar writes (e.g. delete) stay confirmation-gated
             # by the tier-independent unified confirmation gate. ---
             "calendar",
+            # --- Background agents: a child gets this level's tools at most
+            # and never the browser, payment or desktop tools. Without these
+            # "start a background agent" had nothing to call at Solo. ---
+            "start_agent",
+            "check_agents",
+            "cancel_agent",
             # --- Self-reporting & introspection ---
             "file_bug_report",
             "user_capabilities",

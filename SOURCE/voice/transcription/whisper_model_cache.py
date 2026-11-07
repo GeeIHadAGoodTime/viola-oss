@@ -38,7 +38,9 @@ ratchet gate).
 
 from __future__ import annotations
 
+import fnmatch
 import os
+import threading
 from pathlib import Path
 
 from core.logging_config import get_logger
@@ -133,7 +135,99 @@ def resolve_model_load(model_name: str) -> dict[str, object]:
         baked,
         root,
     )
+    try:
+        if download_off_shutdown_path(model_name, root):
+            logger.info("faster-whisper: model '%s' downloaded to %s", model_name, root)
+    except Exception as exc:  # noqa: BLE001, RUF100 - the normal load below still tries
+        logger.warning("faster-whisper: download of '%s' failed early: %s", model_name, exc)
     return {"download_root": str(root), "local_files_only": False}
+
+
+# ---------------------------------------------------------------------------
+# Cold download that never holds up quitting
+# ---------------------------------------------------------------------------
+# huggingface_hub downloads a snapshot through a thread pool, and interpreter
+# shutdown joins every thread-pool worker. A quit during the first-launch download
+# waited for it until the 8 s exit watchdog, which ends the app with code 1. The
+# files are fetched one at a time in a daemon thread instead, and the caller stops
+# waiting as soon as shutdown begins.
+_ALLOW_PATTERNS = ("config.json", "preprocessor_config.json", "model.bin", "tokenizer.json", "vocabulary.*")
+_SHUTTING_DOWN = threading.Event()
+_WAIT_STEP_S = 0.2
+
+
+def _note_shutdown() -> None:
+    _SHUTTING_DOWN.set()
+
+
+_register_threading_atexit = getattr(threading, "_register_atexit", None)
+if callable(_register_threading_atexit):
+    try:
+        # Runs before concurrent.futures joins its workers (later registrations run first).
+        _register_threading_atexit(_note_shutdown)
+    except RuntimeError:
+        pass
+
+
+def _repo_id(model_name: str) -> str | None:
+    if "/" in model_name:
+        return model_name
+    try:
+        from faster_whisper.utils import _MODELS
+    except Exception:  # noqa: BLE001, RUF100 - unknown layout: let faster-whisper handle it
+        return None
+    return _MODELS.get(model_name)
+
+
+def _download_files(model_name: str, root: Path) -> bool:
+    """Fetch the snapshot's files one by one in this thread (no thread pool)."""
+    repo_id = _repo_id(model_name)
+    if not repo_id:
+        return False
+    import huggingface_hub
+
+    names = [
+        name
+        for name in huggingface_hub.list_repo_files(repo_id)
+        if any(fnmatch.fnmatch(name, pattern) for pattern in _ALLOW_PATTERNS)
+    ]
+    for name in names:
+        if _SHUTTING_DOWN.is_set():
+            return False
+        huggingface_hub.hf_hub_download(repo_id, filename=name, cache_dir=str(root))
+    return bool(names)
+
+
+def download_off_shutdown_path(model_name: str, root: Path) -> bool:
+    """Download ``model_name`` into ``root`` from a daemon thread; give up when shutdown starts.
+
+    Returns True when the files are in place. A False means the normal faster-whisper
+    load decides what happens, as before.
+    """
+    if _SHUTTING_DOWN.is_set():
+        return False
+    if os.environ.get("PYTEST_CURRENT_TEST") and not os.environ.get("VIOLA_TEST_WHISPER_PREFETCH"):
+        # Unit tests that resolve a cold cache must not reach HuggingFace.
+        return False
+    done = threading.Event()
+    outcome: dict[str, object] = {}
+
+    def work() -> None:
+        try:
+            outcome["ok"] = _download_files(model_name, root)
+        except Exception as exc:  # noqa: BLE001, RUF100 - reported to the caller below
+            outcome["error"] = exc
+        finally:
+            done.set()
+
+    threading.Thread(target=work, name="whisper-model-download", daemon=True).start()
+    while not done.wait(_WAIT_STEP_S):
+        if _SHUTTING_DOWN.is_set():
+            logger.info("faster-whisper: quitting during the '%s' download; not waiting for it", model_name)
+            return False
+    if "error" in outcome:
+        raise outcome["error"]  # type: ignore[misc]
+    return bool(outcome.get("ok"))
 
 
 def model_available_offline(model_name: str) -> bool:

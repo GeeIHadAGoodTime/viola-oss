@@ -64,6 +64,8 @@ from mcp_servers.browser.server import (
     _payment_gate_block_from_locator,
     _payment_gate_refusal,
     _payment_probe_strings_from_element_info,
+    _playwright_script_lines,
+    _script_is_playwright,
     _select_dropdown_value,
 )
 from services.browser.api_log_redaction import format_api_log_entry
@@ -103,9 +105,15 @@ _CDP_SUBMIT_CLICK_WAIT_ATTEMPTS = 30
 _CDP_SUBMIT_CLICK_WAIT_INTERVAL_SECONDS = 0.4
 _CDP_SNAPSHOT_MAX_REFS = 60
 _CDP_SNAPSHOT_MAX_TEXT_CHARS = 1800
-_CDP_SNAPSHOT_MAX_SELECTOR_CHARS = 220
+_CDP_SNAPSHOT_MAX_SELECTOR_CHARS = 80
 _CDP_SNAPSHOT_MAX_LLM_CHARS = 12_000
 _CDP_SNAPSHOT_MAX_CONTEXT_CHARS = 360
+_CDP_SNAPSHOT_MAX_CONTROLS = 600
+_CDP_SNAPSHOT_CONTROLS_BUDGET = 5000
+_CDP_SNAPSHOT_MAX_FIND_MATCHES = 25
+_CDP_IMPORTANT_CONTROLS = 12
+# Ranks controls for the short list only; nothing is decided from these words.
+_CDP_SHOPPING_CONTROL_RE = re.compile(r"(?i)add[ _-]*to|addcart|cart|basket|\bbuy\b|checkout")
 _BOGUS_PSEUDO_RE = re.compile(
     r"(?ix)(?::contains\s*\(|:has-text\s*\(|:icontains\s*\(|"
     r"\[\s*innerText\s*[*^$~|]?=\s*|\[\s*textContent\s*[*^$~|]?=\s*|"
@@ -315,9 +323,10 @@ def _cdp_important_controls_from_snapshot(snapshot_text: str) -> list[dict[str, 
                 "duplicate_text": {},
             }
         )
-        if len(controls) >= 12:
-            break
-    return controls
+    # Page order alone fills this list with the site's navigation. A stable sort
+    # keeps page order inside each group.
+    controls.sort(key=lambda item: 0 if _CDP_SHOPPING_CONTROL_RE.search(str(item["text"])) else 1)
+    return controls[:_CDP_IMPORTANT_CONTROLS]
 
 
 def _bogus_selector_error(selector: str) -> str | None:
@@ -723,6 +732,7 @@ async def _cdp_click_mutation_count(*, disconnect: bool = False) -> int:
                     state.observer.disconnect();
                     delete window[key];
                 }
+                if (disconnect) delete window.__violaClickTarget;
                 return count;
             })(%s)""" % json.dumps(bool(disconnect)))
     except _CDP_OPERATION_ERRORS:
@@ -805,7 +815,7 @@ async def _cdp_dom_click_target(selector: str | None, x: float, y: float) -> dic
             if (sel) {
                 try { el = document.querySelector(sel); } catch (err) { el = null; }
             }
-            if (!el) el = document.elementFromPoint(x, y);
+            if (!el) el = window.__violaClickTarget || document.elementFromPoint(x, y);
             if (!el) return {ok: false, error: 'No element found for DOM click fallback'};
             el.scrollIntoView({block: 'center', inline: 'center'});
             if (typeof el.click !== 'function') return {ok: false, error: 'Element is not clickable'};
@@ -968,7 +978,8 @@ class CDPBrowserManager:
     @property
     def page(self) -> Any:
         """Return the current Playwright Page for the Qt overlay."""
-        return self.cdp.page
+        cdp = self.cdp
+        return cdp.bound_page if isinstance(cdp, PlaywrightCDPClient) else cdp.page
 
     @property
     def perception(self) -> Any | None:
@@ -1627,10 +1638,187 @@ async def browser_get_page_info() -> str:
         return _json({"error": "Failed to get page info: %s" % exc})
 
 
+# Controls the accessibility tree cannot see. Older sites build buttons from plain
+# <a onclick>, <span>, <div>, <td> or an image with no alt text, which carry no
+# role, so an ARIA snapshot shows no control at all (or only loose text). RockAuto
+# is the case from 1.0.5 build 9: she never found its add-to-cart control. What
+# marks these elements is how they behave: an inline click handler, a pointer
+# cursor, or a tabindex. Listeners added from script leave no trace in the DOM, so
+# the pointer cursor is what finds those. Only the outermost element of a clickable
+# stack is listed.
+_CDP_DOM_CONTROLS_JS = r"""((limit) => {
+  const semantic = 'a[href],button,input,select,textarea,summary,[role]';
+  const seen = new Set();
+  const found = [];
+  const isShown = (el, r) => {
+    if (r.width < 4 || r.height < 4) return false;
+    const style = getComputedStyle(el);
+    return style.visibility !== 'hidden' && style.display !== 'none' && Number(style.opacity) !== 0;
+  };
+  const clickable = (el) => {
+    if (el.hasAttribute('onclick') || el.hasAttribute('tabindex') && el.tabIndex >= 0) return true;
+    return getComputedStyle(el).cursor === 'pointer';
+  };
+  const speak = (el) => {
+    const own = (el.innerText || el.textContent || '').trim().replace(/\s+/g, ' ');
+    const image = el.tagName === 'IMG' ? el : el.querySelector('img,input[type=image]');
+    const parts = [
+      el.getAttribute('aria-label'), own, el.value, el.getAttribute('title'), el.getAttribute('alt'),
+      image && (image.getAttribute('alt') || image.getAttribute('title')),
+    ];
+    return (parts.find((part) => part && String(part).trim()) || '').toString().trim().substring(0, 100);
+  };
+  const clue = (el) => {
+    const image = el.tagName === 'IMG' ? el : el.querySelector('img,input[type=image]');
+    const file = image && image.getAttribute('src') ? image.getAttribute('src').split('?')[0].split('/').pop() : '';
+    const words = [el.id, typeof el.className === 'string' ? el.className : '', file, el.getAttribute('name')];
+    return words.filter(Boolean).join(' ').substring(0, 80);
+  };
+  // What the control belongs to: twenty identical "Add to Cart" buttons are only
+  // usable if each says which row it is in.
+  const owner = (el) => {
+    const row = el.closest('tr,li,article,[class*="listing"],[class*="product"],[class*="item"]');
+    return row && row !== el ? (row.innerText || '').trim().replace(/\s+/g, ' ').substring(0, 110) : '';
+  };
+  const cssPath = (el) => {
+    const path = [];
+    for (let n = el; n && n.nodeType === 1 && n !== document.documentElement; n = n.parentElement) {
+      if (n.id && !/["'\\\s]/.test(n.id) && document.querySelectorAll('#' + CSS.escape(n.id)).length === 1) {
+        path.unshift('#' + CSS.escape(n.id));
+        return path.join(' > ');
+      }
+      let index = 1;
+      for (let sibling = n.previousElementSibling; sibling; sibling = sibling.previousElementSibling) {
+        if (sibling.tagName === n.tagName) index += 1;
+      }
+      path.unshift(n.tagName.toLowerCase() + ':nth-of-type(' + index + ')');
+    }
+    return path.join(' > ');
+  };
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_ELEMENT);
+  const height = window.innerHeight;
+  for (let el = walker.nextNode(); el; el = walker.nextNode()) {
+    if (el.matches(semantic) && !(el.tagName === 'A' && !el.hasAttribute('href'))) continue;
+    if (el.closest('a[href],button,[role=button],[role=link]')) continue;
+    if (el.tagName === 'BODY' || el.tagName === 'HTML' || el.tagName === 'SVG') continue;
+    if (!clickable(el)) continue;
+    const parent = el.parentElement;
+    if (parent && seen.has(parent)) { seen.add(el); continue; }
+    const r = el.getBoundingClientRect();
+    if (!isShown(el, r)) continue;
+    if (r.width > window.innerWidth * 0.9 && r.height > height * 0.5) continue;
+    seen.add(el);
+    const text = speak(el);
+    const hint = clue(el);
+    if (!text && !hint) continue;
+    found.push({
+      tag: el.tagName.toLowerCase(), text, hint, selector: cssPath(el), context: owner(el),
+      on_screen: r.bottom > 0 && r.top < height,
+    });
+    if (found.length >= limit) break;
+  }
+  return found;
+})(%d)"""
+
+
+async def _cdp_dom_controls(first_ref: int) -> list[dict[str, Any]]:
+    """Find clickable elements with no accessibility role and give them refs."""
+    try:
+        found = await manager.evaluate_js(_CDP_DOM_CONTROLS_JS % _CDP_SNAPSHOT_MAX_CONTROLS)
+    except _CDP_OPERATION_ERRORS:
+        logger.debug("Clickable-element scan failed")
+        return []
+    if not isinstance(found, list):
+        return []
+    controls = [item for item in found if isinstance(item, dict) and item.get("selector")]
+    for offset, item in enumerate(controls):
+        item["ref"] = "@e%d" % (first_ref + offset)
+    _store_cdp_refs(controls)
+    return controls
+
+
+def _cdp_dom_control_line(item: dict[str, Any]) -> str:
+    hint = str(item.get("hint") or "")
+    text = str(item.get("text") or "")
+    context = str(item.get("context") or "")
+    where = "" if item.get("on_screen") else " (scroll needed)"
+    return "- clickable %s %s %s%s%s%s" % (
+        item.get("ref"),
+        item.get("tag"),
+        json.dumps(text),
+        " hint=%s" % json.dumps(hint) if hint else "",
+        " in=%s" % json.dumps(context) if context else "",
+        where,
+    )
+
+
+def _cdp_dom_controls_block(controls: list[dict[str, Any]]) -> str:
+    """The list, shopping controls first and then what is on screen, within a budget."""
+    ranked = sorted(
+        controls,
+        key=lambda item: (
+            0 if _CDP_SHOPPING_CONTROL_RE.search("%s %s" % (item.get("text"), item.get("hint"))) else 1,
+            0 if item.get("on_screen") else 1,
+        ),
+    )
+    lines: list[str] = []
+    used = 0
+    for item in ranked:
+        line = _cdp_dom_control_line(item)
+        if used + len(line) > _CDP_SNAPSHOT_CONTROLS_BUDGET:
+            break
+        lines.append(line)
+        used += len(line) + 1
+    if not lines:
+        return ""
+    return "Clickable elements with no accessibility role (use the @eN ref):\n" + "\n".join(lines)
+
+
+def _cdp_find_in_snapshot(query: str, annotated: str, controls: list[dict[str, Any]]) -> list[str]:
+    """Controls on the whole page that best match ``query``, not just the cut-down view.
+
+    A word counts when it appears in the line, ignoring case and separators, so
+    "add to cart" also reaches an icon whose only clue is ``addcart.png``.
+    """
+    words = [word for word in re.split(r"\W+", query.lower()) if word]
+    if not words:
+        return []
+    needed = max(1, (len(words) + 1) // 2)
+    scored: list[tuple[int, int, str]] = []
+    rows = [line for line in annotated.splitlines() if re.search(r"@e\d+", line)]
+    rows += [_cdp_dom_control_line(item) for item in controls]
+    for index, row in enumerate(rows):
+        lowered = row.lower()
+        hits = sum(1 for word in words if word in lowered)
+        if hits >= needed:
+            scored.append((-hits, index, row.strip()))
+    scored.sort()
+    return [row for _hits, _index, row in scored[:_CDP_SNAPSHOT_MAX_FIND_MATCHES]]
+
+
+def _cdp_fit_snapshot(annotated: str, controls_block: str, preview: str) -> str:
+    """Fit the snapshot to the model's budget without losing the controls.
+
+    A plain cut keeps the top of the page, so a long parts table loses everything
+    below the navigation. Lines with refs are what can be acted on: when the page
+    is too long they survive first, and the rest of the structure goes.
+    """
+    sections = [part for part in (controls_block, annotated, preview) if part]
+    whole = "\n\n".join(sections)
+    if len(whole) <= _CDP_SNAPSHOT_MAX_LLM_CHARS:
+        return whole
+    room = _CDP_SNAPSHOT_MAX_LLM_CHARS - len(controls_block) - 2
+    with_refs = "\n".join(line for line in annotated.splitlines() if re.search(r"@e\d+", line))
+    body = annotated if len(annotated) <= room else with_refs
+    return "\n\n".join(part for part in (controls_block, _truncate(body, room)) if part)
+
+
 @server.tool(
     description=(
         "Get the page's interactive snapshot with @eN refs and selector_for_ref entries for clicking, "
-        "filling, and selecting elements." + _CDP_REF_USAGE_DOC
+        "filling, and selecting elements. Clickable elements with no accessibility role are listed too, "
+        "with the row they belong to. On a long page pass find='add to cart' (any words) to search every "
+        "control on the whole page." + _CDP_REF_USAGE_DOC
     ),
     annotations=_SAFE,
     meta={"risk": "safe", "anthropic/alwaysLoad": True},
@@ -1638,8 +1826,13 @@ async def browser_get_page_info() -> str:
 async def browser_snapshot(
     wait_for_stable: bool = False,
     mode: str = "full",
+    find: str = "",
 ) -> str:
-    """Get fresh page state with @eN refs for CDP browser tools."""
+    """Get fresh page state with @eN refs for CDP browser tools.
+
+    ``find`` also returns every line of the whole page that holds all its words,
+    which reaches controls a long page's cut-down view has dropped.
+    """
     if block := await _browser_payment_observation_refusal("browser_snapshot"):
         _clear_cdp_refs()
         return block
@@ -1654,6 +1847,10 @@ async def browser_snapshot(
         annotated, _ = _inject_refs_into_aria_snapshot(aria_text, browser_manager=_CDP_REF_MANAGER)
         visible_refs = set(re.findall(r"e\d+", annotated))
         _CDP_REF_MANAGER.restrict_ref_map(visible_refs)
+        next_ref = max((int(ref) for ref in re.findall(r"@e(\d+)", annotated)), default=0) + 1
+        dom_controls = await _cdp_dom_controls(next_ref)
+        controls_block = _cdp_dom_controls_block(dom_controls)
+        preview = ""
         if mode == "interactive":
             snapshot_text = "\n".join(line for line in annotated.splitlines() if re.search(r"@e\d+", line))
         else:
@@ -1663,24 +1860,44 @@ async def browser_snapshot(
             except _CDP_OPERATION_ERRORS:
                 body_text = ""
             if body_text:
-                snapshot_text = "%s\n\nPage text preview:\n%s" % (
-                    snapshot_text,
-                    _truncate(str(body_text).replace("\r", " "), _CDP_SNAPSHOT_MAX_TEXT_CHARS),
+                preview = "Page text preview:\n%s" % _truncate(
+                    str(body_text).replace("\r", " "), _CDP_SNAPSHOT_MAX_TEXT_CHARS
                 )
-        selector_for_ref = {
-            "@%s" % key.lstrip("@"): value for key, value in _CDP_REF_SELECTOR_MAP.items() if key.startswith("@")
-        }
-        important_controls = _cdp_important_controls_from_snapshot(snapshot_text)
-        snapshot_original_chars = len(snapshot_text)
+        important_controls = _cdp_important_controls_from_snapshot(annotated)
+        shopping = [
+            {
+                "ref": item["ref"],
+                "role": "clickable",
+                "text": item.get("text") or item.get("hint") or "",
+                "state": {},
+                "context": str(item.get("context") or ""),
+                "duplicate_text": {},
+            }
+            for item in dom_controls
+            if _CDP_SHOPPING_CONTROL_RE.search("%s %s" % (item.get("text"), item.get("hint")))
+        ]
+        important_controls = shopping + important_controls
+        important_controls = important_controls[:_CDP_IMPORTANT_CONTROLS]
+        full_text = "\n\n".join(part for part in (annotated, controls_block, preview) if part)
+        snapshot_original_chars = len(full_text)
         # #579: compute page_health BEFORE truncation, off the full snapshot
         # text (which already includes the body-text preview above) so a
         # Cloudflare / JS-challenge interstitial on the desktop CDP surface
         # surfaces the same bot_protection fact the #575 loop halt consumes.
         page_title = await manager.get_title()
-        page_health = detect_page_health(page_title, None, snapshot_text)
+        page_health = detect_page_health(page_title, None, full_text)
         snapshot_truncated = snapshot_original_chars > _CDP_SNAPSHOT_MAX_LLM_CHARS
-        if snapshot_truncated:
-            snapshot_text = _truncate(snapshot_text, _CDP_SNAPSHOT_MAX_LLM_CHARS)
+        snapshot_text = _cdp_fit_snapshot(snapshot_text, controls_block, preview)
+        find_matches = _cdp_find_in_snapshot(find, annotated, dom_controls) if find.strip() else []
+        # Only the refs the model can see, and the short form of each: every ref
+        # resolves here, so a long CSS path would only cost tokens on every step.
+        shown_refs = set(re.findall(r"@e\d+", " ".join([snapshot_text, *find_matches])))
+        shown_refs.update(str(item.get("ref")) for item in important_controls)
+        selector_for_ref = {
+            "@%s" % key.lstrip("@"): _compact_cdp_selector_for_llm(key, value)
+            for key, value in _CDP_REF_SELECTOR_MAP.items()
+            if key.startswith("@") and key in shown_refs
+        }
         result = {
             "snapshot": snapshot_text.strip(),
             "url": await manager.get_url(),
@@ -1693,9 +1910,31 @@ async def browser_snapshot(
         }
         if page_health:
             result["page_health"] = page_health
+        if find.strip():
+            result["find_matches"] = find_matches
+        elif snapshot_truncated:
+            result["snapshot_hint"] = (
+                "This page is longer than this view. browser_snapshot(find='add to cart') "
+                "searches the whole page for a control by its words."
+            )
         return _json(result)
     except _CDP_OPERATION_ERRORS as exc:
         return _json({"error": "Snapshot failed: %s" % exc})
+
+
+async def visible_page_health() -> dict[str, Any]:
+    """Read-only look at the visible page, for waiting on a check the user is doing."""
+    await manager.ensure_connected()
+    info = await manager.evaluate_js("""(() => ({
+            title: document.title || '',
+            url: location.href,
+            text: ((document.body && document.body.innerText) || '').substring(0, 5000),
+        }))()""")
+    if not isinstance(info, dict):
+        return {}
+    info["page_health"] = detect_page_health(info.get("title"), None, str(info.get("text") or "")) or {}
+    info.pop("text", None)
+    return info
 
 
 async def _attach_cdp_interaction_snapshot(result: dict[str, Any]) -> None:
@@ -1713,6 +1952,9 @@ async def _attach_cdp_interaction_snapshot(result: dict[str, Any]) -> None:
         return
 
     result["snapshot"] = snapshot_payload.get("snapshot", "")
+    if snapshot_payload.get("page_health"):
+        # The page a click led to can be a person check; the loop reads this field.
+        result["page_health"] = snapshot_payload["page_health"]
     result["selector_for_ref"] = snapshot_payload.get("selector_for_ref", {})
     result["refs_resolve_server_side"] = bool(snapshot_payload.get("refs_resolve_server_side"))
     result["important_controls"] = snapshot_payload.get("important_controls", [])
@@ -1727,6 +1969,44 @@ async def _attach_cdp_interaction_snapshot(result: dict[str, Any]) -> None:
 # ===========================================================================
 # INTERACTION TOOLS
 # ===========================================================================
+
+
+async def _locator_click_target(ref_locator: Any, name: str) -> dict[str, Any]:
+    """Resolve a Playwright locator to viewport coordinates and remember the element."""
+    try:
+        count = await ref_locator.count()
+        if count == 0:
+            return {
+                "error": "Ref '%s' no longer resolves on the current page." % name,
+                "stale_ref": True,
+                "requested_ref": name,
+            }
+        locator = ref_locator.first
+        await locator.scroll_into_view_if_needed(timeout=5000)
+        box = await locator.bounding_box(timeout=5000)
+        if not box:
+            return {"error": "Ref '%s' has no visible bounding box" % name}
+        try:
+            clicked_text = await locator.inner_text(timeout=1000)
+        except _CDP_OPERATION_ERRORS:
+            clicked_text = ""
+        try:
+            href = await locator.evaluate(
+                "el => { window.__violaClickTarget = el; "
+                "return el.closest && el.closest('a[href]') ? el.closest('a[href]').href : ''; }"
+            )
+        except _CDP_OPERATION_ERRORS:
+            href = ""
+        return {
+            "x": float(box["x"]) + float(box["width"]) / 2,
+            "y": float(box["y"]) + float(box["height"]) / 2,
+            "clicked_text": str(clicked_text).strip()[:80],
+            "match_count": count,
+            "ref": name,
+            "href": str(href or ""),
+        }
+    except _CDP_OPERATION_ERRORS as exc:
+        return {"error": "Could not resolve ref '%s': %s" % (name, exc)}
 
 
 async def _find_element_center(selector_or_text: str, text_filter: str = "") -> dict[str, Any]:
@@ -1744,39 +2024,7 @@ async def _find_element_center(selector_or_text: str, text_filter: str = "") -> 
             "requested_ref": selector_or_text,
         }
     if ref_locator is not None:
-        try:
-            count = await ref_locator.count()
-            if count == 0:
-                return {
-                    "error": "Ref '%s' no longer resolves on the current page." % selector_or_text,
-                    "stale_ref": True,
-                    "requested_ref": selector_or_text,
-                }
-            locator = ref_locator.first
-            await locator.scroll_into_view_if_needed(timeout=5000)
-            box = await locator.bounding_box(timeout=5000)
-            if not box:
-                return {"error": "Ref '%s' has no visible bounding box" % selector_or_text}
-            try:
-                clicked_text = await locator.inner_text(timeout=1000)
-            except _CDP_OPERATION_ERRORS:
-                clicked_text = ""
-            try:
-                href = await locator.evaluate(
-                    "el => el.closest && el.closest('a[href]') ? el.closest('a[href]').href : ''"
-                )
-            except _CDP_OPERATION_ERRORS:
-                href = ""
-            return {
-                "x": float(box["x"]) + float(box["width"]) / 2,
-                "y": float(box["y"]) + float(box["height"]) / 2,
-                "clicked_text": str(clicked_text).strip()[:80],
-                "match_count": count,
-                "ref": selector_or_text,
-                "href": str(href or ""),
-            }
-        except _CDP_OPERATION_ERRORS as exc:
-            return {"error": "Could not resolve ref '%s': %s" % (selector_or_text, exc)}
+        return await _locator_click_target(ref_locator, selector_or_text)
 
     resolved_selector = _resolve_cdp_selector(selector_or_text)
     if resolved_selector and resolved_selector != selector_or_text:
@@ -1803,6 +2051,7 @@ async def _find_element_center(selector_or_text: str, text_filter: str = "") -> 
                 }
                 if (els.length === 0) return { found: false };
                 const el = els[0];
+                window.__violaClickTarget = el;
                 el.scrollIntoView({block: 'center', inline: 'center'});
                 const r = el.getBoundingClientRect();
                 return {
@@ -1829,6 +2078,48 @@ async def _find_element_center(selector_or_text: str, text_filter: str = "") -> 
                 "href": result.get("href", ""),
             }
 
+    # Strategy 1b: a control whose whole visible name is the text. "Add" must find
+    # the Add button, not the first link that merely contains those letters.
+    result = await manager.evaluate_js("""((searchText) => {
+            const norm = (s) => String(s || '').toLowerCase().replace(/\s+/g, ' ').trim();
+            const wanted = norm(searchText);
+            const controls = Array.from(document.querySelectorAll(
+                'a[href], button, [role="button"], [role="link"], input[type="submit"], '
+                + 'input[type="button"], input[type="image"]'
+            )).filter((el) => [el.innerText, el.value, el.alt, el.getAttribute('aria-label')]
+                .some((name) => norm(name) === wanted));
+            const shown = controls.filter((el) => {
+                const r = el.getBoundingClientRect();
+                return r.width > 0 && r.height > 0;
+            });
+            if (!shown.length) return { found: false };
+            const onScreen = shown.find((el) => {
+                const r = el.getBoundingClientRect();
+                return r.bottom > 0 && r.top < window.innerHeight;
+            });
+            const el = onScreen || shown[0];
+            window.__violaClickTarget = el;
+            el.scrollIntoView({block: 'nearest', inline: 'nearest'});
+            const r = el.getBoundingClientRect();
+            return {
+                exactName: true,
+                found: true,
+                x: r.left + r.width / 2,
+                y: r.top + r.height / 2,
+                text: (el.innerText || el.value || el.alt || el.getAttribute('aria-label') || '').trim().substring(0, 80),
+                href: el.closest('a[href]') ? el.closest('a[href]').href : '',
+                count: shown.length,
+            };
+        })(%s)""" % json.dumps(search_text))
+    if isinstance(result, dict) and result.get("exactName"):
+        return {
+            "x": result["x"],
+            "y": result["y"],
+            "clicked_text": result.get("text", ""),
+            "match_count": result.get("count", 1),
+            "href": result.get("href", ""),
+        }
+
     # Strategy 2: visible link text
     result = await manager.evaluate_js("""((searchText) => {
             const lowerSearch = searchText.toLowerCase();
@@ -1836,6 +2127,7 @@ async def _find_element_center(selector_or_text: str, text_filter: str = "") -> 
             for (const el of links) {
                 const t = (el.innerText || el.getAttribute('aria-label') || el.textContent || '').trim();
                 if (t.toLowerCase().includes(lowerSearch)) {
+                    window.__violaClickTarget = el;
                     el.scrollIntoView({block: 'center', inline: 'center'});
                     const r = el.getBoundingClientRect();
                     if (r.width > 0 && r.height > 0) {
@@ -1873,6 +2165,7 @@ async def _find_element_center(selector_or_text: str, text_filter: str = "") -> 
             for (const el of btns) {
                 const t = (el.innerText || el.value || '').trim();
                 if (t.toLowerCase().includes(lowerSearch)) {
+                    window.__violaClickTarget = el;
                     el.scrollIntoView({block: 'center', inline: 'center'});
                     const r = el.getBoundingClientRect();
                     if (r.width > 0 && r.height > 0) {
@@ -1906,6 +2199,7 @@ async def _find_element_center(selector_or_text: str, text_filter: str = "") -> 
                 if (node.textContent.toLowerCase().includes(lowerSearch)) {
                     const el = node.parentElement;
                     if (el) {
+                        window.__violaClickTarget = el;
                         el.scrollIntoView({block: 'center', inline: 'center'});
                         const r = el.getBoundingClientRect();
                         if (r.width > 0 && r.height > 0) {
@@ -1961,8 +2255,265 @@ async def _find_element_center(selector_or_text: str, text_filter: str = "") -> 
     return payload
 
 
-async def _do_click(selector: str, text: str = "") -> str:
-    """Click an element via Playwright. Internal handler for browser_interact(action='click')."""
+# ---------------------------------------------------------------------------
+# Verified clicks
+# ---------------------------------------------------------------------------
+# A click is a coordinate, so it hits whatever is on top at that point. Playwright
+# only scrolls a target that is outside the viewport: a button that is inside the
+# viewport but under a sticky header stays there, and the header takes the click
+# (1.0.5 build 9, High 13: five add clicks on Walmart went to header links and all
+# reported success). So the page is asked what is really at the point, the target
+# is scrolled clear of fixed and sticky bars, and a guard listens for the click
+# itself: a click that reaches anything else is stopped before the page acts on it
+# and comes back as a failure naming what it hit.
+
+_CDP_CLICK_JS_HELPERS = r"""
+  const parentOf = (n) => (n ? (n.parentNode || n.host || null) : null);
+  const inside = (n, a) => { for (; n; n = parentOf(n)) { if (n === a) return true; } return false; };
+  const deepHit = (x, y) => {
+    let h = document.elementFromPoint(x, y);
+    while (h && h.shadowRoot) {
+      const i = h.shadowRoot.elementFromPoint(x, y);
+      if (!i || i === h) break;
+      h = i;
+    }
+    return h;
+  };
+  const CONTROL = 'a[href],button,input,select,textarea,label,summary,[role=button],[role=link],'
+    + '[role=menuitem],[role=tab],[role=checkbox],[role=radio],[role=switch],[role=option]';
+  const lands = (el, h) => {
+    if (!h) return false;
+    if (inside(h, el)) return true;
+    const owner = el.closest ? el.closest(CONTROL) : null;
+    if (owner && inside(h, owner)) return true;
+    return Array.from(el.labels || []).some((label) => inside(h, label));
+  };
+  const describe = (el) => {
+    if (!el || !el.getAttribute) return {};
+    const link = el.closest ? el.closest('a[href]') : null;
+    const named = (link || el);
+    return {
+      tag: (named.tagName || '').toLowerCase(),
+      role: named.getAttribute('role') || '',
+      text: (named.innerText || named.value || named.getAttribute('aria-label') || named.textContent || '')
+        .trim().replace(/\s+/g, ' ').substring(0, 80),
+      href: link ? link.href : '',
+    };
+  };
+"""
+
+_CDP_CLICK_PREPARE_JS = (
+    r"""(async () => {"""
+    + _CDP_CLICK_JS_HELPERS
+    + r"""
+  let el = window.__violaClickTarget;
+  if (!el || !el.isConnected) return {violaPrepared: true, ok: false, reason: 'detached'};
+  const box = () => el.getBoundingClientRect();
+  if (box().width < 1 || box().height < 1) {
+    const label = Array.from(el.labels || []).find((item) => item.getBoundingClientRect().width >= 1);
+    if (label) { el = label; window.__violaClickTarget = label; }
+  }
+  const settle = async () => {
+    let previous = '';
+    for (let i = 0; i < 4; i += 1) {
+      const r = box();
+      const now = [r.left, r.top, r.width, r.height].join();
+      if (now === previous) return;
+      previous = now;
+      await new Promise((resolve) => setTimeout(resolve, 60));
+    }
+  };
+  const pick = () => {
+    const r = box();
+    if (r.width < 1 || r.height < 1) return {reason: 'no_size'};
+    let blocker = null;
+    let onScreen = false;
+    for (const [fx, fy] of [[0.5, 0.5], [0.5, 0.3], [0.5, 0.7], [0.25, 0.5], [0.75, 0.5]]) {
+      const x = r.left + r.width * fx;
+      const y = r.top + r.height * fy;
+      if (x < 0 || y < 0 || x >= window.innerWidth || y >= window.innerHeight) continue;
+      onScreen = true;
+      const h = deepHit(x, y);
+      if (lands(el, h)) return {x, y};
+      blocker = blocker || h;
+    }
+    return onScreen ? {reason: 'covered', blocker} : {reason: 'offscreen'};
+  };
+  const stuckBar = (n) => {
+    for (; n && n.nodeType === 1; n = parentOf(n)) {
+      const position = getComputedStyle(n).position;
+      if (position === 'fixed' || position === 'sticky') return n;
+    }
+    return null;
+  };
+  const scroller = () => {
+    for (let n = el.parentElement; n && n !== document.body; n = n.parentElement) {
+      const overflow = getComputedStyle(n).overflowY;
+      if ((overflow === 'auto' || overflow === 'scroll') && n.scrollHeight > n.clientHeight) return n;
+    }
+    return window;
+  };
+  const center = () => el.scrollIntoView({block: 'center', inline: 'center', behavior: 'instant'});
+  let scrolled = false;
+  let last = {};
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    await settle();
+    const found = pick();
+    if (found.x !== undefined) {
+      return {violaPrepared: true, ok: true, x: found.x, y: found.y, scrolled};
+    }
+    last = found;
+    if (found.reason === 'no_size') break;
+    scrolled = true;
+    const bar = found.reason === 'covered' ? stuckBar(found.blocker) : null;
+    if (!bar) {
+      if (attempt > 0 && found.reason === 'covered') break;
+      center();
+      continue;
+    }
+    const b = bar.getBoundingClientRect();
+    const r = box();
+    const above = (b.top + b.bottom) / 2 < window.innerHeight / 2;
+    const delta = above ? r.top - (b.bottom + 16) : r.bottom - (b.top - 16);
+    scroller().scrollBy({top: delta, left: 0, behavior: 'instant'});
+  }
+  return {violaPrepared: true, ok: false, reason: last.reason || 'covered', hit: describe(last.blocker)};
+})()"""
+)
+
+_CDP_CLICK_ARM_JS = (
+    r"""((x, y) => {"""
+    + _CDP_CLICK_JS_HELPERS
+    + r"""
+  const el = window.__violaClickTarget;
+  if (!el || !el.isConnected) return {violaGuard: true, armed: false, reason: 'detached'};
+  const h = deepHit(x, y);
+  if (!lands(el, h)) return {violaGuard: true, armed: false, reason: 'moved', hit: describe(h)};
+  const previous = window.__violaClickGuard;
+  if (previous && previous.off) previous.off();
+  const state = {fired: false, landed: null, hit: null};
+  const types = ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click', 'auxclick', 'dblclick'];
+  const judge = (event) => {
+    if (!event.isTrusted || Math.abs(event.clientX - x) > 2 || Math.abs(event.clientY - y) > 2) return;
+    if (state.landed === true) return;
+    if (state.landed === null) {
+      state.fired = true;
+      const path = event.composedPath ? event.composedPath() : [];
+      const reached = path[0] || event.target;
+      state.landed = lands(el, reached);
+      if (state.landed) return;
+      state.hit = describe(reached);
+    }
+    event.stopImmediatePropagation();
+    event.preventDefault();
+  };
+  state.off = () => types.forEach((type) => window.removeEventListener(type, judge, true));
+  types.forEach((type) => window.addEventListener(type, judge, true));
+  setTimeout(state.off, 5000);
+  window.__violaClickGuard = state;
+  return {violaGuard: true, armed: true};
+})(%s, %s)"""
+)
+
+_CDP_CLICK_READ_JS = r"""(() => {
+  const state = window.__violaClickGuard;
+  if (!state) return {violaGuard: true, present: false};
+  if (state.off) state.off();
+  delete window.__violaClickGuard;
+  return {violaGuard: true, present: true, fired: state.fired, landed: state.landed, hit: state.hit};
+})()"""
+
+_CDP_CLICK_ATTEMPTS = 2
+
+
+def _cdp_hit_label(hit: Any) -> str:
+    """Name what a click hit, in the words a model or person can act on."""
+    if not isinstance(hit, dict) or not hit:
+        return "something else on the page"
+    tag = str(hit.get("tag") or "element")
+    kind = {"a": "link", "button": "button", "input": "field", "img": "image"}.get(tag, tag)
+    text = str(hit.get("text") or "").strip()
+    label = "%s %s" % (kind, json.dumps(text)) if text else kind
+    href = str(hit.get("href") or "")
+    return "%s (%s)" % (label, href) if href else label
+
+
+def _cdp_click_target_name(target: dict[str, Any]) -> str:
+    return str(target.get("clicked_text") or target.get("ref") or target.get("selector") or "the target")
+
+
+async def _cdp_prepare_click_point(target: dict[str, Any]) -> dict[str, Any] | None:
+    """Move the target clear of whatever covers it and pick a point that reaches it.
+
+    Returns None when the point is good (``target`` then holds it), or the
+    failure to return: nothing has been clicked at that stage.
+    """
+    prepared = await manager.evaluate_js(_CDP_CLICK_PREPARE_JS)
+    if not isinstance(prepared, dict) or not prepared.get("violaPrepared"):
+        target["landing_unverified"] = True
+        return None
+    if prepared.get("ok"):
+        target["x"] = float(prepared["x"])
+        target["y"] = float(prepared["y"])
+        if prepared.get("scrolled"):
+            target["scrolled_clear"] = True
+        return None
+    name = _cdp_click_target_name(target)
+    reason = str(prepared.get("reason") or "covered")
+    payload: dict[str, Any] = {"ok": False, "click_not_sent": True, "target": name, "reason": reason}
+    if reason == "covered":
+        hit = prepared.get("hit")
+        payload["covered_by"] = hit
+        payload["error"] = (
+            "Nothing was clicked: %s is on top of %s and could not be scrolled clear. "
+            "Close or deal with it first." % (_cdp_hit_label(hit), json.dumps(name))
+        )
+    elif reason == "detached":
+        payload["stale_ref"] = True
+        payload["error"] = "Nothing was clicked: %s is no longer on the page." % json.dumps(name)
+    else:
+        payload["error"] = "Nothing was clicked: %s is not showing on the page." % json.dumps(name)
+    return payload
+
+
+async def _cdp_read_click_guard() -> dict[str, Any]:
+    """What the click reached. A page that has already navigated has no guard left."""
+    try:
+        landing = await manager.evaluate_js(_CDP_CLICK_READ_JS)
+    except _CDP_OPERATION_ERRORS:
+        logger.debug("Click guard not readable after the click; the page moved on")
+        return {"violaGuard": True, "present": False}
+    return landing if isinstance(landing, dict) else {}
+
+
+def _cdp_click_miss_payload(target: dict[str, Any], landing: dict[str, Any], url: str) -> dict[str, Any]:
+    name = _cdp_click_target_name(target)
+    if landing.get("fired"):
+        hit = landing.get("hit")
+        return {
+            "ok": False,
+            "click_missed": True,
+            "target": name,
+            "landed_on": hit,
+            "url": url,
+            "error": "The click on %s did not reach it: it hit %s, so it was stopped and nothing happened."
+            % (json.dumps(name), _cdp_hit_label(hit)),
+        }
+    return {
+        "ok": False,
+        "click_not_delivered": True,
+        "target": name,
+        "url": url,
+        "error": "The click on %s never reached the page, so nothing happened." % json.dumps(name),
+    }
+
+
+async def _do_click(selector: str, text: str = "", *, locator: Any = None) -> str:
+    """Click an element via Playwright. Internal handler for browser_interact(action='click').
+
+    ``locator`` clicks a Playwright locator already built by a script line, through
+    the same checks; ``selector`` then only names it in the result.
+    """
     try:
         await manager.ensure_connected()
 
@@ -1972,7 +2523,10 @@ async def _do_click(selector: str, text: str = "") -> str:
         field_count_before = await _cdp_form_field_count()
 
         # Find element and click
-        target = await _find_element_center(selector, text)
+        if locator is not None:
+            target = await _locator_click_target(locator, selector)
+        else:
+            target = await _find_element_center(selector, text)
         if "error" in target:
             payload = {
                 "ok": False,
@@ -1985,19 +2539,42 @@ async def _do_click(selector: str, text: str = "") -> str:
                 payload["requested_ref"] = target.get("requested_ref")
             return _json(payload)
 
-        gate_info = await _cdp_element_info_at_point(float(target["x"]), float(target["y"]))
-        if blocked := await _cdp_action_gate_block_from_info(
-            gate_info,
-            selector,
-            text,
-            str(target.get("clicked_text") or ""),
-        ):
-            return _json({"ok": False, "error": blocked})
+        mutation_count_before = await _cdp_begin_click_effect_watch()
+        gate_info: dict[str, Any] = {}
+        landing: dict[str, Any] = {}
+        for _attempt in range(_CDP_CLICK_ATTEMPTS):
+            if failure := await _cdp_prepare_click_point(target):
+                await _cdp_click_mutation_count(disconnect=True)
+                return _json(failure)
+            # The gates judge the element at the final point, so they run after
+            # every move and immediately before the click that uses it.
+            gate_info = await _cdp_element_info_at_point(float(target["x"]), float(target["y"]))
+            if blocked := await _cdp_action_gate_block_from_info(
+                gate_info,
+                selector,
+                text,
+                str(target.get("clicked_text") or ""),
+            ):
+                await _cdp_click_mutation_count(disconnect=True)
+                return _json({"ok": False, "error": blocked})
+            armed = await manager.evaluate_js(_CDP_CLICK_ARM_JS % (json.dumps(target["x"]), json.dumps(target["y"])))
+            guarded = isinstance(armed, dict) and bool(armed.get("violaGuard"))
+            if guarded and not armed.get("armed"):
+                # The page moved between the check and the click: nothing was sent.
+                landing = {"present": True, "fired": True, "landed": False, "hit": armed.get("hit")}
+                continue
+
+            await manager.click(target["x"], target["y"])
+
+            landing = await _cdp_read_click_guard() if guarded else {}
+            if not landing.get("present") or landing.get("landed"):
+                break
+        if landing.get("present") and not landing.get("landed"):
+            await _cdp_click_mutation_count(disconnect=True)
+            return _json(_cdp_click_miss_payload(target, landing, await manager.get_url()))
+
         submit_control_click = _cdp_info_is_submit_control(gate_info)
         dom_click_fallback = False
-        mutation_count_before = await _cdp_begin_click_effect_watch()
-
-        await manager.click(target["x"], target["y"])
 
         if submit_control_click:
             changed = await _cdp_wait_for_click_effect(
@@ -2034,7 +2611,14 @@ async def _do_click(selector: str, text: str = "") -> str:
         clicked_href = str(target.get("href") or "")
         href_followed = False
         href_follow_error = ""
-        if not submit_control_click and clicked_href and current_url == url_before:
+        if (
+            not submit_control_click
+            and clicked_href
+            and current_url == url_before
+            # A button inside a product link that did its job must not then be
+            # navigated away by the link around it.
+            and await _cdp_page_fingerprint() == fingerprint_before
+        ):
             href_url = clicked_href
             if href_url != url_before:
                 href_follow_error = _validate_url(href_url) or ""
@@ -2151,10 +2735,14 @@ async def _do_click(selector: str, text: str = "") -> str:
         if result.get("refs_invalidated"):
             await _attach_cdp_interaction_snapshot(result)
 
+        if target.get("scrolled_clear"):
+            result["scrolled_clear"] = True
+        result["landing_verified"] = not target.get("landing_unverified")
+        result.setdefault("ok", True)
         await _cdp_click_mutation_count(disconnect=True)
         return _json(result)
     except Exception as exc:
-        return _json({"error": "Click failed: %s" % exc})
+        return _json({"ok": False, "error": "Click failed: %s" % exc})
 
 
 async def _do_type(selector: str, text: str, clear_first: bool = True) -> str:
@@ -2796,6 +3384,14 @@ async def browser_evaluate(script: str) -> str:
         return _json({"error": "Evaluate failed: %s" % exc})
 
 
+async def _script_click(locator: Any, desc: str) -> str:
+    """A click from a script gets the same landing checks as browser_interact."""
+    outcome = json.loads(await _do_click(desc, locator=locator))
+    if outcome.get("ok") is False or outcome.get("error"):
+        raise RuntimeError(str(outcome.get("error") or "The click on %s had no visible effect" % desc))
+    return "Clicked %s (now on %s)" % (desc, outcome.get("url") or "the same page")
+
+
 async def _execute_overlay_playwright_line(line: str) -> str | None:
     stripped = line.strip().rstrip(";")
     if stripped == "page.url":
@@ -2804,14 +3400,16 @@ async def _execute_overlay_playwright_line(line: str) -> str | None:
         stripped = "await " + stripped
     if stripped.startswith("await page.navigate("):
         stripped = stripped.replace("await page.navigate(", "await page.goto(", 1)
-    return await _execute_playwright_line(manager.page, stripped)
+    return await _execute_playwright_line(manager.page, stripped, click_fn=_script_click, press_fn=browser_press_key)
 
 
 @server.tool(
     description=(
         "Execute browser code. For simple DOM reads pass JavaScript directly, e.g. "
         "document.title, return document.title, evaluate(document.title), or evaluate document.title. "
-        "For multi-step actions pass Playwright page.click/page.fill/page.evaluate lines. "
+        "For multi-step actions pass straight-line Playwright in Python or JavaScript spelling, for example "
+        "await page.get_by_role('button', name='Add').first.click(), page.keyboard.press('Enter'), "
+        "page.wait_for_load_state('load'). Clicks get the same landing check as browser_interact. "
         "JavaScript exceptions return success=false instead of opaque success output."
     ),
     annotations=_CONFIRM,
@@ -2845,7 +3443,7 @@ async def browser_run_script(script: str) -> str:
                 script[:200],
             )
             return _json({"ok": False, "error": sig_block, "success": False})
-        if not any("page." in line or "asyncio.sleep" in line for line in lines):
+        if not _script_is_playwright(lines):
             if blocked := blocked_js_pattern(script):
                 return _json(
                     {
@@ -2871,6 +3469,7 @@ async def browser_run_script(script: str) -> str:
                 }
             )
 
+        lines = _playwright_script_lines(script)
         for index, line in enumerate(lines, start=1):
             try:
                 result = await _execute_overlay_playwright_line(line)
@@ -2904,7 +3503,9 @@ async def browser_run_script(script: str) -> str:
             }
         )
     except Exception as exc:
-        return _json({"error": "Script execution failed: %s" % exc, "success": False})
+        # The command error's own text is a generic retry line; the model needs the cause.
+        detail = getattr(exc, "error", "") or exc
+        return _json({"error": "Script execution failed: %s" % str(detail)[:400], "success": False})
 
 
 @server.tool(

@@ -293,7 +293,7 @@ def _looks_like_powershell(command: str, first_exe: str) -> bool:
         first_exe.startswith("get-")
         or first_exe.startswith("select-")
         or first_exe.startswith("set-")
-        or first_exe in {"cat", "gci", "gc", "gps", "ls", "pwd", "type", "write-output", "where-object"}
+        or first_exe in {"cat", "gci", "gc", "gps", "ls", "pwd", "test-path", "type", "write-output", "where-object"}
         or "$env:" in command
     )
 
@@ -304,6 +304,48 @@ def _requires_shell_interpretation(command: str, shell: ShellName) -> bool:
     if shell == "cmd" and _extract_executable(_first_token(command)) in {"dir", "echo", "type", "ver"}:
         return True
     return len(_split_command_segments(command)) > 1
+
+
+def _split_windows_words(command: str) -> list[str]:
+    """Split a command line the way a Windows program receives it.
+
+    Double quotes group and are not part of the argument; backslash-quote is a
+    literal quote. ``shlex`` in non-POSIX mode kept the quotes, and Windows then
+    passed them on: ``python "C:/a/primes.py"`` looked for a file whose name
+    starts with a quote and exited 2, though the same line works in a normal
+    shell (1.0.5 laptop K1).
+    """
+    words: list[str] = []
+    current: list[str] = []
+    quoted = False
+    started = False
+    for char in command:
+        if char == '"':
+            if current and current[-1] == "\\":
+                current[-1] = '"'
+            else:
+                quoted = not quoted
+                started = True
+        elif char.isspace() and not quoted:
+            if started:
+                words.append("".join(current))
+                current = []
+                started = False
+        else:
+            current.append(char)
+            started = True
+    if quoted:
+        raise ValueError("No closing quotation")
+    if started:
+        words.append("".join(current))
+    return words
+
+
+def _argv_for_direct_run(command: str, shell: ShellName) -> list[str]:
+    """Split a command for running without a shell, into what the program should receive."""
+    if shell == "bash":
+        return shlex.split(command, posix=True)
+    return _split_windows_words(command)
 
 
 def _decision_payload(decision: ShellSafetyDecision) -> dict[str, str | bool | None]:
@@ -359,6 +401,22 @@ _SENSITIVE_READ_RE = re.compile(
 )
 
 
+_WINDOWS_HOME_VARIABLE_RE = re.compile(r"\$\{HOME\}|\$HOME\b|\$env:USERPROFILE\b", re.IGNORECASE)
+
+
+def _with_windows_home_written_out(command: str) -> str:
+    """Write out the home folder where a model used a POSIX or PowerShell variable.
+
+    Windows runs a plain command in cmd.exe, which does not know ``$HOME``. So
+    ``dir "$HOME/Desktop"`` asked for confirmation (``$`` looks like bash), then
+    found nothing, and each new spelling the model tried asked again: "run dir on
+    my desktop" looped on confirmations at Symphony.
+    """
+    if sys.platform != "win32" or "$" not in command:
+        return command
+    return _WINDOWS_HOME_VARIABLE_RE.sub(lambda _match: str(Path.home()), command)
+
+
 def is_read_only_command(command: object, working_directory: object = "") -> bool:
     """True when the shell safety parser proves the command only reads.
 
@@ -367,7 +425,9 @@ def is_read_only_command(command: object, working_directory: object = "") -> boo
     crucial moments). Anything the parser cannot prove read-only, or that is
     too long to run, keeps the confirmation. Fails closed on any error.
     """
-    text = str(command or "").strip()
+    text, _replaced = _with_real_user_folders(str(command or "").strip())
+    text = _with_windows_home_written_out(text)
+    working_directory = _real_working_directory(str(working_directory or ""))
     if not text or len(text) > _MAX_COMMAND_LENGTH:
         return False
     if _SENSITIVE_READ_RE.search(text):
@@ -380,6 +440,93 @@ def is_read_only_command(command: object, working_directory: object = "") -> boo
     except Exception:  # noqa: BLE001, RUF100 - an unparseable command keeps its confirmation
         return False
     return decision.behavior == "allow" and bool(decision.read_only)
+
+
+_IS_WINDOWS = sys.platform == "win32"
+_USER_FOLDER_NAMES = ("Desktop", "Documents", "Downloads", "Pictures", "Music", "Videos")
+_HOME_SPELLINGS = r"%USERPROFILE%|%HOMEDRIVE%%HOMEPATH%|\$env:USERPROFILE|\$\{HOME\}|\$HOME|~"
+
+
+def _with_real_user_folders(text: str) -> tuple[str, dict[str, str]]:
+    """Point home-based user folders at the real ones, on Windows.
+
+    "On my desktop" became ``%USERPROFILE%\\Desktop`` in a command, but OneDrive
+    can move the Desktop, so an approved ``mkdir`` would make a folder the user
+    never sees. Each spelling of home plus a user folder is replaced by the
+    Windows known folder, only when that is somewhere else. A path with spaces
+    is replaced only inside quotes, so the command keeps its words. Returns the
+    new text and what was replaced.
+    """
+    if not _IS_WINDOWS or not text:
+        return text, {}
+    from intent.tools.filesystem import user_known_folder
+
+    try:
+        home = Path.home()
+    except (OSError, RuntimeError):
+        return text, {}
+    pattern = re.compile(
+        r"(?<![\w%%$~])(?:%s|%s)[\\/](%s)(?=$|[\\/\"'\s])"
+        % (_HOME_SPELLINGS, re.escape(str(home)), "|".join(_USER_FOLDER_NAMES)),
+        re.IGNORECASE,
+    )
+    replaced: dict[str, str] = {}
+
+    def real_folder(match: re.Match[str]) -> str:
+        real = user_known_folder(match.group(1))
+        if real is None or str(real).lower() == str(home / match.group(1)).lower():
+            return match.group(0)
+        quoted = match.start() > 0 and text[match.start() - 1] == '"'
+        if " " in str(real) and not quoted:
+            return match.group(0)
+        replaced[match.group(0)] = str(real)
+        return str(real)
+
+    return pattern.sub(real_folder, text), replaced
+
+
+def _real_working_directory(working_directory: str) -> str:
+    """A working folder named "Desktop" or "~/Desktop" means the real one."""
+    text, _replaced = _with_real_user_folders(str(working_directory or "").strip())
+    if _IS_WINDOWS and text.lower() in {name.lower() for name in _USER_FOLDER_NAMES}:
+        from intent.tools.filesystem import user_known_folder
+
+        real = user_known_folder(text)
+        if real is not None:
+            return str(real)
+    return text
+
+
+_SCRIPT_RUNNERS = frozenset({"python", "python3", "py", "node"})
+_SCRIPT_SUFFIXES = frozenset({".py", ".pyw", ".js", ".mjs", ".cjs"})
+_SHELL_SYNTAX_CHARS = frozenset("|&;<>^%$`\n\r")
+
+
+def script_run_target(command: object, working_directory: object = "") -> Path | None:
+    """The script file a plain ``python primes.py`` command runs, else None.
+
+    Only one interpreter running one existing script file: no pipes, chaining,
+    redirection, variables, ``-c`` or ``-m``. Anything else returns None and
+    stays a plain shell command to every gate. Fails closed on any error.
+    """
+    text, _replaced = _with_real_user_folders(str(command or "").strip())
+    working_directory = _real_working_directory(str(working_directory or ""))
+    if not text or len(text) > _MAX_COMMAND_LENGTH or _SHELL_SYNTAX_CHARS & set(text):
+        return None
+    try:
+        shell = "cmd" if sys.platform == "win32" else "bash"
+        argv = _argv_for_direct_run(text, shell)
+        if len(argv) < 2 or executable_name(argv[0]) not in _SCRIPT_RUNNERS or argv[1].startswith("-"):
+            return None
+        script = Path(argv[1]).expanduser()
+        if not script.is_absolute():
+            script = Path(str(working_directory or "").strip() or _default_working_directory()) / script
+        script = script.resolve()
+        if script.suffix.lower() not in _SCRIPT_SUFFIXES or not script.is_file():
+            return None
+    except (OSError, RuntimeError, ValueError):
+        return None
+    return script
 
 
 def _default_working_directory() -> str:
@@ -443,6 +590,9 @@ async def run_command(
         permission_mode: Claude-style permission mode for non-read-only commands.
     """
 
+    command, user_folders = _with_real_user_folders(command)
+    command = _with_windows_home_written_out(command)
+    working_directory = _real_working_directory(working_directory)
     if len(command) > _MAX_COMMAND_LENGTH:
         return ToolResult(
             ok=False,
@@ -450,7 +600,8 @@ async def run_command(
         )
 
     if working_directory:
-        cwd = Path(working_directory).expanduser().resolve()
+        # A relative folder is relative to where commands run, not to Viola's own.
+        cwd = (Path(_default_working_directory()) / Path(working_directory).expanduser()).resolve()
         if not cwd.is_dir():
             return ToolResult(ok=False, error="Working directory does not exist: %s" % cwd)
         cwd_str = str(cwd)
@@ -503,7 +654,7 @@ async def run_command(
     elif use_shell:
         argv = None
     else:
-        argv = shlex.split(command, posix=(decision.shell == "bash"))
+        argv = _argv_for_direct_run(command, decision.shell)
     returncode: int | None = None
 
     try:
@@ -575,6 +726,9 @@ async def run_command(
     }
     if stderr_text:
         result_data["stderr"] = stderr_text
+    if user_folders:
+        # Tell the model where the folder really is, for the rest of the task.
+        result_data["user_folders"] = user_folders
 
     return ToolResult(
         ok=returncode == 0,

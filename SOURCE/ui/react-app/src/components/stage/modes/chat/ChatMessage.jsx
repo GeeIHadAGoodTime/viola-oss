@@ -48,7 +48,15 @@ export default function ChatMessage({
               Regenerate
             </button>
           )}
-          <button type="button" onClick={() => onFork(message)} disabled={!serverActionsEnabled}>Edit</button>
+          <button
+            type="button"
+            onClick={() => onFork(message)}
+            disabled={!serverActionsEnabled}
+            aria-label="Fork chat from this message"
+            title="Start a new chat from here, with your message edited"
+          >
+            Fork
+          </button>
           {role === 'assistant' && (
             <>
               <button

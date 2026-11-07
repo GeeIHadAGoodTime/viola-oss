@@ -114,6 +114,10 @@ def trigger_google_oauth_flow(domain_id: str | None = None) -> bool:
 def trigger_spotify_browser_auth_login() -> bool:
     """Proactively start the in-app Spotify BrowserAuth login flow.
 
+    Only for someone who has never signed in. With a sign-in in place, a view
+    opened here would be closed again by the sign-in watch (build 9: the view
+    opened and closed by itself).
+
     Opens the BrowserAuth overlay inside Viola so the user can sign in.
     Uses the same cooldown mechanism as Google OAuth to avoid spamming
     login surfaces.
@@ -121,6 +125,15 @@ def trigger_spotify_browser_auth_login() -> bool:
     Returns:
         True if the login flow was started, False otherwise.
     """
+    try:
+        from music.spotify.connection import NOT_SIGNED_IN, get_spotify_connection
+
+        if get_spotify_connection().state != NOT_SIGNED_IN:
+            return False
+    except Exception:
+        logger.debug("Spotify connection check failed before proactive sign-in", exc_info=True)
+        return False
+
     with _oauth_lock:
         if _oauth_in_progress.get("spotify"):
             logger.debug("Spotify BrowserAuth login already in progress, skipping")
@@ -228,7 +241,7 @@ def resolve(
                 # the login flow just like Google OAuth.
                 service_name = _PROACTIVE_CONNECT_DOMAINS[domain_id]
                 if domain_id == "music" and trigger_spotify_browser_auth_login():
-                    message = "I'm opening %s inside Viola — " "just log in and I'll take it from there." % service_name
+                    message = "I'm opening %s inside Viola — just log in and I'll take it from there." % service_name
                 else:
                     message = "%s is not connected yet. I can help start the setup flow." % display_name
             else:

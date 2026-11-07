@@ -37,6 +37,40 @@ _EPHEMERAL_CONTENT_RE = re.compile(
 )
 
 
+# A memory states something lasting about the user. These shapes state something
+# else: a report of one turn, or the runtime's own text echoed back. Build 9's
+# context.md held "User asked a simple arithmetic question: 2 + 2", "System
+# reminder indicates..." and raw session ids. This judges stored memory text
+# only; it never decides what a user's request does.
+_TURN_REPORT_RE = re.compile(
+    r"^(?:the\s+)?(?:user|they|he|she)\s+"
+    r"(?:just\s+)?(?:asked|wanted|requested|inquired|said|told|was\s+asking|is\s+asking|wants\s+to\s+know)\b"
+    r"|^(?:the\s+)?(?:assistant|viola|agent)\s+(?:said|answered|replied|responded|told|played|asked)\b",
+    re.IGNORECASE,
+)
+_LASTING_FACT_RE = re.compile(
+    r"\b(?:prefers?|always|never|every|favou?rite|allerg\w*|call\s+(?:me|him|her|them)|likes?|loves?|hates?|dislikes?)\b",
+    re.IGNORECASE,
+)
+_RUNTIME_TEXT_RE = re.compile(
+    r"system[-\s]reminder|runtime[-\s]context|tool[-\s]permission\s+level"
+    r"|\b(?:session|task|trace|request|conversation)[-_\s]?id\b"
+    r"|\bchannel(?:_type)?\b.{0,24}\b(?:web|voice|written|spoken)\b"
+    r"|\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b",
+    re.IGNORECASE,
+)
+
+
+def is_junk_memory_line(content: str) -> bool:
+    """True when a memory line reports one turn or repeats runtime text."""
+    text = _BULLET_RE.sub("", (content or "").strip())
+    if not text:
+        return False
+    if _RUNTIME_TEXT_RE.search(text):
+        return True
+    return bool(_TURN_REPORT_RE.match(text)) and not _LASTING_FACT_RE.search(text)
+
+
 def validate_semantic_content(content: str) -> None:
     """Reject obvious conversational filler without retaining its text."""
     normalized = " ".join(_BULLET_RE.sub("", content.strip()).casefold().split()).strip(".!?")

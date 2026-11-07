@@ -120,6 +120,12 @@ class WakeListenerLifecycleTests(unittest.TestCase):
         self.watcher = watcher_patch.start()
         self.addCleanup(watcher_patch.stop)
         self.runtime = load("_wake_listener_lifecycle", "voice/wake_detector/violawake_listener.py")
+        # The wake-prewarm thread imports real modules. It outlives the test, so its
+        # imports ran while sys.modules was being swapped between tests and could
+        # remove the next test's stand-ins (ImportError: SAMPLE_RATE_16K, in setUp).
+        prewarm_patch = patch.object(self.runtime.ViolaWakeListener, "_prewarm_wake_path", Mock())
+        prewarm_patch.start()
+        self.addCleanup(prewarm_patch.stop)
         self.listener = self.make_listener()
         self.stop = threading.Event()
 

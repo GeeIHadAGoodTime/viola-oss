@@ -116,6 +116,41 @@ class AudioDucker:
             else:
                 logger.debug("🔉 Nested duck request (count: %s)", self._duck_count)
 
+    def user_volume(self) -> int | None:
+        """The level the user chose while the player sits at the duck level, else None.
+
+        While Viola talks the player really is at the duck level, and the
+        embedded player follows the broadcast ``volume``. So that value cannot
+        also be what the slider shows: on the laptop the slider sat at the duck
+        level through every change. This is what the slider and any relative
+        "volume up" must use instead.
+        """
+        with self._lock:
+            if self._duck_applied and self._original_volume is not None:
+                return self._original_volume
+            if self._restore_target is not None and self._fade_thread is not None and self._fade_thread.is_alive():
+                return self._restore_target
+            return None
+
+    def adopt_user_volume(self, level: int) -> int:
+        """Take a volume the user just chose; return the level the player must go to now.
+
+        A change made while ducked used to be set on the player and then wiped
+        by the un-duck, which restored the old level ("set the volume to 30" by
+        voice ended back at 80). Now it becomes the level to come back to, and
+        the music stays ducked (never above the new level) until Viola stops.
+        """
+        level = max(0, min(100, int(level)))
+        with self._lock:
+            if self._duck_applied and self._original_volume is not None:
+                self._original_volume = level
+                self._active_duck_level = min(level, self.duck_level)
+                return self._active_duck_level
+            if self._restore_target is not None and self._fade_thread is not None and self._fade_thread.is_alive():
+                self._fade_cancel.set()
+                self._restore_target = None
+            return level
+
     def _apply_duck_locked(self, thread_name: str) -> None:
         """Save the current volume and drop to the duck level (caller holds the lock)."""
         # First applied duck - save current volume and drop
@@ -417,6 +452,18 @@ def set_global_ducker(ducker: AudioDucker) -> None:
     global _global_ducker
     _global_ducker = ducker
     logger.info("Global audio ducker configured")
+
+
+def user_volume_while_ducked() -> int | None:
+    """The user's chosen level while the global ducker holds the music down, else None."""
+    ducker = _global_ducker
+    return ducker.user_volume() if ducker is not None else None
+
+
+def player_level_for_user_volume(level: int) -> int:
+    """Record ``level`` as the user's volume; return what the player should be set to now."""
+    ducker = _global_ducker
+    return ducker.adopt_user_volume(level) if ducker is not None else level
 
 
 def get_global_ducker() -> AudioDucker | None:

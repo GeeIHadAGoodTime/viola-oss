@@ -319,6 +319,18 @@ def _arm_exit_watchdog() -> None:
         logging.getLogger(__name__).debug("Exit watchdog not armed", exc_info=True)
 
 
+def _protect_desktop_sessions_for_quit() -> None:
+    """Stop refreshing and deleting stored sessions before anything winds down (never raises)."""
+    try:
+        from auth.desktop_session import begin_desktop_session_shutdown
+
+        begin_desktop_session_shutdown()
+    except Exception:  # noqa: BLE001, RUF100 - a quit must never fail on this
+        import logging
+
+        logging.getLogger(__name__).debug("Desktop session shutdown guard not set", exc_info=True)
+
+
 def _start_sentry_session_for_active() -> None:
     return None
 
@@ -788,6 +800,9 @@ if not _cdp_port and not _headless_requested():
 # --disable-gpu alone does not prevent (Chromium flag vs Qt rendering pipeline).
 os.environ.setdefault("QT_OPENGL", "software")
 _chromium_stability_flags = "--autoplay-policy=no-user-gesture-required"
+# Viola is an app, not a web page: a two-finger pinch must not zoom it (1.0.5
+# build 9, K10: two fingers zoomed the whole page about 2.4x).
+_chromium_stability_flags = _chromium_stability_flags + " --disable-pinch"
 # Windows keeps Chromium GPU compositing on. With --disable-gpu the whole React
 # UI is rasterized on the CPU every frame: the 1.0.5 build idled at ~107% of a
 # core (one Qt6WebEngineCore thread) and lagged clicks and typing on a laptop;
@@ -938,7 +953,14 @@ def _ensure_qt_file_logging() -> None:
         # structured logger's own redaction, and this file is what users attach
         # to bug reports.
         try:
-            from diagnostics.observability_logging import RedactingFormatter as _LogFormatter
+            from diagnostics.observability_logging import (
+                RedactingFormatter as _LogFormatter,
+                RepeatCollapseFilter as _RepeatCollapseFilter,
+            )
+
+            # This is the file a bug report carries: one repeating line must
+            # not push the rest of the day out of it.
+            handler.addFilter(_RepeatCollapseFilter(handler))
         except ImportError:
             _LogFormatter = _logging.Formatter
         handler.setFormatter(
@@ -1488,6 +1510,7 @@ def main():
     # ends with aboutToQuit. Put a deadline on the rest of the shutdown so a
     # stuck thread or a native modal dialog cannot keep the process alive.
     app.aboutToQuit.connect(_arm_exit_watchdog)
+    app.aboutToQuit.connect(_protect_desktop_sessions_for_quit)
 
     try:
         from backend.ports import PortSelectionError, resolve_listen_port

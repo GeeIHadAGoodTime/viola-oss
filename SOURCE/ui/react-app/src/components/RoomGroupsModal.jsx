@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useId } from 'react';
 import PropTypes from 'prop-types';
+import { confirmDialog } from './ViolaDialog';
 import { useRoomGroups } from '../hooks/useRoomGroups';
 import { useAcknowledgedSliderValue } from '../hooks/useAcknowledgedSliderValue';
 import DeviceDiscoveryPanel from './DeviceDiscoveryPanel';
@@ -262,9 +263,9 @@ export const GroupCard = ({ group, onDelete, onMasterVolumeChange, onRoomVolumeC
             {masterVolume}%
           </span>
           <button
-            onClick={(e) => {
+            onClick={async (e) => {
               e.stopPropagation();
-              if (window.confirm(`Delete "${group.group_name}" group?`)) {
+              if (await confirmDialog({ title: `Delete "${group.group_name}" group?`, confirmLabel: 'Delete', danger: true })) {
                 onDelete();
               }
             }}

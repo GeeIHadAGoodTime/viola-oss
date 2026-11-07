@@ -71,8 +71,12 @@ class QueueLimits:
         Returns:
             True if autoplay can add song
         """
-        # Don't exceed autoplay limit (prevents API waste and queue spam)
-        if autoplay_count >= self.max_autoplay_size:
+        # Don't let autoplay stack up more than this many songs still waiting
+        # (prevents API waste and queue spam). Songs that already played do not
+        # count: the old check used the running total since the last "play",
+        # so after 15 additions autoplay refused forever and the music stopped
+        # on an empty queue about an hour in ("capacity", queue_size 0).
+        if min(autoplay_count, current_size) >= self.max_autoplay_size:
             return False
 
         return True

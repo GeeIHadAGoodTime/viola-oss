@@ -181,6 +181,10 @@ class BotTurnFloorState:
         self._max_window_secs = max_window_secs
         self._clock = clock
         self._generating_since: float | None = None
+        # Set on outbound calls: True when the newest transcript is someone answering
+        # her voicemail message. That speech has no floor to win: a single "hello"
+        # counts, or a person could be hung up on for answering briefly.
+        self.live_answer_check: Callable[[], bool] | None = None
 
     def note_generation_started(self) -> None:
         """Recipient yielded the floor; the LLM run/generation has begun."""
@@ -246,6 +250,7 @@ class SelfEchoGuardedMinWordsUserTurnStartStrategy(MinWordsUserTurnStartStrategy
         # which routes through the property setter below and must find these attrs.
         self._bot_actually_speaking = False
         self._floor_state = floor_state
+        self._judging_live_answer = False
         super().__init__(min_words=min_words, use_interim=use_interim, **kwargs)
         self._echo_reference = echo_reference
         # Observe-only recorder (PhoneLatencyTraceRecorder | None). Emitting into it
@@ -275,6 +280,8 @@ class SelfEchoGuardedMinWordsUserTurnStartStrategy(MinWordsUserTurnStartStrategy
         the generation window WITHOUT duplicating the base decision logic, so future
         Pipecat changes to that logic keep working.
         """
+        if self._judging_live_answer:
+            return False
         if self._bot_actually_speaking:
             return True
         floor = self._floor_state
@@ -337,7 +344,13 @@ class SelfEchoGuardedMinWordsUserTurnStartStrategy(MinWordsUserTurnStartStrategy
             text_chars=len(getattr(frame, "text", "") or ""),
             bot_speaking=bool(self._bot_speaking),
         )
-        return await super()._handle_transcription(frame)
+        floor = self._floor_state
+        check = getattr(floor, "live_answer_check", None)
+        self._judging_live_answer = bool(check is not None and check())
+        try:
+            return await super()._handle_transcription(frame)
+        finally:
+            self._judging_live_answer = False
 
 
 def build_phone_user_turn_strategies(

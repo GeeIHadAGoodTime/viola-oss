@@ -185,6 +185,12 @@ def _is_wake_voice_turn() -> bool:
 # ============================================================================
 
 
+_HELP_SHORTCUTS = (
+    ("clear", "/clear to start a fresh conversation"),
+    ("status", "/status to see what I'm working on"),
+)
+
+
 class IntentPipeline:
     """
     Unified intent processing pipeline.
@@ -341,6 +347,9 @@ class IntentPipeline:
         self._processors = IntentPipelineProcessors(self)
         self._command_executor = CommandExecutor(self.music, self.tts)
         self._tts_speaker = TTSSpeaker(self.tts, self._tts_tasks)
+        from core.live_call_state import set_held_report_speaker
+
+        set_held_report_speaker(self._tts_speaker.speak)
 
         # Initialize sub-components
         self.instant_handler = InstantCommandHandler(music, state)
@@ -510,8 +519,14 @@ class IntentPipeline:
 
     def _handle_help_command(self, _invocation: CommandInvocation) -> dict[str, object]:
         available_specs = self.command_registry.list_available()
-        available = ", ".join("/%s" % spec.name for spec in available_specs)
-        message = "Available commands: %s." % available if available else "No commands are currently available."
+        # What a customer can use, in plain words. The rest of the registry
+        # (/compact, /permissions, skills from a developer's folders) stays
+        # callable and stays in ``data``, but it is not help for a person.
+        names = {spec.name for spec in available_specs}
+        shortcuts = [text for name, text in _HELP_SHORTCUTS if name in names]
+        message = "Just tell me what you need, in your own words."
+        if shortcuts:
+            message += " You can also type %s." % " or ".join(shortcuts)
         return {
             "message": message,
             "data": {"available_commands": [spec.name for spec in available_specs]},
@@ -534,7 +549,7 @@ class IntentPipeline:
                 "" if pending_count == 1 else "s",
             )
         else:
-            message = "No task plan running."
+            message = "Nothing is running right now."
         return {"message": message}
 
     def _record_command_invocation_frame(self, invocation: CommandInvocation) -> None:

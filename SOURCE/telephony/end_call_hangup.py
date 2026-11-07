@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Callable
 from contextlib import suppress
 from dataclasses import dataclass
@@ -33,6 +34,8 @@ class EndCallHangupFrame(ControlFrame):  # type: ignore[misc]
 
     call_id: str
     reason: str
+    # After a voicemail message: give a person who picked up the chance to answer.
+    listen_first: bool = False
 
 
 async def dispatch_telnyx_end_call_hangup(
@@ -121,6 +124,7 @@ class EndCallHangupAfterOutputProcessor(FrameProcessor if PIPECAT_AVAILABLE else
         self._transport = transport
         self._mark_timeout_seconds = mark_timeout_seconds
         self._dispatched = False
+        self._listen_task: asyncio.Task[None] | None = None
 
     async def process_frame(self, frame: Any, direction: Any) -> None:
         if not PIPECAT_AVAILABLE:
@@ -164,6 +168,32 @@ class EndCallHangupAfterOutputProcessor(FrameProcessor if PIPECAT_AVAILABLE else
         else:
             logger.warning("end_call: Telnyx transport has no output mark support; hanging up fail-closed")
 
+        answer_watch = getattr(self._call_record, "_voicemail_answer_watch", None)
+        if frame.listen_first and answer_watch is not None:
+            # Not inline: frames keep flowing here while the line is listened to.
+            self._listen_task = asyncio.create_task(
+                self._hang_up_unless_answered(frame, answer_watch),
+                name="voicemail-answer-window-%s" % frame.call_id,
+            )
+            return
+
+        await self._dispatch_hangup(frame)
+
+    async def _hang_up_unless_answered(self, frame: EndCallHangupFrame, answer_watch: Any) -> None:
+        if not await answer_watch.nobody_answered():
+            self._dispatched = False
+            return
+        logger.info("end_call: nobody answered the voicemail message on %s; hanging up", frame.call_id)
+        with suppress(AttributeError, TypeError):
+            self._call_record._end_call_committed = True
+        await self._dispatch_hangup(frame)
+
+    async def cleanup(self) -> None:
+        if self._listen_task is not None and not self._listen_task.done():
+            self._listen_task.cancel()
+        await super().cleanup()
+
+    async def _dispatch_hangup(self, frame: EndCallHangupFrame) -> None:
         await dispatch_telnyx_end_call_hangup(
             telnyx_client=self._telnyx_client,
             call_control_id=str(self._call_control_id_getter() or ""),

@@ -346,8 +346,12 @@ _health = _EndpointHealth()
 
 
 def reset_remote_voice_cooldown_for_tests() -> None:
-    global _client
+    global _client, _no_capacity_until, _gate_gave_up_at, _warm_watchers
     _health.reset()
+    with _capacity_lock:
+        _no_capacity_until = 0.0
+        _gate_gave_up_at = None
+        _warm_watchers = 0
     with _client_lock:
         if _client is not None:
             with suppress(Exception):
@@ -355,16 +359,125 @@ def reset_remote_voice_cooldown_for_tests() -> None:
         _client = None
 
 
+# --- Can this endpoint run a worker at all? ----------------------------------
+# On 2026-11-05 the RunPod endpoint was set to workersMax=0, so no worker could
+# ever start. Every call then waited out the whole 60 s dial gate and every turn
+# of every call paid the 2.5 s remote timeout before running locally. A warmup
+# cannot tell that apart from a slow cold start, but RunPod's endpoint record can.
+_CAPACITY_RECHECK_SECS = 300.0
+_CAPACITY_TIMEOUT_SECS = 3.0
+_CAPACITY_API_URL = "https://rest.runpod.io/v1/endpoints/%s"
+# After the dial gate gives up on a worker, later calls do not wait for it again
+# for this long. A worker that missed the whole ceiling is not cold, it is stuck.
+_GATE_GAVE_UP_MEMORY_SECS = 600.0
+
+_capacity_lock = threading.Lock()
+_no_capacity_until = 0.0
+_gate_gave_up_at: float | None = None
+# Warm loops running right now. While one runs, it is the probe: a serve request
+# only goes remote once a warmup has come back, so no turn pays for a cold worker.
+_warm_watchers = 0
+
+
+def _runpod_endpoint_id() -> str:
+    host = phone_voice_remote_url().split("//", 1)[-1].split("/", 1)[0]
+    return host.split(".", 1)[0] if host.endswith(".api.runpod.ai") else ""
+
+
+def _no_worker_capacity() -> bool:
+    with _capacity_lock:
+        return time.monotonic() < _no_capacity_until
+
+
+def refresh_remote_capacity() -> bool:
+    """Ask RunPod whether this endpoint can run a worker. True when it cannot.
+
+    Only a definite ``workersMax: 0`` counts. Any failure to find out leaves the
+    worker presumed reachable, so this can never disable a working endpoint.
+    Blocking: call it off the event loop.
+    """
+    global _no_capacity_until
+    endpoint_id = _runpod_endpoint_id()
+    if not endpoint_id or not _remote_configured():
+        return False
+    try:
+        response = _shared_client().get(
+            _CAPACITY_API_URL % endpoint_id,
+            params={"includeWorkers": "false"},
+            # Cloudflare refuses RunPod API calls with a library's default agent.
+            headers={
+                "Authorization": "Bearer %s" % phone_voice_remote_api_key(),
+                "User-Agent": "viola-phone-voice/1.0",
+            },
+            timeout=_CAPACITY_TIMEOUT_SECS,
+        )
+        body = response.json() if response.status_code == 200 else None
+    except Exception as exc:  # noqa: BLE001, RUF100 - unknown capacity must never affect a call
+        logger.debug("Remote phone voice capacity check failed: %s", type(exc).__name__)
+        return False
+    no_capacity = isinstance(body, dict) and body.get("workersMax") == 0
+    with _capacity_lock:
+        _no_capacity_until = time.monotonic() + _CAPACITY_RECHECK_SECS if no_capacity else 0.0
+    if no_capacity:
+        logger.warning(
+            "Remote phone voice: RunPod endpoint %s has max workers 0, so no worker can start. "
+            "Calls run on the local CPU path. Raise Max Workers on the endpoint to use the GPU voice.",
+            endpoint_id,
+        )
+    return no_capacity
+
+
+def note_warm_gate_gave_up() -> None:
+    """Remember that the dial gate waited out its whole ceiling for nothing."""
+    global _gate_gave_up_at
+    with _capacity_lock:
+        _gate_gave_up_at = time.monotonic()
+
+
+def warm_gate_recently_gave_up() -> bool:
+    with _capacity_lock:
+        gave_up_at = _gate_gave_up_at
+    return gave_up_at is not None and time.monotonic() - gave_up_at < _GATE_GAVE_UP_MEMORY_SECS
+
+
+def begin_warm_watch() -> None:
+    global _warm_watchers
+    with _capacity_lock:
+        _warm_watchers += 1
+
+
+def end_warm_watch() -> None:
+    global _warm_watchers
+    with _capacity_lock:
+        _warm_watchers = max(0, _warm_watchers - 1)
+
+
+def _remote_serve_ready() -> bool:
+    """True when a live turn should try the worker.
+
+    A turn that tries a cold worker waits out the whole request timeout and then
+    runs locally anyway: that was 2.5 s added to each transcript and each spoken
+    sentence on call 3745134a. When a warm loop is watching the worker, the turn
+    goes straight to the local path until the loop has seen the worker answer.
+    """
+    if not remote_voice_available():
+        return False
+    with _capacity_lock:
+        watching = _warm_watchers > 0
+    return not watching or is_remote_voice_warm()
+
+
 def remote_voice_available() -> bool:
     """True when the remote path should be attempted for this request.
 
-    Gated by config (flag/url/key) and endpoint health. A COLD or WARMING worker
-    stays available (see _EndpointHealth) so the call retries and uses the worker
-    as soon as it is warm, instead of a single cold-start timeout blinding the
-    whole call. Only a GENUINELY down endpoint -- breaker tripped by repeated
-    hard failures, or spin-up failures that never resolve -- returns False.
+    Gated by config (flag/url/key), by the endpoint being able to run a worker at
+    all, and by endpoint health. A COLD or WARMING worker stays available (see
+    _EndpointHealth) so the call retries and uses the worker as soon as it is
+    warm, instead of a single cold-start timeout blinding the whole call. Only a
+    GENUINELY down endpoint -- breaker tripped by repeated hard failures, or
+    spin-up failures that never resolve -- returns False.
     """
-    if not _remote_configured():
+    if not _remote_configured() or _no_worker_capacity():
         return False
     return _health.available()
 
@@ -461,6 +574,8 @@ def is_remote_voice_warm(*, max_age_secs: float | None = None) -> bool:
 
 def _prewarm_loop(stop: threading.Event, deadline: float) -> None:
     """Ping until warm, then keep-alive, until the deadline or a stop request."""
+    if refresh_remote_capacity():
+        return
     while not stop.is_set() and time.monotonic() < deadline:
         try:
             warm = warm_remote_voice(timeout_s=_PREWARM_PING_TIMEOUT_SECS)
@@ -639,6 +754,8 @@ def _post_op(payload: dict[str, Any]) -> dict[str, Any] | None:
         _health.record_failure(category, reason)
         return None
     _health.record_success()
+    # A served turn proves the worker is up just as a warmup does.
+    _note_remote_voice_warm()
     return result
 
 
@@ -660,7 +777,7 @@ def warm_remote_voice(*, timeout_s: float | None = None) -> bool:
       clears any stale transient).
     Safe to call repeatedly as a keep-alive -- it never accumulates state.
     """
-    if not _remote_configured():
+    if not _remote_configured() or _no_worker_capacity():
         return False
     ceiling = _DEFAULT_WARM_TIMEOUT_SECS if timeout_s is None else max(0.1, float(timeout_s))
     url = phone_voice_remote_url()
@@ -727,7 +844,7 @@ def remote_transcribe_pcm(
     initial_prompt: str = "",
 ) -> str | None:
     """Transcribe raw PCM16 on the remote endpoint; None -> use local path."""
-    if not audio or not remote_voice_available():
+    if not audio or not _remote_serve_ready():
         return None
     started = time.perf_counter()
     output = _post_op(
@@ -769,7 +886,7 @@ def remote_synthesize(
     Returns (float32 samples in [-1, 1], sample_rate) matching the local
     kokoro.create contract, or None -> use the local Kokoro runtime.
     """
-    if not text.strip() or not remote_voice_available():
+    if not text.strip() or not _remote_serve_ready():
         return None
     started = time.perf_counter()
     output = _post_op(

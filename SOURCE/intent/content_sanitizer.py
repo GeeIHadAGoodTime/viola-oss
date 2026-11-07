@@ -101,7 +101,10 @@ HIGH_RISK_TOOLS = frozenset(
 #   * payments and shell commands are refused outright, with no confirm
 #     override (TAINT_HARD_BLOCK_ACTION_CLASSES), except that the two
 #     payment-gate-bound tools run once the user approved this exact order
-#     through the payment gate (PAYMENT_GATE_BOUND_TOOLS, below);
+#     through the payment gate (PAYMENT_GATE_BOUND_TOOLS, below), and that a
+#     command that only runs the user's own script goes on to its confirm gate
+#     (``runs_users_own_script``: named by the user or written here, and not
+#     changed while untrusted content was in the conversation);
 #   * a phone call goes on to its confirm-or-cancel gate like the actions
 #     below (r5/phone): the confirmation shows the user the exact number and
 #     who it belongs to, says the number came from outside content, and must
@@ -131,6 +134,49 @@ TAINT_UNGATED_HIGH_RISK_TOOLS = frozenset({"send_telegram", "write_file"})
 # payment-class call, and anything before approval, stays refused, and the
 # exfiltration defence below is unchanged.
 PAYMENT_GATE_BOUND_TOOLS = frozenset({"fill_payment_details", "transmit_payment_to_call"})
+
+
+# Tools whose arguments must be the user's own words, tainted or not: a saved
+# delivery address is where real orders go. Taint covers a page or email read in
+# this task; the word check below covers one read in an earlier task and repeated
+# in a reply, which leaves this task clean.
+USER_WORDS_ONLY_TOOLS = frozenset({"save_delivery_address"})
+_NUMBER_RUN_RE = re.compile(r"\d+")
+_DIGIT_GROUP_COMMA_RE = re.compile(r"(?<=\d),(?=\d)")
+_WORD_RE = re.compile(r"[a-z0-9]+")
+# Words that say nothing about which street it is, and have a short and a long form.
+_STREET_FILLER_WORDS = frozenset(
+    "n s e w ne nw se sw north south east west northeast northwest southeast southwest "
+    "st street ave avenue rd road blvd boulevard dr drive ln lane ct court cir circle pl place way "
+    "pkwy parkway hwy highway ter terrace trl trail sq square".split()
+)
+_SPOKEN_NUMBER_WORDS = frozenset(
+    "zero oh one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen "
+    "seventeen eighteen nineteen twenty thirty forty fifty sixty seventy eighty ninety hundred thousand".split()
+)
+
+
+def _words_not_from_user(args: Mapping[str, Any], own_words: str) -> list[str]:
+    """Name the address fields whose words the user never said."""
+    own = _DIGIT_GROUP_COMMA_RE.sub("", own_words.lower())
+    own_tokens = set(_WORD_RE.findall(own))
+    own_numbers = set(_NUMBER_RUN_RE.findall(own))
+    said_a_number_in_words = bool(own_tokens & _SPOKEN_NUMBER_WORDS)
+    missing: list[str] = []
+    street = _WORD_RE.findall(str(args.get("street") or "").lower())
+    house_number = street[0] if street and street[0][:1].isdigit() else ""
+    name_words = [word for word in street if word != house_number and word not in _STREET_FILLER_WORDS]
+    if not all(word in own_tokens for word in name_words):
+        missing.append("street")
+    digits = "".join(_NUMBER_RUN_RE.findall(house_number))
+    if digits and digits not in own_numbers and not said_a_number_in_words:
+        missing.append("house number")
+    if not all(word in own_tokens for word in _WORD_RE.findall(str(args.get("city") or "").lower())):
+        missing.append("city")
+    zip_code = "".join(_NUMBER_RUN_RE.findall(str(args.get("zip_code") or "")))
+    if zip_code and zip_code[:5] not in own_numbers and not said_a_number_in_words:
+        missing.append("ZIP code")
+    return missing
 
 
 def canonicalize_tool_name_for_safety(tool_name: str | None) -> str:
@@ -574,7 +620,61 @@ def is_user_named_file_read(tool_name: str | None, tool_args: object, user_text:
             pattern = r"(?<![\w.\-])" + re.escape(name) + r"(?![\w\-]|\.\w)"
             if re.search(pattern, text, flags=re.IGNORECASE) is not None:
                 return True
+        if _is_own_file_of_this_conversation(raw_path):
+            return True
     return _inside_user_named_folder(raw_path, text, include_self=action in _FOLDER_SEARCH_ACTIONS)
+
+
+def _is_own_file_of_this_conversation(raw_path: str) -> bool:
+    """The path holds what the user had Viola write here, before any untrusted content arrived.
+
+    Reading it back is not third-party content arriving: on the turn the user
+    says "confirm", a look at the script Viola had just written turned the
+    conversation tainted and the next run of that script was refused (1.0.5
+    laptop K1). A file changed while untrusted content was in the conversation
+    never counts: what it holds may have been steered by that content.
+    """
+    from intent.file_gates import active_file_gate_context
+    from intent.tools.filesystem import path_touched_in_session, path_written_under_taint, resolve_tool_path
+
+    context = active_file_gate_context()
+    path = resolve_tool_path(raw_path) if raw_path else None
+    if context is None or not context.user_id or path is None:
+        return False
+    return path_touched_in_session(context.user_id, context.session_key, path) and not path_written_under_taint(
+        context.user_id, context.session_key, path
+    )
+
+
+def runs_users_own_script(tool_args: object) -> bool:
+    """A shell call that only runs a script the user named or had Viola write here.
+
+    Provenance of the script file, never its content: one interpreter on one
+    file (``intent.tools.shell.script_run_target``) that the user's own words
+    name, or that Viola wrote in this conversation, and that was not changed
+    while untrusted content was in the conversation (it may hold what a web page
+    told the model to write). Nothing under Downloads, temp or mail attachments
+    counts: files there arrive from outside. Such a call still goes to the
+    confirm gate, which under taint accepts only the user's own words.
+    """
+    args = _tool_args_mapping(tool_args)
+    if args is None:
+        return False
+    from intent.file_gates import active_file_gate_context, is_outside_arrival_location, named_by_user
+    from intent.tools.filesystem import path_touched_in_session, path_written_under_taint
+    from intent.tools.shell import script_run_target
+
+    context = active_file_gate_context()
+    if context is None or not context.user_id:
+        return False
+    script = script_run_target(args.get("command"), args.get("working_directory"))
+    if script is None or is_outside_arrival_location(script):
+        return False
+    if path_written_under_taint(context.user_id, context.session_key, script):
+        return False
+    return named_by_user(script, context.user_text) or path_touched_in_session(
+        context.user_id, context.session_key, script
+    )
 
 
 def _inside_user_named_folder(raw_path: str, user_text: str, *, include_self: bool) -> bool:
@@ -723,7 +823,8 @@ class BrowserTaintTracker:
 
       * shell commands are refused outright, and so is every payment except
         filling (or speaking) the card the user approved for this exact
-        order through the payment gate's out-of-band approval;
+        order through the payment gate's out-of-band approval. A command that
+        only runs the user's own script reaches its confirm-or-cancel gate;
       * phone calls reach their confirm-or-cancel gate, which shows the exact
         number and who it belongs to (r5/phone);
       * every other consequential action goes on to its confirm-or-cancel
@@ -764,6 +865,17 @@ class BrowserTaintTracker:
         # gate, and is that approval still live for this task?" Installed by
         # the agent loop from executor state; None means "never".
         self._payment_approval_probe: Callable[[str, Mapping[str, Any]], bool] | None = None
+        # What the user has really said in this conversation, plus what they have
+        # already saved. Empty for a helper: its task was written by the model.
+        self._user_own_words: str = ""
+        # Taint from anything but Viola's own memory. "Remember my address" often
+        # checks memory first, and that alone must not stop the save: the word
+        # check below still refuses any address the user did not say.
+        self._tainted_from_outside: bool = False
+
+    def set_user_own_words(self, text: str | None) -> None:
+        """Record the words a USER_WORDS_ONLY_TOOLS call may be made of."""
+        self._user_own_words = str(text or "")
 
     def set_user_request(self, user_text: str | None) -> None:
         """Record the current user request (user-named file/site exemptions)."""
@@ -890,6 +1002,8 @@ class BrowserTaintTracker:
             )
         self._tainted = True
         self._taint_source = source_tool
+        if canonicalize_tool_name_for_safety(source_tool) != "memory":
+            self._tainted_from_outside = True
         if category == "non_browser":
             self._non_browser_tainted = True
 
@@ -970,6 +1084,8 @@ class BrowserTaintTracker:
         Returns an error message if refused, or None if the call may proceed
         (consequential calls then still meet their confirm-or-cancel gate).
         """
+        if tool_name and canonicalize_tool_name_for_safety(tool_name) in USER_WORDS_ONLY_TOOLS:
+            return self._check_user_words_only(tool_name, _tool_args_mapping(tool_args) or {})
         if not self._tainted or not tool_name:
             return None
         args = _tool_args_mapping(tool_args) or {}
@@ -997,6 +1113,14 @@ class BrowserTaintTracker:
                 'payment(action="request_review") with the merchant, items and total, then stop '
                 "and wait; Viola sends the user the approval link and continues once they approve." % tool_name
             )
+
+        if action_class == "shell_command" and runs_users_own_script(args):
+            logger.info(
+                "TAINT_GATE: %s runs the user's own script; it goes to its confirm gate (taint from '%s')",
+                tool_name,
+                self._taint_source,
+            )
+            return None
 
         if action_class in TAINT_HARD_BLOCK_ACTION_CLASSES:
             logger.warning(
@@ -1043,6 +1167,24 @@ class BrowserTaintTracker:
             )
 
         return self._check_exfiltration(tool_name, canonical, args)
+
+    def _check_user_words_only(self, tool_name: str, args: Mapping[str, Any]) -> str | None:
+        """Refuse a saved address that did not come from the user's own words."""
+        if self._tainted_from_outside:
+            logger.warning("TAINT_GATE: refusing %s after untrusted content from '%s'", tool_name, self._taint_source)
+            return (
+                "BLOCKED: '%s' cannot run after web, email, calendar or file content entered this task "
+                "(prompt injection defense). Nothing was saved. Ask the user to say their address again in a "
+                "new request." % tool_name
+            )
+        missing = _words_not_from_user(args, self._user_own_words)
+        if missing:
+            logger.warning("TAINT_GATE: refusing %s: not the user's own words (%s)", tool_name, ", ".join(missing))
+            return (
+                "BLOCKED: nothing was saved. The user did not say this %s. Use only what they said, leave the "
+                "rest empty, or ask them for it." % " or ".join(missing)
+            )
+        return None
 
     def _check_exfiltration(self, tool_name: str, canonical: str, args: Mapping[str, Any]) -> str | None:
         """Refuse a URL/script that carries private data to a site the user did not name."""

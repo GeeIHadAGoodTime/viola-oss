@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import asyncio
+import hmac
 
 from fastapi.responses import JSONResponse
 
-from contracts.api_response import failure_response
+from contracts.api_response import failure_response, success_response
 from core.logging_config import get_logger
 from core.task_tracker import TaskTracker
-from fastapi import Body, Depends
+from fastapi import Body, Depends, Request
 from ui.api.context import ApiContext
 from ui.api.routes.auth_dependencies import require_auth
 from ui.api.routes.common import RouteToolbox
@@ -127,6 +128,38 @@ def register_onboarding_routes(context: ApiContext, toolbox: RouteToolbox) -> No
             return await asyncio.to_thread(desktop_account_status)
 
         return await toolbox.record_and_call(_inner, route="/v1/onboarding/account", method="GET")
+
+    @router.post("/v1/onboarding/account/reattach", dependencies=[Depends(require_auth)])
+    async def reattach_desktop_account(request: Request):
+        """Give this computer's page a working cookie for the signed-in account.
+
+        The desktop account lives in the session store; the page reaches it with
+        a cookie. When the cookie is lost the app stays signed in and Settings >
+        Account asked for a password (1.0.5 build 9, 11-05). Only the desktop's
+        own page holds the local API key, and it can already act for this
+        account, so a key plus a loopback caller is the proof needed here.
+        """
+        from auth.desktop_session import reattach_desktop_session
+        from auth.middleware import set_session_cookie
+        from ui.core.security import is_loopback_request
+        from ui.security.config import get_security_config
+
+        config = get_security_config()
+        api_key = request.headers.get("X-API-Key") or ""
+        if (
+            not is_loopback_request(request)
+            or not config.auth_api_key
+            or not hmac.compare_digest(api_key, config.auth_api_key)
+        ):
+            return JSONResponse(
+                status_code=403,
+                content=failure_response("forbidden", "Only this computer's Viola page can do this."),
+            )
+        minted = await asyncio.to_thread(reattach_desktop_session)
+        response = JSONResponse(success_response({"reattached": minted is not None}))
+        if minted is not None:
+            set_session_cookie(response, minted.session_token, max_age_seconds=minted.max_age_seconds)
+        return response
 
     @router.get("/v1/onboarding/status", dependencies=[Depends(require_auth)])
     async def get_onboarding_status():

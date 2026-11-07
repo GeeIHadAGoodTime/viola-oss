@@ -137,6 +137,9 @@ from telephony.remote_voice import maybe_remote_first_kokoro, remote_transcribe_
 from telephony.telnyx_dial_response import telnyx_dial_call_control_id  # noqa: E402 - customer privacy bootstrap precedes application imports
 from telephony.usage import company_phone_billing_available, get_phone_billing  # noqa: E402 - customer privacy bootstrap precedes application imports
 from telephony.user_settings_lookup import load_cloud_user_settings_blob  # noqa: E402 - customer privacy bootstrap precedes application imports
+from telephony.phone_stt_background import OffPathTranscriber  # noqa: E402 - customer privacy bootstrap precedes application imports
+from telephony.spoken_transcript_pacer import SpokenTranscriptPacer  # noqa: E402 - customer privacy bootstrap precedes application imports
+from telephony.voicemail_answer_watch import VoicemailAnswerWatch  # noqa: E402 - customer privacy bootstrap precedes application imports
 from telephony.voicemail_detection import PipecatVoicemailDetectionHandler  # noqa: E402 - customer privacy bootstrap precedes application imports
 
 logger = get_logger(__name__)
@@ -563,6 +566,8 @@ PHONE_VAD_START_SECS = 0.2
 # pre-queue yield guard below are the structural backstops; this value keeps the
 # common case from ever reaching them.
 _PHONE_ANSWER_SILENT_FALLBACK_SECS = 4.0
+# How long after a silent-answer opening the first words still count as the greeting.
+_LATE_GREETING_WAIT_SECS = 20.0
 _PHONE_RING_WARMUP_AUDIO_SAMPLE_RATE = 16000
 _PHONE_RING_WARMUP_AUDIO_SECONDS = 1
 _PHONE_RING_STT_WARMUP_TIMEOUT_SECS = 3.0
@@ -1972,6 +1977,35 @@ def _is_cloud_llm_consented() -> bool:
     return is_cloud_llm_consented()
 
 
+def _transcript_only_summary(transcript_text: str) -> str:
+    """What the card says when no model may read the call."""
+    lines = [line for line in transcript_text.strip().split("\n") if line.strip()]
+    return "No summary for this call. The transcript has %d line%s." % (len(lines), "" if len(lines) == 1 else "s")
+
+
+async def _post_call_llm_consented(user_id: str | None, *, cloud_mode: bool) -> bool:
+    """Whether the call's OWNER allows the post-call LLM work.
+
+    The call's cloud teardown runs on the serving loop, where the sync consent
+    gate cannot bridge to the async consent service and fails closed. That logged
+    "cloud LLM consent not given" for a user who had granted it minutes earlier,
+    and left the card with its first and last lines instead of a summary.
+    """
+    if cloud_mode and user_id:
+        try:
+            from services.cloud_consent import get_cloud_consent_service
+
+            service = get_cloud_consent_service()
+            return bool(await service.has_consent(user_id, service.CLOUD_LLM))
+        except ImportError:
+            pass
+        # Consent must fail closed; a lookup failure only costs the summary.
+        except Exception as exc:  # noqa: BLE001, RUF100
+            logger.warning("Post-call consent lookup failed: %s", type(exc).__name__)
+            return False
+    return _is_cloud_llm_consented()
+
+
 def _ensure_cloud_llm_consent_for_phone_call() -> None:
     if _is_cloud_llm_consented():
         return
@@ -3097,6 +3131,29 @@ async def _remote_warm_loop(
     """
     from telephony import remote_voice
 
+    remote_voice.begin_warm_watch()
+    try:
+        await _ping_remote_worker_until_cancelled(
+            call_id,
+            warm_ready,
+            started_monotonic,
+            ping_timeout_s=ping_timeout_s,
+            keepalive_s=keepalive_s,
+        )
+    finally:
+        remote_voice.end_warm_watch()
+
+
+async def _ping_remote_worker_until_cancelled(
+    call_id: str,
+    warm_ready: asyncio.Event,
+    started_monotonic: float,
+    *,
+    ping_timeout_s: float,
+    keepalive_s: float,
+) -> None:
+    from telephony import remote_voice
+
     while True:
         ping_started = time.monotonic()
         try:
@@ -3529,6 +3586,8 @@ class CallRecord:
     # _voicemail_context_frames_to_allow count that dropped the post-interrupt
     # re-fire and left 57s of dead air (closing call 857c52b2, 2026-06-27).
     voicemail_message_delivered: bool = False
+    # A person answered her voicemail message, so the call went back to a conversation.
+    voicemail_answered_by_person: bool = False
     human_takeover_detected: bool = False
     human_takeover_at: datetime | None = None
     info_manifest: dict[str, list[str]] = field(default_factory=dict)
@@ -3583,6 +3642,8 @@ class CallRecord:
     _cost_tracker: Any = field(default=None, repr=False)
     _hold_handler: Any = field(default=None, repr=False)
     _voicemail_handler: Any = field(default=None, repr=False)
+    _voicemail_answer_watch: Any = field(default=None, repr=False)
+    _late_greeting_task: Any = field(default=None, repr=False)
     _payment_sensitive_segment: Any = field(default=None, repr=False)
     queue_id: str = ""
     queue_position: int = 0
@@ -3707,6 +3768,11 @@ async def queue_model_driven_outbound_opening(
     voicemail_handler = getattr(record, "_voicemail_handler", None)
     if voicemail_handler is not None and hasattr(voicemail_handler, "on_outbound_opening_queued"):
         await voicemail_handler.on_outbound_opening_queued(reason)
+    # Viola has the floor from here. A stray "hello" while the opening is being
+    # written must meet the same word-count bar as one spoken over her audio.
+    floor_state = getattr(record, "_bot_turn_floor_state", None)
+    if floor_state is not None:
+        floor_state.note_generation_started()
     await task.queue_frame(LLMRunFrame())
     logger.info("Call %s: queued model-driven outbound opening via %s", record.call_id, reason)
     return True
@@ -3872,7 +3938,28 @@ async def queue_outbound_opening_after_answer_settle(
         return "recipient_turn_opened"
 
     queued = await queue_model_driven_outbound_opening(record, task, reason="silent_answer")
+    if queued:
+        record._late_greeting_task = asyncio.create_task(
+            _classify_greeting_that_arrives_late(record, answer_settle_observer),
+            name="phone-late-greeting-%s" % record.call_id,
+        )
     return "silent_answer_queued" if queued else "skipped"
+
+
+async def _classify_greeting_that_arrives_late(record: CallRecord, answer_settle_observer: Any) -> None:
+    """Give a pickup called silent the voicemail check it missed, if words turn up."""
+    voicemail_handler = getattr(record, "_voicemail_handler", None)
+    if voicemail_handler is None or not hasattr(voicemail_handler, "reclassify_late_greeting"):
+        return
+    try:
+        greeting = await answer_settle_observer.wait_for_first_transcription(_LATE_GREETING_WAIT_SECS)
+        if greeting and await voicemail_handler.reclassify_late_greeting(greeting) == "VOICEMAIL":
+            logger.info("Call %s: late greeting was a recording; switching to one voicemail message", record.call_id)
+    except asyncio.CancelledError:
+        raise
+    # A failed check must never disturb the call; the handler has already released it.
+    except Exception:  # noqa: BLE001, RUF100
+        logger.warning("Call %s: late greeting check failed", record.call_id, exc_info=True)
 
 
 def _phone_function_result_properties(*, run_llm: bool = True) -> Any:
@@ -4043,6 +4130,28 @@ class TranscriptCollector:
         if cleaned:
             self.entries.append({"role": "viola", "text": cleaned, "ts": self._timestamp(ts)})
 
+    def trim_interrupted_assistant(self, written: str, heard: str) -> None:
+        """Cut a recorded reply back to what was said before the interruption.
+
+        Replies are recorded when the model finishes writing them. If nothing was
+        heard the entry goes, so a reply nobody heard does not read as said.
+        """
+        from intent.log_redaction import redact_card_data
+
+        cleaned = str(redact_card_data(written)).strip()
+        for index in range(len(self.entries) - 1, -1, -1):
+            entry = self.entries[index]
+            if entry.get("role") != "viola":
+                continue
+            if entry.get("text") != cleaned:
+                return
+            spoken = str(redact_card_data(heard)).strip()
+            if spoken:
+                entry["text"] = spoken
+            else:
+                del self.entries[index]
+            return
+
     def to_text(self) -> str:
         """Format transcript as readable text."""
         lines = []
@@ -4050,6 +4159,14 @@ class TranscriptCollector:
             speaker = "Them" if entry["role"] == "them" else "Viola"
             lines.append("%s: %s" % (speaker, entry["text"]))
         return "\n".join(lines)
+
+
+def _speech_pacer_for_call(transcript_collector: TranscriptCollector, publisher: Any) -> SpokenTranscriptPacer:
+    """Pace Viola's live lines through *publisher*, a transcript frame collector."""
+    return SpokenTranscriptPacer(
+        publisher._publish_delta,
+        trim_spoken=transcript_collector.trim_interrupted_assistant,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -6173,6 +6290,7 @@ class CallManager:
             try:
                 from telephony import remote_voice as _remote_voice_probe
 
+                await asyncio.to_thread(_remote_voice_probe.refresh_remote_capacity)
                 _remote_configured = bool(_remote_voice_probe.remote_voice_available())
             # Best-effort: the availability probe must never break the call.
             except Exception as exc:  # noqa: BLE001, RUF100
@@ -6625,10 +6743,12 @@ class CallManager:
                     hangup_after_output_drain=True,
                 )
 
+            speech_pacer = _speech_pacer_for_call(transcript_collector, user_transcript_collector)
             assistant_transcript_collector = TranscriptFrameCollector(
                 transcript_collector,
                 capture_user=False,
                 on_assistant_complete=_on_assistant_text_complete,
+                speech_pacer=speech_pacer,
             )
             payment_gate_text_filter = None
             if _phone_text_gate_executor is not None:
@@ -6723,6 +6843,12 @@ class CallManager:
             record._bot_speech_echo_reference = bot_speech_echo_reference
             bot_turn_floor_state = BotTurnFloorState()
             record._bot_turn_floor_state = bot_turn_floor_state
+            voicemail_answer_watch = VoicemailAnswerWatch(
+                record,
+                on_live_answer=voicemail_handler.on_live_person_answered,
+            )
+            record._voicemail_answer_watch = voicemail_answer_watch
+            bot_turn_floor_state.live_answer_check = voicemail_answer_watch.latest_speech_answers_message
             turn_strategies = UserTurnStrategies(
                 start=[
                     SelfEchoGuardedMinWordsUserTurnStartStrategy(
@@ -6781,6 +6907,7 @@ class CallManager:
             @user_aggregator.event_handler("on_user_turn_started")
             async def _on_user_turn_started_floor(_agg: Any, _strategy: Any) -> None:
                 bot_turn_floor_state.note_generation_ended()
+                await voicemail_answer_watch.on_recipient_turn_started()
 
             language_handler.set_context_frame_target(user_aggregator)
             voicemail_handler.set_context_frame_target(user_aggregator)
@@ -6851,6 +6978,7 @@ class CallManager:
                 inbound_tee_processor,
                 stt,
                 answer_settle_observer,
+                voicemail_answer_watch,
             ]
             # Streaming STT sits immediately after batch whisper: both receive the
             # same InputAudioRawFrame (whisper passes audio through), whisper still
@@ -6962,6 +7090,7 @@ class CallManager:
                     outbound_tee_processor,
                     *([disclosure_playback_marker] if disclosure_playback_marker is not None else []),
                     transport.output(),
+                    speech_pacer,
                     *([playout_end_mark] if playout_end_mark is not None else []),
                     end_call_hangup,
                     assistant_aggregator,
@@ -7125,12 +7254,19 @@ class CallManager:
                     name="phone-preparing-cue-%s" % record.call_id,
                 )
                 try:
-                    await _await_remote_warm_gate(
+                    from telephony import remote_voice as _remote_voice_gate
+
+                    # A worker that just missed a whole ceiling is stuck, not
+                    # cold: do not make this call wait a minute for it too.
+                    gate_ceiling = 0.0 if _remote_voice_gate.warm_gate_recently_gave_up() else REMOTE_WARM_DIAL_CEILING_S
+                    worker_warm = await _await_remote_warm_gate(
                         record.call_id,
                         remote_warm_ready,
                         remote_warm_started,
-                        ceiling_s=REMOTE_WARM_DIAL_CEILING_S,
+                        ceiling_s=gate_ceiling,
                     )
+                    if not worker_warm and gate_ceiling > 0.0:
+                        _remote_voice_gate.note_warm_gate_gave_up()
                 finally:
                     preparing_cue_task.cancel()
                     with suppress(asyncio.CancelledError):
@@ -7309,10 +7445,14 @@ class CallManager:
             # Estimate cost
             self._estimate_cost(record)
 
+            post_call_llm_allowed = await _post_call_llm_consented(record.user_id, cloud_mode=self.config.mode == "cloud")
+
             # Generate post-call summary
             record.summary = await self._generate_summary(
                 transcript_collector.to_text(),
                 user_id=record.user_id,
+                task=record.task,
+                llm_allowed=post_call_llm_allowed,
             )
 
             # Post-call extraction and automation
@@ -7322,7 +7462,7 @@ class CallManager:
                     extract_call_data,
                 )
 
-                if _is_cloud_llm_consented():
+                if post_call_llm_allowed:
                     extraction = await extract_call_data(
                         transcript_collector.to_text(),
                         record.task,
@@ -7389,6 +7529,8 @@ class CallManager:
             # opening-turn observer may already have cancelled it). Guarantees the
             # warm-state task never leaks past the call on any exit path.
             await _cancel_remote_warm("call cleanup (finally)")
+            if record._late_greeting_task is not None:
+                record._late_greeting_task.cancel()
 
             if disconnect_watchdog_task is not None and not disconnect_watchdog_task.done():
                 disconnect_watchdog_task.cancel()
@@ -7715,6 +7857,14 @@ class CallManager:
                             record.call_id,
                             exc_info=True,
                         )
+                # With the media gone no frames flow, so the pipeline would idle
+                # out 150 s later and the call would read as live until then
+                # (2m45s call, "live" for 5m). An EndFrame finishes it now through
+                # the same completion path, which still owns the terminal status.
+                if record._pipeline_task is not None:
+                    from pipecat.frames.frames import EndFrame
+
+                    await record._pipeline_task.queue_frame(EndFrame(reason="Telnyx media stream ended"))
                 return
 
             record.status = CallStatus.FAILED
@@ -7779,6 +7929,9 @@ class CallManager:
         async def _consume() -> None:
             async for _frame in stt.run_stt(silence_bytes):
                 pass
+            finish = getattr(stt, "finish_pending_transcriptions", None)
+            if callable(finish):
+                await finish()
 
         await asyncio.wait_for(_consume(), timeout=_PHONE_RING_STT_WARMUP_TIMEOUT_SECS)
 
@@ -7952,6 +8105,11 @@ class CallManager:
                 # processor per call), while concurrent calls proceed in parallel
                 # under the process-wide _phone_stt_transcribe_semaphore() cap.
                 self._stt_call_lock = threading.Lock()
+                self._off_path = OffPathTranscriber(
+                    self._transcribe_clip,
+                    self._yield_transcription,
+                    self.push_frame,
+                )
                 base_kwargs = dict(kwargs)
                 if uses_multilingual:
                     base_kwargs["beam_size"] = beam_size
@@ -8049,13 +8207,23 @@ class CallManager:
                     yield ErrorFrame("Whisper model not available")
                     return
 
-                text = await self._transcribe_pcm_text(
+                # Returns at once: awaiting the decode here held all later audio
+                # back from VAD. The transcript is pushed when it is ready.
+                self._off_path.submit(audio)
+
+            async def _transcribe_clip(self, audio: bytes) -> str:
+                return await self._transcribe_pcm_text(
                     audio,
                     initial_prompt=self._initial_prompt,
                     collect_metrics=True,
                 )
-                async for frame in self._yield_transcription(text):
-                    yield frame
+
+            async def finish_pending_transcriptions(self) -> None:
+                await self._off_path.finish_pending()
+
+            async def cleanup(self) -> None:
+                self._off_path.cancel()
+                await super().cleanup()
 
         return _SharedPhoneWhisperSTTService(
             settings=_SharedPhoneWhisperSTTService.Settings(
@@ -8319,30 +8487,35 @@ class CallManager:
             tts_cost,
         )
 
-    async def _generate_summary(self, transcript_text: str, *, user_id: str = "") -> str:
+    async def _generate_summary(
+        self,
+        transcript_text: str,
+        *,
+        user_id: str = "",
+        task: str = "",
+        llm_allowed: bool | None = None,
+    ) -> str:
         """Generate a concise post-call summary using the LLM.
 
-        Falls back to a basic summary if the LLM call fails.
+        Falls back to a plain line count if the LLM cannot be used. It never
+        stitches the first and last lines together: that read like a summary and
+        said nothing about the call.
         """
         if not transcript_text.strip():
             return "No conversation recorded."
 
-        if not _is_cloud_llm_consented():
+        fallback = _transcript_only_summary(transcript_text)
+        if not (_is_cloud_llm_consented() if llm_allowed is None else llm_allowed):
             logger.warning("Skipping post-call summary: cloud LLM consent not given")
-            lines = transcript_text.strip().split("\n")
-            if len(lines) <= 3:
-                return "Call transcript: " + _log_text_preview(transcript_text.strip())
-            return "Call started with: %s\n...\nCall ended with: %s" % (
-                _log_text_preview(lines[0]),
-                _log_text_preview(lines[-1]),
-            )
+            return fallback
 
         try:
+            request = "\nWHAT THE USER ASKED FOR:\n%s\n" % task if task.strip() else ""
             prompt = (
                 "Summarize this phone call in 2-3 sentences for the person who requested it.\n"
-                "Include what was accomplished or not, key details such as times, prices, "
-                "confirmation numbers, and any follow-up needed. Be factual. No preamble.\n\n"
-                "CALL TRANSCRIPT:\n%s" % transcript_text
+                "Say whether what they asked for got done, and if it did not, what happened instead. "
+                "Include key details such as times, prices, confirmation numbers, and any follow-up needed. "
+                "Be factual. No preamble.\n%s\nCALL TRANSCRIPT:\n%s" % (request, transcript_text)
             )
 
             data = await create_accounted_openai_chat_completion(
@@ -8363,13 +8536,7 @@ class CallManager:
 
         except Exception as exc:
             logger.warning("Summary generation failed: %s", exc)
-            lines = transcript_text.strip().split("\n")
-            if len(lines) <= 3:
-                return "Call transcript: " + transcript_text.strip()
-            return "Call started with: %s\n...\nCall ended with: %s" % (
-                lines[0],
-                lines[-1],
-            )
+            return fallback
 
     def cleanup_completed(self, max_age_seconds: float = 3600) -> int:
         """Remove completed call records older than max_age.

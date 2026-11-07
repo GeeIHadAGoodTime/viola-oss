@@ -29,19 +29,20 @@ def _get_watch_playlist(client, seed_video_id: str, limit: int) -> dict:
     ytmusicapi 1.11.4's ``get_watch_playlist`` also reads the browse ids of
     the Lyrics and Related tabs, and it indexes ``tabRenderer["endpoint"]``
     for any tab not marked ``unselectable``. YouTube Music now returns tabs
-    that carry neither key, so the call raised ``KeyError: 'endpoint'`` on
-    every seed after the queue itself had already arrived, and autoplay
-    never queued a next track. Autoplay only needs the queue, so on that
-    failure re-read the same ``next`` response and parse the queue alone.
+    that carry neither key, so that call raises ``KeyError: 'endpoint'`` on
+    every seed after the queue itself has arrived. Autoplay only needs the
+    queue, so it reads the queue alone: one request per seed instead of a
+    failed one plus a retry, and no warning per seed. The library call stays
+    as the fallback if YouTube changes the response shape again.
     """
     try:
-        return client.get_watch_playlist(seed_video_id, limit=limit)
-    except KeyError as exc:
-        logger.warning(
-            "YouTubeMusicRadio: get_watch_playlist could not parse the tab list (%r); reading the queue only",
-            exc,
-        )
-    return _get_watch_queue_only(client, seed_video_id)
+        queue = _get_watch_queue_only(client, seed_video_id)
+    except Exception as exc:  # noqa: BLE001 - any parse failure falls back to the library
+        logger.debug("YouTubeMusicRadio: queue-only read failed (%r)", exc)
+        queue = {"tracks": []}
+    if queue["tracks"]:
+        return {"tracks": queue["tracks"][:limit]}
+    return client.get_watch_playlist(seed_video_id, limit=limit)
 
 
 def _get_watch_queue_only(client, seed_video_id: str) -> dict:

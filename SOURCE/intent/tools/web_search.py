@@ -1,18 +1,35 @@
-"""SearXNG-backed web search tool for the agent.
+"""Web search tool for the agent.
 
 ``web_search`` returns raw discovery snippets with stable result ids. ``web_read``
 can read selected public result URLs; browser tools handle JavaScript-heavy,
 login, commerce, or interactive pages.
+
+Where the results come from:
+
+* The cloud runs SearXNG next to the API, on a private Docker network, and uses it
+  whenever ``VIOLA_SEARXNG_URL`` is set.
+* A desktop has no SearXNG and never will: it is a Linux server program with its
+  own engine pool, not something an installer can put on a Windows tablet, and
+  sending every desktop's searches through the cloud's one would add a server hop,
+  put users' queries on our servers, and give every engine one shared address to
+  rate-limit. So a desktop asks the search engines itself, from the user's own
+  address, which is a first-class path and not a degraded one: DuckDuckGo Lite with
+  the full query (``site:``, time range, next pages), then Bing's RSS feed if
+  DuckDuckGo shows a bot check, errors or finds nothing. News asks Google News' RSS
+  feed first. On a bot check that engine is skipped for a while
+  and the next one is asked.
 """
 
 from __future__ import annotations
 
 import asyncio
 import re
+import time
+from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from html import unescape
 from typing import Any
-from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
+from urllib.parse import parse_qs, parse_qsl, urlencode, urlparse, urlunparse
 
 import httpx
 
@@ -29,8 +46,23 @@ _WEB_SEARCH_CACHE_TTL_SECONDS = int(TIMEOUT_10_MINUTES)
 _DOMAIN_AGE_CACHE_TTL_SECONDS = 7 * 24 * 60 * 60
 _DDG_API_URL = "https://api.duckduckgo.com/"
 _DDG_LITE_URL = "https://lite.duckduckgo.com/lite/"
+_BING_SEARCH_URL = "https://www.bing.com/search"
+_GOOGLE_NEWS_RSS_URL = "https://news.google.com/rss/search"
 _DEFAULT_CATEGORY = "general"
 _VALID_TIME_RANGES: frozenset[str] = frozenset({"day", "week", "month", "year"})
+_DDG_TIME_FILTERS: dict[str, str] = {"day": "d", "week": "w", "month": "m", "year": "y"}
+_GOOGLE_NEWS_WHEN: dict[str, str] = {"day": "1d", "week": "7d", "month": "30d", "year": "1y"}
+_MAX_DDG_PAGE = 5
+_NEWS_DEFAULT_TIME_RANGE = "week"
+_BROWSER_HEADERS: dict[str, str] = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+    "Accept": "text/html,application/xml",
+    "Accept-Language": "en-US,en;q=0.9",
+}
+# An engine that showed a bot check or a rate limit is skipped this long.
+_ENGINE_COOLDOWN_SECONDS = 15 * 60
+# Domain age is a nice-to-have signal: it must not hold up the answer.
+_DOMAIN_AGE_BUDGET_SECONDS = 1.5
 _TRACKING_PARAM_NAMES: frozenset[str] = frozenset(
     {
         "_hsenc",
@@ -119,6 +151,22 @@ _CATEGORY_ALIASES: dict[str, str] = {
     "videos": "videos",
     "video": "videos",
 }
+
+
+class _EngineBlocked(Exception):
+    """A search engine showed a bot check or a rate limit; that engine is skipped for a while."""
+
+
+# engine name -> time.monotonic() until which it is not asked.
+_engine_cooldowns: dict[str, float] = {}
+
+
+def _engine_cooling_down(engine: str) -> bool:
+    return _engine_cooldowns.get(engine, 0.0) > time.monotonic()
+
+
+def _reset_engine_cooldowns() -> None:
+    _engine_cooldowns.clear()
 
 
 def clear_web_search_counter() -> None:
@@ -440,14 +488,18 @@ async def _post_process_results(
             domain_to_items.setdefault(domain, []).append(item)
 
     domains = list(domain_to_items)[:12]
-    age_results = await asyncio.gather(
-        *(_fetch_domain_age_days(client, domain) for domain in domains),
-        return_exceptions=True,
-    )
-    for domain, age in zip(domains, age_results, strict=False):
-        if isinstance(age, int):
-            for item in domain_to_items[domain]:
-                item["domain_age_days"] = age
+    if domains:
+        lookups = {asyncio.ensure_future(_fetch_domain_age_days(client, domain)): domain for domain in domains}
+        done, pending = await asyncio.wait(lookups, timeout=_DOMAIN_AGE_BUDGET_SECONDS)
+        for task in pending:
+            task.cancel()
+        if pending:
+            await asyncio.gather(*pending, return_exceptions=True)
+        for task in done:
+            age = None if task.cancelled() or task.exception() is not None else task.result()
+            if isinstance(age, int):
+                for item in domain_to_items[lookups[task]]:
+                    item["domain_age_days"] = age
 
     for item in deduped:
         title = str(item.get("title") or "")
@@ -606,7 +658,7 @@ def _web_search_cache_key(
     searxng_url: str,
 ) -> str:
     return public_cache_key(
-        "web_search:v4",
+        "web_search:v5",
         {
             "query": query,
             "category": category,
@@ -633,12 +685,13 @@ def _cached_web_search_result(cache_key: str, query: str) -> ToolResult | None:
 
 
 def _cache_web_search_result(cache_key: str, data: dict[str, Any]) -> None:
-    # #2776: a degraded bundle (SearXNG down/unconfigured, DuckDuckGo
-    # fallback) must never be cached at the normal success TTL. Caching it
-    # would return the same degraded/possibly-empty result as "success" for
-    # the full TTL window even after the primary backend recovers.
-    if data.get("degraded"):
-        logger.debug("Not caching degraded web_search result for key=%s", cache_key)
+    # #2776: a degraded bundle (a configured SearXNG is down, so a direct
+    # engine stood in) must never be cached at the normal success TTL. Caching
+    # it would return the same degraded/possibly-empty result as "success" for
+    # the full TTL window even after the primary backend recovers. A desktop
+    # with no SearXNG is not degraded, so its results are cached normally.
+    if data.get("degraded") or (data.get("backend") != "searxng" and not data.get("results")):
+        logger.debug("Not caching degraded or empty web_search result for key=%s", cache_key)
         return
     payload = dict(data)
     payload.pop("query", None)
@@ -739,7 +792,7 @@ async def _search_instant_answer(
     client: httpx.AsyncClient,
     query: str,
 ) -> list[dict[str, Any]]:
-    """Fallback DuckDuckGo Instant Answer search when SearXNG is absent."""
+    """DuckDuckGo Instant Answer: a short abstract, when the query has one."""
 
     response = await client.get(
         _DDG_API_URL,
@@ -771,78 +824,266 @@ async def _search_instant_answer(
                 "source": _clean_text(data.get("AbstractSource")) or "duckduckgo",
             }
         )
-
-    for topic in data.get("RelatedTopics", []):
-        if isinstance(topic, dict) and topic.get("Text"):
-            results.append(
-                {
-                    "title": _clean_text(topic.get("Text"), limit=120),
-                    "snippet": _clean_text(topic.get("Text"), limit=600),
-                    "url": _clean_text(topic.get("FirstURL")),
-                    "source": "duckduckgo",
-                }
-            )
-
     return results
+
+
+_DDG_LINK_RE = re.compile(r"""<a\b[^>]*class=['"]result-link['"][^>]*>""", re.IGNORECASE)
+_DDG_HREF_RE = re.compile(r"""href=['"]([^'"]+)['"]""", re.IGNORECASE)
+_DDG_SNIPPET_RE = re.compile(r"""<td[^>]+class=['"]result-snippet['"][^>]*>(.*?)</td>""", re.IGNORECASE | re.DOTALL)
+_DDG_FORM_RE = re.compile(r"<form\b.*?</form>", re.IGNORECASE | re.DOTALL)
+_HTML_INPUT_RE = re.compile(r"<input\b[^>]*>", re.IGNORECASE)
+_HTML_ATTR_RE = re.compile(r"""\b(name|value)=['"]([^'"]*)['"]""", re.IGNORECASE)
+
+
+def _ddg_target_url(raw_href: str) -> str:
+    """The page a DuckDuckGo result points at, or "" for an ad or DuckDuckGo's own page."""
+    href = unescape(raw_href).strip()
+    if href.startswith("//"):
+        href = "https:" + href
+    parsed = urlparse(href)
+    host = _normalized_host(parsed.hostname)
+    if host == "duckduckgo.com" or host.endswith(".duckduckgo.com"):
+        if parsed.path.rstrip("/") == "/l":
+            return parse_qs(parsed.query).get("uddg", [""])[0]
+        return ""
+    return href
+
+
+def _results_from_ddg_lite(html: str) -> list[dict[str, Any]]:
+    """Organic results from a Lite page, each with the snippet in its own rows."""
+    matches = list(_DDG_LINK_RE.finditer(html))
+    results: list[dict[str, Any]] = []
+    for index, match in enumerate(matches):
+        end_of_title = html.find("</a>", match.end())
+        if end_of_title < 0:
+            continue
+        href = _DDG_HREF_RE.search(match.group(0))
+        url = _ddg_target_url(href.group(1)) if href else ""
+        if not url:
+            continue
+        block_end = matches[index + 1].start() if index + 1 < len(matches) else len(html)
+        snippet = _DDG_SNIPPET_RE.search(html, end_of_title, block_end)
+        results.append(
+            {
+                "title": _clean_text(html[match.end() : end_of_title]),
+                "snippet": _clean_text(snippet.group(1), limit=600) if snippet else "",
+                "url": _clean_text(url),
+                "source": "duckduckgo",
+            }
+        )
+    return results
+
+
+def _ddg_next_page_fields(html: str) -> dict[str, str] | None:
+    """The hidden fields of the page's own "Next Page" form."""
+    for form in _DDG_FORM_RE.findall(html):
+        if "next page" not in form.lower():
+            continue
+        fields: dict[str, str] = {}
+        for tag in _HTML_INPUT_RE.findall(form):
+            attributes = {key.lower(): value for key, value in _HTML_ATTR_RE.findall(tag)}
+            if attributes.get("name"):
+                fields[attributes["name"]] = unescape(attributes.get("value", ""))
+        return fields or None
+    return None
+
+
+async def _ddg_lite_page(client: httpx.AsyncClient, fields: dict[str, str]) -> str:
+    response = await client.post(_DDG_LITE_URL, data=fields, headers=_BROWSER_HEADERS)
+    # 202 is DuckDuckGo's bot check.
+    if response.status_code in {202, 403, 429} or "anomaly" in response.text[:2000].lower():
+        raise _EngineBlocked("DuckDuckGo showed a bot check (HTTP %d)" % response.status_code)
+    response.raise_for_status()
+    return response.text
 
 
 async def _search_lite_html(
     client: httpx.AsyncClient,
     query: str,
+    *,
+    page: int = 1,
+    time_range: str | None = None,
 ) -> list[dict[str, Any]]:
-    """Fallback DuckDuckGo Lite HTML search when SearXNG is absent."""
+    """DuckDuckGo Lite: the full query, with its time filter and next pages."""
 
-    response = await client.post(
-        _DDG_LITE_URL,
-        data={"q": query.strip()},
-        headers={
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-            "Accept": "text/html",
-        },
+    fields = {"q": query.strip()}
+    if time_range in _DDG_TIME_FILTERS:
+        fields["df"] = _DDG_TIME_FILTERS[time_range]
+    html = await _ddg_lite_page(client, fields)
+    for _ in range(min(page, _MAX_DDG_PAGE) - 1):
+        next_fields = _ddg_next_page_fields(html)
+        if next_fields is None:
+            return []
+        html = await _ddg_lite_page(client, {**fields, **next_fields})
+    return _results_from_ddg_lite(html)
+
+
+_RSS_ITEM_RE = re.compile(r"<item\b[^>]*>(.*?)</item>", re.IGNORECASE | re.DOTALL)
+
+
+def _rss_field(item: str, name: str) -> str:
+    match = re.search(r"<%s\b[^>]*>(.*?)</%s>" % (name, name), item, re.IGNORECASE | re.DOTALL)
+    if match is None:
+        return ""
+    value = match.group(1).strip()
+    if value.startswith("<![CDATA[") and value.endswith("]]>"):
+        value = value[9:-3]
+    return value
+
+
+def _site_operators(query: str) -> list[str]:
+    return [site.lower() for site in re.findall(r"(?<!\S)site:(\S+)", query, flags=re.IGNORECASE)]
+
+
+def _on_site(url: str, sites: list[str]) -> bool:
+    host = _normalized_host(urlparse(url).hostname)
+    return any(host == _normalized_host(site) or host.endswith("." + _normalized_host(site)) for site in sites)
+
+
+async def _search_bing_rss(
+    client: httpx.AsyncClient,
+    query: str,
+    *,
+    page: int = 1,
+    time_range: str | None = None,
+) -> list[dict[str, Any]]:
+    """Bing's RSS feed. Plain ranking only: it ignores operators, dates and paging."""
+
+    del page, time_range
+    sites = _site_operators(query)
+    plain_query = re.sub(r"(?<!\S)site:(\S+)", r"\1", query, flags=re.IGNORECASE).strip()
+    response = await client.get(
+        _BING_SEARCH_URL,
+        params={"q": plain_query, "format": "rss"},
+        headers=_BROWSER_HEADERS,
+        follow_redirects=True,
     )
+    if response.status_code in {403, 429}:
+        raise _EngineBlocked("Bing refused the search (HTTP %d)" % response.status_code)
     response.raise_for_status()
-    if response.status_code == 202 or "challenge" in response.text[:500].lower():
-        raise httpx.HTTPStatusError(
-            "DuckDuckGo rate-limited (CAPTCHA)",
-            request=response.request,
-            response=response,
-        )
-    html = response.text
-
-    link_pattern = re.compile(
-        r"""<a[^>]+class=['"]result-link['"][^>]*href=['"]([^'"]+)['"][^>]*>([^<]+)</a>"""
-        r"""|<a[^>]+href=['"]([^'"]+)['"][^>]*class=['"]result-link['"][^>]*>([^<]+)</a>""",
-        re.IGNORECASE,
-    )
-    snippet_pattern = re.compile(
-        r"""<td[^>]+class=['"]result-snippet['"][^>]*>(.*?)</td>""",
-        re.IGNORECASE | re.DOTALL,
-    )
-
-    raw_links = link_pattern.findall(html)
-    snippets = snippet_pattern.findall(html)
-    links: list[tuple[str, str]] = []
-    for match in raw_links:
-        url = match[0] or match[2]
-        title = match[1] or match[3]
-        if url and title:
-            links.append((url, title))
-
     results: list[dict[str, Any]] = []
-    for index, (url, title) in enumerate(links):
-        snippet = ""
-        if index < len(snippets):
-            snippet = _clean_text(snippets[index], limit=600)
+    for item in _RSS_ITEM_RE.findall(response.text):
+        url = _clean_text(_rss_field(item, "link"))
+        if not url:
+            continue
         results.append(
             {
-                "title": _clean_text(title),
-                "snippet": snippet,
-                "url": _clean_text(url),
-                "source": "duckduckgo",
+                "title": _clean_text(_rss_field(item, "title")),
+                "snippet": _clean_text(_rss_field(item, "description"), limit=600),
+                "url": url,
+                "source": "bing",
             }
         )
+    # The feed ignores site:, so keep what is on the site. When nothing is, keep
+    # the results anyway: ``site_filter_met`` tells the model they are not.
+    on_site = [item for item in results if _on_site(str(item["url"]), sites)]
+    return on_site or results
 
+
+async def _search_google_news_rss(
+    client: httpx.AsyncClient,
+    query: str,
+    *,
+    page: int = 1,
+    time_range: str | None = None,
+) -> list[dict[str, Any]]:
+    """Google News' RSS feed: dated headlines. Its links open in a browser, not web_read."""
+
+    del page
+    when = _GOOGLE_NEWS_WHEN.get(time_range or _NEWS_DEFAULT_TIME_RANGE)
+    response = await client.get(
+        _GOOGLE_NEWS_RSS_URL,
+        params={"q": "%s when:%s" % (query.strip(), when), "hl": "en-US", "gl": "US", "ceid": "US:en"},
+        headers=_BROWSER_HEADERS,
+        follow_redirects=True,
+    )
+    if response.status_code in {403, 429}:
+        raise _EngineBlocked("Google News refused the search (HTTP %d)" % response.status_code)
+    response.raise_for_status()
+    results: list[dict[str, Any]] = []
+    for item in _RSS_ITEM_RE.findall(response.text)[:20]:
+        url = _clean_text(_rss_field(item, "link"))
+        title = _clean_text(_rss_field(item, "title"))
+        if not url or not title:
+            continue
+        result: dict[str, Any] = {
+            "title": title,
+            "snippet": title,
+            "url": url,
+            "source": "google_news",
+            "open_with": "browser",
+        }
+        published = _clean_text(_rss_field(item, "pubDate"))
+        if published:
+            result["publishedDate"] = published
+        results.append(result)
     return results
+
+
+_EngineSearch = Callable[..., Awaitable[list[dict[str, Any]]]]
+
+
+def _direct_engines(category: str) -> list[tuple[str, _EngineSearch]]:
+    engines: list[tuple[str, _EngineSearch]] = [("duckduckgo", _search_lite_html), ("bing", _search_bing_rss)]
+    if category == "news":
+        # A date filter on the web still ranks home pages first; this is news.
+        engines.insert(0, ("google_news", _search_google_news_rss))
+    return engines
+
+
+async def _search_direct_engines(
+    client: httpx.AsyncClient,
+    query: str,
+    category: str,
+    *,
+    page: int,
+    time_range: str | None,
+) -> tuple[str, list[dict[str, Any]], list[str]]:
+    """Ask the engines in order until one has results.
+
+    Returns the engine that answered, its results, and the engines it stood in
+    for. Raises the last failure when every engine failed.
+    """
+    skipped: list[str] = []
+    last_error: Exception | None = None
+    answered = ""
+    for engine, search in _direct_engines(category):
+        if _engine_cooling_down(engine):
+            skipped.append(engine)
+            continue
+        try:
+            results = await search(client, query, page=page, time_range=time_range)
+        except _EngineBlocked as exc:
+            # Skip this engine for a while and move on, like moving to another store.
+            _engine_cooldowns[engine] = time.monotonic() + _ENGINE_COOLDOWN_SECONDS
+            logger.warning("Web search engine %s is unavailable for now: %s", engine, exc)
+            last_error = exc
+            skipped.append(engine)
+            continue
+        except (httpx.HTTPError, ValueError) as exc:
+            logger.warning("Web search engine %s failed: %s", engine, type(exc).__name__)
+            last_error = exc
+            skipped.append(engine)
+            continue
+        answered = engine
+        if results:
+            return engine, results, skipped
+        skipped.append(engine)
+    if answered or last_error is None:
+        return answered or "duckduckgo", [], skipped
+    raise last_error
+
+
+async def _instant_answers(client: httpx.AsyncClient, query: str) -> list[dict[str, Any]]:
+    """A short abstract for the query, if there is one. Never fails the search."""
+    plain = re.sub(r"(?<!\S)site:\S+\s*", "", query).replace('"', "").strip()
+    if not plain:
+        return []
+    try:
+        return await _search_instant_answer(client, plain)
+    except Exception as exc:  # noqa: BLE001, RUF100 - the abstract is optional
+        logger.debug("DuckDuckGo instant answer unavailable: %s", type(exc).__name__)
+        return []
 
 
 async def web_search(
@@ -854,9 +1095,9 @@ async def web_search(
 ) -> ToolResult:
     """Search the public web.
 
-    SearXNG is the primary backend when configured. DuckDuckGo is retained only
-    as a degraded compatibility fallback for local/dev environments that do not
-    have ``VIOLA_SEARXNG_URL`` configured.
+    SearXNG when ``VIOLA_SEARXNG_URL`` is configured (the cloud), otherwise the
+    search engines directly (a desktop; see the module docstring). A configured
+    SearXNG that fails falls back to those engines and says so as ``degraded``.
     """
 
     if not query or not query.strip():
@@ -933,64 +1174,82 @@ async def web_search(
                     httpx.TimeoutException,
                 ) as searxng_exc:
                     # API-first triage: SearXNG is preferred, but if it fails we
-                    # degrade to DuckDuckGo before giving up.
+                    # degrade to the direct engines before giving up.
                     status = getattr(getattr(searxng_exc, "response", None), "status_code", None)
                     searxng_failure_reason = (
-                        "SearXNG returned HTTP %d; degraded to DuckDuckGo." % status
+                        "SearXNG returned HTTP %d; degraded to direct search." % status
                         if status is not None
-                        else "SearXNG unreachable (%s); degraded to DuckDuckGo." % type(searxng_exc).__name__
+                        else "SearXNG unreachable (%s); degraded to direct search." % type(searxng_exc).__name__
                     )
                     logger.warning(
-                        "SearXNG web search backend failed: status=%s type=%s; falling back to DuckDuckGo",
+                        "SearXNG web search backend failed: status=%s type=%s; falling back to direct search",
                         status,
                         type(searxng_exc).__name__,
                     )
 
-            ddg_query = normalized_query
-            ddg_query = re.sub(r"site:\S+\s*", "", ddg_query).strip()
-            if ddg_query.count('"') >= 4:
-                ddg_query = ddg_query.replace('"', "")
-            if not ddg_query:
-                ddg_query = normalized_query.replace('"', "")
-            results = await _search_instant_answer(client, ddg_query)
-            if not results:
-                results = await _search_lite_html(client, ddg_query)
-            raw_candidate_count = len(results)
-            results = await _post_process_results(client, results)
+            served_time = normalized_time
+            if normalized_category == "news" and served_time is None:
+                served_time = _NEWS_DEFAULT_TIME_RANGE
+            wants_abstract = normalized_page == 1 and normalized_time is None and normalized_category != "news"
+            abstract_task = asyncio.ensure_future(_instant_answers(client, normalized_query)) if wants_abstract else None
+            try:
+                engine, results, stood_in_for = await _search_direct_engines(
+                    client,
+                    normalized_query,
+                    normalized_category,
+                    page=normalized_page,
+                    time_range=served_time,
+                )
+            except BaseException:
+                if abstract_task is not None:
+                    abstract_task.cancel()
+                raise
+            abstracts = await abstract_task if abstract_task is not None else []
+            if engine != "duckduckgo":
+                # These feeds take the query alone: no next pages, no date filter.
+                served_page = 1
+                served_time = served_time if engine == "google_news" else None
+            else:
+                served_page = normalized_page
+            raw_candidate_count = len(results) + len(abstracts)
+            results = await _post_process_results(client, abstracts + results)
             result_refs = _with_result_refs(results)
             data = {
-                "query": ddg_query,
+                "query": normalized_query,
             }
             data.update(
                 {
-                    "backend": "duckduckgo",
+                    "backend": engine,
                     "selection_mode": "raw",
                     "enrichment_mode": "generic_trust_signals",
-                    "degraded": True,
-                    "degraded_reason": (
-                        searxng_failure_reason
-                        if searxng_failure_reason
-                        else "SearXNG is not configured; using legacy DuckDuckGo fallback."
-                    ),
                     "category": normalized_category,
-                    "page": 1,
+                    "page": served_page,
+                    "time_range": served_time,
                     "raw_candidate_count": raw_candidate_count,
                     "candidate_count": len(results),
                     "count": len(result_refs),
                     "results": result_refs,
                     "search_metadata": {
-                        "answers": [],
+                        "answers": [str(item.get("snippet") or "") for item in abstracts],
                         "corrections": [],
                         "infoboxes": [],
                         "suggestions": [],
-                        "unresponsive_engines": [],
+                        "unresponsive_engines": stood_in_for,
                         "number_of_results": None,
-                        "page": 1,
+                        "page": served_page,
                         "category": normalized_category,
-                        "time_range": None,
+                        "time_range": served_time,
                     },
                 }
             )
+            sites = _site_operators(normalized_query)
+            if sites:
+                data["search_metadata"]["site_filter_met"] = bool(results) and all(
+                    _on_site(str(item.get("url") or ""), sites) for item in results
+                )
+            if searxng_failure_reason:
+                data["degraded"] = True
+                data["degraded_reason"] = searxng_failure_reason
             _cache_web_search_result(cache_key, data)
             return ToolResult(ok=True, data=data)
 
@@ -1001,11 +1260,23 @@ async def web_search(
             retryable=True,
         )
     except httpx.HTTPStatusError as exc:
-        backend = "searxng" if searxng_url else "duckduckgo"
+        backend = "searxng" if searxng_url else "web"
         return ToolResult(
             ok=False,
             error="%s search request failed: HTTP %d" % (backend, exc.response.status_code),
             retryable=exc.response.status_code >= 500,
+        )
+    except _EngineBlocked:
+        return ToolResult(
+            ok=False,
+            error="The search engines are refusing automated searches from this connection right now.",
+            retryable=True,
+        )
+    except httpx.TransportError:
+        return ToolResult(
+            ok=False,
+            error="Web search could not reach any search engine.",
+            retryable=True,
         )
     except Exception as exc:
         logger.warning("Web search backend failed: %s", type(exc).__name__)

@@ -19,6 +19,7 @@ import json
 import os
 import tempfile
 import threading
+import time
 from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Protocol, cast
@@ -35,6 +36,8 @@ logger = get_logger(__name__)
 # keyring is bypassed entirely when VIOLA_DISABLE_OS_KEYRING is set — that hatch
 # is owned by ``_os_keyring_disabled`` / ``_load_keyring`` below (#757), so the
 # resolver just consults ``_load_keyring`` and gets file-fallback deterministically.
+_ATOMIC_REPLACE_ATTEMPTS = 5
+_ATOMIC_REPLACE_RETRY_S = 0.05
 _KEY_SOURCE_KEYCHAIN = "os-keychain"
 _KEY_SOURCE_FILE = "file-fallback"
 _KEY_SOURCE_GENERATED = "generated"
@@ -149,6 +152,14 @@ def _load_fernet() -> tuple[type[_FernetCipher], type[Exception]] | None:
 
 def _ensure_parent_dir(path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
+
+
+def _file_already_holds(path: Path, payload: str) -> bool:
+    """True when ``path`` already has exactly this text. A failed read means no."""
+    try:
+        return path.read_text(encoding="utf-8") == payload
+    except (OSError, UnicodeError):
+        return False
 
 
 def _try_set_restrictive_perms(path: Path) -> None:
@@ -399,15 +410,31 @@ class SecureSettingsManager:
         if not self._encryption_enabled or self._cipher is None:
             raise SecurityError(f"Encryption unavailable: {self._disabled_reason or 'disabled'}")
 
+        cache_key = f"encrypted_{key}"
+        if self._holds_value(cache_key, value):
+            # Encrypting gives different bytes every time, so re-storing the
+            # same value would make the file look changed and get rewritten.
+            return True
+
         try:
             encrypted = self._cipher.encrypt(value.encode("utf-8"))
         except Exception as exc:
             logger.exception("Encryption failed: %s", exc)
             raise SecurityError("Encryption failed; value not stored.") from exc
 
-        self._encrypted_cache[f"encrypted_{key}"] = encrypted.decode("utf-8")
-        logger.info("Encrypted value stored.")
+        self._encrypted_cache[cache_key] = encrypted.decode("utf-8")
+        logger.debug("Encrypted value stored.")
         return True
+
+    def _holds_value(self, cache_key: str, value: str) -> bool:
+        """True when this entry already decrypts to ``value``."""
+        current = self._encrypted_cache.get(cache_key)
+        if not isinstance(current, str) or self._cipher is None:
+            return False
+        try:
+            return self._cipher.decrypt(current.encode("utf-8")) == value.encode("utf-8")
+        except Exception:  # noqa: BLE001, RUF100 - unreadable entry: store the value afresh
+            return False
 
     def get_secret(self, key: str) -> str | None:
         encrypted_key = f"encrypted_{key}"
@@ -441,6 +468,10 @@ class SecureSettingsManager:
             return None
         return decrypted.decode("utf-8")
 
+    def has_secret(self, key: str) -> bool:
+        """True when a value is stored for ``key``, readable or not."""
+        return f"encrypted_{key}" in self._encrypted_cache
+
     def delete_secret(self, key: str) -> bool:
         """Remove an encrypted value from the local cache."""
         encrypted_key = f"encrypted_{key}"
@@ -472,6 +503,10 @@ class SecureSettingsManager:
         try:
             _ensure_parent_dir(file_path)
             payload = json.dumps(self._encrypted_cache, indent=2)
+            if _file_already_holds(file_path, payload):
+                # Nothing changed, and it is already durable: the store was
+                # rewritten 668 times in a day on a battery tablet (build 9).
+                return
             if strict:
                 with tempfile.NamedTemporaryFile(
                     mode="w",
@@ -484,11 +519,20 @@ class SecureSettingsManager:
                     pending.write(payload)
                     pending.flush()
                     os.fsync(pending.fileno())
-                os.replace(pending_path, file_path)
+                # Windows refuses the swap while something (antivirus, a backup)
+                # has the target open for a moment.
+                for attempt in range(_ATOMIC_REPLACE_ATTEMPTS):
+                    try:
+                        os.replace(pending_path, file_path)
+                        break
+                    except PermissionError:
+                        if attempt == _ATOMIC_REPLACE_ATTEMPTS - 1:
+                            raise
+                        time.sleep(_ATOMIC_REPLACE_RETRY_S)
                 pending_path = None
             else:
                 file_path.write_text(payload, encoding="utf-8")
-            logger.info("Encrypted cache saved.")
+            logger.debug("Encrypted cache saved.")
         except Exception as exc:
             logger.warning("Failed to save encrypted cache: %s", exc)
             if strict:

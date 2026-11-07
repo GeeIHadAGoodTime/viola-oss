@@ -29,7 +29,8 @@ import uuid
 from collections import OrderedDict
 from collections.abc import Callable, Iterable, Mapping
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, is_dataclass
+from dataclasses import fields as dc_fields
 from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
@@ -39,6 +40,7 @@ from config.env import get_bool as _env_get_bool
 from core.asyncio_safe import is_event_loop_closed_error
 from core.logging_config import get_logger
 from core.platform import get_logs_dir
+from intent.active_task import ActiveTask, answer_from_helper_results
 from intent.agent_message_manager import (
     AgentMessageManager,
     record_tool_result_replacements,
@@ -65,6 +67,7 @@ from intent.irreversible_actions import (
     describe_browser_send,
     describe_irreversible_action,
     gate_action_class,
+    irreversible_action_class,
 )
 from intent.log_redaction import redact_card_data, redact_card_field, redact_pii
 from intent.post_answer_teardown import (
@@ -311,19 +314,8 @@ _PROVIDER_PRIVATE_RESPONSE_KEYS = frozenset(
 
 
 def _trace_safe_copy(value: Any) -> Any:
-    try:
-        return copy.deepcopy(value)
-    except (TypeError, ValueError, AttributeError, RuntimeError, RecursionError):
-        try:
-            return json.loads(
-                json.dumps(
-                    value,
-                    default=lambda item: "<%s>" % type(item).__name__,
-                    ensure_ascii=True,
-                )
-            )
-        except (TypeError, ValueError, AttributeError, RuntimeError, RecursionError):
-            return "<%s>" % type(value).__name__
+    """Trace copy without copy.deepcopy (see _trace_copy)."""
+    return _trace_copy(value)
 
 
 def _estimated_tokens_for_messages(messages: list[dict[str, Any]]) -> int:
@@ -761,6 +753,55 @@ _NO_PROGRESS_PAGE_HEALTH_STATUSES = frozenset({"bot_protection", "parked_or_expi
 # more managed-LLM turns waiting for one to "pass" on its own. Bounded
 # per the ticket's minimal-fix spec ("same page/state N times -> halt").
 _BOT_PROTECTION_HALT_STREAK = 3
+
+# A site's person check: shown to the user in the browser view while the task waits.
+_BOT_CHECK_WAIT_SECONDS = 180.0
+_BOT_CHECK_POLL_SECONDS = 2.0
+_BOT_CHECK_NOTICE = (
+    "This site wants to check you're a person. "
+    "The page is on your screen: please finish the check there and I'll carry on as soon as it's done."
+)
+_BOT_CHECK_DONE_NOTE = (
+    "[The user finished the site's person check in the browser view. Take a fresh browser_snapshot "
+    "and carry on with the task. If the site shows another check, it is shown to the user the same way.]"
+)
+_BOT_CHECK_GIVEN_UP_NOTE = (
+    "[This site is showing a person check that the user did not finish (%s). "
+    "Leave this site. If the request can be met at another store or site, use that one "
+    "and tell the user you switched. If it cannot, stop and tell the user plainly that the site needs "
+    "them to finish the check; the page stays open on their screen.]"
+)
+
+def _trace_copy(value: Any, _depth: int = 0) -> Any:
+    """A copy for the task trace that cannot fail.
+
+    Plain data (dicts, lists, tuples, strings, numbers) is copied deeply, so later
+    changes never reach the trace. Anything else is written as ``<TypeName>``. A tool
+    result can hold an object tied to an event loop; copy.deepcopy then failed half
+    way, the trace lost that tool call, and the half-built loop it left behind logged
+    "Exception ignored in BaseEventLoop.__del__" on every tool turn.
+    """
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if _depth > 40:
+        return "<nested too deep>"
+    if isinstance(value, dict):
+        return {(k if isinstance(k, (str, int, float, bool)) or k is None else str(k)): _trace_copy(v, _depth + 1)
+                for k, v in value.items()}
+    if isinstance(value, (list, tuple, set, frozenset)):
+        return [_trace_copy(item, _depth + 1) for item in value]
+    if isinstance(value, (bytes, bytearray)):
+        return "<%d bytes>" % len(value)
+    if is_dataclass(value) and not isinstance(value, type):
+        return {f.name: _trace_copy(getattr(value, f.name, None), _depth + 1) for f in dc_fields(value)}
+    dump = getattr(value, "model_dump", None)
+    if callable(dump):
+        try:
+            return _trace_copy(dump(), _depth + 1)
+        except Exception:  # noqa: BLE001, RUF100 - fall back to text
+            pass
+    return "<%s>" % type(value).__name__
+
 _MEMORY_ALL_SCOPE_PATHS = frozenset({"", "memory", "memory/", "MEMORY.md", "memory/MEMORY.md"})
 _MEMORY_SEARCH_ACTIONS = frozenset({"search", "grep"})
 _MEMORY_ENUMERATION_ACTIONS = frozenset({"read", "list"})
@@ -1310,6 +1351,23 @@ def _delivery_address_from_value(value: Any) -> dict[str, str] | str | None:
     return None
 
 
+def _street_number_and_name(address: dict[str, str] | str) -> tuple[str, str] | None:
+    text = address.get("street", "") if isinstance(address, dict) else str(address)
+    match = re.match(r"\s*(\d{1,6}[a-z]?)\s+([^,\n]{1,80})", text, re.IGNORECASE)
+    if match is None:
+        return None
+    return match.group(1).lower(), " ".join(re.findall(r"[a-z0-9]+", match.group(2).lower()))
+
+
+def _house_number_differs(order_address: Any, saved_address: Any) -> bool:
+    """True for the same street with another number: the slip a misheard digit makes."""
+    order = _street_number_and_name(order_address) if order_address else None
+    saved = _street_number_and_name(saved_address) if saved_address else None
+    if order is None or saved is None or order[0] == saved[0]:
+        return False
+    return order[1].startswith(saved[1]) or saved[1].startswith(order[1])
+
+
 def _delivery_address_from_request(
     request: dict[str, Any],
 ) -> dict[str, str] | str | None:
@@ -1662,6 +1720,139 @@ def _payment_gate_answer_with_confirm_url(
     return "%s\n%s" % (answer.rstrip(), url)
 
 
+_ORDER_WORD_RE = re.compile(r"[a-z0-9]{3,}")
+_ORDER_FILLER_WORDS = frozenset({"the", "and", "for", "with", "pack", "count", "each", "item", "items", "one", "new"})
+
+
+def _order_words(text: Any) -> set[str]:
+    return set(_ORDER_WORD_RE.findall(str(text or "").lower())) - _ORDER_FILLER_WORDS
+
+
+def _order_item_name(item: Any) -> str:
+    if isinstance(item, dict):
+        return str(item.get("name") or item.get("description") or "").strip()
+    return str(item or "").strip()
+
+
+def _order_item_seen_in(item: Any, others: list[Any]) -> bool:
+    words = _order_words(_order_item_name(item))
+    if not words:
+        return True
+    return any(len(words & _order_words(_order_item_name(other))) * 2 >= len(words) for other in others)
+
+
+def _reconcile_claimed_order(
+    order_summary: dict[str, Any],
+    claimed_items: Any,
+    claimed_total: str,
+    claimed_text: str = "",
+) -> None:
+    """Compare what the model claimed with what the store's page shows.
+
+    ``order_summary["items"]`` holds the page's items when they could be read. The
+    claim is only used when they could not, and the card then says so. Every
+    difference becomes a plain line in ``order_warnings``, shown above the pay button.
+    """
+    from services.payments.purchase_ceiling import parse_money_cents
+
+    claimed = claimed_items if isinstance(claimed_items, list) else []
+    page_items = order_summary.get("items")
+    warnings: list[str] = []
+    if isinstance(page_items, list) and page_items:
+        for item in claimed:
+            if not _order_item_seen_in(item, page_items):
+                warnings.append(
+                    "Viola thought this order had %s, but the store's page does not show it." % _order_item_name(item)
+                )
+        said = claimed or ([claimed_text] if claimed_text.strip() else [])
+        for item in page_items if said else []:
+            if not _order_item_seen_in(item, said):
+                warnings.append("The store's page shows %s, which Viola did not mention." % _order_item_name(item))
+    else:
+        if claimed:
+            order_summary["items"] = claimed
+        order_summary["items_source"] = "agent"
+        warnings.append(
+            "Viola could not read the items from the store's page. Check them on the page before you approve."
+        )
+    dom_total = str(order_summary.get("dom_total") or "").strip()
+    if claimed_total and dom_total:
+        claimed_cents = parse_money_cents(claimed_total)
+        page_cents = order_summary.get("dom_total_cents")
+        if claimed_cents is not None and page_cents is not None and abs(claimed_cents - int(page_cents)) > 1:
+            warnings.append("Viola said the total was %s, but the store's page says %s." % (claimed_total, dom_total))
+    if warnings:
+        order_summary["order_warnings"] = warnings
+
+
+def _payment_gate_answer_from_order(answer: str | None, order_summary: dict[str, Any] | None) -> str | None:
+    """Say what is being bought from the store's page, not from the model's summary."""
+    if not answer or not isinstance(order_summary, dict):
+        return answer
+    lines: list[str] = []
+    merchant = str(order_summary.get("merchant") or "").strip()
+    site = str(order_summary.get("site") or "").strip()
+    if merchant or site:
+        lines.append("Store: %s" % (" at ".join(part for part in (merchant, site) if part)))
+    items = order_summary.get("items")
+    if isinstance(items, list) and items:
+        rows: list[str] = []
+        for item in items:
+            name = _order_item_name(item)
+            if not name:
+                continue
+            quantity = item.get("quantity") if isinstance(item, dict) else None
+            price = str(item.get("price") or "").strip() if isinstance(item, dict) else ""
+            rows.append("- %s%s%s" % ("%s x " % quantity if quantity else "", name, " (%s)" % price if price else ""))
+        hidden = order_summary.get("items_not_listed")
+        if hidden:
+            rows.append("- and %s more on the store's page" % hidden)
+        if rows:
+            source = "On the store's page" if order_summary.get("items_source") == "page" else "Viola says"
+            lines.append("%s:\n%s" % (source, "\n".join(rows)))
+    total = str(order_summary.get("dom_total") or order_summary.get("total") or "").strip()
+    if total:
+        lines.append("Total: %s" % total)
+    if not lines:
+        return answer
+    for warning in order_summary.get("order_warnings") or []:
+        lines.append("Check this: %s" % warning)
+    prefix = _PAYMENT_GATE_PREFIX
+    return "%s%s" % ("%s " % prefix if str(answer).strip().startswith(prefix) else "", "\n".join(lines))
+
+
+_APPROVAL_TEXT_REASONS = {
+    "no_phone": "add and verify your phone under Settings > Account",
+    "no_consent": "turn on approval texts under Settings > Account",
+    "not_signed_in": "sign in to Viola first",
+    "cloud_not_configured": "texting is not available in this setup",
+    "cloud_unreachable": "Viola's service could not be reached",
+    "cloud_bad_response": "Viola's service gave an answer that could not be read",
+    "hosted_link_unavailable": "no link for your phone could be made",
+}
+
+
+def _payment_approval_ways_line(delivery: dict[str, Any] | None, link_note: str | None = None) -> str:
+    """Say both ways to approve, every time: on this device, and by a texted link.
+
+    ``link_note`` already says why there is no link for the phone, so it is not repeated.
+    """
+    if link_note:
+        return "You can approve here with Review and pay."
+    sms = delivery.get("sms_default") if isinstance(delivery, dict) else None
+    if isinstance(sms, dict) and (sms.get("sent") or sms.get("already_sent")):
+        return "You can approve here with Review and pay, or from the link I just texted to your phone."
+    reason = ""
+    if isinstance(sms, dict):
+        reason = str(
+            sms.get("user_message") or _APPROVAL_TEXT_REASONS.get(str(sms.get("reason") or sms.get("status"))) or ""
+        )
+    elif isinstance(delivery, dict):
+        reason = _APPROVAL_TEXT_REASONS.get(str(delivery.get("reason")), "")
+    reason = reason.rstrip(".") or "texting is not available right now"
+    return "You can approve here with Review and pay. I could not text you the approval link: %s." % reason
+
+
 async def _dispatch_payment_confirmation_link_for_executor(
     executor: Any,
     payment_confirmation_ctx: dict[str, Any] | None,
@@ -1885,7 +2076,32 @@ def flush_agent_task_log_io(timeout: float | None = 10.0) -> bool:
     return True
 
 
+# A day's step log that passes this size moves to a ".1" file, replacing the
+# previous one, so a long day keeps at most about twice this on disk.
+_STEP_LOG_MAX_BYTES = 32 * 1024 * 1024
+_SCHEMAS_IN_STEP_LOG: dict[str, set[str]] = {}
+_SCHEMAS_IN_STEP_LOG_LOCK = threading.Lock()
+
+
+def _first_time_in_step_log(path: Path, schema_hash: str) -> bool:
+    """True the first time this schema set is written to this log file."""
+    key = str(path)
+    with _SCHEMAS_IN_STEP_LOG_LOCK:
+        seen = _SCHEMAS_IN_STEP_LOG.setdefault(key, set())
+        if schema_hash in seen:
+            return False
+        seen.add(schema_hash)
+        return True
+
+
 def _write_structured_log_line(path: Path, line: str) -> None:
+    try:
+        if path.stat().st_size + len(line) > _STEP_LOG_MAX_BYTES:
+            os.replace(path, path.with_name(path.stem + ".1" + path.suffix))
+            with _SCHEMAS_IN_STEP_LOG_LOCK:
+                _SCHEMAS_IN_STEP_LOG.pop(str(path), None)
+    except OSError:
+        pass
     with open(path, "a", encoding="utf-8") as f:
         f.write(line)
 
@@ -1921,18 +2137,53 @@ def _redacted_static_step_field(key: str, value: Any) -> Any:
     return copy.deepcopy(cached)
 
 
+_ADDRESS_LOG_KEYS = frozenset({"street", "zip_code", "read_back"})
+_ADDRESS_TOOL = "save_delivery_address"
+# In a turn that saves an address, a bare "no, the house number is 4812" carries
+# no street to recognise, so every number in that turn's words is masked.
+_ADDRESS_TURN_TEXT_KEYS = ("user_text", "final_answer", "llm_reasoning", "result_summary")
+_NUMBER_RE = re.compile(r"\d+")
+
+
+def _mask_address_turn(record: dict[str, Any]) -> dict[str, Any]:
+    for key in _ADDRESS_TURN_TEXT_KEYS:
+        value = record.get(key)
+        if isinstance(value, str):
+            record[key] = _NUMBER_RE.sub("[redacted]", value)
+    return record
+
+
+def _mask_addresses_for_log(value: Any) -> Any:
+    """Keep a street address out of the agent's plain-text logs, like a phone number."""
+    from services.memory.store import redact_street_addresses
+
+    if isinstance(value, str):
+        return redact_street_addresses(value)
+    if isinstance(value, dict):
+        return {
+            key: "[redacted]" if key in _ADDRESS_LOG_KEYS and item else _mask_addresses_for_log(item)
+            for key, item in value.items()
+        }
+    if isinstance(value, (list, tuple)):
+        return [_mask_addresses_for_log(item) for item in value]
+    return value
+
+
 def _redact_step_data(step_data: dict[str, Any]) -> Any:
-    """``redact_card_data(step_data)``, reusing the redaction of unchanged tool-schema fields."""
+    """Card and personal data out of a step line, reusing the redaction of unchanged tool-schema fields."""
     static_keys = [key for key in _STEP_LOG_STATIC_FIELDS if isinstance(step_data.get(key), (dict, list))]
     if not static_keys:
-        return redact_card_data(step_data)
+        return _mask_addresses_for_log(redact_pii(redact_card_data(step_data)))
     try:
         redacted_static = {key: _redacted_static_step_field(key, step_data[key]) for key in static_keys}
-        rest = redact_card_data({key: value for key, value in step_data.items() if key not in redacted_static})
+        rest = redact_pii(
+            redact_card_data({key: value for key, value in step_data.items() if key not in redacted_static})
+        )
     except Exception:  # noqa: BLE001, RUF100 - any surprise falls back to the plain whole-mapping redaction
-        return redact_card_data(step_data)
+        return _mask_addresses_for_log(redact_pii(redact_card_data(step_data)))
     if not isinstance(rest, dict):
-        return redact_card_data(step_data)
+        return _mask_addresses_for_log(redact_pii(redact_card_data(step_data)))
+    rest = _mask_addresses_for_log(rest)
     return {key: redacted_static[key] if key in redacted_static else rest[key] for key in step_data}
 
 
@@ -2129,6 +2380,69 @@ def _strip_old_browser_refs(native_messages: list[dict[str, Any]]) -> None:
                     content[key] = _REF_PATTERN.sub("", val)
 
 
+_CHECK_AGENTS_WAIT_S = 20.0
+
+# Tools whose result is a whole-page read. On a long shopping run these are most
+# of the history, and only the newest pages can still be acted on.
+_PAGE_SNAPSHOT_TOOLS = frozenset(
+    {
+        "browser_navigate",
+        "browser_snapshot",
+        "browser_interact",
+        "browser_fill_form",
+        "browser_run_script",
+        "browser_get_form_fields",
+        "verify_state",
+    }
+)
+_PAGE_SNAPSHOTS_KEPT_WHOLE = 2
+_OLD_PAGE_SNAPSHOT_CHARS = 1_500
+_OLD_PAGE_SNAPSHOT_NOTE = "\n[older page view shortened. Take a new snapshot if you need that page again.]"
+
+
+def _tool_names_by_call_id(native_messages: list[dict[str, Any]]) -> dict[str, str]:
+    names: dict[str, str] = {}
+    for message in native_messages:
+        content = message.get("content") if isinstance(message, dict) else None
+        if isinstance(content, dict) and isinstance(content.get("tool_calls"), list):
+            for call in content["tool_calls"]:
+                function = call.get("function") if isinstance(call, dict) else None
+                if isinstance(function, dict) and call.get("id"):
+                    names[str(call["id"])] = str(function.get("name") or "")
+        elif isinstance(content, list):
+            for block in content:
+                if isinstance(block, dict) and block.get("type") == "tool_use" and block.get("id"):
+                    names[str(block["id"])] = str(block.get("name") or "")
+    return names
+
+
+def _shorten_old_page_snapshots(native_messages: list[dict[str, Any]]) -> None:
+    """Keep the two newest page views whole and shorten older ones in place.
+
+    Each result keeps its head, which holds the URL, title and top of the page,
+    so the model still knows where it has been. Search results and files are not
+    touched: an answer found there has to stay readable (R2-P0-1).
+    """
+
+    tool_names = _tool_names_by_call_id(native_messages)
+    seen = 0
+    for message in reversed(native_messages):
+        content = message.get("content") if isinstance(message, dict) else None
+        if not isinstance(content, list):
+            continue
+        for block in reversed(content):
+            if not isinstance(block, dict) or block.get("type") != "tool_result":
+                continue
+            if tool_names.get(str(block.get("tool_use_id") or "")) not in _PAGE_SNAPSHOT_TOOLS:
+                continue
+            seen += 1
+            text = block.get("content")
+            if seen <= _PAGE_SNAPSHOTS_KEPT_WHOLE or not isinstance(text, str):
+                continue
+            if len(text) > _OLD_PAGE_SNAPSHOT_CHARS + len(_OLD_PAGE_SNAPSHOT_NOTE):
+                block["content"] = text[:_OLD_PAGE_SNAPSHOT_CHARS] + _OLD_PAGE_SNAPSHOT_NOTE
+
+
 # ---------------------------------------------------------------------------
 # Structured step logging
 # ---------------------------------------------------------------------------
@@ -2239,8 +2553,8 @@ class AgentStepRecord:
     tool_use_id: str | None = None
 
     def __post_init__(self) -> None:
-        self.tool_input = redact_card_data(self.tool_input)
-        self.tool_result_summary = redact_card_data(self.tool_result_summary)
+        self.tool_input = _mask_addresses_for_log(redact_card_data(self.tool_input))
+        self.tool_result_summary = _mask_addresses_for_log(redact_card_data(self.tool_result_summary))
         self.tool_use_id = str(self.tool_use_id or "").strip() or None
 
 
@@ -2301,7 +2615,7 @@ class AgentTaskLog:
 
         def _write() -> None:
             try:
-                _atomic_write_json_restricted(path, redact_card_data(snapshot))
+                _atomic_write_json_restricted(path, _mask_addresses_for_log(redact_card_data(snapshot)))
                 logger.debug("Agent task log written to %s", path)
             except Exception as exc:
                 logger.warning("Failed to write agent task log: %s", exc)
@@ -3125,6 +3439,8 @@ class AgentExecutor:
         self._llm_cumulative_total_tokens: int = 0
         self._llm_total_input_tokens_seen: int = 0
         self._llm_total_output_tokens_seen: int = 0
+        # This task's own model turns, by model. See _record_task_turn_usage.
+        self._task_turn_usage: dict[str, dict[str, int | float]] = {}
         self._llm_last_input_tokens: int = 0
         self._llm_last_output_tokens: int = 0
         self._llm_context_usage_pct: float = 0.0
@@ -3158,6 +3474,10 @@ class AgentExecutor:
         # observations across ANY browser tool call (see
         # _NO_PROGRESS_PAGE_HEALTH_STATUSES / _BOT_PROTECTION_HALT_STREAK).
         self._consecutive_bot_protection_signals: int = 0
+        # Sites whose person check the user left unfinished in this task, and
+        # whether the page on screen is still one when the task ends.
+        self._bot_check_given_up_hosts: set[str] = set()
+        self._bot_check_unresolved: bool = False
         self._memory_all_scope_no_match_queries: list[str] = []
         self._memory_enumeration_blocked_after_no_match: bool = False
         self._stuck_tool_compaction_attempted: bool = False
@@ -4313,6 +4633,16 @@ class AgentExecutor:
             restored_continuity=checkpoint.llm_continuity,
         )
 
+    def _restored_active_task(self, checkpoint: Any) -> ActiveTask | None:
+        """The task a restored chain belongs to, for compaction before the loop starts."""
+        task = getattr(self, "_active_task", None)
+        if isinstance(task, ActiveTask) and task.request:
+            return task
+        context = getattr(checkpoint, "context", None)
+        recorded = context.get("active_request") if isinstance(context, dict) else ""
+        request = recorded or getattr(checkpoint, "task_description", "") or ""
+        return ActiveTask.from_messages(self._native_messages, str(request)) if request else None
+
     @staticmethod
     def _format_prior_context_lines(
         messages: list[dict[str, str]] | None,
@@ -4722,6 +5052,7 @@ class AgentExecutor:
         )
         self._step_log_jsonl_path = self._build_structured_step_log_path(task_log.started_at)
         self._step_log_metadata_emitted = False
+        self._address_turn = False
         self._last_model_name = self._get_model_name_safe()
         self._token_tracker.configure(
             model=self._last_model_name,
@@ -4883,6 +5214,7 @@ class AgentExecutor:
         self._llm_cumulative_total_tokens = 0
         self._llm_total_input_tokens_seen = 0
         self._llm_total_output_tokens_seen = 0
+        self._task_turn_usage = {}
         self._llm_last_input_tokens = 0
         self._llm_last_output_tokens = 0
         self._llm_context_usage_pct = 0.0
@@ -4896,6 +5228,8 @@ class AgentExecutor:
         self._tool_progress_consecutive_identical = {}
         self._tool_progress_script_probe_state = {"page_url": "", "count": 0}
         self._consecutive_bot_protection_signals = 0
+        self._bot_check_given_up_hosts = set()
+        self._bot_check_unresolved = False
         self._stuck_tool_compaction_attempted = False
         self._pending_stuck_tool_progress = None
         self._diagnostic_contexts = []
@@ -5031,6 +5365,7 @@ class AgentExecutor:
                         self._native_messages,
                         user_id=self._user_id or "",
                         session_id=self._session_id,
+                        active_task=self._restored_active_task(existing_checkpoint),
                     )
                     if compacted:
                         self._native_messages = compacted
@@ -5486,11 +5821,11 @@ class AgentExecutor:
         }
         try:
             if self._task_trace is not None:
-                self._task_trace.append_event("trace_stop", copy.deepcopy(stop_data))
+                self._task_trace.append_event("trace_stop", _trace_copy(stop_data))
         except Exception:
             logger.debug("Task trace stop event write failed, continuing", exc_info=True)
         try:
-            line = json.dumps(redact_card_data(stop_data), default=str) + "\n"
+            line = json.dumps(redact_pii(redact_card_data(stop_data)), default=str) + "\n"
             step_log_path = self._get_structured_step_log_path()
             # Same ordered writer as the step and task_complete lines.
             _run_task_log_io(lambda: _write_structured_log_line(step_log_path, line))
@@ -5717,6 +6052,7 @@ class AgentExecutor:
             total_duration,
             outcome,
         )
+        self._retire_unanswered_confirmations(start_time)
 
         if not self._agent_chain_metrics_recorded:
             self._agent_chain_metrics_recorded = True
@@ -5782,6 +6118,9 @@ class AgentExecutor:
                 "llm_total_input_tokens_seen": getattr(self, "_llm_total_input_tokens_seen", 0),
                 "responses_continuity_mode": getattr(self, "_last_continuity_mode", None),
             }
+            complete_data = _mask_addresses_for_log(redact_pii(redact_card_data(complete_data)))
+            if self.__dict__.get("_address_turn") or any(step.tool_name == _ADDRESS_TOOL for step in task_log.steps):
+                complete_data = _mask_address_turn(complete_data)
             line = json.dumps(complete_data, default=str) + "\n"
             step_log_path = self._get_structured_step_log_path()
             _run_task_log_io(lambda: _append_structured_log_line(jsonl_dir, step_log_path, line))
@@ -5944,10 +6283,16 @@ class AgentExecutor:
             # Without this, missing param descriptions and injected fields
             # (like reasoning) are invisible in surface replays.
             tool_schemas = self._build_tool_schema_snapshot()
-            step_data["tool_schemas"] = tool_schemas
-            step_data["tool_schema_hash"] = self._hash_tool_schema_snapshot(tool_schemas)
-            step_data["tool_schema_fingerprint"] = self._build_tool_schema_fingerprint(tool_schemas)
-            tool_surface = self._get_runtime_tool_surface()
+            schema_hash = self._hash_tool_schema_snapshot(tool_schemas)
+            step_data["tool_schema_hash"] = schema_hash
+            # The schemas are about 170 KB and the same command after command, so
+            # writing them on every task made agent-steps grow by megabytes in a
+            # short session. Each set is written once per log file; later tasks
+            # carry its hash.
+            if _first_time_in_step_log(self._get_structured_step_log_path(), schema_hash):
+                step_data["tool_schemas"] = tool_schemas
+                step_data["tool_schema_fingerprint"] = self._build_tool_schema_fingerprint(tool_schemas)
+            tool_surface = self._get_runtime_tool_surface() if "tool_schemas" in step_data else None
             if tool_surface is not None:
                 if hasattr(tool_surface, "to_dict"):
                     step_data["tool_surface"] = tool_surface.to_dict()
@@ -6010,6 +6355,15 @@ class AgentExecutor:
             self._pending_trim_stats = None
 
         step_data = _redact_step_data(step_data)
+        if not self.__dict__.get("_address_turn") and (
+            step_data.get("tool_name") == _ADDRESS_TOOL
+            or ("user_text" in step_data and self._follows_address_read_back())
+        ):
+            # Decided before the first line is written: the user's words go out on
+            # step 1, and a correction may only be saved at step 2 or later.
+            self._address_turn = True
+        if self.__dict__.get("_address_turn"):
+            step_data = _mask_address_turn(step_data)
 
         # Zero-tools monitoring: warn when agent has no tools available.
         # This was the root cause of the March 23 collapse (326 blocked calls).
@@ -6023,9 +6377,9 @@ class AgentExecutor:
         if self._task_trace is not None:
             try:
                 if _trace_compaction_payload is not None:
-                    _compaction_event_payload = copy.deepcopy(_trace_compaction_payload)
+                    _compaction_event_payload = _trace_copy(_trace_compaction_payload)
                     if self._task_trace_last_request:
-                        _compaction_event_payload["next_llm_input"] = copy.deepcopy(self._task_trace_last_request)
+                        _compaction_event_payload["next_llm_input"] = _trace_copy(self._task_trace_last_request)
                     self._task_trace.append_compaction(
                         ts=step_data["ts"],
                         step=record.step,
@@ -6041,21 +6395,21 @@ class AgentExecutor:
                     "signature_gate",
                 }:
                     _step_kind = _trace_control["typed_outcome"]
-                trace_step_data = copy.deepcopy(step_data)
+                trace_step_data = _trace_copy(step_data)
                 if model_messages_snapshot is not None:
-                    trace_step_data["messages"] = copy.deepcopy(model_messages_snapshot)
+                    trace_step_data["messages"] = _trace_copy(model_messages_snapshot)
                 self._task_trace.append_step(
                     step=record.step,
                     ts=step_data["ts"],
                     step_kind=_step_kind,
                     agent_step=trace_step_data,
                     attempt_id=getattr(self, "_task_trace_last_attempt_id", None),
-                    llm_input=copy.deepcopy(self._task_trace_last_request),
-                    llm_output=copy.deepcopy(self._task_trace_last_response),
-                    continuity_before=copy.deepcopy(self._task_trace_last_continuity_before),
-                    continuity_after=copy.deepcopy(self._task_trace_last_continuity_after),
-                    control=copy.deepcopy(_trace_control),
-                    tool_execution=copy.deepcopy(self._task_trace_last_tool_execution),
+                    llm_input=_trace_copy(self._task_trace_last_request),
+                    llm_output=_trace_copy(self._task_trace_last_response),
+                    continuity_before=_trace_copy(self._task_trace_last_continuity_before),
+                    continuity_after=_trace_copy(self._task_trace_last_continuity_after),
+                    control=_trace_copy(_trace_control),
+                    tool_execution=_trace_copy(self._task_trace_last_tool_execution),
                 )
             except Exception:
                 logger.debug("Task trace step write failed, continuing", exc_info=True)
@@ -6270,7 +6624,24 @@ class AgentExecutor:
         }
 
     def _build_task_usage_summary(self) -> dict[str, Any]:
-        """Return task-level token/cost totals from the active cost tracker."""
+        """Return this task's token and cost totals.
+
+        The task's own model turns are the answer whichever provider ran them.
+        The session cost tracker cannot be: it totals the whole session, so every
+        task reported everything before it, and on a managed desktop it never saw
+        the turns at all (the cloud runs them) and held only background calls.
+        That is how "what is 7 times 6" came to log 187,714 input tokens and a
+        28-step helper logged 466,685 tokens at cost 0. The tracker stays the
+        source only for a task that observed no turn of its own.
+        """
+        own_turns = _normalize_model_totals(getattr(self, "_task_turn_usage", None))
+        if own_turns:
+            return {
+                "usage": _task_usage_from_model_totals(own_turns),
+                "total_cost_usd": sum(float(row.get("cost_usd") or 0.0) for row in own_turns.values()),
+                "model_totals": own_turns,
+            }
+
         usage = _empty_task_usage()
         total_cost_usd = 0.0
         model_totals: dict[str, dict[str, int | float]] = {}
@@ -6345,6 +6716,7 @@ class AgentExecutor:
         if total_tokens <= 0:
             total_tokens = input_tokens + output_tokens
 
+        self._record_task_turn_usage(usage, input_tokens, output_tokens)
         self._llm_last_input_tokens = input_tokens
         self._llm_last_output_tokens = output_tokens
         self._last_server_context_tokens = input_tokens
@@ -6369,6 +6741,92 @@ class AgentExecutor:
             self._llm_context_usage_pct = self._llm_last_input_tokens / float(context_window)
         else:
             self._llm_context_usage_pct = 0.0
+
+    def _record_task_turn_usage(self, usage: dict[str, Any], input_tokens: int, output_tokens: int) -> None:
+        """Add one model turn to this task's totals, priced like every other usage row."""
+        cached_tokens = self._usage_int(usage, "cache_read_tokens", "cached_tokens", "cache_read_input_tokens")
+        cache_write_tokens = self._usage_int(
+            usage,
+            "cache_write_tokens",
+            "cache_creation_tokens",
+            "cache_creation_input_tokens",
+        )
+        web_search_requests = self._usage_int(usage, "web_search_requests")
+        if not (input_tokens or output_tokens or cached_tokens or cache_write_tokens or web_search_requests):
+            return
+        model = str(getattr(self, "_last_model_name", "") or "").strip() or "unknown"
+        try:
+            from services.llm.pricing import calculate_cost_usd
+
+            cost_usd = calculate_cost_usd(
+                model,
+                input_tokens,
+                output_tokens,
+                cached_tokens,
+                cache_write_tokens=cache_write_tokens,
+                web_search_requests=web_search_requests,
+            )
+        except (ImportError, KeyError, TypeError, ValueError):
+            logger.debug("Task usage cost lookup failed for model %s", model, exc_info=True)
+            cost_usd = 0.0
+        totals = self.__dict__.setdefault("_task_turn_usage", {})
+        row = totals.setdefault(
+            model,
+            {
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "cache_read_input_tokens": 0,
+                "cache_creation_input_tokens": 0,
+                "web_search_requests": 0,
+                "cost_usd": 0.0,
+            },
+        )
+        row["input_tokens"] += input_tokens
+        row["output_tokens"] += output_tokens
+        row["cache_read_input_tokens"] += cached_tokens
+        row["cache_creation_input_tokens"] += cache_write_tokens
+        row["web_search_requests"] += web_search_requests
+        row["cost_usd"] += float(cost_usd)
+
+    def _user_own_words(self, user_text: str) -> str:
+        """What the user has said in this conversation, and the address they already saved.
+
+        Only frames the user wrote count. Compaction summaries are user-role frames
+        too, but they carry an origin, and they can quote a page.
+        """
+        from services.conversation.state_manager import get_request_conversation_manager
+
+        parts = [str(user_text or "")]
+        manager = get_request_conversation_manager() or getattr(self, "_conversation_state_manager", None)
+        get_window = getattr(manager, "get_prompt_window", None)
+        if callable(get_window):
+            for frame in get_window().frames:
+                if frame.role is FrameRole.USER and frame.kind is FrameKind.USER_INPUT and not frame.origin:
+                    parts.extend(block.text for block in frame.blocks if isinstance(block, TextBlock))
+        try:
+            from intent.tools.settings_tools import delivery_address_text
+            from ui.settings_manager import get_settings_manager
+
+            saved = get_settings_manager().get("delivery_address", {}, user_id=self._get_effective_user_id())
+            if isinstance(saved, dict):
+                parts.append(delivery_address_text(saved))
+        except (ImportError, LookupError, OSError, RuntimeError, TypeError, ValueError):
+            logger.debug("Saved address unavailable for the user-words check", exc_info=True)
+        return "\n".join(parts)
+
+    def _prompt_cache_key(self) -> str | None:
+        """One opaque cache key per account, the same for every command.
+
+        The key decides which cache machines a request can reach. It used to be
+        the task id, new on every command, so a command's first model call could
+        never land where the previous command had left the shared prefix. Hashed
+        so no account id leaves the device, and per account so one person's
+        traffic never shares a routing key with another's.
+        """
+        user_id = str(getattr(self, "_user_id", "") or "").strip()
+        if not user_id:
+            return None
+        return hashlib.sha256(("viola-prompt-cache:%s" % user_id).encode("utf-8")).hexdigest()[:32]
 
     def _reset_llm_usage_compaction_window(self) -> None:
         """Reset the usage window that drives the next compaction threshold."""
@@ -7227,7 +7685,7 @@ class AgentExecutor:
                 kind=kind,
                 reason=reason,
                 next_action=next_action,
-                detail=copy.deepcopy(detail or {}),
+                detail=_trace_copy(detail or {}),
             )
         except Exception:
             logger.debug("Task trace LLM retry/fallback write failed, continuing", exc_info=True)
@@ -7287,21 +7745,21 @@ class AgentExecutor:
         tool_error: str | None,
     ) -> None:
         """Capture the exact tool call/result surface that fed the next turn."""
-        trace_tool_input = _redact_email_trace_payload(tool_name, copy.deepcopy(tool_input), tool_input)
+        trace_tool_input = _redact_email_trace_payload(tool_name, _trace_copy(tool_input), tool_input)
         trace_model_visible_result = _redact_email_trace_payload(
             tool_name,
             copy.deepcopy(model_visible_result),
             tool_input,
         )
-        trace_tool_data = _redact_email_trace_payload(tool_name, copy.deepcopy(tool_result.data), tool_input)
+        trace_tool_data = _redact_email_trace_payload(tool_name, _trace_copy(tool_result.data), tool_input)
         trace_mcp_content = _redact_email_trace_payload(
             tool_name,
-            copy.deepcopy(tool_result.mcp_content),
+            _trace_copy(tool_result.mcp_content),
             tool_input,
         )
         trace_mcp_meta = _redact_email_trace_payload(
             tool_name,
-            copy.deepcopy(tool_result.mcp_meta),
+            _trace_copy(tool_result.mcp_meta),
             tool_input,
         )
         self._task_trace_last_tool_execution = {
@@ -7332,7 +7790,7 @@ class AgentExecutor:
                     tool_name=tool_name,
                     ok=tool_result.ok,
                     duration_ms=duration_ms,
-                    result=copy.deepcopy(self._task_trace_last_tool_execution),
+                    result=_trace_copy(self._task_trace_last_tool_execution),
                     error=tool_error or tool_result.error,
                 )
             except Exception:
@@ -7579,6 +8037,10 @@ class AgentExecutor:
             view_closed = False
         if view_closed:
             self._overlay_shown = False
+            self._bot_check_unresolved = False
+            forget = getattr(overlay, "forget_page", None)
+            if callable(forget):
+                forget()
         data = dict(result.data) if isinstance(result.data, dict) else {}
         data.setdefault("closed", bool(result.ok))
         data["view_closed"] = view_closed
@@ -8548,6 +9010,32 @@ class AgentExecutor:
         except Exception as exc:
             logger.debug("Consult-user WS broadcast failed for %s: %s", tool_name, exc)
 
+    def _retire_unanswered_confirmations(self, turn_started_at: float) -> None:
+        """A question this turn did not answer ends with this turn (see ApprovalManager)."""
+        retire = getattr(getattr(self, "_approval", None), "retire_unanswered_confirmations", None)
+        if not callable(retire) or getattr(self, "_current_agent_id", None):
+            return  # helpers share the store and must not end their parent's question
+        try:
+            dropped = retire(turn_started_at)
+        except Exception:  # noqa: BLE001, RUF100 - a stale grant then expires on its own timer
+            logger.debug("Retiring unanswered confirmations failed", exc_info=True)
+            return
+        if not dropped:
+            return
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            return
+        for tool_name, description, tool_args in dropped:
+            loop.create_task(
+                self._broadcast_consult_user_event(
+                    tool_name=tool_name,
+                    action_class=irreversible_action_class(tool_name, tool_args) or "tool_action",
+                    planned_action=description,
+                    status="denied",
+                )
+            )
+
     async def _email_send_unavailable(self, tool_name: str, tool_args: dict[str, Any]) -> ToolResult | None:
         """Say "no email account is connected" before asking to confirm a send.
 
@@ -8682,6 +9170,14 @@ class AgentExecutor:
                 tool_args=tool_args,
                 status="approved",
             )
+            if action_class == "phone_call":
+                # The tool can hold this turn for the whole call, and the PC then
+                # said nothing for 3 minutes (2026-11-05: first sentence 182 s
+                # after the command). Say the call is under way before it starts.
+                try:
+                    await self._speak("Okay, placing the call now. The Phone tab shows how it's going.")
+                except (AttributeError, OSError, RuntimeError, TypeError, ValueError):
+                    logger.debug("Call-started notice could not be spoken", exc_info=True)
             return True
 
         await self._broadcast_consult_user_event(
@@ -9273,6 +9769,22 @@ class AgentExecutor:
         except Exception:
             logger.debug("Failed to auto-trigger OAuth for %s", tool_name, exc_info=True)
 
+    async def _deliver_helper_answers(self, channel: Any, user_id: str) -> None:
+        """Send what the helpers found, as one reply, to where the user asked."""
+        held = list(getattr(self, "_held_helper_answers", None) or [])
+        self._held_helper_answers = []
+        if channel is None or not held:
+            return
+        task = getattr(self, "_active_task", None)
+        if len(held) == 1 or not isinstance(task, ActiveTask):
+            reply = "\n\n".join(item["answer"] for item in held)
+        else:
+            reply = await answer_from_helper_results(task, held, user_id=user_id)
+        try:
+            await channel.send(reply)
+        except Exception as exc:
+            logger.debug("Background agent channel.send failed: %s", exc)
+
     async def _handle_start_agent(self, tool_args: dict[str, Any]) -> ToolResult:
         """Dispatch a long-running background agent and return its id immediately.
 
@@ -9325,21 +9837,6 @@ class AgentExecutor:
         # extension outside the parity surface.
         run_in_background = True
 
-        if run_in_background:
-            shared_names = _shared_state_tool_names(
-                self._native_tools_for_child(
-                    subagent_mode=effective_mode,
-                    subagent_type=effective_subagent_type,
-                )
-            )
-            if shared_names:
-                return ToolResult(
-                    ok=False,
-                    error=_background_shared_state_error(shared_names),
-                    error_category="SUBAGENT_SHARED_STATE_TOOLS",
-                    retryable=False,
-                )
-
         from services.agent_runtime.registry import (
             AgentLimitExceededError,
             agent_registry,
@@ -9359,6 +9856,10 @@ class AgentExecutor:
         # request returned; SSE finalize_stream is what the web UI actually
         # consumes.
         delivery_channel = getattr(self, "_channel", None)
+        helper_done = asyncio.Event()
+        if getattr(self, "_live_helpers", None) is None:
+            self._live_helpers = {}
+        self._live_helpers[agent_id] = helper_done
 
         async def _runner(cancel_event: asyncio.Event) -> str:
             from intent.hooks import dispatch_lifecycle
@@ -9401,15 +9902,23 @@ class AgentExecutor:
                         subagent_mode=effective_mode,
                         subagent_type=effective_subagent_type,
                         model_override=str(tool_args.get("model") or "").strip() or None,
-                        allow_shared_state_tools=False,
+                        # Background children run beside the parent, so the
+                        # browser, payment and desktop tools stay with it. A
+                        # fork inherits those tools, and refusing to start here
+                        # meant no background agent could ever run.
+                        exclude_shared_state_tools=True,
                     )
                     answer = _child_answer_text(child_result)
                     finalize_stream(stream_id, content=answer)
-                    if delivery_channel is not None and answer:
-                        try:
-                            await delivery_channel.send(answer)
-                        except Exception as exc:
-                            logger.debug("Background agent channel.send failed: %s", exc)
+                    self._held_helper_answers = [
+                        *(getattr(self, "_held_helper_answers", None) or []),
+                        {"task": task, "answer": answer},
+                    ]
+                    # While the parent runs it writes the reply; reports used to
+                    # go straight to the stage, raw. Once it has ended, the last
+                    # helper to finish delivers one reply for all of them.
+                    if not getattr(self, "_agent_loop_active", False) and len(self._live_helpers) <= 1:
+                        await self._deliver_helper_answers(delivery_channel, user_id)
                     try:
                         dispatch_lifecycle(
                             "SubagentStop",
@@ -9461,6 +9970,10 @@ class AgentExecutor:
                         error=str(exc),
                     )
                     raise
+
+                finally:
+                    helper_done.set()
+                    self._live_helpers.pop(agent_id, None)
 
         try:
             registry_start = getattr(agent_registry, "start", None)
@@ -9520,7 +10033,11 @@ class AgentExecutor:
                     runner_task=runner_task,
                 )
         except AgentLimitExceededError as exc:
-            return ToolResult(ok=False, error=str(exc))
+            self._live_helpers.pop(agent_id, None)
+            return ToolResult(
+                ok=False,
+                error="%s Tell the user how many are running; they can wait or cancel one from the agents drawer." % exc,
+            )
 
         if not run_in_background:
             background_wait_task = asyncio.create_task(background_signal.wait())
@@ -9576,6 +10093,15 @@ class AgentExecutor:
     async def _handle_check_agents(self, tool_args: dict[str, Any]) -> ToolResult:
         """Return JSON list of this user's active + recent_completed agents."""
         from services.agent_runtime.registry import agent_registry
+
+        # Hold the answer until a helper finishes or a short time passes. Polled
+        # at full speed, a parent spent 16 model turns in 45 s, each resending
+        # its whole context, to learn nothing had changed.
+        running = [asyncio.ensure_future(done.wait()) for done in (getattr(self, "_live_helpers", None) or {}).values()]
+        if running:
+            await asyncio.wait(running, timeout=_CHECK_AGENTS_WAIT_S, return_when=asyncio.FIRST_COMPLETED)
+            for wait in running:
+                wait.cancel()
 
         user_id = self._get_effective_user_id()
         active = await agent_registry.list_active(user_id)
@@ -10765,11 +11291,16 @@ class AgentExecutor:
                         session_id=tool_result_replacement_session_id(self),
                         replacement_writer=lambda records: record_tool_result_replacements(self, records),
                         content_replacement_state=getattr(self, "_content_replacement_state", None),
+                        active_task=getattr(self, "_active_task", None),
                     )
                     if _compaction_meta:
                         self._pending_compaction_meta = _compaction_meta
                 else:
-                    messages[:] = await compact_messages(messages, user_id=self._user_id)
+                    messages[:] = await compact_messages(
+                        messages,
+                        user_id=self._user_id,
+                        active_task=getattr(self, "_active_task", None),
+                    )
                 _budget_msgs = self._native_messages if self._use_native else messages
                 self._token_tracker.recount(_budget_msgs, after_compaction=True)
                 _compaction_record_progress(self, pre_compaction_tokens, self._token_tracker.total_tokens)
@@ -11006,7 +11537,11 @@ class AgentExecutor:
                         if _compaction_meta:
                             self._pending_compaction_meta = _compaction_meta
                     else:
-                        messages[:] = await compact_messages(messages, user_id=self._user_id)
+                        messages[:] = await compact_messages(
+                        messages,
+                        user_id=self._user_id,
+                        active_task=getattr(self, "_active_task", None),
+                    )
                     _compaction_record_progress(
                         self,
                         pre_compaction_tokens,
@@ -11099,10 +11634,10 @@ class AgentExecutor:
             self._last_no_result_reasoning = "provider_returned_non_dict_response"
             return None
         self._last_usage = _normalize_usage(response)
-        self._record_llm_usage_for_context(self._last_usage)
         self._last_model_name = (
             str(response.get("_model_name") or self._get_model_name_safe()) if isinstance(response, dict) else "unknown"
         )
+        self._record_llm_usage_for_context(self._last_usage)
         if isinstance(response, dict):
             context_window = response.get("_context_window")
             if isinstance(context_window, int) and context_window > 0:
@@ -11484,6 +12019,14 @@ class AgentExecutor:
 
     async def _speak(self, text: str) -> None:
         """Send progress text through the channel (preferred) or TTS fallback."""
+        # The turn that placed a live call does not narrate over it.
+        call_id = getattr(self, "_live_call_of_turn", "")
+        if call_id:
+            from core.live_call_state import call_is_live, hold_report
+
+            if call_is_live(call_id):
+                hold_report(call_id)
+                return
         # Prefer channel if available
         if self._channel is not None:
             try:
@@ -11603,7 +12146,7 @@ class AgentExecutor:
             "message": progress,
         }
         if tool_input is not None:
-            payload["tool_input"] = redact_card_data(copy.deepcopy(tool_input))
+            payload["tool_input"] = redact_card_data(_trace_copy(tool_input))
         if tool_output is not None:
             payload["tool_output"] = redact_card_data(tool_output)
         try:
@@ -11747,7 +12290,12 @@ class AgentExecutor:
         if self._overlay is None or not self._overlay_shown:
             return
         try:
-            self._overlay.hide(outcome=outcome)
+            if self._bot_check_unresolved and not self._cancelled:
+                # The user still has to finish the site's check: hiding the view
+                # here is what left them with no way to do it.
+                self._overlay.leave_open_for_user(status="bot_check")
+            else:
+                self._overlay.hide(outcome=outcome)
         except Exception as exc:
             logger.debug("Overlay hide failed: %s", exc)
         self._overlay_shown = False
@@ -12023,13 +12571,15 @@ class AgentExecutor:
             order_summary["description"] = summary
 
     def _apply_context_delivery_address_to_summary(self, order_summary: dict[str, Any]) -> None:
-        """Backfill the delivery address from saved settings when no structured tool arg exists."""
+        """Backfill the saved address, and flag an order that differs from it by a house number.
 
-        existing = order_summary.get("delivery_address")
-        if isinstance(existing, dict) and any(existing.get(key) for key in ("street", "city", "state", "zip")):
-            return
-        if isinstance(existing, str) and existing.strip():
-            return
+        The saved address is the one the user typed in Settings or heard read back.
+        The order's address may have been read off the merchant's page. It is not
+        replaced, because the card must show what the merchant holds, but the user
+        is told before paying.
+        """
+
+        existing = _delivery_address_from_value(order_summary.get("delivery_address"))
 
         try:
             from ui.settings_manager import get_settings_manager
@@ -12042,8 +12592,67 @@ class AgentExecutor:
         except Exception:
             saved = None
         address = _delivery_address_from_value(saved)
+        if existing:
+            if _house_number_differs(existing, address):
+                order_summary["address_warning"] = (
+                    "The house number here differs from the address you saved. Check it before you pay."
+                )
+            elif self._order_address_from_elsewhere(existing, address):
+                order_summary["address_warning"] = (
+                    "This address came from the page, not from you or your saved address. Check it before you pay."
+                )
+            return
         if address:
             order_summary["delivery_address"] = address
+
+    def _follows_address_read_back(self) -> bool:
+        """True when Viola's last reply read back the saved address.
+
+        The next turn is where "no, the house number is 4812" comes: a bare number
+        with no street to recognise in the log.
+        """
+        from services.conversation.state_manager import get_request_conversation_manager
+
+        try:
+            from ui.settings_manager import get_settings_manager
+
+            saved = get_settings_manager().get("delivery_address", {}, user_id=self._get_effective_user_id())
+            street = str(saved.get("street") or "").strip().lower() if isinstance(saved, dict) else ""
+            manager = get_request_conversation_manager() or getattr(self, "_conversation_state_manager", None)
+            get_window = getattr(manager, "get_prompt_window", None)
+            if not street or not callable(get_window):
+                return False
+            replies = [frame for frame in get_window().frames if frame.role is FrameRole.ASSISTANT]
+        except (AttributeError, ImportError, LookupError, OSError, RuntimeError, TypeError, ValueError):
+            logger.debug("Address read-back check skipped", exc_info=True)
+            return False
+        if not replies:
+            return False
+        last = " ".join(block.text for block in replies[-1].blocks if isinstance(block, TextBlock)).lower()
+        return street in last
+
+    def _order_address_from_elsewhere(self, order_address: Any, saved_address: Any) -> bool:
+        """True when the order ships somewhere the user neither said nor saved.
+
+        An address the user gives for this order is theirs and goes on the card as
+        it is. One that only the merchant's page holds is shown too, because it is
+        what the merchant will use, but the user is told where it came from.
+        """
+        from intent.content_sanitizer import _words_not_from_user
+        from intent.tools.settings_tools import delivery_address_text
+
+        order_text = delivery_address_text(order_address) if isinstance(order_address, dict) else str(order_address)
+        street = order_text.split(",", 1)[0]
+        try:
+            own_words = self._user_own_words(str(getattr(self, "_original_command", "") or ""))
+        except (AttributeError, LookupError, RuntimeError, TypeError, ValueError):
+            logger.debug("Order address provenance unavailable", exc_info=True)
+            return False
+        if isinstance(saved_address, dict):
+            own_words += "\n" + delivery_address_text(saved_address)
+        elif saved_address:
+            own_words += "\n" + str(saved_address)
+        return bool(_words_not_from_user({"street": street}, own_words))
 
     async def _extract_dom_order_details(self, page: Any, order_summary: dict[str, Any]) -> None:
         """Extract visible checkout summary details from the browser DOM."""
@@ -12085,7 +12694,11 @@ class AgentExecutor:
                         'aside',
                     ]);
 
-                    const itemNodes = Array.from(document.querySelectorAll([
+                    const moneyRe = /[$\\u20ac\\u00a3]\\s?\\d[\\d,]*(?:\\.\\d{2})?/g;
+                    const notAnItem = /^(sub-?total|total|order total|estimated total|tax|taxes|estimated tax|shipping|delivery|fees?|discount|savings|tip|promo)\\b/i;
+                    const moneyIn = (text) => (text.match(moneyRe) || []);
+                    const shown = (el) => el.offsetParent !== null || getComputedStyle(el).position === 'fixed';
+                    const named = Array.from(document.querySelectorAll([
                         '[data-testid*="cart-item" i]',
                         '[data-testid*="order-item" i]',
                         '[data-testid*="line-item" i]',
@@ -12093,15 +12706,46 @@ class AgentExecutor:
                         '[class*="order-item" i]',
                         '[class*="line-item" i]',
                         '[class*="product" i]',
-                    ].join(',')));
+                    ].join(','))).filter(shown);
+                    // A list wrapper matches the same selectors as its rows: drop any
+                    // element that holds more prices than a row inside it, then any
+                    // element inside a row that stayed.
+                    const rowsOf = (nodes) => {
+                        const rows = nodes.filter((el) => !nodes.some((other) => other !== el
+                            && el.contains(other)
+                            && moneyIn(textOf(other)).length > 0
+                            && moneyIn(textOf(el)).length > moneyIn(textOf(other)).length));
+                        return rows.filter((el) => !rows.some((other) => other !== el && other.contains(el)));
+                    };
+                    let itemNodes = rowsOf(named);
+                    if (!itemNodes.some((el) => moneyIn(textOf(el)).length > 0)) {
+                        // Stores with no telling class names: any table row or list
+                        // item that carries a price.
+                        const generic = Array.from(document.querySelectorAll('tr, li, [role="row"], [role="listitem"]'))
+                            .filter((el) => shown(el) && moneyIn(textOf(el)).length > 0);
+                        const genericRows = rowsOf(generic);
+                        if (genericRows.length) itemNodes = genericRows;
+                    }
                     const items = [];
                     const seen = new Set();
+                    let itemCount = 0;
                     for (const el of itemNodes) {
                         const text = textOf(el);
-                        if (!text || text.length < 4 || text.length > 240 || seen.has(text)) continue;
+                        if (!text || text.length < 4 || text.length > 240 || notAnItem.test(text) || seen.has(text)) continue;
                         seen.add(text);
-                        items.push({name: text, description: text});
-                        if (items.length >= 8) break;
+                        itemCount += 1;
+                        if (items.length >= 20) continue;
+                        const prices = moneyIn(text);
+                        const field = el.querySelector('select, input[type="number"], input[name*="qty" i], input[name*="quantity" i]');
+                        const counted = text.match(/(?:qty|quantity)\\b\\W*(\\d+)/i) || text.match(/(?:^|\\s)[x\\u00d7]\\s?(\\d+)\\b/i) || text.match(/\\b(\\d+)\\s?[x\\u00d7](?:\\s|$)/i);
+                        const quantity = field && Number(field.value) > 0 ? Number(field.value) : (counted ? Number(counted[1]) : null);
+                        const name = norm(text.replace(moneyRe, ' ').replace(/(?:qty|quantity)\\b\\W*\\d+/ig, ' '));
+                        items.push({
+                            name: name || text,
+                            description: text,
+                            price: prices.length ? prices[prices.length - 1] : '',
+                            quantity,
+                        });
                     }
 
                     const domTotal = firstText([
@@ -12124,6 +12768,8 @@ class AgentExecutor:
                     return {
                         merchant: merchant,
                         items: items,
+                        item_count: itemCount,
+                        site: host,
                         summary_text: summaryText ? summaryText.slice(0, 700) : '',
                         dom_total: domTotal,
                         delivery_address: deliveryAddress,
@@ -12146,7 +12792,7 @@ class AgentExecutor:
             from services.payments.purchase_ceiling import parse_money_cents
 
             clean_items = []
-            for item in items[:8]:
+            for item in items[:20]:
                 if not isinstance(item, dict):
                     continue
                 name = str(item.get("name") or "").strip()
@@ -12168,6 +12814,14 @@ class AgentExecutor:
                 clean_items.append(clean_item)
             if clean_items:
                 order_summary["items"] = clean_items
+                order_summary["items_source"] = "page"
+                item_count = details.get("item_count")
+                if isinstance(item_count, int) and item_count > len(clean_items):
+                    order_summary["items_not_listed"] = item_count - len(clean_items)
+
+        site = str(details.get("site") or "").strip()
+        if site:
+            order_summary["site"] = site[:120]
 
         summary_text = str(details.get("summary_text") or "").strip()
         if summary_text and _is_generic_payment_order_text(str(order_summary.get("description") or "")):
@@ -12189,9 +12843,18 @@ class AgentExecutor:
         """Populate confirmation-page order fields before creating the session."""
 
         self._apply_payment_review_request_to_summary(order_summary)
+        # What the model says it is buying is a claim. A task can drift, so the
+        # card shows what the store's own page says, and says so when they differ.
+        claimed_items = order_summary.pop("items", None)
+        claimed_total = str(order_summary.get("total") or "").strip()
+        claimed_text = str(order_summary.get("description") or "")
         await self._extract_dom_order_details(page, order_summary)
         await self._extract_dom_total(page, order_summary)
         self._apply_context_delivery_address_to_summary(order_summary)
+        _reconcile_claimed_order(order_summary, claimed_items, claimed_total, claimed_text)
+        requested = str(getattr(self, "_agent_task_description", "") or "").strip()
+        if requested:
+            order_summary["requested"] = requested
 
     async def _prepare_payment_confirmation_session(self) -> dict[str, Any]:
         """Create the hosted payment confirmation session before AgentResult exists."""
@@ -12765,6 +13428,82 @@ class AgentExecutor:
             self._payment_gate_active = False
             self._hide_overlay(outcome="done")
 
+    async def _bot_check_still_showing(self) -> bool | None:
+        """True while the visible page is a person check; None when it cannot be read."""
+        try:
+            from mcp_servers.browser_cdp.server import visible_page_health
+
+            info = await visible_page_health()
+        except Exception as exc:
+            logger.debug("Reading the page during a person check failed: %s", exc)
+            return None
+        if not info:
+            return None
+        return (info.get("page_health") or {}).get("status") == "bot_protection"
+
+    async def _wait_for_user_bot_check(self) -> str:
+        """Wait for the user to finish the check. Returns done, closed, timeout or cancelled."""
+        overlay = self._overlay
+        clear_reads = 0
+        deadline = time.monotonic() + _BOT_CHECK_WAIT_SECONDS
+        while time.monotonic() < deadline:
+            if self._cancelled:
+                return "cancelled"
+            if getattr(overlay, "state", "agentic") == "hidden":
+                return "closed"
+            showing = await self._bot_check_still_showing()
+            # Two reads: these pages blank out and reload while they decide.
+            clear_reads = clear_reads + 1 if showing is False else 0
+            if clear_reads >= 2:
+                return "done"
+            await asyncio.sleep(_BOT_CHECK_POLL_SECONDS)
+        return "timeout"
+
+    async def _resolve_bot_check_after_tool(self, tool_name: str, tool_result: ToolResult) -> str | None:
+        """Hand a site's person check to the user, then tell the model how it went.
+
+        Runs after a browser tool reports the page is a check. Only a surface with
+        a view the user can reach can wait; elsewhere the streak halt stays. Returns
+        the note for the model, or None when there is nothing to add. Nothing here
+        touches the page: the user does the check, or it is not done.
+        """
+        if self._overlay is None or not tool_name.startswith("browser_"):
+            return None
+        if self._tool_progress_page_health_status(tool_result) != "bot_protection":
+            if tool_name.startswith("browser_") and isinstance(getattr(tool_result, "data", None), dict):
+                if tool_result.data.get("url"):
+                    self._bot_check_unresolved = False
+            return None
+        data = tool_result.data if isinstance(tool_result.data, dict) else {}
+        from urllib.parse import urlparse
+
+        url = str(data.get("url") or getattr(self, "_last_page_url", None) or "")
+        host = urlparse(url).hostname or url
+        self._bot_check_unresolved = True
+        if host in self._bot_check_given_up_hosts:
+            return _BOT_CHECK_GIVEN_UP_NOTE % "earlier in this task"
+
+        self._update_overlay_for_browser(url)
+        self._update_overlay_status("bot_check")
+        self._update_overlay_phase("user_input")
+        logger.info("Waiting for the user to finish a site's person check")
+        await self._speak(_BOT_CHECK_NOTICE)
+        outcome = await self._wait_for_user_bot_check()
+        logger.info("Person check wait ended: %s", outcome)
+        self._consecutive_bot_protection_signals = 0
+        if outcome == "cancelled":
+            return None
+        if outcome == "done":
+            self._bot_check_unresolved = False
+            self._update_overlay_status("working")
+            self._update_overlay_phase("acting")
+            return _BOT_CHECK_DONE_NOTE
+        self._bot_check_given_up_hosts.add(host)
+        if outcome == "closed":
+            self._bot_check_unresolved = False
+            return _BOT_CHECK_GIVEN_UP_NOTE % "they closed the page"
+        return _BOT_CHECK_GIVEN_UP_NOTE % ("no answer after %d seconds" % _BOT_CHECK_WAIT_SECONDS)
+
     async def _extract_dom_total(self, page: Any, order_summary: dict[str, Any]) -> None:
         """Attempt to extract the order total from the live checkout page DOM.
 
@@ -12964,6 +13703,21 @@ class AgentExecutor:
         if callable(stop):
             await stop()
 
+    def _visible_browser_page(self, preferred_url: str = "") -> Any:
+        """The page in the desktop's visible agent browser, when it is on the checkout."""
+        try:
+            from mcp_servers.browser_cdp.server import manager as visible_browser
+
+            if not visible_browser.is_connected:
+                return None
+            page = visible_browser.page
+        except (AttributeError, ImportError, RuntimeError):
+            logger.debug("Visible agent browser is not available for the checkout page")
+            return None
+        if preferred_url and not self._same_merchant_resume_page(self._page_url(page), preferred_url):
+            return None
+        return page
+
     async def _get_active_browser_page_from_cdp(self, preferred_url: str = "") -> Any:
         """Attach to the existing CDP-launched checkout browser and return its live page."""
         bridge = getattr(self, "_payment_cdp_bridge", None)
@@ -12973,6 +13727,14 @@ class AgentExecutor:
                 not preferred_url or self._same_merchant_resume_page(self._page_url(page), preferred_url)
             ):
                 return page
+
+        # On the desktop the checkout is in the visible browser the agent already
+        # drives. A second Playwright cannot start on the app's event loop and could
+        # not attach to Qt WebEngine anyway, so this method used to return None there
+        # and the approval card never saw the page: no items, no store total.
+        visible_page = self._visible_browser_page(preferred_url)
+        if visible_page is not None:
+            return visible_page
 
         try:
             from config.settings import settings

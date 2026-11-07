@@ -138,6 +138,7 @@ export default function BrowserMode({
 
   const statusLabel = useMemo(() => {
     if (loginMode) return `Sign in to ${loginName}`;
+    if (status === 'bot_check') return 'This site wants to check you\'re a person. Please finish it here.';
     if (takeoverActive) return 'Your turn';
     if (status === 'payment_review') return 'Review needed';
     if (phase === 'thinking') return 'Viola is thinking';

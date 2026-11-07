@@ -12,11 +12,131 @@ import json
 import logging
 import re
 import sys
+import threading
+import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import Any
+
+
+class RepeatCollapseFilter(logging.Filter):
+    """Keep a line that repeats from eating the log, and keep its count.
+
+    One repeating line pushed everything else out of the retained logs: on the
+    1.0.5 build-9 laptop, three 49 MB files held about a day, most of it two
+    lines. Each kind of line (logger, level and text with the numbers taken
+    out) gets a budget per minute and per hour. Past that, its lines are
+    counted instead of written, and one summary line says how many were left
+    out, so the evidence that it was happening, and how much, survives.
+
+    Errors get a much larger budget: they are what the log is for.
+    """
+
+    PER_MINUTE = 12
+    PER_HOUR = 120
+    ERROR_PER_MINUTE = 60
+    ERROR_PER_HOUR = 600
+    SUMMARY_EVERY_SECONDS = 300.0
+    SWEEP_EVERY_SECONDS = 15.0
+    MAX_TRACKED = 2000
+    _NUMBERS = re.compile(r"\d+")
+
+    def __init__(self, handler: logging.Handler, clock: Callable[[], float] = time.monotonic) -> None:
+        super().__init__()
+        self._handler = handler
+        self._clock = clock
+        self._lock = threading.Lock()
+        self._kinds: dict[tuple[str, int, str], _LineKind] = {}
+        self._next_sweep = 0.0
+
+    @classmethod
+    def _key(cls, record: logging.LogRecord) -> tuple[str, int, str]:
+        return record.name, record.levelno, cls._NUMBERS.sub("#", str(record.msg))[:120]
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if getattr(record, "viola_repeat_summary", False):
+            return True
+        now = self._clock()
+        with self._lock:
+            allowed = self._allow(record, now)
+            due = self._take_due_summaries(now)
+        for summary in due:
+            self._handler.handle(summary)
+        return allowed
+
+    def _allow(self, record: logging.LogRecord, now: float) -> bool:
+        key = self._key(record)
+        kind = self._kinds.get(key)
+        if kind is None:
+            if len(self._kinds) >= self.MAX_TRACKED:
+                self._kinds.clear()
+            kind = self._kinds[key] = _LineKind(minute_start=now, hour_start=now, summary_due=now)
+        if now - kind.minute_start >= 60.0:
+            kind.minute_start, kind.in_minute = now, 0
+        if now - kind.hour_start >= 3600.0:
+            kind.hour_start, kind.in_hour = now, 0
+        is_error = record.levelno >= logging.ERROR
+        per_minute = self.ERROR_PER_MINUTE if is_error else self.PER_MINUTE
+        per_hour = self.ERROR_PER_HOUR if is_error else self.PER_HOUR
+        if kind.in_minute < per_minute and kind.in_hour < per_hour:
+            kind.in_minute += 1
+            kind.in_hour += 1
+            return True
+        if kind.suppressed == 0:
+            kind.sample = record
+            kind.suppressed_since = now
+            kind.summary_due = max(kind.summary_due, now + 60.0)
+        kind.suppressed += 1
+        return False
+
+    def _take_due_summaries(self, now: float) -> list[logging.LogRecord]:
+        if now < self._next_sweep:
+            return []
+        self._next_sweep = now + self.SWEEP_EVERY_SECONDS
+        due = []
+        for kind in self._kinds.values():
+            if kind.suppressed and kind.sample is not None and now >= kind.summary_due:
+                due.append(self._summary(kind, now))
+                kind.suppressed = 0
+                kind.sample = None
+                kind.summary_due = now + self.SUMMARY_EVERY_SECONDS
+        return due
+
+    @staticmethod
+    def _summary(kind: _LineKind, now: float) -> logging.LogRecord:
+        sample = kind.sample
+        assert sample is not None
+        try:
+            text = sample.getMessage()
+        except Exception:  # noqa: BLE001, RUF100 - a bad format string must not break logging
+            text = str(sample.msg)
+        summary = logging.LogRecord(
+            sample.name,
+            sample.levelno,
+            sample.pathname,
+            sample.lineno,
+            "%s [%d more like this in the last %ds]",
+            (text[:300], kind.suppressed, int(now - kind.suppressed_since)),
+            None,
+            func=sample.funcName,
+        )
+        summary.viola_repeat_summary = True
+        return summary
+
+
+@dataclass
+class _LineKind:
+    minute_start: float
+    hour_start: float
+    summary_due: float
+    in_minute: int = 0
+    in_hour: int = 0
+    suppressed: int = 0
+    suppressed_since: float = 0.0
+    sample: logging.LogRecord | None = None
 
 
 class WindowsSafeRotatingFileHandler(RotatingFileHandler):
@@ -329,6 +449,7 @@ def configure_observability(
         )
         structured_handler.setLevel(logging.DEBUG)
         structured_handler.setFormatter(JsonLineFormatter())
+        structured_handler.addFilter(RepeatCollapseFilter(structured_handler))
         handlers.append(structured_handler)
 
     project_root = directories["root"].parent

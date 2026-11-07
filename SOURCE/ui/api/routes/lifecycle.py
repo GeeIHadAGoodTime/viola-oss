@@ -55,6 +55,21 @@ async def _replay_router_shutdown_handlers(app: FastAPI) -> None:
             await result
 
 
+async def refresh_until_a_failure(entries: dict[str, Any], refresh: Any) -> int:
+    """Refresh weather entries, stopping at the first one that fails.
+
+    When one fails the network is usually down (a tablet asleep at 3 AM), and
+    every other entry would only fail too: 24 wttr.in failures in one pass on
+    the 1.0.5 build-9 laptop. Returns how many worked.
+    """
+    refreshed = 0
+    for cache_key, entry in entries.items():
+        if not await refresh(cache_key, entry):
+            break
+        refreshed += 1
+    return refreshed
+
+
 def _log_task_exception(task: asyncio.Task) -> None:
     """Log exceptions from fire-and-forget tasks."""
     if task.cancelled():
@@ -321,8 +336,10 @@ def configure_lifecycle(context: ApiContext) -> None:
             hour = datetime.datetime.now().hour
             return 3 <= hour < 5
 
-        async def refresh_weather_for_key(cache_key: str, entry: dict[str, Any]) -> None:
+        async def refresh_weather_for_key(cache_key: str, entry: dict[str, Any]) -> bool:
             """Refresh a single weather cache entry via internal API call.
+
+            Returns True when the refresh worked.
 
             cache_key comes from snapshot() which strips the 'weather_' prefix,
             so keys are either city names (e.g. 'milwaukee') or coordinates
@@ -365,24 +382,27 @@ def configure_lifecycle(context: ApiContext) -> None:
                     ) as resp:
                         if resp.status == 200:
                             log.debug("Proactive refresh successful for %s", cache_key)
-                        else:
-                            log.debug(
-                                "Proactive refresh failed for %s (status %s)",
-                                cache_key,
-                                resp.status,
-                            )
+                            return True
+                        log.debug(
+                            "Proactive refresh failed for %s (status %s)",
+                            cache_key,
+                            resp.status,
+                        )
             except Exception as exc:
                 log.debug("Error refreshing weather for %s: %s", cache_key, exc)
+            return False
 
+        last_nightly_refresh: datetime.date | None = None
         while True:
             try:
                 await asyncio.sleep(TIMEOUT_10_MINUTES)
 
                 if is_low_usage_hour():
-                    log.info("Low-usage hour: Refreshing all weather caches")
-                    all_cached = weather_cache.snapshot()
-                    for cache_key, entry in all_cached.items():
-                        await refresh_weather_for_key(cache_key, entry)
+                    today = datetime.date.today()
+                    if last_nightly_refresh != today:
+                        last_nightly_refresh = today
+                        log.info("Low-usage hour: Refreshing all weather caches")
+                        await refresh_until_a_failure(weather_cache.snapshot(), refresh_weather_for_key)
                 else:
                     all_cached = weather_cache.snapshot()
                     for cache_key, entry in all_cached.items():

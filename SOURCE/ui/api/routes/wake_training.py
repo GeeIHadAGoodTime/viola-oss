@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import re
 from dataclasses import asdict
@@ -18,17 +19,26 @@ from fastapi import Body, Depends, HTTPException, Request, status
 from services.violawake_client import (
     ViolaWakeClient,
     ViolaWakeClientError,
+    ViolaWakeMonthlyLimitError,
     ViolaWakeRemoteError,
+    ViolaWakeSignInRequiredError,
     ViolaWakeUnavailableError,
     WakeAudioSample,
+    wake_client_for,
 )
 from services.wake_word.custom_models import (
     DEFAULT_WAKE_MODEL_ID,
     WakeTrainingJobRecord,
+    calibrate_wake_rule,
     delete_model_for_user,
+    discard_job_samples,
+    keep_job_samples,
+    latest_open_job_for_user,
     list_models_for_user,
     read_job_record,
+    read_job_samples,
     resolve_model_for_user,
+    set_model_wake_rule,
     store_trained_model,
     validate_onnx_model,
     write_job_record,
@@ -42,7 +52,10 @@ _MIN_WAKE_SAMPLES = 5
 _MAX_WAKE_SAMPLES = 10
 _DEFAULT_TRAINING_EPOCHS = 80
 _TEMPORARILY_UNAVAILABLE = "Custom wake-words are temporarily unavailable."
-_WAKE_DATA_UPLOAD_CONTROL = "wake_data_upload"
+_WAKE_TRAINING_CONTROL = "custom_wake_training"
+_SIGN_IN_REQUIRED = "Sign in to your Viola account to train a wake word."
+_RESERVED_WAKE_WORDS = frozenset({"viola", "hey viola", "ok viola", "okay viola"})
+_RESERVED_WAKE_WORD_MESSAGE = '"Viola" is already built in, so there is nothing to train. Pick a different word.'
 
 # Reason codes the UI can key its tips content off of. "quality_gate" covers
 # ViolaWake's automated post-training quality check (letter-graded A-F); a
@@ -53,14 +66,23 @@ _WAKE_DATA_UPLOAD_CONTROL = "wake_data_upload"
 # only widens which real failures get the reassuring quality-gate copy below
 # -- it cannot loosen the leak guarantee, since both branches only ever return
 # one of the two fixed, pre-written safe messages.
+# Tested before the quality-gate pattern: ViolaWake's outage text mentions the
+# quality gate too ("Quality gate could not synthesize..."), and calling that a
+# quality verdict tells the user to retry something that cannot work.
+_SERVICE_OUTAGE_PATTERN = re.compile(r"down on our side|on our side|infrastructure outage|could not synthesize", re.IGNORECASE)
 _QUALITY_GATE_PATTERN = re.compile(r"quality[ _]gate|quality metrics|\bgrade\s*f\b", re.IGNORECASE)
 _TRAINING_FAILURE_MESSAGES: dict[str, str] = {
     "quality_gate": (
-        "Training finished, but the resulting model did not pass ViolaWake's automated "
-        "quality check. This happens even with good recordings -- see the tips below, "
-        "then try training again with the same recordings before you re-record."
+        "Training finished, but this wake word did not pass the automated quality check, "
+        "so it was not installed. This happens even with good recordings. Your current wake "
+        "word still works. See the tips below, then try again with the same recordings "
+        "before you re-record."
     ),
-    "generic": "Training did not finish successfully. See the tips below, then try again.",
+    "service_outage": (
+        "Training is down on our side right now. Your recordings are fine and your current "
+        "wake word still works. Please try again in a little while."
+    ),
+    "generic": "Training did not finish, so nothing was changed and your current wake word still works. See the tips below, then try again.",
 }
 
 # Returned when ViolaWake refuses the submission itself. Its raw refusal text
@@ -84,16 +106,18 @@ def _client(user_id: str) -> ViolaWakeClient:
     The client carries the user's opaque tenant key on every request, so
     ViolaWake can keep its per-user training breaker and pending-job cap
     per-user instead of applying them to the whole shared service account.
+    On an installed desktop this is the relay client, which reaches ViolaWake
+    through the Viola cloud; see ``wake_client_for``.
     """
 
-    return ViolaWakeClient(user_id=user_id)
+    return wake_client_for(user_id)
 
 
 async def _wake_training_available() -> bool:
     try:
         from services.operator_controls import require_enabled_async
 
-        decision = await require_enabled_async(_WAKE_DATA_UPLOAD_CONTROL, action="custom_wake_training")
+        decision = await require_enabled_async(_WAKE_TRAINING_CONTROL, action="custom_wake_training")
     except (ImportError, KeyError, RuntimeError):
         return False
     return bool(decision.allowed)
@@ -101,24 +125,6 @@ async def _wake_training_available() -> bool:
 
 def _json_error(status_code: int, code: str, message: str) -> JSONResponse:
     return JSONResponse(status_code=status_code, content=failure_response(code, message))
-
-
-async def _wake_training_upload_allowed(user_id: str) -> bool:
-    try:
-        from services.operator_controls import require_enabled_async
-
-        decision = await require_enabled_async(
-            _WAKE_DATA_UPLOAD_CONTROL,
-            user_id=user_id,
-            action="custom_wake_word_training",
-        )
-        if not decision.allowed:
-            logger.debug("Custom wake-word training blocked: %s", decision.reason)
-            return False
-        return True
-    except Exception:
-        logger.exception("Custom wake-word training blocked: operator control check failed")
-        return False
 
 
 def _now_iso() -> str:
@@ -130,30 +136,36 @@ def _now_iso() -> str:
 def _classify_training_failure(raw_error: str) -> str:
     """Classify a raw upstream training-failure message for display purposes.
 
-    Returns "quality_gate" when the failure looks like ViolaWake's automated
-    post-training quality check, otherwise "generic". This is a plain
-    substring classification of text ViolaWake already produced for this job
-    -- it never alters training/grading behavior or routes model output.
+    Returns "service_outage" when ViolaWake says the failure was on its side,
+    "quality_gate" when the failure looks like its automated post-training
+    quality check, otherwise "generic". This is a plain substring classification
+    of text ViolaWake already produced for this job -- it never alters
+    training/grading behavior or routes model output.
     """
 
+    if _SERVICE_OUTAGE_PATTERN.search(raw_error):
+        return "service_outage"
     if _QUALITY_GATE_PATTERN.search(raw_error):
         return "quality_gate"
     return "generic"
 
 
-def _sanitize_remote_training_error(job_id: str, raw_error: str | None) -> tuple[str | None, str | None]:
+def _sanitize_remote_training_error(
+    job_id: str, raw_error: str | None, reason_hint: str | None = None
+) -> tuple[str | None, str | None]:
     """Return a (safe_message, reason_code) pair for a raw ViolaWake failure.
 
     ViolaWake's own error text can carry internal detail (container paths,
     stack fragments) that must never reach a browser (CL-20260714-4c23). The
     raw text is logged here for operators; only the mapped, safe message and
-    reason code are ever returned to the client.
+    reason code are ever returned to the client. ``reason_hint`` is the reason the
+    cloud relay already worked out, which is the only reason a desktop ever gets.
     """
 
     if not raw_error:
         return None, None
     logger.debug("ViolaWake job %s reported a failure: %s", job_id, raw_error)
-    reason_code = _classify_training_failure(raw_error)
+    reason_code = reason_hint if reason_hint in _TRAINING_FAILURE_MESSAGES else _classify_training_failure(raw_error)
     return _TRAINING_FAILURE_MESSAGES[reason_code], reason_code
 
 
@@ -212,6 +224,9 @@ def _set_active_model(user_id: str, model_path: str, *, model_name: str, is_defa
         settings_manager.set("use_custom_wake_word", not is_default, save_immediately=False)
         settings_manager.set("custom_wake_word_name", "" if is_default else model_name, save_immediately=False)
         settings_manager.save()
+    from voice.wake_detector.active_word import publish_active_wake_word
+
+    publish_active_wake_word(None if is_default else model_name)
 
 
 def _reload_wake_detector(model_path: str) -> dict[str, Any]:
@@ -244,6 +259,41 @@ def _reload_wake_detector(model_path: str) -> dict[str, Any]:
         return {"reloaded": False, "reason": "detector_not_running"}
 
 
+def _activate_model(user_id: str, record: Any) -> tuple[dict[str, Any], JSONResponse | None]:
+    """Swap the detector to ``record`` first, and only then remember the choice.
+
+    The other order saved a model the detector had just refused, so the listener kept
+    the old word until the next restart, then loaded the bad file at boot.
+    """
+
+    reload_result = _reload_wake_detector(record.model_path)
+    if not reload_result.get("reloaded") and reload_result.get("reason") in {"invalid_model", "model_not_found"}:
+        return reload_result, _json_error(
+            status.HTTP_400_BAD_REQUEST,
+            "invalid_wake_model",
+            "That wake word could not be loaded, so your current wake word is still on.",
+        )
+    _set_active_model(user_id, record.model_path, model_name=record.name, is_default=record.is_default)
+    return reload_result, None
+
+
+async def _measure_wake_rule(user_id: str, job_id: str, model_path: str) -> None:
+    """Fit the detector's rule to this word, using the recordings kept for it.
+
+    Best effort: a model with no measured rule still works, on the default rule.
+    """
+
+    samples = read_job_samples(user_id, job_id)
+    if not samples:
+        return
+    try:
+        rule = await asyncio.to_thread(calibrate_wake_rule, Path(model_path), samples)
+        if rule is not None:
+            set_model_wake_rule(Path(model_path), rule)
+    except Exception:  # never lose a good model over a measurement
+        logger.exception("Could not measure the wake rule for job %s", job_id)
+
+
 def _custom_model_activation_error(record: Any) -> JSONResponse | None:
     if record.is_default:
         return None
@@ -258,6 +308,23 @@ def _custom_model_activation_error(record: Any) -> JSONResponse | None:
     return None
 
 
+async def _word_verdict(wake_word: str, user_id: str) -> dict[str, Any]:
+    """Ask ViolaWake about a word. If it cannot be asked, let the upload decide.
+
+    ViolaWake checks again at submit, so skipping this when the service is
+    unreachable costs a recording session at worst, never a bad model.
+    """
+
+    normalized = " ".join(wake_word.strip().lower().split())
+    if normalized in _RESERVED_WAKE_WORDS:
+        return {"ok": False, "reason": _RESERVED_WAKE_WORD_MESSAGE, "code": "reserved"}
+    try:
+        verdict = await _client(user_id).check_word(wake_word)
+    except ViolaWakeClientError:
+        return {"ok": True, "reason": None, "code": None}
+    return {"ok": verdict.ok, "reason": verdict.reason, "code": verdict.code}
+
+
 def _model_rows(user_id: str) -> list[dict[str, Any]]:
     active_model_path = _get_active_model_path(user_id)
     return [asdict(row) for row in list_models_for_user(user_id, active_model_path=active_model_path)]
@@ -267,6 +334,42 @@ def register_wake_training_routes(context: ApiContext) -> None:
     """Register wake-word training routes on the feature router."""
 
     router = context.router
+
+    @router.get(
+        "/v1/wake/training/status",
+        tags=["wake"],
+        dependencies=[Depends(require_auth)],
+    )
+    async def wake_training_status(user_id: str = Depends(get_current_user_id)) -> Any:
+        """Say whether Settings should offer training right now, and if not, why."""
+
+        if not await _wake_training_available():
+            return success_response({"available": False, "message": _TEMPORARILY_UNAVAILABLE})
+        try:
+            readiness = await _client(user_id).readiness()
+        except ViolaWakeSignInRequiredError:
+            return success_response({"available": False, "message": _SIGN_IN_REQUIRED})
+        except ViolaWakeClientError:
+            return success_response({"available": False, "message": _TEMPORARILY_UNAVAILABLE})
+        return success_response(
+            {
+                "available": readiness.ready,
+                "message": None if readiness.ready else (readiness.message or _TEMPORARILY_UNAVAILABLE),
+            }
+        )
+
+    @router.post(
+        "/v1/wake/check-word",
+        tags=["wake"],
+        dependencies=[Depends(require_auth)],
+    )
+    async def check_wake_word(
+        body: dict[str, Any] = Body(...),
+        user_id: str = Depends(get_current_user_id),
+    ) -> Any:
+        """Say whether a word can work, before the user records anything."""
+
+        return success_response(await _word_verdict(str(body.get("wake_word") or ""), user_id))
 
     @router.post(
         "/v1/wake/train",
@@ -287,6 +390,10 @@ def register_wake_training_routes(context: ApiContext) -> None:
         except HTTPException as exc:
             return _json_error(exc.status_code, "invalid_training_request", str(exc.detail))
 
+        verdict = await _word_verdict(wake_word, user_id)
+        if not verdict["ok"]:
+            return _json_error(status.HTTP_400_BAD_REQUEST, "wake_word_refused", str(verdict["reason"]))
+
         client = _client(user_id)
         try:
             submission = await client.submit_training_job(
@@ -294,6 +401,10 @@ def register_wake_training_routes(context: ApiContext) -> None:
                 audio_samples=samples,
                 epochs=_DEFAULT_TRAINING_EPOCHS,
             )
+        except ViolaWakeSignInRequiredError:
+            return _json_error(status.HTTP_401_UNAUTHORIZED, "sign_in_required", _SIGN_IN_REQUIRED)
+        except ViolaWakeMonthlyLimitError as exc:
+            return _json_error(status.HTTP_429_TOO_MANY_REQUESTS, "wake_monthly_limit", str(exc))
         except ViolaWakeUnavailableError:
             return _json_error(status.HTTP_503_SERVICE_UNAVAILABLE, "violawake_unavailable", _TEMPORARILY_UNAVAILABLE)
         except ViolaWakeRemoteError:
@@ -318,7 +429,23 @@ def register_wake_training_routes(context: ApiContext) -> None:
             created_at=_now_iso(),
         )
         write_job_record(record)
+        keep_job_samples(user_id, submission.job_id, [sample.content for sample in samples])
         return success_response({"job_id": submission.job_id, "status": submission.status})
+
+    @router.get(
+        "/v1/wake/jobs/current",
+        tags=["wake"],
+        dependencies=[Depends(require_auth)],
+    )
+    async def current_wake_job(user_id: str = Depends(get_current_user_id)) -> Any:
+        """Return the job still in progress, so Settings can pick it back up."""
+
+        record = latest_open_job_for_user(user_id)
+        if record is None:
+            return success_response({"job": None})
+        return success_response(
+            {"job": {"job_id": record.job_id, "status": record.status, "wake_word": record.wake_word}}
+        )
 
     @router.get(
         "/v1/wake/jobs/{job_id}",
@@ -351,7 +478,9 @@ def register_wake_training_routes(context: ApiContext) -> None:
         # below by a sanitized/locally-authored message (see
         # _sanitize_remote_training_error: the raw text must never reach the
         # client, so we cannot re-derive the reason from the final message).
-        safe_error, error_reason = _sanitize_remote_training_error(job_id, remote_status.error)
+        safe_error, error_reason = _sanitize_remote_training_error(
+            job_id, remote_status.error, remote_status.error_reason
+        )
         updated = WakeTrainingJobRecord(
             job_id=local_record.job_id,
             user_id=local_record.user_id,
@@ -373,7 +502,7 @@ def register_wake_training_routes(context: ApiContext) -> None:
                 error_reason = "generic"
             else:
                 try:
-                    model_config = await client.get_model_config(remote_status.model_id)
+                    model_config = await client.get_model_config(remote_status.model_id, job_id=job_id)
                     model_bytes = await client.download_model(
                         remote_status.model_url,
                         expected_sha256=remote_status.model_hash,
@@ -393,6 +522,7 @@ def register_wake_training_routes(context: ApiContext) -> None:
                         far_per_hour=model_config.far_per_hour,
                         frr=model_config.frr,
                     )
+                    await _measure_wake_rule(user_id, job_id, model_record.model_path)
                     updated = WakeTrainingJobRecord(
                         **{
                             **asdict(updated),
@@ -419,6 +549,8 @@ def register_wake_training_routes(context: ApiContext) -> None:
                     error_reason = "generic"
 
         write_job_record(updated)
+        if updated.status in {"done", "failed"}:
+            discard_job_samples(user_id, job_id)
         return success_response(
             {
                 "job_id": updated.job_id,
@@ -429,6 +561,7 @@ def register_wake_training_routes(context: ApiContext) -> None:
                 "model_hash": updated.model_hash,
                 "error": updated.error,
                 "error_reason": error_reason if updated.error else None,
+                "wake_word": updated.wake_word,
             }
         )
 
@@ -471,8 +604,9 @@ def register_wake_training_routes(context: ApiContext) -> None:
         if activation_error is not None:
             return activation_error
 
-        _set_active_model(user_id, record.model_path, model_name=record.name, is_default=record.is_default)
-        reload_result = _reload_wake_detector(record.model_path)
+        reload_result, reload_error = _activate_model(user_id, record)
+        if reload_error is not None:
+            return reload_error
         return success_response({"model": asdict(record), "reload": reload_result})
 
     @router.delete(
@@ -556,8 +690,9 @@ def register_wake_training_routes(context: ApiContext) -> None:
         activation_error = _custom_model_activation_error(record)
         if activation_error is not None:
             return activation_error
-        _set_active_model(user_id, record.model_path, model_name=record.name, is_default=record.is_default)
-        reload_result = _reload_wake_detector(record.model_path)
+        reload_result, reload_error = _activate_model(user_id, record)
+        if reload_error is not None:
+            return reload_error
         return success_response({"active": record.name.lower(), "reload": reload_result})
 
     @router.get(

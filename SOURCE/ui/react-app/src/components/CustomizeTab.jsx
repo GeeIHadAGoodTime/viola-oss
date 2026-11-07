@@ -448,7 +448,7 @@ const CustomizeTab = React.memo(function CustomizeTab({
           fontSize: '13px',
           lineHeight: 1.55,
         }}>
-          Custom wake-word training is currently unavailable. The default is <strong>"Viola"</strong>; existing local models can still be switched here.
+          The default is <strong>"Viola"</strong>. Train your own below, and switch between them at any time.
         </div>
         <WakeWordSection theme={theme} />
       </Section>

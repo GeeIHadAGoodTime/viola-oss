@@ -12,7 +12,20 @@ const SAMPLE_TARGET = 5;
 const SAMPLE_LIMIT = 10;
 const SAMPLE_MS = 1600;
 const POLL_MS = 5000;
-const CUSTOM_WAKE_TRAINING_AVAILABLE = false;
+// A sample whose loudest point is below this is a dead or muted microphone, not a
+// quiet voice: normal speech peaks far above it even at a distance.
+const MIN_SAMPLE_PEAK = 0.01;
+
+// What the job is doing, in words. ViolaWake reports one progress number; its stages
+// run 0-12 setup, 12-30 practice audio, 30-95 training, 95-100 the quality check.
+function trainingStageText(status, progress) {
+  if (status === 'queued') return 'Waiting for a training slot';
+  if (status === 'done') return 'Finished';
+  if (progress < 12) return 'Preparing your recordings';
+  if (progress < 30) return 'Making practice audio';
+  if (progress < 95) return 'Training your wake word';
+  return 'Checking quality';
+}
 
 function wait(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -49,6 +62,17 @@ function mergeChunks(chunks) {
     offset += chunk.length;
   });
   return merged;
+}
+
+function samplePeak(chunks) {
+  let peak = 0;
+  chunks.forEach((chunk) => {
+    for (let index = 0; index < chunk.length; index += 1) {
+      const value = Math.abs(chunk[index]);
+      if (value > peak) peak = value;
+    }
+  });
+  return peak;
 }
 
 function encodeWav(chunks, sampleRate) {
@@ -117,6 +141,9 @@ async function recordWavSample() {
   if (!chunks.length) {
     throw new Error('No microphone audio was captured.');
   }
+  if (samplePeak(chunks) < MIN_SAMPLE_PEAK) {
+    throw new Error('That recording was silent. Check that your microphone is on and not muted, then try again.');
+  }
   return encodeWav(chunks, audioContext.sampleRate || 16000);
 }
 
@@ -161,6 +188,12 @@ function architectureLabel(architecture) {
 function WakeWordTrainingTips({ reasonCode }) {
   return (
     <div>
+      {reasonCode === 'service_outage' && (
+        <p style={{ margin: '0 0 8px 0' }}>
+          This one is on us, not your recordings. Nothing below will change it, so just try
+          again later.
+        </p>
+      )}
       {reasonCode === 'quality_gate' && (
         <p style={{ margin: '0 0 8px 0' }}>
           A grade of F means the automated quality check did not pass. That does not mean your
@@ -184,8 +217,7 @@ function WakeWordTrainingTips({ reasonCode }) {
         </li>
         <li>
           If training fails several times in a row for the same wake word, wait a few minutes and
-          try again, or contact support: repeated failures can pause your training queue until
-          it is reset.
+          try again, or try a different word. If it keeps failing, contact support.
         </li>
       </ul>
     </div>
@@ -217,6 +249,10 @@ export default function WakeWordSection({ theme = THEME }) {
   const [trainingErrorReason, setTrainingErrorReason] = useState(null);
   const [completedModel, setCompletedModel] = useState(null);
   const [tipsOpen, setTipsOpen] = useState(false);
+  const [trainingAvailable, setTrainingAvailable] = useState(false);
+  const [trainingUnavailableReason, setTrainingUnavailableReason] = useState(null);
+  const [wordRefusal, setWordRefusal] = useState(null);
+  const [wordChecked, setWordChecked] = useState('');
 
   const activeModel = useMemo(
     () => models.find((model) => model.is_active) || null,
@@ -255,6 +291,39 @@ export default function WakeWordSection({ theme = THEME }) {
   useEffect(() => {
     reloadModels();
   }, [reloadModels]);
+
+  // Ask the service rather than assume: the button is offered only when a job could
+  // finish, and a job that outlived this panel is picked back up, because the model
+  // is imported while something polls it.
+  useEffect(() => {
+    if (isFeatureHidden('wake_models')) return undefined;
+    let cancelled = false;
+    (async () => {
+      try {
+        const status = await wakeRequest('/v1/wake/training/status');
+        if (cancelled) return;
+        setTrainingAvailable(Boolean(status.available));
+        setTrainingUnavailableReason(status.available ? null : status.message || null);
+      } catch (err) {
+        if (cancelled) return;
+        setTrainingAvailable(false);
+        setTrainingUnavailableReason(err?.message || null);
+      }
+      try {
+        const current = await wakeRequest('/v1/wake/jobs/current');
+        if (cancelled || !current.job) return;
+        setWakeWordText(current.job.wake_word || '');
+        setTrainingStatus({ status: current.job.status, progress: 0 });
+        setTrainingJobId(current.job.job_id);
+        setWizardOpen(true);
+      } catch {
+        // Nothing to resume is the common case, and a failed check changes nothing.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!trainingJobId) return undefined;
@@ -304,12 +373,35 @@ export default function WakeWordSection({ theme = THEME }) {
     setTrainingError(null);
     setTrainingErrorReason(null);
     setCompletedModel(null);
+    setWordRefusal(null);
+    setWordChecked('');
   }, []);
+
+  // A bad word is refused before anyone spends time recording it.
+  const checkWord = useCallback(async () => {
+    const wakeWord = wakeWordText.trim();
+    if (!wakeWord) return false;
+    if (wakeWord === wordChecked) return !wordRefusal;
+    try {
+      const verdict = await wakeRequest('/v1/wake/check-word', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ wake_word: wakeWord }),
+      });
+      setWordChecked(wakeWord);
+      setWordRefusal(verdict.ok ? null : verdict.reason || 'That word will not work. Try a different one.');
+      return Boolean(verdict.ok);
+    } catch {
+      // The service checks again at Train, so a failed check should not stop the user.
+      return true;
+    }
+  }, [wakeWordText, wordChecked, wordRefusal]);
 
   const addSample = useCallback(async () => {
     if (recording || samples.length >= SAMPLE_LIMIT) return;
     setTrainingError(null);
     setTrainingErrorReason(null);
+    if (!(await checkWord())) return;
     setRecording(true);
     try {
       const blob = await recordWavSample();
@@ -326,7 +418,7 @@ export default function WakeWordSection({ theme = THEME }) {
     } finally {
       setRecording(false);
     }
-  }, [recording, samples.length]);
+  }, [checkWord, recording, samples.length]);
 
   const removeSample = useCallback((indexToRemove) => {
     setSamples((current) => current.filter((_, index) => index !== indexToRemove));
@@ -407,7 +499,7 @@ export default function WakeWordSection({ theme = THEME }) {
     : null;
   const canTrain = wakeWordText.trim() && samples.length >= SAMPLE_TARGET && !trainingJobId;
   const progressPct = Math.max(0, Math.min(100, Math.round(Number(trainingStatus?.progress || 0))));
-  const statusText = trainingStatus?.status || (trainingJobId ? 'queued' : '');
+  const statusText = trainingStageText(trainingStatus?.status || 'queued', progressPct);
 
   // Switching and deleting on-disk wake models has no cloud analog at all, so
   // the whole panel becomes the upsell rather than an empty model list with
@@ -450,25 +542,22 @@ export default function WakeWordSection({ theme = THEME }) {
           <h3 style={{ margin: 0, color: theme.colors.textPrimary, fontSize: 15 }}>My Wake Words</h3>
           <button
             onClick={() => {
-              if (!CUSTOM_WAKE_TRAINING_AVAILABLE) return;
+              if (!trainingAvailable) return;
               setWizardOpen(true);
               setNotice(null);
               setTrainingError(null);
             }}
-            disabled={!CUSTOM_WAKE_TRAINING_AVAILABLE}
-            title={
-              CUSTOM_WAKE_TRAINING_AVAILABLE
-                ? 'Create a custom wake word'
-                : 'Custom wake-word training is currently unavailable'
-            }
-            style={buttonStyle(theme, 'primary', !CUSTOM_WAKE_TRAINING_AVAILABLE)}
+            disabled={!trainingAvailable}
+            title={trainingAvailable ? 'Create a custom wake word' : 'Training is not available right now'}
+            style={buttonStyle(theme, 'primary', !trainingAvailable)}
           >
-            {CUSTOM_WAKE_TRAINING_AVAILABLE ? 'Create' : 'Unavailable'}
+            {trainingAvailable ? 'Create' : 'Unavailable'}
           </button>
         </div>
-        {!CUSTOM_WAKE_TRAINING_AVAILABLE && (
+        {!trainingAvailable && (
           <div style={{ color: theme.colors.textSecondary, fontSize: 12, marginTop: 8 }}>
-            Custom wake-word training is currently unavailable. Existing local models can still be switched or deleted.
+            {trainingUnavailableReason || 'Training is not available right now.'} You can still
+            switch or delete the wake words you already have.
           </div>
         )}
 
@@ -598,17 +687,7 @@ export default function WakeWordSection({ theme = THEME }) {
         </div>
       </div>
 
-      {/*
-        Whole wizard is pre-existing product-gated (CUSTOM_WAKE_TRAINING_AVAILABLE is
-        hardcoded false above), so this block -- including the trainingError display
-        and the inline WakeWordTrainingTips below -- cannot mount in the current
-        build: there is no way to open the wizard or reach a failure state to show
-        tips for. That gate is a separate product decision (not made here); the tips
-        content is wired correctly so it goes live the moment training is re-enabled.
-        The tips that ARE reachable right now are the standalone disclosure above
-        (outside this gate) and the Help > Troubleshooting entry in HelpModal.jsx.
-      */}
-      {CUSTOM_WAKE_TRAINING_AVAILABLE && wizardOpen && (
+      {wizardOpen && (
         <div style={{
           padding: 14,
           backgroundColor: theme.colors.bgElevated,
@@ -621,13 +700,17 @@ export default function WakeWordSection({ theme = THEME }) {
           <input
             type="text"
             value={wakeWordText}
-            onChange={(event) => setWakeWordText(event.target.value)}
+            onChange={(event) => {
+              setWakeWordText(event.target.value);
+              setWordRefusal(null);
+            }}
+            onBlur={checkWord}
             placeholder="e.g. Athena"
             disabled={Boolean(trainingJobId)}
             style={{
               width: '100%',
               padding: '8px 10px',
-              marginBottom: 12,
+              marginBottom: wordRefusal ? 4 : 12,
               borderRadius: 8,
               border: `1px solid ${theme.colors.borderLight}`,
               backgroundColor: theme.colors.bgCard,
@@ -637,8 +720,16 @@ export default function WakeWordSection({ theme = THEME }) {
             }}
           />
 
+          {wordRefusal && (
+            <div role="alert" style={{ color: theme.colors.statusRed, fontSize: 12, marginBottom: 12 }}>
+              {wordRefusal}
+            </div>
+          )}
+
           <div style={{ color: theme.colors.textSecondary, fontSize: 12, marginBottom: 10 }}>
             Record yourself saying "{wakeWordText.trim() || 'your wake word'}" {SAMPLE_TARGET} times.
+            Your recordings go to Viola's training service, are used only to build this wake word,
+            and are deleted about a day after training.
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
@@ -685,6 +776,7 @@ export default function WakeWordSection({ theme = THEME }) {
             <div style={{ marginBottom: 12 }}>
               <div style={{ color: theme.colors.textSecondary, fontSize: 12, marginBottom: 6 }}>
                 {statusText}
+                {trainingJobId && ' (usually about 10 minutes, and you can close Settings)'}
               </div>
               <div style={{
                 height: 8,
@@ -724,7 +816,10 @@ export default function WakeWordSection({ theme = THEME }) {
           )}
 
           {completedModelRow ? (
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+              <span style={{ color: theme.colors.textSecondary, fontSize: 12, width: '100%' }}>
+                "{completedModelRow.name}" is ready. Nothing changes until you activate it.
+              </span>
               <button
                 onClick={() => activateModel(completedModelRow)}
                 style={buttonStyle(theme, 'primary')}
@@ -742,8 +837,8 @@ export default function WakeWordSection({ theme = THEME }) {
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <button
                 onClick={startTraining}
-                disabled={!canTrain}
-                style={buttonStyle(theme, 'primary', !canTrain)}
+                disabled={!canTrain || Boolean(wordRefusal)}
+                style={buttonStyle(theme, 'primary', !canTrain || Boolean(wordRefusal))}
               >
                 Train
               </button>

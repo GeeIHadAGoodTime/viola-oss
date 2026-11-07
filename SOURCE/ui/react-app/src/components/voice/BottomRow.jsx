@@ -2,8 +2,9 @@
 /**
  * BottomRow — AI response area, PTT button, spoke chat, and connection status.
  */
-import { useId } from 'react';
+import { useEffect, useId, useRef } from 'react';
 import PropTypes from 'prop-types';
+import { useVoiceNotice } from '../../hooks/useVoiceNotice';
 import { useTranslation } from 'react-i18next';
 import { THEME } from '../../config';
 import ErrorBoundary from '../ErrorBoundary';
@@ -41,9 +42,12 @@ const BottomRow = ({
   isTyping,
   typingInput,
   setTypingInput,
+  setIsTyping,
+  typingFieldRef,
+  typingMaxChars,
   isCommandLoading,
   lastResponse,
-  mainThinking,
+  liveReply,
   voice,
   processingTooLong,
   // Managed-AI usage cap (C-077): when the turn was denied for hitting the
@@ -61,42 +65,62 @@ const BottomRow = ({
 }) => {
   const { t } = useTranslation();
   const micStatusId = useId();
+  const voiceNotice = useVoiceNotice(voice, lastResponse, isCommandLoading);
+  const responseAreaRef = useRef(null);
+
+  // A reply longer than the line scrolls; keep the words being said in view.
+  useEffect(() => {
+    const area = responseAreaRef.current;
+    if (liveReply && area) area.scrollTop = area.scrollHeight;
+  }, [liveReply]);
+
+  // Typing is finished (sent, cancelled or emptied): give the keys back to the
+  // stage, so hotkeys and type-anywhere work again.
+  useEffect(() => {
+    if (!isTyping) typingFieldRef?.current?.blur();
+  }, [isTyping, typingFieldRef]);
 
   return (
     <div className={`viola-bottom-row ${styles.container}`}>
       {/* AI Response / Typing Input */}
       <ErrorBoundary name="AI Response">
         <div
+          ref={responseAreaRef}
           className={styles.responseArea}
-          role={voice.error ? 'alert' : 'status'}
-          aria-live="polite"
+          role={voiceNotice ? 'alert' : 'status'}
+          aria-live={isTyping ? 'off' : 'polite'}
           aria-atomic="true"
+          aria-busy={Boolean(liveReply)}
           style={{ color: isTyping ? THEME.colors.textPrimary : THEME.colors.textTertiary }}
         >
-          {isTyping ? (
-            <span style={{ color: THEME.colors.textPrimary }}>
-              {typingInput}
-              <span className={styles.cursor} style={{ backgroundColor: THEME.colors.textSecondary }} />
-            </span>
-          ) : (
+          {/*
+            A real text field, always there. Type-anywhere used to draw the
+            letters into a span, so screen readers and Windows UI Automation
+            found no text box on the stage and Ctrl+A had nothing to select
+            (1.0.5 build 9 report). Until typing starts it stays out of sight
+            and out of the way of fingers, but Tab and assistive tech reach it.
+          */}
+          <input
+            ref={typingFieldRef}
+            type="text"
+            className={isTyping ? styles.typingField : styles.typingFieldIdle}
+            data-testid="stage-typing-field"
+            value={typingInput}
+            onChange={(event) => {
+              setTypingInput(event.target.value);
+              setIsTyping(event.target.value.length > 0);
+            }}
+            maxLength={typingMaxChars}
+            placeholder={t('voice.stage_field')}
+            aria-label={t('voice.stage_field')}
+            autoComplete="off"
+          />
+          {isTyping ? null : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: 0 }}>
-              {mainThinking && (
-                <span
-                  style={{
-                    color: THEME.colors.textMuted,
-                    fontSize: '0.82em',
-                    fontStyle: 'italic',
-                    lineHeight: 1.35,
-                    opacity: 0.7,
-                    overflow: 'hidden',
-                    whiteSpace: 'nowrap',
-                    textOverflow: 'ellipsis',
-                  }}
-                >
-                  {mainThinking}
-                </span>
-              )}
-              {isCommandLoading ? (
+              {liveReply ? (
+                /* Ahead of every "working" state: the answer has started. */
+                <span data-testid="live-reply">{renderStageMarkdown(`"${liveReply}"`)}</span>
+              ) : isCommandLoading ? (
                 <span className={styles.loadingIndicator} style={{ color: `${THEME.colors.statusYellow}CC` }}>
                   <span
                     className={styles.loadingSpinner}
@@ -112,21 +136,25 @@ const BottomRow = ({
                 <span className={styles.thinkingText} style={{ color: `${THEME.colors.statusYellow}CC` }}>
                   {processingTooLong ? t('voice.status.taking_longer') : t('voice.status.thinking')}
                 </span>
-              ) : voice.error ? (
-                /*
-                  Rendered through describeError rather than raw. This area is
-                  the only thing a user sees when a voice turn fails, so it must
-                  survive whatever the failure hands it: the API's failure
-                  envelope is an OBJECT (`{code, message}`), and React throws
-                  "Objects are not valid as a React child" on one, which the
-                  surrounding ErrorBoundary turned into "AI Response couldn't
-                  load" — losing the reason exactly when the user needed it.
-                  Normalising at the point of render means no upstream caller
-                  can ever crash this widget again.
-                */
-                <span style={{ color: `${THEME.colors.statusRed}CC` }}>{describeError(voice.error)}</span>
               ) : (
-                <span>{renderStageMarkdown(lastResponse)}</span>
+                <>
+                  {/*
+                    Rendered through describeError rather than raw. The API's
+                    failure envelope is an OBJECT (`{code, message}`), and React
+                    throws "Objects are not valid as a React child" on one,
+                    which the ErrorBoundary turned into "AI Response couldn't
+                    load". Normalising here means no upstream caller can crash
+                    this widget.
+
+                    The notice sits ABOVE the reply, never instead of it: it
+                    used to replace the reply line and, with nothing to clear
+                    it, hid every later reply for 70+ minutes (build 9, High 1).
+                  */}
+                  {voiceNotice && (
+                    <span style={{ color: `${THEME.colors.statusRed}CC` }}>{describeError(voiceNotice)}</span>
+                  )}
+                  <span>{renderStageMarkdown(lastResponse)}</span>
+                </>
               )}
             </div>
           )}
@@ -214,9 +242,12 @@ BottomRow.propTypes = {
   isTyping: PropTypes.bool.isRequired,
   typingInput: PropTypes.string.isRequired,
   setTypingInput: PropTypes.func.isRequired,
+  setIsTyping: PropTypes.func,
+  typingFieldRef: PropTypes.shape({ current: PropTypes.any }),
+  typingMaxChars: PropTypes.number,
   isCommandLoading: PropTypes.bool.isRequired,
   lastResponse: PropTypes.string.isRequired,
-  mainThinking: PropTypes.string,
+  liveReply: PropTypes.string,
   voice: PropTypes.object.isRequired,
   processingTooLong: PropTypes.bool,
   capDenial: PropTypes.shape({
@@ -233,7 +264,7 @@ BottomRow.propTypes = {
 };
 
 BottomRow.defaultProps = {
-  mainThinking: '',
+  liveReply: '',
   capDenial: null,
   onUpgradeFromCap: () => {},
 };

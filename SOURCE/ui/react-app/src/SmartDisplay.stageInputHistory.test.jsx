@@ -6,7 +6,7 @@
  *    list was only what this launch had added.
  *  - The multiroom speaker page kept an old reply on screen (A7.3-A7.6).
  */
-import { act, render, screen, waitFor, cleanup } from './test/test-utils';
+import { act, fireEvent, render, screen, waitFor, cleanup } from './test/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import SmartDisplay, { IDLE_RESPONSE_LINE, SPOKE_REPLY_HOLD_MS, stagePasteText } from './SmartDisplay';
 
@@ -90,13 +90,64 @@ describe('stage paste', () => {
     render(<SmartDisplay />);
     const event = pasteOnStage('play some jazz');
     expect(event.defaultPrevented).toBe(true);
-    await waitFor(() => expect(screen.getByText('play some jazz')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByDisplayValue('play some jazz')).toBeInTheDocument());
   });
 
   it('turns pasted line breaks into spaces', () => {
     expect(stagePasteText({ getData: () => 'play\r\nsome\tjazz' })).toBe('play some jazz');
     expect(stagePasteText({ getData: () => '' })).toBe('');
     expect(stagePasteText(null)).toBe('');
+  });
+});
+
+// 1.0.5 build 9: the stage's text box was drawn letters, so it was missing from
+// Windows UI Automation and screen readers, and Ctrl+A selected nothing.
+describe('stage text field', () => {
+  const field = () => screen.getByRole('textbox', { name: 'Message Viola' });
+  const press = (key, target = document.body) => {
+    act(() => {
+      target.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
+    });
+  };
+
+  it('is a real, named text box even before anyone types', () => {
+    render(<SmartDisplay />);
+    expect(field().tagName).toBe('INPUT');
+    expect(field()).toHaveValue('');
+  });
+
+  it('takes typing from anywhere on the stage, then holds the focus for editing', async () => {
+    render(<SmartDisplay />);
+    press('h');
+    await waitFor(() => expect(field()).toHaveValue('h'));
+    expect(document.activeElement).toBe(field());
+  });
+
+  it('can select everything typed', async () => {
+    render(<SmartDisplay />);
+    press('h');
+    await waitFor(() => expect(field()).toHaveValue('h'));
+    fireEvent.change(field(), { target: { value: 'hello there' } });
+    field().select();
+    expect(field().selectionStart).toBe(0);
+    expect(field().selectionEnd).toBe('hello there'.length);
+  });
+
+  it('gives the keys back to the stage after Escape', async () => {
+    render(<SmartDisplay />);
+    press('h');
+    await waitFor(() => expect(document.activeElement).toBe(field()));
+    press('Escape', field());
+    await waitFor(() => expect(field()).toHaveValue(''));
+    expect(document.activeElement).not.toBe(field());
+  });
+
+  it('leaves typing when the last letter is deleted in the field', async () => {
+    render(<SmartDisplay />);
+    press('h');
+    await waitFor(() => expect(document.activeElement).toBe(field()));
+    fireEvent.change(field(), { target: { value: '' } });
+    await waitFor(() => expect(document.activeElement).not.toBe(field()));
   });
 });
 

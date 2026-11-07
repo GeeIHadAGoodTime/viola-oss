@@ -271,10 +271,14 @@ class TimerNotifier(TimerEventListener):
             logger.debug("Timer %s broadcast skipped; EventHub/loop unavailable", event_type)
             return
         try:
-            asyncio.run_coroutine_threadsafe(
-                hub.broadcast_to_user(user_id, event_type, payload),
-                loop,
-            )
+            # The UI socket may be bound to the device identity, not the account.
+            from ui.websocket.event_hub import transport_command_recipients
+
+            for recipient in transport_command_recipients(user_id):
+                asyncio.run_coroutine_threadsafe(
+                    hub.broadcast_to_user(recipient, event_type, payload),
+                    loop,
+                )
         except _BRIDGE_ERRORS:
             logger.exception("Timer %s broadcast failed for user=%s", event_type, user_id)
 

@@ -281,11 +281,57 @@ describe('ConnectSpeakerPanel', () => {
     const off = await screen.findByTestId('connect-speaker-lan-off');
     off.click();
 
-    expect(await screen.findByTestId('connect-speaker-lan-unavailable')).toBeInTheDocument();
+    expect(await screen.findByTestId('connect-speaker-lan-start')).toBeInTheDocument();
     const post = fetchSpy.mock.calls.find(([url]) => url === '/v1/network/lan-access');
     expect(post).toBeTruthy();
     expect(post[1].method).toBe('POST');
     expect(JSON.parse(post[1].body)).toEqual({ enabled: false });
     expect(screen.queryByTestId('connect-speaker-qr')).toBeNull();
+  });
+
+  // 1.0.5 build 9: Add Room is the first tab, so just opening Rooms opened a
+  // LAN port for good. Looking must not start anything; Start must.
+  it('opens no LAN access by itself and starts it only from the Start button', async () => {
+    let started = false;
+    const fetchSpy = vi.fn().mockImplementation(async (url, init) => {
+      if (url === '/v1/network/lan-access') {
+        started = JSON.parse(init.body).enabled;
+        return { ok: true, status: 200, json: async () => ({ ok: true, data: {} }), text: async () => '' };
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => (started
+          ? {
+            ip: '192.168.1.23',
+            port: 8756,
+            spoke_url: 'http://192.168.1.23:8756/?room=',
+            pairing_code: 'ABCD',
+            lan_access: { reachable: true, via: 'lan_listener', firewall: null },
+          }
+          : {
+            ip: '',
+            port: 8756,
+            spoke_url: '',
+            pairing_code: '',
+            lan_access: { enabled: false, reachable: false, reason_code: 'lan_access_off', message: 'Off.' },
+          }),
+        text: async () => '',
+      };
+    });
+    vi.stubGlobal('fetch', fetchSpy);
+
+    render(<ConnectSpeakerPanel />);
+
+    const start = await screen.findByTestId('connect-speaker-lan-start');
+    expect(fetchSpy.mock.calls.some(([url]) => url === '/v1/network/lan-access')).toBe(false);
+    expect(screen.queryByTestId('connect-speaker-qr')).toBeNull();
+
+    start.click();
+
+    expect(await screen.findByTestId('connect-speaker-qr')).toBeInTheDocument();
+    const post = fetchSpy.mock.calls.find(([url]) => url === '/v1/network/lan-access');
+    expect(post[1].method).toBe('POST');
+    expect(JSON.parse(post[1].body)).toEqual({ enabled: true });
   });
 });

@@ -689,11 +689,12 @@ function ContentCardInner({ data, onDismiss }) {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
+        ...(data.compact ? { alignItems: 'flex-end', justifyContent: 'flex-end' } : null),
         padding: '24px',
         // Taps pass through to the app; the outside-tap listener dismisses.
         pointerEvents: 'none',
-        // Semi-transparent backdrop
-        backgroundColor: exiting ? 'transparent' : 'rgba(0,0,0,0.45)',
+        // Semi-transparent backdrop. A compact card leaves the video undimmed.
+        backgroundColor: exiting || data.compact ? 'transparent' : 'rgba(0,0,0,0.45)',
         transition: `background-color ${SLIDE_ANIMATION_MS}ms ease`,
       }}
     >
@@ -706,7 +707,8 @@ function ContentCardInner({ data, onDismiss }) {
         aria-label={data.title || "Viola's response"}
         style={{
           width: '100%',
-          maxWidth: 'min(720px, 92vw)',
+          maxWidth: data.compact ? 'min(420px, 92vw)' : 'min(720px, 92vw)',
+          ...(data.compact ? { maxHeight: '38vh' } : null),
           pointerEvents: 'auto',
           display: 'flex',
           flexDirection: 'column',
@@ -727,15 +729,20 @@ function ContentCardInner({ data, onDismiss }) {
         }}
       >
         {/* Header with gold accent line */}
-        <div style={{
-          padding: '24px 32px 16px 32px',
-          display: 'flex',
-          alignItems: 'flex-start',
-          justifyContent: 'space-between',
-          gap: '12px',
-          flexShrink: 0,
-          borderBottom: `1px solid ${THEME.colors.borderSubtle}`,
-        }}>
+        <div
+          data-testid="content-card-header"
+          style={{
+            padding: data.title || data.subtitle ? '24px 32px 16px 32px' : '12px 16px 0 32px',
+            display: 'flex',
+            alignItems: 'flex-start',
+            justifyContent: 'space-between',
+            gap: '12px',
+            flexShrink: 0,
+            // An untitled card has only the close button up here: a ruled-off
+            // header with nothing in it read as a page that failed to load.
+            ...(data.title || data.subtitle ? { borderBottom: `1px solid ${THEME.colors.borderSubtle}` } : null),
+          }}
+        >
           <div style={{ flex: 1, minWidth: 0 }}>
             {data.title && (
               <div style={{
@@ -845,6 +852,7 @@ ContentCardInner.propTypes = {
     source: PropTypes.string,
     // optional override
     dismiss_after_ms: PropTypes.number,
+    compact: PropTypes.bool,
   }),
   onDismiss: PropTypes.func.isRequired,
 };

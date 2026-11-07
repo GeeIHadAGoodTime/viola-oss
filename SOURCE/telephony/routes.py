@@ -768,8 +768,7 @@ async def _proxy_account_sms(action: str, user: User | None, body: dict | None) 
                 json=body if method == "POST" else None,
                 headers={"Authorization": "Bearer %s" % bearer},
             )
-        payload = resp.json()
-    except (httpx.HTTPError, ValueError) as exc:
+    except httpx.HTTPError as exc:
         logger.warning("Account SMS proxy %s failed: %s", action, type(exc).__name__)
         return JSONResponse(
             {
@@ -778,8 +777,29 @@ async def _proxy_account_sms(action: str, user: User | None, body: dict | None) 
             },
             status_code=502,
         )
+    # An answer that came back but cannot be read is a problem on Viola's side,
+    # not the user's connection. Proxies in front of the cloud swap some error
+    # replies for their own HTML page, so log what actually arrived.
+    try:
+        payload = resp.json()
+    except ValueError:
+        payload = None
     if not isinstance(payload, dict):
-        return JSONResponse({"error": "Unexpected response.", "error_code": "cloud_bad_response"}, status_code=502)
+        logger.warning(
+            "Account SMS proxy %s: unreadable reply HTTP %d, type=%s, %d bytes",
+            action,
+            resp.status_code,
+            resp.headers.get("content-type", "unknown"),
+            len(resp.content),
+        )
+        return JSONResponse(
+            {
+                "error": "Viola's text service had a problem on our side. Your connection is fine. "
+                "Try again in a few minutes.",
+                "error_code": "cloud_bad_response",
+            },
+            status_code=502,
+        )
     return JSONResponse(payload, status_code=resp.status_code)
 
 

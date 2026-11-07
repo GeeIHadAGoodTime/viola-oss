@@ -50,6 +50,12 @@ class WakeContext:
     # True while Viola's own TTS is speaking, and for a short tail after it
     # stops. The listener fills it from viola_self_speech_active().
     self_speech_active: bool = False
+    # The candidate was checked against what she just played and is not her
+    # (voice.wake_detector.own_speech): it may pass the self-speech and listening
+    # gates. Only ever set while she talks.
+    own_speech_cleared: bool = False
+    # A voice turn is only waiting on its command: a new wake runs beside it.
+    busy_turn: bool = False
 
     # Timing
     timestamp: float = field(default_factory=time.time)

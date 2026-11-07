@@ -138,7 +138,7 @@
         "ensemble": {
           "label": "Ensemble",
           "subtitle": "Capable & sandboxed",
-          "description": "Can read your files, browse the web in a sandbox, read email, and manage your calendar. Anything that changes data asks you first."
+          "description": "Can read your files, browse the web in a sandbox, send email you approve, and manage your calendar. Anything that changes data asks you first."
         },
         "symphony": {
           "label": "Symphony",
@@ -149,6 +149,7 @@
     }
   },
   "voice": {
+    "stage_field": "Message Viola",
     "spoke_chat": {
       "open": "Type a command for this room",
       "input_label": "Command for this room",

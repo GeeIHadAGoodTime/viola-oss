@@ -10,6 +10,7 @@ License: Apache-2.0 (Kokoro) + Apache-2.0 (ONNX Runtime).
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import random
 import re
@@ -132,6 +133,23 @@ _SENTENCE_RE = re.compile(r"(?<=[.!?])\s+")
 # Character count threshold for chunking long text into sentences
 _CHUNK_THRESHOLD = 200
 
+_WARM_UP_SENTENCE = "Hello there, this is a short sentence."
+# Streamed speech: finished audio waiting behind the sentence being played.
+_SPEECH_LOOKAHEAD_UNITS = 2
+# Speech-unit limits (see _speech_units). The first unit is what the listener
+# waits for; a unit under the minimum is not worth the extra boundary.
+_FIRST_UNIT_CHARS = 90
+_MAX_UNIT_CHARS = 200
+_MIN_UNIT_CHARS = 30
+_CLAUSE_END_MARKS = ",;:—–"
+# A breath between two languages in one sentence.
+_LANGUAGE_SWITCH_PAUSE_SECONDS = 0.12
+# One reply says the "can't say that part" notice once, even across sentences.
+_UNSPOKEN_NOTICE_REPEAT_SECONDS = 30.0
+# Language names of the internal eSpeak pronunciation route.
+_ESPEAK_LANGUAGES = {"zh": "cmn", "fr": "fr-fr"}
+_CLAUSE_END_RE = re.compile(r"[,;:—–](?=\s)")
+
 # Safety limit: reject text longer than this to prevent memory/CPU exhaustion.
 # 5000 chars ≈ ~1000 words ≈ ~60s synthesis time.
 _MAX_TEXT_LENGTH = 5000
@@ -162,6 +180,32 @@ def _split_sentences(text: str) -> list[str]:
     """Split text on sentence boundaries (.!? followed by whitespace)."""
     parts = _SENTENCE_RE.split(text)
     return [p.strip() for p in parts if p.strip()]
+
+
+def _speech_units(sentence: str, *, first: bool) -> list[str]:
+    """Cut a long sentence at its clause marks so audio can start, and keep up, sooner.
+
+    Synthesis time grows with length, and on a laptop CPU a long sentence takes
+    seconds. Nothing is audible until the first unit is done, so the first one
+    stays short; later units stay short enough to finish while the one before
+    plays. Only existing clause punctuation is used: the words never change.
+    """
+    limit = _FIRST_UNIT_CHARS if first else _MAX_UNIT_CHARS
+    units: list[str] = []
+    rest = sentence.strip()
+    while len(rest) > limit:
+        cuts = [match.end() for match in _CLAUSE_END_RE.finditer(rest, 0, limit + 1) if match.end() >= _MIN_UNIT_CHARS]
+        if not cuts:
+            later = _CLAUSE_END_RE.search(rest, limit)
+            if later is None or len(rest) - later.end() < _MIN_UNIT_CHARS:
+                break
+            cuts = [later.end()]
+        units.append(rest[: cuts[-1]].strip())
+        rest = rest[cuts[-1] :].strip()
+        limit = _MAX_UNIT_CHARS
+    if rest:
+        units.append(rest)
+    return units
 
 
 # ---------------------------------------------------------------------------
@@ -435,8 +479,22 @@ class KokoroTTSEngine:
         startup from a background thread (see
         VoicePipelineInitializer._prewarm_synthesizer) so the load never blocks
         the first turn.
+
+        Loading is not enough: the first sentence after a load pays for the
+        pronunciation model's and ONNX Runtime's own first run (measured on the
+        customer route: 7.9 s, then 1.2 s for the same sentence). So one throwaway
+        sentence is rendered here too, where nobody is waiting for it.
         """
-        return self._ensure_loaded()
+        ready = self._ensure_loaded()
+        if ready and not getattr(self, "_warmed_up", False):
+            self._warmed_up = True
+            t0 = time.perf_counter()
+            try:
+                self._synthesize_locked(_WARM_UP_SENTENCE, None, apply_volume=False)
+                logger.info("Kokoro warm-up sentence rendered in %.2fs", time.perf_counter() - t0)
+            except (RuntimeError, ValueError, OSError) as exc:
+                logger.debug("Kokoro warm-up skipped: %s", exc)
+        return ready
 
     def _kick_off_opener_cache_build(self) -> None:
         """Schedule the opener cache build on a daemon thread (one-shot)."""
@@ -758,6 +816,11 @@ class KokoroTTSEngine:
         retry_text = drop_unspeakable(text, tokens, latin_script=latin_script)
         if not retry_text or retry_text == text or not any(character.isalnum() for character in retry_text):
             logger.warning("Customer speech could not be spoken: %s tokens=%s", exc, list(tokens))
+            if self._claim_unspoken_notice():
+                # Nothing of this text can be read: say so instead of going silent.
+                from voice.speech_language import unspoken_notice
+
+                return self._synthesize_internal(unspoken_notice(language), voice, speed, apply_volume=apply_volume)
             raise exc
         try:
             audio = self._synthesize_internal(retry_text, voice, speed, apply_volume=apply_volume)
@@ -788,12 +851,9 @@ class KokoroTTSEngine:
             speed = self._speed_with_jitter()
         t0 = time.perf_counter()
 
-        samples, sample_rate = self._kokoro.create(
-            text,
-            voice=selected_voice,
-            speed=speed,
-            lang=getattr(self, "_speech_language", "en-us"),
-        )
+        samples, sample_rate = self._create_routed_samples(text, selected_voice, speed)
+        if len(samples) == 0:
+            return b""
 
         elapsed = time.perf_counter() - t0
         audio_duration = len(samples) / sample_rate
@@ -829,6 +889,102 @@ class KokoroTTSEngine:
             pcm_native = self._scale_pcm_volume(pcm_native, self._current_volume())
 
         return pcm_native.tobytes()
+
+    def _create_routed_samples(self, text: str, voice: str | np.ndarray, speed: float) -> tuple[np.ndarray, int]:
+        """Synthesise ``text``, sending each language to the voice that can read it.
+
+        The selected language still decides everything it can pronounce. Spanish
+        and Chinese inside it go to their own route and voice, and text no route
+        can read is replaced by one spoken notice, so a reply is never silently
+        cut short. (voice/speech_language.py says why.)
+        """
+        from voice.speech_language import BASE, MANDARIN, route_text, spanish_route_text, speech_spans, unspoken_notice
+
+        base = getattr(self, "_speech_language", "en-us")
+        kokoro = self._kokoro
+        assert kokoro is not None
+        spanish_base = base.split("-", 1)[0] == "es"
+        spans = speech_spans(text, base)
+        if not spans or (len(spans) == 1 and spans[0].language == BASE):
+            return kokoro.create(
+                spanish_route_text(text) if spanish_base else text, voice=voice, speed=speed, lang=base
+            )
+
+        sample_rate = SAMPLE_RATE_24K
+        parts: list[np.ndarray] = []
+        skipped = False
+        for span in spans:
+            if span.language == BASE:
+                samples, sample_rate = kokoro.create(
+                    spanish_route_text(span.text) if spanish_base else span.text, voice=voice, speed=speed, lang=base
+                )
+                parts.append(np.asarray(samples, dtype=np.float32))
+                continue
+            route = self._foreign_route(span.language)
+            if route is None:
+                skipped = True
+                continue
+            language, route_voice = route
+            try:
+                samples, sample_rate = kokoro.create(
+                    span.text if span.language == MANDARIN else route_text(span.language, span.text),
+                    voice=route_voice,
+                    speed=speed,
+                    lang=language,
+                )
+            except (ValueError, RuntimeError, KeyError, AssertionError) as exc:
+                logger.warning("Speech route %s could not read a span: %s", span.language, type(exc).__name__)
+                skipped = True
+                continue
+            parts.append(np.asarray(samples, dtype=np.float32))
+        if skipped and self._claim_unspoken_notice():
+            samples, sample_rate = kokoro.create(
+                spanish_route_text(unspoken_notice(base)) if spanish_base else unspoken_notice(base),
+                voice=voice,
+                speed=speed,
+                lang=base,
+            )
+            parts.append(np.asarray(samples, dtype=np.float32))
+        if not parts:
+            return np.empty(0, dtype=np.float32), sample_rate
+        pause = np.zeros(int(sample_rate * _LANGUAGE_SWITCH_PAUSE_SECONDS), dtype=np.float32)
+        joined: list[np.ndarray] = []
+        for part in parts:
+            if joined:
+                joined.append(pause)
+            joined.append(part)
+        return np.concatenate(joined), sample_rate
+
+    def _foreign_route(self, span_language: str) -> tuple[str, str] | None:
+        """The (language, voice) that reads a span, or None when this build has no such route."""
+        from voice.customer_voice_routing import default_voice
+
+        voice = default_voice(span_language)
+        kokoro = self._kokoro
+        if voice is None or kokoro is None:
+            return None
+        customer = getattr(self, "_customer_tokenizer", None)
+        if customer is not None:
+            if not customer.supports_locale(span_language):
+                return None
+            language = span_language
+        else:
+            language = _ESPEAK_LANGUAGES.get(span_language, span_language)
+        try:
+            if voice not in kokoro.get_voices():
+                return None
+        except (AttributeError, TypeError, ValueError):
+            return None
+        return language, voice
+
+    def _claim_unspoken_notice(self) -> bool:
+        """True once per reply: the first text no route could read gets the spoken notice."""
+        now = time.monotonic()
+        last = getattr(self, "_unspoken_notice_at", None)
+        if last is not None and now - last < _UNSPOKEN_NOTICE_REPEAT_SECONDS:
+            return False
+        self._unspoken_notice_at = now
+        return True
 
     @staticmethod
     def _scale_pcm_volume(pcm: np.ndarray, volume: float) -> np.ndarray:
@@ -1012,6 +1168,8 @@ class KokoroTTSEngine:
         base = self._intersentence_gap_ms
         if base <= 0:
             return 0
+        if current_sentence.rstrip()[-1:] in _CLAUSE_END_MARKS:
+            return min(base, 60)  # the same sentence goes on: a breath, not a stop
         next_start = next_sentence.lstrip().lower()
         if next_start.startswith(("and ", "also ", "plus ")):
             return min(base, 80)
@@ -1227,6 +1385,13 @@ class KokoroTTSEngine:
             getattr(self, "_voice_blend_spec", None) or "none",
             language,
         )
+        try:
+            # What she is about to say, so her own words can be recognised when heard back.
+            from audio_core.own_playback import get_own_playback
+
+            get_own_playback().note_text(text)
+        except Exception as exc:  # noqa: BLE001, RUF100 - this record must never break speech
+            logger.debug("Spoken text record failed: %s", exc)
 
         try:
             from admin.instrumentation import record_feature_used
@@ -1262,15 +1427,20 @@ class KokoroTTSEngine:
         if len(clean_text) > _MAX_TEXT_LENGTH:
             clean_text = clean_text[:_MAX_TEXT_LENGTH]
 
-        use_streaming = len(clean_text) > _CHUNK_THRESHOLD
-        sentences = _split_sentences(clean_text) if use_streaming else []
+        # Every multi-sentence reply goes sentence by sentence: audio starts
+        # after the first one is ready, not after the whole reply is.
+        sentences = [
+            unit
+            for index, sentence in enumerate(_split_sentences(clean_text))
+            for unit in _speech_units(sentence, first=index == 0)
+        ]
         # Fall back to single-shot if split produces 0 or 1 sentence
-        if len(sentences) <= 1:
-            use_streaming = False
+        use_streaming = len(sentences) > 1
 
         async with self._speak_lock:
             if not self._tts_is_enabled() or policy_marker is not getattr(self, "_tts_disable_marker", 0):
                 return
+            self._unspoken_notice_at = None
             try:
                 if use_streaming:
                     await self._speak_streaming(clean_text, sentences, policy_marker=policy_marker)
@@ -1279,6 +1449,50 @@ class KokoroTTSEngine:
             except asyncio.CancelledError:
                 self.stop()
                 raise
+
+    async def speak_preview(
+        self, voice: str | None, *, language: str | None = None, rate: float | None = None, volume: float | None = None
+    ) -> bool:
+        """Say a short sample in a voice, at a speed and volume, without saving anything.
+
+        The Settings preview hears the choice on the screen, not the saved one,
+        so nothing here touches the running route. Returns whether it played.
+        """
+        from voice.customer_voice_routing import preview_sentence, resolve_kokoro_voice_alias
+
+        selected_language = language or getattr(self, "_speech_language", "en-us")
+        selected_voice = resolve_kokoro_voice_alias(voice) if voice and voice != "default" else None
+        speed = self._speed if rate is None else float(rate) / 150.0
+        scale = self._current_volume() if volume is None else max(0.0, min(1.0, float(volume)))
+        policy_marker = getattr(self, "_tts_disable_marker", 0)
+
+        def render() -> bytes:
+            with self._lock:
+                if not self._ensure_loaded():
+                    return b""
+                samples, sample_rate = self._kokoro.create(
+                    preview_sentence(selected_language),
+                    voice=selected_voice or self._voice,
+                    speed=speed,
+                    lang=selected_language,
+                )
+                self._last_sample_rate = int(sample_rate)
+                samples = np.asarray(samples, dtype=np.float32)
+                if self._post_fx_enabled:
+                    from voice.synthesis.audio_postfx import process_voice
+
+                    samples = process_voice(samples, int(sample_rate), self._loudness_target_lufs)
+                return self._scale_pcm_volume(self._float_to_int16(samples), scale).tobytes()
+
+        if self._speak_lock is None:
+            self._speak_lock = asyncio.Lock()
+        async with self._speak_lock:
+            pcm = await asyncio.to_thread(render)
+            if not pcm:
+                return False
+            return bool(
+                await asyncio.to_thread(self._play_pcm_locally, pcm, self.last_sample_rate, policy_marker=policy_marker)
+            )
 
     def _create_opener_cache(self, cfg: object) -> OpenerCache | None:
         if getattr(cfg, "tts_opener_cache_enabled", True) is False:
@@ -1547,13 +1761,16 @@ class KokoroTTSEngine:
     # ------------------------------------------------------------------
 
     async def speak_streaming(self, text_chunks: AsyncIterator[str]) -> str:
-        """Speak LLM-streamed text sentence-by-sentence with prefetch.
+        """Speak LLM-streamed text with synthesis running ahead of playback.
 
-        Buffers incoming tokens until a sentence boundary is detected, then
-        synthesises and plays that sentence immediately while the LLM
-        continues generating.  Uses the same prefetch pipeline as
-        ``_speak_streaming`` to overlap synthesis of sentence N+1 with
-        playback of sentence N.
+        Two stages share one bounded queue. ``synthesize_ahead`` reads the
+        incoming text, cuts it into speech units and synthesises them in order;
+        the player takes finished audio and plays it. So while sentence N is
+        audible, sentence N+1 is already being synthesised, however the text
+        arrives. (Reading and playing used to be one loop: a sentence that
+        arrived alone was synthesised only after the one before it had
+        finished playing, which put the whole synthesis time of every sentence
+        between sentences. 1.0.5 build-9 laptop report: 4 sentences took 28 s.)
 
         Args:
             text_chunks: Async iterator yielding text fragments (LLM tokens).
@@ -1589,14 +1806,9 @@ class KokoroTTSEngine:
 
         # Collect full text for caller (history / logging)
         full_text_parts: list[str] = []
-        buffer = ""
-        sentences_queue: list[str] = []
-
-        # --- Phase 1: drain the async iterator, buffering into sentences ---
-        # We process sentences as they become available (interleaving drain
-        # and playback) rather than draining everything first.
 
         async with self._speak_lock:
+            self._unspoken_notice_at = None
             # --- diagnostics: is_speaking flag (once) ---
             monitor = None
             try:
@@ -1619,36 +1831,56 @@ class KokoroTTSEngine:
                 logger.debug("Audio ducking unavailable: %s", e)
                 duck_ctx = nullcontext()
 
-            prefetch_task: asyncio.Task[bytes] | None = None
-            try:
-                with duck_ctx:
-                    sentence_count = 0
-                    previous_pcm: bytes | None = None
-                    previous_sentence: str | None = None
-                    policy_marker = getattr(self, "_tts_disable_marker", 0)
+            policy_marker = getattr(self, "_tts_disable_marker", 0)
+            sentence_count = 0
+            # (text, pcm, policy marker) in speaking order; None ends the reply.
+            ready: asyncio.Queue[tuple[str, bytes, object] | None] = asyncio.Queue(maxsize=_SPEECH_LOOKAHEAD_UNITS)
 
-                    async def retire_pending():
-                        nonlocal buffer, previous_pcm, previous_sentence, prefetch_task
-                        buffer = ""
-                        sentences_queue.clear()
-                        previous_pcm = previous_sentence = None
-                        if prefetch_task is not None:
-                            await prefetch_task  # Retirement does not claim to interrupt native inference.
-                            prefetch_task = None
+            def retired() -> bool:
+                return stop_marker is not getattr(self, "_stop_marker", 0) or (
+                    customer_route and route_epoch is not getattr(self, "_customer_route_epoch", 0)
+                )
 
+            async def synthesize_unit(unit: str) -> None:
+                nonlocal sentence_count
+                sentence_count += 1
+                pcm = await self._run_synthesize_with_watchdog(
+                    unit, None, policy_marker=policy_marker, later_sentence=sentence_count > 1
+                )
+                if pcm:
+                    await ready.put((unit, pcm, policy_marker))
+
+            async def speak_sentence(raw_sentence: str) -> None:
+                cleaned = self._prepare_route_text(raw_sentence.strip())
+                if cleaned:
+                    cleaned = normalize_for_speech(cleaned, **normalization_kwargs)
+                if cleaned:
+                    for unit in _speech_units(cleaned, first=sentence_count == 0):
+                        if retired() or policy_marker is not getattr(self, "_tts_disable_marker", 0):
+                            return
+                        await synthesize_unit(unit)
+
+            async def synthesize_ahead() -> None:
+                nonlocal policy_marker
+                buffer = ""
+                try:
                     async for chunk in text_chunks:
                         full_text_parts.append(chunk)
-                        if stop_marker is not getattr(self, "_stop_marker", 0) or (
-                            customer_route and route_epoch is not getattr(self, "_customer_route_epoch", 0)
-                        ):
+                        try:
+                            from audio_core.own_playback import get_own_playback
+
+                            get_own_playback().note_text(chunk)
+                        except Exception as exc:  # noqa: BLE001, RUF100 - must never break speech
+                            logger.debug("Spoken text record failed: %s", exc)
+                        if retired():
                             # A stop or new selection retires this response. Drain
                             # this response for history without normalizing its
                             # remaining chunks under an old/new mixed route.
-                            await retire_pending()
+                            buffer = ""
                             continue
                         enabled = self._tts_is_enabled()
                         if not enabled or policy_marker is not getattr(self, "_tts_disable_marker", 0):
-                            await retire_pending()
+                            buffer = ""
                             policy_marker = getattr(self, "_tts_disable_marker", 0)
                         if not enabled or stop_marker is not getattr(self, "_stop_marker", 0):
                             continue
@@ -1658,132 +1890,73 @@ class KokoroTTSEngine:
                         parts = _SENTENCE_RE.split(buffer)
                         if len(parts) > 1:
                             # All but the last part are complete sentences
-                            for part in parts[:-1]:
-                                cleaned = self._prepare_route_text(part.strip())
-                                if cleaned:
-                                    cleaned = normalize_for_speech(cleaned, **normalization_kwargs)
-                                    if cleaned:
-                                        sentences_queue.append(cleaned)
                             buffer = parts[-1]
+                            for part in parts[:-1]:
+                                await speak_sentence(part)
                         elif buffer.rstrip()[-1:] in ".!?" and not has_pending_decimal_point(buffer.rstrip()):
                             # Buffer ends with sentence punctuation (no trailing space yet)
-                            cleaned = self._prepare_route_text(buffer.strip())
-                            if cleaned:
-                                cleaned = normalize_for_speech(cleaned, **normalization_kwargs)
-                                if cleaned:
-                                    sentences_queue.append(cleaned)
-                            buffer = ""
-
-                        # Play any queued sentences immediately
-                        while sentences_queue:
-                            if not self._tts_is_enabled() or policy_marker is not getattr(
-                                self, "_tts_disable_marker", 0
-                            ):
-                                await retire_pending()
-                                break
-                            sentence = sentences_queue.pop(0)
-                            sentence_count += 1
-
-                            # Wait for prefetch if available
-                            if prefetch_task is not None:
-                                pcm = await prefetch_task
-                                prefetch_task = None
-                            else:
-                                pcm = await self._run_synthesize_with_watchdog(
-                                    sentence, None, policy_marker=policy_marker, later_sentence=sentence_count > 1
-                                )
-
-                            if policy_marker is not getattr(self, "_tts_disable_marker", 0):
-                                await retire_pending()
-                                break
-
-                            # Kick off next sentence synthesis if more queued
-                            if sentences_queue:
-                                next_s = sentences_queue[0]
-                                prefetch_task = asyncio.ensure_future(
-                                    self._run_synthesize_with_watchdog(
-                                        next_s, None, policy_marker=policy_marker, later_sentence=True
-                                    )
-                                )
-
-                            if not pcm:
-                                continue
-                            if previous_sentence is not None:
-                                await self._sleep_sentence_gap(previous_sentence, sentence)
-                            pcm = self._smooth_sentence_boundary(previous_pcm, pcm)
-
-                            if not ttfb_logged:
-                                ttfb_ms = (time.perf_counter() - t_start) * 1000
-                                ttfb_logged = True
-                                if ttfb_ms > 500:
-                                    logger.warning(
-                                        "LLM-streaming TTS TTFB %.0f ms (> 500 ms)",
-                                        ttfb_ms,
-                                    )
-                                else:
-                                    logger.info("LLM-streaming TTS TTFB %.0f ms", ttfb_ms)
-
-                            await asyncio.to_thread(
-                                self._play_pcm_if_enabled, pcm, self.last_sample_rate, policy_marker=policy_marker
-                            )
-                            if policy_marker is getattr(self, "_tts_disable_marker", 0):
-                                previous_pcm = pcm
-                                previous_sentence = sentence
-                            else:
-                                previous_pcm = previous_sentence = None
-                                buffer = ""
-
-                    if not self._tts_is_enabled() or policy_marker is not getattr(self, "_tts_disable_marker", 0):
-                        await retire_pending()
+                            complete, buffer = buffer, ""
+                            await speak_sentence(complete)
 
                     # --- Flush remaining buffer ---
-                    if buffer.strip():
-                        cleaned = self._prepare_route_text(buffer.strip())
-                        if cleaned:
-                            cleaned = normalize_for_speech(cleaned, **normalization_kwargs)
-                            if cleaned:
-                                sentences_queue.append(cleaned)
-                                buffer = ""
+                    if (
+                        buffer.strip()
+                        and not retired()
+                        and self._tts_is_enabled()
+                        and policy_marker is getattr(self, "_tts_disable_marker", 0)
+                    ):
+                        await speak_sentence(buffer)
+                finally:
+                    with contextlib.suppress(asyncio.QueueFull):
+                        ready.put_nowait(None)
 
-                    # Play remaining sentences
-                    for sentence in sentences_queue:
-                        sentence_count += 1
-                        if prefetch_task is not None:
-                            pcm = await prefetch_task
-                            prefetch_task = None
-                        else:
-                            pcm = await self._run_synthesize_with_watchdog(
-                                sentence, None, policy_marker=policy_marker, later_sentence=sentence_count > 1
-                            )
-                        if pcm:
-                            if previous_sentence is not None:
-                                await self._sleep_sentence_gap(previous_sentence, sentence)
-                            pcm = self._smooth_sentence_boundary(previous_pcm, pcm)
-                            if not ttfb_logged:
-                                ttfb_ms = (time.perf_counter() - t_start) * 1000
-                                ttfb_logged = True
-                                logger.info("LLM-streaming TTS TTFB %.0f ms", ttfb_ms)
-                            await asyncio.to_thread(
-                                self._play_pcm_if_enabled, pcm, self.last_sample_rate, policy_marker=policy_marker
-                            )
-                            if policy_marker is getattr(self, "_tts_disable_marker", 0):
-                                previous_pcm = pcm
-                                previous_sentence = sentence
+            synthesis_task: asyncio.Task[None] | None = None
+            try:
+                with duck_ctx:
+                    synthesis_task = asyncio.create_task(synthesize_ahead())
+                    previous_pcm: bytes | None = None
+                    previous_sentence: str | None = None
+                    previous_marker: object | None = None
+                    while True:
+                        if synthesis_task.done() and ready.empty():
+                            break  # The end marker found the queue full and was dropped.
+                        item = await ready.get()
+                        if item is None:
+                            break
+                        sentence, pcm, marker = item
+                        if marker is not getattr(self, "_tts_disable_marker", 0) or not self._tts_is_enabled():
+                            previous_pcm = previous_sentence = None
+                            continue
+                        if marker is not previous_marker:
+                            # Speech was retired in between: nothing to join on to.
+                            previous_pcm = previous_sentence = None
+                        previous_marker = marker
+                        if previous_sentence is not None:
+                            await self._sleep_sentence_gap(previous_sentence, sentence)
+                        pcm = self._smooth_sentence_boundary(previous_pcm, pcm)
+
+                        if not ttfb_logged:
+                            ttfb_ms = (time.perf_counter() - t_start) * 1000
+                            ttfb_logged = True
+                            if ttfb_ms > 500:
+                                logger.warning(
+                                    "LLM-streaming TTS TTFB %.0f ms (> 500 ms)",
+                                    ttfb_ms,
+                                )
                             else:
-                                previous_pcm = previous_sentence = None
-                                buffer = ""
+                                logger.info("LLM-streaming TTS TTFB %.0f ms", ttfb_ms)
 
-                    # Await any remaining prefetch
-                    if prefetch_task is not None:
-                        remaining_pcm = await prefetch_task
-                        if remaining_pcm:
-                            remaining_pcm = self._smooth_sentence_boundary(previous_pcm, remaining_pcm)
-                            await asyncio.to_thread(
-                                self._play_pcm_if_enabled,
-                                remaining_pcm,
-                                self.last_sample_rate,
-                                policy_marker=policy_marker,
-                            )
+                        await asyncio.to_thread(
+                            self._play_pcm_if_enabled, pcm, self.last_sample_rate, policy_marker=marker
+                        )
+                        if marker is getattr(self, "_tts_disable_marker", 0):
+                            previous_pcm = pcm
+                            previous_sentence = sentence
+                        else:
+                            previous_pcm = previous_sentence = None
+
+                    # A synthesis failure ends the reply the way it always did.
+                    await synthesis_task
 
                     elapsed = time.perf_counter() - t_start
                     logger.info(
@@ -1796,12 +1969,14 @@ class KokoroTTSEngine:
                 self.stop()
                 raise
             finally:
-                if prefetch_task is not None and not prefetch_task.done():
-                    prefetch_task.cancel()
+                if synthesis_task is not None and not synthesis_task.done():
+                    synthesis_task.cancel()
                     try:
-                        await prefetch_task
+                        await synthesis_task
                     except asyncio.CancelledError:
                         pass  # Worker ownership persists until its actual completion.
+                    except Exception:  # noqa: BLE001, RUF100 - the reply already ended another way
+                        logger.debug("Speech synthesis stage ended with an error", exc_info=True)
                 if monitor is not None:
                     try:
                         monitor.update_tts_state(is_speaking=False)

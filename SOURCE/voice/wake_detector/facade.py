@@ -247,7 +247,7 @@ class WakeDetector:
         def _pausable_callback() -> None:
             # Check pause state first
             with self._pause_lock:
-                if self._paused:
+                if self._paused and not _busy_voice_turn():
                     logger.debug("Wake callback suppressed: detector is paused")
                     return
 
@@ -801,6 +801,16 @@ class WakeDetector:
             if self._paused:
                 return "busy"
         return "wake"
+
+
+def _busy_voice_turn() -> bool:
+    """A voice turn only waits on its command: a wake runs beside it (see own_speech)."""
+    try:
+        from voice.wake_detector.own_speech import busy_turn_active
+
+        return busy_turn_active()
+    except ImportError:
+        return False
 
 
 class WakeDetectorFacade:

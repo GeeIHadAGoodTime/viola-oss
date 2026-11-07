@@ -194,6 +194,23 @@ class IntentPipelineProcessors:
         if not self.pipeline.gpt_handler:
             return None
 
+        # Say so at once when we are offline and the model is out of reach. Not
+        # routing: nothing about the words is read, and the turn would otherwise
+        # spend half a minute finding out (1.0.5 build 9, High 2).
+        from services.connectivity import OFFLINE_REPLY, model_is_out_of_reach
+
+        if await model_is_out_of_reach():
+            return PipelineResult(
+                ok=False,
+                intent="offline",
+                data={"message": OFFLINE_REPLY},
+                error="offline",
+                source="ai",
+                requires_clarification=False,
+                policy_flags=["offline"],
+                source_node_id=self.pipeline.node_id,
+            )
+
         # F-003: Enforce per-user rate limit before any LLM call
         try:
             from services.llm.rate_limiter import get_rate_limiter

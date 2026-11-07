@@ -1,6 +1,7 @@
 /* eslint react/jsx-uses-vars: "error" */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
+import { usePacedLine } from '../hooks/usePacedReply';
 import { THEME } from '../config';
 
 const SUGGESTED_ACTIONS = [
@@ -57,6 +58,13 @@ function transcriptSpeakerLabel(role, recipientName) {
   if (role === 'viola') return 'Viola';
   if (role === 'them') return recipientName || 'Them';
   return 'System';
+}
+
+// Viola's line arrives in one burst from the model, seconds before the call audio
+// says it (1.0.5 build-9: the screen ran ahead of the voice). It is revealed at
+// speaking pace; the other party's words were already spoken, so they show at once.
+function ViolaLiveText({ text, live }) {
+  return usePacedLine(text, live);
 }
 
 function transcriptBubbleStyle(role, partial) {
@@ -412,7 +420,7 @@ export default function PhoneCallPanel({
               const speaker = transcriptSpeakerLabel(role, recipientName);
               return (
                 <div
-                  key={`${entry.ts || 'transcript'}-${index}`}
+                  key={`transcript-${index}`}
                   style={{
                     display: 'flex',
                     flexDirection: 'column',
@@ -473,7 +481,7 @@ export default function PhoneCallPanel({
                     data-partial={entry.partial ? 'true' : 'false'}
                     style={transcriptBubbleStyle(role, entry.partial)}
                   >
-                    {entry.text}
+                    {isViola ? <ViolaLiveText text={entry.text} live={Boolean(entry.partial)} /> : entry.text}
                   </div>
                 </div>
               );

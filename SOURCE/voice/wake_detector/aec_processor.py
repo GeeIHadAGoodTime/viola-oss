@@ -227,8 +227,11 @@ WEBRTC_AVAILABLE = False
 _REF_SILENCE_RMS = 50.0
 
 # Min cumulative active ref frames before the inner AEC sees a real reference.
-# 50 frames at 10 ms/frame = 500 ms warm-up.
-_MIN_ACTIVE_FRAMES = 50
+# 20 frames at 10 ms/frame = 200 ms. It was 500 ms, and every reply starts with a
+# closed gate: her first half second went through uncancelled, and a barge-in
+# candidate 300 ms in logged "reference silent while Viola is speaking". The
+# filter keeps what it learned across replies, so it needs no longer.
+_MIN_ACTIVE_FRAMES = 20
 
 # Max frames the activity counter accumulates. Caps how long the gate takes
 # to decay back closed after playback stops.
@@ -986,7 +989,18 @@ class ViolaAECAdapter(AECProcessor):
         return "viola"
 
     def get_diagnostics(self) -> dict:
-        """Expose ViolaAEC ERLE + reference-gate diagnostics."""
+        """Expose ViolaAEC ERLE + reference-gate diagnostics.
+
+        While the native backend carries the audio (Viola's own music), the
+        FDAF and this adapter's gate see nothing: their ERLE is stale and the
+        gate reads closed, which the barge-in monitor reported as "reference
+        silent while Viola is speaking". Report the backend doing the work.
+        """
+        downshift = self._downshift_backend
+        if self._local_playback_active and downshift is not None:
+            active = downshift.get_diagnostics()
+            if isinstance(active, dict) and active:
+                return active
         base: dict = {}
         if self._initialized and hasattr(self._inner, "get_diagnostics"):
             inner = self._inner.get_diagnostics()

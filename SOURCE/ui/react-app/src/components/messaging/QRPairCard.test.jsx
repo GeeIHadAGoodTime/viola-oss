@@ -163,14 +163,16 @@ describe('QRPairCard', () => {
         linked_at: '2026-05-12T12:00:00Z',
       })
       .mockResolvedValueOnce({ ok: true, message: 'Telegram account disconnected' });
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
-
     render(<QRPairCard channel="telegram" />);
 
     fireEvent.click(await screen.findByRole('button', { name: /unpair/i }));
+    const dialog = await screen.findByRole('alertdialog');
+    expect(dialog).toHaveTextContent('Disconnect Telegram?');
+    expect(dialog).toHaveTextContent('Your conversation history will be deleted.');
+    expect(apiFetch).not.toHaveBeenCalledWith('/auth/telegram/unlink', { method: 'POST' });
+    fireEvent.click(screen.getByRole('button', { name: 'Disconnect' }));
 
     await waitFor(() => expect(apiFetch).toHaveBeenCalledWith('/auth/telegram/unlink', { method: 'POST' }));
-    expect(window.confirm).toHaveBeenCalledWith('Disconnect Telegram? Your conversation history will be deleted.');
     expect(await screen.findByRole('button', { name: /pair with telegram/i })).toBeInTheDocument();
   });
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Callable
+from datetime import datetime
 from typing import Any, Mapping
 from urllib.parse import urlparse
 
@@ -177,6 +178,8 @@ def irreversible_action_class(
             return "calendar_write"
     if name == "memory" and action in _MEMORY_DELETE_ACTIONS:
         return "memory_delete"
+    if _discards_unsaved_work(name, args):
+        return "discard_unsaved_work"
     if name == "payment":
         if action in _PAYMENT_SAFE_ACTIONS:
             return None
@@ -199,6 +202,22 @@ def irreversible_action_class(
         return "oauth_connect"
 
     return None
+
+
+_DISCARD_BUTTON_NAMES = frozenset({"don't save", "dont save", "do not save", "discard", "discard changes"})
+
+
+def _discards_unsaved_work(tool_name: str, args: Mapping[str, Any] | None) -> bool:
+    """A click on the "Don't save" button of a real app. It cannot be undone.
+
+    Consent for an app lasts the session, so this click would otherwise go through
+    with no question at all once the user had said yes to anything in that app.
+    """
+    params = args or {}
+    if tool_name != "computer" or "click" not in str(params.get("action") or "").lower():
+        return False
+    name = " ".join(str(params.get("name") or "").replace("\u2019", "'").lower().split())
+    return name in _DISCARD_BUTTON_NAMES
 
 
 def _gmail_message_count(args: Mapping[str, Any] | None) -> int:
@@ -382,7 +401,12 @@ def describe_irreversible_action(tool_name: str, args: Mapping[str, Any] | None 
             "respond": "respond to",
             "respond_to_event": "respond to",
         }.get(action, "change")
-        return "%s the calendar event %s" % (verb, event) if event else "%s the calendar event" % verb
+        described = "%s the calendar event %s" % (verb, event) if event else "%s the calendar event" % verb
+        when = _calendar_when(params)
+        return "%s %s" % (described, when) if when else described
+    if action_class == "discard_unsaved_work":
+        window = _clean(params.get("app_executable") or params.get("window_title") or params.get("target_window"))
+        return "throw away the unsaved changes in %s" % window if window else "throw away the unsaved changes"
     if action_class == "memory_delete":
         target = _clean(params.get("path") or params.get("query") or params.get("section_title"))
         return "delete the memory entry %s" % target if target else "delete memory"
@@ -408,6 +432,27 @@ def describe_irreversible_action(tool_name: str, args: Mapping[str, Any] | None 
         summary = ", ".join("%s=%s" % (key, value) for key, value in list(params.items())[:3])
         return "%s(%s)" % (name, summary)
     return name.replace("_", " ")
+
+
+def _calendar_when(params: Mapping[str, Any]) -> str:
+    """When the event is, in words: "on Friday, Nov 6 at 3:00 PM". Empty when unknown.
+
+    "Create the calendar event Dentist" gave the user nothing to check before
+    saying yes (1.0.5 laptop). Absolute dates only: the same call has to read the
+    same on the turn it is confirmed, so never "today" or "tomorrow".
+    """
+    raw = _clean(params.get("start_time") or params.get("start") or params.get("start_date"))
+    if not raw:
+        return ""
+    try:
+        moment = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        return "at %s" % raw
+    day = "on %s, %s %d" % (moment.strftime("%A"), moment.strftime("%b"), moment.day)
+    if params.get("all_day") in _META_TRUE_VALUES or "T" not in raw.upper():
+        return day
+    hour = moment.hour % 12 or 12
+    return "%s at %d:%02d %s" % (day, hour, moment.minute, "AM" if moment.hour < 12 else "PM")
 
 
 def _share_response_class(args: Mapping[str, Any] | None) -> str:

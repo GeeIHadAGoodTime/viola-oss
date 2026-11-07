@@ -83,6 +83,7 @@ from intent.tools.music_tools import (
     video_fullscreen_handler as _video_fullscreen_handler,
 )
 from intent.tools.notification_tools import (
+    delete_notify_reminder_handler as _delete_notify_reminder_handler,
     list_notify_reminders_handler as _list_notify_reminders_handler,
     notify_handler as _notify_handler,
 )
@@ -273,9 +274,16 @@ _APP_PANEL_ACTIONS: dict[str, dict[str, str]] = {
         "ui_action": "open_help",
         "path_identifier": "help",
     },
+    "memory": {
+        "ui_action": "open_memory_panel",
+        "path_identifier": "memory",
+    },
 }
 
 _APP_PANEL_ALIASES: dict[str, str] = {
+    "memories": "memory",
+    "memory_panel": "memory",
+    "workbench": "memory",
     "rooms_add_speaker": "rooms.add_speaker",
     "room_add_speaker": "rooms.add_speaker",
     "add_speaker": "rooms.add_speaker",
@@ -1582,9 +1590,9 @@ async def file_write(
 
 @server.tool(
     description=(
-        "Execute a shell command and return stdout, stderr, and exit code. "
-        "Last resort — prefer dedicated tools (file_read, web_search, media) over shell. "
-        "30s default timeout, 4000 char output cap."
+        "Run a shell command; returns stdout, stderr, exit code. Last resort: file_read/file_write handle files "
+        "(info says if one exists). Use full paths. %USERPROFILE%\\Desktop and ~\\Desktop become the real "
+        "Desktop, even under OneDrive (same for Documents, Downloads). 30s timeout, 4000 char output."
     ),
     annotations=_DANGEROUS,
     meta={"risk": "destructive"},
@@ -1593,19 +1601,19 @@ async def run_command(
     command: Annotated[
         str,
         Field(
-            description="Shell command string to execute exactly as written. Include all arguments and quoting; use this only when a direct tool cannot accomplish the task."
+            description="Shell command to run exactly as written, with all arguments and quoting."
         ),
     ],
     timeout: Annotated[
         float,
         Field(
-            description="Maximum execution time in seconds before the command is terminated. Use a larger value for long-running commands; default is 30."
+            description="Timeout in seconds; default 30, higher for long-running commands."
         ),
     ] = 30.0,
     working_directory: Annotated[
         str,
         Field(
-            description="Working directory for the command. Leave empty to run in the user's home folder, or provide an absolute path to run elsewhere."
+            description="Leave empty for the user's home folder, or give an absolute path."
         ),
     ] = "",
 ) -> str:
@@ -1621,7 +1629,9 @@ async def run_command(
             working_directory,
             permission_mode=permission_mode,
         )
-        return _format_result(result)
+        # A failed command's output is the only way to see why it failed; the
+        # model used to get just "exit code 2" and rewrote a working script.
+        return _format_result_with_error_data(result)
     except Exception as exc:
         logger.exception("run_command failed for command_chars=%d", len(command or ""))
         return json.dumps({"error": str(exc)})
@@ -1704,7 +1714,7 @@ async def web_read(
     max_chars: Annotated[
         int | None,
         Field(
-            description="Maximum characters to return. Defaults to the configured web_read default and is capped by settings."
+            description="Maximum characters to return, capped by settings."
         ),
     ] = None,
     offset: Annotated[
@@ -3441,6 +3451,7 @@ def _normalize_user_capability_spec(
         else:
             continue
         action_type = str(item.get("type") or "call_capability")
+        item["type"] = action_type
         args_json = item.pop("args_json", None)
         if action_type == "call_capability" and "args" not in item:
             try:
@@ -3453,14 +3464,23 @@ def _normalize_user_capability_spec(
         actions.append({key: value for key, value in item.items() if value is not None})
     if actions:
         raw["actions"] = actions
+    # A routine needs only a name and its actions from the user. Everything else
+    # was a validation error the model could not explain, and nothing got saved.
+    name = str(raw.get("name") or "").strip()
+    if name:
+        raw["description"] = str(raw.get("description") or "").strip() or "Routine: %s" % name
+        trigger = raw.get("trigger")
+        if not isinstance(trigger, dict) or not trigger.get("phrases"):
+            raw["trigger"] = {"kind": "phrase", "phrases": [name, "run %s" % name]}
 
     return {key: value for key, value in raw.items() if value is not None}
 
 
 @server.tool(
     description=(
-        "Author user-scoped shortcuts as declarative compositions that can be created, listed, updated, "
-        "disabled, enabled, or deleted after confirmation. When you notice the user repeatedly asking for "
+        "The user's routines, also called shortcuts: declarative compositions that can be created, listed, "
+        "updated, disabled, enabled, or deleted after confirmation. A create needs only spec.name and "
+        "spec.actions. When you notice the user repeatedly asking for "
         "the same workflow, or when the user explicitly wants a recurring task, propose creating a shortcut "
         "here. Creating a shortcut reports phrase conflicts and deterministic command interception risks. "
         "Confirm before saving."
@@ -3552,7 +3572,7 @@ async def delegate_to_provider(
     provider: Annotated[
         str,
         Field(
-            description="Provider selection. Use 'auto' for automatic routing, or a specific configured provider name when the user requested one."
+            description="'auto' routes automatically, or name a configured provider the user asked for."
         ),
     ] = "auto",
     context: Annotated[
@@ -3678,7 +3698,8 @@ async def spawn_parallel_subtasks(
 @server.tool(
     description=(
         "start_agent(description, prompt, subagent_type, model, name, team_name, mode) launches an async subagent. "
-        "Omit subagent_type to fork yourself — a fork inherits your full conversation context and tool array. "
+        "Omit subagent_type to fork yourself: a fork inherits your full conversation context and tool array. "
+        "A background agent has no browser, payment or desktop tools; do that work yourself. "
         "Provide prompt as the exact task and description as the short reason/label. "
         "The optional mode selects the child's context model: 'fork' (inherit parent) or 'fresh' (clean slate). "
         "All launches return immediately with an agent_id; completion arrives through task notifications. "
@@ -3752,8 +3773,7 @@ async def start_agent(
         bool,
         Field(
             description=(
-                "Deprecated compatibility field. Ignored by the runtime: every start_agent call launches async "
-                "background work and returns immediately with an agent_id."
+                "Deprecated and ignored."
             ),
             deprecated=True,
         ),
@@ -3852,7 +3872,7 @@ async def check_pending_tasks(
     query: Annotated[
         str,
         Field(
-            description="Optional text filter for task descriptions. Leave empty to list recent resumable tasks, or provide keywords to narrow the results."
+            description="Optional keywords; empty lists recent resumable tasks."
         ),
     ] = "",
 ) -> str:
@@ -3888,6 +3908,8 @@ async def check_pending_tasks(
                     continue
                 status = data.get("status", "")
                 if status not in ("in_progress", "interrupted", "waiting_for_user"):
+                    continue
+                if checkpoints.is_stale_pending(data):
                     continue
                 desc = data.get("task_description", "")
                 if query and query.lower() not in desc.lower():
@@ -3941,13 +3963,14 @@ async def check_pending_tasks(
         "The account has VIOLA.md (read-only user instructions), memory/MEMORY.md, and memory/topics/*.md. "
         "Use for user-specific facts and preferences; it does not search the public web and is not for calendar, weather, or runtime settings. "
         "It is not a general contacts directory or business lookup; when an external destination such as a business phone number is missing from the current request, ask the user or use the appropriate public-search/contact tool instead of enumerating memory topics. "
-        "Actions: recall, read, search, write, edit, delete, list, stats, audit. You decide what is worth remembering. "
+        "Actions: recall, read, search, write, edit, delete, list, stats, audit, conversation. You decide what is worth remembering. "
+        "action='conversation' reads earlier turns of this conversation, oldest first. "
         "Deterministic hygiene skips duplicate writes, rejects oversized entries, rotates audit logs, "
         "and reports counts via stats. "
         "Do not store passwords, API keys, tokens, card numbers, SSNs, PINs, or bank details. "
+        "A street address never goes here; use save_delivery_address. "
         "When the user explicitly asks you to remember something, write it and briefly acknowledge. "
         "When you decide to remember something on your own, write silently. "
-        "Does not search the public web or manage calendar events; use web_search or calendar for those. "
         "For runtime settings use user_settings; memory is not a settings API."
     ),
     annotations=_SAFE,
@@ -3961,7 +3984,7 @@ async def check_pending_tasks(
 async def memory(
     action: Annotated[
         str,
-        Field(description="Action: recall, read, search, write, edit, delete, list, stats, audit"),
+        Field(description="Action: recall, read, search, write, edit, delete, list, stats, audit, conversation"),
     ] = "read",
     path: Annotated[
         str,
@@ -3974,7 +3997,7 @@ async def memory(
     ] = "MEMORY.md",
     query: Annotated[
         str,
-        Field(description="Query for action='recall' or explicit body search text for action='search'."),
+        Field(description="Query for action='recall' or 'conversation', or explicit body search text for action='search'."),
     ] = "",
     content: Annotated[
         str,
@@ -4044,6 +4067,39 @@ async def memory(
 
 @server.tool(
     description=(
+        "Save or correct the user's own delivery address when they want it kept, from their words only. No confirmation first. "
+        "Say the returned read_back word for word."
+    ),
+    annotations=_SAFE,
+    meta={"risk": "safe", "anthropic/alwaysLoad": True},
+)
+async def save_delivery_address(
+    street: str,
+    city: str = "",
+    state: str = "",
+    zip_code: str = "",
+) -> str:
+    """Save the user's delivery address and return the text to read back."""
+    from intent.tools.settings_tools import save_delivery_address_handler
+
+    try:
+        return _format_result(
+            await _call_user_scoped(
+                save_delivery_address_handler,
+                street=street,
+                city=city,
+                state=state,
+                zip_code=zip_code,
+            )
+        )
+    except Exception as exc:
+        # Never log the arguments: they are the user's home address.
+        logger.exception("save_delivery_address failed")
+        return json.dumps({"error": str(exc)})
+
+
+@server.tool(
+    description=(
         "The user's Workbench folder: files, documents, photos, longer notes, and saved emails the "
         "user explicitly dropped or uploaded for Viola to reference. It is just a filesystem folder "
         "Viola checks first before using broader file access. It contains saved prior content such "
@@ -4090,7 +4146,7 @@ async def workbench(
         str,
         Field(
             description=(
-                "For remember: filename hint; try a 3-6 word content slug (pizza-recipe, monday-dentist-notes, apartment-lease-2025). Blank derives title from content."
+                "For remember: filename hint, a 3-6 word slug such as pizza-recipe. Blank derives it from content."
             )
         ),
     ] = "",
@@ -4298,13 +4354,13 @@ async def schedule(
     label: Annotated[
         str,
         Field(
-            description="Human-readable label for action='create' or action='update'. Leave empty on update to keep the current label."
+            description="Label for create or update; empty on update keeps the current one."
         ),
     ] = "",
     schedule_action: Annotated[
         str,
         Field(
-            description="Command text for action='create' or action='update'. Leave empty on update to keep the current action."
+            description="Command text for create or update; empty on update keeps the current one."
         ),
     ] = "",
     schedule_spec: Annotated[
@@ -4450,7 +4506,7 @@ async def ToolSearch(
     top_n: Annotated[
         int,
         Field(
-            description="Maximum number of tool matches to return. Use a small number for precision; the tool caps this at 12."
+            description="Maximum tool matches to return, at most 12."
         ),
     ] = 7,
 ) -> str:
@@ -4521,7 +4577,7 @@ async def ask_user(
     context: Annotated[
         str,
         Field(
-            description="Internal context for why the question is being asked. This helps the system route or frame the question and is not shown to the user."
+            description="Why the question is being asked; not shown to the user."
         ),
     ] = "",
 ) -> str:
@@ -4665,8 +4721,11 @@ async def api_credential(
 
 @server.tool(
     description=(
-        "Manage the user's saved Viola playlists, stored locally and persistent across sessions. "
-        "Actions: create, add_track using a track_uri from media search results, list, delete, play a saved playlist, or play favorites. "
+        "Manage the user's saved playlists: create, add_track (a track_uri from media results), list, delete, "
+        "play, play_favorites. "
+        "Building and playing a playlist needs no permission, so never ask before create, add_track or play. "
+        "Viola's own prompt confirms a delete once, so do not ask in words as well. "
+        "Deleting a playlist that is playing stops it. Saved locally, across sessions. "
         "Does not search the public web, answer music facts, or control transport; media finds and plays selectable tracks, and playback controls pause/skip/seek."
     ),
     annotations=_DANGEROUS,
@@ -4787,19 +4846,19 @@ async def get_liked_songs(
     since: Annotated[
         str,
         Field(
-            description="Optional ISO-8601 date or datetime cutoff. Only songs liked after this value are returned; examples: '2026-03-10' or '2026-03-10T14:30:00+00:00'."
+            description="Optional ISO-8601 cutoff, such as '2026-03-10'; only songs liked after it are returned."
         ),
     ] = "",
     provider: Annotated[
         str,
         Field(
-            description="Optional provider filter. Use 'spotify', 'youtube_music', 'youtube', or 'local', or leave empty for all providers."
+            description="Optional filter: 'spotify', 'youtube_music', 'youtube' or 'local'; empty means all."
         ),
     ] = "",
     limit: Annotated[
         int,
         Field(
-            description="Maximum number of liked songs to return. Use a smaller number for quick summaries; the tool supports up to 500."
+            description="Maximum liked songs to return, up to 500."
         ),
     ] = 50,
 ) -> str:
@@ -4834,11 +4893,11 @@ async def get_liked_songs(
 
 @server.tool(
     description=(
-        "Unified music and video search/play tool. For direct requests like 'play Drake', use "
-        "action='search_play' with query to search, select the top playable candidate, and start playback in "
-        "one tool call. Search mode: pass query to inspect playable candidates with provider, title, artist, "
-        "and track_uri, using recently played tracks to avoid repeats. Play mode: pass track_uri from a "
-        "selected candidate; include target_room for Viola's in-house "
+        "Search and play music and video. For 'play Drake' use action='search_play' with query: one call plays the "
+        "top match. For an open request ('play something', 'put something on') choose a concrete query yourself and "
+        "play it. action='recent' lists recent tracks, to avoid repeats; it plays nothing. "
+        "Search mode: pass query to inspect playable candidates with provider, title, artist, and track_uri. "
+        "Play mode: pass track_uri from a selected candidate; include target_room for Viola's in-house "
         "multi-room playback, room_route facts, and Add Speaker pairing_flow fallback. Use pair_speaker_setup "
         "for speaker setup without playback. Active provider from settings drives where to search; pass "
         "provider explicitly to override. Transport controls use playback. "
@@ -4859,11 +4918,11 @@ async def media(
         ),
     ] = "",
     action: Annotated[
-        Literal["auto", "search", "play", "search_play"],
+        Literal["auto", "search", "play", "search_play", "recent"],
         Field(
             description=(
-                "Media action. auto preserves compatibility: query searches and track_uri plays. "
-                "Use search_play for direct 'play X' requests to search, select the top candidate, and play it."
+                "auto: query searches, track_uri plays. search_play for direct 'play X' requests. "
+                "recent lists the last played tracks and plays nothing."
             )
         ),
     ] = "auto",
@@ -5017,8 +5076,9 @@ async def check_music_provider_status(
 @server.tool(
     description=(
         "Open a Viola app panel for user intents like 'open settings', 'show payment methods', "
-        "or 'take me to my calendar'. Available panel_id values: settings, rooms.add_speaker, "
-        "calendar, music_accounts, payment_methods, help. Optional sub_tab can name a Settings "
+        "'open the memory panel' or 'take me to my calendar'. Available panel_id values: settings, "
+        "rooms.add_speaker, calendar, music_accounts, payment_methods, help, memory (the user's saved "
+        "memories and Workbench). Optional sub_tab can name a Settings "
         "tab such as account, ai_agents, music_voice, messaging, services, payment, or preferences. "
         "Optional prefill can pass structured UI defaults such as {'room_name': 'kitchen'}. "
         "Returns a structured ui_action envelope for the React app; this is a UI capability, "
@@ -5032,8 +5092,7 @@ async def open_app_panel(
         str,
         Field(
             description=(
-                "Panel to open. Use one of: settings, rooms.add_speaker, calendar, "
-                "music_accounts, payment_methods, help."
+                "Panel to open, from the list above."
             )
         ),
     ],
@@ -5041,8 +5100,7 @@ async def open_app_panel(
         str | None,
         Field(
             description=(
-                "Optional Settings tab or section. Useful values include account, ai_agents, "
-                "music_voice, messaging, services, payment, and preferences."
+                "Optional Settings tab: account, ai_agents, music_voice, messaging, services, payment or preferences."
             )
         ),
     ] = None,
@@ -5136,9 +5194,7 @@ async def pair_speaker_setup(
         str,
         Field(
             description=(
-                "Room or speaker name to prefill in the Add Room flow, for example "
-                "'kitchen' from 'add a kitchen speaker'. Use 'speaker' when the user "
-                "does not name a room."
+                "Room or speaker name for the Add Room flow, such as 'kitchen'. Use 'speaker' if the user names no room."
             )
         ),
     ] = "speaker",
@@ -5152,14 +5208,17 @@ async def pair_speaker_setup(
 
 @server.tool(
     description=(
-        "Control current music playback, music player volume, and queue state. Actions: stop, pause, resume, skip, next, previous, seek_to "
-        "(absolute seconds), seek_relative (delta seconds; negative rewinds), "
-        "restart, clear_queue, volume_set, volume_up, volume_down, mute, and unmute. Useful for operations on whatever is already playing. "
+        "Control music: stop, pause, resume, skip, next, previous, restart, clear_queue, seek_to, seek_relative, "
+        "seek_from_end, volume_set, volume_up, volume_down, mute, unmute, shuffle_on, shuffle_off, repeat_off, "
+        "repeat_all, repeat_one. Plain volume requests use this, playing, paused or stopped. "
+        "seek_to takes absolute seconds, seek_relative a delta (negative rewinds), seek_from_end the seconds before "
+        "the end of the track, for 'skip to 10 seconds before the end'; the tool reads the track length itself. "
+        "repeat_all repeats the queue and repeat_one this track. Useful for operations on whatever is already playing. "
         "For requests like 'skip', 'next song', 'skip this song', or 'advance to the next track', "
         "call playback directly; do not call view_queue first to decide whether transport control is allowed. "
-        "When CURRENT SYSTEM STATE shows music is playing, bare contextual volume requests such as turn it down, "
-        "louder, quieter, or volume up/down should use playback's music player volume actions. "
-        "Machine-wide OS/system output volume belongs to desktop_volume only when the user explicitly asks for system, OS, desktop, speaker, computer, or master output volume. "
+        "Every plain volume request (set the volume to 30, volume 50, turn it down, louder, quieter, volume up/down) "
+        "is this tool's music player volume, whether music is playing, paused or stopped. "
+        "Machine-wide OS/system output volume belongs to desktop_volume only when the user's own words say system, OS, desktop, speaker, computer, or master volume. "
         "Does not start new music, choose tracks, add rooms, or pair speakers; media and "
         "playlist cover starting playback, and pair_speaker_setup covers Add Room setup. "
         "Set completes_request=true only when this one call is the user's whole request; Viola then answers "
@@ -5173,10 +5232,8 @@ async def playback(
         str,
         Field(
             description=(
-                "Playback action. Use one of: 'stop', 'pause', 'resume', 'skip', 'next', 'previous', "
-                "'seek_to', 'seek_relative', 'restart', 'clear_queue', 'volume_set', 'volume_up', "
-                "'volume_down', 'mute', or 'unmute'. "
-                "Use 'skip' or 'next' for next-song requests. The alias 'seek' is accepted as 'seek_to'."
+                "One of the actions listed above. Use 'skip' or 'next' for next-song requests. "
+                "The alias 'seek' is accepted as 'seek_to'."
             )
         ),
     ] = "pause",
@@ -5192,9 +5249,13 @@ async def playback(
             )
         ),
     ] = None,
+    seek_from_end_seconds: Annotated[
+        float | None,
+        Field(description="Seconds before the end of the track for action='seek_from_end'."),
+    ] = None,
     seconds: Annotated[
         float | None,
-        Field(description=("Compatibility alias for seek_to_seconds when action='seek' or action='seek_to'.")),
+        Field(description=("Alias for seek_to_seconds.")),
     ] = None,
     volume_level: Annotated[
         int | None,
@@ -5202,7 +5263,12 @@ async def playback(
     ] = None,
     volume_step: Annotated[
         int | None,
-        Field(description="Music player volume step percent for action='volume_up' or action='volume_down'."),
+        Field(
+            description=(
+                "Percent step for volume_up or volume_down (default 10, at most 30). "
+                "Leave it empty unless the user named a step; an exact level uses action='volume_set'."
+            )
+        ),
     ] = None,
     completes_request: Annotated[
         bool,
@@ -5232,6 +5298,7 @@ async def playback(
                 action,
                 seek_to_seconds=effective_seek_to,
                 seek_delta_seconds=seek_delta_seconds,
+                seek_from_end_seconds=seek_from_end_seconds,
                 volume_level=volume_level,
                 volume_step=volume_step,
                 user_id=required_user_id,
@@ -5267,9 +5334,11 @@ async def view_queue() -> str:
 
 @server.tool(
     description=(
-        "Rate a music track with thumbs up or thumbs down. Without track_id, "
-        "rates the currently playing track. With track_id, rates that explicit "
-        "track through Viola's rating system."
+        "Rate a track; without track_id, the one playing. A remark about the playing song such as "
+        "'I don't like this', 'not this one' or 'thumbs down' IS the request: call this at once with "
+        "value='thumbs_down' and do not ask what they mean. It records and skips, so do not also call playback. "
+        "Set completes_request=true only when this one call is the user's whole request; Viola then "
+        "answers from the confirmed result without another turn."
     ),
     annotations=_CONFIRM,
     meta={"risk": "confirm"},
@@ -5279,9 +5348,8 @@ async def rate_track(
         str,
         Field(
             description=(
-                "Rating value. Use 'thumbs_up' to like the track (on Spotify: save it to the user's "
-                "Spotify Liked Songs), 'remove' to unlike it (remove from liked songs, keep playing), or "
-                "'thumbs_down' to dislike it. The aliases 'up', 'down' and 'unlike' are accepted."
+                "'thumbs_up' likes it (on Spotify, saves to Liked Songs), 'remove' unlikes it and keeps playing, "
+                "'thumbs_down' dislikes and skips it. Aliases: up, down, unlike."
             )
         ),
     ] = "",
@@ -5299,10 +5367,20 @@ async def rate_track(
     ] = "",
     rating: Annotated[
         str,
-        Field(description="Compatibility alias for value, accepting 'up' or 'down'."),
+        Field(description="Alias for value: 'up' or 'down'."),
     ] = "",
+    completes_request: Annotated[
+        bool,
+        Field(
+            description=(
+                "true only if this call by itself fully answers everything the user asked in this turn."
+            )
+        ),
+    ] = False,
 ) -> str:
     """Rate the current or explicit track through Viola's canonical rating APIs."""
+    # Read by the agent loop from the call arguments; the handler ignores it.
+    del completes_request
     try:
         effective_value = value or rating
         result = await _rate_track_handler(
@@ -5462,8 +5540,7 @@ async def timer(
         str,
         Field(
             description=(
-                "Timer ID for action='cancel'. Leave empty to cancel the most recently created timer. "
-                "Use action='cancel_all' to cancel every active timer."
+                "Timer ID for action='cancel'; empty cancels the newest. action='cancel_all' cancels every timer."
             )
         ),
     ] = "",
@@ -5563,8 +5640,10 @@ async def alarm(
 
 @server.tool(
     description=(
-        "Send, schedule, or list notifications/reminders. Use action='list' when "
-        "the user asks what reminders they have. For send/schedule, provide message, "
+        "Send, schedule, list or delete notifications/reminders. Use action='list' when "
+        "the user asks what reminders they have, with enabled_only=false to include finished or "
+        "disabled ones. Use action='delete' with reminder set to an id from the list or the "
+        "reminder's words; delete them one at a time. For send/schedule, provide message, "
         "optional when for delayed delivery, and optional channel. User-scoped delivery "
         "uses the user's subscribed web push devices; phone/SMS delivery requires a "
         "separately configured account-bound notification path."
@@ -5587,20 +5666,30 @@ async def notify(
     ] = "",
     action: Annotated[
         str,
-        Field(description="Notification action. Use 'list' to list pending notify reminders; otherwise omit."),
+        Field(
+            description="'list' lists reminders, 'delete' deletes one; otherwise omit."
+        ),
     ] = "",
     enabled_only: Annotated[
         bool,
         Field(description="For action='list', set true to return only enabled pending reminders."),
     ] = True,
+    reminder: Annotated[
+        str,
+        Field(description="For action='delete', the reminder's id from action='list', or words from its message."),
+    ] = "",
 ) -> str:
-    """Send, schedule, or list notifications/reminders."""
+    """Send, schedule, list or delete notifications/reminders."""
     try:
         action_name = action.strip().lower()
         if action_name == "list":
             return _format_result(await _call_user_scoped(_list_notify_reminders_handler, enabled_only=enabled_only))
+        if action_name == "delete":
+            return _format_result(await _call_user_scoped(_delete_notify_reminder_handler, reminder=reminder))
         if action_name and action_name not in {"send", "schedule", "create"}:
-            return json.dumps({"error": "Unknown action: %s. Use 'list', 'send', 'schedule', or omit action." % action})
+            return json.dumps(
+                {"error": "Unknown action: %s. Use 'list', 'delete', 'send', 'schedule', or omit action." % action}
+            )
         return _format_result(
             await _call_user_scoped(
                 _notify_handler,
@@ -5909,8 +5998,7 @@ async def payment(
         str,
         Field(
             description=(
-                "For action='request_review': concise order summary with items and total. "
-                "This is the PRIMARY checkout handoff path when payment is ready."
+                "For action='request_review': concise order summary with items and total."
             )
         ),
     ] = "",
@@ -5924,7 +6012,14 @@ async def payment(
     ] = "",
     notes: Annotated[
         str,
-        Field(description="Optional checkout notes or reason for opening secure card entry."),
+        Field(description="Optional notes."),
+    ] = "",
+    # Read by the agent executor from the call's arguments for the approval card.
+    # Without it the card fell back to the saved address even when the user had
+    # given another one for this order.
+    delivery_address: Annotated[
+        str,
+        Field(description="Where this order ships."),
     ] = "",
 ) -> str:
     """List masked payment cards or request secure payment handoff.

@@ -624,6 +624,31 @@ export async function hydrateDesktopSessionFromCookie() {
 }
 
 /**
+ * Ask the desktop backend to give this page a working session cookie.
+ *
+ * The session store is the one truth for "signed in on this computer". A page
+ * whose cookie is missing or stale would otherwise read as signed out while
+ * the app works. Needs the local API key, so only the desktop's own page can.
+ * @returns {Promise<boolean>} true when a cookie was issued.
+ */
+export async function reattachDesktopSessionCookie() {
+  const apiKey = typeof window !== 'undefined' ? window.__VIOLA_API_KEY__ : '';
+  if (!apiKey) return false;
+  try {
+    const response = await fetch('/v1/onboarding/account/reattach', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'X-API-Key': apiKey },
+    });
+    if (!response.ok) return false;
+    const envelope = await response.json();
+    return Boolean((envelope?.data ?? envelope)?.reattached);
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Sign out — revokes the GoTrue session server-side. The proxy returns 204
  * and clears compatibility cookies. A failed logout still clears local state
  * (handled by the caller), so this resolves `ok:true` on transport failure to

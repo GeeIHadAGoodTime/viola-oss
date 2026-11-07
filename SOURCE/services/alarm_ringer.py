@@ -24,6 +24,7 @@ It is desktop-only; the cloud surface has no speaker and never starts one.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import threading
 import time
 from collections.abc import Callable
@@ -113,6 +114,17 @@ def _play_on_speaker(samples: np.ndarray, sample_rate: int) -> bool:
         return False
 
 
+def _ring_duck() -> contextlib.AbstractContextManager[Any]:
+    """Music ducking for a ring; a ducking failure must never stop the alarm."""
+    try:
+        from utils.audio_ducking import duck_context
+
+        return duck_context()
+    except Exception:  # noqa: BLE001, RUF100 - the alarm matters more than the music level
+        logger.debug("Alarm ducking unavailable", exc_info=True)
+        return contextlib.nullcontext()
+
+
 def _default_emit(user_id: str, event_type: str, payload: dict[str, Any]) -> None:
     """Broadcast an alarm event to this user's webview clients. Never raises."""
     try:
@@ -123,7 +135,13 @@ def _default_emit(user_id: str, event_type: str, payload: dict[str, Any]) -> Non
         if hub is None or loop is None or not loop.is_running():
             logger.debug("Alarm %s broadcast skipped; EventHub/loop unavailable", event_type)
             return
-        asyncio.run_coroutine_threadsafe(hub.broadcast_to_user(user_id, event_type, payload), loop)
+        # The desktop UI socket binds under the account or the device identity,
+        # whichever resolved when it connected. Sent to one of them, the alarm
+        # rang with no card on screen (1.0.5 build 9, T5).
+        from ui.websocket.event_hub import transport_command_recipients
+
+        for recipient in transport_command_recipients(user_id):
+            asyncio.run_coroutine_threadsafe(hub.broadcast_to_user(recipient, event_type, payload), loop)
     except Exception:  # noqa: BLE001, RUF100 - a UI broadcast failure must not stop the ring
         logger.warning("Alarm %s broadcast failed for user=%s", event_type, user_id, exc_info=True)
 
@@ -155,6 +173,8 @@ def alarm_message(label: str) -> str:
     clean = " ".join((label or "").split())
     if not clean or clean.lower() == "alarm":
         return "Your alarm is going off."
+    if clean.lower().endswith("timer"):
+        return "Your %s is done." % clean
     if clean.lower().endswith("alarm"):
         return "Your %s is going off." % clean
     return "Your %s alarm is going off." % clean
@@ -292,22 +312,29 @@ class AlarmRinger:
     def _run(self, ring: _Ring, initial_delay: float = 0.0) -> None:
         if initial_delay and ring.stop_event.wait(initial_delay):
             return
-        failures = 0
-        while not ring.stop_event.is_set():
-            if self._clock() - ring.started_monotonic >= ring.max_seconds:
-                self._end_from_thread(ring, "timeout")
-                return
-            if self._play(self._burst_samples(), RING_SAMPLE_RATE):
-                failures = 0
-            else:
-                failures += 1
-                if failures >= 3:
-                    # No speaker at all: stop pretending to ring, but the card
-                    # and the spoken line already told the user.
-                    self._end_from_thread(ring, "playback_failed")
+        # Music stays down while it rings, and music that starts under the ring
+        # goes down too (1.0.5 build-9: a song started under a 73 s alarm). The
+        # outer duck holds the volume for the whole ring; the duck around each
+        # burst is what applies it to music that started after the first burst.
+        with _ring_duck():
+            failures = 0
+            while not ring.stop_event.is_set():
+                if self._clock() - ring.started_monotonic >= ring.max_seconds:
+                    self._end_from_thread(ring, "timeout")
                     return
-            if ring.stop_event.wait(self._burst_pause_seconds):
-                return
+                with _ring_duck():
+                    played = self._play(self._burst_samples(), RING_SAMPLE_RATE)
+                if played:
+                    failures = 0
+                else:
+                    failures += 1
+                    if failures >= 3:
+                        # No speaker at all: stop pretending to ring, but the card
+                        # and the spoken line already told the user.
+                        self._end_from_thread(ring, "playback_failed")
+                        return
+                if ring.stop_event.wait(self._burst_pause_seconds):
+                    return
 
     def _end_from_thread(self, ring: _Ring, reason: StopReason) -> None:
         with self._lock:

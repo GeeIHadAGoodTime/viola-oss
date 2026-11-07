@@ -38,6 +38,12 @@ describe('browserLeaveAction', () => {
 });
 
 describe('stageForOverlayState', () => {
+  it('a person check needs the browser stage, an ordinary agent page does not', () => {
+    expect(stageForOverlayState({ visible: true, mode: 'agentic', status: 'bot_check' })).toBe('browser');
+    expect(stageForOverlayState({ visible: true, mode: 'agentic', status: 'working' })).toBe(null);
+    expect(stageForOverlayState({ visible: false, mode: 'agentic', status: 'bot_check' })).toBe(null);
+  });
+
   it('a sign-in page takes the browser stage; other states leave the stage alone', () => {
     expect(stageForOverlayState({ visible: true, mode: 'login' })).toBe('browser');
     expect(stageForOverlayState({ visible: false, mode: 'login' })).toBe(null);

@@ -106,6 +106,7 @@ vi.mock('../hooks/usePlayerState', () => ({
     setAgentFrameCallback: vi.fn(),
     setPlaybackCommandCallback: vi.fn((callback) => { playerHarness.playbackCommandCallback = callback; }),
     setChatResponseCallback: vi.fn((callback) => { playerHarness.chatResponseCallback = callback; }),
+    setReplyPartialCallback: vi.fn((callback) => { playerHarness.replyPartialCallback = callback; }),
     setCalendarUpdateCallback: vi.fn(),
     setDisconnectCallback: vi.fn((callback) => { playerHarness.disconnectCallback = callback; }),
     getWsDebug: vi.fn(() => ({})),
@@ -438,6 +439,10 @@ describe('Help keyboard isolation', () => {
     return document.querySelector('.viola-bottom-row [role="status"]');
   }
 
+  function stageDraft() {
+    return screen.getByTestId('stage-typing-field').value;
+  }
+
   it('does not start a hidden Music draft from typing inside Help', async () => {
     const { user } = render(<SmartDisplay />);
     const initialResponse = responseArea().textContent;
@@ -460,17 +465,17 @@ describe('Help keyboard isolation', () => {
   ])('preserves an existing Music draft on %s in Help', async (_name, keys) => {
     const { user } = render(<SmartDisplay />);
     await user.keyboard('draft');
-    expect(responseArea()).toHaveTextContent(/^draft$/);
+    expect(stageDraft()).toBe('draft');
     const { dialog, opener } = await openHelp(user);
     within(dialog).getByRole('button', { name: 'Commands' }).focus();
 
     await user.keyboard(keys);
 
     expect(apiHarness.sendCommandStreaming).not.toHaveBeenCalled();
-    expect(responseArea()).toHaveTextContent(/^draft$/);
+    expect(stageDraft()).toBe('draft');
     if (keys !== '{Escape}') await user.keyboard('{Escape}');
     expect(screen.queryByRole('dialog', { name: 'Help' })).not.toBeInTheDocument();
-    expect(responseArea()).toHaveTextContent(/^draft$/);
+    expect(stageDraft()).toBe('draft');
     expect(opener).toHaveFocus();
 
     // Once dismissed, the same document listener must resume editing/sending.
@@ -1157,8 +1162,7 @@ describe('SmartDisplay', () => {
       }));
     });
 
-    const responseArea = document.querySelector('.viola-bottom-row [role="status"]');
-    expect(responseArea.textContent).toBe(' a');
+    expect(screen.getByTestId('stage-typing-field').value).toBe(' a');
   });
 
   it('toggles mic_muted when the mute hotkey (default Ctrl+M) is pressed', () => {
@@ -1569,6 +1573,74 @@ describe('YouTube iframe playback honesty (#2757)', () => {
 
     await waitFor(() => expect(wsHarness.sent.length).toBeGreaterThan(0));
     expect(youtubeStateMessages().filter((m) => m.payload.state === 'UNSTARTED')).toHaveLength(0);
+  });
+
+  it('replays the same video at its end under Repeat One', async () => {
+    await mountWithTrack();
+    playerHarness.state = { ...playerHarness.state, repeat_mode: 'one' };
+    const view = render(<SmartDisplay />);
+    const frame = view.container.querySelector('iframe');
+    const post = vi.spyOn(frame.contentWindow, 'postMessage');
+    act(() => {
+      window.dispatchEvent(iframeMessage('yt_iframe_state', { state: 0, videoId: 'vid-123' }));
+    });
+    const sent = post.mock.calls.map(([message]) => message?.command);
+    expect(sent).toContain('seekTo');
+    expect(sent).toContain('play');
+    post.mockRestore();
+  });
+
+  it('stops reporting a paused position after saying so twice', async () => {
+    await mountWithTrack();
+    const positions = () => wsHarness.sent.filter((m) => m.action === 'position_update');
+    const tick = (seconds, state) => act(() => {
+      window.dispatchEvent(iframeMessage('yt_iframe_time', { currentTime: seconds, duration: 200, state, videoId: 'vid-123' }));
+    });
+    const now = vi.spyOn(Date, 'now');
+    let clock = 1_000_000;
+    now.mockImplementation(() => clock);
+    try {
+      tick(30, 2);
+      const afterFirst = positions().length;
+      expect(afterFirst).toBeGreaterThan(0);
+      for (let i = 0; i < 20; i += 1) {
+        clock += 1000;
+        tick(30, 2);
+      }
+      expect(positions().length).toBe(afterFirst + 1);
+    } finally {
+      now.mockRestore();
+    }
+  });
+
+  it('reports a seek and a state change at once, and a playing song every two seconds', async () => {
+    await mountWithTrack();
+    const positions = () => wsHarness.sent.filter((m) => m.action === 'position_update');
+    const tick = (seconds, state) => act(() => {
+      window.dispatchEvent(iframeMessage('yt_iframe_time', { currentTime: seconds, duration: 200, state, videoId: 'vid-123' }));
+    });
+    const now = vi.spyOn(Date, 'now');
+    let clock = 2_000_000;
+    now.mockImplementation(() => clock);
+    try {
+      tick(10, 1);
+      const start = positions().length;
+      clock += 1000;
+      tick(11, 1);
+      expect(positions().length).toBe(start);
+      clock += 1000;
+      tick(12, 1);
+      expect(positions().length).toBe(start + 1);
+      clock += 100;
+      tick(120, 1);
+      expect(positions().length).toBe(start + 2);
+      clock += 100;
+      tick(120.1, 2);
+      expect(positions().length).toBe(start + 3);
+      expect(positions().at(-1).payload.video_id).toBe('vid-123');
+    } finally {
+      now.mockRestore();
+    }
   });
 
   it('reports a stuck player once, not once per retry post', async () => {
@@ -2045,6 +2117,65 @@ it('review: preserves voice history across same-principal auth object refreshes'
   expect(await within(dialog).findByText('Current principal history')).toBeInTheDocument();
 });
 
+it('keeps an action approval in the chat it was asked in, like a call approval', async () => {
+  render(<SmartDisplay />);
+  await waitFor(() => expect(wsHarness.handler).toBeTypeOf('function'));
+  const title = 'Viola needs your approval';
+  act(() => {
+    wsHarness.handlers.forEach((handler) => handler({
+      type: 'consult_user',
+      payload: {
+        action_class: 'file_delete',
+        status: 'pending',
+        planned_action: 'delete primes.py from your desktop',
+        chat_thread_id: 'chat-a',
+      },
+    }));
+  });
+  expect(await screen.findByText(title)).toBeInTheDocument();
+  act(() => {
+    window.dispatchEvent(new CustomEvent('viola:chat:active-thread', { detail: { threadId: 'chat-b' } }));
+  });
+  await waitFor(() => expect(screen.queryByText(title)).not.toBeInTheDocument());
+  act(() => {
+    window.dispatchEvent(new CustomEvent('viola:chat:active-thread', { detail: { threadId: 'chat-a' } }));
+  });
+  expect(await screen.findByText(title)).toBeInTheDocument();
+});
+
+const LONG_ANSWER = `${'A long answer that goes on for a while. '.repeat(6)}The end.`;
+
+it('shows a long unspoken answer in a card at once, with only a lead on the stage line', async () => {
+  render(<SmartDisplay />);
+  await waitFor(() => expect(playerHarness.chatResponseCallback).toBeTypeOf('function'));
+  act(() => { playerHarness.chatResponseCallback({ text: LONG_ANSWER }); });
+  const card = await screen.findByRole('dialog');
+  expect(card).toHaveTextContent('The end.');
+  expect(screen.getByTestId('content-card-backdrop')).toBeInTheDocument();
+  expect(document.querySelector('.viola-bottom-row')).not.toHaveTextContent('The end.');
+});
+
+it('holds a long spoken answer card until the stage has finished revealing it', async () => {
+  render(<SmartDisplay />);
+  await waitFor(() => expect(playerHarness.replyPartialCallback).toBeTypeOf('function'));
+  vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'Date'] });
+  try {
+    act(() => {
+      playerHarness.replyPartialCallback({ turn: 'turn-1', text: LONG_ANSWER, spoken: true });
+    });
+    act(() => { vi.advanceTimersByTime(1000); });
+    act(() => { playerHarness.chatResponseCallback({ text: LONG_ANSWER }); });
+    act(() => { vi.advanceTimersByTime(1000); });
+    expect(screen.queryByTestId('content-card-backdrop')).not.toBeInTheDocument();
+    expect(screen.getByTestId('live-reply')).not.toHaveTextContent('The end.');
+    act(() => { vi.advanceTimersByTime(20000); });
+    expect(screen.getByTestId('content-card-backdrop')).toBeInTheDocument();
+    expect(screen.getByRole('dialog')).toHaveTextContent('The end.');
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
 it.each(['websocket-first', 'http-first'])('records one reply in Chat History when the broadcast and the command result both arrive (%s)', async order => {
   // ui/api/routes/command.py broadcasts chat_response BEFORE the HTTP command
   // response returns, so the same reply reaches both handlers for one turn.
@@ -2090,11 +2221,9 @@ it('review: ignores a late old-principal streaming completion', async () => {
   const { user, rerender } = render(<SmartDisplay />);
   await user.keyboard('synthetic{Enter}');
   expect(apiHarness.sendCommandStreaming).toHaveBeenCalledTimes(1);
-  const oldToken = apiHarness.sendCommandStreaming.mock.calls[0][1];
   apiHarness.account = { id: 'account-b' };
   rerender(<SmartDisplay />);
   await act(async () => {
-    oldToken('Old streaming token');
     finish({ message: 'Old streaming completion', ui_action: 'open_settings', tab: 'account' });
   });
   expect(screen.queryByTestId('settings-modal')).not.toBeInTheDocument();
@@ -2104,6 +2233,19 @@ it('review: ignores a late old-principal streaming completion', async () => {
   delete window.viola;
 });
 
+
+describe('SmartDisplay volume slider during speech', () => {
+  it('shows the level the user chose, not the ducked level', () => {
+    playerHarness.state = {
+      is_playing: true,
+      volume: 20,
+      user_volume: 80,
+      now_playing: { id: 't1', title: 'Track', artist: 'A', provider: 'local' },
+    };
+    render(<SmartDisplay />);
+    expect(screen.getByRole('slider', { name: 'Volume' })).toHaveValue('80');
+  });
+});
 
 describe('SmartDisplay rating requests follow track and click order', () => {
   const trackA = { id: 'track-a', title: 'Track A', artist: 'Fixture Artist', provider: 'local' };
@@ -2153,6 +2295,32 @@ describe('SmartDisplay rating requests follow track and click order', () => {
     await user.click(button(name));
     expectRating(rating);
     expect(apiHarness.setRating.mock.calls).toEqual([[rating, 'track-a'], [rating, 'track-a']]);
+  });
+
+  it('skips the track once a dislike is saved, like the Next button', async () => {
+    const { user } = mount();
+    await user.click(button('Dislike'));
+    await waitFor(() => expect(apiHarness.skip).toHaveBeenCalledTimes(1));
+    expect(apiHarness.setRating.mock.calls).toEqual([['disliked', 'track-a']]);
+  });
+
+  it('does not skip for a like, or for taking a dislike back', async () => {
+    apiHarness.skip.mockClear();
+    const { user } = mount();
+    await user.click(button('Like'));
+    await waitFor(() => expect(apiHarness.setRating).toHaveBeenCalledTimes(1));
+    await user.click(button('Like'));
+    await waitFor(() => expect(apiHarness.setRating).toHaveBeenCalledTimes(2));
+    expect(apiHarness.skip).not.toHaveBeenCalled();
+  });
+
+  it('does not skip when the dislike could not be saved', async () => {
+    apiHarness.skip.mockClear();
+    apiHarness.setRating.mockRejectedValueOnce(apiRejection());
+    const { user } = mount();
+    await user.click(button('Dislike'));
+    expect(await screen.findByText(failedCopy)).toBeInTheDocument();
+    expect(apiHarness.skip).not.toHaveBeenCalled();
   });
 
   it('keeps the newest choice when an older save fails, and orders the actual writes', async () => {

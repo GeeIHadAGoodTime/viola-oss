@@ -33,11 +33,12 @@ ROUTE_TOOL_SCHEMAS: list[dict[str, Any]] = [
             "provider, title, artist, and track_uri. For broad requests — single-word artist names ('drake'), "
             "bare genres/moods/eras ('jazz', 'chill', '80s'), or 'play me a X' / 'play some X' patterns — "
             "action='search_play' is preferred unless the user is asking to choose from options. Pass query as "
-            "just the descriptor (artist/title/genre/mood) without filler words like 'some' or 'play me'; for a "
-            "fully generic 'play some music' / 'play anything' request with no descriptor, use search_play with an "
-            "empty query so the tool returns a general selection rather than searching the literal word. "
+            "just the descriptor (artist/title/genre/mood) without filler words like 'some' or 'play me'. "
+            "For an open request ('play something', 'play some music', 'play anything') choose a concrete query "
+            "yourself from the user's tastes, recently played tracks (action='recent') and the time of day, "
+            "and play it; never ask. "
             "Use CURRENT SYSTEM STATE for provider choice, local-library metadata, local-match facts, "
-            "target_room, room_route/pairing_flow, recently played tracks, and user music preferences. "
+            "target_room, room_route/pairing_flow, and user music preferences. "
             "Setup/login requests use pair_speaker_setup or connect_music_provider. Transport controls use playback."
         ),
         "parameters": {
@@ -144,8 +145,8 @@ ROUTE_TOOL_SCHEMAS: list[dict[str, Any]] = [
         "name": "open_app_panel",
         "description": (
             "Open a Viola UI panel for requests like 'open settings', 'show payment methods', "
-            "or 'take me to my calendar'. Available panel_id values: settings, "
-            "rooms.add_speaker, calendar, music_accounts, payment_methods, help. "
+            "'open the memory panel' or 'take me to my calendar'. Available panel_id values: settings, "
+            "rooms.add_speaker, calendar, music_accounts, payment_methods, help, memory. "
             "Returns structured ui_action data for the app; this is a UI capability, "
             "not a classifier, gate, or settings mutation."
         ),
@@ -161,6 +162,7 @@ ROUTE_TOOL_SCHEMAS: list[dict[str, Any]] = [
                         "music_accounts",
                         "payment_methods",
                         "help",
+                        "memory",
                     ],
                     "description": "Panel to open.",
                 },
@@ -289,9 +291,10 @@ ROUTE_TOOL_SCHEMAS: list[dict[str, Any]] = [
         "description": (
             "Music player volume control for the active Viola music player. "
             "This changes the per-player music volume, not the machine-wide Windows/macOS/Linux output volume. "
-            "Use CURRENT SYSTEM STATE: when music is currently playing, bare volume requests like louder, quieter, "
-            "or turn it down apply here. Use desktop_volume only for explicit system, OS, desktop, speaker, "
-            "computer, or master output volume requests. "
+            "CURRENT SYSTEM STATE shows the current level. "
+            "Every plain volume request (set the volume to 30, louder, quieter, turn it down) applies here, "
+            "whether music is playing, paused or stopped. Use desktop_volume only when the user's own words say "
+            "system, OS, desktop, speaker, computer, or master volume. "
             "Use action='set' with level 0-100 for 'set volume to 50', "
             "'volume 75', 'set it to about half volume'. "
             "Use action='up' for 'louder', 'volume up', 'turn it up', "
@@ -372,7 +375,8 @@ ROUTE_TOOL_SCHEMAS: list[dict[str, Any]] = [
             "(on Spotify this adds it to the user's Spotify Liked Songs). "
             "Use rating='remove' for 'unlike this', 'remove this from my liked songs' "
             "(removes the like and keeps playing). "
-            "Use rating='down' to dislike / thumbs down the current song (also skips it)."
+            "Use rating='down' at once, without asking, for 'I don't like this', 'I hate this song', 'not this one', "
+            "'thumbs down'; it records the dislike and skips the song."
         ),
         "parameters": {
             "type": "object",

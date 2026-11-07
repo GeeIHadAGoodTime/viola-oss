@@ -41,8 +41,13 @@ from violawake.config import (
     STREAM_AGREE_K,
     STREAM_AGREE_N,
     STREAM_CHUNK_SAMPLES,
+    custom_operating_point,
     stream_operating_point,
 )
+
+
+# 0.4 s: the over-speech rule's debounce (see ``_init_music_path``).
+_OVER_SPEECH_DEBOUNCE_FRAMES = 5
 
 
 class WakeTrigger(NamedTuple):
@@ -52,6 +57,9 @@ class WakeTrigger(NamedTuple):
     the best frame of the looser rule's window. ``frame_threshold``/``k``/``n``:
     the rule that confirmed it. ``music_path``: the looser music rule confirmed
     it, so Stage 2 must hear "Viola" (see config.MUSIC_WAKE_RULE).
+    ``over_speech``: the rule used while Viola is talking confirmed it
+    (config.OVER_SPEECH_RULE); the listener must clear it against what she is
+    saying before it counts.
     """
 
     score: float
@@ -59,6 +67,7 @@ class WakeTrigger(NamedTuple):
     k: int
     n: int
     music_path: bool = False
+    over_speech: bool = False
 
 if TYPE_CHECKING:
     from violawake.model import WakeWordModel
@@ -843,16 +852,24 @@ class ViolaWake:
     def _sync_operating_point(self) -> None:
         """Re-map ``threshold`` (the level) when it changed since the last chunk."""
         checked = bool(getattr(self, "checked", False))
+        custom = bool(getattr(self, "custom_model", False))
+        custom_rule = getattr(self, "custom_rule", None)
         if self._operating_point_pinned or (
-            self.threshold == self._mapped_level and checked == getattr(self, "_mapped_checked", False)
+            self.threshold == self._mapped_level
+            and checked == getattr(self, "_mapped_checked", False)
+            and (custom, custom_rule) == getattr(self, "_mapped_custom", (False, None))
         ):
             return
-        k, n, frame_threshold = stream_operating_point(self.threshold, checked=checked)
+        if custom:
+            k, n, frame_threshold = custom_operating_point(self.threshold, custom_rule, checked=checked)
+        else:
+            k, n, frame_threshold = stream_operating_point(self.threshold, checked=checked)
         if (k, n) != (self._agreement.k, self._agreement.n):
             self._agreement.configure(k, n)
         self._stream_threshold = frame_threshold
         self._mapped_level = self.threshold
         self._mapped_checked = checked
+        self._mapped_custom = (custom, custom_rule)
 
     def _init_music_path(self, debounce_frames: int) -> None:
         # The looser rule used while Viola's own music plays (None = off; the
@@ -864,6 +881,11 @@ class ViolaWake:
         self._music_pending_peak = 0.0
         self._recent_scores: list[float] = []
         self.last_trigger: WakeTrigger | None = None
+        # The rule used while Viola talks (None = she is quiet; the listener
+        # sets it). Its short debounce: a candidate that turns out to be her own
+        # voice must not hide a real "Viola" said a moment later.
+        self.over_speech_rule: tuple[int, int, float] | None = None
+        self._over_speech_gate = AgreementGate(3, 5, debounce_frames=_OVER_SPEECH_DEBOUNCE_FRAMES)
 
     def _music_rule_now(self) -> tuple[int, int, float] | None:
         rule = getattr(self, "music_rule", None)
@@ -888,6 +910,15 @@ class ViolaWake:
             music_agreed = self._music_gate.update(score, mthr)
         else:
             self._music_pending = None
+        over_speech = getattr(self, "over_speech_rule", None)
+        if over_speech is not None and not self._operating_point_pinned:
+            ok, on, othr = over_speech
+            if (ok, on) != (self._over_speech_gate.k, self._over_speech_gate.n):
+                self._over_speech_gate.configure(ok, on)
+            if self._over_speech_gate.update(score, othr) and not normal:
+                # Viola is talking: every frame counts, so no waiting for the
+                # normal rule. The listener checks this against her own voice.
+                return WakeTrigger(max(self._recent_scores[-on:]), othr, ok, on, over_speech=True)
         if normal:
             # The normal rule decides (normal Stage 2); the music rule shares the debounce.
             self._music_gate.reset()
@@ -924,6 +955,7 @@ class ViolaWake:
             self._music_gate.reset()
             self._music_pending = None
             self._recent_scores.clear()
+            self._over_speech_gate.reset()
         self._chunk_energy.clear()
         self._stream_ring[:] = 0.0
         self._stream_ring_idx = 0
@@ -1004,7 +1036,11 @@ class ViolaWake:
                     trigger.k,
                     trigger.n,
                     self.threshold,
-                    " music_path (Stage 2 must hear Viola)" if trigger.music_path else "",
+                    (
+                        " music_path (Stage 2 must hear Viola)"
+                        if trigger.music_path
+                        else " over_speech (checked against her own voice)" if trigger.over_speech else ""
+                    ),
                 )
                 self._callback()
         return score

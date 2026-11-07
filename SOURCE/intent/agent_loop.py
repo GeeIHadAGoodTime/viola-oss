@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import copy
+import dataclasses
 import inspect
 import json as _json
 import re
@@ -20,6 +21,15 @@ from typing import TYPE_CHECKING, Any, Callable
 
 from core.logging_config import get_logger
 from diagnostics import latency_spans
+from intent.active_task import (
+    ActiveTask,
+    add_turn_reminder,
+    answer_from_helper_results,
+    final_answer_is_off_task,
+    message_carries_request,
+    off_task_answer_message,
+    off_task_correction_text,
+)
 from intent.agent_message_manager import (
     reconstruct_executor_content_replacement_state,
     record_tool_result_replacements,
@@ -86,16 +96,34 @@ def _normalize_terminal_model_text(text: str | None) -> str:
     return _strip_json_template(str(text or ""))
 
 
-def _trace_safe_copy(value: Any) -> Any:
-    """Copy trace payloads without letting live runtime objects break the agent loop."""
+def _trace_safe_copy(value: Any, _depth: int = 0) -> Any:
+    """Copy trace payloads without letting live runtime objects break the agent loop.
 
-    try:
-        return copy.deepcopy(value)
-    except (TypeError, ValueError, AttributeError, RuntimeError, RecursionError):
+    Plain data is copied deeply; a live object is written as ``<TypeName>``. This no
+    longer tries copy.deepcopy first: the turn's request carries an asyncio.Event,
+    deepcopy failed half way through it, and the half-built event loop it left behind
+    logged "Exception ignored in BaseEventLoop.__del__" on every model call.
+    """
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if _depth > 40:
+        return "<%s>" % type(value).__name__
+    if isinstance(value, dict):
+        return {
+            (k if isinstance(k, (str, int, float, bool)) or k is None else str(k)): _trace_safe_copy(v, _depth + 1)
+            for k, v in value.items()
+        }
+    if isinstance(value, (list, tuple)):
+        return [_trace_safe_copy(item, _depth + 1) for item in value]
+    if dataclasses.is_dataclass(value) and not isinstance(value, type):
+        return {f.name: _trace_safe_copy(getattr(value, f.name, None), _depth + 1) for f in dataclasses.fields(value)}
+    dump = getattr(value, "model_dump", None)
+    if callable(dump):
         try:
-            return _json.loads(_json.dumps(value, default=lambda obj: "<%s>" % type(obj).__name__))
-        except (TypeError, ValueError, AttributeError, RuntimeError, RecursionError):
-            return "<%s>" % type(value).__name__
+            return _trace_safe_copy(dump(), _depth + 1)
+        except Exception:  # noqa: BLE001, RUF100 - fall back to the type name
+            pass
+    return "<%s>" % type(value).__name__
 
 
 _REASONING_MODEL_TAGS = ("o1", "o3", "o4-", "gpt-5", "gpt-6")
@@ -136,6 +164,18 @@ class _AgentLoopCostLimitStop(RuntimeError):
 _COMPACTION_PROGRESS_MIN_FRACTION = 0.05  # 5% token reduction = "progress"
 _COMPACTION_NO_PROGRESS_LIMIT = 2  # bail after this many consecutive no-progress attempts
 _COMPACTION_HARD_CEILING = 6  # absolute defense-in-depth (always-allow at most this many)
+
+
+# A run this long, or one that compacted, is checked for having wandered off the
+# request before it may report success. Short runs cannot drift and pay nothing.
+_ANSWER_CHECK_MIN_STEPS = 15
+# A bad gateway on one model call must not end a run that has work in hand: T8b
+# lost three finished helpers to one HTTP 502.
+_TRANSIENT_TURN_RETRIES = 2
+_TRANSIENT_TURN_BACKOFF_S = 1.5
+_TRANSIENT_ERROR_CATEGORIES = frozenset({"server", "overloaded", "timeout"})
+_TRANSIENT_STATUS_TEXT_RE = re.compile(r"\b(?:500|502|503|504|529)\b")
+_HELPER_WAIT_S = 240.0
 
 
 def _compaction_should_allow(executor: Any) -> bool:
@@ -341,6 +381,82 @@ def _prompt_bundle_has_current_user_text(prompt_context_bundle: PromptFrameBundl
         if getattr(frame, "role", None) is FrameRole.USER:
             return _frame_text(frame) == needle
     return False
+
+
+def _is_transient_turn_error(exc: BaseException) -> bool:
+    from services.llm.request_policy import classify_provider_error
+
+    # Some routes only carry the status in the message ("HTTP 502").
+    return (
+        isinstance(exc, ConnectionError)
+        or classify_provider_error(exc) in _TRANSIENT_ERROR_CATEGORIES
+        or bool(_TRANSIENT_STATUS_TEXT_RE.search(str(exc)))
+    )
+
+
+def _log_reasoning_tier(executor: Any) -> None:
+    """Say which reasoning tier this run asks for, so helpers can be checked from the log."""
+    from config.defaults import get_configured_reasoning_effort
+
+    depth = getattr(executor, "_depth", 0)
+    tier = "background_agent" if isinstance(depth, int) and depth > 0 else "agent"
+    model = executor._get_model_name_safe()
+    logger.info(
+        "Agent run reasoning_tier=%s effort=%s depth=%s model=%s task=%s",
+        tier,
+        get_configured_reasoning_effort(tier, model),
+        depth,
+        model,
+        getattr(executor, "task_id", "?"),
+    )
+
+
+async def _answer_from_helpers(executor: Any, active_task: ActiveTask) -> str:
+    """Finish for the parent when it can no longer reach the model itself."""
+    live = dict(getattr(executor, "_live_helpers", None) or {})
+    if live:
+        logger.info("Agent run failed with %d helpers still working; waiting for them", len(live))
+        waits = [asyncio.ensure_future(done.wait()) for done in live.values()]
+        await asyncio.wait(waits, timeout=_HELPER_WAIT_S)
+        for wait in waits:
+            wait.cancel()
+    held = list(getattr(executor, "_held_helper_answers", None) or [])
+    if not held:
+        return ""
+    executor._held_helper_answers = []
+    return await answer_from_helper_results(active_task, held, user_id=str(getattr(executor, "_user_id", "") or ""))
+
+
+def _run_was_compacted(executor: Any) -> bool:
+    count = getattr(executor, "_compaction_count", 0)
+    return isinstance(count, int) and count > 0
+
+
+def _active_task_for_run(
+    executor: Any,
+    checkpoint: Any,
+    user_text: str,
+    messages: list[dict[str, Any]],
+    restored: bool,
+) -> ActiveTask:
+    """Record what this run is for, on the executor and in its checkpoint."""
+
+    context = getattr(checkpoint, "context", None)
+    recorded = context.get("active_request") if isinstance(context, dict) else None
+    description = getattr(checkpoint, "task_description", "")
+    previous = getattr(executor, "_active_task", None)
+    active_task = ActiveTask.for_run(
+        user_text=user_text,
+        messages=messages,
+        restored=restored,
+        previous=previous if isinstance(previous, ActiveTask) else None,
+        checkpoint_request=recorded if isinstance(recorded, str) else "",
+        checkpoint_description=description if isinstance(description, str) else "",
+    )
+    executor._active_task = active_task
+    if isinstance(context, dict) and active_task.request:
+        context["active_request"] = active_task.request
+    return active_task
 
 
 def _executor_hook_session_id(executor: AgentExecutor) -> str | None:
@@ -1283,6 +1399,12 @@ _MEMORY_ID_RE = re.compile(r"\bid=(\d+)\b")
 # goes back to the model exactly as before.
 _PLAYBACK_TERMINAL_ACTIONS = frozenset(
     {
+        "dislike_skip",
+        "shuffle_on",
+        "shuffle_off",
+        "repeat_off",
+        "repeat_all",
+        "repeat_one",
         "next",
         "skip",
         "previous",
@@ -1301,13 +1423,56 @@ _PLAYBACK_TERMINAL_ACTIONS = frozenset(
 )
 # A track change is heard; Jay prefers no spoken "Now playing" on top of it.
 # The chat still shows the tool's text.
-_PLAYBACK_SILENT_ACTIONS = frozenset({"next", "skip", "previous"})
+_PLAYBACK_SILENT_ACTIONS = frozenset({"next", "skip", "previous", "dislike_skip"})
 _DISCOVERY_TOOL_NAMES = frozenset({"ToolSearch", "tool_search"})
+
+
+def _note_turn_placed_live_call(executor: Any, tool_name: str, tool_args: Any, tool_result: Any) -> None:
+    """Remember that this turn placed a call that is still live.
+
+    From here the turn's own speech is about that call, so it waits for the call to
+    end. Decided by what this turn did, never by what its text says.
+    """
+    if tool_name != "phone" or not isinstance(tool_args, dict) or tool_args.get("action") != "call":
+        return
+    from core.live_call_state import call_is_live, note_turn_placed_call
+    from services.llm.stream_bus import get_current_command_stream_id
+
+    data = getattr(tool_result, "data", None)
+    if isinstance(data, str):
+        try:
+            data = _json.loads(data)
+        except ValueError:
+            return
+    call_id = str(data.get("call_id") or "") if isinstance(data, dict) else ""
+    if not call_id or not call_is_live(call_id):
+        return
+    executor._live_call_of_turn = call_id
+    note_turn_placed_call(get_current_command_stream_id(), call_id)
+
+
+def _phone_watch_lost_response(tool_name: str, tool_result: Any) -> str | None:
+    """The reply for a call whose status cannot be read, or None.
+
+    This ends the turn with no further model step, so the model never gets to act on
+    a poll error: it cannot hang up the call or report it as failed.
+    """
+    if tool_name != "phone" or tool_result is None:
+        return None
+    data = getattr(tool_result, "data", None)
+    if isinstance(data, str):
+        try:
+            data = _json.loads(data)
+        except ValueError:
+            return None
+    if not isinstance(data, dict) or data.get("status") != "status_unavailable" or not data.get("call_placed"):
+        return None
+    return "The call is still going as far as I can tell. I can't see its progress right now, so I'm leaving it alone. The Phone tab will show how it ends."
 
 
 def _playback_terminal_response(tool_name: str, tool_result: Any) -> tuple[str, bool] | None:
     """Return ``(text, silent)`` when a confirmed playback control can end the turn."""
-    if tool_name != "playback" or tool_result is None or not getattr(tool_result, "ok", False):
+    if tool_name not in {"playback", "rate_track"} or tool_result is None or not getattr(tool_result, "ok", False):
         return None
     if getattr(tool_result, "unverified", False):
         return None
@@ -1685,6 +1850,7 @@ async def run_agent_loop(
         _PaymentConfirmationGateRefused,
         _record_structured_incomplete_diagnostic,
         _remember_last_tool_result,
+        _shorten_old_page_snapshots,
         _strip_image_from_result,
         _strip_old_browser_refs,
         _terminal_response_from_tool_result,
@@ -2178,6 +2344,8 @@ async def run_agent_loop(
     # follow-up write (founder rule 2026-10-23; content_sanitizer
     # is_user_named_file_read). Consequential actions keep their confirm gates.
     taint_tracker.set_user_request(user_text)
+    if getattr(executor, "_depth", 0) == 0 and hasattr(executor, "_user_own_words"):
+        taint_tracker.set_user_own_words(executor._user_own_words(user_text))
     # Let the gate read a tool's _meta (a payment extension's irreversible
     # class) and let the approval layer see this task's taint, so a
     # confirm-or-cancel gate under taint accepts only the user's own words.
@@ -2187,6 +2355,10 @@ async def run_agent_loop(
     taint_tracker.set_payment_approval_probe(getattr(executor, "_payment_gate_approval_active", None))
     _bind_active_taint_tracker(taint_tracker)
     _bind_file_gate_context_for_run(executor, loop_messages, user_text)
+    active_task = _active_task_for_run(executor, checkpoint, user_text, loop_messages, initial_messages is not None)
+    executor._agent_loop_active = True
+    _log_reasoning_tier(executor)
+    _transient_turn_retries = 0
     pending_hook_context_messages: list[dict[str, Any]] = []
     native_turn_max_tokens = _native_turn_max_tokens_for_model(executor._get_model_name_safe())
 
@@ -2237,6 +2409,7 @@ async def run_agent_loop(
             return
         for pending_text in pending:
             loop_messages.append({"role": "user", "content": pending_text})
+            active_task.note_instruction(pending_text)
         _record_subagent_transcript()
 
     _record_subagent_transcript()
@@ -2534,6 +2707,10 @@ async def run_agent_loop(
             replacement_writer=lambda records: record_tool_result_replacements(executor, records),
             session_id=tool_result_replacement_session_id(executor),
         )
+        if turn_messages and not message_carries_request(turn_messages[-1], active_task.request):
+            # Added to this outgoing copy only: the goal rides on every turn of a
+            # working run whatever happens to history, and history does not grow.
+            turn_messages = add_turn_reminder(turn_messages, active_task.render_reminder())
         turn_kwargs: dict[str, Any] = {
             "messages": turn_messages,
             "first_turn": first_turn,
@@ -2613,6 +2790,9 @@ async def run_agent_loop(
             turn_kwargs["model_override"] = executor._model_override
         if tool_choice_override is not None:
             turn_kwargs["tool_choice_override"] = tool_choice_override
+        prompt_cache_key = executor._prompt_cache_key() if hasattr(executor, "_prompt_cache_key") else None
+        if prompt_cache_key:
+            turn_kwargs["prompt_cache_key"] = prompt_cache_key
         if use_delta:
             continuity_payload: dict[str, Any] = {
                 "mode": provider_continuity_before["mode"],
@@ -2631,6 +2811,30 @@ async def run_agent_loop(
             turn_kwargs["continuity"] = copy.deepcopy(continuity_payload)
             turn_kwargs["responses_continuity"] = copy.deepcopy(continuity_payload)
         return turn_kwargs, turn_messages, continuity_before
+
+    _off_task_verdicts: dict[str, bool | None] = {}
+
+    async def _answer_is_off_task(answer: str) -> bool:
+        """Check a long run's answer against its request, once per distinct answer."""
+        if not (_run_was_compacted(executor) or iterations >= _ANSWER_CHECK_MIN_STEPS):
+            return False
+        if answer not in _off_task_verdicts:
+            _off_task_verdicts[answer] = await final_answer_is_off_task(
+                active_task,
+                answer,
+                user_id=str(getattr(executor, "_user_id", "") or ""),
+            )
+        return _off_task_verdicts[answer] is True
+
+    async def _send_off_task_answer_back(answer: str) -> bool:
+        """Return True when an off-task answer went back for one more try."""
+        if active_task.answer_redirected or not await _answer_is_off_task(answer):
+            return False
+        active_task.answer_redirected = True
+        logger.warning("Agent task %s: final answer is off the request; sending it back once", task_id)
+        loop_messages.append({"role": "assistant", "content": answer})
+        loop_messages.append({"role": "user", "content": off_task_correction_text(active_task)})
+        return True
 
     def _acknowledge_sent_messages(messages: list[dict[str, Any]]) -> None:
         """Advance the agent-loop-side delta cursor after a successful provider call."""
@@ -2703,6 +2907,7 @@ async def run_agent_loop(
             session_id=tool_result_replacement_session_id(executor),
             replacement_writer=lambda records: record_tool_result_replacements(executor, records),
             content_replacement_state=getattr(executor, "_content_replacement_state", None),
+            active_task=active_task,
         )
         if not compaction_meta:
             return False
@@ -3609,12 +3814,12 @@ async def run_agent_loop(
                         _acknowledge_sent_messages(loop_messages)
                 # tool_choice="auto" always â€” no first_turn override.
                 executor._last_usage = _normalize_usage(response) if isinstance(response, dict) else {}
-                executor._record_llm_usage_for_context(executor._last_usage)
                 executor._last_model_name = (
                     str(response.get("_model_name") or executor._get_model_name_safe())
                     if isinstance(response, dict)
                     else "unknown"
                 )
+                executor._record_llm_usage_for_context(executor._last_usage)
                 if isinstance(response, dict) and _turn_kwargs:
                     executor._record_task_trace_llm_exchange(
                         call_kind="agent_loop",
@@ -3641,6 +3846,17 @@ async def run_agent_loop(
                     call_kind="agent_loop",
                     exc=exc,
                 )
+                if _transient_turn_retries < _TRANSIENT_TURN_RETRIES and _is_transient_turn_error(exc):
+                    _transient_turn_retries += 1
+                    logger.warning(
+                        "Agent turn %d hit a temporary model error, retry %d/%d: %s",
+                        iterations,
+                        _transient_turn_retries,
+                        _TRANSIENT_TURN_RETRIES,
+                        exc,
+                    )
+                    await asyncio.sleep(_TRANSIENT_TURN_BACKOFF_S * _transient_turn_retries)
+                    continue
                 if isinstance(exc, RuntimeError) and _is_native_tool_calling_unsupported(exc):
                     logger.exception("Native tool calling not supported by active provider")
                     terminal_provider_error = "PROVIDER_UNSUPPORTED"
@@ -3654,6 +3870,8 @@ async def run_agent_loop(
                 executor._llm_error_occurred = True
                 outcome = "llm_error"
                 break
+
+            _transient_turn_retries = 0
 
             # Per-turn billing: reservation settlement happened in
             # _call_native_turn; keep the post-settle cap recheck so a turn
@@ -3684,6 +3902,7 @@ async def run_agent_loop(
                             continue_listening=False,
                         )
                         executor._final_params["cap_state"] = _spend_gate.cap_state
+                        outcome = "cost_limit"
                         break
                 except Exception as _pl_exc:
                     if _handle_agent_loop_billing_failure(_pl_exc):
@@ -3753,6 +3972,8 @@ async def run_agent_loop(
                 answer_text = response.get("answer", "")
                 cl_value = response.get("continue_listening")
                 raw_text = answer_text if isinstance(answer_text, str) else str(answer_text or "")
+                if await _send_off_task_answer_back(_normalize_terminal_model_text(raw_text)):
+                    continue
                 _set_final_response(
                     executor,
                     _normalize_terminal_model_text(raw_text),
@@ -3781,7 +4002,9 @@ async def run_agent_loop(
                     operator_message = user_message_for_operator_diagnostic(operator_diagnostic)
                     if operator_message:
                         _set_final_response(executor, operator_message, continue_listening=False)
-                outcome = "llm_error" if executor._llm_error_occurred else "success"
+                # Tools may have run, but the model never answered: that is a
+                # failure whatever came before it, not a success.
+                outcome = "llm_error"
                 break
 
             if resp_type in {"ask_user", "clarification"}:
@@ -3793,6 +4016,8 @@ async def run_agent_loop(
             if resp_type == "final_answer":
                 answer_text = response.get("answer", response.get("text", ""))
                 raw = answer_text if isinstance(answer_text, str) else str(answer_text)
+                if await _send_off_task_answer_back(_normalize_terminal_model_text(raw)):
+                    continue
                 _set_final_response(
                     executor,
                     _normalize_terminal_model_text(raw),
@@ -3825,6 +4050,8 @@ async def run_agent_loop(
                         "Agent loop received text fallback response with content_len=%d; treating as answer",
                         len(content),
                     )
+                    if await _send_off_task_answer_back(_normalize_terminal_model_text(content)):
+                        continue
                     _set_final_response(
                         executor,
                         _normalize_terminal_model_text(content),
@@ -4562,6 +4789,13 @@ async def run_agent_loop(
                     executor._forced_tool_failure_error = tool_result.error or "calendar tool failed"
                     executor._forced_tool_failure_outcome = "tool_error"
 
+                active_task.note_step(
+                    tc_name,
+                    tc_args,
+                    ok=bool(tool_result.ok),
+                    note=str(_turn_reasoning if tool_result.ok else tool_result.error or ""),
+                    page_url=str(getattr(executor, "_last_page_url", "") or ""),
+                )
                 if session_memory is not None:
                     try:
                         session_memory.update_after_tool(
@@ -4615,6 +4849,16 @@ async def run_agent_loop(
                             continue_listening=False,
                             params={"nested_gate_result": dict(_nested_gate)},
                         )
+                _note_turn_placed_live_call(executor, tc_name, tc_args, tool_result)
+                _phone_watch_lost = _phone_watch_lost_response(tc_name, tool_result)
+                if _phone_watch_lost is not None:
+                    _set_final_response(
+                        executor,
+                        _phone_watch_lost,
+                        continue_listening=False,
+                        params={"silent_reply": True, "terminal_tool": "phone"},
+                    )
+                    _media_terminal_fired = True
                 _terminal_tool_response = _terminal_response_from_tool_result(tc_name, tool_result)
                 if _terminal_tool_response is not None and len(all_tool_calls) == 1:
                     _set_final_response(executor, _terminal_tool_response, continue_listening=False)
@@ -4796,6 +5040,20 @@ async def run_agent_loop(
                 except (AttributeError, RuntimeError, TypeError, ValueError):
                     logger.debug("Repeated tool progress tracking failed", exc_info=True)
 
+                # A site's person check: the user does it, the loop waits, and the
+                # model reads how it went with this tool's result.
+                bot_check_note = await executor._resolve_bot_check_after_tool(tc_name, tool_result)
+                if bot_check_note:
+                    executor._pending_stuck_tool_progress = None
+                    latest_result = tool_results_content[-1]
+                    if isinstance(latest_result["content"], list):
+                        latest_result["content"] = [
+                            *latest_result["content"],
+                            {"type": "text", "text": bot_check_note},
+                        ]
+                    else:
+                        latest_result["content"] = "%s\n\n%s" % (latest_result["content"], bot_check_note)
+
                 # â”€â”€ Post-execution bookkeeping via middleware pipeline â”€â”€
                 # Browser tier tracking (lightweight, not worth a middleware)
                 if tc_name == "check_api_registry":
@@ -4951,6 +5209,7 @@ async def run_agent_loop(
                 loop_messages.append({"role": "user", "content": tool_results_content})
                 if _had_browser_nav:
                     _strip_old_browser_refs(loop_messages)
+                _shorten_old_page_snapshots(loop_messages)
                 _record_subagent_transcript()
                 tool_results_content = []
                 _flush_pending_hook_context()
@@ -5011,6 +5270,12 @@ async def run_agent_loop(
                     },
                 },
             )
+
+        if outcome == "llm_error":
+            helper_answer = await _answer_from_helpers(executor, active_task)
+            if helper_answer:
+                final_answer = helper_answer
+                _set_final_response(executor, final_answer, continue_listening=False)
 
         from intent.agent_executor import _apply_approval_blocked_final_answer
 
@@ -5129,8 +5394,8 @@ async def run_agent_loop(
                         _flush_pending_hook_context()
                     if isinstance(response, dict):
                         executor._last_usage = _normalize_usage(response)
-                        executor._record_llm_usage_for_context(executor._last_usage)
                         executor._last_model_name = str(response.get("_model_name") or executor._get_model_name_safe())
+                        executor._record_llm_usage_for_context(executor._last_usage)
                         retry_type = response.get("type", "answer")
                         if retry_type in {"answer", "final_answer"}:
                             retry_answer = response.get("answer", response.get("text", ""))
@@ -5235,6 +5500,16 @@ async def run_agent_loop(
                 outcome = "incomplete"
                 _record_structured_incomplete_diagnostic(executor, incomplete_diagnostic)
 
+        if outcome == "success" and await _answer_is_off_task(final_answer):
+            logger.warning("Agent task %s: final answer does not deal with the request; not reporting success", task_id)
+            outcome = "off_task"
+            final_answer = off_task_answer_message(active_task)
+            _set_final_response(executor, final_answer, continue_listening=True)
+            _record_structured_incomplete_diagnostic(
+                executor,
+                {"reason": "final_answer_off_task", "domain": "agent_task", "evidence_source": "final_answer_check"},
+            )
+
         if (
             outcome in ("success", "payment_gate", "signature_gate")
             and _current_subagent_id(executor)
@@ -5294,18 +5569,28 @@ async def run_agent_loop(
                     payment_confirmation_ctx = await executor._prepare_payment_confirmation_session()
                     from intent.agent_executor import (
                         _dispatch_payment_confirmation_link_for_executor,
+                        _payment_approval_ways_line,
+                        _payment_gate_answer_from_order,
                         _payment_gate_answer_with_confirm_url,
                     )
 
+                    final_answer = _payment_gate_answer_from_order(
+                        final_answer,
+                        payment_confirmation_ctx.get("order_summary"),
+                    )
+                    delivery = await _dispatch_payment_confirmation_link_for_executor(
+                        executor,
+                        payment_confirmation_ctx,
+                        str(payment_confirmation_ctx.get("url") or ""),
+                    )
+                    final_answer = "%s\n%s" % (
+                        final_answer,
+                        _payment_approval_ways_line(delivery, payment_confirmation_ctx.get("link_note")),
+                    )
                     final_answer = _payment_gate_answer_with_confirm_url(
                         final_answer,
                         str(payment_confirmation_ctx.get("url") or ""),
                         payment_confirmation_ctx.get("link_note"),
-                    )
-                    await _dispatch_payment_confirmation_link_for_executor(
-                        executor,
-                        payment_confirmation_ctx,
-                        str(payment_confirmation_ctx.get("url") or ""),
                     )
                     _set_final_response(executor, final_answer, continue_listening=False)
                 except _PaymentConfirmationGateRefused as exc:
@@ -5365,7 +5650,7 @@ async def run_agent_loop(
             )
         terminal_llm_error = executor._llm_error_occurred and not final_overrides_llm_error
         terminal_cost_limit = outcome == "cost_limit"
-        terminal_incomplete = outcome == "incomplete"
+        terminal_incomplete = outcome in {"incomplete", "off_task"}
         final_ok = (
             not terminal_llm_error
             and executor._forced_tool_failure_error is None
@@ -5444,6 +5729,7 @@ async def run_agent_loop(
             error=str(exc),
         )
     finally:
+        executor._agent_loop_active = False
         _dispatch_session_end("agent_loop_teardown")
         hook_file_watcher = getattr(executor, "_hook_file_watcher", None)
         if hook_file_watcher is not None:

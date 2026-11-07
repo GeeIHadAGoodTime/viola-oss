@@ -2,6 +2,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
 import { THEME } from '../../config';
 import { apiFetch } from '../../hooks/useViolaApi';
+import { confirmDialog } from '../ViolaDialog';
 import { isFeatureHidden } from '../../utils/featureSurface';
 import DesktopUpsell from '../DesktopUpsell';
 import ExtensionsSection from '../extensions/ExtensionsSection';
@@ -107,7 +108,7 @@ const AdvancedSettingsWindow = React.memo(({
     if (isFeatureHidden('system_controls')) {
       return;
     }
-    if (typeof window !== 'undefined' && !window.confirm('Reset all settings to defaults?')) {
+    if (!(await confirmDialog({ title: 'Reset all settings to defaults?', confirmLabel: 'Reset', danger: true }))) {
       return;
     }
     setResetBusy(true);

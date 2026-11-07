@@ -317,6 +317,88 @@ def open_stream(pa: Any, **kwargs: Any) -> GuardedStream:
     return guarded
 
 
+class _SoundDeviceInput:
+    """A sounddevice input stream with pyaudio's method names, so GuardedStream can hold it."""
+
+    def __init__(self, stream: Any) -> None:
+        self._stream = stream
+
+    def read(self, num_frames: int, exception_on_overflow: bool = False) -> bytes:
+        data, _overflowed = self._stream.read(num_frames)
+        return bytes(data)
+
+    def is_active(self) -> bool:
+        return bool(self._stream.active)
+
+    def is_stopped(self) -> bool:
+        return bool(self._stream.stopped)
+
+    def stop_stream(self) -> None:
+        self._stream.stop()
+
+    def get_read_available(self) -> int:
+        return int(self._stream.read_available)
+
+    def close(self) -> None:
+        self._stream.close()
+
+
+def _sounddevice_input_index(sd: Any, pa: Any, device_index: int | None) -> int | None:
+    """The same input device in sounddevice's table (None: its default). Raises if not found."""
+    if device_index is None:
+        return None
+    wanted = pa.get_device_info_by_index(device_index)
+    wanted_api = pa.get_host_api_info_by_index(wanted["hostApi"])["name"]
+    for index, info in enumerate(sd.query_devices()):
+        if (
+            info["name"] == wanted["name"]
+            and info["max_input_channels"] > 0
+            and sd.query_hostapis(info["hostapi"])["name"] == wanted_api
+        ):
+            return index
+    raise LookupError("input device not in the sounddevice table: %s" % wanted["name"])
+
+
+def open_deep_input_stream(
+    pa: Any,
+    *,
+    rate: int,
+    channels: int,
+    frames_per_buffer: int,
+    input_device_index: int | None,
+    keep_seconds: float,
+) -> GuardedStream:
+    """Open a 16-bit input stream that holds ``keep_seconds`` of audio between reads.
+
+    Why not pyaudio: it always opens with the device's lowest latency, and on
+    Windows MME that keeps 240 ms (measured; PA_MIN_LATENCY_MSEC and bigger
+    buffers change nothing useful). The reader needs the interpreter lock after
+    every read, and with two busy Python threads that wait was 250 ms at the
+    median and 1.3 s at worst, so audio was silently lost. sounddevice passes a
+    suggested latency, and PortAudio then holds that much with no added delay
+    (measured: 80 ms reads, 1.68 s kept through a 1.6 s stall).
+
+    Raises when the stream cannot be opened; the caller falls back to pyaudio.
+    """
+    with sounddevice_guard():
+        import sounddevice as sd
+
+        device = _sounddevice_input_index(sd, pa, input_device_index)
+        raw = sd.RawInputStream(
+            samplerate=rate,
+            blocksize=frames_per_buffer,
+            device=device,
+            channels=channels,
+            dtype="int16",
+            latency=keep_seconds,
+        )
+        raw.start()
+    guarded = GuardedStream(_SoundDeviceInput(raw), pa)
+    with _REGISTRY_LOCK:
+        _STREAM_REGISTRY.setdefault(pa, set()).add(guarded)
+    return guarded
+
+
 def _close_streams_for(pa: Any, timeout: float) -> bool:
     """Close every guarded stream opened on ``pa``. False if any would not quiesce."""
     with _REGISTRY_LOCK:
@@ -511,6 +593,7 @@ __all__ = [
     "STREAM_QUIESCE_TIMEOUT",
     "GuardedStream",
     "PortAudioStreamClosed",
+    "open_deep_input_stream",
     "open_portaudio",
     "open_stream",
     "portaudio_instance",

@@ -499,13 +499,16 @@ class RatingSystem:
 
             return get_current_user_id()
         except Exception:
-            from core.user_context import get_device_user_id
+            from core.user_context import get_cached_desktop_account_user_id, get_device_user_id
 
+            # Background work (the autoplay dislike check, the radio filter)
+            # has no request bound. On the desktop the signed-in account owns
+            # the ratings; the device id is only for nobody being signed in.
+            account_id = get_cached_desktop_account_user_id()
+            if account_id:
+                return account_id
             device_id = get_device_user_id()
-            log.warning(
-                "Rating user_id resolved to device fallback (%s) because ContextVar is not set; ratings may merge across users",
-                device_id,
-            )
+            log.debug("Rating user_id is the device (%s): nobody is signed in", device_id)
             return device_id
 
     def _get_user_ratings(self, user_id: str) -> dict[str, SongRating]:

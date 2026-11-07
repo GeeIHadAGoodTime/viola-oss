@@ -105,7 +105,7 @@ def _play_blocking(samples: np.ndarray, sample_rate: int) -> bool:
             try:
                 from audio_core.aec_reference_base import push_local_playback_reference
 
-                push_local_playback_reference(samples, sample_rate)
+                push_local_playback_reference(samples, sample_rate, voice=False)
             except Exception:  # noqa: BLE001, RUF100 - the reference tap must never stop the chime
                 logger.debug("Wake chime AEC reference push failed", exc_info=True)
             # latency="low": with the default ("high") the Windows MME output

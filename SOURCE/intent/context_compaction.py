@@ -31,6 +31,7 @@ from typing import Any
 
 from config.defaults import DEFAULT_BACKGROUND_TASK_MODEL, DEFAULT_GPT_MODEL
 from core.logging_config import get_logger
+from intent.active_task import ActiveTask, find_request_index
 from intent.token_budget import _estimate_tokens
 from services.conversation.context_frames import (
     Frame,
@@ -42,7 +43,7 @@ from services.conversation.context_frames import (
     tool_use_frame,
 )
 from services.conversation.frame_rendering import render_for_anthropic
-from services.conversation.typed_compaction import CompactionRequest, compact_frames
+from services.conversation.typed_compaction import ACTIVE_REQUEST_FRAME_ORIGIN, CompactionRequest, compact_frames
 from services.openai_background import run_background_openai_response
 
 logger = get_logger(__name__)
@@ -51,10 +52,22 @@ _COMPACT_RATIO = 0.6  # summarise oldest 60% of messages
 BACKGROUND_COMPACTION_MODEL = DEFAULT_BACKGROUND_TASK_MODEL
 
 # INT-11: Upper bound on per-compaction summariser input size, measured in
-# characters.  ~4 chars per token -> 8k tokens ~= 32k chars.  When the oldest
-# 60% of history would exceed this, skip the LLM summariser and FIFO-prune
-# instead so we never send an oversized request that itself would 400.
+# characters.  ~4 chars per token -> 8k tokens ~= 32k chars.  The transcript is
+# always fitted to this (see ``_fit_summary_transcript``), so a large history
+# makes the input smaller, never a reason to skip the summary. Build 9 measured
+# the raw message size against this limit, used up its retries on a slab the
+# renderer would have shrunk anyway (92177 chars > 32000), and left the agent
+# with no idea what it had been asked.
 _MAX_SUMMARY_INPUT_CHARS = 32_000
+# Tool output is the bulk of a long run, so each fitting pass cuts it harder
+# before any message is left out.
+_SUMMARY_TOOL_RESULT_CHAR_STEPS = (1_500, 600, 200)
+_SUMMARY_MESSAGE_CHARS = 6_000
+# History from before the current request only ever gets this share, so the
+# current run is never crowded out by older tasks.
+_SUMMARY_EARLIER_HISTORY_SHARE = 0.25
+_SUMMARY_MAX_OUTPUT_TOKENS = 3_000
+_SUMMARY_TIMEOUT_S = 60.0
 _NATIVE_COMPACT_BOUNDARY_KEY = "_viola_compact_boundary"
 
 # R2-P0-1: tool-result truncation budgets. Parity target is Claude Code's
@@ -75,7 +88,7 @@ _COMPACT_SUMMARY_HEADER = (
     "summary preserves their relevant context for this ongoing session."
 )
 _COMPACT_SUMMARY_CONTINUATION = (
-    "Carry on with the latest unfinished request using this context. Do not "
+    "Carry on with the user's current request using this context. Do not "
     "ask the user to repeat information or answer more questions. Start the "
     "next useful action directly, without announcing the handoff, restating "
     "the summary, or introducing a plan to resume."
@@ -84,12 +97,12 @@ _COMPACT_SUMMARY_CONTINUATION = (
 # SOMETHING in the summary slot. The fallback is a single line of
 # CONTINUATION text, NOT a Python prose-bucketed re-classification. The
 # recent-tail messages are preserved verbatim so the model can still see
-# the live state; the missing piece is the older context, and lying about
-# it with a hand-bucketed re-summary is worse than admitting we lost it.
+# the live state, and the active task block that follows carries the request
+# and the step record; the missing piece is detail from the older steps.
 _COMPACT_FALLBACK_BODY = (
-    "Earlier turns were dropped because the background summarizer was "
-    "unavailable. The recent uncompressed messages that follow below carry "
-    "the live state; continue from there."
+    "Older details were left out because no summary could be made. You have not "
+    "lost the task: the request and the step record below are exact, and the "
+    "recent messages that follow carry the live state. Continue from there."
 )
 
 # Per-message-origin keys that mark a native dict-shaped message as
@@ -497,13 +510,22 @@ def _summary_relevant_messages(messages: list[dict[str, Any]]) -> list[dict[str,
             continue
         if _is_native_meta_message(message):
             continue
-        if _content_looks_like_runtime_metadata_dump(message.get("content")):
+        content = message.get("content")
+        # A continuity record is how every OpenAI-shaped assistant turn is
+        # stored, tool calls included. It renders by name below; dropping it
+        # hid all the agent's actions from the summary.
+        continuity_record = isinstance(content, dict) and content.get("_openai_assistant")
+        if not continuity_record and _content_looks_like_runtime_metadata_dump(content):
             continue
         filtered.append(message)
     return filtered
 
 
-def _render_messages_for_summarizer(messages: list[dict[str, Any]]) -> str:
+def _render_messages_for_summarizer(
+    messages: list[dict[str, Any]],
+    *,
+    tool_result_chars: int = _SUMMARY_TOOL_RESULT_CHAR_STEPS[0],
+) -> str:
     """Render the filtered messages as a single role-tagged transcript.
 
     The summarizer gets ``[role] content`` lines so the LLM can produce
@@ -514,25 +536,50 @@ def _render_messages_for_summarizer(messages: list[dict[str, Any]]) -> str:
     inference works.
     """
 
+    return "\n\n".join(_rendered_message_parts(messages, tool_result_chars=tool_result_chars))
+
+
+def _rendered_message_parts(messages: list[dict[str, Any]], *, tool_result_chars: int) -> list[str]:
     parts: list[str] = []
     for msg in messages:
         role = str(msg.get("role", "unknown"))
         content = msg.get("content", "")
-        rendered = _render_message_content_for_summarizer(content)
+        rendered = _render_message_content_for_summarizer(content, tool_result_chars=tool_result_chars)
         if not rendered.strip():
             continue
         parts.append("[%s]\n%s" % (role, rendered.strip()))
-    return "\n\n".join(parts)
+    return parts
 
 
-def _render_message_content_for_summarizer(content: Any) -> str:
+def _render_continuity_record(record: dict[str, Any]) -> str:
+    """Render an ``_openai_assistant`` record by what it did, never as a dict repr."""
+
+    parts: list[str] = []
+    text = record.get("content")
+    if isinstance(text, str) and text.strip():
+        parts.append(text)
+    tool_calls = record.get("tool_calls")
+    if isinstance(tool_calls, list):
+        for call in tool_calls:
+            function = call.get("function") if isinstance(call, dict) else None
+            if isinstance(function, dict):
+                parts.append(
+                    "[tool_use:%s] %s"
+                    % (str(function.get("name") or "tool"), str(function.get("arguments") or "")[:600])
+                )
+    return "\n".join(parts)
+
+
+def _render_message_content_for_summarizer(
+    content: Any,
+    *,
+    tool_result_chars: int = _SUMMARY_TOOL_RESULT_CHAR_STEPS[0],
+) -> str:
     if isinstance(content, str):
         return content
     if isinstance(content, dict):
-        # An assistant continuity record reached the rendering loop —
-        # skip it (the filter should have caught it; render defensively).
         if content.get("_openai_assistant"):
-            return ""
+            return _render_continuity_record(content)
         return _native_content_to_text(content)
     if not isinstance(content, list):
         return str(content)
@@ -556,7 +603,7 @@ def _render_message_content_for_summarizer(content: Any) -> str:
             inner = block.get("content", "")
             text = _native_content_to_text(inner) if not isinstance(inner, str) else inner
             tname = str(block.get("tool_name") or "tool")
-            parts.append("[tool_result:%s]\n%s" % (tname, text[:1500]))
+            parts.append("[tool_result:%s]\n%s" % (tname, text[:tool_result_chars]))
         elif btype in {"image", "input_image"}:
             parts.append("[image]")
         elif btype in {"document", "input_file"}:
@@ -564,7 +611,82 @@ def _render_message_content_for_summarizer(content: Any) -> str:
     return "\n".join(part for part in parts if part)
 
 
-async def _summarise_messages_with_background_model(messages: list[dict[str, Any]], *, user_id: str = "") -> str:
+def _fit_messages_to_budget(messages: list[dict[str, Any]], budget: int) -> str:
+    """Render ``messages`` into at most ``budget`` characters, newest kept first.
+
+    Tool output is cut harder on each pass. If that is not enough the oldest
+    messages are left out, with a note saying so. This cannot fail: however big
+    the input, what comes back fits.
+    """
+
+    if budget <= 0:
+        return ""
+    parts: list[str] = []
+    for tool_result_chars in _SUMMARY_TOOL_RESULT_CHAR_STEPS:
+        parts = [
+            part if len(part) <= _SUMMARY_MESSAGE_CHARS else "%s\n[message shortened]" % part[:_SUMMARY_MESSAGE_CHARS]
+            for part in _rendered_message_parts(messages, tool_result_chars=tool_result_chars)
+        ]
+        joined = "\n\n".join(parts)
+        if len(joined) <= budget:
+            return joined
+
+    kept: list[str] = []
+    used = 0
+    for part in reversed(parts):
+        if used + len(part) + 2 > budget:
+            break
+        kept.append(part)
+        used += len(part) + 2
+    if not kept:
+        return "%s\n[message shortened]" % parts[-1][: max(0, budget - 24)] if parts else ""
+    left_out = len(parts) - len(kept)
+    note = "[%d older messages left out to fit]\n\n" % left_out if left_out else ""
+    return "%s%s" % (note, "\n\n".join(reversed(kept)))
+
+
+def _fit_summary_transcript(
+    messages: list[dict[str, Any]],
+    active_task: ActiveTask | None,
+    budget: int,
+) -> str:
+    """Build the summariser's transcript within ``budget`` characters.
+
+    Build 9 took the first 12,000 characters of the rendered slab. The oldest
+    messages are the previous task, so the summary described the old water order
+    and never saw the brakes request. The current run now gets the budget first,
+    newest messages first, and older history is labelled as background.
+    """
+
+    request_index = find_request_index(messages, active_task.request) if active_task else None
+    if not active_task or request_index is None or request_index == 0:
+        return _fit_messages_to_budget(messages, budget)
+
+    current_heading = "=== THE CURRENT REQUEST AND THE WORK ON IT ===\n"
+    earlier_heading = "=== BEFORE THE CURRENT REQUEST (background, finished or replaced) ===\n"
+    earlier_share = int(budget * _SUMMARY_EARLIER_HISTORY_SHARE)
+    current_budget = budget - earlier_share - len(current_heading)
+    current_text = _fit_messages_to_budget(messages[request_index:], current_budget)
+    earlier_budget = budget - len(current_heading) - len(current_text) - len(earlier_heading) - 2
+    earlier_text = _fit_messages_to_budget(messages[:request_index], earlier_budget)
+    sections = ["%s%s" % (earlier_heading, earlier_text)] if earlier_text else []
+    sections.append("%s%s" % (current_heading, current_text))
+    return "\n\n".join(sections)
+
+
+def _summary_system_prompt(active_task: ActiveTask | None) -> str:
+    if active_task is None or not active_task.request:
+        return _TS_COMPACT_PROMPT
+    return "%s\n%s\n" % (_TS_COMPACT_PROMPT, active_task.render_for_summary_prompt())
+
+
+async def _summarise_messages_with_background_model(
+    messages: list[dict[str, Any]],
+    *,
+    user_id: str = "",
+    active_task: ActiveTask | None = None,
+    char_budget: int = _MAX_SUMMARY_INPUT_CHARS,
+) -> str:
     """Ask the background LLM for a Claude-shaped prose summary.
 
     R5-P0-I parity: send the verbatim ``<analysis>``/``<summary>`` prompt
@@ -589,15 +711,15 @@ async def _summarise_messages_with_background_model(messages: list[dict[str, Any
         # the caller emit the fallback summary.
         raise ValueError("No user-authored content survived meta-filter for compaction summary")
 
-    transcript = _render_messages_for_summarizer(relevant)
-    transcript = transcript[: min(12_000, _MAX_SUMMARY_INPUT_CHARS)]
+    transcript = _fit_summary_transcript(relevant, active_task, min(char_budget, _MAX_SUMMARY_INPUT_CHARS))
 
     raw = await run_background_openai_response(
-        system_prompt=_TS_COMPACT_PROMPT,
+        system_prompt=_summary_system_prompt(active_task),
         user_content=transcript,
-        max_output_tokens=1500,
+        max_output_tokens=_SUMMARY_MAX_OUTPUT_TOKENS,
         user_id=user_id,
         model=BACKGROUND_COMPACTION_MODEL,
+        timeout_s=_SUMMARY_TIMEOUT_S,
     )
 
     body = _format_compact_summary(raw)
@@ -607,6 +729,64 @@ async def _summarise_messages_with_background_model(messages: list[dict[str, Any
         # the caller falls back instead of recording a blank summary.
         raise ValueError("Compact summarizer returned no usable text content")
     return body
+
+
+async def _summary_body_for(
+    messages: list[dict[str, Any]],
+    *,
+    user_id: str,
+    active_task: ActiveTask | None,
+) -> tuple[str, str]:
+    """Return ``(summary body, method)``. Always returns; a failure yields the fallback.
+
+    TS parity (compact.ts:243-291): when the summariser itself reports the
+    prompt is too long, retry with less. The input is fitted before each try, so
+    this only guards against a provider with a smaller window than expected.
+    """
+
+    char_budget = _MAX_SUMMARY_INPUT_CHARS
+    for attempt in range(_PTL_RETRY_MAX_ATTEMPTS):
+        try:
+            body = await _summarise_messages_with_background_model(
+                messages,
+                user_id=user_id,
+                active_task=active_task,
+                char_budget=char_budget,
+            )
+        except Exception as exc:
+            if attempt + 1 < _PTL_RETRY_MAX_ATTEMPTS and is_token_limit_error(exc):
+                char_budget //= 2
+                logger.warning(
+                    "Native compaction summary too large for the model; retrying with %d chars (%d/%d)",
+                    char_budget,
+                    attempt + 1,
+                    _PTL_RETRY_MAX_ATTEMPTS,
+                )
+                continue
+            # G201 + #9
+            logger.exception(
+                "Native summarization failed, emitting fallback summary for %d messages",
+                len(messages),
+            )
+            return _compact_fallback_summary(messages), "fifo_prune"
+        logger.info(
+            "Native context compaction: summarized %d messages into %d chars",
+            len(messages),
+            len(body),
+        )
+        return body, "typed_summary" if attempt == 0 else "typed_summary_ptl_retry_%d" % attempt
+    return _compact_fallback_summary(messages), "fifo_prune"
+
+
+def _compact_summary_text(summary_body: str, active_task: ActiveTask | None) -> str:
+    """Assemble the handoff. The runtime's task block follows the model's summary, so it has the last word."""
+
+    anchor = active_task.render_anchor() if active_task is not None else ""
+    sections = [_COMPACT_SUMMARY_HEADER, summary_body]
+    if anchor:
+        sections.append(anchor)
+    sections.append(_COMPACT_SUMMARY_CONTINUATION)
+    return "\n\n".join(sections)
 
 
 # ---------------------------------------------------------------------------
@@ -630,40 +810,9 @@ def _native_content_len_value(content: Any) -> int:
     return len(str(content))
 
 
-def _summary_input_char_count(messages: list[dict[str, Any]]) -> int:
-    return sum(_native_content_len_value(message.get("content", "")) for message in messages)
-
-
-def _halved_summary_input(
-    messages: list[dict[str, Any]],
-) -> tuple[list[dict[str, Any]], int]:
-    """Keep the newer half of an oversized summary slab for one retry."""
-    if len(messages) <= 1:
-        return [], 0
-    reduced = messages[len(messages) // 2 :]
-    return reduced, _summary_input_char_count(reduced)
-
-
-# TS parity port: src/services/compact/compact.ts:243-291 truncateHeadForPTLRetry.
-# When the summary LLM call would be prompt-too-long, iteratively drop the
-# oldest 20% of messages and retry. Keeps at least 1 message group so the
-# summarizer has something to summarize. TS uses 3 attempts before giving up
-# (MAX_PTL_RETRIES).
+# TS parity (compact.ts MAX_PTL_RETRIES): tries before the fallback note when the
+# summariser reports its prompt is too long.
 _PTL_RETRY_MAX_ATTEMPTS = 3
-_PTL_RETRY_DROP_RATIO = 0.2
-
-
-def _truncate_head_for_ptl_retry(
-    messages: list[dict[str, Any]],
-) -> list[dict[str, Any]] | None:
-    """Drop the oldest 20% of messages for a PTL retry; None when can't shrink further."""
-    if len(messages) < 2:
-        return None
-    drop_count = max(1, int(len(messages) * _PTL_RETRY_DROP_RATIO))
-    drop_count = min(drop_count, len(messages) - 1)
-    if drop_count < 1:
-        return None
-    return messages[drop_count:]
 
 
 def _native_content_to_text(content: Any) -> str:
@@ -712,12 +861,24 @@ def _compact_fallback_summary(_messages: list[dict[str, Any]]) -> str:
     return _COMPACT_FALLBACK_BODY
 
 
-def _native_messages_to_frames(messages: list[dict[str, Any]]) -> list[Frame]:
+def _native_messages_to_frames(
+    messages: list[dict[str, Any]],
+    *,
+    active_task: ActiveTask | None = None,
+) -> list[Frame]:
     frames: list[Frame] = []
     tool_names: dict[str, str] = {}
-    for message in filter_compact_boundaries_for_provider(messages_after_compact_boundary(messages)):
+    chain = filter_compact_boundaries_for_provider(messages_after_compact_boundary(messages))
+    request_index = (
+        find_request_index(chain, active_task.request, exact=True) if active_task and active_task.request else None
+    )
+    for index, message in enumerate(chain):
         role = str(message.get("role") or "")
         content = message.get("content")
+        if index == request_index:
+            # The user's own message stays a real message after compaction.
+            frames.append(_active_request_frame(content))
+            continue
         if role == "user":
             if isinstance(content, str):
                 if content.strip():
@@ -836,6 +997,15 @@ def _native_messages_to_frames(messages: list[dict[str, Any]]) -> list[Frame]:
     return frames
 
 
+def _active_request_frame(content: Any) -> Frame:
+    return text_frame(
+        kind=FrameKind.USER_INPUT,
+        role=FrameRole.USER,
+        text=_native_content_to_text(content),
+        origin=ACTIVE_REQUEST_FRAME_ORIGIN,
+    )
+
+
 def _native_boundary_message(result: Any) -> dict[str, Any]:
     compact_metadata = copy.deepcopy(getattr(result.boundary_frame, "extra", {}).get("compact_metadata", {}))
     return {
@@ -847,10 +1017,40 @@ def _native_boundary_message(result: Any) -> dict[str, Any]:
     }
 
 
+def _as_loop_assistant_message(message: dict[str, Any]) -> dict[str, Any]:
+    """Store an assistant tool turn the way the agent loop stores every other one.
+
+    The frame renderer gives Anthropic ``tool_use`` blocks. Managed turns are
+    converted on the cloud, whose converter dropped those blocks and then every
+    kept tool result as an orphan, so this must not depend on a cloud deploy.
+    """
+    content = message.get("content")
+    if message.get("role") != "assistant" or not isinstance(content, list):
+        return message
+    tool_calls = [
+        {
+            "id": block.get("id", ""),
+            "type": "function",
+            "function": {
+                "name": block.get("name", ""),
+                "arguments": json.dumps(block.get("input") or {}, ensure_ascii=False, default=str),
+            },
+        }
+        for block in content
+        if isinstance(block, dict) and block.get("type") == "tool_use"
+    ]
+    if not tool_calls:
+        return message
+    text = "\n".join(str(block.get("text", "")) for block in content if isinstance(block, dict) and "text" in block)
+    return {**message, "content": {"_openai_assistant": True, "content": text, "tool_calls": tool_calls}}
+
+
 def _frames_to_native_messages(frames: list[Frame]) -> list[dict[str, Any]]:
     rendered = render_for_anthropic(PromptFrameBundle(frames=frames))
     messages = rendered.get("messages")
-    return messages if isinstance(messages, list) else []
+    if not isinstance(messages, list):
+        return []
+    return [_as_loop_assistant_message(message) if isinstance(message, dict) else message for message in messages]
 
 
 async def compact_messages(
@@ -858,6 +1058,7 @@ async def compact_messages(
     *,
     keep_system: bool = True,
     user_id: str = "",
+    active_task: ActiveTask | None = None,
 ) -> list[dict[str, Any]]:
     """Compact *messages* by summarising the oldest 60%.
 
@@ -865,11 +1066,13 @@ async def compact_messages(
     recent 40% of messages.  The middle portion is replaced with a
     single summary message.
 
-    Falls back to FIFO pruning if summarisation fails.
+    Falls back to a continuation note if summarisation fails. Either way the
+    active task block goes into the summary message.
 
     Args:
         messages: Full message list (will NOT be mutated).
         keep_system: If True, always preserve messages[0].
+        active_task: The run's task; read from the chain when not given.
 
     Returns:
         A new, shorter message list.
@@ -890,47 +1093,32 @@ async def compact_messages(
     to_summarise = compactable[:split]
     to_keep = compactable[split:]
 
-    # INT-11: if the oldest-60% slab would overflow the summariser input
-    # ceiling we skip the LLM call entirely and go straight to FIFO pruning.
-    # Otherwise a 200k-token history would 400 the request itself.
-    _approx_chars = sum(len(str(msg.get("content", ""))) for msg in to_summarise)
-    _oversized = _approx_chars > _MAX_SUMMARY_INPUT_CHARS
-
-    if _oversized:
-        logger.warning(
-            "Compaction input too large (%d chars > %d) — emitting fallback summary for %d messages",
-            _approx_chars,
-            _MAX_SUMMARY_INPUT_CHARS,
+    task = active_task or ActiveTask.from_messages(messages)
+    try:
+        summary_body = await _summarise_messages_with_background_model(
+            to_summarise,
+            user_id=user_id,
+            active_task=task,
+        )
+        logger.info(
+            "Context compaction: summarised %d messages into %d chars",
+            len(to_summarise),
+            len(summary_body),
+        )
+    except Exception:
+        # G201 + #9: surface the actual cause (was silently swallowed; in
+        # practice this most commonly fires when the background model
+        # endpoint hits insufficient_quota / rate-limit / network failure
+        # and we could not tell from the log alone).
+        logger.exception(
+            "Summarisation failed, falling back to TS-shaped continuation note for %d messages",
             split,
         )
         summary_body = _compact_fallback_summary(to_summarise)
-    else:
-        try:
-            summary_body = await _summarise_messages_with_background_model(to_summarise, user_id=user_id)
-            logger.info(
-                "Context compaction: summarised %d messages into %d chars",
-                len(to_summarise),
-                len(summary_body),
-            )
-        except Exception:
-            # G201 + #9: surface the actual cause (was silently swallowed; in
-            # practice this most commonly fires when the background model
-            # endpoint hits insufficient_quota / rate-limit / network failure
-            # and we could not tell from the log alone).
-            logger.exception(
-                "Summarisation failed, falling back to TS-shaped continuation note for %d messages",
-                split,
-            )
-            summary_body = _compact_fallback_summary(to_summarise)
 
     summary_msg = {
         "role": "user",
-        "content": "%s\n\n%s\n\n%s"
-        % (
-            _COMPACT_SUMMARY_HEADER,
-            summary_body,
-            _COMPACT_SUMMARY_CONTINUATION,
-        ),
+        "content": _compact_summary_text(summary_body, task),
         "_viola_compact_summary": True,
     }
 
@@ -949,6 +1137,7 @@ async def _compact_native_messages_legacy(
     session_id: str | None = None,
     replacement_writer: Any | None = None,
     content_replacement_state: Any | None = None,
+    active_task: ActiveTask | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, Any] | None]:
     """Back-compat shim — delegates to the typed-frame ``compact_native_messages``.
 
@@ -963,6 +1152,7 @@ async def _compact_native_messages_legacy(
         session_id=session_id,
         replacement_writer=replacement_writer,
         content_replacement_state=content_replacement_state,
+        active_task=active_task,
     )
 
 
@@ -973,8 +1163,13 @@ async def compact_native_messages(
     session_id: str | None = None,
     replacement_writer: Any | None = None,
     content_replacement_state: Any | None = None,
+    active_task: ActiveTask | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, Any] | None]:
-    """Compact native provider messages through the typed frame pipeline."""
+    """Compact native provider messages through the typed frame pipeline.
+
+    ``active_task`` is the run's task. It is read from the chain when a caller
+    has none, so no route through here can compact the request away.
+    """
 
     budgeted = project_native_messages_for_provider(
         messages,
@@ -986,94 +1181,13 @@ async def compact_native_messages(
         prepared = filter_compact_boundaries_for_provider(budgeted)
         return prepared, None
 
+    task = active_task if active_task is not None and active_task.request else ActiveTask.from_messages(budgeted)
     split = max(2, int(len(budgeted) * _COMPACT_RATIO))
     if split >= len(budgeted):
         split = max(0, len(budgeted) - 2)
-    to_summarise = budgeted[:split]
-    approx_chars = _summary_input_char_count(to_summarise)
-    oversized = approx_chars > _MAX_SUMMARY_INPUT_CHARS
-
-    if oversized:
-        # TS parity (compact.ts:387-491): iteratively drop oldest 20% of
-        # messages and retry the LLM summary until under the size limit OR
-        # _PTL_RETRY_MAX_ATTEMPTS exhausted. Only fall back to the generic
-        # continuation note when retries are spent — that preserves working
-        # memory across compaction, fixing the LLC spin where post-compaction
-        # the model re-tried clicks it had already failed (live evidence:
-        # task c3a279968c1f step 30 re-clicked _btnStart that failed at step 9
-        # because the previous halved-once fallback dropped the failure record).
-        summary_body = None
-        retry_msgs: list[dict[str, Any]] = to_summarise
-        retry_chars = approx_chars
-        for attempt in range(_PTL_RETRY_MAX_ATTEMPTS):
-            truncated = _truncate_head_for_ptl_retry(retry_msgs)
-            if truncated is None:
-                break
-            truncated_chars = _summary_input_char_count(truncated)
-            logger.warning(
-                "Native compaction input too large (%d chars > %d) - PTL retry %d/%d with %d messages (%d chars)",
-                retry_chars,
-                _MAX_SUMMARY_INPUT_CHARS,
-                attempt + 1,
-                _PTL_RETRY_MAX_ATTEMPTS,
-                len(truncated),
-                truncated_chars,
-            )
-            if truncated_chars <= _MAX_SUMMARY_INPUT_CHARS:
-                try:
-                    summary_body = await _summarise_messages_with_background_model(truncated, user_id=user_id)
-                    method = "typed_summary_ptl_retry_%d" % (attempt + 1)
-                    logger.info(
-                        "Native context compaction: PTL retry %d succeeded, summarized %d messages into %d chars",
-                        attempt + 1,
-                        len(truncated),
-                        len(summary_body),
-                    )
-                    break
-                except (RuntimeError, ValueError, OSError):
-                    logger.exception(
-                        "Native PTL-retry %d/%d summary call failed",
-                        attempt + 1,
-                        _PTL_RETRY_MAX_ATTEMPTS,
-                    )
-                    summary_body = None
-            retry_msgs = truncated
-            retry_chars = truncated_chars
-
-        if summary_body is None:
-            method = "fifo_prune_oversized"
-            logger.warning(
-                "Native compaction input too large (%d chars > %d) - all %d PTL retries exhausted, emitting fallback for %d messages",
-                approx_chars,
-                _MAX_SUMMARY_INPUT_CHARS,
-                _PTL_RETRY_MAX_ATTEMPTS,
-                len(to_summarise),
-            )
-            summary_body = _compact_fallback_summary(to_summarise)
-    else:
-        try:
-            summary_body = await _summarise_messages_with_background_model(to_summarise, user_id=user_id)
-            method = "typed_summary"
-            logger.info(
-                "Native context compaction: summarized %d messages into %d chars",
-                len(to_summarise),
-                len(summary_body),
-            )
-        except Exception:
-            method = "fifo_prune"
-            # G201 + #9
-            logger.exception(
-                "Native summarization failed, emitting fallback summary for %d messages",
-                len(to_summarise),
-            )
-            summary_body = _compact_fallback_summary(to_summarise)
-
-    summary_text = "%s\n\n%s\n\n%s" % (
-        _COMPACT_SUMMARY_HEADER,
-        summary_body,
-        _COMPACT_SUMMARY_CONTINUATION,
-    )
-    frames = _native_messages_to_frames(budgeted)
+    summary_body, method = await _summary_body_for(budgeted[:split], user_id=user_id, active_task=task)
+    summary_text = _compact_summary_text(summary_body, task)
+    frames = _native_messages_to_frames(budgeted, active_task=task)
     if len(frames) <= 2:
         prepared = filter_compact_boundaries_for_provider(budgeted)
         return prepared, None

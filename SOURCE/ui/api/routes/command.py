@@ -225,6 +225,15 @@ def _new_streamed_reply(
         return None
 
 
+def _silent_stage_reply(channel_value: Any, stream_id: str | None, user_id: str) -> Any:
+    """Live stage text for a reply on a local text surface that is not being spoken."""
+    if channel_key(channel_value) not in _LOCALLY_SPOKEN_CHANNELS or not is_desktop_surface():
+        return contextlib.nullcontext()
+    from voice.stage_reply import stage_reply
+
+    return stage_reply(stream_id, user_id=user_id)
+
+
 def _speak_reply_now(
     context: ApiContext,
     envelope: Any,
@@ -584,7 +593,12 @@ def register_command_routes(context: ApiContext) -> None:
                 user_id=user_id,
                 stream_id=stream_id,
             )
-            reply_context = streamed_reply.attached() if streamed_reply is not None else contextlib.nullcontext()
+            # A reply that is not spoken still shows on the stage as it is written.
+            reply_context = (
+                streamed_reply.attached()
+                if streamed_reply is not None
+                else _silent_stage_reply(channel_value, stream_id, user_id)
+            )
             try:
                 with stream_context, reply_context:
                     result = await command_service.execute(command_request)

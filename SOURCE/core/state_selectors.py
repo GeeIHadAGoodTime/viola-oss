@@ -282,14 +282,37 @@ def select_default_volume() -> int:
     return get_state_hub().get_state().preferences.volume
 
 
+def _player_preferences():
+    """The preferences of the person the player belongs to right now.
+
+    The state hub is per user. Shuffle and repeat are written with the request's
+    account id, but most readers run with no request bound: the WebSocket
+    handlers that broadcast state on every position update and the track-end
+    handler. Those used to fall through to the device id and read a second hub
+    that nobody writes, so the broadcast put the buttons back to "off" a moment
+    after each tap and Repeat never took effect at track end. Outside a request
+    the signed-in desktop account is the owner; on the cloud nothing changes
+    (no bound user still fails loudly in ``get_state_hub``).
+    """
+    from core.user_context import get_cached_desktop_account_user_id, get_current_user_id, user_id_or_none
+
+    try:
+        user_id = user_id_or_none(get_current_user_id())
+    except LookupError:
+        user_id = None
+    if user_id is None:
+        user_id = get_cached_desktop_account_user_id()
+    return get_state_hub(user_id=user_id).get_state().preferences
+
+
 def select_shuffle_enabled() -> bool:
     """Is shuffle enabled?"""
-    return get_state_hub().get_state().preferences.shuffle
+    return _player_preferences().shuffle
 
 
 def select_repeat_mode() -> str:
     """Get repeat mode (off, all, one)."""
-    return get_state_hub().get_state().preferences.repeat_mode
+    return _player_preferences().repeat_mode
 
 
 def select_autoplay_enabled() -> bool:
