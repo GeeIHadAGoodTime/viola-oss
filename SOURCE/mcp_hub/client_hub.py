@@ -1432,6 +1432,7 @@ class MCPClientHub:
             "ask_user",
             # --- Memory & knowledge (UI: Memory) ---
             "memory",
+            "save_delivery_address",
             "workbench",
             # --- Web read (UI: Web search) ---
             "web_search",

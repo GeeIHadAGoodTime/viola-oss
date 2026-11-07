@@ -3942,13 +3942,13 @@ async def check_pending_tasks(
         "Use for user-specific facts and preferences; it does not search the public web and is not for calendar, weather, or runtime settings. "
         "It is not a general contacts directory or business lookup; when an external destination such as a business phone number is missing from the current request, ask the user or use the appropriate public-search/contact tool instead of enumerating memory topics. "
         "Actions: recall, read, search, write, edit, delete, list, stats, audit, conversation. You decide what is worth remembering. "
-        "action='conversation' reads what was said earlier in this conversation, oldest first, optionally matching query. "
+        "action='conversation' reads earlier turns of this conversation, oldest first. "
         "Deterministic hygiene skips duplicate writes, rejects oversized entries, rotates audit logs, "
         "and reports counts via stats. "
-        "Do not store passwords, API keys, tokens, card numbers, SSNs, PINs, bank details, or street addresses. "
+        "Do not store passwords, API keys, tokens, card numbers, SSNs, PINs, or bank details. "
+        "A street address never goes here; use save_delivery_address. "
         "When the user explicitly asks you to remember something, write it and briefly acknowledge. "
         "When you decide to remember something on your own, write silently. "
-        "Does not search the public web or manage calendar events; use web_search or calendar for those. "
         "For runtime settings use user_settings; memory is not a settings API."
     ),
     annotations=_SAFE,
@@ -4040,6 +4040,39 @@ async def memory(
         )
     except Exception as exc:
         logger.exception("memory failed for action=%s", action)
+        return json.dumps({"error": str(exc)})
+
+
+@server.tool(
+    description=(
+        "Save or correct the user's own delivery address, from their words only. No confirmation first. "
+        "Say the returned read_back word for word."
+    ),
+    annotations=_SAFE,
+    meta={"risk": "safe", "anthropic/alwaysLoad": True},
+)
+async def save_delivery_address(
+    street: str,
+    city: str = "",
+    state: str = "",
+    zip_code: str = "",
+) -> str:
+    """Save the user's delivery address and return the text to read back."""
+    from intent.tools.settings_tools import save_delivery_address_handler
+
+    try:
+        return _format_result(
+            await _call_user_scoped(
+                save_delivery_address_handler,
+                street=street,
+                city=city,
+                state=state,
+                zip_code=zip_code,
+            )
+        )
+    except Exception as exc:
+        # Never log the arguments: they are the user's home address.
+        logger.exception("save_delivery_address failed")
         return json.dumps({"error": str(exc)})
 
 

@@ -2178,6 +2178,8 @@ async def run_agent_loop(
     # follow-up write (founder rule 2026-10-23; content_sanitizer
     # is_user_named_file_read). Consequential actions keep their confirm gates.
     taint_tracker.set_user_request(user_text)
+    if getattr(executor, "_depth", 0) == 0 and hasattr(executor, "_user_own_words"):
+        taint_tracker.set_user_own_words(executor._user_own_words(user_text))
     # Let the gate read a tool's _meta (a payment extension's irreversible
     # class) and let the approval layer see this task's taint, so a
     # confirm-or-cancel gate under taint accepts only the user's own words.

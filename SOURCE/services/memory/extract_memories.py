@@ -213,8 +213,8 @@ def sanitize_memory_candidate_text(content: str) -> str | None:
         return None
     if mask_secrets_in_text(clean) != clean:
         return None
-    # A heard house number can be a digit off, and nothing here can check it. A
-    # street address is saved by typing it in Settings, never picked up from a turn.
+    # A heard house number can be a digit off, and nothing here reads it back. A
+    # street address is saved only through save_delivery_address or Settings.
     if contains_street_address(clean) or is_junk_memory_line(clean):
         return None
     redacted = redact_pii_output(clean).strip()

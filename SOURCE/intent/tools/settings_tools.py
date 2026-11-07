@@ -500,6 +500,54 @@ async def settings_get_handler(key: str, user_id: str = "") -> ToolResult:
     )
 
 
+def delivery_address_text(address: dict[str, str]) -> str:
+    """One line, the same words the user hears and the approval page shows."""
+    street = " ".join(part for part in (address.get("street"), address.get("apt")) if part)
+    place = " ".join(part for part in (address.get("state"), address.get("zip")) if part)
+    return ", ".join(part for part in (street, address.get("city"), place) if part)
+
+
+async def save_delivery_address_handler(
+    street: str,
+    city: str = "",
+    state: str = "",
+    zip_code: str = "",
+    user_id: str = "",
+) -> ToolResult:
+    """Write the address to the same slot the Settings screen writes, replacing it.
+
+    Not confirm-gated: the read-back in the same reply is how a misheard digit gets
+    caught, and a correction replaces the address. Whether the words really are the
+    user's own is checked before this runs (``BrowserTaintTracker.check_tool``).
+    """
+    address = {
+        "street": str(street or "").strip(),
+        "city": str(city or "").strip(),
+        "state": str(state or "").strip().upper(),
+        "zip": str(zip_code or "").strip(),
+    }
+    if not any(char.isdigit() for char in address["street"]):
+        return ToolResult(ok=False, data=None, error="A delivery address needs a house number and street. Ask for them.")
+
+    resolved_user_id = _resolve_user_id(user_id)
+    try:
+        from ui.settings_manager import get_settings_manager
+
+        sm = get_settings_manager()
+        saved = sm.set_user_setting(resolved_user_id, "delivery_address", address, save_immediately=True)
+    except Exception as exc:
+        # Type only: the message could quote the address.
+        logger.error("save_delivery_address write failed: %s", type(exc).__name__)
+        return ToolResult(ok=False, data=None, error="The address could not be saved.")
+    if not saved:
+        return ToolResult(ok=False, data=None, error="The address could not be saved.")
+
+    from ui.settings_effects import broadcast_settings_changed
+
+    await broadcast_settings_changed(sm, user_id=resolved_user_id)
+    return ToolResult(ok=True, data={"read_back": delivery_address_text(address)})
+
+
 async def settings_set_handler(key: str, value: object, user_id: str = "") -> ToolResult:
     """Validate *value* and persist it to ``SettingsManager`` under *key*.
 

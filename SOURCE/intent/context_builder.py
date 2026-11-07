@@ -2707,7 +2707,7 @@ class ContextBuilder:
 
             text = (
                 "SAVED DELIVERY ADDRESS:\n  %s\n"
-                "The user typed this address, so it wins over any address heard by voice. "
+                "This is the user's saved address: it wins over any other address. "
                 "Components are split by field for forms that ask for a delivery address."
             ) % "\n  ".join(parts)
             frame = self._make_context_frame(

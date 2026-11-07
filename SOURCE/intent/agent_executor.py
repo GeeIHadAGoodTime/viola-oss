@@ -6454,6 +6454,32 @@ class AgentExecutor:
         row["web_search_requests"] += web_search_requests
         row["cost_usd"] += float(cost_usd)
 
+    def _user_own_words(self, user_text: str) -> str:
+        """What the user has said in this conversation, and the address they already saved.
+
+        Only frames the user wrote count. Compaction summaries are user-role frames
+        too, but they carry an origin, and they can quote a page.
+        """
+        from services.conversation.state_manager import get_request_conversation_manager
+
+        parts = [str(user_text or "")]
+        manager = get_request_conversation_manager() or getattr(self, "_conversation_state_manager", None)
+        get_window = getattr(manager, "get_prompt_window", None)
+        if callable(get_window):
+            for frame in get_window().frames:
+                if frame.role is FrameRole.USER and frame.kind is FrameKind.USER_INPUT and not frame.origin:
+                    parts.extend(block.text for block in frame.blocks if isinstance(block, TextBlock))
+        try:
+            from intent.tools.settings_tools import delivery_address_text
+            from ui.settings_manager import get_settings_manager
+
+            saved = get_settings_manager().get("delivery_address", {}, user_id=self._get_effective_user_id())
+            if isinstance(saved, dict):
+                parts.append(delivery_address_text(saved))
+        except (ImportError, LookupError, OSError, RuntimeError, TypeError, ValueError):
+            logger.debug("Saved address unavailable for the user-words check", exc_info=True)
+        return "\n".join(parts)
+
     def _prompt_cache_key(self) -> str | None:
         """One opaque cache key per account, the same for every command.
 
@@ -12123,10 +12149,10 @@ class AgentExecutor:
     def _apply_context_delivery_address_to_summary(self, order_summary: dict[str, Any]) -> None:
         """Backfill the saved address, and flag an order that differs from it by a house number.
 
-        Only the Settings screen writes the saved address, so it is what the user
-        typed. The order's address may have been heard, or read off the merchant's
-        page. It is not replaced, because the card must show what the merchant
-        holds, but the user is told before paying.
+        The saved address is the one the user typed in Settings or heard read back.
+        The order's address may have been read off the merchant's page. It is not
+        replaced, because the card must show what the merchant holds, but the user
+        is told before paying.
         """
 
         existing = _delivery_address_from_value(order_summary.get("delivery_address"))
