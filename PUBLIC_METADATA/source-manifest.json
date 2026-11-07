@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "b28036f34c6d6c2496c31612d742970932f65064",
-  "sha256": "eb5c5f18e32562cf8b9b8838a7e2586035f7659b270b3f390fc5323c2ab0436d",
+  "revision": "5d8734e1dfbafea2e7f015384dcdc9a96369244a",
+  "sha256": "7e66ba476f2d3cdb7bfec5cced39908b755761c4a095817541e7db7fd24931e7",
   "files": [
     {
       "path": ".env.example",
@@ -5450,8 +5450,8 @@
     },
     {
       "path": "services/wake_word/custom_models.py",
-      "sha256": "f21cb8814eb49d41608da39c3aac1a1b09acc73192d50d5c1697655b3bc65e41",
-      "bytes": 23247
+      "sha256": "9cc37a9503a10c9b191be24b2e3d553712ff6a8dcbd659537f694bac45f2b80a",
+      "bytes": 28190
     },
     {
       "path": "services/wake_word/embedding_common.py",
@@ -9705,8 +9705,8 @@
     },
     {
       "path": "ui/api/routes/wake_training.py",
-      "sha256": "53c734f8b74e18833501fdfc1c0d2308790f9bccde830d946010e290f3892c78",
-      "bytes": 29579
+      "sha256": "a11ca7ac8840ca80e9a4ed05aa803c9c0dd1e298ce48cf392f2f06c5f08ffe06",
+      "bytes": 30656
     },
     {
       "path": "ui/api/routes/weather.py",
@@ -13285,13 +13285,13 @@
     },
     {
       "path": "violawake/config.py",
-      "sha256": "40006500132156f2b5223d84397ec724b7a96de1dd588c5b74e9021108808328",
-      "bytes": 13701
+      "sha256": "27960db9fd5953c548c306d41a66ac0d4ff256be05af7ceee3c21e3a52e36b4e",
+      "bytes": 15551
     },
     {
       "path": "violawake/engine.py",
-      "sha256": "8e79ceba8d6d528e0efc29f3914c56d5884cd787019e87028765419e9734b724",
-      "bytes": 51605
+      "sha256": "e7682e21de900beea8825e293b9394244e48c6b8997b18f865cfdf639e7928c4",
+      "bytes": 52044
     },
     {
       "path": "violawake/model.py",
@@ -13860,8 +13860,8 @@
     },
     {
       "path": "voice/wake_detector/violawake_listener.py",
-      "sha256": "695da2212c62da0ab45281c2ebbfa355e81666dc4cf3ca5f9ebb68c83539bf84",
-      "bytes": 185894
+      "sha256": "ef463790aaf3e438d1a70d2582823a0c118809a88b7519cf4475e435599ce3d0",
+      "bytes": 186685
     },
     {
       "path": "voice/wake_detector/wake/__init__.py",
