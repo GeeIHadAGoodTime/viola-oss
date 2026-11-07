@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "9506e4e5d284d46c95a56cbb2cac84d6ac2ce0eb",
-  "sha256": "7e2290ca95999bccfff84deaa467922d8de36efe65c2b754763eab7d730f8e08",
+  "revision": "3fe9cef62fee533bfc6b0a7e4156a37ce4a8f7aa",
+  "sha256": "ddf4ef87e755f523ed05e2756a8c9312ba9a61113c543e37f34dca32161b04ad",
   "files": [
     {
       "path": ".env.example",
@@ -1250,8 +1250,8 @@
     },
     {
       "path": "core/voice_command_handler.py",
-      "sha256": "55671db5b7d88fd02b2659e497361d3d7593e1d57356a466e8c44c108303a3a6",
-      "bytes": 110924
+      "sha256": "a737fec2a79792cd067a2179e8338e62980365144db7dfd0812d753df8fc1454",
+      "bytes": 111395
     },
     {
       "path": "core/voice_orchestrator.py",
@@ -2390,8 +2390,8 @@
     },
     {
       "path": "mcp_servers/core_tools/server.py",
-      "sha256": "fd663baf448c2b132a17d1537f47a845a6401069ee27ee0e255909799026384a",
-      "bytes": 268777
+      "sha256": "9b1e82a5c5704ac4983775b464b9b39e1ed0f87f308a122f7603efeab078b6e6",
+      "bytes": 266350
     },
     {
       "path": "mcp_servers/phone_tool_descriptions.py",
@@ -5475,8 +5475,8 @@
     },
     {
       "path": "services/violawake_client.py",
-      "sha256": "76427dda1de05877a41707e985b286aafae6e9b23d59c96eb841f2435859f37a",
-      "bytes": 32278
+      "sha256": "d9cbd39c018dca1ab943b7e05fa198f6b8f231084e52d84f53e23e47460fb72d",
+      "bytes": 33651
     },
     {
       "path": "services/wake_word/__init__.py",
@@ -9760,8 +9760,8 @@
     },
     {
       "path": "ui/api/routes/wake_training.py",
-      "sha256": "a11ca7ac8840ca80e9a4ed05aa803c9c0dd1e298ce48cf392f2f06c5f08ffe06",
-      "bytes": 30656
+      "sha256": "5393a91327e8069f42ffdff9f2c6bc1bd72ae647a4bbbcf45630e921f627255d",
+      "bytes": 30975
     },
     {
       "path": "ui/api/routes/weather.py",
@@ -10755,8 +10755,8 @@
     },
     {
       "path": "ui/react-app/src/components/HelpModal.jsx",
-      "sha256": "65fa71f3d42bc68349eebfed503fae1997342f78e8564a3d4b1bd100ef20fbdb",
-      "bytes": 16711
+      "sha256": "c26f9698a3b447dd9e9efb44fdb7494317197a8712610748496f04060b87435e",
+      "bytes": 16812
     },
     {
       "path": "ui/react-app/src/components/HelpModal.test.jsx",
@@ -10985,8 +10985,8 @@
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.jsx",
-      "sha256": "6b65bdedc9028c3ea57c238ddf5a35c19f31cd280bd02a8e2d86f40428f29974",
-      "bytes": 224490
+      "sha256": "a5f81da32a224423b82381fe5e14f9a98cee47177e06461cfa99ac0a1c27013a",
+      "bytes": 224574
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.localDiscovery.test.jsx",
@@ -12322,6 +12322,16 @@
       "path": "ui/react-app/src/hooks/useWakeLock.js",
       "sha256": "d644bbd1cfd1f26feb37c0aa54e3970114ae40730aca2d6d044f5a165ac72c85",
       "bytes": 2348
+    },
+    {
+      "path": "ui/react-app/src/hooks/useWakeWordName.js",
+      "sha256": "0e3ba7012a06bba1181d146980a0fe081f6ebc457dfded9d3d444fe8b24bdfdc",
+      "bytes": 1122
+    },
+    {
+      "path": "ui/react-app/src/hooks/useWakeWordName.test.jsx",
+      "sha256": "c9d9c46b5ea49be53f38a477bba0b194aa2057f16de9c194fba7a69bfca090ec",
+      "bytes": 1819
     },
     {
       "path": "ui/react-app/src/hooks/useWebSocket.js",
@@ -13854,6 +13864,11 @@
       "bytes": 2634
     },
     {
+      "path": "voice/wake_detector/active_word.py",
+      "sha256": "9abb73c85ecf5314905bef823191dc15463d93f0d7be6153e1e4ce53b2436c2f",
+      "bytes": 3872
+    },
+    {
       "path": "voice/wake_detector/adaptive_gain_scheduler.py",
       "sha256": "43b8502b13bdf97e6111a8fc0745ab641eec1f95e6d5b7e5b0aa2b2f91734919",
       "bytes": 15897
@@ -14005,8 +14020,8 @@
     },
     {
       "path": "voice/wake_detector/violawake_listener.py",
-      "sha256": "5ee048ef35bde2d56efa4f4afecf37a9c97472ddb974cb6481e50685d6c647a7",
-      "bytes": 192833
+      "sha256": "f1be309c652be4541cb4c8bb1044d7428cb7685ffb3c0743ecb20e6bed07c3db",
+      "bytes": 192963
     },
     {
       "path": "voice/wake_detector/wake/__init__.py",
@@ -14040,8 +14055,8 @@
     },
     {
       "path": "voice/wake_detector/wake_verifier.py",
-      "sha256": "0848022906fc5f0a42f7a84467c06f24c8c5a5230d3e0caaaf37cc2554251731",
-      "bytes": 36174
+      "sha256": "1c9b4c452966a773b9725b068e1585a72235dd52dc90fdd1ab66489e5365a75e",
+      "bytes": 35097
     }
   ]
 }

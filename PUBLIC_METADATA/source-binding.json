@@ -30,10 +30,10 @@
   },
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "425e87567e78c964393963fc34696e0cdc4c634ef6ca3ba87914ea5ac88c5e6f",
-  "source_tree_sha256": "7e2290ca95999bccfff84deaa467922d8de36efe65c2b754763eab7d730f8e08",
-  "source_file_count": 2808,
-  "source_revision": "9506e4e5d284d46c95a56cbb2cac84d6ac2ce0eb",
+  "source_manifest_sha256": "53b18c085868c74ee85166c6c64c60924d561da36e7c3b564f4f175489695426",
+  "source_tree_sha256": "ddf4ef87e755f523ed05e2756a8c9312ba9a61113c543e37f34dca32161b04ad",
+  "source_file_count": 2811,
+  "source_revision": "3fe9cef62fee533bfc6b0a7e4156a37ce4a8f7aa",
   "comparison_public_revision": "ecab2772465fcc89ae6645b028af1c2273b9199f",
   "changed_source_paths": [
     "LICENSES/SPEECH_COMPONENT_NOTICES.md",
@@ -468,6 +468,8 @@
     "ui/react-app/src/hooks/useVoiceStream.js",
     "ui/react-app/src/hooks/useVoiceWs.js",
     "ui/react-app/src/hooks/useVoiceWs.sentenceTts.test.jsx",
+    "ui/react-app/src/hooks/useWakeWordName.js",
+    "ui/react-app/src/hooks/useWakeWordName.test.jsx",
     "ui/react-app/src/i18n/en.json",
     "ui/react-app/src/lib/auth_context.desktopRestore.test.jsx",
     "ui/react-app/src/lib/auth_context.tsx",
@@ -529,6 +531,7 @@
     "voice/synthesis/text_normalizer.py",
     "voice/transcription/whisper.py",
     "voice/wake_chime.py",
+    "voice/wake_detector/active_word.py",
     "voice/wake_detector/aec_delay_tracker.py",
     "voice/wake_detector/aec_processor.py",
     "voice/wake_detector/aec_viola.py",
@@ -616,7 +619,7 @@
     "historical_inventory_limits": "This renderer correction changes no dependency or workflow inputs. All six retained SBOMs and their complete status objects stay historical and unchanged; no current installed inventory qualification is claimed."
   },
   "qualification": {
-    "source_commit": "9506e4e5d284d46c95a56cbb2cac84d6ac2ce0eb",
+    "source_commit": "3fe9cef62fee533bfc6b0a7e4156a37ce4a8f7aa",
     "kind": "build 10 integration"
   },
   "historical_bindings": [
