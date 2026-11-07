@@ -8855,6 +8855,14 @@ class AgentExecutor:
                 tool_args=tool_args,
                 status="approved",
             )
+            if action_class == "phone_call":
+                # The tool can hold this turn for the whole call, and the PC then
+                # said nothing for 3 minutes (2026-11-05: first sentence 182 s
+                # after the command). Say the call is under way before it starts.
+                try:
+                    await self._speak("Okay, placing the call now. The Phone tab shows how it's going.")
+                except (AttributeError, OSError, RuntimeError, TypeError, ValueError):
+                    logger.debug("Call-started notice could not be spoken", exc_info=True)
             return True
 
         await self._broadcast_consult_user_event(
@@ -11696,6 +11704,14 @@ class AgentExecutor:
 
     async def _speak(self, text: str) -> None:
         """Send progress text through the channel (preferred) or TTS fallback."""
+        # The turn that placed a live call does not narrate over it.
+        call_id = getattr(self, "_live_call_of_turn", "")
+        if call_id:
+            from core.live_call_state import call_is_live, hold_report
+
+            if call_is_live(call_id):
+                hold_report(call_id)
+                return
         # Prefer channel if available
         if self._channel is not None:
             try:

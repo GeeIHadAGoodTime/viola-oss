@@ -9,7 +9,10 @@ if TYPE_CHECKING:
 
 PHONE_STT_NO_SPEECH_THRESHOLD = 0.6
 PHONE_STT_HALLUCINATION_SILENCE_THRESHOLD_SECS = 1.0
-PHONE_STT_TEMPERATURES = (0.0, 0.2, 0.4, 0.6, 0.8, 1.0)
+# Each step is a full re-decode of the clip, and the transcribe holds up the whole
+# pipeline while it runs. Three steps keep the fallback and cap the worst case at
+# three decodes rather than six.
+PHONE_STT_TEMPERATURES = (0.0, 0.4, 0.8)
 
 # faster-whisper's feature extractor is fixed at 16 kHz. When `transcribe()`
 # receives a numpy ndarray it does NOT resample -- it skips decode_audio() and

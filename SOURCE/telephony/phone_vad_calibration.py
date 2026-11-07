@@ -25,8 +25,9 @@ produces.
 
 from __future__ import annotations
 
-from typing import Callable
+from typing import Any, Callable
 
+import numpy
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.audio.vad.vad_analyzer import VADParams, VADState
 
@@ -41,6 +42,16 @@ _SAMPLE_EVERY_N = 16
 # Callback receives keyword-only calibration fields; must never raise into the
 # audio path (the wrapper swallows callback errors).
 VADSampleCallback = Callable[..., None]
+
+
+def _scalar(value: Any) -> float:
+    """One number from a VAD reading.
+
+    Silero hands back a one-element array, and ``float()`` on that raises on
+    current numpy. Every sample then logged a full traceback, hundreds per call,
+    on the same event loop that carries the call's audio.
+    """
+    return float(numpy.asarray(value, dtype=float).reshape(-1)[0])
 
 
 class CalibratingSileroVADAnalyzer(SileroVADAnalyzer):
@@ -91,8 +102,8 @@ class CalibratingSileroVADAnalyzer(SileroVADAnalyzer):
                 self._frames_since_emit = 0
                 try:
                     self._on_sample(
-                        confidence=round(float(self._last_confidence), 4),
-                        volume=round(float(self._last_volume), 4),
+                        confidence=round(_scalar(self._last_confidence), 4),
+                        volume=round(_scalar(self._last_volume), 4),
                         state=state.name if hasattr(state, "name") else str(state),
                         confidence_threshold=self._params.confidence,
                         min_volume=self._params.min_volume,

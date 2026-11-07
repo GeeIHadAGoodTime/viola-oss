@@ -341,6 +341,9 @@ class IntentPipeline:
         self._processors = IntentPipelineProcessors(self)
         self._command_executor = CommandExecutor(self.music, self.tts)
         self._tts_speaker = TTSSpeaker(self.tts, self._tts_tasks)
+        from core.live_call_state import set_held_report_speaker
+
+        set_held_report_speaker(self._tts_speaker.speak)
 
         # Initialize sub-components
         self.instant_handler = InstantCommandHandler(music, state)

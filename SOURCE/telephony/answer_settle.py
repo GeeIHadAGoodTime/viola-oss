@@ -42,6 +42,7 @@ turn.
 from __future__ import annotations
 
 import asyncio
+import time
 
 from core.logging_config import get_logger
 
@@ -96,11 +97,23 @@ _OPENING_TRANSCRIPTION_GRACE_SECS = 0.4
 # recipient off; it only bounds the pathological never-ending case.
 _RECIPIENT_TURN_MAX_WAIT_SECS = 45.0
 
+# The silent-answer timer below is judged on turn starts, and a turn starts on a
+# transcript, which on the CPU path trails the audio by seconds. On call 3745134a a
+# nine-second voicemail greeting was playing when the timer called the pickup silent;
+# Viola opened, and the greeting's transcript landed eight seconds later. So when the
+# VAD has actually heard audio, the wait is for its transcript instead: until the audio
+# has been quiet this long, within this overall bound.
+_HEARD_AUDIO_QUIET_SECS = 6.0
+_HEARD_AUDIO_MAX_WAIT_SECS = 30.0
+_HEARD_AUDIO_POLL_SECS = 0.2
+
 try:
     from pipecat.frames.frames import (
         TranscriptionFrame,
         UserStartedSpeakingFrame,
         UserStoppedSpeakingFrame,
+        VADUserStartedSpeakingFrame,
+        VADUserStoppedSpeakingFrame,
     )
     from pipecat.processors.frame_processor import FrameProcessor
 
@@ -148,6 +161,10 @@ class AnswerSettleObserver(FrameProcessor if PIPECAT_AVAILABLE else object):  # 
         # answer_settle) tell "genuinely about to finish organically" apart from
         # "capped — this turn will never finish, proceed anyway" (issue #2797).
         self._recipient_turn_capped = False
+        # Raw audio activity, which leads every transcript. Used only to tell a
+        # silent pickup from one whose transcript has not arrived yet.
+        self._vad_active = False
+        self._vad_last_stopped_at: float | None = None
 
     @property
     def recipient_started_speaking(self) -> bool:
@@ -167,7 +184,12 @@ class AnswerSettleObserver(FrameProcessor if PIPECAT_AVAILABLE else object):  # 
         await super().process_frame(frame, direction)
 
         if PIPECAT_AVAILABLE:
-            if isinstance(frame, UserStartedSpeakingFrame):
+            if isinstance(frame, VADUserStartedSpeakingFrame):
+                self._vad_active = True
+            elif isinstance(frame, VADUserStoppedSpeakingFrame):
+                self._vad_active = False
+                self._vad_last_stopped_at = time.monotonic()
+            elif isinstance(frame, UserStartedSpeakingFrame):
                 self._recipient_started = True
                 self._recipient_started_event.set()
                 self._recipient_finished.clear()
@@ -181,6 +203,39 @@ class AnswerSettleObserver(FrameProcessor if PIPECAT_AVAILABLE else object):  # 
                 self._recipient_finished.set()
 
         await self.push_frame(frame, direction)
+
+    async def _heard_audio_became_a_turn(self) -> bool:
+        """After the silent timer: wait out audio the VAD heard but STT has not delivered.
+
+        True when that audio became a recipient turn. False when nothing was ever
+        heard, or the line went quiet and no transcript followed, which is a silent
+        pickup after all.
+        """
+        if not self._vad_active and self._vad_last_stopped_at is None:
+            return False
+        deadline = time.monotonic() + _HEARD_AUDIO_MAX_WAIT_SECS
+        while time.monotonic() < deadline:
+            quiet_since = self._vad_last_stopped_at
+            if (
+                not self._vad_active
+                and quiet_since is not None
+                and time.monotonic() - quiet_since >= _HEARD_AUDIO_QUIET_SECS
+            ):
+                return False
+            try:
+                await asyncio.wait_for(self._recipient_started_event.wait(), timeout=_HEARD_AUDIO_POLL_SECS)
+                return True
+            except TimeoutError:
+                continue
+        return False
+
+    async def wait_for_first_transcription(self, timeout: float) -> str:
+        """The first thing the recipient is heard to say, within *timeout* seconds."""
+        try:
+            await asyncio.wait_for(self._recipient_transcription_event.wait(), timeout=max(0.0, timeout))
+        except TimeoutError:
+            return ""
+        return self.recipient_opening_text
 
     async def wait_for_recipient_opening(
         self,
@@ -254,8 +309,8 @@ class AnswerSettleObserver(FrameProcessor if PIPECAT_AVAILABLE else object):  # 
                     try:
                         await asyncio.wait_for(self._recipient_started_event.wait(), timeout=grace)
                     except TimeoutError:
-                        return False
-                if not self._recipient_started_event.is_set():
+                        pass
+                if not self._recipient_started_event.is_set() and not await self._heard_audio_became_a_turn():
                     return False
 
         # Phase 2 — the recipient is (or was) speaking. Follow their turn to the

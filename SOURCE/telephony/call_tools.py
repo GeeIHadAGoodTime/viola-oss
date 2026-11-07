@@ -1517,6 +1517,37 @@ def make_end_call_handler(
 
         logger.info("end_call: call=%s reason=%s", call_record.call_id, reason_for_log[:120])
 
+        # A voicemail message may have been heard by a person who has just picked
+        # up. Do not close the line yet: it stays open for the answer window, and
+        # the hangup processor only commits if nobody answers.
+        answer_watch = getattr(call_record, "_voicemail_answer_watch", None)
+        listen_first = bool(voicemail_terminal and hangup_after_output_drain and answer_watch is not None)
+        if listen_first:
+            with suppress(AttributeError, TypeError):
+                call_record._pending_end_call = None
+            try:
+                await params.result_callback(
+                    {"call_status": "ending", "reason": reason_for_log},
+                    properties=_no_llm_function_result_properties(),
+                )
+            except Exception as exc:
+                logger.debug("end_call result_callback failed: %s", exc)
+            try:
+                await params.llm.push_frame(
+                    EndCallHangupFrame(
+                        call_id=str(getattr(call_record, "call_id", "")),
+                        reason=reason_for_log,
+                        listen_first=True,
+                    )
+                )
+                return
+            except (AttributeError, RuntimeError, TypeError, ValueError) as exc:
+                logger.warning(
+                    "end_call: failed to queue voicemail hangup for %s: %s; hanging up immediately",
+                    call_record.call_id,
+                    exc,
+                )
+
         # Mark the call as closing the instant end_call commits. The downstream
         # end-call lifecycle guard reads this transport flag so the spoken-close
         # drain window cannot start a fresh recipient turn while carrier hangup

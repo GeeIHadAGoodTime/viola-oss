@@ -65,11 +65,17 @@ what it is today. The fast path is strictly narrower than "always fast".
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 from core.logging_config import get_logger
 
 logger = get_logger(__name__)
+
+# How long a finished stretch of speech may wait for its transcript before the turn
+# stops waiting for it. Whisper returns nothing for noise, so a segment can have no
+# transcript at all. Set for the slowest honest CPU pass, not the usual one.
+_SEGMENT_TRANSCRIPT_WAIT_SECS = 3.0
 
 # Only the base strategy is imported. The frame and end-of-turn-state types this
 # module reasons about (``VADUserStartedSpeakingFrame``, ``TranscriptionFrame``,
@@ -105,6 +111,16 @@ class SemanticEndOfTurnStopStrategy(TurnAnalyzerUserTurnStopStrategy):  # type: 
         # (``_handle_vad_user_started_speaking``), so a stale COMPLETE from the
         # previous utterance can never fast-path the next one.
         self._semantic_turn_complete = False
+        # Whether the recipient's audio is active right now, and how many finished
+        # stretches of it have not been transcribed yet. Neither is cleared by
+        # ``reset()``. Transcripts lag the audio by seconds, so a turn START caused by
+        # one stretch can land while the recipient is well into the next. The base
+        # class's reset then believes they are silent and ends the turn 0.8 s later,
+        # mid-sentence: call 3745134a answered "on" and "stop talking with me you're
+        # just" as separate turns out of "...a little bit slow in your responses".
+        self._recipient_talking = False
+        self._segments_awaiting_text = 0
+        self._segment_wait_task: Any = None
         # Observe-only. Smart-Turn's verdict reaches NO trace today: the analyzer's
         # MetricsFrame is pushed downstream from inside the aggregator, while the only
         # tap that classifies VAD/turn metrics sits upstream of it, so `vad_ms` appears
@@ -121,13 +137,48 @@ class SemanticEndOfTurnStopStrategy(TurnAnalyzerUserTurnStopStrategy):  # type: 
         # class clears its own state, but order does not matter here: both land on
         # "no verdict for the utterance now starting".
         self._semantic_turn_complete = False
+        self._recipient_talking = True
         await super()._handle_vad_user_started_speaking(frame)
 
     async def _handle_vad_user_stopped_speaking(self, frame: Any) -> None:
         # The base class runs the Smart-Turn analyzer here and records the answer in
         # `_turn_complete`. Capture it before a turn-START reset can wipe it.
+        self._recipient_talking = False
+        self._segments_awaiting_text += 1
         await super()._handle_vad_user_stopped_speaking(frame)
         self._semantic_turn_complete = bool(self._turn_complete)
+        if self._segment_wait_task is not None:
+            await self.task_manager.cancel_task(self._segment_wait_task)
+        self._segment_wait_task = self.task_manager.create_task(
+            self._give_up_on_missing_transcripts(), f"{self}::_give_up_on_missing_transcripts"
+        )
+
+    async def reset(self) -> None:
+        await super().reset()
+        # The base class forgets the recipient is talking. They still are.
+        self._vad_user_speaking = self._recipient_talking
+
+    async def cleanup(self) -> None:
+        if self._segment_wait_task is not None:
+            await self.task_manager.cancel_task(self._segment_wait_task)
+            self._segment_wait_task = None
+        await super().cleanup()
+
+    async def _give_up_on_missing_transcripts(self) -> None:
+        try:
+            await asyncio.sleep(_SEGMENT_TRANSCRIPT_WAIT_SECS)
+        except asyncio.CancelledError:
+            return
+        self._segment_wait_task = None
+        self._segments_awaiting_text = 0
+        await self._maybe_trigger_user_turn_stopped()
+
+    async def _maybe_trigger_user_turn_stopped(self) -> None:
+        # Never end the recipient's turn while they are talking, or while speech
+        # they already finished is still being transcribed.
+        if self._recipient_talking or self._segments_awaiting_text > 0:
+            return
+        await super()._maybe_trigger_user_turn_stopped()
 
     async def _handle_input_audio(self, frame: Any) -> None:
         # A batch analyzer can also reach COMPLETE here, on its own silence timeout,
@@ -137,6 +188,8 @@ class SemanticEndOfTurnStopStrategy(TurnAnalyzerUserTurnStopStrategy):  # type: 
             self._semantic_turn_complete = True
 
     async def _handle_transcription(self, frame: Any) -> None:
+        if getattr(frame, "finalized", False) and self._segments_awaiting_text > 0:
+            self._segments_awaiting_text -= 1
         await super()._handle_transcription(frame)
 
         # Past this point the base class has, for a finalized transcript arriving after
