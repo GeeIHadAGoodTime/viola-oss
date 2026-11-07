@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "c390b20499beaeb57152905bbe2841c4111af100",
-  "sha256": "960cd81ae03f1bbcfc0c26caebab9a5943d243892db0cf6ccc18986ba6da3ece",
+  "revision": "a8847a7071a19144766495093256b7a582553843",
+  "sha256": "8b82d9efd234199f9a03d0e8c9f5067d51ad858c05dd77694c2c9872d199eb31",
   "files": [
     {
       "path": ".env.example",
@@ -2160,8 +2160,8 @@
     },
     {
       "path": "intent/tools/shell.py",
-      "sha256": "99a9897ec535f076bde93907fd7ab0febccec5cedb68835f3e538bb62808f58e",
-      "bytes": 23073
+      "sha256": "ee374538bfc470f2cbafddf7df62a2b63f64c31e602598f1b853661a455fd281",
+      "bytes": 25804
     },
     {
       "path": "intent/tools/system_state.py",
@@ -2375,8 +2375,8 @@
     },
     {
       "path": "mcp_servers/core_tools/server.py",
-      "sha256": "6921d19967655b8a3ba255d0655f41ddc2ff466c747bd58422e79300cbbe10e4",
-      "bytes": 264109
+      "sha256": "bfe444de5e82e0a853b838416931efdc4a153d6dded3ee559f6ba27ffae4a0c8",
+      "bytes": 264064
     },
     {
       "path": "mcp_servers/phone_tool_descriptions.py",
