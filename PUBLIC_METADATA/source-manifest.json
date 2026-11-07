@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "da9d4332c39e1141a12961b450d13b45cdf41f7f",
-  "sha256": "e5c0b2d5bc1d30823198d43f8857b05e68127960f10cd3fc58333509fee88c1d",
+  "revision": "5e6a5e8931be4a4aba71fb1772042e218f7e46ed",
+  "sha256": "ea1c8f0be3e053363e2396a4354c2850ee6eeecb226512301765298bc1f50a9e",
   "files": [
     {
       "path": ".env.example",
@@ -4500,8 +4500,8 @@
     },
     {
       "path": "services/credential_boundary.py",
-      "sha256": "9cd13092c602c88511b62cda75f65e2592fdf349e3ebe3160aee5ef92f25e37e",
-      "bytes": 10090
+      "sha256": "6bdceed02abad3439060be1d3bb949fddf4b3ef5426e9346845ff234d4c69a2a",
+      "bytes": 10424
     },
     {
       "path": "services/daemon/__init__.py",
@@ -6480,8 +6480,8 @@
     },
     {
       "path": "tests/public/test_wake_listener_lifecycle.py",
-      "sha256": "fcd8d847997d7a6f47796c53b6529f58d08e6c4177e1f6039c0904e80ad95cd3",
-      "bytes": 47579
+      "sha256": "62358b3b12d8c4178166dd78015a3f9b004927394c9b18dcdb15e77a12fe31df",
+      "bytes": 48004
     },
     {
       "path": "tests/public/test_windows_gpu_compositing.py",
@@ -10185,8 +10185,8 @@
     },
     {
       "path": "ui/react-app/src/__tests__/SmartDisplay.test.jsx",
-      "sha256": "3e0e4fccee75e687096cca4715a90345092b592b052f44fe08d42b3062bae882",
-      "bytes": 150715
+      "sha256": "ce484f4858850826e2a9ce5e0caab88210b4ca40f23e48c192816e5dd062f0ea",
+      "bytes": 152468
     },
     {
       "path": "ui/react-app/src/__tests__/hooks/useEventBus.test.jsx",
@@ -10240,8 +10240,8 @@
     },
     {
       "path": "ui/react-app/src/__tests__/integration/phoneTranscriptRenderChain.test.jsx",
-      "sha256": "dfffbe812203a0a3a4041a8aeba508d2327cdbffa2064b165960dc33dae8b58e",
-      "bytes": 24212
+      "sha256": "0e217ed61183c1312d41b15126f0468002d8295e5d2784231d3a8b514c81b5b1",
+      "bytes": 24324
     },
     {
       "path": "ui/react-app/src/__tests__/utils/formatters.test.js",
