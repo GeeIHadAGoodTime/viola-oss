@@ -190,7 +190,7 @@ def _resolve_custom_wake_model_path() -> Path | None:
 
 
 def _point_verifier_at(model_path: Path) -> str | None:
-    """Tell the Stage 2 check which word this model listens for; return that word."""
+    """Publish the word this model listens for; return that word."""
 
     word: str | None = None
     try:
@@ -199,12 +199,9 @@ def _point_verifier_at(model_path: Path) -> str | None:
         word = custom_wake_word_for_model(model_path)
     except Exception as exc:  # noqa: BLE001, RUF100 - an unreadable sidecar means the built-in word
         logger.warning("Could not read the wake word for %s: %s", model_path, exc)
-    try:
-        from voice.wake_detector.wake_verifier import get_wake_verifier
+    from voice.wake_detector.active_word import publish_active_wake_word
 
-        get_wake_verifier().set_target(word)
-    except Exception as exc:  # noqa: BLE001, RUF100 - the check is optional; the detector is not
-        logger.warning("[WAKE_VERIFY] could not set the wake word: %s", exc)
+    publish_active_wake_word(word)
     return word
 
 
@@ -896,6 +893,10 @@ class ViolaWakeListener:
             self._engine = new_engine
             self._model_path = candidate
             self._custom_wake_word = _point_verifier_at(candidate)
+            # The check of her own voice scores with a copy of the engine, built on
+            # first use. It has to be the model now in use, or her saying the custom
+            # word goes unnoticed.
+            self._reference_engine = None
             model_name = candidate.name.lower()
             self._infer_interval = 2 if "mlp" in model_name else 5
             self._configure_cadence()

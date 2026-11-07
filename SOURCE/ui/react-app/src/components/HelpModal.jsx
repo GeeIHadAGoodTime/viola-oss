@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import PropTypes from 'prop-types';
 import { THEME } from '../config';
+import useWakeWordName from '../hooks/useWakeWordName';
 import Modal, { secondaryButtonStyle } from './Modal';
 
 // The installed app does not serve /docs/USER_GUIDE.md or /docs/legal/ (only
@@ -156,10 +157,11 @@ AccordionItem.propTypes = {
 };
 
 function CommandsTab() {
+  const wakeWord = useWakeWordName();
   return (
     <div>
       <p style={{ color: THEME.colors.textSecondary, marginBottom: 14, fontSize: 14, lineHeight: 1.6 }}>
-        Two ways to talk to Viola: say <strong style={{ color: THEME.colors.textPrimary }}>&quot;Viola&quot;</strong> to wake her up, or hold push-to-talk (Space by default).
+        Two ways to talk to Viola: say <strong style={{ color: THEME.colors.textPrimary }}>&quot;{wakeWord}&quot;</strong> to wake her up, or hold push-to-talk (Space by default).
         You can also type into the chat tab. Examples by capability:
       </p>
 

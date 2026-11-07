@@ -258,8 +258,8 @@ _BARGE_IN_ECHO_RUN = 2
 _BARGE_IN_USER_DONE_SEC = 0.7
 _BARGE_IN_USER_MAX_SEC = 5.0
 
-# The wake word as Whisper writes it. Stricter than the wake Stage 2 list on
-# purpose: here a false match stops Viola mid-sentence.
+# "Viola" as Whisper writes it. Stricter than the wake Stage 2 list on purpose:
+# here a false match stops Viola mid-sentence. A custom wake word replaces it.
 _BARGE_IN_WAKE_WORDS = frozenset({"viola", "violas", "vyola", "viyola", "voila", "fiola", "biola"})
 _BARGE_IN_STOP_RE = re.compile(
     r"^(?:(?:ok|okay|hey|please|no)\s+)*"
@@ -291,6 +291,13 @@ class BargeInDecision:
 
 
 def _is_barge_in_wake_word(word: str) -> bool:
+    from voice.wake_detector.active_word import active_wake_word, is_custom_wake_token
+
+    # The word that wakes her is the word that stops her. Once the user has their own,
+    # "Viola" is only her name, so it stops nothing.
+    custom = active_wake_word()
+    if custom:
+        return is_custom_wake_token(word, custom)
     w = word.lower().replace("'", "")
     if w in _BARGE_IN_WAKE_WORDS:
         return True
@@ -1456,7 +1463,7 @@ class VoiceCommandHandler:
         return result
 
     # What the user reads when a wake heard no command (the tone says it too).
-    NOTHING_HEARD_MESSAGE = "I didn't hear anything after the chime. Try again: say Viola, then your request."
+    NOTHING_HEARD_MESSAGE = "I didn't hear anything after the chime. Try again: say {wake_word}, then your request."
 
     async def _signal_nothing_heard(self, ctx: CommandContext, reason: str) -> None:
         """Tell the user the wake ended without a command (a soft tone and a toast).
@@ -1474,6 +1481,7 @@ class VoiceCommandHandler:
             logger.debug("Nothing-heard tone unavailable: %s", exc)
         try:
             from ui.websocket.event_hub import get_event_hub
+            from voice.wake_detector.active_word import wake_word_name
 
             hub = get_event_hub()
             if hub is not None and ctx.user_id:
@@ -1481,7 +1489,7 @@ class VoiceCommandHandler:
                     "error",
                     {
                         "code": "wake_no_command",
-                        "user_message": self.NOTHING_HEARD_MESSAGE,
+                        "user_message": self.NOTHING_HEARD_MESSAGE.format(wake_word=wake_word_name()),
                         "level": "info",
                     },
                     user_id=ctx.user_id,

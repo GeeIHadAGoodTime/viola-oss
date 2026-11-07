@@ -4,6 +4,7 @@ import { useSettings } from '../hooks/useSettings';
 import { useSettingsDraft } from '../hooks/useSettingsDraft';
 import { useOptionalAuth } from '../hooks/useAuth';
 import { useHandsFreeWake } from '../hooks/useHandsFreeWake';
+import useWakeWordName from '../hooks/useWakeWordName';
 import { isCloudSurface } from './auth/cloudSurface';
 import { apiFetch } from '../hooks/useViolaApi';
 import { THEME, applyTheme, setAccent } from '../config';
@@ -413,6 +414,7 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
   // immediately — it is NOT part of localSettings/save because a hot-mic
   // preference must never sync to other devices.
   const [handsFreeWake, setHandsFreeWake] = useHandsFreeWake();
+  const wakeWordName = useWakeWordName();
   // Cloud Sync consent is a property of the ACCOUNT, not of this install: the
   // switch writes the cloud row every Tier-2 gate reads, and turning it off
   // purges the account's synced copy. With nobody signed in there is no row to
@@ -3813,7 +3815,7 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
             <AdvancedSection title="Voice Recognition & Advanced">
               <SettingRow
                 title="Double-check the wake word"
-                description={'Before the chime, Viola takes a quick second listen and ignores the wake if it clearly heard talking without "Viola".'}
+                description={`Before the chime, Viola takes a quick second listen and ignores the wake if it clearly heard talking without "${wakeWordName}".`}
                 tooltip="On by default. It cuts false wakes from talking, TV and music. Turn it off if Viola often misses you when you say its name. The check runs on this device."
               >
                 <Toggle

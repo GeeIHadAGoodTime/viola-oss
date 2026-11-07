@@ -223,6 +223,9 @@ def _set_active_model(user_id: str, model_path: str, *, model_name: str, is_defa
         settings_manager.set("use_custom_wake_word", not is_default, save_immediately=False)
         settings_manager.set("custom_wake_word_name", "" if is_default else model_name, save_immediately=False)
         settings_manager.save()
+    from voice.wake_detector.active_word import publish_active_wake_word
+
+    publish_active_wake_word(None if is_default else model_name)
 
 
 def _reload_wake_detector(model_path: str) -> dict[str, Any]:
