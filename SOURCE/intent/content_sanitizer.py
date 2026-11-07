@@ -136,6 +136,49 @@ TAINT_UNGATED_HIGH_RISK_TOOLS = frozenset({"send_telegram", "write_file"})
 PAYMENT_GATE_BOUND_TOOLS = frozenset({"fill_payment_details", "transmit_payment_to_call"})
 
 
+# Tools whose arguments must be the user's own words, tainted or not: a saved
+# delivery address is where real orders go. Taint covers a page or email read in
+# this task; the word check below covers one read in an earlier task and repeated
+# in a reply, which leaves this task clean.
+USER_WORDS_ONLY_TOOLS = frozenset({"save_delivery_address"})
+_NUMBER_RUN_RE = re.compile(r"\d+")
+_DIGIT_GROUP_COMMA_RE = re.compile(r"(?<=\d),(?=\d)")
+_WORD_RE = re.compile(r"[a-z0-9]+")
+# Words that say nothing about which street it is, and have a short and a long form.
+_STREET_FILLER_WORDS = frozenset(
+    "n s e w ne nw se sw north south east west northeast northwest southeast southwest "
+    "st street ave avenue rd road blvd boulevard dr drive ln lane ct court cir circle pl place way "
+    "pkwy parkway hwy highway ter terrace trl trail sq square".split()
+)
+_SPOKEN_NUMBER_WORDS = frozenset(
+    "zero oh one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen "
+    "seventeen eighteen nineteen twenty thirty forty fifty sixty seventy eighty ninety hundred thousand".split()
+)
+
+
+def _words_not_from_user(args: Mapping[str, Any], own_words: str) -> list[str]:
+    """Name the address fields whose words the user never said."""
+    own = _DIGIT_GROUP_COMMA_RE.sub("", own_words.lower())
+    own_tokens = set(_WORD_RE.findall(own))
+    own_numbers = set(_NUMBER_RUN_RE.findall(own))
+    said_a_number_in_words = bool(own_tokens & _SPOKEN_NUMBER_WORDS)
+    missing: list[str] = []
+    street = _WORD_RE.findall(str(args.get("street") or "").lower())
+    house_number = street[0] if street and street[0][:1].isdigit() else ""
+    name_words = [word for word in street if word != house_number and word not in _STREET_FILLER_WORDS]
+    if not all(word in own_tokens for word in name_words):
+        missing.append("street")
+    digits = "".join(_NUMBER_RUN_RE.findall(house_number))
+    if digits and digits not in own_numbers and not said_a_number_in_words:
+        missing.append("house number")
+    if not all(word in own_tokens for word in _WORD_RE.findall(str(args.get("city") or "").lower())):
+        missing.append("city")
+    zip_code = "".join(_NUMBER_RUN_RE.findall(str(args.get("zip_code") or "")))
+    if zip_code and zip_code[:5] not in own_numbers and not said_a_number_in_words:
+        missing.append("ZIP code")
+    return missing
+
+
 def canonicalize_tool_name_for_safety(tool_name: str | None) -> str:
     """Return the policy name for a tool, stripping external MCP namespaces."""
     if not tool_name:
@@ -822,6 +865,17 @@ class BrowserTaintTracker:
         # gate, and is that approval still live for this task?" Installed by
         # the agent loop from executor state; None means "never".
         self._payment_approval_probe: Callable[[str, Mapping[str, Any]], bool] | None = None
+        # What the user has really said in this conversation, plus what they have
+        # already saved. Empty for a helper: its task was written by the model.
+        self._user_own_words: str = ""
+        # Taint from anything but Viola's own memory. "Remember my address" often
+        # checks memory first, and that alone must not stop the save: the word
+        # check below still refuses any address the user did not say.
+        self._tainted_from_outside: bool = False
+
+    def set_user_own_words(self, text: str | None) -> None:
+        """Record the words a USER_WORDS_ONLY_TOOLS call may be made of."""
+        self._user_own_words = str(text or "")
 
     def set_user_request(self, user_text: str | None) -> None:
         """Record the current user request (user-named file/site exemptions)."""
@@ -948,6 +1002,8 @@ class BrowserTaintTracker:
             )
         self._tainted = True
         self._taint_source = source_tool
+        if canonicalize_tool_name_for_safety(source_tool) != "memory":
+            self._tainted_from_outside = True
         if category == "non_browser":
             self._non_browser_tainted = True
 
@@ -1028,6 +1084,8 @@ class BrowserTaintTracker:
         Returns an error message if refused, or None if the call may proceed
         (consequential calls then still meet their confirm-or-cancel gate).
         """
+        if tool_name and canonicalize_tool_name_for_safety(tool_name) in USER_WORDS_ONLY_TOOLS:
+            return self._check_user_words_only(tool_name, _tool_args_mapping(tool_args) or {})
         if not self._tainted or not tool_name:
             return None
         args = _tool_args_mapping(tool_args) or {}
@@ -1109,6 +1167,24 @@ class BrowserTaintTracker:
             )
 
         return self._check_exfiltration(tool_name, canonical, args)
+
+    def _check_user_words_only(self, tool_name: str, args: Mapping[str, Any]) -> str | None:
+        """Refuse a saved address that did not come from the user's own words."""
+        if self._tainted_from_outside:
+            logger.warning("TAINT_GATE: refusing %s after untrusted content from '%s'", tool_name, self._taint_source)
+            return (
+                "BLOCKED: '%s' cannot run after web, email, calendar or file content entered this task "
+                "(prompt injection defense). Nothing was saved. Ask the user to say their address again in a "
+                "new request." % tool_name
+            )
+        missing = _words_not_from_user(args, self._user_own_words)
+        if missing:
+            logger.warning("TAINT_GATE: refusing %s: not the user's own words (%s)", tool_name, ", ".join(missing))
+            return (
+                "BLOCKED: nothing was saved. The user did not say this %s. Use only what they said, leave the "
+                "rest empty, or ask them for it." % " or ".join(missing)
+            )
+        return None
 
     def _check_exfiltration(self, tool_name: str, canonical: str, args: Mapping[str, Any]) -> str | None:
         """Refuse a URL/script that carries private data to a site the user did not name."""

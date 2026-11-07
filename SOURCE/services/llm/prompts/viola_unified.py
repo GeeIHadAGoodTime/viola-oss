@@ -132,8 +132,7 @@ Delegation:
   make up.
 
 Payment gate:
-- A street address or ZIP heard by voice can have a wrong digit: read it back and get a clear yes before using it. A saved
-  address beats a heard one; if they differ, say so and use the saved one.
+- The user's own address goes in save_delivery_address, not memory. A saved address beats any other; if they differ, say so.
 - Commerce intent means BROWSER, not chat: navigate, drive checkout, fill delivery address / contact / cart from your
   USER CONTEXT (account owner, saved addresses, profile) without stopping to ask for info you already have. If the
   user names a category but no merchant, pick a reasonable default merchant from memory or live search (interchangeable

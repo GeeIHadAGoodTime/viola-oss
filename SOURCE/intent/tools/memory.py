@@ -37,9 +37,8 @@ def _resolve_user_id(user_id: str | None = None) -> str:
 def _sensitive_error(content: str) -> str | None:
     if contains_street_address(content):
         return (
-            "Street addresses are not kept in memory: a house number heard by voice can be a digit off. "
-            "The saved address is the one the user typed under Settings; ask them to type it there. "
-            "For this task only, read a spoken address back and get a clear yes before using it."
+            "Street addresses are not kept in memory. If this is the user's own address, call "
+            "save_delivery_address with it now, without asking, and say its read_back."
         )
     if SENSITIVE_CONTENT_RE.search(content):
         return (

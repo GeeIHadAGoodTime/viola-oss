@@ -2092,20 +2092,40 @@ def _redacted_static_step_field(key: str, value: Any) -> Any:
     return copy.deepcopy(cached)
 
 
+_ADDRESS_LOG_KEYS = frozenset({"street", "zip_code", "read_back"})
+
+
+def _mask_addresses_for_log(value: Any) -> Any:
+    """Keep a street address out of the agent's plain-text logs, like a phone number."""
+    from services.memory.store import redact_street_addresses
+
+    if isinstance(value, str):
+        return redact_street_addresses(value)
+    if isinstance(value, dict):
+        return {
+            key: "[redacted]" if key in _ADDRESS_LOG_KEYS and item else _mask_addresses_for_log(item)
+            for key, item in value.items()
+        }
+    if isinstance(value, (list, tuple)):
+        return [_mask_addresses_for_log(item) for item in value]
+    return value
+
+
 def _redact_step_data(step_data: dict[str, Any]) -> Any:
     """Card and personal data out of a step line, reusing the redaction of unchanged tool-schema fields."""
     static_keys = [key for key in _STEP_LOG_STATIC_FIELDS if isinstance(step_data.get(key), (dict, list))]
     if not static_keys:
-        return redact_pii(redact_card_data(step_data))
+        return _mask_addresses_for_log(redact_pii(redact_card_data(step_data)))
     try:
         redacted_static = {key: _redacted_static_step_field(key, step_data[key]) for key in static_keys}
         rest = redact_pii(
             redact_card_data({key: value for key, value in step_data.items() if key not in redacted_static})
         )
     except Exception:  # noqa: BLE001, RUF100 - any surprise falls back to the plain whole-mapping redaction
-        return redact_pii(redact_card_data(step_data))
+        return _mask_addresses_for_log(redact_pii(redact_card_data(step_data)))
     if not isinstance(rest, dict):
-        return redact_pii(redact_card_data(step_data))
+        return _mask_addresses_for_log(redact_pii(redact_card_data(step_data)))
+    rest = _mask_addresses_for_log(rest)
     return {key: redacted_static[key] if key in redacted_static else rest[key] for key in step_data}
 
 
@@ -2475,8 +2495,8 @@ class AgentStepRecord:
     tool_use_id: str | None = None
 
     def __post_init__(self) -> None:
-        self.tool_input = redact_card_data(self.tool_input)
-        self.tool_result_summary = redact_card_data(self.tool_result_summary)
+        self.tool_input = _mask_addresses_for_log(redact_card_data(self.tool_input))
+        self.tool_result_summary = _mask_addresses_for_log(redact_card_data(self.tool_result_summary))
         self.tool_use_id = str(self.tool_use_id or "").strip() or None
 
 
@@ -2537,7 +2557,7 @@ class AgentTaskLog:
 
         def _write() -> None:
             try:
-                _atomic_write_json_restricted(path, redact_card_data(snapshot))
+                _atomic_write_json_restricted(path, _mask_addresses_for_log(redact_card_data(snapshot)))
                 logger.debug("Agent task log written to %s", path)
             except Exception as exc:
                 logger.warning("Failed to write agent task log: %s", exc)
@@ -6039,7 +6059,7 @@ class AgentExecutor:
                 "llm_total_input_tokens_seen": getattr(self, "_llm_total_input_tokens_seen", 0),
                 "responses_continuity_mode": getattr(self, "_last_continuity_mode", None),
             }
-            line = json.dumps(redact_pii(redact_card_data(complete_data)), default=str) + "\n"
+            line = json.dumps(_mask_addresses_for_log(redact_pii(redact_card_data(complete_data))), default=str) + "\n"
             step_log_path = self._get_structured_step_log_path()
             _run_task_log_io(lambda: _append_structured_log_line(jsonl_dir, step_log_path, line))
         except Exception:
@@ -6690,6 +6710,32 @@ class AgentExecutor:
         row["cache_creation_input_tokens"] += cache_write_tokens
         row["web_search_requests"] += web_search_requests
         row["cost_usd"] += float(cost_usd)
+
+    def _user_own_words(self, user_text: str) -> str:
+        """What the user has said in this conversation, and the address they already saved.
+
+        Only frames the user wrote count. Compaction summaries are user-role frames
+        too, but they carry an origin, and they can quote a page.
+        """
+        from services.conversation.state_manager import get_request_conversation_manager
+
+        parts = [str(user_text or "")]
+        manager = get_request_conversation_manager() or getattr(self, "_conversation_state_manager", None)
+        get_window = getattr(manager, "get_prompt_window", None)
+        if callable(get_window):
+            for frame in get_window().frames:
+                if frame.role is FrameRole.USER and frame.kind is FrameKind.USER_INPUT and not frame.origin:
+                    parts.extend(block.text for block in frame.blocks if isinstance(block, TextBlock))
+        try:
+            from intent.tools.settings_tools import delivery_address_text
+            from ui.settings_manager import get_settings_manager
+
+            saved = get_settings_manager().get("delivery_address", {}, user_id=self._get_effective_user_id())
+            if isinstance(saved, dict):
+                parts.append(delivery_address_text(saved))
+        except (ImportError, LookupError, OSError, RuntimeError, TypeError, ValueError):
+            logger.debug("Saved address unavailable for the user-words check", exc_info=True)
+        return "\n".join(parts)
 
     def _prompt_cache_key(self) -> str | None:
         """One opaque cache key per account, the same for every command.
@@ -12450,10 +12496,10 @@ class AgentExecutor:
     def _apply_context_delivery_address_to_summary(self, order_summary: dict[str, Any]) -> None:
         """Backfill the saved address, and flag an order that differs from it by a house number.
 
-        Only the Settings screen writes the saved address, so it is what the user
-        typed. The order's address may have been heard, or read off the merchant's
-        page. It is not replaced, because the card must show what the merchant
-        holds, but the user is told before paying.
+        The saved address is the one the user typed in Settings or heard read back.
+        The order's address may have been read off the merchant's page. It is not
+        replaced, because the card must show what the merchant holds, but the user
+        is told before paying.
         """
 
         existing = _delivery_address_from_value(order_summary.get("delivery_address"))
