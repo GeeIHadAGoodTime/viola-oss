@@ -1590,11 +1590,9 @@ async def file_write(
 
 @server.tool(
     description=(
-        "Run a shell command as a last resort; prefer dedicated tools. "
-        "file_read info says whether a file exists, file_write delete removes one. "
-        "On Windows a plain command runs in cmd.exe from the user's home folder, so 'dir Desktop' lists their desktop. "
-        "Use a full path or working_directory for a script. "
-        "Returns stdout, stderr and exit code; 30s default timeout, 4000 char output cap."
+        "Run a shell command; returns stdout, stderr, exit code. Last resort: file_read/file_write handle files "
+        "(info says if one exists). Use full paths. %USERPROFILE%\\Desktop and ~\\Desktop become the real "
+        "Desktop, even under OneDrive (same for Documents, Downloads). 30s timeout, 4000 char output."
     ),
     annotations=_DANGEROUS,
     meta={"risk": "destructive"},
@@ -4069,7 +4067,7 @@ async def memory(
 
 @server.tool(
     description=(
-        "Save or correct the user's own delivery address, from their words only. No confirmation first. "
+        "Save or correct the user's own delivery address when they want it kept, from their words only. No confirmation first. "
         "Say the returned read_back word for word."
     ),
     annotations=_SAFE,
@@ -6000,8 +5998,7 @@ async def payment(
         str,
         Field(
             description=(
-                "For action='request_review': concise order summary with items and total. "
-                "This is the PRIMARY checkout handoff path when payment is ready."
+                "For action='request_review': concise order summary with items and total."
             )
         ),
     ] = "",
@@ -6015,7 +6012,14 @@ async def payment(
     ] = "",
     notes: Annotated[
         str,
-        Field(description="Optional checkout notes or reason for opening secure card entry."),
+        Field(description="Optional notes."),
+    ] = "",
+    # Read by the agent executor from the call's arguments for the approval card.
+    # Without it the card fell back to the saved address even when the user had
+    # given another one for this order.
+    delivery_address: Annotated[
+        str,
+        Field(description="Where this order ships."),
     ] = "",
 ) -> str:
     """List masked payment cards or request secure payment handoff.
@@ -6554,28 +6558,16 @@ if not _HA_CONFIGURED:
 
 @server.tool(
     description=(
-        "Viola's in-house multi-room audio uses rooms, room groups, and paired "
-        "speakers (Spoke devices), separate from this smart_home tool. "
-        "Music-to-room requests such as 'play music in the kitchen' are covered by media with target_room and can return Viola's Add Speaker QR pairing flow. "
-        "Control smart home devices and scenes - lights, thermostats, locks, "
-        "switches, fans, garage doors, alarms, scenes. Useful for "
-        "requests to turn on/off, dim, lock/unlock, or set temperature on "
-        "household devices. Actions: list (discover devices, optionally by "
-        "domain), state (read one entity), control (turn_on/turn_off/toggle/"
-        "set_temperature/set_brightness/lock/unlock), scene (activate). "
-        "Configured smart-home providers are optional advanced integrations for "
-        "household-device control, at the same priority as other external device "
-        "ecosystems. If "
-        "no smart-home provider is configured, the tool returns a setup "
+        "Lights, switches, climate, fans, covers, locks, alarms, media, scenes: "
+        "list, state, control (turn_on/turn_off/set_temperature/unlock...), scene. "
+        "The user's request is the go-ahead; act without asking. "
+        "Music to a room ('play music in the kitchen') is media with target_room, not this tool. "
+        "If no smart-home provider is configured, the tool returns a setup "
         "message - call it anyway for real smart-home requests so the user "
         "gets the setup CTA instead of a clarifying question."
     ),
     annotations=_CONFIRM,
-    meta={
-        "risk": "confirm",
-        "irreversible_actions": ["unlock", "disarm"],
-        "irreversible_class": "smart_home",
-    },
+    meta={"risk": "confirm"},
 )
 async def smart_home(
     action: Annotated[

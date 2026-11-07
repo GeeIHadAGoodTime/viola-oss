@@ -53,8 +53,8 @@ _DIRECT_ACTION_CLASSES: dict[str, str] = {
     # via the named command/args) — an irreversible, RCE-equivalent action that
     # must go through the unified confirmation gate, not just the CONFIRM tier.
     "register_mcp_server": "mcp_register",
-    "smart_home_unlock": "smart_home_unlock",
-    "smart_home_disarm": "smart_home_disarm",
+    "smart_home_unlock": "smart_home_control",
+    "smart_home_disarm": "smart_home_control",
     "oauth_connect": "oauth_connect",
     "oauth_disconnect": "oauth_disconnect",
     "auth_clear": "oauth_disconnect",
@@ -92,8 +92,14 @@ _CALENDAR_WRITE_ACTIONS = {
 }
 _MEMORY_DELETE_ACTIONS = {"delete", "forget", "delete_all", "clear"}
 _PAYMENT_SAFE_ACTIONS = {"", "list", "request_review", "open_secure_card_entry"}
-_SMART_HOME_UNLOCK_ACTIONS = {"unlock"}
-_SMART_HOME_DISARM_ACTIONS = {"disarm"}
+# Device control through Home Assistant (founder rule 2026-11-07): Viola never
+# asks before controlling a device the user told her to control, and never
+# controls one the user did not ask for. So this class never asks: with no
+# untrusted content in the conversation it just runs (``gate_action_class``);
+# with untrusted content in it, it runs only when the user's own message for
+# this turn asks for it, and is refused otherwise (AgentExecutor).
+SMART_HOME_CONTROL_CLASS = "smart_home_control"
+_SMART_HOME_CONTROL_ACTIONS = {"control", "scene"}
 _OAUTH_DISCONNECT_ACTIONS = {"disconnect", "clear", "revoke", "logout", "unlink"}
 _OAUTH_CONNECT_ACTIONS = {"connect", "login", "link", "authorize", "auth"}
 
@@ -137,14 +143,10 @@ def irreversible_action_class(
     action = _action(args)
     if name == "gmail":
         return _gmail_action_class(action, args)
+    if name == "smart_home":
+        return SMART_HOME_CONTROL_CLASS if action in _SMART_HOME_CONTROL_ACTIONS else None
     meta = _meta(schema)
     if _meta_marks_irreversible(meta, action):
-        if name == "smart_home":
-            control_action = _clean((args or {}).get("control_action")).lower()
-            if action in _SMART_HOME_UNLOCK_ACTIONS or control_action in _SMART_HOME_UNLOCK_ACTIONS:
-                return "smart_home_unlock"
-            if action in _SMART_HOME_DISARM_ACTIONS or control_action in _SMART_HOME_DISARM_ACTIONS:
-                return "smart_home_disarm"
         meta_class = _clean(meta.get("irreversible_class"))
         if meta_class:
             return meta_class
@@ -190,12 +192,6 @@ def irreversible_action_class(
         return "payment"
     if name.startswith("payment_"):
         return "payment"
-    if name == "smart_home":
-        control_action = _clean((args or {}).get("control_action")).lower()
-        if action in _SMART_HOME_UNLOCK_ACTIONS or control_action in _SMART_HOME_UNLOCK_ACTIONS:
-            return "smart_home_unlock"
-        if action in _SMART_HOME_DISARM_ACTIONS or control_action in _SMART_HOME_DISARM_ACTIONS:
-            return "smart_home_disarm"
     if name in {"google_auth", "oauth"} and action in _OAUTH_DISCONNECT_ACTIONS:
         return "oauth_disconnect"
     if name in {"oauth", "music_accounts"} and action in _OAUTH_CONNECT_ACTIONS:
@@ -274,21 +270,24 @@ def gate_action_class(
     """The class the confirm-or-cancel gate asks about, or None to just do it.
 
     ``irreversible_action_class`` names what a call IS (and drives the taint
-    gate, which must keep seeing every shell command). The gate then lets two
-    harmless cases through when no untrusted content is in the conversation
+    gate, which must keep seeing every shell command). The gate then lets three
+    cases through when no untrusted content is in the conversation
     (founder rule: confirm only at crucial moments):
 
     * a shell command the parser proves read-only (``echo``, ``dir``,
       ``git status``); it used to ask every time (1.0.5 laptop X8.1);
     * saving an answer as a NEW file (share_response never replaces a file),
-      like creating any new file with the file tools.
+      like creating any new file with the file tools;
+    * device control the user asked for (lights, locks, climate, scenes):
+      with no untrusted content in context the request can only be the
+      user's, and Viola does not ask before doing what she was told.
     """
     action_class = irreversible_action_class(tool_name, args, schema)
     if action_class is None or tainted:
         return action_class
     if action_class == "shell_command" and _is_read_only_shell_call(args):
         return None
-    if action_class == "share_response_file":
+    if action_class in {"share_response_file", SMART_HOME_CONTROL_CLASS}:
         return None
     return action_class
 
@@ -415,12 +414,13 @@ def describe_irreversible_action(tool_name: str, args: Mapping[str, Any] | None 
     if action_class == "shell_command":
         command = _clean(params.get("command") or params.get("cmd") or params.get("script"))
         return "run the command: %s" % command if command else "run the shell command"
-    if action_class == "smart_home_unlock":
+    if action_class == SMART_HOME_CONTROL_CLASS:
+        if _action(params) == "scene":
+            scene = _clean(params.get("scene_name"))
+            return "activate the scene %s" % scene if scene else "activate a scene"
+        verb = _clean(params.get("control_action")).replace("_", " ") or "control"
         entity = _clean(params.get("entity_id") or params.get("device") or params.get("name"))
-        return "unlock %s" % entity if entity else "unlock the smart-home device"
-    if action_class == "smart_home_disarm":
-        entity = _clean(params.get("entity_id") or params.get("device") or params.get("name"))
-        return "disarm %s" % entity if entity else "disarm the smart-home system"
+        return "%s %s" % (verb, entity) if entity else "%s a smart-home device" % verb
     if action_class == "oauth_connect":
         provider = _clean(params.get("provider") or params.get("service") or params.get("service_name"))
         return "connect %s" % provider if provider else "connect the account"
