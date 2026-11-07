@@ -345,7 +345,14 @@ class RetainedFormatterCurrencyTests(unittest.TestCase):
         import re
 
         source = ROOT / "voice/synthesis/text_normalizer.py"
-        names = {"_CURRENCY_RE", "_DIGIT_NAMES", "_clean_num2words_output", "_number_to_words", "_replace_currency"}
+        names = {
+            "_CURRENCY_RE",
+            "_CURRENCIES",
+            "_DIGIT_NAMES",
+            "_clean_num2words_output",
+            "_number_to_words",
+            "_replace_currency",
+        }
         nodes = []
         for node in ast.parse(source.read_text(encoding="utf-8")).body:
             if isinstance(node, ast.FunctionDef) and node.name in names:

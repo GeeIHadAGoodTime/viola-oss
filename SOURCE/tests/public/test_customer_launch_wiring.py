@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import ast
 import asyncio
+import contextlib
 from contextlib import nullcontext
 import importlib
 import json
@@ -163,7 +164,7 @@ class QualificationLaunchTests(unittest.TestCase):
             self.assertIs(self.runtime.get_qualification_composition(), owner)
             self.assertIs(self.runtime.get_qualification_composition(), owner)
         self.assertEqual(compose.call_count, 2)
-        self.assertEqual(compose.call_args.kwargs, {"mandarin": True, "romance_locales": ("es",)})
+        self.assertEqual(compose.call_args.kwargs, {"mandarin": True, "romance_locales": ("es", "fr", "pt-br")})
 
     def factory(self, create):
         namespace = {"threading": threading, "_shared_kokoro_lock": threading.Lock(), "_shared_kokoro": None,
@@ -223,8 +224,15 @@ class QualificationLaunchTests(unittest.TestCase):
         self.assertIn(("tts_voice", {"on_load_error": "raise"}), requested)
 
     def engine(self):
-        methods = {"set_customer_route", "invalidate_customer_route", "_prepare_route_text", "_synthesize_locked", "_retry_without_unspeakable"}
-        cls = actual_source("voice/synthesis/kokoro_engine.py", methods, {"logger": LOG, "_MAX_TEXT_LENGTH": 5000, "_strip_emoji": lambda text: text.replace("❓", "")}, class_name="KokoroTTSEngine")
+        methods = {
+            "set_customer_route",
+            "invalidate_customer_route",
+            "_prepare_route_text",
+            "_synthesize_locked",
+            "_retry_without_unspeakable",
+            "_claim_unspoken_notice",
+        }
+        cls = actual_source("voice/synthesis/kokoro_engine.py", methods, {"logger": LOG, "time": time, "_UNSPOKEN_NOTICE_REPEAT_SECONDS": 30.0, "_MAX_TEXT_LENGTH": 5000, "_strip_emoji": lambda text: text.replace("❓", "")}, class_name="KokoroTTSEngine")
         engine = cls(); engine._lock = threading.Lock()
         engine._customer_tokenizer = types.SimpleNamespace(supports_locale=lambda locale: locale in {"en-us", "es", "zh"})
         engine._kokoro = types.SimpleNamespace(get_voices=lambda: ["af_heart", "ef_dora", "zf_xiaobei"])
@@ -288,11 +296,12 @@ class QualificationLaunchTests(unittest.TestCase):
             engine._synthesize_locked("x y", None)
         self.assertEqual(engine._synthesize_internal.call_count, 2)
         engine._synthesize_internal.reset_mock()
-        engine._synthesize_internal.side_effect = PronunciationError("unknown word", tokens=("世界",))
+        # Nothing of it can be read: she says so, in the reply's language.
+        engine._unspoken_notice_at = None
+        engine._synthesize_internal.side_effect = [PronunciationError("unknown word", tokens=("世界",)), b"notice"]
         engine._speech_language = "zh"
-        with self.assertRaises(PronunciationError):
-            engine._synthesize_locked("世界", None)
-        self.assertEqual(engine._synthesize_internal.call_count, 1)
+        self.assertEqual(engine._synthesize_locked("世界", None), b"notice")
+        self.assertEqual(engine._synthesize_internal.call_args.args[0], "这部分我读不出来，请看屏幕。")
 
     def test_phone_normal_constructor_binds_composition_before_queue_side_effects(self):
         self.activate(); owner = object()
@@ -330,7 +339,15 @@ class QualificationLaunchTests(unittest.TestCase):
     def test_stream_route_change_drains_old_response_and_next_utterance_uses_new_locale(self):
         self.activate()
         engine = self.engine()
-        namespace = {"asyncio": asyncio, "time": time, "logger": LOG, "_SENTENCE_RE": re.compile(r"(?<=[.!?])\s+")}
+        namespace = {
+            "asyncio": asyncio,
+            "contextlib": contextlib,
+            "time": time,
+            "logger": LOG,
+            "_SENTENCE_RE": re.compile(r"(?<=[.!?])\s+"),
+            "_SPEECH_LOOKAHEAD_UNITS": 2,
+            "_speech_units": lambda sentence, first: [sentence],
+        }
         cls = actual_source("voice/synthesis/kokoro_engine.py", {"speak_streaming"}, namespace, class_name="KokoroTTSEngine")
         engine.speak_streaming = types.MethodType(cls.speak_streaming, engine)
         engine._speak_lock = None

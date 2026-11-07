@@ -2,7 +2,7 @@
 /**
  * BottomRow — AI response area, PTT button, spoke chat, and connection status.
  */
-import { useEffect, useId } from 'react';
+import { useEffect, useId, useRef } from 'react';
 import PropTypes from 'prop-types';
 import { useTranslation } from 'react-i18next';
 import { THEME } from '../../config';
@@ -46,7 +46,7 @@ const BottomRow = ({
   typingMaxChars,
   isCommandLoading,
   lastResponse,
-  mainThinking,
+  liveReply,
   voice,
   processingTooLong,
   // Managed-AI usage cap (C-077): when the turn was denied for hitting the
@@ -64,6 +64,13 @@ const BottomRow = ({
 }) => {
   const { t } = useTranslation();
   const micStatusId = useId();
+  const responseAreaRef = useRef(null);
+
+  // A reply longer than the line scrolls; keep the words being said in view.
+  useEffect(() => {
+    const area = responseAreaRef.current;
+    if (liveReply && area) area.scrollTop = area.scrollHeight;
+  }, [liveReply]);
 
   // Typing is finished (sent, cancelled or emptied): give the keys back to the
   // stage, so hotkeys and type-anywhere work again.
@@ -76,10 +83,12 @@ const BottomRow = ({
       {/* AI Response / Typing Input */}
       <ErrorBoundary name="AI Response">
         <div
+          ref={responseAreaRef}
           className={styles.responseArea}
           role={voice.error ? 'alert' : 'status'}
           aria-live={isTyping ? 'off' : 'polite'}
           aria-atomic="true"
+          aria-busy={Boolean(liveReply)}
           style={{ color: isTyping ? THEME.colors.textPrimary : THEME.colors.textTertiary }}
         >
           {/*
@@ -106,23 +115,10 @@ const BottomRow = ({
           />
           {isTyping ? null : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: 0 }}>
-              {mainThinking && (
-                <span
-                  style={{
-                    color: THEME.colors.textMuted,
-                    fontSize: '0.82em',
-                    fontStyle: 'italic',
-                    lineHeight: 1.35,
-                    opacity: 0.7,
-                    overflow: 'hidden',
-                    whiteSpace: 'nowrap',
-                    textOverflow: 'ellipsis',
-                  }}
-                >
-                  {mainThinking}
-                </span>
-              )}
-              {isCommandLoading ? (
+              {liveReply ? (
+                /* Ahead of every "working" state: the answer has started. */
+                <span data-testid="live-reply">{renderStageMarkdown(`"${liveReply}"`)}</span>
+              ) : isCommandLoading ? (
                 <span className={styles.loadingIndicator} style={{ color: `${THEME.colors.statusYellow}CC` }}>
                   <span
                     className={styles.loadingSpinner}
@@ -245,7 +241,7 @@ BottomRow.propTypes = {
   typingMaxChars: PropTypes.number,
   isCommandLoading: PropTypes.bool.isRequired,
   lastResponse: PropTypes.string.isRequired,
-  mainThinking: PropTypes.string,
+  liveReply: PropTypes.string,
   voice: PropTypes.object.isRequired,
   processingTooLong: PropTypes.bool,
   capDenial: PropTypes.shape({
@@ -262,7 +258,7 @@ BottomRow.propTypes = {
 };
 
 BottomRow.defaultProps = {
-  mainThinking: '',
+  liveReply: '',
   capDenial: null,
   onUpgradeFromCap: () => {},
 };

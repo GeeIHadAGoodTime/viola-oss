@@ -137,7 +137,7 @@ def get_qualification_composition():
             from voice.customer_pronunciation import CustomerTokenizer
 
             owner = compose_customer_tokenizer(
-                CustomerTokenizer(DEFAULT_VOCAB), mandarin=True, romance_locales=("es",)
+                CustomerTokenizer(DEFAULT_VOCAB), mandarin=True, romance_locales=("es", "fr", "pt-br")
             )
             if not all(owner.supports_locale(locale) for locale in qualification_profile()["locales"]):
                 raise RuntimeError("The qualification pronunciation routes are incomplete")

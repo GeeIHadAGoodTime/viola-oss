@@ -20,6 +20,8 @@ The optional checksum-pinned Kokoro model/voice downloads originate from
 https://github.com/thewh1teagle/kokoro-onnx/releases/tag/model-files-v1.0 . Kokoro-82M
 weights are Apache-2.0 under https://huggingface.co/hexgrad/Kokoro-82M . They are
 prepared only when requested; they are not in the source snapshot.
+Its `ff_siwis` voice was trained on the SIWIS French Speech Synthesis Database,
+CC BY 4.0: https://datashare.ed.ac.uk/handle/10283/2353 .
 
 ## Local speech recognition and wake detection
 

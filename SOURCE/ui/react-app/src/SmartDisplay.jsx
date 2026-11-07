@@ -5,6 +5,7 @@ import { usePlayerState } from './hooks/usePlayerState';
 import { useOrderedPreference } from './hooks/useOrderedPreference';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useViolaApi, authFetch, apiFetch } from './hooks/useViolaApi';
+import { usePacedReply } from './hooks/usePacedReply';
 import { useAuth } from './hooks/useAuth';
 import { useDesktopAccount } from './hooks/useDesktopAccount';
 import { useAgentRegistry } from './hooks/useAgentRegistry';
@@ -578,7 +579,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
   // Real state from backend (includes send for WebSocket commands, setLocalIsPlaying for optimistic updates)
   const playerState = usePlayerState();
   const [spokeBackendTimedOut, setSpokeBackendTimedOut] = useState(false);
-  const { send: wsSend, setLocalIsPlaying, setDiagnosticRequestCallback, setErrorCallback, setOverlayCallback, setAgentProgressCallback, setDisplayPriorityCallback, setAgentFrameCallback, setPlaybackCommandCallback, setChatResponseCallback, setCalendarUpdateCallback, setDisconnectCallback } = playerState;
+  const { send: wsSend, setLocalIsPlaying, setDiagnosticRequestCallback, setErrorCallback, setOverlayCallback, setAgentProgressCallback, setDisplayPriorityCallback, setAgentFrameCallback, setPlaybackCommandCallback, setChatResponseCallback, setReplyPartialCallback, setCalendarUpdateCallback, setDisconnectCallback } = playerState;
   const api = useViolaApi();
   const {
     settings: userSettings,
@@ -1069,7 +1070,10 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
     setChatHistory([]);
   }, [historyPrincipalKey]);
   const [lastResponse, setLastResponse] = useState(IDLE_RESPONSE_LINE);
-  const [mainThinking, setMainThinking] = useState('');
+  // The reply as it is written, paced with the voice (hooks/usePacedReply.js).
+  const { liveReply, onPartial: onReplyPartial, onFinal: onReplyFinal } = usePacedReply({
+    speechRate: Number(userSettings?.tts_rate) > 5 ? Number(userSettings.tts_rate) / 150 : 1,
+  });
   // Managed-AI usage cap (C-077). Non-null for as long as the plan allowance is
   // spent, so the response area can offer a route to the upgrade surface rather
   // than dead-ending on cap copy the user cannot act on. Cleared by the first
@@ -1079,14 +1083,12 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
   // via the cloud->desktop auto-link; null when it ran in the cloud.
   const [relayDeviceName, setRelayDeviceName] = useState(null);
   const [isCommandLoading, setIsCommandLoading] = useState(false);
-  const streamingResponseRef = useRef('');
   const [activeCard, setActiveCard] = useState(null);
   const dismissCard = useCallback(() => setActiveCard(null), []);
   const [agentDrawerExpanded, setAgentDrawerExpanded] = useState(true);
   const handleAgentResult = useCallback(({ content }) => {
     if (!mountedRef.current) return;
     setLastResponse(content);
-    setMainThinking('');
     setChatHistory(prev => [
       ...prev,
       { role: 'assistant', content, timestamp: new Date().toISOString() },
@@ -1307,6 +1309,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
       // desktop instead of the cloud.
       setRelayDeviceName(relayDeviceFromResult(result));
       const responseText = result.data?.message || result.data?.response || result.message || result.response || result.data?.text || '';
+      onReplyFinal(responseText);
       if (responseText) {
         setLastResponse(`"${responseText}"`);
         // The backend's chat_response broadcast for this same turn usually
@@ -1328,7 +1331,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
         onboarding.onCommandExecuted(result);
       }
     }
-  }, [handlePaidActionGatePayload, onboarding]);
+  }, [handlePaidActionGatePayload, onboarding, onReplyFinal]);
 
   // Voice handler dispatch:
   //   - Hub (isSpoke=false) uses the HTTP path (/v1/transcribe + /v1/command);
@@ -1924,47 +1927,45 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
       dispatchUiActions(payload);
       const text = payload.text || '';
       if (!text) return;
+      onReplyFinal(text);
 
       const hasExplicitCard = payload.card && typeof payload.card === 'object';
-      const isLongResponse = text.length > 200;
-      const willShowCard = hasExplicitCard || isLongResponse;
 
-      if (willShowCard) {
-        // Card responses: the card is the display, but the response line still
-        // shows what Viola actually SAID — same shape as the short-response
-        // branch below — so it stays true and readable after the card
-        // auto-dismisses. It must never show `payload.intent`: that is the
-        // pipeline's own intent slug (`answer`, `set_volume`, `skip`, from
-        // core/voice_command_handler.py), not display copy, so it rendered
-        // as the literal sentence "Showing details for answer" on screen.
-        setLastResponse(`"${truncateForResponseLine(text)}"`);
-        if (hasExplicitCard) {
-          setActiveCard(payload.card);
-          if (payload.card.type === 'gate_review' && payload.card.gate_kind === 'payment') {
-            // Fallback delivery for the purchase approval: a desktop
-            // notification, so a minimized window still tells the user.
-            showNotification('Approve your purchase', {
-              body: truncateForResponseLine(String(payload.card.body || 'Viola is waiting for your approval.')),
-              tag: 'viola-payment-gate',
-              requireInteraction: true,
-            }, showNotificationsRef.current);
-          }
-        } else {
-          // An auto-promoted long answer has no title anyone wrote for it.
-          // ContentCard omits the whole title block when `title` is absent,
-          // and no title beats a slug titled "answer".
-          setActiveCard({ type: 'detail', body: text });
+      // The response line always shows the whole of what Viola said, however
+      // long (it scrolls): a long answer used to be cut to 160 characters and
+      // popped up in full in a card, on top of the video, before she had said a
+      // word of it. It must never show `payload.intent`: that is the pipeline's
+      // own intent slug (`answer`, `set_volume`, `skip`, from
+      // core/voice_command_handler.py), not display copy.
+      setLastResponse(`"${text}"`);
+      if (hasExplicitCard) {
+        setActiveCard(payload.card);
+        if (payload.card.type === 'gate_review' && payload.card.gate_kind === 'payment') {
+          // Fallback delivery for the purchase approval: a desktop
+          // notification, so a minimized window still tells the user.
+          showNotification('Approve your purchase', {
+            body: truncateForResponseLine(String(payload.card.body || 'Viola is waiting for your approval.')),
+            tag: 'viola-payment-gate',
+            requireInteraction: true,
+          }, showNotificationsRef.current);
         }
         // Don't add to chatHistory — card is the display
       } else {
-        // Short responses: show in chat only, no card
-        setLastResponse(`"${text}"`);
         setChatHistory(prev => appendAssistantEntry(prev, text));
       }
     };
     setChatResponseCallback(handleChatResponse);
     return () => setChatResponseCallback(null);
-  }, [setChatResponseCallback]);
+  }, [setChatResponseCallback, onReplyFinal]);
+
+  useEffect(() => {
+    if (!setReplyPartialCallback) return undefined;
+    const handleReplyPartial = (payload) => {
+      if (mountedRef.current) onReplyPartial(payload);
+    };
+    setReplyPartialCallback(handleReplyPartial);
+    return () => setReplyPartialCallback(null);
+  }, [setReplyPartialCallback, onReplyPartial]);
 
   useEffect(() => {
     if (!setCalendarUpdateCallback) return;
@@ -3233,15 +3234,11 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
         // streaming turn and no prompt.
         if (interceptCloudConsent({ kind: 'text', text })) return;
         setChatHistory(prev => [...prev, { role: 'user', content: text, timestamp: new Date().toISOString() }]);
-        streamingResponseRef.current = '';
         setLastResponse('"Processing..."'); setIsCommandLoading(true);
-        setMainThinking('');
-        api.sendCommandStreaming(text, (token) => {
-          streamingResponseRef.current += token;
-          setLastResponse(`"${streamingResponseRef.current}"`);
-        }, [], (thinking) => {
-          setMainThinking(prev => `${prev}${thinking}`);
-        }).then(result => {
+        // The stage shows only the answer, as `reply_partial` events: the raw
+        // token stream also carries tool preambles, and the model's reasoning
+        // never goes on the stage (it showed a street address and tool names).
+        api.sendCommandStreaming(text).then(result => {
           if (result) handleCommandResult(result);
         }).catch(() => { setLastResponse('"Sorry, something went wrong."'); }).finally(() => { setIsCommandLoading(false); });
         return;
@@ -4012,7 +4009,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
               typingMaxChars={STAGE_TYPING_MAX_CHARS}
               isCommandLoading={isCommandLoading}
               lastResponse={lastResponse}
-              mainThinking={mainThinking}
+              liveReply={liveReply}
               voice={voice}
               processingTooLong={processingTooLong}
               capDenial={capDenial}

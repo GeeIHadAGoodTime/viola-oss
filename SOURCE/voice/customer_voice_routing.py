@@ -25,7 +25,31 @@ _VOICE_FAMILIES = {
     "pt-br": ("pf_", "pm_", "pf_dora"),
 }
 
+# Voices that read a phrase inside a reply ("In French, thanks is merci"). They
+# are in the shipped voice file already, and they are not output languages: the
+# Settings picker and the qualification marker do not offer them.
+_PHRASE_VOICES = {"fr": "ff_siwis", "pt-br": "pf_dora"}
+
 _SETTINGS_VOICE_ALIASES = {"alloy": "af_alloy", "echo": "am_echo", "nova": "af_nova"}
+
+
+_PREVIEW_SENTENCES = {
+    "es": "Hola, soy Viola. Así sueno cuando te hablo.",
+    "zh": "你好，我是你的语音助手。这就是我的声音。",
+}
+_ENGLISH_PREVIEW = "Hi, I'm Viola. This is how I sound when I talk to you."
+
+
+def preview_sentence(locale: object) -> str:
+    """What a voice says in the Settings preview, in its own language."""
+    key = locale.lower().replace("_", "-").split("-", 1)[0] if isinstance(locale, str) else ""
+    return _PREVIEW_SENTENCES.get(key, _ENGLISH_PREVIEW)
+
+
+def default_voice(locale: str) -> str | None:
+    """The locale's default voice ID, or None when the locale has no voice family."""
+    family = _VOICE_FAMILIES.get(locale)
+    return family[2] if family else None
 
 
 def resolve_kokoro_voice_alias(voice: str) -> str:
@@ -60,6 +84,8 @@ def require_customer_voice(locale: object, voice: object) -> None:
     from voice.customer_runtime import qualification_profile
 
     profile = qualification_profile()
+    if _PHRASE_VOICES.get(key) == voice:
+        return
     if profile is not None and (key not in profile["locales"] or voice not in profile["selected_voice_ids"]):
         raise ValueError("The voice and locale are not selected in this qualification artifact")
 

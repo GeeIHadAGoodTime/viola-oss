@@ -123,7 +123,7 @@ export default function TimerCountdown({ addToast }) {
       const message = msg.payload.message
         || (msg.payload.label ? `Your ${msg.payload.label} is done!` : 'Your timer is done!');
       // Leaves on its own: it stayed up for minutes when it persisted (1.0.5
-      // build-7 laptop report). The timer also rings and speaks.
+      // build-7 laptop report). The timer also rings, with its own Stop card.
       if (addToast) addToast({ message, level: 'info', durationMs: TIMER_DONE_TOAST_MS });
       setTimers((prev) => prev.filter((t) => t.timer_id !== timerId));
     } else if (msg.type === 'alarm_ringing' && msg.payload) {

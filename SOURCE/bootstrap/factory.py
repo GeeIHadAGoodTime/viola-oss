@@ -1242,7 +1242,7 @@ class BootstrapFactory:
 
             logger.info("🎉 Bootstrap complete!")
 
-            # Wire timer expiration notifications — speak via TTS and
+            # Wire timer expiration notifications: ring the alarm sound and
             # broadcast via messaging hub when timers complete.
             try:
                 from services.timer_service import TimerService
@@ -1251,35 +1251,12 @@ class BootstrapFactory:
 
                 def _on_timer_completed(user_id: str, timer_id: str, label: str) -> None:
                     """Notify the user when a timer expires."""
-                    notification = f"Your {label} is done!" if label else "Your timer is done!"
-                    logger.info("Timer notification: %s (user=%s)", notification, user_id)
+                    from services.timer_alerts import alert_timer_completed, timer_message
 
-                    # 1) Speak via TTS (synchronous — called from timer check thread)
-                    try:
-                        from core.user_context import user_scope
+                    notification = timer_message(label)
 
-                        engine = _tts_ref
-                        with user_scope(user_id):
-                            # LazyTTSEngine wraps the real engine; try speak_sync first
-                            speak_sync = getattr(engine, "speak_sync", None)
-                            if callable(speak_sync):
-                                speak_sync(notification)
-                            else:
-                                # Fall back to async speak via event loop
-                                import asyncio as _aio
-
-                                speak = getattr(engine, "speak", None)
-                                if callable(speak):
-                                    try:
-                                        loop = _aio.get_running_loop()
-                                    except RuntimeError:
-                                        loop = None
-                                    if loop and loop.is_running():
-                                        _aio.run_coroutine_threadsafe(speak(notification), loop)
-                                    else:
-                                        _aio.run(speak(notification))
-                    except Exception as tts_err:
-                        logger.warning("Timer TTS notification failed: %s", tts_err)
+                    # 1) The alarm sound, the same every time (called from the timer check thread)
+                    alert_timer_completed(_tts_ref, user_id, timer_id, label)
 
                     # 2) Send through the user-scoped notification service if available.
                     #    user_requested: the user set this timer for this moment, so it
@@ -1333,7 +1310,7 @@ class BootstrapFactory:
                 from services.notifications.timer_notifier import TimerNotifier
 
                 timer_service.add_listener(TimerNotifier())
-                logger.info("Timer expiration notifications wired (TTS + messaging + in-app EventHub)")
+                logger.info("Timer expiration notifications wired (alarm sound + messaging + in-app EventHub)")
             except Exception as timer_wire_err:
                 logger.warning("Could not wire timer notifications: %s", timer_wire_err)
 

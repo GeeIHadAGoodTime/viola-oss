@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ast
 import asyncio
+import contextlib
 import re
 import time
 import threading
@@ -34,14 +35,33 @@ def load_streaming_method(source: Path):
         if (
             isinstance(node, ast.Assign)
             and any(
-                isinstance(target, ast.Name) and target.id in {"_SENTENCE_RE", "_EMOJI_RE", "STREAM_TIMEOUT_SECONDS", "_MAX_TEXT_LENGTH"}
+                isinstance(target, ast.Name)
+                and target.id
+                in {
+                    "_SENTENCE_RE",
+                    "_EMOJI_RE",
+                    "STREAM_TIMEOUT_SECONDS",
+                    "_MAX_TEXT_LENGTH",
+                    "_SPEECH_LOOKAHEAD_UNITS",
+                    "_FIRST_UNIT_CHARS",
+                    "_MAX_UNIT_CHARS",
+                    "_MIN_UNIT_CHARS",
+                    "_CLAUSE_END_RE",
+                }
                 for target in node.targets
             )
         )
-        or (isinstance(node, ast.FunctionDef) and node.name == "_strip_emoji")
+        or (isinstance(node, ast.FunctionDef) and node.name in {"_strip_emoji", "_speech_units"})
     ]
     logger = types.SimpleNamespace(**{name: lambda *args, **kwargs: None for name in ("debug", "info", "warning")})
-    namespace = {"asyncio": asyncio, "re": re, "time": time, "threading": threading, "logger": logger}
+    namespace = {
+        "asyncio": asyncio,
+        "contextlib": contextlib,
+        "re": re,
+        "time": time,
+        "threading": threading,
+        "logger": logger,
+    }
     module = ast.Module(
         body=[
             ast.ImportFrom(module="__future__", names=[ast.alias(name="annotations")], level=0),

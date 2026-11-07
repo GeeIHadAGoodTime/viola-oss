@@ -11,6 +11,7 @@ import { isFeatureHidden } from '../utils/featureSurface';
 import { canQuitDesktopApp, quitDesktopApp } from '../utils/runtimeSurface';
 import { outputDeviceOptions as buildOutputDeviceOptions, outputDeviceValue } from '../utils/audioOutputSelection';
 import { customerSpeechSelection, customerSpeechLanguagePatch } from '../utils/customerSpeechSelection';
+import VoicePreviewButton from './VoicePreviewButton';
 import DesktopUpsell from './DesktopUpsell';
 import AccountTab, { CalendarSettings } from './AccountTab';
 import ICloudCalendarSettings from './ICloudCalendarSettings';
@@ -3705,6 +3706,12 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
                         { value: 'echo', label: 'Echo' },
                         { value: 'nova', label: 'Nova' },
                       ]}
+                    />
+                    <VoicePreviewButton
+                      voice={customerSpeech ? speechSelection.voice : localSettings.tts_voice || 'default'}
+                      language={customerSpeech ? speechSelection.language : undefined}
+                      rate={localSettings.tts_rate ?? 150}
+                      volume={localSettings.tts_volume}
                     />
                   </div>
                   <SectionDivider />

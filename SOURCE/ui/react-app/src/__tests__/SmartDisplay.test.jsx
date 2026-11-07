@@ -2093,11 +2093,9 @@ it('review: ignores a late old-principal streaming completion', async () => {
   const { user, rerender } = render(<SmartDisplay />);
   await user.keyboard('synthetic{Enter}');
   expect(apiHarness.sendCommandStreaming).toHaveBeenCalledTimes(1);
-  const oldToken = apiHarness.sendCommandStreaming.mock.calls[0][1];
   apiHarness.account = { id: 'account-b' };
   rerender(<SmartDisplay />);
   await act(async () => {
-    oldToken('Old streaming token');
     finish({ message: 'Old streaming completion', ui_action: 'open_settings', tab: 'account' });
   });
   expect(screen.queryByTestId('settings-modal')).not.toBeInTheDocument();

@@ -150,6 +150,7 @@ export function usePlayerState() {
   const playbackCommandCallbackRef = useRef(null);
   // Callback for chat response events (assistant response text via WS)
   const chatResponseCallbackRef = useRef(null);
+  const replyPartialCallbackRef = useRef(null);
   // Callback for calendar mutation broadcasts from backend
   const calendarUpdateCallbackRef = useRef(null);
   const rehydrateRef = useRef({ key: null, inFlight: false });
@@ -369,6 +370,12 @@ export function usePlayerState() {
         chatResponseCallbackRef.current(msg.payload);
       }
     }
+    // The answer so far, while the model is still writing it (voice/stage_reply.py).
+    if (msg.type === 'reply_partial' && msg.payload) {
+      if (replyPartialCallbackRef.current) {
+        replyPartialCallbackRef.current(msg.payload);
+      }
+    }
     if (msg.type === 'calendar_updated' && msg.payload) {
       if (calendarUpdateCallbackRef.current) {
         calendarUpdateCallbackRef.current(msg.payload);
@@ -452,6 +459,10 @@ export function usePlayerState() {
     chatResponseCallbackRef.current = callback;
   }, []);
 
+  const setReplyPartialCallback = useCallback((callback) => {
+    replyPartialCallbackRef.current = callback;
+  }, []);
+
   const setCalendarUpdateCallback = useCallback((callback) => {
     calendarUpdateCallbackRef.current = callback;
   }, []);
@@ -501,6 +512,7 @@ export function usePlayerState() {
     setAgentFrameCallback,  // Expose for agent viewport frame streaming (spoke mode)
     setPlaybackCommandCallback,  // Expose for playback command handling (CB-7: seek from voice/REST)
     setChatResponseCallback,  // Expose for chat response handling (assistant text via WS)
+    setReplyPartialCallback,  // Expose for the answer as it is written (assistant text via WS)
     setCalendarUpdateCallback,  // Expose for calendar mutation broadcasts
     setDisconnectCallback,  // Expose for WS disconnect toast notification
     getWsDebug,  // Access WS debug info without subscribing the UI to message-rate renders
