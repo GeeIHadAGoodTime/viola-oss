@@ -188,6 +188,13 @@ DEFAULT_CONTROL_DEFINITIONS: tuple[ControlDefinition, ...] = (
     ControlDefinition(
         "wake_data_upload", ControlState.DISABLED, ControlSeverity.CRITICAL, ControlFailMode.CLOSED, True
     ),
+    # Custom wake-word training sends a user's own samples, at their request, to build
+    # their own model. wake_data_upload is the separate, launch-excluded voice-data
+    # CONTRIBUTION pipeline, and it stays off; the two used to share one switch, which
+    # meant custom training could not ship without opening contribution uploads.
+    ControlDefinition(
+        "custom_wake_training", ControlState.ENABLED, ControlSeverity.CRITICAL, ControlFailMode.CLOSED, True
+    ),
     ControlDefinition("telemetry_ingest", ControlState.ENABLED, ControlSeverity.WARNING, ControlFailMode.OPEN, False),
     ControlDefinition(
         "auto_update_rollout", ControlState.DISABLED, ControlSeverity.CRITICAL, ControlFailMode.CLOSED, False

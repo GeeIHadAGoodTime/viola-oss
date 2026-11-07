@@ -284,6 +284,51 @@ MUSIC_WAKE_RULE: tuple[int, int, float] = (5, 6, 0.78)
 QUIET_WAKE_RULE: tuple[int, int, float] = (3, 7, 0.85)
 
 
+# A custom wake word cannot use the table above. It was measured on the built-in
+# model, whose real "Viola" holds a score for 7 frames or more. A model trained from
+# 10 samples holds its score for as long as that word and that voice happen to: 3 or
+# 4 frames for a two-syllable word in real recordings, 7 or more for a longer one. So
+# 6 of 7 never fired on a real custom "Viola" (0 of 60 held-out recordings) while
+# peaks reached 0.99. Each custom model gets its own k of n, measured on the user's
+# own samples when it is imported (``calibrate_wake_rule`` in
+# services/wake_word/custom_models.py), and the sensitivity level moves only the
+# per-frame threshold. Most sensitive first; the nearest row wins, stricter on a tie.
+CUSTOM_FRAME_THRESHOLDS: tuple[tuple[float, float], ...] = (
+    (0.80, 0.78),
+    (0.84, 0.80),
+    (0.87, 0.82),
+    (0.90, 0.85),  # Balanced
+    (0.93, 0.88),
+    (0.95, 0.90),
+    (0.97, 0.92),
+    (0.98, 0.93),  # quiet hours at Balanced
+)
+# Used when a custom model has no measured rule. Short words need it, and the Stage 2
+# check is what stands behind it.
+CUSTOM_DEFAULT_RULE: tuple[int, int] = (2, 3)
+
+
+def custom_operating_point(
+    level: float, rule: tuple[int, int] | None, *, checked: bool = False
+) -> tuple[int, int, float]:
+    """Return (k, n, frame_threshold) for a custom wake word at a sensitivity level.
+
+    With the Stage 2 check off there is nothing behind the detector, so it asks for
+    one more frame.
+    """
+    try:
+        lv = float(level)
+    except (TypeError, ValueError):
+        lv = DEFAULT_THRESHOLD
+    if lv != lv:  # NaN
+        lv = DEFAULT_THRESHOLD
+    k, n = rule or CUSTOM_DEFAULT_RULE
+    if not checked:
+        k, n = k + 1, max(n, k + 2)
+    frame = min(CUSTOM_FRAME_THRESHOLDS, key=lambda row: (round(abs(row[0] - lv), 9), -row[0]))[1]
+    return k, n, frame
+
+
 def stream_operating_point(level: float, *, checked: bool = False) -> tuple[int, int, float]:
     """Return (k, n, frame_threshold) for a sensitivity level.
 
