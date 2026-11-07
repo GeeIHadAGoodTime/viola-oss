@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "5e6a5e8931be4a4aba71fb1772042e218f7e46ed",
-  "sha256": "ea1c8f0be3e053363e2396a4354c2850ee6eeecb226512301765298bc1f50a9e",
+  "revision": "896ff2e5b97f31c0d20f5375f3dfdcd67a78a02d",
+  "sha256": "c4c8a505500e62e9ff61ca26757b17f59165d7051824e64a1b3dde9cb18ab73a",
   "files": [
     {
       "path": ".env.example",
@@ -2375,8 +2375,8 @@
     },
     {
       "path": "mcp_servers/computer_use/server.py",
-      "sha256": "9b638767b447ba7350b3cd42b6d911bc7983f282a23728aaa3a532f25499434a",
-      "bytes": 53189
+      "sha256": "7b18e7ef1af6741d572c7f131cded2195720075a9545c707dc13e1d0419d34a1",
+      "bytes": 53209
     },
     {
       "path": "mcp_servers/core_tools/__init__.py",
@@ -4370,8 +4370,8 @@
     },
     {
       "path": "services/computer_use/window_manager.py",
-      "sha256": "17b1df5322f2ae6a83a21c45e217eeaa90e478bcf810a521dc30ef84d0309445",
-      "bytes": 40365
+      "sha256": "790089af79d57ec966496905d3e658e0e6345966716193c12857df7051d7bf68",
+      "bytes": 41926
     },
     {
       "path": "services/connectivity.py",
