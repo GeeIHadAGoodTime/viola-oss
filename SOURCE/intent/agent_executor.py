@@ -5052,6 +5052,7 @@ class AgentExecutor:
         )
         self._step_log_jsonl_path = self._build_structured_step_log_path(task_log.started_at)
         self._step_log_metadata_emitted = False
+        self._address_turn = False
         self._last_model_name = self._get_model_name_safe()
         self._token_tracker.configure(
             model=self._last_model_name,
@@ -6118,7 +6119,7 @@ class AgentExecutor:
                 "responses_continuity_mode": getattr(self, "_last_continuity_mode", None),
             }
             complete_data = _mask_addresses_for_log(redact_pii(redact_card_data(complete_data)))
-            if any(step.tool_name == _ADDRESS_TOOL for step in task_log.steps):
+            if self.__dict__.get("_address_turn") or any(step.tool_name == _ADDRESS_TOOL for step in task_log.steps):
                 complete_data = _mask_address_turn(complete_data)
             line = json.dumps(complete_data, default=str) + "\n"
             step_log_path = self._get_structured_step_log_path()
@@ -6354,7 +6355,14 @@ class AgentExecutor:
             self._pending_trim_stats = None
 
         step_data = _redact_step_data(step_data)
-        if step_data.get("tool_name") == _ADDRESS_TOOL:
+        if not self.__dict__.get("_address_turn") and (
+            step_data.get("tool_name") == _ADDRESS_TOOL
+            or ("user_text" in step_data and self._follows_address_read_back())
+        ):
+            # Decided before the first line is written: the user's words go out on
+            # step 1, and a correction may only be saved at step 2 or later.
+            self._address_turn = True
+        if self.__dict__.get("_address_turn"):
             step_data = _mask_address_turn(step_data)
 
         # Zero-tools monitoring: warn when agent has no tools available.
@@ -12596,6 +12604,32 @@ class AgentExecutor:
             return
         if address:
             order_summary["delivery_address"] = address
+
+    def _follows_address_read_back(self) -> bool:
+        """True when Viola's last reply read back the saved address.
+
+        The next turn is where "no, the house number is 4812" comes: a bare number
+        with no street to recognise in the log.
+        """
+        from services.conversation.state_manager import get_request_conversation_manager
+
+        try:
+            from ui.settings_manager import get_settings_manager
+
+            saved = get_settings_manager().get("delivery_address", {}, user_id=self._get_effective_user_id())
+            street = str(saved.get("street") or "").strip().lower() if isinstance(saved, dict) else ""
+            manager = get_request_conversation_manager() or getattr(self, "_conversation_state_manager", None)
+            get_window = getattr(manager, "get_prompt_window", None)
+            if not street or not callable(get_window):
+                return False
+            replies = [frame for frame in get_window().frames if frame.role is FrameRole.ASSISTANT]
+        except (AttributeError, ImportError, LookupError, OSError, RuntimeError, TypeError, ValueError):
+            logger.debug("Address read-back check skipped", exc_info=True)
+            return False
+        if not replies:
+            return False
+        last = " ".join(block.text for block in replies[-1].blocks if isinstance(block, TextBlock)).lower()
+        return street in last
 
     def _order_address_from_elsewhere(self, order_address: Any, saved_address: Any) -> bool:
         """True when the order ships somewhere the user neither said nor saved.
