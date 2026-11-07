@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "10027a74a977a92af5c958f6377b1577d14dabad",
-  "sha256": "678ae81ab194eb5aa4853b863f0639cc8a987c1bc44165baa86e760d546ad113",
+  "revision": "36f0229a9586062bf45054e72b58ec4a56294b83",
+  "sha256": "1d01ebabb8218c22048cdabe130278d45e84a36850001e6cd34c28051a2465f1",
   "files": [
     {
       "path": ".env.example",
@@ -1595,8 +1595,8 @@
     },
     {
       "path": "intent/agent_executor.py",
-      "sha256": "874a5488617eef40a30090b061066b92c8b51c782b32e901cb0a4525e068b34f",
-      "bytes": 629762
+      "sha256": "185d6af3e777cf04eca36c6572b371ba6338b6dfd8f12082cab7de828fad0a75",
+      "bytes": 633567
     },
     {
       "path": "intent/agent_loop.py",
@@ -1695,8 +1695,8 @@
     },
     {
       "path": "intent/context_builder.py",
-      "sha256": "7e4e8c8825b32db2f02d23d12089e66ee2395b76d4d8d3ce4fd0299e11bd27b8",
-      "bytes": 125703
+      "sha256": "da03d7a716503a9d8c9a389366201ddc37f67220687405742c2ba04f25873613",
+      "bytes": 125698
     },
     {
       "path": "intent/context_compaction.py",
@@ -2390,8 +2390,8 @@
     },
     {
       "path": "mcp_servers/core_tools/server.py",
-      "sha256": "a0c6bef71b5390e1862679b2f506f7cf0cac0d63153e0969405c31532fa2c348",
-      "bytes": 266243
+      "sha256": "ca7b37bca099ff2da4c0533e2e0b4794086fc22255dec50b19733abeb7f3580e",
+      "bytes": 266447
     },
     {
       "path": "mcp_servers/phone_tool_descriptions.py",
@@ -4685,8 +4685,8 @@
     },
     {
       "path": "services/llm/prompts/viola_unified.py",
-      "sha256": "0cf37263b486de0c93047e9d83623aa4444413a86b9f5fb7ae0cec8076127569",
-      "bytes": 16963
+      "sha256": "39454fdd7ac6335321713b99fd6d673f58d5d43b6bc59a71884de05afc2af329",
+      "bytes": 16965
     },
     {
       "path": "services/llm/provider_fallback.py",
