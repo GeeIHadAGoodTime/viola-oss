@@ -626,6 +626,9 @@ class _Change:
     entries: list[dict[str, Any]] = field(default_factory=list)
     undone: bool = False
     undo_of: str | None = None
+    # Made while untrusted content was in the conversation, so what was written
+    # may have been steered by it (see ``path_written_under_taint``).
+    under_taint: bool = False
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -637,6 +640,7 @@ class _Change:
             "entries": self.entries,
             "undone": self.undone,
             "undo_of": self.undo_of,
+            "under_taint": self.under_taint,
         }
 
     @classmethod
@@ -650,7 +654,18 @@ class _Change:
             entries=list(data.get("entries") or []),
             undone=bool(data.get("undone")),
             undo_of=data.get("undo_of"),
+            under_taint=bool(data.get("under_taint")),
         )
+
+
+def _conversation_is_tainted() -> bool:
+    """Is untrusted content in the conversation this change is being made in?"""
+    try:
+        from intent.content_sanitizer import context_is_tainted
+
+        return context_is_tainted()
+    except (ImportError, AttributeError):
+        return True  # cannot tell: treat the write as steered
 
 
 class _SessionState:
@@ -659,6 +674,7 @@ class _SessionState:
         self.lock = threading.RLock()
         self.reads: dict[str, _ReadRecord] = {}
         self.touched: set[str] = set()
+        self.tainted_writes: set[str] = set()
         self.created_dirs: set[str] = set()
         self.changes: list[_Change] = []
         self._counter = 0
@@ -688,6 +704,8 @@ class _SessionState:
                 continue
             for entry in change.entries:
                 self.touched.add(_path_key(entry.get("path") or ""))
+                if change.under_taint:
+                    self.tainted_writes.add(_path_key(entry.get("path") or ""))
             if change.action == "mkdir":
                 self.created_dirs.add(_path_key(change.path))
 
@@ -712,6 +730,7 @@ class _SessionState:
             action=action,
             path=str(path),
             destination=str(destination) if destination is not None else None,
+            under_taint=_conversation_is_tainted(),
         )
 
     def blob_path(self, change: _Change, source: Path) -> Path:
@@ -722,6 +741,8 @@ class _SessionState:
         self.changes.append(change)
         for entry in change.entries:
             self.touched.add(_path_key(entry.get("path") or ""))
+            if change.under_taint:
+                self.tainted_writes.add(_path_key(entry.get("path") or ""))
         self._persist()
 
     def note_read(self, p: Path, raw: bytes | None, complete: bool) -> None:
@@ -803,6 +824,22 @@ def path_touched_in_session(user_id: str, session_key: str, path: Path) -> bool:
             return False
     with state.lock:
         return state.is_agent_touched(path)
+
+
+def path_written_under_taint(user_id: str, session_key: str, path: Path) -> bool:
+    """True when ``path`` was changed in this conversation while untrusted content was in it.
+
+    Such a file may hold what a web page or email told the model to write, so it
+    is never treated as the user's own (taint gate, ``intent.content_sanitizer``).
+    """
+    state = peek_session_state(user_id, session_key)
+    if state is None:
+        try:
+            state = _state_for(FileScope(user_id, session_key))
+        except (OSError, ValueError):
+            return True
+    with state.lock:
+        return _path_key(path) in state.tainted_writes
 
 
 # ---------------------------------------------------------------------------

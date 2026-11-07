@@ -11,6 +11,7 @@ from core.logging_config import get_logger
 from intent.tool_types import ToolResult
 from intent.tools.music_tools import play_music_handler as _play_music_handler
 from intent.tools.search_tracks_tools import (
+    _recently_played_tracks,
     search_tracks_handler as _search_tracks_handler,
 )
 from music.youtube_embed import extract_video_id
@@ -42,7 +43,7 @@ _PLAY_PROVIDER_ALIASES = {
     "local files": "local",
 }
 _SEARCH_PROVIDERS = {"any", "local", "spotify", "youtube"}
-_MEDIA_ACTIONS = {"auto", "search", "play", "search_play"}
+_MEDIA_ACTIONS = {"auto", "search", "play", "search_play", "recent"}
 _MEDIA_CANDIDATE_FIELDS = (
     "title",
     "artist",
@@ -812,6 +813,25 @@ async def _handle_search_play_mode(
     )
 
 
+async def _handle_recent_mode(user_id: str) -> ToolResult:
+    """What the user last listened to, so an open request can be chosen for them.
+
+    The per-turn recents injection was retired so the model would read recents
+    from a music tool when it judges them relevant, but the only reader was a
+    side field of a search, which needs a query it does not have yet. Plays
+    nothing. A store that cannot be read is an empty history, not a failed turn.
+    """
+    try:
+        tracks = await _recently_played_tracks(user_id)
+    except (OSError, RuntimeError, ValueError) as exc:
+        logger.debug("Recently played tracks unavailable: %s", type(exc).__name__)
+        tracks = []
+    return ToolResult(
+        ok=True,
+        data={"mode": "recent", "action": "recent", "recently_played": tracks, "count": len(tracks)},
+    )
+
+
 async def media_handler(
     query: str = "",
     *,
@@ -832,8 +852,11 @@ async def media_handler(
         return ToolResult(
             ok=False,
             data=None,
-            error="media action must be one of auto, search, play, or search_play.",
+            error="media action must be one of auto, search, play, search_play, or recent.",
         )
+
+    if cleaned_action == "recent":
+        return await _handle_recent_mode(user_id)
 
     generic_request = False
     if not cleaned_track_uri and not cleaned_query and cleaned_action in {"auto", "search_play"}:

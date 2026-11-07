@@ -576,6 +576,7 @@ def _merge_action_metadata(
     annotations=_DANGEROUS,
     description=(
         "Unified desktop GUI control for the local Windows computer. "
+        "Not for files: listing, finding, reading or deleting files is file_read and file_write, never File Explorer. "
         "Observation — variants: list_windows / screenshot(region) / "
         "observe_region(x,y,width,height) / analyze_screen(question,capture_mode) / "
         "read_window(title) / inspect_window(title, include_screenshot, include_vision) "

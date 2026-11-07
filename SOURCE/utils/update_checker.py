@@ -524,10 +524,18 @@ def check_for_update(manifest_url: str | None = None, *, force_refresh: bool = F
     user_min = _user_minimum_version()
     current_parsed = _parse_version(VIOLA_VERSION)
     max_version_issue = bool(max_version and current_parsed > _parse_version(max_version))
+    # ``latest_version`` is what THIS install is offered: during a staged rollout
+    # an install outside the cohort sees the previous stable. The newest release
+    # actually published is a separate fact, for anything that reports it.
+    newest_published = max(
+        (remote_version, str(data.get("version", "")).strip(), str(_candidate_block(data).get("version") or "").strip()),
+        key=_parse_version,
+    )
     result: dict[str, object] = {
         "available": False,
         "current_version": VIOLA_VERSION,
         "latest_version": remote_version,
+        "published_version": newest_published,
         "min_supported": min_supported,
         "max_version": max_version,
         "max_version_message": max_version_message,

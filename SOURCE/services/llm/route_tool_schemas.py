@@ -33,11 +33,12 @@ ROUTE_TOOL_SCHEMAS: list[dict[str, Any]] = [
             "provider, title, artist, and track_uri. For broad requests — single-word artist names ('drake'), "
             "bare genres/moods/eras ('jazz', 'chill', '80s'), or 'play me a X' / 'play some X' patterns — "
             "action='search_play' is preferred unless the user is asking to choose from options. Pass query as "
-            "just the descriptor (artist/title/genre/mood) without filler words like 'some' or 'play me'; for a "
-            "fully generic 'play some music' / 'play anything' request with no descriptor, use search_play with an "
-            "empty query so the tool returns a general selection rather than searching the literal word. "
+            "just the descriptor (artist/title/genre/mood) without filler words like 'some' or 'play me'. "
+            "For an open request ('play something', 'play some music', 'play anything') choose a concrete query "
+            "yourself from the user's tastes, recently played tracks (action='recent') and the time of day, "
+            "and play it; never ask. "
             "Use CURRENT SYSTEM STATE for provider choice, local-library metadata, local-match facts, "
-            "target_room, room_route/pairing_flow, recently played tracks, and user music preferences. "
+            "target_room, room_route/pairing_flow, and user music preferences. "
             "Setup/login requests use pair_speaker_setup or connect_music_provider. Transport controls use playback."
         ),
         "parameters": {
@@ -144,8 +145,8 @@ ROUTE_TOOL_SCHEMAS: list[dict[str, Any]] = [
         "name": "open_app_panel",
         "description": (
             "Open a Viola UI panel for requests like 'open settings', 'show payment methods', "
-            "or 'take me to my calendar'. Available panel_id values: settings, "
-            "rooms.add_speaker, calendar, music_accounts, payment_methods, help. "
+            "'open the memory panel' or 'take me to my calendar'. Available panel_id values: settings, "
+            "rooms.add_speaker, calendar, music_accounts, payment_methods, help, memory. "
             "Returns structured ui_action data for the app; this is a UI capability, "
             "not a classifier, gate, or settings mutation."
         ),
@@ -161,6 +162,7 @@ ROUTE_TOOL_SCHEMAS: list[dict[str, Any]] = [
                         "music_accounts",
                         "payment_methods",
                         "help",
+                        "memory",
                     ],
                     "description": "Panel to open.",
                 },

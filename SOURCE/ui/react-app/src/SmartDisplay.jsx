@@ -26,8 +26,10 @@ import { useSettings } from './hooks/useSettings';
 import { useAvailableRooms } from './hooks/useAvailableRooms';
 import CallBriefing, {
   callBriefingBelongsElsewhere,
+  ACTION_APPROVAL_TTL_MS,
   CALL_APPROVE_COMMAND,
   CALL_CANCEL_COMMAND,
+  actionApprovalFromConsultEvent,
   answerCallBriefing,
   callBriefingFromConsultEvent,
 } from './components/CallBriefing';
@@ -776,6 +778,8 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
     window.addEventListener('viola:chat:active-thread', handleActiveThread);
     return () => window.removeEventListener('viola:chat:active-thread', handleActiveThread);
   }, []);
+  // Same card for every other action that waits on a yes (CallBriefing).
+  const [actionApproval, setActionApproval] = useState(null);
   const [callConsultation, setCallConsultation] = useState(null);
   const consultationReply = useCallConsultationReply(callConsultation, setCallConsultation);
   const [lastEndedCall, setLastEndedCall] = useState(null);
@@ -1472,6 +1476,20 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
       method: 'POST', body: JSON.stringify({ text: answer }),
     }),
   }), [callBriefing, submitTextCommand]);
+  const answerActionApproval = useCallback(async (text) => {
+    await answerCallBriefing(actionApproval, text, {
+      sendCommand: submitTextCommand,
+      sendToChat: (threadId, answer) => apiFetch(`/v1/chat/threads/${encodeURIComponent(threadId)}/send`, {
+        method: 'POST', body: JSON.stringify({ text: answer }),
+      }),
+    });
+    setActionApproval(null);
+  }, [actionApproval, submitTextCommand]);
+  useEffect(() => {
+    if (!actionApproval) return undefined;
+    const timer = setTimeout(() => setActionApproval(null), ACTION_APPROVAL_TTL_MS);
+    return () => clearTimeout(timer);
+  }, [actionApproval]);
 
   // Cloud browser first-visit welcome (#2607): server-side completion-gated
   // (useCloudWelcome -> /v1/cloud-welcome/*), so it opens once `completed`
@@ -2193,6 +2211,8 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
       // number and who it belongs to, with Approve / Cancel (CallBriefing).
       const briefing = callBriefingFromConsultEvent(payload);
       if (briefing !== undefined) setCallBriefing(briefing);
+      const approval = actionApprovalFromConsultEvent(payload);
+      if (approval !== undefined) setActionApproval(approval);
     } else if (data.type === 'call_briefing') {
       setCallBriefing(payload);
       rememberCallMeta(payload, callId);
@@ -4337,6 +4357,12 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
         onDismiss={() => setCallBriefing(null)}
         onApprove={() => answerCallBriefingInItsChat(CALL_APPROVE_COMMAND)}
         onCancel={() => answerCallBriefingInItsChat(CALL_CANCEL_COMMAND).then(() => setCallBriefing(null))}
+      />
+      <CallBriefing
+        briefing={actionApproval}
+        onDismiss={() => setActionApproval(null)}
+        onApprove={() => answerActionApproval(CALL_APPROVE_COMMAND)}
+        onCancel={() => answerActionApproval(CALL_CANCEL_COMMAND)}
       />
       {!activeInlineConsultation && (
         <CallConsultation

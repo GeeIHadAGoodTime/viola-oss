@@ -84,6 +84,14 @@ _AUTOSTART_PATTERNS = [
 ]
 _EXECUTABLE_RE = re.compile(r"\.(?:exe|dll|scr|com|msi|msp|sys|cpl|ocx|pif|lnk|hta|jar)$", re.IGNORECASE)
 _WELL_KNOWN_USER_FOLDERS = frozenset({"desktop", "documents", "downloads", "pictures", "music", "videos", "onedrive"})
+_SPOKEN_FOLDERS = (
+    ("desktop", "on your Desktop"),
+    ("documents", "in your Documents"),
+    ("downloads", "in your Downloads"),
+    ("pictures", "in your Pictures"),
+    ("music", "in your Music"),
+    ("videos", "in your Videos"),
+)
 
 
 @dataclass(frozen=True)
@@ -235,9 +243,19 @@ def _folder_named(folder: Path, user_text: str, text: str, home: Path | None, *,
     return bool(
         home is not None
         and folder.name.lower() in _WELL_KNOWN_USER_FOLDERS
-        and _norm(str(folder.parent)) == _norm(str(home))
+        and _is_users_own_folder(folder, home)
         and re.search(r"\bmy\s+%s\b" % name, user_text, re.IGNORECASE)
     )
+
+
+def _is_users_own_folder(folder: Path, home: Path) -> bool:
+    """``folder`` is the real one "my desktop" means, also when OneDrive moved it."""
+    if _norm(str(folder.parent)) == _norm(str(home)):
+        return True
+    from intent.tools.filesystem import user_known_folder
+
+    known = user_known_folder(folder.name)
+    return known is not None and _norm(str(known)) == _norm(str(folder))
 
 
 def is_user_referenced_path(p: Path, user_text: str) -> bool:
@@ -382,12 +400,7 @@ def _named_in_current_request(p: Path) -> bool:
         words = str(getattr(active_taint_tracker(), "user_request", "") or "")
     except ImportError:  # pragma: no cover - same package
         return False
-    if not words.strip():
-        return False
-    if _name_mentioned(p.name, words):
-        return True
-    text = _norm(words)
-    return any(_contains_path(text, form) for form in _path_forms(p, _home()) if "/" in form)
+    return named_by_user(p, words)
 
 
 def base_file_write_class(action: str) -> str | None:
@@ -472,6 +485,46 @@ def file_write_action_class(args: Mapping[str, Any] | None) -> str | None:
     return FILE_WRITE
 
 
+def named_by_user(p: Path, user_text: str) -> bool:
+    """The user's own words name this file, by name or by a path to it."""
+    if not user_text or not user_text.strip():
+        return False
+    if _name_mentioned(p.name, user_text):
+        return True
+    text = _norm(user_text)
+    return any(_contains_path(text, form) for form in _path_forms(p, _home()) if "/" in form)
+
+
+def _spoken_path(raw_path: str) -> str:
+    """A path as a person says it: "primes.py on your Desktop", not C:\\Users\\name\\...
+
+    The prompt must still pin down which file, so anything below a known folder
+    keeps its full route from there. Outside the user's own folders the real
+    path is the only honest name for it.
+    """
+    from intent.tools.filesystem import user_known_folder
+
+    path = _resolve(raw_path)
+    if path is None:
+        return raw_path
+    for folder_name, label in _SPOKEN_FOLDERS:
+        folder = user_known_folder(folder_name)
+        if folder is None:
+            continue
+        try:
+            inside = path.relative_to(folder)
+        except ValueError:
+            continue
+        return "%s %s" % (inside, label) if inside.parts else label.split(" ", 1)[1]
+    home = _home()
+    if home is not None:
+        try:
+            return "%s in your home folder" % path.relative_to(home)
+        except ValueError:
+            pass
+    return raw_path
+
+
 def describe_file_action(action_class: str, args: Mapping[str, Any] | None) -> str | None:
     """Plain-words description for the confirm prompt, or None if not a file class."""
     params = args or {}
@@ -480,6 +533,7 @@ def describe_file_action(action_class: str, args: Mapping[str, Any] | None) -> s
     action = _action_of(params)
     destination = str(params.get("destination") or "").strip()
     if action_class == FILE_DELETE:
+        target = _spoken_path(raw_path) if raw_path else target
         path = _resolve(raw_path) if raw_path else None
         if path is not None and path.is_dir():
             count = _folder_file_count(path)
@@ -488,7 +542,7 @@ def describe_file_action(action_class: str, args: Mapping[str, Any] | None) -> s
             else:
                 inside = "1 file" if count == 1 else "%d files" % count
             return "delete the folder %s and the %s in it (it goes to the Recycle Bin and can be undone)" % (
-                raw_path,
+                target,
                 inside,
             )
         return "delete %s (it goes to the Recycle Bin and can be undone)" % target if raw_path else "delete the file"
@@ -529,6 +583,7 @@ __all__ = [
     "is_autostart_location",
     "is_executable_file",
     "is_user_referenced_path",
+    "named_by_user",
     "reset_file_gate_context",
     "user_texts_from_messages",
 ]

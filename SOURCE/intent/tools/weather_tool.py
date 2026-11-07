@@ -292,20 +292,19 @@ def _weekend_note(
     covered = [value for value in weekend if value.isoformat() in forecast_dates]
 
     if weekday == 5:
-        text = "Weekend: today is Saturday, so this weekend is today and tomorrow (Sunday)."
+        text = "Today is Saturday, so this weekend is today and tomorrow."
     elif weekday == 6:
         next_saturday = ref_date + datetime.timedelta(days=6)
-        text = (
-            "Weekend: today is Sunday, the last day of this weekend, so this weekend means today "
-            "(Saturday is already over). Next weekend is %s and %s."
-            % (_short_date(next_saturday), _short_date(next_saturday + datetime.timedelta(days=1)))
+        text = "Today is Sunday, the last day of this weekend. Next weekend is %s and %s." % (
+            _short_date(next_saturday),
+            _short_date(next_saturday + datetime.timedelta(days=1)),
         )
     else:
-        text = "Weekend: this weekend is %s and %s." % (_short_date(weekend[0]), _short_date(weekend[1]))
+        text = "This weekend is %s and %s." % (_short_date(weekend[0]), _short_date(weekend[1]))
         if not covered:
-            text += " Those days are not in this forecast yet."
+            text += " The forecast doesn't reach that far yet."
         elif len(covered) < len(weekend):
-            text += " Only %s is in this forecast so far." % covered[0].strftime("%A")
+            text += " The forecast only reaches %s so far." % covered[0].strftime("%A")
     data = {
         "today_is_weekend": weekday >= 5,
         "this_weekend_dates": [value.isoformat() for value in weekend],
