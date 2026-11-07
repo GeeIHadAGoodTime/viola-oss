@@ -30,10 +30,10 @@
   },
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "4149b39cce4f2de0b503fe9b4881f3e40572f8c2f5f8f5de002ecbba08daff25",
-  "source_tree_sha256": "77445bd768617dd7c56cd8f4d12adf577d7e987ddf17e630103526e05e0567a1",
-  "source_file_count": 2778,
-  "source_revision": "b4aa6fc32081a825cceb7a9ebcb06ec1c2d725e1",
+  "source_manifest_sha256": "35840ec853b71def762cdb6a494dbe5fc22e2e680c060129b23a99fcbf8dc91a",
+  "source_tree_sha256": "50f8e5500367950fffd852171216b261158bb4f70c5f34a2124cb42cf65a55d7",
+  "source_file_count": 2780,
+  "source_revision": "50b2e743adc3759a8986cc228033c77d3047715c",
   "comparison_public_revision": "ecab2772465fcc89ae6645b028af1c2273b9199f",
   "changed_source_paths": [
     "START_WEB_INTERFACE.py",
@@ -119,6 +119,7 @@
     "intent/tools/weather_tool.py",
     "intent/tools/web_read.py",
     "intent/tools/web_search.py",
+    "logs/structured/viola-20261107.jsonl",
     "mcp_hub/approval_bridge.py",
     "mcp_hub/client_hub.py",
     "mcp_hub/inprocess.py",
@@ -153,6 +154,7 @@
     "playback/engines/__init__.py",
     "playback/engines/spotify.py",
     "playback/engines/spotify_cdp.py",
+    "scripts/ai_debug_session.log",
     "services/alarm_ringer.py",
     "services/browser/qt_cdp_bridge.py",
     "services/browser_overlay_controller.py",
@@ -511,7 +513,7 @@
     "historical_inventory_limits": "This renderer correction changes no dependency or workflow inputs. All six retained SBOMs and their complete status objects stay historical and unchanged; no current installed inventory qualification is claimed."
   },
   "qualification": {
-    "source_commit": "b4aa6fc32081a825cceb7a9ebcb06ec1c2d725e1",
+    "source_commit": "50b2e743adc3759a8986cc228033c77d3047715c",
     "kind": "r10 tools"
   },
   "historical_bindings": [

@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "b4aa6fc32081a825cceb7a9ebcb06ec1c2d725e1",
-  "sha256": "77445bd768617dd7c56cd8f4d12adf577d7e987ddf17e630103526e05e0567a1",
+  "revision": "50b2e743adc3759a8986cc228033c77d3047715c",
+  "sha256": "50f8e5500367950fffd852171216b261158bb4f70c5f34a2124cb42cf65a55d7",
   "files": [
     {
       "path": ".env.example",
@@ -2244,6 +2244,11 @@
       "bytes": 10792
     },
     {
+      "path": "logs/structured/viola-20261107.jsonl",
+      "sha256": "54e082fe38f24ac9be11cb9ed9502bc714065880564cf2349372d96120246b16",
+      "bytes": 10808
+    },
+    {
       "path": "mcp_hub/__init__.py",
       "sha256": "fcd9a4ca3f575ec84adea8dfd2ec035c991ad113008637f67687fc8fb2625041",
       "bytes": 380
@@ -2360,8 +2365,8 @@
     },
     {
       "path": "mcp_servers/computer_use/server.py",
-      "sha256": "54e3f7e01cfba26482bd19ca7367c7ec6e810605e5d2b4cee66010ac5b28232b",
-      "bytes": 50244
+      "sha256": "a7ba81c0858fe214f12b58c8d35f213a11d2178446305e936adff1bf226dd17d",
+      "bytes": 50264
     },
     {
       "path": "mcp_servers/core_tools/__init__.py",
@@ -3874,6 +3879,11 @@
       "bytes": 2255
     },
     {
+      "path": "scripts/ai_debug_session.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
       "path": "scripts/build_youtube_embed.py",
       "sha256": "55f1e3163498329da44cbe1eee1f7d301a07910cbb1442af5f66e27c63bf6a56",
       "bytes": 1783
@@ -4345,8 +4355,8 @@
     },
     {
       "path": "services/computer_use/window_manager.py",
-      "sha256": "17b1df5322f2ae6a83a21c45e217eeaa90e478bcf810a521dc30ef84d0309445",
-      "bytes": 40365
+      "sha256": "790089af79d57ec966496905d3e658e0e6345966716193c12857df7051d7bf68",
+      "bytes": 41926
     },
     {
       "path": "services/connectors/__init__.py",
