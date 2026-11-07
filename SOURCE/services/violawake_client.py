@@ -109,6 +109,10 @@ class ViolaWakeTrainingPausedError(ViolaWakeRemoteError):
     """ViolaWake refused a submission because this user's training is paused."""
 
 
+class ViolaWakeMonthlyLimitError(ViolaWakeClientError):
+    """The user has used this month's custom wake words. The message is ours, for the user."""
+
+
 @dataclass(frozen=True, slots=True)
 class WakeAudioSample:
     """Audio sample submitted to ViolaWake."""
@@ -141,6 +145,15 @@ class TrainingJobStatus:
     # Set only by the relay, which classified ``error`` on the cloud side so that
     # ViolaWake's own text never reaches a desktop.
     error_reason: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class TrainingJobSummary:
+    """One of this user's jobs, as much as a monthly count needs."""
+
+    status: str
+    created_at: str
+    error: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -296,6 +309,26 @@ class ViolaWakeClient:
             reason=_optional_str(response.get("reason")),
             code=_optional_str(response.get("code")),
         )
+
+    async def list_jobs(self) -> list[TrainingJobSummary]:
+        """List this user's jobs. ViolaWake scopes the list to the tenant key."""
+
+        response = await self._request("GET", "/api/jobs")
+        try:
+            payload = response.json()
+        except ValueError as exc:
+            raise ViolaWakeClientError("ViolaWake returned a non-JSON response") from exc
+        if not isinstance(payload, list):
+            raise ViolaWakeClientError("ViolaWake returned an invalid response")
+        return [
+            TrainingJobSummary(
+                status=str(item.get("status", "")),
+                created_at=str(item.get("created_at", "")),
+                error=_optional_str(item.get("error")),
+            )
+            for item in payload
+            if isinstance(item, dict)
+        ]
 
     async def get_job_status(self, job_id: str) -> TrainingJobStatus:
         """Poll a ViolaWake training job."""
@@ -749,6 +782,8 @@ def _origin(url: str) -> tuple[str, str, int]:
 def _raise_for_response(response: httpx.Response) -> None:
     if response.status_code >= 500:
         raise ViolaWakeUnavailableError("ViolaWake is temporarily unavailable")
+    if response.status_code == 429 and _RELAY_PREFIX in str(response.request.url):
+        raise ViolaWakeMonthlyLimitError(_error_message(response))
     if response.status_code == 409 and response.headers.get("X-Training-Paused"):
         raise ViolaWakeTrainingPausedError(_error_message(response))
     if response.status_code in {401, 403} and _RELAY_PREFIX in str(response.request.url):
@@ -789,11 +824,13 @@ __all__ = [
     "DEFAULT_VIOLAWAKE_API_URL",
     "WAKE_TENANT_HEADER",
     "TrainingJobStatus",
+    "TrainingJobSummary",
     "TrainingModelConfig",
     "TrainingReadiness",
     "TrainingSubmission",
     "ViolaWakeClient",
     "ViolaWakeClientError",
+    "ViolaWakeMonthlyLimitError",
     "ViolaWakeRelayClient",
     "ViolaWakeRemoteError",
     "ViolaWakeSignInRequiredError",

@@ -192,15 +192,16 @@ def _resolve_custom_wake_model_path() -> Path | None:
 def _point_verifier_at(model_path: Path) -> str | None:
     """Publish the word this model listens for; return that word."""
 
-    word: str | None = None
     try:
         from services.wake_word.custom_models import custom_wake_word_for_model
-
+        from voice.wake_detector.active_word import publish_active_wake_word
+    except ImportError:  # the listener loaded on its own: only the built-in word exists
+        return None
+    word: str | None = None
+    try:
         word = custom_wake_word_for_model(model_path)
     except Exception as exc:  # noqa: BLE001, RUF100 - an unreadable sidecar means the built-in word
         logger.warning("Could not read the wake word for %s: %s", model_path, exc)
-    from voice.wake_detector.active_word import publish_active_wake_word
-
     publish_active_wake_word(word)
     return word
 
@@ -824,6 +825,8 @@ class ViolaWakeListener:
 
             engine.custom_model = bool(custom_wake_word_for_model(model_path))
             engine.custom_rule = custom_wake_rule_for_model(model_path)
+        except ImportError:
+            logger.debug("Custom wake models are not available here")
         except Exception as exc:  # noqa: BLE001, RUF100 - an unreadable sidecar means the built-in rule
             logger.warning("Could not read the wake rule for %s: %s", model_path, exc)
         return engine

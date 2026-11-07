@@ -19,6 +19,7 @@ from fastapi import Body, Depends, HTTPException, Request, status
 from services.violawake_client import (
     ViolaWakeClient,
     ViolaWakeClientError,
+    ViolaWakeMonthlyLimitError,
     ViolaWakeRemoteError,
     ViolaWakeSignInRequiredError,
     ViolaWakeUnavailableError,
@@ -402,6 +403,8 @@ def register_wake_training_routes(context: ApiContext) -> None:
             )
         except ViolaWakeSignInRequiredError:
             return _json_error(status.HTTP_401_UNAUTHORIZED, "sign_in_required", _SIGN_IN_REQUIRED)
+        except ViolaWakeMonthlyLimitError as exc:
+            return _json_error(status.HTTP_429_TOO_MANY_REQUESTS, "wake_monthly_limit", str(exc))
         except ViolaWakeUnavailableError:
             return _json_error(status.HTTP_503_SERVICE_UNAVAILABLE, "violawake_unavailable", _TEMPORARILY_UNAVAILABLE)
         except ViolaWakeRemoteError:
