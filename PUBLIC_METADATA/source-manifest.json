@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "0c6989980727268fbc3f029d84fd76a57b0ab32a",
-  "sha256": "77b6b374a5368b4555e9148a729c08d4d525d2a1ca383dff594c71b34348a886",
+  "revision": "e3b56abacbc2f177cba41e68966c34cf76732caa",
+  "sha256": "6bac71789bc55873a00e7dce7253049383f7c983575d29f3e8a903a3844c2c1f",
   "files": [
     {
       "path": ".env.example",
@@ -1595,8 +1595,8 @@
     },
     {
       "path": "intent/agent_executor.py",
-      "sha256": "0e30a1afa42b00311fc160a2928870f9178c76c7d73b9c14c914c12f235d1e1e",
-      "bytes": 638799
+      "sha256": "cd7b929b6d39614d94d98a487e689df71000cf139a6783ced0e3bcc703a15177",
+      "bytes": 642330
     },
     {
       "path": "intent/agent_loop.py",
@@ -1635,8 +1635,8 @@
     },
     {
       "path": "intent/approval.py",
-      "sha256": "03e36719e15d56daa1060fc51e1136b64e19f6eef8b96ef4e07e7c31033bb4a9",
-      "bytes": 60274
+      "sha256": "60d70228861533622e154fc8ed7154defde086513fc01504408da2eed11ed4c3",
+      "bytes": 61873
     },
     {
       "path": "intent/capability_resolver.py",
