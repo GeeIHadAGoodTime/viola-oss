@@ -4359,7 +4359,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
         onCancel={() => answerCallBriefingInItsChat(CALL_CANCEL_COMMAND).then(() => setCallBriefing(null))}
       />
       <CallBriefing
-        briefing={actionApproval}
+        briefing={callBriefingBelongsElsewhere(actionApproval, openChatThreadId) ? null : actionApproval}
         onDismiss={() => setActionApproval(null)}
         onApprove={() => answerActionApproval(CALL_APPROVE_COMMAND)}
         onCancel={() => answerActionApproval(CALL_CANCEL_COMMAND)}

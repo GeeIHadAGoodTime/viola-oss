@@ -2117,6 +2117,32 @@ it('review: preserves voice history across same-principal auth object refreshes'
   expect(await within(dialog).findByText('Current principal history')).toBeInTheDocument();
 });
 
+it('keeps an action approval in the chat it was asked in, like a call approval', async () => {
+  render(<SmartDisplay />);
+  await waitFor(() => expect(wsHarness.handler).toBeTypeOf('function'));
+  const title = 'Viola needs your approval';
+  act(() => {
+    wsHarness.handlers.forEach((handler) => handler({
+      type: 'consult_user',
+      payload: {
+        action_class: 'file_delete',
+        status: 'awaiting_confirmation',
+        planned_action: 'delete primes.py from your desktop',
+        chat_thread_id: 'chat-a',
+      },
+    }));
+  });
+  expect(await screen.findByText(title)).toBeInTheDocument();
+  act(() => {
+    window.dispatchEvent(new CustomEvent('viola:chat:active-thread', { detail: { threadId: 'chat-b' } }));
+  });
+  await waitFor(() => expect(screen.queryByText(title)).not.toBeInTheDocument());
+  act(() => {
+    window.dispatchEvent(new CustomEvent('viola:chat:active-thread', { detail: { threadId: 'chat-a' } }));
+  });
+  expect(await screen.findByText(title)).toBeInTheDocument();
+});
+
 const LONG_ANSWER = `${'A long answer that goes on for a while. '.repeat(6)}The end.`;
 
 it('shows a long unspoken answer in a card at once, with only a lead on the stage line', async () => {
