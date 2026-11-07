@@ -193,6 +193,10 @@ def reset_hwnd_cache_for_tests() -> None:
         _HWND_CACHE.clear()
 
 
+# The taskbars and the desktop itself: part of Windows, not windows a user has open.
+_SHELL_CHROME_CLASSES: frozenset[str] = frozenset({"Shell_TrayWnd", "Shell_SecondaryTrayWnd", "Progman", "WorkerW"})
+
+
 @dataclass(frozen=True)
 class WindowInfo:
     """Top-level Windows desktop window metadata."""
@@ -270,8 +274,28 @@ def _process_name(process_id: int) -> str:
 
 def _window_to_info(window: Any) -> WindowInfo:
     handle = int(getattr(window, "handle", 0) or 0)
-    rectangle = window.rectangle()
     element_info = getattr(window, "element_info", None)
+    if handle and _user32 is not None and _user32.IsWindow(handle):
+        # Plain Win32 for a real window. UIA's is_minimized needs the WindowPattern,
+        # which games, Discord and the shell do not offer, so it raised and those
+        # windows silently vanished from every listing: the game filling the
+        # screen was not an open window at all (2026-11-06, Warhammer3.exe).
+        rect = _get_window_rect_fast(handle)
+        process_id = _process_id_for_handle(handle)
+        return WindowInfo(
+            handle=handle,
+            title=_get_window_title_fast(handle),
+            executable=_process_name(process_id),
+            process_id=process_id,
+            class_name=_get_window_class_fast(handle),
+            left=int(rect.left),
+            top=int(rect.top),
+            right=int(rect.right),
+            bottom=int(rect.bottom),
+            minimized=bool(_user32.IsIconic(handle)),
+            visible=bool(_user32.IsWindowVisible(handle)),
+        )
+    rectangle = window.rectangle()
     class_name = str(getattr(element_info, "class_name", "") or "")
     process_id = _process_id_for_handle(handle) if handle else int(getattr(element_info, "process_id", 0) or 0)
     return WindowInfo(
@@ -308,13 +332,15 @@ def list_windows(*, include_minimized: bool = False, include_titles: bool = True
     Desktop = _import_desktop()
     desktop = Desktop(backend="uia")
     windows: list[dict[str, object]] = []
+    unreadable = 0
     for window in desktop.windows():
         try:
             info = _window_to_info(window)
-        except Exception:
-            logger.debug("Skipping window with unreadable metadata")
+        except Exception as exc:
+            unreadable += 1
+            logger.warning("Skipping window with unreadable metadata: %s", type(exc).__name__)
             continue
-        if not info.visible:
+        if not info.visible or info.class_name in _SHELL_CHROME_CLASSES:
             continue
         if info.minimized and not include_minimized:
             continue
@@ -322,12 +348,16 @@ def list_windows(*, include_minimized: bool = False, include_titles: bool = True
             continue
         windows.append(info.to_dict(include_title=include_titles))
 
-    return {
+    result: dict[str, object] = {
         "ok": True,
         "action": "list_windows",
         "windows": windows,
         "count": len(windows),
     }
+    if unreadable:
+        # Never let a partial list read as the whole desktop.
+        result["unreadable_windows"] = unreadable
+    return result
 
 
 def _list_windows_darwin(*, include_minimized: bool, include_titles: bool) -> dict[str, object]:
@@ -934,6 +964,8 @@ def focus_window(
             info = _window_to_info(window)
         except Exception:
             logger.debug("Skipping window during focus lookup")
+            continue
+        if info.class_name in _SHELL_CHROME_CLASSES:
             continue
         if _matches_window(info, handle=handle, title=title, app_executable=app_executable):
             try:
