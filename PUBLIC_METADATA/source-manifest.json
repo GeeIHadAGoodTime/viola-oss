@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "0c3f644cbfe9b11156a75b90e5fb43196662c865",
-  "sha256": "deeb82eeddbf08df0f618fcbd76048797c44fc9534d69f9e9c666b99aaeb9187",
+  "revision": "8607c7f77e6eea3095ae5f4e8c1a749f5ec86cb5",
+  "sha256": "6583e9bcf6acfc2337b8083dcc71ef36f420b296bc3a5272541df1dcaf3d0c80",
   "files": [
     {
       "path": ".env.example",
@@ -5060,8 +5060,8 @@
     },
     {
       "path": "services/operator_controls.py",
-      "sha256": "75dccdf48a0c667bd6683e1448a3cf75e3e207febf5346a35d9df0f0311e4a65",
-      "bytes": 37169
+      "sha256": "77ea3cd769d1d59b9efbae78f4e45c297a87a1e752f503b815fc5f6380903877",
+      "bytes": 37647
     },
     {
       "path": "services/orchestration/__init__.py",
@@ -5475,8 +5475,8 @@
     },
     {
       "path": "services/violawake_client.py",
-      "sha256": "9a50dead290a18d8e30b17252ef7f7e7f2032e7b01e090fd4af04144e5dc626e",
-      "bytes": 22206
+      "sha256": "76427dda1de05877a41707e985b286aafae6e9b23d59c96eb841f2435859f37a",
+      "bytes": 32278
     },
     {
       "path": "services/wake_word/__init__.py",
@@ -5485,8 +5485,8 @@
     },
     {
       "path": "services/wake_word/custom_models.py",
-      "sha256": "fb6cb0e59a26343f5ab5c3a24fd9ac0ef79ae3507839618be9e98115dffae093",
-      "bytes": 21508
+      "sha256": "9cc37a9503a10c9b191be24b2e3d553712ff6a8dcbd659537f694bac45f2b80a",
+      "bytes": 28190
     },
     {
       "path": "services/wake_word/embedding_common.py",
@@ -9760,8 +9760,8 @@
     },
     {
       "path": "ui/api/routes/wake_training.py",
-      "sha256": "3345e51a9383b7652386f81e13d246fef0a43e7d2e0eb9bd0f22baff49e2cb3e",
-      "bytes": 24689
+      "sha256": "a11ca7ac8840ca80e9a4ed05aa803c9c0dd1e298ce48cf392f2f06c5f08ffe06",
+      "bytes": 30656
     },
     {
       "path": "ui/api/routes/weather.py",
@@ -10695,8 +10695,8 @@
     },
     {
       "path": "ui/react-app/src/components/CustomizeTab.jsx",
-      "sha256": "c62df11c75e439e7b41c123dbf7c0ae4b511ae825001681a6d99b3b2f76740a3",
-      "bytes": 17384
+      "sha256": "ee7afe3cf3943d0967a9937a0fc8a8d41367a05f14f062b9818421e834c27b0a",
+      "bytes": 17341
     },
     {
       "path": "ui/react-app/src/components/CustomizeTab.test.jsx",
@@ -10755,13 +10755,13 @@
     },
     {
       "path": "ui/react-app/src/components/HelpModal.jsx",
-      "sha256": "3b6f8021025c7529e97402700f67b47e9da6e79a750b152475127dc7d65dc1ea",
-      "bytes": 16460
+      "sha256": "65fa71f3d42bc68349eebfed503fae1997342f78e8564a3d4b1bd100ef20fbdb",
+      "bytes": 16711
     },
     {
       "path": "ui/react-app/src/components/HelpModal.test.jsx",
-      "sha256": "779d5cd7abf0f427f334f07790e3960b1f6e2df6c2c654df19f80fe6491954fe",
-      "bytes": 2685
+      "sha256": "27d29d0ff19a035a853d935de96ed5009e3a470fb452f8e5b72118c4c86aad63",
+      "bytes": 2667
     },
     {
       "path": "ui/react-app/src/components/HistoryModal.jsx",
@@ -11095,13 +11095,18 @@
     },
     {
       "path": "ui/react-app/src/components/WakeWordSection.jsx",
-      "sha256": "5da128d197523d0d575e7114e4cea1071f300d5d1806e90a088706bab5332c8a",
-      "bytes": 27800
+      "sha256": "fd39fb7a870da097d5d44bb75252c028e3d75c54f1596858a5519566763cd918",
+      "bytes": 31507
     },
     {
       "path": "ui/react-app/src/components/WakeWordSection.status.test.jsx",
-      "sha256": "18d1f4573080389917c290c119b503628210b24291ededfc9440d6d42abf2609",
-      "bytes": 3948
+      "sha256": "85093cf9d4a695267f0add06ff31e42413832a96ecdb97606d87cdf9948afa4f",
+      "bytes": 4127
+    },
+    {
+      "path": "ui/react-app/src/components/WakeWordSection.test.jsx",
+      "sha256": "bcb1e1f141cabaaad962000ac1b7d200a9638f3c8b9bd45f1da16d47783ec402",
+      "bytes": 5135
     },
     {
       "path": "ui/react-app/src/components/WeatherDetailIcons.jsx",
@@ -13405,13 +13410,13 @@
     },
     {
       "path": "violawake/config.py",
-      "sha256": "3eb1d594745402e9dee6c52a041b1629985f081e99c9a7f5d2c53349099b2fae",
-      "bytes": 14379
+      "sha256": "9ee2245fd5cb57a8feb514c093eaa9e2773efeced488d95d34923b05c6ebc201",
+      "bytes": 16229
     },
     {
       "path": "violawake/engine.py",
-      "sha256": "06b212cf82bfbbbb65241dd00c44a15a070f219ce0f5fbad3ad8e76680e46701",
-      "bytes": 53164
+      "sha256": "b60c539a026497ae626cefd12c9019b410450e3d775a78c202f89ac10ab90d9e",
+      "bytes": 53603
     },
     {
       "path": "violawake/model.py",
@@ -14000,8 +14005,8 @@
     },
     {
       "path": "voice/wake_detector/violawake_listener.py",
-      "sha256": "bf685dae5ad85f1bdd60ea7fcd4fa21a0a72afbc1abcbc440b1b7b118c61eece",
-      "bytes": 189798
+      "sha256": "5ee048ef35bde2d56efa4f4afecf37a9c97472ddb974cb6481e50685d6c647a7",
+      "bytes": 192833
     },
     {
       "path": "voice/wake_detector/wake/__init__.py",
@@ -14035,8 +14040,8 @@
     },
     {
       "path": "voice/wake_detector/wake_verifier.py",
-      "sha256": "9cbbe5b8f2a3a8836f03d3b5ed4e1d6d4bca1f439292b2bb428b1c368931abfb",
-      "bytes": 33327
+      "sha256": "0848022906fc5f0a42f7a84467c06f24c8c5a5230d3e0caaaf37cc2554251731",
+      "bytes": 36174
     }
   ]
 }
