@@ -1589,11 +1589,9 @@ async def file_write(
 
 @server.tool(
     description=(
-        "Execute a shell command and return stdout, stderr, and exit code. "
-        "Last resort — prefer dedicated tools (file_read, web_search, media) over shell: "
-        "file_read info says whether a file exists, file_write delete removes one. "
-        "Use a full path or working_directory for a script. "
-        "30s default timeout, 4000 char output cap."
+        "Run a shell command; returns stdout, stderr, exit code. Last resort: file_read/file_write handle files "
+        "(info says if one exists). Use full paths. %USERPROFILE%\\Desktop and ~\\Desktop become the real "
+        "Desktop, even under OneDrive (same for Documents, Downloads). 30s timeout, 4000 char output."
     ),
     annotations=_DANGEROUS,
     meta={"risk": "destructive"},

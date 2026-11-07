@@ -409,7 +409,8 @@ def is_read_only_command(command: object, working_directory: object = "") -> boo
     crucial moments). Anything the parser cannot prove read-only, or that is
     too long to run, keeps the confirmation. Fails closed on any error.
     """
-    text = str(command or "").strip()
+    text, _replaced = _with_real_user_folders(str(command or "").strip())
+    working_directory = _real_working_directory(str(working_directory or ""))
     if not text or len(text) > _MAX_COMMAND_LENGTH:
         return False
     if _SENSITIVE_READ_RE.search(text):
@@ -424,6 +425,61 @@ def is_read_only_command(command: object, working_directory: object = "") -> boo
     return decision.behavior == "allow" and bool(decision.read_only)
 
 
+_IS_WINDOWS = sys.platform == "win32"
+_USER_FOLDER_NAMES = ("Desktop", "Documents", "Downloads", "Pictures", "Music", "Videos")
+_HOME_SPELLINGS = r"%USERPROFILE%|%HOMEDRIVE%%HOMEPATH%|\$env:USERPROFILE|\$\{HOME\}|\$HOME|~"
+
+
+def _with_real_user_folders(text: str) -> tuple[str, dict[str, str]]:
+    """Point home-based user folders at the real ones, on Windows.
+
+    "On my desktop" became ``%USERPROFILE%\\Desktop`` in a command, but OneDrive
+    can move the Desktop, so an approved ``mkdir`` would make a folder the user
+    never sees. Each spelling of home plus a user folder is replaced by the
+    Windows known folder, only when that is somewhere else. A path with spaces
+    is replaced only inside quotes, so the command keeps its words. Returns the
+    new text and what was replaced.
+    """
+    if not _IS_WINDOWS or not text:
+        return text, {}
+    from intent.tools.filesystem import user_known_folder
+
+    try:
+        home = Path.home()
+    except (OSError, RuntimeError):
+        return text, {}
+    pattern = re.compile(
+        r"(?<![\w%%$~])(?:%s|%s)[\\/](%s)(?=$|[\\/\"'\s])"
+        % (_HOME_SPELLINGS, re.escape(str(home)), "|".join(_USER_FOLDER_NAMES)),
+        re.IGNORECASE,
+    )
+    replaced: dict[str, str] = {}
+
+    def real_folder(match: re.Match[str]) -> str:
+        real = user_known_folder(match.group(1))
+        if real is None or str(real).lower() == str(home / match.group(1)).lower():
+            return match.group(0)
+        quoted = match.start() > 0 and text[match.start() - 1] == '"'
+        if " " in str(real) and not quoted:
+            return match.group(0)
+        replaced[match.group(0)] = str(real)
+        return str(real)
+
+    return pattern.sub(real_folder, text), replaced
+
+
+def _real_working_directory(working_directory: str) -> str:
+    """A working folder named "Desktop" or "~/Desktop" means the real one."""
+    text, _replaced = _with_real_user_folders(str(working_directory or "").strip())
+    if _IS_WINDOWS and text.lower() in {name.lower() for name in _USER_FOLDER_NAMES}:
+        from intent.tools.filesystem import user_known_folder
+
+        real = user_known_folder(text)
+        if real is not None:
+            return str(real)
+    return text
+
+
 _SCRIPT_RUNNERS = frozenset({"python", "python3", "py", "node"})
 _SCRIPT_SUFFIXES = frozenset({".py", ".pyw", ".js", ".mjs", ".cjs"})
 _SHELL_SYNTAX_CHARS = frozenset("|&;<>^%$`\n\r")
@@ -436,7 +492,8 @@ def script_run_target(command: object, working_directory: object = "") -> Path |
     redirection, variables, ``-c`` or ``-m``. Anything else returns None and
     stays a plain shell command to every gate. Fails closed on any error.
     """
-    text = str(command or "").strip()
+    text, _replaced = _with_real_user_folders(str(command or "").strip())
+    working_directory = _real_working_directory(str(working_directory or ""))
     if not text or len(text) > _MAX_COMMAND_LENGTH or _SHELL_SYNTAX_CHARS & set(text):
         return None
     try:
@@ -516,6 +573,8 @@ async def run_command(
         permission_mode: Claude-style permission mode for non-read-only commands.
     """
 
+    command, user_folders = _with_real_user_folders(command)
+    working_directory = _real_working_directory(working_directory)
     if len(command) > _MAX_COMMAND_LENGTH:
         return ToolResult(
             ok=False,
@@ -648,6 +707,9 @@ async def run_command(
     }
     if stderr_text:
         result_data["stderr"] = stderr_text
+    if user_folders:
+        # Tell the model where the folder really is, for the rest of the task.
+        result_data["user_folders"] = user_folders
 
     return ToolResult(
         ok=returncode == 0,
