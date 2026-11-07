@@ -5069,6 +5069,14 @@ def _stop_voice_for_quit(bootstrap: object | None, report: dict[str, object]) ->
             report.setdefault("speech_stopped", []).append(type(engine).__name__)  # type: ignore[union-attr]
         except Exception:  # noqa: BLE001, RUF100 - a failed cut must not stop the quit
             logger.warning("Could not cut speech while quitting", exc_info=True)
+    try:
+        # Callers can be waiting on an engine the cut above never reached; a quit
+        # must not wait for its sentence to finish.
+        from voice.synthesis.engine import release_speech_waiters
+
+        report["speech_waiters_released"] = release_speech_waiters()
+    except Exception:  # noqa: BLE001, RUF100 - a failed release must not stop the quit
+        logger.warning("Could not release speech waiters while quitting", exc_info=True)
     voice = getattr(bootstrap, "voice", None) if bootstrap is not None else None
     stop_voice = getattr(voice, "stop", None)
     if callable(stop_voice):

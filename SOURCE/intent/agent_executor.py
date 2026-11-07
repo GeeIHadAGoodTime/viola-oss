@@ -29,7 +29,8 @@ import uuid
 from collections import OrderedDict
 from collections.abc import Callable, Iterable, Mapping
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, is_dataclass
+from dataclasses import fields as dc_fields
 from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
@@ -781,6 +782,41 @@ _BOT_CHECK_GIVEN_UP_NOTE = (
     "and tell the user you switched. If it cannot, stop and tell the user plainly that the site needs "
     "them to finish the check; the page stays open on their screen.]"
 )
+
+def _trace_copy(value: Any, _depth: int = 0) -> Any:
+    """A copy for the task trace that cannot fail.
+
+    Plain data (dicts, lists, tuples, strings, numbers) is copied deeply, so later
+    changes never reach the trace. Anything else is written as short text. A tool
+    result can hold an object tied to an event loop; copy.deepcopy then failed half
+    way, the trace lost that tool call, and the half-built loop it left behind logged
+    "Exception ignored in BaseEventLoop.__del__" on every tool turn.
+    """
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if _depth > 40:
+        return "<nested too deep>"
+    if isinstance(value, dict):
+        return {(k if isinstance(k, (str, int, float, bool)) or k is None else str(k)): _trace_copy(v, _depth + 1)
+                for k, v in value.items()}
+    if isinstance(value, (list, tuple, set, frozenset)):
+        return [_trace_copy(item, _depth + 1) for item in value]
+    if isinstance(value, (bytes, bytearray)):
+        return "<%d bytes>" % len(value)
+    if is_dataclass(value) and not isinstance(value, type):
+        return {f.name: _trace_copy(getattr(value, f.name, None), _depth + 1) for f in dc_fields(value)}
+    dump = getattr(value, "model_dump", None)
+    if callable(dump):
+        try:
+            return _trace_copy(dump(), _depth + 1)
+        except Exception:  # noqa: BLE001, RUF100 - fall back to text
+            pass
+    try:
+        text = str(value)
+    except Exception:  # noqa: BLE001, RUF100 - a trace must never fail on a value
+        text = "<%s>" % type(value).__name__
+    return text[:500]
+
 _MEMORY_ALL_SCOPE_PATHS = frozenset({"", "memory", "memory/", "MEMORY.md", "memory/MEMORY.md"})
 _MEMORY_SEARCH_ACTIONS = frozenset({"search", "grep"})
 _MEMORY_ENUMERATION_ACTIONS = frozenset({"read", "list"})
@@ -5761,7 +5797,7 @@ class AgentExecutor:
         }
         try:
             if self._task_trace is not None:
-                self._task_trace.append_event("trace_stop", copy.deepcopy(stop_data))
+                self._task_trace.append_event("trace_stop", _trace_copy(stop_data))
         except Exception:
             logger.debug("Task trace stop event write failed, continuing", exc_info=True)
         try:
@@ -6299,9 +6335,9 @@ class AgentExecutor:
         if self._task_trace is not None:
             try:
                 if _trace_compaction_payload is not None:
-                    _compaction_event_payload = copy.deepcopy(_trace_compaction_payload)
+                    _compaction_event_payload = _trace_copy(_trace_compaction_payload)
                     if self._task_trace_last_request:
-                        _compaction_event_payload["next_llm_input"] = copy.deepcopy(self._task_trace_last_request)
+                        _compaction_event_payload["next_llm_input"] = _trace_copy(self._task_trace_last_request)
                     self._task_trace.append_compaction(
                         ts=step_data["ts"],
                         step=record.step,
@@ -6317,21 +6353,21 @@ class AgentExecutor:
                     "signature_gate",
                 }:
                     _step_kind = _trace_control["typed_outcome"]
-                trace_step_data = copy.deepcopy(step_data)
+                trace_step_data = _trace_copy(step_data)
                 if model_messages_snapshot is not None:
-                    trace_step_data["messages"] = copy.deepcopy(model_messages_snapshot)
+                    trace_step_data["messages"] = _trace_copy(model_messages_snapshot)
                 self._task_trace.append_step(
                     step=record.step,
                     ts=step_data["ts"],
                     step_kind=_step_kind,
                     agent_step=trace_step_data,
                     attempt_id=getattr(self, "_task_trace_last_attempt_id", None),
-                    llm_input=copy.deepcopy(self._task_trace_last_request),
-                    llm_output=copy.deepcopy(self._task_trace_last_response),
-                    continuity_before=copy.deepcopy(self._task_trace_last_continuity_before),
-                    continuity_after=copy.deepcopy(self._task_trace_last_continuity_after),
-                    control=copy.deepcopy(_trace_control),
-                    tool_execution=copy.deepcopy(self._task_trace_last_tool_execution),
+                    llm_input=_trace_copy(self._task_trace_last_request),
+                    llm_output=_trace_copy(self._task_trace_last_response),
+                    continuity_before=_trace_copy(self._task_trace_last_continuity_before),
+                    continuity_after=_trace_copy(self._task_trace_last_continuity_after),
+                    control=_trace_copy(_trace_control),
+                    tool_execution=_trace_copy(self._task_trace_last_tool_execution),
                 )
             except Exception:
                 logger.debug("Task trace step write failed, continuing", exc_info=True)
@@ -7607,7 +7643,7 @@ class AgentExecutor:
                 kind=kind,
                 reason=reason,
                 next_action=next_action,
-                detail=copy.deepcopy(detail or {}),
+                detail=_trace_copy(detail or {}),
             )
         except Exception:
             logger.debug("Task trace LLM retry/fallback write failed, continuing", exc_info=True)
@@ -7667,21 +7703,21 @@ class AgentExecutor:
         tool_error: str | None,
     ) -> None:
         """Capture the exact tool call/result surface that fed the next turn."""
-        trace_tool_input = _redact_email_trace_payload(tool_name, copy.deepcopy(tool_input), tool_input)
+        trace_tool_input = _redact_email_trace_payload(tool_name, _trace_copy(tool_input), tool_input)
         trace_model_visible_result = _redact_email_trace_payload(
             tool_name,
             copy.deepcopy(model_visible_result),
             tool_input,
         )
-        trace_tool_data = _redact_email_trace_payload(tool_name, copy.deepcopy(tool_result.data), tool_input)
+        trace_tool_data = _redact_email_trace_payload(tool_name, _trace_copy(tool_result.data), tool_input)
         trace_mcp_content = _redact_email_trace_payload(
             tool_name,
-            copy.deepcopy(tool_result.mcp_content),
+            _trace_copy(tool_result.mcp_content),
             tool_input,
         )
         trace_mcp_meta = _redact_email_trace_payload(
             tool_name,
-            copy.deepcopy(tool_result.mcp_meta),
+            _trace_copy(tool_result.mcp_meta),
             tool_input,
         )
         self._task_trace_last_tool_execution = {
@@ -7712,7 +7748,7 @@ class AgentExecutor:
                     tool_name=tool_name,
                     ok=tool_result.ok,
                     duration_ms=duration_ms,
-                    result=copy.deepcopy(self._task_trace_last_tool_execution),
+                    result=_trace_copy(self._task_trace_last_tool_execution),
                     error=tool_error or tool_result.error,
                 )
             except Exception:
@@ -12068,7 +12104,7 @@ class AgentExecutor:
             "message": progress,
         }
         if tool_input is not None:
-            payload["tool_input"] = redact_card_data(copy.deepcopy(tool_input))
+            payload["tool_input"] = redact_card_data(_trace_copy(tool_input))
         if tool_output is not None:
             payload["tool_output"] = redact_card_data(tool_output)
         try:

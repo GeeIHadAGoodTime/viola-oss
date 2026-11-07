@@ -23,6 +23,7 @@ import asyncio
 import queue
 import threading
 import time
+import weakref
 from contextvars import Context, copy_context
 from dataclasses import dataclass, field
 from typing import Any
@@ -37,7 +38,9 @@ logger = get_logger(__name__)
 
 @dataclass
 class TTSRequest:
-    """Request to speak text."""
+    """Request to speak text. Hashed by identity so waiting callers can be tracked."""
+
+    __hash__ = object.__hash__
 
     text: str
     completion_event: threading.Event
@@ -64,6 +67,13 @@ class TTSWorker(threading.Thread):
         self._engine: Any = None
         self._engine_failure_count = 0
         self._max_engine_failures = 3  # Max consecutive failures before disabling
+        # Callers waiting in queue_speak. stop() releases them: a quit used to wait
+        # for the utterance being spoken, because each waiter is a thread-pool job
+        # that interpreter shutdown joins (6 s quits during the first-run welcome).
+        self._waiting: set[TTSRequest] = set()
+        self._waiting_lock = threading.Lock()
+        self._released = False
+        _LIVE_WORKERS.add(self)
 
     def run(self) -> None:
         """Worker thread main loop."""
@@ -240,21 +250,65 @@ class TTSWorker(threading.Thread):
         Returns:
             True if speech completed, False if timed out or failed
         """
-        if not self._running:
+        if not self._running or self._released:
             logger.warning("TTS worker not running")
             return False
 
         completion_event = threading.Event()
         request = TTSRequest(text=text, completion_event=completion_event)
 
-        self._request_queue.put(request)
-        completed = completion_event.wait(timeout=timeout)
-        return completed and request.success
+        with self._waiting_lock:
+            self._waiting.add(request)
+        try:
+            self._request_queue.put(request)
+            completed = completion_event.wait(timeout=timeout)
+        finally:
+            with self._waiting_lock:
+                self._waiting.discard(request)
+        return completed and request.success and self._running and not self._released
 
     def stop(self) -> None:
-        """Stop the worker thread."""
+        """Stop the worker thread and let every caller waiting on speech return now."""
         self._running = False
         self._request_queue.put(None)  # Send shutdown signal
+        self.release_waiters()
+
+    def release_waiters(self) -> int:
+        """Let every caller waiting on speech return now (False), and take no new speech."""
+        self._released = True
+        with self._waiting_lock:
+            waiting = list(self._waiting)
+        for request in waiting:
+            request.completion_event.set()
+        return len(waiting)
+
+
+# Every speech worker, so a quit can release the callers of all of them. The app can
+# hold more than one engine; the quit cut stopped one while callers waited on another
+# that was still speaking (exit after the 8 s watchdog, code 1).
+_LIVE_WORKERS: weakref.WeakSet[TTSWorker] = weakref.WeakSet()
+
+
+def release_speech_waiters() -> int:
+    """Release every caller waiting on speech, in every worker. Returns how many."""
+    released = 0
+    for worker in list(_LIVE_WORKERS):
+        try:
+            released += worker.release_waiters()
+        except Exception:  # noqa: BLE001, RUF100 - shutdown must not fail here
+            logger.debug("Releasing speech waiters failed", exc_info=True)
+    return released
+
+
+# Interpreter shutdown joins thread-pool jobs (concurrent.futures). This runs first
+# (later registrations run earlier), so a speech wait never holds the exit, whatever
+# path the process takes out.
+_register_threading_atexit = getattr(threading, "_register_atexit", None)
+if callable(_register_threading_atexit):
+    try:
+        _register_threading_atexit(release_speech_waiters)
+    except RuntimeError:
+        pass
 
 
 class TTSEngine:
