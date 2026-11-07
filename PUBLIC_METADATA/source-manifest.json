@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "4a4942761bf0d9284f9c62d08c48c83533b8d3bf",
-  "sha256": "fe075b3c635fe044587650358986de90622f57e153841c28de5e1cfdb95ddad1",
+  "revision": "9b44d4a445baecd504e1a429316f79d4eabcad62",
+  "sha256": "d8c177ec8c701c03693ec0123de621dddcbb4a4b925e0d0e6bd78d8e6e3a248e",
   "files": [
     {
       "path": ".env.example",
@@ -1580,8 +1580,8 @@
     },
     {
       "path": "intent/agent_executor.py",
-      "sha256": "252fcc6dc4d33f19724c11913154fd1e58dcfd0965e7d9270eb3769c34e2c5ee",
-      "bytes": 602912
+      "sha256": "0f2fc19b99446fac804b505a4c296cfb6ef0f49ba3ab45f618eaa06a3ae2c036",
+      "bytes": 603803
     },
     {
       "path": "intent/agent_loop.py",
@@ -1675,8 +1675,8 @@
     },
     {
       "path": "intent/content_sanitizer.py",
-      "sha256": "48d5c8e3d8b243d087e2a5b28e401f884c6670c907c2371d5b4c614b0016166e",
-      "bytes": 58719
+      "sha256": "55dc6386b19a7e475b0e71b708fe0bf287942dab1b35afb3e7711e3288efdb24",
+      "bytes": 59121
     },
     {
       "path": "intent/context_builder.py",
@@ -2105,8 +2105,8 @@
     },
     {
       "path": "intent/tools/memory.py",
-      "sha256": "0912ba153196d27b29219b76b8bb235fed0f07e8146282a2dd7af473e59fc729",
-      "bytes": 11993
+      "sha256": "f762cf18d486f8d6e1ecc92c3421581796f51a558de6bce4f8fc469646851e14",
+      "bytes": 12010
     },
     {
       "path": "intent/tools/music_connect.py",
@@ -2155,8 +2155,8 @@
     },
     {
       "path": "intent/tools/settings_tools.py",
-      "sha256": "87085200611e45e59bed060d01b32c6a408067134cbb9972d92a435b18fdba38",
-      "bytes": 27508
+      "sha256": "13d9cf2a5d70f73689a82e4a2842cf9ac125f694ee0e04817f6e54238f446054",
+      "bytes": 27646
     },
     {
       "path": "intent/tools/shell.py",
@@ -4655,8 +4655,8 @@
     },
     {
       "path": "services/llm/prompts/viola_unified.py",
-      "sha256": "a77092c3c6f0e5b209e6275d246ffaf9620af5e889c14994c65aa31b2206c5a0",
-      "bytes": 16436
+      "sha256": "68448b670025786594bfbd6713d8830b91ff9e79a57918f0f5acb12767492758",
+      "bytes": 16355
     },
     {
       "path": "services/llm/provider_fallback.py",
