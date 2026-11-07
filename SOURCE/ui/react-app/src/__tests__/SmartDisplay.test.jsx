@@ -2126,7 +2126,7 @@ it('keeps an action approval in the chat it was asked in, like a call approval',
       type: 'consult_user',
       payload: {
         action_class: 'file_delete',
-        status: 'awaiting_confirmation',
+        status: 'pending',
         planned_action: 'delete primes.py from your desktop',
         chat_thread_id: 'chat-a',
       },
