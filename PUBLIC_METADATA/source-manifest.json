@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "56ce7a861015ca2d8936a5de2a5f5cdc24b1683a",
-  "sha256": "c57d8ed1bd111d76b90a1641d5a3e2e5e3bec5596fa521d76c2561afbe95cb42",
+  "revision": "c49aba1ed6fcb695a111625cf53e51a067200600",
+  "sha256": "efaa1ab6c2c6ccb35aa62642dfe2be826a00245373cd82ee87f4aff147c7c1c7",
   "files": [
     {
       "path": ".env.example",
@@ -1595,8 +1595,8 @@
     },
     {
       "path": "intent/agent_executor.py",
-      "sha256": "1d9d1a8703acfd92cd8e18a3566e17a933b10d91e0e659956fdd7054c5bc75d8",
-      "bytes": 642220
+      "sha256": "6d9ae7cf83b1e9a253a10b57b4ec061b10af2d05765e4c5751fa45da471929fd",
+      "bytes": 639744
     },
     {
       "path": "intent/agent_loop.py",
@@ -2340,8 +2340,8 @@
     },
     {
       "path": "mcp_servers/browser/captcha_solver.py",
-      "sha256": "c45f28cc08145aeee310293f24d192d251b9c72da02fba2c9547e259990a3db9",
-      "bytes": 413
+      "sha256": "897bbd06a9aabe82ffae72bdba2099be7939b3b8b815894c9444118348458ce8",
+      "bytes": 686
     },
     {
       "path": "mcp_servers/browser/js_safety.py",
@@ -2355,8 +2355,8 @@
     },
     {
       "path": "mcp_servers/browser/server.py",
-      "sha256": "ba00613da078d6b99f7f78b67296c80a97fe3f89388f37f916f89da95ab92fde",
-      "bytes": 259686
+      "sha256": "b3af4f8c3633f870b8a99e13aead1a6770f4d65db9c3bcc9fa23cd4ba0a98f7c",
+      "bytes": 259636
     },
     {
       "path": "mcp_servers/browser_cdp/__init__.py",
@@ -2365,8 +2365,8 @@
     },
     {
       "path": "mcp_servers/browser_cdp/server.py",
-      "sha256": "7214b94fc08501a6e91ad5c59e69db8cc245665a72dda6a23f0cff6abe22b64b",
-      "bytes": 160728
+      "sha256": "c65416c5185e2dc50209ac7bffbd50670578aa9bd95e4fe92ceb13c276ad871e",
+      "bytes": 160640
     },
     {
       "path": "mcp_servers/computer_use/__init__.py",
