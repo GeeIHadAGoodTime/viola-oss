@@ -735,8 +735,7 @@ class AuthMiddleware:
                 # the browser out even though nothing was revoked (issue #340:
                 # a >30-min-old desktop session showed "signed-in: none" after a
                 # transient hiccup hit the scheduled access-token refresh).
-                is_transient_refresh_failure = validation.reason == "gotrue_refresh_transient"
-                should_clear_cookie = token_source == "cookie" and not is_transient_refresh_failure
+                should_clear_cookie = token_source == "cookie" and not validation.transient
                 request.state.clear_invalid_session_cookie = should_clear_cookie
                 request.state.clear_invalid_refresh_cookie = should_clear_cookie
                 return
@@ -793,17 +792,11 @@ class AuthMiddleware:
                 from core.db_backend import reset_db_user_id
 
                 reset_db_user_id(db_user_token)
-            from auth.desktop_session import (
-                delete_desktop_session_token,
-                is_desktop_local_session_token,
-            )
-
-            if is_desktop_local_session_token(token):
-                delete_desktop_session_token(token)
-            logger.warning("Desktop local auth middleware failed closed: %s", exc)
+            # A failure in this process (Viola quitting, a half-loaded module)
+            # says nothing about the session: this request fails, the session
+            # and its cookie stay. Only a real rejection ends a session.
+            logger.warning("Desktop local auth middleware failed closed (session kept): %s", exc)
             request.state.auth_error = "Invalid or expired session"
-            request.state.clear_invalid_session_cookie = token_source == "cookie"
-            request.state.clear_invalid_refresh_cookie = token_source == "cookie"
             return
 
     async def _resolve_spoke_request(

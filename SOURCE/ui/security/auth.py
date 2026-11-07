@@ -383,7 +383,11 @@ class AuthenticationPlugin(SecurityPlugin):
             content={"detail": "Authentication required"},
             headers={"WWW-Authenticate": "ApiKey"},
         )
-        if request.cookies.get("viola_session"):
+        # Only a session that is really over loses its cookie. This line used to
+        # wipe it on any failed request, so one blip or a request caught by a
+        # quit left the app signed in and the page without a way to reach the
+        # session: Settings > Account showed a sign-in form (1.0.5 build 9, 11-05).
+        if request.cookies.get("viola_session") and not getattr(request.state, "desktop_session_kept", False):
             from auth.middleware import clear_refresh_cookie, clear_session_cookie
 
             clear_session_cookie(response)
@@ -526,6 +530,8 @@ class AuthenticationPlugin(SecurityPlugin):
             validation = await validate_desktop_session_token(token)
             if not validation.authenticated or validation.user is None or validation.session is None:
                 log.warning("Desktop local UI auth rejected token: %s", validation.reason)
+                if validation.transient and request is not None:
+                    request.state.desktop_session_kept = True
                 return False
         except (
             AttributeError,
@@ -535,6 +541,8 @@ class AuthenticationPlugin(SecurityPlugin):
             ValueError,
         ) as exc:
             log.warning("Desktop local UI auth failed closed: %s", exc)
+            if request is not None:
+                request.state.desktop_session_kept = True
             return False
 
         self._attach_desktop_local_authenticated_session(

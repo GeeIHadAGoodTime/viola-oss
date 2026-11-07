@@ -126,6 +126,7 @@ _FULLSCREEN_HINT_VISIBLE_MS = 3000
 # After the window comes back from the tray or the taskbar, wait this long for
 # it to be on screen before asking the page for a fresh frame.
 _RESTORE_SURFACE_REFRESH_MS = 250
+_SURFACE_BOUNCE_MS = 120
 _FULLSCREEN_HINT_FADE_MS = 180
 _FULLSCREEN_HINT_TOP_MARGIN = 18
 _FULLSCREEN_TITLE_BAR_REVEAL_PX = 30
@@ -1762,6 +1763,22 @@ class ConsoleCapturePage(QWebEnginePage):
 
             QTimer.singleShot(500, lambda: self.setUrl(current_url))
 
+    # No native JavaScript dialogs, on any page. Qt runs them as a modal loop
+    # nested inside Chromium's own callback, and the window stopped repainting
+    # after Escape on one (1.0.5 build 9, 11-01). Viola's own pages use the React
+    # dialog; a third-party page in the agent browser gets the "cancelled" answer
+    # a blocked dialog gets in a browser.
+    def javaScriptAlert(self, securityOrigin, msg):
+        logger.info("Page alert() dismissed: no native dialogs in Viola")
+
+    def javaScriptConfirm(self, securityOrigin, msg):
+        logger.info("Page confirm() answered no: no native dialogs in Viola")
+        return False
+
+    def javaScriptPrompt(self, securityOrigin, msg, defaultValue, result=None):
+        logger.info("Page prompt() cancelled: no native dialogs in Viola")
+        return False, ""
+
     def javaScriptConsoleMessage(self, level, message, lineNumber, sourceId):
         """Capture JS console messages and log them."""
         level_map = {
@@ -2951,6 +2968,79 @@ class ViolaWebViewWindow(QMainWindow):
         except RuntimeError:
             logger.debug("Page surface refresh skipped", exc_info=True)
 
+    def _start_surface_watchdog(self) -> None:
+        """Keep checking that the page really reaches the screen. Never raises."""
+        try:
+            if getattr(self, "_surface_watchdog", None) is None:
+                from ui.qt_native.surface_watchdog import SurfaceWatchdog
+
+                self._surface_watchdog = SurfaceWatchdog(
+                    self,
+                    recover=self._recover_surface,
+                    probe_allowed=self._surface_probe_allowed,
+                )
+            self._surface_watchdog.start()
+        except (ImportError, RuntimeError):
+            logger.exception("Surface watchdog not started")
+
+    def _surface_probe_allowed(self) -> bool:
+        """True when the page's bottom-right corner should be on screen right now."""
+        if not self.isVisible() or self.isMinimized():
+            return False
+        if getattr(self, "_browser_overlay_placed", False):
+            return False  # the agent browser view may cover the corner
+        update_banner = getattr(self, "update_banner", None)
+        return not (update_banner is not None and update_banner.isVisible())
+
+    def _recover_surface(self, rung) -> None:
+        """Run one step of the surface watchdog's recovery ladder."""
+        from ui.qt_native.surface_watchdog import Rung
+
+        if rung is Rung.REDRAW_VIEW:
+            self._refresh_page_surface()
+        elif rung is Rung.RESIZE_WINDOW:
+            self._bounce_window_size()
+        elif rung is Rung.REBUILD_WINDOW:
+            self._rebuild_native_window()
+        else:
+            self.webview.reload()
+
+    def _bounce_window_size(self) -> None:
+        """Change the window's own size and back: a new swap chain size.
+
+        This is what the maximize button did when it cured the black window in
+        build 7, where a click did not.
+        """
+        if self.isFullScreen():
+            self._refresh_page_surface()
+        elif self.isMaximized():
+            self.showNormal()
+            QTimer.singleShot(_SURFACE_BOUNCE_MS, self.showMaximized)
+        else:
+            geometry = QRect(self.geometry())
+            self.setGeometry(geometry.adjusted(0, 0, 0, -1))
+            QTimer.singleShot(_SURFACE_BOUNCE_MS, lambda: self.setGeometry(geometry))
+
+    def _rebuild_native_window(self) -> None:
+        """Give the window a new native window and so a new swap chain.
+
+        Changing a window flag makes Qt destroy and recreate the native window
+        and hand every embedded view the new one, the same path Qt takes when
+        it changes a window's surface type. The page and its audio keep running.
+        """
+        state = self.windowState()
+        fullscreen = self.isFullScreen()
+        self._snap_styles_applied = False
+        self._touch_keyboard = None
+        self.setWindowFlags(self.windowFlags() ^ Qt.WindowType.WindowContextHelpButtonHint)
+        self.setWindowState(state)
+        self.show()
+        self.raise_()
+        self.activateWindow()
+        if fullscreen:
+            mark_taskbar_fullscreen(int(self.winId()), True)
+        QTimer.singleShot(_RESTORE_SURFACE_REFRESH_MS, self._refresh_page_surface)
+
     def _sync_title_bar_window_state(self) -> None:
         """Make the maximize/restore and fullscreen glyphs match the window now."""
         title_bar = getattr(self, "title_bar", None)
@@ -3065,6 +3155,7 @@ class ViolaWebViewWindow(QMainWindow):
         # carries a currently-valid (<30s TTL) token; api_key/base/cloud are
         # constant, so a signed-in reload always finds them present regardless.
         self.webview.loadFinished.connect(self._refresh_credentials_after_load)
+        self.webview.loadFinished.connect(self._reconnect_bridge_after_reload)
         self.webview.setStyleSheet("background-color: #000000;")
         self.webview.setHtml(_LOADING_HTML)  # breathing icon while backend starts
         self._content_stack.addWidget(self.webview)
@@ -3744,6 +3835,10 @@ class ViolaWebViewWindow(QMainWindow):
         if event.type() == QEvent.Type.WindowStateChange:
             self._sync_fullscreen_controls()
             self._remember_window_state()
+            # Back from the taskbar, which does not go through restore_window.
+            old_state = event.oldState() if hasattr(event, "oldState") else Qt.WindowState.WindowNoState
+            if old_state & Qt.WindowState.WindowMinimized and not self.isMinimized():
+                QTimer.singleShot(_RESTORE_SURFACE_REFRESH_MS, self._refresh_page_surface)
 
     def resizeEvent(self, event: QEvent) -> None:
         """Reposition floating chrome when the window changes size."""
@@ -4043,6 +4138,16 @@ class ViolaWebViewWindow(QMainWindow):
         self._bootstrap = bootstrap
         self._load_react_ui()
 
+    def _reconnect_bridge_after_reload(self, ok: bool) -> None:
+        """A reload (render-crash recovery, the surface watchdog) needs the bridge too.
+
+        Only the tracked first navigation installed it, so after any reload
+        ``window.viola`` stayed a placeholder and every native action, Quit from
+        Viola's menu included, silently did nothing. Found live, 1.0.5 build 10.
+        """
+        if ok and self._react_ui_loaded and self._react_ui_load_url is None:
+            self._on_load_finished(ok=True)
+
     def _on_page_loading_changed(self, loading_info) -> None:
         """Route only the tracked React navigation into its completion handler."""
         expected_url = self._react_ui_load_url
@@ -4226,6 +4331,7 @@ class ViolaWebViewWindow(QMainWindow):
         """Called when page finishes loading."""
         if ok:
             self._react_ui_loaded = True
+            self._start_surface_watchdog()
             # Credential globals (__VIOLA_API_KEY__ / __VIOLA_WS_AUTH_TOKEN__ /
             # __VIOLA_BASE_URL__ / __VIOLA_CLOUD_URL__) are NO LONGER set here.
             # They are injected at DocumentCreation via
@@ -4242,6 +4348,8 @@ class ViolaWebViewWindow(QMainWindow):
             js = """
                 // Load QWebChannel bridge for system browser OAuth
                 (function() {
+                    if (window.__violaBridgeInstalling || (window.viola && !window.viola.__pending)) return;
+                    window.__violaBridgeInstalling = true;
                     var script = document.createElement('script');
                     script.src = 'qrc:///qtwebchannel/qwebchannel.js';
                     script.onload = function() {
@@ -4333,10 +4441,10 @@ class ViolaWebViewWindow(QMainWindow):
         """
         self._browser_overlay_user_visible = True
         self._browser_overlay_mode = mode or ""
-        if self._browser_webview is not None:
-            # The view has always been a native window once shown (the old
-            # show path read winId()); keep that so its paint path is unchanged.
-            self._browser_webview.winId()
+        # Never call winId() on this view. It turned the view, every sibling
+        # and every ancestor into native child windows, each with its own swap
+        # chain on the laptop's GPU, and parking then pushed one off screen.
+        # Left alone, Qt composes the whole window on one surface.
         self._apply_browser_overlay_geometry("show_browser_overlay")
         if self._browser_overlay_placed:
             logger.info("Browser overlay shown at %s (mode=%s)", self._browser_overlay_rect, self._browser_overlay_mode)
@@ -4822,12 +4930,16 @@ class ViolaWebViewWindow(QMainWindow):
         # is stuck: a Windows passkey dialog opened by the agent browser kept a
         # quit hanging for over a minute (1.0.5 build-5 laptop report).
         _arm_quit_watchdog()
+        watchdog = getattr(self, "_surface_watchdog", None)
+        if watchdog is not None:
+            watchdog.stop()
         if hasattr(self, "_tray_icon"):
             self._tray_icon.hide()
         hide_window = getattr(self, "hide", None)
         if callable(hide_window):
             hide_window()
         silence_voice_for_quit(getattr(self, "_bootstrap", None))
+        _protect_desktop_sessions_for_quit()
         from PySide6.QtWidgets import QApplication
 
         QApplication.instance().quit()
@@ -4891,6 +5003,21 @@ class ViolaWebViewWindow(QMainWindow):
         logger.info("Window closed: quitting Viola (%s)", reason)
         self._quit_app()
         super().closeEvent(event)
+
+
+def _protect_desktop_sessions_for_quit() -> None:
+    """From here no refresh starts and no stored session is deleted. Never raises.
+
+    Quitting used to delete the session: a thread pool closing under a request
+    failed validation, and validation deleted on any failure (1.0.5 build 9,
+    11-01 15:29 and 11-04).
+    """
+    try:
+        from auth.desktop_session import begin_desktop_session_shutdown
+
+        begin_desktop_session_shutdown()
+    except Exception:  # noqa: BLE001, RUF100 - a quit must never fail on this
+        logger.debug("Desktop session shutdown guard not set", exc_info=True)
 
 
 def _arm_quit_watchdog() -> None:

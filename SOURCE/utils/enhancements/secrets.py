@@ -19,6 +19,7 @@ import json
 import os
 import tempfile
 import threading
+import time
 from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Protocol, cast
@@ -35,6 +36,8 @@ logger = get_logger(__name__)
 # keyring is bypassed entirely when VIOLA_DISABLE_OS_KEYRING is set — that hatch
 # is owned by ``_os_keyring_disabled`` / ``_load_keyring`` below (#757), so the
 # resolver just consults ``_load_keyring`` and gets file-fallback deterministically.
+_ATOMIC_REPLACE_ATTEMPTS = 5
+_ATOMIC_REPLACE_RETRY_S = 0.05
 _KEY_SOURCE_KEYCHAIN = "os-keychain"
 _KEY_SOURCE_FILE = "file-fallback"
 _KEY_SOURCE_GENERATED = "generated"
@@ -465,6 +468,10 @@ class SecureSettingsManager:
             return None
         return decrypted.decode("utf-8")
 
+    def has_secret(self, key: str) -> bool:
+        """True when a value is stored for ``key``, readable or not."""
+        return f"encrypted_{key}" in self._encrypted_cache
+
     def delete_secret(self, key: str) -> bool:
         """Remove an encrypted value from the local cache."""
         encrypted_key = f"encrypted_{key}"
@@ -512,7 +519,16 @@ class SecureSettingsManager:
                     pending.write(payload)
                     pending.flush()
                     os.fsync(pending.fileno())
-                os.replace(pending_path, file_path)
+                # Windows refuses the swap while something (antivirus, a backup)
+                # has the target open for a moment.
+                for attempt in range(_ATOMIC_REPLACE_ATTEMPTS):
+                    try:
+                        os.replace(pending_path, file_path)
+                        break
+                    except PermissionError:
+                        if attempt == _ATOMIC_REPLACE_ATTEMPTS - 1:
+                            raise
+                        time.sleep(_ATOMIC_REPLACE_RETRY_S)
                 pending_path = None
             else:
                 file_path.write_text(payload, encoding="utf-8")

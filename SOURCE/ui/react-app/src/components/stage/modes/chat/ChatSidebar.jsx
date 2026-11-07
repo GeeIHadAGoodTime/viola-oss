@@ -40,6 +40,7 @@ export default function ChatSidebar({
   onDelete,
   onExport,
   onOpenSettings = () => {},
+  onOpenStageHistory = null,
   profileName,
   profileDetail = '',
 }) {
@@ -121,6 +122,11 @@ export default function ChatSidebar({
           )
         ))}
       </div>
+      {onOpenStageHistory && (
+        <button type="button" className="chat-stage-history" onClick={onOpenStageHistory}>
+          Stage conversations
+        </button>
+      )}
       <div className="chat-profile-sliver">
         <div className="chat-profile-avatar">{(profileName || 'U').slice(0, 1).toUpperCase()}</div>
         <div>
@@ -148,6 +154,7 @@ ChatSidebar.propTypes = {
   onDelete: PropTypes.func.isRequired,
   onExport: PropTypes.func.isRequired,
   onOpenSettings: PropTypes.func,
+  onOpenStageHistory: PropTypes.func,
   profileName: PropTypes.string,
   profileDetail: PropTypes.string,
 };

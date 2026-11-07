@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo } from 'react';
 import PropTypes from 'prop-types';
+import { confirmDialog, promptDialog } from './ViolaDialog';
 import { useSettings } from '../hooks/useSettings';
 import { useSettingsDraft } from '../hooks/useSettingsDraft';
 import { useOptionalAuth } from '../hooks/useAuth';
@@ -1385,7 +1386,7 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
 
   const handleDeletePaymentCard = useCallback(async (card) => {
     if (!card?.label) return;
-    if (!window.confirm(`Delete payment method "${card.label}"?`)) return;
+    if (!(await confirmDialog({ title: `Delete payment method "${card.label}"?`, confirmLabel: 'Delete', danger: true }))) return;
     setPaymentCardActionError('');
     try {
       await apiFetch(`/api/payments/cards/${encodeURIComponent(card.label)}`, {
@@ -1459,7 +1460,13 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
   }, [isOpen, handleCancel]);
 
   const handleDeleteAllCallData = useCallback(async () => {
-    if (!window.confirm('Delete all saved phone call history and recordings? This cannot be undone.')) {
+    const confirmed = await confirmDialog({
+      title: 'Delete all saved phone call history and recordings?',
+      body: 'This cannot be undone.',
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (!confirmed) {
       return;
     }
     setIsDeletingCallData(true);
@@ -3530,8 +3537,8 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginLeft: '12px', flexShrink: 0 }}>
                           <button
-                            onClick={() => {
-                              const newName = window.prompt('Rename playlist:', playlist.name);
+                            onClick={async () => {
+                              const newName = await promptDialog({ title: 'Rename playlist', label: 'Playlist name', defaultValue: playlist.name, confirmLabel: 'Rename' });
                               if (newName && newName !== playlist.name) {
                                 renamePlaylist(playlist.name, newName);
                               }
@@ -3556,8 +3563,8 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
                             <Icons.Edit />
                           </button>
                           <button
-                            onClick={() => {
-                              if (window.confirm(`Delete playlist "${playlist.name}"?`)) {
+                            onClick={async () => {
+                              if (await confirmDialog({ title: `Delete playlist "${playlist.name}"?`, confirmLabel: 'Delete', danger: true })) {
                                 deletePlaylist(playlist.name);
                               }
                             }}

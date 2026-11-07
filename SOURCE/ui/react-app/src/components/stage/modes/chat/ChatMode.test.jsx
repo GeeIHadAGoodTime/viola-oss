@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor } from '../../../../test/test-utils';
+import { within } from '@testing-library/react';
 import ChatMode from './ChatMode';
 import ToolUseCard from './ToolUseCard';
 
@@ -152,7 +153,6 @@ describe('ChatMode command registry', () => {
     const oldOther = { ...thread, id: 'private-other', title: 'PRIVATE OTHER THREAD' };
     let nextOwner = false;
     let accept;
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
     chatHarness.apiFetch.mockImplementation((url, options = {}) => {
       if (options.method === 'DELETE') return new Promise((resolve) => { accept = resolve; });
       if (url === '/v1/chat/threads') return Promise.resolve({ threads: nextOwner ? [thread] : [thread, oldOther] });
@@ -162,12 +162,45 @@ describe('ChatMode command registry', () => {
     await screen.findByText('PRIVATE OTHER THREAD');
     fireEvent.click(screen.getAllByRole('button', { name: 'Conversation menu' })[0]);
     fireEvent.click(screen.getByRole('button', { name: 'Delete', exact: true }));
+    fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Delete' }));
+    await waitFor(() => expect(accept).toBeTypeOf('function'));
     nextOwner = true;
     view.rerender(<ChatMode principalKey="owner-b" />);
     await screen.findByText('Initial response');
     await act(async () => { accept({ deleted: true }); });
     expect(screen.queryByText('PRIVATE OTHER THREAD')).not.toBeInTheDocument();
+  });
+
+  it('asks in its own dialog, naming the title the open chat really has', async () => {
+    const confirm = vi.spyOn(window, 'confirm');
+    const fallback = chatHarness.apiFetch.getMockImplementation();
+    // The list still says "New chat"; the open chat already got its real title.
+    chatHarness.apiFetch.mockImplementation((url, options = {}) => {
+      if (url === '/v1/chat/threads') return Promise.resolve({ threads: [{ ...thread, title: 'New chat' }] });
+      return fallback(url, options);
+    });
+    render(<ChatMode />);
+    await screen.findByText('Initial response');
+    fireEvent.click(screen.getAllByRole('button', { name: 'Conversation menu' })[0]);
+    fireEvent.click(screen.getByRole('button', { name: 'Delete', exact: true }));
+    const dialog = await screen.findByRole('alertdialog');
+    expect(dialog).toHaveTextContent(`Delete "${thread.title}"?`);
+    expect(confirm).not.toHaveBeenCalled();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
+    expect(chatHarness.apiFetch.mock.calls.filter(([, options]) => options?.method === 'DELETE')).toHaveLength(0);
     confirm.mockRestore();
+  });
+
+  it('keeps the sidebar row on the open chat title', async () => {
+    const fallback = chatHarness.apiFetch.getMockImplementation();
+    chatHarness.apiFetch.mockImplementation((url, options = {}) => {
+      if (url === '/v1/chat/threads') return Promise.resolve({ threads: [{ ...thread, title: 'New chat' }] });
+      return fallback(url, options);
+    });
+    render(<ChatMode />);
+    await screen.findByText('Initial response');
+    await waitFor(() => expect(document.querySelector('.chat-thread-select')).toHaveTextContent(thread.title));
   });
 
   it('REVIEW retires prior-principal title and unsent draft for an empty next workspace', async () => {
@@ -1270,21 +1303,26 @@ describe('ChatMode command registry', () => {
   it('locks generation ownership while a fork POST is pending', async () => {
     const { state, sources } = recoveryHarness();
     state.messages = [{ id: 'user-1', role: 'user', content: 'Prompt', status: 'complete', metadata: {} }, assistantMessage];
-    const prompt = vi.spyOn(window, 'prompt').mockReturnValue('Edited prompt');
     let accept;
     const fallback = chatHarness.apiFetch.getMockImplementation();
     chatHarness.apiFetch.mockImplementation((url, options) => url.endsWith('/fork')
       ? new Promise((resolve) => { accept = resolve; }) : fallback(url, options));
     render(<ChatMode />);
     await screen.findByText('Initial response');
-    fireEvent.click(screen.getAllByRole('button', { name: 'Edit', exact: true })[1]);
-    expect(screen.getByLabelText('Stop response')).toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole('button', { name: 'Fork chat from this message' })[1]);
+    const dialog = await screen.findByRole('alertdialog');
+    expect(dialog).toHaveTextContent('Fork this chat');
+    expect(within(dialog).getByRole('textbox')).toHaveValue('Prompt');
+    fireEvent.change(within(dialog).getByRole('textbox'), { target: { value: 'Edited prompt' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Fork' }));
+    await waitFor(() => expect(screen.getByLabelText('Stop response')).toBeInTheDocument());
     fireEvent.click(screen.getAllByRole('button', { name: 'Regenerate', exact: true })[0]);
     expect(chatHarness.apiFetch.mock.calls.filter(([url]) => url.includes('/regenerate/'))).toHaveLength(0);
     await act(async () => { accept({ thread: { ...thread, id: 'branch' }, messages: state.messages, stream_id: 'fork-stream' }); });
     expect(sources).toHaveLength(1);
     expect(screen.getByLabelText('Stop response')).toBeInTheDocument();
-    prompt.mockRestore();
+    const forkCall = chatHarness.apiFetch.mock.calls.find(([url]) => url.endsWith('/fork'));
+    expect(JSON.parse(forkCall[1].body).content).toBe('Edited prompt');
   });
 
 });

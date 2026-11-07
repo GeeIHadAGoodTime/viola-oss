@@ -1,5 +1,6 @@
 import PropTypes from 'prop-types';
 import { THEME } from '../../config';
+import { confirmDialog } from '../ViolaDialog';
 import { generateQR } from '../../utils/qrcode';
 import {
   CHANNEL_PAIRING_CONFIGS,
@@ -197,10 +198,14 @@ function QRPairCardContent({ config }) {
   const linkedMeta = formatLinkedAt(pairing.status?.linked_at);
   const qrModules = pairing.linkToken?.deepLink ? buildQrModules(pairing.linkToken.deepLink) : null;
 
-  const handleUnlink = () => {
-    if (window.confirm('Disconnect Telegram? Your conversation history will be deleted.')) {
-      void pairing.unlink();
-    }
+  const handleUnlink = async () => {
+    const confirmed = await confirmDialog({
+      title: 'Disconnect Telegram?',
+      body: 'Your conversation history will be deleted.',
+      confirmLabel: 'Disconnect',
+      danger: true,
+    });
+    if (confirmed) void pairing.unlink();
   };
 
   return (

@@ -237,6 +237,17 @@
   color: var(--status-red);
 }
 
+.chat-stage-history {
+  margin: 0 12px 8px;
+  min-height: 40px;
+  border: 1px solid var(--chat-border, rgba(255, 255, 255, 0.12));
+  border-radius: 10px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
 .chat-profile-sliver {
   display: grid;
   grid-template-columns: 34px minmax(0, 1fr) auto;

@@ -689,11 +689,12 @@ function ContentCardInner({ data, onDismiss }) {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
+        ...(data.compact ? { alignItems: 'flex-end', justifyContent: 'flex-end' } : null),
         padding: '24px',
         // Taps pass through to the app; the outside-tap listener dismisses.
         pointerEvents: 'none',
-        // Semi-transparent backdrop
-        backgroundColor: exiting ? 'transparent' : 'rgba(0,0,0,0.45)',
+        // Semi-transparent backdrop. A compact card leaves the video undimmed.
+        backgroundColor: exiting || data.compact ? 'transparent' : 'rgba(0,0,0,0.45)',
         transition: `background-color ${SLIDE_ANIMATION_MS}ms ease`,
       }}
     >
@@ -706,7 +707,8 @@ function ContentCardInner({ data, onDismiss }) {
         aria-label={data.title || "Viola's response"}
         style={{
           width: '100%',
-          maxWidth: 'min(720px, 92vw)',
+          maxWidth: data.compact ? 'min(420px, 92vw)' : 'min(720px, 92vw)',
+          ...(data.compact ? { maxHeight: '38vh' } : null),
           pointerEvents: 'auto',
           display: 'flex',
           flexDirection: 'column',
@@ -850,6 +852,7 @@ ContentCardInner.propTypes = {
     source: PropTypes.string,
     // optional override
     dismiss_after_ms: PropTypes.number,
+    compact: PropTypes.bool,
   }),
   onDismiss: PropTypes.func.isRequired,
 };
