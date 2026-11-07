@@ -313,6 +313,8 @@ class ContextBuilder:
             gate_state=None,
         )
 
+        stored_frames, omitted_exchanges = self._stored_conversation_window()
+
         registry = RuntimeContextRegistry()
 
         def _coerce_meta(value: Any, *, origin: str, source_tag: str) -> list[Frame]:
@@ -531,6 +533,14 @@ class ContextBuilder:
             relevance="request",
         )
         _register_provider(
+            name="conversation_window",
+            origin="conversation_window",
+            source_tag="conversation-window",
+            priority=95,
+            build=lambda req: self._conversation_window_note(omitted_exchanges),
+            relevance="always",
+        )
+        _register_provider(
             name="user_capabilities",
             origin="user_capabilities",
             source_tag="user-capabilities",
@@ -600,7 +610,6 @@ class ContextBuilder:
         # Conversation repair is read from the typed stored frame chain now.
         components["conversation_repair"] = ""
 
-        stored_frames = self._stored_conversation_frames()
         components["stored_frame_chain"] = self._frames_text(stored_frames)
 
         static_runtime_frames, volatile_runtime_frames = self._aggregate_runtime_context_frames(provider_meta_frames)
@@ -612,12 +621,17 @@ class ContextBuilder:
         # NOT included in the message-chain ``frames`` list because
         # they are rendered as part of the system prompt, not as
         # in-stream user messages.
+        #
+        # The volatile block goes AFTER the history, next to the command it
+        # describes. It holds the clock and player state, so anything placed
+        # after it can never match a cached prefix: at the front of the chain it
+        # kept the whole history out of the provider's prompt cache.
         return PromptFrameBundle(
             system_static_blocks=static_runtime_frames,
             system_dynamic_blocks=system_frames,
             meta_user_frames=volatile_runtime_frames,
             history_frames=stored_frames,
-            frames=[*volatile_runtime_frames, *stored_frames],
+            frames=[*stored_frames, *volatile_runtime_frames],
         )
 
     def get_context_components(self) -> dict[str, str]:
@@ -843,6 +857,30 @@ class ContextBuilder:
         except Exception as exc:
             logger.debug("Request conversation manager lookup failed (non-fatal): %s", exc)
         return self._conversation_state_manager
+
+    def _stored_conversation_window(self) -> tuple[list[Frame], int]:
+        """Return the bounded history for this command and what it left out."""
+        manager = self._current_conversation_state_manager()
+        get_window = getattr(manager, "get_prompt_window", None) if manager is not None else None
+        if not callable(get_window):
+            return self._stored_conversation_frames(), 0
+        try:
+            window = get_window()
+        except Exception as exc:
+            logger.debug("Conversation window lookup failed (non-fatal): %s", exc)
+            return self._stored_conversation_frames(limit=20), 0
+        return [frame for frame in window.frames if isinstance(frame, Frame)], int(window.omitted_exchanges)
+
+    @staticmethod
+    def _conversation_window_note(omitted_exchanges: int) -> str:
+        """Tell the model older turns exist, so it fetches them instead of guessing."""
+        if omitted_exchanges <= 0:
+            return ""
+        return (
+            "This conversation has %d earlier exchange(s) not shown here. If the request depends on them, "
+            'read them with memory(action="conversation", query="<words to look for, or empty>") '
+            "before answering; never guess what was said." % omitted_exchanges
+        )
 
     def _stored_conversation_frames(self, limit: int = 200) -> list[Frame]:
         """Pull stored chat history for the model — BEHAVIORAL-ONLY.
@@ -2013,15 +2051,27 @@ class ContextBuilder:
     _MEMORY_WORD_BUDGET = 600
     _MEMORY_STALE_AFTER_SECONDS = 24 * 60 * 60
 
-    def _memory_context_frames(self, text: str) -> list[Frame]:
-        frame = self._make_context_frame(
-            kind=FrameKind.SYSTEM_REMINDER,
-            role=FrameRole.META_USER,
-            text=text,
-            origin="memory_store",
-            source_tag="memory",
-        )
-        return [frame] if frame is not None else []
+    def _memory_context_frames(self, durable_text: str, recalled_text: str = "") -> list[Frame]:
+        """Split memory context by how long it stays true.
+
+        VIOLA.md and the file list change only when memory does, so they ride the
+        cached system prompt. The memories picked for this request differ from one
+        command to the next: in the system prompt they broke the cached prefix on
+        every command for anyone who has memories, so they go in the per-command
+        block with the clock and player state.
+        """
+        frames: list[Frame] = []
+        for text, origin in ((durable_text, "memory_store"), (recalled_text, "memory_recall")):
+            frame = self._make_context_frame(
+                kind=FrameKind.SYSTEM_REMINDER,
+                role=FrameRole.META_USER,
+                text=text,
+                origin=origin,
+                source_tag="memory",
+            )
+            if frame is not None:
+                frames.append(frame)
+        return frames
 
     @staticmethod
     def _strip_memory_frontmatter(content: str) -> str:
@@ -2475,7 +2525,12 @@ class ContextBuilder:
         # vs what's available via the memory tool.
         if all_headers:
             try:
-                manifest_text = directory.format_memory_manifest(all_headers)
+                # No timestamps and a fixed order: this text is cached, and a
+                # background memory write must not change it.
+                manifest_text = directory.format_memory_manifest(
+                    sorted(all_headers, key=lambda header: header.filename),
+                    include_timestamps=False,
+                )
             except (OSError, RuntimeError, ValueError, TypeError) as exc:
                 detail = "closed event loop" if is_event_loop_closed_error(exc) else str(exc)
                 logger.debug("Memory manifest format failed (non-fatal): %s", detail)
@@ -2485,6 +2540,8 @@ class ContextBuilder:
                 lines.append(manifest_text)
                 lines.append("")
 
+        durable_lines = lines
+        lines = []
         word_count = 0
         if by_category:
             lines.append("USER MEMORIES (things you've learned about the user):")
@@ -2518,9 +2575,9 @@ class ContextBuilder:
         # iter-3 audit; canonical text lives in the unified prompt).
         # If ``lines`` is empty after VIOLA.md + manifest + topic content
         # all returned nothing, emit no frame.
-        if not lines:
+        if not durable_lines and not lines:
             return []
-        return self._memory_context_frames("\n".join(lines))
+        return self._memory_context_frames("\n".join(durable_lines).strip(), "\n".join(lines))
 
     def _profile_context_frames(self, text: str) -> list[Frame]:
         frame = self._make_context_frame(
@@ -2671,6 +2728,7 @@ class ContextBuilder:
 
             text = (
                 "SAVED DELIVERY ADDRESS:\n  %s\n"
+                "The user typed this address, so it wins over any address heard by voice. "
                 "Components are split by field for forms that ask for a delivery address."
             ) % "\n  ".join(parts)
             frame = self._make_context_frame(

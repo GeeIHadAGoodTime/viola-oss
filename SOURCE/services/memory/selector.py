@@ -105,11 +105,12 @@ def default_side_query_selector(request: MemorySelectionRequest) -> Sequence[str
         return []
 
     recent_tools = ", ".join(request.recent_tools) if request.recent_tools else "none"
-    user_content = "User query:\n%s\n\nRecent tools: %s\n\nLimit: %d\n\nAvailable memory files:\n%s" % (
-        request.query,
-        recent_tools,
-        request.limit,
+    # The file list first: it is the same on every command, so it can be cached.
+    user_content = "Available memory files:\n%s\n\nLimit: %d\n\nRecent tools: %s\n\nUser query:\n%s" % (
         request.manifest,
+        request.limit,
+        recent_tools,
+        request.query,
     )
     text = _run_coroutine_blocking(
         run_background_openai_response(

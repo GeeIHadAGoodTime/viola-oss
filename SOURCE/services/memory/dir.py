@@ -635,6 +635,57 @@ class MemoryDir:
         self.audit_path.touch(exist_ok=True)
         self._chmod_private()
         self._migrate_legacy_once()
+        self._clean_saved_memory_once()
+
+    def _clean_saved_memory_once(self) -> None:
+        """Remove what earlier builds wrongly saved, once per account.
+
+        Reports of single turns and echoed runtime text are deleted. A street
+        address is masked in place, the same as a phone number: the line keeps
+        saying that an address exists, so Viola asks rather than trusts it.
+        """
+        marker = self.root / ".saved_memory_cleaned_v1"
+        if marker.exists():
+            return
+        from services.memory.hygiene import is_junk_memory_line
+        from services.memory.store import redact_street_addresses
+
+        removed = 0
+        masked = 0
+        try:
+            # Memories written to the top of memory/ were invisible to recall.
+            for stray in sorted(self.root.glob("*.md")):
+                if stray.resolve() == self.index_path.resolve():
+                    continue
+                topic = self.topics_dir / stray.name
+                existing = self._read_memory_file(topic).rstrip() + "\n" if topic.exists() else ""
+                self._write_memory_file(topic, existing + self._read_memory_file(stray))
+                stray.unlink()
+            for path in sorted(self.topics_dir.glob("*.md")):
+                original = self._read_memory_file(path)
+                kept: list[str] = []
+                for line in original.splitlines():
+                    if line.lstrip().startswith(("- ", "* ")) and is_junk_memory_line(line):
+                        removed += 1
+                        continue
+                    clean = redact_street_addresses(line)
+                    masked += int(clean != line)
+                    kept.append(clean)
+                cleaned = "\n".join(kept) + ("\n" if original.endswith("\n") else "")
+                if cleaned != original:
+                    self._write_memory_file(path, cleaned)
+        except (OSError, RuntimeError, ValueError) as exc:
+            # Encrypted memory may not be readable yet; try again on a later start.
+            logger.debug("Saved memory cleanup deferred: %s", exc)
+            return
+        marker.write_text(_now_iso(), encoding="utf-8")
+        if removed or masked:
+            self._audit(
+                "cleanup",
+                "memory/topics/",
+                "removed %d junk entries, masked %d street addresses" % (removed, masked),
+                agent_initiated=False,
+            )
 
     def _chmod_private(self) -> None:
         if os.name == "nt":
@@ -798,7 +849,12 @@ class MemoryDir:
         if target.startswith("topic:"):
             topic = _topic_slug(target.split(":", 1)[1])
             return self._normalize_memory_path("%s/%s" % (TOPICS_DIR, topic))
-        return self._normalize_memory_path(target)
+        resolved = self._normalize_memory_path(target)
+        # A bare file name means a topic. Left at the top of memory/ it was saved
+        # and reported as saved, but no list or recall ever looked there.
+        if resolved.parent.resolve() == self.root.resolve() and not resolved.exists():
+            return self._normalize_memory_path("%s/%s" % (TOPICS_DIR, resolved.name))
+        return resolved
 
     @staticmethod
     def _looks_like_index_pointer(content: str) -> bool:
@@ -2117,7 +2173,7 @@ class MemoryDir:
         return headers[:_MAX_MEMORY_FILES]
 
     @staticmethod
-    def format_memory_manifest(headers: list[MemoryHeader]) -> str:
+    def format_memory_manifest(headers: list[MemoryHeader], *, include_timestamps: bool = True) -> str:
         """Format scan output as a one-line-per-file manifest.
 
         Mirrors Claude's ``formatMemoryManifest``: a selector LLM sees only
@@ -2126,8 +2182,15 @@ class MemoryDir:
         """
         lines: list[str] = []
         for header in headers:
-            ts = datetime.fromtimestamp(header.mtime_ms / 1000.0, UTC).isoformat()
             tag = "[%s] " % header.type if header.type else ""
+            if not include_timestamps:
+                lines.append(
+                    "- %s%s: %s" % (tag, header.filename, header.description)
+                    if header.description
+                    else "- %s%s" % (tag, header.filename)
+                )
+                continue
+            ts = datetime.fromtimestamp(header.mtime_ms / 1000.0, UTC).isoformat()
             if header.description:
                 lines.append("- %s%s (%s): %s" % (tag, header.filename, ts, header.description))
             else:

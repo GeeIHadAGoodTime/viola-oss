@@ -2720,6 +2720,9 @@ async def run_agent_loop(
             turn_kwargs["model_override"] = executor._model_override
         if tool_choice_override is not None:
             turn_kwargs["tool_choice_override"] = tool_choice_override
+        prompt_cache_key = executor._prompt_cache_key() if hasattr(executor, "_prompt_cache_key") else None
+        if prompt_cache_key:
+            turn_kwargs["prompt_cache_key"] = prompt_cache_key
         if use_delta:
             continuity_payload: dict[str, Any] = {
                 "mode": provider_continuity_before["mode"],
@@ -3741,12 +3744,12 @@ async def run_agent_loop(
                         _acknowledge_sent_messages(loop_messages)
                 # tool_choice="auto" always â€” no first_turn override.
                 executor._last_usage = _normalize_usage(response) if isinstance(response, dict) else {}
-                executor._record_llm_usage_for_context(executor._last_usage)
                 executor._last_model_name = (
                     str(response.get("_model_name") or executor._get_model_name_safe())
                     if isinstance(response, dict)
                     else "unknown"
                 )
+                executor._record_llm_usage_for_context(executor._last_usage)
                 if isinstance(response, dict) and _turn_kwargs:
                     executor._record_task_trace_llm_exchange(
                         call_kind="agent_loop",
@@ -5297,8 +5300,8 @@ async def run_agent_loop(
                         _flush_pending_hook_context()
                     if isinstance(response, dict):
                         executor._last_usage = _normalize_usage(response)
-                        executor._record_llm_usage_for_context(executor._last_usage)
                         executor._last_model_name = str(response.get("_model_name") or executor._get_model_name_safe())
+                        executor._record_llm_usage_for_context(executor._last_usage)
                         retry_type = response.get("type", "answer")
                         if retry_type in {"answer", "final_answer"}:
                             retry_answer = response.get("answer", response.get("text", ""))
