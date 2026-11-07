@@ -3403,6 +3403,7 @@ class AgentExecutor:
         # A helper's task is written by the model; device control in a helper
         # is checked against the user's own words for the turn that started it.
         self._turn_user_request = ""
+        self._turn_device_context: dict[str, Any] | None = None
         self._parent_task_id = parent_task_id
         self.task_id = str(parent_task_id or generate_task_id())
         normalized_user_id = (user_id or "").strip()
@@ -8398,6 +8399,7 @@ class AgentExecutor:
         )
         child.task_id = child_agent_id
         child._turn_user_request = self._device_control_user_words()
+        child._turn_device_context = self._device_control_conversation()
 
         external_cancel_relay: asyncio.Task[None] | None = None
         if external_cancel_event is not None:
@@ -9105,6 +9107,61 @@ class AgentExecutor:
         except ImportError:  # pragma: no cover - same package
             return ""
 
+    def _device_control_conversation(self) -> dict[str, Any]:
+        """What the device check may weigh besides this turn's words (a helper gets its parent's).
+
+        ``earlier_words``: what the user wrote earlier in this conversation (their
+        own input frames only). ``suggestion``: Viola's message right before this
+        turn, so "yes" to "want me to turn on the kitchen light?" counts (founder
+        rule 2026-11-07). ``suggestion_after_content``: whether a web, email,
+        calendar, memory or file result came before that message, in which case
+        it may repeat what the content said (structural, by tool name).
+        """
+        if self._depth > 0:
+            return dict(getattr(self, "_turn_device_context", None) or {})
+        empty: dict[str, Any] = {"earlier_words": "", "suggestion": "", "suggestion_after_content": True}
+        try:
+            from intent.content_sanitizer import is_untrusted_content_source
+            from services.conversation.state_manager import get_request_conversation_manager
+
+            manager = get_request_conversation_manager() or getattr(self, "_conversation_state_manager", None)
+            get_window = getattr(manager, "get_prompt_window", None)
+            frames = list(get_window().frames) if callable(get_window) else []
+        except (AttributeError, ImportError, LookupError, OSError, RuntimeError, TypeError, ValueError):
+            logger.debug("Device check: conversation unavailable", exc_info=True)
+            return empty
+
+        def _text(frame: Any) -> str:
+            return " ".join(block.text for block in frame.blocks if isinstance(block, TextBlock)).strip()
+
+        def _own_input(frame: Any) -> bool:
+            return frame.role is FrameRole.USER and frame.kind is FrameKind.USER_INPUT and not frame.origin
+
+        current = " ".join(self._device_control_user_words().split())
+        if frames and _own_input(frames[-1]) and " ".join(_text(frames[-1]).split()) == current:
+            frames = frames[:-1]  # this turn's own words are judged separately
+        earlier = [_text(frame) for frame in frames if _own_input(frame) and _text(frame)]
+        suggestion = ""
+        suggestion_index = -1
+        for index in range(len(frames) - 1, -1, -1):
+            frame = frames[index]
+            if _own_input(frame):
+                break
+            if frame.role is FrameRole.ASSISTANT and frame.kind is FrameKind.ASSISTANT_TEXT and _text(frame):
+                suggestion, suggestion_index = _text(frame), index
+                break
+        after_content = any(
+            is_untrusted_content_source(getattr(block, "name", None))
+            for frame in frames[: max(suggestion_index, 0)]
+            if frame.kind is FrameKind.TOOL_USE
+            for block in frame.blocks
+        )
+        return {
+            "earlier_words": "\n".join(earlier),
+            "suggestion": suggestion,
+            "suggestion_after_content": after_content,
+        }
+
     async def _device_control_refusal(self, tool_name: str, tool_args: dict[str, Any]) -> ToolResult | None:
         """None when the user's own message asks for this device action, else the refusal.
 
@@ -9119,8 +9176,17 @@ class AgentExecutor:
         check = getattr(getattr(self, "_approval", None), "user_message_asks_for", None)
         asked = False
         if user_words and callable(check):
+            context = self._device_control_conversation()
             try:
-                asked = bool(await check(user_words, planned_action))
+                asked = bool(
+                    await check(
+                        user_words,
+                        planned_action,
+                        suggestion=str(context.get("suggestion") or ""),
+                        suggestion_after_content=bool(context.get("suggestion_after_content", True)),
+                        earlier_words=str(context.get("earlier_words") or ""),
+                    )
+                )
             except Exception:  # noqa: BLE001 - fail closed
                 logger.warning("Device control asked-for check failed; refusing", exc_info=True)
                 asked = False
