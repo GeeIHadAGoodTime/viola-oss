@@ -431,7 +431,9 @@ class WakeDecisionPolicy:
             local_listening = self._is_listening_active
         hub_listening = _check_state_hub_listening()
 
-        if local_listening or hub_listening:
+        # A wake checked against her own voice, or one that runs beside a voice
+        # turn waiting on a long task, is exactly what this gate must let through.
+        if (local_listening or hub_listening) and not (context.own_speech_cleared or context.busy_turn):
             source = []
             if local_listening:
                 source.append("local_flag")
@@ -450,8 +452,9 @@ class WakeDecisionPolicy:
             return result
 
         # Self-speech is part of the listening gate: Viola is talking, so a
-        # "wake word" heard now is overwhelmingly Viola's own voice.
-        if context.self_speech_active:
+        # "wake word" heard now is her own voice unless the listener cleared it
+        # against what she just played (voice.wake_detector.own_speech).
+        if context.self_speech_active and not context.own_speech_cleared:
             result.blocking_reason = "SELF_SPEECH_BLOCK: Viola's own TTS is speaking (or just stopped)"
             result.layers_failed.append("listening_gate")
             logger.info("SELF_SPEECH: Wake blocked while Viola is speaking, score=%.3f", context.wake_score)

@@ -1385,6 +1385,13 @@ class KokoroTTSEngine:
             getattr(self, "_voice_blend_spec", None) or "none",
             language,
         )
+        try:
+            # What she is about to say, so her own words can be recognised when heard back.
+            from audio_core.own_playback import get_own_playback
+
+            get_own_playback().note_text(text)
+        except Exception as exc:  # noqa: BLE001, RUF100 - this record must never break speech
+            logger.debug("Spoken text record failed: %s", exc)
 
         try:
             from admin.instrumentation import record_feature_used
@@ -1859,6 +1866,12 @@ class KokoroTTSEngine:
                 try:
                     async for chunk in text_chunks:
                         full_text_parts.append(chunk)
+                        try:
+                            from audio_core.own_playback import get_own_playback
+
+                            get_own_playback().note_text(chunk)
+                        except Exception as exc:  # noqa: BLE001, RUF100 - must never break speech
+                            logger.debug("Spoken text record failed: %s", exc)
                         if retired():
                             # A stop or new selection retires this response. Drain
                             # this response for history without normalizing its

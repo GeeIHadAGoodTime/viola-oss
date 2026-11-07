@@ -22,6 +22,11 @@ if TYPE_CHECKING:
 logger = get_logger(__name__)
 
 
+def _policy_needs_update(current: tuple[bool, int], last: tuple[Any, Any], policy: Any) -> bool:
+    """The poller's test: the player changed, or the policy has drifted from it."""
+    return current != last or bool(policy.is_playback_active) != current[0]
+
+
 def _start_policy_playback_poller(music: Any, policy: Any, log: StructuredLogger) -> None:
     """
     Start a background poller that pushes playback state into the wake policy.
@@ -97,7 +102,11 @@ def _start_policy_playback_poller(music: Any, policy: Any, log: StructuredLogger
                         policy.is_playback_active,
                     )
 
-                if cur != last:
+                # Compared with the policy too, not only the last poll: a state
+                # push from the middle of a track change can leave the policy False
+                # while the player says True, and nothing else corrected it for
+                # the rest of the track (build 9: music=no while Drake played).
+                if _policy_needs_update(cur, last, policy):
                     policy.set_playback_active(is_playing, volume)
                     log.info(
                         "Wake policy playback state updated (poll): playing=%s, volume=%s",

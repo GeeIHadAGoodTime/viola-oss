@@ -273,6 +273,16 @@ STREAM_OPERATING_POINTS_CHECKED: tuple[tuple[float, int, int, float], ...] = tup
 # levels and outside quiet hours (stricter choices keep their own rule).
 MUSIC_WAKE_RULE: tuple[int, int, float] = (5, 6, 0.78)
 
+# Quiet or distant speech (1.0.5 build-9 laptop: 2 of 6 from 2 m, others peaking
+# 0.73-0.87; wakecheck: clips at -38 dBFS peak at 0.90+ but too few frames clear
+# 0.85 for 6 of 7). When no music plays the same guarded path uses this rule: the
+# wake passes only if Whisper is confident it heard "Viola". Measured on real
+# recordings at that level: Jay 46 -> 93%, Sierra 27 -> 73%; whispers 82 -> 91%.
+# Cost: 66 candidates in 30.2 h of speech, none passed; 214 in 14.2 h of vocal
+# music, one passed (a sung "Viola"). 4 of 6 at 0.70 recovers no more at this level
+# and let 5 through; 3 of 5 at 0.65 let speech through.
+QUIET_WAKE_RULE: tuple[int, int, float] = (3, 7, 0.85)
+
 
 def stream_operating_point(level: float, *, checked: bool = False) -> tuple[int, int, float]:
     """Return (k, n, frame_threshold) for a sensitivity level.
