@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "8bb7a2acc79fb35b71958cd299b202d4af42fc80",
-  "sha256": "262f72a08e51df1187eeb00c8f7e96df9fcb71f74f836607c62b42973e486e51",
+  "revision": "ad83197333486d6ae2d6cfe60d50080f147c2e96",
+  "sha256": "27cc950940bb371a3e9926a749b8e504956afa9d70530b29a870456b57d4de9d",
   "files": [
     {
       "path": ".env.example",
@@ -2130,8 +2130,8 @@
     },
     {
       "path": "intent/tools/playlist_tools.py",
-      "sha256": "75885ed6851e738e4f170e2b7b5652e046ef0b15d1d6e57d250424170112dc3d",
-      "bytes": 28810
+      "sha256": "c4d8417ba96cfd04686cd4d2d4f0cd3e384154c750ad5961c1f0d9d2deca8071",
+      "bytes": 30306
     },
     {
       "path": "intent/tools/random_pick.py",
@@ -9380,8 +9380,8 @@
     },
     {
       "path": "ui/api/models.py",
-      "sha256": "598889477dc3c524827fc354a60d99869b82ec09e93d6c1238e09709479f502a",
-      "bytes": 5184
+      "sha256": "817af49677c15801cf84e850b32ed45b7f45bf742bc4622b3ade4f97bbddfbd3",
+      "bytes": 5406
     },
     {
       "path": "ui/api/routes/__init__.py",
@@ -9470,8 +9470,8 @@
     },
     {
       "path": "ui/api/routes/control.py",
-      "sha256": "e69b2ff66fe60992331559859a2b226e14d1192bafaf115386d07922aa72dad7",
-      "bytes": 68466
+      "sha256": "2e9e956bfc7b9bc4c32a9c7f2aa7c3879b366eb877f5a4745864509e9c2383de",
+      "bytes": 68791
     },
     {
       "path": "ui/api/routes/cost.py",
