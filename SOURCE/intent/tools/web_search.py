@@ -16,8 +16,8 @@ Where the results come from:
   address, which is a first-class path and not a degraded one: DuckDuckGo Lite with
   the full query (``site:``, time range, next pages), then Bing's RSS feed if
   DuckDuckGo shows a bot check, errors or finds nothing. News asks Google News' RSS
-  feed first. On a bot check that engine is skipped for a while
-  and the next one is asked.
+  feed first. An engine that shows a bot check is rested for a while and the next
+  one is asked.
 """
 
 from __future__ import annotations
@@ -59,7 +59,7 @@ _BROWSER_HEADERS: dict[str, str] = {
     "Accept": "text/html,application/xml",
     "Accept-Language": "en-US,en;q=0.9",
 }
-# An engine that showed a bot check or a rate limit is skipped this long.
+# An engine that showed a bot check or a rate limit is left alone this long.
 _ENGINE_COOLDOWN_SECONDS = 15 * 60
 # Domain age is a nice-to-have signal: it must not hold up the answer.
 _DOMAIN_AGE_BUDGET_SECONDS = 1.5
@@ -154,7 +154,7 @@ _CATEGORY_ALIASES: dict[str, str] = {
 
 
 class _EngineBlocked(Exception):
-    """A search engine showed a bot check or a rate limit; that engine is skipped for a while."""
+    """A search engine showed a bot check or a rate limit."""
 
 
 # engine name -> time.monotonic() until which it is not asked.
@@ -890,7 +890,7 @@ def _ddg_next_page_fields(html: str) -> dict[str, str] | None:
 
 async def _ddg_lite_page(client: httpx.AsyncClient, fields: dict[str, str]) -> str:
     response = await client.post(_DDG_LITE_URL, data=fields, headers=_BROWSER_HEADERS)
-    # 202 is DuckDuckGo's bot check.
+    # 202 is DuckDuckGo's bot check page.
     if response.status_code in {202, 403, 429} or "anomaly" in response.text[:2000].lower():
         raise _EngineBlocked("DuckDuckGo showed a bot check (HTTP %d)" % response.status_code)
     response.raise_for_status()
@@ -1054,7 +1054,7 @@ async def _search_direct_engines(
         try:
             results = await search(client, query, page=page, time_range=time_range)
         except _EngineBlocked as exc:
-            # Skip this engine for a while and move on, like moving to another store.
+            # Rest this engine for a while and ask the next one.
             _engine_cooldowns[engine] = time.monotonic() + _ENGINE_COOLDOWN_SECONDS
             logger.warning("Web search engine %s is unavailable for now: %s", engine, exc)
             last_error = exc

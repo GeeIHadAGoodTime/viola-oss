@@ -234,7 +234,7 @@ _PARKING_TEXT_SIGNALS = (
     "acquire this domain",
 )
 
-# Bot-protection / WAF challenge pages that headless browsers cannot bypass.
+# Bot-protection / WAF challenge pages.
 _BOT_PROTECTION_SIGNALS = (
     "performing security verification",
     "checking your browser",
@@ -249,8 +249,8 @@ _BOT_PROTECTION_SIGNALS = (
 
 
 # Words a person-check page uses that an ordinary page can also contain, so they
-# only count in the title or on a short page. Detection exists to hand the check
-# to the user; Viola never tries to pass one.
+# only count in the title or on a short page. Detection keeps the page on screen
+# so the user can see it and finish it.
 _BOT_CHECK_PAGE_SIGNALS = (
     "robot or human",
     "press & hold",
