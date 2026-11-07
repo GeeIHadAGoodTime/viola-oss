@@ -30,10 +30,10 @@
   },
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "1f7f4e7165941fcf784dd97b802f7bb2fa139cbdd43ed020de17b6457e40a0a4",
-  "source_tree_sha256": "abd9cd415c4b6fd144a1efdb5238c7d19621534b6ba7c05d00a0ef82ee605c0e",
+  "source_manifest_sha256": "052beef932a52b97e99df38911e3b591c8a60bee8602024f804f4ae95e38d5c8",
+  "source_tree_sha256": "88917185966958c6c896885c98d69635bbd52af51c445a499846c1252eeb8009",
   "source_file_count": 2811,
-  "source_revision": "c981c4d42c948ccf965e2b7db87aa3a227bd9613",
+  "source_revision": "647ee874f15fc0d0e39c6175b04a51b3008967b6",
   "comparison_public_revision": "ecab2772465fcc89ae6645b028af1c2273b9199f",
   "changed_source_paths": [
     "LICENSES/SPEECH_COMPONENT_NOTICES.md",
@@ -532,6 +532,7 @@
     "voice/synthesis/kokoro_engine.py",
     "voice/synthesis/text_normalizer.py",
     "voice/transcription/whisper.py",
+    "voice/transcription/whisper_model_cache.py",
     "voice/wake_chime.py",
     "voice/wake_detector/active_word.py",
     "voice/wake_detector/aec_delay_tracker.py",
@@ -621,7 +622,7 @@
     "historical_inventory_limits": "This renderer correction changes no dependency or workflow inputs. All six retained SBOMs and their complete status objects stay historical and unchanged; no current installed inventory qualification is claimed."
   },
   "qualification": {
-    "source_commit": "c981c4d42c948ccf965e2b7db87aa3a227bd9613",
+    "source_commit": "647ee874f15fc0d0e39c6175b04a51b3008967b6",
     "kind": "build 10 integration"
   },
   "historical_bindings": [

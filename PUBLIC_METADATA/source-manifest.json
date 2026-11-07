@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "c981c4d42c948ccf965e2b7db87aa3a227bd9613",
-  "sha256": "abd9cd415c4b6fd144a1efdb5238c7d19621534b6ba7c05d00a0ef82ee605c0e",
+  "revision": "647ee874f15fc0d0e39c6175b04a51b3008967b6",
+  "sha256": "88917185966958c6c896885c98d69635bbd52af51c445a499846c1252eeb8009",
   "files": [
     {
       "path": ".env.example",
@@ -13840,8 +13840,8 @@
     },
     {
       "path": "voice/transcription/whisper_model_cache.py",
-      "sha256": "a23b6261e031fa2724bf728412ca43cf5fe9d20b432950c250e9fcd07c88c721",
-      "bytes": 7028
+      "sha256": "a90b08833e1c9773299440ddaebf2aa0b8995970665e06d00b53b5559a66abf0",
+      "bytes": 10697
     },
     {
       "path": "voice/vad/__init__.py",
