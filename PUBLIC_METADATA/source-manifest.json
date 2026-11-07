@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "5d8734e1dfbafea2e7f015384dcdc9a96369244a",
-  "sha256": "7e66ba476f2d3cdb7bfec5cced39908b755761c4a095817541e7db7fd24931e7",
+  "revision": "16abce021921fd6fd7aa730ddb34cee5458cbf5e",
+  "sha256": "7e4dfedfdc2068aa2f55d733e527fe62dcb0be43bdbb7cbea5215661fe51a226",
   "files": [
     {
       "path": ".env.example",
@@ -1240,8 +1240,8 @@
     },
     {
       "path": "core/voice_command_handler.py",
-      "sha256": "8c945a6b7e1d475399b42bbb87e093f95e3b74c48123a8fd53d9517ca97dc466",
-      "bytes": 99055
+      "sha256": "6fc3a3b76d9a4448246870af20f45ba043156408be27bf279b31e14f0d0ed548",
+      "bytes": 99526
     },
     {
       "path": "core/voice_orchestrator.py",
@@ -9705,8 +9705,8 @@
     },
     {
       "path": "ui/api/routes/wake_training.py",
-      "sha256": "a11ca7ac8840ca80e9a4ed05aa803c9c0dd1e298ce48cf392f2f06c5f08ffe06",
-      "bytes": 30656
+      "sha256": "749bfd366c1ae0ed5b65a02881c768b961331b34f210aee9f7f0f01b725117fb",
+      "bytes": 30795
     },
     {
       "path": "ui/api/routes/weather.py",
@@ -10690,8 +10690,8 @@
     },
     {
       "path": "ui/react-app/src/components/HelpModal.jsx",
-      "sha256": "a364ab595c4f0f6215b9b0766d0670bf2a0d6735352d9138a16526566dbecc07",
-      "bytes": 16766
+      "sha256": "47cc07003c0326a2f436df7b97c90f92784825e3086136be51cef593bde9d678",
+      "bytes": 16867
     },
     {
       "path": "ui/react-app/src/components/HelpModal.test.jsx",
@@ -10920,8 +10920,8 @@
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.jsx",
-      "sha256": "1685b01d6ce92e3452aa2197fdb1bbd8c9fe90334a9b9743ed5c7d1c99bd72e1",
-      "bytes": 218121
+      "sha256": "fc76bda907764f3a3d66b9df8b762bc39c81993b4b39fe0e20a69e205fa1cb19",
+      "bytes": 218205
     },
     {
       "path": "ui/react-app/src/components/SettingsModal.localDiscovery.test.jsx",
@@ -12197,6 +12197,16 @@
       "path": "ui/react-app/src/hooks/useWakeLock.js",
       "sha256": "d644bbd1cfd1f26feb37c0aa54e3970114ae40730aca2d6d044f5a165ac72c85",
       "bytes": 2348
+    },
+    {
+      "path": "ui/react-app/src/hooks/useWakeWordName.js",
+      "sha256": "0e3ba7012a06bba1181d146980a0fe081f6ebc457dfded9d3d444fe8b24bdfdc",
+      "bytes": 1122
+    },
+    {
+      "path": "ui/react-app/src/hooks/useWakeWordName.test.jsx",
+      "sha256": "c9d9c46b5ea49be53f38a477bba0b194aa2057f16de9c194fba7a69bfca090ec",
+      "bytes": 1819
     },
     {
       "path": "ui/react-app/src/hooks/useWebSocket.js",
@@ -13719,6 +13729,11 @@
       "bytes": 2634
     },
     {
+      "path": "voice/wake_detector/active_word.py",
+      "sha256": "9abb73c85ecf5314905bef823191dc15463d93f0d7be6153e1e4ce53b2436c2f",
+      "bytes": 3872
+    },
+    {
       "path": "voice/wake_detector/adaptive_gain_scheduler.py",
       "sha256": "43b8502b13bdf97e6111a8fc0745ab641eec1f95e6d5b7e5b0aa2b2f91734919",
       "bytes": 15897
@@ -13860,8 +13875,8 @@
     },
     {
       "path": "voice/wake_detector/violawake_listener.py",
-      "sha256": "ef463790aaf3e438d1a70d2582823a0c118809a88b7519cf4475e435599ce3d0",
-      "bytes": 186685
+      "sha256": "9d5fe5d457bb315e7737ae919b3a6b609dc9f31ee58092b1a5fd7c8560d64e40",
+      "bytes": 186721
     },
     {
       "path": "voice/wake_detector/wake/__init__.py",
@@ -13895,8 +13910,8 @@
     },
     {
       "path": "voice/wake_detector/wake_verifier.py",
-      "sha256": "59a69b498a1a3c3412bf8cc3ccc63a6d50c7d007b348902676e381e32091ec2a",
-      "bytes": 35003
+      "sha256": "2f2d07a85a12bdf129ea43ae606d05ac226b7995cb8d68b6391a070ef955deb8",
+      "bytes": 33922
     }
   ]
 }
