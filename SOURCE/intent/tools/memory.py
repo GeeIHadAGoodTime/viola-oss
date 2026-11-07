@@ -130,15 +130,24 @@ def _conversation_exchanges(uid: str, query: str, limit: int) -> ToolResult:
         elif frame.role.value == "assistant" and exchanges:
             exchanges[-1]["assistant"] = text[:_CONVERSATION_TEXT_CHARS]
     total = len(exchanges)
-    words = [word for word in (query or "").lower().split() if word]
-    if words:
-        exchanges = [
-            row for row in exchanges if any(word in ("%s %s" % (row["user"], row["assistant"])).lower() for word in words)
-        ]
+    first = exchanges[0] if exchanges else None
+    # Live, the model searched "earliest user message today in this conversation":
+    # short words matched unrelated turns and the first exchange was filtered out.
+    # The first exchange always comes back, and a search that finds nothing returns
+    # the conversation rather than an empty result to guess from.
+    words = [word for word in (query or "").lower().split() if len(word) > 3]
+    matches = [
+        row for row in exchanges if any(word in ("%s %s" % (row["user"], row["assistant"])).lower() for word in words)
+    ]
     count = max(1, min(int(limit or _CONVERSATION_EXCHANGE_LIMIT), _CONVERSATION_EXCHANGE_LIMIT))
     return ToolResult(
         ok=True,
-        data={"exchanges": exchanges[:count], "matched": len(exchanges), "total_exchanges": total},
+        data={
+            "first_exchange": first,
+            "exchanges": (matches or exchanges)[:count],
+            "matched": len(matches),
+            "total_exchanges": total,
+        },
     )
 
 
