@@ -16,8 +16,8 @@ Where the results come from:
   address, which is a first-class path and not a degraded one: DuckDuckGo Lite with
   the full query (``site:``, time range, next pages), then Bing's RSS feed if
   DuckDuckGo shows a bot check, errors or finds nothing. News asks Google News' RSS
-  feed first. A bot check is never answered: that engine is left alone for a while
-  and the next one is asked.
+  feed first. An engine that shows a bot check is rested for a while and the next
+  one is asked.
 """
 
 from __future__ import annotations
@@ -154,7 +154,7 @@ _CATEGORY_ALIASES: dict[str, str] = {
 
 
 class _EngineBlocked(Exception):
-    """A search engine showed a bot check or a rate limit. It is never answered."""
+    """A search engine showed a bot check or a rate limit."""
 
 
 # engine name -> time.monotonic() until which it is not asked.
@@ -890,7 +890,7 @@ def _ddg_next_page_fields(html: str) -> dict[str, str] | None:
 
 async def _ddg_lite_page(client: httpx.AsyncClient, fields: dict[str, str]) -> str:
     response = await client.post(_DDG_LITE_URL, data=fields, headers=_BROWSER_HEADERS)
-    # 202 is DuckDuckGo's bot check. It is left unanswered.
+    # 202 is DuckDuckGo's bot check page.
     if response.status_code in {202, 403, 429} or "anomaly" in response.text[:2000].lower():
         raise _EngineBlocked("DuckDuckGo showed a bot check (HTTP %d)" % response.status_code)
     response.raise_for_status()
@@ -1054,7 +1054,7 @@ async def _search_direct_engines(
         try:
             results = await search(client, query, page=page, time_range=time_range)
         except _EngineBlocked as exc:
-            # Never answered, never retried: move on, like moving to another store.
+            # Rest this engine for a while and ask the next one.
             _engine_cooldowns[engine] = time.monotonic() + _ENGINE_COOLDOWN_SECONDS
             logger.warning("Web search engine %s is unavailable for now: %s", engine, exc)
             last_error = exc
