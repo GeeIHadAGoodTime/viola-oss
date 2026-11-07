@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "896ff2e5b97f31c0d20f5375f3dfdcd67a78a02d",
-  "sha256": "c4c8a505500e62e9ff61ca26757b17f59165d7051824e64a1b3dde9cb18ab73a",
+  "revision": "60e7fa905d5b3227ea458dddf2543f66af961ad1",
+  "sha256": "c5a0318fbe34594847c94b2ef9bd92fd0d2a0be4af67c6c42f9f7844a34449e0",
   "files": [
     {
       "path": ".env.example",
@@ -10145,8 +10145,8 @@
     },
     {
       "path": "ui/react-app/src/SmartDisplay.jsx",
-      "sha256": "b37e74754b211aaeff82064a5804033566c502b3268c8cc16fd3129955fdc2ec",
-      "bytes": 202859
+      "sha256": "f52296da749a3e7b30f10e966189168f9195a216d8abfe1a226f9c68a00d5d99",
+      "bytes": 202931
     },
     {
       "path": "ui/react-app/src/SmartDisplay.overlayLifecycle.test.jsx",
@@ -10185,8 +10185,8 @@
     },
     {
       "path": "ui/react-app/src/__tests__/SmartDisplay.test.jsx",
-      "sha256": "ce484f4858850826e2a9ce5e0caab88210b4ca40f23e48c192816e5dd062f0ea",
-      "bytes": 152468
+      "sha256": "3f12d8d147b29d5d12487e9b3eb49df47aec5544272e1d94cf281eb76e280036",
+      "bytes": 153485
     },
     {
       "path": "ui/react-app/src/__tests__/hooks/useEventBus.test.jsx",
