@@ -758,6 +758,12 @@ class AutoplayController:
                         raw_url = track.get("url")
                         raw_title = track.get("title")
                         query = raw_url if isinstance(raw_url, str) and raw_url else None
+                        if query is not None and query.startswith("ytsearch1:"):
+                            # A search directive is not a location: resolve it
+                            # by name, so the item gets a real video id.
+                            artist = track.get("artist")
+                            named = " ".join(str(part) for part in (raw_title, artist) if part)
+                            query = named or query[len("ytsearch1:") :].strip()
                         if query is None and isinstance(raw_title, str) and raw_title:
                             query = raw_title
 

@@ -1380,6 +1380,12 @@ _MEMORY_ID_RE = re.compile(r"\bid=(\d+)\b")
 # goes back to the model exactly as before.
 _PLAYBACK_TERMINAL_ACTIONS = frozenset(
     {
+        "dislike_skip",
+        "shuffle_on",
+        "shuffle_off",
+        "repeat_off",
+        "repeat_all",
+        "repeat_one",
         "next",
         "skip",
         "previous",
@@ -1398,7 +1404,7 @@ _PLAYBACK_TERMINAL_ACTIONS = frozenset(
 )
 # A track change is heard; Jay prefers no spoken "Now playing" on top of it.
 # The chat still shows the tool's text.
-_PLAYBACK_SILENT_ACTIONS = frozenset({"next", "skip", "previous"})
+_PLAYBACK_SILENT_ACTIONS = frozenset({"next", "skip", "previous", "dislike_skip"})
 _DISCOVERY_TOOL_NAMES = frozenset({"ToolSearch", "tool_search"})
 
 
@@ -1447,7 +1453,7 @@ def _phone_watch_lost_response(tool_name: str, tool_result: Any) -> str | None:
 
 def _playback_terminal_response(tool_name: str, tool_result: Any) -> tuple[str, bool] | None:
     """Return ``(text, silent)`` when a confirmed playback control can end the turn."""
-    if tool_name != "playback" or tool_result is None or not getattr(tool_result, "ok", False):
+    if tool_name not in {"playback", "rate_track"} or tool_result is None or not getattr(tool_result, "ok", False):
         return None
     if getattr(tool_result, "unverified", False):
         return None

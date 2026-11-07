@@ -281,9 +281,9 @@ def register_event_socket(
                 resource_limits.validate_websocket_message_size(message)
                 if message.strip():
                     # Dispatch to registered command handlers (e.g., youtube_state)
-                    log.info("WS route: dispatching message (chars=%d)", len(message))
+                    log.debug("WS route: dispatching message (chars=%d)", len(message))
                     handled = await hub.dispatch_command(message, ws)
-                    log.info("WS route: Message handled=%s", handled)
+                    log.debug("WS route: Message handled=%s", handled)
                     if not handled:
                         log.debug(
                             "WebSocket message not handled (chars=%d)",

@@ -289,9 +289,10 @@ ROUTE_TOOL_SCHEMAS: list[dict[str, Any]] = [
         "description": (
             "Music player volume control for the active Viola music player. "
             "This changes the per-player music volume, not the machine-wide Windows/macOS/Linux output volume. "
-            "Use CURRENT SYSTEM STATE: when music is currently playing, bare volume requests like louder, quieter, "
-            "or turn it down apply here. Use desktop_volume only for explicit system, OS, desktop, speaker, "
-            "computer, or master output volume requests. "
+            "CURRENT SYSTEM STATE shows the current level. "
+            "Every plain volume request (set the volume to 30, louder, quieter, turn it down) applies here, "
+            "whether music is playing, paused or stopped. Use desktop_volume only when the user's own words say "
+            "system, OS, desktop, speaker, computer, or master volume. "
             "Use action='set' with level 0-100 for 'set volume to 50', "
             "'volume 75', 'set it to about half volume'. "
             "Use action='up' for 'louder', 'volume up', 'turn it up', "
@@ -372,7 +373,8 @@ ROUTE_TOOL_SCHEMAS: list[dict[str, Any]] = [
             "(on Spotify this adds it to the user's Spotify Liked Songs). "
             "Use rating='remove' for 'unlike this', 'remove this from my liked songs' "
             "(removes the like and keeps playing). "
-            "Use rating='down' to dislike / thumbs down the current song (also skips it)."
+            "Use rating='down' at once, without asking, for 'I don't like this', 'I hate this song', 'not this one', "
+            "'thumbs down'; it records the dislike and skips the song."
         ),
         "parameters": {
             "type": "object",

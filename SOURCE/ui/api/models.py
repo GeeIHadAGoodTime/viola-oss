@@ -90,6 +90,8 @@ class PlayIn(BaseModel):
     query: str = Field(..., min_length=1, max_length=32_767)
     source: str | None = Field(default=None, description="ytsearch1, url, local, spotify_cdp, youtube_music")
     target_room: str | None = Field(default=None, max_length=80, description="Optional in-house room target")
+    title: str | None = Field(default=None, max_length=500, description="Known track title when query is a URL")
+    artist: str | None = Field(default=None, max_length=500, description="Known artist when query is a URL")
 
     @model_validator(mode="before")
     @classmethod

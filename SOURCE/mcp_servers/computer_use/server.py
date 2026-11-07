@@ -404,6 +404,35 @@ async def _desktop_screenshot(region: str) -> dict[str, object]:
     return _tool_result_payload(await desktop_screenshot(region))
 
 
+# The words that really name the machine's volume. "volume" alone never does.
+_SYSTEM_VOLUME_WORDS = frozenset(
+    {"system", "computer", "pc", "laptop", "desktop", "machine", "windows", "mac", "os", "speaker", "speakers", "master"}
+)
+_SYSTEM_VOLUME_READ_ACTIONS = frozenset({"get"})
+
+
+def _system_volume_refusal(volume_action: str, system_volume_word: str) -> dict[str, Any] | None:
+    """Refuse a machine-wide change the user did not ask for by name.
+
+    "set the volume to 30" went here on the laptop while the music was paused,
+    and it moved the Windows volume instead of the music. Two controls called
+    volume must not be one guess, so the model has to quote the word the user
+    said. This checks the tool's argument; it reads nothing the user typed.
+    """
+    if str(volume_action or "").strip().lower() in _SYSTEM_VOLUME_READ_ACTIONS:
+        return None
+    if str(system_volume_word or "").strip().lower() in _SYSTEM_VOLUME_WORDS:
+        return None
+    return {
+        "ok": False,
+        "error_category": "SYSTEM_VOLUME_NOT_NAMED",
+        "error": (
+            "Nothing was changed. This tool is the whole machine's volume, and the user did not name it. "
+            "A plain volume request is the music: use playback with action='volume_set' (or volume_up, volume_down)."
+        ),
+    }
+
+
 async def _desktop_volume(
     *,
     action: str,
@@ -632,6 +661,15 @@ async def computer(
     percent: Annotated[int | None, Field(description="Alias for level.")] = None,
     mute: Annotated[bool | None, Field(description="Optional mute state for volume(set).")] = None,
     step: Annotated[int, Field(description="Step size for volume(up/down).")] = 10,
+    system_volume_word: Annotated[
+        str,
+        Field(
+            description=(
+                "For changing volume: the word in the user's request that names the machine (system, computer, "
+                "Windows, speakers, master). If they only said 'volume', this is the wrong tool: use playback."
+            )
+        ),
+    ] = "",
     question: Annotated[str, Field(description="Question for analyze_screen.")] = "",
     capture_mode: Annotated[
         str,
@@ -862,6 +900,9 @@ async def computer(
                 monitor_id=monitor_id,
             )
         elif action == "volume":
+            refusal = _system_volume_refusal(volume_action, system_volume_word)
+            if refusal is not None:
+                return _json(refusal)
             result = await _desktop_volume(
                 action=volume_action,
                 percent=level if level is not None else percent,
@@ -1107,7 +1148,9 @@ async def computer(
     description=(
         "Compact machine-wide system output volume control for Windows/macOS/Linux. This changes the OS/desktop "
         "speaker output, not Viola's active music player volume, per-player media volume, microphone volume, "
-        "or Viola preference defaults. This tool is first-turn native. Viola preference defaults such as "
+        "or Viola preference defaults. Use it only when the user's own words name the machine (system, computer, "
+        "Windows, speakers, master). A plain 'set the volume to 30' is the music, playing or paused: use playback. "
+        "This tool is first-turn native. Viola preference defaults such as "
         "default music volume, default playback volume, TTS volume, microphone volume, or speaker defaults "
         "belong in user_settings."
     ),
@@ -1120,6 +1163,15 @@ async def desktop_volume(
     percent: Annotated[int | None, Field(description="Target system volume percent for action='set'.")] = None,
     mute: Annotated[bool | None, Field(description="Optional mute state when setting volume.")] = None,
     step: Annotated[int, Field(description="Percent step size for action='up' or action='down'.")] = 10,
+    system_volume_word: Annotated[
+        str,
+        Field(
+            description=(
+                "The word in the user's request that names the machine: system, computer, Windows, speakers, master. "
+                "Required to change anything. If they only said 'volume', leave this tool and use playback."
+            )
+        ),
+    ] = "",
 ) -> str:
     """Read or change the machine-wide system output volume via the computer-use safety path."""
     return await computer(
@@ -1128,6 +1180,7 @@ async def desktop_volume(
         level=percent,
         mute=mute,
         step=step,
+        system_volume_word=system_volume_word,
     )
 
 

@@ -56,6 +56,9 @@ CRITICAL_ALWAYS_LOAD_TOOLS = frozenset(
         # (1.0.5 laptop A6.4). Hidden below Symphony by the tier filter.
         "view_screen",
         "media",
+        # "I don't like this": a remark, so a model that first has to search for
+        # the tool asks what they mean instead (1.0.5 laptop T2).
+        "rate_track",
         "memory",
         # Everyday voice commands: "next track", "skip to 2 minutes", "set a
         # timer", "wake me at 7", "remind me to...", "what's on my calendar".

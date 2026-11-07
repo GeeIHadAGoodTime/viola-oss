@@ -26,6 +26,7 @@ from typing import TYPE_CHECKING
 
 from core.logging_config import get_logger
 from music.playlists.playlist_store import PlaylistStore, TrackRecord
+from music.providers.youtube_url_validator import extract_video_id
 
 if TYPE_CHECKING:
     pass
@@ -70,9 +71,18 @@ def _track_to_session_dict(track: TrackRecord) -> dict:
         entry["url"] = track.track_uri
         entry["source"] = "local"
     elif provider in ("youtube", "youtube_music", "ytmusic"):
-        # YouTube: track_uri may be a URL or video ID
+        # YouTube: track_uri may be a URL, a video ID or a search phrase. Only a
+        # real id may be typed as a YouTube track: a "ytsearch1:..." url reached
+        # the queue as a youtube_music item with no video id, which is the
+        # video_id_missing / YTM_TOS_VIOLATION / "Audio file not found:
+        # ytsearch1:" chain from the 1.0.5 laptop.
         uri = track.track_uri
-        if uri.startswith("http"):
+        video_id = extract_video_id(uri)
+        if video_id:
+            entry["video_id"] = video_id
+            entry["url"] = "https://www.youtube.com/watch?v=%s" % video_id
+            entry["source"] = "url"
+        elif uri.startswith("http"):
             entry["url"] = uri
             entry["source"] = "url"
         else:

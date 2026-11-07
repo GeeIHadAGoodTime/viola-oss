@@ -590,6 +590,13 @@ async def _read_live_playback_state() -> dict[str, Any]:
         position = float(position_ms) / 1000.0 if isinstance(position_ms, (int, float)) else None
     if isinstance(position, (int, float)):
         state["position_seconds"] = float(position)
+    duration = state_data.get("duration")
+    if isinstance(duration, (int, float)) and not isinstance(duration, bool) and duration > 0:
+        state["duration_seconds"] = float(duration)
+    # What the user set: while Viola talks ``volume`` is the ducked level.
+    user_volume = state_data.get("user_volume")
+    if isinstance(user_volume, (int, float)) and not isinstance(user_volume, bool):
+        state["volume"] = max(0, min(100, int(user_volume)))
     return state
 
 
@@ -690,6 +697,11 @@ async def _prefer_resolved_now_playing(
     live = await _read_live_playback_state()
     if _provider_family(str(result.get("provider") or "")) == _provider_family("spotify"):
         live = await _await_spotify_start(live)
+    else:
+        # A local file takes a moment to open and report PLAYING; the first read
+        # came too soon and the reply was "hasn't confirmed playback yet" over the
+        # music (1.0.5 laptop, Local Files). Same short wait as a track change.
+        live = await _await_track_change_playing(live)
     verification = _live_verification(live)
     result["verification"] = verification
     result["playback_verified"] = verification == VERIFY_PLAYING
@@ -1346,11 +1358,25 @@ async def play_music_handler(
         )
 
 
+# "volume up" is a nudge. A step of 100 (the 1.0.5 laptop saw "volume up" land
+# on 100) is an absolute level passed in the wrong field, and playing at full
+# volume is the worst way to find that out. An exact level uses volume_set.
+_REPEAT_ACTIONS = {"repeat_off": "off", "repeat_all": "all", "repeat_one": "one"}
+_DEFAULT_VOLUME_STEP = 10
+_MAX_VOLUME_STEP = 30
+
+
+def _volume_step(volume_step: int | None) -> int:
+    step = int(volume_step) if volume_step is not None else _DEFAULT_VOLUME_STEP
+    return max(0, min(_MAX_VOLUME_STEP, step))
+
+
 async def playback_control_handler(
     action: str,
     *,
     seek_to_seconds: float | None = None,
     seek_delta_seconds: float | None = None,
+    seek_from_end_seconds: float | None = None,
     volume_level: int | None = None,
     volume_step: int | None = None,
     user_id: str = "",
@@ -1361,6 +1387,7 @@ async def playback_control_handler(
         "seek": "seek_to",
         "seek_absolute": "seek_to",
         "relative_seek": "seek_relative",
+        "seek_end": "seek_from_end",
         "clear": "clear_queue",
         "clearqueue": "clear_queue",
         "skip_track": "skip",
@@ -1415,11 +1442,9 @@ async def playback_control_handler(
                     )
                 target_level = int(volume_level)
             elif action_name == "volume_up":
-                step = int(volume_step) if volume_step is not None else 10
-                target_level = previous_level + max(0, step)
+                target_level = previous_level + _volume_step(volume_step)
             elif action_name == "volume_down":
-                step = int(volume_step) if volume_step is not None else 10
-                target_level = previous_level - max(0, step)
+                target_level = previous_level - _volume_step(volume_step)
             elif action_name == "mute":
                 # Remember the level we are muting FROM (not 0) so a later
                 # unmute has something real to restore -- see #2755.
@@ -1603,6 +1628,39 @@ async def playback_control_handler(
                 return ToolResult(ok=False, data=data, error=_response_error(data))
             return await _seek_result("seek_to", target_seconds, data)
 
+        if action_name in {"shuffle_on", "shuffle_off"}:
+            enabled = action_name == "shuffle_on"
+            data = await _post_runtime("/v1/shuffle", {"enabled": enabled}, timeout=10.0)
+            if not data.get("ok"):
+                return ToolResult(ok=False, data=data, error=_response_error(data))
+            message = "Shuffle is on." if enabled else "Shuffle is off."
+            return ToolResult(ok=True, data={"action": action_name, "message": message, "verified": True})
+
+        if action_name in _REPEAT_ACTIONS:
+            mode = _REPEAT_ACTIONS[action_name]
+            data = await _post_runtime("/v1/repeat", {"mode": mode}, timeout=10.0)
+            if not data.get("ok"):
+                return ToolResult(ok=False, data=data, error=_response_error(data))
+            message = {"off": "Repeat is off.", "all": "Repeating the queue.", "one": "Repeating this track."}[mode]
+            return ToolResult(ok=True, data={"action": action_name, "message": message, "verified": True})
+
+        if action_name == "seek_from_end":
+            if seek_from_end_seconds is None:
+                return ToolResult(ok=False, data=None, error="seek_from_end_seconds is required for seek_from_end")
+            live = await _read_live_playback_state()
+            duration = live.get("duration_seconds")
+            if not live.get("probe_ok") or not isinstance(duration, (int, float)) or duration <= 0:
+                return ToolResult(
+                    ok=False,
+                    data={"action": action_name},
+                    error="The player has not reported this track's length yet, so I can't count back from its end.",
+                )
+            target_seconds = max(0.0, float(duration) - max(0.0, float(seek_from_end_seconds)))
+            data = await _post_runtime("/v1/seek", {"position": round(target_seconds * 1000)}, timeout=15.0)
+            if not data.get("ok"):
+                return ToolResult(ok=False, data=data, error=_response_error(data))
+            return await _seek_result(action_name, target_seconds, data)
+
         if action_name == "seek_relative":
             if seek_delta_seconds is None:
                 return ToolResult(
@@ -1643,7 +1701,12 @@ async def rate_track_handler(
     artist: str = "",
     user_id: str = "",
 ) -> ToolResult:
-    """Rate the current track or an explicit track through Viola's rating APIs."""
+    """Rate the current track or an explicit track through Viola's rating APIs.
+
+    A thumbs-down of what is playing also moves on: the user said they do not
+    want to hear it, so the rating and the skip are one action here, the same
+    as the Dislike button. There is nothing to ask them.
+    """
     del user_id
 
     try:
@@ -1651,6 +1714,15 @@ async def rate_track_handler(
         explicit_track_id = track_id.strip()
 
         if explicit_track_id and rating_value != "remove":
+            is_current_track = False
+            if rating_value == "thumbs_down":
+                live = await _read_live_playback_state()
+                playing_now = live.get("now_playing")
+                if isinstance(playing_now, dict):
+                    is_current_track = explicit_track_id in {
+                        str(playing_now.get("video_id") or ""),
+                        str(playing_now.get("id") or ""),
+                    }
             track_rating = "up" if rating_value == "thumbs_up" else "down"
             request_payload: dict[str, Any] = {
                 "track_id": explicit_track_id,
@@ -1662,6 +1734,15 @@ async def rate_track_handler(
                 request_payload["artist"] = artist.strip()
 
             data = await _post_runtime("/v1/track/rate", request_payload, timeout=10.0)
+            if data.get("ok") and is_current_track:
+                return await _skip_after_dislike(
+                    {
+                        "value": rating_value,
+                        "rating": track_rating,
+                        "track_id": explicit_track_id,
+                        "response": data,
+                    }
+                )
             if data.get("ok"):
                 return ToolResult(
                     ok=True,
@@ -1691,8 +1772,30 @@ async def rate_track_handler(
             }
             if rated_track_id:
                 result_data["track_id"] = rated_track_id
+            if rating_value == "thumbs_down":
+                return await _skip_after_dislike(result_data)
             return ToolResult(ok=True, data=result_data)
 
         return ToolResult(ok=False, data=data, error=_response_error(data))
     except Exception as exc:
         return ToolResult(ok=False, data=None, error="Failed to rate track: %s" % exc)
+
+
+async def _skip_after_dislike(result_data: dict[str, Any]) -> ToolResult:
+    """Finish a dislike of the playing track by moving to the next one.
+
+    The rating is already saved, so a skip that fails is not a failed rating:
+    it is reported as saved-but-still-playing, in those words.
+    """
+    outcome = dict(result_data)
+    outcome["action"] = "dislike_skip"
+    skip = await _post_runtime("/v1/skip", {}, timeout=15.0)
+    if not skip.get("ok"):
+        outcome["skipped"] = False
+        outcome["verified"] = False
+        outcome["message"] = "Noted that you don't like this one, but I couldn't skip it: %s" % _response_error(skip)
+        return ToolResult(ok=True, data=outcome, unverified=True)
+    outcome["skipped"] = True
+    outcome["verified"] = True
+    outcome["message"] = "Noted, skipping this one."
+    return ToolResult(ok=True, data=outcome)

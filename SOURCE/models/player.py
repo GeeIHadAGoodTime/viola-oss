@@ -256,6 +256,10 @@ class PlayerState(BaseModel):
         default=False,
         description="Whether shuffle is enabled.",
     )
+    user_volume: int | None = Field(
+        default=None,
+        description="The volume the user chose. Differs from volume only while speech holds the music down.",
+    )
 
     model_config = ConfigDict(extra="ignore", arbitrary_types_allowed=True)
 
