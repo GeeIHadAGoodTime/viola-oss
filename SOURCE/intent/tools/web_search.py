@@ -59,7 +59,7 @@ _BROWSER_HEADERS: dict[str, str] = {
     "Accept": "text/html,application/xml",
     "Accept-Language": "en-US,en;q=0.9",
 }
-# An engine that showed a bot check or a rate limit is left alone this long.
+# An engine that showed a bot check or a rate limit is skipped this long.
 _ENGINE_COOLDOWN_SECONDS = 15 * 60
 # Domain age is a nice-to-have signal: it must not hold up the answer.
 _DOMAIN_AGE_BUDGET_SECONDS = 1.5
