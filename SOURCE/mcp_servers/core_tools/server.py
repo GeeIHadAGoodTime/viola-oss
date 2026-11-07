@@ -83,6 +83,7 @@ from intent.tools.music_tools import (
     video_fullscreen_handler as _video_fullscreen_handler,
 )
 from intent.tools.notification_tools import (
+    delete_notify_reminder_handler as _delete_notify_reminder_handler,
     list_notify_reminders_handler as _list_notify_reminders_handler,
     notify_handler as _notify_handler,
 )
@@ -1584,6 +1585,7 @@ async def file_write(
     description=(
         "Execute a shell command and return stdout, stderr, and exit code. "
         "Last resort — prefer dedicated tools (file_read, web_search, media) over shell. "
+        "On Windows a plain command runs in cmd.exe from the user's home folder, so 'dir Desktop' lists their desktop. "
         "30s default timeout, 4000 char output cap."
     ),
     annotations=_DANGEROUS,
@@ -3441,6 +3443,7 @@ def _normalize_user_capability_spec(
         else:
             continue
         action_type = str(item.get("type") or "call_capability")
+        item["type"] = action_type
         args_json = item.pop("args_json", None)
         if action_type == "call_capability" and "args" not in item:
             try:
@@ -3453,14 +3456,23 @@ def _normalize_user_capability_spec(
         actions.append({key: value for key, value in item.items() if value is not None})
     if actions:
         raw["actions"] = actions
+    # A routine needs only a name and its actions from the user. Everything else
+    # was a validation error the model could not explain, and nothing got saved.
+    name = str(raw.get("name") or "").strip()
+    if name:
+        raw["description"] = str(raw.get("description") or "").strip() or "Routine: %s" % name
+        trigger = raw.get("trigger")
+        if not isinstance(trigger, dict) or not trigger.get("phrases"):
+            raw["trigger"] = {"kind": "phrase", "phrases": [name, "run %s" % name]}
 
     return {key: value for key, value in raw.items() if value is not None}
 
 
 @server.tool(
     description=(
-        "Author user-scoped shortcuts as declarative compositions that can be created, listed, updated, "
-        "disabled, enabled, or deleted after confirmation. When you notice the user repeatedly asking for "
+        "The user's routines, also called shortcuts: declarative compositions that can be created, listed, "
+        "updated, disabled, enabled, or deleted after confirmation. A create needs only spec.name and "
+        "spec.actions. When you notice the user repeatedly asking for "
         "the same workflow, or when the user explicitly wants a recurring task, propose creating a shortcut "
         "here. Creating a shortcut reports phrase conflicts and deterministic command interception risks. "
         "Confirm before saving."
@@ -3682,7 +3694,8 @@ async def spawn_parallel_subtasks(
         "Provide prompt as the exact task and description as the short reason/label. "
         "The optional mode selects the child's context model: 'fork' (inherit parent) or 'fresh' (clean slate). "
         "All launches return immediately with an agent_id; completion arrives through task notifications. "
-        "check_agents returns status for prior background work."
+        "check_agents returns status for prior background work. "
+        "A background agent has no browser, payment or desktop tools; do that work yourself."
     ),
     annotations=_SAFE,
     # F-014 (R3-C): ``start_agent`` must remain visible on turn one so the
@@ -3888,6 +3901,8 @@ async def check_pending_tasks(
                     continue
                 status = data.get("status", "")
                 if status not in ("in_progress", "interrupted", "waiting_for_user"):
+                    continue
+                if checkpoints.is_stale_pending(data):
                     continue
                 desc = data.get("task_description", "")
                 if query and query.lower() not in desc.lower():
@@ -5563,8 +5578,10 @@ async def alarm(
 
 @server.tool(
     description=(
-        "Send, schedule, or list notifications/reminders. Use action='list' when "
-        "the user asks what reminders they have. For send/schedule, provide message, "
+        "Send, schedule, list or delete notifications/reminders. Use action='list' when "
+        "the user asks what reminders they have, with enabled_only=false to include finished or "
+        "disabled ones. Use action='delete' with reminder set to an id from the list or the "
+        "reminder's words; delete them one at a time. For send/schedule, provide message, "
         "optional when for delayed delivery, and optional channel. User-scoped delivery "
         "uses the user's subscribed web push devices; phone/SMS delivery requires a "
         "separately configured account-bound notification path."
@@ -5587,20 +5604,30 @@ async def notify(
     ] = "",
     action: Annotated[
         str,
-        Field(description="Notification action. Use 'list' to list pending notify reminders; otherwise omit."),
+        Field(
+            description="Notification action. Use 'list' to list notify reminders, 'delete' to delete one; otherwise omit."
+        ),
     ] = "",
     enabled_only: Annotated[
         bool,
         Field(description="For action='list', set true to return only enabled pending reminders."),
     ] = True,
+    reminder: Annotated[
+        str,
+        Field(description="For action='delete', the reminder's id from action='list', or words from its message."),
+    ] = "",
 ) -> str:
-    """Send, schedule, or list notifications/reminders."""
+    """Send, schedule, list or delete notifications/reminders."""
     try:
         action_name = action.strip().lower()
         if action_name == "list":
             return _format_result(await _call_user_scoped(_list_notify_reminders_handler, enabled_only=enabled_only))
+        if action_name == "delete":
+            return _format_result(await _call_user_scoped(_delete_notify_reminder_handler, reminder=reminder))
         if action_name and action_name not in {"send", "schedule", "create"}:
-            return json.dumps({"error": "Unknown action: %s. Use 'list', 'send', 'schedule', or omit action." % action})
+            return json.dumps(
+                {"error": "Unknown action: %s. Use 'list', 'delete', 'send', 'schedule', or omit action." % action}
+            )
         return _format_result(
             await _call_user_scoped(
                 _notify_handler,

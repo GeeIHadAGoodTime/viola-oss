@@ -1492,10 +1492,11 @@ class ContextBuilder:
                     default=str,
                 ),
                 (
-                    "instruction: If the current user explicitly confirms this same pending action, call "
-                    "tool_name with tool_args_json plus confirmation_args_json. If the user cancels, do not "
-                    "call the tool. If the user changes details, call the tool with the updated details and "
-                    "without confirmation_args_json so safety can re-prompt."
+                    "instruction: If the current user confirms this same pending action, call tool_name with "
+                    "tool_args_json plus confirmation_args_json. Any plain yes counts, in any language: yes, ok, "
+                    "sure, go ahead, do it, confirm. If the user cancels or says no, do not call the tool. If the "
+                    "user changes details, call the tool with the updated details and without "
+                    "confirmation_args_json so safety can re-prompt."
                 ),
             ]
             frames.append(
@@ -1511,6 +1512,26 @@ class ContextBuilder:
                         "confirmation_id": confirmation_id,
                         "tool_name": tool_name,
                     },
+                )
+            )
+        elsewhere_provider = getattr(self._approval_manager, "pending_confirmations_elsewhere", None)
+        elsewhere = elsewhere_provider() if callable(elsewhere_provider) else []
+        if isinstance(elsewhere, list) and elsewhere:
+            actions = "; ".join(self._quote_context_fragment(str(item)) for item in elsewhere)
+            text = (
+                "name: PENDING_IN_ANOTHER_CHAT\nactions: %s\ninstruction: These are waiting for an answer in another "
+                "chat, and a reply in this chat cannot approve or cancel them. If the user seems to be answering "
+                "one, say that it belongs to the other chat and they can answer it there. Never call a tool to "
+                "carry one out from here." % actions
+            )
+            frames.append(
+                Frame(
+                    kind=FrameKind.SYSTEM_REMINDER,
+                    role=FrameRole.META_USER,
+                    blocks=(SystemReminderBlock(text=text, source_tag="pending-confirmation"),),
+                    is_meta=True,
+                    origin="deferred_confirmation",
+                    extra={"runtime_context_provider": "pending_confirmation_elsewhere"},
                 )
             )
         return frames

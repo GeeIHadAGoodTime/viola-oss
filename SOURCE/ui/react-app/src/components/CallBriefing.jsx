@@ -73,6 +73,16 @@ const buttonBase = {
   cursor: 'pointer',
 };
 
+/**
+ * True when a different chat is on screen from the one this approval belongs to.
+ * The approval waits there: only that chat can answer it, so showing the card
+ * here invites a "yes" that can't count.
+ */
+export function callBriefingBelongsElsewhere(briefing, openChatThreadId) {
+  const threadId = briefing && briefing.chat_thread_id;
+  return Boolean(threadId && openChatThreadId && threadId !== openChatThreadId);
+}
+
 export default function CallBriefing({ briefing, onDismiss, onApprove, onCancel }) {
   const [sending, setSending] = useState(null);
 

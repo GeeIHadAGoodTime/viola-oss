@@ -248,6 +248,10 @@ class CheckpointStep:
             self.timestamp = datetime.now(UTC).isoformat()
 
 
+_PENDING_WITHOUT_STEPS_TTL_S = 15 * 60
+_PENDING_WITH_STEPS_TTL_S = 24 * 60 * 60
+
+
 @dataclass
 class TaskCheckpoint:
     """Full state snapshot of an agent task."""
@@ -342,6 +346,24 @@ def load_checkpoint(task_id: str, user_id: str | None = None) -> TaskCheckpoint 
             return None
     logger.warning("Checkpoint file not found: %s", task_id)
     return None
+
+
+def is_stale_pending(data: dict[str, Any], *, now: datetime | None = None) -> bool:
+    """True for a task that was cut off and has nothing worth resuming.
+
+    An interrupted "what's the weather" did no steps and is out of date within
+    minutes, yet it stayed listed as pending for good. A task waiting on the user
+    is never stale: it is holding a decision.
+    """
+    if data.get("status") not in ("in_progress", "interrupted"):
+        return False
+    updated_at = _parse_checkpoint_time(data.get("updated_at") or data.get("created_at"))
+    if updated_at is None:
+        return True
+    age = ((now or datetime.now(UTC)) - updated_at).total_seconds()
+    did_work = data.get("steps") or data.get("step_index")
+    limit = _PENDING_WITH_STEPS_TTL_S if did_work else _PENDING_WITHOUT_STEPS_TTL_S
+    return age > limit
 
 
 def find_resumable(task_description: str, user_id: str | None = None) -> TaskCheckpoint | None:

@@ -177,6 +177,8 @@ def irreversible_action_class(
             return "calendar_write"
     if name == "memory" and action in _MEMORY_DELETE_ACTIONS:
         return "memory_delete"
+    if _discards_unsaved_work(name, args):
+        return "discard_unsaved_work"
     if name == "payment":
         if action in _PAYMENT_SAFE_ACTIONS:
             return None
@@ -199,6 +201,22 @@ def irreversible_action_class(
         return "oauth_connect"
 
     return None
+
+
+_DISCARD_BUTTON_NAMES = frozenset({"don't save", "dont save", "do not save", "discard", "discard changes"})
+
+
+def _discards_unsaved_work(tool_name: str, args: Mapping[str, Any] | None) -> bool:
+    """A click on the "Don't save" button of a real app. It cannot be undone.
+
+    Consent for an app lasts the session, so this click would otherwise go through
+    with no question at all once the user had said yes to anything in that app.
+    """
+    params = args or {}
+    if tool_name != "computer" or "click" not in str(params.get("action") or "").lower():
+        return False
+    name = " ".join(str(params.get("name") or "").replace("\u2019", "'").lower().split())
+    return name in _DISCARD_BUTTON_NAMES
 
 
 def _gmail_message_count(args: Mapping[str, Any] | None) -> int:
@@ -383,6 +401,9 @@ def describe_irreversible_action(tool_name: str, args: Mapping[str, Any] | None 
             "respond_to_event": "respond to",
         }.get(action, "change")
         return "%s the calendar event %s" % (verb, event) if event else "%s the calendar event" % verb
+    if action_class == "discard_unsaved_work":
+        window = _clean(params.get("app_executable") or params.get("window_title") or params.get("target_window"))
+        return "throw away the unsaved changes in %s" % window if window else "throw away the unsaved changes"
     if action_class == "memory_delete":
         target = _clean(params.get("path") or params.get("query") or params.get("section_title"))
         return "delete the memory entry %s" % target if target else "delete memory"

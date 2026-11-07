@@ -38,6 +38,7 @@ from services.scheduler.store import (
     ScheduleStore,
     get_schedule_store,
 )
+from services.user_timezone import active_timezone_name
 
 logger = get_logger(__name__)
 
@@ -170,9 +171,17 @@ def _coerce_cron_base(value: datetime, timezone: datetime.tzinfo) -> datetime:
 
 
 def _normalise_one_shot_at(value: str) -> str:
+    """Return the instant in UTC.
+
+    The store finds due rows by comparing ``next_run_at`` as text, so every row
+    must use the same offset. A row kept as 16:51-05:00 sorts before 21:46+00:00
+    and fires on the next poll: "4:51 PM" ran 13 s after it was created
+    (laptop 16:46:28, schedule 18). A naive time is the user's wall clock.
+    """
     dt = datetime.fromisoformat(value)
     if dt.tzinfo is None or dt.utcoffset() is None:
-        dt = dt.replace(tzinfo=_resolve_scheduler_timezone(_configured_scheduler_timezone_name()))
+        zone_name = active_timezone_name() or _configured_scheduler_timezone_name()
+        dt = dt.replace(tzinfo=_resolve_scheduler_timezone(zone_name))
     return dt.astimezone(UTC).isoformat()
 
 
@@ -280,15 +289,10 @@ class SchedulerService:
                 )
             return compute_next_run(cron_expr, timezone_name=_configured_scheduler_timezone_name())
         if one_shot_at:
-            # Validate the datetime is parseable and in the future
             try:
-                dt = datetime.fromisoformat(one_shot_at)
-                if dt.tzinfo is None:
-                    # Naive datetimes represent user's local time, not UTC
-                    dt = dt.astimezone()
+                return _normalise_one_shot_at(one_shot_at)
             except (ValueError, TypeError) as exc:
                 raise ValueError("Invalid one_shot_at datetime: %s" % exc) from exc
-            return dt.isoformat()
         raise ValueError("Either cron_expr or one_shot_at must be provided")
 
     @staticmethod
@@ -368,7 +372,7 @@ class SchedulerService:
             action=action,
             next_run_at=next_run,
             cron_expr=cron_expr,
-            one_shot_at=one_shot_at,
+            one_shot_at=next_run if one_shot_at else None,
         )
         self._record_timer_feature()
         return schedule_id
@@ -957,14 +961,19 @@ class SchedulerService:
             raise RuntimeError("Scheduled action could not be processed (service unavailable)")
 
         try:
-            result = await self._dispatch_schedule_action(schedule)
-            ok = result.get("ok", False) if isinstance(result, dict) else False
+            result = _schedule_result_fields(await self._dispatch_schedule_action(schedule))
+            ok = bool(result.get("ok", False))
             if not ok:
-                error_msg = ""
-                if isinstance(result, dict):
-                    data = result.get("data", {})
-                    data_error = data.get("error", "") if isinstance(data, dict) else ""
-                    error_msg = str(result.get("error") or data_error or result.get("message", "") or "")
+                data = result.get("data", {})
+                data_error = data.get("error", "") if isinstance(data, dict) else ""
+                data_message = data.get("message", "") if isinstance(data, dict) else ""
+                error_msg = str(
+                    result.get("error")
+                    or data_error
+                    or result.get("message", "")
+                    or data_message
+                    or "the action finished without saying why"
+                )
                 logger.warning(
                     "Sub-agent returned not-ok for schedule %d: %s",
                     schedule.id,
@@ -982,7 +991,7 @@ class SchedulerService:
                         ),
                     )
                 raise ServiceError(
-                    "Scheduled action did not complete successfully",
+                    "Scheduled action did not complete: %s" % error_msg,
                     ErrorContext(
                         component="services.scheduler",
                         operation="run_schedule",
@@ -994,7 +1003,7 @@ class SchedulerService:
             logger.info(
                 "Sub-agent completed for schedule %d: %s",
                 schedule.id,
-                result.get("message", "ok") if isinstance(result, dict) else "ok",
+                result.get("message", "ok"),
             )
         except ServiceError:
             raise
@@ -1015,6 +1024,34 @@ class SchedulerService:
                 ),
             ) from exc
 
+    async def _deliver_schedule_reply(self, schedule: Schedule, result: dict[str, Any]) -> None:
+        """Say what a model-run schedule produced; nobody else will.
+
+        A typed or spoken request has a caller waiting for the reply. A schedule
+        has none, so the joke was written and then dropped.
+        """
+        reply = _schedule_reply_text(result)
+        if not reply:
+            return
+        spoken = False
+        speak = getattr(getattr(self._intent_pipeline, "tts", None), "speak", None)
+        if callable(speak):
+            try:
+                await speak(reply)
+                spoken = True
+            except (RuntimeError, OSError, TypeError, ValueError) as exc:
+                logger.warning("Scheduled reply TTS failed for schedule=%s: %s", schedule.id, exc)
+        from intent.tools.notification_tools import deliver_notification_handler
+
+        delivered = await deliver_notification_handler(
+            message=reply,
+            user_id=schedule.user_id,
+            metadata={"schedule_id": schedule.id, "spoken": spoken},
+            user_requested=True,
+        )
+        if not spoken and not getattr(delivered, "ok", False):
+            raise RuntimeError("Scheduled action ran but its reply could not be delivered")
+
     async def _dispatch_schedule_action(self, schedule: Schedule) -> Any:
         """Dispatch a scheduled action while preserving the owning user context.
 
@@ -1034,7 +1071,10 @@ class SchedulerService:
             process = getattr(self._intent_pipeline, "process", None)
             if callable(process):
                 with _scheduled_action_tool_guard():
-                    return await process(schedule.action, user_key=schedule.user_id)
+                    result = _schedule_result_fields(await process(schedule.action, user_key=schedule.user_id))
+                if result.get("ok"):
+                    await self._deliver_schedule_reply(schedule, result)
+                return result
 
             raise RuntimeError("Scheduled action could not be processed (pipeline unavailable)")
 
@@ -1126,6 +1166,32 @@ class SchedulerService:
                 "result": result,
             },
         }
+
+
+def _schedule_result_fields(result: Any) -> dict[str, Any]:
+    """Read a dispatch result as a dict.
+
+    ``IntentPipeline.process`` returns a ``PipelineResult`` dataclass, while the
+    structured actions return dicts. Reading only dicts marked every model-run
+    schedule failed with an empty reason, whatever really happened.
+    """
+    if isinstance(result, dict):
+        return result
+    ok = getattr(result, "ok", None)
+    if ok is None:
+        return {"ok": False, "error": "the action returned no result"}
+    return {"ok": bool(ok), "error": getattr(result, "error", None), "data": getattr(result, "data", None)}
+
+
+def _schedule_reply_text(result: dict[str, Any]) -> str:
+    data = result.get("data")
+    if not isinstance(data, dict) or data.get("queued"):
+        return ""
+    for key in ("response", "answer", "message"):
+        value = data.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return ""
 
 
 def _tool_result_to_schedule_result(result: Any) -> dict[str, Any]:

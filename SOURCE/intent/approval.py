@@ -562,6 +562,24 @@ class ApprovalManager:
             )
         return frames
 
+    def pending_confirmations_elsewhere(self) -> list[str]:
+        """Describe what is waiting in other chats, for the prompt only.
+
+        Holds no id and no arguments: nothing here can answer a confirmation. It
+        lets Viola say where a stray "yes" belongs instead of guessing at it.
+        """
+
+        now = time.monotonic()
+        scope = current_confirmation_conversation_scope()
+        store = self._pending_store()
+        with store.lock:
+            self._prune_pending_confirmations(store, now)
+            return [
+                pending.action_description
+                for pending in store.confirmations.values()
+                if pending.conversation_scope != scope
+            ]
+
     def consume_deferred_confirmation(
         self,
         *,

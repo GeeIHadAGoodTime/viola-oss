@@ -359,6 +359,22 @@ _SENSITIVE_READ_RE = re.compile(
 )
 
 
+_WINDOWS_HOME_VARIABLE_RE = re.compile(r"\$\{HOME\}|\$HOME\b|\$env:USERPROFILE\b", re.IGNORECASE)
+
+
+def _with_windows_home_written_out(command: str) -> str:
+    """Write out the home folder where a model used a POSIX or PowerShell variable.
+
+    Windows runs a plain command in cmd.exe, which does not know ``$HOME``. So
+    ``dir "$HOME/Desktop"`` asked for confirmation (``$`` looks like bash), then
+    found nothing, and each new spelling the model tried asked again: "run dir on
+    my desktop" looped on confirmations at Symphony.
+    """
+    if sys.platform != "win32" or "$" not in command:
+        return command
+    return _WINDOWS_HOME_VARIABLE_RE.sub(lambda _match: str(Path.home()), command)
+
+
 def is_read_only_command(command: object, working_directory: object = "") -> bool:
     """True when the shell safety parser proves the command only reads.
 
@@ -367,7 +383,7 @@ def is_read_only_command(command: object, working_directory: object = "") -> boo
     crucial moments). Anything the parser cannot prove read-only, or that is
     too long to run, keeps the confirmation. Fails closed on any error.
     """
-    text = str(command or "").strip()
+    text = _with_windows_home_written_out(str(command or "").strip())
     if not text or len(text) > _MAX_COMMAND_LENGTH:
         return False
     if _SENSITIVE_READ_RE.search(text):
@@ -443,6 +459,7 @@ async def run_command(
         permission_mode: Claude-style permission mode for non-read-only commands.
     """
 
+    command = _with_windows_home_written_out(command)
     if len(command) > _MAX_COMMAND_LENGTH:
         return ToolResult(
             ok=False,
@@ -450,7 +467,8 @@ async def run_command(
         )
 
     if working_directory:
-        cwd = Path(working_directory).expanduser().resolve()
+        # A relative folder is relative to where commands run, not to Viola's own.
+        cwd = (Path(_default_working_directory()) / Path(working_directory).expanduser()).resolve()
         if not cwd.is_dir():
             return ToolResult(ok=False, error="Working directory does not exist: %s" % cwd)
         cwd_str = str(cwd)

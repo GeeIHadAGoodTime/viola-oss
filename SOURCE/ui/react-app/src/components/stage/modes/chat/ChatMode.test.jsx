@@ -268,6 +268,44 @@ describe('ChatMode command registry', () => {
     expect(chatHarness.apiFetch.mock.calls.filter(([url, options]) => url === '/v1/chat/threads' && options?.method === 'POST')).toHaveLength(1);
   });
 
+  it('sends a message typed while a new chat opens to the new chat, never the old one', async () => {
+    // Laptop build 9: a "yes" typed into a new chat vanished. Sent to the chat
+    // being left, it could also have answered that chat's pending approval.
+    const fallback = chatHarness.apiFetch.getMockImplementation();
+    let finishCreate;
+    const creating = new Promise((resolve) => { finishCreate = resolve; });
+    const sendTargets = [];
+    chatHarness.apiFetch.mockImplementation((url, options = {}) => {
+      if (url === '/v1/chat/threads' && options.method === 'POST') return creating;
+      if (url.endsWith('/send')) {
+        sendTargets.push(url);
+        return Promise.resolve({ stream_id: 'stream-1' });
+      }
+      return fallback(url, options);
+    });
+    render(<ChatMode principalKey="owner-a" />);
+    await screen.findByText('Initial response');
+
+    fireEvent.click(screen.getByRole('button', { name: 'New chat', exact: true }));
+    const composer = screen.getByRole('textbox', { name: 'Message Viola' });
+    fireEvent.change(composer, { target: { value: 'yes' } });
+    fireEvent.keyDown(composer, { key: 'Enter' });
+    await act(async () => finishCreate({ thread: { id: 'new-current', title: 'New current chat' } }));
+
+    await waitFor(() => expect(sendTargets).toEqual(['/v1/chat/threads/new-current/send']));
+    expect(await screen.findByText('yes')).toBeInTheDocument();
+  });
+
+  it('tells the shell which chat is open', async () => {
+    const seen = [];
+    const listener = (event) => seen.push(event.detail.threadId);
+    window.addEventListener('viola:chat:active-thread', listener);
+    render(<ChatMode principalKey="owner-a" />);
+    await screen.findByText('Initial response');
+    window.removeEventListener('viola:chat:active-thread', listener);
+    expect(seen).toContain('thread-1');
+  });
+
   it('shows a model-catalog outage and recovers through an explicit retry', async () => {
     const fallback = chatHarness.apiFetch.getMockImplementation();
     let available = false;

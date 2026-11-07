@@ -209,6 +209,8 @@ _POWERSHELL_READONLY_FILESYSTEM_CMDLETS = frozenset(
 )
 
 _CMD_READONLY_FILESYSTEM_COMMANDS = frozenset({"dir", "type"})
+_CMD_USERPROFILE_RE = re.compile(r"%userprofile%", re.IGNORECASE)
+_CMD_SWITCH_RE = re.compile(r"^/[a-z4?](?::-?[a-z]+|-?[a-z])?$", re.IGNORECASE)
 
 _WRITE_COMMANDS = frozenset(
     {
@@ -1114,12 +1116,25 @@ def _powershell_hard_deny(command: _SimpleCommand, cwd: str) -> str | None:
     return _sensitive_path_reason(args)
 
 
+def _cmd_literal_args(args: tuple[str, ...] | list[str]) -> list[str]:
+    """Write out the user's home folder variable, the one expansion a model commonly uses.
+
+    Anything else with ``%`` stays unprovable and keeps its confirmation.
+    """
+    return [_CMD_USERPROFILE_RE.sub(lambda _match: str(Path.home()), arg) for arg in args]
+
+
+def _cmd_path_args(args: list[str]) -> list[str]:
+    """Leave out ``dir`` switches. ``/b`` is a switch, not a path at the top of the drive."""
+    return [arg for arg in args if not _CMD_SWITCH_RE.match(arg)]
+
+
 def _cmd_hard_deny(command: _SimpleCommand, cwd: str) -> str | None:
     argv = command.stripped_argv
     if not argv:
         return None
     exe = command.executable
-    args = list(argv[1:])
+    args = _cmd_literal_args(argv[1:])
     lower_args = [arg.lower().strip('"') for arg in args]
     if exe in {"del", "erase", "rmdir", "rd"}:
         return "Destructive cmd.exe filesystem command is denied."
@@ -1150,7 +1165,7 @@ def _cmd_hard_deny(command: _SimpleCommand, cwd: str) -> str | None:
     if exe in _POWERSHELL_CROSS_SHELLS:
         return _nested_cross_shell_guard(exe, args, cwd)
     if exe in _CMD_READONLY_FILESYSTEM_COMMANDS:
-        escape_reason = _readonly_path_escape_reason(args, cwd, raw=command.raw)
+        escape_reason = _readonly_path_escape_reason(_cmd_path_args(args), cwd, raw=command.raw)
         if escape_reason:
             return escape_reason
     return _sensitive_path_reason(args)
@@ -1232,7 +1247,7 @@ def _cmd_command_is_read_only(command: _SimpleCommand, cwd: str) -> bool:
     if not argv or command.redirection:
         return False
     exe = command.executable
-    args = list(argv[1:])
+    args = _cmd_literal_args(argv[1:])
     if "%" in " ".join(args):
         return False
     if _sensitive_path_reason(args):

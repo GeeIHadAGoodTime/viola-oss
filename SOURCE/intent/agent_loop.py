@@ -20,6 +20,15 @@ from typing import TYPE_CHECKING, Any, Callable
 
 from core.logging_config import get_logger
 from diagnostics import latency_spans
+from intent.active_task import (
+    ActiveTask,
+    add_turn_reminder,
+    answer_from_helper_results,
+    final_answer_is_off_task,
+    message_carries_request,
+    off_task_answer_message,
+    off_task_correction_text,
+)
 from intent.agent_message_manager import (
     reconstruct_executor_content_replacement_state,
     record_tool_result_replacements,
@@ -136,6 +145,18 @@ class _AgentLoopCostLimitStop(RuntimeError):
 _COMPACTION_PROGRESS_MIN_FRACTION = 0.05  # 5% token reduction = "progress"
 _COMPACTION_NO_PROGRESS_LIMIT = 2  # bail after this many consecutive no-progress attempts
 _COMPACTION_HARD_CEILING = 6  # absolute defense-in-depth (always-allow at most this many)
+
+
+# A run this long, or one that compacted, is checked for having wandered off the
+# request before it may report success. Short runs cannot drift and pay nothing.
+_ANSWER_CHECK_MIN_STEPS = 15
+# A bad gateway on one model call must not end a run that has work in hand: T8b
+# lost three finished helpers to one HTTP 502.
+_TRANSIENT_TURN_RETRIES = 2
+_TRANSIENT_TURN_BACKOFF_S = 1.5
+_TRANSIENT_ERROR_CATEGORIES = frozenset({"server", "overloaded", "timeout"})
+_TRANSIENT_STATUS_TEXT_RE = re.compile(r"\b(?:500|502|503|504|529)\b")
+_HELPER_WAIT_S = 240.0
 
 
 def _compaction_should_allow(executor: Any) -> bool:
@@ -341,6 +362,82 @@ def _prompt_bundle_has_current_user_text(prompt_context_bundle: PromptFrameBundl
         if getattr(frame, "role", None) is FrameRole.USER:
             return _frame_text(frame) == needle
     return False
+
+
+def _is_transient_turn_error(exc: BaseException) -> bool:
+    from services.llm.request_policy import classify_provider_error
+
+    # Some routes only carry the status in the message ("HTTP 502").
+    return (
+        isinstance(exc, ConnectionError)
+        or classify_provider_error(exc) in _TRANSIENT_ERROR_CATEGORIES
+        or bool(_TRANSIENT_STATUS_TEXT_RE.search(str(exc)))
+    )
+
+
+def _log_reasoning_tier(executor: Any) -> None:
+    """Say which reasoning tier this run asks for, so helpers can be checked from the log."""
+    from config.defaults import get_configured_reasoning_effort
+
+    depth = getattr(executor, "_depth", 0)
+    tier = "background_agent" if isinstance(depth, int) and depth > 0 else "agent"
+    model = executor._get_model_name_safe()
+    logger.info(
+        "Agent run reasoning_tier=%s effort=%s depth=%s model=%s task=%s",
+        tier,
+        get_configured_reasoning_effort(tier, model),
+        depth,
+        model,
+        getattr(executor, "task_id", "?"),
+    )
+
+
+async def _answer_from_helpers(executor: Any, active_task: ActiveTask) -> str:
+    """Finish for the parent when it can no longer reach the model itself."""
+    live = dict(getattr(executor, "_live_helpers", None) or {})
+    if live:
+        logger.info("Agent run failed with %d helpers still working; waiting for them", len(live))
+        waits = [asyncio.ensure_future(done.wait()) for done in live.values()]
+        await asyncio.wait(waits, timeout=_HELPER_WAIT_S)
+        for wait in waits:
+            wait.cancel()
+    held = list(getattr(executor, "_held_helper_answers", None) or [])
+    if not held:
+        return ""
+    executor._held_helper_answers = []
+    return await answer_from_helper_results(active_task, held, user_id=str(getattr(executor, "_user_id", "") or ""))
+
+
+def _run_was_compacted(executor: Any) -> bool:
+    count = getattr(executor, "_compaction_count", 0)
+    return isinstance(count, int) and count > 0
+
+
+def _active_task_for_run(
+    executor: Any,
+    checkpoint: Any,
+    user_text: str,
+    messages: list[dict[str, Any]],
+    restored: bool,
+) -> ActiveTask:
+    """Record what this run is for, on the executor and in its checkpoint."""
+
+    context = getattr(checkpoint, "context", None)
+    recorded = context.get("active_request") if isinstance(context, dict) else None
+    description = getattr(checkpoint, "task_description", "")
+    previous = getattr(executor, "_active_task", None)
+    active_task = ActiveTask.for_run(
+        user_text=user_text,
+        messages=messages,
+        restored=restored,
+        previous=previous if isinstance(previous, ActiveTask) else None,
+        checkpoint_request=recorded if isinstance(recorded, str) else "",
+        checkpoint_description=description if isinstance(description, str) else "",
+    )
+    executor._active_task = active_task
+    if isinstance(context, dict) and active_task.request:
+        context["active_request"] = active_task.request
+    return active_task
 
 
 def _executor_hook_session_id(executor: AgentExecutor) -> str | None:
@@ -1685,6 +1782,7 @@ async def run_agent_loop(
         _PaymentConfirmationGateRefused,
         _record_structured_incomplete_diagnostic,
         _remember_last_tool_result,
+        _shorten_old_page_snapshots,
         _strip_image_from_result,
         _strip_old_browser_refs,
         _terminal_response_from_tool_result,
@@ -2187,6 +2285,10 @@ async def run_agent_loop(
     taint_tracker.set_payment_approval_probe(getattr(executor, "_payment_gate_approval_active", None))
     _bind_active_taint_tracker(taint_tracker)
     _bind_file_gate_context_for_run(executor, loop_messages, user_text)
+    active_task = _active_task_for_run(executor, checkpoint, user_text, loop_messages, initial_messages is not None)
+    executor._agent_loop_active = True
+    _log_reasoning_tier(executor)
+    _transient_turn_retries = 0
     pending_hook_context_messages: list[dict[str, Any]] = []
     native_turn_max_tokens = _native_turn_max_tokens_for_model(executor._get_model_name_safe())
 
@@ -2237,6 +2339,7 @@ async def run_agent_loop(
             return
         for pending_text in pending:
             loop_messages.append({"role": "user", "content": pending_text})
+            active_task.note_instruction(pending_text)
         _record_subagent_transcript()
 
     _record_subagent_transcript()
@@ -2534,6 +2637,10 @@ async def run_agent_loop(
             replacement_writer=lambda records: record_tool_result_replacements(executor, records),
             session_id=tool_result_replacement_session_id(executor),
         )
+        if turn_messages and not message_carries_request(turn_messages[-1], active_task.request):
+            # Added to this outgoing copy only: the goal rides on every turn of a
+            # working run whatever happens to history, and history does not grow.
+            turn_messages = add_turn_reminder(turn_messages, active_task.render_reminder())
         turn_kwargs: dict[str, Any] = {
             "messages": turn_messages,
             "first_turn": first_turn,
@@ -2632,6 +2739,30 @@ async def run_agent_loop(
             turn_kwargs["responses_continuity"] = copy.deepcopy(continuity_payload)
         return turn_kwargs, turn_messages, continuity_before
 
+    _off_task_verdicts: dict[str, bool | None] = {}
+
+    async def _answer_is_off_task(answer: str) -> bool:
+        """Check a long run's answer against its request, once per distinct answer."""
+        if not (_run_was_compacted(executor) or iterations >= _ANSWER_CHECK_MIN_STEPS):
+            return False
+        if answer not in _off_task_verdicts:
+            _off_task_verdicts[answer] = await final_answer_is_off_task(
+                active_task,
+                answer,
+                user_id=str(getattr(executor, "_user_id", "") or ""),
+            )
+        return _off_task_verdicts[answer] is True
+
+    async def _send_off_task_answer_back(answer: str) -> bool:
+        """Return True when an off-task answer went back for one more try."""
+        if active_task.answer_redirected or not await _answer_is_off_task(answer):
+            return False
+        active_task.answer_redirected = True
+        logger.warning("Agent task %s: final answer is off the request; sending it back once", task_id)
+        loop_messages.append({"role": "assistant", "content": answer})
+        loop_messages.append({"role": "user", "content": off_task_correction_text(active_task)})
+        return True
+
     def _acknowledge_sent_messages(messages: list[dict[str, Any]]) -> None:
         """Advance the agent-loop-side delta cursor after a successful provider call."""
         nonlocal _loop_sent_message_count
@@ -2703,6 +2834,7 @@ async def run_agent_loop(
             session_id=tool_result_replacement_session_id(executor),
             replacement_writer=lambda records: record_tool_result_replacements(executor, records),
             content_replacement_state=getattr(executor, "_content_replacement_state", None),
+            active_task=active_task,
         )
         if not compaction_meta:
             return False
@@ -3641,6 +3773,17 @@ async def run_agent_loop(
                     call_kind="agent_loop",
                     exc=exc,
                 )
+                if _transient_turn_retries < _TRANSIENT_TURN_RETRIES and _is_transient_turn_error(exc):
+                    _transient_turn_retries += 1
+                    logger.warning(
+                        "Agent turn %d hit a temporary model error, retry %d/%d: %s",
+                        iterations,
+                        _transient_turn_retries,
+                        _TRANSIENT_TURN_RETRIES,
+                        exc,
+                    )
+                    await asyncio.sleep(_TRANSIENT_TURN_BACKOFF_S * _transient_turn_retries)
+                    continue
                 if isinstance(exc, RuntimeError) and _is_native_tool_calling_unsupported(exc):
                     logger.exception("Native tool calling not supported by active provider")
                     terminal_provider_error = "PROVIDER_UNSUPPORTED"
@@ -3654,6 +3797,8 @@ async def run_agent_loop(
                 executor._llm_error_occurred = True
                 outcome = "llm_error"
                 break
+
+            _transient_turn_retries = 0
 
             # Per-turn billing: reservation settlement happened in
             # _call_native_turn; keep the post-settle cap recheck so a turn
@@ -3684,6 +3829,7 @@ async def run_agent_loop(
                             continue_listening=False,
                         )
                         executor._final_params["cap_state"] = _spend_gate.cap_state
+                        outcome = "cost_limit"
                         break
                 except Exception as _pl_exc:
                     if _handle_agent_loop_billing_failure(_pl_exc):
@@ -3753,6 +3899,8 @@ async def run_agent_loop(
                 answer_text = response.get("answer", "")
                 cl_value = response.get("continue_listening")
                 raw_text = answer_text if isinstance(answer_text, str) else str(answer_text or "")
+                if await _send_off_task_answer_back(_normalize_terminal_model_text(raw_text)):
+                    continue
                 _set_final_response(
                     executor,
                     _normalize_terminal_model_text(raw_text),
@@ -3781,7 +3929,9 @@ async def run_agent_loop(
                     operator_message = user_message_for_operator_diagnostic(operator_diagnostic)
                     if operator_message:
                         _set_final_response(executor, operator_message, continue_listening=False)
-                outcome = "llm_error" if executor._llm_error_occurred else "success"
+                # Tools may have run, but the model never answered: that is a
+                # failure whatever came before it, not a success.
+                outcome = "llm_error"
                 break
 
             if resp_type in {"ask_user", "clarification"}:
@@ -3793,6 +3943,8 @@ async def run_agent_loop(
             if resp_type == "final_answer":
                 answer_text = response.get("answer", response.get("text", ""))
                 raw = answer_text if isinstance(answer_text, str) else str(answer_text)
+                if await _send_off_task_answer_back(_normalize_terminal_model_text(raw)):
+                    continue
                 _set_final_response(
                     executor,
                     _normalize_terminal_model_text(raw),
@@ -3825,6 +3977,8 @@ async def run_agent_loop(
                         "Agent loop received text fallback response with content_len=%d; treating as answer",
                         len(content),
                     )
+                    if await _send_off_task_answer_back(_normalize_terminal_model_text(content)):
+                        continue
                     _set_final_response(
                         executor,
                         _normalize_terminal_model_text(content),
@@ -4562,6 +4716,13 @@ async def run_agent_loop(
                     executor._forced_tool_failure_error = tool_result.error or "calendar tool failed"
                     executor._forced_tool_failure_outcome = "tool_error"
 
+                active_task.note_step(
+                    tc_name,
+                    tc_args,
+                    ok=bool(tool_result.ok),
+                    note=str(_turn_reasoning if tool_result.ok else tool_result.error or ""),
+                    page_url=str(getattr(executor, "_last_page_url", "") or ""),
+                )
                 if session_memory is not None:
                     try:
                         session_memory.update_after_tool(
@@ -4951,6 +5112,7 @@ async def run_agent_loop(
                 loop_messages.append({"role": "user", "content": tool_results_content})
                 if _had_browser_nav:
                     _strip_old_browser_refs(loop_messages)
+                _shorten_old_page_snapshots(loop_messages)
                 _record_subagent_transcript()
                 tool_results_content = []
                 _flush_pending_hook_context()
@@ -5011,6 +5173,12 @@ async def run_agent_loop(
                     },
                 },
             )
+
+        if outcome == "llm_error":
+            helper_answer = await _answer_from_helpers(executor, active_task)
+            if helper_answer:
+                final_answer = helper_answer
+                _set_final_response(executor, final_answer, continue_listening=False)
 
         from intent.agent_executor import _apply_approval_blocked_final_answer
 
@@ -5235,6 +5403,16 @@ async def run_agent_loop(
                 outcome = "incomplete"
                 _record_structured_incomplete_diagnostic(executor, incomplete_diagnostic)
 
+        if outcome == "success" and await _answer_is_off_task(final_answer):
+            logger.warning("Agent task %s: final answer does not deal with the request; not reporting success", task_id)
+            outcome = "off_task"
+            final_answer = off_task_answer_message(active_task)
+            _set_final_response(executor, final_answer, continue_listening=True)
+            _record_structured_incomplete_diagnostic(
+                executor,
+                {"reason": "final_answer_off_task", "domain": "agent_task", "evidence_source": "final_answer_check"},
+            )
+
         if (
             outcome in ("success", "payment_gate", "signature_gate")
             and _current_subagent_id(executor)
@@ -5365,7 +5543,7 @@ async def run_agent_loop(
             )
         terminal_llm_error = executor._llm_error_occurred and not final_overrides_llm_error
         terminal_cost_limit = outcome == "cost_limit"
-        terminal_incomplete = outcome == "incomplete"
+        terminal_incomplete = outcome in {"incomplete", "off_task"}
         final_ok = (
             not terminal_llm_error
             and executor._forced_tool_failure_error is None
@@ -5444,6 +5622,7 @@ async def run_agent_loop(
             error=str(exc),
         )
     finally:
+        executor._agent_loop_active = False
         _dispatch_session_end("agent_loop_teardown")
         hook_file_watcher = getattr(executor, "_hook_file_watcher", None)
         if hook_file_watcher is not None:

@@ -39,6 +39,7 @@ from config.env import get_bool as _env_get_bool
 from core.asyncio_safe import is_event_loop_closed_error
 from core.logging_config import get_logger
 from core.platform import get_logs_dir
+from intent.active_task import ActiveTask, answer_from_helper_results
 from intent.agent_message_manager import (
     AgentMessageManager,
     record_tool_result_replacements,
@@ -2127,6 +2128,69 @@ def _strip_old_browser_refs(native_messages: list[dict[str, Any]]) -> None:
                 val = content.get(key)
                 if isinstance(val, str) and _REF_PATTERN.search(val):
                     content[key] = _REF_PATTERN.sub("", val)
+
+
+_CHECK_AGENTS_WAIT_S = 20.0
+
+# Tools whose result is a whole-page read. On a long shopping run these are most
+# of the history, and only the newest pages can still be acted on.
+_PAGE_SNAPSHOT_TOOLS = frozenset(
+    {
+        "browser_navigate",
+        "browser_snapshot",
+        "browser_interact",
+        "browser_fill_form",
+        "browser_run_script",
+        "browser_get_form_fields",
+        "verify_state",
+    }
+)
+_PAGE_SNAPSHOTS_KEPT_WHOLE = 2
+_OLD_PAGE_SNAPSHOT_CHARS = 1_500
+_OLD_PAGE_SNAPSHOT_NOTE = "\n[older page view shortened. Take a new snapshot if you need that page again.]"
+
+
+def _tool_names_by_call_id(native_messages: list[dict[str, Any]]) -> dict[str, str]:
+    names: dict[str, str] = {}
+    for message in native_messages:
+        content = message.get("content") if isinstance(message, dict) else None
+        if isinstance(content, dict) and isinstance(content.get("tool_calls"), list):
+            for call in content["tool_calls"]:
+                function = call.get("function") if isinstance(call, dict) else None
+                if isinstance(function, dict) and call.get("id"):
+                    names[str(call["id"])] = str(function.get("name") or "")
+        elif isinstance(content, list):
+            for block in content:
+                if isinstance(block, dict) and block.get("type") == "tool_use" and block.get("id"):
+                    names[str(block["id"])] = str(block.get("name") or "")
+    return names
+
+
+def _shorten_old_page_snapshots(native_messages: list[dict[str, Any]]) -> None:
+    """Keep the two newest page views whole and shorten older ones in place.
+
+    Each result keeps its head, which holds the URL, title and top of the page,
+    so the model still knows where it has been. Search results and files are not
+    touched: an answer found there has to stay readable (R2-P0-1).
+    """
+
+    tool_names = _tool_names_by_call_id(native_messages)
+    seen = 0
+    for message in reversed(native_messages):
+        content = message.get("content") if isinstance(message, dict) else None
+        if not isinstance(content, list):
+            continue
+        for block in reversed(content):
+            if not isinstance(block, dict) or block.get("type") != "tool_result":
+                continue
+            if tool_names.get(str(block.get("tool_use_id") or "")) not in _PAGE_SNAPSHOT_TOOLS:
+                continue
+            seen += 1
+            text = block.get("content")
+            if seen <= _PAGE_SNAPSHOTS_KEPT_WHOLE or not isinstance(text, str):
+                continue
+            if len(text) > _OLD_PAGE_SNAPSHOT_CHARS + len(_OLD_PAGE_SNAPSHOT_NOTE):
+                block["content"] = text[:_OLD_PAGE_SNAPSHOT_CHARS] + _OLD_PAGE_SNAPSHOT_NOTE
 
 
 # ---------------------------------------------------------------------------
@@ -4313,6 +4377,16 @@ class AgentExecutor:
             restored_continuity=checkpoint.llm_continuity,
         )
 
+    def _restored_active_task(self, checkpoint: Any) -> ActiveTask | None:
+        """The task a restored chain belongs to, for compaction before the loop starts."""
+        task = getattr(self, "_active_task", None)
+        if isinstance(task, ActiveTask) and task.request:
+            return task
+        context = getattr(checkpoint, "context", None)
+        recorded = context.get("active_request") if isinstance(context, dict) else ""
+        request = recorded or getattr(checkpoint, "task_description", "") or ""
+        return ActiveTask.from_messages(self._native_messages, str(request)) if request else None
+
     @staticmethod
     def _format_prior_context_lines(
         messages: list[dict[str, str]] | None,
@@ -5031,6 +5105,7 @@ class AgentExecutor:
                         self._native_messages,
                         user_id=self._user_id or "",
                         session_id=self._session_id,
+                        active_task=self._restored_active_task(existing_checkpoint),
                     )
                     if compacted:
                         self._native_messages = compacted
@@ -9273,6 +9348,22 @@ class AgentExecutor:
         except Exception:
             logger.debug("Failed to auto-trigger OAuth for %s", tool_name, exc_info=True)
 
+    async def _deliver_helper_answers(self, channel: Any, user_id: str) -> None:
+        """Send what the helpers found, as one reply, to where the user asked."""
+        held = list(getattr(self, "_held_helper_answers", None) or [])
+        self._held_helper_answers = []
+        if channel is None or not held:
+            return
+        task = getattr(self, "_active_task", None)
+        if len(held) == 1 or not isinstance(task, ActiveTask):
+            reply = "\n\n".join(item["answer"] for item in held)
+        else:
+            reply = await answer_from_helper_results(task, held, user_id=user_id)
+        try:
+            await channel.send(reply)
+        except Exception as exc:
+            logger.debug("Background agent channel.send failed: %s", exc)
+
     async def _handle_start_agent(self, tool_args: dict[str, Any]) -> ToolResult:
         """Dispatch a long-running background agent and return its id immediately.
 
@@ -9325,21 +9416,6 @@ class AgentExecutor:
         # extension outside the parity surface.
         run_in_background = True
 
-        if run_in_background:
-            shared_names = _shared_state_tool_names(
-                self._native_tools_for_child(
-                    subagent_mode=effective_mode,
-                    subagent_type=effective_subagent_type,
-                )
-            )
-            if shared_names:
-                return ToolResult(
-                    ok=False,
-                    error=_background_shared_state_error(shared_names),
-                    error_category="SUBAGENT_SHARED_STATE_TOOLS",
-                    retryable=False,
-                )
-
         from services.agent_runtime.registry import (
             AgentLimitExceededError,
             agent_registry,
@@ -9359,6 +9435,10 @@ class AgentExecutor:
         # request returned; SSE finalize_stream is what the web UI actually
         # consumes.
         delivery_channel = getattr(self, "_channel", None)
+        helper_done = asyncio.Event()
+        if getattr(self, "_live_helpers", None) is None:
+            self._live_helpers = {}
+        self._live_helpers[agent_id] = helper_done
 
         async def _runner(cancel_event: asyncio.Event) -> str:
             from intent.hooks import dispatch_lifecycle
@@ -9401,15 +9481,23 @@ class AgentExecutor:
                         subagent_mode=effective_mode,
                         subagent_type=effective_subagent_type,
                         model_override=str(tool_args.get("model") or "").strip() or None,
-                        allow_shared_state_tools=False,
+                        # Background children run beside the parent, so the
+                        # browser, payment and desktop tools stay with it. A
+                        # fork inherits those tools, and refusing to start here
+                        # meant no background agent could ever run.
+                        exclude_shared_state_tools=True,
                     )
                     answer = _child_answer_text(child_result)
                     finalize_stream(stream_id, content=answer)
-                    if delivery_channel is not None and answer:
-                        try:
-                            await delivery_channel.send(answer)
-                        except Exception as exc:
-                            logger.debug("Background agent channel.send failed: %s", exc)
+                    self._held_helper_answers = [
+                        *(getattr(self, "_held_helper_answers", None) or []),
+                        {"task": task, "answer": answer},
+                    ]
+                    # While the parent runs it writes the reply; reports used to
+                    # go straight to the stage, raw. Once it has ended, the last
+                    # helper to finish delivers one reply for all of them.
+                    if not getattr(self, "_agent_loop_active", False) and len(self._live_helpers) <= 1:
+                        await self._deliver_helper_answers(delivery_channel, user_id)
                     try:
                         dispatch_lifecycle(
                             "SubagentStop",
@@ -9461,6 +9549,10 @@ class AgentExecutor:
                         error=str(exc),
                     )
                     raise
+
+                finally:
+                    helper_done.set()
+                    self._live_helpers.pop(agent_id, None)
 
         try:
             registry_start = getattr(agent_registry, "start", None)
@@ -9520,7 +9612,11 @@ class AgentExecutor:
                     runner_task=runner_task,
                 )
         except AgentLimitExceededError as exc:
-            return ToolResult(ok=False, error=str(exc))
+            self._live_helpers.pop(agent_id, None)
+            return ToolResult(
+                ok=False,
+                error="%s Tell the user how many are running; they can wait or cancel one from the agents drawer." % exc,
+            )
 
         if not run_in_background:
             background_wait_task = asyncio.create_task(background_signal.wait())
@@ -9576,6 +9672,15 @@ class AgentExecutor:
     async def _handle_check_agents(self, tool_args: dict[str, Any]) -> ToolResult:
         """Return JSON list of this user's active + recent_completed agents."""
         from services.agent_runtime.registry import agent_registry
+
+        # Hold the answer until a helper finishes or a short time passes. Polled
+        # at full speed, a parent spent 16 model turns in 45 s, each resending
+        # its whole context, to learn nothing had changed.
+        running = [asyncio.ensure_future(done.wait()) for done in (getattr(self, "_live_helpers", None) or {}).values()]
+        if running:
+            await asyncio.wait(running, timeout=_CHECK_AGENTS_WAIT_S, return_when=asyncio.FIRST_COMPLETED)
+            for wait in running:
+                wait.cancel()
 
         user_id = self._get_effective_user_id()
         active = await agent_registry.list_active(user_id)
@@ -10765,11 +10870,16 @@ class AgentExecutor:
                         session_id=tool_result_replacement_session_id(self),
                         replacement_writer=lambda records: record_tool_result_replacements(self, records),
                         content_replacement_state=getattr(self, "_content_replacement_state", None),
+                        active_task=getattr(self, "_active_task", None),
                     )
                     if _compaction_meta:
                         self._pending_compaction_meta = _compaction_meta
                 else:
-                    messages[:] = await compact_messages(messages, user_id=self._user_id)
+                    messages[:] = await compact_messages(
+                        messages,
+                        user_id=self._user_id,
+                        active_task=getattr(self, "_active_task", None),
+                    )
                 _budget_msgs = self._native_messages if self._use_native else messages
                 self._token_tracker.recount(_budget_msgs, after_compaction=True)
                 _compaction_record_progress(self, pre_compaction_tokens, self._token_tracker.total_tokens)
@@ -11006,7 +11116,11 @@ class AgentExecutor:
                         if _compaction_meta:
                             self._pending_compaction_meta = _compaction_meta
                     else:
-                        messages[:] = await compact_messages(messages, user_id=self._user_id)
+                        messages[:] = await compact_messages(
+                        messages,
+                        user_id=self._user_id,
+                        active_task=getattr(self, "_active_task", None),
+                    )
                     _compaction_record_progress(
                         self,
                         pre_compaction_tokens,
