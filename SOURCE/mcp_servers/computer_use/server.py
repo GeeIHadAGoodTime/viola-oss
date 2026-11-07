@@ -1129,8 +1129,8 @@ async def desktop_volume(
     meta={"risk": "confirm", "anthropic/alwaysLoad": True},
     description=(
         "Look at the user's computer screen and answer a question about it ('what's on my screen?', "
-        "'what does this error say?', 'which window is open?'). Captures the active window or the whole "
-        "screen and describes it. For clicking, typing or opening apps, use the computer tool."
+        "'what does this error say?'). Captures the active window or the whole screen and describes it. "
+        "For clicking, typing, opening apps or listing open windows (no screenshot needed), use the computer tool."
     ),
 )
 async def view_screen(
