@@ -191,21 +191,19 @@ def _resolve_custom_wake_model_path() -> Path | None:
 
 
 def _point_verifier_at(model_path: Path) -> str | None:
-    """Tell the Stage 2 check which word this model listens for; return that word."""
+    """Publish the word this model listens for; return that word."""
 
-    word: str | None = None
     try:
         from services.wake_word.custom_models import custom_wake_word_for_model
-
+        from voice.wake_detector.active_word import publish_active_wake_word
+    except ImportError:  # the listener loaded on its own: only the built-in word exists
+        return None
+    word: str | None = None
+    try:
         word = custom_wake_word_for_model(model_path)
     except Exception as exc:  # noqa: BLE001, RUF100 - an unreadable sidecar means the built-in word
         logger.warning("Could not read the wake word for %s: %s", model_path, exc)
-    try:
-        from voice.wake_detector.wake_verifier import get_wake_verifier
-
-        get_wake_verifier().set_target(word)
-    except Exception as exc:  # noqa: BLE001, RUF100 - the check is optional; the detector is not
-        logger.warning("[WAKE_VERIFY] could not set the wake word: %s", exc)
+    publish_active_wake_word(word)
     return word
 
 
@@ -875,6 +873,8 @@ class ViolaWakeListener:
 
             engine.custom_model = bool(custom_wake_word_for_model(model_path))
             engine.custom_rule = custom_wake_rule_for_model(model_path)
+        except ImportError:
+            logger.debug("Custom wake models are not available here")
         except Exception as exc:  # noqa: BLE001, RUF100 - an unreadable sidecar means the built-in rule
             logger.warning("Could not read the wake rule for %s: %s", model_path, exc)
         return engine
@@ -944,7 +944,9 @@ class ViolaWakeListener:
             self._engine = new_engine
             self._model_path = candidate
             self._custom_wake_word = _point_verifier_at(candidate)
-            # A fork of the old model would judge her own speech by the old word.
+            # The check of her own voice scores with a copy of the engine, built on
+            # first use. It has to be the model now in use, or her saying the custom
+            # word goes unnoticed.
             self._reference_engine = None
             model_name = candidate.name.lower()
             self._infer_interval = 2 if "mlp" in model_name else 5

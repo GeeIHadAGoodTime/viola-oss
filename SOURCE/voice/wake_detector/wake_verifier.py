@@ -88,13 +88,13 @@ import zlib
 from collections.abc import Callable, Sequence
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, field
-from difflib import SequenceMatcher
 from itertools import pairwise
 from typing import Any, Protocol
 
 import numpy as np
 
 from core.logging_config import get_logger
+from voice.wake_detector.active_word import active_wake_word, similarity, wake_word_keys
 
 logger = get_logger(__name__)
 
@@ -203,31 +203,19 @@ def find_viola_token(text: str) -> str | None:
     return None
 
 
-def _sound_key(word: str) -> str:
-    """Fold spellings of the same sound together, so "kuhpree" can meet "capri"."""
-    folded = word.replace("ph", "f").replace("ck", "k").replace("qu", "k").replace("x", "ks")
-    folded = folded.translate(str.maketrans("zcqvwy", "skkfui"))
-    return re.sub(r"(.)\1+", r"\1", folded)
-
-
 def _sounds_like(heard: str, target: str) -> bool:
-    if heard == target:
-        return True
-    heard_key, target_key = _sound_key(heard), _sound_key(target)
-    return SequenceMatcher(None, heard_key, target_key).ratio() >= _CUSTOM_MATCH_RATIO
+    return similarity(heard, target) >= _CUSTOM_MATCH_RATIO
 
 
 def find_target_token(text: str, target: str) -> str | None:
     """Return the first word in ``text`` that sounds like a custom wake word.
 
-    A phrase is judged by its longest word, or all of it joined: "hey jarvis" is
-    heard when "jarvis" is, and "hey" alone must not count. Adjacent words are also
-    tried joined, because Whisper splits a word it does not know ("zef ira").
+    Adjacent words are also tried joined, because Whisper splits a word it does not
+    know ("zef ira").
     """
-    target_words = _WORD_RE.findall(target.lower().replace("'", ""))
-    if not target_words:
+    keys = wake_word_keys(target)
+    if not keys:
         return None
-    keys = {max(target_words, key=len), "".join(target_words)}
     words = _WORD_RE.findall(text.lower().replace("'", ""))
     for word in words:
         if any(_sounds_like(word, key) for key in keys):
@@ -318,7 +306,9 @@ def decide(
     text = info.text.strip()
     if not _WORD_RE.search(text.lower()):
         return GateDecision(not require_token, "empty")
-    token = find_target_token(text, target) if target else find_viola_token(text)
+    # The word in use, unless a caller names one: every check here follows it.
+    wake_word = target if target is not None else active_wake_word()
+    token = find_target_token(text, wake_word) if wake_word else find_viola_token(text)
     if token and not _hallucinated_token(info, cfg):
         return GateDecision(True, "token", token)
     if require_token:
@@ -331,6 +321,12 @@ def decide(
 # ---------------------------------------------------------------------------
 # Audio helpers
 # ---------------------------------------------------------------------------
+
+
+def _whisper_prompt(config: VerifierConfig) -> str:
+    """Prime Whisper with the word in use. Left on "Viola", it nudged a custom word away."""
+    word = active_wake_word()
+    return "%s, " % word.capitalize() if word else config.prompt
 
 
 def _chunk_rms(audio: np.ndarray) -> np.ndarray:
@@ -491,25 +487,6 @@ class WakeVerifier:
         self._early_pending: Future[TranscriptInfo] | None = None
         # When a normal-rule candidate last failed for want of a token.
         self._last_no_token_at: float | None = None
-        # The user's custom wake word, or None for "Viola".
-        self._target: str | None = None
-
-    def set_target(self, word: str | None) -> None:
-        """Listen for this custom wake word instead of "Viola" (None: back to "Viola").
-
-        Both the prompt and the token check follow it. Left on "Viola", the check
-        rejected the user's own word as "speech without Viola", and the prompt nudged
-        Whisper to hear Viola instead.
-        """
-        cleaned = " ".join((word or "").split())
-        self._target = cleaned or None
-
-    @property
-    def target(self) -> str | None:
-        return self._target
-
-    def _prompt(self) -> str:
-        return "%s, " % self._target.capitalize() if self._target else self.config.prompt
 
     # -- model lifecycle ----------------------------------------------------
 
@@ -569,7 +546,7 @@ class WakeVerifier:
             temperature=0.0,
             condition_on_previous_text=False,
             without_timestamps=True,
-            initial_prompt=self._prompt(),
+            initial_prompt=_whisper_prompt(self.config),
             vad_filter=False,
             no_speech_threshold=None,
         )
@@ -775,7 +752,7 @@ class WakeVerifier:
         except Exception as exc:  # noqa: BLE001, RUF100 - doubt passes
             logger.debug("[WAKE_VERIFY] Whisper failed: %s", exc)
             return _doubt("error", tail_ms=tail_ms, whisper_ms=whisper_ms)
-        verdict = decide(info, cfg, low_score=low_score, require_token=require_token, target=self._target)
+        verdict = decide(info, cfg, low_score=low_score, require_token=require_token)
 
         if not verdict.passed and early is not None:
             # The early window ended on the word; the audio after it may hold the
@@ -786,9 +763,7 @@ class WakeVerifier:
                 second = self._executor.submit(self.transcribe, _read_tail())
                 if _await(second):
                     second_info = second.result()
-                    second_verdict = decide(
-                        second_info, cfg, low_score=low_score, require_token=require_token, target=self._target
-                    )
+                    second_verdict = decide(second_info, cfg, low_score=low_score, require_token=require_token)
                     if second_verdict.passed:
                         info, verdict = second_info, second_verdict
             except Exception as exc:  # noqa: BLE001, RUF100 - the first answer stands

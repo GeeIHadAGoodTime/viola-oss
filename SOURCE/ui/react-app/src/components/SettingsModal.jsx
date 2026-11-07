@@ -3946,7 +3946,7 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
             <AdvancedSection title="Voice Recognition & Advanced">
               <SettingRow
                 title="Double-check the wake word"
-                description={'Before the chime, Viola takes a quick second listen and ignores the wake if it clearly heard talking without "Viola".'}
+                description={`Before the chime, Viola takes a quick second listen and ignores the wake if it clearly heard talking without "${(localSettings.use_custom_wake_word && localSettings.custom_wake_word_name) || 'Viola'}".`}
                 tooltip="On by default. It cuts false wakes from talking, TV and music. Turn it off if Viola often misses you when you say its name. The check runs on this device."
               >
                 <Toggle

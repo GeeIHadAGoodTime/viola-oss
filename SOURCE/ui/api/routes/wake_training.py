@@ -19,6 +19,7 @@ from fastapi import Body, Depends, HTTPException, Request, status
 from services.violawake_client import (
     ViolaWakeClient,
     ViolaWakeClientError,
+    ViolaWakeMonthlyLimitError,
     ViolaWakeRemoteError,
     ViolaWakeSignInRequiredError,
     ViolaWakeUnavailableError,
@@ -223,6 +224,9 @@ def _set_active_model(user_id: str, model_path: str, *, model_name: str, is_defa
         settings_manager.set("use_custom_wake_word", not is_default, save_immediately=False)
         settings_manager.set("custom_wake_word_name", "" if is_default else model_name, save_immediately=False)
         settings_manager.save()
+    from voice.wake_detector.active_word import publish_active_wake_word
+
+    publish_active_wake_word(None if is_default else model_name)
 
 
 def _reload_wake_detector(model_path: str) -> dict[str, Any]:
@@ -399,6 +403,8 @@ def register_wake_training_routes(context: ApiContext) -> None:
             )
         except ViolaWakeSignInRequiredError:
             return _json_error(status.HTTP_401_UNAUTHORIZED, "sign_in_required", _SIGN_IN_REQUIRED)
+        except ViolaWakeMonthlyLimitError as exc:
+            return _json_error(status.HTTP_429_TOO_MANY_REQUESTS, "wake_monthly_limit", str(exc))
         except ViolaWakeUnavailableError:
             return _json_error(status.HTTP_503_SERVICE_UNAVAILABLE, "violawake_unavailable", _TEMPORARILY_UNAVAILABLE)
         except ViolaWakeRemoteError:
