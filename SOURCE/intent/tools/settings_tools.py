@@ -520,10 +520,12 @@ async def save_delivery_address_handler(
     caught, and a correction replaces the address. Whether the words really are the
     user's own is checked before this runs (``BrowserTaintTracker.check_tool``).
     """
+    region = str(state or "").strip()
     address = {
         "street": str(street or "").strip(),
         "city": str(city or "").strip(),
-        "state": str(state or "").strip().upper(),
+        # A spoken "Wisconsin" stays a word; only a two-letter code is capitalised.
+        "state": region.upper() if len(region) == 2 else region,
         "zip": str(zip_code or "").strip(),
     }
     if not any(char.isdigit() for char in address["street"]):

@@ -1938,18 +1938,38 @@ def _redacted_static_step_field(key: str, value: Any) -> Any:
     return copy.deepcopy(cached)
 
 
+_ADDRESS_LOG_KEYS = frozenset({"street", "zip_code", "read_back"})
+
+
+def _mask_addresses_for_log(value: Any) -> Any:
+    """Keep a street address out of the agent's plain-text logs, like a phone number."""
+    from services.memory.store import redact_street_addresses
+
+    if isinstance(value, str):
+        return redact_street_addresses(value)
+    if isinstance(value, dict):
+        return {
+            key: "[redacted]" if key in _ADDRESS_LOG_KEYS and item else _mask_addresses_for_log(item)
+            for key, item in value.items()
+        }
+    if isinstance(value, (list, tuple)):
+        return [_mask_addresses_for_log(item) for item in value]
+    return value
+
+
 def _redact_step_data(step_data: dict[str, Any]) -> Any:
     """``redact_card_data(step_data)``, reusing the redaction of unchanged tool-schema fields."""
     static_keys = [key for key in _STEP_LOG_STATIC_FIELDS if isinstance(step_data.get(key), (dict, list))]
     if not static_keys:
-        return redact_card_data(step_data)
+        return _mask_addresses_for_log(redact_card_data(step_data))
     try:
         redacted_static = {key: _redacted_static_step_field(key, step_data[key]) for key in static_keys}
         rest = redact_card_data({key: value for key, value in step_data.items() if key not in redacted_static})
     except Exception:  # noqa: BLE001, RUF100 - any surprise falls back to the plain whole-mapping redaction
-        return redact_card_data(step_data)
+        return _mask_addresses_for_log(redact_card_data(step_data))
     if not isinstance(rest, dict):
-        return redact_card_data(step_data)
+        return _mask_addresses_for_log(redact_card_data(step_data))
+    rest = _mask_addresses_for_log(rest)
     return {key: redacted_static[key] if key in redacted_static else rest[key] for key in step_data}
 
 
@@ -2256,8 +2276,8 @@ class AgentStepRecord:
     tool_use_id: str | None = None
 
     def __post_init__(self) -> None:
-        self.tool_input = redact_card_data(self.tool_input)
-        self.tool_result_summary = redact_card_data(self.tool_result_summary)
+        self.tool_input = _mask_addresses_for_log(redact_card_data(self.tool_input))
+        self.tool_result_summary = _mask_addresses_for_log(redact_card_data(self.tool_result_summary))
         self.tool_use_id = str(self.tool_use_id or "").strip() or None
 
 
@@ -2318,7 +2338,7 @@ class AgentTaskLog:
 
         def _write() -> None:
             try:
-                _atomic_write_json_restricted(path, redact_card_data(snapshot))
+                _atomic_write_json_restricted(path, _mask_addresses_for_log(redact_card_data(snapshot)))
                 logger.debug("Agent task log written to %s", path)
             except Exception as exc:
                 logger.warning("Failed to write agent task log: %s", exc)
@@ -5802,7 +5822,7 @@ class AgentExecutor:
                 "llm_total_input_tokens_seen": getattr(self, "_llm_total_input_tokens_seen", 0),
                 "responses_continuity_mode": getattr(self, "_last_continuity_mode", None),
             }
-            line = json.dumps(complete_data, default=str) + "\n"
+            line = json.dumps(_mask_addresses_for_log(complete_data), default=str) + "\n"
             step_log_path = self._get_structured_step_log_path()
             _run_task_log_io(lambda: _append_structured_log_line(jsonl_dir, step_log_path, line))
         except Exception:

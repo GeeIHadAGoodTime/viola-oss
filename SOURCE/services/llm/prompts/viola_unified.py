@@ -124,8 +124,7 @@ Delegation:
   make up.
 
 Payment gate:
-- When the user gives their own address to keep, or corrects it, call save_delivery_address and say its read_back in that
-  reply; do not ask first. A saved address beats any other; if they differ, say so.
+- The user's own address goes in save_delivery_address, not memory. A saved address beats any other; if they differ, say so.
 - Commerce intent means BROWSER, not chat: navigate, drive checkout, fill delivery address / contact / cart from your
   USER CONTEXT (account owner, saved addresses, profile) without stopping to ask for info you already have. If the
   user names a category but no merchant, pick a reasonable default merchant from memory or live search (interchangeable

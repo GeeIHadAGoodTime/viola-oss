@@ -810,6 +810,10 @@ class BrowserTaintTracker:
         # What the user has really said in this conversation, plus what they have
         # already saved. Empty for a helper: its task was written by the model.
         self._user_own_words: str = ""
+        # Taint from anything but Viola's own memory. "Remember my address" often
+        # checks memory first, and that alone must not stop the save: the word
+        # check below still refuses any address the user did not say.
+        self._tainted_from_outside: bool = False
 
     def set_user_own_words(self, text: str | None) -> None:
         """Record the words a USER_WORDS_ONLY_TOOLS call may be made of."""
@@ -940,6 +944,8 @@ class BrowserTaintTracker:
             )
         self._tainted = True
         self._taint_source = source_tool
+        if canonicalize_tool_name_for_safety(source_tool) != "memory":
+            self._tainted_from_outside = True
         if category == "non_browser":
             self._non_browser_tainted = True
 
@@ -1098,10 +1104,10 @@ class BrowserTaintTracker:
 
     def _check_user_words_only(self, tool_name: str, args: Mapping[str, Any]) -> str | None:
         """Refuse a saved address that did not come from the user's own words."""
-        if self._tainted:
+        if self._tainted_from_outside:
             logger.warning("TAINT_GATE: refusing %s after untrusted content from '%s'", tool_name, self._taint_source)
             return (
-                "BLOCKED: '%s' cannot run after web, email, calendar, memory or file content entered this task "
+                "BLOCKED: '%s' cannot run after web, email, calendar or file content entered this task "
                 "(prompt injection defense). Nothing was saved. Ask the user to say their address again in a "
                 "new request." % tool_name
             )
