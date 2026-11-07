@@ -23,7 +23,7 @@ from collections.abc import AsyncIterator, Callable, Iterator
 from typing import Any
 
 from config import env as config_env
-from core.live_call_state import live_call_active
+from core.live_call_state import hold_report, live_call_of_turn
 from core.logging_config import get_logger
 from services.llm.answer_stream import FinalAnswerSpeechGate
 from services.llm.stream_bus import (
@@ -145,8 +145,11 @@ class StreamedReply:
     def _push(self, text: str) -> None:
         if self._closed or not text.strip():
             return
-        if self.speaking_task is None and live_call_active():
-            # Nothing starts over a live call; the reply still reaches the screen.
+        call_id = live_call_of_turn(self.stream_id)
+        if call_id:
+            # This is the turn that placed a live call: its words reach the screen
+            # and its report waits for the call to end. Other turns speak normally.
+            hold_report(call_id)
             return
         self._queue.put_nowait(text.strip() + " ")
         if self.speaking_task is None:

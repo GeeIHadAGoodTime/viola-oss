@@ -1305,6 +1305,30 @@ _PLAYBACK_SILENT_ACTIONS = frozenset({"next", "skip", "previous"})
 _DISCOVERY_TOOL_NAMES = frozenset({"ToolSearch", "tool_search"})
 
 
+def _note_turn_placed_live_call(executor: Any, tool_name: str, tool_args: Any, tool_result: Any) -> None:
+    """Remember that this turn placed a call that is still live.
+
+    From here the turn's own speech is about that call, so it waits for the call to
+    end. Decided by what this turn did, never by what its text says.
+    """
+    if tool_name != "phone" or not isinstance(tool_args, dict) or tool_args.get("action") != "call":
+        return
+    from core.live_call_state import call_is_live, note_turn_placed_call
+    from services.llm.stream_bus import get_current_command_stream_id
+
+    data = getattr(tool_result, "data", None)
+    if isinstance(data, str):
+        try:
+            data = _json.loads(data)
+        except ValueError:
+            return
+    call_id = str(data.get("call_id") or "") if isinstance(data, dict) else ""
+    if not call_id or not call_is_live(call_id):
+        return
+    executor._live_call_of_turn = call_id
+    note_turn_placed_call(get_current_command_stream_id(), call_id)
+
+
 def _phone_watch_lost_response(tool_name: str, tool_result: Any) -> str | None:
     """The reply for a call whose status cannot be read, or None.
 
@@ -4634,6 +4658,7 @@ async def run_agent_loop(
                             continue_listening=False,
                             params={"nested_gate_result": dict(_nested_gate)},
                         )
+                _note_turn_placed_live_call(executor, tc_name, tc_args, tool_result)
                 _phone_watch_lost = _phone_watch_lost_response(tc_name, tool_result)
                 if _phone_watch_lost is not None:
                     _set_final_response(

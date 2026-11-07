@@ -57,6 +57,26 @@ _diagnostics = get_diagnostics_bus()
 
 # Per-request state isolated via contextvars to prevent race conditions
 # when concurrent async requests share a single AIController instance.
+def _hold_report_of_live_call(result: dict[str, Any], executor: Any) -> None:
+    """Show this reply but do not speak it, if this turn placed a call still live.
+
+    Uses the "spoken" contract the voice and typed reply paths already honour. Any
+    other turn is untouched, so a question asked during a call is answered aloud.
+    """
+    from core.live_call_state import call_is_live, hold_report, live_call_of_turn
+    from services.llm.stream_bus import get_current_command_stream_id
+
+    call_id = live_call_of_turn(get_current_command_stream_id())
+    if not call_id:
+        placed = str(getattr(executor, "_live_call_of_turn", "") or "")
+        call_id = placed if placed and call_is_live(placed) else ""
+    if not call_id:
+        return
+    hold_report(call_id)
+    result["spoken"] = True
+    result["data"]["spoken"] = True
+
+
 _ctx_user_id: contextvars.ContextVar[str | None] = contextvars.ContextVar("request_user_id", default=None)
 _ctx_ask_tier_active: contextvars.ContextVar[bool] = contextvars.ContextVar("ask_tier_active", default=False)
 _ctx_agent_model_override: contextvars.ContextVar[str | None] = contextvars.ContextVar(
@@ -3403,6 +3423,7 @@ class AIController:
                 result["message"] = cleaned_answer
                 result["data"]["answer"] = cleaned_answer
                 result["response"] = cleaned_answer
+                _hold_report_of_live_call(result, executor)
                 if isinstance(agent_result.params, dict) and agent_result.params.get("silent_reply"):
                     # A confirmed track change the user hears: show the text,
                     # do not speak it (same "spoken" contract the voice and

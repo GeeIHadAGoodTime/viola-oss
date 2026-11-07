@@ -160,12 +160,6 @@ class Synthesizer:
             logger.warning("Synthesizer not available")
             return
 
-        from core.live_call_state import live_call_active
-
-        if live_call_active():
-            logger.info("Speech held back: a phone call is live")
-            return
-
         await self._impl.speak(text)
 
     async def speak_streaming(self, text_chunks: AsyncIterator[str]) -> str:
@@ -182,10 +176,8 @@ class Synthesizer:
         Returns:
             The full concatenated text that was spoken (for logging/history).
         """
-        from core.live_call_state import live_call_active
-
-        if self._impl is None or live_call_active():
-            logger.warning("Speech not played: no synthesizer, or a phone call is live")
+        if self._impl is None:
+            logger.warning("Synthesizer not available for streaming")
             # Drain the iterator and return the collected text
             collected: list[str] = []
             async for chunk in text_chunks:

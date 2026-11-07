@@ -11492,6 +11492,14 @@ class AgentExecutor:
 
     async def _speak(self, text: str) -> None:
         """Send progress text through the channel (preferred) or TTS fallback."""
+        # The turn that placed a live call does not narrate over it.
+        call_id = getattr(self, "_live_call_of_turn", "")
+        if call_id:
+            from core.live_call_state import call_is_live, hold_report
+
+            if call_is_live(call_id):
+                hold_report(call_id)
+                return
         # Prefer channel if available
         if self._channel is not None:
             try:

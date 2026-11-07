@@ -1720,8 +1720,8 @@ async def _make_phone_call_cloud(
                 "message": "Call queued. It will dial automatically when the current call ends.",
             },
         )
-    # From here until the call ends the PC keeps quiet. Its voice reaches the line
-    # when the phone is in the same room (see core/live_call_state.py).
+    # While the call is live this turn's own report waits for it to end, because the
+    # PC's voice reaches the line when the phone is in the room (core/live_call_state.py).
     note_call_live(call_id)
     if not wait_for_completion:
         return ToolResult(
