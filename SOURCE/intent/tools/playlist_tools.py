@@ -10,12 +10,16 @@ here so that all playlist data lives in one place (the SQLite store).
 
 from __future__ import annotations
 
+import asyncio
+import time
 from typing import Any
 
 from core.logging_config import get_logger
 from intent.tool_types import ToolResult
 
 logger = get_logger(__name__)
+
+_PLAY_CONFIRM_SECONDS = 4.0
 
 # Verification verdicts for a playback claim, matching intent.tools.music_tools
 # so both music surfaces label the same evidence the same way.
@@ -125,23 +129,29 @@ async def _confirm_runtime_playback() -> tuple[str, dict[str, Any] | None]:
     into a bare failure-to-find is what let a caller treat an unanswered probe
     as confirmation.
     """
-    try:
-        payload = await _get_runtime("/v1/player/state", timeout=5.0)
-    except _runtime_call_errors() as exc:
-        logger.debug("player-state probe failed: %s", exc)
-        return VERIFY_UNAVAILABLE, None
-    if not payload.get("ok"):
-        return VERIFY_UNAVAILABLE, None
+    # The embed takes a moment to report PLAYING: one read straight after
+    # /v1/play said "not playing yet" while the song was starting.
+    deadline = time.monotonic() + _PLAY_CONFIRM_SECONDS
+    while True:
+        try:
+            payload = await _get_runtime("/v1/player/state", timeout=5.0)
+        except _runtime_call_errors() as exc:
+            logger.debug("player-state probe failed: %s", exc)
+            return VERIFY_UNAVAILABLE, None
+        if not payload.get("ok"):
+            return VERIFY_UNAVAILABLE, None
 
-    state = payload.get("data")
-    if not isinstance(state, dict):
-        state = payload
-    now = state.get("now_playing") or state.get("current")
-    now = now if isinstance(now, dict) else None
-    title = str(now.get("title") or now.get("name") or "").strip() if now else ""
-    if state.get("is_playing") and title:
-        return VERIFY_PLAYING, now
-    return VERIFY_NOT_PLAYING, now
+        state = payload.get("data")
+        if not isinstance(state, dict):
+            state = payload
+        now = state.get("now_playing") or state.get("current")
+        now = now if isinstance(now, dict) else None
+        title = str(now.get("title") or now.get("name") or "").strip() if now else ""
+        if state.get("is_playing") and title:
+            return VERIFY_PLAYING, now
+        if time.monotonic() >= deadline:
+            return VERIFY_NOT_PLAYING, now
+        await asyncio.sleep(0.2)
 
 
 def _link_playlists(user_id: str) -> dict[str, dict[str, Any]]:
@@ -152,13 +162,26 @@ def _link_playlists(user_id: str) -> dict[str, dict[str, Any]]:
     SQLite, so the name the Settings form tells the user to say answered "No
     playlists saved yet" (1.0.5 laptop T2). The manager is desktop-only state.
     """
-    from core.user_context import _is_cloud_surface
+    from core.user_context import _is_cloud_surface, get_desktop_local_principals
 
     if _is_cloud_surface():
         return {}
     from music.playlist_manager import get_playlist_manager
 
-    return dict(get_playlist_manager().list_playlists(user_id=user_id) or {})
+    # One person per install: the account and the device id are the same human,
+    # and a request can land under either depending on how it authenticated. The
+    # form must not save where the tool cannot see. This reads only those two ids.
+    owners = [user_id]
+    try:
+        owners += [principal for principal in get_desktop_local_principals() if principal != user_id]
+    except LookupError:
+        pass
+    found: dict[str, dict[str, Any]] = {}
+    manager = get_playlist_manager()
+    for owner in owners:
+        for name, record in (manager.list_playlists(user_id=owner) or {}).items():
+            found.setdefault(name, {**record, "_owner": owner})
+    return found
 
 
 async def end_deleted_playlist_playback(name: str) -> bool:
@@ -286,10 +309,11 @@ async def delete_playlist_handler(name: str, user_id: str = "") -> ToolResult:
         store = PlaylistStore()
         # Async-native: cloud `playlist` tool on the serving loop (CL-20260711-afd7).
         deleted = await store.delete_playlist_async(resolved_user_id, name)
-        if name.lower() in _link_playlists(resolved_user_id):
+        linked = _link_playlists(resolved_user_id).get(name.lower())
+        if linked is not None:
             from music.playlist_manager import get_playlist_manager
 
-            deleted = get_playlist_manager().remove_playlist(name, user_id=resolved_user_id) or deleted
+            deleted = get_playlist_manager().remove_playlist(name, user_id=linked["_owner"]) or deleted
         if deleted:
             stopped = await end_deleted_playlist_playback(name)
             return ToolResult(
@@ -337,7 +361,7 @@ async def play_playlist_handler(name: str, user_id: str = "") -> ToolResult:
         if playlist is None:
             linked = _link_playlists(resolved_user_id)
             if name.lower() in linked:
-                return await _play_link_playlist(name, resolved_user_id)
+                return await _play_link_playlist(name, linked[name.lower()]["_owner"])
             all_playlists = await store.list_playlists_async(resolved_user_id)
             all_names = [pl.name for pl in all_playlists] + list(linked)
             hint = "Available: %s" % ", ".join(all_names) if all_names else "No playlists saved yet."
@@ -413,7 +437,15 @@ async def _start_first_track(name: str, first_track: dict[str, Any], *, track_co
             error="Playlist %r has tracks, but none of them carry a playable URL or title." % name,
         )
 
-    response = await _post_runtime("/v1/play", {"query": play_query})
+    # Sent with the title: a bare URL showed the URL as the song's name on stage.
+    request: dict[str, Any] = {"query": play_query}
+    title = str(first_track.get("title") or "").strip()
+    if title and title != play_query:
+        request["title"] = title
+        artist = str(first_track.get("artist") or first_track.get("uploader") or "").strip()
+        if artist:
+            request["artist"] = artist
+    response = await _post_runtime("/v1/play", request)
     if int(response.get("_status_code", 0) or 0) != 200 or not response.get("ok"):
         return ToolResult(
             ok=False,

@@ -51,6 +51,12 @@ def _create_state_adapter(app):
     return state_adapter
 
 
+def _known_track_metadata(body: Any) -> dict[str, Any]:
+    """Keyword arguments for a play whose caller already knows the track's name."""
+    metadata = {key: value for key in ("title", "artist") if (value := getattr(body, key, None))}
+    return {"metadata": metadata} if metadata else {}
+
+
 def _control_error_response(
     status_code: int,
     code: str,
@@ -333,7 +339,7 @@ def register_control_routes(context: ApiContext, toolbox: RouteToolbox) -> None:
             try:
                 if hasattr(music, "play_async"):
                     enqueued = await asyncio.wait_for(
-                        music.play_async(query, source=source),
+                        music.play_async(query, source=source, **_known_track_metadata(body)),
                         timeout=20.0,
                     )
                     log.info(
