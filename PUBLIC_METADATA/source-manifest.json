@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "e201dd1e2ead1ffd43527b4c80ca7b5460139426",
-  "sha256": "955cf0826e8c353d6a0fe9c79462eba28aeb8a7b98836af37495da738ac96c26",
+  "revision": "0c6989980727268fbc3f029d84fd76a57b0ab32a",
+  "sha256": "77b6b374a5368b4555e9148a729c08d4d525d2a1ca383dff594c71b34348a886",
   "files": [
     {
       "path": ".env.example",
@@ -1595,8 +1595,8 @@
     },
     {
       "path": "intent/agent_executor.py",
-      "sha256": "8e23b47e5cea6aaf23fc02a8d26ea86c84fdf111dc507c6b4f48ff55e794a233",
-      "bytes": 635434
+      "sha256": "0e30a1afa42b00311fc160a2928870f9178c76c7d73b9c14c914c12f235d1e1e",
+      "bytes": 638799
     },
     {
       "path": "intent/agent_loop.py",
@@ -1635,8 +1635,8 @@
     },
     {
       "path": "intent/approval.py",
-      "sha256": "f44ec6ea8e9dbf73396189e88b790ee30ee159696243a27eb4c0fa1196b3e2e2",
-      "bytes": 57540
+      "sha256": "03e36719e15d56daa1060fc51e1136b64e19f6eef8b96ef4e07e7c31033bb4a9",
+      "bytes": 60274
     },
     {
       "path": "intent/capability_resolver.py",
@@ -1875,8 +1875,8 @@
     },
     {
       "path": "intent/irreversible_actions.py",
-      "sha256": "8202b3bb837c92c6f7328c0abdede0019d18d9279b24cac13151484afeb63950",
-      "bytes": 24132
+      "sha256": "b6ce25e3e9477b853ebf040644e7dd5d7a4001dd22b9f51b2d107bf6536ef535",
+      "bytes": 24229
     },
     {
       "path": "intent/json_utils.py",
@@ -2270,8 +2270,8 @@
     },
     {
       "path": "mcp_hub/client_hub.py",
-      "sha256": "a7f320575a7dfb5117343a587c465886ed653a8e1900104bef43160bb828c2f9",
-      "bytes": 132547
+      "sha256": "2b581e4d2f1abc883d0d6309f81f8817e21e02b2e006a98dabcba17c41043219",
+      "bytes": 132566
     },
     {
       "path": "mcp_hub/compound_tools.py",
@@ -2390,8 +2390,8 @@
     },
     {
       "path": "mcp_servers/core_tools/server.py",
-      "sha256": "ca7b37bca099ff2da4c0533e2e0b4794086fc22255dec50b19733abeb7f3580e",
-      "bytes": 266447
+      "sha256": "4bc1107fa801ccd66c9f188eb8e56e0be254354a101d5d180cbbf08e5de5f195",
+      "bytes": 265713
     },
     {
       "path": "mcp_servers/phone_tool_descriptions.py",
