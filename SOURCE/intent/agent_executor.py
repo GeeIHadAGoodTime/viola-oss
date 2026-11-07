@@ -764,21 +764,20 @@ _NO_PROGRESS_PAGE_HEALTH_STATUSES = frozenset({"bot_protection", "parked_or_expi
 # per the ticket's minimal-fix spec ("same page/state N times -> halt").
 _BOT_PROTECTION_HALT_STREAK = 3
 
-# A site's person check is for a person. Viola never solves or gets around one:
-# she leaves the page on screen, says so, and waits for the user to finish it.
+# A site's person check: shown to the user in the browser view while the task waits.
 _BOT_CHECK_WAIT_SECONDS = 180.0
 _BOT_CHECK_POLL_SECONDS = 2.0
 _BOT_CHECK_NOTICE = (
-    "This site wants to check you're a person, and I can't do that for you. "
+    "This site wants to check you're a person. "
     "The page is on your screen: please finish the check there and I'll carry on as soon as it's done."
 )
 _BOT_CHECK_DONE_NOTE = (
     "[The user finished the site's person check in the browser view. Take a fresh browser_snapshot "
-    "and carry on with the task. If the site shows another check, it is theirs to do, not yours.]"
+    "and carry on with the task. If the site shows another check, it is shown to the user the same way.]"
 )
 _BOT_CHECK_GIVEN_UP_NOTE = (
-    "[This site is showing a person check that the user did not finish (%s). Never try to solve or "
-    "get around it. Leave this site. If the request can be met at another store or site, use that one "
+    "[This site is showing a person check that the user did not finish (%s). "
+    "Leave this site. If the request can be met at another store or site, use that one "
     "and tell the user you switched. If it cannot, stop and tell the user plainly that the site needs "
     "them to finish the check; the page stays open on their screen.]"
 )
