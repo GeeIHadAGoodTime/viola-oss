@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "9de3ffd3967a5105d4b8715bcd6f0b7082bbc4f1",
-  "sha256": "0fd6220647f8124f4ba757eabc5bcbb5e91f7e41c1a9b38e72b1c4def9ca4beb",
+  "revision": "b9731f4995d089553095e9efd30b18d96e4b89d5",
+  "sha256": "25f54a24fc774c5a87a7ba0c2e2e93dec219c4ac157ff148e57afd4950d70bd1",
   "files": [
     {
       "path": ".env.example",
@@ -1595,8 +1595,8 @@
     },
     {
       "path": "intent/agent_executor.py",
-      "sha256": "851791fb40404a9d0d23dda092271a43f6ccd8590000b4fa75e5317aca52f130",
-      "bytes": 628659
+      "sha256": "2a49262a5fc1f6981e367e04a271888e428b42b9001b657f83440ed7e00f1adf",
+      "bytes": 630313
     },
     {
       "path": "intent/agent_loop.py",
@@ -2175,8 +2175,8 @@
     },
     {
       "path": "intent/tools/shell.py",
-      "sha256": "0140904522412387147535d1960bceb182b3c7d62fc4598da1d02a77715dc7c9",
-      "bytes": 23988
+      "sha256": "a7f80980eebdce01e9e67fa3618fc753dc8fe22374acfc2ee6d47005ba4fc6e8",
+      "bytes": 26735
     },
     {
       "path": "intent/tools/system_state.py",
@@ -2390,8 +2390,8 @@
     },
     {
       "path": "mcp_servers/core_tools/server.py",
-      "sha256": "9b1e82a5c5704ac4983775b464b9b39e1ed0f87f308a122f7603efeab078b6e6",
-      "bytes": 266350
+      "sha256": "a0c6bef71b5390e1862679b2f506f7cf0cac0d63153e0969405c31532fa2c348",
+      "bytes": 266243
     },
     {
       "path": "mcp_servers/phone_tool_descriptions.py",
@@ -9985,8 +9985,8 @@
     },
     {
       "path": "ui/qt_native/webview_window.py",
-      "sha256": "2964d96cce93e2952dde4140d21a9f64f74dccebff628ded71e7d6912a36e8cb",
-      "bytes": 261351
+      "sha256": "37a9666b28c1be912cf3df2f35d1b58512c692bb5a3b18ebda341aa5fcb41d2c",
+      "bytes": 261807
     },
     {
       "path": "ui/qt_native/widgets/connectivity_status.py",
@@ -13765,8 +13765,8 @@
     },
     {
       "path": "voice/synthesis/engine.py",
-      "sha256": "4932de72512eadf35b57fe64ca4e4d61f7be38d7e16f939db1118e43e5706e48",
-      "bytes": 14905
+      "sha256": "3ae7197f392cbf20e292232600ae3a17af934127e9d4e9f232cd31cca226cdfa",
+      "bytes": 17226
     },
     {
       "path": "voice/synthesis/factory.py",
