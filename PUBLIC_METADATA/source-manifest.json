@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "94d077ca9151bb2dc8ef5b80ab16604e3ab693af",
-  "sha256": "917d384c60914f76c9a39aa5cb8f9540a3690523f3884a71012f784cd43366f1",
+  "revision": "9de3ffd3967a5105d4b8715bcd6f0b7082bbc4f1",
+  "sha256": "0fd6220647f8124f4ba757eabc5bcbb5e91f7e41c1a9b38e72b1c4def9ca4beb",
   "files": [
     {
       "path": ".env.example",
@@ -1595,8 +1595,8 @@
     },
     {
       "path": "intent/agent_executor.py",
-      "sha256": "c92a8629475a08819bd2ba919280cf80822fbeef034abfd9acf7344c60899416",
-      "bytes": 628792
+      "sha256": "851791fb40404a9d0d23dda092271a43f6ccd8590000b4fa75e5317aca52f130",
+      "bytes": 628659
     },
     {
       "path": "intent/agent_loop.py",
@@ -2230,8 +2230,8 @@
     },
     {
       "path": "intent/tools/web_search.py",
-      "sha256": "10f7dfba1be684f597dc9a989a8ff2a01a918e5da02ce6ccb3d8c65963a7e5cb",
-      "bytes": 46905
+      "sha256": "a6de9622073eeeeba09c9d7850468c781518e03a6cf0afe73b7c2b988008a0e1",
+      "bytes": 46876
     },
     {
       "path": "intent/tools/workbench.py",
