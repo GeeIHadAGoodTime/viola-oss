@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import copy
+import dataclasses
 import inspect
 import json as _json
 import re
@@ -95,16 +96,34 @@ def _normalize_terminal_model_text(text: str | None) -> str:
     return _strip_json_template(str(text or ""))
 
 
-def _trace_safe_copy(value: Any) -> Any:
-    """Copy trace payloads without letting live runtime objects break the agent loop."""
+def _trace_safe_copy(value: Any, _depth: int = 0) -> Any:
+    """Copy trace payloads without letting live runtime objects break the agent loop.
 
-    try:
-        return copy.deepcopy(value)
-    except (TypeError, ValueError, AttributeError, RuntimeError, RecursionError):
+    Plain data is copied deeply; a live object is written as ``<TypeName>``. This no
+    longer tries copy.deepcopy first: the turn's request carries an asyncio.Event,
+    deepcopy failed half way through it, and the half-built event loop it left behind
+    logged "Exception ignored in BaseEventLoop.__del__" on every model call.
+    """
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if _depth > 40:
+        return "<%s>" % type(value).__name__
+    if isinstance(value, dict):
+        return {
+            (k if isinstance(k, (str, int, float, bool)) or k is None else str(k)): _trace_safe_copy(v, _depth + 1)
+            for k, v in value.items()
+        }
+    if isinstance(value, (list, tuple)):
+        return [_trace_safe_copy(item, _depth + 1) for item in value]
+    if dataclasses.is_dataclass(value) and not isinstance(value, type):
+        return {f.name: _trace_safe_copy(getattr(value, f.name, None), _depth + 1) for f in dataclasses.fields(value)}
+    dump = getattr(value, "model_dump", None)
+    if callable(dump):
         try:
-            return _json.loads(_json.dumps(value, default=lambda obj: "<%s>" % type(obj).__name__))
-        except (TypeError, ValueError, AttributeError, RuntimeError, RecursionError):
-            return "<%s>" % type(value).__name__
+            return _trace_safe_copy(dump(), _depth + 1)
+        except Exception:  # noqa: BLE001, RUF100 - fall back to the type name
+            pass
+    return "<%s>" % type(value).__name__
 
 
 _REASONING_MODEL_TAGS = ("o1", "o3", "o4-", "gpt-5", "gpt-6")

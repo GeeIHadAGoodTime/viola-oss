@@ -314,19 +314,8 @@ _PROVIDER_PRIVATE_RESPONSE_KEYS = frozenset(
 
 
 def _trace_safe_copy(value: Any) -> Any:
-    try:
-        return copy.deepcopy(value)
-    except (TypeError, ValueError, AttributeError, RuntimeError, RecursionError):
-        try:
-            return json.loads(
-                json.dumps(
-                    value,
-                    default=lambda item: "<%s>" % type(item).__name__,
-                    ensure_ascii=True,
-                )
-            )
-        except (TypeError, ValueError, AttributeError, RuntimeError, RecursionError):
-            return "<%s>" % type(value).__name__
+    """Trace copy without copy.deepcopy (see _trace_copy)."""
+    return _trace_copy(value)
 
 
 def _estimated_tokens_for_messages(messages: list[dict[str, Any]]) -> int:
@@ -787,7 +776,7 @@ def _trace_copy(value: Any, _depth: int = 0) -> Any:
     """A copy for the task trace that cannot fail.
 
     Plain data (dicts, lists, tuples, strings, numbers) is copied deeply, so later
-    changes never reach the trace. Anything else is written as short text. A tool
+    changes never reach the trace. Anything else is written as ``<TypeName>``. A tool
     result can hold an object tied to an event loop; copy.deepcopy then failed half
     way, the trace lost that tool call, and the half-built loop it left behind logged
     "Exception ignored in BaseEventLoop.__del__" on every tool turn.
@@ -811,11 +800,7 @@ def _trace_copy(value: Any, _depth: int = 0) -> Any:
             return _trace_copy(dump(), _depth + 1)
         except Exception:  # noqa: BLE001, RUF100 - fall back to text
             pass
-    try:
-        text = str(value)
-    except Exception:  # noqa: BLE001, RUF100 - a trace must never fail on a value
-        text = "<%s>" % type(value).__name__
-    return text[:500]
+    return "<%s>" % type(value).__name__
 
 _MEMORY_ALL_SCOPE_PATHS = frozenset({"", "memory", "memory/", "MEMORY.md", "memory/MEMORY.md"})
 _MEMORY_SEARCH_ACTIONS = frozenset({"search", "grep"})
