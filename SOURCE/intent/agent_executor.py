@@ -2076,7 +2076,32 @@ def flush_agent_task_log_io(timeout: float | None = 10.0) -> bool:
     return True
 
 
+# A day's step log that passes this size moves to a ".1" file, replacing the
+# previous one, so a long day keeps at most about twice this on disk.
+_STEP_LOG_MAX_BYTES = 32 * 1024 * 1024
+_SCHEMAS_IN_STEP_LOG: dict[str, set[str]] = {}
+_SCHEMAS_IN_STEP_LOG_LOCK = threading.Lock()
+
+
+def _first_time_in_step_log(path: Path, schema_hash: str) -> bool:
+    """True the first time this schema set is written to this log file."""
+    key = str(path)
+    with _SCHEMAS_IN_STEP_LOG_LOCK:
+        seen = _SCHEMAS_IN_STEP_LOG.setdefault(key, set())
+        if schema_hash in seen:
+            return False
+        seen.add(schema_hash)
+        return True
+
+
 def _write_structured_log_line(path: Path, line: str) -> None:
+    try:
+        if path.stat().st_size + len(line) > _STEP_LOG_MAX_BYTES:
+            os.replace(path, path.with_name(path.stem + ".1" + path.suffix))
+            with _SCHEMAS_IN_STEP_LOG_LOCK:
+                _SCHEMAS_IN_STEP_LOG.pop(str(path), None)
+    except OSError:
+        pass
     with open(path, "a", encoding="utf-8") as f:
         f.write(line)
 
@@ -2113,6 +2138,19 @@ def _redacted_static_step_field(key: str, value: Any) -> Any:
 
 
 _ADDRESS_LOG_KEYS = frozenset({"street", "zip_code", "read_back"})
+_ADDRESS_TOOL = "save_delivery_address"
+# In a turn that saves an address, a bare "no, the house number is 4812" carries
+# no street to recognise, so every number in that turn's words is masked.
+_ADDRESS_TURN_TEXT_KEYS = ("user_text", "final_answer", "llm_reasoning", "result_summary")
+_NUMBER_RE = re.compile(r"\d+")
+
+
+def _mask_address_turn(record: dict[str, Any]) -> dict[str, Any]:
+    for key in _ADDRESS_TURN_TEXT_KEYS:
+        value = record.get(key)
+        if isinstance(value, str):
+            record[key] = _NUMBER_RE.sub("[redacted]", value)
+    return record
 
 
 def _mask_addresses_for_log(value: Any) -> Any:
@@ -6079,7 +6117,10 @@ class AgentExecutor:
                 "llm_total_input_tokens_seen": getattr(self, "_llm_total_input_tokens_seen", 0),
                 "responses_continuity_mode": getattr(self, "_last_continuity_mode", None),
             }
-            line = json.dumps(_mask_addresses_for_log(redact_pii(redact_card_data(complete_data))), default=str) + "\n"
+            complete_data = _mask_addresses_for_log(redact_pii(redact_card_data(complete_data)))
+            if any(step.tool_name == _ADDRESS_TOOL for step in task_log.steps):
+                complete_data = _mask_address_turn(complete_data)
+            line = json.dumps(complete_data, default=str) + "\n"
             step_log_path = self._get_structured_step_log_path()
             _run_task_log_io(lambda: _append_structured_log_line(jsonl_dir, step_log_path, line))
         except Exception:
@@ -6241,10 +6282,16 @@ class AgentExecutor:
             # Without this, missing param descriptions and injected fields
             # (like reasoning) are invisible in surface replays.
             tool_schemas = self._build_tool_schema_snapshot()
-            step_data["tool_schemas"] = tool_schemas
-            step_data["tool_schema_hash"] = self._hash_tool_schema_snapshot(tool_schemas)
-            step_data["tool_schema_fingerprint"] = self._build_tool_schema_fingerprint(tool_schemas)
-            tool_surface = self._get_runtime_tool_surface()
+            schema_hash = self._hash_tool_schema_snapshot(tool_schemas)
+            step_data["tool_schema_hash"] = schema_hash
+            # The schemas are about 170 KB and the same command after command, so
+            # writing them on every task made agent-steps grow by megabytes in a
+            # short session. Each set is written once per log file; later tasks
+            # carry its hash.
+            if _first_time_in_step_log(self._get_structured_step_log_path(), schema_hash):
+                step_data["tool_schemas"] = tool_schemas
+                step_data["tool_schema_fingerprint"] = self._build_tool_schema_fingerprint(tool_schemas)
+            tool_surface = self._get_runtime_tool_surface() if "tool_schemas" in step_data else None
             if tool_surface is not None:
                 if hasattr(tool_surface, "to_dict"):
                     step_data["tool_surface"] = tool_surface.to_dict()
@@ -6307,6 +6354,8 @@ class AgentExecutor:
             self._pending_trim_stats = None
 
         step_data = _redact_step_data(step_data)
+        if step_data.get("tool_name") == _ADDRESS_TOOL:
+            step_data = _mask_address_turn(step_data)
 
         # Zero-tools monitoring: warn when agent has no tools available.
         # This was the root cause of the March 23 collapse (326 blocked calls).
@@ -12540,9 +12589,36 @@ class AgentExecutor:
                 order_summary["address_warning"] = (
                     "The house number here differs from the address you saved. Check it before you pay."
                 )
+            elif self._order_address_from_elsewhere(existing, address):
+                order_summary["address_warning"] = (
+                    "This address came from the page, not from you or your saved address. Check it before you pay."
+                )
             return
         if address:
             order_summary["delivery_address"] = address
+
+    def _order_address_from_elsewhere(self, order_address: Any, saved_address: Any) -> bool:
+        """True when the order ships somewhere the user neither said nor saved.
+
+        An address the user gives for this order is theirs and goes on the card as
+        it is. One that only the merchant's page holds is shown too, because it is
+        what the merchant will use, but the user is told where it came from.
+        """
+        from intent.content_sanitizer import _words_not_from_user
+        from intent.tools.settings_tools import delivery_address_text
+
+        order_text = delivery_address_text(order_address) if isinstance(order_address, dict) else str(order_address)
+        street = order_text.split(",", 1)[0]
+        try:
+            own_words = self._user_own_words(str(getattr(self, "_original_command", "") or ""))
+        except (AttributeError, LookupError, RuntimeError, TypeError, ValueError):
+            logger.debug("Order address provenance unavailable", exc_info=True)
+            return False
+        if isinstance(saved_address, dict):
+            own_words += "\n" + delivery_address_text(saved_address)
+        elif saved_address:
+            own_words += "\n" + str(saved_address)
+        return bool(_words_not_from_user({"street": street}, own_words))
 
     async def _extract_dom_order_details(self, page: Any, order_summary: dict[str, Any]) -> None:
         """Extract visible checkout summary details from the browser DOM."""
