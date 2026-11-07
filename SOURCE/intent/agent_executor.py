@@ -29,7 +29,8 @@ import uuid
 from collections import OrderedDict
 from collections.abc import Callable, Iterable, Mapping
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, is_dataclass
+from dataclasses import fields as dc_fields
 from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
@@ -62,6 +63,7 @@ from intent.gate_protocol import (
 )
 from intent.hooks import HookEvent, dispatch as _dispatch_hook, hook_result_frames
 from intent.irreversible_actions import (
+    SMART_HOME_CONTROL_CLASS,
     browser_send_action_class,
     describe_browser_send,
     describe_irreversible_action,
@@ -313,19 +315,8 @@ _PROVIDER_PRIVATE_RESPONSE_KEYS = frozenset(
 
 
 def _trace_safe_copy(value: Any) -> Any:
-    try:
-        return copy.deepcopy(value)
-    except (TypeError, ValueError, AttributeError, RuntimeError, RecursionError):
-        try:
-            return json.loads(
-                json.dumps(
-                    value,
-                    default=lambda item: "<%s>" % type(item).__name__,
-                    ensure_ascii=True,
-                )
-            )
-        except (TypeError, ValueError, AttributeError, RuntimeError, RecursionError):
-            return "<%s>" % type(value).__name__
+    """Trace copy without copy.deepcopy (see _trace_copy)."""
+    return _trace_copy(value)
 
 
 def _estimated_tokens_for_messages(messages: list[dict[str, Any]]) -> int:
@@ -781,6 +772,37 @@ _BOT_CHECK_GIVEN_UP_NOTE = (
     "can be met at another store or site, use that one and tell the user you switched. If it cannot, "
     "tell the user plainly that the site is waiting on the check; the page stays open on their screen.]"
 )
+
+def _trace_copy(value: Any, _depth: int = 0) -> Any:
+    """A copy for the task trace that cannot fail.
+
+    Plain data (dicts, lists, tuples, strings, numbers) is copied deeply, so later
+    changes never reach the trace. Anything else is written as ``<TypeName>``. A tool
+    result can hold an object tied to an event loop; copy.deepcopy then failed half
+    way, the trace lost that tool call, and the half-built loop it left behind logged
+    "Exception ignored in BaseEventLoop.__del__" on every tool turn.
+    """
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if _depth > 40:
+        return "<nested too deep>"
+    if isinstance(value, dict):
+        return {(k if isinstance(k, (str, int, float, bool)) or k is None else str(k)): _trace_copy(v, _depth + 1)
+                for k, v in value.items()}
+    if isinstance(value, (list, tuple, set, frozenset)):
+        return [_trace_copy(item, _depth + 1) for item in value]
+    if isinstance(value, (bytes, bytearray)):
+        return "<%d bytes>" % len(value)
+    if is_dataclass(value) and not isinstance(value, type):
+        return {f.name: _trace_copy(getattr(value, f.name, None), _depth + 1) for f in dc_fields(value)}
+    dump = getattr(value, "model_dump", None)
+    if callable(dump):
+        try:
+            return _trace_copy(dump(), _depth + 1)
+        except Exception:  # noqa: BLE001, RUF100 - fall back to text
+            pass
+    return "<%s>" % type(value).__name__
+
 _MEMORY_ALL_SCOPE_PATHS = frozenset({"", "memory", "memory/", "MEMORY.md", "memory/MEMORY.md"})
 _MEMORY_SEARCH_ACTIONS = frozenset({"search", "grep"})
 _MEMORY_ENUMERATION_ACTIONS = frozenset({"read", "list"})
@@ -2055,7 +2077,32 @@ def flush_agent_task_log_io(timeout: float | None = 10.0) -> bool:
     return True
 
 
+# A day's step log that passes this size moves to a ".1" file, replacing the
+# previous one, so a long day keeps at most about twice this on disk.
+_STEP_LOG_MAX_BYTES = 32 * 1024 * 1024
+_SCHEMAS_IN_STEP_LOG: dict[str, set[str]] = {}
+_SCHEMAS_IN_STEP_LOG_LOCK = threading.Lock()
+
+
+def _first_time_in_step_log(path: Path, schema_hash: str) -> bool:
+    """True the first time this schema set is written to this log file."""
+    key = str(path)
+    with _SCHEMAS_IN_STEP_LOG_LOCK:
+        seen = _SCHEMAS_IN_STEP_LOG.setdefault(key, set())
+        if schema_hash in seen:
+            return False
+        seen.add(schema_hash)
+        return True
+
+
 def _write_structured_log_line(path: Path, line: str) -> None:
+    try:
+        if path.stat().st_size + len(line) > _STEP_LOG_MAX_BYTES:
+            os.replace(path, path.with_name(path.stem + ".1" + path.suffix))
+            with _SCHEMAS_IN_STEP_LOG_LOCK:
+                _SCHEMAS_IN_STEP_LOG.pop(str(path), None)
+    except OSError:
+        pass
     with open(path, "a", encoding="utf-8") as f:
         f.write(line)
 
@@ -2092,6 +2139,19 @@ def _redacted_static_step_field(key: str, value: Any) -> Any:
 
 
 _ADDRESS_LOG_KEYS = frozenset({"street", "zip_code", "read_back"})
+_ADDRESS_TOOL = "save_delivery_address"
+# In a turn that saves an address, a bare "no, the house number is 4812" carries
+# no street to recognise, so every number in that turn's words is masked.
+_ADDRESS_TURN_TEXT_KEYS = ("user_text", "final_answer", "llm_reasoning", "result_summary")
+_NUMBER_RE = re.compile(r"\d+")
+
+
+def _mask_address_turn(record: dict[str, Any]) -> dict[str, Any]:
+    for key in _ADDRESS_TURN_TEXT_KEYS:
+        value = record.get(key)
+        if isinstance(value, str):
+            record[key] = _NUMBER_RE.sub("[redacted]", value)
+    return record
 
 
 def _mask_addresses_for_log(value: Any) -> Any:
@@ -3340,6 +3400,10 @@ class AgentExecutor:
         self._tool_timeout = tool_timeout
         self._overlay = overlay_controller
         self._depth = depth
+        # A helper's task is written by the model; device control in a helper
+        # is checked against the user's own words for the turn that started it.
+        self._turn_user_request = ""
+        self._turn_device_context: dict[str, Any] | None = None
         self._parent_task_id = parent_task_id
         self.task_id = str(parent_task_id or generate_task_id())
         normalized_user_id = (user_id or "").strip()
@@ -4993,6 +5057,7 @@ class AgentExecutor:
         )
         self._step_log_jsonl_path = self._build_structured_step_log_path(task_log.started_at)
         self._step_log_metadata_emitted = False
+        self._address_turn = False
         self._last_model_name = self._get_model_name_safe()
         self._token_tracker.configure(
             model=self._last_model_name,
@@ -5761,7 +5826,7 @@ class AgentExecutor:
         }
         try:
             if self._task_trace is not None:
-                self._task_trace.append_event("trace_stop", copy.deepcopy(stop_data))
+                self._task_trace.append_event("trace_stop", _trace_copy(stop_data))
         except Exception:
             logger.debug("Task trace stop event write failed, continuing", exc_info=True)
         try:
@@ -6058,7 +6123,10 @@ class AgentExecutor:
                 "llm_total_input_tokens_seen": getattr(self, "_llm_total_input_tokens_seen", 0),
                 "responses_continuity_mode": getattr(self, "_last_continuity_mode", None),
             }
-            line = json.dumps(_mask_addresses_for_log(redact_pii(redact_card_data(complete_data))), default=str) + "\n"
+            complete_data = _mask_addresses_for_log(redact_pii(redact_card_data(complete_data)))
+            if self.__dict__.get("_address_turn") or any(step.tool_name == _ADDRESS_TOOL for step in task_log.steps):
+                complete_data = _mask_address_turn(complete_data)
+            line = json.dumps(complete_data, default=str) + "\n"
             step_log_path = self._get_structured_step_log_path()
             _run_task_log_io(lambda: _append_structured_log_line(jsonl_dir, step_log_path, line))
         except Exception:
@@ -6220,10 +6288,16 @@ class AgentExecutor:
             # Without this, missing param descriptions and injected fields
             # (like reasoning) are invisible in surface replays.
             tool_schemas = self._build_tool_schema_snapshot()
-            step_data["tool_schemas"] = tool_schemas
-            step_data["tool_schema_hash"] = self._hash_tool_schema_snapshot(tool_schemas)
-            step_data["tool_schema_fingerprint"] = self._build_tool_schema_fingerprint(tool_schemas)
-            tool_surface = self._get_runtime_tool_surface()
+            schema_hash = self._hash_tool_schema_snapshot(tool_schemas)
+            step_data["tool_schema_hash"] = schema_hash
+            # The schemas are about 170 KB and the same command after command, so
+            # writing them on every task made agent-steps grow by megabytes in a
+            # short session. Each set is written once per log file; later tasks
+            # carry its hash.
+            if _first_time_in_step_log(self._get_structured_step_log_path(), schema_hash):
+                step_data["tool_schemas"] = tool_schemas
+                step_data["tool_schema_fingerprint"] = self._build_tool_schema_fingerprint(tool_schemas)
+            tool_surface = self._get_runtime_tool_surface() if "tool_schemas" in step_data else None
             if tool_surface is not None:
                 if hasattr(tool_surface, "to_dict"):
                     step_data["tool_surface"] = tool_surface.to_dict()
@@ -6286,6 +6360,15 @@ class AgentExecutor:
             self._pending_trim_stats = None
 
         step_data = _redact_step_data(step_data)
+        if not self.__dict__.get("_address_turn") and (
+            step_data.get("tool_name") == _ADDRESS_TOOL
+            or ("user_text" in step_data and self._follows_address_read_back())
+        ):
+            # Decided before the first line is written: the user's words go out on
+            # step 1, and a correction may only be saved at step 2 or later.
+            self._address_turn = True
+        if self.__dict__.get("_address_turn"):
+            step_data = _mask_address_turn(step_data)
 
         # Zero-tools monitoring: warn when agent has no tools available.
         # This was the root cause of the March 23 collapse (326 blocked calls).
@@ -6299,9 +6382,9 @@ class AgentExecutor:
         if self._task_trace is not None:
             try:
                 if _trace_compaction_payload is not None:
-                    _compaction_event_payload = copy.deepcopy(_trace_compaction_payload)
+                    _compaction_event_payload = _trace_copy(_trace_compaction_payload)
                     if self._task_trace_last_request:
-                        _compaction_event_payload["next_llm_input"] = copy.deepcopy(self._task_trace_last_request)
+                        _compaction_event_payload["next_llm_input"] = _trace_copy(self._task_trace_last_request)
                     self._task_trace.append_compaction(
                         ts=step_data["ts"],
                         step=record.step,
@@ -6317,21 +6400,21 @@ class AgentExecutor:
                     "signature_gate",
                 }:
                     _step_kind = _trace_control["typed_outcome"]
-                trace_step_data = copy.deepcopy(step_data)
+                trace_step_data = _trace_copy(step_data)
                 if model_messages_snapshot is not None:
-                    trace_step_data["messages"] = copy.deepcopy(model_messages_snapshot)
+                    trace_step_data["messages"] = _trace_copy(model_messages_snapshot)
                 self._task_trace.append_step(
                     step=record.step,
                     ts=step_data["ts"],
                     step_kind=_step_kind,
                     agent_step=trace_step_data,
                     attempt_id=getattr(self, "_task_trace_last_attempt_id", None),
-                    llm_input=copy.deepcopy(self._task_trace_last_request),
-                    llm_output=copy.deepcopy(self._task_trace_last_response),
-                    continuity_before=copy.deepcopy(self._task_trace_last_continuity_before),
-                    continuity_after=copy.deepcopy(self._task_trace_last_continuity_after),
-                    control=copy.deepcopy(_trace_control),
-                    tool_execution=copy.deepcopy(self._task_trace_last_tool_execution),
+                    llm_input=_trace_copy(self._task_trace_last_request),
+                    llm_output=_trace_copy(self._task_trace_last_response),
+                    continuity_before=_trace_copy(self._task_trace_last_continuity_before),
+                    continuity_after=_trace_copy(self._task_trace_last_continuity_after),
+                    control=_trace_copy(_trace_control),
+                    tool_execution=_trace_copy(self._task_trace_last_tool_execution),
                 )
             except Exception:
                 logger.debug("Task trace step write failed, continuing", exc_info=True)
@@ -7607,7 +7690,7 @@ class AgentExecutor:
                 kind=kind,
                 reason=reason,
                 next_action=next_action,
-                detail=copy.deepcopy(detail or {}),
+                detail=_trace_copy(detail or {}),
             )
         except Exception:
             logger.debug("Task trace LLM retry/fallback write failed, continuing", exc_info=True)
@@ -7667,21 +7750,21 @@ class AgentExecutor:
         tool_error: str | None,
     ) -> None:
         """Capture the exact tool call/result surface that fed the next turn."""
-        trace_tool_input = _redact_email_trace_payload(tool_name, copy.deepcopy(tool_input), tool_input)
+        trace_tool_input = _redact_email_trace_payload(tool_name, _trace_copy(tool_input), tool_input)
         trace_model_visible_result = _redact_email_trace_payload(
             tool_name,
             copy.deepcopy(model_visible_result),
             tool_input,
         )
-        trace_tool_data = _redact_email_trace_payload(tool_name, copy.deepcopy(tool_result.data), tool_input)
+        trace_tool_data = _redact_email_trace_payload(tool_name, _trace_copy(tool_result.data), tool_input)
         trace_mcp_content = _redact_email_trace_payload(
             tool_name,
-            copy.deepcopy(tool_result.mcp_content),
+            _trace_copy(tool_result.mcp_content),
             tool_input,
         )
         trace_mcp_meta = _redact_email_trace_payload(
             tool_name,
-            copy.deepcopy(tool_result.mcp_meta),
+            _trace_copy(tool_result.mcp_meta),
             tool_input,
         )
         self._task_trace_last_tool_execution = {
@@ -7712,7 +7795,7 @@ class AgentExecutor:
                     tool_name=tool_name,
                     ok=tool_result.ok,
                     duration_ms=duration_ms,
-                    result=copy.deepcopy(self._task_trace_last_tool_execution),
+                    result=_trace_copy(self._task_trace_last_tool_execution),
                     error=tool_error or tool_result.error,
                 )
             except Exception:
@@ -8315,6 +8398,8 @@ class AgentExecutor:
             allowed_tools=child_allowed_tools,
         )
         child.task_id = child_agent_id
+        child._turn_user_request = self._device_control_user_words()
+        child._turn_device_context = self._device_control_conversation()
 
         external_cancel_relay: asyncio.Task[None] | None = None
         if external_cancel_event is not None:
@@ -8701,12 +8786,18 @@ class AgentExecutor:
         return schema if isinstance(schema, dict) else {}
 
     def _irreversible_confirmation_class(self, tool_name: str, tool_args: dict[str, Any]) -> str | None:
-        action_class = gate_action_class(
-            tool_name,
-            tool_args,
-            self._irreversible_tool_schema(tool_name),
-            tainted=_content_context_is_tainted(),
-        )
+        schema = self._irreversible_tool_schema(tool_name)
+        tainted = _content_context_is_tainted()
+        action_class = gate_action_class(tool_name, tool_args, schema, tainted=tainted)
+        if (
+            action_class is None
+            and not tainted
+            and self._depth > 0
+            and irreversible_action_class(tool_name, tool_args, schema) == SMART_HOME_CONTROL_CLASS
+        ):
+            # A helper starts with a clean taint tracker and a model-written
+            # task, so its device control is checked like a tainted turn's.
+            action_class = SMART_HOME_CONTROL_CLASS
         if action_class is None and str(tool_name or "").startswith("browser_"):
             # Clicking Send in webmail / chat / social sites in the agent
             # browser sends a message too, so it asks first (1.0.5 A6.5).
@@ -9004,6 +9095,115 @@ class AgentExecutor:
         if result is not None:
             await self._broadcast_paid_action_gate(tool_name, result)
         return result
+
+    def _device_control_user_words(self) -> str:
+        """The user's own words for this turn (a helper gets its parent's)."""
+        if self._depth > 0:
+            return str(getattr(self, "_turn_user_request", "") or "")
+        try:
+            from intent.content_sanitizer import active_taint_tracker
+
+            return str(getattr(active_taint_tracker(), "user_request", "") or "")
+        except ImportError:  # pragma: no cover - same package
+            return ""
+
+    def _device_control_conversation(self) -> dict[str, Any]:
+        """What the device check may weigh besides this turn's words (a helper gets its parent's).
+
+        ``earlier_words``: what the user wrote earlier in this conversation (their
+        own input frames only). ``suggestion``: Viola's message right before this
+        turn, so "yes" to "want me to turn on the kitchen light?" counts (founder
+        rule 2026-11-07). ``suggestion_after_content``: whether a web, email,
+        calendar, memory or file result came before that message, in which case
+        it may repeat what the content said (structural, by tool name).
+        """
+        if self._depth > 0:
+            return dict(getattr(self, "_turn_device_context", None) or {})
+        empty: dict[str, Any] = {"earlier_words": "", "suggestion": "", "suggestion_after_content": True}
+        try:
+            from intent.content_sanitizer import is_untrusted_content_source
+            from services.conversation.state_manager import get_request_conversation_manager
+
+            manager = get_request_conversation_manager() or getattr(self, "_conversation_state_manager", None)
+            get_window = getattr(manager, "get_prompt_window", None)
+            frames = list(get_window().frames) if callable(get_window) else []
+        except (AttributeError, ImportError, LookupError, OSError, RuntimeError, TypeError, ValueError):
+            logger.debug("Device check: conversation unavailable", exc_info=True)
+            return empty
+
+        def _text(frame: Any) -> str:
+            return " ".join(block.text for block in frame.blocks if isinstance(block, TextBlock)).strip()
+
+        def _own_input(frame: Any) -> bool:
+            return frame.role is FrameRole.USER and frame.kind is FrameKind.USER_INPUT and not frame.origin
+
+        current = " ".join(self._device_control_user_words().split())
+        if frames and _own_input(frames[-1]) and " ".join(_text(frames[-1]).split()) == current:
+            frames = frames[:-1]  # this turn's own words are judged separately
+        earlier = [_text(frame) for frame in frames if _own_input(frame) and _text(frame)]
+        suggestion = ""
+        suggestion_index = -1
+        for index in range(len(frames) - 1, -1, -1):
+            frame = frames[index]
+            if _own_input(frame):
+                break
+            if frame.role is FrameRole.ASSISTANT and frame.kind is FrameKind.ASSISTANT_TEXT and _text(frame):
+                suggestion, suggestion_index = _text(frame), index
+                break
+        after_content = any(
+            is_untrusted_content_source(getattr(block, "name", None))
+            for frame in frames[: max(suggestion_index, 0)]
+            if frame.kind is FrameKind.TOOL_USE
+            for block in frame.blocks
+        )
+        return {
+            "earlier_words": "\n".join(earlier),
+            "suggestion": suggestion,
+            "suggestion_after_content": after_content,
+        }
+
+    async def _device_control_refusal(self, tool_name: str, tool_args: dict[str, Any]) -> ToolResult | None:
+        """None when the user's own message asks for this device action, else the refusal.
+
+        Device control never asks the user (founder rule 2026-11-07). It reaches
+        here only while untrusted content is in the conversation (or from a
+        helper): the call then runs when the user's own message for this turn
+        asks for it, and is refused otherwise, so a page, email or tool result
+        can never switch, unlock or disarm anything by itself.
+        """
+        planned_action = describe_irreversible_action(tool_name, tool_args)
+        user_words = self._device_control_user_words()
+        check = getattr(getattr(self, "_approval", None), "user_message_asks_for", None)
+        asked = False
+        if user_words and callable(check):
+            context = self._device_control_conversation()
+            try:
+                asked = bool(
+                    await check(
+                        user_words,
+                        planned_action,
+                        suggestion=str(context.get("suggestion") or ""),
+                        suggestion_after_content=bool(context.get("suggestion_after_content", True)),
+                        earlier_words=str(context.get("earlier_words") or ""),
+                    )
+                )
+            except Exception:  # noqa: BLE001 - fail closed
+                logger.warning("Device control asked-for check failed; refusing", exc_info=True)
+                asked = False
+        if asked:
+            logger.info("Device control runs: the user's own message asks for it: %s", planned_action)
+            return None
+        logger.warning("Device control refused: the user's own message did not ask for it: %s", planned_action)
+        return ToolResult(
+            ok=False,
+            error=(
+                "Not done: outside content (a web page, email, file or other tool result) is in this "
+                "conversation and the user's own message did not ask to %s, so it cannot control a "
+                "device. If the user wants it, they can ask for it in their own words." % planned_action
+            ),
+            error_category="DEVICE_CONTROL_NOT_REQUESTED",
+            retryable=False,
+        )
 
     async def _confirm_irreversible_tool_call(self, tool_name: str, tool_args: dict[str, Any]) -> bool:
         action_class = self._irreversible_confirmation_class(tool_name, tool_args)
@@ -9336,7 +9536,12 @@ class AgentExecutor:
 
         irreversible_action = self._irreversible_confirmation_class(tool_name, tool_args)
         irreversible_confirmation_granted = False
-        if irreversible_action is not None:
+        if irreversible_action == SMART_HOME_CONTROL_CLASS:
+            device_refusal = await self._device_control_refusal(tool_name, tool_args)
+            if device_refusal is not None:
+                return device_refusal
+            irreversible_confirmation_granted = True
+        elif irreversible_action is not None:
             try:
                 confirmed = await self._confirm_irreversible_tool_call(tool_name, tool_args)
             except ConfirmationDeferred as deferred:
@@ -12068,7 +12273,7 @@ class AgentExecutor:
             "message": progress,
         }
         if tool_input is not None:
-            payload["tool_input"] = redact_card_data(copy.deepcopy(tool_input))
+            payload["tool_input"] = redact_card_data(_trace_copy(tool_input))
         if tool_output is not None:
             payload["tool_output"] = redact_card_data(tool_output)
         try:
@@ -12519,9 +12724,62 @@ class AgentExecutor:
                 order_summary["address_warning"] = (
                     "The house number here differs from the address you saved. Check it before you pay."
                 )
+            elif self._order_address_from_elsewhere(existing, address):
+                order_summary["address_warning"] = (
+                    "This address came from the page, not from you or your saved address. Check it before you pay."
+                )
             return
         if address:
             order_summary["delivery_address"] = address
+
+    def _follows_address_read_back(self) -> bool:
+        """True when Viola's last reply read back the saved address.
+
+        The next turn is where "no, the house number is 4812" comes: a bare number
+        with no street to recognise in the log.
+        """
+        from services.conversation.state_manager import get_request_conversation_manager
+
+        try:
+            from ui.settings_manager import get_settings_manager
+
+            saved = get_settings_manager().get("delivery_address", {}, user_id=self._get_effective_user_id())
+            street = str(saved.get("street") or "").strip().lower() if isinstance(saved, dict) else ""
+            manager = get_request_conversation_manager() or getattr(self, "_conversation_state_manager", None)
+            get_window = getattr(manager, "get_prompt_window", None)
+            if not street or not callable(get_window):
+                return False
+            replies = [frame for frame in get_window().frames if frame.role is FrameRole.ASSISTANT]
+        except (AttributeError, ImportError, LookupError, OSError, RuntimeError, TypeError, ValueError):
+            logger.debug("Address read-back check skipped", exc_info=True)
+            return False
+        if not replies:
+            return False
+        last = " ".join(block.text for block in replies[-1].blocks if isinstance(block, TextBlock)).lower()
+        return street in last
+
+    def _order_address_from_elsewhere(self, order_address: Any, saved_address: Any) -> bool:
+        """True when the order ships somewhere the user neither said nor saved.
+
+        An address the user gives for this order is theirs and goes on the card as
+        it is. One that only the merchant's page holds is shown too, because it is
+        what the merchant will use, but the user is told where it came from.
+        """
+        from intent.content_sanitizer import _words_not_from_user
+        from intent.tools.settings_tools import delivery_address_text
+
+        order_text = delivery_address_text(order_address) if isinstance(order_address, dict) else str(order_address)
+        street = order_text.split(",", 1)[0]
+        try:
+            own_words = self._user_own_words(str(getattr(self, "_original_command", "") or ""))
+        except (AttributeError, LookupError, RuntimeError, TypeError, ValueError):
+            logger.debug("Order address provenance unavailable", exc_info=True)
+            return False
+        if isinstance(saved_address, dict):
+            own_words += "\n" + delivery_address_text(saved_address)
+        elif saved_address:
+            own_words += "\n" + str(saved_address)
+        return bool(_words_not_from_user({"street": street}, own_words))
 
     async def _extract_dom_order_details(self, page: Any, order_summary: dict[str, Any]) -> None:
         """Extract visible checkout summary details from the browser DOM."""
