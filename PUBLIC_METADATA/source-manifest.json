@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "3fe9cef62fee533bfc6b0a7e4156a37ce4a8f7aa",
-  "sha256": "ddf4ef87e755f523ed05e2756a8c9312ba9a61113c543e37f34dca32161b04ad",
+  "revision": "94d077ca9151bb2dc8ef5b80ab16604e3ab693af",
+  "sha256": "917d384c60914f76c9a39aa5cb8f9540a3690523f3884a71012f784cd43366f1",
   "files": [
     {
       "path": ".env.example",
@@ -10490,8 +10490,8 @@
     },
     {
       "path": "ui/react-app/src/components/AccountTab.cloudPlan.test.jsx",
-      "sha256": "4fd317654023b952538809d4e9394689edf9a40fd5e00af7f9373ec478a2e2d0",
-      "bytes": 6098
+      "sha256": "82179cc4ebd90035722b48210d2b74d0e041acb43a20a189861d74a8aee2c27a",
+      "bytes": 6209
     },
     {
       "path": "ui/react-app/src/components/AccountTab.cloudStoreReconciliation.test.jsx",
