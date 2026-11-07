@@ -177,16 +177,63 @@ async def _annotate_saved_provider_fallback(
     except Exception:
         return
 
-    if status.get("connected") is True:
+    failure = _recent_spotify_failure()
+    if status.get("connected") is True and failure is None:
         return
 
-    result.setdefault("fallback_reason", "spotify_not_connected")
+    if failure is not None:
+        result.setdefault("fallback_reason", str(failure.get("code") or "spotify_play_failed"))
+        result.setdefault("fallback_explanation", failure.get("message"))
+    else:
+        result.setdefault("fallback_reason", "spotify_not_connected")
+        result.setdefault("fallback_explanation", status.get("message"))
+    result.setdefault("fallback_used", True)
     result.setdefault("fallback_from_provider", "spotify")
     result.setdefault("fallback_to_provider", result_provider or "youtube_music")
     result.setdefault("connect_tool", "connect_music_provider")
     login_url = status.get("login_url_to_show_user")
     if login_url:
         result.setdefault("login_url_to_show_user", login_url)
+    _notify_spotify_fallback()
+
+
+def _recent_spotify_failure() -> dict[str, Any] | None:
+    try:
+        from music.spotify.connection import recent_play_failure
+
+        return recent_play_failure()
+    except Exception:
+        logger.debug("Spotify failure lookup failed", exc_info=True)
+        return None
+
+
+def _notify_spotify_fallback() -> None:
+    try:
+        from music.providers.browser.auth_manager import notify_spotify_not_connected
+
+        notify_spotify_not_connected()
+    except Exception:
+        logger.debug("Spotify fallback notice failed", exc_info=True)
+
+
+def _spotify_stays_the_source(provider_id: str, active_provider_before: str) -> bool:
+    """A play on another service while Spotify can't play is a fallback, not a choice.
+
+    The music source was silently rewritten to YouTube here (build 9,
+    `Provider switch: spotify -> youtube_iframe` 9 s after play), which then hid
+    every later "Spotify isn't connected" notice.
+    """
+    if _provider_family(active_provider_before) != _provider_family("spotify"):
+        return False
+    if _provider_family(provider_id) == _provider_family("spotify"):
+        return False
+    try:
+        from music.spotify.connection import spotify_usable
+
+        return not spotify_usable()
+    except Exception:
+        logger.debug("Spotify usability check failed", exc_info=True)
+        return True
 
 
 _PROVIDER_FAMILIES: tuple[frozenset[str], ...] = (
@@ -383,6 +430,13 @@ async def _reject_unrelated_candidate_if_needed(
         now_playing["title_unverified"] = True
 
     query_match = _classify_tool_query_match(query, now_playing)
+    if query_match == "fallback_unrelated" and _provider_family(str(now_playing.get("provider") or "")) == (
+        _provider_family("spotify")
+    ):
+        # Spotify's own search chose this song, and "play some jazz" shares no
+        # words with "Take Five". Stopping it left "Nothing playing" with no
+        # explanation. The reply names the song, so nothing is hidden.
+        query_match = "provider_search"
     result["query_match"] = query_match
     if query_match != "fallback_unrelated":
         return None
@@ -552,6 +606,11 @@ except ImportError:  # pragma: no cover - the music runtime ships with the tools
     _PLAY_CONFIRM_BUDGET = 8.0
 _TRACK_CHANGE_CONFIRM_SECONDS = float(_PLAY_CONFIRM_BUDGET)
 _TRACK_CHANGE_POLL_SECONDS = 0.1
+# Launch + page load + the engine's 18 s proof that the position moves.
+_SPOTIFY_START_BUDGET_SECONDS = 35.0
+_SPOTIFY_START_POLL_SECONDS = 0.25
+# A first search can include launching the hidden browser.
+_SPOTIFY_PLAY_REQUEST_TIMEOUT_SECONDS = 45.0
 
 
 async def _await_track_change_playing(state: dict[str, Any]) -> dict[str, Any]:
@@ -563,6 +622,29 @@ async def _await_track_change_playing(state: dict[str, Any]) -> dict[str, Any]:
     deadline = time.monotonic() + _TRACK_CHANGE_CONFIRM_SECONDS
     while state.get("probe_ok") and not state.get("is_playing") and time.monotonic() < deadline:
         await asyncio.sleep(_TRACK_CHANGE_POLL_SECONDS)
+        state = await _read_live_playback_state()
+    return state
+
+
+def _reports_spotify_playing(state: dict[str, Any]) -> bool:
+    now = state.get("now_playing")
+    if not state.get("is_playing") or not isinstance(now, dict):
+        return False
+    return _provider_family(str(now.get("provider") or "")) == _provider_family("spotify")
+
+
+async def _await_spotify_start(state: dict[str, Any]) -> dict[str, Any]:
+    """Wait for Spotify to really start, or to say why it can't.
+
+    A Spotify start takes seconds (the browser may be launching, and the engine
+    only reports playing once the position moves). The first read used to come
+    back with the previous track, which was then judged "unrelated" and stopped.
+    """
+    deadline = time.monotonic() + _SPOTIFY_START_BUDGET_SECONDS
+    while state.get("probe_ok") and time.monotonic() < deadline:
+        if _reports_spotify_playing(state) or _recent_spotify_failure() is not None:
+            break
+        await asyncio.sleep(_SPOTIFY_START_POLL_SECONDS)
         state = await _read_live_playback_state()
     return state
 
@@ -606,6 +688,8 @@ async def _prefer_resolved_now_playing(
         return result
 
     live = await _read_live_playback_state()
+    if _provider_family(str(result.get("provider") or "")) == _provider_family("spotify"):
+        live = await _await_spotify_start(live)
     verification = _live_verification(live)
     result["verification"] = verification
     result["playback_verified"] = verification == VERIFY_PLAYING
@@ -650,6 +734,26 @@ async def _prefer_resolved_now_playing(
     if message:
         result["message"] = message
     return result
+
+
+def _spotify_play_failure_result(result: dict[str, Any]) -> ToolResult | None:
+    """Spotify was asked and said no: report why, instead of "nothing playing"."""
+    if _provider_family(str(result.get("provider") or "")) != _provider_family("spotify"):
+        return None
+    failure = _recent_spotify_failure()
+    if failure is None:
+        return None
+    message = str(failure.get("message") or "Spotify couldn't play that.")
+    data = {
+        "message": message,
+        "provider": "spotify",
+        "playback_status": "candidate_not_played",
+        "playback_verified": False,
+        "spotify_state": failure.get("state"),
+        "error_code": failure.get("code"),
+        "connect_tool": "connect_music_provider",
+    }
+    return ToolResult(ok=False, data=data, error=message, error_category=str(failure.get("code") or ""))
 
 
 def _play_tool_result(result: dict[str, Any], *, fallback_label: str = "") -> ToolResult:
@@ -1023,7 +1127,14 @@ async def view_queue_handler() -> ToolResult:
         return ToolResult(ok=False, data=None, error="Failed to read queue: %s" % exc)
 
 
-async def play_music_handler(query: str, provider: str = "", target_room: str = "", user_id: str = "") -> ToolResult:
+async def play_music_handler(
+    query: str,
+    provider: str = "",
+    target_room: str = "",
+    user_id: str = "",
+    *,
+    remember_provider: bool = True,
+) -> ToolResult:
     """Search for and play music through Viola's internal music player.
 
     This calls the same /v1/play endpoint that the rule interpreter uses,
@@ -1034,7 +1145,9 @@ async def play_music_handler(query: str, provider: str = "", target_room: str = 
         query: What to play: artist, song, genre, mood, or any music query.
         provider: Optional provider override, such as spotify, youtube_music,
             youtube, or local. When provided, Viola switches the active
-            provider before starting playback.
+            provider once playback starts.
+        remember_provider: False when the caller picked this provider for one
+            song (a search result), so the user's music source stays as it is.
         target_room: Optional Viola room, room group, or paired Spoke speaker.
             When provided, the runtime returns structured room-route and
             pairing-flow facts when the target is not paired.
@@ -1070,11 +1183,20 @@ async def play_music_handler(query: str, provider: str = "", target_room: str = 
             request_payload["source"] = source
         if target_room.strip():
             request_payload["target_room"] = target_room.strip()
-        data = await _post_runtime("/v1/play", request_payload)
+        plays_on_spotify = _provider_family(provider_id or active_provider_before) == _provider_family("spotify")
+        if plays_on_spotify:
+            from music.spotify.connection import clear_play_failure
+
+            clear_play_failure(scoped_user_id or None)
+        data = await _post_runtime(
+            "/v1/play",
+            request_payload,
+            timeout=_SPOTIFY_PLAY_REQUEST_TIMEOUT_SECONDS if plays_on_spotify else 15.0,
+        )
         status_code = int(data.get("_status_code", 0) or 0)
 
         if status_code == 200 and data.get("ok"):
-            if provider_id:
+            if provider_id and remember_provider and not _spotify_stays_the_source(provider_id, active_provider_before):
                 with user_scope(scoped_user_id):
                     _select_provider(provider_id, scoped_user_id)
             # record_and_call/ensure_envelope (contracts/api_response.py)
@@ -1190,6 +1312,9 @@ async def play_music_handler(query: str, provider: str = "", target_room: str = 
                 active_provider_before=active_provider_before,
                 requested_provider=provider_id,
             )
+            spotify_failure = _spotify_play_failure_result(result)
+            if spotify_failure is not None:
+                return spotify_failure
             mismatch = await _reject_unrelated_candidate_if_needed(query, result)
             if mismatch is not None:
                 return mismatch

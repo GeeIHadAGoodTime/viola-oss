@@ -47,9 +47,11 @@ _cdp_controllers: dict[str, SpotifyCDPController] = {}
 def _resolve_controller_user_id(user_id: str | None = None) -> str:
     if user_id:
         return user_id
-    from core.user_context import get_current_or_device_user_id
+    # The music worker and the poller have no request behind them. They must
+    # land on the signed-in account's controller, the one holding the sign-in.
+    from core.user_context import get_current_or_desktop_active_user_id
 
-    return get_current_or_device_user_id()
+    return get_current_or_desktop_active_user_id()
 
 
 def get_cdp_controller(user_id: str | None = None) -> SpotifyCDPController:
@@ -165,7 +167,7 @@ def set_spotify_track_saved(track_id: str, saved: bool, *, user_id: str | None =
     with a user-facing message on failure.
     """
     controller = get_cdp_controller(user_id)
-    controller.ensure_running(wait_for_login=False)
+    controller.ensure_running()
     return controller.set_track_saved(track_id, saved)
 
 
@@ -205,10 +207,17 @@ class SpotifyCDPProvider(MusicProvider[None]):
         exc: Exception,
     ) -> NoReturn:
         logger.exception("Spotify CDP %s failed for query=%r", operation, query)
-        raise ServiceUnavailableError(
-            "Spotify",
-            "CDP %s failed: %s" % (operation, exc),
-        ) from exc
+        # Same reason, same words, on screen and in the tool result.
+        from music.spotify import connection
+
+        state = str(getattr(exc, "state", "") or connection.PLAYER_UNAVAILABLE)
+        message = connection.message_for(state)
+        code = "spotify_%s" % state
+        connection.record_play_failure(None, state=state, message=message, code=code)
+        connection.notify_spotify(None, message, code=code, level="error")
+        if state == connection.PLAYER_UNAVAILABLE:
+            raise ServiceUnavailableError("Spotify", "CDP %s failed: %s" % (operation, exc)) from exc
+        raise ServiceUnavailableError("Spotify", message) from exc
 
     # ------------------------------------------------------------------
     # MusicProvider ABC
@@ -255,16 +264,13 @@ class SpotifyCDPProvider(MusicProvider[None]):
         controller = self._get_controller(user_id)
 
         try:
-            controller.ensure_running(wait_for_login=False)
+            controller.ensure_running()
         except (SpotifyCDPError, OSError, RuntimeError, TimeoutError) as exc:
             self._raise_search_unavailable(
                 query,
                 operation="search initialization",
                 exc=exc,
             )
-
-        if not controller.is_logged_in():
-            logger.warning("Spotify CDP: not logged in, search may return limited results")
 
         try:
             raw_results = controller.search(query)

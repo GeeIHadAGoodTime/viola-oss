@@ -1219,6 +1219,15 @@ class ContextBuilder:
         except Exception as exc:
             logger.debug("Music provider status context failed: %s", exc)
 
+        try:
+            # Spotify has no OAuth link in shipped builds, so the consent state
+            # above said "not linked" while Settings said Connected.
+            from music.spotify.connection import peek_state
+
+            statuses["spotify"] = peek_state(user_id)
+        except Exception as exc:
+            logger.debug("Spotify connection context failed: %s", exc)
+
         for provider_id in _MUSIC_CONTEXT_PROVIDER_IDS:
             label = _MUSIC_CONTEXT_PROVIDER_NAMES[provider_id]
             state = statuses.get(provider_id, "unknown")

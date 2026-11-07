@@ -80,6 +80,19 @@ def _notify_spotify_not_connected(user_id: str = "") -> None:
         logger.debug("media could not show the Spotify fallback notice", exc_info=True)
 
 
+def _notify_spotify_no_match(query: str, user_id: str) -> None:
+    try:
+        from music.providers.browser.auth_manager import notify_user_about_spotify
+
+        notify_user_about_spotify(
+            user_id or None,
+            "Spotify had no match for %s, so this is playing on YouTube." % query[:60],
+            code="spotify_no_match",
+        )
+    except Exception:
+        logger.debug("media could not show the Spotify no-match notice", exc_info=True)
+
+
 def _clean_provider(value: str | None, default: str = "auto") -> str:
     provider = str(value or default).strip().lower().replace("-", "_")
     return provider or default
@@ -402,7 +415,14 @@ async def _handle_search_mode(query: str, provider: str, limit: int, user_id: st
     return ToolResult(ok=True, data=data)
 
 
-async def _handle_play_mode(track_uri: str, provider: str, target_room: str, user_id: str) -> ToolResult:
+async def _handle_play_mode(
+    track_uri: str,
+    provider: str,
+    target_room: str,
+    user_id: str,
+    *,
+    remember_provider: bool = False,
+) -> ToolResult:
     resolved_provider = _infer_play_provider(provider, track_uri)
     if resolved_provider == "local":
         try:
@@ -422,7 +442,13 @@ async def _handle_play_mode(track_uri: str, provider: str, target_room: str, use
         play_query = track_uri
         play_provider = resolved_provider
 
-    result = await _play_music_handler(play_query, provider=play_provider, target_room=target_room, user_id=user_id)
+    result = await _play_music_handler(
+        play_query,
+        provider=play_provider,
+        target_room=target_room,
+        user_id=user_id,
+        remember_provider=remember_provider,
+    )
     if isinstance(result.data, dict):
         data = dict(result.data)
         data.setdefault("mode", "play")
@@ -633,6 +659,17 @@ async def _handle_search_play_mode(
                 if _select_playable_index(query, broad_tracks, generic_request=generic_request) is not None:
                     data = dict(broad_result.data)
                     tracks = broad_tracks
+                    if resolved_provider == "spotify":
+                        # Never silent: the user's source had no match.
+                        data.update(
+                            {
+                                "fallback_used": True,
+                                "fallback_from_provider": "spotify",
+                                "fallback_to_provider": "youtube",
+                                "fallback_reason": "spotify_no_match",
+                            }
+                        )
+                        _notify_spotify_no_match(query, user_id)
 
     data.update(
         {
@@ -679,7 +716,10 @@ async def _handle_search_play_mode(
     selected_provider = str(
         selected.get("playback_provider") or selected.get("provider") or data.get("playback_provider") or provider
     ).strip()
-    play_result = await _handle_play_mode(selected_track_uri, selected_provider, target_room, user_id)
+    remember_provider = _clean_provider(provider) not in {"auto", "any"}
+    play_result = await _handle_play_mode(
+        selected_track_uri, selected_provider, target_room, user_id, remember_provider=remember_provider
+    )
     unplayable: list[str] = []
     later_indices = [
         index for index in _candidate_indices(query, tracks, generic_request=generic_request) if index > selected_index
@@ -703,7 +743,9 @@ async def _handle_search_play_mode(
         selected_provider = str(
             selected.get("playback_provider") or selected.get("provider") or data.get("playback_provider") or provider
         ).strip()
-        play_result = await _handle_play_mode(selected_track_uri, selected_provider, target_room, user_id)
+        play_result = await _handle_play_mode(
+            selected_track_uri, selected_provider, target_room, user_id, remember_provider=remember_provider
+        )
     if unplayable:
         data["unplayable_candidates"] = unplayable
     play_data = dict(play_result.data or {}) if isinstance(play_result.data, dict) else play_result.data
@@ -714,7 +756,9 @@ async def _handle_search_play_mode(
             "selected_provider": selected_provider,
             "tracks": [selected],
             "count": 1,
-            "playback_started": _playback_started_evidence(play_result.ok, play_data, unverified=play_result.unverified),
+            "playback_started": _playback_started_evidence(
+                play_result.ok, play_data, unverified=play_result.unverified
+            ),
             "play_result": play_data,
         }
     )
@@ -817,7 +861,13 @@ async def media_handler(
     if cleaned_track_uri or cleaned_action == "play":
         if not cleaned_track_uri:
             return ToolResult(ok=False, data=None, error="Pass track_uri when action is play.")
-        return await _handle_play_mode(cleaned_track_uri, cleaned_provider, cleaned_target_room, user_id)
+        return await _handle_play_mode(
+            cleaned_track_uri,
+            cleaned_provider,
+            cleaned_target_room,
+            user_id,
+            remember_provider=_clean_provider(cleaned_provider) not in {"auto", "any"},
+        )
 
     if not cleaned_query:
         return ToolResult(ok=False, data=None, error="Pass query to search or track_uri to play.")

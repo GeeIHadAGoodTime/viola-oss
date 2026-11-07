@@ -588,9 +588,31 @@ def inject_spotify_cookies_into_playwright(playwright_context: Any, *, user_id: 
     if not to_add:
         return 0
 
-    playwright_context.add_cookies(to_add)
-    logger.info("Injected %d Spotify cookies into Playwright CDP context", len(to_add))
-    return len(to_add)
+    # The sign-in cookie goes first, and cookies go one at a time when the batch
+    # is refused: Chromium rejects a whole batch for one bad cookie (checked on
+    # real Edge), which would lose sp_dc to an unrelated cookie Viola never needed.
+    to_add.sort(key=lambda cookie: cookie.get("name") != SPOTIFY_AUTH_COOKIE)
+    try:
+        playwright_context.add_cookies(to_add)
+        accepted = len(to_add)
+        rejected: list[str] = []
+    except Exception:
+        accepted = 0
+        rejected = []
+        for cookie in to_add:
+            try:
+                playwright_context.add_cookies([cookie])
+                accepted += 1
+            except Exception:
+                rejected.append(str(cookie.get("name") or "?"))
+    logger.info(
+        "Spotify cookie handoff: sent=%d refused=%d sign_in_cookie=%s refused_names=%s",
+        accepted,
+        len(rejected),
+        has_spotify_auth_cookie([c for c in to_add if str(c.get("name")) not in rejected]),
+        rejected[:6],
+    )
+    return accepted
 
 
 __all__ = [

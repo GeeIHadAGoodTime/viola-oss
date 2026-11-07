@@ -363,6 +363,28 @@ function validationSummary(profile) {
 // Main Settings Component
 // The backend saves several ids for the same Music Source card: the agent's
 // media tool and the no-sign-in fallback store "youtube_iframe", older
+// The desktop's one answer about Spotify (music/spotify/connection.py). Settings
+// only displays it, so it can never disagree with what the assistant says.
+export function spotifySourceDescription(status) {
+  if (status?.logged_in) return 'Connected';
+  if (status?.state === 'checking') return 'Checking your sign-in...';
+  if (status?.state === 'signing_in') return 'Waiting for you to sign in...';
+  if (spotifyStatusProblem(status)) return 'Not working';
+  return 'Sign in to play Spotify';
+}
+
+export function spotifyStatusProblem(status) {
+  if (!status || status.logged_in) return '';
+  if (['checking', 'signing_in', 'not_signed_in'].includes(status.state)) return '';
+  return status.state_message || '';
+}
+
+// Spotify refused the in-app sign-in: the separate window is the way in now,
+// so it is the only button offered. Otherwise it stays a plain second choice.
+export function spotifyWindowSignInLabel(status) {
+  return status?.state === 'session_rejected' ? 'Sign in again' : 'Sign in using a separate window';
+}
+
 // settings hold "youtube", and Spotify can be "spotify_cdp". The cards only
 // know youtube_music / spotify / local, so an exact match left NO card
 // selected while YouTube was in use (1.0.5 build 5, A10.4).
@@ -1577,6 +1599,17 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
     };
   }, [activeTab, isOpen, refreshSpotifyStatus]);
 
+  // While the desktop tries a sign-in in the player, keep the answer current.
+  const spotifySigningIn = spotifyStatus?.state === 'signing_in';
+  const spotifyChecking = spotifyStatus?.state === 'checking' || spotifySigningIn;
+  useEffect(() => {
+    if (!isOpen || activeTab !== 'music' || !spotifyChecking) return undefined;
+    const intervalId = setInterval(() => {
+      refreshSpotifyStatus({ silent: true });
+    }, SPOTIFY_LOGIN_POLL_MS);
+    return () => clearInterval(intervalId);
+  }, [activeTab, isOpen, refreshSpotifyStatus, spotifyChecking]);
+
   // Handle "Connect with Spotify" click inside the login overlay
   const spotifyLoginAttemptRef = useRef(0);
   const handleSpotifyConnect = useCallback(async () => {
@@ -1613,6 +1646,12 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
           setShowSpotifyLogin(false);
           return;
         }
+        if (spotifyStatusProblem(status)) {
+          // The sign-in finished but the player can't use it: Viola says why
+          // on the music page (the same words the assistant uses).
+          setShowSpotifyLogin(false);
+          return;
+        }
         if (status?.login_error_code === 'identifier_rejected') {
           setSpotifyStatusError('Spotify rejected that login identifier before password entry. Use the email linked to the account.');
           return;
@@ -1644,6 +1683,33 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
     }
   }, [spotifyLoginInProgress]);
 
+  // Sign in inside the playback browser's own window, for when the sign-in
+  // inside Viola doesn't work. The desktop hides the window again by itself.
+  const handleSpotifyWindowSignIn = useCallback(async () => {
+    if (isFeatureHidden('music_services')) return;
+    setSpotifyStatusError(null);
+    setSwitchError(null);
+    setShowSpotifyLogin(false);
+    try {
+      await apiFetch('/v1/spotify/direct-sign-in', {
+        method: 'POST',
+        body: JSON.stringify({ select_as_music_source: true }),
+      });
+      setSpotifyStatus(prev => ({ ...(prev || {}), state: 'signing_in', state_message: '' }));
+    } catch {
+      setSpotifyStatusError("Couldn't open the sign-in window. Try again.");
+    }
+  }, []);
+
+  const handleSpotifyWindowSignInCancel = useCallback(async () => {
+    try {
+      await apiFetch('/v1/spotify/direct-sign-in/cancel', { method: 'POST' });
+    } catch {
+      setSpotifyStatusError("Couldn't close the sign-in window.");
+    }
+    refreshSpotifyStatus({ silent: true });
+  }, [refreshSpotifyStatus]);
+
   const handleSpotifyDisconnect = useCallback(async () => {
     if (isFeatureHidden('music_services')) return;
     setSpotifyDisconnecting(true);
@@ -1664,6 +1730,8 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
           profile_exists: false,
         },
         cookie_bridge_cached: false,
+        state: 'not_signed_in',
+        state_message: '',
       }));
       setShowSpotifyLogin(false);
       if (musicSourceCardId(localSettings.active_music_provider_id) === 'spotify') {
@@ -2789,6 +2857,17 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
         const isSpotify = activeProvider === 'spotify' && !musicServicesHidden;
         const localFolder = localSettings.local_music_folder || '';
         const spotifyLoggedIn = Boolean(spotifyStatus?.logged_in);
+        const spotifySecondaryButtonStyle = {
+          padding: '8px 14px',
+          minHeight: '44px',
+          borderRadius: '8px',
+          border: `1px solid ${theme.colors.borderLight}`,
+          backgroundColor: 'transparent',
+          color: theme.colors.textSecondary,
+          fontSize: '13px',
+          fontWeight: 500,
+          cursor: 'pointer',
+        };
         const spotifyAccountLabel = spotifyStatus?.account_email
           ? `Connected - ${spotifyStatus.account_email}`
           : 'Connected';
@@ -2801,7 +2880,7 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
             id: 'spotify',
             label: 'Spotify',
             icon: <span style={{ fontSize: '18px' }}>S</span>,
-            desc: spotifyLoggedIn ? 'Connected' : 'Sign in to play Spotify',
+            desc: spotifySourceDescription(spotifyStatus),
           }]),
           ...(localMusicHidden ? [] : [
             { id: 'local', label: 'Local Files', icon: <Icons.Music />, desc: localFolder || 'Play from local library' },
@@ -2963,21 +3042,37 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
                   </div>
                 )}
 
-                {(isSpotify || spotifyLoggedIn) && !showSpotifyLogin && (
+                {(isSpotify || spotifyLoggedIn || spotifyChecking || spotifyStatus?.state === 'session_rejected') && !showSpotifyLogin && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '8px' }}>
                     <div style={{
                       color: spotifyLoggedIn ? theme.colors.statusGreen : theme.colors.textMuted,
                       fontSize: '13px',
                       fontWeight: spotifyLoggedIn ? 600 : 400,
                     }}>
-                      {spotifyStatusLoading
+                      {spotifySigningIn
+                        ? 'Finish signing in to Spotify in the window Viola opened.'
+                        : spotifyStatusLoading || spotifyChecking
                         ? 'Checking Spotify...'
                         : spotifyLoggedIn
                           ? spotifyAccountLabel
-                          : 'Not connected'}
+                          : spotifyStatusProblem(spotifyStatus) || 'Not connected'}
                     </div>
                     <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                      {spotifyLoggedIn ? (
+                      {spotifySigningIn ? (
+                        <button
+                          onClick={handleSpotifyWindowSignInCancel}
+                          style={spotifySecondaryButtonStyle}
+                        >
+                          Cancel
+                        </button>
+                      ) : spotifyStatus?.state === 'session_rejected' ? (
+                        <button
+                          onClick={handleSpotifyWindowSignIn}
+                          style={spotifySecondaryButtonStyle}
+                        >
+                          {spotifyWindowSignInLabel(spotifyStatus)}
+                        </button>
+                      ) : spotifyLoggedIn ? (
                         <button
                           onClick={handleSpotifyDisconnect}
                           disabled={spotifyDisconnecting}
@@ -3071,6 +3166,23 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
                         <div style={{ color: theme.colors.textMuted, fontSize: '13px', marginTop: '2px' }}>
                           You'll sign in to Spotify in a secure window inside Viola.
                         </div>
+                        <button
+                          type="button"
+                          onClick={handleSpotifyWindowSignIn}
+                          style={{
+                            marginTop: '6px',
+                            padding: 0,
+                            minHeight: '32px',
+                            border: 'none',
+                            background: 'none',
+                            color: theme.colors.accent,
+                            fontSize: '13px',
+                            textDecoration: 'underline',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          {spotifyWindowSignInLabel(spotifyStatus)}
+                        </button>
                       </div>
                     </div>
 

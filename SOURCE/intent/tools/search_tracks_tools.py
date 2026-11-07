@@ -14,7 +14,6 @@ from typing import Any
 from intent.tool_types import ToolResult
 from intent.tools.media_filter import filter_candidates
 from music.providers.active_provider import get_active_music_provider_id
-from music.providers.checker import is_provider_linked
 from music.providers.errors import (
     MusicProviderUnavailableError,
     MusicTrackNotFoundError,
@@ -61,9 +60,10 @@ def _providers_for_request(provider: str, *, user_id: str) -> list[str]:
 
     providers = ["local"]
     active = _canonical_provider_id(get_active_music_provider_id(user_id=user_id))
-    if active and active not in providers:
+    spotify_connected = _spotify_provider_is_connected(user_id)
+    if active and active not in providers and (active != _SPOTIFY_PROVIDER_ID or spotify_connected):
         providers.append(active)
-    if _spotify_provider_is_connected(user_id) and _SPOTIFY_PROVIDER_ID not in providers:
+    if spotify_connected and _SPOTIFY_PROVIDER_ID not in providers:
         providers.append(_SPOTIFY_PROVIDER_ID)
     if _YOUTUBE_IFRAME_PROVIDER_ID not in providers:
         providers.append(_YOUTUBE_IFRAME_PROVIDER_ID)
@@ -93,7 +93,9 @@ def _track_dict(item: Any, provider_id: str) -> dict[str, Any]:
 
 
 def _spotify_provider_is_connected(user_id: str) -> bool:
-    return is_provider_linked(_SPOTIFY_PROVIDER_ID, user_id=user_id)
+    from music.spotify.connection import get_spotify_connection
+
+    return get_spotify_connection(user_id or None).connected
 
 
 async def _recently_played_tracks(user_id: str) -> list[dict]:

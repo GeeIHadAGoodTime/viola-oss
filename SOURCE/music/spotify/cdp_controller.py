@@ -32,7 +32,12 @@ from urllib.parse import quote
 from core.logging_config import get_logger
 from core.platform import get_data_dir
 from core.subprocess_utils import popen_silent
-from music.spotify.cookie_bridge import get_cached_spotify_cookies, inject_spotify_cookies_into_playwright
+from music.spotify.cookie_bridge import (
+    SPOTIFY_AUTH_COOKIE,
+    get_cached_spotify_cookies,
+    has_spotify_auth_cookie,
+    inject_spotify_cookies_into_playwright,
+)
 
 logger = get_logger(__name__)
 
@@ -76,9 +81,12 @@ def _safe_spotify_cdp_user(user_id: str) -> str:
 def _resolve_spotify_cdp_user_id(user_id: str | None = None) -> str:
     if user_id:
         return user_id
-    from core.user_context import get_current_or_device_user_id
+    # Not the device id: the playback worker has no request context, and the
+    # sign-in is held for the signed-in account. Resolving the device id there
+    # gave playback a second, signed-out profile (build 9: nothing ever played).
+    from core.user_context import get_current_or_desktop_active_user_id
 
-    return get_current_or_device_user_id()
+    return get_current_or_desktop_active_user_id()
 
 
 def spotify_cdp_profile_path(user_id: str) -> Path:
@@ -134,6 +142,7 @@ def _track_text_matches(expected: str | None, observed: str | None) -> bool:
 # ---------------------------------------------------------------------------
 SPOTIFY_URL = "https://open.spotify.com"
 SPOTIFY_LIKED_SONGS_URL = "https://open.spotify.com/collection/tracks"
+SPOTIFY_DIRECT_LOGIN_URL = "https://accounts.spotify.com/login?continue=https%3A%2F%2Fopen.spotify.com%2F"
 
 # --- Liked Songs (the user's Spotify library) --------------------------------
 # Like/unlike goes through the logged-in web player itself, never through the
@@ -162,6 +171,20 @@ async ({method, url, token}) => {
         return {status: response.status, body};
     } catch (e) {
         return {status: 0, body: String(e).slice(0, 200)};
+    }
+}
+"""
+_WEB_API_PUT_JSON_JS = r"""
+async ({url, token, body}) => {
+    try {
+        const response = await fetch(url, {
+            method: 'PUT',
+            headers: {Authorization: 'Bearer ' + token, 'Content-Type': 'application/json'},
+            body,
+        });
+        return {status: response.status};
+    } catch (e) {
+        return {status: 0};
     }
 }
 """
@@ -263,6 +286,38 @@ _POPOVER_DONE_JS = r"""
     return false;
 })()
 """
+# Does this browser profile have a working Widevine? createMediaKeys is what
+# actually loads the CDM; requestMediaKeySystemAccess alone only reads config.
+_WIDEVINE_CHECK_JS = r"""
+async () => {
+    try {
+        const access = await navigator.requestMediaKeySystemAccess('com.widevine.alpha', [{
+            initDataTypes: ['cenc'],
+            audioCapabilities: [{contentType: 'audio/mp4; codecs="mp4a.40.2"', robustness: ''}],
+        }]);
+        await access.createMediaKeys();
+        return {ok: true};
+    } catch (e) {
+        return {ok: false, detail: String(e).slice(0, 160)};
+    }
+}
+"""
+_MEDIA_TIME_JS = r"""
+(() => {
+    const el = document.querySelector('audio, video');
+    return el ? Number(el.currentTime) || 0 : null;
+})()
+"""
+# A real player press while signed out sends the page here (seen 2026-11).
+_LOGIN_WALL_JS = r"""
+(() => {
+    const href = String(window.location.href || "").toLowerCase();
+    return {
+        modal: String(window.location.hash || "").toLowerCase().includes("login"),
+        auth_failed: href.includes("_authfailed"),
+    };
+})()
+"""
 _SHUFFLE_STATE_JS = r"""
 (() => {
     const button = document.querySelector('button[data-testid="control-button-shuffle"]');
@@ -283,6 +338,7 @@ def normalize_spotify_track_id(value: str) -> str:
     if not _SPOTIFY_TRACK_ID_RE.match(raw):
         raise SpotifyCDPError("Not a Spotify track id: %r" % value)
     return raw
+
 
 # --- DevTools (CDP) exposure ------------------------------------------------
 # Viola drives the Spotify Chrome over Chromium's DevTools endpoint, which has
@@ -313,6 +369,8 @@ DEVTOOLS_ACTIVE_PORT_FILE = "DevToolsActivePort"
 # Any real web origin works for the self-check; it must be refused.
 _WEB_ORIGIN_PROBE = "https://example.com"
 _CDP_LAUNCH_TIMEOUT_S = 15.0
+# How long a freshly loaded page gets to show whether it is signed in.
+_LOGIN_VERDICT_TIMEOUT_S = 15.0
 
 
 def read_devtools_active_port(profile_path: Path) -> tuple[int, str] | None:
@@ -436,18 +494,18 @@ def _invalidate_cdp_session_cache() -> None:
 
 
 def has_cdp_session_cookies(user_id: str | None = None) -> bool:
-    """Return True when the external CDP Chrome profile has unexpired Spotify auth cookies.
+    """Return True when the external CDP Chrome profile has an unexpired sp_dc cookie.
 
     Used by intent/tools/music_connect to bypass the Qt-overlay-only "logged_in" check.
     The Qt overlay's cookie store is independent from the CDP Chrome's; a fresh Viola
     restart finds Qt empty even when CDP's per-user Chrome Cookies database still has
-    valid sp_dc + sp_key (1-year expiry). Without this bypass the agent would
+    a valid sp_dc (1-year expiry). Without this bypass the agent would
     pointlessly re-prompt for login on every restart.
 
     Strategy:
     1. If we've previously observed valid cookies (cache flag set), return True.
     2. Try to read the cookies file directly. If it's unlocked (Chrome not running)
-       and contains unexpired sp_dc + sp_key, set cache and return True.
+       and contains an unexpired sp_dc, set cache and return True.
     3. If the file is locked (PermissionError — Windows-specific Chrome behavior)
        AND a CDP controller process is alive, assume Chrome loaded a valid profile
        at startup and return True optimistically. A subsequent CDP play is the
@@ -479,9 +537,7 @@ def has_cdp_session_cookies(user_id: str | None = None) -> bool:
     try:
         conn = sqlite3.connect(f"file:{cookies_db}?mode=ro", uri=True, timeout=2.0)
         try:
-            cur = conn.execute(
-                "SELECT name, expires_utc FROM cookies " "WHERE host_key='.spotify.com' AND name IN ('sp_dc','sp_key')"
-            )
+            cur = conn.execute("SELECT name, expires_utc FROM cookies WHERE host_key='.spotify.com' AND name='sp_dc'")
             rows = cur.fetchall()
         finally:
             conn.close()
@@ -494,8 +550,6 @@ def has_cdp_session_cookies(user_id: str | None = None) -> bool:
         return False
 
     if rows:
-        if len(rows) < 2:
-            return False
         now_unix = _t.time()
         for _name, expires_utc in rows:
             if not expires_utc:
@@ -622,7 +676,10 @@ _LOGIN_CHECK_JS = r"""
         const visible = !!(frame.offsetWidth || frame.offsetHeight || frame.getClientRects().length);
         return visible && src.includes("recaptcha") && (src.includes("/bframe") || /challenge/i.test(title));
     });
-    const statusText = Array.from(document.querySelectorAll('[role="alert"], [aria-live], div, p, span'))
+    // Only the sign-in pages are read as text: on the player, a song called
+    // "Verification Code" must not look like a sign-in challenge.
+    const statusText = !(isLoginPage || isChallengePage) ? "" :
+        Array.from(document.querySelectorAll('[role="alert"], [aria-live], div, p, span'))
         .map((node) => String(node.innerText || node.textContent || "").trim())
         .filter(Boolean)
         .join("\n")
@@ -641,10 +698,18 @@ _LOGIN_CHECK_JS = r"""
                               statusText.includes("authenticator") ||
                               (statusText.includes("captcha") &&
                                (statusText.includes("verify") || statusText.includes("robot")));
-    const loggedIn = !!(userWidget || accountButton) && !loginButton && !isLoginPage;
+    // Spotify's answer to a sign-in cookie it refuses: it deletes sp_dc and
+    // lands on /?_authfailed=1 (seen on the real page, 2026-11). Pressing Play
+    // signed out opens the login modal at #login.
+    const authFailed = href.includes("_authfailed");
+    const loginModal = String(window.location.hash || "").toLowerCase().includes("login");
+    const hydrated = !!document.querySelector('[data-testid="now-playing-bar"], [data-testid="global-nav-bar"]');
+    const loggedIn = !!(userWidget || accountButton) && !loginButton && !isLoginPage && !authFailed;
     let authState = "unknown";
     let loginErrorCode = null;
-    if (loggedIn) {
+    if (authFailed) {
+        authState = "session_rejected";
+    } else if (loggedIn) {
         authState = "authenticated";
     } else if (identifierRejected) {
         authState = "identifier_rejected";
@@ -654,13 +719,20 @@ _LOGIN_CHECK_JS = r"""
         loginErrorCode = "interactive_challenge_required";
     } else if (passwordField) {
         authState = "password_required";
-    } else if (usernameField || isLoginPage) {
+    } else if (usernameField || isLoginPage || loginButton || loginModal) {
         authState = "login_required";
+    } else if (hydrated) {
+        authState = "no_login_button";
+    } else {
+        authState = "loading";
     }
     return JSON.stringify({
         logged_in: loggedIn,
         has_user_widget: !!(userWidget || accountButton),
         has_login_button: !!loginButton,
+        hydrated: hydrated,
+        auth_failed: authFailed,
+        login_modal: loginModal,
         is_login_page: isLoginPage,
         has_password_field: !!passwordField,
         has_username_field: !!usernameField,
@@ -671,8 +743,11 @@ _LOGIN_CHECK_JS = r"""
 })();
 """
 
+# open.spotify.com/api/token now answers 400 to anything but the player itself
+# (checked 2026-11), so the tier comes from /v1/me with the bearer the player
+# already sends (see _get_account_tier_status_impl), or this telemetry.
 _ACCOUNT_TIER_JS = r"""
-(async () => {
+(() => {
     const base = {
         product: "unknown",
         is_premium: null,
@@ -721,48 +796,7 @@ _ACCOUNT_TIER_JS = r"""
         return payload;
     }
 
-    const fallback = telemetryTier();
-    try {
-        const tokenResp = await fetch("https://open.spotify.com/api/token", {
-            credentials: "include",
-            cache: "no-store"
-        });
-        if (!tokenResp.ok) {
-            fallback.web_token_status = tokenResp.status;
-            return JSON.stringify(fallback);
-        }
-
-        const tokenPayload = await tokenResp.json();
-        const token = tokenPayload && (tokenPayload.accessToken || tokenPayload.access_token);
-        if (!token || tokenPayload.isAnonymous === true) {
-            fallback.web_token_status = tokenResp.status;
-            return JSON.stringify(fallback);
-        }
-
-        const profileResp = await fetch("https://api.spotify.com/v1/me", {
-            headers: { Authorization: "Bearer " + token },
-            cache: "no-store"
-        });
-        if (!profileResp.ok) {
-            fallback.web_api_status = profileResp.status;
-            return JSON.stringify(fallback);
-        }
-
-        const profile = await profileResp.json();
-        const product = profile && profile.product ? profile.product : "unknown";
-        const payload = applyProduct(
-            Object.assign({}, base),
-            product,
-            "spotify_web_api_v1_me"
-        );
-        payload.web_api_status = profileResp.status;
-        return JSON.stringify(payload);
-    } catch (e) {
-        fallback.source = fallback.is_premium === null
-            ? "spotify_account_tier_unavailable"
-            : fallback.source;
-        return JSON.stringify(fallback);
-    }
+    return JSON.stringify(telemetryTier());
 })();
 """
 
@@ -877,7 +911,8 @@ _NOW_PLAYING_JS = (
     const ppBtn = document.querySelector('button[data-testid="control-button-playpause"]');
     if (ppBtn) {
         const ariaLabel = (ppBtn.getAttribute('aria-label') || '').toLowerCase();
-        result.is_playing = ariaLabel.includes('pause');
+        // Signed out, Spotify shows a disabled button labelled Pause.
+        result.is_playing = !ppBtn.disabled && ariaLabel.includes('pause');
     } else {
         result.is_playing = false;
     }
@@ -943,7 +978,15 @@ _SEARCH_RESULTS_JS = r"""
 
 
 class SpotifyCDPError(Exception):
-    """Raised when CDP operations fail."""
+    """Raised when CDP operations fail.
+
+    ``state`` is the connection state this failure means (see
+    ``music/spotify/connection.py``), so every caller reports the same reason.
+    """
+
+    def __init__(self, message: str = "", *, state: str = "player_unavailable") -> None:
+        super().__init__(message)
+        self.state = state
 
 
 # ---------------------------------------------------------------------------
@@ -1131,6 +1174,81 @@ def cloak_chrome_windows(root_pid: int) -> int:
     return changed
 
 
+def bring_browser_window_forward(root_pid: int) -> bool:
+    """Put the sign-in window in front. The user just asked for it, so this isn't stealing focus."""
+    if sys.platform != "win32":
+        return False
+    import ctypes
+    from ctypes import wintypes
+
+    pids = _chrome_process_tree(root_pid)
+    user32 = ctypes.WinDLL("user32", use_last_error=True)
+    found: list[int] = []
+    enum_proc = ctypes.WINFUNCTYPE(ctypes.c_bool, wintypes.HWND, wintypes.LPARAM)
+
+    def _check(hwnd: int, _lparam: int) -> bool:
+        pid = wintypes.DWORD()
+        user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+        cls = ctypes.create_unicode_buffer(64)
+        user32.GetClassNameW(hwnd, cls, 64)
+        if pid.value in pids and cls.value == "Chrome_WidgetWin_1" and user32.IsWindowVisible(hwnd):
+            found.append(hwnd)
+        return True
+
+    user32.EnumWindows(enum_proc(_check), 0)
+    if not found:
+        return False
+    kernel32 = ctypes.WinDLL("kernel32")
+    own_thread = kernel32.GetCurrentThreadId()
+    front_thread = user32.GetWindowThreadProcessId(user32.GetForegroundWindow(), None)
+    attached = bool(front_thread and user32.AttachThreadInput(own_thread, front_thread, True))
+    try:
+        user32.ShowWindow(found[0], 9)  # SW_RESTORE
+        return bool(user32.SetForegroundWindow(found[0]))
+    finally:
+        if attached:
+            user32.AttachThreadInput(own_thread, front_thread, False)
+
+
+def playback_window_visible(root_pid: int) -> bool:
+    """Could the user see or reach a playback window? Read-only check for the diagnostic."""
+    if sys.platform != "win32":
+        return False
+    import ctypes
+    from ctypes import wintypes
+
+    pids = _chrome_process_tree(root_pid)
+    user32 = ctypes.WinDLL("user32", use_last_error=True)
+    user32.GetWindowLongPtrW.restype = ctypes.c_ssize_t
+    user32.GetWindowLongPtrW.argtypes = [wintypes.HWND, ctypes.c_int]
+    found: list[bool] = []
+    enum_proc = ctypes.WINFUNCTYPE(ctypes.c_bool, wintypes.HWND, wintypes.LPARAM)
+
+    def _check(hwnd: int, _lparam: int) -> bool:
+        pid = wintypes.DWORD()
+        user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+        if pid.value not in pids or not user32.IsWindowVisible(hwnd):
+            return True
+        cls = ctypes.create_unicode_buffer(64)
+        user32.GetClassNameW(hwnd, cls, 64)
+        rect = wintypes.RECT()
+        user32.GetWindowRect(hwnd, ctypes.byref(rect))
+        if cls.value != "Chrome_WidgetWin_1" or rect.right <= rect.left or rect.bottom <= rect.top:
+            return True
+        ex_style = int(user32.GetWindowLongPtrW(hwnd, -20))
+        alpha = ctypes.c_ubyte(255)
+        flags = wintypes.DWORD(0)
+        has_alpha = user32.GetLayeredWindowAttributes(hwnd, None, ctypes.byref(alpha), ctypes.byref(flags))
+        transparent = bool(has_alpha and alpha.value == 0 and flags.value & 0x2)
+        on_a_monitor = bool(user32.MonitorFromRect(ctypes.byref(rect), 0))
+        in_taskbar = not ex_style & 0x80  # WS_EX_TOOLWINDOW
+        found.append(in_taskbar or (on_a_monitor and not transparent))
+        return True
+
+    user32.EnumWindows(enum_proc(_check), 0)
+    return any(found)
+
+
 class SpotifyCDPController:
     """
     Low-level Chrome/Playwright bridge for Spotify web player control.
@@ -1140,6 +1258,9 @@ class SpotifyCDPController:
     thread via ``_in_cdp_thread()``.  Callers may invoke public methods from
     any thread (including asyncio worker threads).
     """
+
+    # True while the player's own window is open for the user to sign in.
+    _direct_sign_in_open: bool = False
 
     def __init__(self, *, user_id: str | None = None) -> None:
         self._user_id = _resolve_spotify_cdp_user_id(user_id)
@@ -1207,7 +1328,7 @@ class SpotifyCDPController:
                     old_policy = type(asyncio.get_event_loop_policy()).__name__
                     asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
                     logger.info(
-                        "CDP thread: forced WindowsProactorEventLoopPolicy " "(was %s)",
+                        "CDP thread: forced WindowsProactorEventLoopPolicy (was %s)",
                         old_policy,
                     )
 
@@ -1351,7 +1472,7 @@ class SpotifyCDPController:
             if found:
                 return (name, found)
 
-        raise SpotifyCDPError(NO_SPOTIFY_BROWSER_MESSAGE)
+        raise SpotifyCDPError(NO_SPOTIFY_BROWSER_MESSAGE, state="no_browser")
 
     # ------------------------------------------------------------------
     # Port check
@@ -1445,7 +1566,7 @@ class SpotifyCDPController:
         self._unregister_chrome_for_capture()
         try:
             self._chrome_proc.terminate()
-            self._chrome_proc.wait(timeout=5)
+            self._chrome_proc.wait(timeout=2)
             logger.info("Chrome process %d terminated", pid)
         except Exception:
             try:
@@ -1660,12 +1781,17 @@ class SpotifyCDPController:
         self.find_browser()
         logger.info("Spotify CDP launch requested (random loopback DevTools port, offscreen=True)")
 
-    def _launch_chrome(self) -> int:
+    def _launch_chrome(self, *, sign_in_url: str | None = None) -> int:
         """Start the Spotify Chrome and return its per-launch DevTools port.
 
         Launched via subprocess (not Playwright) to keep native Widevine.
         See the DevTools exposure notes at the top of this module for the
         port, bind and origin policy.
+
+        With ``sign_in_url`` the same profile opens as a small visible app
+        window, for the user to sign in. App mode has no toolbar, so there is no
+        profile button to sign in to a Microsoft account with, no sidebar and no
+        extensions menu, on top of the same flags as the hidden player.
 
         Raises:
             SpotifyCDPError: If Chrome does not come up, or comes up accepting
@@ -1685,11 +1811,6 @@ class SpotifyCDPController:
             "--remote-allow-origins=%s" % CDP_NO_WEB_ORIGIN,
             "--autoplay-policy=no-user-gesture-required",
             "--user-data-dir=%s" % self._profile_path,
-            # Spotify's Web Playback UI needs a real headed page for
-            # the CDP click/DRM/user-gesture path. Keep normal playback
-            # off-screen but headed so the click path can start audio.
-            "--window-size=1280,720",
-            "--window-position=%d,%d" % (_OFFSCREEN_XY, _OFFSCREEN_XY),
             # The window is cloaked (see cloak_chrome_windows); do not let
             # Chrome treat it as occluded and throttle the page.
             "--disable-backgrounding-occluded-windows",
@@ -1698,6 +1819,13 @@ class SpotifyCDPController:
             # The playback profile is Viola's alone: never sync an account into it.
             "--disable-sync",
         ]
+        if sign_in_url:
+            chrome_args.extend(["--window-size=520,760", "--window-position=120,60"])
+        else:
+            # Spotify's Web Playback UI needs a real headed page for
+            # the CDP click/DRM/user-gesture path. Keep normal playback
+            # off-screen but headed so the click path can start audio.
+            chrome_args.extend(["--window-size=1280,720", "--window-position=%d,%d" % (_OFFSCREEN_XY, _OFFSCREEN_XY)])
         disabled_features: list[str] = []
         if browser_name == "Edge":
             chrome_args.extend(_EDGE_EXTRA_ARGS)
@@ -1734,6 +1862,8 @@ class SpotifyCDPController:
             disabled_features[:0] = ["AudioServiceSandbox", "AudioServiceOutOfProcess", "CalculateNativeWinOcclusion"]
         if disabled_features:
             chrome_args.append("--disable-features=" + ",".join(disabled_features))
+        # Start blank: Edge's new tab page would otherwise load MSN first.
+        chrome_args.append("--app=%s" % sign_in_url if sign_in_url else "about:blank")
         logger.info("Launching %s via subprocess (random loopback DevTools port, offscreen=True)", browser_name)
 
         # CREATE_NO_WINDOW on Windows prevents a console flash
@@ -1747,18 +1877,20 @@ class SpotifyCDPController:
             "creationflags": creation_flags,
             "env": _browser_launch_env(),
         }
-        startupinfo = _hidden_startupinfo()
+        startupinfo = None if sign_in_url else _hidden_startupinfo()
         if startupinfo is not None:
             popen_kwargs["startupinfo"] = startupinfo
         focus_guard = _ForegroundGuard()
-        focus_guard.lock()
+        if not sign_in_url:
+            focus_guard.lock()
         try:
             self._chrome_proc = popen_silent(chrome_args, **popen_kwargs)
         except Exception:
             focus_guard.unlock()
             raise
         logger.info("%s PID: %d", browser_name, self._chrome_proc.pid)
-        self._start_cloak_watchdog(self._chrome_proc, focus_guard)
+        if not sign_in_url:
+            self._start_cloak_watchdog(self._chrome_proc, focus_guard)
 
         # Bind Chrome to the Viola-lifetime Job Object so the OS
         # kernel forcibly terminates Chrome (and all its child
@@ -1806,7 +1938,8 @@ class SpotifyCDPController:
             # Small extra wait for Chrome to finish initializing, then release the
             # foreground lock once its windows are cloaked (WS_EX_NOACTIVATE).
             time.sleep(1.5)
-            self._recloak_chrome_window()
+            if not sign_in_url:
+                self._recloak_chrome_window()
         finally:
             focus_guard.unlock()
         return port
@@ -1818,7 +1951,7 @@ class SpotifyCDPController:
         """Connect to Chrome via CDP (thread-safe wrapper)."""
         self._in_cdp_thread(self._connect_impl)
 
-    def _connect_impl(self) -> None:
+    def _connect_impl(self, *, sign_in_url: str | None = None) -> None:
         """Connect to Chrome via CDP and get a page for open.spotify.com.
 
         Launches Chrome via subprocess (not Playwright's launch_persistent_context)
@@ -1863,11 +1996,11 @@ class SpotifyCDPController:
             # or one still running after a Viola restart) when it is verified
             # and refuses web origins, else launch a new one.
             target_url = SPOTIFY_URL
-            port = self._find_reusable_cdp_port()
+            port = None if sign_in_url else self._find_reusable_cdp_port()
             if port is not None and port != self._cdp_port:
                 logger.info("Reusing the Spotify Chrome already running on loopback port %d", port)
             if port is None:
-                port = self._launch_chrome()
+                port = self._launch_chrome(sign_in_url=sign_in_url)
             self._cdp_port = port
 
             # ---- Step 2: Connect Playwright via connect_over_cdp ----
@@ -1888,14 +2021,23 @@ class SpotifyCDPController:
             except Exception:
                 logger.debug("Could not watch Spotify web player requests", exc_info=True)
 
-            try:
-                injected_count = inject_spotify_cookies_into_playwright(context, user_id=self._user_id)
-                self._cookie_bridge_last_injected = injected_count > 0
-            except Exception:
-                logger.warning("Spotify QWebEngine cookie injection failed; BrowserAuth overlay may be required")
+            if not sign_in_url and not self._signed_in_inside_player():
+                self._refresh_bridge_cookies()
+                try:
+                    injected_count = inject_spotify_cookies_into_playwright(context, user_id=self._user_id)
+                    self._cookie_bridge_last_injected = injected_count > 0
+                except Exception:
+                    logger.warning("Spotify cookie handoff to the playback browser failed", exc_info=True)
 
             # Register Chrome PID for ProcTap capture
             self._register_chrome_for_capture()
+
+            if sign_in_url:
+                # The window already shows Spotify's login; leave the page alone
+                # while the user signs in.
+                self._page = context.pages[0] if context.pages else context.new_page()
+                self._connected = True
+                return
 
             # Find or create Spotify page
             spotify_page = None
@@ -1938,18 +2080,94 @@ class SpotifyCDPController:
     # ------------------------------------------------------------------
     # Lifecycle
     # ------------------------------------------------------------------
-    def ensure_running(self, *, wait_for_login: bool = True) -> None:
-        """Ensure Chrome is running, connected, and logged in (thread-safe)."""
-        self._in_cdp_thread(self._ensure_running_impl, wait_for_login=wait_for_login)
+    def ensure_running(self) -> None:
+        """Ensure the player is running, connected and signed in (thread-safe)."""
+        self._in_cdp_thread(self._ensure_running_impl)
 
-    def _ensure_running_impl(self, *, wait_for_login: bool = True) -> None:
-        """Ensure Chrome is running, connected, and logged in.
+    def _refresh_bridge_cookies(self) -> None:
+        """Re-read the in-app sign-in, so a handoff after a restart has its cookies.
 
-        This is the single entry point that the engine should call.
-        Handles first-run login flow automatically when ``wait_for_login`` is
-        enabled. Playback/search callers pass ``wait_for_login=False`` so a
-        logged-out browser fails fast instead of blocking the command route.
+        The cookie cache lives in memory: after a restart it was empty until
+        something happened to ask for the sign-in status.
         """
+        try:
+            from music.providers.browser.auth_manager import get_browser_auth_manager
+
+            get_browser_auth_manager(self._user_id).refresh_spotify_sign_in()
+        except Exception:
+            logger.debug("Spotify sign-in refresh for the handoff failed", exc_info=True)
+
+    def _sign_in_available(self) -> bool:
+        """Is there a Spotify sign-in? If not, the player has no reason to start."""
+        if self._signed_in_inside_player():
+            return True
+        self._refresh_bridge_cookies()
+        return has_spotify_auth_cookie(get_cached_spotify_cookies(user_id=self._user_id))
+
+    def _signed_in_inside_player(self) -> bool:
+        """The sign-in lives in this profile: handing a cookie over would overwrite it."""
+        from music.spotify.connection import signed_in_inside_the_player
+
+        return signed_in_inside_the_player(self._user_id)
+
+    # ------------------------------------------------------------------
+    # Signing in inside the player's own window
+    # ------------------------------------------------------------------
+    def open_direct_sign_in(self) -> None:
+        """Open this user's playback profile in a visible window at Spotify's login."""
+        self._in_cdp_thread(self._open_direct_sign_in_impl)
+
+    def _open_direct_sign_in_impl(self) -> None:
+        self._shutdown_impl()
+        self._direct_sign_in_open = True
+        try:
+            self._connect_impl(sign_in_url=SPOTIFY_DIRECT_LOGIN_URL)
+            # A cookie Spotify refused must not count as the new sign-in.
+            if self._pw_context is not None:
+                self._pw_context.clear_cookies(name=SPOTIFY_AUTH_COOKIE)
+            _invalidate_cdp_session_cache()
+        except Exception:
+            self._direct_sign_in_open = False
+            raise
+        if self._chrome_proc is not None:
+            bring_browser_window_forward(self._chrome_proc.pid)
+        logger.info("Spotify sign-in window open in the player's own profile")
+
+    def direct_sign_in_status(self) -> str:
+        """``waiting``, ``signed_in`` or ``closed`` (the user closed the window)."""
+        return self._in_cdp_thread(self._direct_sign_in_status_impl)
+
+    def _direct_sign_in_status_impl(self) -> str:
+        if self._chrome_process_exited() or self._page is None or self._page.is_closed():
+            # Signed in, then closed the window before the next look: the browser
+            # wrote the cookie to the profile on its way out. It has to be fully
+            # gone first, or the file is locked and can't be read.
+            self._shutdown_impl()
+            _invalidate_cdp_session_cache()
+            return "signed_in" if has_cdp_session_cookies(user_id=self._user_id) else "closed"
+        # Only the cookie store is read: the login page itself is left alone.
+        return "signed_in" if self._has_authenticated_spotify_cookies_impl() else "waiting"
+
+    def close_direct_sign_in(self) -> None:
+        """Close the window, writing its cookies to the profile. The player restarts hidden."""
+        self._in_cdp_thread(self._close_direct_sign_in_impl)
+
+    def _close_direct_sign_in_impl(self) -> None:
+        self._shutdown_impl()
+
+    def _ensure_running_impl(self) -> None:
+        """Ensure the player is running, connected and signed in.
+
+        This is the single entry point callers use. It never opens the sign-in
+        view: signing in is something the user starts. Opening it from a play
+        made the view flash (the watch saw the in-app cookie and closed it at
+        once) while the play blocked for two minutes.
+
+        Raises:
+            SpotifyCDPError: With ``state`` saying why the player can't be used.
+        """
+        if self._direct_sign_in_open:
+            raise SpotifyCDPError("The sign-in window is open.", state="signing_in")
         reconnect_notice = False
         if self._connected and self._page:
             # Verify page is still responsive
@@ -1963,16 +2181,16 @@ class SpotifyCDPController:
                 self._connected = False
                 self._page = None
             else:
-                if wait_for_login and not self._is_logged_in_impl():
-                    if self._try_cookie_bridge_login():
-                        return
-                    if not self._handle_login_flow(is_first_run=False):
-                        raise SpotifyCDPError("Spotify login timed out. User did not authenticate.")
-                return
+                status = self._login_status_impl()
+                if status.get("logged_in") or status.get("auth_state") in ("loading", "unknown"):
+                    return
+                if self._try_cookie_bridge_login():
+                    return
+                raise self._signed_out_error(status)
 
-        # Detect first-run (no profile directory yet)
-        is_first_run = not self._profile_path.exists()
-        has_bridge_cookies = bool(get_cached_spotify_cookies(user_id=self._user_id))
+        if not self._sign_in_available():
+            self._finish_unexpected_reconnect_notice(reconnect_notice, success=False)
+            raise SpotifyCDPError("Spotify isn't signed in.", state="not_signed_in")
 
         # Launch if not already running
         if not self._is_port_open():
@@ -1986,58 +2204,69 @@ class SpotifyCDPController:
             self._finish_unexpected_reconnect_notice(reconnect_notice, success=False)
             raise
 
-        # Check login and handle first-run flow
-        logged_in = self._is_logged_in_impl()
-        if not logged_in and self._cookie_bridge_last_injected:
-            logged_in = self._is_logged_in_impl()
-            if logged_in:
-                logger.info("Spotify login restored from QWebEngine cookies; skipping Chrome login flow")
-
-        if not logged_in:
-            if self._try_cookie_bridge_login(already_injected=self._cookie_bridge_last_injected):
-                self._finish_unexpected_reconnect_notice(reconnect_notice, success=True)
-                return
-            if not wait_for_login:
-                self._finish_unexpected_reconnect_notice(reconnect_notice, success=False)
-                raise SpotifyCDPError("Spotify login required. Say 'connect Spotify' to sign in.")
-            if not self._handle_login_flow(is_first_run=is_first_run):
-                self._finish_unexpected_reconnect_notice(reconnect_notice, success=False)
-                raise SpotifyCDPError("Spotify login timed out. User did not authenticate.")
-
+        status = self._wait_for_login_verdict()
+        if not status.get("logged_in"):
+            self._finish_unexpected_reconnect_notice(reconnect_notice, success=False)
+            raise self._signed_out_error(status)
         self._finish_unexpected_reconnect_notice(reconnect_notice, success=True)
 
-    def _try_cookie_bridge_login(self, *, already_injected: bool = False) -> bool:
-        """Try QWebEngine-authenticated Spotify cookies before prompting login."""
-        if self._pw_context is None:
+    def _signed_out_error(self, status: Mapping[str, Any]) -> SpotifyCDPError:
+        """The page isn't signed in although a sign-in was handed over."""
+        auth_state = str(status.get("auth_state") or "unknown")
+        if auth_state in ("loading", "unknown", "not_connected"):
+            return SpotifyCDPError("Spotify's page did not finish loading (%s)." % auth_state)
+        _invalidate_cdp_session_cache()
+        return SpotifyCDPError("Spotify did not accept the sign-in (%s)." % auth_state, state="session_rejected")
+
+    def _wait_for_login_verdict(self, timeout: float = _LOGIN_VERDICT_TIMEOUT_S) -> dict[str, Any]:
+        """Wait until the page has decided whether it is signed in."""
+        deadline = time.monotonic() + timeout
+        while True:
+            status = self._login_status_impl()
+            if status.get("auth_state") not in ("loading", "unknown") or time.monotonic() >= deadline:
+                return status
+            time.sleep(0.5)
+
+    def _try_cookie_bridge_login(self) -> bool:
+        """Hand over a sign-in the player doesn't have yet (the user signed in again)."""
+        if self._pw_context is None or self._signed_in_inside_player():
             return False
-
-        injected_count = 0
-        if not already_injected:
-            try:
-                injected_count = inject_spotify_cookies_into_playwright(self._pw_context, user_id=self._user_id)
-                self._cookie_bridge_last_injected = injected_count > 0
-            except Exception:
-                logger.warning("Spotify QWebEngine cookie injection failed during login check")
-                return False
-        elif self._cookie_bridge_last_injected:
-            injected_count = 1
-
+        self._refresh_bridge_cookies()
+        try:
+            injected_count = inject_spotify_cookies_into_playwright(self._pw_context, user_id=self._user_id)
+        except Exception:
+            logger.warning("Spotify cookie handoff to the playback browser failed", exc_info=True)
+            return False
+        self._cookie_bridge_last_injected = injected_count > 0
         if injected_count <= 0:
             return False
-
         if self._page is not None:
             try:
-                logger.info("Refreshing Spotify after QWebEngine cookie injection")
                 self._page.goto(SPOTIFY_URL, wait_until="domcontentloaded", timeout=30000)
-                time.sleep(2)
             except Exception:
-                logger.debug("Spotify refresh after cookie injection skipped")
+                logger.debug("Spotify refresh after the handoff failed", exc_info=True)
+        return bool(self._wait_for_login_verdict().get("logged_in"))
 
-        if self._is_logged_in_impl():
-            logger.info("Spotify login restored from QWebEngine cookies; skipping Chrome login flow")
-            return True
-        logger.info("Spotify QWebEngine cookies did not authenticate CDP context")
-        return False
+    def check_session(self) -> dict[str, Any]:
+        """Try the sign-in in the real player and say what happened (thread-safe)."""
+        return self._in_cdp_thread(self._check_session_impl)
+
+    def _check_session_impl(self) -> dict[str, Any]:
+        try:
+            self._ensure_running_impl()
+        except SpotifyCDPError as exc:
+            return {"state": exc.state, "detail": str(exc)[:200]}
+        drm = self._drm_status_impl()
+        if not drm.get("ok"):
+            return {"state": "drm_unavailable", "detail": str(drm.get("detail") or "")[:200]}
+        return {"state": "connected", "detail": "player page signed in, Widevine available"}
+
+    def _drm_status_impl(self) -> dict[str, Any]:
+        """Can this browser profile decrypt Spotify's audio?"""
+        result = self._page.evaluate(_WIDEVINE_CHECK_JS) if self._page is not None else None
+        if isinstance(result, dict):
+            return result
+        return {"ok": False, "detail": "no answer from the page"}
 
     @property
     def is_connected(self) -> bool:
@@ -2045,92 +2274,8 @@ class SpotifyCDPController:
         return self._connected and self._page is not None
 
     # ------------------------------------------------------------------
-    # Login flow
+    # Notices
     # ------------------------------------------------------------------
-    def _handle_login_flow(self, *, is_first_run: bool = False) -> bool:
-        """Handle Spotify login through the in-app BrowserAuth overlay.
-
-        Args:
-            is_first_run: Whether this is the first time using the profile.
-
-        Returns:
-            True if login succeeded, False on timeout.
-        """
-        context = "First-run" if is_first_run else "Re-authentication"
-        logger.info(
-            "%s: Spotify login required. Starting BrowserAuth overlay...",
-            context,
-        )
-
-        # Notify user via toast that login is needed.
-        if is_first_run:
-            self._notify_user("Spotify login required - sign in inside Viola.")
-        else:
-            self._notify_user("Spotify session expired - please sign in again.")
-
-        if not self._start_browser_auth_overlay():
-            self._notify_user("Open Settings > Music and connect Spotify, then try again.")
-            return False
-
-        # Poll for login success
-        timeout = 120  # 2 minutes
-        poll_interval = 2
-        start = time.time()
-
-        while time.time() - start < timeout:
-            if self._try_cookie_bridge_login() or self.is_logged_in():
-                logger.info(
-                    "%s: Spotify login confirmed from BrowserAuth cookies.",
-                    context,
-                )
-                self._notify_user("Spotify login successful!")
-                self.hide_window()
-                # Navigate to Spotify home after login
-                self.navigate_home()
-                return True
-            time.sleep(poll_interval)
-
-        # Timeout — notify user and hide window
-        logger.warning(
-            "%s: Spotify login timed out after %ds.",
-            context,
-            timeout,
-        )
-        self._notify_user("Spotify login timed out. Falling back to YouTube for playback.")
-        self.hide_window()
-        return False
-
-    @staticmethod
-    def _start_browser_auth_overlay() -> bool:
-        """Start Spotify BrowserAuth through the local runtime endpoint."""
-        try:
-            import httpx
-
-            from config.settings import settings
-            from core.constants import DEFAULT_API_PORT
-            from ui.security.bootstrap import load_bootstrap_api_key
-
-            port = getattr(settings, "api_port", DEFAULT_API_PORT)
-            headers: dict[str, str] = {}
-            api_key = load_bootstrap_api_key()
-            if api_key:
-                headers["X-API-Key"] = api_key
-
-            with httpx.Client(timeout=10) as client:
-                resp = client.post(
-                    "http://127.0.0.1:%d/v1/browser/auth/login/spotify" % port,
-                    headers=headers,
-                )
-            if resp.status_code != 200:
-                logger.warning("Spotify BrowserAuth start returned status %d", resp.status_code)
-                return False
-            payload = resp.json()
-            data = payload.get("data", payload) if isinstance(payload, dict) else {}
-            return not (isinstance(data, dict) and data.get("controller_attached") is False)
-        except Exception:
-            logger.debug("Spotify BrowserAuth start failed")
-            return False
-
     @staticmethod
     def _notify_user(message: str) -> None:
         """Send a toast notification to the UI (best-effort)."""
@@ -2149,7 +2294,11 @@ class SpotifyCDPController:
         """Handle re-authentication when session expires during playback.
 
         Called by the engine's poll loop when is_logged_in() returns False.
+        Never starts a player nobody can sign in to, and never opens the sign-in
+        view: after a Disconnect a leftover poll must not bring the browser back.
         """
+        if not self._sign_in_available():
+            raise SpotifyCDPError("Spotify isn't signed in.", state="not_signed_in")
         reconnect_notice = False
         needs_reconnect = (
             not self._connected or self._page is None or self._chrome_process_exited() or not self._is_port_open()
@@ -2177,8 +2326,10 @@ class SpotifyCDPController:
             return
 
         self._finish_unexpected_reconnect_notice(reconnect_notice, success=True)
-        if not self._handle_login_flow(is_first_run=False):
-            raise SpotifyCDPError("Spotify re-authentication failed.")
+        status = self._wait_for_login_verdict()
+        if status.get("logged_in") or status.get("auth_state") in ("loading", "unknown"):
+            return  # a page mid-load is not a signed-out page; the next check decides
+        raise self._signed_out_error(status)
 
     # ------------------------------------------------------------------
     # Login detection
@@ -2193,6 +2344,14 @@ class SpotifyCDPController:
 
     def _login_status_impl(self) -> dict[str, Any]:
         """Return login state without exposing cookies, tokens, or identifiers."""
+        if self._direct_sign_in_open:
+            # The user is typing a password in that page: leave it alone.
+            return {
+                "logged_in": False,
+                "auth_state": "signing_in",
+                "login_error_code": None,
+                "challenge_required": False,
+            }
         if not self._page:
             return {
                 "logged_in": False,
@@ -2202,60 +2361,34 @@ class SpotifyCDPController:
             }
 
         result = self._safe_evaluate(_LOGIN_CHECK_JS, "login check")
-        cookie_authenticated = self._has_authenticated_spotify_cookies_impl()
-        if result and isinstance(result, dict):
-            login_page_state = any(
-                bool(result.get(marker))
-                for marker in (
-                    "is_login_page",
-                    "has_password_field",
-                    "has_username_field",
-                    "challenge_required",
-                )
-            )
-            if (
-                not bool(result.get("logged_in", False))
-                and cookie_authenticated
-                and not login_page_state
-                and not result.get("login_error_code")
-            ):
-                return {
-                    "logged_in": True,
-                    "auth_state": "authenticated_cdp_cookies",
-                    "login_error_code": None,
-                    "challenge_required": False,
-                    "is_login_page": False,
-                    "has_password_field": False,
-                    "has_username_field": False,
-                }
-            return {
-                "logged_in": bool(result.get("logged_in", False)),
-                "auth_state": str(result.get("auth_state") or "unknown"),
-                "login_error_code": result.get("login_error_code"),
-                "challenge_required": bool(result.get("challenge_required", False)),
-                "is_login_page": bool(result.get("is_login_page", False)),
-                "has_password_field": bool(result.get("has_password_field", False)),
-                "has_username_field": bool(result.get("has_username_field", False)),
-            }
-        if cookie_authenticated:
-            return {
-                "logged_in": True,
-                "auth_state": "authenticated_cdp_cookies",
-                "login_error_code": None,
-                "challenge_required": False,
-                "is_login_page": False,
-                "has_password_field": False,
-                "has_username_field": False,
-            }
+        if not isinstance(result, dict):
+            return {"logged_in": False, "auth_state": "unknown", "login_error_code": None, "challenge_required": False}
+
+        auth_state = str(result.get("auth_state") or "unknown")
+        logged_in = bool(result.get("logged_in", False))
+        if auth_state == "no_login_button":
+            # The page has loaded and offers no Log in button. Spotify renames
+            # its account widget now and then; the button and the cookie are
+            # what the signed-out page can never fake. A cookie alone proves
+            # nothing: Spotify deletes a refused sp_dc only when the page loads.
+            logged_in = self._has_authenticated_spotify_cookies_impl()
+            auth_state = "authenticated" if logged_in else "login_required"
         return {
-            "logged_in": False,
-            "auth_state": "unknown",
-            "login_error_code": None,
-            "challenge_required": False,
+            "logged_in": logged_in,
+            "auth_state": auth_state,
+            "login_error_code": result.get("login_error_code"),
+            "challenge_required": bool(result.get("challenge_required", False)),
+            "is_login_page": bool(result.get("is_login_page", False)),
+            "has_password_field": bool(result.get("has_password_field", False)),
+            "has_username_field": bool(result.get("has_username_field", False)),
+            "has_login_button": bool(result.get("has_login_button", False)),
+            "has_user_widget": bool(result.get("has_user_widget", False)),
+            "auth_failed": bool(result.get("auth_failed", False)),
+            "login_modal": bool(result.get("login_modal", False)),
         }
 
     def _has_authenticated_spotify_cookies_impl(self) -> bool:
-        """Return True when the live CDP context has Spotify auth cookies."""
+        """Return True when the live CDP context holds Spotify's sign-in cookie."""
         playwright_errors = _playwright_error_types()
         contexts: list[Any] = []
         if self._pw_context is not None:
@@ -2277,13 +2410,7 @@ class SpotifyCDPController:
             except playwright_errors as exc:
                 logger.debug("Spotify CDP cookie probe read failed: %s", exc)
                 cookies = []
-            if not cookies:
-                continue
-            cookie_names = {
-                str(cookie.get("name") or "") for cookie in cookies if "spotify" in str(cookie.get("domain") or "")
-            }
-            if {"sp_dc", "sp_key"}.issubset(cookie_names):
-                _cdp_session_known_present_by_user.add(self._user_id)
+            if has_spotify_auth_cookie(cookies):
                 return True
         return False
 
@@ -2381,7 +2508,7 @@ class SpotifyCDPController:
             self._account_tier_cache_at = now
             return payload
 
-        result = self._safe_evaluate(_ACCOUNT_TIER_JS, "account tier")
+        result = self._account_tier_from_web_api() or self._safe_evaluate(_ACCOUNT_TIER_JS, "account tier")
         if not isinstance(result, dict):
             payload = self._account_tier_status()
             self._account_tier_cache = dict(payload)
@@ -2404,6 +2531,25 @@ class SpotifyCDPController:
         self._account_tier_cache = dict(payload)
         self._account_tier_cache_at = now
         return payload
+
+    def _account_tier_from_web_api(self) -> dict[str, Any] | None:
+        token = self._web_player_bearer(wait_s=0.0)
+        if not token:
+            return None
+        status, body = self._web_api("GET", "/me", token)
+        if status != 200:
+            return None
+        try:
+            product = str(json.loads(body).get("product") or "unknown").lower()
+        except (ValueError, AttributeError):
+            return None
+        is_premium = None if product == "unknown" else product == "premium"
+        return {
+            "product": product,
+            "is_premium": is_premium,
+            "source": "spotify_web_api_v1_me",
+            "web_api_status": status,
+        }
 
     # ------------------------------------------------------------------
     # Now playing
@@ -2646,6 +2792,7 @@ class SpotifyCDPController:
         nudged = False
         last_payload: Any = None
         while time.time() < deadline:
+            self._raise_if_login_wall()
             audio = self._safe_evaluate(_ENSURE_AUDIO_PLAYING_JS, "ensure spotify audio playing")
             now_playing = self._safe_evaluate(_NOW_PLAYING_JS, "now playing after collection play")
             last_payload = now_playing
@@ -2664,12 +2811,67 @@ class SpotifyCDPController:
                     nudged = True
                     first = first_at = None
             time.sleep(_DIRECT_TRACK_POLL_S)
-        raise SpotifyCDPError("Spotify Liked Songs did not start playing; last_now_playing=%r" % (last_payload,))
+        raise SpotifyCDPError("Spotify did not start playing; last_now_playing=%r" % (last_payload,))
+
+    def _raise_if_login_wall(self) -> None:
+        """Pressing Play signed out opens Spotify's login modal: that is a failure, now."""
+        wall = self._safe_evaluate(_LOGIN_WALL_JS, "login wall")
+        if isinstance(wall, dict) and (wall.get("modal") or wall.get("auth_failed")):
+            _invalidate_cdp_session_cache()
+            raise SpotifyCDPError("Spotify asked to log in when Play was pressed.", state="session_rejected")
+
+    def _web_player_devices(self) -> dict[str, Any]:
+        """Spotify's view of this account's devices. No device names leave this method."""
+        token = self._web_player_bearer(wait_s=0.0)
+        if not token or self._page is None:
+            return {"known": False, "reason": "no_player_token"}
+        status, body = self._web_api("GET", "/me/player/devices", token)
+        if status != 200:
+            return {"known": False, "reason": "http_%s" % status}
+        try:
+            devices = json.loads(body).get("devices") or []
+        except (ValueError, AttributeError):
+            return {"known": False, "reason": "bad_answer"}
+        own = next((d for d in devices if str(d.get("name") or "").startswith("Web Player")), None)
+        active = next((d for d in devices if d.get("is_active")), None)
+        return {
+            "known": True,
+            "device_count": len(devices),
+            "this_player_listed": own is not None,
+            "this_player_active": bool(own and own.get("is_active")),
+            "other_device_active": bool(active and active is not own),
+            "active_device_type": str((active or {}).get("type") or ""),
+            "_own_id": str((own or {}).get("id") or ""),
+        }
+
+    def _take_over_playback_device(self) -> bool:
+        """Move playback here when Spotify is playing on another of the user's devices."""
+        devices = self._web_player_devices()
+        if not devices.get("other_device_active") or not devices.get("_own_id"):
+            return False
+        token = self._web_player_bearer(wait_s=0.0)
+        if not token or self._page is None:
+            return False
+        result = self._page.evaluate(
+            _WEB_API_PUT_JSON_JS,
+            {
+                "url": _SPOTIFY_WEB_API + "/me/player",
+                "token": token,
+                "body": json.dumps({"device_ids": [devices["_own_id"]], "play": True}),
+            },
+        )
+        status = int(result.get("status") or 0) if isinstance(result, dict) else 0
+        logger.info("Spotify CDP: asked to move playback to this player (HTTP %s)", status)
+        return status in (200, 202, 204)
 
     def _nudge_footer_playback(self) -> None:
         """Pause/resume the footer transport once to recover Spotify false-starts."""
         if not self._page:
             return
+        try:
+            self._take_over_playback_device()
+        except _playwright_error_types() as exc:
+            logger.debug("Spotify CDP device takeover failed: %s", exc)
         try:
             button = self._page.query_selector('button[data-testid="control-button-playpause"]')
             if button:
@@ -2699,6 +2901,7 @@ class SpotifyCDPController:
         nudged = False
         last_payload: Any = None
         while time.time() < deadline:
+            self._raise_if_login_wall()
             audio_state = self._safe_evaluate(_ENSURE_AUDIO_PLAYING_JS, "ensure spotify audio playing")
             now_playing = self._safe_evaluate(_NOW_PLAYING_JS, "now playing after direct URI click")
             last_payload = now_playing
@@ -3058,6 +3261,8 @@ class SpotifyCDPController:
                 self._recloak_chrome_window()
             except Exception:
                 logger.debug("Window moveTo off-screen failed (non-critical)")
+        # A click is not playback. Same proof as every other start.
+        self._wait_for_any_playback_progress(time.time() + 18.0)
 
     # ------------------------------------------------------------------
     # Window management
@@ -3276,19 +3481,126 @@ class SpotifyCDPController:
         DevTools port closes with it. Does NOT touch other Chrome processes.
         """
         logger.info("Shutting down Spotify CDP controller")
+        self._direct_sign_in_open = False
         self._connected = False
         self._page = None
         self._account_tier_cache = None
         self._account_tier_cache_at = 0.0
 
+        root_pid = self._chrome_proc.pid if self._chrome_proc is not None else None
+        tree = _chrome_process_tree(root_pid) if root_pid else set()
+        started = time.monotonic()
+        self._close_browser_gracefully()
         self._stop_playwright_session()
 
         adopted = self._chrome_proc is None and self._cdp_port is not None
         self._terminate_tracked_chrome()
         if adopted:
             self._close_unusable_profile_chrome()
+        self._end_process_tree(tree)
+        logger.info("Spotify player closed in %.1fs", time.monotonic() - started)
         self._cdp_port = None
         self._remove_devtools_active_port_file()
+
+    # ------------------------------------------------------------------
+    # Diagnostic (see music/spotify/diagnostic.py)
+    # ------------------------------------------------------------------
+    def diagnose(self) -> dict[str, Any]:
+        """Report each link of the chain. Never starts anything (thread-safe)."""
+        return self._in_cdp_thread(self._diagnose_impl)
+
+    def _diagnose_impl(self) -> dict[str, Any]:
+        self._refresh_bridge_cookies()
+        cached = get_cached_spotify_cookies(user_id=self._user_id)
+        pid = self.get_capture_chrome_pid() if self._cdp_port or self._chrome_proc is not None else None
+        report: dict[str, Any] = {
+            "in_app_sign_in": has_spotify_auth_cookie(cached),
+            "handed_over_cookie_count": len(cached),
+            "browser_running": bool(self._connected and self._page is not None),
+            "browser_pid": pid,
+            "window_visible": bool(pid and playback_window_visible(pid)),
+            "microsoft_account_in_profile": self._profile_has_microsoft_account(),
+            "player_sign_in_cookie": False,
+            "expected_to_play": False,
+        }
+        if not report["browser_running"]:
+            return report
+        report["player_sign_in_cookie"] = self._has_authenticated_spotify_cookies_impl()
+        status = self._login_status_impl()
+        report["page_auth_state"] = status.get("auth_state")
+        report["page_login_button"] = status.get("has_login_button")
+        report["page_user_widget"] = status.get("has_user_widget")
+        report["page_auth_failed"] = status.get("auth_failed")
+        report["page_login_modal"] = status.get("login_modal")
+        report["page_visibility"] = self._safe_evaluate("document.visibilityState", "visibility")
+        drm = self._drm_status_impl()
+        report["widevine_ok"] = bool(drm.get("ok"))
+        report["widevine_detail"] = drm.get("detail")
+        devices = self._web_player_devices()
+        report.update({"device_" + key: value for key, value in devices.items() if not key.startswith("_")})
+        report["other_device_active"] = bool(devices.get("other_device_active"))
+
+        first = self._safe_evaluate(_NOW_PLAYING_JS, "diagnostic now playing")
+        first_media = self._safe_evaluate(_MEDIA_TIME_JS, "diagnostic media time")
+        time.sleep(2.0)
+        second = self._safe_evaluate(_NOW_PLAYING_JS, "diagnostic now playing")
+        second_media = self._safe_evaluate(_MEDIA_TIME_JS, "diagnostic media time")
+        payload = second if isinstance(second, dict) else {}
+        widget_moved = _now_playing_position_seconds(second) - _now_playing_position_seconds(first)
+        media_moved = 0.0
+        if isinstance(first_media, (int, float)) and isinstance(second_media, (int, float)):
+            media_moved = float(second_media) - float(first_media)
+        moved = max(widget_moved, media_moved)
+        report["expected_to_play"] = bool(payload.get("is_playing"))
+        report["track_id"] = payload.get("track_id")
+        report["track_title_known"] = bool(payload.get("track"))
+        report["position_moved_s"] = round(moved, 2)
+        report["position_moving"] = moved >= 0.5
+        report["media_element_present"] = isinstance(second_media, (int, float))
+        return report
+
+    def _profile_has_microsoft_account(self) -> bool:
+        """Did Edge sign this profile in? Presence only; the account itself is not read out."""
+        try:
+            prefs = json.loads((self._profile_path / "Default" / "Preferences").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return False
+        return bool(prefs.get("account_info"))
+
+    @staticmethod
+    def _end_process_tree(pids: set[int]) -> None:
+        """Nothing of the player may outlive it: helpers hold the profile's files open."""
+        try:
+            import psutil
+        except ImportError:
+            return
+        procs = []
+        for pid in pids:
+            try:
+                proc = psutil.Process(pid)
+                proc.kill()
+                procs.append(proc)
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                continue
+        _gone, alive = psutil.wait_procs(procs, timeout=1)
+        if alive:
+            logger.info("Spotify player: %d process(es) still closing", len(alive))
+
+    def _close_browser_gracefully(self) -> None:
+        """Let the browser write its cookies before it goes.
+
+        A hard kill loses everything from the last 30 s, including a sign-in
+        that was just handed over (seen on real Edge, 2026-11).
+        """
+        if self._browser is None:
+            return
+        try:
+            self._browser.new_browser_cdp_session().send("Browser.close")
+            proc = self._chrome_proc
+            if proc is not None:
+                proc.wait(timeout=2)
+        except Exception as exc:
+            logger.debug("Graceful browser close failed: %s", exc)
 
     # ------------------------------------------------------------------
     # Multi-room ProcTap integration
