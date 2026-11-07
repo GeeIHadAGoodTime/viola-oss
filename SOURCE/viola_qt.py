@@ -938,7 +938,14 @@ def _ensure_qt_file_logging() -> None:
         # structured logger's own redaction, and this file is what users attach
         # to bug reports.
         try:
-            from diagnostics.observability_logging import RedactingFormatter as _LogFormatter
+            from diagnostics.observability_logging import (
+                RedactingFormatter as _LogFormatter,
+                RepeatCollapseFilter as _RepeatCollapseFilter,
+            )
+
+            # This is the file a bug report carries: one repeating line must
+            # not push the rest of the day out of it.
+            handler.addFilter(_RepeatCollapseFilter(handler))
         except ImportError:
             _LogFormatter = _logging.Formatter
         handler.setFormatter(

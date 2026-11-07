@@ -32,6 +32,12 @@ if (typeof window !== 'undefined' && !window.__violaChatModeNewChatListener) {
   });
 }
 
+// The server hands back the empty chat that is already there rather than adding
+// another, so the thread may be in the list.
+function withThreadFirst(threads, thread) {
+  return [thread, ...threads.filter((item) => item.id !== thread.id)];
+}
+
 function isUnconfirmedRequest(error) {
   return !error?.status || error.status >= 500;
 }
@@ -566,7 +572,7 @@ function ChatModeInner({
       body: JSON.stringify({ title: 'New chat', model: selectedModel || null }),
     });
     if (requestGenerationRef.current !== generation) return null;
-    setThreads((current) => [data.thread, ...current]);
+    setThreads((current) => withThreadFirst(current, data.thread));
     setActiveThread(data.thread);
     setActiveThreadId(data.thread.id);
     activeThreadIdRef.current = data.thread.id;
@@ -1009,7 +1015,7 @@ function ChatModeInner({
       body: JSON.stringify({ title: 'New chat', model: selectedModel || null }),
     }).then((data) => {
       if (requestGenerationRef.current !== generation) return;
-      setThreads((current) => [data.thread, ...current]);
+      setThreads((current) => withThreadFirst(current, data.thread));
       setActiveThreadId(data.thread.id);
       activeThreadIdRef.current = data.thread.id;
       setActiveThread(data.thread);

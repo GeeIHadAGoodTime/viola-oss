@@ -19,6 +19,11 @@ describe('customer month-gift facts', () => {
     expect(screen.getByText(/After complimentary access: Free/)).toBeInTheDocument();
     expect(screen.getByText(/does not restart the canceled subscription/)).toBeInTheDocument();
   });
+  it('does not say the plan twice when the status adds nothing', () => {
+    render(<MonthGiftSummary entitlement={{ ...projection,
+      base_subscription: { plan_id: 'free', status: 'free' } }} />);
+    expect(screen.getByText(/^Base subscription: Free\.$/)).toBeInTheDocument();
+  });
   it('distinguishes selected flexible level and future queued gifts from current access', () => {
     render(<MonthGiftSummary entitlement={{ ...projection, active_gift: null,
       queued_gifts: [{ ...gift, selected_level: 'flexible', monthly_price_cents: 3000, capacity_multiplier: 3 }] }} />);

@@ -179,8 +179,7 @@ function CommandsTab() {
       <SectionLabel>CALENDAR & EMAIL</SectionLabel>
       <CommandRow command={'"What\'s on my calendar today?"'} description="Read agenda" />
       <CommandRow command={'"Schedule dinner Friday at 7"'} description="Create an event" />
-      <CommandRow command={'"Read my unread email"'} description="Inbox summary" />
-      <CommandRow command={'"Reply to Sarah"'} description="Draft a reply" />
+      <CommandRow command={'"Email Sarah that I\'m running late"'} description="Sends after you say yes" />
 
       <SectionLabel>SMART HOME & BROWSER</SectionLabel>
       <CommandRow command={'"Turn off the bedroom lights"'} description="Smart-home control (if hub paired)" />

@@ -216,6 +216,14 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
         wcscat(cmd, tail);
     }
 
+    /*
+     * This shim is the only process with the user's click behind it: the app it
+     * starts takes seconds to reach its single-instance check and has lost the
+     * right to hand over the foreground by then. If Viola is already running,
+     * this grant is what lets it come to the front. Costs nothing otherwise.
+     */
+    AllowSetForegroundWindow(ASFW_ANY);
+
     STARTUPINFOW si;
     PROCESS_INFORMATION pi;
     ZeroMemory(&si, sizeof(si));

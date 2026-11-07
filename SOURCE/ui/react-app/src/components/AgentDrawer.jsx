@@ -1,11 +1,12 @@
 /* eslint react/jsx-uses-vars: "error" */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { THEME } from '../config';
 import AgentCard from './AgentCard';
 
 const TERMINAL_VISIBLE_MS = 3000;
 const MAX_VISIBLE_AGENTS = 5;
+const DRAWER_GAP_PX = 24;
 
 function isTerminalStatus(status) {
   return ['completed', 'cancelled', 'killed', 'error', 'failed'].includes(status);
@@ -75,6 +76,26 @@ export default function AgentDrawer({
     [active, recentCompleted, streamStates, now],
   );
 
+  // The drawer is fixed over the bottom of the window, so without this a card
+  // sat on top of the reply text (1.0.5 build 9, "Running a scheduled task").
+  const drawerRef = useRef(null);
+  const showing = rows.length > 0;
+  useLayoutEffect(() => {
+    const node = drawerRef.current;
+    if (!showing || !node) return undefined;
+    const root = document.documentElement;
+    const publish = () => {
+      root.style.setProperty('--agent-drawer-space', `${Math.ceil(node.getBoundingClientRect().height) + DRAWER_GAP_PX}px`);
+    };
+    publish();
+    const observer = typeof window.ResizeObserver === 'function' ? new window.ResizeObserver(publish) : null;
+    observer?.observe(node);
+    return () => {
+      observer?.disconnect();
+      root.style.removeProperty('--agent-drawer-space');
+    };
+  }, [showing, expanded]);
+
   if (rows.length === 0) {
     return null;
   }
@@ -84,6 +105,7 @@ export default function AgentDrawer({
 
   return (
     <aside
+      ref={drawerRef}
       aria-live="polite"
       aria-label="Background agents"
       style={{

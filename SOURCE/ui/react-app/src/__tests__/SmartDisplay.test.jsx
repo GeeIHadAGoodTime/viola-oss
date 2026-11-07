@@ -438,6 +438,10 @@ describe('Help keyboard isolation', () => {
     return document.querySelector('.viola-bottom-row [role="status"]');
   }
 
+  function stageDraft() {
+    return screen.getByTestId('stage-typing-field').value;
+  }
+
   it('does not start a hidden Music draft from typing inside Help', async () => {
     const { user } = render(<SmartDisplay />);
     const initialResponse = responseArea().textContent;
@@ -460,17 +464,17 @@ describe('Help keyboard isolation', () => {
   ])('preserves an existing Music draft on %s in Help', async (_name, keys) => {
     const { user } = render(<SmartDisplay />);
     await user.keyboard('draft');
-    expect(responseArea()).toHaveTextContent(/^draft$/);
+    expect(stageDraft()).toBe('draft');
     const { dialog, opener } = await openHelp(user);
     within(dialog).getByRole('button', { name: 'Commands' }).focus();
 
     await user.keyboard(keys);
 
     expect(apiHarness.sendCommandStreaming).not.toHaveBeenCalled();
-    expect(responseArea()).toHaveTextContent(/^draft$/);
+    expect(stageDraft()).toBe('draft');
     if (keys !== '{Escape}') await user.keyboard('{Escape}');
     expect(screen.queryByRole('dialog', { name: 'Help' })).not.toBeInTheDocument();
-    expect(responseArea()).toHaveTextContent(/^draft$/);
+    expect(stageDraft()).toBe('draft');
     expect(opener).toHaveFocus();
 
     // Once dismissed, the same document listener must resume editing/sending.
@@ -1157,8 +1161,7 @@ describe('SmartDisplay', () => {
       }));
     });
 
-    const responseArea = document.querySelector('.viola-bottom-row [role="status"]');
-    expect(responseArea.textContent).toBe(' a');
+    expect(screen.getByTestId('stage-typing-field').value).toBe(' a');
   });
 
   it('toggles mic_muted when the mute hotkey (default Ctrl+M) is pressed', () => {

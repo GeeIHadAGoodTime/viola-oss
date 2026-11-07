@@ -2,6 +2,19 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act, fireEvent, render, screen, waitFor } from '../test/test-utils';
 import ContentCard from './ContentCard';
 
+describe('ContentCard header', () => {
+  it('draws no ruled-off header on an untitled card', () => {
+    render(<ContentCard data={{ type: 'detail', body: 'A long answer.' }} onDismiss={vi.fn()} />);
+    expect(screen.getByTestId('content-card-header').style.borderBottom).toBe('');
+    expect(screen.getByRole('button', { name: 'Dismiss' })).toBeInTheDocument();
+  });
+
+  it('keeps the rule under a real title', () => {
+    render(<ContentCard data={{ type: 'detail', title: 'Weather', body: 'Sunny.' }} onDismiss={vi.fn()} />);
+    expect(screen.getByTestId('content-card-header').style.borderBottom).not.toBe('');
+  });
+});
+
 describe('ContentCard gate review cards', () => {
   beforeEach(() => {
     vi.restoreAllMocks();

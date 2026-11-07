@@ -151,6 +151,14 @@ def _ensure_parent_dir(path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
 
 
+def _file_already_holds(path: Path, payload: str) -> bool:
+    """True when ``path`` already has exactly this text. A failed read means no."""
+    try:
+        return path.read_text(encoding="utf-8") == payload
+    except (OSError, UnicodeError):
+        return False
+
+
 def _try_set_restrictive_perms(path: Path) -> None:
     """Restrict file permissions to the current user only (0o600 equivalent).
 
@@ -399,15 +407,31 @@ class SecureSettingsManager:
         if not self._encryption_enabled or self._cipher is None:
             raise SecurityError(f"Encryption unavailable: {self._disabled_reason or 'disabled'}")
 
+        cache_key = f"encrypted_{key}"
+        if self._holds_value(cache_key, value):
+            # Encrypting gives different bytes every time, so re-storing the
+            # same value would make the file look changed and get rewritten.
+            return True
+
         try:
             encrypted = self._cipher.encrypt(value.encode("utf-8"))
         except Exception as exc:
             logger.exception("Encryption failed: %s", exc)
             raise SecurityError("Encryption failed; value not stored.") from exc
 
-        self._encrypted_cache[f"encrypted_{key}"] = encrypted.decode("utf-8")
-        logger.info("Encrypted value stored.")
+        self._encrypted_cache[cache_key] = encrypted.decode("utf-8")
+        logger.debug("Encrypted value stored.")
         return True
+
+    def _holds_value(self, cache_key: str, value: str) -> bool:
+        """True when this entry already decrypts to ``value``."""
+        current = self._encrypted_cache.get(cache_key)
+        if not isinstance(current, str) or self._cipher is None:
+            return False
+        try:
+            return self._cipher.decrypt(current.encode("utf-8")) == value.encode("utf-8")
+        except Exception:  # noqa: BLE001, RUF100 - unreadable entry: store the value afresh
+            return False
 
     def get_secret(self, key: str) -> str | None:
         encrypted_key = f"encrypted_{key}"
@@ -472,6 +496,10 @@ class SecureSettingsManager:
         try:
             _ensure_parent_dir(file_path)
             payload = json.dumps(self._encrypted_cache, indent=2)
+            if _file_already_holds(file_path, payload):
+                # Nothing changed, and it is already durable: the store was
+                # rewritten 668 times in a day on a battery tablet (build 9).
+                return
             if strict:
                 with tempfile.NamedTemporaryFile(
                     mode="w",
@@ -488,7 +516,7 @@ class SecureSettingsManager:
                 pending_path = None
             else:
                 file_path.write_text(payload, encoding="utf-8")
-            logger.info("Encrypted cache saved.")
+            logger.debug("Encrypted cache saved.")
         except Exception as exc:
             logger.warning("Failed to save encrypted cache: %s", exc)
             if strict:

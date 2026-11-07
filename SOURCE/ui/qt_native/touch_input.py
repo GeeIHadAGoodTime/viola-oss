@@ -15,7 +15,9 @@ but three things a tablet user needs are not done by QtWebEngine itself:
   screen.
 * **Not typing behind the keyboard.** :func:`bottom_inset_for` turns that
   rectangle into how much of the window's bottom edge is covered, so the shell
-  can lift the page above a docked keyboard.
+  can lift the page above a docked keyboard. Windows reports nothing for a
+  floating keyboard, so :func:`floating_keyboard_rect` finds its window and
+  :func:`floating_inset_for` lifts the page above that too.
 
 Everything here is best effort: on any other platform, on a PC without a touch
 screen, or if a Windows call fails, the functions answer "no touch" / "no
@@ -108,6 +110,72 @@ def bottom_inset_for(window: Rect, occluded: Rect | None) -> int:
     if covered <= 0:
         return 0
     return int(min(covered, window.height / 2))
+
+
+def floating_inset_for(window: Rect, keyboard: Rect | None) -> int:
+    """How far to lift the page clear of a floating keyboard, in the same px.
+
+    A floating keyboard sits over the bottom of the window and hid the left
+    part of the field being typed in (1.0.5 build 9). One dragged up over the
+    top of the window cannot be cleared by lifting, so it is left alone.
+    """
+    if keyboard is None or keyboard.y < window.y + window.height * FLOATING_KEYBOARD_MIN_TOP_FRACTION:
+        return 0
+    return bottom_inset_for(window, keyboard)
+
+
+# Where Windows hosts the touch keyboard: (class, title), newest first. The
+# modern one is also found inside an ApplicationFrameWindow on some builds.
+_TEXT_INPUT_WINDOW = ("Windows.UI.Core.CoreWindow", "Microsoft Text Input Application")
+_LEGACY_KEYBOARD_WINDOW = ("IPTip_Main_Window", None)
+_DWMWA_CLOAKED = 14
+FLOATING_KEYBOARD_MIN_TOP_FRACTION = 0.3
+
+
+def _on_screen_rect(user32, dwmapi, hwnd: int) -> Rect | None:
+    """The window's rectangle in physical px, or None while it is not shown."""
+    from ctypes import wintypes
+
+    if not hwnd or not user32.IsWindowVisible(hwnd):
+        return None
+    cloaked = ctypes.c_int(0)
+    # Windows keeps this window around, cloaked, while the keyboard is hidden.
+    if dwmapi.DwmGetWindowAttribute(hwnd, _DWMWA_CLOAKED, ctypes.byref(cloaked), ctypes.sizeof(cloaked)) == 0:
+        if cloaked.value:
+            return None
+    rect = wintypes.RECT()
+    if not user32.GetWindowRect(hwnd, ctypes.byref(rect)):
+        return None
+    width, height = rect.right - rect.left, rect.bottom - rect.top
+    if width <= 0 or height <= 0:
+        return None
+    return Rect(float(rect.left), float(rect.top), float(width), float(height))
+
+
+def floating_keyboard_rect(user32=None, dwmapi=None) -> Rect | None:
+    """Where the touch keyboard's own window is, in physical px, or None.
+
+    Best effort, and a miss only means the page is not lifted. Never raises.
+    """
+    if user32 is None and sys.platform != "win32":
+        return None
+    try:
+        user32 = user32 or ctypes.WinDLL("user32")
+        dwmapi = dwmapi or ctypes.WinDLL("dwmapi")
+        candidates = [user32.FindWindowW(*_TEXT_INPUT_WINDOW), user32.FindWindowW(*_LEGACY_KEYBOARD_WINDOW)]
+        frame = 0
+        while True:
+            frame = user32.FindWindowExW(None, frame or None, "ApplicationFrameWindow", None)
+            if not frame:
+                break
+            candidates.append(user32.FindWindowExW(frame, None, *_TEXT_INPUT_WINDOW))
+        for hwnd in candidates:
+            rect = _on_screen_rect(user32, dwmapi, hwnd)
+            if rect is not None:
+                return rect
+    except (AttributeError, OSError, ValueError) as exc:
+        logger.debug("Touch keyboard window lookup failed: %s", exc)
+    return None
 
 
 class _GUID(ctypes.Structure):

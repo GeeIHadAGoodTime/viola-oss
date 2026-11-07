@@ -296,6 +296,16 @@ function getActiveStagePillMode(displayMode) {
   return 'music';
 }
 
+// The pill that is lit must match what is on the stage. An agent task with no
+// page yet keeps displayMode 'agentic_task' while the stage shows music, and the
+// globe pill stayed lit over the player (1.0.5 build 9).
+export function visibleStagePillMode(displayMode, stageContentMode) {
+  const pillMode = getActiveStagePillMode(displayMode);
+  return (pillMode === 'agent' || pillMode === 'browser') && stageContentMode !== 'browser'
+    ? stageContentMode
+    : pillMode;
+}
+
 // Decides which stage CONTENT actually renders, given the current display mode plus
 // live signals. Two rules the raw displayMode map can't express:
 //   1. A live phone call does NOT auto-steal the stage (founder direction
@@ -650,6 +660,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
   // calendar
   // =========================================================================
   const [displayMode, setDisplayMode] = useState('now_playing');
+  const stageContentModeRef = useRef('music');
   const [browserModeActive, setBrowserModeActive] = useState(false);
   const [browserUrl, setBrowserUrl] = useState('');
   const [calendarModeActive, setCalendarModeActive] = useState(false);
@@ -945,7 +956,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
     setDisplayMode('now_playing');
   }, [agentTaskActive]);
   const handleStageModeSelect = useCallback((nextMode) => {
-    const activeStageMode = getActiveStagePillMode(displayMode);
+    const activeStageMode = visibleStagePillMode(displayMode, stageContentModeRef.current);
     const targetMode = activeStageMode === nextMode || (nextMode === 'agent' && (activeStageMode === 'agent' || activeStageMode === 'browser'))
       ? 'music'
       : nextMode;
@@ -1168,6 +1179,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
   // Keyboard input state
   const [typingInput, setTypingInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const stageTypingFieldRef = useRef(null);
 
   const normalizeSettingsTab = useCallback((value) => {
     if (typeof value !== 'string' || !value.trim()) return null;
@@ -3197,7 +3209,10 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (settingsOpen || queueOpen || historyOpen || roomsOpen || helpOpen || bugReportOpen || workbenchPanelOpen || commandPaletteOpen) return;
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      // The stage's own field still ends here for Enter and Escape; everything
+      // else in it is ordinary text editing, Ctrl+A included.
+      const inStageField = e.target === stageTypingFieldRef.current;
+      if ((e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') && !inStageField) return;
       if (isHotkeyEvent(e, muteHotkey) && !isTyping && !e.repeat) {
         e.preventDefault();
         toggleMicMuted();
@@ -3232,13 +3247,14 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
         return;
       }
       if (e.key === 'Escape' && isTyping) { setTypingInput(''); setIsTyping(false); return; }
-      if (e.key === 'Backspace' && isTyping) {
+      if (e.key === 'Backspace' && isTyping && !inStageField) {
         e.preventDefault();
         setTypingInput(prev => { const newVal = prev.slice(0, -1); if (newVal.length === 0) setIsTyping(false); return newVal; });
         return;
       }
-      if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey && !inStageField) {
         e.preventDefault(); setIsTyping(true); setTypingInput(prev => prev + e.key);
+        stageTypingFieldRef.current?.focus();
         return;
       }
     };
@@ -3261,6 +3277,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
       e.preventDefault();
       setIsTyping(true);
       setTypingInput(prev => (prev + pasted).slice(0, STAGE_TYPING_MAX_CHARS));
+      stageTypingFieldRef.current?.focus();
     };
     document.addEventListener('keydown', handleKeyDown);
     document.addEventListener('keyup', handleKeyUp);
@@ -3274,13 +3291,14 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
 
   const formatTime = (date) => formatTimeDisplay(date, userSettings.time_display_format || 'auto');
   const formatDate = (date) => date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
-  const activeStagePillMode = getActiveStagePillMode(displayMode);
   const stageContentMode = resolveStageContentMode(displayMode, {
     activeCallId,
     browserModeActive,
     agentFrameSrc,
     browserUrl,
   });
+  stageContentModeRef.current = stageContentMode;
+  const activeStagePillMode = visibleStagePillMode(displayMode, stageContentMode);
   const isChatStageActive = stageContentMode === 'chat';
 
   // Native browser view (desktop): it may only sit on the browser stage with
@@ -3989,6 +4007,9 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
               isTyping={isTyping}
               typingInput={typingInput}
               setTypingInput={setTypingInput}
+              setIsTyping={setIsTyping}
+              typingFieldRef={stageTypingFieldRef}
+              typingMaxChars={STAGE_TYPING_MAX_CHARS}
               isCommandLoading={isCommandLoading}
               lastResponse={lastResponse}
               mainThinking={mainThinking}

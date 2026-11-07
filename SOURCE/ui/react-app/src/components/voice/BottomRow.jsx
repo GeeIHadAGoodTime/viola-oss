@@ -2,7 +2,7 @@
 /**
  * BottomRow — AI response area, PTT button, spoke chat, and connection status.
  */
-import { useId } from 'react';
+import { useEffect, useId } from 'react';
 import PropTypes from 'prop-types';
 import { useTranslation } from 'react-i18next';
 import { THEME } from '../../config';
@@ -41,6 +41,9 @@ const BottomRow = ({
   isTyping,
   typingInput,
   setTypingInput,
+  setIsTyping,
+  typingFieldRef,
+  typingMaxChars,
   isCommandLoading,
   lastResponse,
   mainThinking,
@@ -62,6 +65,12 @@ const BottomRow = ({
   const { t } = useTranslation();
   const micStatusId = useId();
 
+  // Typing is finished (sent, cancelled or emptied): give the keys back to the
+  // stage, so hotkeys and type-anywhere work again.
+  useEffect(() => {
+    if (!isTyping) typingFieldRef?.current?.blur();
+  }, [isTyping, typingFieldRef]);
+
   return (
     <div className={`viola-bottom-row ${styles.container}`}>
       {/* AI Response / Typing Input */}
@@ -69,16 +78,33 @@ const BottomRow = ({
         <div
           className={styles.responseArea}
           role={voice.error ? 'alert' : 'status'}
-          aria-live="polite"
+          aria-live={isTyping ? 'off' : 'polite'}
           aria-atomic="true"
           style={{ color: isTyping ? THEME.colors.textPrimary : THEME.colors.textTertiary }}
         >
-          {isTyping ? (
-            <span style={{ color: THEME.colors.textPrimary }}>
-              {typingInput}
-              <span className={styles.cursor} style={{ backgroundColor: THEME.colors.textSecondary }} />
-            </span>
-          ) : (
+          {/*
+            A real text field, always there. Type-anywhere used to draw the
+            letters into a span, so screen readers and Windows UI Automation
+            found no text box on the stage and Ctrl+A had nothing to select
+            (1.0.5 build 9 report). Until typing starts it stays out of sight
+            and out of the way of fingers, but Tab and assistive tech reach it.
+          */}
+          <input
+            ref={typingFieldRef}
+            type="text"
+            className={isTyping ? styles.typingField : styles.typingFieldIdle}
+            data-testid="stage-typing-field"
+            value={typingInput}
+            onChange={(event) => {
+              setTypingInput(event.target.value);
+              setIsTyping(event.target.value.length > 0);
+            }}
+            maxLength={typingMaxChars}
+            placeholder={t('voice.stage_field')}
+            aria-label={t('voice.stage_field')}
+            autoComplete="off"
+          />
+          {isTyping ? null : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: 0 }}>
               {mainThinking && (
                 <span
@@ -214,6 +240,9 @@ BottomRow.propTypes = {
   isTyping: PropTypes.bool.isRequired,
   typingInput: PropTypes.string.isRequired,
   setTypingInput: PropTypes.func.isRequired,
+  setIsTyping: PropTypes.func,
+  typingFieldRef: PropTypes.shape({ current: PropTypes.any }),
+  typingMaxChars: PropTypes.number,
   isCommandLoading: PropTypes.bool.isRequired,
   lastResponse: PropTypes.string.isRequired,
   mainThinking: PropTypes.string,

@@ -61,8 +61,8 @@ const theme = THEME;
 /**
  * Settings > System > Advanced: whether phones and tablets on this Wi-Fi can
  * reach Viola (Rooms). Applied immediately through /v1/network/lan-access, not
- * through the Save draft, because it opens or closes a network port. Opening
- * Rooms > Add Room turns it on; this is where the user can see and undo that.
+ * through the Save draft, because it opens or closes a network port. Start in
+ * Rooms > Add Room turns it on too; this is where the user can see and undo that.
  */
 function LanAccessSettingRow() {
   const [status, setStatus] = useState(null);
@@ -106,7 +106,7 @@ function LanAccessSettingRow() {
   return (
     <SettingRow
       title="Let devices on your Wi-Fi connect"
-      description="Lets phones and tablets on this Wi-Fi join as Rooms speakers. They still need the code from Rooms > Add Room. Turns on when you add a room."
+      description="Lets phones and tablets on this Wi-Fi join as Rooms speakers. They still need the code from Rooms > Add Room. Off until you start Rooms, and turns off again if nothing joins."
     >
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
         <Toggle
@@ -185,7 +185,7 @@ const TIER_OPTIONS = [
 
 const TIER_DESCRIPTIONS = {
   solo: 'Viola answers questions, plays music, searches the web, and manages your local calendar. No file access, no email, no browsing, no desktop control. The safest option for shared devices.',
-  ensemble: 'Viola can read your files, browse the web in a sandbox, and read email. Anything that modifies data requires your confirmation first.',
+  ensemble: 'Viola can read your files, browse the web in a sandbox, and send email you approve. Anything that modifies data requires your confirmation first.',
   symphony: 'Full access. Viola can write files, send emails, control your desktop, and browse with your saved passwords. Dangerous actions still require confirmation.',
 };
 
@@ -2276,7 +2276,7 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
                   <Section title="Agent Autonomy">
                     {/* Segmented control */}
                     <div style={{ padding: '16px 20px' }}>
-                      <div style={{
+                      <div role="group" aria-label="Agent autonomy" style={{
                         display: 'flex',
                         borderRadius: '12px',
                         border: `1px solid ${theme.colors.borderLight}`,
@@ -2287,6 +2287,8 @@ const SettingsModal = React.memo(function SettingsModal({ isOpen, onClose, initi
                           return (
                             <button
                               key={tier.id}
+                              type="button"
+                              aria-pressed={isActive}
                               onClick={() => {
                                 updateLocal('agent_autonomy', tier.id);
                                 // Derive browser_session_mode from autonomy mode
