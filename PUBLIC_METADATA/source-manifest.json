@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "c3691900c33deb2e9e5acc88d8df51b1eb83d607",
-  "sha256": "309872e1604831bb153944dec104aa28e93ba9a69a564176885617d5a4ba58f3",
+  "revision": "6f8a4c14a4f83d18535b4fd6dc459e9d68756653",
+  "sha256": "f82645a48e0a8b4adce5e80b2dd2512a0770f6a5ea9103208af526a458f4ca13",
   "files": [
     {
       "path": ".env.example",
@@ -4655,8 +4655,8 @@
     },
     {
       "path": "services/llm/prompts/viola_unified.py",
-      "sha256": "4b17549793de7f25ea740996fd97f7f66d69b7645c4a38f84780a6197bcd5559",
-      "bytes": 18535
+      "sha256": "17ae599638b0e3c9e29dff849352828d205559f9601c168dd7b6984e11d120db",
+      "bytes": 16428
     },
     {
       "path": "services/llm/provider_fallback.py",
