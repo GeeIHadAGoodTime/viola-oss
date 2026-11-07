@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "16abce021921fd6fd7aa730ddb34cee5458cbf5e",
-  "sha256": "7e4dfedfdc2068aa2f55d733e527fe62dcb0be43bdbb7cbea5215661fe51a226",
+  "revision": "ed850846ee62257a71780b9a51fb12a5d02e8286",
+  "sha256": "07376c080c9f4894fe627e87f9f8ff51022c1156d113a70a92257ccaeb96e285",
   "files": [
     {
       "path": ".env.example",
@@ -5440,8 +5440,8 @@
     },
     {
       "path": "services/violawake_client.py",
-      "sha256": "76427dda1de05877a41707e985b286aafae6e9b23d59c96eb841f2435859f37a",
-      "bytes": 32278
+      "sha256": "d9cbd39c018dca1ab943b7e05fa198f6b8f231084e52d84f53e23e47460fb72d",
+      "bytes": 33651
     },
     {
       "path": "services/wake_word/__init__.py",
@@ -9705,8 +9705,8 @@
     },
     {
       "path": "ui/api/routes/wake_training.py",
-      "sha256": "749bfd366c1ae0ed5b65a02881c768b961331b34f210aee9f7f0f01b725117fb",
-      "bytes": 30795
+      "sha256": "5393a91327e8069f42ffdff9f2c6bc1bd72ae647a4bbbcf45630e921f627255d",
+      "bytes": 30975
     },
     {
       "path": "ui/api/routes/weather.py",
@@ -13875,8 +13875,8 @@
     },
     {
       "path": "voice/wake_detector/violawake_listener.py",
-      "sha256": "9d5fe5d457bb315e7737ae919b3a6b609dc9f31ee58092b1a5fd7c8560d64e40",
-      "bytes": 186721
+      "sha256": "c45f6c1b0c5d697ea4c4f73b105e223de38261674b2e3ddc6d5a8d497d6281f9",
+      "bytes": 186939
     },
     {
       "path": "voice/wake_detector/wake/__init__.py",
