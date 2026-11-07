@@ -248,6 +248,26 @@ _BOT_PROTECTION_SIGNALS = (
 )
 
 
+# Words a person-check page uses that an ordinary page can also contain, so they
+# only count in the title or on a short page. Detection exists to hand the check
+# to the user; Viola never tries to pass one.
+_BOT_CHECK_PAGE_SIGNALS = (
+    "robot or human",
+    "press & hold",
+    "press and hold",
+    "verify you are human",
+    "verifying you are human",
+    "confirm you are human",
+    "confirm that you're human",
+    "are you a robot",
+    "not a robot",
+    "unusual traffic",
+    "security check",
+    "captcha",
+)
+_BOT_CHECK_SHORT_PAGE_CHARS = 6000
+
+
 def _count_interactive_refs(snapshot: str) -> int:
     """Count @eN refs in a snapshot (proxy for interactive elements)."""
     if not snapshot:
@@ -277,8 +297,13 @@ def detect_page_health(
     snapshot_lower = snapshot_str.lower()
 
     # --- Bot protection / WAF challenge pages (most important for loop halt) ---
+    title_lower = (title or "").lower()
     for signal in _BOT_PROTECTION_SIGNALS:
-        if signal in snapshot_lower:
+        if signal in snapshot_lower or signal in title_lower:
+            return {"status": "bot_protection", "matched_signal": signal}
+    short_page = len(snapshot_str) <= _BOT_CHECK_SHORT_PAGE_CHARS
+    for signal in _BOT_CHECK_PAGE_SIGNALS:
+        if signal in title_lower or (short_page and signal in snapshot_lower):
             return {"status": "bot_protection", "matched_signal": signal}
 
     # --- Parked / expired domain (text signals are more specific than iframe) ---

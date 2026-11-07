@@ -179,6 +179,8 @@ class BrowserOverlayController:
         # Told (previous_state, target) when the user closes the view; target
         # is the provider for a sign-in view, so a sign-in watcher can stop.
         self._user_close_listeners: list[Callable[[str, str], None]] = []
+        # Set for one broadcast when the page should no longer be offered again.
+        self._page_forgotten: bool = False
 
     # ------------------------------------------------------------------
     # Public API
@@ -249,6 +251,31 @@ class BrowserOverlayController:
                 except Exception:
                     logger.exception("Browser overlay user-close listener failed")
         return previous.value
+
+    def forget_page(self) -> None:
+        """The browser was closed on purpose: nothing is left to reopen.
+
+        The view can already be hidden (a finished task hides it and the globe
+        pill stays so it can be reopened), so this always tells React, which is
+        what takes the pill away ("close the browser" left it there, build 9).
+        """
+        self._last_agentic_url = ""
+        self._page_forgotten = True
+        self._broadcast()
+
+    def leave_open_for_user(self, *, status: str) -> None:
+        """Keep the view up after the task ends because the user still has to act.
+
+        Without this the end of a task hides the view and the user loses the page
+        they were asked to finish (a site's person check, build 9 High 13). Every
+        close path still works: the state stays AGENTIC, no longer busy.
+        """
+        if self._state != OverlayState.AGENTIC:
+            return
+        self._agent_busy = False
+        self._agent_task_status = status
+        self._agent_phase = "user_input"
+        self._broadcast()
 
     def add_user_close_listener(self, listener: Callable[[str, str], None]) -> None:
         """Call ``listener(previous_state, target)`` when the user closes the view.
@@ -425,6 +452,9 @@ class BrowserOverlayController:
                     "status": self._agent_task_status,
                     "phase": self._agent_phase,
                 }
+            if self._page_forgotten:
+                payload["page_forgotten"] = True
+                self._page_forgotten = False
             # Include outcome when hiding (for completion toasts)
             outcome = getattr(self, "_hide_outcome", "")
             if self._state == OverlayState.HIDDEN and outcome:

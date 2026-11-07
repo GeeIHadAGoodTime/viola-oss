@@ -762,6 +762,25 @@ _NO_PROGRESS_PAGE_HEALTH_STATUSES = frozenset({"bot_protection", "parked_or_expi
 # more managed-LLM turns waiting for one to "pass" on its own. Bounded
 # per the ticket's minimal-fix spec ("same page/state N times -> halt").
 _BOT_PROTECTION_HALT_STREAK = 3
+
+# A site's person check is for a person. Viola never solves or gets around one:
+# she leaves the page on screen, says so, and waits for the user to finish it.
+_BOT_CHECK_WAIT_SECONDS = 180.0
+_BOT_CHECK_POLL_SECONDS = 2.0
+_BOT_CHECK_NOTICE = (
+    "This site wants to check you're a person, and I can't do that for you. "
+    "The page is on your screen: please finish the check there and I'll carry on as soon as it's done."
+)
+_BOT_CHECK_DONE_NOTE = (
+    "[The user finished the site's person check in the browser view. Take a fresh browser_snapshot "
+    "and carry on with the task. If the site shows another check, it is theirs to do, not yours.]"
+)
+_BOT_CHECK_GIVEN_UP_NOTE = (
+    "[This site is showing a person check that the user did not finish (%s). Never try to solve or "
+    "get around it. Leave this site. If the request can be met at another store or site, use that one "
+    "and tell the user you switched. If it cannot, stop and tell the user plainly that the site needs "
+    "them to finish the check; the page stays open on their screen.]"
+)
 _MEMORY_ALL_SCOPE_PATHS = frozenset({"", "memory", "memory/", "MEMORY.md", "memory/MEMORY.md"})
 _MEMORY_SEARCH_ACTIONS = frozenset({"search", "grep"})
 _MEMORY_ENUMERATION_ACTIONS = frozenset({"read", "list"})
@@ -1680,6 +1699,139 @@ def _payment_gate_answer_with_confirm_url(
     return "%s\n%s" % (answer.rstrip(), url)
 
 
+_ORDER_WORD_RE = re.compile(r"[a-z0-9]{3,}")
+_ORDER_FILLER_WORDS = frozenset({"the", "and", "for", "with", "pack", "count", "each", "item", "items", "one", "new"})
+
+
+def _order_words(text: Any) -> set[str]:
+    return set(_ORDER_WORD_RE.findall(str(text or "").lower())) - _ORDER_FILLER_WORDS
+
+
+def _order_item_name(item: Any) -> str:
+    if isinstance(item, dict):
+        return str(item.get("name") or item.get("description") or "").strip()
+    return str(item or "").strip()
+
+
+def _order_item_seen_in(item: Any, others: list[Any]) -> bool:
+    words = _order_words(_order_item_name(item))
+    if not words:
+        return True
+    return any(len(words & _order_words(_order_item_name(other))) * 2 >= len(words) for other in others)
+
+
+def _reconcile_claimed_order(
+    order_summary: dict[str, Any],
+    claimed_items: Any,
+    claimed_total: str,
+    claimed_text: str = "",
+) -> None:
+    """Compare what the model claimed with what the store's page shows.
+
+    ``order_summary["items"]`` holds the page's items when they could be read. The
+    claim is only used when they could not, and the card then says so. Every
+    difference becomes a plain line in ``order_warnings``, shown above the pay button.
+    """
+    from services.payments.purchase_ceiling import parse_money_cents
+
+    claimed = claimed_items if isinstance(claimed_items, list) else []
+    page_items = order_summary.get("items")
+    warnings: list[str] = []
+    if isinstance(page_items, list) and page_items:
+        for item in claimed:
+            if not _order_item_seen_in(item, page_items):
+                warnings.append(
+                    "Viola thought this order had %s, but the store's page does not show it." % _order_item_name(item)
+                )
+        said = claimed or ([claimed_text] if claimed_text.strip() else [])
+        for item in page_items if said else []:
+            if not _order_item_seen_in(item, said):
+                warnings.append("The store's page shows %s, which Viola did not mention." % _order_item_name(item))
+    else:
+        if claimed:
+            order_summary["items"] = claimed
+        order_summary["items_source"] = "agent"
+        warnings.append(
+            "Viola could not read the items from the store's page. Check them on the page before you approve."
+        )
+    dom_total = str(order_summary.get("dom_total") or "").strip()
+    if claimed_total and dom_total:
+        claimed_cents = parse_money_cents(claimed_total)
+        page_cents = order_summary.get("dom_total_cents")
+        if claimed_cents is not None and page_cents is not None and abs(claimed_cents - int(page_cents)) > 1:
+            warnings.append("Viola said the total was %s, but the store's page says %s." % (claimed_total, dom_total))
+    if warnings:
+        order_summary["order_warnings"] = warnings
+
+
+def _payment_gate_answer_from_order(answer: str | None, order_summary: dict[str, Any] | None) -> str | None:
+    """Say what is being bought from the store's page, not from the model's summary."""
+    if not answer or not isinstance(order_summary, dict):
+        return answer
+    lines: list[str] = []
+    merchant = str(order_summary.get("merchant") or "").strip()
+    site = str(order_summary.get("site") or "").strip()
+    if merchant or site:
+        lines.append("Store: %s" % (" at ".join(part for part in (merchant, site) if part)))
+    items = order_summary.get("items")
+    if isinstance(items, list) and items:
+        rows: list[str] = []
+        for item in items:
+            name = _order_item_name(item)
+            if not name:
+                continue
+            quantity = item.get("quantity") if isinstance(item, dict) else None
+            price = str(item.get("price") or "").strip() if isinstance(item, dict) else ""
+            rows.append("- %s%s%s" % ("%s x " % quantity if quantity else "", name, " (%s)" % price if price else ""))
+        hidden = order_summary.get("items_not_listed")
+        if hidden:
+            rows.append("- and %s more on the store's page" % hidden)
+        if rows:
+            source = "On the store's page" if order_summary.get("items_source") == "page" else "Viola says"
+            lines.append("%s:\n%s" % (source, "\n".join(rows)))
+    total = str(order_summary.get("dom_total") or order_summary.get("total") or "").strip()
+    if total:
+        lines.append("Total: %s" % total)
+    if not lines:
+        return answer
+    for warning in order_summary.get("order_warnings") or []:
+        lines.append("Check this: %s" % warning)
+    prefix = _PAYMENT_GATE_PREFIX
+    return "%s%s" % ("%s " % prefix if str(answer).strip().startswith(prefix) else "", "\n".join(lines))
+
+
+_APPROVAL_TEXT_REASONS = {
+    "no_phone": "add and verify your phone under Settings > Account",
+    "no_consent": "turn on approval texts under Settings > Account",
+    "not_signed_in": "sign in to Viola first",
+    "cloud_not_configured": "texting is not available in this setup",
+    "cloud_unreachable": "Viola's service could not be reached",
+    "cloud_bad_response": "Viola's service gave an answer that could not be read",
+    "hosted_link_unavailable": "no link for your phone could be made",
+}
+
+
+def _payment_approval_ways_line(delivery: dict[str, Any] | None, link_note: str | None = None) -> str:
+    """Say both ways to approve, every time: on this device, and by a texted link.
+
+    ``link_note`` already says why there is no link for the phone, so it is not repeated.
+    """
+    if link_note:
+        return "You can approve here with Review and pay."
+    sms = delivery.get("sms_default") if isinstance(delivery, dict) else None
+    if isinstance(sms, dict) and (sms.get("sent") or sms.get("already_sent")):
+        return "You can approve here with Review and pay, or from the link I just texted to your phone."
+    reason = ""
+    if isinstance(sms, dict):
+        reason = str(
+            sms.get("user_message") or _APPROVAL_TEXT_REASONS.get(str(sms.get("reason") or sms.get("status"))) or ""
+        )
+    elif isinstance(delivery, dict):
+        reason = _APPROVAL_TEXT_REASONS.get(str(delivery.get("reason")), "")
+    reason = reason.rstrip(".") or "texting is not available right now"
+    return "You can approve here with Review and pay. I could not text you the approval link: %s." % reason
+
+
 async def _dispatch_payment_confirmation_link_for_executor(
     executor: Any,
     payment_confirmation_ctx: dict[str, Any] | None,
@@ -1940,17 +2092,19 @@ def _redacted_static_step_field(key: str, value: Any) -> Any:
 
 
 def _redact_step_data(step_data: dict[str, Any]) -> Any:
-    """``redact_card_data(step_data)``, reusing the redaction of unchanged tool-schema fields."""
+    """Card and personal data out of a step line, reusing the redaction of unchanged tool-schema fields."""
     static_keys = [key for key in _STEP_LOG_STATIC_FIELDS if isinstance(step_data.get(key), (dict, list))]
     if not static_keys:
-        return redact_card_data(step_data)
+        return redact_pii(redact_card_data(step_data))
     try:
         redacted_static = {key: _redacted_static_step_field(key, step_data[key]) for key in static_keys}
-        rest = redact_card_data({key: value for key, value in step_data.items() if key not in redacted_static})
+        rest = redact_pii(
+            redact_card_data({key: value for key, value in step_data.items() if key not in redacted_static})
+        )
     except Exception:  # noqa: BLE001, RUF100 - any surprise falls back to the plain whole-mapping redaction
-        return redact_card_data(step_data)
+        return redact_pii(redact_card_data(step_data))
     if not isinstance(rest, dict):
-        return redact_card_data(step_data)
+        return redact_pii(redact_card_data(step_data))
     return {key: redacted_static[key] if key in redacted_static else rest[key] for key in step_data}
 
 
@@ -3241,6 +3395,10 @@ class AgentExecutor:
         # observations across ANY browser tool call (see
         # _NO_PROGRESS_PAGE_HEALTH_STATUSES / _BOT_PROTECTION_HALT_STREAK).
         self._consecutive_bot_protection_signals: int = 0
+        # Sites whose person check the user left unfinished in this task, and
+        # whether the page on screen is still one when the task ends.
+        self._bot_check_given_up_hosts: set[str] = set()
+        self._bot_check_unresolved: bool = False
         self._memory_all_scope_no_match_queries: list[str] = []
         self._memory_enumeration_blocked_after_no_match: bool = False
         self._stuck_tool_compaction_attempted: bool = False
@@ -4990,6 +5148,8 @@ class AgentExecutor:
         self._tool_progress_consecutive_identical = {}
         self._tool_progress_script_probe_state = {"page_url": "", "count": 0}
         self._consecutive_bot_protection_signals = 0
+        self._bot_check_given_up_hosts = set()
+        self._bot_check_unresolved = False
         self._stuck_tool_compaction_attempted = False
         self._pending_stuck_tool_progress = None
         self._diagnostic_contexts = []
@@ -5585,7 +5745,7 @@ class AgentExecutor:
         except Exception:
             logger.debug("Task trace stop event write failed, continuing", exc_info=True)
         try:
-            line = json.dumps(redact_card_data(stop_data), default=str) + "\n"
+            line = json.dumps(redact_pii(redact_card_data(stop_data)), default=str) + "\n"
             step_log_path = self._get_structured_step_log_path()
             # Same ordered writer as the step and task_complete lines.
             _run_task_log_io(lambda: _write_structured_log_line(step_log_path, line))
@@ -5877,7 +6037,7 @@ class AgentExecutor:
                 "llm_total_input_tokens_seen": getattr(self, "_llm_total_input_tokens_seen", 0),
                 "responses_continuity_mode": getattr(self, "_last_continuity_mode", None),
             }
-            line = json.dumps(complete_data, default=str) + "\n"
+            line = json.dumps(redact_pii(redact_card_data(complete_data)), default=str) + "\n"
             step_log_path = self._get_structured_step_log_path()
             _run_task_log_io(lambda: _append_structured_log_line(jsonl_dir, step_log_path, line))
         except Exception:
@@ -7752,6 +7912,10 @@ class AgentExecutor:
             view_closed = False
         if view_closed:
             self._overlay_shown = False
+            self._bot_check_unresolved = False
+            forget = getattr(overlay, "forget_page", None)
+            if callable(forget):
+                forget()
         data = dict(result.data) if isinstance(result.data, dict) else {}
         data.setdefault("closed", bool(result.ok))
         data["view_closed"] = view_closed
@@ -11975,7 +12139,12 @@ class AgentExecutor:
         if self._overlay is None or not self._overlay_shown:
             return
         try:
-            self._overlay.hide(outcome=outcome)
+            if self._bot_check_unresolved and not self._cancelled:
+                # The user still has to finish the site's check: hiding the view
+                # here is what left them with no way to do it.
+                self._overlay.leave_open_for_user(status="bot_check")
+            else:
+                self._overlay.hide(outcome=outcome)
         except Exception as exc:
             logger.debug("Overlay hide failed: %s", exc)
         self._overlay_shown = False
@@ -12321,7 +12490,11 @@ class AgentExecutor:
                         'aside',
                     ]);
 
-                    const itemNodes = Array.from(document.querySelectorAll([
+                    const moneyRe = /[$\\u20ac\\u00a3]\\s?\\d[\\d,]*(?:\\.\\d{2})?/g;
+                    const notAnItem = /^(sub-?total|total|order total|estimated total|tax|taxes|estimated tax|shipping|delivery|fees?|discount|savings|tip|promo)\\b/i;
+                    const moneyIn = (text) => (text.match(moneyRe) || []);
+                    const shown = (el) => el.offsetParent !== null || getComputedStyle(el).position === 'fixed';
+                    const named = Array.from(document.querySelectorAll([
                         '[data-testid*="cart-item" i]',
                         '[data-testid*="order-item" i]',
                         '[data-testid*="line-item" i]',
@@ -12329,15 +12502,46 @@ class AgentExecutor:
                         '[class*="order-item" i]',
                         '[class*="line-item" i]',
                         '[class*="product" i]',
-                    ].join(',')));
+                    ].join(','))).filter(shown);
+                    // A list wrapper matches the same selectors as its rows: drop any
+                    // element that holds more prices than a row inside it, then any
+                    // element inside a row that stayed.
+                    const rowsOf = (nodes) => {
+                        const rows = nodes.filter((el) => !nodes.some((other) => other !== el
+                            && el.contains(other)
+                            && moneyIn(textOf(other)).length > 0
+                            && moneyIn(textOf(el)).length > moneyIn(textOf(other)).length));
+                        return rows.filter((el) => !rows.some((other) => other !== el && other.contains(el)));
+                    };
+                    let itemNodes = rowsOf(named);
+                    if (!itemNodes.some((el) => moneyIn(textOf(el)).length > 0)) {
+                        // Stores with no telling class names: any table row or list
+                        // item that carries a price.
+                        const generic = Array.from(document.querySelectorAll('tr, li, [role="row"], [role="listitem"]'))
+                            .filter((el) => shown(el) && moneyIn(textOf(el)).length > 0);
+                        const genericRows = rowsOf(generic);
+                        if (genericRows.length) itemNodes = genericRows;
+                    }
                     const items = [];
                     const seen = new Set();
+                    let itemCount = 0;
                     for (const el of itemNodes) {
                         const text = textOf(el);
-                        if (!text || text.length < 4 || text.length > 240 || seen.has(text)) continue;
+                        if (!text || text.length < 4 || text.length > 240 || notAnItem.test(text) || seen.has(text)) continue;
                         seen.add(text);
-                        items.push({name: text, description: text});
-                        if (items.length >= 8) break;
+                        itemCount += 1;
+                        if (items.length >= 20) continue;
+                        const prices = moneyIn(text);
+                        const field = el.querySelector('select, input[type="number"], input[name*="qty" i], input[name*="quantity" i]');
+                        const counted = text.match(/(?:qty|quantity)\\b\\W*(\\d+)/i) || text.match(/(?:^|\\s)[x\\u00d7]\\s?(\\d+)\\b/i) || text.match(/\\b(\\d+)\\s?[x\\u00d7](?:\\s|$)/i);
+                        const quantity = field && Number(field.value) > 0 ? Number(field.value) : (counted ? Number(counted[1]) : null);
+                        const name = norm(text.replace(moneyRe, ' ').replace(/(?:qty|quantity)\\b\\W*\\d+/ig, ' '));
+                        items.push({
+                            name: name || text,
+                            description: text,
+                            price: prices.length ? prices[prices.length - 1] : '',
+                            quantity,
+                        });
                     }
 
                     const domTotal = firstText([
@@ -12360,6 +12564,8 @@ class AgentExecutor:
                     return {
                         merchant: merchant,
                         items: items,
+                        item_count: itemCount,
+                        site: host,
                         summary_text: summaryText ? summaryText.slice(0, 700) : '',
                         dom_total: domTotal,
                         delivery_address: deliveryAddress,
@@ -12382,7 +12588,7 @@ class AgentExecutor:
             from services.payments.purchase_ceiling import parse_money_cents
 
             clean_items = []
-            for item in items[:8]:
+            for item in items[:20]:
                 if not isinstance(item, dict):
                     continue
                 name = str(item.get("name") or "").strip()
@@ -12404,6 +12610,14 @@ class AgentExecutor:
                 clean_items.append(clean_item)
             if clean_items:
                 order_summary["items"] = clean_items
+                order_summary["items_source"] = "page"
+                item_count = details.get("item_count")
+                if isinstance(item_count, int) and item_count > len(clean_items):
+                    order_summary["items_not_listed"] = item_count - len(clean_items)
+
+        site = str(details.get("site") or "").strip()
+        if site:
+            order_summary["site"] = site[:120]
 
         summary_text = str(details.get("summary_text") or "").strip()
         if summary_text and _is_generic_payment_order_text(str(order_summary.get("description") or "")):
@@ -12425,9 +12639,18 @@ class AgentExecutor:
         """Populate confirmation-page order fields before creating the session."""
 
         self._apply_payment_review_request_to_summary(order_summary)
+        # What the model says it is buying is a claim. A task can drift, so the
+        # card shows what the store's own page says, and says so when they differ.
+        claimed_items = order_summary.pop("items", None)
+        claimed_total = str(order_summary.get("total") or "").strip()
+        claimed_text = str(order_summary.get("description") or "")
         await self._extract_dom_order_details(page, order_summary)
         await self._extract_dom_total(page, order_summary)
         self._apply_context_delivery_address_to_summary(order_summary)
+        _reconcile_claimed_order(order_summary, claimed_items, claimed_total, claimed_text)
+        requested = str(getattr(self, "_agent_task_description", "") or "").strip()
+        if requested:
+            order_summary["requested"] = requested
 
     async def _prepare_payment_confirmation_session(self) -> dict[str, Any]:
         """Create the hosted payment confirmation session before AgentResult exists."""
@@ -13001,6 +13224,82 @@ class AgentExecutor:
             self._payment_gate_active = False
             self._hide_overlay(outcome="done")
 
+    async def _bot_check_still_showing(self) -> bool | None:
+        """True while the visible page is a person check; None when it cannot be read."""
+        try:
+            from mcp_servers.browser_cdp.server import visible_page_health
+
+            info = await visible_page_health()
+        except Exception as exc:
+            logger.debug("Reading the page during a person check failed: %s", exc)
+            return None
+        if not info:
+            return None
+        return (info.get("page_health") or {}).get("status") == "bot_protection"
+
+    async def _wait_for_user_bot_check(self) -> str:
+        """Wait for the user to finish the check. Returns done, closed, timeout or cancelled."""
+        overlay = self._overlay
+        clear_reads = 0
+        deadline = time.monotonic() + _BOT_CHECK_WAIT_SECONDS
+        while time.monotonic() < deadline:
+            if self._cancelled:
+                return "cancelled"
+            if getattr(overlay, "state", "agentic") == "hidden":
+                return "closed"
+            showing = await self._bot_check_still_showing()
+            # Two reads: these pages blank out and reload while they decide.
+            clear_reads = clear_reads + 1 if showing is False else 0
+            if clear_reads >= 2:
+                return "done"
+            await asyncio.sleep(_BOT_CHECK_POLL_SECONDS)
+        return "timeout"
+
+    async def _resolve_bot_check_after_tool(self, tool_name: str, tool_result: ToolResult) -> str | None:
+        """Hand a site's person check to the user, then tell the model how it went.
+
+        Runs after a browser tool reports the page is a check. Only a surface with
+        a view the user can reach can wait; elsewhere the streak halt stays. Returns
+        the note for the model, or None when there is nothing to add. Nothing here
+        touches the page: the user does the check, or it is not done.
+        """
+        if self._overlay is None or not tool_name.startswith("browser_"):
+            return None
+        if self._tool_progress_page_health_status(tool_result) != "bot_protection":
+            if tool_name.startswith("browser_") and isinstance(getattr(tool_result, "data", None), dict):
+                if tool_result.data.get("url"):
+                    self._bot_check_unresolved = False
+            return None
+        data = tool_result.data if isinstance(tool_result.data, dict) else {}
+        from urllib.parse import urlparse
+
+        url = str(data.get("url") or getattr(self, "_last_page_url", None) or "")
+        host = urlparse(url).hostname or url
+        self._bot_check_unresolved = True
+        if host in self._bot_check_given_up_hosts:
+            return _BOT_CHECK_GIVEN_UP_NOTE % "earlier in this task"
+
+        self._update_overlay_for_browser(url)
+        self._update_overlay_status("bot_check")
+        self._update_overlay_phase("user_input")
+        logger.info("Waiting for the user to finish a site's person check")
+        await self._speak(_BOT_CHECK_NOTICE)
+        outcome = await self._wait_for_user_bot_check()
+        logger.info("Person check wait ended: %s", outcome)
+        self._consecutive_bot_protection_signals = 0
+        if outcome == "cancelled":
+            return None
+        if outcome == "done":
+            self._bot_check_unresolved = False
+            self._update_overlay_status("working")
+            self._update_overlay_phase("acting")
+            return _BOT_CHECK_DONE_NOTE
+        self._bot_check_given_up_hosts.add(host)
+        if outcome == "closed":
+            self._bot_check_unresolved = False
+            return _BOT_CHECK_GIVEN_UP_NOTE % "they closed the page"
+        return _BOT_CHECK_GIVEN_UP_NOTE % ("no answer after %d seconds" % _BOT_CHECK_WAIT_SECONDS)
+
     async def _extract_dom_total(self, page: Any, order_summary: dict[str, Any]) -> None:
         """Attempt to extract the order total from the live checkout page DOM.
 
@@ -13200,6 +13499,21 @@ class AgentExecutor:
         if callable(stop):
             await stop()
 
+    def _visible_browser_page(self, preferred_url: str = "") -> Any:
+        """The page in the desktop's visible agent browser, when it is on the checkout."""
+        try:
+            from mcp_servers.browser_cdp.server import manager as visible_browser
+
+            if not visible_browser.is_connected:
+                return None
+            page = visible_browser.page
+        except (AttributeError, ImportError, RuntimeError):
+            logger.debug("Visible agent browser is not available for the checkout page")
+            return None
+        if preferred_url and not self._same_merchant_resume_page(self._page_url(page), preferred_url):
+            return None
+        return page
+
     async def _get_active_browser_page_from_cdp(self, preferred_url: str = "") -> Any:
         """Attach to the existing CDP-launched checkout browser and return its live page."""
         bridge = getattr(self, "_payment_cdp_bridge", None)
@@ -13209,6 +13523,14 @@ class AgentExecutor:
                 not preferred_url or self._same_merchant_resume_page(self._page_url(page), preferred_url)
             ):
                 return page
+
+        # On the desktop the checkout is in the visible browser the agent already
+        # drives. A second Playwright cannot start on the app's event loop and could
+        # not attach to Qt WebEngine anyway, so this method used to return None there
+        # and the approval card never saw the page: no items, no store total.
+        visible_page = self._visible_browser_page(preferred_url)
+        if visible_page is not None:
+            return visible_page
 
         try:
             from config.settings import settings

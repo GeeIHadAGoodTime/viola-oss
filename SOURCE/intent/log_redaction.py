@@ -2,11 +2,16 @@
 
 The card-data layer is intentionally narrow and deterministic: it masks
 PAN-shaped strings and card security codes before data reaches durable logs.
-The PII layer masks common low-ambiguity identifiers (email, phone, SSN).
+The PII layer masks common identifiers (email, phone, SSN, street address).
+
+Street addresses are recognised by shape (house number, street name, street
+type) plus the address fields of structured payloads, and over-masking a log
+line is the accepted cost: Viola logged the home address given for an order
+while masking the phone number next to it (1.0.5 build 9).
 
 Not redacted by default:
-- Names and street addresses, because precision is poor without a structured
-  address parser and false positives would damage replay/debug value.
+- Names, because precision is poor and false positives would damage replay/debug
+  value.
 - Expiration dates, because month/year alone has low standalone risk and is
   often needed to debug checkout form routing.
 """
@@ -59,6 +64,33 @@ _PHONE_RE = re.compile(r"(?<![\w/-])(?:\+?1[-.\s]?)?(?:\(\d{3}\)|\d{3})[-.\s]?\d
 _SSN_RE = re.compile(r"(?<![\w-])\d{3}-\d{2}-\d{4}(?![\w-])")
 _IPV4_RE = re.compile(r"(?<![\w.])(?:\d{1,3}\.){3}\d{1,3}(?![\w.])")
 _PHONE_CONTEXT_CHARS = frozenset("0123456789+().- ")
+# "7228 W Honeycreek Dr", "four two one one north main street", "12 Oak Ave Apt 3,
+# Milwaukee, WI 53219", and the same in a URL query ("7228+W+Honeycreek+Dr"). The
+# number must stand alone, so "76th Street" (a place name) is left alone.
+_ADDRESS_GAP = r"(?:[\s+]|%20)+"
+_ADDRESS_NUMBER_WORD = r"(?:zero|oh|one|two|three|four|five|six|seven|eight|nine)"
+_ADDRESS_NOT_NAME = r"(?!(?:the|of|in|to|for|a|an|and|is|on|at|by|with|from|or|as|it|this|that)\b)"
+_ADDRESS_STREET_TYPE = (
+    r"(?:street|st|avenue|ave|road|rd|boulevard|blvd|drive|dr|lane|ln|court|ct|way|place|pl|"
+    r"circle|cir|terrace|ter|highway|hwy|parkway|pkwy|trail|trl|square|sq|loop|alley|aly|crossing|xing|run|pike)"
+)
+_STREET_ADDRESS_RE = re.compile(
+    r"(?i)(?<![\w.,:/#$-])"
+    r"(?:\d{1,6}[a-z]?|%(word)s(?:[\s-]+%(word)s){1,6})"
+    r"(?:%(gap)s(?:n|s|e|w|ne|nw|se|sw|north|south|east|west)\.?)?"
+    r"(?:%(gap)s%(not_name)s[a-z][a-z'.-]*|%(gap)s\d{1,3}(?:st|nd|rd|th)){1,4}?"
+    r"%(gap)s%(street_type)s\b\.?"
+    r"(?:,?%(gap)s(?:apt|apartment|unit|suite|ste|#)\.?%(gap)s?[\w-]{1,6})?"
+    r"(?:,?%(gap)s[a-z][a-z.-]*(?:%(gap)s[a-z][a-z.-]*)?,?%(gap)s[a-z]{2}%(gap)s\d{5}(?:-\d{4})?)?"
+    % {
+        "word": _ADDRESS_NUMBER_WORD,
+        "gap": _ADDRESS_GAP,
+        "not_name": _ADDRESS_NOT_NAME,
+        "street_type": _ADDRESS_STREET_TYPE,
+    }
+)
+_CITY_STATE_ZIP_RE = re.compile(r"\b[A-Z][a-z]+(?: [A-Z][a-z]+)?, [A-Z]{2},? \d{5}(?:-\d{4})?\b")
+_LABELLED_ZIP_RE = re.compile(r"(?i)\b(zip(?:[\s_-]?code)?|postal[\s_-]?code)\b([\s\"':=]+)\d{5}(?:-\d{4})?\b")
 # A phone number as speech-to-text writes it when Viola reads one back ("plus 1,
 # 4, 1, 4, 5, 5, 5, ...", "+1, 414, 555, 1234", "four one four five five five
 # ...") or as an E.164 string outside the US layout ("+447946095812"). The plain
@@ -77,6 +109,7 @@ _REDACTED_EMAIL = "[REDACTED:EMAIL]"
 _REDACTED_PHONE = "[REDACTED:PHONE]"
 _REDACTED_SSN = "[REDACTED:SSN]"
 _REDACTED_IP = "[REDACTED:IP]"
+_REDACTED_ADDRESS = "[REDACTED:ADDRESS]"
 _REDACTED_SANITIZER_ERROR = "[REDACTED:SANITIZER_ERROR]"
 _REDACTED_CYCLE = "[REDACTED:CYCLE]"
 _REDACTED_MAX_DEPTH = "[REDACTED:MAX_DEPTH]"
@@ -137,6 +170,29 @@ _PHONE_CONTEXT_KEYS = {
 _SSN_KEYS = {
     "ssn",
     "socialsecuritynumber",
+}
+# Normalized field names. Plain "address" is not here: it also means IP and mail
+# addresses, and its value still gets the text patterns.
+_ADDRESS_KEYS = {
+    "street",
+    "streetaddress",
+    "street1",
+    "street2",
+    "line1",
+    "line2",
+    "addressline1",
+    "addressline2",
+    "address1",
+    "address2",
+    "deliveryaddress",
+    "shippingaddress",
+    "billingaddress",
+    "homeaddress",
+    "mailingaddress",
+    "zip",
+    "zipcode",
+    "postcode",
+    "postalcode",
 }
 
 
@@ -505,11 +561,18 @@ def _redact_spoken_phone(value: str) -> str:
     return _SPOKEN_PHONE_RUN_RE.sub(_replace_spoken_phone, redacted)
 
 
+def _redact_street_address(value: str) -> str:
+    redacted = _STREET_ADDRESS_RE.sub(_REDACTED_ADDRESS, value)
+    redacted = _CITY_STATE_ZIP_RE.sub(_REDACTED_ADDRESS, redacted)
+    return _LABELLED_ZIP_RE.sub(lambda match: match.group(1) + match.group(2) + _REDACTED_ADDRESS, redacted)
+
+
 def _redact_pii_string(value: str) -> str:
     redacted = _EMAIL_RE.sub(_REDACTED_EMAIL, value)
     redacted = _PHONE_RE.sub(_replace_phone, redacted)
     redacted = _redact_spoken_phone(redacted)
     redacted = _SSN_RE.sub(_REDACTED_SSN, redacted)
+    redacted = _redact_street_address(redacted)
     return mask_secrets_in_text(_IPV4_RE.sub(_replace_ipv4, redacted), include_card_data=False)
 
 
@@ -519,10 +582,14 @@ def _redact_pii_any(value: Any, key_path: tuple[str, ...], seen: set[int], depth
     if isinstance(value, str):
         if key_path and key_path[-1] in _SSN_KEYS:
             return _REDACTED_SSN
+        if key_path and key_path[-1] in _ADDRESS_KEYS and value.strip():
+            return _REDACTED_ADDRESS
         return _redact_pii_string(value)
     if isinstance(value, int) and not isinstance(value, bool):
         if key_path and key_path[-1] in _SSN_KEYS:
             return _REDACTED_SSN
+        if key_path and key_path[-1] in _ADDRESS_KEYS:
+            return _REDACTED_ADDRESS
         return value
     if isinstance(value, Path):
         return str(value)
@@ -583,8 +650,8 @@ def _redact_pii_any(value: Any, key_path: tuple[str, ...], seen: set[int], depth
 def redact_pii(blob: dict[str, Any] | str) -> dict[str, Any] | str:
     """Return a copy of *blob* with low-ambiguity PII masked.
 
-    This masks email addresses, US-style phone numbers, and SSNs. It does not
-    attempt to detect names or street addresses.
+    This masks email addresses, US-style phone numbers, SSNs and street
+    addresses. It does not attempt to detect names.
     """
 
     try:

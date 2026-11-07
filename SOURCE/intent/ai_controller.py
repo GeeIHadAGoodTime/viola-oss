@@ -25,6 +25,7 @@ from core.logging_config import get_logger
 from diagnostics.bus import get_diagnostics_bus
 
 # Q-002: _strip_json_template and helpers moved to intent.response_cleanup
+from intent.gate_protocol import gate_message_body
 from intent.response_cleanup import strip_json_template as _strip_json_template
 from intent.tools.deferred_tool_schemas import format_deferred_tools_block
 from services.conversation import (
@@ -531,6 +532,9 @@ async def _dispatch_payment_gate_card(
     if not confirmation_url:
         return existing_delivery
     if _payment_link_delivery_reached_user(existing_delivery):
+        return existing_delivery
+    if isinstance(existing_delivery, dict) and existing_delivery.get("status") == "local_only":
+        # The link on the card only works on this computer: never mail or text it.
         return existing_delivery
     try:
         from services.payments.confirmation_link_dispatch import (
@@ -3217,7 +3221,9 @@ class AIController:
                 }
             # Payment gate: agent stopped before committing money
             if agent_result.payment_gate:
-                payment_msg = agent_result.answer or "Your order is ready for review."
+                payment_msg = (
+                    gate_message_body(agent_result.answer, "payment") or "Your order is ready for review."
+                )
                 confirmation_url = getattr(agent_result, "confirmation_url", None)
                 origin_channel = getattr(agent_result, "origin_channel", None)
                 payment_card = _build_gate_card(

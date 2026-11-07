@@ -5013,6 +5013,20 @@ async def run_agent_loop(
                 except (AttributeError, RuntimeError, TypeError, ValueError):
                     logger.debug("Repeated tool progress tracking failed", exc_info=True)
 
+                # A site's person check: the user does it, the loop waits, and the
+                # model reads how it went with this tool's result.
+                bot_check_note = await executor._resolve_bot_check_after_tool(tc_name, tool_result)
+                if bot_check_note:
+                    executor._pending_stuck_tool_progress = None
+                    latest_result = tool_results_content[-1]
+                    if isinstance(latest_result["content"], list):
+                        latest_result["content"] = [
+                            *latest_result["content"],
+                            {"type": "text", "text": bot_check_note},
+                        ]
+                    else:
+                        latest_result["content"] = "%s\n\n%s" % (latest_result["content"], bot_check_note)
+
                 # â”€â”€ Post-execution bookkeeping via middleware pipeline â”€â”€
                 # Browser tier tracking (lightweight, not worth a middleware)
                 if tc_name == "check_api_registry":
@@ -5528,18 +5542,28 @@ async def run_agent_loop(
                     payment_confirmation_ctx = await executor._prepare_payment_confirmation_session()
                     from intent.agent_executor import (
                         _dispatch_payment_confirmation_link_for_executor,
+                        _payment_approval_ways_line,
+                        _payment_gate_answer_from_order,
                         _payment_gate_answer_with_confirm_url,
                     )
 
+                    final_answer = _payment_gate_answer_from_order(
+                        final_answer,
+                        payment_confirmation_ctx.get("order_summary"),
+                    )
+                    delivery = await _dispatch_payment_confirmation_link_for_executor(
+                        executor,
+                        payment_confirmation_ctx,
+                        str(payment_confirmation_ctx.get("url") or ""),
+                    )
+                    final_answer = "%s\n%s" % (
+                        final_answer,
+                        _payment_approval_ways_line(delivery, payment_confirmation_ctx.get("link_note")),
+                    )
                     final_answer = _payment_gate_answer_with_confirm_url(
                         final_answer,
                         str(payment_confirmation_ctx.get("url") or ""),
                         payment_confirmation_ctx.get("link_note"),
-                    )
-                    await _dispatch_payment_confirmation_link_for_executor(
-                        executor,
-                        payment_confirmation_ctx,
-                        str(payment_confirmation_ctx.get("url") or ""),
                     )
                     _set_final_response(executor, final_answer, continue_listening=False)
                 except _PaymentConfirmationGateRefused as exc:

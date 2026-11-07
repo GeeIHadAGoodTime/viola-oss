@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import inspect
 import sys
 import threading
 import time
@@ -199,6 +200,59 @@ class _DriverLoop:
         if thread is not None:
             with contextlib.suppress(Exception):
                 await asyncio.get_running_loop().run_in_executor(None, thread.join, 10.0)
+
+
+class _DriverBound:
+    """A Playwright object whose calls run on the driver loop, from any thread.
+
+    The browser tools reach Playwright through ``manager.page`` on the app's
+    loop, but the objects belong to the driver loop. Awaiting one from the wrong
+    loop does not fail: the reply arrives on the driver thread and wakes nothing,
+    so the call only finishes when something else happens to wake the caller's
+    loop (it never finishes on an otherwise idle loop). Every async call and
+    every object reached through this proxy is therefore marshalled to the
+    driver, the same rule ``_DriverLoop`` states for this client's own methods.
+    """
+
+    __slots__ = ("_driver", "_target")
+
+    def __init__(self, target: Any, driver: _DriverLoop) -> None:
+        self._target = target
+        self._driver = driver
+
+    @property
+    def wrapped_type(self) -> type:
+        """The Playwright class behind this proxy, for code that checks a method's signature."""
+        return type(self._target)
+
+    def __getattr__(self, name: str) -> Any:
+        return _bind_to_driver(getattr(self._target, name), self._driver)
+
+    def __call__(self, *args: Any, **kwargs: Any) -> Any:
+        plain_args = [item._target if isinstance(item, _DriverBound) else item for item in args]
+        plain_kwargs = {key: item._target if isinstance(item, _DriverBound) else item for key, item in kwargs.items()}
+        outcome = self._target(*plain_args, **plain_kwargs)
+        if inspect.isawaitable(outcome):
+            return self._await_on_driver(outcome)
+        return _bind_to_driver(outcome, self._driver)
+
+    async def _await_on_driver(self, awaitable: Any) -> Any:
+        async def _await() -> Any:
+            return await awaitable
+
+        return _bind_to_driver(await self._driver.run(_await), self._driver)
+
+    def __repr__(self) -> str:
+        return "_DriverBound(%r)" % (self._target,)
+
+
+def _bind_to_driver(value: Any, driver: _DriverLoop) -> Any:
+    """Wrap Playwright objects, bound methods and lists of them; pass data through."""
+    if isinstance(value, list):
+        return [_bind_to_driver(item, driver) for item in value]
+    if inspect.ismethod(value) or type(value).__module__.startswith("playwright."):
+        return _DriverBound(value, driver)
+    return value
 
 
 async def _install_no_os_credential_ui(page: Any) -> None:
@@ -431,6 +485,11 @@ class PlaywrightCDPClient:
                 "reachable."
             )
         return self._page
+
+    @property
+    def bound_page(self) -> Any:
+        """The page for callers on any loop; see ``_DriverBound``."""
+        return _DriverBound(self.page, self._driver)
 
     async def navigate(self, url: str) -> dict[str, Any]:
         try:
