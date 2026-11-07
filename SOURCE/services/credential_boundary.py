@@ -65,6 +65,9 @@ _TIER3_VALUE_MARKERS: frozenset[str] = frozenset(
     }
 )
 _PAYMENT_CARD_PAN_RE = re.compile(r"(?<!\d)(?:\d[ -]?){13,19}(?!\d)")
+# A UUID's digit groups can read as a card number: about 1 random UUID in 3,700
+# did, and a user id like that lost every relayed turn to the desktop.
+_UUID_RE = re.compile(r"\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b", re.IGNORECASE)
 _RAW_TIER3_KEY_RE = re.compile(
     rb'(?i)(["\'])(?:access[_-]?token|api[_-]?key|authorization|auth[_-]?token|bearer|browser[_-]?profile|'
     rb"client[_-]?secret|cookies?|credentials?|cvc|cvv|id[_-]?token|oauth|pan|password|private[_-]?key|"
@@ -188,7 +191,7 @@ def is_plausible_card_pan(digits: str) -> bool:
 def contains_payment_card_pan(value: object) -> bool:
     if not isinstance(value, str):
         return False
-    for match in _PAYMENT_CARD_PAN_RE.finditer(value):
+    for match in _PAYMENT_CARD_PAN_RE.finditer(_UUID_RE.sub(" ", value)):
         digits = "".join(character for character in match.group(0) if character.isdigit())
         if is_plausible_card_pan(digits):
             return True
@@ -218,6 +221,8 @@ def is_tier3_credential_value(value: object) -> bool:
         return True
     if any(marker in lowered for marker in _TIER3_VALUE_MARKERS):
         return True
+    if _UUID_RE.fullmatch(stripped):
+        return False
     return contains_maskable_secret(stripped) or contains_payment_card_pan(stripped)
 
 

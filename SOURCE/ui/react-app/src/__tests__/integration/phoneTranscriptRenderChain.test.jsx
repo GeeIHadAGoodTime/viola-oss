@@ -404,9 +404,10 @@ describe('transcript render chain: local socket -> PhoneCallPanel (Refs #1529)',
       partial: false,
       ts: 12,
     }));
+    // Viola's line is revealed at speaking pace, so the final takes a moment to show whole.
     await waitFor(() => {
       expect(renderedTranscriptLines()).toEqual(["Hi, I'd like to order a large pepperoni"]);
-    });
+    }, { timeout: 5000 });
     // A final over a partial replaces it: one turn, one bubble.
     expect(within(pane).queryByText("Hi, I'd like to order")).not.toBeInTheDocument();
   });

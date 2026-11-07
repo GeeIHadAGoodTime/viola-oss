@@ -106,6 +106,7 @@ vi.mock('../hooks/usePlayerState', () => ({
     setAgentFrameCallback: vi.fn(),
     setPlaybackCommandCallback: vi.fn((callback) => { playerHarness.playbackCommandCallback = callback; }),
     setChatResponseCallback: vi.fn((callback) => { playerHarness.chatResponseCallback = callback; }),
+    setReplyPartialCallback: vi.fn((callback) => { playerHarness.replyPartialCallback = callback; }),
     setCalendarUpdateCallback: vi.fn(),
     setDisconnectCallback: vi.fn((callback) => { playerHarness.disconnectCallback = callback; }),
     getWsDebug: vi.fn(() => ({})),
@@ -2114,6 +2115,39 @@ it('review: preserves voice history across same-principal auth object refreshes'
   rerender(<SmartDisplay />);
   const dialog = await openReviewHistory(user);
   expect(await within(dialog).findByText('Current principal history')).toBeInTheDocument();
+});
+
+const LONG_ANSWER = `${'A long answer that goes on for a while. '.repeat(6)}The end.`;
+
+it('shows a long unspoken answer in a card at once, with only a lead on the stage line', async () => {
+  render(<SmartDisplay />);
+  await waitFor(() => expect(playerHarness.chatResponseCallback).toBeTypeOf('function'));
+  act(() => { playerHarness.chatResponseCallback({ text: LONG_ANSWER }); });
+  const card = await screen.findByRole('dialog');
+  expect(card).toHaveTextContent('The end.');
+  expect(screen.getByTestId('content-card-backdrop')).toBeInTheDocument();
+  expect(document.querySelector('.viola-bottom-row')).not.toHaveTextContent('The end.');
+});
+
+it('holds a long spoken answer card until the stage has finished revealing it', async () => {
+  render(<SmartDisplay />);
+  await waitFor(() => expect(playerHarness.replyPartialCallback).toBeTypeOf('function'));
+  vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'Date'] });
+  try {
+    act(() => {
+      playerHarness.replyPartialCallback({ turn: 'turn-1', text: LONG_ANSWER, spoken: true });
+    });
+    act(() => { vi.advanceTimersByTime(1000); });
+    act(() => { playerHarness.chatResponseCallback({ text: LONG_ANSWER }); });
+    act(() => { vi.advanceTimersByTime(1000); });
+    expect(screen.queryByTestId('content-card-backdrop')).not.toBeInTheDocument();
+    expect(screen.getByTestId('live-reply')).not.toHaveTextContent('The end.');
+    act(() => { vi.advanceTimersByTime(20000); });
+    expect(screen.getByTestId('content-card-backdrop')).toBeInTheDocument();
+    expect(screen.getByRole('dialog')).toHaveTextContent('The end.');
+  } finally {
+    vi.useRealTimers();
+  }
 });
 
 it.each(['websocket-first', 'http-first'])('records one reply in Chat History when the broadcast and the command result both arrive (%s)', async order => {
