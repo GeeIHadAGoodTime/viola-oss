@@ -63,6 +63,7 @@ from intent.gate_protocol import (
 )
 from intent.hooks import HookEvent, dispatch as _dispatch_hook, hook_result_frames
 from intent.irreversible_actions import (
+    SMART_HOME_CONTROL_CLASS,
     browser_send_action_class,
     describe_browser_send,
     describe_irreversible_action,
@@ -3399,6 +3400,10 @@ class AgentExecutor:
         self._tool_timeout = tool_timeout
         self._overlay = overlay_controller
         self._depth = depth
+        # A helper's task is written by the model; device control in a helper
+        # is checked against the user's own words for the turn that started it.
+        self._turn_user_request = ""
+        self._turn_device_context: dict[str, Any] | None = None
         self._parent_task_id = parent_task_id
         self.task_id = str(parent_task_id or generate_task_id())
         normalized_user_id = (user_id or "").strip()
@@ -8393,6 +8398,8 @@ class AgentExecutor:
             allowed_tools=child_allowed_tools,
         )
         child.task_id = child_agent_id
+        child._turn_user_request = self._device_control_user_words()
+        child._turn_device_context = self._device_control_conversation()
 
         external_cancel_relay: asyncio.Task[None] | None = None
         if external_cancel_event is not None:
@@ -8779,12 +8786,18 @@ class AgentExecutor:
         return schema if isinstance(schema, dict) else {}
 
     def _irreversible_confirmation_class(self, tool_name: str, tool_args: dict[str, Any]) -> str | None:
-        action_class = gate_action_class(
-            tool_name,
-            tool_args,
-            self._irreversible_tool_schema(tool_name),
-            tainted=_content_context_is_tainted(),
-        )
+        schema = self._irreversible_tool_schema(tool_name)
+        tainted = _content_context_is_tainted()
+        action_class = gate_action_class(tool_name, tool_args, schema, tainted=tainted)
+        if (
+            action_class is None
+            and not tainted
+            and self._depth > 0
+            and irreversible_action_class(tool_name, tool_args, schema) == SMART_HOME_CONTROL_CLASS
+        ):
+            # A helper starts with a clean taint tracker and a model-written
+            # task, so its device control is checked like a tainted turn's.
+            action_class = SMART_HOME_CONTROL_CLASS
         if action_class is None and str(tool_name or "").startswith("browser_"):
             # Clicking Send in webmail / chat / social sites in the agent
             # browser sends a message too, so it asks first (1.0.5 A6.5).
@@ -9082,6 +9095,115 @@ class AgentExecutor:
         if result is not None:
             await self._broadcast_paid_action_gate(tool_name, result)
         return result
+
+    def _device_control_user_words(self) -> str:
+        """The user's own words for this turn (a helper gets its parent's)."""
+        if self._depth > 0:
+            return str(getattr(self, "_turn_user_request", "") or "")
+        try:
+            from intent.content_sanitizer import active_taint_tracker
+
+            return str(getattr(active_taint_tracker(), "user_request", "") or "")
+        except ImportError:  # pragma: no cover - same package
+            return ""
+
+    def _device_control_conversation(self) -> dict[str, Any]:
+        """What the device check may weigh besides this turn's words (a helper gets its parent's).
+
+        ``earlier_words``: what the user wrote earlier in this conversation (their
+        own input frames only). ``suggestion``: Viola's message right before this
+        turn, so "yes" to "want me to turn on the kitchen light?" counts (founder
+        rule 2026-11-07). ``suggestion_after_content``: whether a web, email,
+        calendar, memory or file result came before that message, in which case
+        it may repeat what the content said (structural, by tool name).
+        """
+        if self._depth > 0:
+            return dict(getattr(self, "_turn_device_context", None) or {})
+        empty: dict[str, Any] = {"earlier_words": "", "suggestion": "", "suggestion_after_content": True}
+        try:
+            from intent.content_sanitizer import is_untrusted_content_source
+            from services.conversation.state_manager import get_request_conversation_manager
+
+            manager = get_request_conversation_manager() or getattr(self, "_conversation_state_manager", None)
+            get_window = getattr(manager, "get_prompt_window", None)
+            frames = list(get_window().frames) if callable(get_window) else []
+        except (AttributeError, ImportError, LookupError, OSError, RuntimeError, TypeError, ValueError):
+            logger.debug("Device check: conversation unavailable", exc_info=True)
+            return empty
+
+        def _text(frame: Any) -> str:
+            return " ".join(block.text for block in frame.blocks if isinstance(block, TextBlock)).strip()
+
+        def _own_input(frame: Any) -> bool:
+            return frame.role is FrameRole.USER and frame.kind is FrameKind.USER_INPUT and not frame.origin
+
+        current = " ".join(self._device_control_user_words().split())
+        if frames and _own_input(frames[-1]) and " ".join(_text(frames[-1]).split()) == current:
+            frames = frames[:-1]  # this turn's own words are judged separately
+        earlier = [_text(frame) for frame in frames if _own_input(frame) and _text(frame)]
+        suggestion = ""
+        suggestion_index = -1
+        for index in range(len(frames) - 1, -1, -1):
+            frame = frames[index]
+            if _own_input(frame):
+                break
+            if frame.role is FrameRole.ASSISTANT and frame.kind is FrameKind.ASSISTANT_TEXT and _text(frame):
+                suggestion, suggestion_index = _text(frame), index
+                break
+        after_content = any(
+            is_untrusted_content_source(getattr(block, "name", None))
+            for frame in frames[: max(suggestion_index, 0)]
+            if frame.kind is FrameKind.TOOL_USE
+            for block in frame.blocks
+        )
+        return {
+            "earlier_words": "\n".join(earlier),
+            "suggestion": suggestion,
+            "suggestion_after_content": after_content,
+        }
+
+    async def _device_control_refusal(self, tool_name: str, tool_args: dict[str, Any]) -> ToolResult | None:
+        """None when the user's own message asks for this device action, else the refusal.
+
+        Device control never asks the user (founder rule 2026-11-07). It reaches
+        here only while untrusted content is in the conversation (or from a
+        helper): the call then runs when the user's own message for this turn
+        asks for it, and is refused otherwise, so a page, email or tool result
+        can never switch, unlock or disarm anything by itself.
+        """
+        planned_action = describe_irreversible_action(tool_name, tool_args)
+        user_words = self._device_control_user_words()
+        check = getattr(getattr(self, "_approval", None), "user_message_asks_for", None)
+        asked = False
+        if user_words and callable(check):
+            context = self._device_control_conversation()
+            try:
+                asked = bool(
+                    await check(
+                        user_words,
+                        planned_action,
+                        suggestion=str(context.get("suggestion") or ""),
+                        suggestion_after_content=bool(context.get("suggestion_after_content", True)),
+                        earlier_words=str(context.get("earlier_words") or ""),
+                    )
+                )
+            except Exception:  # noqa: BLE001 - fail closed
+                logger.warning("Device control asked-for check failed; refusing", exc_info=True)
+                asked = False
+        if asked:
+            logger.info("Device control runs: the user's own message asks for it: %s", planned_action)
+            return None
+        logger.warning("Device control refused: the user's own message did not ask for it: %s", planned_action)
+        return ToolResult(
+            ok=False,
+            error=(
+                "Not done: outside content (a web page, email, file or other tool result) is in this "
+                "conversation and the user's own message did not ask to %s, so it cannot control a "
+                "device. If the user wants it, they can ask for it in their own words." % planned_action
+            ),
+            error_category="DEVICE_CONTROL_NOT_REQUESTED",
+            retryable=False,
+        )
 
     async def _confirm_irreversible_tool_call(self, tool_name: str, tool_args: dict[str, Any]) -> bool:
         action_class = self._irreversible_confirmation_class(tool_name, tool_args)
@@ -9414,7 +9536,12 @@ class AgentExecutor:
 
         irreversible_action = self._irreversible_confirmation_class(tool_name, tool_args)
         irreversible_confirmation_granted = False
-        if irreversible_action is not None:
+        if irreversible_action == SMART_HOME_CONTROL_CLASS:
+            device_refusal = await self._device_control_refusal(tool_name, tool_args)
+            if device_refusal is not None:
+                return device_refusal
+            irreversible_confirmation_granted = True
+        elif irreversible_action is not None:
             try:
                 confirmed = await self._confirm_irreversible_tool_call(tool_name, tool_args)
             except ConfirmationDeferred as deferred:

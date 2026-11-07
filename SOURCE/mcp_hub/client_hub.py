@@ -1486,10 +1486,10 @@ class MCPClientHub:
             "cancel_payment_gate",
             # --- Smart home (founder-locked 2026-07-04): available at every
             # tier — users who don't want it simply don't connect Home
-            # Assistant. Control actions still route through confirm-tier
-            # approval via the tool's own _CONFIRM annotation
-            # (mcp_servers/core_tools/server.py), so the tier no longer
-            # pre-hides the tool but per-action approval still applies. ---
+            # Assistant. Device control the user asks for runs at once, with
+            # no approval prompt (founder rule 2026-11-07); while untrusted
+            # content is in the conversation it runs only when the user's own
+            # message asks for it (intent/irreversible_actions.py). ---
             "smart_home",
         }
     )

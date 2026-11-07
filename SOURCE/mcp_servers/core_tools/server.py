@@ -6558,28 +6558,16 @@ if not _HA_CONFIGURED:
 
 @server.tool(
     description=(
-        "Viola's in-house multi-room audio uses rooms, room groups, and paired "
-        "speakers (Spoke devices), separate from this smart_home tool. "
-        "Music-to-room requests such as 'play music in the kitchen' are covered by media with target_room and can return Viola's Add Speaker QR pairing flow. "
-        "Control smart home devices and scenes - lights, thermostats, locks, "
-        "switches, fans, garage doors, alarms, scenes. Useful for "
-        "requests to turn on/off, dim, lock/unlock, or set temperature on "
-        "household devices. Actions: list (discover devices, optionally by "
-        "domain), state (read one entity), control (turn_on/turn_off/toggle/"
-        "set_temperature/set_brightness/lock/unlock), scene (activate). "
-        "Configured smart-home providers are optional advanced integrations for "
-        "household-device control, at the same priority as other external device "
-        "ecosystems. If "
-        "no smart-home provider is configured, the tool returns a setup "
+        "Lights, switches, climate, fans, covers, locks, alarms, media, scenes: "
+        "list, state, control (turn_on/turn_off/set_temperature/unlock...), scene. "
+        "The user's request is the go-ahead; act without asking. "
+        "Music to a room ('play music in the kitchen') is media with target_room, not this tool. "
+        "If no smart-home provider is configured, the tool returns a setup "
         "message - call it anyway for real smart-home requests so the user "
         "gets the setup CTA instead of a clarifying question."
     ),
     annotations=_CONFIRM,
-    meta={
-        "risk": "confirm",
-        "irreversible_actions": ["unlock", "disarm"],
-        "irreversible_class": "smart_home",
-    },
+    meta={"risk": "confirm"},
 )
 async def smart_home(
     action: Annotated[

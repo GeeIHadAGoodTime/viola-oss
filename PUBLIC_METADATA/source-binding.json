@@ -30,10 +30,10 @@
   },
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "3e45dfa487777e45d44cf1462abde563ac9b5aabf345431f56988245fac67f27",
-  "source_tree_sha256": "955cf0826e8c353d6a0fe9c79462eba28aeb8a7b98836af37495da738ac96c26",
+  "source_manifest_sha256": "f3fce62ad72aeb5a83ea1845cfa7d48ebde90bd4cd2312f07e1e29a12a8de10d",
+  "source_tree_sha256": "6bac71789bc55873a00e7dce7253049383f7c983575d29f3e8a903a3844c2c1f",
   "source_file_count": 2811,
-  "source_revision": "e201dd1e2ead1ffd43527b4c80ca7b5460139426",
+  "source_revision": "e3b56abacbc2f177cba41e68966c34cf76732caa",
   "comparison_public_revision": "ecab2772465fcc89ae6645b028af1c2273b9199f",
   "changed_source_paths": [
     "LICENSES/SPEECH_COMPONENT_NOTICES.md",
@@ -623,8 +623,8 @@
     "historical_inventory_limits": "This renderer correction changes no dependency or workflow inputs. All six retained SBOMs and their complete status objects stay historical and unchanged; no current installed inventory qualification is claimed."
   },
   "qualification": {
-    "source_commit": "e201dd1e2ead1ffd43527b4c80ca7b5460139426",
-    "kind": "privacy 3.8 accepted version"
+    "source_commit": "e3b56abacbc2f177cba41e68966c34cf76732caa",
+    "kind": "smart home"
   },
   "historical_bindings": [
     {
