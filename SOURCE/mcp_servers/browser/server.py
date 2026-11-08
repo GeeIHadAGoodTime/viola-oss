@@ -2090,7 +2090,7 @@ async def browser_get_links(selector: str = "") -> str:
 
 @server.tool(
     description=(
-        "Get all visible form fields and submit buttons with their CSS selectors, excluding hidden and reCAPTCHA inputs."
+        "Get all visible form fields and submit buttons with their CSS selectors, excluding hidden inputs."
     ),
     annotations=_SAFE,
     meta={"risk": "safe"},
@@ -2102,8 +2102,8 @@ async def browser_get_form_fields() -> str:
     that shows form fields. Use this only when you need exact CSS selectors
     for fields that the snapshot doesn't clearly identify.
 
-    Returns JSON with fields array and buttons array. Hidden inputs and
-    recaptcha fields are excluded to reduce noise.
+    Returns JSON with fields array and buttons array. Hidden inputs are
+    excluded to reduce noise; reCAPTCHA fields are kept so a human check is visible.
     """
     try:
         page = await manager.get_page()
@@ -2113,10 +2113,9 @@ async def browser_get_form_fields() -> str:
                 const inputs = Array.from(document.querySelectorAll(
                     'input, textarea, select'
                 )).filter(el => {
-                    // Skip hidden, recaptcha, and invisible elements.
+                    // Skip hidden and invisible elements. reCAPTCHA fields are
+                    // kept so Viola can see and work a human check herself.
                     if (el.type === 'hidden') return false;
-                    if (el.name && el.name.includes('recaptcha')) return false;
-                    if (el.id && el.id.includes('recaptcha')) return false;
                     const rect = el.getBoundingClientRect();
                     return rect.width > 0 && rect.height > 0;
                 });

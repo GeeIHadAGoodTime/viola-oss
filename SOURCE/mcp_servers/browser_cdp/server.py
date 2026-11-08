@@ -1480,7 +1480,7 @@ async def browser_get_links(selector: str = "") -> str:
         "INPUT: No parameters required. Scans the entire page automatically. "
         "SUCCESS: Returns JSON with url, a fields array (each with index, name, type, id, value, placeholder, "
         "label, and a CSS selector), a count of fields, and a submit_buttons array (each with text and selector). "
-        "Hidden inputs and reCAPTCHA fields are excluded. Selectors are generated as #id, [name=...], or "
+        "Hidden inputs are excluded; reCAPTCHA fields are kept so a human check is visible. Selectors are generated as #id, [name=...], or "
         "input:nth-of-type(N) as fallback. Buttons include both type=submit buttons and action buttons "
         "matching common patterns (Submit, Continue, Next, Place Order, Add to Cart, Find Store). "
         "FAILURE: Returns empty fields and buttons arrays if no visible form elements exist — the page may "
@@ -1492,8 +1492,8 @@ async def browser_get_links(selector: str = "") -> str:
 async def browser_get_form_fields() -> str:
     """Get all visible form input fields and submit buttons.
 
-    Returns JSON with fields array and buttons array. Hidden inputs and
-    recaptcha fields are excluded to reduce noise.
+    Returns JSON with fields array and buttons array. Hidden inputs are
+    excluded to reduce noise; reCAPTCHA fields are kept so a human check is visible.
     """
     if block := await _browser_payment_observation_refusal("browser_get_form_fields"):
         _clear_cdp_refs()
@@ -1505,8 +1505,6 @@ async def browser_get_form_fields() -> str:
                     'input, textarea, select'
                 )).filter(el => {
                     if (el.type === 'hidden') return false;
-                    if (el.name && el.name.includes('recaptcha')) return false;
-                    if (el.id && el.id.includes('recaptcha')) return false;
                     const rect = el.getBoundingClientRect();
                     return rect.width > 0 && rect.height > 0;
                 });

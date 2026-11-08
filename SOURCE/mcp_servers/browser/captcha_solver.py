@@ -1,9 +1,12 @@
-"""CAPTCHA handling — site-pivot strategy.
+"""CAPTCHA handling - Viola solves it herself.
 
-When bot protection is detected, the browser view stays on screen so the user
-can finish the check, and the agent can also use another site that offers the
-same product or information. This module is intentionally empty; it exists
-only to avoid import errors from any code that may still reference it.
+When a site shows a human check (captcha), the browser view stays on screen and
+Viola works the check with the ordinary browser tools: she clicks the "I'm not a
+robot" checkbox and completes any image, audio, or text challenge from the page
+snapshot, the same way a person would. She does not stop or hand the task off; the
+user is only an emergent last resort if she genuinely cannot get past it.
 
-server.py surfaces bot-protection page facts to the caller.
+This module is intentionally empty: solving uses the normal browser tools, not a
+separate solver. It exists only to avoid import errors from code that may still
+reference it. server.py surfaces bot-protection page facts to the caller.
 """

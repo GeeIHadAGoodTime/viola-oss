@@ -748,29 +748,24 @@ _BROWSER_RUN_SCRIPT_READ_PROBE_LIMIT = 4
 # session-wide, tool-agnostic loop-control signal (distinct from the
 # per-(tool,args) spin gate below, which requires identical repeats of the
 # SAME call).
-_NO_PROGRESS_PAGE_HEALTH_STATUSES = frozenset({"bot_protection", "parked_or_expired_domain", "http_error_page"})
-# Small on purpose: a real Cloudflare/WAF challenge does not resolve by
-# blindly retrying navigate/snapshot, so there is no benefit to burning
-# more managed-LLM turns waiting for one to "pass" on its own. Bounded
-# per the ticket's minimal-fix spec ("same page/state N times -> halt").
+_NO_PROGRESS_PAGE_HEALTH_STATUSES = frozenset({"parked_or_expired_domain", "http_error_page"})
+# A parked/expired domain or an HTTP error page is a genuine dead end that does
+# not resolve by retrying, so a short streak of them halts the browser loop.
+# A bot-protection / human check is deliberately NOT in this set: it is not a
+# dead end. Viola works through it herself (see _resolve_bot_check_after_tool),
+# so the loop must keep going so she can act on the page. The constant below
+# now bounds only the parked-domain / HTTP-error streak.
 _BOT_PROTECTION_HALT_STREAK = 3
 
-# When a site shows a person check, Viola leaves the page on screen, says so, and
-# gives the user time to finish it there.
-_BOT_CHECK_WAIT_SECONDS = 180.0
-_BOT_CHECK_POLL_SECONDS = 2.0
-_BOT_CHECK_NOTICE = (
-    "This site wants to check you're a person. "
-    "The page is on your screen: you can finish the check there and I'll carry on as soon as it's done."
-)
-_BOT_CHECK_DONE_NOTE = (
-    "[The user finished the site's person check in the browser view. Take a fresh browser_snapshot "
-    "and carry on with the task.]"
-)
-_BOT_CHECK_GIVEN_UP_NOTE = (
-    "[This site is still showing a person check that the user did not finish (%s). If the request "
-    "can be met at another store or site, use that one and tell the user you switched. If it cannot, "
-    "tell the user plainly that the site is waiting on the check; the page stays open on their screen.]"
+# A site's human check (captcha) is something Viola solves herself with the
+# browser tools; she does not stop or hand it off. This note tells the model to
+# do exactly that; the user is only an emergent last resort if she truly cannot.
+_BOT_CHECK_SOLVE_NOTE = (
+    "[This page is a human check (captcha). Solve it yourself with the browser tools: click the "
+    "\"I'm not a robot\" checkbox, and work through any image, audio, or text challenge, taking a "
+    "fresh browser_snapshot after each step. Keep going until the page moves past the check. Only "
+    "if you have genuinely tried and still cannot get past it, tell the user what is blocking you; "
+    "the page stays visible so they can help if they choose.]"
 )
 
 def _trace_copy(value: Any, _depth: int = 0) -> Any:
@@ -13555,81 +13550,27 @@ class AgentExecutor:
             self._payment_gate_active = False
             self._hide_overlay(outcome="done")
 
-    async def _bot_check_still_showing(self) -> bool | None:
-        """True while the visible page is a person check; None when it cannot be read."""
-        try:
-            from mcp_servers.browser_cdp.server import visible_page_health
-
-            info = await visible_page_health()
-        except Exception as exc:
-            logger.debug("Reading the page during a person check failed: %s", exc)
-            return None
-        if not info:
-            return None
-        return (info.get("page_health") or {}).get("status") == "bot_protection"
-
-    async def _wait_for_user_bot_check(self) -> str:
-        """Wait for the user to finish the check. Returns done, closed, timeout or cancelled."""
-        overlay = self._overlay
-        clear_reads = 0
-        deadline = time.monotonic() + _BOT_CHECK_WAIT_SECONDS
-        while time.monotonic() < deadline:
-            if self._cancelled:
-                return "cancelled"
-            if getattr(overlay, "state", "agentic") == "hidden":
-                return "closed"
-            showing = await self._bot_check_still_showing()
-            # Two reads: these pages blank out and reload while they decide.
-            clear_reads = clear_reads + 1 if showing is False else 0
-            if clear_reads >= 2:
-                return "done"
-            await asyncio.sleep(_BOT_CHECK_POLL_SECONDS)
-        return "timeout"
-
     async def _resolve_bot_check_after_tool(self, tool_name: str, tool_result: ToolResult) -> str | None:
-        """Hand a site's person check to the user, then tell the model how it went.
+        """Tell the model to solve a site's human check itself.
 
-        Runs after a browser tool reports the page is a check. Only a surface with
-        a view the user can reach can wait; elsewhere the streak halt stays. Returns
-        the note for the model, or None when there is nothing to add. The wait only
-        reads the page.
+        Runs after a browser tool reports the page is a check. Viola works the
+        check with the browser tools (click the checkbox, complete the challenge);
+        she does not stop or wait for the user. Returns the solve note for the
+        model, or None when there is nothing to add.
         """
         if self._overlay is None or not tool_name.startswith("browser_"):
             return None
         if self._tool_progress_page_health_status(tool_result) != "bot_protection":
-            if tool_name.startswith("browser_") and isinstance(getattr(tool_result, "data", None), dict):
-                if tool_result.data.get("url"):
-                    self._bot_check_unresolved = False
+            if isinstance(getattr(tool_result, "data", None), dict) and tool_result.data.get("url"):
+                self._bot_check_unresolved = False
             return None
         data = tool_result.data if isinstance(tool_result.data, dict) else {}
-        from urllib.parse import urlparse
-
         url = str(data.get("url") or getattr(self, "_last_page_url", None) or "")
-        host = urlparse(url).hostname or url
         self._bot_check_unresolved = True
-        if host in self._bot_check_given_up_hosts:
-            return _BOT_CHECK_GIVEN_UP_NOTE % "earlier in this task"
-
         self._update_overlay_for_browser(url)
-        self._update_overlay_status("bot_check")
-        self._update_overlay_phase("user_input")
-        logger.info("Waiting for the user to finish a site's person check")
-        await self._speak(_BOT_CHECK_NOTICE)
-        outcome = await self._wait_for_user_bot_check()
-        logger.info("Person check wait ended: %s", outcome)
-        self._consecutive_bot_protection_signals = 0
-        if outcome == "cancelled":
-            return None
-        if outcome == "done":
-            self._bot_check_unresolved = False
-            self._update_overlay_status("working")
-            self._update_overlay_phase("acting")
-            return _BOT_CHECK_DONE_NOTE
-        self._bot_check_given_up_hosts.add(host)
-        if outcome == "closed":
-            self._bot_check_unresolved = False
-            return _BOT_CHECK_GIVEN_UP_NOTE % "they closed the page"
-        return _BOT_CHECK_GIVEN_UP_NOTE % ("no answer after %d seconds" % _BOT_CHECK_WAIT_SECONDS)
+        self._update_overlay_status("working")
+        self._update_overlay_phase("acting")
+        return _BOT_CHECK_SOLVE_NOTE
 
     async def _extract_dom_total(self, page: Any, order_summary: dict[str, Any]) -> None:
         """Attempt to extract the order total from the live checkout page DOM.
