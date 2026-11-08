@@ -761,11 +761,14 @@ _BOT_PROTECTION_HALT_STREAK = 3
 # browser tools; she does not stop or hand it off. This note tells the model to
 # do exactly that; the user is only an emergent last resort if she truly cannot.
 _BOT_CHECK_SOLVE_NOTE = (
-    "[This page is a human check (captcha). Solve it yourself with the browser tools: click the "
-    "\"I'm not a robot\" checkbox, and work through any image, audio, or text challenge, taking a "
-    "fresh browser_snapshot after each step. Keep going until the page moves past the check. Only "
-    "if you have genuinely tried and still cannot get past it, tell the user what is blocking you; "
-    "the page stays visible so they can help if they choose.]"
+    "[This page is a human check (captcha). Solve it yourself, the way a person would, with "
+    "whatever tool best fits what is actually on the page. You are not limited to the browser: use "
+    "the browser tools to click, type, and work through an image, audio, or text challenge, and "
+    "use your desktop control when a page click cannot do the job, such as a press-and-hold "
+    "button, a drag or slider, or any other gesture. Look again with a fresh snapshot after each "
+    "step and adapt to what you see; do not assume the check is any one kind. Keep going until the "
+    "page moves past it. Only if you have genuinely tried and still cannot get past it, tell the "
+    "user what is blocking you; the page stays visible so they can help if they choose.]"
 )
 
 def _trace_copy(value: Any, _depth: int = 0) -> Any:
