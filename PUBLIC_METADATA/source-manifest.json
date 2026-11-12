@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "6ffe36e8cfa03075d8329ecc09a7bddd409f7251",
-  "sha256": "6b0ac3031d79aedf90e76e8ded8131d62c3d267298492a1964ed33315c301fea",
+  "revision": "f0c6fd18f746acb5e59293b900a2b3b94dd2c650",
+  "sha256": "363193b8ef8f822d8bf0ac4fd6b325c1698ff852c4be64a89a2445492411a420",
   "files": [
     {
       "path": ".env.example",
@@ -2140,8 +2140,8 @@
     },
     {
       "path": "intent/tools/phone_call.py",
-      "sha256": "38882a38a4d7b2fefcff082b0a7e0e1833b717d5cbf8066c00e0e510554866de",
-      "bytes": 79304
+      "sha256": "c92f58bc27896a13bbd4e242fa2a9795612ecf608e4af07d12b8021bf96da04f",
+      "bytes": 79904
     },
     {
       "path": "intent/tools/playlist_tools.py",
@@ -5765,8 +5765,8 @@
     },
     {
       "path": "telephony/call_manager.py",
-      "sha256": "791057fa0fdd180a66c23a5e524b044294b4f4e2130243c506e8e323006636a5",
-      "bytes": 389172
+      "sha256": "5e77fa26dcf086c7d6a974968d602d8f940918d75696459c1d5445350c3ca23e",
+      "bytes": 395489
     },
     {
       "path": "telephony/call_queue.py",
@@ -5780,8 +5780,8 @@
     },
     {
       "path": "telephony/call_tools.py",
-      "sha256": "1f0d8d7b59636de8c9a664e39ce6b64116a294ff8ae2c92e0bd4ff09feadc3c6",
-      "bytes": 69089
+      "sha256": "388d06d088c66f2e1c52ac4c2df4defeb601998d4cfe54540e32a6da47f5d23b",
+      "bytes": 71591
     },
     {
       "path": "telephony/caller_validation.py",
@@ -6080,8 +6080,8 @@
     },
     {
       "path": "telephony/voicemail_detection.py",
-      "sha256": "aba475cce3b36b3034ed5428df2178329426ce5dd5fb2a145b21c311cb3c3474",
-      "bytes": 30866
+      "sha256": "adb58e4f4b035ccee85b0b6e67dc048de7f3affbf66afd8e7205e59832172f5b",
+      "bytes": 30919
     },
     {
       "path": "tests/customer_speech/test_real_cjk_pronunciation.py",
@@ -10145,8 +10145,8 @@
     },
     {
       "path": "ui/react-app/src/SmartDisplay.jsx",
-      "sha256": "f52296da749a3e7b30f10e966189168f9195a216d8abfe1a226f9c68a00d5d99",
-      "bytes": 202931
+      "sha256": "58c480b2b0ce6c012a1cd85b86dfafb30e6edf44a081ab7f278b4d8ac9e30f63",
+      "bytes": 203395
     },
     {
       "path": "ui/react-app/src/SmartDisplay.overlayLifecycle.test.jsx",
@@ -12035,13 +12035,13 @@
     },
     {
       "path": "ui/react-app/src/hooks/useCallAudio.js",
-      "sha256": "52b675a02b0b4cfe758c885b0826ef24e20a23b2318923c7c31a9674a4e7c118",
-      "bytes": 24418
+      "sha256": "c5c123ba282b245a491c1fe3a32678c37ab14c48955a67892001fa3bba8491bc",
+      "bytes": 24875
     },
     {
       "path": "ui/react-app/src/hooks/useCallAudio.test.js",
-      "sha256": "0b32d7127f5c68af896e8a24dee158b898706345f7a124c0ee001eeef6badc11",
-      "bytes": 8687
+      "sha256": "e65a07fd916bed3e9ab53f3a7ab314bac8d0ab16d6c5f412abe5bb30a9ae9667",
+      "bytes": 9302
     },
     {
       "path": "ui/react-app/src/hooks/useCallConsultationReply.js",
