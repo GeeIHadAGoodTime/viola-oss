@@ -793,8 +793,6 @@ def _carrier_reported_hangup(record: Any) -> bool:
 def _record_needs_telnyx_hangup(record: Any) -> bool:
     if bool(getattr(record, "_telnyx_hangup_dispatched", False)):
         return False
-    if _carrier_reported_hangup(record):
-        return False
     call_control_id = str(getattr(record, "telnyx_call_control_id", "") or "")
     return bool(call_control_id and _record_status_value(record) in _CALL_STATUSES_REQUIRING_HANGUP)
 
@@ -3587,6 +3585,8 @@ async def _resolve_natural_end_status(record: CallRecord, api_key: str) -> None:
 
     if completed_pending_hangup_confirmation:
         if hangup_confirmed:
+            record.status = CallStatus.COMPLETED
+            # A voicemail she left before the far end hung up is a voicemail.
             record.status = _answered_call_end_status(record)
         else:
             logger.warning(
