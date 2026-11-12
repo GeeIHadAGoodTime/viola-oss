@@ -469,7 +469,7 @@ export default function useCallAudio(callId) {
     teardownMicCapture();
   }, [teardownMicCapture]);
 
-  const endCall = useCallback(async (targetCallId = callId) => {
+  const endCall = useCallback(async (targetCallId = callId, { onCallOver } = {}) => {
     if (!targetCallId) return null;
     try {
       // Hit the LOCAL backend; in cloud mode it proxies the hang-up to the
@@ -481,9 +481,16 @@ export default function useCallAudio(callId) {
       if (!response.ok) {
         console.warn('[useCallAudio] endCall failed:', response.status);
       }
+      // 404 means the server has no live call with this id: it is already over.
+      // The live-call screen otherwise only closes on a call_ended event, and a
+      // call that ended without one left the screen up with an End button that
+      // did nothing (2026-11-12).
+      if ((response.ok || response.status === 404) && typeof onCallOver === 'function') {
+        onCallOver(targetCallId);
+      }
       try {
         const json = await response.json();
-        if (!response.ok) notifyPaidActionError(json);
+        if (!response.ok && response.status !== 404) notifyPaidActionError(json);
         return json;
       } catch (_) {
         return null;

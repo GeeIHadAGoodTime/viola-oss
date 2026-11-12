@@ -1911,6 +1911,19 @@ async def end_phone_call(call_id: str) -> ToolResult:
             error=data.get("error", "Call not found or already ended."),
         )
     except httpx.HTTPStatusError as exc:
+        if exc.response.status_code == 404:
+            # The cloud has no live call with this id. "Cloud hangup failed" made
+            # Viola report a failure to end a call that was already over
+            # (2026-11-12 09:30, "end that call now").
+            note_call_over(call_id)
+            return ToolResult(
+                ok=True,
+                data={
+                    "call_id": call_id,
+                    "already_ended": True,
+                    "message": "No call with this id is live: it has already ended. Nothing was left to hang up.",
+                },
+            )
         return ToolResult(
             ok=False,
             error="Cloud hangup failed (HTTP %d)." % exc.response.status_code,

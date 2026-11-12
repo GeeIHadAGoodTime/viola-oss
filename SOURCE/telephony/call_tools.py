@@ -1391,6 +1391,56 @@ async def complete_spoken_goodbye_end_call_if_omitted(
     return True
 
 
+async def complete_voicemail_end_call_if_omitted(call_record: Any, *, push_frame: Any = None) -> bool:
+    """Hang up after Viola's voicemail message when the model did not call end_call.
+
+    On a recording she says one message and nothing more: once it is delivered the
+    voicemail gate drops every later model turn, so nothing else can ever end the
+    call. On call a2353e21 (2026-11-12) the model left the message without
+    ``end_call`` and the line stayed open, silent, until the voicemail system cut
+    it off at three minutes.
+
+    This queues the same hangup an accepted voicemail ``end_call`` queues: it waits
+    for the message to finish playing, then for the answer window, and only hangs
+    up if nobody answered. If the model did call ``end_call`` in the same reply
+    the two requests collapse into one in the hangup processor. Returns True when
+    a hangup was queued.
+    """
+    from telephony.call_manager import _is_terminal_call_status
+
+    if (
+        not bool(getattr(call_record, "voicemail_detected", False))
+        or not bool(getattr(call_record, "voicemail_message_delivered", False))
+        or bool(getattr(call_record, "human_takeover_detected", False))
+        or bool(getattr(call_record, "voicemail_answered_by_person", False))
+        or bool(getattr(call_record, "_voicemail_auto_hangup_queued", False))
+        or bool(getattr(call_record, "_end_call_committed", False))
+        or bool(getattr(call_record, "_telnyx_hangup_dispatched", False))
+        or _is_terminal_call_status(getattr(call_record, "status", None))
+        or not callable(push_frame)
+    ):
+        return False
+
+    call_id = str(getattr(call_record, "call_id", "") or "")
+    with suppress(AttributeError, TypeError):
+        call_record._voicemail_auto_hangup_queued = True
+    try:
+        await push_frame(
+            EndCallHangupFrame(
+                call_id=call_id,
+                reason="voicemail message left",
+                listen_first=getattr(call_record, "_voicemail_answer_watch", None) is not None,
+            )
+        )
+    except (AttributeError, RuntimeError, TypeError, ValueError) as exc:
+        with suppress(AttributeError, TypeError):
+            call_record._voicemail_auto_hangup_queued = False
+        logger.warning("end_call: could not queue the hangup after the voicemail message for %s: %s", call_id, exc)
+        return False
+    logger.info("end_call: voicemail message delivered on %s; hangup queued behind it", call_id)
+    return True
+
+
 def make_end_call_handler(
     *,
     telnyx_client,

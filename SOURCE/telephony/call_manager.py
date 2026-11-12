@@ -777,11 +777,55 @@ def _record_status_value(record: Any) -> str:
     return str(getattr(status, "value", status) or "")
 
 
+def _carrier_reported_hangup(record: Any) -> bool:
+    """True when the carrier's own ``call.hangup`` has arrived for this leg.
+
+    That event is the carrier saying the leg is over. Asking it to hang the same
+    leg up afterwards is refused (HTTP 422 on call a2353e21, 2026-11-12, one second
+    after ``call.hangup`` was handled), and that refusal must not read as "the
+    line may still be open".
+    """
+    return getattr(record, "carrier_hangup_at", None) is not None or bool(
+        str(getattr(record, "carrier_hangup_cause", "") or "").strip()
+    )
+
+
 def _record_needs_telnyx_hangup(record: Any) -> bool:
     if bool(getattr(record, "_telnyx_hangup_dispatched", False)):
         return False
+    if _carrier_reported_hangup(record):
+        return False
     call_control_id = str(getattr(record, "telnyx_call_control_id", "") or "")
     return bool(call_control_id and _record_status_value(record) in _CALL_STATUSES_REQUIRING_HANGUP)
+
+
+# Telnyx's error code for a command sent to a call that is no longer there.
+_TELNYX_CALL_ALREADY_ENDED_CODE = "90018"
+
+
+def _telnyx_hangup_refusal(response: Any) -> tuple[bool, str]:
+    """Read a refused hangup: (the call is already over, short description for the log).
+
+    Telnyx answers 404 for a leg it no longer knows and 422 with error code 90018
+    for one that has already ended. Both mean there is nothing left to hang up.
+    The description carries the error code and title so the next refusal that is
+    NOT one of these can be told apart from the log alone.
+    """
+    status_code = int(getattr(response, "status_code", 0) or 0)
+    if status_code == 404:
+        return True, "HTTP 404"
+    codes: list[str] = []
+    titles: list[str] = []
+    try:
+        errors = response.json().get("errors") or []
+    except (AttributeError, TypeError, ValueError):
+        errors = []
+    for item in errors if isinstance(errors, list) else []:
+        if isinstance(item, dict):
+            codes.append(str(item.get("code") or ""))
+            titles.append(str(item.get("title") or item.get("detail") or "")[:80])
+    description = "HTTP %d code=%s title=%s" % (status_code, ",".join(codes) or "-", "; ".join(titles) or "-")
+    return status_code == 422 and _TELNYX_CALL_ALREADY_ENDED_CODE in codes, description
 
 
 def _sync_post_telnyx_hangup(api_key: str, call_control_id: str) -> bool:
@@ -797,11 +841,14 @@ def _sync_post_telnyx_hangup(api_key: str, call_control_id: str) -> bool:
                 _TELNYX_HANGUP_URL % call_control_id,
                 headers={"Authorization": "Bearer %s" % api_key},
             )
-        if 200 <= response.status_code < 300 or response.status_code == 404:
+        if 200 <= response.status_code < 300:
+            return True
+        already_over, refusal = _telnyx_hangup_refusal(response)
+        if already_over:
             return True
         logger.warning(
-            "Telnyx shutdown hangup returned HTTP %d for call_control_id=%s",
-            response.status_code,
+            "Telnyx shutdown hangup returned %s for call_control_id=%s",
+            refusal,
             call_control_id[:16],
         )
     except Exception as exc:
@@ -826,11 +873,19 @@ async def _async_post_telnyx_hangup(api_key: str, call_control_id: str) -> bool:
                 _TELNYX_HANGUP_URL % call_control_id,
                 headers={"Authorization": "Bearer %s" % api_key},
             )
-        if 200 <= response.status_code < 300 or response.status_code == 404:
+        if 200 <= response.status_code < 300:
+            return True
+        already_over, refusal = _telnyx_hangup_refusal(response)
+        if already_over:
+            logger.info(
+                "Telnyx says call_control_id=%s has already ended (%s); nothing to hang up",
+                call_control_id[:16],
+                refusal,
+            )
             return True
         logger.warning(
-            "Telnyx hangup returned HTTP %d for call_control_id=%s",
-            response.status_code,
+            "Telnyx hangup returned %s for call_control_id=%s",
+            refusal,
             call_control_id[:16],
         )
     except Exception as exc:
@@ -3405,6 +3460,46 @@ def _derive_natural_end_status(record: CallRecord) -> CallStatus:
     return CallStatus.COMPLETED
 
 
+def _answered_call_end_status(record: CallRecord) -> CallStatus:
+    """COMPLETED, or VOICEMAIL when Viola left her message on a recording.
+
+    The same rule ``dispatch_telnyx_end_call_hangup`` applies when she hangs up
+    herself. It has to hold when the far end hangs up first too, or a voicemail
+    that was left is reported as an ordinary completed call.
+    """
+    if (
+        record.voicemail_detected
+        and record.voicemail_message_delivered
+        and not record.human_takeover_detected
+        and not record.voicemail_answered_by_person
+    ):
+        return CallStatus.VOICEMAIL
+    return CallStatus.COMPLETED
+
+
+def _settle_unfinished_status_at_teardown(record: CallRecord) -> bool:
+    """Give a call whose task is ending a terminal status. True if it changed.
+
+    ``_run_call``'s ``finally`` is the last code that will ever run for a call.
+    A status that is still live there (ACTIVE because a hangup could not be
+    confirmed) used to be left alone "so retry keeps tearing the leg down", but
+    nothing retries after this point. The result on call a2353e21: billing
+    refused the live status, the ledger row stayed ``active``, no ``call_ended``
+    was sent, and the account could place no more calls. The leg itself is
+    bounded by the carrier's own time limit, and a later ``call.hangup`` or
+    ``call.cost`` still corrects a settled row.
+    """
+    if _is_terminal_call_status(record.status):
+        return False
+    if record.status != CallStatus.ACTIVE and not record.carrier_answered:
+        # Still dialing or ringing when the task ended: nobody was reached.
+        record.status = CallStatus.NO_ANSWER
+        return True
+    derived = _derive_natural_end_status(record)
+    record.status = _answered_call_end_status(record) if derived == CallStatus.COMPLETED else derived
+    return True
+
+
 async def _resolve_natural_end_status(record: CallRecord, api_key: str) -> None:
     """Apply the honest terminal status at the natural end of a call's pipeline.
 
@@ -3464,7 +3559,16 @@ async def _resolve_natural_end_status(record: CallRecord, api_key: str) -> None:
     # that previously leaked billing minutes. It runs regardless of
     # `was_active` -- it is a general safety net for any path reaching
     # natural end with a live, not-yet-hung-up leg.
-    hangup_confirmed = bool(record._telnyx_hangup_dispatched) or not record.telnyx_call_control_id
+    # The carrier's own call.hangup is the strongest proof there is that the leg is
+    # down. Without counting it, a call the far end hung up (a voicemail system
+    # cutting off, the person hanging up) was asked to hang up again, Telnyx
+    # refused, and the record stayed ACTIVE for good: call a2353e21 locked its
+    # owner out of every later call ("You already have an active call").
+    hangup_confirmed = (
+        bool(record._telnyx_hangup_dispatched)
+        or not record.telnyx_call_control_id
+        or _carrier_reported_hangup(record)
+    )
     if not hangup_confirmed:
         try:
             if await _async_post_telnyx_hangup(api_key, str(record.telnyx_call_control_id)):
@@ -3483,7 +3587,7 @@ async def _resolve_natural_end_status(record: CallRecord, api_key: str) -> None:
 
     if completed_pending_hangup_confirmation:
         if hangup_confirmed:
-            record.status = CallStatus.COMPLETED
+            record.status = _answered_call_end_status(record)
         else:
             logger.warning(
                 "Call %s: natural-end hangup not confirmed; leaving record ACTIVE "
@@ -3616,6 +3720,9 @@ class CallRecord:
     # turn while carrier hangup is draining. The semantic owner/recipient
     # boundary belongs in telephony.call_context, not in this transport flag.
     _end_call_committed: bool = field(default=False, repr=False)
+    # The runtime queued the hangup that follows her voicemail message because the
+    # model left the message without calling end_call. One per call.
+    _voicemail_auto_hangup_queued: bool = field(default=False, repr=False)
     # PHONE-15 path-drop recovery: holds a telephony.call_tools._LatchedEndCall
     # when the model emitted end_call in a text-empty tool-only turn (which the
     # PHONE-15 guard refuses). The next spoken assistant turn completes the hangup
@@ -5949,6 +6056,12 @@ class CallManager:
             if record.local_end_at is None:
                 record.local_end_at = record.ended_at
             logger.info("Call %s cancelled by user", call_id)
+            # No task is left to announce the end, and the Phone tab only leaves its
+            # live-call screen on this event.
+            try:
+                await self._broadcast_call_ws_event("call_ended", record, include_summary=True)
+            except Exception:  # noqa: BLE001, RUF100 - the call is ended either way
+                logger.warning("Call %s: could not announce the cancelled call", call_id, exc_info=True)
             return True
         if task is not None:
             return True
@@ -6728,12 +6841,16 @@ class CallManager:
                 # drops. No-op unless an end_call was actually latched.
                 from telephony.call_tools import (
                     complete_spoken_goodbye_end_call_if_omitted,
+                    complete_voicemail_end_call_if_omitted,
                     fire_latched_end_call_if_pending,
                 )
 
                 llm_service = getattr(record, "_llm_service", None)
                 push_frame = getattr(llm_service, "push_frame", None)
                 if await fire_latched_end_call_if_pending(record, push_frame=push_frame):
+                    return
+                # A voicemail message is the last thing she says on a recording.
+                if await complete_voicemail_end_call_if_omitted(record, push_frame=push_frame):
                     return
                 await complete_spoken_goodbye_end_call_if_omitted(
                     record,
@@ -7541,9 +7658,23 @@ class CallManager:
             await self._cancel_number_pool_heartbeat_and_wait(record.call_id)
 
             if _record_needs_telnyx_hangup(record):
-                await _async_post_telnyx_hangup(
+                if await _async_post_telnyx_hangup(
                     self.config.api_key,
                     str(record.telnyx_call_control_id or ""),
+                ):
+                    record._telnyx_hangup_dispatched = True
+
+            # Nothing runs for this call after this block, so a status that is
+            # still live here would stay live for good (see the helper).
+            status_before_teardown = record.status
+            if _settle_unfinished_status_at_teardown(record):
+                logger.warning(
+                    "Call %s: task ended while still %s (hangup confirmed=%s, carrier hangup=%s); recorded as %s",
+                    record.call_id,
+                    status_before_teardown.value,
+                    bool(record._telnyx_hangup_dispatched),
+                    _carrier_reported_hangup(record),
+                    record.status.value,
                 )
 
             # Tie the owner-takeover conference leg's teardown to the primary

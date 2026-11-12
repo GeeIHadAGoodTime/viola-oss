@@ -933,7 +933,17 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
 
   const handleEndActiveCall = useCallback(() => {
     if (activeCallId) {
-      void endCall(activeCallId);
+      // Leave the live-call screen as soon as the server confirms the call is
+      // over (ended now, or already gone). Do not wait for a call_ended event
+      // that an already-finished call will never send.
+      void endCall(activeCallId, {
+        onCallOver: (endedCallId) => {
+          setActiveCallId((current) => (current === endedCallId ? null : current));
+          setActiveCallMeta(null);
+          setCallBriefing(null);
+          setCallConsultation(null);
+        },
+      });
     }
   }, [activeCallId, endCall]);
   const checkPhoneTosStatus = useCallback(async () => {
