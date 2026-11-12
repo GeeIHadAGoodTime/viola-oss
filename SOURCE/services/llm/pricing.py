@@ -103,6 +103,26 @@ _unknown_models_seen: contextvars.ContextVar[frozenset[str]] = contextvars.Conte
 
 UNKNOWN_MODEL_COST_WARNING = "costs may be inaccurate due to usage of unknown models"
 
+# Models served by the user's own machine (Ollama, a loopback OpenAI-compatible
+# server). They cost nothing per token. Without this, a local model missing
+# from the price table was tracked at the most expensive cloud rate and logged
+# an "Unknown model" warning on every call (1.0.5 build 10, K5: qwen2.5:0.5b).
+# The LLM factory registers a model here when it builds a local provider. A
+# name that is in the price table keeps its listed price.
+_local_models: set[str] = set()
+
+
+def register_local_model(model: str | None) -> None:
+    """Record that ``model`` runs on this machine, so its tokens are free."""
+    name = str(model or "").strip()
+    if name:
+        _local_models.add(name)
+
+
+def is_local_model(model: str | None) -> bool:
+    """True when ``model`` was registered as running on this machine."""
+    return str(model or "").strip() in _local_models
+
 
 def _normalize_pricing(raw: dict[str, float]) -> dict[str, float]:
     """Return a pricing dict with every component present (default 0.0)."""
@@ -145,6 +165,8 @@ def _pricing_for_spend_tracking(model: str) -> dict[str, float]:
     pricing = LLM_PRICING_CENTS.get(model)
     if pricing:
         return _normalize_pricing(pricing)
+    if is_local_model(model):
+        return _normalize_pricing({})
     fallback = max(LLM_PRICING_CENTS.values(), key=lambda p: p["output"])
     set_has_unknown_model_cost(model)
     logger.warning(

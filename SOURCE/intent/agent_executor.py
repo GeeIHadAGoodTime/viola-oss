@@ -6048,12 +6048,23 @@ class AgentExecutor:
                 control=complete_control,
             )
         task_log.write_to_disk()
+        # Token totals in the text log too: the laptop report could not confirm
+        # prompt caching because only the structured step log carried the
+        # cached count (1.0.5 build 10). cached is the part of input_tokens the
+        # provider served from its prompt cache.
+        _task_usage = task_usage_summary["usage"]
         logger.info(
-            "Agent task %s completed: %d steps, %.1fs, outcome=%s",
+            "Agent task %s completed: %d steps, %.1fs, outcome=%s, "
+            "input_tokens=%d cached_tokens=%d cache_write_tokens=%d output_tokens=%d cost_usd=%.5f",
             task_log.task_id,
             task_log.total_steps,
             total_duration,
             outcome,
+            _task_usage.get("input_tokens", 0),
+            _task_usage.get("cache_read_tokens", 0),
+            _task_usage.get("cache_write_tokens", 0),
+            _task_usage.get("output_tokens", 0),
+            float(task_usage_summary.get("total_cost_usd") or 0.0),
         )
         self._retire_unanswered_confirmations(start_time)
 
