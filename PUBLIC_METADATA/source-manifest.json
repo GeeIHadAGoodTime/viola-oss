@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "6ffe36e8cfa03075d8329ecc09a7bddd409f7251",
-  "sha256": "6b0ac3031d79aedf90e76e8ded8131d62c3d267298492a1964ed33315c301fea",
+  "revision": "580e2fe378bbb5969025517b764b5f8c007a1dc6",
+  "sha256": "f888b1461e201013a3c5b0d2bfe901cde8b4395b96f32ccb390ca66cb463fac7",
   "files": [
     {
       "path": ".env.example",
@@ -1595,8 +1595,8 @@
     },
     {
       "path": "intent/agent_executor.py",
-      "sha256": "3785784b3a8f8cc92398bd4a52dc5674316bed21d52b0fa4054badcc2c6882d6",
-      "bytes": 640058
+      "sha256": "087f1f3ab1ec50d1443eda1584202a108cabc49cd01f2e2b17bdd5fc89fcc880",
+      "bytes": 640765
     },
     {
       "path": "intent/agent_loop.py",
@@ -4590,8 +4590,8 @@
     },
     {
       "path": "services/llm/factory.py",
-      "sha256": "4d4345cae38d524bed96513e52839badba493504d86e9e3fadeda3547e397aff",
-      "bytes": 60335
+      "sha256": "c04f0abf6ca5815ffe7cb069a3c1b1230073f94b2f5ba6ee81f9ec5f271b4022",
+      "bytes": 60988
     },
     {
       "path": "services/llm/hook_llm.py",
@@ -4645,8 +4645,8 @@
     },
     {
       "path": "services/llm/pricing.py",
-      "sha256": "07e1fc1f13ba1406bd09fcad5a419a822826919e5fd78b416b02fa082ffab311",
-      "bytes": 9686
+      "sha256": "cd50dbe8b34d7e861e8368fc688186246fd0b29e8c5d7c04e466cbca8e8fd07e",
+      "bytes": 10624
     },
     {
       "path": "services/llm/prompts/__init__.py",
