@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "6ffe36e8cfa03075d8329ecc09a7bddd409f7251",
-  "sha256": "6b0ac3031d79aedf90e76e8ded8131d62c3d267298492a1964ed33315c301fea",
+  "revision": "7aa8c73687998a37d8d4e732ae495ce3ec1b127d",
+  "sha256": "9944ed7abd14848a245c58b0d2b821b25691c708c5d0152d49b1de9e4c5afbe6",
   "files": [
     {
       "path": ".env.example",
@@ -545,8 +545,8 @@
     },
     {
       "path": "auth/desktop_session.py",
-      "sha256": "594e4bef00cf44e5aae5ac5fc3e3ca3ede79ad0011c31b34690697751637ea75",
-      "bytes": 60163
+      "sha256": "590bf306b4cbf497da8fef6881b7276b508910d70a9de5d65f0b183f17b06dbe",
+      "bytes": 61522
     },
     {
       "path": "auth/entitlement_projection.py",
@@ -5465,8 +5465,8 @@
     },
     {
       "path": "services/user_profile.py",
-      "sha256": "cb4d0908f83518af904191eaeb1bd1ed0cf1cba3890f51524c4bf8bf8939db77",
-      "bytes": 20537
+      "sha256": "010593d2a0a732c984d0cf424c9875347af424f94d3d8b79588d8b1ecaed6139",
+      "bytes": 21032
     },
     {
       "path": "services/user_timezone.py",
@@ -9585,8 +9585,8 @@
     },
     {
       "path": "ui/api/routes/lifecycle.py",
-      "sha256": "5284acdbf34878a92b8f72d2f8cbbdda5e15f012311c7b3f5cc0fb2c950925e3",
-      "bytes": 46574
+      "sha256": "c3f87cc0c7b2c11153ab7038874bd448c5fc207934be7236aefceb4d7e918076",
+      "bytes": 46978
     },
     {
       "path": "ui/api/routes/llm_stream.py",
@@ -12955,8 +12955,8 @@
     },
     {
       "path": "ui/settings_schema.py",
-      "sha256": "78e5d87a90ba04c306577622bd9960c7835869bf3b0cf088b3fbcd4c8e47f12a",
-      "bytes": 10506
+      "sha256": "2d12467dbef80f685912ee5a47ca05df989d2ea70e3fe956b7021e854743d377",
+      "bytes": 11004
     },
     {
       "path": "ui/static/README_WEB_UI.txt",
@@ -13310,8 +13310,8 @@
     },
     {
       "path": "utils/speaker_pairing_flow.py",
-      "sha256": "70f19eab1e8e747b25d71533d236352304086b3891df7c73bebf18c1545b6c51",
-      "bytes": 25572
+      "sha256": "df2bceb272eeea43067d5943772985a153602633350e6f06f6ef5c7ad6b289d5",
+      "bytes": 28209
     },
     {
       "path": "utils/startup_validation.py",
