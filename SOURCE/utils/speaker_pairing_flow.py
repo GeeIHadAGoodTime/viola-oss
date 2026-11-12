@@ -15,11 +15,18 @@ shows. Merely LOOKING at Rooms opens nothing: the panel's
 on every look, because Add Room is the modal's first tab, and kept it open for
 good).
 
-The port stays open only while it has a use. ``lan_access_supervisor`` turns
-LAN access back off once nothing has paired for
-``LAN_ACCESS_UNPAIRED_WINDOW_SECONDS`` after the last sign of someone pairing,
-and at startup when no paired device is left to reconnect. That also closes
-the port on installs an older build left open.
+The port stays open only while it has a use, and "use" means a room that
+actually connects, not a credential that could. ``lan_access_supervisor`` turns
+LAN access back off once no room has connected for
+``LAN_ACCESS_UNPAIRED_WINDOW_SECONDS`` after the last sign of someone pairing.
+At startup a saved "on" is honoured only when a paired room was connected in
+the last ``LAN_ACCESS_RESUME_MAX_IDLE_SECONDS``, and then only for one such
+window: if that room does not come back, the port closes again.
+
+1.0.5 build 10 asked "is any device still paired?" instead. A phone paired once
+keeps a valid credential for 30 days, so on a laptop where one phone had joined
+a test room two weeks earlier that answer stayed yes: the port opened on the
+Wi-Fi at every launch (with the Windows prompt) and never closed.
 
 The listener serves the same app object, so the middleware auth, the
 spoke-scope allowlist and every route-level loopback-only guard apply to LAN
@@ -137,6 +144,10 @@ LAN_ACCESS_SUPERVISOR_INTERVAL_SECONDS = 15.0
 # minutes). Long enough to find a phone and scan the code, short enough that a
 # forgotten Start does not leave a port open on the Wi-Fi all week.
 LAN_ACCESS_UNPAIRED_WINDOW_SECONDS = 15 * 60
+# A saved "on" survives a restart only when a paired room was connected this
+# recently. Older than that, the room is treated as gone and Rooms waits for
+# Start again.
+LAN_ACCESS_RESUME_MAX_IDLE_SECONDS = 7 * 24 * 60 * 60
 _FIREWALL_CACHE_SECONDS = 30.0
 
 
@@ -165,6 +176,9 @@ _firewall_cache: tuple[float, str, JsonDict] | None = None
 # time.monotonic() deadline for pairing something; None until a user start in
 # this run, which is how a setting left on by an earlier run is recognised.
 _lan_unpaired_deadline: float | None = None
+# Wall-clock start of this run. A paired device whose ``last_seen`` is at or
+# after it has connected to this run of the hub.
+_run_started_at: float = time.time()
 
 
 def register_lan_app(app: Any) -> None:
@@ -226,21 +240,24 @@ def _persist_lan_access_setting(enabled: bool) -> None:
         logger.warning("Could not save %s=%s", LAN_ACCESS_SETTING, enabled, exc_info=True)
 
 
-def _has_paired_device() -> bool:
-    """True when a device could still reconnect to the hub over the LAN."""
+def _paired_device_last_seen_times() -> list[int] | None:
+    """When each paired, non-revoked device last connected; ``None`` if unreadable."""
     try:
-        from ui.security.spoke_credentials import SPOKE_TOKEN_IDLE_MAX_AGE_SECONDS
         from ui.security.spoke_device_registry import list_devices
 
-        oldest_usable = int(time.time()) - SPOKE_TOKEN_IDLE_MAX_AGE_SECONDS
-        return any(
-            not device.get("revoked") and int(device.get("last_seen") or 0) >= oldest_usable
-            for device in list_devices()
-        )
+        return [int(device.get("last_seen") or 0) for device in list_devices() if not device.get("revoked")]
     except Exception:
-        # A read failure must not unpair a working house.
-        logger.warning("Could not read paired devices; leaving LAN access as it is", exc_info=True)
-        return True
+        logger.warning("Could not read paired devices", exc_info=True)
+        return None
+
+
+def _age_text(seconds: float) -> str:
+    seconds = max(0, int(seconds))
+    if seconds >= 2 * 86400:
+        return "%d days" % (seconds // 86400)
+    if seconds >= 2 * 3600:
+        return "%d hours" % (seconds // 3600)
+    return "%d minutes" % (seconds // 60)
 
 
 def note_pairing_activity() -> None:
@@ -250,27 +267,60 @@ def note_pairing_activity() -> None:
 
 
 async def _retire_unused_lan_access(at_startup: bool = False) -> bool:
-    """Turn LAN access off when nothing uses it; return True if it did.
+    """Turn LAN access off when no room is using it; return True if it did.
 
-    At startup a saved "on" with nothing paired is closed straight away, since
-    no device is waiting to reconnect. Later the user gets the pairing window.
+    A room "uses" LAN access by connecting. A credential that merely could
+    connect does not count: a phone paired once stays valid for 30 days.
+
+    At startup a saved "on" is kept only when a paired room was connected
+    recently, and it then gets one pairing window to come back. After that,
+    LAN access stays on while a room has connected in this run, and otherwise
+    closes when the pairing window ends.
     """
     if not await asyncio.to_thread(_lan_access_setting_enabled):
         return False
-    if await asyncio.to_thread(_has_paired_device):
-        return False
+    seen = await asyncio.to_thread(_paired_device_last_seen_times)
+    now = time.time()
     deadline = _lan_unpaired_deadline
-    if deadline is None:
-        if not at_startup:
+    if at_startup and deadline is None:
+        # Left on by an earlier run; nobody has pressed Start in this one.
+        newest = max(seen, default=0) if seen is not None else 0
+        if newest and now - newest <= LAN_ACCESS_RESUME_MAX_IDLE_SECONDS:
+            note_pairing_activity()
+            logger.info(
+                "LAN access kept from an earlier run: %d paired device(s), newest connected %s ago; "
+                "closing in %d minutes unless a room connects",
+                len(seen or ()),
+                _age_text(now - newest),
+                LAN_ACCESS_UNPAIRED_WINDOW_SECONDS // 60,
+            )
+            return False
+        if seen is None:
+            reason = "left on by an earlier run and the paired devices could not be read"
+        elif not newest:
+            reason = "left on by an earlier run with no paired device"
+        else:
+            reason = "left on by an earlier run; %d paired device(s), none connected for %s" % (
+                len(seen),
+                _age_text(now - newest),
+            )
+    else:
+        if seen is None:
+            # A read failure mid-run must not cut off a room that is playing.
+            return False
+        if any(last_seen >= int(_run_started_at) for last_seen in seen):
+            return False
+        if deadline is None:
             # Turned on outside this module (a settings file edit, say).
             note_pairing_activity()
             return False
-    elif time.monotonic() < deadline:
-        return False
-    logger.info(
-        "LAN access closed: no device paired (%s)",
-        "left on by an earlier run" if deadline is None else "pairing window ended",
-    )
+        if time.monotonic() < deadline:
+            return False
+        reason = "no room connected within %d minutes (%d paired device(s) on record)" % (
+            LAN_ACCESS_UNPAIRED_WINDOW_SECONDS // 60,
+            len(seen),
+        )
+    logger.info("LAN access closed: %s", reason)
     await ensure_lan_access(False, check_firewall=False)
     return True
 
@@ -452,6 +502,7 @@ async def ensure_lan_access(enable: bool | None = None, *, check_firewall: bool 
             await asyncio.to_thread(_persist_lan_access_setting, bool(enable))
             enabled = bool(enable)
             if enabled:
+                logger.info("LAN access turned on by request (Start in Rooms, Settings, or a pairing request)")
                 note_pairing_activity()
             else:
                 _lan_unpaired_deadline = None
@@ -528,9 +579,9 @@ async def lan_access_supervisor(interval: float = LAN_ACCESS_SUPERVISOR_INTERVAL
     Re-runs ``ensure_lan_access()`` periodically: brings a remembered LAN
     listener back after a restart once the network is up, follows a DHCP
     address change, and applies a toggle saved from Settings. Before that it
-    closes LAN access that nothing paired with. Cheap: reads one setting, and
-    only when that is on the paired-device list, then asks the OS for the
-    outbound interface address.
+    closes LAN access that no room is using, so a stale setting never reaches
+    the bind. Cheap: reads one setting, and only when that is on the
+    paired-device list, then asks the OS for the outbound interface address.
     """
     at_startup = True
     while True:

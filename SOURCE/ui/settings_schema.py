@@ -19,8 +19,10 @@ INFRASTRUCTURE_KEYS: Final[frozenset[str]] = frozenset(
         "attribution_self_report",
         "auth_enabled",
         "auto_update_check_enabled",
+        "background_agent_reasoning_effort",
         "base_url",
         "browser_provider_enabled",
+        "calendar_timezone",
         "companion_device_name",
         "companion_enabled",
         "computer_use_app_whitelist",
@@ -41,6 +43,7 @@ INFRASTRUCTURE_KEYS: Final[frozenset[str]] = frozenset(
         "google_workspace_mcp_path",
         "input_device",
         "lan_access_enabled",
+        "llm_fallback_chain",
         "local_music_folder",
         "log_level",
         "microphone_volume",
@@ -104,9 +107,16 @@ INFRASTRUCTURE_KEYS: Final[frozenset[str]] = frozenset(
 # computer-use allowlist (read with an explicit user_id by its safety check).
 ACCOUNT_BOUND_DEVICE_KEYS: Final[frozenset[str]] = frozenset(
     {
+        # Read on every turn but never listed, so each launch logged
+        # "Unclassified settings key ..." for all three (1.0.5 build 10).
+        # Listed here they keep exactly the storage they already had by
+        # default: local to this computer, never synced, not machine-wide.
+        "background_agent_reasoning_effort",
+        "calendar_timezone",
         "computer_use_app_whitelist",
         "dangerous_mode_acknowledged",
         "founder_phone_number",
+        "llm_fallback_chain",
     }
 )
 
