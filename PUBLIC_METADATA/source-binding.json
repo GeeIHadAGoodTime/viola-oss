@@ -30,10 +30,10 @@
   },
   "schema_version": 1,
   "source_manifest": "source-manifest.json",
-  "source_manifest_sha256": "1654b7f0bb7a72ef921fad6c9cbf91227bae0d8232d3edad39244a412cb88a40",
-  "source_tree_sha256": "18d7b2862367ede1a01f1ca18dd7c606097105867b2321a3668cfde8cd2a7997",
+  "source_manifest_sha256": "d4b80e24c8e0d29df6ef600aeb3502faf4c8eed6f71560b7495dbd433e3c883d",
+  "source_tree_sha256": "b1316aed036741f8d086ec21630125afc36be0ec9ca86dd95082e7014e44f688",
   "source_file_count": 2811,
-  "source_revision": "cc76e1387ae38b404b46bc0955c1ce5578ab2c95",
+  "source_revision": "98ce6d3618879db5a6285b89ed88ea331e0ef445",
   "comparison_public_revision": "ecab2772465fcc89ae6645b028af1c2273b9199f",
   "changed_source_paths": [
     "LICENSES/SPEECH_COMPONENT_NOTICES.md",
@@ -244,6 +244,7 @@
     "telephony/call_context.py",
     "telephony/call_manager.py",
     "telephony/call_tools.py",
+    "telephony/cost_tracker.py",
     "telephony/end_call_hangup.py",
     "telephony/openai_chat.py",
     "telephony/phone_mode.py",
@@ -625,8 +626,8 @@
     "historical_inventory_limits": "This renderer correction changes no dependency or workflow inputs. All six retained SBOMs and their complete status objects stay historical and unchanged; no current installed inventory qualification is claimed."
   },
   "qualification": {
-    "source_commit": "cc76e1387ae38b404b46bc0955c1ce5578ab2c95",
-    "kind": "billing true cost"
+    "source_commit": "98ce6d3618879db5a6285b89ed88ea331e0ef445",
+    "kind": "billing cost model"
   },
   "historical_bindings": [
     {

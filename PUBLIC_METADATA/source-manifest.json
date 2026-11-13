@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "cc76e1387ae38b404b46bc0955c1ce5578ab2c95",
-  "sha256": "18d7b2862367ede1a01f1ca18dd7c606097105867b2321a3668cfde8cd2a7997",
+  "revision": "98ce6d3618879db5a6285b89ed88ea331e0ef445",
+  "sha256": "b1316aed036741f8d086ec21630125afc36be0ec9ca86dd95082e7014e44f688",
   "files": [
     {
       "path": ".env.example",
@@ -4645,8 +4645,8 @@
     },
     {
       "path": "services/llm/pricing.py",
-      "sha256": "cd50dbe8b34d7e861e8368fc688186246fd0b29e8c5d7c04e466cbca8e8fd07e",
-      "bytes": 10624
+      "sha256": "c35c3277ffc015234701410f8d4bf9f7b831471914c5a0ec540868161d81d07a",
+      "bytes": 11234
     },
     {
       "path": "services/llm/prompts/__init__.py",
@@ -4730,8 +4730,8 @@
     },
     {
       "path": "services/llm/providers/openai_compatible.py",
-      "sha256": "9de1224ded76fe0fbd22c8403745b7b864fd4551e31edc357d1d948dc369d4f0",
-      "bytes": 191532
+      "sha256": "b5ca513aeeba673d1c84a0b83a55953e360697550ef8476b85fd99da78541cf2",
+      "bytes": 195647
     },
     {
       "path": "services/llm/quota_repository.py",
@@ -5765,8 +5765,8 @@
     },
     {
       "path": "telephony/call_manager.py",
-      "sha256": "3729e79478b054ed510272bedbffa806c2cff9b1d09b7d5bffc26bd320e4e940",
-      "bytes": 390793
+      "sha256": "4cfd673f8dbbf58ba87fc54d4dab0e39a406b26ad826b75b23b422b9a8d50ea5",
+      "bytes": 391385
     },
     {
       "path": "telephony/call_queue.py",
@@ -5805,8 +5805,8 @@
     },
     {
       "path": "telephony/cost_tracker.py",
-      "sha256": "0a86207a6bcb323a5611a0a8e107535214ba1fb0a6af695ba46d98df306e0512",
-      "bytes": 16391
+      "sha256": "7646e37fd343ccda1b110f9be0e0d1d15509ccf395134cb71f20ebd79163da30",
+      "bytes": 20621
     },
     {
       "path": "telephony/disclosure_playback_marker.py",
@@ -5990,8 +5990,8 @@
     },
     {
       "path": "telephony/remote_voice.py",
-      "sha256": "db48010e49d5ef1dcd8cff352b06e801582a57d3e2bb8f4c0b644649a6efdeac",
-      "bytes": 41622
+      "sha256": "492421884830fce5b471cccffd487b5661e789e6ebad6a4e0072ff392ddaa6c2",
+      "bytes": 42319
     },
     {
       "path": "telephony/routes.py",
