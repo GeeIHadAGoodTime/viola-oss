@@ -2728,6 +2728,7 @@ class TTSSpeaker:
         if self._channel is not None:
             ch_type = getattr(self._channel, "channel_type", "voice")
             if ch_type != "voice":
+                logger.info("Reply not spoken: request channel is %s, not voice", ch_type)
                 return
 
         try:
@@ -2756,7 +2757,9 @@ class TTSSpeaker:
                 loop = asyncio.get_event_loop()
                 await loop.run_in_executor(None, speak_method, spoken_text)
         except Exception as e:
-            logger.debug("TTS speak error: %s", e)
+            # Logged at debug only before, so a reply shown but never spoken
+            # (J10, build-10 laptop) left no trace.
+            logger.warning("TTS speak error: %s", e)
 
     def speak_async(self, text: str) -> None:
         """
@@ -2772,6 +2775,7 @@ class TTSSpeaker:
         if self._channel is not None:
             ch_type = getattr(self._channel, "channel_type", "voice")
             if ch_type != "voice":
+                logger.info("Reply not spoken: request channel is %s, not voice", ch_type)
                 return
 
         try:

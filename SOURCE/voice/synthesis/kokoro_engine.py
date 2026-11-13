@@ -14,6 +14,7 @@ import contextlib
 import logging
 import random
 import re
+import sys
 import threading
 import time
 from pathlib import Path
@@ -1439,6 +1440,13 @@ class KokoroTTSEngine:
 
         async with self._speak_lock:
             if not self._tts_is_enabled() or policy_marker is not getattr(self, "_tts_disable_marker", 0):
+                # J10 (build-10 laptop): a reply shown in chat was never spoken,
+                # with no log line. Name it, so the next run shows which stop
+                # (see stop()) retired a reply that was waiting its turn.
+                logger.info(
+                    "Reply not spoken: speech was stopped or switched off while it waited (%d chars)",
+                    len(clean_text),
+                )
                 return
             self._unspoken_notice_at = None
             try:
@@ -2131,6 +2139,15 @@ class KokoroTTSEngine:
         Native inference keeps its worker/model ownership until it really ends.
         Do not acquire its lock or unload the model on the caller/event loop.
         """
+        try:
+            caller = sys._getframe(1)
+            logger.info(
+                "TTS stop requested by %s.%s",
+                caller.f_globals.get("__name__", "?"),
+                caller.f_code.co_name,
+            )
+        except Exception:  # noqa: BLE001, RUF100 - a log line must never block a stop
+            pass
         # Construction-bypassing source-contract fixtures have no playback yet.
         if not hasattr(self, "_playback_state_lock"):
             self._playback_state_lock = threading.Lock()
