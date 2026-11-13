@@ -333,6 +333,11 @@ def _settings_dev_mode_bypass_enabled() -> bool:
         return False
 
 
+def _is_onboarding_progress_key(key: str) -> bool:
+    """Keys the onboarding code saves itself; a settings save has nothing to do with them."""
+    return key in {"onboarding_completed", "onboarding_completed_at"} or key.startswith("onboarding_step_")
+
+
 def _settings_strict_classifier_enabled() -> bool:
     if _settings_dev_mode_bypass_enabled():
         return False
@@ -1147,7 +1152,11 @@ def create_settings_router(*, music_service: object | None = None) -> APIRouter:
             dropped = set(normalized_incoming) - set(known)
             legacy_dropped = dropped & settings_mgr.REMOVED_LEGACY_SETTING_KEYS
             for key in dropped - legacy_dropped:
-                logger.warning("Ignoring unknown setting: %s", key)
+                if _is_onboarding_progress_key(key):
+                    # Saved separately by /v1/onboarding/save, so nothing is lost here.
+                    logger.debug("Ignoring onboarding key in settings save (saved by onboarding): %s", key)
+                else:
+                    logger.warning("Ignoring unknown setting: %s", key)
 
             known, llm_lock_errors = _enforce_llm_lock(known, settings_mgr)
             if llm_lock_errors and not known:

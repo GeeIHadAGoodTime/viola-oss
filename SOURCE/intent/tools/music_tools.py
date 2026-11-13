@@ -887,6 +887,18 @@ async def _transport_result(action_name: str, before: dict[str, Any], response: 
     return ToolResult(ok=True, data=result_data, unverified=True)
 
 
+def _spoken_position(seconds: float) -> str:
+    """A track position the way a person says it: 45 seconds, 3:05, 3:34:35."""
+    total = max(0, int(round(float(seconds))))
+    if total < 60:
+        return "%d seconds" % total
+    hours, rest = divmod(total, 3600)
+    minutes, secs = divmod(rest, 60)
+    if hours:
+        return "%d:%02d:%02d" % (hours, minutes, secs)
+    return "%d:%02d" % (minutes, secs)
+
+
 async def _seek_result(
     action_name: str,
     target_seconds: float,
@@ -911,7 +923,7 @@ async def _seek_result(
     if not after.get("probe_ok") or not isinstance(observed, (int, float)):
         result_data["verified"] = False
         result_data["message"] = (
-            "I asked the player to move to %.1f seconds but could not read back its position." % target_seconds
+            "I asked the player to move to %s but could not read back its position." % _spoken_position(target_seconds)
         )
         return ToolResult(ok=True, data=result_data, unverified=True)
 
@@ -926,17 +938,17 @@ async def _seek_result(
         )
     if landed:
         result_data["verified"] = True
-        result_data["message"] = "Moved to %.1f seconds." % float(observed)
+        result_data["message"] = "Moved to %s." % _spoken_position(float(observed))
         return ToolResult(ok=True, data=result_data)
 
     result_data["verified"] = False
     result_data["retry"] = False
     result_data["message"] = (
-        "The seek to %.1f seconds was sent once; the player reports %.1f seconds. "
+        "The seek to %s was sent once; the player reports %s. "
         "Sending it again will not change that: tell the user where it is."
     ) % (
-        target_seconds,
-        float(observed),
+        _spoken_position(target_seconds),
+        _spoken_position(float(observed)),
     )
     return ToolResult(ok=True, data=result_data, unverified=True)
 
