@@ -9,7 +9,8 @@ from __future__ import annotations
 
 import json
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from decimal import ROUND_CEILING, Decimal
 from typing import Any
 
 from core.logging_config import get_logger
@@ -210,6 +211,50 @@ def estimated_spend_cents(model: str, usage: LlmTokenUsage) -> int:
     return max(1, math.ceil(float(cents)))
 
 
+MICRODOLLARS_PER_CENT = 10_000
+
+
+def exact_spend_microdollars(model: str, usage: LlmTokenUsage) -> int | None:
+    """True cost of one call in microdollars (1 cent = 10,000), rounded up once.
+
+    Build 11: managed AI is charged at its true cost; the ledger turns these
+    into whole cents with a per-account carry (billing/plan_limiter.py
+    ``_true_cost_charge``), so there is no one-cent minimum per request and
+    the running charge is never below the running cost. Returns None when the
+    price cannot be computed: the caller then keeps the reserved estimate
+    instead of charging less.
+    """
+    try:
+        from services.llm.pricing import calculate_cost_cents
+
+        cents = calculate_cost_cents(
+            model,
+            usage.input_tokens,
+            usage.output_tokens,
+            usage.cached_tokens,
+            cache_write_tokens=usage.cache_write_tokens,
+            web_search_requests=usage.web_search_requests,
+        )
+    except Exception as exc:
+        logger.warning("LLM exact cost failed for model %s (%s); keeping the reserved estimate", model, exc)
+        return None
+    value = Decimal(repr(float(cents))) * MICRODOLLARS_PER_CENT
+    return max(0, int(value.to_integral_value(rounding=ROUND_CEILING)))
+
+
+def failed_request_usage(estimated: LlmTokenUsage, actual: LlmTokenUsage | None) -> LlmTokenUsage:
+    """What a request that reached the provider and then failed is charged.
+
+    The provider generally bills a request that was sent even when it times
+    out, is cancelled or breaks mid-stream. Reported usage wins when there is
+    any; otherwise the full estimate with no cache discount, which is the
+    most the provider could have billed for it (no subsidy, Jay 2026-11-12).
+    """
+    if actual is not None and actual.total_tokens > 0:
+        return actual
+    return replace(estimated, cached_tokens=0)
+
+
 class LlmSpendReservation:
     """Pre-network reservation and post-network settlement for direct LLM calls."""
 
@@ -280,7 +325,19 @@ class LlmSpendReservation:
             )
             self._reserved = True
 
-    async def settle(self, actual_usage: LlmTokenUsage | None = None, *, failed: bool = False) -> None:
+    async def settle(
+        self,
+        actual_usage: LlmTokenUsage | None = None,
+        *,
+        failed: bool = False,
+        sent: bool = True,
+    ) -> None:
+        """Settle once. ``failed`` with ``sent`` (the default) still charges.
+
+        Pass ``sent=False`` only when the request never reached the provider
+        (refused before sending, or rejected outright with an error status);
+        only then is the hold released at no charge.
+        """
         if self._settled:
             return
         self._settled = True
@@ -319,21 +376,39 @@ class LlmSpendReservation:
             from billing.plan_limiter import get_plan_limiter
 
             limiter = get_plan_limiter()
+            charge_usage: LlmTokenUsage | None
+            if not failed:
+                charge_usage = usage
+            elif sent and self._spend_reservation is not None:
+                charge_usage = failed_request_usage(self.estimated_usage, actual_usage)
+            else:
+                charge_usage = None
             if self._spend_reservation is not None:
-                limiter.settle_spend_reservation(
-                    self._spend_reservation,
-                    actual_cents=estimated_spend_cents(self.model, usage),
-                    failed=failed,
-                )
-            elif not failed:
+                if charge_usage is None:
+                    limiter.settle_spend_reservation(self._spend_reservation, actual_cents=0, failed=True)
+                else:
+                    exact = exact_spend_microdollars(self.model, charge_usage)
+                    reserved = float(getattr(self._spend_reservation, "reserved_cents", 0) or 0)
+                    if exact is None:
+                        limiter.settle_spend_reservation(
+                            self._spend_reservation, actual_cents=max(reserved, 1.0), failed=False
+                        )
+                    else:
+                        limiter.settle_spend_reservation(
+                            self._spend_reservation,
+                            actual_cents=exact / MICRODOLLARS_PER_CENT,
+                            failed=False,
+                            exact_microdollars=exact,
+                        )
+            elif charge_usage is not None:
                 limiter.settle_spend(
                     self.user_id,
                     self.model,
-                    usage.input_tokens,
-                    usage.output_tokens,
-                    usage.cached_tokens,
-                    cache_write_tokens=usage.cache_write_tokens,
-                    web_search_requests=usage.web_search_requests,
+                    charge_usage.input_tokens,
+                    charge_usage.output_tokens,
+                    charge_usage.cached_tokens,
+                    cache_write_tokens=charge_usage.cache_write_tokens,
+                    web_search_requests=charge_usage.web_search_requests,
                 )
         except Exception as exc:
             # A settle failure (in practice a transient Postgres timeout in the
@@ -373,6 +448,8 @@ __all__ = [
     "LlmTokenUsage",
     "estimate_openai_payload_usage",
     "estimated_spend_cents",
+    "exact_spend_microdollars",
+    "failed_request_usage",
     "usage_from_chat_completion_payload",
     "usage_from_openai_response",
     "usage_from_openai_usage",

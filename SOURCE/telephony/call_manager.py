@@ -2696,11 +2696,38 @@ class _OpenAISpendAccounting:
 
             limiter = get_plan_limiter()
             if self._spend_reservation is not None:
-                limiter.settle_spend_reservation(
-                    self._spend_reservation,
-                    actual_cents=_estimated_spend_cents(self.model, usage),
-                    failed=failed,
+                # Build 11, no subsidy: every failure here happens after the
+                # request was sent (create raised, the stream broke, HTTP
+                # error), and the provider still bills it. Charge the reported
+                # usage, or the full uncached estimate, at its true cost.
+                from services.llm.spend_accounting import (
+                    MICRODOLLARS_PER_CENT,
+                    LlmTokenUsage,
+                    exact_spend_microdollars,
                 )
+
+                reported = bool(actual_usage) and (actual_usage.input_tokens + actual_usage.output_tokens) > 0
+                charged = self.estimated_usage if failed and not reported else usage
+                exact = exact_spend_microdollars(
+                    self.model,
+                    LlmTokenUsage(
+                        input_tokens=charged.input_tokens,
+                        output_tokens=charged.output_tokens,
+                        cached_tokens=0 if failed else charged.cached_tokens,
+                    ),
+                )
+                if exact is None:
+                    reserved = float(getattr(self._spend_reservation, "reserved_cents", 0) or 0)
+                    limiter.settle_spend_reservation(
+                        self._spend_reservation, actual_cents=max(reserved, 1.0), failed=False
+                    )
+                else:
+                    limiter.settle_spend_reservation(
+                        self._spend_reservation,
+                        actual_cents=exact / MICRODOLLARS_PER_CENT,
+                        failed=False,
+                        exact_microdollars=exact,
+                    )
             elif not failed:
                 limiter.settle_spend(
                     self.user_id,
