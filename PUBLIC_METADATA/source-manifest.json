@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "90726b689579e904cd6d5ec32ab21dc8cb7dd537",
-  "sha256": "d67047b995fad303ab0ffb82b4c8880b2d304ab32542a68d613dc358e134c059",
+  "revision": "4a5c109d5321c05ff18db5b1b8c0d74cd9c7036a",
+  "sha256": "8a7a3dead789d5f7fb4143a77212aab5ec75fdf01a1478d6e96f115cd26b019c",
   "files": [
     {
       "path": ".env.example",
@@ -5195,13 +5195,13 @@
     },
     {
       "path": "services/scheduler/service.py",
-      "sha256": "aaa329b1ba37d6abdc14c532e636664f76260ad90160db2ca264aa720aa2ab24",
-      "bytes": 49856
+      "sha256": "d57950ea11cd41022213c2c221836fcbabcacf99b16741d5fb1295ab5b366fe1",
+      "bytes": 52343
     },
     {
       "path": "services/scheduler/store.py",
-      "sha256": "5704dfb7b709fcc3f8fb7d37a27f9f79bab23ec4839401e2961a58188a6ed92f",
-      "bytes": 53965
+      "sha256": "c481f455ba0f732a0dccc9a0f3614c58aba59024f6aa9df935e3c4e3be893321",
+      "bytes": 55288
     },
     {
       "path": "services/sentry_init.py",
