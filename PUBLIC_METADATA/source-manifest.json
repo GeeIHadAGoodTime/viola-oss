@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "97b3e6ec9ea9b713c872da34181053da67e78920",
-  "sha256": "e58a1ffeb3116dfefc83456c5eddc6aad4fb746e6fd9b8e746d4bd39bbc7e730",
+  "revision": "c98cf50140c0eda141aa3787f6097260b06f0a4d",
+  "sha256": "bf9d5419ae27441b352c7bf21902504a71c955b5b10a36e31361385bb0991032",
   "files": [
     {
       "path": ".env.example",
@@ -5765,8 +5765,8 @@
     },
     {
       "path": "telephony/call_manager.py",
-      "sha256": "5e77fa26dcf086c7d6a974968d602d8f940918d75696459c1d5445350c3ca23e",
-      "bytes": 395489
+      "sha256": "2a2c89d238335142b530dcb36af549dda3c1824eab847784ebd2c7687ac90348",
+      "bytes": 399479
     },
     {
       "path": "telephony/call_queue.py",
@@ -5780,8 +5780,8 @@
     },
     {
       "path": "telephony/call_tools.py",
-      "sha256": "388d06d088c66f2e1c52ac4c2df4defeb601998d4cfe54540e32a6da47f5d23b",
-      "bytes": 71591
+      "sha256": "69764cf61cbe8d8f284573c9df0e4035b22e21bca8c62b3f9a878f836ad91221",
+      "bytes": 72064
     },
     {
       "path": "telephony/caller_validation.py",
@@ -6435,8 +6435,8 @@
     },
     {
       "path": "tests/public/test_source_contract.py",
-      "sha256": "00d4136182323e34a29b61f84b7ea7feccd300e3c24cd06bfc0ffdc70f68181d",
-      "bytes": 55813
+      "sha256": "4798ac1f49f2b5ef1154e245c1e0ca61e8dc35e13136ec168c1b4cc79015c555",
+      "bytes": 56247
     },
     {
       "path": "tests/public/test_speech_volume_wiring.py",
