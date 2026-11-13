@@ -26,6 +26,10 @@ from services.memory.hygiene import (
     HYGIENE_SETTINGS,
     MemoryHygienePolicy,
     canonical_memory_text,
+    is_junk_memory_line,
+    is_state_snapshot_line,
+    mask_labelled_zip,
+    memory_fact_key,
     validate_entry_content,
     validate_file_content,
     validate_semantic_content,
@@ -640,18 +644,31 @@ class MemoryDir:
     def _clean_saved_memory_once(self) -> None:
         """Remove what earlier builds wrongly saved, once per account.
 
-        Reports of single turns and echoed runtime text are deleted. A street
-        address is masked in place, the same as a phone number: the line keeps
-        saying that an address exists, so Viola asks rather than trusts it.
+        Removed: reports of single turns, echoed runtime text, copies of the
+        runtime state ("CURRENT SYSTEM STATE", "Current time", "Now playing"),
+        logs of single file actions, and repeats of a fact already kept. A street
+        address or a named ZIP code is masked in place, the same as a phone
+        number: the line keeps saying that one exists, so Viola asks rather than
+        trusts it.
+
+        Version 2. Version 1 (build 10) knew turn reports and runtime ids only,
+        read bullets one line at a time, and never looked for repeats, so the
+        laptop's Context topic kept about 148 state copies and Facts kept 15
+        wordings of one fact. It also said nothing in the log, so nobody could
+        tell whether it had run. This one says what it did, in counts only.
         """
-        marker = self.root / ".saved_memory_cleaned_v1"
+        marker = self.root / ".saved_memory_cleaned_v2"
         if marker.exists():
             return
-        from services.memory.hygiene import is_junk_memory_line
         from services.memory.store import redact_street_addresses
 
         removed = 0
+        repeats = 0
         masked = 0
+        kept_entries = 0
+        topic_files = 0
+        seen_text: set[str] = set()
+        seen_facts: set[frozenset[str]] = set()
         try:
             # Memories written to the top of memory/ were invisible to recall.
             for stray in sorted(self.root.glob("*.md")):
@@ -662,13 +679,44 @@ class MemoryDir:
                 self._write_memory_file(topic, existing + self._read_memory_file(stray))
                 stray.unlink()
             for path in sorted(self.topics_dir.glob("*.md")):
+                topic_files += 1
                 original = self._read_memory_file(path)
-                kept: list[str] = []
-                for line in original.splitlines():
-                    if line.lstrip().startswith(("- ", "* ")) and is_junk_memory_line(line):
+                lines = original.splitlines()
+                frontmatter_end = 0
+                if lines and lines[0].strip() == _FRONTMATTER_DELIMITER:
+                    for index, line in enumerate(lines[1:], start=1):
+                        if line.strip() == _FRONTMATTER_DELIMITER:
+                            frontmatter_end = index + 1
+                            break
+                kept: list[str] = lines[:frontmatter_end]
+                dropping = False
+                for line in lines[frontmatter_end:]:
+                    stripped = line.strip()
+                    if not stripped or stripped.startswith("#"):
+                        dropping = False
+                        kept.append(line)
+                        continue
+                    if line.lstrip().startswith(("- ", "* ")):
+                        dropping = True
+                        if is_junk_memory_line(line):
+                            removed += 1
+                            continue
+                        text_key = canonical_memory_text(line)
+                        fact_key = memory_fact_key(line)
+                        if text_key in seen_text or (len(fact_key) >= 2 and fact_key in seen_facts):
+                            repeats += 1
+                            continue
+                        dropping = False
+                        seen_text.add(text_key)
+                        seen_facts.add(fact_key)
+                        kept_entries += 1
+                    elif dropping:
+                        # The rest of an entry that was just removed.
+                        continue
+                    elif is_state_snapshot_line(line):
                         removed += 1
                         continue
-                    clean = redact_street_addresses(line)
+                    clean = mask_labelled_zip(redact_street_addresses(line))
                     masked += int(clean != line)
                     kept.append(clean)
                 cleaned = "\n".join(kept) + ("\n" if original.endswith("\n") else "")
@@ -676,14 +724,23 @@ class MemoryDir:
                     self._write_memory_file(path, cleaned)
         except (OSError, RuntimeError, ValueError) as exc:
             # Encrypted memory may not be readable yet; try again on a later start.
-            logger.debug("Saved memory cleanup deferred: %s", exc)
+            logger.info("Saved memory cleanup v2 deferred (%s); it will run on a later start", type(exc).__name__)
             return
         marker.write_text(_now_iso(), encoding="utf-8")
-        if removed or masked:
+        logger.info(
+            "Saved memory cleanup v2: removed %d junk entries and %d repeats, masked %d lines, "
+            "kept %d entries in %d topic files",
+            removed,
+            repeats,
+            masked,
+            kept_entries,
+            topic_files,
+        )
+        if removed or repeats or masked:
             self._audit(
                 "cleanup",
                 "memory/topics/",
-                "removed %d junk entries, masked %d street addresses" % (removed, masked),
+                "removed %d junk entries and %d repeats, masked %d addresses" % (removed, repeats, masked),
                 agent_initiated=False,
             )
 
@@ -1349,6 +1406,10 @@ class MemoryDir:
         incoming = canonical_memory_text(content)
         if not incoming:
             return None
+        # The same fact in other filler words ("User's sister is Mara", "The user
+        # has a sister named Mara") shares under 92% of its words, so the overlap
+        # rule alone let 15 wordings of one fact through (build 10 laptop).
+        incoming_fact = memory_fact_key(content) if "\n" not in content.strip() else frozenset()
         for item in self._markdown_files(include_viola=False):
             if topics_only and item.parent.resolve() != self.topics_dir.resolve():
                 continue
@@ -1365,6 +1426,8 @@ class MemoryDir:
                 if not existing:
                     continue
                 overlap = 1.0 if incoming == existing else word_overlap(incoming, existing)
+                if len(incoming_fact) >= 2 and incoming_fact == memory_fact_key(str(entry.get("text") or "")):
+                    overlap = 1.0
                 if overlap >= self.hygiene_policy.dedup_word_overlap:
                     return {
                         "path": self._relative(item),
@@ -1886,7 +1949,19 @@ class MemoryDir:
         sure the index points at its topic. Index pointers themselves still go to
         MEMORY.md unchanged.
         """
-        target = self._path_for_where(where)
+        try:
+            target = self._path_for_where(where)
+        except ValueError as exc:
+            if VIOLA_FILE not in str(exc):
+                raise
+            target = self.viola_path
+        if target.resolve() == self.viola_path.resolve():
+            # VIOLA.md is the user's own file and stays untouched. A fact aimed at
+            # it used to be refused ("VIOLA.md is user-owned"), which cost the
+            # user a failed first try; it is a memory, so it is saved as one.
+            result = self.store_semantic_memory(content, category="note", agent_initiated=True)
+            result["rerouted_from"] = VIOLA_FILE
+            return result
         if (
             target.resolve() == self.index_path.resolve()
             and position != "replace"
@@ -1896,6 +1971,7 @@ class MemoryDir:
             result["rerouted_from"] = self._relative(self.index_path)
             return result
         is_topic = target.parent.resolve() == self.topics_dir.resolve()
+        topic_is_new = is_topic and not target.exists()
         if is_topic and position == "append" and not (target.exists() and self._read_memory_file(target).strip()):
             title, description, memory_type = self._topic_metadata(target)
             self._ensure_semantic_frontmatter(
@@ -1906,6 +1982,9 @@ class MemoryDir:
                 agent_initiated=True,
             )
         result = self.write(content, where=where, position=position, agent_initiated=True)
+        if topic_is_new and result.get("deduped") and target.exists():
+            # The fact is already kept elsewhere: do not leave an empty topic behind.
+            target.unlink()
         landed = self.root / str(result.get("path") or "").removeprefix("memory/")
         if is_topic and landed.parent.resolve() == self.topics_dir.resolve() and landed.is_file():
             try:

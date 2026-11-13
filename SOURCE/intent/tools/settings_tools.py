@@ -500,6 +500,12 @@ async def settings_get_handler(key: str, user_id: str = "") -> ToolResult:
     )
 
 
+# "48.12 Maple Street": speech-to-text writes a house number said as two pairs
+# ("forty-eight twelve") with a point or a comma in the middle. No house number
+# has one, so the digits are joined; the read-back says what was stored.
+_HEARD_HOUSE_NUMBER_RE = re.compile(r"^(\d{1,6})[.,](\d{1,6})(?=[A-Za-z]?(?:\s|$))")
+
+
 def delivery_address_text(address: dict[str, str]) -> str:
     """One line, the same words the user hears and the approval page shows."""
     street = " ".join(part for part in (address.get("street"), address.get("apt")) if part)
@@ -522,7 +528,7 @@ async def save_delivery_address_handler(
     """
     region = str(state or "").strip()
     address = {
-        "street": str(street or "").strip(),
+        "street": _HEARD_HOUSE_NUMBER_RE.sub(r"\1\2", str(street or "").strip()),
         "city": str(city or "").strip(),
         # A spoken "Wisconsin" stays a word; only a two-letter code is capitalised.
         "state": region.upper() if len(region) == 2 else region,

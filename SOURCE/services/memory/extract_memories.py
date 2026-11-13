@@ -17,7 +17,7 @@ from core.constants import TIMEOUT_MINUTE
 from core.logging_config import get_logger
 from core.secrets_mask import mask_secrets_in_text, scan_secrets_in_text
 from services.memory.dir import MemoryDir, get_memory_dir
-from services.memory.hygiene import is_junk_memory_line
+from services.memory.hygiene import is_junk_memory_line, mask_labelled_zip
 from services.memory.store import (
     SENSITIVE_CONTENT_RE,
     contains_street_address,
@@ -133,9 +133,6 @@ def model_visible_messages_to_transcript(messages: Sequence[Mapping[str, Any]]) 
 
 _SYSTEM_REMINDER_RE = re.compile(r"<system-reminder>.*?</system-reminder>", re.DOTALL)
 _SPOKEN_TEXT_BLOCK_TYPES = frozenset({"text", "input_text", "output_text"})
-_RESULT_KEYS = ("tool_results", "tool_result", "model_visible_result")
-# Enough of a result to carry a fact about the user, not a whole page.
-_TOOL_RESULT_CHARS = 1_000
 
 
 def _spoken_text(content: Any) -> str:
@@ -153,19 +150,6 @@ def _spoken_text(content: Any) -> str:
     return ""
 
 
-def _tool_result_text(message: Mapping[str, Any]) -> str:
-    parts: list[str] = []
-    content = message.get("content")
-    if isinstance(content, Sequence) and not isinstance(content, (str, bytes, bytearray)):
-        parts.extend(
-            _content_to_text(block.get("content"))
-            for block in content
-            if isinstance(block, Mapping) and block.get("type") == "tool_result"
-        )
-    parts.extend(_content_to_text(message.get(key)) for key in _RESULT_KEYS if key in message)
-    return "\n".join(part[:_TOOL_RESULT_CHARS] for part in parts if part.strip())
-
-
 def current_turn_transcript(messages: Sequence[Mapping[str, Any]]) -> str:
     """Return only the latest turn, for the memory extractor.
 
@@ -173,6 +157,11 @@ def current_turn_transcript(messages: Sequence[Mapping[str, Any]]) -> str:
     all the history in the prompt and cursor lines carrying task ids. That made
     each command's extraction grow with the session, and is where "System reminder
     indicates..." and raw ids in saved memory came from.
+
+    Tool results are left out too. A result is a log of what a tool did ("Wrote
+    notes.txt"), a page, or memory read back; build 10 kept the first 1,000
+    characters of each and file-action lines were saved as facts about the user.
+    A memory comes from what the user said and what Viola answered.
     """
     start = 0
     for index in range(len(messages) - 1, -1, -1):
@@ -185,7 +174,7 @@ def current_turn_transcript(messages: Sequence[Mapping[str, Any]]) -> str:
         role = str(message.get("role") or "").lower()
         if role not in {"user", "assistant"}:
             continue
-        body = "\n".join(part for part in (_spoken_text(message.get("content")), _tool_result_text(message)) if part)
+        body = _spoken_text(message.get("content"))
         if body:
             lines.append("%s: %s" % (role, body))
     return "\n".join(lines)
@@ -217,7 +206,7 @@ def sanitize_memory_candidate_text(content: str) -> str | None:
     # street address is saved only through save_delivery_address or Settings.
     if contains_street_address(clean) or is_junk_memory_line(clean):
         return None
-    redacted = redact_pii_output(clean).strip()
+    redacted = mask_labelled_zip(redact_pii_output(clean)).strip()
     return redacted if len(redacted) >= 5 else None
 
 
@@ -357,6 +346,14 @@ class ExtractMemoriesService:
                 continue
             if not result.get("deduped"):
                 written += 1
+        # Counts only. Shows on the next laptop run whether repeats and junk in
+        # memory come from this background extractor or from the memory tool.
+        logger.info(
+            "Memory extraction: %d candidates, %d written, %d already known",
+            len(extracted),
+            written,
+            len(extracted) - written,
+        )
 
         self._write_cursor({"last_hash": digest, "last_task_id": task_id, "written": written})
         return written

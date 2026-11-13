@@ -108,6 +108,7 @@ def _recall_memory(uid: str, query: str, limit: int = 5) -> ToolResult:
 
 
 _CONVERSATION_EXCHANGE_LIMIT = 10
+_SAVED_TEXT_CHARS = 200
 _CONVERSATION_TEXT_CHARS = 600
 
 
@@ -214,6 +215,16 @@ async def memory_handler(
             # to a topic file instead of rejecting it, and keeps the index
             # pointing at every topic the agent writes (1.0.5 laptop item 4).
             write_result = memory.write_agent_memory(content, where=where, position=position)
+            if write_result.get("ok", True) and not write_result.get("deduped"):
+                # A misheard "save ..." was written without a word (build 10
+                # laptop: "Say good morning in Spanish" heard as "Save ..."). The
+                # model's copy of the tool description is cut before any guidance
+                # on acknowledging, so the words to say back travel in the result.
+                write_result["saved_text"] = content.strip()[:_SAVED_TEXT_CHARS]
+                write_result["if_user_asked"] = (
+                    "If the user asked you to remember this, say in a few words what you saved, "
+                    "so a mishearing can be undone."
+                )
             return ToolResult(ok=bool(write_result.get("ok", True)), data=write_result, error=write_result.get("error"))
         if normalized_action == "edit":
             error = _sensitive_error(replace)

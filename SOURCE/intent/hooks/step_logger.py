@@ -14,7 +14,7 @@ from typing import Any
 
 from core.logging_config import get_logger
 from intent.hooks.base import HookContext, PostToolHook
-from intent.log_redaction import redact_card_data
+from intent.log_redaction import redact_card_data, redact_tool_arguments_for_log, redact_tool_result_for_log
 
 logger = get_logger(__name__)
 
@@ -113,8 +113,8 @@ class StepLoggerHook(PostToolHook):
             "Agent step %d: %s(%s) -> %s [%dms]",
             context.iteration,
             tool_name,
-            self._summarize_args(safe_tool_input),
-            self._summarize(summary_text, 50),
+            self._summarize_args(redact_tool_arguments_for_log(tool_name, safe_tool_input)),
+            self._summarize(str(redact_tool_result_for_log(tool_name, summary_text)), 50),
             tool_elapsed_ms,
         )
 

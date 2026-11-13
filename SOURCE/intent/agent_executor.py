@@ -70,7 +70,14 @@ from intent.irreversible_actions import (
     gate_action_class,
     irreversible_action_class,
 )
-from intent.log_redaction import redact_card_data, redact_card_field, redact_pii
+from intent.log_redaction import (
+    is_address_argument_tool,
+    redact_card_data,
+    redact_card_field,
+    redact_pii,
+    redact_tool_arguments_for_log,
+    redact_tool_result_for_log,
+)
 from intent.post_answer_teardown import (
     drain_owner as _drain_post_answer_owner,
     schedule_post_answer_coro,
@@ -2136,6 +2143,9 @@ def _redacted_static_step_field(key: str, value: Any) -> Any:
     return copy.deepcopy(cached)
 
 
+# Origins of a user frame that hold the user's own words: typed (no origin) and
+# spoken. Summaries, resumed sessions and hook output are user-role frames too.
+_USER_AUTHORED_FRAME_ORIGINS = frozenset({"", "voice"})
 _ADDRESS_LOG_KEYS = frozenset({"street", "zip_code", "read_back"})
 _ADDRESS_TOOL = "save_delivery_address"
 # In a turn that saves an address, a bare "no, the house number is 4812" carries
@@ -2168,8 +2178,23 @@ def _mask_addresses_for_log(value: Any) -> Any:
     return value
 
 
+def _mask_address_tool_step(step_data: dict[str, Any]) -> dict[str, Any]:
+    """An address tool's arguments and result are masked whole, because of the tool, not the text's shape."""
+    tool_name = step_data.get("tool_name")
+    if not is_address_argument_tool(tool_name):
+        return step_data
+    masked = dict(step_data)
+    if "tool_input" in masked:
+        masked["tool_input"] = redact_tool_arguments_for_log(tool_name, masked["tool_input"])
+    for key in ("tool_result", "result_summary"):
+        if masked.get(key):
+            masked[key] = redact_tool_result_for_log(tool_name, masked[key])
+    return masked
+
+
 def _redact_step_data(step_data: dict[str, Any]) -> Any:
     """Card and personal data out of a step line, reusing the redaction of unchanged tool-schema fields."""
+    step_data = _mask_address_tool_step(step_data)
     static_keys = [key for key in _STEP_LOG_STATIC_FIELDS if isinstance(step_data.get(key), (dict, list))]
     if not static_keys:
         return _mask_addresses_for_log(redact_pii(redact_card_data(step_data)))
@@ -2554,6 +2579,9 @@ class AgentStepRecord:
     def __post_init__(self) -> None:
         self.tool_input = _mask_addresses_for_log(redact_card_data(self.tool_input))
         self.tool_result_summary = _mask_addresses_for_log(redact_card_data(self.tool_result_summary))
+        if is_address_argument_tool(self.tool_name):
+            self.tool_input = redact_tool_arguments_for_log(self.tool_name, self.tool_input)
+            self.tool_result_summary = str(redact_tool_result_for_log(self.tool_name, self.tool_result_summary))
         self.tool_use_id = str(self.tool_use_id or "").strip() or None
 
 
@@ -6794,8 +6822,11 @@ class AgentExecutor:
     def _user_own_words(self, user_text: str) -> str:
         """What the user has said in this conversation, and the address they already saved.
 
-        Only frames the user wrote count. Compaction summaries are user-role frames
-        too, but they carry an origin, and they can quote a page.
+        Only frames the user wrote or spoke count. Compaction summaries are
+        user-role frames too, but they carry another origin, and they can quote a
+        page. A spoken turn carries the origin "voice": leaving it out meant an
+        address given over two spoken answers was refused, because the street
+        said one answer earlier did not count as the user's words (build 10).
         """
         from services.conversation.state_manager import get_request_conversation_manager
 
@@ -6804,7 +6835,11 @@ class AgentExecutor:
         get_window = getattr(manager, "get_prompt_window", None)
         if callable(get_window):
             for frame in get_window().frames:
-                if frame.role is FrameRole.USER and frame.kind is FrameKind.USER_INPUT and not frame.origin:
+                if (
+                    frame.role is FrameRole.USER
+                    and frame.kind is FrameKind.USER_INPUT
+                    and (frame.origin or "") in _USER_AUTHORED_FRAME_ORIGINS
+                ):
                     parts.extend(block.text for block in frame.blocks if isinstance(block, TextBlock))
         try:
             from intent.tools.settings_tools import delivery_address_text

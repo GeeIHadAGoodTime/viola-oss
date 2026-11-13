@@ -39,6 +39,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from core.logging_config import get_logger
+from intent.log_redaction import redact_tool_arguments_for_log, redact_tool_result_for_log
 
 logger = get_logger(__name__)
 
@@ -753,13 +754,14 @@ class StepLoggerMiddleware(Middleware):
             except Exception as exc:
                 logger.warning("StepLogger telemetry failed: %s", exc)
 
-            # Info log
+            # Info log. Arguments are masked by tool and by field name first:
+            # once joined into one string only a pattern can still catch them.
             logger.info(
                 "Agent step %d: %s(%s) -> %s [%dms]",
                 context.iteration,
                 tool_name,
-                _summarize_args(tool_args),
-                _summarize(summary_text, 50),
+                _summarize_args(redact_tool_arguments_for_log(tool_name, tool_args)),
+                _summarize(str(redact_tool_result_for_log(tool_name, summary_text)), 50),
                 tool_elapsed_ms,
             )
 
