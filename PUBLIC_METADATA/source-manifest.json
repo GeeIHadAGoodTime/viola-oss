@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "a14a6299638de515c8ce66429fd3fa7ffd907466",
-  "sha256": "47041322c5be38849f2ec4cc842cdffa620f48166d45865d45e3b9a667d5ca94",
+  "revision": "1f6052b1eee69861729e996c045bce46b8343e93",
+  "sha256": "a25ccc2fd0c5ab143ef6e4dd7ac3531aac37a2a1ada3ef238ac98d1e2f505d19",
   "files": [
     {
       "path": ".env.example",
@@ -4730,8 +4730,8 @@
     },
     {
       "path": "services/llm/providers/openai_compatible.py",
-      "sha256": "9de1224ded76fe0fbd22c8403745b7b864fd4551e31edc357d1d948dc369d4f0",
-      "bytes": 191532
+      "sha256": "4bb86d87b25b6db08d68ba099bab1f59652c35a09d1135226841267833a73ae7",
+      "bytes": 193905
     },
     {
       "path": "services/llm/quota_repository.py",
