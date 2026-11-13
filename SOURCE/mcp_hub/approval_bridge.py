@@ -735,6 +735,7 @@ _RISK_MAP_RAW: dict[str, RiskLevel] = {
     "open_app_panel": RiskLevel.SAFE,
     "pair_speaker_setup": RiskLevel.SAFE,
     "video_fullscreen": RiskLevel.SAFE,
+    "read_aloud": RiskLevel.SAFE,
     "rate_track": RiskLevel.SAFE,
     # delegate_to_provider: routes to external compute, no local side effects.
     "delegate_to_provider": RiskLevel.SAFE,

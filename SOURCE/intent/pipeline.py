@@ -1773,6 +1773,14 @@ class IntentPipeline:
                 return
         except Exception:  # noqa: BLE001, RUF100 - a settings hiccup must not silently mute Viola
             logger.debug("Could not read voice_muted for queued reply", exc_info=True)
+        try:
+            from services.llm.answer_stream import spoken_reply
+            from voice.streamed_reply import speaks_english
+
+            english = speaks_english(getattr(self._tts_speaker, "tts", None))
+            message = spoken_reply(message, english=english) or message
+        except Exception:  # noqa: BLE001, RUF100 - the long-answer rule must never silence a reply
+            logger.debug("Long-answer rule unavailable for queued reply", exc_info=True)
         with use_request_channel(channel):
             await self._tts_speaker.speak(message)
 

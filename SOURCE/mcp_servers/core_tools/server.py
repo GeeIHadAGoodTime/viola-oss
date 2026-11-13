@@ -5150,6 +5150,22 @@ async def open_app_panel(
 
 @server.tool(
     description=(
+        "When the user asks to hear an answer read out loud in full, call this, then reply with the full text."
+    ),
+    annotations=_SAFE,
+    meta={"risk": "safe", "anthropic/alwaysLoad": True},
+)
+async def read_aloud() -> str:
+    """Mark this turn's answer to be spoken in full (voice/streamed_reply reads the tool event)."""
+    from intent.tool_types import ToolResult
+
+    return _format_result(
+        ToolResult(ok=True, data={"message": "Your reply this turn will be read out loud in full."})
+    )
+
+
+@server.tool(
+    description=(
         "Show the playing Music-stage video full screen (enabled=true: 'put this in full screen', "
         "'go full screen') or end it (enabled=false: 'end full screen', 'exit full screen'; while "
         "full screen also 'go back', 'normal size'). Desktop app only. Returns a ui_action; does "

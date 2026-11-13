@@ -13,8 +13,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 export const SPOKEN_CHARS_PER_SECOND = 17;
 export const SHOWN_CHARS_PER_SECOND = 120;
 // Viola stops talking at her spoken budget (services/llm/answer_stream.py): what
-// is left after that is only ever read, so there is nothing left to pace.
-export const SPOKEN_BUDGET_CHARS = 800;
+// is left after that is only ever read, so there is nothing left to pace. A long
+// answer is spoken only up to LONG_ANSWER_CHARS (200) and then goes on the card.
+export const SPOKEN_BUDGET_CHARS = 200;
 export const PACE_TICK_MS = 50;
 // A turn that never reports its end must not hold the line forever.
 export const LIVE_REPLY_IDLE_MS = 60000;

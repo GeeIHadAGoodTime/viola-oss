@@ -241,6 +241,16 @@ export function longAnswerCard(body, overVideo) {
     : { type: 'detail', body, long_answer: true };
 }
 
+// A background agent's result: the response line, and the big card when it is
+// long (same LONG_ANSWER_CARD_CHARS as a long spoken answer).
+export function agentResultView(content, overVideo) {
+  const text = typeof content === 'string' ? content : String(content ?? '');
+  if (text.trim().length > LONG_ANSWER_CARD_CHARS) {
+    return { text, line: truncateForResponseLine(text), card: longAnswerCard(text, overVideo) };
+  }
+  return { text, line: text, card: null };
+}
+
 export function truncateForResponseLine(text) {
   const value = typeof text === 'string' ? text.trim() : '';
   if (value.length <= RESPONSE_LINE_MAX_CHARS) return value;
@@ -459,6 +469,8 @@ function formatCallTitleElapsed(startedAt, fallbackMs = Date.now()) {
 // Embedded YouTube Player component - MUST be defined outside SmartDisplay
 // to prevent React from recreating it on every parent render
 const LONG_ANSWER_OVER_VIDEO_MS = 15000;
+// Same number as services/llm/answer_stream.py LONG_ANSWER_CHARS: past it Viola
+// says only the lead and "I put the rest on the screen for you".
 const LONG_ANSWER_CARD_CHARS = 200;
 const SPOKE_EMBED_URL = resolveYouTubeEmbedUrl(import.meta.env.VITE_YOUTUBE_EMBED_URL);
 const SPOKE_EMBED_ORIGIN = new URL(SPOKE_EMBED_URL).origin;
@@ -1120,7 +1132,12 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
   const [agentDrawerExpanded, setAgentDrawerExpanded] = useState(true);
   const handleAgentResult = useCallback(({ content }) => {
     if (!mountedRef.current) return;
-    setLastResponse(content);
+    // A long background-agent result (a 2,000-word essay on the laptop) goes on
+    // the big card like any long answer; the response line shows only its lead.
+    // It used to be dumped whole into the small stage text area.
+    const view = agentResultView(content, videoPlayingRef.current);
+    setLastResponse(view.line);
+    if (view.card) setActiveCard(view.card);
     setChatHistory(prev => [
       ...prev,
       { role: 'assistant', content, timestamp: new Date().toISOString() },

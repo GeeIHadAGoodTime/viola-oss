@@ -1912,6 +1912,15 @@ class VoiceCommandHandler:
             return
 
         if self.tts and message and not already_spoken and tts_enabled:
+            # Long answers say their lead and point at the card; a turn of quick
+            # music actions that all worked gets the done tone, not words.
+            from voice.streamed_reply import play_done_tone, whole_reply_speech
+
+            spoken = whole_reply_speech(message, self.tts, streamed_reply)
+            if spoken is None:
+                play_done_tone()
+                return
+            message = spoken
             try:
                 logger.info("Speaking response: %s...", message[:100])
                 self._last_spoken_reply = (message, time.monotonic())

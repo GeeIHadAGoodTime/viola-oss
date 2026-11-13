@@ -273,6 +273,18 @@ def _speak_reply_now(
     speak = getattr(engine, "speak", None) if engine is not None else None
     if not callable(speak):
         return
+    try:
+        from voice.streamed_reply import play_done_tone, whole_reply_speech
+    except Exception:  # noqa: BLE001, RUF100 - without the long-answer rule the reply is still spoken
+        log.debug("Long-answer rule unavailable; speaking the reply whole", exc_info=True)
+    else:
+        # Long answers say their lead and point at the card; a turn of quick
+        # music actions that all worked gets the done tone, not words.
+        spoken_text = whole_reply_speech(message, engine, streamed_reply)
+        if spoken_text is None:
+            play_done_tone()
+            return
+        message = spoken_text
 
     async def _run() -> None:
         try:

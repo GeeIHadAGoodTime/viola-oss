@@ -1479,6 +1479,7 @@ class MCPClientHub:
             "open_app_panel",
             "pair_speaker_setup",
             "video_fullscreen",
+            "read_aloud",
             # --- Pending-gate plumbing (works at every tier) ---
             "resume_signature_gate",
             "cancel_signature_gate",

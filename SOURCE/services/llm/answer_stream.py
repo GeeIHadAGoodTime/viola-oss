@@ -64,6 +64,44 @@ MAX_LIVE_SENTENCES = 10
 MAX_SPOKEN_CHARS = 800
 SUMMARY_SUFFIX = "I'll send the full details in chat."
 
+# Long answers (Jay's request, 1.0.5 build 11): a reply longer than this is shown
+# whole on the big card (ui/react-app/src/SmartDisplay.jsx LONG_ANSWER_CARD_CHARS,
+# the same number) and spoken as its first sentence, plus the second when the two
+# stay within this length, then LONG_ANSWER_LINES. The user can ask to have it
+# sent or read out loud (the read_aloud tool lifts the cap for that turn).
+# English speech only; other speech languages keep the budget above.
+LONG_ANSWER_CHARS = 200
+LONG_ANSWER_LINES = (
+    "I put the rest on the screen for you. If you want me to send this to you or read it out loud, just let me know."
+)
+# Tool that asks for this turn's answer to be spoken in full (mcp_servers/core_tools).
+READ_ALOUD_TOOL = "read_aloud"
+# Quick music actions answered with the soft done tone instead of words when they
+# are everything the turn did and all of them succeeded (Jay's suggestion, build 11).
+QUICK_MUSIC_TOOLS = frozenset({"playback"})
+_FINISHED_TOOL_STATUSES = frozenset({"ok", "error", "unknown"})
+
+
+def is_long_answer(text: str | None) -> bool:
+    return len((text or "").strip()) > LONG_ANSWER_CHARS
+
+
+def long_answer_lead(text: str | None) -> list[str]:
+    """The first sentence, plus the second when both fit in LONG_ANSWER_CHARS."""
+    sentences = all_sentences(text or "")
+    lead = sentences[:1]
+    if len(sentences) > 1 and len(sentences[0]) + 1 + len(sentences[1]) <= LONG_ANSWER_CHARS:
+        lead.append(sentences[1])
+    return lead
+
+
+def spoken_reply(text: str | None, *, english: bool = True, read_in_full: bool = False) -> str:
+    """What Viola says for a finished reply spoken whole (not live)."""
+    value = (text or "").strip()
+    if read_in_full or not english or not is_long_answer(value):
+        return value
+    return " ".join([*long_answer_lead(value), LONG_ANSWER_LINES])
+
 # Set while a child agent runs inside a turn: its text is never the answer.
 _answer_events_muted: contextvars.ContextVar[bool] = contextvars.ContextVar("answer_events_muted", default=False)
 
@@ -340,9 +378,18 @@ class FinalAnswerSpeechGate:
     """
 
     def __init__(
-        self, *, live: bool = True, reason: str | None = None, summary_suffix: str | None = SUMMARY_SUFFIX
+        self,
+        *,
+        live: bool = True,
+        reason: str | None = None,
+        summary_suffix: str | None = SUMMARY_SUFFIX,
+        long_answer_lines: str | None = None,
     ) -> None:
         self._summary_suffix = summary_suffix
+        # Set: the long-answer rule (LONG_ANSWER_CHARS) instead of the budget.
+        self._long_answer_lines = long_answer_lines
+        self._held: list[str] = []
+        self._tools: list[tuple[str, str]] = []
         self._suffix_said = False
         self._attempts: dict[str, _Attempt] = {}
         self._spoken: list[str] = []
@@ -366,6 +413,18 @@ class FinalAnswerSpeechGate:
         return self._live and not self._closed
 
     @property
+    def read_in_full(self) -> bool:
+        """The model called read_aloud this turn: say the whole answer."""
+        return any(name == READ_ALOUD_TOOL and status == "ok" for name, status in self._tools)
+
+    @property
+    def done_tone(self) -> bool:
+        """Every tool this turn was a quick music action and every one succeeded."""
+        return bool(self._tools) and all(
+            name in QUICK_MUSIC_TOOLS and status == "ok" for name, status in self._tools
+        )
+
+    @property
     def heard_text(self) -> str:
         """Final-answer text received so far (spoken or about to be)."""
         return self._final_text_so_far
@@ -380,6 +439,14 @@ class FinalAnswerSpeechGate:
     def feed(self, event: dict[str, Any] | None) -> list[str]:
         """Consume one stream-bus event; return sentences to speak now."""
         if self._closed or not isinstance(event, dict):
+            return []
+        tool = event.get("tool")
+        if isinstance(tool, dict):
+            status = str(tool.get("status") or "")
+            if status in _FINISHED_TOOL_STATUSES:
+                # Bare names; an MCP-qualified one (mcp__core__playback) ends in it.
+                name = str(tool.get("tool_name") or tool.get("name") or "").rsplit("__", 1)[-1]
+                self._tools.append((name, status))
             return []
         payload = event.get(ANSWER_EVENT_KEY)
         if not isinstance(payload, dict):
@@ -435,14 +502,14 @@ class FinalAnswerSpeechGate:
                     item = attempt.items[item_id]
                     if item.phase == FINAL_ANSWER_PHASE:
                         out.extend(self._take(item, "", final=True))
-                return out
+                return out + self._release_held()
             # No final-answer text: the held text (commentary-only or no
             # phase) was the answer.
             for item_id in attempt.order:
                 item = attempt.items[item_id]
                 if item.kind == "message" and item.text:
                     out.extend(self._take(item, item.text, final=True))
-            return out
+            return out + self._release_held()
         return []
 
     def _abandon(self, attempt: _Attempt) -> None:
@@ -461,6 +528,9 @@ class FinalAnswerSpeechGate:
         item.pending = rest
         out: list[str] = []
         for sentence in sentences:
+            if self._long_answer_lines is not None:
+                out.extend(self._offer_long_rule(sentence))
+                continue
             if self._offer(sentence):
                 out.append(sentence)
             elif self.stop_reason == "long_answer" and not self._suffix_said:
@@ -468,6 +538,67 @@ class FinalAnswerSpeechGate:
                 if self._spoken and self._summary_suffix:
                     out.append(self._summary_suffix)
         return out
+
+    def _offer_long_rule(self, sentence: str) -> list[str]:
+        """The long-answer rule, live: what to say now for ``sentence``.
+
+        The first sentence is said at once; the second too when both fit in
+        LONG_ANSWER_CHARS. Later sentences wait: once the answer passes
+        LONG_ANSWER_CHARS it is long, they are dropped and LONG_ANSWER_LINES is
+        said; if the answer ends short they are said then (``_release_held``).
+        """
+        if not self._replay_allows(sentence) or not self._live:
+            return []
+        if self.done_tone:
+            self.stop_live("done_tone")
+            return []
+        whole = " ".join([self._final_text_so_far, *self._held, sentence]).strip()
+        reason = hold_reason(whole, sentence)
+        if reason is not None:
+            self.stop_live(reason)
+            return []
+        if self.read_in_full:
+            self._accept(sentence)
+            return [sentence]
+        if is_long_answer(whole):
+            out: list[str] = []
+            if not self._spoken:
+                self._accept(sentence)
+                out.append(sentence)
+            self._held = []
+            self.stop_live("long_answer")
+            self._suffix_said = True
+            out.append(self._long_answer_lines or "")
+            return [text for text in out if text]
+        if not self._spoken or (len(self._spoken) == 1 and not self._held):
+            self._accept(sentence)
+            return [sentence]
+        self._held.append(sentence)
+        return []
+
+    def _accept(self, sentence: str) -> None:
+        self._final_text_so_far = (self._final_text_so_far + " " + sentence).strip()
+        self._spoken.append(sentence)
+
+    def _release_held(self) -> list[str]:
+        """The answer ended short: say the sentences that were waiting."""
+        held, self._held = self._held, []
+        if not self._live:
+            return []
+        for sentence in held:
+            self._accept(sentence)
+        return held
+
+    def _replay_allows(self, sentence: str) -> bool:
+        if self._replay:
+            expected = self._replay[0]
+            if same_sentence(sentence, expected):
+                self._replay.pop(0)
+                return False
+            self._replay = []
+            self.stop_live("diverged_after_retry")
+            return False
+        return True
 
     def _offer(self, sentence: str) -> bool:
         if self._replay:
@@ -479,6 +610,9 @@ class FinalAnswerSpeechGate:
             self.stop_live("diverged_after_retry")
             return False
         if not self._live:
+            return False
+        if self.done_tone:
+            self.stop_live("done_tone")
             return False
         candidate = (self._final_text_so_far + " " + sentence).strip()
         reason = hold_reason(candidate, sentence)
@@ -524,6 +658,12 @@ class FinalAnswerSpeechGate:
                 len(self._spoken),
             )
         rest = final_sentences[matched:]
+        if self._long_answer_lines is not None:
+            if self.read_in_full or not is_long_answer(final):
+                return " ".join(rest)
+            if self._suffix_said:
+                return ""
+            return " ".join([*long_answer_lead(final)[matched:], self._long_answer_lines])
         oversized = len(final_sentences) > MAX_LIVE_SENTENCES or len(final) > MAX_SPOKEN_CHARS
         if not oversized:
             return " ".join(rest)
@@ -540,12 +680,19 @@ __all__ = [
     "AnswerAttempt",
     "FinalAnswerSpeechGate",
     "FinalAnswerText",
+    "LONG_ANSWER_CHARS",
+    "LONG_ANSWER_LINES",
+    "QUICK_MUSIC_TOOLS",
+    "READ_ALOUD_TOOL",
     "all_sentences",
     "answer_events_are_muted",
     "answer_events_muted",
     "hold_reason",
+    "is_long_answer",
+    "long_answer_lead",
     "observe_anthropic_stream_event",
     "observe_openai_responses_event",
     "same_sentence",
     "split_sentences",
+    "spoken_reply",
 ]
