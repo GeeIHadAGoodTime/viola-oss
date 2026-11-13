@@ -12,6 +12,10 @@ const SAMPLE_TARGET = 5;
 const SAMPLE_LIMIT = 10;
 const SAMPLE_MS = 1600;
 const POLL_MS = 5000;
+// One name for the one action that makes a word wake Viola. The list said "Switch"
+// and the finished-training row said "Activate" for the same call, and the laptop
+// test pressed one without seeing the other.
+const USE_WORD_LABEL = 'Use this word';
 // A sample whose loudest point is below this is a dead or muted microphone, not a
 // quiet voice: normal speech peaks far above it even at a distance.
 const MIN_SAMPLE_PEAK = 0.01;
@@ -464,10 +468,19 @@ export default function WakeWordSection({ theme = THEME }) {
       setNotice(`Selected "${model.name || 'Viola'}" as your wake word.`);
       setLoadError(null);
       await reloadModels();
+      return true;
     } catch (err) {
       setLoadError(err?.message || 'Could not activate that wake word.');
+      return false;
     }
   }, [reloadModels]);
+
+  // The finished-training row is the same action as the list's button; once the word
+  // is in use the wizard has nothing left to offer, so it closes and the list shows
+  // the word as Selected.
+  const applyCompletedModel = useCallback(async (model) => {
+    if (await activateModel(model)) resetWizard();
+  }, [activateModel, resetWizard]);
 
   const deleteModel = useCallback(async (model) => {
     if (!model || model.is_default) return;
@@ -670,7 +683,7 @@ export default function WakeWordSection({ theme = THEME }) {
                   model.is_active || model.is_supported === false,
                 )}
               >
-                {model.is_supported === false ? 'Unsupported' : 'Switch'}
+                {model.is_supported === false ? 'Unsupported' : model.is_active ? 'In use' : USE_WORD_LABEL}
               </button>
               {!model.is_default ? (
                 <button
@@ -818,13 +831,13 @@ export default function WakeWordSection({ theme = THEME }) {
           {completedModelRow ? (
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
               <span style={{ color: theme.colors.textSecondary, fontSize: 12, width: '100%' }}>
-                "{completedModelRow.name}" is ready. Nothing changes until you activate it.
+                "{completedModelRow.name}" is ready. Nothing changes until you press "{USE_WORD_LABEL}".
               </span>
               <button
-                onClick={() => activateModel(completedModelRow)}
+                onClick={() => applyCompletedModel(completedModelRow)}
                 style={buttonStyle(theme, 'primary')}
               >
-                Activate
+                {USE_WORD_LABEL}
               </button>
               <button
                 onClick={discardCompleted}

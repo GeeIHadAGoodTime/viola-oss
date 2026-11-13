@@ -1052,6 +1052,26 @@ def create_settings_router(*, music_service: object | None = None) -> APIRouter:
                 key: normalized_incoming[key] for key in ("tts_language", "tts_voice") if key in normalized_incoming
             }
 
+            # The wake word is chosen only through /v1/wake/activate (and the
+            # model delete route), which reloads the detector first and then
+            # stores these four keys. The Settings window posts its whole draft,
+            # copied when it opened, so a Save after choosing a trained word
+            # wrote the old "Viola" values back and hot-reloaded the default
+            # model (1.0.5 laptop report: "computer" stopped waking after
+            # Settings was closed and reopened). A draft never owns them.
+            ignored_wake_keys = sorted(
+                key
+                for key in _WAKE_MODEL_RUNTIME_KEYS
+                if key in normalized_incoming
+                and normalized_incoming.pop(key) != _current_setting_value_for_request(settings_mgr, key, request_user_id)
+            )
+            if ignored_wake_keys:
+                logger.info(
+                    "Ignored wake word keys in settings %s (only /v1/wake/activate changes them): %s",
+                    mutation_kind_label,
+                    ignored_wake_keys,
+                )
+
             # The React UI echoes the full localSettings blob on every save.
             # Treat unchanged known values as no-ops before validation so one
             # stale invalid setting cannot block an unrelated setting change.
@@ -1229,7 +1249,6 @@ def create_settings_router(*, music_service: object | None = None) -> APIRouter:
             old_autostart = settings_mgr.get("start_on_boot", False)
             old_voice_mode = settings_mgr.get("voice_mode", "push_to_talk")
             old_mic_muted = bool(settings_mgr.get("mic_muted", False))
-            old_wake_model_vals = {key: settings_mgr.get(key) for key in _WAKE_MODEL_RUNTIME_KEYS if key in validated}
 
             _llm_keys = {"ai_source", "llm_provider", "llm_api_key", "llm_model", "llm_base_url"}
             old_llm_vals = {k: settings_mgr.get(k) for k in _llm_keys if k in validated}
@@ -1399,25 +1418,6 @@ def create_settings_router(*, music_service: object | None = None) -> APIRouter:
                         "Failed to sync wake detector on voice_mode/mic_muted change: %s",
                         wake_effect.detail,
                     )
-
-            if old_wake_model_vals:
-                new_wake_model_vals = {key: settings_mgr.get(key) for key in old_wake_model_vals}
-                if new_wake_model_vals != old_wake_model_vals:
-                    try:
-                        from config.wake_config import get_violawake_model_path
-                        from voice.wake_detector.facade import WakeDetectorFacade
-
-                        active_model = str(settings_mgr.get("wake_word_active_model", "") or "")
-                        fallback_model = str(settings_mgr.get("wake_word_model", "") or "")
-                        model_path = active_model or fallback_model
-                        if not model_path:
-                            default_path = get_violawake_model_path()
-                            model_path = str(default_path) if default_path is not None else ""
-                        if model_path:
-                            reload_result = WakeDetectorFacade.reload_model(model_path)
-                            logger.info("Wake detector reload after settings change: %s", reload_result)
-                    except Exception as exc:
-                        logger.warning("Failed to reload wake detector after settings change: %s", exc)
 
             speech_effect = None
             if {"tts_language", "tts_voice"}.intersection(validated):
