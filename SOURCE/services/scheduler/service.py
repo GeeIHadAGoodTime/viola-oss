@@ -582,16 +582,16 @@ class SchedulerService:
             except Exception as exc:
                 logger.exception("Scheduler check loop error: %s", exc)
 
-            if time.monotonic() - self._last_reminder_sweep >= _FIRED_REMINDER_SWEEP_SECONDS:
-                self._last_reminder_sweep = time.monotonic()
-                try:
-                    await self.prune_fired_reminders()
-                except asyncio.CancelledError:
-                    break
-                except Exception:
-                    logger.warning("Fired-reminder cleanup failed", exc_info=True)
-
             await self._wait_for_next_tick()
+
+    async def _sweep_fired_reminders_hourly(self, now: datetime) -> None:
+        if time.monotonic() - self._last_reminder_sweep < _FIRED_REMINDER_SWEEP_SECONDS and self._last_reminder_sweep:
+            return
+        self._last_reminder_sweep = time.monotonic()
+        try:
+            await self.prune_fired_reminders(now=now)
+        except Exception:  # noqa: BLE001, RUF100 - cleanup must never stop due reminders from firing
+            logger.warning("Fired-reminder cleanup failed", exc_info=True)
 
     @staticmethod
     def _is_expired_fired_reminder(schedule: Schedule, cutoff: datetime) -> bool:
@@ -650,6 +650,8 @@ class SchedulerService:
         """
         now = datetime.now(UTC)
         now_iso = now.isoformat()
+
+        await self._sweep_fired_reminders_hourly(now)
 
         due = await self._store.get_due_schedules_for_all_users_async(now_iso)
         if not due:

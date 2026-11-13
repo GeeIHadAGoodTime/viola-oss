@@ -129,6 +129,27 @@ _TOOL_ARGUMENT_DEFAULTS: dict[str, dict[str, Any]] = {}
 _TOOL_ARGUMENT_DEFAULTS_LOCK = threading.Lock()
 
 
+# For one action of a compound tool, the only arguments its code path reads.
+# Strict schemas make the model send every field, and on a "yes" it refilled
+# fields the action never reads with new values: launch_app re-sent with
+# include_minimized/include_window_titles flipped, then with axis="horizontal";
+# playlist delete re-sent with an artist (1.0.5 build 10 laptop log, 11/08 07:16
+# and 08:00). The call then no longer matched the question and the user was
+# asked again. Keep these in step with the handlers: computer launch_app in
+# mcp_servers/computer_use/server.py, playlist delete in core_tools/server.py.
+_ACTION_ARGUMENTS: dict[tuple[str, str], frozenset[str]] = {
+    ("computer", "launch_app"): frozenset(
+        {"action", "app_name", "app_executable", "title", "window_title", "target_window", "bring_to_front"}
+    ),
+    ("playlist", "delete"): frozenset({"action", "name"}),
+}
+
+
+def _action_arguments(tool_name: str, tool_args: dict[str, Any]) -> frozenset[str] | None:
+    action = str(tool_args.get("action") or "").strip().lower()
+    return _ACTION_ARGUMENTS.get((str(tool_name or "").strip(), action))
+
+
 def register_tool_argument_defaults(tool_name: str, input_schema: Any) -> None:
     """Record the declared argument defaults from a tool's JSON input schema."""
     name = str(tool_name or "").strip()
@@ -427,10 +448,11 @@ class ApprovalManager:
 
     @staticmethod
     def _confirmation_comparable_args(tool_name: str, tool_args: dict[str, Any]) -> dict[str, Any]:
+        read_by_action = _action_arguments(tool_name, tool_args)
         comparable = {
             key: ApprovalManager._normalize_confirmation_value(value)
             for key, value in tool_args.items()
-            if key not in _CONFIRMATION_ARG_KEYS
+            if key not in _CONFIRMATION_ARG_KEYS and (read_by_action is None or key in read_by_action)
         }
         if ApprovalManager._is_phone_call_tool_args(tool_name, comparable) and "call_id" in comparable:
             comparable["call_id"] = ""
