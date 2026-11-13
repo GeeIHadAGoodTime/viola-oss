@@ -26,6 +26,7 @@ the existing WASAPI adapter test suite is the regression net for that claim.
 from __future__ import annotations
 
 import threading
+import time
 import weakref
 from collections import deque
 from math import gcd
@@ -60,6 +61,27 @@ LOOPBACK_DEAF_FRAMES = 50
 # judged to hear Viola (0.2 s).
 LOOPBACK_HEARS_FRAMES = 20
 
+# While the loopback is streaming, a reference underrun means its packet is
+# late, not missing: the capture callback needs the interpreter lock, and the
+# wake loop holds it while it cancels a whole 80 ms chunk at once. The reference
+# used to replay the last frame and leave the late samples queued, so every
+# underrun served 10 ms of the wrong audio and then made the whole reference
+# 10 ms later than the microphone, for good. A few of those put the echo ahead
+# of the reference, where no delay or filter can reach it, while the delay
+# tracker still finds a sharp peak (offline through this adapter and ViolaAEC:
+# ERLE 31.6 dB on time, 1.5 dB with callback jitter). Now the wake loop waits
+# this long for the late packet (releasing the lock so the callback can run). If
+# it still has not come, the loopback has stopped (nothing is rendered): the
+# rest of the frame is silence and nobody waits again until the loopback writes.
+REFERENCE_WAIT_S = 0.08
+# Not in the first moments after the loopback starts again, though: its first
+# packets are newer than the microphone chunk being cancelled, and waiting for
+# them would pin the new audio onto older microphone frames (offline: the lag
+# wandered 50-150 ms and ERLE fell to 3 dB when sound stopped between sentences).
+REFERENCE_RESUME_SETTLE_S = 0.2
+# Report reference timing trouble at most this often (INFO).
+REFERENCE_REPORT_INTERVAL_S = 60.0
+
 # Most of Viola's own playback the reference keeps queued (250ms at 16kHz). The
 # wake listener drains it in real time; the cap only bounds the backlog when the
 # listener pauses (for example while a command is being recorded).
@@ -72,6 +94,7 @@ __all__ = [
     "LOOPBACK_HEARS_FRAMES",
     "LOOPBACK_SILENT_RMS",
     "MIN_READY_SAMPLES",
+    "REFERENCE_WAIT_S",
     "LocalPlaybackAECReferenceAdapter",
     "RingBufferAECReferenceAdapter",
     "push_local_playback_reference",
@@ -184,8 +207,17 @@ class RingBufferAECReferenceAdapter:
         # Startup gate: don't serve real frames until buffer reaches MIN_READY_SAMPLES
         self._primed = False
 
-        # Underrun protection: replay last good frame instead of returning zeros
-        self._last_frame = np.zeros(160, dtype=np.int16)
+        # Underrun: wait for a late loopback packet while the loopback is
+        # streaming (REFERENCE_WAIT_S) instead of replaying the last frame.
+        self._data_ready = threading.Condition(self._lock)
+        self._loopback_streaming = False
+        self._streaming_since = 0.0
+        self._clock = time.monotonic
+        self._underrun_samples = 0
+        self._waited_s = 0.0
+        self._overflow_samples = 0
+        self._reported: tuple[float, ...] = (0, 0.0, 0)
+        self._reported_at = 0.0
 
         # Adaptive buffer target (milliseconds) - used by passive calibration
         self._buffer_target_ms = 100.0
@@ -259,8 +291,15 @@ class RingBufferAECReferenceAdapter:
 
             # Store in ring buffer
             with self._lock:
+                overflow = len(self._buffer) + len(mono_data) - self.BUFFER_SIZE_SAMPLES
+                if overflow > 0:
+                    self._overflow_samples += overflow
                 self._buffer.extend(mono_data)
                 buffer_len = len(self._buffer)
+                if not self._loopback_streaming:
+                    self._loopback_streaming = True
+                    self._streaming_since = self._clock()
+                self._data_ready.notify_all()
 
             diagnostics = self._diagnostics
             if diagnostics is not None and not self._diagnostics_disabled:
@@ -335,19 +374,52 @@ class RingBufferAECReferenceAdapter:
                 len(self._buffer),
             )
 
-        if len(self._buffer) < frame_samples:
-            # Underrun: not enough fresh data -- replay last good frame
-            return self._last_frame.copy()
+        waited = False
+        if (
+            len(self._buffer) < frame_samples
+            and self._loopback_streaming
+            and self._clock() - self._streaming_since >= REFERENCE_RESUME_SETTLE_S
+        ):
+            self._wait_for_loopback_locked(frame_samples)
+            waited = True
 
         # FIFO: consume samples from the left side of the deque
-        consumed = []
-        for _ in range(min(frame_samples, len(self._buffer))):
-            consumed.append(self._buffer.popleft())
-        frame_data = np.array(consumed, dtype=np.int16)
-
-        # Save as last good frame for underrun protection
-        self._last_frame = frame_data.copy()
+        frame_data = np.zeros(frame_samples, dtype=np.int16)
+        count = min(frame_samples, len(self._buffer))
+        if count:
+            frame_data[:count] = [self._buffer.popleft() for _ in range(count)]
+        missing = frame_samples - count
+        if missing:
+            # Silence, not a replayed frame. After a wait this means the
+            # loopback has stopped (nothing is rendered): no more waiting until
+            # it writes again.
+            self._underrun_samples += missing
+            if waited:
+                self._loopback_streaming = False
         return frame_data
+
+    def _wait_for_loopback_locked(self, frame_samples: int) -> None:
+        """Wait up to REFERENCE_WAIT_S for a late loopback packet. Caller holds ``self._lock`` (released while waiting)."""
+        started = self._clock()
+        self._data_ready.wait_for(lambda: len(self._buffer) >= frame_samples, timeout=REFERENCE_WAIT_S)
+        self._waited_s += max(0.0, self._clock() - started)
+
+    def reference_timing_report(self) -> str | None:
+        """One INFO line on reference timing since the last report, at most once a minute, None when nothing changed."""
+        with self._lock:
+            counts = (self._underrun_samples, self._waited_s, self._overflow_samples)
+            now = self._clock()
+            if counts == self._reported or now - self._reported_at < REFERENCE_REPORT_INTERVAL_S:
+                return None
+            under, waited, over = (a - b for a, b in zip(counts, self._reported, strict=True))
+            self._reported, self._reported_at = counts, now
+            depth = len(self._buffer)
+        ms = 1000.0 / self._target_rate
+        return (
+            "[AEC_REF] loopback reference timing since the last report: "
+            f"waited {waited * 1000:.0f} ms for late packets, {under * ms:.0f} ms served as silence "
+            f"(loopback stopped), {over * ms:.0f} ms dropped on overflow; queue now {depth * ms:.0f} ms"
+        )
 
     def _learn_loopback_hearing(self, loopback_rms: float, local_rms: float) -> bool | None:
         """Learn, from frames where Viola is audibly playing, whether the loopback hears her.

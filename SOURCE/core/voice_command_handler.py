@@ -397,17 +397,7 @@ def classify_after_wake(transcript: str, reply: str) -> BargeInDecision:
     tokens = _BARGE_IN_TOKEN_RE.findall((transcript or "").replace("\u2019", "'"))
     wake_at = max((i for i, t in enumerate(tokens) if _is_barge_in_wake_word(t)), default=None)
     after = tokens if wake_at is None else tokens[wake_at + 1 :]
-    decision = _request_after_wake(after, reply, empty=BargeInDecision("listen", "wake_word_over_speech"))
-    if decision.kind == "command":
-        # Laptop log 2026-11-12 (08:33:15, 08:34:26): Jay's "Viola" was cleared as
-        # his (reference scores 0.03 to 0.05) and she went quiet at once, but what
-        # Whisper made of the next seconds over her voice was neither her words nor
-        # his ("First first first first first" over a reply about the piano,
-        # "What's the first one Stop" over one about the guitar). Nothing heard
-        # over her own voice is run: she is already quiet, so she listens for the
-        # request on clean audio. Exactly "stop" (or a dismiss phrase) still stops.
-        return BargeInDecision("listen", "request_over_her_voice")
-    return decision
+    return _request_after_wake(after, reply, empty=BargeInDecision("listen", "wake_word_over_speech"))
 
 
 # A removed word this long is evidence that Viola's voice is in the recording.
@@ -497,6 +487,34 @@ async def signal_nothing_heard(user_id: str | None, reason: str) -> str:
     except Exception as exc:  # noqa: BLE001, RUF100 - feedback must never break the turn
         logger.debug("Nothing-heard notice not sent: %s", exc)
     return message
+
+
+# How long her audio takes from the playback write to the room (device buffer).
+_HER_OUTPUT_LATENCY_SEC = 0.05
+# Below this word probability the decoder is guessing (tuned on the mixes, see below).
+_BARGE_IN_MIN_WORD_PROB = 0.2
+_BARGE_IN_MIN_WORD_SEC = 0.03
+_DECODING_LOOP_REPEATS = 3
+
+
+def reliable_words_after(words: list[tuple[str, float, float, float]], her_end: float) -> str:
+    """The words (text, start, end, probability) the decoder backs, said after ``her_end`` seconds into the clip."""
+    kept = [
+        text
+        for text, start, end, prob in words
+        if start >= her_end and prob >= _BARGE_IN_MIN_WORD_PROB and end - start >= _BARGE_IN_MIN_WORD_SEC
+    ]
+    transcript = "".join(kept).strip()
+    tokens = _echo_words(transcript)
+    if len(tokens) >= _DECODING_LOOP_REPEATS and len(set(tokens)) == 1:
+        transcript = ""  # "first first first first first": a decoding loop
+    logger.info(
+        "Barge-in words: %d heard, %d kept after her voice ended at %.2fs and the decoder's confidence",
+        len(words),
+        len(kept),
+        her_end,
+    )
+    return transcript
 
 
 def _needs_confirmation(decision: BargeInDecision) -> bool:
@@ -2358,7 +2376,9 @@ class VoiceCommandHandler:
                 break
         if wake_at is not None:
             seconds = time.monotonic() - wake_at + _BARGE_IN_WAKE_LEAD_SEC
-            transcript = await self._transcribe_recent(capture, seconds)
+            transcript = await self._transcribe_after_her_voice(capture, seconds)
+            if transcript is None:
+                transcript = await self._transcribe_recent(capture, seconds)
             if self._local_no_speech_prob() > _BARGE_IN_NO_SPEECH_PROB:
                 transcript = ""
             after_wake = classify_after_wake(transcript or "", self._reply_text(message))
@@ -2383,6 +2403,46 @@ class VoiceCommandHandler:
         if decision.kind == "command" or full.kind == "command":
             logger.info("Barge-in request was not heard clearly over Viola's voice; listening for it again")
         return BargeInDecision("listen", "wake_word_request_unclear" if decision.kind == "command" else decision.reason)
+
+    async def _transcribe_after_her_voice(self, capture: Any, seconds: float) -> str | None:
+        """The words said after Viola went quiet, kept only where the decoder backs them; None if unsupported.
+
+        1.0.5 laptop log (2026-11-12 08:33:15, 08:34:26): she stopped at Jay's
+        "Viola", and Whisper turned the next seconds (the end of her sentence,
+        then his words) into "First first first first first" and "What's the
+        first one Stop", words neither of them said. The decoder knows when each
+        word was said and how sure it is. A word that starts while her voice was
+        still coming out of the speaker, a word it gives under 20% probability,
+        and a word with no duration are dropped; the same word three or more times
+        over is a decoding loop, not a request. What is left is the request.
+        Measured on mixes of her voice (canceller removing ~0 dB) and a request
+        (C:/_wt11/voice/measure/halluc): requests run right 53% -> 82%, nothing
+        said but a request run anyway 36% -> 4%.
+        """
+        local = self._local_barge_in_transcriber()
+        words_fn = getattr(local, "transcribe_words", None)
+        if local is None or not callable(words_fn):
+            return None
+        try:
+            import numpy as np
+
+            from audio_core.own_playback import get_own_playback
+
+            pcm = capture.get_recent_recording(seconds)
+            # Where in this clip her voice stopped coming out of the speaker.
+            her_end = len(pcm) / 2 / 16000 - get_own_playback().seconds_since_audio() + _HER_OUTPUT_LATENCY_SEC
+            if not pcm or len(pcm) < 3200:
+                return ""
+            words = await asyncio.wait_for(
+                asyncio.to_thread(words_fn, np.frombuffer(pcm, dtype=np.int16).copy()),
+                timeout=_BARGE_IN_STT_TIMEOUT_SEC,
+            )
+        except Exception as exc:  # noqa: BLE001, RUF100 - fall back to the plain transcription
+            logger.debug("Word-timed barge-in transcription failed: %s", exc)
+            return None
+        if not isinstance(words, list):
+            return None
+        return reliable_words_after(words, her_end)
 
     def _local_no_speech_prob(self) -> float:
         """Whisper's no-speech probability for the last on-device transcription (0 if unknown)."""
