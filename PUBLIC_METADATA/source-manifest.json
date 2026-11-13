@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "e431489f0062095f9f09b4ff84052802e123c7de",
-  "sha256": "6a18907557c16c6a20809c2683898df3810f7bd49fdd40a4a8e59b490630725e",
+  "revision": "87cdd2bccb922bcadd3451e6b93d21ddaafc08d0",
+  "sha256": "bffa51bd7f59cf5c3508fbff2f4dff3e216195bff5ea0dd57486d46ec0f46290",
   "files": [
     {
       "path": ".env.example",
@@ -2130,8 +2130,8 @@
     },
     {
       "path": "intent/tools/music_tools.py",
-      "sha256": "1446e0cf62556cfdfff7ea6cb9f68a85ee3c02ba36579fba41f66efb361f0257",
-      "bytes": 82102
+      "sha256": "0ea41e23b032c0e4fa34ddb946251ff5fe2ec20718961f836a95cc33a0a824ca",
+      "bytes": 82546
     },
     {
       "path": "intent/tools/notification_tools.py",
@@ -12950,8 +12950,8 @@
     },
     {
       "path": "ui/settings_api.py",
-      "sha256": "d423b71bc1883ba6779a4a0af5c1500fe6b53377eb6d1b0c5fb06c42130977aa",
-      "bytes": 89589
+      "sha256": "8072a9b9d4b2d059413f72f2dbf4d695724014d911040a16a8256a2ad6eafbf6",
+      "bytes": 90119
     },
     {
       "path": "ui/settings_effects.py",
@@ -12965,8 +12965,8 @@
     },
     {
       "path": "ui/settings_schema.py",
-      "sha256": "2d12467dbef80f685912ee5a47ca05df989d2ea70e3fe956b7021e854743d377",
-      "bytes": 11004
+      "sha256": "dc896ec8d3377ce033efb6c66f90e621aa0afcc9015d736956d72592e528a6f7",
+      "bytes": 12208
     },
     {
       "path": "ui/static/README_WEB_UI.txt",
