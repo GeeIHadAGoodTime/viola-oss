@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "ddb04702e25dcb2f7e4fa70c6d46a176dcdb3b5a",
-  "sha256": "30db89627bdd4e6300cf480a3deb2be17ad8e76c2d5d1fd41db813aa6b9e1846",
+  "revision": "5886003f26922637fe9b1c5c06e399eddce56691",
+  "sha256": "64300b2adc5c344020c7d221f77c98f3c3db70fa0ebade2c8f1257ad04f11916",
   "files": [
     {
       "path": ".env.example",
@@ -1250,8 +1250,8 @@
     },
     {
       "path": "core/voice_command_handler.py",
-      "sha256": "45f331a5c4bb1adce4deab5ecc0d22d9fbf3eb5693838dc29bbe3c81a2f3f890",
-      "bytes": 112552
+      "sha256": "6425d0e20e81fb9b2dbc43d90d6f949f8ec20331b0ebe8cf36d3c585927eb910",
+      "bytes": 112839
     },
     {
       "path": "core/voice_orchestrator.py",
@@ -4565,8 +4565,8 @@
     },
     {
       "path": "services/llm/answer_stream.py",
-      "sha256": "7fd247a077a108b54fcb196abde1eaa95ef9685c91bd78a445913f3e79cd8e5c",
-      "bytes": 28399
+      "sha256": "3a79188849d474019f112bf864dcbcdc7b5c38981f6c37e72044f2723261e0df",
+      "bytes": 28534
     },
     {
       "path": "services/llm/anthropic_cache.py",
@@ -9505,8 +9505,8 @@
     },
     {
       "path": "ui/api/routes/command.py",
-      "sha256": "08ad62eb6b5e447a297a6ac4ef9264312493c8a6258e1e5a0f46b7da1bf2b3cd",
-      "bytes": 32134
+      "sha256": "22d69c9fcba05d1dd37b8c47a41480fb2aa8d962f858313168d9ac6fd3762d2a",
+      "bytes": 33344
     },
     {
       "path": "ui/api/routes/common.py",
@@ -10145,12 +10145,12 @@
     },
     {
       "path": "ui/react-app/src/SmartDisplay.jsx",
-      "sha256": "69cf2ffacde96de93e0f51c4b9f1fa07f275a9cac87b7d4b3aa35f9aeb1909b2",
+      "sha256": "0b6834b14e712a3b9b29b33d2187a51feb1032d7235fbe98f539e1897e782f9b",
       "bytes": 203981
     },
     {
       "path": "ui/react-app/src/SmartDisplay.longAnswer.test.jsx",
-      "sha256": "c8bde6ff050591ea235bf65f4ce993fc531223be7555236de1bea4907ce831c7",
+      "sha256": "cb87d7091b6771339ad4164ba5b93f6c178437ac01cbf59f437fe90f6669d8ac",
       "bytes": 1240
     },
     {
@@ -10190,8 +10190,8 @@
     },
     {
       "path": "ui/react-app/src/__tests__/SmartDisplay.test.jsx",
-      "sha256": "54190feb13699d8ccbb26e669e153fe95cb592589e5548c8f8f24e7bb4d11378",
-      "bytes": 153616
+      "sha256": "14f7952fa94149d272e36cee9f3afefb1c180d8f9db549047bb0dc11044a962e",
+      "bytes": 153617
     },
     {
       "path": "ui/react-app/src/__tests__/hooks/useEventBus.test.jsx",
@@ -12145,7 +12145,7 @@
     },
     {
       "path": "ui/react-app/src/hooks/usePacedReply.js",
-      "sha256": "7bc3552adb2b22d222f03e57fc13ef9d1c35bb080f4099c09c0e6d67aa225b30",
+      "sha256": "574ac4243e5c3ba879a77fb741a62c483df22fa8e81e0d0ba994198948b3733a",
       "bytes": 5998
     },
     {
@@ -13755,8 +13755,8 @@
     },
     {
       "path": "voice/streamed_reply.py",
-      "sha256": "29efb40b5e7629bda68b7fba5af1eb19c4557a0f327c1617580b213b7e15487b",
-      "bytes": 11402
+      "sha256": "1742e62cf1383c272b7582c0dc0ddc42f205741e8a69f3b6aaaa1bf6147a3525",
+      "bytes": 12847
     },
     {
       "path": "voice/synthesis/__init__.py",
