@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "69bb0e13a2e4fd3bd9ecd62307d162ab72dd6527",
-  "sha256": "35d6f83ae1dfbac3845933c89f60d27ab141dc257a0c6bd4061969f75f6398cc",
+  "revision": "42349dc5f7c175deda7e2ab115964cbe9887e910",
+  "sha256": "9a5e30ec97ea8cd31a63595e5a35021a66626e5177f8b9173acb78654a030b16",
   "files": [
     {
       "path": ".env.example",
@@ -545,8 +545,8 @@
     },
     {
       "path": "auth/desktop_session.py",
-      "sha256": "590bf306b4cbf497da8fef6881b7276b508910d70a9de5d65f0b183f17b06dbe",
-      "bytes": 61522
+      "sha256": "92a727dd666bea9a1568be77a78b0abe291008ce301470aafaf586c4af72b78c",
+      "bytes": 61690
     },
     {
       "path": "auth/entitlement_projection.py",
@@ -12875,8 +12875,8 @@
     },
     {
       "path": "ui/security/auth.py",
-      "sha256": "0ecd55b48893b134bd602f0c6bf4d2b654757c632470f08f66b4a47848767cd9",
-      "bytes": 48558
+      "sha256": "bd85987603dcf4c4b747aa1a9aa412b99102ec1990b261c2ee0c7f6c2545e6fb",
+      "bytes": 49502
     },
     {
       "path": "ui/security/auth_failure_store.py",
