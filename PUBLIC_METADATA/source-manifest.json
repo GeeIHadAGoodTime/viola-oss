@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "08294ec32d0ab989ddcff1c93799223289111cbf",
-  "sha256": "799190ba50bb836d16377e8280343a01b87ca37068e13cd4f1df1eae01dbce03",
+  "revision": "328a5f765c1448d88361b1347be3fac5fd708616",
+  "sha256": "20fe52db7a459993b44a3bfcf768cc2ba7cbd9e359c14e2f8427bf16276f1cb6",
   "files": [
     {
       "path": ".env.example",
@@ -5195,8 +5195,8 @@
     },
     {
       "path": "services/scheduler/service.py",
-      "sha256": "3e5a5446ee779c55f87191a59d577b0957c321cbe86288c060fe2cad99da7bba",
-      "bytes": 52486
+      "sha256": "eb655b08a330a43614a82bc328680e65725bfcd447062c98cef3b695d8fce9ec",
+      "bytes": 53037
     },
     {
       "path": "services/scheduler/store.py",
