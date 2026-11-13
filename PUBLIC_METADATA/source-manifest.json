@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "6ffe36e8cfa03075d8329ecc09a7bddd409f7251",
-  "sha256": "6b0ac3031d79aedf90e76e8ded8131d62c3d267298492a1964ed33315c301fea",
+  "revision": "0e50a70c57753b493d8a5e27d79a1adaa84fa5e1",
+  "sha256": "66b3cad5afccbff140236f062758970c3df9a99f7dd5153a908f7d6369e83c99",
   "files": [
     {
       "path": ".env.example",
@@ -9760,8 +9760,8 @@
     },
     {
       "path": "ui/api/routes/wake_training.py",
-      "sha256": "5393a91327e8069f42ffdff9f2c6bc1bd72ae647a4bbbcf45630e921f627255d",
-      "bytes": 30975
+      "sha256": "9b170426e3517131ab6b5949f9b52c66c4d030579a12672d495cc18ff9d30b98",
+      "bytes": 31592
     },
     {
       "path": "ui/api/routes/weather.py",
@@ -11095,18 +11095,18 @@
     },
     {
       "path": "ui/react-app/src/components/WakeWordSection.jsx",
-      "sha256": "fd39fb7a870da097d5d44bb75252c028e3d75c54f1596858a5519566763cd918",
-      "bytes": 31507
+      "sha256": "6447ad1b1ad9a4d4d55e34fafbfb3a4ca6d39b753dd3ff9774f76c8067c8de98",
+      "bytes": 32208
     },
     {
       "path": "ui/react-app/src/components/WakeWordSection.status.test.jsx",
-      "sha256": "85093cf9d4a695267f0add06ff31e42413832a96ecdb97606d87cdf9948afa4f",
-      "bytes": 4127
+      "sha256": "13e5cff69b0510f8dcd68f30959a480f590b9d5cf8295edd7b8feef12a128364",
+      "bytes": 4134
     },
     {
       "path": "ui/react-app/src/components/WakeWordSection.test.jsx",
-      "sha256": "bcb1e1f141cabaaad962000ac1b7d200a9638f3c8b9bd45f1da16d47783ec402",
-      "bytes": 5135
+      "sha256": "8c1e80bc8dc024b7c76cf9a6e7ab37607bc8a0cc239eee149c76d37aaf5ac17e",
+      "bytes": 8093
     },
     {
       "path": "ui/react-app/src/components/WeatherDetailIcons.jsx",
@@ -12940,8 +12940,8 @@
     },
     {
       "path": "ui/settings_api.py",
-      "sha256": "655c554c21fe3312e10dfb5973c73ab3cb5c72919612f4a4ecb58e40cdb749b8",
-      "bytes": 89437
+      "sha256": "8cea3da87de9503a7f7df6c13dea67fae7b8bddede812cf120190a81357931fc",
+      "bytes": 89184
     },
     {
       "path": "ui/settings_effects.py",
