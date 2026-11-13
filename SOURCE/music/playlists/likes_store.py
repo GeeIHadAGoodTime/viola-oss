@@ -21,7 +21,43 @@ if TYPE_CHECKING:
 
 logger = get_logger(__name__)
 
-_DEFAULT_DB_PATH = Path(__file__).parent.parent.parent / ".viola" / "data" / "persistence" / "liked_songs.sqlite3"
+_DB_FILENAME = "liked_songs.sqlite3"
+# Up to 1.0.5 build 10 this file sat inside the source tree, which for an
+# installed app is the install folder; an update replaced it and the liked
+# songs were gone. Kept only as a place to migrate from.
+_LEGACY_INSTALL_DB_PATH = Path(__file__).parent.parent.parent / ".viola" / "data" / "persistence" / _DB_FILENAME
+
+
+def default_likes_db_path() -> Path:
+    """The liked-songs database: in the user-data folder, never the install folder."""
+    from core.platform import get_data_dir
+
+    return get_data_dir() / _DB_FILENAME
+
+
+def _copy_legacy_likes_db_if_missing(dest_path: Path) -> None:
+    """Bring the old install-folder file across the first time the new one is opened."""
+    from core.platform import get_data_dir
+
+    if dest_path.exists():
+        return
+    for legacy_path in (_LEGACY_INSTALL_DB_PATH, get_data_dir() / "data" / "persistence" / _DB_FILENAME):
+        try:
+            if not legacy_path.is_file() or legacy_path.resolve() == dest_path.resolve():
+                continue
+            source = sqlite3.connect("file:%s?mode=ro" % legacy_path.as_posix(), uri=True)
+            try:
+                dest = sqlite3.connect(str(dest_path))
+                try:
+                    source.backup(dest)
+                finally:
+                    dest.close()
+            finally:
+                source.close()
+            logger.info("Migrated liked songs from old location %s to %s", legacy_path, dest_path)
+            return
+        except (sqlite3.Error, OSError) as exc:
+            logger.warning("Could not migrate liked songs from %s to %s: %s", legacy_path, dest_path, exc)
 _SYNC_TIMEOUT_SECONDS = 10.0
 _TIMEOUT = object()
 _T = TypeVar("_T")
@@ -186,11 +222,13 @@ class SqliteLikesBackend:
     is_postgres = False
 
     def __init__(self, db_path: Path | None = None) -> None:
-        self._db_path = db_path if db_path is not None else _DEFAULT_DB_PATH
+        self._db_path = db_path if db_path is not None else default_likes_db_path()
         self._db_path.parent.mkdir(parents=True, exist_ok=True)
+        if db_path is None:
+            _copy_legacy_likes_db_if_missing(self._db_path)
         self._lock = threading.Lock()
         self._init_db()
-        logger.info("LikesStore initialised at %s", self._db_path)
+        logger.debug("LikesStore initialised at %s", self._db_path)
 
     @property
     def db_path(self) -> Path | None:

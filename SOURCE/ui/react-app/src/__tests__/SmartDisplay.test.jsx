@@ -1778,12 +1778,20 @@ describe('SmartDisplay shuffle toggle', () => {
       shuffle: false,
     };
     const result = render(<SmartDisplay />);
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Shuffle tracks' })).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole('button', { name: /^Shuffle tracks: / })).toBeInTheDocument());
     return result;
   };
 
-  const shuffleButton = () => screen.getByRole('button', { name: 'Shuffle tracks' });
+  const shuffleButton = () => screen.getByRole('button', { name: /^Shuffle tracks: / });
   const isOn = () => shuffleButton().getAttribute('aria-pressed') === 'true';
+
+  it('says in its accessible name whether shuffle is on', async () => {
+    const { user } = await mountPlaying();
+    expect(shuffleButton()).toHaveAccessibleName('Shuffle tracks: off');
+    await user.click(shuffleButton());
+    await waitFor(() => expect(shuffleButton()).toHaveAccessibleName('Shuffle tracks: on'));
+    expect(isOn()).toBe(true);
+  });
 
   it('keeps returning-user transport controls accessible after the welcome delay', async () => {
     vi.useFakeTimers();
@@ -2514,7 +2522,7 @@ describe('SmartDisplay repeated preference acceptance', () => {
     ['repeat', 'setRepeat', 'off', ['all', 'one', 'off']],
   ];
   const button = (kind) => screen.getByRole('button', {
-    name: kind === 'shuffle' ? 'Shuffle tracks' : /^Repeat:/,
+    name: kind === 'shuffle' ? /^Shuffle tracks: / : /^Repeat:/,
   });
   const shown = (kind) => kind === 'shuffle'
     ? button(kind).getAttribute('aria-pressed') === 'true'

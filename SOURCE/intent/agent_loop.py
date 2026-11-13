@@ -1413,6 +1413,7 @@ _PLAYBACK_TERMINAL_ACTIONS = frozenset(
         "stop",
         "seek_to",
         "seek_relative",
+        "seek_from_end",
         "restart",
         "volume_set",
         "volume_up",
