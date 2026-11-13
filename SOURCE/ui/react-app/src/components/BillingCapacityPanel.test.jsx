@@ -81,6 +81,26 @@ describe('in-app capacity billing', () => {
     expect(texts.some((text) => text.startsWith('3× Pro through '))).toBe(true);
   });
 
+  // 1.0.5 build 10: "Base paid plan: Pro" for a gifted user with no paid plan.
+  it('shows None as the own paid plan of a gifted user, and plain Free without a gift', async () => {
+    handler = async (path) => (path === `${BASE}/catalog` ? catalog : { ...account, monthly_price_cents: 0, recurring_amount_cents: 0 });
+    const { unmount } = render(<BillingCapacityPanel accountId="account-1" currentPlanFallback="Pro"
+      entitlement={{ active_gift: { capacity_multiplier: 1, end_at: '2030-02-28T12:00:00Z' } }} />);
+    expect(await screen.findByText('Base paid plan')).toBeInTheDocument();
+    expect(screen.getByText('None')).toBeInTheDocument();
+    expect(screen.queryByText('Pro')).not.toBeInTheDocument();
+    unmount();
+    render(<BillingCapacityPanel accountId="account-1" />);
+    expect(await screen.findByText('Current plan')).toBeInTheDocument();
+    expect(screen.getByText('Free')).toBeInTheDocument();
+  });
+
+  it('shows a paying user their plan under a gift', async () => {
+    render(<BillingCapacityPanel accountId="account-1" entitlement={{ active_gift: { capacity_multiplier: 3, end_at: '2030-02-28T12:00:00Z' } }} />);
+    expect(await screen.findByText('Base paid plan')).toBeInTheDocument();
+    expect(screen.getByText(/\/month · 2× Pro$/)).toBeInTheDocument();
+  });
+
   it('hides the usage row until the page has its usage read', async () => {
     render(<BillingCapacityPanel accountId="account-1" managedUsagePercent={null} />);
     expect(await screen.findByText('Usage resets')).toBeInTheDocument();

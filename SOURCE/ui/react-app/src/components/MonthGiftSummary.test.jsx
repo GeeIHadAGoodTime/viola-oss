@@ -20,9 +20,21 @@ describe('customer month-gift facts', () => {
     expect(screen.getByText(/does not restart the canceled subscription/)).toBeInTheDocument();
   });
   it('does not say the plan twice when the status adds nothing', () => {
-    render(<MonthGiftSummary entitlement={{ ...projection,
+    render(<MonthGiftSummary entitlement={{ ...projection, active_gift: null, queued_gifts: [gift],
       base_subscription: { plan_id: 'free', status: 'free' } }} />);
     expect(screen.getByText(/^Base subscription: Free\.$/)).toBeInTheDocument();
+  });
+  // 1.0.5 build 10: a gifted Pro with no paid plan read "Base subscription: Free.".
+  it('says a gifted user has no paid plan of their own', () => {
+    render(<MonthGiftSummary entitlement={{ ...projection, active_gift: { ...gift, selected_level: 'pro' },
+      base_subscription: { plan_id: 'free', status: 'free' } }} />);
+    expect(screen.getByText('Your own paid plan: none. Pro access comes from your gift.')).toBeInTheDocument();
+    expect(screen.queryByText(/Base subscription: Free/)).not.toBeInTheDocument();
+  });
+  it('keeps the base line for a paying user with a gift', () => {
+    render(<MonthGiftSummary entitlement={projection} />);
+    expect(screen.getByText(/^Base subscription: Pro · canceled\./)).toBeInTheDocument();
+    expect(screen.queryByText(/Your own paid plan/)).not.toBeInTheDocument();
   });
   // 1.0.5 build 10: the laptop's read of the Account page showed
   // "Pro · x Pro managed capacity" with no number. The number was its own text

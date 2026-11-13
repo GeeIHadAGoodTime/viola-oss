@@ -120,7 +120,9 @@ export default function BillingCapacityPanel({
             ? `${capacityMoney(account.recurring_amount_cents ?? (account.interval === 'year'
               ? catalog?.selections?.find((row) => row.monthly_price_cents === account.monthly_price_cents)?.annual_price_cents
               : account.monthly_price_cents))}/${account.interval === 'year' ? 'year' : 'month'} · ${account.capacity_multiplier}× Pro`
-            : (currentPlanFallback || 'Free')}</SummaryRow>
+            // With a gift active this row is the user's own paid plan; the gift
+            // has its own row below, so the fallback ("Pro") would contradict it.
+            : entitlement?.active_gift ? 'None' : (currentPlanFallback || 'Free')}</SummaryRow>
           {/* Each value is one string: a number in its own JSX node is a separate
               text node, and the laptop's accessibility read of this card lost it
               ("% used" with no number, 1.0.5 build 10). */}
