@@ -2162,6 +2162,8 @@ it('holds a long spoken answer card until the stage has finished revealing it', 
   try {
     act(() => {
       playerHarness.replyPartialCallback({ turn: 'turn-1', text: LONG_ANSWER, spoken: true });
+      // Build 11: a spoken reply's text waits for her voice.
+      playerHarness.replyPartialCallback({ turn: 'turn-1', voice_started: true });
     });
     act(() => { vi.advanceTimersByTime(1000); });
     act(() => { playerHarness.chatResponseCallback({ text: LONG_ANSWER }); });
