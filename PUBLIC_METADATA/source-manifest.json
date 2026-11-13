@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "6ffe36e8cfa03075d8329ecc09a7bddd409f7251",
-  "sha256": "6b0ac3031d79aedf90e76e8ded8131d62c3d267298492a1964ed33315c301fea",
+  "revision": "2b9c274f4596cd1c2542939c60b6f6b253ccf5be",
+  "sha256": "d1322678b6b88c41a29ee7d0b444b63bd68fe60047f49749d0689f94f9e17716",
   "files": [
     {
       "path": ".env.example",
@@ -1380,8 +1380,8 @@
     },
     {
       "path": "diagnostics/failure_envelope.py",
-      "sha256": "a6d17cef8aa0e43a1ab38b3d3756d48d20cfb6ae4aec078ede0128b9330b613c",
-      "bytes": 13801
+      "sha256": "c35d78998e0fe8beabbc624ac46636aadf2229461643005d167fd1e47a757d9d",
+      "bytes": 14340
     },
     {
       "path": "diagnostics/latency_spans.py",
@@ -1595,8 +1595,8 @@
     },
     {
       "path": "intent/agent_executor.py",
-      "sha256": "3785784b3a8f8cc92398bd4a52dc5674316bed21d52b0fa4054badcc2c6882d6",
-      "bytes": 640058
+      "sha256": "d5fa5c39bb6decb91e1f23dbc8041ff4156e174762cdee371837e725a428b45a",
+      "bytes": 640346
     },
     {
       "path": "intent/agent_loop.py",
@@ -1635,8 +1635,8 @@
     },
     {
       "path": "intent/approval.py",
-      "sha256": "60d70228861533622e154fc8ed7154defde086513fc01504408da2eed11ed4c3",
-      "bytes": 61873
+      "sha256": "5739c675736c177ef5b3a990f4704470422b8b9c9971250d772b26b4eb98af04",
+      "bytes": 65099
     },
     {
       "path": "intent/capability_resolver.py",
@@ -1705,8 +1705,8 @@
     },
     {
       "path": "intent/file_gates.py",
-      "sha256": "2e81b93f7e4e6a4f1026fa2f44eb0f7ba5fd6a0cbb47d92721869b56c749a47c",
-      "bytes": 21736
+      "sha256": "ddbb5318a35bf4fd73f7ec5ac0a52a26ec21dfe8507af1eb0d65891368291264",
+      "bytes": 23325
     },
     {
       "path": "intent/gate_protocol.py",
@@ -1840,8 +1840,8 @@
     },
     {
       "path": "intent/instant_commands/smart_home.py",
-      "sha256": "f0a01241d6693fe7d5d52e54c2beac0da97d63e676b9763a2a90b142f16e71d4",
-      "bytes": 12880
+      "sha256": "7f09865a3a7c13258b6a10a80fa770a716d77738e2ddf532aba231296f0cbe64",
+      "bytes": 12901
     },
     {
       "path": "intent/instant_commands/system.py",
@@ -2135,8 +2135,8 @@
     },
     {
       "path": "intent/tools/notification_tools.py",
-      "sha256": "231f69af7501612e709870c9e3eb51734f83abbd77e02d59567c09049c136b3c",
-      "bytes": 14034
+      "sha256": "746da544d092fb1fe337853f7ad4ca25116c3912d995262893974ff36eef86f6",
+      "bytes": 16255
     },
     {
       "path": "intent/tools/phone_call.py",
@@ -2265,13 +2265,13 @@
     },
     {
       "path": "mcp_hub/approval_bridge.py",
-      "sha256": "a70a04cfd2ea038316e5450796c1a7b3637d98243b7a4a040ea929418cf7a84c",
-      "bytes": 69114
+      "sha256": "8ad295705bfc1791afff08611a5bbcd59916ec182418b056da2315034ca47d5a",
+      "bytes": 69489
     },
     {
       "path": "mcp_hub/client_hub.py",
-      "sha256": "2b581e4d2f1abc883d0d6309f81f8817e21e02b2e006a98dabcba17c41043219",
-      "bytes": 132566
+      "sha256": "d628c39d365706fafecf09e50a1c48a3a78d68f01ee644b16ef1b29cc693decb",
+      "bytes": 132936
     },
     {
       "path": "mcp_hub/compound_tools.py",
@@ -2375,8 +2375,8 @@
     },
     {
       "path": "mcp_servers/computer_use/server.py",
-      "sha256": "7b18e7ef1af6741d572c7f131cded2195720075a9545c707dc13e1d0419d34a1",
-      "bytes": 53209
+      "sha256": "46e43642a8e6ead10fe5f7c8cde6f7239a224d764df8f6b60d92fb885adcbb7b",
+      "bytes": 53250
     },
     {
       "path": "mcp_servers/core_tools/__init__.py",
@@ -2390,8 +2390,8 @@
     },
     {
       "path": "mcp_servers/core_tools/server.py",
-      "sha256": "4bc1107fa801ccd66c9f188eb8e56e0be254354a101d5d180cbbf08e5de5f195",
-      "bytes": 265713
+      "sha256": "53252d39e6b53a03de80459b14453334e1a7a64db50a6baf173f697f7210ecfc",
+      "bytes": 267176
     },
     {
       "path": "mcp_servers/phone_tool_descriptions.py",
@@ -4205,13 +4205,13 @@
     },
     {
       "path": "services/capability_providers/home_assistant.py",
-      "sha256": "e051da81a786f57328c8ff5d104646e09658e41ba6915a85f8b0fbbf510a423c",
-      "bytes": 12067
+      "sha256": "9eb237a3ebd32f259ec384f741494792145f98427dba97735150d8758b02607c",
+      "bytes": 12307
     },
     {
       "path": "services/capability_registry.py",
-      "sha256": "b814c8b31fea86881c4763102bc932f015b1379bcba9ea90728ed0a8558d26cd",
-      "bytes": 24280
+      "sha256": "23ef40d9ef14cdbd480ec03be03f75867b28ad4cb24b63e3577a15ffdda4bf25",
+      "bytes": 24305
     },
     {
       "path": "services/cdp_target.py",
@@ -4370,8 +4370,8 @@
     },
     {
       "path": "services/computer_use/window_manager.py",
-      "sha256": "790089af79d57ec966496905d3e658e0e6345966716193c12857df7051d7bf68",
-      "bytes": 41926
+      "sha256": "ff68e1133495b1246d43b1fd0128d3507cab3883ec8204cba429ddb09198aaeb",
+      "bytes": 45578
     },
     {
       "path": "services/connectivity.py",
@@ -4685,8 +4685,8 @@
     },
     {
       "path": "services/llm/prompts/viola_unified.py",
-      "sha256": "39454fdd7ac6335321713b99fd6d673f58d5d43b6bc59a71884de05afc2af329",
-      "bytes": 16965
+      "sha256": "e1b7a163e37c9ec54d72a6c3e8ce9d66598bf6aee80a8727377fac515bd79616",
+      "bytes": 17079
     },
     {
       "path": "services/llm/provider_fallback.py",
@@ -5225,8 +5225,8 @@
     },
     {
       "path": "services/smart_home/home_assistant.py",
-      "sha256": "8ce0c3fa3f8c6a8d33b2f49a78b7a3debb8d9d6db0fb33756d927b3fe58d5148",
-      "bytes": 24060
+      "sha256": "54730aa3e970033bf930085dfa4b690e56da9530276e2df7653b74fa7e43f6ee",
+      "bytes": 24742
     },
     {
       "path": "services/storage/__init__.py",
@@ -11595,13 +11595,13 @@
     },
     {
       "path": "ui/react-app/src/components/settingsSearch.js",
-      "sha256": "50018f7576d869281904e6e5baabc884e730f876c49292cdf5f914b1ad12e551",
-      "bytes": 4241
+      "sha256": "8b204417788b07b399e2683328ba1a07073192ccb21ca84438a638232cc94098",
+      "bytes": 4298
     },
     {
       "path": "ui/react-app/src/components/settingsSearch.test.js",
-      "sha256": "c52a69b90daae95707c69b9dc61fdef782a45504b7d6deab7c43bcc5459e556b",
-      "bytes": 2907
+      "sha256": "3b070f70c1179f97c806e187f9f3895deea98bf2282e3e21de8d6cb4d6fd07d8",
+      "bytes": 3125
     },
     {
       "path": "ui/react-app/src/components/shared/LoadingSkeleton.jsx",
@@ -11650,18 +11650,18 @@
     },
     {
       "path": "ui/react-app/src/components/smarthome/HASetupForm.jsx",
-      "sha256": "1841ccf502ce6e9ef0f9f743f0d4fce1b89d288d066718f84111035d84887213",
-      "bytes": 11289
+      "sha256": "30cb4159bd47c7df9d3f6898f863174963f6f2d5983ea11a5fa530561f18eda1",
+      "bytes": 11382
     },
     {
       "path": "ui/react-app/src/components/smarthome/SmartHomeWizard.jsx",
-      "sha256": "1ae9e07eee0731a43a8c7a5462405fb523b04b9d3adbc4ee540dc868275e2285",
-      "bytes": 10271
+      "sha256": "62f3a03e81b06dadce8396d68f625040cac60f6bac2c48c345bcf4b245912508",
+      "bytes": 12178
     },
     {
       "path": "ui/react-app/src/components/smarthome/SmartHomeWizard.test.jsx",
-      "sha256": "ba5cbb9f63786121260eb455eb9c45e6db0e63c3642c99a9c11ec7868e636f01",
-      "bytes": 2881
+      "sha256": "fd7439d11158dae452f15d3baaa6b0437c046d454e274c4791a339bf72093dac",
+      "bytes": 4756
     },
     {
       "path": "ui/react-app/src/components/smarthome/index.js",
@@ -13295,8 +13295,8 @@
     },
     {
       "path": "utils/self_knowledge.py",
-      "sha256": "88c15a27babacc591afb221a0978fe932f591d913beac99d18caa6ba5aa03f08",
-      "bytes": 19762
+      "sha256": "195b72e36704b4952fed4c06bffe1a111a0879bd005cfede6b17d30e00c51af9",
+      "bytes": 20745
     },
     {
       "path": "utils/service_registry.py",
