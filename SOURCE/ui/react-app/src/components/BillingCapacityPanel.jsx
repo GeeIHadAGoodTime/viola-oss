@@ -121,13 +121,16 @@ export default function BillingCapacityPanel({
               ? catalog?.selections?.find((row) => row.monthly_price_cents === account.monthly_price_cents)?.annual_price_cents
               : account.monthly_price_cents))}/${account.interval === 'year' ? 'year' : 'month'} · ${account.capacity_multiplier}× Pro`
             : (currentPlanFallback || 'Free')}</SummaryRow>
+          {/* Each value is one string: a number in its own JSX node is a separate
+              text node, and the laptop's accessibility read of this card lost it
+              ("% used" with no number, 1.0.5 build 10). */}
           {entitlement?.active_gift && <SummaryRow label="Effective complimentary capacity">
-            {entitlement.active_gift.capacity_multiplier}× Pro through {capacityDate(entitlement.active_gift.end_at)}
+            {`${entitlement.active_gift.capacity_multiplier}× Pro through ${capacityDate(entitlement.active_gift.end_at)}`}
           </SummaryRow>}
-          {typeof shownUsagePercent === 'number' && <SummaryRow label="Managed usage">{shownUsagePercent}% used</SummaryRow>}
+          {typeof shownUsagePercent === 'number' && <SummaryRow label="Managed usage">{`${shownUsagePercent}% used`}</SummaryRow>}
           <SummaryRow label="Usage resets">{capacityDate(account.usage_resets_at)}</SummaryRow>
           {account.billing_review_required && typeof account.effective_capacity_multiplier === 'number'
-            && <SummaryRow label="Available managed capacity">{account.effective_capacity_multiplier}× Pro</SummaryRow>}
+            && <SummaryRow label="Available managed capacity">{`${account.effective_capacity_multiplier}× Pro`}</SummaryRow>}
           {account.renews_at && <SummaryRow label="Renewal">{capacityDate(account.renews_at)}</SummaryRow>}
         </dl>
         {account.scheduled_change && <div className="billing-capacity-scheduled">

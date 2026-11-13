@@ -506,9 +506,17 @@ def _broadcast_chat_response(result: dict[str, Any]) -> None:
         # A spoken panel or full-screen request carries a ui_action (as the
         # /v1/command broadcast does); without it the app shows the reply but
         # never opens the panel or goes full screen.
-        data = result.get("data") if isinstance(result.get("data"), dict) else {}
-        action_source = result if result.get("ui_action") else data
-        if isinstance(action_source.get("ui_action"), str) and action_source["ui_action"]:
+        # A voice turn's result is the command envelope's data: what the agent
+        # returned (the ui_action a tool asked for) sits under ``ai_data``.
+        # Only ``result`` and ``result["data"]`` were read, so "open the memory
+        # panel" by voice answered "it's open" and opened nothing (1.0.5 build
+        # 10, 09:09:21); typed, the same request worked.
+        action_source: dict[str, Any] = {}
+        for candidate in (result, result.get("data"), result.get("ai_data")):
+            if isinstance(candidate, dict) and isinstance(candidate.get("ui_action"), str) and candidate["ui_action"]:
+                action_source = candidate
+                break
+        if action_source:
             for key in _UI_ACTION_BROADCAST_KEYS:
                 if key in action_source:
                     payload[key] = action_source[key]

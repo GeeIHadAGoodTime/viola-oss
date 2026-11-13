@@ -163,8 +163,8 @@ export default function AgentCard({ agent, thinkingText = '', onCancel }) {
         </span>
         <button
           type="button"
-          aria-label={`Cancel agent: ${task}`}
-          title="Cancel"
+          aria-label="Cancel agent"
+          title="Cancel agent"
           disabled={terminal}
           onClick={() => onCancel(agent.agent_id)}
           style={{

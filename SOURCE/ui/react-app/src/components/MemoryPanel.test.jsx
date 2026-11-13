@@ -143,7 +143,11 @@ describe('MemoryPanel -- cloud SPA Memory tab reads/writes /v1/memories (#1182)'
     render(<MemoryPanel isOpen onClose={() => {}} />);
     await waitFor(() => expect(screen.getByText('Loves jazz on weekends')).toBeInTheDocument());
 
-    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    // 1.0.5 build 10: memory add, edit and delete read as unnamed, identical
+    // controls; each now names the memory it acts on.
+    expect(screen.getByRole('button', { name: 'Add memory' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Edit memory: Loves jazz on weekends' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Delete memory: Loves jazz on weekends' }));
 
     await waitFor(() => expect(screen.queryByText('Loves jazz on weekends')).not.toBeInTheDocument());
     expect(

@@ -66,6 +66,21 @@ describe('in-app capacity billing', () => {
     expect(screen.queryByText('49% used')).not.toBeInTheDocument();
   });
 
+  // 1.0.5 build 10: the laptop's read of this card showed "% used" with no
+  // number, and the gift row's multiplier was missing too. Each value had its
+  // number in a separate text node; every value read whole was one string.
+  it('keeps each number in the same text node as its words', async () => {
+    const gift = { capacity_multiplier: 3, end_at: '2030-02-28T12:00:00Z' };
+    const { container } = render(<BillingCapacityPanel accountId="account-1" managedUsagePercent={61}
+      entitlement={{ active_gift: gift }} />);
+    await screen.findByText('Usage resets');
+    const texts = [];
+    const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+    while (walker.nextNode()) texts.push(walker.currentNode.nodeValue);
+    expect(texts).toContain('61% used');
+    expect(texts.some((text) => text.startsWith('3× Pro through '))).toBe(true);
+  });
+
   it('hides the usage row until the page has its usage read', async () => {
     render(<BillingCapacityPanel accountId="account-1" managedUsagePercent={null} />);
     expect(await screen.findByText('Usage resets')).toBeInTheDocument();

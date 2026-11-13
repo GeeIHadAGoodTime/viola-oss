@@ -441,6 +441,35 @@ def _redact_settings_for_response(settings: dict[str, Any]) -> dict[str, Any]:
     return redacted
 
 
+def effective_settings_snapshot(settings_mgr: Any, user_id: str | None) -> dict[str, Any]:
+    """Return settings as ``user_id`` reads them back (the account's own values on top).
+
+    With an account signed in, account-scoped settings (theme, clock format,
+    the user's name) live in that account's store, not in ``settings.json``.
+    ``settings_mgr.settings`` alone is the signed-out install's view.
+    """
+    if user_id is None:
+        return dict(settings_mgr.settings)
+
+    is_user_scoped_key = getattr(settings_mgr, "_is_user_scoped_key", lambda _key: True)
+    account_values = {
+        key: settings_mgr.get(key, settings_mgr.DEFAULT_SETTINGS.get(key), user_id=user_id)
+        for key in settings_mgr.DEFAULT_SETTINGS
+        if is_user_scoped_key(key)
+    }
+    # Copied only after the account's settings have loaded: the first load
+    # of an older account blob moves this machine's device settings out of
+    # it into the machine's own settings, and the page must show those.
+    snapshot = dict(settings_mgr.settings)
+    for key in settings_mgr.DEFAULT_SETTINGS:
+        if key in account_values:
+            snapshot[key] = account_values[key]
+        else:
+            fallback = snapshot.get(key, settings_mgr.DEFAULT_SETTINGS.get(key))
+            snapshot[key] = settings_mgr.get(key, fallback, user_id=user_id)
+    return snapshot
+
+
 def _settings_response_payload(settings: dict[str, Any]) -> dict[str, Any]:
     """Build a settings response with non-persisted runtime voice status."""
     from diagnostics.voice_status import get_voice_status
@@ -949,26 +978,7 @@ def create_settings_router(*, music_service: object | None = None) -> APIRouter:
         except HTTPException:
             user_id = None
 
-        if user_id is None:
-            return dict(settings_mgr.settings)
-
-        is_user_scoped_key = getattr(settings_mgr, "_is_user_scoped_key", lambda _key: True)
-        account_values = {
-            key: settings_mgr.get(key, settings_mgr.DEFAULT_SETTINGS.get(key), user_id=user_id)
-            for key in settings_mgr.DEFAULT_SETTINGS
-            if is_user_scoped_key(key)
-        }
-        # Copied only after the account's settings have loaded: the first load
-        # of an older account blob moves this machine's device settings out of
-        # it into the machine's own settings, and the page must show those.
-        snapshot = dict(settings_mgr.settings)
-        for key in settings_mgr.DEFAULT_SETTINGS:
-            if key in account_values:
-                snapshot[key] = account_values[key]
-            else:
-                fallback = snapshot.get(key, settings_mgr.DEFAULT_SETTINGS.get(key))
-                snapshot[key] = settings_mgr.get(key, fallback, user_id=user_id)
-        return snapshot
+        return effective_settings_snapshot(settings_mgr, user_id)
 
     async def _handle_settings_mutation(
         *,
