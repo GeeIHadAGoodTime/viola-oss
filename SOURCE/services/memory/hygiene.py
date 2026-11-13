@@ -132,7 +132,9 @@ def memory_fact_key(text: str) -> frozenset[str]:
     coffee, not tea". Such lines are still compared by word overlap.
     """
     words = []
-    for word in _WORD_RE.findall(canonical_memory_text(text)):
+    # The model writes "sister’s" with a curly apostrophe as often as a straight one.
+    straight = (text or "").replace("’", "'").replace("‘", "'")
+    for word in _WORD_RE.findall(canonical_memory_text(straight)):
         if word in _NEGATION_WORDS or word.endswith("n't"):
             return frozenset()
         word = word.removesuffix("'s").strip("'")
