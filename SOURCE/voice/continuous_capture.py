@@ -366,6 +366,51 @@ class ContinuousMicCapture:
 
         if old_mode != mode:
             logger.debug("ContinuousMicCapture mode: %s -> %s", old_mode, mode)
+            if mode == MODE_VAD_MONITOR:
+                self._echo_window_action(start=True)
+            elif old_mode == MODE_VAD_MONITOR:
+                self._echo_window_action(start=False)
+
+    def _echo_window_action(self, *, start: bool) -> None:
+        """Start, or log, the echo canceller's record for the reply she is speaking.
+
+        One `[AEC_REPLY]` line per spoken reply settles on a real laptop whether
+        her voice still reaches the barge-in monitor after cancelling, which the
+        one-off "AEC degraded" warning cannot (see EchoWindow).
+        """
+        try:
+            with self._mode_lock:
+                source = self._aec_state_source
+                candidates = self._candidates_this_turn
+            processor = source()[0] if source is not None else None
+            window = getattr(processor, "echo_window", None)
+            if window is None:
+                return
+            if start:
+                window.start()
+                return
+            summary = window.summary()
+            if summary is None:
+                return
+            diagnostics = processor.get_diagnostics() or {}
+            delay = diagnostics.get("ref_gate_delay_samples")
+            logger.info(
+                "[AEC_REPLY] backend=%s while she spoke %.1fs: echo removed median %.1f dB (worst 10%% %.1f dB), "
+                "her voice at the mic %.0f dBFS, left after cancelling %.0f dBFS (loudest 10%% %.0f dBFS), "
+                "reference active %.0f%%, delay %s ms, barge-in candidates %d",
+                diagnostics.get("active_backend") or diagnostics.get("backend") or getattr(processor, "name", "?"),
+                summary["seconds_playing"],
+                summary["erle_median_db"],
+                summary["erle_p10_db"],
+                summary["mic_median_dbfs"],
+                summary["residual_median_dbfs"],
+                summary["residual_p90_dbfs"],
+                100.0 * summary["reference_active_share"],
+                f"{delay / 16:.0f}" if isinstance(delay, (int, float)) else "?",
+                candidates,
+            )
+        except Exception:  # noqa: BLE001, RUF100 - a diagnostic must never break capture
+            logger.debug("Echo window %s failed", "start" if start else "report", exc_info=True)
 
     # -------------------------------------------------------------------
     # Recording Buffer Access

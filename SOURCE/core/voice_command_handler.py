@@ -384,30 +384,85 @@ def classify_barge_in_transcript(transcript: str, reply: str) -> BargeInDecision
             return BargeInDecision("ignore", "reply_says_viola")
     if not after:
         return BargeInDecision("listen", "wake_word", wake_at_end=wake_at == len(tokens) - 1)
-    command = " ".join(after)
-    if _BARGE_IN_STOP_RE.match(command.lower()):
-        return BargeInDecision("stop", "wake_word_stop", command)
-    return BargeInDecision("command", "wake_word_command", command)
+    return _request_after_wake(tokens[wake_at + 1 :], reply, empty=BargeInDecision("listen", "wake_word"))
 
 
 def classify_after_wake(transcript: str, reply: str) -> BargeInDecision:
     """What the user said after a wake that was already accepted over Viola's voice.
 
     The wake model heard "Viola", so the wake word need not be in the transcript
-    (over her voice it often is not). Whatever her own words remain are dropped;
-    the rest is the request. Nothing clear means she listens for it.
+    (over her voice it often is not). Her own words are removed; the rest is the
+    request (see :func:`_request_after_wake`). Nothing left means she listens.
     """
     tokens = _BARGE_IN_TOKEN_RE.findall((transcript or "").replace("\u2019", "'"))
     wake_at = max((i for i, t in enumerate(tokens) if _is_barge_in_wake_word(t)), default=None)
-    rest = _drop_reply_runs(tokens if wake_at is None else tokens[wake_at + 1 :], _echo_words(reply))
-    if not rest:
-        return BargeInDecision("listen", "wake_word_over_speech")
-    command = " ".join(rest)
-    if _BARGE_IN_STOP_RE.match(command.lower()):
-        return BargeInDecision("stop", "wake_word_stop", command)
-    if _is_echo_of_reply(command, reply):
-        return BargeInDecision("listen", "wake_word_over_speech")
-    return BargeInDecision("command", "wake_word_command", command)
+    after = tokens if wake_at is None else tokens[wake_at + 1 :]
+    return _request_after_wake(after, reply, empty=BargeInDecision("listen", "wake_word_over_speech"))
+
+
+# A removed word this long is evidence that Viola's voice is in the recording.
+# Shorter ones ("the", "is", "one") are in almost any two English sentences.
+_HER_WORD_EVIDENCE_LETTERS = 4
+
+
+def _collapse_repeats(words: list[str]) -> list[str]:
+    """One copy of each word said twice or more in a row ("stop stop" -> "stop")."""
+    out: list[str] = []
+    for word in words:
+        if not out or out[-1] != word:
+            out.append(word)
+    return out
+
+
+def _request_after_wake(after: list[str], reply: str, *, empty: BargeInDecision) -> BargeInDecision:
+    """What the words after the wake word mean, once Viola's own words are taken out.
+
+    1.0.5 build-10 laptop (Jay, 08:33 to 08:37): every "Viola, stop" over her
+    reply ran as a new command made partly of her own words: "First first first
+    first first", "What's the first one Stop", "Stop Stop", "Develop Stop". Only
+    runs of two or more of her words in a row were removed, so a single word of
+    hers ("Develop", or "first" heard five times) stayed in, and "stop" said
+    twice was not the stop phrase.
+
+    Now every word of what she was saying is removed. Nothing left is nothing
+    heard after the wake (``empty``). What is left, said once, being exactly a
+    stop or dismiss phrase means that phrase (whole utterance, as before). Any
+    other mix that clearly held her words never runs: she has stopped, so she
+    listens for the request on clean audio. Otherwise the request runs as said.
+    """
+    spoken = _echo_words(reply)
+    vocabulary = list(dict.fromkeys(spoken))
+    lowered = [t.lower().replace("\u2019", "'") for t in after]
+    hers = [any(_same_word(word, said) for said in vocabulary) for word in lowered]
+    left = [word for word, is_hers in zip(lowered, hers, strict=True) if not is_hers]
+    if not left:
+        return empty
+    phrase = " ".join(_collapse_repeats(left))
+    if _BARGE_IN_STOP_RE.match(phrase) or _is_dismiss_phrase(phrase):
+        return BargeInDecision("stop", "wake_word_stop", phrase)
+    # Proof that her voice is in the request: one of her longer words exactly as
+    # she said it, or two or more of her words in a row. A near match alone is
+    # not proof ("play some rock" right after she said "Playing relaxing jazz").
+    exact = {word.replace("'", "") for word in spoken}
+    plain = [word.replace("'", "") for word in lowered]
+    her_voice = any(len(word) >= _HER_WORD_EVIDENCE_LETTERS and word in exact for word in plain) or len(
+        _drop_reply_runs(after, spoken)
+    ) < len(after)
+    if her_voice or _is_echo_of_reply(" ".join(after), reply):
+        return BargeInDecision("listen", "request_mixed_with_her_words")
+    return BargeInDecision("command", "wake_word_command", " ".join(after))
+
+
+def _log_barge_in_heard(route: str, transcript: str, decision: BargeInDecision) -> None:
+    """One line per barge-in: what was heard over her reply and what it was taken to mean."""
+    logger.info(
+        "Barge-in (%s) heard %r -> %s (%s)%s",
+        route,
+        transcript[:120],
+        decision.kind,
+        decision.reason,
+        f" {decision.command!r}" if decision.command else "",
+    )
 
 
 def _update_state_hub_voice_mode(mode_name: str, *, user_id: str) -> None:
@@ -2238,11 +2293,14 @@ class VoiceCommandHandler:
             transcript = await self._transcribe_recent(capture, seconds)
             if self._local_no_speech_prob() > _BARGE_IN_NO_SPEECH_PROB:
                 transcript = ""
-            return classify_after_wake(transcript or "", self._reply_text(message))
+            after_wake = classify_after_wake(transcript or "", self._reply_text(message))
+            _log_barge_in_heard("wake over her voice", transcript or "", after_wake)
+            return after_wake
         window_end = getattr(self, "_barge_in_window_end", None) or started
         seconds = min(_BARGE_IN_WINDOW_SEC + (time.monotonic() - window_end), 30.0)
         transcript = await self._transcribe_recent(capture, seconds)
         full = classify_barge_in_transcript(transcript or "", self._reply_text(message))
+        _log_barge_in_heard("transcript check", transcript or "", full)
         if decision.kind == "stop" or full.kind == "stop":
             return decision if decision.kind == "stop" else full
         if decision.kind == "command" and full.kind == "command":
