@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "580e2fe378bbb5969025517b764b5f8c007a1dc6",
-  "sha256": "f888b1461e201013a3c5b0d2bfe901cde8b4395b96f32ccb390ca66cb463fac7",
+  "revision": "17be9297df207c36d4230ec3506717113bb97643",
+  "sha256": "e5513e31f2acf1457fcf2c7ac8d05b7cf974c0969431ef3556deb321ba3f3658",
   "files": [
     {
       "path": ".env.example",
@@ -830,8 +830,8 @@
     },
     {
       "path": "chat/service.py",
-      "sha256": "c35922398d092d7ce328650909cd3c6010ec1eaed70c0331587aed0e4f9183e2",
-      "bytes": 21883
+      "sha256": "e6886c7ad2938cc866f35a8e54ebff21145b718849e6e822b35507ecbc95dfa3",
+      "bytes": 21981
     },
     {
       "path": "config/__init__.py",
@@ -1600,8 +1600,8 @@
     },
     {
       "path": "intent/agent_loop.py",
-      "sha256": "ebd36ad5d7a06c02b0cfab3d8eb78ac1353d1f0e009796e6660bb0ab0624aec6",
-      "bytes": 272837
+      "sha256": "08f122660ff68fa0d9f9cc7ea930a4f8f14dfa072b414cb6b8f4e6ce4178b0ef",
+      "bytes": 273123
     },
     {
       "path": "intent/agent_message_manager.py",
@@ -2215,8 +2215,8 @@
     },
     {
       "path": "intent/tools/vision_tools.py",
-      "sha256": "178b1a7277d4e1d3e7ce99d5d5c1d7f79d1a901a10df99245f363aee1105af42",
-      "bytes": 44065
+      "sha256": "f630bac76b526785b4de0bf5330dfb77c3d563df6838c1cf215be318fea660fb",
+      "bytes": 44265
     },
     {
       "path": "intent/tools/weather_tool.py",
@@ -4760,8 +4760,8 @@
     },
     {
       "path": "services/llm/spend_accounting.py",
-      "sha256": "82a4e3f2f3e218dfa36523bfa19acbe5f73506fcb5428e3b0c06528efddddfa1",
-      "bytes": 15817
+      "sha256": "f03940b5c5d25d253df590d680e462d5a13779ef24f8976430597941b0ff7566",
+      "bytes": 19204
     },
     {
       "path": "services/llm/stream_bus.py",
@@ -5765,8 +5765,8 @@
     },
     {
       "path": "telephony/call_manager.py",
-      "sha256": "791057fa0fdd180a66c23a5e524b044294b4f4e2130243c506e8e323006636a5",
-      "bytes": 389172
+      "sha256": "d5d1c2a1a5f194c5aa7a52446800cedff9df628e4b068f2fe56a69e62b5c7b7a",
+      "bytes": 390612
     },
     {
       "path": "telephony/call_queue.py",
