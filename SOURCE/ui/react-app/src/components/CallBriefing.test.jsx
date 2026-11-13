@@ -7,6 +7,7 @@ import CallBriefing, {
   answerCallBriefing,
   callBriefingBelongsElsewhere,
   callBriefingFromConsultEvent,
+  cardBottomOffset,
 } from './CallBriefing';
 
 vi.mock('../config', () => ({
@@ -38,9 +39,36 @@ describe('callBriefingBelongsElsewhere', () => {
     expect(callBriefingBelongsElsewhere(inChatA, null)).toBe(false);
   });
 
-  it('shows an approval that was not asked in a saved chat', () => {
-    expect(callBriefingBelongsElsewhere({ awaiting_confirmation: true }, 'chat-b')).toBe(false);
+  // 1.0.5 build 10, bug 10: an approval asked in the main conversation floated
+  // over every saved chat. It now waits until the user is back outside a chat.
+  it('hides a main-conversation approval while a saved chat is open', () => {
+    expect(callBriefingBelongsElsewhere({ awaiting_confirmation: true }, 'chat-b')).toBe(true);
+    expect(callBriefingBelongsElsewhere({ awaiting_confirmation: true }, null)).toBe(false);
     expect(callBriefingBelongsElsewhere(null, 'chat-b')).toBe(false);
+  });
+});
+
+// 1.0.5 build 10, bug 10: the card sat at bottom 20px, right 20px, exactly over
+// the chat composer's Send button.
+describe('card placement over the chat composer', () => {
+  it('sits above the composer when the composer is on screen', () => {
+    expect(cardBottomOffset({ top: 700, bottom: 780, height: 80 }, 800)).toBe(112);
+    expect(cardBottomOffset(null, 800)).toBe(20);
+    expect(cardBottomOffset({ top: 900, bottom: 980, height: 80 }, 800)).toBe(20);
+  });
+
+  it('renders the card clear of a real composer row', async () => {
+    const composer = document.createElement('div');
+    composer.className = 'chat-composer-row';
+    composer.getBoundingClientRect = () => ({ top: window.innerHeight - 90, bottom: window.innerHeight - 10, height: 80, left: 0, right: 0, width: 0 });
+    document.body.appendChild(composer);
+    try {
+      render(<CallBriefing briefing={callBriefingFromConsultEvent(pendingSearchCall)} onDismiss={() => {}} onApprove={() => {}} onCancel={() => {}} />);
+      const card = screen.getByRole('dialog', { name: 'Phone call approval' });
+      await waitFor(() => expect(card.style.bottom).toBe('102px'));
+    } finally {
+      composer.remove();
+    }
   });
 });
 

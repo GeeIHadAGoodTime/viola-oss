@@ -333,6 +333,11 @@ def _settings_dev_mode_bypass_enabled() -> bool:
         return False
 
 
+def _is_onboarding_progress_key(key: str) -> bool:
+    """Keys the onboarding code saves itself; a settings save has nothing to do with them."""
+    return key in {"onboarding_completed", "onboarding_completed_at"} or key.startswith("onboarding_step_")
+
+
 def _settings_strict_classifier_enabled() -> bool:
     if _settings_dev_mode_bypass_enabled():
         return False
@@ -439,6 +444,35 @@ def _redact_settings_for_response(settings: dict[str, Any]) -> dict[str, Any]:
         if _is_secret_setting_key(key) and isinstance(value, str) and value:
             redacted[key] = _SECRET_REDACTION
     return redacted
+
+
+def effective_settings_snapshot(settings_mgr: Any, user_id: str | None) -> dict[str, Any]:
+    """Return settings as ``user_id`` reads them back (the account's own values on top).
+
+    With an account signed in, account-scoped settings (theme, clock format,
+    the user's name) live in that account's store, not in ``settings.json``.
+    ``settings_mgr.settings`` alone is the signed-out install's view.
+    """
+    if user_id is None:
+        return dict(settings_mgr.settings)
+
+    is_user_scoped_key = getattr(settings_mgr, "_is_user_scoped_key", lambda _key: True)
+    account_values = {
+        key: settings_mgr.get(key, settings_mgr.DEFAULT_SETTINGS.get(key), user_id=user_id)
+        for key in settings_mgr.DEFAULT_SETTINGS
+        if is_user_scoped_key(key)
+    }
+    # Copied only after the account's settings have loaded: the first load
+    # of an older account blob moves this machine's device settings out of
+    # it into the machine's own settings, and the page must show those.
+    snapshot = dict(settings_mgr.settings)
+    for key in settings_mgr.DEFAULT_SETTINGS:
+        if key in account_values:
+            snapshot[key] = account_values[key]
+        else:
+            fallback = snapshot.get(key, settings_mgr.DEFAULT_SETTINGS.get(key))
+            snapshot[key] = settings_mgr.get(key, fallback, user_id=user_id)
+    return snapshot
 
 
 def _settings_response_payload(settings: dict[str, Any]) -> dict[str, Any]:
@@ -949,26 +983,7 @@ def create_settings_router(*, music_service: object | None = None) -> APIRouter:
         except HTTPException:
             user_id = None
 
-        if user_id is None:
-            return dict(settings_mgr.settings)
-
-        is_user_scoped_key = getattr(settings_mgr, "_is_user_scoped_key", lambda _key: True)
-        account_values = {
-            key: settings_mgr.get(key, settings_mgr.DEFAULT_SETTINGS.get(key), user_id=user_id)
-            for key in settings_mgr.DEFAULT_SETTINGS
-            if is_user_scoped_key(key)
-        }
-        # Copied only after the account's settings have loaded: the first load
-        # of an older account blob moves this machine's device settings out of
-        # it into the machine's own settings, and the page must show those.
-        snapshot = dict(settings_mgr.settings)
-        for key in settings_mgr.DEFAULT_SETTINGS:
-            if key in account_values:
-                snapshot[key] = account_values[key]
-            else:
-                fallback = snapshot.get(key, settings_mgr.DEFAULT_SETTINGS.get(key))
-                snapshot[key] = settings_mgr.get(key, fallback, user_id=user_id)
-        return snapshot
+        return effective_settings_snapshot(settings_mgr, user_id)
 
     async def _handle_settings_mutation(
         *,
@@ -1052,6 +1067,26 @@ def create_settings_router(*, music_service: object | None = None) -> APIRouter:
                 key: normalized_incoming[key] for key in ("tts_language", "tts_voice") if key in normalized_incoming
             }
 
+            # The wake word is chosen only through /v1/wake/activate (and the
+            # model delete route), which reloads the detector first and then
+            # stores these four keys. The Settings window posts its whole draft,
+            # copied when it opened, so a Save after choosing a trained word
+            # wrote the old "Viola" values back and hot-reloaded the default
+            # model (1.0.5 laptop report: "computer" stopped waking after
+            # Settings was closed and reopened). A draft never owns them.
+            ignored_wake_keys = sorted(
+                key
+                for key in _WAKE_MODEL_RUNTIME_KEYS
+                if key in normalized_incoming
+                and normalized_incoming.pop(key) != _current_setting_value_for_request(settings_mgr, key, request_user_id)
+            )
+            if ignored_wake_keys:
+                logger.info(
+                    "Ignored wake word keys in settings %s (only /v1/wake/activate changes them): %s",
+                    mutation_kind_label,
+                    ignored_wake_keys,
+                )
+
             # The React UI echoes the full localSettings blob on every save.
             # Treat unchanged known values as no-ops before validation so one
             # stale invalid setting cannot block an unrelated setting change.
@@ -1117,7 +1152,11 @@ def create_settings_router(*, music_service: object | None = None) -> APIRouter:
             dropped = set(normalized_incoming) - set(known)
             legacy_dropped = dropped & settings_mgr.REMOVED_LEGACY_SETTING_KEYS
             for key in dropped - legacy_dropped:
-                logger.warning("Ignoring unknown setting: %s", key)
+                if _is_onboarding_progress_key(key):
+                    # Saved separately by /v1/onboarding/save, so nothing is lost here.
+                    logger.debug("Ignoring onboarding key in settings save (saved by onboarding): %s", key)
+                else:
+                    logger.warning("Ignoring unknown setting: %s", key)
 
             known, llm_lock_errors = _enforce_llm_lock(known, settings_mgr)
             if llm_lock_errors and not known:
@@ -1229,7 +1268,6 @@ def create_settings_router(*, music_service: object | None = None) -> APIRouter:
             old_autostart = settings_mgr.get("start_on_boot", False)
             old_voice_mode = settings_mgr.get("voice_mode", "push_to_talk")
             old_mic_muted = bool(settings_mgr.get("mic_muted", False))
-            old_wake_model_vals = {key: settings_mgr.get(key) for key in _WAKE_MODEL_RUNTIME_KEYS if key in validated}
 
             _llm_keys = {"ai_source", "llm_provider", "llm_api_key", "llm_model", "llm_base_url"}
             old_llm_vals = {k: settings_mgr.get(k) for k in _llm_keys if k in validated}
@@ -1399,25 +1437,6 @@ def create_settings_router(*, music_service: object | None = None) -> APIRouter:
                         "Failed to sync wake detector on voice_mode/mic_muted change: %s",
                         wake_effect.detail,
                     )
-
-            if old_wake_model_vals:
-                new_wake_model_vals = {key: settings_mgr.get(key) for key in old_wake_model_vals}
-                if new_wake_model_vals != old_wake_model_vals:
-                    try:
-                        from config.wake_config import get_violawake_model_path
-                        from voice.wake_detector.facade import WakeDetectorFacade
-
-                        active_model = str(settings_mgr.get("wake_word_active_model", "") or "")
-                        fallback_model = str(settings_mgr.get("wake_word_model", "") or "")
-                        model_path = active_model or fallback_model
-                        if not model_path:
-                            default_path = get_violawake_model_path()
-                            model_path = str(default_path) if default_path is not None else ""
-                        if model_path:
-                            reload_result = WakeDetectorFacade.reload_model(model_path)
-                            logger.info("Wake detector reload after settings change: %s", reload_result)
-                    except Exception as exc:
-                        logger.warning("Failed to reload wake detector after settings change: %s", exc)
 
             speech_effect = None
             if {"tts_language", "tts_voice"}.intersection(validated):

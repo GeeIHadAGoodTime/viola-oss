@@ -29,6 +29,12 @@ from .base import (
 _POSITION_RE = re.compile(r"(\d+):(\d+)")
 _ARTWORK_SYNC_DELAY_SECONDS = 1.5
 _STARTUP_STALE_TRACK_GUARD_SECONDS = 3.0
+# Polls in a row that must see Spotify playing while the player says otherwise
+# before the player is corrected. One poll can cross a pause or a new play.
+_STATE_HEAL_AFTER_POLLS = 2
+# The SPOTIFY_STATE line is written when anything in it changes, and at least
+# this often (12 polls = 30 s) so a long session still shows the state.
+_STATE_LOG_EVERY_POLLS = 12
 
 
 def _parse_time_str(time_str: str | None) -> float:
@@ -97,6 +103,13 @@ class SpotifyCDPEngine(ProviderPlaybackEngine):
         self._handles: dict[str, PlaybackHandle] = {}
         self._poll_thread: threading.Thread | None = None
         self._poll_stop = threading.Event()
+        # One poller per play, each with its own stop signal. They used to
+        # share one: stopping the previous song's handle after the next song
+        # had started ended the new song's poller, which reported the new song
+        # finished while it was still playing.
+        self._pollers: dict[int, tuple[threading.Thread, threading.Event]] = {}
+        self._current_handle: PlaybackHandle | None = None
+        self._emit_thread: threading.Thread | None = None
         self._last_track: str | None = None
         self._position: float = 0.0
         self._duration: float = 0.0
@@ -111,35 +124,64 @@ class SpotifyCDPEngine(ProviderPlaybackEngine):
     # State polling
     # ------------------------------------------------------------------
     def _start_poll_loop(self, handle: PlaybackHandle) -> None:
-        """Start the background state polling loop."""
-        self._poll_stop.clear()
-        self._poll_thread = threading.Thread(
+        """Start the background state polling loop for this play."""
+        stop = threading.Event()
+        thread = threading.Thread(
             target=self._poll_loop,
-            args=(handle,),
+            args=(handle, stop),
             name="SpotifyCDPPoller",
             daemon=True,
         )
-        self._poll_thread.start()
+        with self._lock:
+            self._pollers[id(handle)] = (thread, stop)
+        self._poll_stop = stop
+        self._poll_thread = thread
+        thread.start()
 
-    def _stop_poll_loop(self) -> None:
-        """Stop the polling loop."""
-        self._poll_stop.set()
-        if self._poll_thread and self._poll_thread.is_alive():
-            self._poll_thread.join(timeout=5)
-        self._poll_thread = None
+    def _stop_poll_loop(self, handle: PlaybackHandle | None = None) -> None:
+        """Stop this play's poller (every poller when no handle is given)."""
+        with self._lock:
+            if handle is None:
+                entries = list(self._pollers.values())
+                self._pollers.clear()
+            else:
+                entry = self._pollers.pop(id(handle), None)
+                entries = [entry] if entry is not None else []
+        if handle is None:
+            self._poll_stop.set()
+            if self._poll_thread is not None:
+                entries.append((self._poll_thread, self._poll_stop))
+        for thread, stop in entries:
+            stop.set()
+            if thread.is_alive() and thread is not threading.current_thread():
+                thread.join(timeout=5)
+        if handle is None or not self._pollers:
+            self._poll_thread = None
 
-    def _poll_loop(self, handle: PlaybackHandle) -> None:
+    def _owns_player(self, handle: PlaybackHandle) -> bool:
+        """This play is the one the engine is playing now (not a superseded one)."""
+        current = self._current_handle
+        return current is None or current is handle
+
+    def _poll_loop(self, handle: PlaybackHandle, stop: threading.Event | None = None) -> None:
         """Background loop that polls Spotify DOM for state changes."""
         self._logger.info("SpotifyCDPPoller: poll loop started")
         controller = self._get_controller()
+        if stop is None:
+            stop = self._poll_stop
         poll_interval = 2.5
         login_check_counter = 0
         poll_count = 0
         consecutive_poll_errors = 0
         connection_notice_sent = False
+        watch: dict[str, Any] = {}
 
-        while not handle.stop_requested() and not self._poll_stop.is_set():
+        while not handle.stop_requested() and not stop.is_set():
             try:
+                if not self._owns_player(handle):
+                    # A newer play owns the player; this one only waits to be stopped.
+                    stop.wait(poll_interval)
+                    continue
                 np = controller.get_now_playing()
                 if consecutive_poll_errors:
                     self._logger.info(
@@ -190,8 +232,12 @@ class SpotifyCDPEngine(ProviderPlaybackEngine):
                             self._last_track = current_track
                             if genuine_change:
                                 self._request_proctap_track_rescan(current_track)
-                            if np.get("artwork_url"):
-                                handle.mark_artwork(np["artwork_url"])
+
+                        # Every poll, not only on a track change: the cover is
+                        # often not on the page yet when the title first shows.
+                        artwork_url = np.get("artwork_url")
+                        if artwork_url and artwork_url != handle.artwork_url():
+                            handle.mark_artwork(artwork_url)
 
                         # Metadata sync runs EVERY non-stale poll, not only on a
                         # track change: the change-only sync left a raw-URI
@@ -199,9 +245,15 @@ class SpotifyCDPEngine(ProviderPlaybackEngine):
                         # already matched the playing track.
                         self._sync_item_metadata(handle, current_track, np.get("artist"))
 
+                        try:
+                            self._keep_player_truthful(handle, np, poll_count, watch)
+                        except Exception:
+                            # Never counted as a lost connection.
+                            self._logger.debug("Spotify state check failed", exc_info=True)
+
                         # Broadcast state update via player._emit()
                         self._broadcast_state()
-                elif poll_count <= 5:
+                elif poll_count <= 5 or poll_count % _STATE_LOG_EVERY_POLLS == 0:
                     self._logger.info("SpotifyCDPPoller: poll #%d returned None", poll_count)
 
                 # Periodic login check (every ~30 seconds = 12 polls)
@@ -237,9 +289,140 @@ class SpotifyCDPEngine(ProviderPlaybackEngine):
                 else:
                     self._logger.debug("CDP poll error: %s", exc)
 
-            self._poll_stop.wait(poll_interval)
+            stop.wait(poll_interval)
 
+        with self._lock:
+            entry = self._pollers.get(id(handle))
+            if entry is not None and entry[1] is stop:
+                self._pollers.pop(id(handle), None)
+        self._logger.info(
+            "SpotifyCDPPoller: poll loop ended after %d polls (stop_requested=%s)",
+            poll_count,
+            handle.stop_requested(),
+        )
         handle.mark_finished()
+
+    # ------------------------------------------------------------------
+    # Player truth
+    # ------------------------------------------------------------------
+    def _keep_player_truthful(
+        self,
+        handle: PlaybackHandle,
+        np: dict[str, Any],
+        poll_count: int,
+        watch: dict[str, Any],
+    ) -> None:
+        """Log what Spotify and the player each say, and correct the player.
+
+        Build 10 on the laptop: Spotify played for minutes while the player
+        reported nothing playing ("DUCK_SKIPPED: nothing is playing"), so
+        Viola talked over the music at full volume and the stage, the seek bar
+        and "like" all followed the wrong state. Nothing in the log said what
+        the player's state was or what the page offered. The engine is the only
+        part that can see Spotify, so it now writes both sides
+        (SPOTIFY_STATE) and, when Spotify's position is moving while the
+        player says it is not playing, puts the player right
+        (SPOTIFY_STATE_HEAL). A pause or stop the user asked for is never
+        undone: those pause or end this handle first.
+        """
+        from music.player.playback_state import PlaybackPhase
+        from playback.engine_manager import _get_player_for_emit
+
+        position = float(_parse_time_str(np.get("position")))
+        previous = watch.get("position")
+        watch["position"] = position
+        advancing = previous is not None and position > previous
+        # The play button, the running media element or the page's Media Session.
+        spotify_playing = bool(
+            np.get("is_playing") or np.get("media_playing") or np.get("media_session_state") == "playing"
+        )
+
+        player = _get_player_for_emit()
+        sm = getattr(player, "_playback_sm", None) if player is not None else None
+        phase = getattr(sm, "phase", None)
+        phase_name = getattr(phase, "name", None) or "unknown"
+        shown = getattr(getattr(player, "_state", None), "now_playing", None) if player is not None else None
+
+        summary = (
+            phase_name,
+            shown is not None,
+            spotify_playing,
+            np.get("button_playing"),
+            np.get("media_playing"),
+            np.get("media_elements"),
+            np.get("media_session"),
+            np.get("media_session_state"),
+            np.get("widget"),
+            np.get("track_source"),
+            np.get("artist_source"),
+            np.get("artwork_source"),
+            np.get("position_source"),
+            np.get("duration_source"),
+            np.get("track_id_source") or "none",
+            np.get("visibility"),
+        )
+        if summary != watch.get("summary") or poll_count % _STATE_LOG_EVERY_POLLS == 0:
+            watch["summary"] = summary
+            self._logger.info(
+                "SPOTIFY_STATE poll=%d player_phase=%s player_has_track=%s spotify_playing=%s position_moving=%s "
+                "button_playing=%s media_playing=%s media_elements=%s media_session=%s media_session_state=%s "
+                "widget=%s title_from=%s artist_from=%s art_from=%s position_from=%s duration_from=%s "
+                "track_id_from=%s page=%s position=%s duration=%s",
+                poll_count,
+                summary[0],
+                summary[1],
+                spotify_playing,
+                advancing,
+                *summary[3:],
+                np.get("position"),
+                np.get("duration"),
+            )
+
+        wrong = sm is not None and (phase != PlaybackPhase.PLAYING or shown is None)
+        backend = getattr(player, "_backend", None) if player is not None else None
+        ours = getattr(backend, "_handle", None) is handle
+        user_paused = bool(getattr(player, "_user_paused", False) or getattr(backend, "_paused", False))
+        if not (wrong and ours and spotify_playing and advancing) or user_paused or handle.is_paused():
+            watch["wrong_polls"] = 0
+            return
+        watch["wrong_polls"] = int(watch.get("wrong_polls", 0)) + 1
+        if watch["wrong_polls"] < _STATE_HEAL_AFTER_POLLS:
+            return
+        watch["wrong_polls"] = 0
+
+        cv = getattr(player, "_cv", None)
+        if cv is None:
+            return
+        with cv:
+            if handle.stop_requested() or getattr(player, "_user_paused", False):
+                return
+            state = getattr(player, "_state", None)
+            shown = getattr(state, "now_playing", None)
+            item = handle.item
+            if shown is not None and shown is not item and getattr(shown, "id", None) != getattr(item, "id", None):
+                return  # the player is showing another track; not this play's to correct
+            before = sm.phase
+            if before == PlaybackPhase.PLAYING and shown is not None:
+                return
+            if shown is None:
+                set_now_playing = getattr(player, "_set_now_playing_locked", None)
+                if callable(set_now_playing):
+                    set_now_playing(item)
+                elif state is not None:
+                    state.now_playing = item
+            if before != PlaybackPhase.PLAYING:
+                if before not in (PlaybackPhase.LOADING, PlaybackPhase.PAUSED):
+                    sm.transition(PlaybackPhase.LOADING, force=True)
+                sm.transition(PlaybackPhase.PLAYING, force=True)
+            if state is not None:
+                state.is_playing = True
+            cv.notify_all()
+        self._logger.warning(
+            "SPOTIFY_STATE_HEAL: Spotify is playing (position moving) but the player said %s with %s; "
+            "set the player to PLAYING with this track",
+            before.name,
+            "a track shown" if shown is not None else "no track shown",
+        )
 
     def _sync_item_metadata(self, handle: PlaybackHandle, current_track: Any, artist: Any) -> None:
         """Keep the queue item's title/artist in step with the live Spotify DOM.
@@ -383,7 +566,19 @@ class SpotifyCDPEngine(ProviderPlaybackEngine):
                 # Run _emit in a thread pool so it never blocks the event
                 # loop while waiting for player._lock.
                 main_loop.call_soon_threadsafe(lambda: asyncio.ensure_future(asyncio.to_thread(player._emit)))
-            # else: skip broadcast — periodic broadcaster will pick it up
+                return
+            # No event loop is reachable from the poll thread (always so on the
+            # desktop: the player holds no hub reference). The broadcast used
+            # to be skipped here, leaving the screen to the 5 s periodic
+            # broadcaster, which only sends when the track id, play state or
+            # position changed: a new title or cover on the same play never
+            # reached the stage. Emit from a short-lived thread instead, never
+            # from the poll thread itself (stop() joins it), one at a time.
+            previous = self._emit_thread
+            if previous is not None and previous.is_alive():
+                return
+            self._emit_thread = threading.Thread(target=player._emit, name="SpotifyCDPEmit", daemon=True)
+            self._emit_thread.start()
         except Exception as exc:
             self._logger.debug("State broadcast failed: %s", exc)
 
@@ -532,6 +727,10 @@ class SpotifyCDPEngine(ProviderPlaybackEngine):
         self._annotate_account_tier(controller)
 
         handle = PlaybackHandle(item, self.provider_id)
+        # From here this play owns the player: an older play's poller stops
+        # writing state, and stopping the older handle no longer touches the
+        # transport (it used to press pause on the song that had just started).
+        self._current_handle = handle
 
         # Reset per-play poller state. The engine instance is shared across
         # plays, so a stale _last_track/_position/_duration from the previous
@@ -725,18 +924,25 @@ class SpotifyCDPEngine(ProviderPlaybackEngine):
         acquire player._lock via _emit/_broadcast_state).
         """
         handle.request_stop()
-        self._stop_poll_loop()
+        self._stop_poll_loop(handle)
 
-        try:
-            controller = self._get_controller()
-            np = controller.get_now_playing()
-            if np and np.get("is_playing"):
-                try:
-                    controller.play_pause()
-                except Exception as exc:
-                    self._logger.debug("Spotify CDP stop-pause failed: %s", exc)
-        except Exception as exc:
-            self._logger.debug("Spotify CDP stop controller access failed: %s", exc)
+        superseded = not self._owns_player(handle)
+        if self._current_handle is handle:
+            self._current_handle = None
+        if superseded:
+            # A newer play is on the player. Pausing here would silence it.
+            self._logger.info("Spotify CDP: stopped a superseded play; transport left to the current one")
+        else:
+            try:
+                controller = self._get_controller()
+                np = controller.get_now_playing()
+                if np and np.get("is_playing"):
+                    try:
+                        controller.play_pause()
+                    except Exception as exc:
+                        self._logger.debug("Spotify CDP stop-pause failed: %s", exc)
+            except Exception as exc:
+                self._logger.debug("Spotify CDP stop controller access failed: %s", exc)
 
         with self._lock:
             self._handles.pop(handle.item.id, None)

@@ -496,6 +496,9 @@ async def end_active_phone_call(
     """
     proxied = await _maybe_proxy_phone_to_cloud("DELETE", "/api/phone/calls/%s" % call_id)
     if proxied is not None:
+        # The laptop log of 2026-11-12 had no line at all for the End press that
+        # cancelled call a2353e21; record it and the cloud's answer.
+        logger.info("Phone End pressed for call=%s; cloud answered HTTP %d", call_id, proxied.status_code)
         return proxied
 
     from intent.tools.phone_call import _get_manager

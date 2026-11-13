@@ -118,6 +118,67 @@ _PHONE_CALL_CONFIRMATION_TRANSLATION = str.maketrans(
 )
 
 
+# Declared defaults of each tool's arguments, by tool name (filled by the MCP hub
+# when it discovers a tool). An argument left out and the same argument sent at
+# its declared default are the same call, so neither may decide whether a "yes"
+# matches the question that was asked. Strict tool schemas make the model send
+# every field, and it does not always send the same filler twice: the user said
+# yes, the re-issued call differed only in an unused default, and the same
+# question came back (1.0.5 build 10 laptop: Notepad 08:00, playlist delete 07:16).
+_TOOL_ARGUMENT_DEFAULTS: dict[str, dict[str, Any]] = {}
+_TOOL_ARGUMENT_DEFAULTS_LOCK = threading.Lock()
+
+
+# For one action of a compound tool, the only arguments its code path reads.
+# Strict schemas make the model send every field, and on a "yes" it refilled
+# fields the action never reads with new values: launch_app re-sent with
+# include_minimized/include_window_titles flipped, then with axis="horizontal";
+# playlist delete re-sent with an artist (1.0.5 build 10 laptop log, 11/08 07:16
+# and 08:00). The call then no longer matched the question and the user was
+# asked again. Keep these in step with the handlers: computer launch_app in
+# mcp_servers/computer_use/server.py, playlist delete in core_tools/server.py.
+_ACTION_ARGUMENTS: dict[tuple[str, str], frozenset[str]] = {
+    ("computer", "launch_app"): frozenset(
+        {"action", "app_name", "app_executable", "title", "window_title", "target_window", "bring_to_front"}
+    ),
+    ("playlist", "delete"): frozenset({"action", "name"}),
+}
+
+
+def _action_arguments(tool_name: str, tool_args: dict[str, Any]) -> frozenset[str] | None:
+    action = str(tool_args.get("action") or "").strip().lower()
+    return _ACTION_ARGUMENTS.get((str(tool_name or "").strip(), action))
+
+
+def register_tool_argument_defaults(tool_name: str, input_schema: Any) -> None:
+    """Record the declared argument defaults from a tool's JSON input schema."""
+    name = str(tool_name or "").strip()
+    properties = input_schema.get("properties") if isinstance(input_schema, dict) else None
+    if not name or not isinstance(properties, dict):
+        return
+    defaults = {
+        str(key): spec["default"] for key, spec in properties.items() if isinstance(spec, dict) and "default" in spec
+    }
+    with _TOOL_ARGUMENT_DEFAULTS_LOCK:
+        _TOOL_ARGUMENT_DEFAULTS[name] = defaults
+
+
+def _is_declared_default(tool_name: str, key: str, value: Any) -> bool:
+    defaults = _TOOL_ARGUMENT_DEFAULTS.get(str(tool_name or ""))
+    if not defaults or key not in defaults:
+        return False
+    default = defaults[key]
+    if isinstance(default, (list, tuple)) and not default:
+        default = None  # the comparison form of an empty list (_normalize_confirmation_value)
+    # bool is an int in Python: False must not match 0, nor True match 1.
+    return type(default) is type(value) and default == value
+
+
+def _changed_argument_names(stored: dict[str, Any], current: dict[str, Any]) -> list[str]:
+    """Names (never values) of the arguments that differ between two calls."""
+    return sorted(key for key in set(stored) | set(current) if stored.get(key) != current.get(key))
+
+
 @dataclass(frozen=True)
 class _PendingConfirmation:
     confirmation_id: str
@@ -274,12 +335,18 @@ class ConfirmationDeferred(RuntimeError):
                 "_approval_confirmed": True,
                 "_approval_confirmation_id": self.confirmation_id,
             },
+            # The tool schemas are strict and have no field for the two
+            # confirmation_args, so a model told to add them put them inside a
+            # real argument ("paths": [..., "_approval_confirmed:true"], seen
+            # live 2026-11-12). The call then differed from the one asked about
+            # and the user was asked again (1.0.5 build 10 laptop, bug 9). The
+            # same call, unchanged, is what a "yes" is matched to.
             "message": (
                 "Confirmation is required before I can %s. Ask the user to confirm or cancel. "
-                "If the user confirms, call the same tool again with _approval_confirmed=true "
-                "and _approval_confirmation_id='%s'."
+                "If the user confirms, call the same tool again with exactly the same arguments: "
+                "change nothing and add nothing, not even a confirmation id."
             )
-            % (self.action_description, self.confirmation_id),
+            % self.action_description,
         }
 
 
@@ -381,10 +448,11 @@ class ApprovalManager:
 
     @staticmethod
     def _confirmation_comparable_args(tool_name: str, tool_args: dict[str, Any]) -> dict[str, Any]:
+        read_by_action = _action_arguments(tool_name, tool_args)
         comparable = {
             key: ApprovalManager._normalize_confirmation_value(value)
             for key, value in tool_args.items()
-            if key not in _CONFIRMATION_ARG_KEYS
+            if key not in _CONFIRMATION_ARG_KEYS and (read_by_action is None or key in read_by_action)
         }
         if ApprovalManager._is_phone_call_tool_args(tool_name, comparable) and "call_id" in comparable:
             comparable["call_id"] = ""
@@ -392,7 +460,9 @@ class ApprovalManager:
                 value = comparable.get(field)
                 if isinstance(value, str):
                     comparable[field] = ApprovalManager._normalize_phone_call_confirmation_text(value)
-        return comparable
+        # Last, after the normalizations above, so a value they reset to its
+        # default (the phone call_id) drops out the same way on both turns.
+        return {key: value for key, value in comparable.items() if not _is_declared_default(tool_name, key, value)}
 
     @staticmethod
     def _is_phone_call_tool_args(tool_name: str, tool_args: dict[str, Any]) -> bool:
@@ -698,6 +768,8 @@ class ApprovalManager:
         described = str(action_description or "").strip()
         new_args = self._stored_tool_args_for_tool(tool_name_value, tool_args) if described else {}
         matching_ids: list[str] = []
+        near_misses: list[list[str]] = []
+        current_args = self._stored_tool_args_for_tool(tool_name_value, tool_args)
         store = self._pending_store()
         with store.lock:
             self._prune_pending_confirmations(store, now)
@@ -708,6 +780,8 @@ class ApprovalManager:
                     continue
                 if pending.tool_name != tool_name_value or pending.risk != risk:
                     continue
+                if pending.args_fingerprint != args_fingerprint:
+                    near_misses.append(_changed_argument_names(pending.tool_args, current_args))
                 if pending.args_fingerprint == args_fingerprint:
                     matching_ids.append(confirmation_id)
                 elif (
@@ -723,9 +797,19 @@ class ApprovalManager:
                     # live repro, X8.1 family).
                     matching_ids.append(confirmation_id)
             if not matching_ids:
+                for changed in near_misses:
+                    # Settles "my yes did not count" from a customer log: the
+                    # question was waiting, and the call that came back was a
+                    # different one. Argument names only, never their values.
+                    logger.warning(
+                        "Pending confirmation for %s not matched: the re-issued call changed %s",
+                        tool_name_value,
+                        ", ".join(changed) or "nothing comparable",
+                    )
                 return "missing"
             for confirmation_id in matching_ids:
                 store.confirmations.pop(confirmation_id, None)
+        logger.info("Pending confirmation for %s accepted on the re-issued call", tool_name_value)
         self._apply_tool_arg_confirmation_normalization(tool_name_value, tool_args)
         return "accepted"
 
@@ -749,7 +833,7 @@ class ApprovalManager:
                 store.confirmations.pop(confirmation_id, None)
                 dropped.append((pending.tool_name, pending.action_description, dict(pending.tool_args)))
         for _tool_name, description, _args in dropped:
-            logger.info("Unanswered confirmation retired: %s", description)
+            logger.warning("Unanswered confirmation retired: %s", description)
         return dropped
 
     def pending_confirmation_args(

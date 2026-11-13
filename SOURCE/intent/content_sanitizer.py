@@ -143,6 +143,8 @@ PAYMENT_GATE_BOUND_TOOLS = frozenset({"fill_payment_details", "transmit_payment_
 USER_WORDS_ONLY_TOOLS = frozenset({"save_delivery_address"})
 _NUMBER_RUN_RE = re.compile(r"\d+")
 _DIGIT_GROUP_COMMA_RE = re.compile(r"(?<=\d),(?=\d)")
+_NUMBER_PIECES_RE = re.compile(r"\d+(?:[ .\-]{1,2}\d+)+")
+_NUMBER_PIECES_MAX = 12
 _WORD_RE = re.compile(r"[a-z0-9]+")
 # Words that say nothing about which street it is, and have a short and a long form.
 _STREET_FILLER_WORDS = frozenset(
@@ -156,11 +158,26 @@ _SPOKEN_NUMBER_WORDS = frozenset(
 )
 
 
+def _joined_number_runs(own: str) -> set[str]:
+    """Numbers the user said in pieces: "48 12", "48.12" and "5 3 2 1 1" are 4812 and 53211.
+
+    Speech-to-text splits a spoken house number or ZIP code with a space, a point
+    or a hyphen. Only digit groups that stand next to each other are joined.
+    """
+    joined: set[str] = set()
+    for run in _NUMBER_PIECES_RE.findall(own):
+        pieces = _NUMBER_RUN_RE.findall(run)[:_NUMBER_PIECES_MAX]
+        for start in range(len(pieces)):
+            for end in range(start + 2, len(pieces) + 1):
+                joined.add("".join(pieces[start:end]))
+    return joined
+
+
 def _words_not_from_user(args: Mapping[str, Any], own_words: str) -> list[str]:
     """Name the address fields whose words the user never said."""
     own = _DIGIT_GROUP_COMMA_RE.sub("", own_words.lower())
     own_tokens = set(_WORD_RE.findall(own))
-    own_numbers = set(_NUMBER_RUN_RE.findall(own))
+    own_numbers = set(_NUMBER_RUN_RE.findall(own)) | _joined_number_runs(own)
     said_a_number_in_words = bool(own_tokens & _SPOKEN_NUMBER_WORDS)
     missing: list[str] = []
     street = _WORD_RE.findall(str(args.get("street") or "").lower())
@@ -1179,7 +1196,15 @@ class BrowserTaintTracker:
             )
         missing = _words_not_from_user(args, self._user_own_words)
         if missing:
-            logger.warning("TAINT_GATE: refusing %s: not the user's own words (%s)", tool_name, ", ".join(missing))
+            # Field names and sizes only, never the words: enough to tell an empty
+            # "own words" (nothing counted as said) from one misheard field.
+            logger.warning(
+                "TAINT_GATE: refusing %s: not the user's own words (%s); own words: %d chars, %d numbers",
+                tool_name,
+                ", ".join(missing),
+                len(self._user_own_words),
+                len(_NUMBER_RUN_RE.findall(self._user_own_words)),
+            )
             return (
                 "BLOCKED: nothing was saved. The user did not say this %s. Use only what they said, leave the "
                 "rest empty, or ask them for it." % " or ".join(missing)

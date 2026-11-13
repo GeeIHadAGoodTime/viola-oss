@@ -7,7 +7,7 @@ from typing import Any
 
 from intent.tool_types import ToolResult
 from intent.tools._schedule_time import parse_schedule_time
-from services.scheduler.actions import decode_tool_action, encode_tool_action
+from services.scheduler.actions import decode_tool_action, describe_tool_action, encode_tool_action
 
 
 def _resolve_user_id(user_id: str | None = None) -> str:
@@ -131,8 +131,41 @@ async def notify_handler(
     return await deliver_notification_handler(body, channel=normalized_channel, user_id=uid)
 
 
+# Scheduler rows owned by another always-loaded tool, which lists them itself.
+_OTHER_LISTED_TOOLS = frozenset({"notify", "alarm", "timer"})
+
+
+def _reminder_status(schedule: Any) -> str:
+    """pending (will still fire), finished (a one-time reminder that already fired) or disabled."""
+    if bool(getattr(schedule, "enabled", False)):
+        return "pending"
+    if getattr(schedule, "one_shot_at", None) and int(getattr(schedule, "run_count", 0) or 0) > 0:
+        return "finished"
+    return "disabled"
+
+
+def _scheduled_task_entry(schedule: Any) -> dict[str, Any]:
+    cron_expr = getattr(schedule, "cron_expr", None)
+    return {
+        "schedule_id": schedule.id,
+        "label": schedule.label,
+        "action": describe_tool_action(str(getattr(schedule, "action", "") or ""), schedule.label),
+        "repeats": "cron %s" % cron_expr if cron_expr else "once",
+        "next_run_at": schedule.next_run_at,
+        "enabled": bool(schedule.enabled),
+        "last_status": schedule.last_status,
+    }
+
+
 async def list_notify_reminders_handler(enabled_only: bool = True, user_id: str = "") -> ToolResult:
-    """List scheduled reminders created through notify."""
+    """List reminders created through notify, plus the user's other scheduled tasks.
+
+    Reminders and scheduled tasks are rows of one store. Asked "list my
+    scheduled tasks", the model reached for this always-loaded tool, which
+    showed reminders only, so a weekday 7am task did not exist as far as the
+    answer went (1.0.5 build 10 laptop, bug 12; reproduced 2026-11-12). The
+    same read now returns both, each under its own key.
+    """
     uid = _resolve_user_id(user_id)
     try:
         from services.scheduler.service import get_scheduler_service
@@ -140,9 +173,13 @@ async def list_notify_reminders_handler(enabled_only: bool = True, user_id: str 
         scheduler = get_scheduler_service()
         schedules = scheduler.list_schedules(uid, enabled_only=enabled_only)
         reminders: list[dict[str, Any]] = []
+        scheduled_tasks: list[dict[str, Any]] = []
         for schedule in schedules:
             decoded = decode_tool_action(str(getattr(schedule, "action", "") or ""))
-            if not decoded or decoded.get("tool") != "notify":
+            if not decoded or decoded.get("tool") not in _OTHER_LISTED_TOOLS:
+                scheduled_tasks.append(_scheduled_task_entry(schedule))
+                continue
+            if decoded.get("tool") != "notify":
                 continue
 
             args = decoded.get("args")
@@ -157,12 +194,26 @@ async def list_notify_reminders_handler(enabled_only: bool = True, user_id: str 
                     "when": schedule.one_shot_at or schedule.next_run_at,
                     "next_run_at": schedule.next_run_at,
                     "enabled": bool(schedule.enabled),
+                    "status": _reminder_status(schedule),
                     "last_status": schedule.last_status,
                     "created_at": schedule.created_at,
                 }
             )
 
-        return ToolResult(ok=True, data={"count": len(reminders), "reminders": reminders})
+        pending = sum(1 for item in reminders if item["status"] == "pending")
+        data: dict[str, Any] = {
+            "count": len(reminders),
+            "pending_count": pending,
+            "reminders": reminders,
+            "scheduled_task_count": len(scheduled_tasks),
+            "scheduled_tasks": scheduled_tasks,
+        }
+        if len(reminders) > pending:
+            data["note"] = (
+                "Reminders with status finished or disabled are history: they will not fire again. "
+                "Do not present them as upcoming."
+            )
+        return ToolResult(ok=True, data=data)
     except Exception as exc:
         return ToolResult(ok=False, data=None, error="list_notify_reminders failed: %s" % exc)
 

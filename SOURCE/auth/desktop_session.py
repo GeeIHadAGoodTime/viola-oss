@@ -20,6 +20,7 @@ import base64
 import hmac
 import json
 import sqlite3
+import sys
 import threading
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -276,11 +277,22 @@ class DesktopSessionStore:
             sqlite3.Error,
             TypeError,
             ValueError,
-        ):
+        ) as exc:
             # Fail closed for THIS request only. A failure inside this process
             # says nothing about the session itself: quitting raises
             # "cannot schedule new futures after shutdown" here, and deleting on
             # that signed people out on an unlucky quit (1.0.5 build 9, 11-04).
+            if _process_is_winding_down(exc):
+                # Expected while Viola quits: a request still in flight finds
+                # the thread pool or the store already closing. Build 10 kept
+                # the session but still wrote this as an ERROR with a traceback
+                # on every quit; it is not an error.
+                logger.info(
+                    "Desktop local session check skipped while Viola quits (session kept): %s: %s",
+                    type(exc).__name__,
+                    exc,
+                )
+                return DesktopSessionValidation(authenticated=False, reason="desktop_session_validation_error")
             logger.exception("Desktop local session validation failed closed (session kept)")
             return DesktopSessionValidation(authenticated=False, reason="desktop_session_validation_error")
 
@@ -956,6 +968,22 @@ def _notify_account_change() -> None:
                 logger.exception("Desktop account change listener failed")
 
     threading.Thread(target=_run, daemon=True, name="desktop-account-change").start()
+
+
+def _process_is_winding_down(exc: BaseException) -> bool:
+    """True when a failure is explained by Viola quitting, not by the session.
+
+    Either the quit guard is already set (``begin_desktop_session_shutdown``),
+    or Python itself refused new work because the interpreter or its default
+    thread pool is closing, which can happen on an exit path that never ran the
+    guard.
+    """
+    if _shutdown_started.is_set() or sys.is_finalizing():
+        return True
+    if isinstance(exc, RuntimeError):
+        message = str(exc)
+        return "cannot schedule new futures after" in message or "Event loop is closed" in message
+    return False
 
 
 def get_desktop_session_store() -> DesktopSessionStore:

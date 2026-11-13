@@ -137,7 +137,36 @@ describe('a silent microphone', () => {
     await act(async () => { await result.current.stopRecording(); });
 
     expect(transcribeCalls()).toHaveLength(0);
-    expect(result.current.error).toMatch(/didn't hear anything from the microphone/);
+    // The same tone and notice as a wake that heard nothing (build 10, J5).
+    expect(authFetch.mock.calls.filter(([path]) => path === '/v1/voice/nothing-heard')).toHaveLength(1);
+    expect(result.current.error).toBeNull();
     expect(result.current.isProcessing).toBe(false);
+  });
+
+  it('a clean take with no words gets the same notice as the wake path', async () => {
+    const { result } = await mount();
+    authFetch.mockImplementation(async (path) => ({
+      json: async () => (path === '/v1/transcribe' ? { ok: true, data: { text: '' } } : { ok: true, data: {} }),
+    }));
+    await act(async () => { await result.current.startRecording({ holdToTalk: true }); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(1500); });
+    await act(async () => { await result.current.stopRecording(); });
+
+    expect(transcribeCalls()).toHaveLength(1);
+    expect(authFetch.mock.calls.filter(([path]) => path === '/v1/voice/nothing-heard')).toHaveLength(1);
+    expect(result.current.error).toBeNull();
+  });
+
+  it('falls back to the same words when the server cannot be reached', async () => {
+    level = 0;
+    const { result } = await mount();
+    authFetch.mockImplementation(async (path) => {
+      if (path === '/v1/voice/nothing-heard') throw new Error('offline');
+      return { json: async () => ({ ok: true, data: {} }) };
+    });
+    await act(async () => { await result.current.startRecording({ holdToTalk: true }); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
+    await act(async () => { await result.current.stopRecording(); });
+    expect(result.current.error).toMatch(/didn't hear anything after the chime/);
   });
 });

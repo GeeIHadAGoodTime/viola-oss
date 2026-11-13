@@ -428,6 +428,37 @@ class PlayerControlService(PlayerControlSurface):
             return None
         return str(provider) if provider else None
 
+    def _mark_provider_native_next_playing(self) -> None:
+        """Spotify's own Next starts the next song even from a pause: say so.
+
+        Build 10 on the laptop: "Pause", then "Next". Spotify played the next
+        song (its position moved 16 s -> 41 s) while the player stayed PAUSED
+        with the user pause still set, so Viola never ducked under it
+        (DUCK_SKIPPED at 09:20:24) and the stage showed it paused.
+        """
+        with self._cv:
+            sm = getattr(self._player, "_playback_sm", None)
+            phase = getattr(sm, "phase", None)
+            if self._player._state.now_playing is None or phase == PlaybackPhase.PLAYING:
+                return
+            self._player._user_paused = False
+            self._player._paused = False
+            self._player._is_playing = True
+            self._player._state.is_playing = True
+            _sm_transition(self._player, PlaybackPhase.PLAYING, user_initiated=True)
+            backend = self._backend_manager.backend
+            if backend is not None and getattr(backend, "_paused", False):
+                backend._paused = False
+            handle = getattr(backend, "_handle", None)
+            mark_resumed = getattr(handle, "mark_resumed", None)
+            if callable(mark_resumed):
+                mark_resumed()
+            self._cv.notify_all()
+        self._logger.info(
+            "PROVIDER_NATIVE_SKIP: the provider plays the next track; player %s -> PLAYING",
+            getattr(phase, "name", phase),
+        )
+
     def skip(self) -> dict[str, Any]:
         """Skip to next track."""
         track_id = None
@@ -527,6 +558,7 @@ class PlayerControlService(PlayerControlSurface):
                 self._logger.warning("Provider-native backend skip failed: %s", exc)
             else:
                 mode = engine_provider or "spotify_cdp"
+                self._mark_provider_native_next_playing()
 
         if stop_backend:
             try:

@@ -8,8 +8,19 @@ It enforces two independent guards:
    conservative per-token cost model.  Default $10/month.  Resets on the first
    of the calendar month at 00:00 UTC.
 
-These are GLOBAL (process-wide) infrastructure safety nets.  Per-user managed
-spend caps are handled by plan_limiter; legacy quota counters are telemetry.
+The monthly cost cap is GLOBAL (process-wide).  The per-minute call cap is
+counted per ``scope``: the cloud passes the account id, so each account gets its
+own 30 calls a minute (1.0.5 build 10: one window shared by every account
+stopped a parent and its three research helpers).  The desktop app, and any
+pseudo or unauthenticated id in the cloud, use the one shared window (scope
+"").  Per-user managed spend caps are handled by plan_limiter; legacy quota
+counters are telemetry.
+
+A caller that is refused by the per-minute cap is told how long to wait
+(``retry_after_seconds``).  ``call_waiting_out_per_minute_limit`` is the
+desktop side of that: it waits for a free slot and sends the same turn again
+instead of ending the task, so the cap slows a busy run down but still never
+lets it make more calls per minute than the cap allows.
 
 Usage:
     from services.llm.cost_circuit_breaker import get_circuit_breaker
@@ -20,9 +31,12 @@ Usage:
 
 from __future__ import annotations
 
+import asyncio
+import random
 import threading
 import time
 from collections import deque
+from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from typing import Any
 
@@ -61,8 +75,29 @@ def build_cost_limit_frame(
     )
 
 
-def _cost_limit_error(reason: str, *, limit_type: str) -> CostCircuitBreakerError:
+PER_MINUTE_LIMIT_TYPE = "per_minute_calls"
+_PER_MINUTE_WINDOW_S = 60.0
+# How long one model turn may wait for a free per-minute slot before the task
+# is stopped after all.  Longer than two full windows, so a turn only gives up
+# when the cap stayed full the whole time.
+PER_MINUTE_WAIT_BUDGET_S = 150.0
+_PER_MINUTE_WAIT_STEP_MAX_S = 30.0
+_PER_MINUTE_WAIT_DEFAULT_STEPS_S = (5.0, 10.0, 15.0, 20.0)
+# The reason text an older cloud sends without ``limit_type`` (see
+# ``per_minute_denial_wait_seconds``).
+_PER_MINUTE_REASON_PREFIX = "Per-minute LLM call limit reached"
+# Looked up at call time so tests can replace the wait.
+_sleep = asyncio.sleep
+
+
+def _cost_limit_error(
+    reason: str,
+    *,
+    limit_type: str,
+    retry_after_seconds: float = 0.0,
+) -> CostCircuitBreakerError:
     exc = CostCircuitBreakerError(reason, limit_type=limit_type)
+    exc.retry_after_seconds = max(0.0, float(retry_after_seconds))  # type: ignore[attr-defined]
     exc.viola_stop_reason = "cost_limit"  # type: ignore[attr-defined]
     exc.viola_error_category = "cost_limit"  # type: ignore[attr-defined]
     exc.viola_failure_frames = [  # type: ignore[attr-defined]
@@ -90,8 +125,10 @@ class CostCircuitBreaker:
 
     def __init__(self) -> None:
         self._lock = threading.Lock()
-        # Per-minute sliding window
+        # Per-minute sliding window of the process-wide scope ("")
         self._call_timestamps: deque[float] = deque()
+        # Per-minute sliding windows of named scopes (cloud: one per account)
+        self._scoped_call_timestamps: dict[str, deque[float]] = {}
         # Monthly cost accumulator
         self._monthly_cost_usd: float = 0.0
         self._monthly_call_count: int = 0
@@ -112,11 +149,35 @@ class CostCircuitBreaker:
             self._monthly_call_count = 0
             self._cost_reset_month = month
 
-    def check_and_record(self, estimated_tokens: int = 150) -> None:
+    def _window_for_scope(self, scope: str, now: float) -> deque[float]:
+        """The per-minute window of ``scope`` with expired calls removed (lock held)."""
+        if not scope:
+            window = self._call_timestamps
+        else:
+            existing = self._scoped_call_timestamps.get(scope)
+            if existing is None:
+                # Drop other scopes' expired windows so idle accounts cost nothing.
+                expired = [
+                    key
+                    for key, calls in self._scoped_call_timestamps.items()
+                    if not calls or (now - calls[-1]) >= _PER_MINUTE_WINDOW_S
+                ]
+                for key in expired:
+                    del self._scoped_call_timestamps[key]
+                existing = self._scoped_call_timestamps.setdefault(scope, deque())
+            window = existing
+        while window and (now - window[0]) >= _PER_MINUTE_WINDOW_S:
+            window.popleft()
+        return window
+
+    def check_and_record(self, estimated_tokens: int = 150, *, scope: str = "") -> None:
         """Check hard limits and record this call.  Raises on breach.
 
         Args:
             estimated_tokens: Estimated total tokens for this call.
+            scope: Whose per-minute window this call counts in.  Empty (the
+                desktop app) is the whole process; the cloud passes the
+                account id.  The monthly cost cap is always process-wide.
 
         Raises:
             CostCircuitBreakerError: If per-minute or monthly cost cap is exceeded.
@@ -127,18 +188,22 @@ class CostCircuitBreaker:
 
             # --- Per-minute cap ---
             cap = settings.llm_cost_per_minute_cap
-            # Evict timestamps older than 60s
-            while self._call_timestamps and (now - self._call_timestamps[0]) >= 60.0:
-                self._call_timestamps.popleft()
+            window = self._window_for_scope(scope, now)
 
-            if len(self._call_timestamps) >= cap:
+            if len(window) >= cap:
                 logger.warning(
                     "Cost circuit breaker: per-minute cap hit (%d/%d)",
-                    len(self._call_timestamps),
+                    len(window),
                     cap,
                 )
                 reason = "Per-minute LLM call limit reached (%d calls in 60s). Wait a moment before trying again." % cap
-                raise _cost_limit_error(reason, limit_type="per_minute_calls")
+                # The oldest call in the window leaves it first: that is when a slot frees.
+                retry_after = (_PER_MINUTE_WINDOW_S - (now - window[0])) if window else _PER_MINUTE_WINDOW_S
+                raise _cost_limit_error(
+                    reason,
+                    limit_type=PER_MINUTE_LIMIT_TYPE,
+                    retry_after_seconds=max(1.0, retry_after),
+                )
 
             # --- Monthly cost cap ---
             est_input = estimated_tokens * 0.7  # rough input/output split
@@ -162,14 +227,14 @@ class CostCircuitBreaker:
                 raise _cost_limit_error(reason, limit_type="monthly_cost_usd")
 
             # Record the call
-            self._call_timestamps.append(now)
+            window.append(now)
             self._monthly_cost_usd += est_cost
             self._monthly_call_count += 1
 
-    async def check_and_record_async(self, estimated_tokens: int = 150) -> None:
+    async def check_and_record_async(self, estimated_tokens: int = 150, *, scope: str = "") -> None:
         """Async Redis-aware version of check_and_record for LLM hot paths."""
         if self._redis is None:
-            self.check_and_record(estimated_tokens)
+            self.check_and_record(estimated_tokens, scope=scope)
             return
 
         from services.cache.rate_limit import (
@@ -180,20 +245,21 @@ class CostCircuitBreaker:
         )
 
         if not redis_rate_limit_enabled():
-            self.check_and_record(estimated_tokens)
+            self.check_and_record(estimated_tokens, scope=scope)
             return
 
         cap = settings.llm_cost_per_minute_cap
         minute_decision = await check_redis_sliding_window(
             self._redis,
             scope="llm.cost.minute",
-            identifier="global",
+            # "user:" keeps an account id from ever naming the shared bucket.
+            identifier=("user:%s" % scope) if scope else "global",
             limit=cap,
             window_seconds=60,
         )
         if not minute_decision.allowed:
             if minute_decision.redis_error and not cloud_rate_limit_fail_closed():
-                self.check_and_record(estimated_tokens)
+                self.check_and_record(estimated_tokens, scope=scope)
                 return
             logger.warning(
                 "Cost circuit breaker: per-minute cap hit (%d/%d calls)",
@@ -201,7 +267,11 @@ class CostCircuitBreaker:
                 cap,
             )
             reason = "Per-minute LLM call limit reached (%d calls in 60s). Wait a moment before trying again." % cap
-            raise _cost_limit_error(reason, limit_type="per_minute_calls")
+            raise _cost_limit_error(
+                reason,
+                limit_type=PER_MINUTE_LIMIT_TYPE,
+                retry_after_seconds=max(1.0, float(minute_decision.retry_after or 0)),
+            )
 
         est_input = estimated_tokens * 0.7
         est_output = estimated_tokens * 0.3
@@ -220,7 +290,7 @@ class CostCircuitBreaker:
         )
         if not monthly_decision.allowed:
             if monthly_decision.redis_error and not cloud_rate_limit_fail_closed():
-                self.check_and_record(estimated_tokens)
+                self.check_and_record(estimated_tokens, scope=scope)
                 return
             logger.warning(
                 "Cost circuit breaker: monthly cost cap hit ($%.2f/$%.2f)",
@@ -279,8 +349,103 @@ def get_circuit_breaker() -> CostCircuitBreaker:
     return _breaker
 
 
+def per_minute_denial_wait_seconds(response: object, attempt: int = 0) -> float | None:
+    """How long to wait before resending a turn the per-minute cap refused.
+
+    ``response`` is what the provider returned for the turn.  Returns ``None``
+    when it is anything other than a per-minute refusal (an answer, a tool
+    call, a spend-cap or monthly-cap refusal): those are never waited out.
+
+    The managed cloud answers a refused turn with ``_policy_denial`` and
+    ``error == "cost_circuit_breaker"``.  A cloud from 1.0.5 build 11 on also
+    sends ``limit_type`` and ``retry_after_seconds``; an older one sends only
+    its own fixed reason text, which is what the last check reads.
+    """
+    if not isinstance(response, dict) or not response.get("_policy_denial"):
+        return None
+    if str(response.get("error") or "") != "cost_circuit_breaker":
+        return None
+    limit_type = str(response.get("limit_type") or "")
+    if limit_type:
+        if limit_type != PER_MINUTE_LIMIT_TYPE:
+            return None
+    elif not str(response.get("answer") or "").startswith(_PER_MINUTE_REASON_PREFIX):
+        return None
+    try:
+        told = float(response.get("retry_after_seconds") or 0.0)
+    except (TypeError, ValueError):
+        told = 0.0
+    if told <= 0.0:
+        steps = _PER_MINUTE_WAIT_DEFAULT_STEPS_S
+        told = steps[min(max(0, attempt), len(steps) - 1)]
+    return min(_PER_MINUTE_WAIT_STEP_MAX_S, max(1.0, told))
+
+
+async def call_waiting_out_per_minute_limit(
+    call: Callable[[], Awaitable[Any]],
+    *,
+    cancelled: Callable[[], bool] | None = None,
+    budget_s: float = PER_MINUTE_WAIT_BUDGET_S,
+    sleep: Callable[[float], Awaitable[Any]] | None = None,
+    label: str = "",
+) -> Any:
+    """Run one model turn; when the per-minute cap refuses it, wait and resend.
+
+    The cap is unchanged: a refused turn was never sent to the model, and it
+    is sent again only after the wait the cap asked for.  Anything else the
+    turn returns (or raises) passes straight through.  After ``budget_s`` of
+    waiting, or once ``cancelled()`` is true, the refusal itself is returned
+    and the caller ends the task as before.
+    """
+    pause = sleep or _sleep
+    waited = 0.0
+    attempt = 0
+    while True:
+        response = await call()
+        wait_s = per_minute_denial_wait_seconds(response, attempt)
+        if wait_s is None:
+            if attempt:
+                logger.info(
+                    "Per-minute call limit: %s went through after waiting %.0fs (%d waits)",
+                    label or "turn",
+                    waited,
+                    attempt,
+                )
+            return response
+        # Helpers that were refused together must not all come back together.
+        wait_s += random.uniform(0.0, 2.0)  # noqa: S311 - retry spacing, not security
+        if waited + wait_s > budget_s or (cancelled is not None and cancelled()):
+            logger.warning(
+                "Per-minute call limit: %s still refused after waiting %.0fs (%d waits); stopping",
+                label or "turn",
+                waited,
+                attempt,
+            )
+            return response
+        attempt += 1
+        logger.info(
+            "Per-minute call limit reached; %s waits %.0fs for a free slot (wait %d, %.0fs so far)",
+            label or "turn",
+            wait_s,
+            attempt,
+            waited,
+        )
+        remaining = wait_s
+        while remaining > 0:
+            step = min(1.0, remaining)
+            await pause(step)
+            remaining -= step
+            if cancelled is not None and cancelled():
+                return response
+        waited += wait_s
+
+
 __all__ = [
+    "PER_MINUTE_LIMIT_TYPE",
+    "PER_MINUTE_WAIT_BUDGET_S",
     "CostCircuitBreaker",
     "build_cost_limit_frame",
+    "call_waiting_out_per_minute_limit",
     "get_circuit_breaker",
+    "per_minute_denial_wait_seconds",
 ]

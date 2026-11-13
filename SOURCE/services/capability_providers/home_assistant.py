@@ -107,7 +107,10 @@ class HomeAssistantProvider:
     def get_setup_guide(self) -> dict[str, Any]:
         """Return setup instructions for Home Assistant."""
         return {
-            "orthodox_path": ("Connect to your Home Assistant instance with a Long-Lived Access Token"),
+            "orthodox_path": (
+                "Connect Home Assistant in Settings > Connections > Smart Home with its address and a "
+                "Long-Lived Access Token"
+            ),
             "auto_setup_possible": True,
             "requirements": [
                 "A running Home Assistant instance on your network",
@@ -118,7 +121,8 @@ class HomeAssistantProvider:
                 "Go to your Home Assistant profile page",
                 "Scroll to Long-Lived Access Tokens",
                 "Create a new token and copy it",
-                "Paste the token when prompted by Viola",
+                "In Viola open Settings > Connections > Smart Home and press Connect Home Assistant",
+                "Enter the Home Assistant address, paste the token, press Test connection, then Save setup",
             ],
         }
 

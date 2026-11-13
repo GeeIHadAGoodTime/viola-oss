@@ -384,30 +384,154 @@ def classify_barge_in_transcript(transcript: str, reply: str) -> BargeInDecision
             return BargeInDecision("ignore", "reply_says_viola")
     if not after:
         return BargeInDecision("listen", "wake_word", wake_at_end=wake_at == len(tokens) - 1)
-    command = " ".join(after)
-    if _BARGE_IN_STOP_RE.match(command.lower()):
-        return BargeInDecision("stop", "wake_word_stop", command)
-    return BargeInDecision("command", "wake_word_command", command)
+    return _request_after_wake(tokens[wake_at + 1 :], reply, empty=BargeInDecision("listen", "wake_word"))
 
 
 def classify_after_wake(transcript: str, reply: str) -> BargeInDecision:
     """What the user said after a wake that was already accepted over Viola's voice.
 
     The wake model heard "Viola", so the wake word need not be in the transcript
-    (over her voice it often is not). Whatever her own words remain are dropped;
-    the rest is the request. Nothing clear means she listens for it.
+    (over her voice it often is not). Her own words are removed; the rest is the
+    request (see :func:`_request_after_wake`). Nothing left means she listens.
     """
     tokens = _BARGE_IN_TOKEN_RE.findall((transcript or "").replace("\u2019", "'"))
     wake_at = max((i for i, t in enumerate(tokens) if _is_barge_in_wake_word(t)), default=None)
-    rest = _drop_reply_runs(tokens if wake_at is None else tokens[wake_at + 1 :], _echo_words(reply))
-    if not rest:
-        return BargeInDecision("listen", "wake_word_over_speech")
-    command = " ".join(rest)
-    if _BARGE_IN_STOP_RE.match(command.lower()):
-        return BargeInDecision("stop", "wake_word_stop", command)
-    if _is_echo_of_reply(command, reply):
-        return BargeInDecision("listen", "wake_word_over_speech")
-    return BargeInDecision("command", "wake_word_command", command)
+    after = tokens if wake_at is None else tokens[wake_at + 1 :]
+    return _request_after_wake(after, reply, empty=BargeInDecision("listen", "wake_word_over_speech"))
+
+
+# A removed word this long is evidence that Viola's voice is in the recording.
+# Shorter ones ("the", "is", "one") are in almost any two English sentences.
+_HER_WORD_EVIDENCE_LETTERS = 4
+
+
+def _collapse_repeats(words: list[str]) -> list[str]:
+    """One copy of each word said twice or more in a row ("stop stop" -> "stop")."""
+    out: list[str] = []
+    for word in words:
+        if not out or out[-1] != word:
+            out.append(word)
+    return out
+
+
+def _request_after_wake(after: list[str], reply: str, *, empty: BargeInDecision) -> BargeInDecision:
+    """What the words after the wake word mean, once Viola's own words are taken out.
+
+    1.0.5 build-10 laptop (Jay, 08:33 to 08:37): every "Viola, stop" over her
+    reply ran as a new command made partly of her own words: "First first first
+    first first", "What's the first one Stop", "Stop Stop", "Develop Stop". Only
+    runs of two or more of her words in a row were removed, so a single word of
+    hers ("Develop", or "first" heard five times) stayed in, and "stop" said
+    twice was not the stop phrase.
+
+    Now every word of what she was saying is removed. Nothing left is nothing
+    heard after the wake (``empty``). What is left, said once, being exactly a
+    stop or dismiss phrase means that phrase (whole utterance, as before). Any
+    other mix that clearly held her words never runs: she has stopped, so she
+    listens for the request on clean audio. Otherwise the request runs as said.
+    """
+    spoken = _echo_words(reply)
+    vocabulary = list(dict.fromkeys(spoken))
+    lowered = [t.lower().replace("\u2019", "'") for t in after]
+    hers = [any(_same_word(word, said) for said in vocabulary) for word in lowered]
+    left = [word for word, is_hers in zip(lowered, hers, strict=True) if not is_hers]
+    if not left:
+        return empty
+    phrase = " ".join(_collapse_repeats(left))
+    if _BARGE_IN_STOP_RE.match(phrase) or _is_dismiss_phrase(phrase):
+        return BargeInDecision("stop", "wake_word_stop", phrase)
+    # Proof that her voice is in the request: one of her longer words exactly as
+    # she said it, or two or more of her words in a row. A near match alone is
+    # not proof ("play some rock" right after she said "Playing relaxing jazz").
+    exact = {word.replace("'", "") for word in spoken}
+    plain = [word.replace("'", "") for word in lowered]
+    her_voice = any(len(word) >= _HER_WORD_EVIDENCE_LETTERS and word in exact for word in plain) or len(
+        _drop_reply_runs(after, spoken)
+    ) < len(after)
+    if her_voice or _is_echo_of_reply(" ".join(after), reply):
+        return BargeInDecision("listen", "request_mixed_with_her_words")
+    return BargeInDecision("command", "wake_word_command", " ".join(after))
+
+
+NOTHING_HEARD_MESSAGE = "I didn't hear anything after the chime. Try again: say {wake_word}, then your request."
+
+
+async def signal_nothing_heard(user_id: str | None, reason: str) -> str:
+    """The nothing-heard tone and notice, the same for a wake and for push-to-talk. Never raises.
+
+    1.0.5 build-10 laptop (J5): holding the mic button showed a different
+    "check your settings" warning than the wake path; Jay wants both the same.
+    Returns the notice text.
+    """
+    logger.info("Heard no command (%s): playing the nothing-heard tone", reason)
+    message = NOTHING_HEARD_MESSAGE.format(wake_word="Viola")
+    try:
+        from voice.wake_chime import play_nothing_heard_tone
+
+        play_nothing_heard_tone()
+    except Exception as exc:  # noqa: BLE001, RUF100 - feedback must never break the turn
+        logger.debug("Nothing-heard tone unavailable: %s", exc)
+    try:
+        from ui.websocket.event_hub import get_event_hub
+        from voice.wake_detector.active_word import wake_word_name
+
+        message = NOTHING_HEARD_MESSAGE.format(wake_word=wake_word_name())
+        hub = get_event_hub()
+        if hub is not None and user_id:
+            await hub.broadcast(
+                "error",
+                {"code": "wake_no_command", "user_message": message, "level": "info"},
+                user_id=user_id,
+                force=True,
+            )
+    except Exception as exc:  # noqa: BLE001, RUF100 - feedback must never break the turn
+        logger.debug("Nothing-heard notice not sent: %s", exc)
+    return message
+
+
+# How long her audio takes from the playback write to the room (device buffer).
+_HER_OUTPUT_LATENCY_SEC = 0.05
+# Below this word probability the decoder is guessing (tuned on the mixes, see below).
+_BARGE_IN_MIN_WORD_PROB = 0.2
+_BARGE_IN_MIN_WORD_SEC = 0.03
+_DECODING_LOOP_REPEATS = 3
+
+
+def reliable_words_after(words: list[tuple[str, float, float, float]], her_end: float) -> str:
+    """The words (text, start, end, probability) the decoder backs, said after ``her_end`` seconds into the clip."""
+    kept = [
+        text
+        for text, start, end, prob in words
+        if start >= her_end and prob >= _BARGE_IN_MIN_WORD_PROB and end - start >= _BARGE_IN_MIN_WORD_SEC
+    ]
+    transcript = "".join(kept).strip()
+    tokens = _echo_words(transcript)
+    if len(tokens) >= _DECODING_LOOP_REPEATS and len(set(tokens)) == 1:
+        transcript = ""  # "first first first first first": a decoding loop
+    logger.info(
+        "Barge-in words: %d heard, %d kept after her voice ended at %.2fs and the decoder's confidence",
+        len(words),
+        len(kept),
+        her_end,
+    )
+    return transcript
+
+
+def _needs_confirmation(decision: BargeInDecision) -> bool:
+    """A request heard by the transcript check stops her only once a second look agrees."""
+    return decision.kind == "command" or decision.reason == "request_mixed_with_her_words"
+
+
+def _log_barge_in_heard(route: str, transcript: str, decision: BargeInDecision) -> None:
+    """One line per barge-in: what was heard over her reply and what it was taken to mean."""
+    logger.info(
+        "Barge-in (%s) heard %r -> %s (%s)%s",
+        route,
+        transcript[:120],
+        decision.kind,
+        decision.reason,
+        f" {decision.command!r}" if decision.command else "",
+    )
 
 
 def _update_state_hub_voice_mode(mode_name: str, *, user_id: str) -> None:
@@ -506,9 +630,17 @@ def _broadcast_chat_response(result: dict[str, Any]) -> None:
         # A spoken panel or full-screen request carries a ui_action (as the
         # /v1/command broadcast does); without it the app shows the reply but
         # never opens the panel or goes full screen.
-        data = result.get("data") if isinstance(result.get("data"), dict) else {}
-        action_source = result if result.get("ui_action") else data
-        if isinstance(action_source.get("ui_action"), str) and action_source["ui_action"]:
+        # A voice turn's result is the command envelope's data: what the agent
+        # returned (the ui_action a tool asked for) sits under ``ai_data``.
+        # Only ``result`` and ``result["data"]`` were read, so "open the memory
+        # panel" by voice answered "it's open" and opened nothing (1.0.5 build
+        # 10, 09:09:21); typed, the same request worked.
+        action_source: dict[str, Any] = {}
+        for candidate in (result, result.get("data"), result.get("ai_data")):
+            if isinstance(candidate, dict) and isinstance(candidate.get("ui_action"), str) and candidate["ui_action"]:
+                action_source = candidate
+                break
+        if action_source:
             for key in _UI_ACTION_BROADCAST_KEYS:
                 if key in action_source:
                     payload[key] = action_source[key]
@@ -919,6 +1051,10 @@ class VoiceCommandHandler:
             if result.get("intent") == "ignore":
                 await self._end_streamed_reply(streamed)
                 exit_reason = "ignore"
+                if turn == 1:
+                    # The wake heard no request (song lyrics, a TV): the same tone
+                    # and notice as an empty recording, not silence.
+                    await self._signal_nothing_heard(ctx, "not_a_request")
                 break
 
             # --- Broadcast response text to WS clients (GAP-1 fix) ---
@@ -1618,7 +1754,7 @@ class VoiceCommandHandler:
         return result
 
     # What the user reads when a wake heard no command (the tone says it too).
-    NOTHING_HEARD_MESSAGE = "I didn't hear anything after the chime. Try again: say {wake_word}, then your request."
+    NOTHING_HEARD_MESSAGE = NOTHING_HEARD_MESSAGE
 
     async def _signal_nothing_heard(self, ctx: CommandContext, reason: str) -> None:
         """Tell the user the wake ended without a command (a soft tone and a toast).
@@ -1627,31 +1763,7 @@ class VoiceCommandHandler:
         and then spoke got nothing back and no sign that Viola had stopped
         listening (laptop report A0.6). Never raises.
         """
-        logger.info("Wake heard no command (%s): playing the nothing-heard tone", reason)
-        try:
-            from voice.wake_chime import play_nothing_heard_tone
-
-            play_nothing_heard_tone()
-        except Exception as exc:  # noqa: BLE001, RUF100 - feedback must never break the turn
-            logger.debug("Nothing-heard tone unavailable: %s", exc)
-        try:
-            from ui.websocket.event_hub import get_event_hub
-            from voice.wake_detector.active_word import wake_word_name
-
-            hub = get_event_hub()
-            if hub is not None and ctx.user_id:
-                await hub.broadcast(
-                    "error",
-                    {
-                        "code": "wake_no_command",
-                        "user_message": self.NOTHING_HEARD_MESSAGE.format(wake_word=wake_word_name()),
-                        "level": "info",
-                    },
-                    user_id=ctx.user_id,
-                    force=True,
-                )
-        except Exception as exc:  # noqa: BLE001, RUF100 - feedback must never break the turn
-            logger.debug("Nothing-heard notice not sent: %s", exc)
+        await signal_nothing_heard(ctx.user_id, reason)
 
     async def _play_follow_up_cue(self) -> None:
         """Play a brief audio cue to signal Viola is listening for follow-up.
@@ -1783,11 +1895,22 @@ class VoiceCommandHandler:
         takes effect on the next thing Viola would have said, rather than at
         the next restart. Fails open (unmuted) if settings cannot be read: a
         settings hiccup should not silently make Viola stop talking.
+
+        Settings > "Speak Responses Aloud" (``tts_enabled``) counts as muted
+        too. Typed replies (ui/api/routes/command.py ``_should_speak_reply``)
+        and the wake chime already honoured it, but replies to voice commands
+        did not, so turning it off on the laptop still left every spoken turn
+        speaking. Defaults come from ``config.defaults`` for the reason given
+        in ``_should_speak_reply``.
         """
         try:
+            from config.defaults import TTS_ENABLED_DEFAULT, VOICE_MUTED_DEFAULT
             from ui.settings_manager import get_settings_manager
 
-            return bool(get_settings_manager().get("voice_muted", False, user_id=user_id))
+            settings_mgr = get_settings_manager()
+            if bool(settings_mgr.get("voice_muted", VOICE_MUTED_DEFAULT, user_id=user_id)):
+                return True
+            return not bool(settings_mgr.get("tts_enabled", TTS_ENABLED_DEFAULT, user_id=user_id))
         except Exception:  # noqa: BLE001, RUF100 - a settings hiccup must not silently mute Viola
             logger.debug("Could not read voice_muted; assuming not muted", exc_info=True)
             return False
@@ -1890,7 +2013,7 @@ class VoiceCommandHandler:
         # actually about — still speaking. Checked here, on the path that
         # speaks a reply to a voice command, it means what its name says.
         if self._voice_output_muted(user_id):
-            logger.debug("voice_muted is on; skipping spoken reply")
+            logger.info("Voice muted or Speak Responses Aloud off; reply shown, not spoken")
             return
 
         if not tts_enabled and self.tts:
@@ -1901,6 +2024,18 @@ class VoiceCommandHandler:
             return
 
         if self.tts and message and not already_spoken and tts_enabled:
+            # Long answers say their lead and point at the card; a turn of quick
+            # music actions that all worked gets the done tone, not words.
+            from voice.streamed_reply import full_reading, play_done_tone, whole_reply_speech
+
+            spoken = whole_reply_speech(message, self.tts, streamed_reply)
+            if spoken is None:
+                play_done_tone()
+                return
+            message = spoken
+            # "Read it out loud": the whole answer, with no length cap, and a
+            # barge-in or stop still ends it (FullReading.cancel).
+            reading = full_reading(message, self.tts, streamed_reply)
             try:
                 logger.info("Speaking response: %s...", message[:100])
                 self._last_spoken_reply = (message, time.monotonic())
@@ -1910,7 +2045,7 @@ class VoiceCommandHandler:
                 capture = self._get_continuous_capture()
                 if capture is not None and capture.is_running:
                     interrupted = await self._speak_response_interruptible(
-                        message,
+                        reading or message,
                         capture,
                         user_id=user_id,
                     )
@@ -1921,7 +2056,7 @@ class VoiceCommandHandler:
                         return
                 else:
                     # Standard non-interruptible TTS
-                    speak_coro = self.tts.speak(message)
+                    speak_coro = reading.speak() if reading is not None else self.tts.speak(message)
                     if asyncio.iscoroutine(speak_coro):
                         await speak_coro
 
@@ -2037,6 +2172,9 @@ class VoiceCommandHandler:
                         # own cut in half, or the user still talking. Look again.
                         checks += 1
                         decision = await self._check_barge_in(capture, message, tts_task)
+                    if not wake_heard and _needs_confirmation(decision):
+                        checks += 1
+                        decision = await self._confirm_barge_in(capture, message, tts_task, decision)
                     if wake_heard:  # the wake loop got there during the check
                         decision = BargeInDecision("listen", "wake_word_over_speech")
                 if decision.interrupts:
@@ -2134,6 +2272,40 @@ class VoiceCommandHandler:
         # Read the reply text now, not when speaking started: a streamed reply
         # grows while it is spoken, and the heard words may be its newest ones.
         return classify_barge_in_transcript(transcript, self._reply_text(message))
+
+    async def _confirm_barge_in(
+        self,
+        capture: Any,
+        message: str | StreamedReply,
+        tts_task: asyncio.Future,
+        first: BargeInDecision,
+    ) -> BargeInDecision:
+        """Look again, while she keeps talking, before a heard request stops her (Jay, build 11: option A).
+
+        1.0.5 build-10 laptop, 08:30:02: one check heard a wake-like word and
+        words in her own voice and stopped her at once; the confirming
+        transcription, taken only after she had stopped, disagreed. Now the
+        second look comes first: she stops only for "stop" or for a request both
+        looks agree on. Otherwise she keeps talking.
+        """
+        try:
+            await asyncio.wait_for(asyncio.shield(tts_task), timeout=_BARGE_IN_SETTLE_SEC)
+        except (TimeoutError, asyncio.CancelledError, Exception):  # noqa: BLE001, RUF100 - only a pause
+            pass
+        window_end = getattr(self, "_barge_in_window_end", None) or time.monotonic()
+        seconds = min(_BARGE_IN_WINDOW_SEC + (time.monotonic() - window_end), 30.0)
+        transcript = await self._transcribe_recent(capture, seconds)
+        second = classify_barge_in_transcript(transcript or "", self._reply_text(message))
+        _log_barge_in_heard("second look", transcript or "", second)
+        if second.kind == "stop":
+            return second
+        if second.kind == "command":
+            if first.kind != "command":
+                return second
+            a, b = _echo_words(first.command), _echo_words(second.command)
+            if _extends(a, b) or _extends(b, a):
+                return second
+        return BargeInDecision("ignore", "request_not_confirmed")
 
     @staticmethod
     def _reply_text(message: str | StreamedReply) -> str:
@@ -2235,14 +2407,19 @@ class VoiceCommandHandler:
                 break
         if wake_at is not None:
             seconds = time.monotonic() - wake_at + _BARGE_IN_WAKE_LEAD_SEC
-            transcript = await self._transcribe_recent(capture, seconds)
+            transcript = await self._transcribe_after_her_voice(capture, seconds)
+            if transcript is None:
+                transcript = await self._transcribe_recent(capture, seconds)
             if self._local_no_speech_prob() > _BARGE_IN_NO_SPEECH_PROB:
                 transcript = ""
-            return classify_after_wake(transcript or "", self._reply_text(message))
+            after_wake = classify_after_wake(transcript or "", self._reply_text(message))
+            _log_barge_in_heard("wake over her voice", transcript or "", after_wake)
+            return after_wake
         window_end = getattr(self, "_barge_in_window_end", None) or started
         seconds = min(_BARGE_IN_WINDOW_SEC + (time.monotonic() - window_end), 30.0)
         transcript = await self._transcribe_recent(capture, seconds)
         full = classify_barge_in_transcript(transcript or "", self._reply_text(message))
+        _log_barge_in_heard("transcript check", transcript or "", full)
         if decision.kind == "stop" or full.kind == "stop":
             return decision if decision.kind == "stop" else full
         if decision.kind == "command" and full.kind == "command":
@@ -2257,6 +2434,46 @@ class VoiceCommandHandler:
         if decision.kind == "command" or full.kind == "command":
             logger.info("Barge-in request was not heard clearly over Viola's voice; listening for it again")
         return BargeInDecision("listen", "wake_word_request_unclear" if decision.kind == "command" else decision.reason)
+
+    async def _transcribe_after_her_voice(self, capture: Any, seconds: float) -> str | None:
+        """The words said after Viola went quiet, kept only where the decoder backs them; None if unsupported.
+
+        1.0.5 laptop log (2026-11-12 08:33:15, 08:34:26): she stopped at Jay's
+        "Viola", and Whisper turned the next seconds (the end of her sentence,
+        then his words) into "First first first first first" and "What's the
+        first one Stop", words neither of them said. The decoder knows when each
+        word was said and how sure it is. A word that starts while her voice was
+        still coming out of the speaker, a word it gives under 20% probability,
+        and a word with no duration are dropped; the same word three or more times
+        over is a decoding loop, not a request. What is left is the request.
+        Measured on mixes of her voice (canceller removing ~0 dB) and a request
+        (C:/_wt11/voice/measure/halluc): requests run right 53% -> 82%, nothing
+        said but a request run anyway 36% -> 4%.
+        """
+        local = self._local_barge_in_transcriber()
+        words_fn = getattr(local, "transcribe_words", None)
+        if local is None or not callable(words_fn):
+            return None
+        try:
+            import numpy as np
+
+            from audio_core.own_playback import get_own_playback
+
+            pcm = capture.get_recent_recording(seconds)
+            # Where in this clip her voice stopped coming out of the speaker.
+            her_end = len(pcm) / 2 / 16000 - get_own_playback().seconds_since_audio() + _HER_OUTPUT_LATENCY_SEC
+            if not pcm or len(pcm) < 3200:
+                return ""
+            words = await asyncio.wait_for(
+                asyncio.to_thread(words_fn, np.frombuffer(pcm, dtype=np.int16).copy()),
+                timeout=_BARGE_IN_STT_TIMEOUT_SEC,
+            )
+        except Exception as exc:  # noqa: BLE001, RUF100 - fall back to the plain transcription
+            logger.debug("Word-timed barge-in transcription failed: %s", exc)
+            return None
+        if not isinstance(words, list):
+            return None
+        return reliable_words_after(words, her_end)
 
     def _local_no_speech_prob(self) -> float:
         """Whisper's no-speech probability for the last on-device transcription (0 if unknown)."""

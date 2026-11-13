@@ -1067,6 +1067,12 @@ class MCPClientHub:
             if tool.meta is not None:
                 schema_entry["_meta"] = dict(tool.meta)
             self._tool_schemas[tool_name] = schema_entry
+            try:
+                from intent.approval import register_tool_argument_defaults
+
+                register_tool_argument_defaults(tool_name, schema_entry["inputSchema"])
+            except ImportError:  # pragma: no cover - the hub can run without the agent package
+                logger.debug("Approval argument defaults not registered for %s", tool_name)
             new_count += 1
             if not is_external and tool_name == CANONICAL_TOOL_SEARCH_NAME:
                 self._tool_routes[LEGACY_TOOL_SEARCH_NAME] = server_name
@@ -1479,6 +1485,7 @@ class MCPClientHub:
             "open_app_panel",
             "pair_speaker_setup",
             "video_fullscreen",
+            "read_aloud",
             # --- Pending-gate plumbing (works at every tier) ---
             "resume_signature_gate",
             "cancel_signature_gate",

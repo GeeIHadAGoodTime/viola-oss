@@ -566,6 +566,9 @@ class RuntimeMetrics:
             "waiting",
             "listening",
             "reconciled",
+            # music.player while a song plays: 119 WARNING lines on the
+            # build-10 laptop, with nothing wrong.
+            "playing",
         }
         severity = "DEBUG" if status.lower() in normal_statuses else "WARNING"
         get_diagnostics_bus().emit(

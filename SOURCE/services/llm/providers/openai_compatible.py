@@ -24,6 +24,7 @@ import time
 from contextlib import suppress
 from pathlib import Path
 from types import ModuleType
+from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
 
@@ -92,6 +93,82 @@ class _ResponsesStreamFallbackError(RuntimeError):
     def __init__(self, retry_error_type: str) -> None:
         super().__init__("OpenAI Responses stream requires non-streaming fallback: %s" % retry_error_type)
         self.retry_error_type = retry_error_type
+
+
+_USAGE_KEYS = (
+    "input_tokens",
+    "output_tokens",
+    "cache_read_tokens",
+    "cache_creation_tokens",
+    "cache_write_tokens",
+    "web_search_requests",
+)
+# Attempts that failed AFTER reaching the provider: the provider still bills
+# the prompt (and whatever it generated). 429/5xx/connection refusals are not
+# billed and add nothing.
+_BILLED_FAILURE_TYPES = frozenset(
+    {"APITimeoutError", "TimeoutError", "ReadTimeout", "ReadTimeoutError", "WriteTimeout", "PoolTimeout"}
+)
+
+
+def _usage_payload_from_response(response: Any) -> dict[str, int]:
+    """Usage dict (the ``_usage`` shape) from a Responses or Chat response."""
+    usage = getattr(response, "usage", None)
+    if usage is None:
+        return {}
+    input_tokens = _coerce_usage_int(_usage_field(usage, "input_tokens") or _usage_field(usage, "prompt_tokens"))
+    output_tokens = _coerce_usage_int(_usage_field(usage, "output_tokens") or _usage_field(usage, "completion_tokens"))
+    cache_write = _cache_write_tokens_from_usage(usage)
+    return {
+        "input_tokens": input_tokens,
+        "output_tokens": output_tokens,
+        "cache_read_tokens": _cached_tokens_from_usage(usage),
+        "cache_creation_tokens": cache_write,
+        "cache_write_tokens": cache_write,
+        "web_search_requests": _web_search_requests_from_usage(usage),
+    }
+
+
+def _sum_usage(*parts: dict[str, int] | None) -> dict[str, int]:
+    """Add usage dicts key by key (build 11: every billed attempt is charged)."""
+    total: dict[str, int] = {}
+    for part in parts:
+        if not isinstance(part, dict):
+            continue
+        for key in _USAGE_KEYS:
+            if key in part:
+                total[key] = total.get(key, 0) + _coerce_usage_int(part.get(key))
+    return total
+
+
+def _failed_attempt_usage(reference: dict[str, int] | None, max_output_tokens: int | None) -> dict[str, int]:
+    """What one attempt that reached the provider and then failed is charged.
+
+    Its own usage is never reported, so: the same prompt with no cache
+    discount, plus the most output it was allowed to produce (or, with no
+    limit, the successful attempt's output). Never less than it could cost.
+    """
+    if not reference:
+        return {}
+    output = int(max_output_tokens) if max_output_tokens else _coerce_usage_int(reference.get("output_tokens"))
+    return {"input_tokens": _coerce_usage_int(reference.get("input_tokens")), "output_tokens": output}
+
+
+def _turn_usage_with_retries(
+    final_usage: dict[str, int] | None,
+    replaced_attempt_usages: list[dict[str, int]],
+    retry_events: list[dict[str, Any]],
+    max_output_tokens: int | None,
+) -> dict[str, int]:
+    """Total usage of one model turn: the answer, every replaced attempt, every billed failure."""
+    reference = final_usage or next((u for u in replaced_attempt_usages if u), None)
+    failed = [
+        _failed_attempt_usage(reference, max_output_tokens)
+        for event in retry_events
+        if event.get("action") == "fallback_non_streaming"
+        or str(event.get("error_type") or "") in _BILLED_FAILURE_TYPES
+    ]
+    return _sum_usage(final_usage, *replaced_attempt_usages, *failed)
 
 
 class OpenAIResponsesToolSchemaError(ValueError):
@@ -284,6 +361,67 @@ def _responses_incomplete_reason(response: Any) -> str | None:
 
 
 _RESPONSES_TOOL_COUNT_WARN_THRESHOLD = 80
+# A streamed turn whose stream has not opened and sent its first event in this
+# long is stuck, not thinking: the provider sends ``response.created`` at once,
+# before any reasoning. 1.0.5 build 10 (cloud log 2026-11-08 14:52:44 and
+# 14:54:33): two turns sent nothing for the whole 60 s attempt timeout, then
+# the retry answered in 3-4 s, so the user waited 65 s for "close the browser".
+_STREAM_FIRST_EVENT_TIMEOUT_S = 15.0
+
+
+class _StreamWithFirstEvent:
+    """An opened provider stream whose first event was already read."""
+
+    def __init__(self, first: Any, rest: Any) -> None:
+        self._first: list[Any] = [first]
+        self._rest = rest
+
+    def __aiter__(self) -> _StreamWithFirstEvent:
+        return self
+
+    async def __anext__(self) -> Any:
+        if self._first:
+            return self._first.pop()
+        return await self._rest.__anext__()
+
+
+async def _open_stream_within_deadline(
+    open_stream: Callable[[], Awaitable[Any]],
+    timeout_s: float | None = None,
+) -> Any:
+    """Open a provider stream and read its first event, or raise TimeoutError.
+
+    The timeout covers only the stream's start; once the first event is in,
+    the turn runs as long as it needs (the request policy's own limits apply).
+    A TimeoutError here is retried by the request policy like any timeout.
+    """
+    deadline = _STREAM_FIRST_EVENT_TIMEOUT_S if timeout_s is None else timeout_s
+
+    async def _start() -> Any:
+        stream = await open_stream()
+        iterator = stream.__aiter__()
+        try:
+            first = await iterator.__anext__()
+        except StopAsyncIteration:
+            return _EmptyStream()
+        return _StreamWithFirstEvent(first, iterator)
+
+    try:
+        return await asyncio.wait_for(_start(), timeout=deadline)
+    except TimeoutError as exc:
+        logger.warning("Provider stream sent nothing in %.0fs; abandoning this attempt so it is retried", deadline)
+        raise TimeoutError("Provider stream sent no event in %.0fs" % deadline) from exc
+
+
+class _EmptyStream:
+    """A stream that ended before its first event."""
+
+    def __aiter__(self) -> _EmptyStream:
+        return self
+
+    async def __anext__(self) -> Any:
+        raise StopAsyncIteration
+
 _RESPONSES_TOOL_JSON_BYTES_WARN_THRESHOLD = 70_000
 _RESPONSES_INSTRUCTIONS_BYTES_WARN_THRESHOLD = 20_000
 _RESPONSES_TOOL_DESCRIPTION_MAX_CHARS = 300
@@ -2548,6 +2686,8 @@ class OpenAICompatibleProvider(BaseLLMProvider):
                             store=bool(retry_kwargs.get("store")),
                         )
                         retry_content = _extract_message_text_from_response(retry_response).strip()
+                        # Both attempts were billed by the provider: charge both.
+                        _usage_payload = _sum_usage(_usage_payload, _usage_payload_from_response(retry_response))
                         if retry_content:
                             response = retry_response
                             continuity = retry_continuity
@@ -2556,6 +2696,8 @@ class OpenAICompatibleProvider(BaseLLMProvider):
                             result = build_ai_no_result("empty_assistant_content", retry_attempted=True)
                             result["response_id"] = retry_continuity["response_id"]
                             result["_continuity"] = retry_continuity
+                            result["_usage"] = _usage_payload
+                            result["_model_name"] = _model_name_for_settle
                             return result
 
                     content = _strip_llm_code_fences(content)
@@ -2921,6 +3063,7 @@ class OpenAICompatibleProvider(BaseLLMProvider):
             responses_request_metadata: dict[str, Any] | None = None
             responses_request_fingerprint: dict[str, Any] | None = None
             responses_retry_events: list[dict[str, Any]] = []
+            _replaced_attempt_usages: list[dict[str, int]] = []
             force_non_streaming_responses = False
 
             async def _do_third_party_chat_native_call() -> Any:
@@ -3111,10 +3254,12 @@ class OpenAICompatibleProvider(BaseLLMProvider):
                         # services/llm/answer_stream.py): which text is the
                         # answer and which is a preamble to a tool call.
                         answer_attempt = AnswerAttempt.begin(command_stream_id)
-                        stream = await _responses_create_with_storage_consent(
-                            self._client,
-                            self.config,
-                            stream_kwargs,
+                        stream = await _open_stream_within_deadline(
+                            lambda: _responses_create_with_storage_consent(
+                                self._client,
+                                self.config,
+                                stream_kwargs,
+                            ),
                         )
                         async for event in stream:
                             capture_openai_responses_stream_event(stream_capture, event)
@@ -3333,6 +3478,7 @@ class OpenAICompatibleProvider(BaseLLMProvider):
                             self.config,
                             retry_kwargs,
                         )
+                        _replaced_attempt_usages.append(parsed.get("_usage") or {})
                         parsed = self._parse_responses_native_response(
                             retry_response,
                             request_metadata={
@@ -3367,6 +3513,7 @@ class OpenAICompatibleProvider(BaseLLMProvider):
                         self.config,
                         retry_api_kwargs,
                     )
+                    _replaced_attempt_usages.append(parsed.get("_usage") or {})
                     parsed = self._parse_native_response(retry_response)
                     _mark_native_empty_response_retry_attempted(parsed)
             empty_args_retry = build_empty_tool_arguments_retry(parsed, tools)
@@ -3455,6 +3602,7 @@ class OpenAICompatibleProvider(BaseLLMProvider):
                         "reason": unretryable_reason or "no_retry_path",
                     }
                 else:
+                    _replaced_attempt_usages.append(parsed.get("_usage") or {})
                     parsed = empty_args_retry_parsed
                     parsed["_empty_arguments_retry"] = {
                         "attempted": True,
@@ -3467,6 +3615,11 @@ class OpenAICompatibleProvider(BaseLLMProvider):
                     "retry_events": copy.deepcopy(responses_retry_events),
                     "policy_status": _oai_result_env.status,
                 }
+            # Build 11, no subsidy: every attempt that reached the provider in
+            # this turn was billed, not just the one whose answer is used.
+            parsed["_usage"] = _turn_usage_with_retries(
+                parsed.get("_usage"), _replaced_attempt_usages, responses_retry_events, max_tokens
+            )
             parsed["_model_name"] = effective_model
             return parsed
 

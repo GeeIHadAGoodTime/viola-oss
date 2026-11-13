@@ -54,6 +54,11 @@ describe('Settings search (1.0.5 build 7, A2.8)', () => {
     expect(found('speaking speed')).toContain('voice');
   });
 
+  it('finds the Home Assistant setup under Connections (build 10, blocker 9)', () => {
+    expect(found('home assistant')).toContain('connections');
+    expect(found('Home Assistant')).toContain('connections');
+  });
+
   it('still says nothing matches for a word no setting uses', () => {
     expect(found('zebra')).toEqual([]);
   });

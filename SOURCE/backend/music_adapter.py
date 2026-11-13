@@ -520,7 +520,13 @@ class MusicControllerAdapter:
             nudge=_resend_play,
         )
         if verdict == CONFIRMED:
-            logger.info("PLAY_CONFIRM: player reported PLAYING for %s", video_id)
+            # How long the player itself took to start; with the
+            # "media search_play timing" line it splits a slow first play.
+            logger.info(
+                "PLAY_CONFIRM: player reported PLAYING for %s after %.0f ms",
+                video_id,
+                (time.monotonic() - requested_at) * 1000.0,
+            )
             return True
         if verdict != UNCONFIRMED:
             return None

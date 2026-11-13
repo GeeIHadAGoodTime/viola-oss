@@ -169,4 +169,39 @@ def play_nothing_heard_tone() -> bool:
     return True
 
 
-__all__ = ["generate_wake_chime", "play_nothing_heard_tone", "play_wake_chime", "wake_chime_volume"]
+# One soft low note: "done". Played instead of a spoken confirmation when a turn
+# only ran quick music actions and they worked (Jay's suggestion, build 11).
+# Distinct from the wake chime (rising) and the nothing-heard tone (falling).
+_DONE_NOTES_HZ = (880.0,)
+_DONE_GAIN = 0.7
+
+
+def generate_done_tone() -> np.ndarray:
+    return (generate_wake_chime(CHIME_SAMPLE_RATE, _DONE_NOTES_HZ) * _DONE_GAIN).astype(np.float32)
+
+
+def play_done_tone() -> bool:
+    """Start the done tone without blocking. Returns False when muted."""
+    volume = wake_chime_volume()
+    if volume <= 0.0:
+        logger.debug("Done tone skipped: Viola's voice is muted")
+        return False
+    samples = (generate_done_tone() * min(1.0, volume)).astype(np.float32)
+    logger.info("Quick music action done: tone instead of a spoken confirmation")
+    threading.Thread(
+        target=_play_blocking,
+        args=(samples, CHIME_SAMPLE_RATE),
+        daemon=True,
+        name="done-tone",
+    ).start()
+    return True
+
+
+__all__ = [
+    "generate_done_tone",
+    "generate_wake_chime",
+    "play_done_tone",
+    "play_nothing_heard_tone",
+    "play_wake_chime",
+    "wake_chime_volume",
+]

@@ -113,6 +113,23 @@ _MEMORY_PREFETCH_EXECUTOR = ThreadPoolExecutor(
     thread_name_prefix="memory-side-query-prefetch",
 )
 
+# The shortest wait in which the memory side-query's model call can come back.
+# It is a full model round trip (desktop -> cloud -> provider and back): on Jay's
+# 11/12 sitting every one took one to four seconds, and the real call had already
+# been sent before any of them returned. With the default 150 ms wait its answer
+# was always thrown away and the local ranker chose the memories, so the call was
+# a billed request per turn that changed nothing.
+_SIDE_QUERY_MIN_ROUND_TRIP_MS = 1000
+
+
+def _side_query_can_land() -> bool:
+    """True when the turn's memory wait is long enough for the side-query's model call to be used."""
+    from config.settings import settings
+
+    budget_ms = int(getattr(settings, "auto_memory_side_query_max_block_ms", 150) or 0)
+    return budget_ms >= _SIDE_QUERY_MIN_ROUND_TRIP_MS
+
+
 _MUSIC_CONTEXT_PROVIDER_IDS = ("spotify", "youtube_music")
 _MUSIC_CONTEXT_PROVIDER_NAMES = {
     "spotify": "Spotify",
@@ -215,6 +232,10 @@ class ContextBuilder:
         if self._suppress_memory_context:
             return
         if not str(user_text or "").strip():
+            return
+        if not _side_query_can_land():
+            # The turn waits too briefly for a model round trip: the result would
+            # be thrown away, so the billed call is not made (see _side_query_can_land).
             return
         try:
             from services.memory.dir import get_memory_dir, is_auto_memory_enabled
@@ -1540,10 +1561,10 @@ class ContextBuilder:
                 ),
                 (
                     "instruction: If the current user confirms this same pending action, call tool_name with "
-                    "tool_args_json plus confirmation_args_json. Any plain yes counts, in any language: yes, ok, "
-                    "sure, go ahead, do it, confirm. If the user cancels or says no, do not call the tool. If the "
-                    "user changes details, call the tool with the updated details and without "
-                    "confirmation_args_json so safety can re-prompt."
+                    "exactly tool_args_json, unchanged: add nothing to any argument (confirmation_args_json is "
+                    "only for tools whose schema has those fields). Any plain yes counts, in any language: yes, "
+                    "ok, sure, go ahead, do it, confirm. If the user cancels or says no, do not call the tool. If "
+                    "the user changes details, call the tool with the updated details so safety can re-prompt."
                 ),
             ]
             frames.append(
@@ -2190,6 +2211,22 @@ class ContextBuilder:
         prefetch = _memory_selection_prefetch.get()
         if prefetch is not None:
             _memory_selection_prefetch.set(None)
+
+        if not _side_query_can_land():
+            # No model call: its answer could not arrive within the wait, so the
+            # turn gets what it got when the answer was thrown away -- the local
+            # ranker, or nothing under the founder-gated manifest-only flag.
+            from config.settings import settings
+
+            if bool(getattr(settings, "auto_memory_side_query_nonblocking", False)):
+                return []
+            return self._local_memory_selection(
+                user_id=user_id,
+                user_text=user_text,
+                directory=directory,
+                budget=budget,
+                surfaced=surfaced,
+            )
 
         matches = (
             prefetch is not None

@@ -145,6 +145,17 @@ MarkdownFrame.propTypes = {
   muted: PropTypes.bool,
 };
 
+// What a row's buttons are called by screen readers and voice control: the
+// visible word first, then the item it acts on, so "Edit" on one memory is
+// not the same control as "Edit" on the next (1.0.5 build 10: memory add,
+// edit and delete read as unnamed, identical controls).
+export function memoryControlLabel(verb, text, max = 60) {
+  const clean = String(text || '').replace(/\s+/g, ' ').trim();
+  if (!clean) return verb;
+  const short = clean.length > max ? `${clean.slice(0, max - 1).trimEnd()}…` : clean;
+  return `${verb}: ${short}`;
+}
+
 function EntryRow({ entry, onDelete, busy }) {
   return (
     <div
@@ -352,10 +363,10 @@ function TopicSection({ topic, expanded, busy, onToggle, onDeleteFile, onDeleteE
         >
           {expanded ? 'v' : '>'} {title}
         </button>
-        <button type="button" onClick={() => onToggle(topic.name)} style={{ ...buttonBase, padding: '6px 10px' }}>
+        <button type="button" onClick={() => onToggle(topic.name)} aria-label={memoryControlLabel('View', title)} style={{ ...buttonBase, padding: '6px 10px' }}>
           View
         </button>
-        <button type="button" disabled={busy} onClick={() => onDeleteFile(topic)} style={{ ...buttonBase, padding: '6px 10px', color: THEME.colors.statusRed }}>
+        <button type="button" disabled={busy} onClick={() => onDeleteFile(topic)} aria-label={memoryControlLabel('Delete file', title)} style={{ ...buttonBase, padding: '6px 10px', color: THEME.colors.statusRed }}>
           Delete file
         </button>
       </div>
@@ -582,10 +593,11 @@ function CloudMemoryRow({ memory, busy, onSave, onDelete }) {
               Critical
             </label>
             <div style={{ flex: 1 }} />
-            <button type="button" onClick={() => setEditing(false)} disabled={busy} style={{ ...buttonBase, padding: '6px 10px' }}>Cancel</button>
+            <button type="button" onClick={() => setEditing(false)} disabled={busy} aria-label="Cancel editing memory" style={{ ...buttonBase, padding: '6px 10px' }}>Cancel</button>
             <button
               type="button"
               onClick={save}
+              aria-label="Save memory"
               disabled={busy || !draftContent.trim()}
               style={{ ...buttonBase, padding: '6px 12px', backgroundColor: BRONZE, borderColor: BRONZE, color: '#fff', fontWeight: 700 }}
             >
@@ -612,8 +624,8 @@ function CloudMemoryRow({ memory, busy, onSave, onDelete }) {
             )}
             <span style={{ fontSize: 11, color: THEME.colors.textMuted }}>{formatDate(memory.updated_at || memory.created_at)}</span>
             <div style={{ flex: 1 }} />
-            <button type="button" disabled={busy} onClick={startEdit} style={{ ...buttonBase, padding: '5px 10px' }}>Edit</button>
-            <button type="button" disabled={busy} onClick={() => onDelete(memory.id)} style={{ ...buttonBase, padding: '5px 10px', color: THEME.colors.statusRed }}>Delete</button>
+            <button type="button" disabled={busy} onClick={startEdit} aria-label={memoryControlLabel('Edit memory', memory.content)} style={{ ...buttonBase, padding: '5px 10px' }}>Edit</button>
+            <button type="button" disabled={busy} onClick={() => onDelete(memory.id)} aria-label={memoryControlLabel('Delete memory', memory.content)} style={{ ...buttonBase, padding: '5px 10px', color: THEME.colors.statusRed }}>Delete</button>
           </div>
         </>
       )}
@@ -654,10 +666,10 @@ function CloudQuarantineRow({ item, busy, onRestore, onDelete }) {
         <div style={{ color: THEME.colors.textPrimary, overflowWrap: 'anywhere' }}>{item.content}</div>
         <div style={{ marginTop: 3, color: THEME.colors.textMuted, fontSize: 11 }}>{item.reason}</div>
       </div>
-      <button type="button" disabled={busy} onClick={() => onRestore(item.id)} style={{ ...buttonBase, padding: '6px 10px', borderColor: BRONZE, color: THEME.colors.textBright }}>
+      <button type="button" disabled={busy} onClick={() => onRestore(item.id)} aria-label={memoryControlLabel('Restore', item.content)} style={{ ...buttonBase, padding: '6px 10px', borderColor: BRONZE, color: THEME.colors.textBright }}>
         Restore
       </button>
-      <button type="button" disabled={busy} onClick={() => onDelete(item.id)} style={{ ...buttonBase, padding: '6px 10px', color: THEME.colors.statusRed }}>
+      <button type="button" disabled={busy} onClick={() => onDelete(item.id)} aria-label={memoryControlLabel('Discard', item.content)} style={{ ...buttonBase, padding: '6px 10px', color: THEME.colors.statusRed }}>
         Discard
       </button>
     </div>
@@ -866,6 +878,7 @@ function CloudMemoryTab() {
             onClick={createMemory}
             disabled={busy || !draftContent.trim()}
             data-testid="cloud-memory-add"
+            aria-label="Add memory"
             style={{ ...buttonBase, padding: '7px 14px', backgroundColor: BRONZE, borderColor: BRONZE, color: '#fff', fontWeight: 700 }}
           >
             Add

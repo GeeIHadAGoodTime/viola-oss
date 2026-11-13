@@ -98,6 +98,10 @@ class WhisperTranscriber:
         self._language_hint_ttl = max(60.0, float(getattr(self.config, "stt_language_hint_ttl_seconds", 1800)))
         self._is_prewarmed = False
         self._last_no_speech_prob: float = 0.0
+        # The decoder's own evidence about the last transcript (worst segment):
+        # lowest average log-probability and highest compression ratio.
+        self._last_avg_logprob: float = 0.0
+        self._last_compression_ratio: float = 0.0
         self._load_model()
 
     def _load_model(self):
@@ -359,8 +363,14 @@ class WhisperTranscriber:
                 # Track no_speech_prob across segments (use max for conservative filtering)
                 if segment_list:
                     self._last_no_speech_prob = max(getattr(seg, "no_speech_prob", 0.0) for seg in segment_list)
+                    self._last_avg_logprob = min(float(getattr(seg, "avg_logprob", 0.0)) for seg in segment_list)
+                    self._last_compression_ratio = max(
+                        float(getattr(seg, "compression_ratio", 0.0)) for seg in segment_list
+                    )
                 else:
                     self._last_no_speech_prob = 1.0  # No segments = no speech
+                    self._last_avg_logprob = 0.0
+                    self._last_compression_ratio = 0.0
 
                 self._update_language_hint(
                     getattr(info, "language", None),
@@ -434,6 +444,49 @@ class WhisperTranscriber:
     def is_available(self) -> bool:
         """Return True when the underlying Whisper model is ready."""
         return self.model is not None
+
+    def transcribe_words(self, audio_int16: object) -> list[tuple[str, float, float, float]] | None:
+        """Words with (start s, end s, probability) for a 16 kHz int16 clip, or None on failure.
+
+        Used only for a request heard right after Viola was cut off: when each
+        word was said, and how sure the decoder was of it, tell her own voice and
+        the decoder's inventions from the user's words (see the barge-in handler).
+        Same decode as transcribe() (greedy, VAD, command hint), plus word timing.
+        """
+        import numpy as np
+
+        if not self.model:
+            return None
+        try:
+            hint = _settings_value(
+                "whisper_language", getattr(self.config, "whisper_language", None), user_id=self.user_id
+            )
+            language = hint or None
+            if language == "auto":
+                language = self._get_cached_language_code()
+            segments, _info = self.model.transcribe(
+                np.asarray(audio_int16).astype(np.float32) / 32768.0,
+                beam_size=1,
+                language=language,
+                vad_filter=True,
+                word_timestamps=True,
+                **({"initial_prompt": COMMAND_HINT} if language in (None, "en") else {}),
+            )
+            segment_list = list(segments)
+        except Exception as exc:  # noqa: BLE001, RUF100 - the caller falls back to transcribe()
+            logger.debug("Word-timed transcription failed: %s", exc)
+            return None
+        self._last_no_speech_prob = max((float(seg.no_speech_prob) for seg in segment_list), default=1.0)
+        return [
+            (str(w.word), float(w.start), float(w.end), float(w.probability))
+            for seg in segment_list
+            for w in (getattr(seg, "words", None) or [])
+        ]
+
+    @property
+    def last_decoder_evidence(self) -> tuple[float, float, float]:
+        """(no-speech probability, lowest segment avg log-probability, highest compression ratio) of the last transcript."""
+        return (self._last_no_speech_prob, self._last_avg_logprob, self._last_compression_ratio)
 
     @property
     def last_no_speech_prob(self) -> float:

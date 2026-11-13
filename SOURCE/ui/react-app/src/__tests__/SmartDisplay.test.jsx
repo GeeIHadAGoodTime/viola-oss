@@ -1778,12 +1778,20 @@ describe('SmartDisplay shuffle toggle', () => {
       shuffle: false,
     };
     const result = render(<SmartDisplay />);
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Shuffle tracks' })).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole('button', { name: /^Shuffle tracks: / })).toBeInTheDocument());
     return result;
   };
 
-  const shuffleButton = () => screen.getByRole('button', { name: 'Shuffle tracks' });
+  const shuffleButton = () => screen.getByRole('button', { name: /^Shuffle tracks: / });
   const isOn = () => shuffleButton().getAttribute('aria-pressed') === 'true';
+
+  it('says in its accessible name whether shuffle is on', async () => {
+    const { user } = await mountPlaying();
+    expect(shuffleButton()).toHaveAccessibleName('Shuffle tracks: off');
+    await user.click(shuffleButton());
+    await waitFor(() => expect(shuffleButton()).toHaveAccessibleName('Shuffle tracks: on'));
+    expect(isOn()).toBe(true);
+  });
 
   it('keeps returning-user transport controls accessible after the welcome delay', async () => {
     vi.useFakeTimers();
@@ -2143,7 +2151,7 @@ it('keeps an action approval in the chat it was asked in, like a call approval',
   expect(await screen.findByText(title)).toBeInTheDocument();
 });
 
-const LONG_ANSWER = `${'A long answer that goes on for a while. '.repeat(6)}The end.`;
+const LONG_ANSWER = `${'A long answer that goes on for a while. '.repeat(12)}The end.`;
 
 it('shows a long unspoken answer in a card at once, with only a lead on the stage line', async () => {
   render(<SmartDisplay />);
@@ -2162,13 +2170,15 @@ it('holds a long spoken answer card until the stage has finished revealing it', 
   try {
     act(() => {
       playerHarness.replyPartialCallback({ turn: 'turn-1', text: LONG_ANSWER, spoken: true });
+      // Build 11: a spoken reply's text waits for her voice.
+      playerHarness.replyPartialCallback({ turn: 'turn-1', voice_started: true });
     });
     act(() => { vi.advanceTimersByTime(1000); });
     act(() => { playerHarness.chatResponseCallback({ text: LONG_ANSWER }); });
     act(() => { vi.advanceTimersByTime(1000); });
     expect(screen.queryByTestId('content-card-backdrop')).not.toBeInTheDocument();
     expect(screen.getByTestId('live-reply')).not.toHaveTextContent('The end.');
-    act(() => { vi.advanceTimersByTime(20000); });
+    act(() => { vi.advanceTimersByTime(40000); });
     expect(screen.getByTestId('content-card-backdrop')).toBeInTheDocument();
     expect(screen.getByRole('dialog')).toHaveTextContent('The end.');
   } finally {
@@ -2514,7 +2524,7 @@ describe('SmartDisplay repeated preference acceptance', () => {
     ['repeat', 'setRepeat', 'off', ['all', 'one', 'off']],
   ];
   const button = (kind) => screen.getByRole('button', {
-    name: kind === 'shuffle' ? 'Shuffle tracks' : /^Repeat:/,
+    name: kind === 'shuffle' ? /^Shuffle tracks: / : /^Repeat:/,
   });
   const shown = (kind) => kind === 'shuffle'
     ? button(kind).getAttribute('aria-pressed') === 'true'

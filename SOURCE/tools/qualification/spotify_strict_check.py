@@ -8,7 +8,10 @@ when all of these hold at once, read from the running Viola:
 * the browser reports a real Spotify track id;
 * the position moved between two reads;
 * the hidden browser's own Windows audio session is making sound;
-* the diagnostic names no broken link.
+* the diagnostic names no broken link;
+* Viola's own player shows what the stage shows: a title, a cover, and a
+  position that moves between two reads (build 10 on the laptop played
+  Spotify while the player said nothing was playing).
 
     python spotify_strict_check.py [--port 8756] [--api-key-file PATH]
 
@@ -21,6 +24,7 @@ import argparse
 import json
 import re
 import sys
+import time
 import urllib.request
 from collections.abc import Mapping
 from pathlib import Path
@@ -29,8 +33,15 @@ from typing import Any
 _TRACK_ID = re.compile(r"^[A-Za-z0-9]{22}$")
 
 
-def evaluate(player_state: Mapping[str, Any], diagnostic: Mapping[str, Any]) -> list[str]:
-    """Return every reason this is not proven Spotify playback. Empty means proven."""
+def evaluate(
+    player_state: Mapping[str, Any],
+    diagnostic: Mapping[str, Any],
+    later_state: Mapping[str, Any] | None = None,
+) -> list[str]:
+    """Return every reason this is not proven Spotify playback. Empty means proven.
+
+    ``later_state`` is a second read of the player a few seconds after the first.
+    """
     problems: list[str] = []
     now = player_state.get("now_playing") or player_state.get("current") or {}
     provider = str(now.get("provider") or "").lower()
@@ -40,6 +51,17 @@ def evaluate(player_state: Mapping[str, Any], diagnostic: Mapping[str, Any]) -> 
         problems.append("the item has a YouTube video id")
     if not player_state.get("is_playing"):
         problems.append("the player does not report playing")
+    if not str(now.get("title") or "").strip():
+        problems.append("the player has no title for the song")
+    if not now.get("artwork_url"):
+        problems.append("the player has no cover for the song")
+    if later_state is not None:
+        before = float(player_state.get("position") or 0)
+        after = float(later_state.get("position") or 0)
+        if after <= before:
+            problems.append("the player's position did not move (%s s then %s s)" % (before, after))
+        if not later_state.get("is_playing"):
+            problems.append("the player stopped reporting playing on the second read")
     if not _TRACK_ID.match(str(diagnostic.get("track_id") or "")):
         problems.append("no Spotify track id from the web player")
     if not diagnostic.get("position_moving"):
@@ -72,7 +94,9 @@ def main(argv: list[str] | None = None) -> int:
     api_key = args.api_key_file.read_text(encoding="utf-8").strip()
     state = _get(args.port, "/v1/player/state", api_key)
     diagnostic = _get(args.port, "/v1/spotify/diagnostic", api_key)
-    problems = evaluate(state, diagnostic)
+    time.sleep(3)
+    later = _get(args.port, "/v1/player/state", api_key)
+    problems = evaluate(state, diagnostic, later)
     if problems:
         print("FAIL: " + "; ".join(problems))
         return 1

@@ -47,6 +47,22 @@ def _sm_transition(player, phase: PlaybackPhase, *, user_initiated: bool = False
         logger.debug("State machine transition failed for phase %s", phase)
 
 
+def _spotify_owns_playback(player: Any) -> bool:
+    """True when the current track plays in Spotify's own player, not the YouTube iframe.
+
+    A report from the iframe then describes a video that is no longer the
+    current track. The stale-video checks compare video ids and a Spotify
+    track has none, so every such report used to pass them: a PAUSED or
+    UNSTARTED from the old video moved the player out of PLAYING, and a
+    position report wrote the old video's position over the song's.
+    """
+    now_playing = getattr(getattr(player, "_state", None), "now_playing", None)
+    if now_playing is None:
+        return False
+    provider = str(getattr(now_playing, "provider", "") or "").lower()
+    return provider in ("spotify", "spotify_cdp") or getattr(now_playing, "playback_mode", None) == "spotify_cdp"
+
+
 def _apply_iframe_phase_locked(player: Any, yt_state: str) -> None:
     """Move the playback phase to what the iframe reported, in one step.
 
@@ -92,6 +108,9 @@ def _reconcile_phase_with_iframe_locked(player: Any, payload: dict[str, Any]) ->
     yt_state = _IFRAME_STATE_CODES.get(payload.get("state"))
     sm = getattr(player, "_playback_sm", None)
     if yt_state is None or sm is None:
+        return False
+    if _spotify_owns_playback(player):
+        player._iframe_phase_disagreements = 0
         return False
     phase = getattr(sm, "phase", None)
     if phase not in (PlaybackPhase.PLAYING, PlaybackPhase.PAUSED, PlaybackPhase.LOADING):
@@ -298,6 +317,9 @@ async def handle_youtube_state(
                 yt_state,
             )
             return  # Don't process stale events from old videos
+        if _spotify_owns_playback(player_for_validation):
+            logger.info("Ignoring YouTube state %s: the current track is playing on Spotify", yt_state)
+            return
     except Exception as exc:
         logger.debug("Video ID validation failed (non-critical): %s", exc)
         # Continue processing if validation fails - better to process than drop
@@ -811,6 +833,10 @@ async def handle_position_update(
     try:
         # Unwrap MusicControllerAdapter to get the actual player with _position_ms etc.
         player = getattr(music, "player", music)
+
+        if player is not None and _spotify_owns_playback(player):
+            logger.debug("Ignoring an iframe position report: the current track is playing on Spotify")
+            return
 
         if player is not None:
             # Player stores position in milliseconds - safely convert to numeric

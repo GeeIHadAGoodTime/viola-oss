@@ -1083,6 +1083,10 @@ class SettingsManager:
         # =====================================================================
         # Messaging Channels
         # =====================================================================
+        # Settings > Preferences > Your Name. Without a default here the save
+        # dropped it ("Ignoring unknown setting: user_name", 1.0.5 build 10),
+        # so Viola never learned the name the user typed.
+        "user_name": "",
         "user_phone_number": "",
         "callback_phone": "",
         "founder_phone_number": "",

@@ -332,8 +332,18 @@ class ActiveTask:
             _quoted(_shorten(self.request, _REMINDER_REQUEST_CHARS)),
             *self._context_lines(),
             "Stay on this request. Do not go back to an older one. Your final answer must be about this request.",
-            "</system-reminder>",
         ]
+        # 1.0.5 build 10 seek loop: this reminder repeated the request after
+        # every tool result and nothing said it had been done, so the model
+        # sent the same verified seek_from_end 15 times. Say what is done.
+        if self.steps_taken:
+            lines.append("Steps you have taken on it so far: %d. The most recent:" % self.steps_taken)
+            lines.extend(self.recent_steps)
+            lines.append(
+                "Do not repeat a step that is already done. When these steps did what the request asks, "
+                "give your final answer now."
+            )
+        lines.append("</system-reminder>")
         return "\n".join(lines)
 
     def render_for_summary_prompt(self) -> str:

@@ -851,7 +851,7 @@ class LLMProviderFactory:
                 )
                 return None, "Ollama is not reachable at %s" % base_url
             model = getattr(app_settings, "local_llm_model", "") or DEFAULT_LOCAL_LLM_MODEL
-            provider = cls._create_api_key_provider(
+            provider = cls._create_free_local_provider(
                 provider_type=LLMProviderType.OLLAMA.value,
                 api_key="",
                 model=model,
@@ -975,7 +975,7 @@ class LLMProviderFactory:
                 return None
 
             if cls._is_ollama_native_base_url(base_url):
-                return cls._create_api_key_provider(
+                return cls._create_free_local_provider(
                     provider_type=LLMProviderType.OLLAMA.value,
                     api_key="",
                     model=cls._resolve_ollama_local_model(model, provider_type, base_url),
@@ -990,7 +990,7 @@ class LLMProviderFactory:
                 )
 
             compat_api_key = api_key if api_key and api_key != "***ENCRYPTED***" else "local-ai"
-            return cls._create_api_key_provider(
+            return cls._create_free_local_provider(
                 provider_type=LLMProviderType.OPENAI_COMPATIBLE.value,
                 api_key=compat_api_key,
                 model=model,
@@ -1007,12 +1007,29 @@ class LLMProviderFactory:
                 provider_type,
             )
 
-        return cls._create_api_key_provider(
+        return cls._create_free_local_provider(
             provider_type=LLMProviderType.OLLAMA.value,
             api_key="",
             model=cls._resolve_ollama_local_model(model, provider_type, OLLAMA_DEFAULT_BASE_URL),
             base_url=OLLAMA_DEFAULT_BASE_URL,
         )
+
+    @classmethod
+    def _create_free_local_provider(
+        cls, *, provider_type: str, api_key: str, model: str, base_url: str
+    ) -> BaseLLMProvider | None:
+        """Build a provider on a loopback URL and record its model as free.
+
+        Every caller has already checked that ``base_url`` is this machine.
+        """
+        provider = cls._create_api_key_provider(
+            provider_type=provider_type, api_key=api_key, model=model, base_url=base_url
+        )
+        if provider is not None:
+            from services.llm.pricing import register_local_model
+
+            register_local_model(model)
+        return provider
 
     @classmethod
     def _create_byok_provider(cls, settings: Any) -> BaseLLMProvider | None:

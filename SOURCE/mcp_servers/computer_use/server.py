@@ -646,7 +646,9 @@ async def computer(
         str, Field(description="Native app name for launch_app (the application's display or executable name).")
     ] = "",
     bring_to_front: Annotated[bool, Field(description="For launch_app, focus the launched window when found.")] = True,
-    include_minimized: Annotated[bool, Field(description="Include minimized windows in list_windows.")] = False,
+    include_minimized: Annotated[
+        bool, Field(description="list_windows lists minimized windows too; set false to leave them out.")
+    ] = True,
     include_window_titles: Annotated[bool, Field(description="Return window titles in list_windows.")] = True,
     region: Annotated[
         str,

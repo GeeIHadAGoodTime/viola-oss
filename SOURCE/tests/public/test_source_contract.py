@@ -96,7 +96,7 @@ class SourceContract(unittest.TestCase):
         nodes = [ast.ImportFrom(module="__future__", names=[ast.alias(name="annotations")], level=0)]
         constants = {"_MIN_BILLED_COST_USD", "_BILLABLE_FAILURE_STATES"}
         for node in tree.body:
-            if isinstance(node, ast.FunctionDef) and node.name == "_billed_cost_usd":
+            if isinstance(node, ast.FunctionDef) and node.name in {"_billed_cost_usd", "_conference_leg_cost_usd"}:
                 nodes.append(node)
             elif isinstance(node, ast.Assign) and any(
                 isinstance(target, ast.Name) and target.id in constants for target in node.targets
@@ -124,6 +124,14 @@ class SourceContract(unittest.TestCase):
                     with self.subTest(status=status, estimate=estimate, carrier=carrier):
                         expected = max(0.0, float(carrier if carrier is not None else estimate or 0.0))
                         self.assertEqual(billed_cost(record(status, estimate, carrier)), expected)
+
+        # An owner-takeover leg is a second carrier call: it is added on top of
+        # either figure (2 minutes at 0.01/min plus the 10% surcharge).
+        leg = record("completed", 0.05, 0.03)
+        leg._conference_leg_dialed_at = 100.0
+        leg._conference_leg_ended_at = 220.0
+        leg._conference_leg_rate_per_minute = 0.01
+        self.assertAlmostEqual(billed_cost(leg), 0.03 + 0.022)
 
     def test_audio_ducking_never_amplifies_quiet_playback(self):
         import sys

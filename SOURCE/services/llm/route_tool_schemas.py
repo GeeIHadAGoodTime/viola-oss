@@ -737,7 +737,8 @@ ROUTE_TOOL_SCHEMAS: list[dict[str, Any]] = [
         "description": (
             "Input is ambient noise, unclear speech, or not directed at the assistant. "
             "Only use when the transcript is CLEARLY ambient speech not directed at Viola: "
-            "ongoing third-party conversation, podcast/TV audio, multiple speakers. "
+            "ongoing third-party conversation, podcast/TV audio, multiple speakers, or song lyrics "
+            "heard while music plays (sung lines that ask nothing of Viola). "
             "Do NOT classify short statements or personal remarks as ignore -- the user "
             "already triggered the wake word. When in doubt between answer and ignore, "
             "always choose answer."

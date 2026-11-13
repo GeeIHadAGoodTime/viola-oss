@@ -43,8 +43,8 @@ class EnglishDecimalNormalization(unittest.TestCase):
             "0.000": "zero point zero zero zero",
             "-0.00": "minus zero point zero zero",
             "001.050": "one point zero five zero",
-            "2026.1999": "two thousand twenty six point one nine nine nine",
-            "123.4567890": "one hundred twenty three point four five six seven eight nine zero",
+            "2026.1999": "two thousand twenty-six point one nine nine nine",
+            "123.4567890": "one hundred twenty-three point four five six seven eight nine zero",
             "0.1234567890": "zero point one two three four five six seven eight nine zero",
         }
         for source, expected in cases.items():
@@ -114,12 +114,12 @@ class EnglishDecimalNormalization(unittest.TestCase):
     def test_degree_sign_is_spoken_before_phonemization(self):
         english = {
             "A high of 68°F, a low of 52°F.": (
-                "A high of sixty eight degrees Fahrenheit, a low of fifty two degrees Fahrenheit."
+                "A high of sixty-eight degrees Fahrenheit, a low of fifty-two degrees Fahrenheit."
             ),
             "It is 20 °C.": "It is twenty degrees Celsius.",
-            "68.5°F": "sixty eight point five degrees Fahrenheit",
+            "68.5°F": "sixty-eight point five degrees Fahrenheit",
             "turn 90° left": "turn ninety degrees left",
-            "52°Fahrenheit": "fifty two degrees Fahrenheit",
+            "52°Fahrenheit": "fifty-two degrees Fahrenheit",
         }
         for source, expected in english.items():
             for locale in (None, "en-us", "en-gb"):
@@ -187,7 +187,7 @@ class EnglishDecimalNormalization(unittest.TestCase):
 
     def test_one_degree_is_singular_and_whole_millions_take_de(self):
         english = {"1°F": "one degree Fahrenheit", "It is 1 °C.": "It is one degree Celsius.", "1°": "one degree",
-                   "1.5°C": "one point five degrees Celsius", "21°": "twenty one degrees"}
+                   "1.5°C": "one point five degrees Celsius", "21°": "twenty-one degrees"}
         for source, expected in english.items():
             with self.subTest(source=source):
                 self.assertEqual(self.formatter.format(source), expected)
@@ -233,7 +233,7 @@ class EnglishDecimalNormalization(unittest.TestCase):
 
     def test_markdown_header_cleans_before_plain_decimal_conversion(self):
         self.assertEqual(self.formatter.format("#1.25"), "one point two five")
-        self.assertEqual(self.formatter.format("Tag #1.25"), "Tag #one.twenty five")
+        self.assertEqual(self.formatter.format("Tag #1.25"), "Tag #one.twenty-five")
 
     def test_english_url_and_summary_controls_remain_present(self):
         self.assertEqual(self.formatter.format("See https://example.com/1.25?secret=fixture"), "See (link sent in chat)")

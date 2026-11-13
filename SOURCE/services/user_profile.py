@@ -104,7 +104,13 @@ def _run_async(coro):
     bridge entirely.
     """
     try:
-        return run_async_synchronously(coro)
+        # Desktop reads the profile while building a turn ON the serving loop,
+        # so the serving loop cannot also run the read: the guard below refused
+        # it and the saved profile came back empty for the whole session
+        # ("profile not loaded", 1.0.5 build 10; build 10 fixed the same fault
+        # in preferences_store only). The desktop store is SQLite and needs no
+        # particular loop. Ignored on the cloud, which needs its pool's loop.
+        return run_async_synchronously(coro, prefer_isolated_loop=True)
     except RuntimeError as exc:
         _msg = str(exc)
         # Cloud (set_main_loop registered) raises one message; desktop

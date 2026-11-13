@@ -1468,11 +1468,45 @@ async def file_read(
         return json.dumps({"error": str(exc)})
 
 
+def _delete_targets(path: str, paths: list[str] | None) -> list[str]:
+    """The paths one delete call names, in order, without repeats."""
+    from intent.file_gates import delete_targets
+
+    return delete_targets({"path": path, "paths": list(paths or [])})
+
+
+async def _delete_several(targets: list[str], *, scope: Any) -> Any:
+    """Delete each target and report every outcome; one refusal does not hide the rest.
+
+    A two-file delete used to be two calls, so the user was asked twice and a
+    single "yes" left the second file where it was (1.0.5 build 10 laptop).
+    """
+    from intent.tool_types import ToolResult
+
+    deleted: list[str] = []
+    failed: list[dict[str, str]] = []
+    for target in targets:
+        outcome = await _delete_path(target, recursive=True, scope=scope)
+        if outcome.ok:
+            deleted.append(target)
+        else:
+            failed.append({"path": target, "error": str(outcome.error or "not deleted")})
+    data = {"deleted": deleted, "failed": failed, "deleted_count": len(deleted)}
+    if failed:
+        summary = "; ".join("%s: %s" % (item["path"], item["error"]) for item in failed)
+        return ToolResult(
+            ok=False,
+            data=data,
+            error="Deleted %d of %d. Not deleted: %s" % (len(deleted), len(targets), summary),
+        )
+    return ToolResult(ok=True, data=data)
+
+
 @server.tool(
     description=(
         "Change local files. edit: replace exact old_string with new_string (edits for several, all or none). "
         "write: create or replace a whole file; read it first. Every change is backed up and undo reverts it. "
-        "Also append, insert, replace_lines, move, copy, mkdir, delete (to Recycle Bin), redo."
+        "Also append, insert, replace_lines, move, copy, mkdir, delete (to Recycle Bin; several with paths), redo."
     ),
     annotations=_DANGEROUS,
     meta={
@@ -1522,6 +1556,15 @@ async def file_write(
         int,
         Field(description="replace_lines: last line."),
     ] = 0,
+    paths: Annotated[
+        list[str],
+        Field(
+            description=(
+                "delete: every file or folder to delete, in ONE call, so the user is asked once. "
+                "path is then only their folder and is not deleted."
+            )
+        ),
+    ] = [],
 ) -> str:
     """Modify the filesystem.
 
@@ -1565,7 +1608,11 @@ async def file_write(
         elif action == "mkdir":
             result = await _make_directory(path, scope=scope)
         elif action == "delete":
-            result = await _delete_path(path, recursive=True, scope=scope)
+            targets = _delete_targets(path, paths)
+            if len(targets) > 1:
+                result = await _delete_several(targets, scope=scope)
+            else:
+                result = await _delete_path(targets[0] if targets else path, recursive=True, scope=scope)
         elif action == "undo":
             result = await _undo_change(path, scope=scope)
         elif action == "redo":
@@ -5150,6 +5197,22 @@ async def open_app_panel(
 
 @server.tool(
     description=(
+        "When the user asks to hear an answer read out loud in full, call this, then reply with the full text."
+    ),
+    annotations=_SAFE,
+    meta={"risk": "safe", "anthropic/alwaysLoad": True},
+)
+async def read_aloud() -> str:
+    """Mark this turn's answer to be spoken in full (voice/streamed_reply reads the tool event)."""
+    from intent.tool_types import ToolResult
+
+    return _format_result(
+        ToolResult(ok=True, data={"message": "Your reply this turn will be read out loud in full."})
+    )
+
+
+@server.tool(
+    description=(
         "Show the playing Music-stage video full screen (enabled=true: 'put this in full screen', "
         "'go full screen') or end it (enabled=false: 'end full screen', 'exit full screen'; while "
         "full screen also 'go back', 'normal size'). Desktop app only. Returns a ui_action; does "
@@ -5259,7 +5322,12 @@ async def playback(
     ] = None,
     volume_level: Annotated[
         int | None,
-        Field(description="Target music player volume percent for action='volume_set'."),
+        Field(
+            description=(
+                "Volume percent for action='volume_set', 0 to 100. Pass the number the user said: a number above "
+                "100 is refused and the volume is left alone."
+            )
+        ),
     ] = None,
     volume_step: Annotated[
         int | None,
@@ -5640,13 +5708,10 @@ async def alarm(
 
 @server.tool(
     description=(
-        "Send, schedule, list or delete notifications/reminders. Use action='list' when "
-        "the user asks what reminders they have, with enabled_only=false to include finished or "
-        "disabled ones. Use action='delete' with reminder set to an id from the list or the "
-        "reminder's words; delete them one at a time. For send/schedule, provide message, "
-        "optional when for delayed delivery, and optional channel. User-scoped delivery "
-        "uses the user's subscribed web push devices; phone/SMS delivery requires a "
-        "separately configured account-bound notification path."
+        "Send, schedule, list or delete reminders. action='list' answers what "
+        "reminders or scheduled tasks the user has (returns both); enabled_only=false adds "
+        "finished ones, only if asked. action='delete' takes reminder: an id or its words, "
+        "one at a time. Send: message, optional when, channel."
     ),
     annotations=_CONFIRM,
     meta={"risk": "confirm"},

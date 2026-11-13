@@ -116,7 +116,14 @@ const PlayerSection = ({
 
           {/* Transport Controls */}
           <div className={styles.transportRow}>
-            <TransportButton onClick={onShuffleToggle} active={shuffleOn} toggle ariaLabel="Shuffle tracks">
+            {/* The state is also in the name, as for Repeat: on the 1.0.5 build-10
+                laptop an accessibility tool did not see aria-pressed on this button. */}
+            <TransportButton
+              onClick={onShuffleToggle}
+              active={shuffleOn}
+              toggle
+              ariaLabel={`Shuffle tracks: ${shuffleOn ? 'on' : 'off'}`}
+            >
               <ShuffleIcon />
             </TransportButton>
             <div className={styles.spacer} />

@@ -190,16 +190,26 @@ class PlaylistManager:
         return None
 
     def _load_user_playlists_from_store(self, user_id: str) -> dict[str, dict[str, object]]:
-        stored_playlists = self._store.load_playlist_metadata_map(user_id)
+        stored_playlists = self._link_playlist_rows(user_id)
         return {
             name: self._normalize_playlist_record(playlist_data) for name, playlist_data in stored_playlists.items()
         }
+
+    def _link_playlist_rows(self, user_id: str) -> dict[str, dict[str, object]]:
+        """The rows this manager owns: playlists saved by link.
+
+        Playlists made by voice are lists of tracks in the same table with empty
+        metadata. They belong to the track tools; loading them here would show
+        link-less entries in Settings and write metadata onto them.
+        """
+        stored = self._store.load_playlist_metadata_map(user_id)
+        return {name: playlist_data for name, playlist_data in stored.items() if playlist_data}
 
     def _migrate_legacy_user_if_needed(self, user_id: str) -> None:
         if self._store.has_json_migration_marker(user_id):
             return
 
-        stored_playlists = self._store.load_playlist_metadata_map(user_id)
+        stored_playlists = self._link_playlist_rows(user_id)
         stored_default = self._store.get_default_playlist_name(user_id)
         if stored_playlists or stored_default is not None:
             self._store.mark_json_migrated(user_id)

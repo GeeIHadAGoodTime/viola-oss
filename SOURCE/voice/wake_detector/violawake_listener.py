@@ -554,6 +554,53 @@ class _MicPump:
                 self._cond.notify_all()
 
 
+class _MissedTryTracker:
+    """Summarise a wake attempt that scored but did not wake, in one line.
+
+    The per-frame "[STAGE2] score" lines run out of their log budget within the
+    hour, so on the 1.0.5 build-10 laptop the custom word "computer" left no
+    trace of the tries that did not wake. One line per try says how close it
+    came: its peak score and the most frames that met the frame threshold
+    within the rule's window.
+    """
+
+    START = 0.5  # a frame above this starts (or continues) a try
+    MIN_PEAK = 0.7  # quieter blips are not tries
+    END_AFTER = 4  # frames below START that end a try
+
+    def __init__(self) -> None:
+        self._active = False
+        self._window: deque[bool] = deque()
+        self._peak = 0.0
+        self._best = 0
+        self._frames = 0
+        self._quiet = 0
+
+    def update(self, score: float, frame_threshold: float, k: int, n: int) -> tuple[float, int, int] | None:
+        """Feed one frame; return (peak, best frames in the window, frames above START) when a missed try ends."""
+        if score >= self.START:
+            if not self._active:
+                self._active, self._peak, self._best, self._frames = True, 0.0, 0, 0
+                self._window.clear()
+            self._quiet = 0
+            self._peak = max(self._peak, score)
+            self._frames += 1
+        elif not self._active:
+            return None
+        else:
+            self._quiet += 1
+        self._window.append(score >= frame_threshold)
+        while len(self._window) > n:
+            self._window.popleft()
+        self._best = max(self._best, sum(self._window))
+        if score >= self.START or self._quiet < self.END_AFTER:
+            return None
+        self._active = False
+        if self._best >= k or self._peak < self.MIN_PEAK:
+            return None  # it met the rule (a wake, or a candidate logged elsewhere), or it was no try
+        return self._peak, self._best, self._frames
+
+
 class ViolaWakeListener:
     """
     Standalone wake word listener using ViolaWake engine.
@@ -639,6 +686,7 @@ class ViolaWakeListener:
             logger.info("Using ViolaWake model: %s", model_path)
         self._model_path = Path(model_path)
         self._custom_wake_word = _point_verifier_at(self._model_path)
+        self._missed_tries = _MissedTryTracker()
         # Inference interval: how many audio chunks between inference runs
         # MLP models can use interval=2 (faster inference), others use 5
         if infer_interval is not None:
@@ -1395,6 +1443,7 @@ class ViolaWakeListener:
             processed = np.concatenate(processed_frames)
             self._note_output_level(served_reference)
             self._track_aec_delay(mic_int16, served_reference)
+            self._log_reference_timing()
             return self._never_louder_than_mic(mic_int16, processed)
 
         except Exception as e:
@@ -1433,6 +1482,18 @@ class ViolaWakeListener:
             self._aec_delay_ms = delay_ms
             self._propagate_delay_to_aec()
 
+    def _log_reference_timing(self) -> None:
+        """Log the loopback reference's late-packet/overflow counts (at most once a minute, only when they change)."""
+        report = getattr(getattr(self, "_aec_adapter", None), "reference_timing_report", None)
+        if not callable(report):
+            return
+        try:
+            line = report()
+        except (AttributeError, RuntimeError, TypeError, ValueError):
+            return
+        if isinstance(line, str):
+            logger.info(line)
+
     def _never_louder_than_mic(self, mic_int16: np.ndarray, processed: np.ndarray) -> np.ndarray:
         """Hand on the raw microphone when the canceller made this chunk louder.
 
@@ -1449,7 +1510,8 @@ class ViolaWakeListener:
             return processed
         self._aec_louder_chunks += 1
         now = time.monotonic()
-        if now - self._aec_louder_logged_at >= 60.0:
+        # Every 10 minutes, not every minute: during music this is routine (1.0.5 log-noise list).
+        if now - self._aec_louder_logged_at >= 600.0:
             self._aec_louder_logged_at = now
             logger.info(
                 "[AEC_HEALTH] echo canceller output above the microphone on %d chunks; using the microphone there",
@@ -3284,6 +3346,8 @@ class ViolaWakeListener:
                                 )
                                 last_wake_score = engine.process_chunk(audio_chunk)
                                 self._maybe_start_early_check(engine, last_wake_score, contiguous, frame_count)
+                                if self._custom_wake_word and last_wake_score is not None:
+                                    self._log_missed_try(engine, float(last_wake_score))
                     else:
                         with self._engine_lock:
                             engine = self._engine
@@ -3607,6 +3671,35 @@ class ViolaWakeListener:
             frame_threshold,
             level,
             "on" if checked else "off",
+        )
+
+    def _log_missed_try(self, engine: Any, score: float) -> None:
+        """One line per custom-word try that scored but fell short of the rule (see _MissedTryTracker)."""
+        tracker = getattr(self, "_missed_tries", None)
+        if tracker is None:
+            tracker = self._missed_tries = _MissedTryTracker()
+        try:
+            k, n = engine.agreement
+            frame_threshold = float(engine.stream_threshold)
+        except (AttributeError, TypeError, ValueError):
+            return
+        missed = tracker.update(score, frame_threshold, int(k), int(n))
+        if missed is None or getattr(engine, "over_speech_rule", None) is not None:
+            return  # while she speaks a looser rule applies and has its own lines
+        peak, best, frames = missed
+        logger.info(
+            "[WAKE_MISS] custom word %r did not wake: peak=%.3f, best %d of %d frames at %.2f (rule %d of %d), "
+            "%d frames above %.1f, music=%s",
+            self._custom_wake_word,
+            peak,
+            best,
+            n,
+            frame_threshold,
+            k,
+            n,
+            frames,
+            _MissedTryTracker.START,
+            "yes" if self._music_playing() else "no",
         )
 
     def _music_wake_rule(self, level: float, checked: bool) -> tuple[int, int, float] | None:

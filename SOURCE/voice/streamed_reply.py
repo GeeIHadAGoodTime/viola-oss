@@ -25,7 +25,13 @@ from typing import Any
 from config import env as config_env
 from core.live_call_state import hold_report, live_call_of_turn
 from core.logging_config import get_logger
-from services.llm.answer_stream import SUMMARY_SUFFIX, FinalAnswerSpeechGate
+from services.llm.answer_stream import (
+    LONG_ANSWER_LINES,
+    SUMMARY_SUFFIX,
+    FinalAnswerSpeechGate,
+    all_sentences,
+    spoken_reply,
+)
 from services.llm.stream_bus import (
     add_stream_listener,
     bind_stream_producer,
@@ -34,7 +40,7 @@ from services.llm.stream_bus import (
     remove_stream,
     remove_stream_listener,
 )
-from voice.stage_reply import StageReplyRelay
+from voice.stage_reply import StageReplyRelay, first_audio_callback
 
 logger = get_logger(__name__)
 
@@ -59,6 +65,74 @@ def answer_replacing_hooks_registered(user_id: str | None) -> bool:
         return True
 
 
+def speaks_english(tts: Any) -> bool:
+    return str(getattr(tts, "_speech_language", "en-us") or "en-us").lower().startswith("en")
+
+
+def whole_reply_speech(message: str | None, tts: Any, streamed_reply: StreamedReply | None = None) -> str | None:
+    """What to say for a reply spoken whole, after its turn ended.
+
+    None: say nothing and play the soft done tone, because the turn only ran
+    quick music actions and all of them worked (voice.wake_chime.play_done_tone).
+    Otherwise the reply under the long-answer rule (services/llm/answer_stream),
+    whole when the turn called read_aloud.
+    """
+    gate = streamed_reply.gate if streamed_reply is not None else None
+    if gate is not None and gate.done_tone:
+        return None
+    read_in_full = bool(gate is not None and gate.read_in_full)
+    return spoken_reply(message, english=speaks_english(tts), read_in_full=read_in_full)
+
+
+class FullReading:
+    """A finished reply read out in full because the user asked (read_aloud).
+
+    Spoken sentence by sentence through the engine's speak_streaming, which
+    applies no length cap (a whole-reply speak() stops at 800 characters).
+    Same shape as StreamedReply for the barge-in path: ``heard_text``,
+    ``cancel()`` (no further sentence after a barge-in or stop) and ``speak()``.
+    """
+
+    def __init__(self, tts: Any, text: str) -> None:
+        self._tts = tts
+        self.text = text
+        self._cancelled = False
+
+    @property
+    def heard_text(self) -> str:
+        return self.text
+
+    def cancel(self) -> None:
+        self._cancelled = True
+
+    async def _sentences(self) -> AsyncIterator[str]:
+        for sentence in all_sentences(self.text):
+            if self._cancelled:
+                return
+            yield sentence + " "
+
+    async def speak(self) -> None:
+        await self._tts.speak_streaming(self._sentences())
+
+
+def full_reading(text: str, tts: Any, streamed_reply: StreamedReply | None) -> FullReading | None:
+    """A FullReading when this turn called read_aloud and the engine can stream, else None."""
+    gate = streamed_reply.gate if streamed_reply is not None else None
+    if gate is None or not gate.read_in_full or not can_stream_speech(tts):
+        return None
+    return FullReading(tts, text)
+
+
+def play_done_tone() -> bool:
+    try:
+        from voice.wake_chime import play_done_tone as _play
+
+        return _play()
+    except Exception:  # noqa: BLE001, RUF100 - a missing tone must never break a reply
+        logger.debug("Done tone unavailable", exc_info=True)
+        return False
+
+
 def can_stream_speech(tts: Any) -> bool:
     return tts is not None and callable(getattr(tts, "speak_streaming", None))
 
@@ -80,8 +154,13 @@ class StreamedReply:
         self.user_id = user_id
         self._own_stream = stream_id is None
         self.stream_id = stream_id or "speech-%s" % uuid.uuid4().hex
-        english = str(getattr(tts, "_speech_language", "en-us") or "en-us").lower().startswith("en")
-        self.gate = FinalAnswerSpeechGate(live=live, reason=reason, summary_suffix=SUMMARY_SUFFIX if english else None)
+        english = speaks_english(tts)
+        self.gate = FinalAnswerSpeechGate(
+            live=live,
+            reason=reason,
+            summary_suffix=SUMMARY_SUFFIX if english else None,
+            long_answer_lines=LONG_ANSWER_LINES if english else None,
+        )
         self._start_speaking = start_speaking
         self._queue: asyncio.Queue[str | None] = asyncio.Queue()
         self._loop: asyncio.AbstractEventLoop | None = None
@@ -178,7 +257,9 @@ class StreamedReply:
 
     async def speak(self) -> None:
         """Speak every queued and future sentence through the TTS engine."""
-        await self._tts.speak_streaming(self.sentences())
+        # The stage shows the text when the voice starts, not a second before it.
+        with first_audio_callback(self._stage.voice_started):
+            await self._tts.speak_streaming(self.sentences())
 
     # -- end of turn ------------------------------------------------------
     def finish(self, final_message: str | None, *, already_spoken: bool = False) -> str:
@@ -241,9 +322,14 @@ def new_streamed_reply(
 
 __all__ = [
     "STREAMED_SPEECH_ENV",
+    "FullReading",
     "StreamedReply",
     "answer_replacing_hooks_registered",
     "can_stream_speech",
+    "full_reading",
     "new_streamed_reply",
+    "play_done_tone",
+    "speaks_english",
     "streamed_speech_enabled",
+    "whole_reply_speech",
 ]

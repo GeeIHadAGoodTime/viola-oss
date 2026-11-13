@@ -10,6 +10,24 @@ INFRASTRUCTURE_KEYS: Final[frozenset[str]] = frozenset(
         "_settings_version",
         # One-time 1.0.5 marker: the old minimize_to_tray default was reset.
         "_window_close_quits_migrated",
+        # Read at launch (or on first use) but never listed, so each launch logged
+        # "Unclassified settings key ..." (1.0.5 build 11 follow-up). Listed here AND
+        # in ACCOUNT_BOUND_DEVICE_KEYS they keep exactly the storage they had: device
+        # tier, not install-scoped, not synced, not in the per-account sync set.
+        "autoplay_max_queue",
+        "billing_plan_snapshot",
+        "computer_use_grant_ttl_seconds",
+        "full_name",
+        "hooks",
+        "memory_main_md_max_bytes",
+        "memory_topic_md_max_bytes",
+        "output",
+        "output_style",
+        "policy_hooks",
+        "project_hooks",
+        "recently_played_history",
+        "security",
+        "update_minimum_version",
         "api_host",
         "api_port",
         "app_surface",
@@ -19,8 +37,10 @@ INFRASTRUCTURE_KEYS: Final[frozenset[str]] = frozenset(
         "attribution_self_report",
         "auth_enabled",
         "auto_update_check_enabled",
+        "background_agent_reasoning_effort",
         "base_url",
         "browser_provider_enabled",
+        "calendar_timezone",
         "companion_device_name",
         "companion_enabled",
         "computer_use_app_whitelist",
@@ -41,6 +61,7 @@ INFRASTRUCTURE_KEYS: Final[frozenset[str]] = frozenset(
         "google_workspace_mcp_path",
         "input_device",
         "lan_access_enabled",
+        "llm_fallback_chain",
         "local_music_folder",
         "log_level",
         "microphone_volume",
@@ -104,9 +125,31 @@ INFRASTRUCTURE_KEYS: Final[frozenset[str]] = frozenset(
 # computer-use allowlist (read with an explicit user_id by its safety check).
 ACCOUNT_BOUND_DEVICE_KEYS: Final[frozenset[str]] = frozenset(
     {
+        # Read on every turn but never listed, so each launch logged
+        # "Unclassified settings key ..." for all three (1.0.5 build 10).
+        # Listed here they keep exactly the storage they already had by
+        # default: local to this computer, never synced, not machine-wide.
+        "background_agent_reasoning_effort",
+        "calendar_timezone",
         "computer_use_app_whitelist",
         "dangerous_mode_acknowledged",
         "founder_phone_number",
+        "llm_fallback_chain",
+        # The build 11 follow-up keys (see INFRASTRUCTURE_KEYS): same rule.
+        "autoplay_max_queue",
+        "billing_plan_snapshot",
+        "computer_use_grant_ttl_seconds",
+        "full_name",
+        "hooks",
+        "memory_main_md_max_bytes",
+        "memory_topic_md_max_bytes",
+        "output",
+        "output_style",
+        "policy_hooks",
+        "project_hooks",
+        "recently_played_history",
+        "security",
+        "update_minimum_version",
     }
 )
 

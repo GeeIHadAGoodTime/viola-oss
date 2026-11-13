@@ -11,29 +11,34 @@ const baseAgent = {
 };
 
 describe('AgentCard', () => {
-  it('renders an active agent with empty thinking text', () => {
-    render(<AgentCard agent={baseAgent} thinkingText="" onCancel={vi.fn()} />);
+  it('renders an active agent with no reported step yet', () => {
+    render(<AgentCard agent={baseAgent} activityText="" onCancel={vi.fn()} />);
 
     expect(screen.getByText(/Research reliable local electricians/i)).toBeInTheDocument();
-    expect(screen.getByText('Waiting for reasoning...')).toBeInTheDocument();
+    expect(screen.getByText('Working...')).toBeInTheDocument();
     expect(screen.getByText(/Running 01:05/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Cancel agent/i })).toBeEnabled();
   });
 
-  it('renders the latest thinking text', () => {
-    const thinking = 'Checking constraints, comparing sources, and narrowing the final recommendation.';
+  // 1.0.5 build 10: the button showed "X" but was named with the whole task.
+  it('names the cancel button "Cancel agent", not the task text', () => {
+    render(<AgentCard agent={baseAgent} activityText="" onCancel={vi.fn()} />);
+    expect(screen.getByRole('button', { name: 'Cancel agent' })).toBeInTheDocument();
+  });
 
-    render(<AgentCard agent={baseAgent} thinkingText={thinking} onCancel={vi.fn()} />);
+  // 1.0.5 build 10 (bug 18): the card showed the helper's raw reasoning.
+  it('renders the plain step the agent reported', () => {
+    render(<AgentCard agent={baseAgent} activityText="step 3: reading page" onCancel={vi.fn()} />);
 
-    expect(screen.getByText(/comparing sources/i)).toBeInTheDocument();
-    expect(screen.queryByText('Waiting for reasoning...')).not.toBeInTheDocument();
+    expect(screen.getByText('step 3: reading page')).toBeInTheDocument();
+    expect(screen.queryByText('Working...')).not.toBeInTheDocument();
   });
 
   it('renders cancelled state and disables cancellation', () => {
     render(
       <AgentCard
         agent={{ ...baseAgent, status: 'cancelled' }}
-        thinkingText="Stopping the background work."
+        activityText="Stopping the background work."
         onCancel={vi.fn()}
       />,
     );
@@ -53,7 +58,7 @@ describe('AgentCard for scheduled work', () => {
     render(<AgentCard agent={{ ...baseAgent, task: encoded, reason: 'scheduler:9', status: 'completed' }} onCancel={vi.fn()} />);
     expect(screen.getByText('Reminder: Stretch')).toBeInTheDocument();
     expect(screen.queryByText(/viola-tool-action/)).not.toBeInTheDocument();
-    expect(screen.queryByText('Waiting for reasoning...')).not.toBeInTheDocument();
+    expect(screen.queryByText('Working...')).not.toBeInTheDocument();
   });
 
   it('labels alarms and sleep timers', async () => {

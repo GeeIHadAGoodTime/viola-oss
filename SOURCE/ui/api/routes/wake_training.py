@@ -30,6 +30,7 @@ from services.wake_word.custom_models import (
     DEFAULT_WAKE_MODEL_ID,
     WakeTrainingJobRecord,
     calibrate_wake_rule,
+    custom_wake_rule_for_model,
     delete_model_for_user,
     discard_job_samples,
     keep_job_samples,
@@ -274,6 +275,16 @@ def _activate_model(user_id: str, record: Any) -> tuple[dict[str, Any], JSONResp
             "That wake word could not be loaded, so your current wake word is still on.",
         )
     _set_active_model(user_id, record.model_path, model_name=record.name, is_default=record.is_default)
+    # One line a laptop log can be read against: which word, and the k-of-n rule
+    # measured for it (None means the default custom rule).
+    logger.info(
+        "Wake word chosen: %s (custom=%s, measured rule=%s, detector reloaded=%s, reason=%s)",
+        record.name,
+        not record.is_default,
+        None if record.is_default else custom_wake_rule_for_model(record.model_path),
+        bool(reload_result.get("reloaded")),
+        reload_result.get("reason"),
+    )
     return reload_result, None
 
 
@@ -288,6 +299,7 @@ async def _measure_wake_rule(user_id: str, job_id: str, model_path: str) -> None
         return
     try:
         rule = await asyncio.to_thread(calibrate_wake_rule, Path(model_path), samples)
+        logger.info("Measured the wake rule for job %s on %d recordings: %s", job_id, len(samples), rule)
         if rule is not None:
             set_model_wake_rule(Path(model_path), rule)
     except Exception:  # never lose a good model over a measurement

@@ -241,6 +241,16 @@ export function longAnswerCard(body, overVideo) {
     : { type: 'detail', body, long_answer: true };
 }
 
+// A background agent's result: the response line, and the big card when it is
+// long (same LONG_ANSWER_CARD_CHARS as a long spoken answer).
+export function agentResultView(content, overVideo) {
+  const text = typeof content === 'string' ? content : String(content ?? '');
+  if (text.trim().length > LONG_ANSWER_CARD_CHARS) {
+    return { text, line: truncateForResponseLine(text), card: longAnswerCard(text, overVideo) };
+  }
+  return { text, line: text, card: null };
+}
+
 export function truncateForResponseLine(text) {
   const value = typeof text === 'string' ? text.trim() : '';
   if (value.length <= RESPONSE_LINE_MAX_CHARS) return value;
@@ -459,7 +469,9 @@ function formatCallTitleElapsed(startedAt, fallbackMs = Date.now()) {
 // Embedded YouTube Player component - MUST be defined outside SmartDisplay
 // to prevent React from recreating it on every parent render
 const LONG_ANSWER_OVER_VIDEO_MS = 15000;
-const LONG_ANSWER_CARD_CHARS = 200;
+// Same number as services/llm/answer_stream.py LONG_ANSWER_CHARS: past it Viola
+// says only the lead and "I put the rest on the screen for you".
+const LONG_ANSWER_CARD_CHARS = 400;
 const SPOKE_EMBED_URL = resolveYouTubeEmbedUrl(import.meta.env.VITE_YOUTUBE_EMBED_URL);
 const SPOKE_EMBED_ORIGIN = new URL(SPOKE_EMBED_URL).origin;
 
@@ -933,7 +945,17 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
 
   const handleEndActiveCall = useCallback(() => {
     if (activeCallId) {
-      void endCall(activeCallId);
+      // Leave the live-call screen as soon as the server confirms the call is
+      // over (ended now, or already gone). Do not wait for a call_ended event
+      // that an already-finished call will never send.
+      void endCall(activeCallId, {
+        onCallOver: (endedCallId) => {
+          setActiveCallId((current) => (current === endedCallId ? null : current));
+          setActiveCallMeta(null);
+          setCallBriefing(null);
+          setCallConsultation(null);
+        },
+      });
     }
   }, [activeCallId, endCall]);
   const checkPhoneTosStatus = useCallback(async () => {
@@ -1103,7 +1125,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
   }, [historyPrincipalKey]);
   const [lastResponse, setLastResponse] = useState(IDLE_RESPONSE_LINE);
   // The reply as it is written, paced with the voice (hooks/usePacedReply.js).
-  const { liveReply, onPartial: onReplyPartial, onFinal: onReplyFinal } = usePacedReply({
+  const { liveReply, replyPending, onPartial: onReplyPartial, onFinal: onReplyFinal } = usePacedReply({
     speechRate: Number(userSettings?.tts_rate) > 5 ? Number(userSettings.tts_rate) / 150 : 1,
   });
   // Managed-AI usage cap (C-077). Non-null for as long as the plan allowance is
@@ -1120,7 +1142,12 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
   const [agentDrawerExpanded, setAgentDrawerExpanded] = useState(true);
   const handleAgentResult = useCallback(({ content }) => {
     if (!mountedRef.current) return;
-    setLastResponse(content);
+    // A long background-agent result (a 2,000-word essay on the laptop) goes on
+    // the big card like any long answer; the response line shows only its lead.
+    // It used to be dumped whole into the small stage text area.
+    const view = agentResultView(content, videoPlayingRef.current);
+    setLastResponse(view.line);
+    if (view.card) setActiveCard(view.card);
     setChatHistory(prev => [
       ...prev,
       { role: 'assistant', content, timestamp: new Date().toISOString() },
@@ -2041,10 +2068,10 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
   // before she has said a word of it (1.0.5 build 9). Unspoken replies have
   // nothing to wait for, so theirs comes at once.
   useEffect(() => {
-    if (!pendingLongAnswer || liveReply) return;
+    if (!pendingLongAnswer || liveReply || replyPending) return;
     setActiveCard(longAnswerCard(pendingLongAnswer, videoPlayingRef.current));
     setPendingLongAnswer(null);
-  }, [pendingLongAnswer, liveReply]);
+  }, [pendingLongAnswer, liveReply, replyPending]);
 
   useEffect(() => {
     if (!setReplyPartialCallback) return undefined;
@@ -4126,6 +4153,7 @@ function PrincipalSmartDisplay({ isSpoke = false, micStream = null, room = null,
               // so it is not on screen twice. Once the card goes it shows whole.
               lastResponse={activeCard?.long_answer ? `"${truncateForResponseLine(activeCard.body)}"` : lastResponse}
               liveReply={liveReply}
+              replyPending={replyPending}
               voice={voice}
               processingTooLong={processingTooLong}
               capDenial={capDenial}

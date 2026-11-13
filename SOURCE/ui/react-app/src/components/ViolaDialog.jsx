@@ -110,6 +110,23 @@ function ViolaDialog({ request, onAnswer }) {
         onAnswer(cancelValue);
         return;
       }
+      // The dialog is modal: a key pressed while focus sits outside it (the
+      // menu that opened it took focus back, or nothing has it) belongs to
+      // the dialog, not to the page behind. Ctrl+A in the Rename box used to
+      // highlight the whole window (1.0.5 build 10).
+      const panel = panelRef.current;
+      const field = fieldRef.current;
+      if ((event.ctrlKey || event.metaKey) && !event.altKey && String(event.key).toLowerCase() === 'a') {
+        if (document.activeElement !== field) {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          field?.focus();
+          field?.select?.();
+        }
+        return;
+      }
+      const start = isPrompt ? field : (request.danger ? cancelRef.current : confirmRef.current);
+      if (panel && start && !panel.contains(document.activeElement)) start.focus();
       if (event.key === 'Tab') {
         const panel = panelRef.current;
         if (!panel) return;
@@ -128,7 +145,7 @@ function ViolaDialog({ request, onAnswer }) {
     };
     window.addEventListener('keydown', handleKey, true);
     return () => window.removeEventListener('keydown', handleKey, true);
-  }, [cancelValue, onAnswer]);
+  }, [cancelValue, onAnswer, isPrompt, request.danger]);
 
   const fieldStyle = {
     width: '100%',
@@ -141,6 +158,8 @@ function ViolaDialog({ request, onAnswer }) {
     color: THEME.colors.textPrimary,
     font: 'inherit',
     resize: 'vertical',
+    // The backdrop is not selectable; the field's own text must stay so.
+    userSelect: 'text',
   };
   const buttonStyle = {
     minHeight: '44px',
@@ -167,6 +186,7 @@ function ViolaDialog({ request, onAnswer }) {
         justifyContent: 'center',
         padding: '24px',
         backgroundColor: 'rgba(0,0,0,0.55)',
+        userSelect: 'none',
       }}
     >
       <div
@@ -196,6 +216,7 @@ function ViolaDialog({ request, onAnswer }) {
             {request.multiline ? (
               <textarea
                 ref={fieldRef}
+                aria-label={request.label || request.title}
                 rows={5}
                 value={value}
                 onChange={(event) => setValue(event.target.value)}
@@ -204,6 +225,8 @@ function ViolaDialog({ request, onAnswer }) {
             ) : (
               <input
                 ref={fieldRef}
+                type="text"
+                aria-label={request.label || request.title}
                 value={value}
                 onChange={(event) => setValue(event.target.value)}
                 onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); submit(); } }}

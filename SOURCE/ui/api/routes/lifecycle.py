@@ -782,6 +782,7 @@ def _setup_automatic_state_broadcast(*, hub: Any, music: Any, state: Any) -> Non
         last_state_change_time: list[float] = [0.0]
         pending_state_change: list[dict[str, Any] | None] = [None]
         last_broadcast_is_playing: list[bool | None] = [None]
+        last_broadcast_volume: list[object] = [None]
         state_debounce_lock = threading.Lock()
         state_debounce_ms = 200
         # One trailing flush per debounce window, so the LAST state of a burst
@@ -832,7 +833,16 @@ def _setup_automatic_state_broadcast(*, hub: Any, music: Any, state: Any) -> Non
                     playback_toggle = (
                         last_broadcast_is_playing[0] is not None and incoming_is_playing != last_broadcast_is_playing[0]
                     )
-                    if time_since_last < state_debounce_ms and not playback_toggle:
+                    # A volume change (the duck at a wake) goes out at once: the
+                    # embedded player follows the broadcast volume, and a held
+                    # one let the wake chime play before the music dipped
+                    # (1.0.5 build-10 laptop, J9).
+                    volume_change = (
+                        last_broadcast_volume[0] is not None
+                        and state_dict.get("volume") is not None
+                        and state_dict.get("volume") != last_broadcast_volume[0]
+                    )
+                    if time_since_last < state_debounce_ms and not playback_toggle and not volume_change:
                         log.debug(
                             "State change debounced (%dms < %dms)",
                             int(time_since_last),
@@ -921,6 +931,7 @@ def _setup_automatic_state_broadcast(*, hub: Any, music: Any, state: Any) -> Non
                     state_dict_to_broadcast.get("is_playing"),
                 )
                 last_broadcast_is_playing[0] = bool(state_dict_to_broadcast.get("is_playing"))
+                last_broadcast_volume[0] = state_dict_to_broadcast.get("volume")
 
                 # ── Spoke forwarding (consolidated single point) ──
                 fwd_is_playing = bool(state_dict_to_broadcast.get("is_playing"))
@@ -986,8 +997,13 @@ def _setup_automatic_state_broadcast(*, hub: Any, music: Any, state: Any) -> Non
 
                         main_loop.call_soon_threadsafe(schedule_spoke_forward)
                         last_fwd_time[0] = fwd_now
-                        log.info(
-                            "[SPOKE_FWD] lifecycle: forwarding %s " "video_id=%s trigger=state_change",
+                        # Offered, not sent: the forwarder delivers only to rooms
+                        # that are connected right now and logs "Forwarded ..."
+                        # itself when one received it. At INFO this line read as
+                        # if every pause went to a room that had been offline for
+                        # weeks (1.0.5 build 10 laptop report).
+                        log.debug(
+                            "[SPOKE_FWD] lifecycle: offering %s to connected rooms video_id=%s trigger=state_change",
                             _cmd,
                             fwd_video_id,
                         )

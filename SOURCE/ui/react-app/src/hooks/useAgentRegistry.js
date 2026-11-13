@@ -163,17 +163,18 @@ export function useAgentRegistry({ onAgentResult } = {}) {
             return;
           }
 
-          if (payload?.thinking) {
-            setStreamStates((prev) => {
-              const previous = prev[agent.agent_id] || {};
-              return {
-                ...prev,
-                [agent.agent_id]: {
-                  ...previous,
-                  thinkingText: `${previous.thinkingText || ''}${payload.thinking}`,
-                },
-              };
-            });
+          // 1.0.5 build 10: the card streamed the helper's raw reasoning
+          // (`payload.thinking`). It now shows only the plain step the agent
+          // reports for each tool ("step 3: searching", "reading page").
+          const activity = typeof payload?.tool?.progress === 'string' ? payload.tool.progress.trim() : '';
+          if (activity) {
+            setStreamStates((prev) => ({
+              ...prev,
+              [agent.agent_id]: {
+                ...(prev[agent.agent_id] || {}),
+                activityText: activity,
+              },
+            }));
           }
 
           const terminalStatus = terminalStatusFromPayload(payload);

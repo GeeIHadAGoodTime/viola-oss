@@ -53,7 +53,6 @@ _ACRONYM_WORDS = {
 
 
 _BRAND_PRONUNCIATIONS = {
-    "Spotify": "Spot if eye",
     "YouTube": "you tube",
     "Anthropic": "Ann throw pick",
     "GitHub": "git hub",

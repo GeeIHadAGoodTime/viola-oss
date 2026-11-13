@@ -249,6 +249,8 @@ class ScheduleBackend(Protocol):
 
     async def count_enabled_all_async(self) -> int: ...
 
+    async def user_ids_with_finished_one_shots_async(self) -> list[str]: ...
+
 
 def _validate_schedule_inputs(
     label: str,
@@ -661,6 +663,18 @@ class SqliteScheduleBackend:
 
     async def count_enabled_all_async(self) -> int:
         return await asyncio.to_thread(self.count_enabled_all)
+
+    def user_ids_with_finished_one_shots(self) -> list[str]:
+        """Users who own at least one one-time row that ran and is now off."""
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT DISTINCT user_id FROM schedules "
+                "WHERE one_shot_at IS NOT NULL AND enabled = 0 AND run_count > 0"
+            ).fetchall()
+        return [str(row["user_id"]) for row in rows]
+
+    async def user_ids_with_finished_one_shots_async(self) -> list[str]:
+        return await asyncio.to_thread(self.user_ids_with_finished_one_shots)
 
 
 class PostgresScheduleBackend:
@@ -1195,6 +1209,16 @@ class PostgresScheduleBackend:
             )
         return int(row["cnt"] if row else 0)
 
+    async def user_ids_with_finished_one_shots_async(self) -> list[str]:
+        """Users who own at least one one-time row that ran and is now off."""
+        await self.initialize()
+        async with self._scheduler_worker_conn() as conn:
+            rows = await conn.fetch(
+                "SELECT DISTINCT user_id FROM sync_schedules WHERE one_shot_at IS NOT NULL "
+                "AND enabled IS FALSE AND run_count > 0 AND deleted_at IS NULL"
+            )
+        return [str(row["user_id"]) for row in rows]
+
 
 def create_schedule_backend(
     *,
@@ -1433,6 +1457,9 @@ class ScheduleStore:
 
     async def count_enabled_all_async(self) -> int:
         return await self._backend.count_enabled_all_async()
+
+    async def user_ids_with_finished_one_shots_async(self) -> list[str]:
+        return await self._backend.user_ids_with_finished_one_shots_async()
 
 
 def get_schedule_store(root: Path | None = None) -> ScheduleStore:

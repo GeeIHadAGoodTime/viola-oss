@@ -70,7 +70,15 @@ from intent.irreversible_actions import (
     gate_action_class,
     irreversible_action_class,
 )
-from intent.log_redaction import redact_card_data, redact_card_field, redact_pii
+from intent.log_redaction import (
+    is_address_argument_tool,
+    redact_card_data,
+    redact_card_field,
+    redact_pii,
+    redact_tool_arguments_for_log,
+    redact_tool_error_for_log,
+    redact_tool_result_for_log,
+)
 from intent.post_answer_teardown import (
     drain_owner as _drain_post_answer_owner,
     schedule_post_answer_coro,
@@ -2136,6 +2144,9 @@ def _redacted_static_step_field(key: str, value: Any) -> Any:
     return copy.deepcopy(cached)
 
 
+# Origins of a user frame that hold the user's own words: typed (no origin) and
+# spoken. Summaries, resumed sessions and hook output are user-role frames too.
+_USER_AUTHORED_FRAME_ORIGINS = frozenset({"", "voice"})
 _ADDRESS_LOG_KEYS = frozenset({"street", "zip_code", "read_back"})
 _ADDRESS_TOOL = "save_delivery_address"
 # In a turn that saves an address, a bare "no, the house number is 4812" carries
@@ -2168,8 +2179,23 @@ def _mask_addresses_for_log(value: Any) -> Any:
     return value
 
 
+def _mask_address_tool_step(step_data: dict[str, Any]) -> dict[str, Any]:
+    """An address tool's arguments and result are masked whole, because of the tool, not the text's shape."""
+    tool_name = step_data.get("tool_name")
+    if not is_address_argument_tool(tool_name):
+        return step_data
+    masked = dict(step_data)
+    if "tool_input" in masked:
+        masked["tool_input"] = redact_tool_arguments_for_log(tool_name, masked["tool_input"])
+    for key in ("tool_result", "result_summary"):
+        if masked.get(key):
+            masked[key] = redact_tool_result_for_log(tool_name, masked[key])
+    return masked
+
+
 def _redact_step_data(step_data: dict[str, Any]) -> Any:
     """Card and personal data out of a step line, reusing the redaction of unchanged tool-schema fields."""
+    step_data = _mask_address_tool_step(step_data)
     static_keys = [key for key in _STEP_LOG_STATIC_FIELDS if isinstance(step_data.get(key), (dict, list))]
     if not static_keys:
         return _mask_addresses_for_log(redact_pii(redact_card_data(step_data)))
@@ -2379,7 +2405,7 @@ def _strip_old_browser_refs(native_messages: list[dict[str, Any]]) -> None:
                     content[key] = _REF_PATTERN.sub("", val)
 
 
-_CHECK_AGENTS_WAIT_S = 20.0
+_CHECK_AGENTS_WAIT_S = 60.0
 
 # Tools whose result is a whole-page read. On a long shopping run these are most
 # of the history, and only the newest pages can still be acted on.
@@ -2554,6 +2580,9 @@ class AgentStepRecord:
     def __post_init__(self) -> None:
         self.tool_input = _mask_addresses_for_log(redact_card_data(self.tool_input))
         self.tool_result_summary = _mask_addresses_for_log(redact_card_data(self.tool_result_summary))
+        if is_address_argument_tool(self.tool_name):
+            self.tool_input = redact_tool_arguments_for_log(self.tool_name, self.tool_input)
+            self.tool_result_summary = str(redact_tool_result_for_log(self.tool_name, self.tool_result_summary))
         self.tool_use_id = str(self.tool_use_id or "").strip() or None
 
 
@@ -6048,12 +6077,23 @@ class AgentExecutor:
                 control=complete_control,
             )
         task_log.write_to_disk()
+        # Token totals in the text log too: the laptop report could not confirm
+        # prompt caching because only the structured step log carried the
+        # cached count (1.0.5 build 10). cached is the part of input_tokens the
+        # provider served from its prompt cache.
+        _task_usage = task_usage_summary["usage"]
         logger.info(
-            "Agent task %s completed: %d steps, %.1fs, outcome=%s",
+            "Agent task %s completed: %d steps, %.1fs, outcome=%s, "
+            "input_tokens=%d cached_tokens=%d cache_write_tokens=%d output_tokens=%d cost_usd=%.5f",
             task_log.task_id,
             task_log.total_steps,
             total_duration,
             outcome,
+            _task_usage.get("input_tokens", 0),
+            _task_usage.get("cache_read_tokens", 0),
+            _task_usage.get("cache_write_tokens", 0),
+            _task_usage.get("output_tokens", 0),
+            float(task_usage_summary.get("total_cost_usd") or 0.0),
         )
         self._retire_unanswered_confirmations(start_time)
 
@@ -6794,8 +6834,11 @@ class AgentExecutor:
     def _user_own_words(self, user_text: str) -> str:
         """What the user has said in this conversation, and the address they already saved.
 
-        Only frames the user wrote count. Compaction summaries are user-role frames
-        too, but they carry an origin, and they can quote a page.
+        Only frames the user wrote or spoke count. Compaction summaries are
+        user-role frames too, but they carry another origin, and they can quote a
+        page. A spoken turn carries the origin "voice": leaving it out meant an
+        address given over two spoken answers was refused, because the street
+        said one answer earlier did not count as the user's words (build 10).
         """
         from services.conversation.state_manager import get_request_conversation_manager
 
@@ -6804,7 +6847,11 @@ class AgentExecutor:
         get_window = getattr(manager, "get_prompt_window", None)
         if callable(get_window):
             for frame in get_window().frames:
-                if frame.role is FrameRole.USER and frame.kind is FrameKind.USER_INPUT and not frame.origin:
+                if (
+                    frame.role is FrameRole.USER
+                    and frame.kind is FrameKind.USER_INPUT
+                    and (frame.origin or "") in _USER_AUTHORED_FRAME_ORIGINS
+                ):
                     parts.extend(block.text for block in frame.blocks if isinstance(block, TextBlock))
         try:
             from intent.tools.settings_tools import delivery_address_text
@@ -9826,14 +9873,22 @@ class AgentExecutor:
         try:
             from diagnostics.failure_envelope import emit_failure
 
+            # The envelope is logged, counted and kept in the error registry. An
+            # address tool's arguments are masked because of the tool, and its
+            # error is cleared of them: a failed save printed the street (build 10).
+            asked_first = (
+                str(result.error_category or "").upper() == "CONFIRMATION_REQUIRED"
+                or result.error == "confirmation_required"
+            )
             emit_failure(
                 code="tool_execution_failed",
                 component="agent.tool.%s" % tool_name,
-                message=result.error or "Tool returned error",
-                severity="WARNING",
+                message=redact_tool_error_for_log(tool_name, tool_args, result.error or "Tool returned error"),
+                # A question to the user is the normal path, not a failure.
+                severity="INFO" if asked_first else "WARNING",
                 retryable=result.retryable,
                 tool_name=tool_name,
-                tool_args_summary=str(tool_args)[:200],
+                tool_args_summary=str(redact_tool_arguments_for_log(tool_name, tool_args))[:200],
                 error_category=result.error_category or "UNKNOWN",
             )
         except Exception:
@@ -10222,10 +10277,17 @@ class AgentExecutor:
         # Hold the answer until a helper finishes or a short time passes. Polled
         # at full speed, a parent spent 16 model turns in 45 s, each resending
         # its whole context, to learn nothing had changed.
+        # 1.0.5 build 11: every managed call costs at least a cent, so the hold
+        # is long (60 s); it still ends the moment any helper finishes or the
+        # task is stopped, so nothing is answered later than before.
         running = [asyncio.ensure_future(done.wait()) for done in (getattr(self, "_live_helpers", None) or {}).values()]
         if running:
-            await asyncio.wait(running, timeout=_CHECK_AGENTS_WAIT_S, return_when=asyncio.FIRST_COMPLETED)
-            for wait in running:
+            cancel_event = getattr(self, "_cancel_event", None)
+            waits = list(running)
+            if isinstance(cancel_event, asyncio.Event):
+                waits.append(asyncio.ensure_future(cancel_event.wait()))
+            await asyncio.wait(waits, timeout=_CHECK_AGENTS_WAIT_S, return_when=asyncio.FIRST_COMPLETED)
+            for wait in waits:
                 wait.cancel()
 
         user_id = self._get_effective_user_id()

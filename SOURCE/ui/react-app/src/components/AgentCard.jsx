@@ -80,14 +80,15 @@ export function agentTaskTitle(agent) {
   return 'Scheduled task';
 }
 
-export default function AgentCard({ agent, thinkingText = '', onCancel }) {
+export default function AgentCard({ agent, activityText = '', onCancel }) {
   const status = agent.status || 'running';
   const statusStyle = statusStyleFor(status);
   const terminal = ['completed', 'cancelled', 'killed', 'error', 'failed'].includes(status);
   const scheduled = agent.subagent_type === 'scheduler' || String(agent.reason || '').startsWith('scheduler:');
-  const visibleThinking = thinkingText
-    ? thinkingText.slice(-80)
-    : scheduled ? (terminal ? 'Scheduled task' : 'Running a scheduled task') : 'Waiting for reasoning...';
+  // The plain step the agent reports, never its reasoning (1.0.5 build 10).
+  const visibleThinking = activityText
+    ? activityText.slice(0, 80)
+    : scheduled ? (terminal ? 'Scheduled task' : 'Running a scheduled task') : 'Working...';
   const task = agentTaskTitle(agent);
 
   return (
@@ -163,8 +164,8 @@ export default function AgentCard({ agent, thinkingText = '', onCancel }) {
         </span>
         <button
           type="button"
-          aria-label={`Cancel agent: ${task}`}
-          title="Cancel"
+          aria-label="Cancel agent"
+          title="Cancel agent"
           disabled={terminal}
           onClick={() => onCancel(agent.agent_id)}
           style={{
@@ -199,6 +200,6 @@ AgentCard.propTypes = {
     started_at: PropTypes.string,
     elapsed_seconds: PropTypes.number,
   }).isRequired,
-  thinkingText: PropTypes.string,
+  activityText: PropTypes.string,
   onCancel: PropTypes.func.isRequired,
 };

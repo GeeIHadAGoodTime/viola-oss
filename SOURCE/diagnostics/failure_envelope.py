@@ -110,6 +110,16 @@ def _redact_failure_payload(value: Any) -> Any:
         return "[REDACTED:DIAGNOSTIC_REDACTION_FAILED]"
 
 
+_LOG_METHODS: dict[str, str] = {
+    "DEBUG": "debug",
+    "INFO": "info",
+    "WARNING": "warning",
+    "WARN": "warning",
+    "ERROR": "error",
+    "CRITICAL": "critical",
+}
+
+
 def emit_failure(
     code: str,
     component: str,
@@ -347,11 +357,16 @@ def emit_failure(
             if not is_event_loop_closed_error(log_exc):
                 raise
     else:
+        # Log at the severity the caller gave. Every envelope used to log at
+        # ERROR, so a normal "shall I go ahead?" (confirmation_required) and a
+        # site's HTTP 403, both sent as WARNING, read as errors in the laptop
+        # log (1.0.5 build 10, x6 each).
+        emit_log = getattr(log, _LOG_METHODS.get(str(severity or "").upper(), "error"))
         try:
             if message:
-                log.error(str(envelope.get("message") or ""))
+                emit_log(str(envelope.get("message") or ""))
             else:
-                log.error("%s failure [%s]", component, code)
+                emit_log("%s failure [%s]", component, code)
         except Exception as log_exc:
             if not is_event_loop_closed_error(log_exc):
                 raise

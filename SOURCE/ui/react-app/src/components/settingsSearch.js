@@ -24,7 +24,7 @@ const SECTION_KEYWORDS = {
     'voice wake word sensitivity push-to-talk ptt shortcut text to speech tts voice speed volume stt recognition whisper vad advanced',
   ],
   connections: [
-    'connections connected services smart home calendar oauth google telegram qr messaging',
+    'connections connected services smart home home assistant hub lights access token calendar oauth google telegram qr messaging',
   ],
   customize: [
     'customize theme accent color weather location city zip postal code time format wake word selection',
@@ -56,7 +56,7 @@ export const SETTING_TITLES_BY_TAB = {
     'Assistant Volume', 'Voice Recognition & Advanced', 'Double-check the wake word', 'Voice Recognition',
     'Accuracy Level', 'Processing Hardware', 'Voice Language',
   ],
-  connections: ['Calendar', 'Telegram', 'Smart Home', 'iCloud Calendar'],
+  connections: ['Calendar', 'Telegram', 'Smart Home', 'Home Assistant', 'iCloud Calendar'],
   customize: ['Look', 'Color Theme', 'Weather', 'Personality', 'Voice & Wake Word', 'Reset'],
   system: [
     'Let devices on your Wi-Fi connect', 'Desktop settings', 'Audio Devices', 'Microphone', 'Speaker',

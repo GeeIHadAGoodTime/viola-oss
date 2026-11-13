@@ -26,6 +26,22 @@ describe('Viola dialogs', () => {
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
   });
 
+  // 1.0.5 build 10: Ctrl+A in the Rename box highlighted the whole window.
+  // With focus outside the dialog, Ctrl+A now selects the field's text only.
+  it('keeps Ctrl+A in the rename field when focus has left the dialog', async () => {
+    const { answer } = await open(() => promptDialog({ title: 'Rename chat', label: 'Chat name', defaultValue: 'Trip plans' }));
+    const field = screen.getByRole('textbox', { name: 'Chat name' });
+    await act(async () => { field.blur(); document.body.focus(); });
+    expect(field).not.toHaveFocus();
+    const event = new KeyboardEvent('keydown', { key: 'a', ctrlKey: true, bubbles: true, cancelable: true });
+    await act(async () => { document.body.dispatchEvent(event); });
+    expect(event.defaultPrevented).toBe(true);
+    expect(field).toHaveFocus();
+    expect([field.selectionStart, field.selectionEnd]).toEqual([0, 'Trip plans'.length]);
+    await act(async () => { fireEvent.keyDown(field, { key: 'Escape' }); });
+    await expect(answer).resolves.toBe(null);
+  });
+
   it('starts a destructive confirm on Cancel', async () => {
     await open(() => confirmDialog({ title: 'Delete?', confirmLabel: 'Delete', danger: true }));
     await waitFor(() => expect(screen.getByRole('button', { name: 'Cancel' })).toHaveFocus());

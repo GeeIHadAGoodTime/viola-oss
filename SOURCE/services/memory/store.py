@@ -70,7 +70,7 @@ _PII_CONTENT_RE = re.compile(
     # A house number, up to five name words, a street type. Treated like a phone
     # number: a street address is never kept in or shown from memory. Quantities
     # ("3 miles down the road") are not addresses. Every quantifier is bounded.
-    r"|(?P<street>\b\d{1,6}[a-z]?\s+"
+    r"|(?P<street>\b\d{1,6}(?:[.,]\d{1,6})?[a-z]?\s+"
     r"(?:(?!(?:seconds?|minutes?|mins?|hours?|days?|weeks?|months?|years?|miles?|blocks?|times?|km|feet|steps?)\b)"
     r"[a-z0-9.'\-]{1,30}\s+){1,5}"
     r"(?<!\bmy\s)(?<!\bthe\s)(?<!\bour\s)(?<!\bthis\s)"

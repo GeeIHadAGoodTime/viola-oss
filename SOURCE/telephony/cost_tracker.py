@@ -15,6 +15,7 @@ the on_metrics event handler on the LLM service.
 from __future__ import annotations
 
 import math
+import os
 from dataclasses import dataclass
 
 from core.logging_config import get_logger
@@ -27,6 +28,26 @@ _TELNYX_PER_MINUTE_USD = 0.007  # US domestic PSTN outbound (verified via third-
 _TELNYX_TOLL_FREE_PER_MINUTE_USD = 0.015  # Toll-free origination ($0.01-0.03, using midpoint)
 _TELNYX_REGULATORY_SURCHARGE = 0.10  # ~10% (USF, TRS, state telecom taxes)
 _TELNYX_NUMBER_MONTHLY_USD = 1.00  # US local DID monthly rental
+# Every cloud dial turns on media streaming and premium answering-machine
+# detection (call_manager dial kwargs). telnyx.com/pricing/call-control,
+# read 2026-11-12. The one carrier record in prod did not include them, so
+# they are charged on top until an invoice shows otherwise (no subsidy).
+_TELNYX_MEDIA_STREAMING_PER_MINUTE_USD = 0.0035
+_TELNYX_AMD_PREMIUM_PER_CALL_USD = 0.0065
+
+# RunPod GPU voice worker (endpoint viola-phone-voice-lb). runpod.io/pricing,
+# read 2026-11-12: the endpoint may run on 16 GB at $0.58/hr or 24 GB PRO at
+# $1.34/hr, billed per second while a worker runs (cold start and idle tail
+# included). The code cannot tell which GPU served a call, so the dearer one.
+# VIOLA_PHONE_GPU_USD_PER_SECOND overrides it; zero or invalid means UNPRICED,
+# and an unpriced GPU path is refused (telephony/remote_voice.py).
+_RUNPOD_GPU_USD_PER_SECOND_DEFAULT = 1.34 / 3600.0
+# Worker seconds a call keeps alive besides its own duration, from the code's
+# timers (COST-MODEL.md 2b): pre-warm on the approval request up to 120 s,
+# ring timeout 30 s, idle tail 10 s.
+_GPU_PREWARM_SECONDS = 120.0
+_GPU_RING_SECONDS = 30.0
+_GPU_IDLE_TAIL_SECONDS = 10.0
 
 PHONE_TTS_FREE_PROVIDERS = frozenset({"local", "piper", "espeak"})
 PHONE_TTS_PRICING_USD_PER_1K_CHARS = {
@@ -73,6 +94,73 @@ def estimate_phone_tts_reservation_cents(tts_provider: str, duration_seconds: fl
     return max(1, math.ceil(estimated_cost_usd * 100)) if estimated_cost_usd > 0.0 else 0
 
 
+def phone_gpu_usd_per_second() -> float:
+    """Price of one GPU worker second, or 0.0 when it is not defensibly priced."""
+    raw = os.environ.get("VIOLA_PHONE_GPU_USD_PER_SECOND", "").strip()
+    if not raw:
+        return _RUNPOD_GPU_USD_PER_SECOND_DEFAULT
+    try:
+        value = float(raw)
+    except ValueError:
+        return 0.0
+    return value if math.isfinite(value) and value > 0 else 0.0
+
+
+def estimate_phone_gpu_cost_usd(duration_seconds: float, *, worker_seconds: float | None = None) -> float:
+    """GPU voice cost of one call: reported worker seconds, else the documented worst case."""
+    if worker_seconds is not None and worker_seconds > 0:
+        seconds = float(worker_seconds)
+    else:
+        seconds = (
+            _GPU_PREWARM_SECONDS + _GPU_RING_SECONDS + max(0.0, float(duration_seconds or 0.0)) + _GPU_IDLE_TAIL_SECONDS
+        )
+    return seconds * phone_gpu_usd_per_second()
+
+
+def estimate_phone_carrier_cost_usd(
+    duration_seconds: float, phone_number: str = "", *, worst_case: bool = False
+) -> float:
+    """Carrier cost: per-minute rate plus media streaming, with the surcharge, plus premium AMD."""
+    minutes = max(0.0, float(duration_seconds or 0.0)) / 60.0
+    rate = (
+        max(_TELNYX_PER_MINUTE_USD, _TELNYX_TOLL_FREE_PER_MINUTE_USD) if worst_case else _get_telnyx_rate(phone_number)
+    )
+    per_minute = (rate + _TELNYX_MEDIA_STREAMING_PER_MINUTE_USD) * (1 + _TELNYX_REGULATORY_SURCHARGE)
+    return minutes * per_minute + _TELNYX_AMD_PREMIUM_PER_CALL_USD
+
+
+def carrier_bill_with_unbilled_extras_usd(carrier_total_usd: float, billed_seconds: float | None) -> float:
+    """A Telnyx call CDR total plus the streaming and AMD items it does not include.
+
+    A call that was never answered (zero total, zero billed seconds) ran no
+    answering-machine detection and streamed no media, so it adds nothing.
+    """
+    if float(carrier_total_usd or 0.0) <= 0 and float(billed_seconds or 0.0) <= 0:
+        return 0.0
+    minutes = max(0.0, float(billed_seconds or 0.0)) / 60.0
+    extras = minutes * _TELNYX_MEDIA_STREAMING_PER_MINUTE_USD * (1 + _TELNYX_REGULATORY_SURCHARGE)
+    return max(0.0, float(carrier_total_usd)) + extras + _TELNYX_AMD_PREMIUM_PER_CALL_USD
+
+
+def estimate_phone_call_reservation_cents(
+    tts_provider: str,
+    duration_seconds: float,
+    *,
+    gpu_voice: bool,
+) -> int:
+    """Worst case of one call, reserved before dialing (Jay, 2026-11-12).
+
+    The dearest carrier rate for the full allowed duration with streaming,
+    surcharge and AMD, plus the GPU worst case when the GPU voice path is on,
+    plus paid TTS. The call's own model requests reserve their own holds.
+    """
+    cost = estimate_phone_carrier_cost_usd(duration_seconds, worst_case=True)
+    if gpu_voice:
+        cost += estimate_phone_gpu_cost_usd(duration_seconds)
+    cents = math.ceil(cost * 100) + estimate_phone_tts_reservation_cents(tts_provider, duration_seconds)
+    return max(1, int(cents))
+
+
 def _get_telnyx_rate(phone_number: str) -> float:
     """Return per-minute Telnyx rate based on number type."""
     from telephony.number_validation import is_toll_free_number
@@ -104,6 +192,8 @@ class CallCostBreakdown:
     tts_model: str = "kokoro"
     tts_characters: int = 0
     tts_cost_usd: float = 0.0  # $0 for local Kokoro
+    # GPU voice worker (RunPod), worst case unless worker seconds are reported
+    gpu_cost_usd: float = 0.0
     # Hold mode
     hold_duration_seconds: float = 0.0
     hold_windows_opened: int = 0
@@ -136,6 +226,7 @@ class CallCostBreakdown:
                 "characters": self.tts_characters,
                 "cost_usd": round(self.tts_cost_usd, 6),
             },
+            "gpu": {"cost_usd": round(self.gpu_cost_usd, 6)},
             "total_cost_usd": round(self.total_cost_usd, 6),
             "cost_per_minute_usd": round(self.cost_per_minute_usd, 6),
         }
@@ -161,8 +252,10 @@ class CostTracker:
         llm_model: str = "gpt-5.4-mini",
         phone_number: str = "",
         tts_provider: str = "local",
+        gpu_voice: bool = False,
     ) -> None:
         self._call_id = call_id
+        self._gpu_voice = bool(gpu_voice)
         self._llm_model = llm_model
         self._phone_number = phone_number
         self._tts_provider = _normalize_phone_tts_provider(tts_provider)
@@ -195,8 +288,8 @@ class CostTracker:
     def build_breakdown(self, duration_seconds: float) -> CallCostBreakdown:
         """Compute a cost breakdown without settling user spend counters."""
         minutes = duration_seconds / 60.0
-        rate = _get_telnyx_rate(self._phone_number)
-        telnyx_cost = minutes * rate * (1 + _TELNYX_REGULATORY_SURCHARGE)
+        telnyx_cost = estimate_phone_carrier_cost_usd(duration_seconds, self._phone_number)
+        gpu_cost = estimate_phone_gpu_cost_usd(duration_seconds) if self._gpu_voice else 0.0
 
         # LLM cost from actual tokens - pricing from services.llm.pricing (single source of truth)
         llm_cost = calculate_cost_usd(self._llm_model, self._prompt_tokens, self._completion_tokens)
@@ -206,7 +299,7 @@ class CostTracker:
 
         tts_cost = estimate_phone_tts_cost_usd(self._tts_provider, self._tts_characters)
 
-        total = telnyx_cost + llm_cost + stt_cost + tts_cost
+        total = telnyx_cost + llm_cost + stt_cost + tts_cost + gpu_cost
         cpm = total / minutes if minutes > 0 else 0.0
 
         breakdown = CallCostBreakdown(
@@ -224,6 +317,7 @@ class CostTracker:
             tts_model=_PHONE_TTS_DISPLAY_MODEL.get(self._tts_provider, self._tts_provider),
             tts_characters=self._tts_characters,
             tts_cost_usd=tts_cost,
+            gpu_cost_usd=gpu_cost,
             total_cost_usd=total,
             cost_per_minute_usd=cpm,
         )

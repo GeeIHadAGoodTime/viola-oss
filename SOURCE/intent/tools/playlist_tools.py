@@ -154,6 +154,12 @@ async def _confirm_runtime_playback() -> tuple[str, dict[str, Any] | None]:
         await asyncio.sleep(0.2)
 
 
+def _is_link_row(playlist: object) -> bool:
+    """True for a playlist row saved by link (Settings): it carries link metadata."""
+    metadata_json = getattr(playlist, "metadata_json", None)
+    return isinstance(metadata_json, str) and metadata_json.strip() not in ("", "{}")
+
+
 def _link_playlists(user_id: str) -> dict[str, dict[str, Any]]:
     """Playlists saved by link (Settings > Add a playlist, Sync from YouTube).
 
@@ -275,8 +281,13 @@ async def list_playlists_handler(user_id: str = "") -> ToolResult:
                 data="No playlists saved. Use create_playlist to add one.",
             )
         lines = []
+        linked_names = {link_name.casefold() for link_name in linked}
         for pl in playlists:
             track_count = len(await store.get_tracks_async(resolved_user_id, pl.name))
+            # Link playlists share the table with track playlists (one store).
+            if not track_count and pl.name.casefold() in linked_names:
+                lines.append("%d. %s (saved link)" % (len(lines) + 1, pl.name))
+                continue
             lines.append("%d. %s (%d tracks)" % (len(lines) + 1, pl.name, track_count))
         known = {pl.name.casefold() for pl in playlists}
         for link_name in linked:
@@ -358,6 +369,10 @@ async def play_playlist_handler(name: str, user_id: str = "") -> ToolResult:
         store = PlaylistStore()
         # Async-native: cloud `playlist` tool on the serving loop (CL-20260711-afd7).
         playlist = await store.get_playlist_async(resolved_user_id, name)
+        if _is_link_row(playlist) and not await store.get_tracks_async(resolved_user_id, name):
+            # One store: a playlist saved by link is a row here too (it has
+            # link metadata), with no tracks of its own. Its songs come from the link.
+            return await _play_link_playlist(name, resolved_user_id)
         if playlist is None:
             linked = _link_playlists(resolved_user_id)
             if name.lower() in linked:

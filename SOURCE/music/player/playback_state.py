@@ -10,6 +10,7 @@ Created as part of P0-2 fix (5-flag state divergence elimination).
 
 from __future__ import annotations
 
+import sys
 from enum import Enum, auto
 
 from core.logging_config import get_logger
@@ -81,6 +82,22 @@ VALID_TRANSITIONS: dict[PlaybackPhase, frozenset[PlaybackPhase]] = {
 }
 
 
+def _transition_caller() -> str:
+    """Name the code that asked for a transition, e.g. ``control_surface.pause < playback.pause``."""
+    try:
+        frame = sys._getframe(2)
+    except ValueError:
+        return "unknown"
+    names: list[str] = []
+    while frame is not None and len(names) < 3:
+        name = frame.f_code.co_name
+        if name != "_sm_transition":
+            module = str(frame.f_globals.get("__name__", "")).rsplit(".", 1)[-1]
+            names.append("%s.%s" % (module, name))
+        frame = frame.f_back
+    return " < ".join(names) or "unknown"
+
+
 class PlaybackStateMachine:
     """Single source of truth for playback phase.
 
@@ -146,6 +163,11 @@ class PlaybackStateMachine:
                 raise InvalidTransitionError(old, new_phase)
 
         self._phase = new_phase
+        if old == PlaybackPhase.PLAYING:
+            # Leaving PLAYING is rare (pause, stop, track end, new track) and
+            # was invisible: on the build-10 laptop the player stopped saying
+            # "playing" under a Spotify song and nothing recorded what did it.
+            logger.info("Phase PLAYING -> %s (by %s)", new_phase.name, _transition_caller())
 
         # Track user-initiated pause
         if new_phase == PlaybackPhase.PAUSED:

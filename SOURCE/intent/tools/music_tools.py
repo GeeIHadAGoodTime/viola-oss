@@ -216,26 +216,6 @@ def _notify_spotify_fallback() -> None:
         logger.debug("Spotify fallback notice failed", exc_info=True)
 
 
-def _spotify_stays_the_source(provider_id: str, active_provider_before: str) -> bool:
-    """A play on another service while Spotify can't play is a fallback, not a choice.
-
-    The music source was silently rewritten to YouTube here (build 9,
-    `Provider switch: spotify -> youtube_iframe` 9 s after play), which then hid
-    every later "Spotify isn't connected" notice.
-    """
-    if _provider_family(active_provider_before) != _provider_family("spotify"):
-        return False
-    if _provider_family(provider_id) == _provider_family("spotify"):
-        return False
-    try:
-        from music.spotify.connection import spotify_usable
-
-        return not spotify_usable()
-    except Exception:
-        logger.debug("Spotify usability check failed", exc_info=True)
-        return True
-
-
 _PROVIDER_FAMILIES: tuple[frozenset[str], ...] = (
     frozenset({"spotify", "spotify_cdp"}),
     frozenset({"youtube", "youtube_iframe", "youtube_music"}),
@@ -804,6 +784,37 @@ _IFRAME_SEEK_VERIFY_WINDOW_SECONDS = 4.0
 _IFRAME_SEEK_POLL_SECONDS = 0.4
 
 
+# seek_from_end needs the track's length. The iframe reports it with its first
+# position update, so right after a track starts it can be missing for a moment;
+# the tool waits that moment itself instead of handing "not yet" to the model.
+_TRACK_LENGTH_WAIT_SECONDS = 3.0
+_TRACK_LENGTH_POLL_SECONDS = 0.3
+_SEEK_FROM_END_NO_LENGTH = (
+    "This track has no known length (a live stream or radio has no end), so there is no point to count back "
+    "from. Nothing was moved. Calling this again will give the same answer: tell the user."
+)
+_SEEK_FROM_END_NO_PLAYER = (
+    "The player could not be read, so the track's length is unknown and nothing was moved. "
+    "Calling this again will give the same answer: tell the user."
+)
+
+
+async def _read_track_length() -> dict[str, Any]:
+    """Live state once the track's length is known, or the last read when it never arrives."""
+    started = time.monotonic()
+    state = await _read_live_playback_state()
+    while (
+        state.get("probe_ok")
+        and not state.get("duration_seconds")
+        and isinstance(state.get("now_playing"), dict)
+        and time.monotonic() - started < _TRACK_LENGTH_WAIT_SECONDS
+    ):
+        await asyncio.sleep(_TRACK_LENGTH_POLL_SECONDS)
+        state = await _read_live_playback_state()
+    state["waited_seconds"] = time.monotonic() - started
+    return state
+
+
 def _plays_in_iframe(state: dict[str, Any]) -> bool:
     now = state.get("now_playing")
     return isinstance(now, dict) and bool(now.get("video_id"))
@@ -876,6 +887,18 @@ async def _transport_result(action_name: str, before: dict[str, Any], response: 
     return ToolResult(ok=True, data=result_data, unverified=True)
 
 
+def _spoken_position(seconds: float) -> str:
+    """A track position the way a person says it: 45 seconds, 3:05, 3:34:35."""
+    total = max(0, int(round(float(seconds))))
+    if total < 60:
+        return "%d seconds" % total
+    hours, rest = divmod(total, 3600)
+    minutes, secs = divmod(rest, 60)
+    if hours:
+        return "%d:%02d:%02d" % (hours, minutes, secs)
+    return "%d:%02d" % (minutes, secs)
+
+
 async def _seek_result(
     action_name: str,
     target_seconds: float,
@@ -900,7 +923,7 @@ async def _seek_result(
     if not after.get("probe_ok") or not isinstance(observed, (int, float)):
         result_data["verified"] = False
         result_data["message"] = (
-            "I asked the player to move to %.1f seconds but could not read back its position." % target_seconds
+            "I asked the player to move to %s but could not read back its position." % _spoken_position(target_seconds)
         )
         return ToolResult(ok=True, data=result_data, unverified=True)
 
@@ -915,13 +938,17 @@ async def _seek_result(
         )
     if landed:
         result_data["verified"] = True
-        result_data["message"] = "Moved to %.1f seconds." % float(observed)
+        result_data["message"] = "Moved to %s." % _spoken_position(float(observed))
         return ToolResult(ok=True, data=result_data)
 
     result_data["verified"] = False
-    result_data["message"] = "I asked the player to move to %.1f seconds; it reports %.1f seconds." % (
-        target_seconds,
-        float(observed),
+    result_data["retry"] = False
+    result_data["message"] = (
+        "The seek to %s was sent once; the player reports %s. "
+        "Sending it again will not change that: tell the user where it is."
+    ) % (
+        _spoken_position(target_seconds),
+        _spoken_position(float(observed)),
     )
     return ToolResult(ok=True, data=result_data, unverified=True)
 
@@ -1156,10 +1183,10 @@ async def play_music_handler(
     Args:
         query: What to play: artist, song, genre, mood, or any music query.
         provider: Optional provider override, such as spotify, youtube_music,
-            youtube, or local. When provided, Viola switches the active
-            provider once playback starts.
-        remember_provider: False when the caller picked this provider for one
-            song (a search result), so the user's music source stays as it is.
+            youtube, or local. It applies to this request only; the saved
+            music source is not changed.
+        remember_provider: Kept for callers; no longer changes the saved
+            music source.
         target_room: Optional Viola room, room group, or paired Spoke speaker.
             When provided, the runtime returns structured room-route and
             pairing-flow facts when the target is not paired.
@@ -1208,9 +1235,10 @@ async def play_music_handler(
         status_code = int(data.get("_status_code", 0) or 0)
 
         if status_code == 200 and data.get("ok"):
-            if provider_id and remember_provider and not _spotify_stays_the_source(provider_id, active_provider_before):
-                with user_scope(scoped_user_id):
-                    _select_provider(provider_id, scoped_user_id)
+            # A provider named in a play request applies to that request only
+            # (decision 2026-11-12, build 11): "play X on Spotify" no longer
+            # makes Spotify the saved music source. The source changes in
+            # Settings, by an explicit switch, or when Spotify is first connected.
             # record_and_call/ensure_envelope (contracts/api_response.py)
             # always nests a legacy {"ok": ..., <fields>} handler return under
             # "data" when the handler itself did not set a top-level "data"
@@ -1366,6 +1394,27 @@ _DEFAULT_VOLUME_STEP = 10
 _MAX_VOLUME_STEP = 30
 
 
+# Jay's rule (2026-11-12): a level above this is a mishearing ("volume on 50"
+# heard as "Volume 150" set the music to 100). It is refused and the volume is
+# left alone; she says what she heard and asks what was wanted.
+MAX_VOLUME_LEVEL = 100
+
+
+def volume_level_refusal(volume_level: object) -> str | None:
+    """Why ``volume_level`` cannot be set, or None when it is a usable level."""
+    try:
+        level = int(volume_level)  # type: ignore[call-overload]
+    except (TypeError, ValueError):
+        return None
+    if level <= MAX_VOLUME_LEVEL:
+        return None
+    return (
+        "Volume goes from 0 to %d and the request was for %d, so the volume was not changed. "
+        "That number was probably misheard: tell the user the number you heard and ask what volume they want."
+        % (MAX_VOLUME_LEVEL, level)
+    )
+
+
 def _volume_step(volume_step: int | None) -> int:
     step = int(volume_step) if volume_step is not None else _DEFAULT_VOLUME_STEP
     return max(0, min(_MAX_VOLUME_STEP, step))
@@ -1405,6 +1454,21 @@ async def playback_control_handler(
         "down_volume": "volume_down",
     }
     action_name = action_aliases.get(action_name, action_name)
+
+    if action_name == "volume_set":
+        refusal = volume_level_refusal(volume_level)
+        if refusal is not None:
+            logger.info("playback volume_set refused: requested level %s is above %d", volume_level, MAX_VOLUME_LEVEL)
+            return ToolResult(
+                ok=False,
+                data={
+                    "action": "volume_set",
+                    "requested_level": int(volume_level),  # type: ignore[arg-type]
+                    "volume_changed": False,
+                    "error": "volume_level_out_of_range",
+                },
+                error=refusal,
+            )
 
     # Cloud surface: route transport/volume to the user-scoped cloud playback
     # session service instead of the localhost runtime, which errors for cloud
@@ -1647,19 +1711,46 @@ async def playback_control_handler(
         if action_name == "seek_from_end":
             if seek_from_end_seconds is None:
                 return ToolResult(ok=False, data=None, error="seek_from_end_seconds is required for seek_from_end")
-            live = await _read_live_playback_state()
+            live = await _read_track_length()
             duration = live.get("duration_seconds")
             if not live.get("probe_ok") or not isinstance(duration, (int, float)) or duration <= 0:
+                # The old text ("has not reported this track's length yet")
+                # read as "try again in a moment": on the 1.0.5 build-10 laptop
+                # the model called seek_from_end 15 times in one turn. The tool
+                # has now done the waiting itself, so this answer is final, and
+                # the ``error`` key lets the loop's repeat detector see it.
+                reason = _SEEK_FROM_END_NO_LENGTH if live.get("probe_ok") else _SEEK_FROM_END_NO_PLAYER
+                logger.info(
+                    "playback seek_from_end: no track length (probe_ok=%s is_playing=%s waited=%.1fs)",
+                    live.get("probe_ok"),
+                    live.get("is_playing"),
+                    float(live.get("waited_seconds") or 0.0),
+                )
                 return ToolResult(
                     ok=False,
-                    data={"action": action_name},
-                    error="The player has not reported this track's length yet, so I can't count back from its end.",
+                    data={
+                        "action": action_name,
+                        "error": "track_length_unknown",
+                        "retry": False,
+                        "position_changed": False,
+                    },
+                    error=reason,
                 )
             target_seconds = max(0.0, float(duration) - max(0.0, float(seek_from_end_seconds)))
             data = await _post_runtime("/v1/seek", {"position": round(target_seconds * 1000)}, timeout=15.0)
             if not data.get("ok"):
                 return ToolResult(ok=False, data=data, error=_response_error(data))
-            return await _seek_result(action_name, target_seconds, data)
+            result = await _seek_result(action_name, target_seconds, data)
+            outcome = result.data if isinstance(result.data, dict) else {}
+            logger.info(
+                "playback seek_from_end: length=%.1fs back=%.1fs target=%.1fs observed=%s verified=%s",
+                float(duration),
+                float(seek_from_end_seconds),
+                target_seconds,
+                outcome.get("position_seconds"),
+                outcome.get("verified"),
+            )
+            return result
 
         if action_name == "seek_relative":
             if seek_delta_seconds is None:

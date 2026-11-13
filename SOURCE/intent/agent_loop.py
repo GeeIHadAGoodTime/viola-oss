@@ -1413,6 +1413,7 @@ _PLAYBACK_TERMINAL_ACTIONS = frozenset(
         "stop",
         "seek_to",
         "seek_relative",
+        "seek_from_end",
         "restart",
         "volume_set",
         "volume_up",
@@ -1805,6 +1806,10 @@ def _tool_allowed_by_executor(executor: AgentExecutor, tool_name: str) -> bool:
 # StepLoggerMiddleware handles all step-level logging and summarization.
 
 
+# A model turn slower than this is logged with how long it took.
+_SLOW_MODEL_CALL_S = 20.0
+
+
 async def run_agent_loop(
     executor: AgentExecutor,
     provider: Any,
@@ -2007,7 +2012,8 @@ async def run_agent_loop(
 
         try:
             if reservation is not None:
-                await reservation.settle(failed=True)
+                # Refused before sending: nothing reached the provider.
+                await reservation.settle(failed=True, sent=False)
         except Exception as settle_exc:
             if _handle_agent_loop_billing_failure(settle_exc):
                 raise _AgentLoopBillingStop() from settle_exc
@@ -2156,16 +2162,18 @@ async def run_agent_loop(
         except LLMQuotaExceededError as exc:
             last_gate = getattr(reservation, "_last_gate", None)
             if last_gate is None or last_gate.allowed:
-                await _settle_agent_turn_spend_failed(reservation)
+                await _settle_agent_turn_spend_failed(reservation, sent=False)
                 raise
             await _handle_spend_reservation_denial(reservation, exc)
         return reservation, estimated_usage
 
-    async def _settle_agent_turn_spend_failed(reservation: Any | None) -> None:
+    async def _settle_agent_turn_spend_failed(reservation: Any | None, *, sent: bool = True) -> None:
+        # sent=True (a provider call raised) still charges what the provider
+        # could have billed; sent=False only when nothing was sent.
         if reservation is None:
             return
         try:
-            await reservation.settle(failed=True)
+            await reservation.settle(failed=True, sent=sent)
         except Exception as settle_exc:
             if _handle_agent_loop_billing_failure(settle_exc):
                 raise _AgentLoopBillingStop() from settle_exc
@@ -2179,7 +2187,7 @@ async def run_agent_loop(
     ) -> None:
         nonlocal outcome
         if isinstance(response, dict) and response.get("_policy_denial"):
-            await _settle_agent_turn_spend_failed(reservation)
+            await _settle_agent_turn_spend_failed(reservation, sent=False)
             _set_final_response(
                 executor,
                 str(response.get("answer") or "This request is temporarily unavailable."),
@@ -2985,6 +2993,36 @@ async def run_agent_loop(
                 reset_failures()
         return compacted
 
+    async def _route_native_turn(turn_kwargs: dict[str, Any]) -> Any:
+        """Send one turn to the model, waiting when the per-minute call cap is full.
+
+        1.0.5 build 10: a parent and its three research helpers shared the 30
+        calls a minute the managed cloud allows. The 31st call was refused and
+        every one of them ended ``cost_limit`` with the cap's own message as
+        its answer. A refused turn now waits for a free slot and is sent again;
+        the cap itself is unchanged.
+        """
+        from services.llm.cost_circuit_breaker import call_waiting_out_per_minute_limit
+
+        started = time.monotonic()
+        response = await call_waiting_out_per_minute_limit(
+            lambda: provider.route_command_native(**turn_kwargs),
+            cancelled=lambda: bool(getattr(executor, "_cancelled", False)),
+            label="agent task %s" % task_id,
+        )
+        # 1.0.5 build 10: "close the browser" spent 65 s in its first model
+        # call while a background agent ran, and nothing in the log said so.
+        elapsed = time.monotonic() - started
+        if elapsed >= _SLOW_MODEL_CALL_S:
+            logger.warning(
+                "Slow model call: agent task %s waited %.1fs for one turn (depth=%s, %d messages sent)",
+                task_id,
+                elapsed,
+                getattr(executor, "_depth", 0),
+                len(turn_kwargs.get("messages") or []),
+            )
+        return response
+
     async def _call_native_turn(
         *,
         messages: list[dict[str, Any]],
@@ -3056,9 +3094,7 @@ async def run_agent_loop(
             )
         try:
             with latency_spans.span("PROVIDER_CALL", attempt_id=str(attempt_id), call_kind=call_kind):
-                response = await provider.route_command_native(
-                    **turn_kwargs,
-                )
+                response = await _route_native_turn(turn_kwargs)
         except Exception as exc:
             executor._append_task_trace_llm_attempt_failure(
                 attempt_id=attempt_id,
@@ -3133,9 +3169,7 @@ async def run_agent_loop(
                 attempt_id = retry_attempt_id or attempt_id
                 try:
                     with latency_spans.span("PROVIDER_CALL", attempt_id=str(attempt_id), call_kind=call_kind):
-                        response = await provider.route_command_native(
-                            **turn_kwargs,
-                        )
+                        response = await _route_native_turn(turn_kwargs)
                 except Exception as retry_exc:
                     executor._append_task_trace_llm_attempt_failure(
                         attempt_id=attempt_id,
@@ -3287,9 +3321,7 @@ async def run_agent_loop(
                 attempt_id = retry_attempt_id or attempt_id
                 try:
                     with latency_spans.span("PROVIDER_CALL", attempt_id=str(attempt_id), call_kind=call_kind):
-                        response = await provider.route_command_native(
-                            **turn_kwargs,
-                        )
+                        response = await _route_native_turn(turn_kwargs)
                 except Exception as retry_exc:
                     executor._append_task_trace_llm_attempt_failure(
                         attempt_id=attempt_id,
@@ -3360,9 +3392,7 @@ async def run_agent_loop(
                 attempt_id = retry_attempt_id or attempt_id
                 try:
                     with latency_spans.span("PROVIDER_CALL", attempt_id=str(attempt_id), call_kind=call_kind):
-                        response = await provider.route_command_native(
-                            **turn_kwargs,
-                        )
+                        response = await _route_native_turn(turn_kwargs)
                 except Exception as retry_exc:
                     executor._append_task_trace_llm_attempt_failure(
                         attempt_id=attempt_id,
@@ -5250,6 +5280,11 @@ async def run_agent_loop(
         final_answer = executor._final_answer or ""
         payment_gate = bool(getattr(executor, "_payment_gate_requested", False))
         signature_gate = bool(getattr(executor, "_signature_gate_requested", False))
+        # The run ended with nothing to say (the model's last turn was empty).
+        # 1.0.5 build 10: fifteen seek_from_end calls, an empty reply and
+        # 168,594 tokens were logged ``outcome=success``. The user gets the
+        # "couldn't complete that" line below, so the log must not say success.
+        ended_without_answer = not final_answer and not payment_gate and not signature_gate
         if not final_answer:
             final_answer = _build_agent_final_answer_fallback(
                 executor,
@@ -5300,6 +5335,18 @@ async def run_agent_loop(
             outcome = "llm_error"
         elif executor._forced_tool_failure_error is not None:
             outcome = executor._forced_tool_failure_outcome or "tool_error"
+        elif ended_without_answer and outcome == "success":
+            logger.warning(
+                "Agent task %s ended without an answer after %d steps and %d tool calls; not reporting success",
+                task_id,
+                iterations,
+                len(tools_called),
+            )
+            outcome = "no_answer"
+            _record_structured_incomplete_diagnostic(
+                executor,
+                {"reason": "empty_final_answer", "domain": "agent_task", "evidence_source": "final_answer"},
+            )
 
         terminal_hook_name = _terminal_hook_event_name(executor, outcome)
         if _has_registered_hook(terminal_hook_name):
@@ -5650,7 +5697,7 @@ async def run_agent_loop(
             )
         terminal_llm_error = executor._llm_error_occurred and not final_overrides_llm_error
         terminal_cost_limit = outcome == "cost_limit"
-        terminal_incomplete = outcome in {"incomplete", "off_task"}
+        terminal_incomplete = outcome in {"incomplete", "off_task", "no_answer"}
         final_ok = (
             not terminal_llm_error
             and executor._forced_tool_failure_error is None
@@ -5700,6 +5747,7 @@ async def run_agent_loop(
             "tool_error",
             "waste_terminated",
             "cost_limit",
+            "no_answer",
         }:
             hook_dispatch_fn("StopFailure", reason=outcome, user_id=executor._user_id)
         executor._finalize_log(task_log, outcome, run_start_time)
