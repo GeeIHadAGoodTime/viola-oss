@@ -76,7 +76,9 @@ _ADDRESS_STREET_TYPE = (
 )
 _STREET_ADDRESS_RE = re.compile(
     r"(?i)(?<![\w.,:/#$-])"
-    r"(?:\d{1,6}[a-z]?|%(word)s(?:[\s-]+%(word)s){1,6})"
+    # "48.12 Maple Street": speech-to-text writes a house number said as two
+    # pairs with a point or a comma in it, and that is still a house number.
+    r"(?:\d{1,6}(?:[.,]\d{1,6})?[a-z]?|%(word)s(?:[\s-]+%(word)s){1,6})"
     r"(?:%(gap)s(?:n|s|e|w|ne|nw|se|sw|north|south|east|west)\.?)?"
     r"(?:%(gap)s%(not_name)s[a-z][a-z'.-]*|%(gap)s\d{1,3}(?:st|nd|rd|th)){1,4}?"
     r"%(gap)s%(street_type)s\b\.?"
@@ -658,6 +660,67 @@ def redact_pii(blob: dict[str, Any] | str) -> dict[str, Any] | str:
         return _redact_pii_any(blob, (), set(), 0)
     except _SANITIZER_EXCEPTIONS:
         return _REDACTED_SANITIZER_ERROR
+
+
+# Tools whose arguments are the user's home address. Their arguments and results
+# are masked in plain-text logs because of which tool it is, never because of
+# what the text looks like: a house number heard as "48.12" matched no address
+# pattern and the whole street line reached viola-qt.log (1.0.5 build 10).
+ADDRESS_ARGUMENT_TOOLS = frozenset({"save_delivery_address"})
+
+
+def _bare_tool_name(tool_name: Any) -> str:
+    name = str(tool_name or "").strip()
+    for separator in ("__", "."):
+        if separator in name:
+            name = name.rsplit(separator, 1)[1]
+    return name
+
+
+def is_address_argument_tool(tool_name: Any) -> bool:
+    """True for a tool whose arguments are a street address, with or without a server prefix."""
+    return _bare_tool_name(tool_name) in ADDRESS_ARGUMENT_TOOLS
+
+
+def redact_tool_arguments_for_log(tool_name: Any, tool_args: Any) -> Any:
+    """Return tool arguments that are safe to print in a plain-text log line.
+
+    An address tool has every argument masked. Any other tool has its address,
+    phone and card fields masked by field name before the values are joined into
+    one string, where only a pattern could still recognise them.
+    """
+    if is_address_argument_tool(tool_name):
+        if isinstance(tool_args, Mapping):
+            return {
+                key: _REDACTED_ADDRESS if value not in (None, "", [], {}) else value for key, value in tool_args.items()
+            }
+        return _REDACTED_ADDRESS
+    if isinstance(tool_args, (Mapping, list, tuple, str)):
+        return redact_pii(redact_card_data(tool_args))
+    return tool_args
+
+
+def redact_tool_result_for_log(tool_name: Any, result_text: Any) -> Any:
+    """The result of an address tool is the address read back: never printed."""
+    if is_address_argument_tool(tool_name):
+        return _REDACTED_ADDRESS
+    return result_text
+
+
+def redact_tool_error_for_log(tool_name: Any, tool_args: Any, error_text: Any) -> str:
+    """An address tool's error with every argument value taken out.
+
+    The error stays readable ("The address could not be saved."), but an
+    exception or a validation message can quote an argument back.
+    """
+    text = str(error_text or "")
+    if not is_address_argument_tool(tool_name) or not text:
+        return text
+    values = tool_args.values() if isinstance(tool_args, Mapping) else [tool_args]
+    for value in sorted({str(v).strip() for v in values if v not in (None, "")}, key=len, reverse=True):
+        if len(value) >= 3:  # a two-letter state code alone says nothing, and would mangle words
+            text = text.replace(value, _REDACTED_ADDRESS)
+    return text
 
 
 def redact_diagnostic_payload(blob: Any) -> Any:

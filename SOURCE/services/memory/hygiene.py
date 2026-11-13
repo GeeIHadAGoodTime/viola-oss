@@ -61,12 +61,100 @@ _RUNTIME_TEXT_RE = re.compile(
 )
 
 
+# A copy of the moment, not a fact about the user: the runtime state block that
+# is rebuilt for every command ("CURRENT SYSTEM STATE", "Date:", "Playback:",
+# "Timers:") and sentences made from it ("Current time is 9:14 PM", "Now playing:
+# ..."). Build 10's cleanup knew turn reports and runtime ids only, so about 148
+# of these stayed in the Context topic on the laptop.
+_STATE_SNAPSHOT_RE = re.compile(
+    r"current\s+system\s+state"
+    r"|^(?:the\s+)?current(?:ly)?\s+(?:local\s+)?(?:time|date|day|volume|weather|temperature|track|song|playback|"
+    r"music|provider|source|mode|state|status|queue|timers?)\b"
+    r"|^(?:it\s+is\s+)?(?:now|currently)\s+playing\b"
+    r"|^(?:nothing|music|playback)\s+is\s+(?:currently\s+|now\s+)?(?:playing|paused|stopped)\b"
+    r"|^(?:date|playback|timers?|volume|speaking\s+with|user\s+preferences|custom\s+shortcuts|now\s+playing)\s*:"
+    r"|\bcurrent\s+(?:local\s+)?(?:time|date)\s+(?:is|was)\b",
+    re.IGNORECASE,
+)
+# A log of one file action ("Wrote notes.txt to the Desktop"), saved as a fact.
+_FILE_ACTION_VERB_RE = re.compile(
+    r"\b(?:created?|wrote|written|writes|saved|deleted?|removed?|moved|renamed?|copied|opened|edited|appended|"
+    r"overwrote|overwritten|downloaded|uploaded)\b",
+    re.IGNORECASE,
+)
+_FILE_NAME_RE = re.compile(
+    r"\b[a-z]:[\\/]|(?:^|\s)[~.]?/[\w.\-]+/"
+    r"|\b[\w\-]+\.(?:txt|md|docx?|pdf|csv|json|py|js|xlsx?|pptx?|png|jpe?g|gif|html?|log|zip|mp3|wav)\b",
+    re.IGNORECASE,
+)
+_LABELLED_ZIP_RE = re.compile(
+    r"(\b(?:zip(?:[\s_-]?code)?|postal[\s_-]?code|postcode)\b(?:\s+(?:is|was))?[\s:=]*)\d{5}(?:-\d{4})?\b",
+    re.IGNORECASE,
+)
+# Words that carry no fact of their own. Two entries that are equal once these
+# are gone say the same thing ("User's sister is Mara", "The user has a sister
+# named Mara"). Verbs of liking stay: they change the meaning.
+# fmt: off
+_FILLER_WORDS = frozenset({
+    "a", "an", "the", "user", "users", "user's", "their", "they", "them", "he", "she", "his", "her", "my",
+    "me", "i", "we", "our", "your", "you", "it", "its", "this", "that", "is", "are", "was", "were", "be",
+    "been", "am", "has", "have", "had", "named", "name", "called", "of", "to", "in", "on", "at", "for",
+    "and", "with", "as",
+})
+# fmt: on
+_NEGATION_WORDS = frozenset({"not", "no", "never", "nor", "neither", "without", "instead", "rather", "but"})
+
+
+def is_state_snapshot_line(content: str) -> bool:
+    """True when a memory line copies the runtime state or the time of one command."""
+    text = _BULLET_RE.sub("", (content or "").strip())
+    return bool(text) and bool(_STATE_SNAPSHOT_RE.search(text))
+
+
+def is_file_action_line(content: str) -> bool:
+    """True when a memory line is a log of one file action, not a lasting fact."""
+    text = _BULLET_RE.sub("", (content or "").strip())
+    if not text or _LASTING_FACT_RE.search(text):
+        return False
+    return bool(_FILE_ACTION_VERB_RE.search(text)) and bool(_FILE_NAME_RE.search(text))
+
+
+def mask_labelled_zip(text: str) -> str:
+    """Mask a ZIP code that is named as one; the rest of the line stays."""
+    return _LABELLED_ZIP_RE.sub(lambda match: match.group(1) + "[redacted]", text or "")
+
+
+def memory_fact_key(text: str) -> frozenset[str]:
+    """The words of a memory line that carry its fact, for duplicate checks.
+
+    A line with a negation gets no key (an empty set): the key ignores word
+    order, and "likes tea, not coffee" must never count as a repeat of "likes
+    coffee, not tea". Such lines are still compared by word overlap.
+    """
+    words = []
+    # The model writes "sister’s" with a curly apostrophe as often as a straight one.
+    straight = (text or "").replace("’", "'").replace("‘", "'")
+    for word in _WORD_RE.findall(canonical_memory_text(straight)):
+        if word in _NEGATION_WORDS or word.endswith("n't"):
+            return frozenset()
+        word = word.removesuffix("'s").strip("'")
+        if word and word not in _FILLER_WORDS:
+            words.append(word)
+    return frozenset(words)
+
+
+def same_memory_fact(a: str, b: str) -> bool:
+    """True when two lines hold the same fact in different filler words."""
+    left = memory_fact_key(a)
+    return len(left) >= 2 and left == memory_fact_key(b)
+
+
 def is_junk_memory_line(content: str) -> bool:
-    """True when a memory line reports one turn or repeats runtime text."""
+    """True when a memory line reports one turn, one moment, or repeats runtime text."""
     text = _BULLET_RE.sub("", (content or "").strip())
     if not text:
         return False
-    if _RUNTIME_TEXT_RE.search(text):
+    if _RUNTIME_TEXT_RE.search(text) or is_state_snapshot_line(text) or is_file_action_line(text):
         return True
     return bool(_TURN_REPORT_RE.match(text)) and not _LASTING_FACT_RE.search(text)
 
