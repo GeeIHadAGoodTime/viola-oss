@@ -70,7 +70,7 @@ SUMMARY_SUFFIX = "I'll send the full details in chat."
 # stay within this length, then LONG_ANSWER_LINES. The user can ask to have it
 # sent or read out loud (the read_aloud tool lifts the cap for that turn).
 # English speech only; other speech languages keep the budget above.
-LONG_ANSWER_CHARS = 200
+LONG_ANSWER_CHARS = 400
 LONG_ANSWER_LINES = (
     "I put the rest on the screen for you. If you want me to send this to you or read it out loud, just let me know."
 )
@@ -620,7 +620,9 @@ class FinalAnswerSpeechGate:
             self.stop_live(reason)
             return False
         spoken_chars = sum(len(s) + 1 for s in self._spoken)
-        if len(self._spoken) >= MAX_LIVE_SENTENCES or spoken_chars + len(sentence) > MAX_SPOKEN_CHARS:
+        if self.read_in_full:
+            pass  # the user asked to hear all of it
+        elif len(self._spoken) >= MAX_LIVE_SENTENCES or spoken_chars + len(sentence) > MAX_SPOKEN_CHARS:
             self.stop_live("long_answer")
             return False
         self._final_text_so_far = candidate
@@ -664,7 +666,9 @@ class FinalAnswerSpeechGate:
             if self._suffix_said:
                 return ""
             return " ".join([*long_answer_lead(final)[matched:], self._long_answer_lines])
-        oversized = len(final_sentences) > MAX_LIVE_SENTENCES or len(final) > MAX_SPOKEN_CHARS
+        oversized = not self.read_in_full and (
+            len(final_sentences) > MAX_LIVE_SENTENCES or len(final) > MAX_SPOKEN_CHARS
+        )
         if not oversized:
             return " ".join(rest)
         if self._suffix_said:

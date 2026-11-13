@@ -21,6 +21,6 @@ describe('long answers', () => {
   });
 
   it('paces the stage only as far as a long answer is spoken (answer_stream LONG_ANSWER_CHARS)', () => {
-    expect(SPOKEN_BUDGET_CHARS).toBe(200);
+    expect(SPOKEN_BUDGET_CHARS).toBe(400);
   });
 });

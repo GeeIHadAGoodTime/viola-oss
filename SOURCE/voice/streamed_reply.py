@@ -25,7 +25,13 @@ from typing import Any
 from config import env as config_env
 from core.live_call_state import hold_report, live_call_of_turn
 from core.logging_config import get_logger
-from services.llm.answer_stream import LONG_ANSWER_LINES, SUMMARY_SUFFIX, FinalAnswerSpeechGate, spoken_reply
+from services.llm.answer_stream import (
+    LONG_ANSWER_LINES,
+    SUMMARY_SUFFIX,
+    FinalAnswerSpeechGate,
+    all_sentences,
+    spoken_reply,
+)
 from services.llm.stream_bus import (
     add_stream_listener,
     bind_stream_producer,
@@ -76,6 +82,45 @@ def whole_reply_speech(message: str | None, tts: Any, streamed_reply: StreamedRe
         return None
     read_in_full = bool(gate is not None and gate.read_in_full)
     return spoken_reply(message, english=speaks_english(tts), read_in_full=read_in_full)
+
+
+class FullReading:
+    """A finished reply read out in full because the user asked (read_aloud).
+
+    Spoken sentence by sentence through the engine's speak_streaming, which
+    applies no length cap (a whole-reply speak() stops at 800 characters).
+    Same shape as StreamedReply for the barge-in path: ``heard_text``,
+    ``cancel()`` (no further sentence after a barge-in or stop) and ``speak()``.
+    """
+
+    def __init__(self, tts: Any, text: str) -> None:
+        self._tts = tts
+        self.text = text
+        self._cancelled = False
+
+    @property
+    def heard_text(self) -> str:
+        return self.text
+
+    def cancel(self) -> None:
+        self._cancelled = True
+
+    async def _sentences(self) -> AsyncIterator[str]:
+        for sentence in all_sentences(self.text):
+            if self._cancelled:
+                return
+            yield sentence + " "
+
+    async def speak(self) -> None:
+        await self._tts.speak_streaming(self._sentences())
+
+
+def full_reading(text: str, tts: Any, streamed_reply: StreamedReply | None) -> FullReading | None:
+    """A FullReading when this turn called read_aloud and the engine can stream, else None."""
+    gate = streamed_reply.gate if streamed_reply is not None else None
+    if gate is None or not gate.read_in_full or not can_stream_speech(tts):
+        return None
+    return FullReading(tts, text)
 
 
 def play_done_tone() -> bool:
@@ -277,9 +322,11 @@ def new_streamed_reply(
 
 __all__ = [
     "STREAMED_SPEECH_ENV",
+    "FullReading",
     "StreamedReply",
     "answer_replacing_hooks_registered",
     "can_stream_speech",
+    "full_reading",
     "new_streamed_reply",
     "play_done_tone",
     "speaks_english",

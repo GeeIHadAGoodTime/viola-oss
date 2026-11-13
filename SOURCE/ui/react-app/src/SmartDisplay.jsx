@@ -471,7 +471,7 @@ function formatCallTitleElapsed(startedAt, fallbackMs = Date.now()) {
 const LONG_ANSWER_OVER_VIDEO_MS = 15000;
 // Same number as services/llm/answer_stream.py LONG_ANSWER_CHARS: past it Viola
 // says only the lead and "I put the rest on the screen for you".
-const LONG_ANSWER_CARD_CHARS = 200;
+const LONG_ANSWER_CARD_CHARS = 400;
 const SPOKE_EMBED_URL = resolveYouTubeEmbedUrl(import.meta.env.VITE_YOUTUBE_EMBED_URL);
 const SPOKE_EMBED_ORIGIN = new URL(SPOKE_EMBED_URL).origin;
 

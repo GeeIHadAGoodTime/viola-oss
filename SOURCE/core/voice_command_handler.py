@@ -1914,13 +1914,16 @@ class VoiceCommandHandler:
         if self.tts and message and not already_spoken and tts_enabled:
             # Long answers say their lead and point at the card; a turn of quick
             # music actions that all worked gets the done tone, not words.
-            from voice.streamed_reply import play_done_tone, whole_reply_speech
+            from voice.streamed_reply import full_reading, play_done_tone, whole_reply_speech
 
             spoken = whole_reply_speech(message, self.tts, streamed_reply)
             if spoken is None:
                 play_done_tone()
                 return
             message = spoken
+            # "Read it out loud": the whole answer, with no length cap, and a
+            # barge-in or stop still ends it (FullReading.cancel).
+            reading = full_reading(message, self.tts, streamed_reply)
             try:
                 logger.info("Speaking response: %s...", message[:100])
                 self._last_spoken_reply = (message, time.monotonic())
@@ -1930,7 +1933,7 @@ class VoiceCommandHandler:
                 capture = self._get_continuous_capture()
                 if capture is not None and capture.is_running:
                     interrupted = await self._speak_response_interruptible(
-                        message,
+                        reading or message,
                         capture,
                         user_id=user_id,
                     )
@@ -1941,7 +1944,7 @@ class VoiceCommandHandler:
                         return
                 else:
                     # Standard non-interruptible TTS
-                    speak_coro = self.tts.speak(message)
+                    speak_coro = reading.speak() if reading is not None else self.tts.speak(message)
                     if asyncio.iscoroutine(speak_coro):
                         await speak_coro
 

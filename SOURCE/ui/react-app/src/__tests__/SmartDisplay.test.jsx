@@ -2143,7 +2143,7 @@ it('keeps an action approval in the chat it was asked in, like a call approval',
   expect(await screen.findByText(title)).toBeInTheDocument();
 });
 
-const LONG_ANSWER = `${'A long answer that goes on for a while. '.repeat(6)}The end.`;
+const LONG_ANSWER = `${'A long answer that goes on for a while. '.repeat(12)}The end.`;
 
 it('shows a long unspoken answer in a card at once, with only a lead on the stage line', async () => {
   render(<SmartDisplay />);
@@ -2170,7 +2170,7 @@ it('holds a long spoken answer card until the stage has finished revealing it', 
     act(() => { vi.advanceTimersByTime(1000); });
     expect(screen.queryByTestId('content-card-backdrop')).not.toBeInTheDocument();
     expect(screen.getByTestId('live-reply')).not.toHaveTextContent('The end.');
-    act(() => { vi.advanceTimersByTime(20000); });
+    act(() => { vi.advanceTimersByTime(40000); });
     expect(screen.getByTestId('content-card-backdrop')).toBeInTheDocument();
     expect(screen.getByRole('dialog')).toHaveTextContent('The end.');
   } finally {
