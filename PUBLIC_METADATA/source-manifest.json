@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "revision": "6ffe36e8cfa03075d8329ecc09a7bddd409f7251",
-  "sha256": "6b0ac3031d79aedf90e76e8ded8131d62c3d267298492a1964ed33315c301fea",
+  "revision": "9dbe8e0eedfc4967c480f5ff5e96552496d4c604",
+  "sha256": "9a93d46405e1f529b5187a2cc5449906144644e2cd740a68ba10b4606c002586",
   "files": [
     {
       "path": ".env.example",
@@ -1250,8 +1250,8 @@
     },
     {
       "path": "core/voice_command_handler.py",
-      "sha256": "a737fec2a79792cd067a2179e8338e62980365144db7dfd0812d753df8fc1454",
-      "bytes": 111395
+      "sha256": "a69afe5567912e6585c4b387e78d2bc4b2ad6010eaa9f5b69ecef1e9d55c3af5",
+      "bytes": 114623
     },
     {
       "path": "core/voice_orchestrator.py",
@@ -4660,8 +4660,8 @@
     },
     {
       "path": "services/llm/prompts/constants.py",
-      "sha256": "aa2458782be7c9e56d7b71dd8fb5413722df8bbea43188f3cc84ea36d9498357",
-      "bytes": 16636
+      "sha256": "b0fec6a79f2b7cc169f85b8218e63cbceed1db369eab91ffdeb466d8353188d8",
+      "bytes": 16771
     },
     {
       "path": "services/llm/prompts/output_styles.py",
@@ -4750,8 +4750,8 @@
     },
     {
       "path": "services/llm/route_tool_schemas.py",
-      "sha256": "555378e9b2f4531783b9deadd1b8918e50579fb5ca275f26a154d7c2ef4848e5",
-      "bytes": 44662
+      "sha256": "b20d810a723372b07fea00f84c826be147e7bc00c4473d0c9fa988c7f23b57e5",
+      "bytes": 44756
     },
     {
       "path": "services/llm/session_cost_tracker.py",
@@ -9585,8 +9585,8 @@
     },
     {
       "path": "ui/api/routes/lifecycle.py",
-      "sha256": "5284acdbf34878a92b8f72d2f8cbbdda5e15f012311c7b3f5cc0fb2c950925e3",
-      "bytes": 46574
+      "sha256": "4f444fffb55abcc6fd619b8cce8e5eb9c2b43f22aab4869e1b13f5b053458702",
+      "bytes": 47282
     },
     {
       "path": "ui/api/routes/llm_stream.py",
@@ -13115,8 +13115,8 @@
     },
     {
       "path": "utils/audio_ducking.py",
-      "sha256": "1d9a323292defa17409c15b2fa8c766b276fdb95017ed25ef35e0cb3af4b7998",
-      "bytes": 19717
+      "sha256": "504097d72104c7e69ef945a7201f46780160b909ab9d968b976b987b408fcb19",
+      "bytes": 20398
     },
     {
       "path": "utils/audio_preprocessing.py",
@@ -13530,8 +13530,8 @@
     },
     {
       "path": "voice/continuous_capture.py",
-      "sha256": "8fdc82a2be1571cd0d1e56954719d18127e37abcae8ee8cae4449ee2173aab52",
-      "bytes": 27211
+      "sha256": "a063c28fd2de3ea5024636fa2a22b5bd6a2a780dfd6149b78b1dfb1608316885",
+      "bytes": 29496
     },
     {
       "path": "voice/customer_composition.py",
@@ -13855,8 +13855,8 @@
     },
     {
       "path": "voice/wake_chime.py",
-      "sha256": "93341b2192f0c38c40e7c6a51c22ac9e1be158ffaa525f8b7881354e4b342f9a",
-      "bytes": 6931
+      "sha256": "36315111a5674d9f81f238a51dcbaed520138dd40fb02dc8d15c2c0856153eec",
+      "bytes": 7595
     },
     {
       "path": "voice/wake_detector/__init__.py",
@@ -13885,13 +13885,13 @@
     },
     {
       "path": "voice/wake_detector/aec_processor.py",
-      "sha256": "e06f905a24005b7ffd3f21bcfe4b118c7a7d86ae243908dc0af862a425eae7a3",
-      "bytes": 47855
+      "sha256": "0ecf1128ba0a2577e7c3c7c4b5b236a3a7e64f1e8a7666cc7230571530f9ef72",
+      "bytes": 51383
     },
     {
       "path": "voice/wake_detector/aec_viola.py",
-      "sha256": "eb7a86583a69e9728861b7104f99397d711416c9deff54332fed802b9f914fab",
-      "bytes": 33413
+      "sha256": "6c6eedb830494f26fa6fc394b2fa522667b3ff57f903bd1d180d4a681b6ca503",
+      "bytes": 34046
     },
     {
       "path": "voice/wake_detector/bt_delay_capture.py",
@@ -14020,8 +14020,8 @@
     },
     {
       "path": "voice/wake_detector/violawake_listener.py",
-      "sha256": "f1be309c652be4541cb4c8bb1044d7428cb7685ffb3c0743ecb20e6bed07c3db",
-      "bytes": 192963
+      "sha256": "bf5b0582eff687927e399d7e4a64f8e209d74406caab4e30f850ffb5f3c2dfcc",
+      "bytes": 193063
     },
     {
       "path": "voice/wake_detector/wake/__init__.py",
